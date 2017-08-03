@@ -1,4 +1,6 @@
 # HomotopyContinuation.jl [WIP]
+[![Build Status](https://travis-ci.org/saschatimme/HomotopyContinuation.jl.svg?branch=master)](https://travis-ci.org/saschatimme/HomotopyContinuation.jl)
+
 
 This is a package for solving systems of polynomials via homotopy continuation.
 
