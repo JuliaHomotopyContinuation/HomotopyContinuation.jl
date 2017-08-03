@@ -1,3 +1,5 @@
+__precompile__()
+
 module HomConBase
 
     import Base: eltype, gradient

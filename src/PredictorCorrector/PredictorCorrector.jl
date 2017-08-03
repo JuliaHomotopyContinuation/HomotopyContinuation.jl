@@ -1,3 +1,5 @@
+__precompile__()
+
 module PredictorCorrector
     using ..HomConBase
     using ..Homotopy

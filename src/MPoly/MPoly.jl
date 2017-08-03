@@ -1,3 +1,5 @@
+__precompile__()
+
 module MPoly
     
     import Base: +, - , * , ^, one, zero, zeros, getindex, setindex!, start, next, done, length, deepcopy, show, eltype
