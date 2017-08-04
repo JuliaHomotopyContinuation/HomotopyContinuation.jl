@@ -9,3 +9,5 @@ Poly{T} = MPoly.FixedPoly{T}
 @inline deg(f) = MPoly.deg(f)
 @inline nvars(f) = MPoly.nvars(f)
 @inline weyl_dot(f,g) = MPoly.weyl_dot(f,g)
+
+createpoly(exponents, coeffs, variables) = MPoly.FixedPoly(exponents, coeffs, variables)

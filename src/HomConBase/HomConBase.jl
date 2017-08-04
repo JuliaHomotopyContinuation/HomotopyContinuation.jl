@@ -30,11 +30,13 @@ module HomConBase
     include("poly.jl")
     include("polysystem.jl")
     include("homotopy.jl")
+    include("utilities.jl")
 
-    export Poly, evaluate, gradient, homogenize, is_homogenous, deg, nvars, weyl_dot, weyl_norm
+    export Poly, evaluate, gradient, homogenize, is_homogenous, deg, nvars, weyl_dot, weyl_norm, createpoly
     
-    export PolySystem, evaluate, jacobian, is_homogenous, homogenize, degrees, nvars, nequations
+    export PolySystem, evaluate, jacobian, is_homogenous, homogenize, degrees, nvars, nequations, total_degree
 
     export evaluate, startsystem, targetsystem, jacobian, dt, ∂t, nvars, degrees, nequations, is_homogenous, homogenize  # nvars, nequations, degrees, 
 
+    export affine, projective
 end
