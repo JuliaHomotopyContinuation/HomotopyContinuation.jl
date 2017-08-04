@@ -42,9 +42,7 @@ function solve(
     
     total_start_values = length(start_values)
 
-    if report_progress
-        println("Total number of paths to track: $total_start_values")
-    end
+    if report_progress println("Total number of paths to track: $total_start_values") end
 
     solutions = Vector{Result{T,typeof(algorithm)}}(total_start_values)
     for (index, start_value) in enumerate(start_values)
@@ -54,7 +52,7 @@ function solve(
             println("Start to track path $index")
         end
         sol = track_path(H, start_value, algorithm; kwargs...)
-        println("Path $index returned: $(sol.retcode)")
+        if report_progress println("Path $index returned: $(sol.retcode)") end
 
         solutions[index] = sol
     end
@@ -113,25 +111,28 @@ function track_path(
         end
 
         Δt = min(step_length, t)
-
-        # if t <= endgame_start
-        #   tol = tolerance
-        # else
-        tol = tolerance
+        # println("t: $t Δt: $Δt")
+        # println("x:$x, norm: $(norm(evaluate(H,x,t)))")
+        if t <= endgame_start
+          tol = endgame_tolerance
+        else
+            tol = tolerance
+        end
         u .= predict(algorithm, H, J_H, ∂H∂t, x, t, Δt)
+        # println("u: $u, norm: $(norm(evaluate(H,u,t-Δt)))")
         converged = correct!(u, algorithm, H, J_H, x, t - Δt, tol, iterations_correction_step)
         if converged
-                x .= u
-                t -= Δt
-                sucessive_successes += 1
-                if sucessive_successes == successfull_steps_until_step_length_increase
-                    step_length *= step_length_increase_factor
-                    sucessive_successes = 0
-                end
-            else
+            x .= u
+            t -= Δt
+            sucessive_successes += 1
+            if sucessive_successes == successfull_steps_until_step_length_increase
+                step_length *= step_length_increase_factor
                 sucessive_successes = 0
-                step_length *= step_length_decrease_factor
             end
+        else
+            sucessive_successes = 0
+            step_length *= step_length_decrease_factor
+        end
         # end
         k += 1
     end

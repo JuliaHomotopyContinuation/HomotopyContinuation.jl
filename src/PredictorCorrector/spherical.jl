@@ -49,6 +49,7 @@ function correct!(
     res = zeros(x)
     dx_xt = zeros(T, N, N)
     Δx = zeros(x)
+    u .= x
 
     for k = 1:max_iterations
         res[1:N-1] = -evaluate(H, u, t)
