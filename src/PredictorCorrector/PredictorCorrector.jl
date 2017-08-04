@@ -9,4 +9,7 @@ module PredictorCorrector
 
     include("solve.jl")
     include("spherical.jl")
+    include("affine.jl")
+
+    export Spherical, Affine
 end
