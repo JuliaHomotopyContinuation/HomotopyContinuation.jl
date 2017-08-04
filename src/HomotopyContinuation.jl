@@ -19,5 +19,9 @@ module HomotopyContinuation
     include("PredictorCorrector/PredictorCorrector.jl")
 
     @reexport using .PredictorCorrector
+
+    include("TestSystems/TestSystems.jl")
+
+    @reexport using .TestSystems
 end # module
  
