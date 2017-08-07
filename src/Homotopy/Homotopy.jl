@@ -6,6 +6,7 @@ module Homotopy
     import ..HomConBase: AbstractHomotopy, evaluate, startsystem, targetsystem, jacobian,
         dt, homogenize, degrees, weyl_norm, nvars, nequations
     include("straight_line.jl")
+    include("gamma_trick.jl")
 
-    export StraightLineHomotopy
+    export StraightLineHomotopy, GammaTrickHomotopy
 end
