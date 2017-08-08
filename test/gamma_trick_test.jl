@@ -50,8 +50,17 @@ using Base.Test
         H = GammaTrickHomotopy(g, f)
         @test norm(H.γ) ≈ 1.0 atol=1e-8
 
+        H = GammaTrickHomotopy(g, f, 212)
+        K = GammaTrickHomotopy(g, f, 212)
+        @test H.γ ≈ K.γ
+
         H = GammaTrickHomotopy(g, f, 1.3+4im)
         @test H.γ ≈ 1.3+4im
+
+        a = MPoly.generators(Complex128, :a)
+        @test_throws MethodError GammaTrickHomotopy(g, MPoly.system(a), 1.0+0im)
+        @test_throws ErrorException GammaTrickHomotopy(MPoly.system(x^2+3y, y^2-x), MPoly.system(x^2+3y), 1.0+0im)
+
 
     end
 

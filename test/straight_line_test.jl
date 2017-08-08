@@ -10,6 +10,9 @@ using Base.Test
 
         H = StraightLineHomotopy(g, f)
         @test typeof(H)<:StraightLineHomotopy{Float64}
+        a = MPoly.generators(Complex128, :a)
+        @test_throws MethodError StraightLineHomotopy(g, MPoly.system(a))
+        @test_throws ErrorException StraightLineHomotopy(MPoly.system(x^2+3y, y^2-x), MPoly.system(x^2+3y))
 
         @test evaluate(H, [2.0, 1.0], 1.0) == [-1.0]
         @test evaluate(H, [2.0, 1.0], 0.0) == [7.0]

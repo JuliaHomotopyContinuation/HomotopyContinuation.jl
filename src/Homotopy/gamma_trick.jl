@@ -40,7 +40,7 @@ GammaTrickHomotopy(start, target) = GammaTrickHomotopy(start, target, exp(im * (
 function GammaTrickHomotopy(start, target, seed::Int)
     srand(seed)
     θ = rand() * 2π - π
-    GammaTrickHomotopy([start], [target], exp(im * θ))
+    GammaTrickHomotopy(start, target, exp(im * θ))
 end
 
 function evaluate(H::GammaTrickHomotopy{T}, x::Vector{T}, t::Float64) where {T<:Complex}

@@ -46,7 +46,7 @@ end
 FixedPoly(p::Poly) = FixedPoly(terms(p), vars(p))
 
 system(p::Vector{Poly{T,N}}) where {T,N} = FixedPoly.(p)
-system(p...) = system(collect(p))
+system(p::Vararg{Poly{T,N}}) where {T,N} = FixedPoly.(collect(p))
 
 *(a, p::FixedPoly) =  FixedPoly(p.exponents, a .* p.coeffs, p.vars)
 *(p::FixedPoly, a) =  FixedPoly(p.exponents, a .* p.coeffs, p.vars)
