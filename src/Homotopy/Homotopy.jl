@@ -2,6 +2,8 @@ __precompile__()
 
 module Homotopy
 
+    import MultivariatePolynomials
+    const MP = MultivariatePolynomials
     using ..HomConBase
     import ..HomConBase: AbstractHomotopy, evaluate, startsystem, targetsystem, jacobian,
         dt, homogenize, degrees, weyl_norm, nvars, nequations

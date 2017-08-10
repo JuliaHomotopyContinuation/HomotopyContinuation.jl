@@ -3,10 +3,6 @@ __precompile__()
 module HomotopyContinuation
     using Reexport
 
-    include("MPoly/MPoly.jl")
-    
-    export MPoly
-
     include("HomConBase/HomConBase.jl")
 
     @reexport using .HomConBase

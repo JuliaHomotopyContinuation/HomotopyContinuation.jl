@@ -1,4 +1,9 @@
-prepare_homotopy(H::AbstractHomotopy{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}= is_projective(alg) ? homogenize(H) : H
+# This is complete garbage but I don't want to change the API and the Poly implementation at once
+import TypedPolynomials
+function prepare_homotopy(H::AbstractHomotopy{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
+    TypedPolynomials.@polyvar hom
+    is_projective(alg) ? homogenize(H, hom) : H
+end
 function prepare_start_value(H::AbstractHomotopy{T}, start_value::Vector{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
     N = nvars(H)
     if N == length(start_value)

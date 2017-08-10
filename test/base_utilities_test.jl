@@ -1,6 +1,3 @@
-using HomotopyContinuation
-using Base.Test
-
 @testset "utilities" begin
 
     @testset "affine/projective" begin

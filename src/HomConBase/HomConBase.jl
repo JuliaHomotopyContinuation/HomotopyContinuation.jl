@@ -4,6 +4,8 @@ module HomConBase
 
     import Base: eltype, gradient
 
+    import MultivariatePolynomials
+    const MP = MultivariatePolynomials
 
     export AbstractHomotopy
     abstract type AbstractHomotopy{T<:Number} end

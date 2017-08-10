@@ -9,7 +9,7 @@ dt(H::AbstractHomotopy) = error("`dt` not implemented for $(typeof(H))<:Abstract
 @inline ∂t(H::AbstractHomotopy) = dt(H)
 
 is_homogenous(H::AbstractHomotopy) = error("`is_homogenous` not implemented for $(typeof(H))<:AbstractHomotopy")
-homogenize(H::AbstractHomotopy) = error("`homogenize` not implemented for $(typeof(H))<:AbstractHomotopy")
+homogenize(H::AbstractHomotopy, ::MP.AbstractVariable) = error("`homogenize` not implemented for $(typeof(H))<:AbstractHomotopy")
 
 # optional
 weyl_norm(H::AbstractHomotopy, t::Float64) = error("`weyl_norm` not implemented for $(typeof(H)) for AbstractHomotopy")

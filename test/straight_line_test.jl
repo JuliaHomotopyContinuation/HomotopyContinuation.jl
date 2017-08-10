@@ -1,45 +1,39 @@
-using HomotopyContinuation
-using Base.Test
-
 @testset "straight_line" begin
 
-    @testset "interface" begin
-        x, y = MPoly.generators(Float64, :x, :y)
-        f = MPoly.system(x^2+3y)
-        g = MPoly.system(y^2-x)
+    @TP.polyvar x y a
+    f = [x^2+3.0*y]
+    g = [y^2-1.0*x]
 
-        H = StraightLineHomotopy(g, f)
-        @test typeof(H)<:StraightLineHomotopy{Float64}
-        a = MPoly.generators(Complex128, :a)
-        @test_throws MethodError StraightLineHomotopy(g, MPoly.system(a))
-        @test_throws ErrorException StraightLineHomotopy(MPoly.system(x^2+3y, y^2-x), MPoly.system(x^2+3y))
+    H = StraightLineHomotopy(g, f)
+    @test typeof(H)<:StraightLineHomotopy{Float64}
+    @test_throws MethodError StraightLineHomotopy(g, [TP.polynomial(a)])
+    @test_throws ErrorException StraightLineHomotopy([x^2+3y, y^2-x], [x^2+3y])
 
-        @test evaluate(H, [2.0, 1.0], 1.0) == [-1.0]
-        @test evaluate(H, [2.0, 1.0], 0.0) == [7.0]
+    @test evaluate(H, [2.0, 1.0], 1.0) == [-1.0]
+    @test evaluate(H, [2.0, 1.0], 0.0) == [7.0]
 
-        J_H = jacobian(H)
+    J_H = jacobian(H)
 
-        @test J_H([1.0, 1.0], 0.0) == [2 3]
-        @test J_H([1.0, 1.0], 1.0) == [-1 2]
+    @test J_H([1.0, 1.0], 0.0) == [2 3]
+    @test J_H([1.0, 1.0], 1.0) == [-1 2]
 
-        ∂H∂t = dt(H)
+    ∂H∂t = dt(H)
 
-        ## time derivate is independent of t
-        @test ∂H∂t([1.0,1.0], 0.23) == [-4]
+    ## time derivate is independent of t
+    @test ∂H∂t([1.0,1.0], 0.23) == [-4]
 
-        @test degrees(H) == [2]
-        @test startsystem(H) == g
-        @test targetsystem(H) == f
-    end
+    @test degrees(H) == [2]
+    @test startsystem(H) == g
+    @test targetsystem(H) == f
 
     @testset "homogenize" begin
-        x, y = MPoly.generators(Float64, :x, :y)
-        f = MPoly.system(x^2+3y, 2y-3x)
-        g = MPoly.system(y^2-x, 3x + y)
+        @TP.polyvar x y z
+        f = [x^2+3y, 2y-3x]
+        g = [y^2-x, 3x + y]
 
         H = StraightLineHomotopy(g, f)
 
-        K = homogenize(H)
+        K = homogenize(H, z)
         
         @test nvars(K) == 3
     end

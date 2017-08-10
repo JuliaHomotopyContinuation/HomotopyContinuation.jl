@@ -1,14 +1,12 @@
-using HomotopyContinuation
-
 @testset "spherical" begin
 
     @testset "simplest system" begin
-        x = MPoly.generator(Complex128, :x)
+        @TP.polyvar x
         f = (x - 2.0) * (x - (2.5+ 4.0im))
         g = (x - 4.3im) * (x + (2.1 - 4im))
 
-        F = MPoly.system([f])
-        G = MPoly.system([g])
+        F = [f]
+        G = [g]
 
         H = StraightLineHomotopy(G, F)
 

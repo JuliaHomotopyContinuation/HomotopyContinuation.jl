@@ -1,9 +1,7 @@
-using HomotopyContinuation
-using Base.Test
-
 @testset "TestSystems" begin
     @testset "cyclic5 validate solutions" begin
-        cyclic5 = TestSystems.cyclic5()
+        @TP.polyvar x[1:5]
+        cyclic5 = TestSystems.cyclic(x...)
 
         solutions = TestSystems.cyclic5Solutions()
 
@@ -11,7 +9,8 @@ using Base.Test
     end
 
     @testset "cyclic7 validate solutions" begin
-        cyclic7 = TestSystems.cyclic7()
+        @TP.polyvar x[1:7]
+        cyclic7 = TestSystems.cyclic(x...)
 
         solutions = TestSystems.cyclic7Solutions()
 

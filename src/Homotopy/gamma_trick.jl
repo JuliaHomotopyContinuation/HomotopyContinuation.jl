@@ -9,11 +9,11 @@ This yields a more generic interpolation.
 Possible to create it optionally with a seed.
 """
 struct GammaTrickHomotopy{T<:Complex} <: AbstractHomotopy{T}
-    start::Vector{Poly{T}}
-    target::Vector{Poly{T}}
+    start::PolySystem{T}
+    target::PolySystem{T}
     γ::T
 
-    function GammaTrickHomotopy{T}(start::Vector{Poly{T}}, target::Vector{Poly{T}}, γ::T) where {T<:Complex}
+    function GammaTrickHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}, γ::T) where {T<:Complex}
         N_start = nvars(start)
         N_target = nvars(target)
         n_start = nequations(start)
@@ -33,8 +33,8 @@ struct GammaTrickHomotopy{T<:Complex} <: AbstractHomotopy{T}
     end
 end
 
-GammaTrickHomotopy(start::Vector{Poly{T}}, target::Vector{Poly{T}}, γ::T) where {T<:Complex} = GammaTrickHomotopy{T}(start, target, γ)
-GammaTrickHomotopy(start::Poly{T}, target::Poly{T}, γ::T) where {T<:Complex} = GammaTrickHomotopy([start], [target], γ)
+GammaTrickHomotopy(start::PolySystem{T}, target::PolySystem{T}, γ::T) where {T<:Complex} = GammaTrickHomotopy{T}(start, target, γ)
+# GammaTrickHomotopy(start::Poly{T}, target::Poly{T}, γ::T) where {T<:Complex} = GammaTrickHomotopy([start], [target], γ)
 
 GammaTrickHomotopy(start, target) = GammaTrickHomotopy(start, target, exp(im * (rand() * 2π - π)))
 function GammaTrickHomotopy(start, target, seed::Int)
@@ -59,12 +59,12 @@ function jacobian(H::GammaTrickHomotopy{T}) where {T<:Number}
 end
 dt(H::GammaTrickHomotopy{T}) where {T<:Number} = (x::Vector{T}, ::Float64) -> evaluate(H.start, x) - evaluate(H.target, x)
 
-function homogenize(H::GammaTrickHomotopy)
+function homogenize(H::GammaTrickHomotopy, var::MP.AbstractVariable)
     N = nvars(H)
     n = nequations(H)
     # currently square system
     if N == n
-        return GammaTrickHomotopy(homogenize(H.start), homogenize(H.target), H.γ)
+        return GammaTrickHomotopy(homogenize(H.start, var), homogenize(H.target, var), H.γ)
     elseif N == n + 1
         if is_homogenous(H.start) && is_homogenous(H.start)
            return H

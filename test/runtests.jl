@@ -1,4 +1,11 @@
-include("mpoly_test.jl")
+using HomotopyContinuation
+using Base.Test
+import TypedPolynomials
+const TP = TypedPolynomials
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
+
+include("poly_test.jl")
 include("polysystem_test.jl")
 include("straight_line_test.jl")
 include("gamma_trick_test.jl")

@@ -6,10 +6,10 @@ StraightLineHomotopy(G, F)
 The homotopy ``(1-t)F + tG``.
 """
 struct StraightLineHomotopy{T<:Number} <: AbstractHomotopy{T}
-    start::Vector{Poly{T}}
-    target::Vector{Poly{T}}
+    start::PolySystem{T}
+    target::PolySystem{T}
 
-    function StraightLineHomotopy{T}(start::Vector{Poly{T}}, target::Vector{Poly{T}}) where {T<:Number}
+    function StraightLineHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}) where {T<:Number}
         N_start = nvars(start)
         N_target = nvars(target)
         n_start = nequations(start)
@@ -29,13 +29,13 @@ struct StraightLineHomotopy{T<:Number} <: AbstractHomotopy{T}
     end
 end
 
-function StraightLineHomotopy(start::Vector{Poly{T}},target::Vector{Poly{T}}) where {T<:Number}
+function StraightLineHomotopy(start::PolySystem{T},target::PolySystem{T}) where {T<:Number}
     StraightLineHomotopy{T}(start,target)
 end
 
-function StraightLineHomotopy(start::Poly{T},target::Poly{T}) where {T<:Number}
-    StraightLineHomotopy([start], [target])
-end
+# function StraightLineHomotopy(start::Poly{T},target::Poly{T}) where {T<:Number}
+#     StraightLineHomotopy([start], [target])
+# end
 
 function evaluate(H::StraightLineHomotopy{T}, x::Vector{T}, t::Float64) where {T<:Number}
     (1-t) * evaluate(H.target, x) + t * evaluate(H.start, x)
@@ -49,12 +49,12 @@ function jacobian(H::StraightLineHomotopy{T}) where {T<:Number}
 end
 dt(H::StraightLineHomotopy{T}) where {T<:Number} = (x::Vector{T}, ::Float64) -> evaluate(H.start, x) - evaluate(H.target, x)
 
-function homogenize(H::StraightLineHomotopy)
+function homogenize(H::StraightLineHomotopy, var::MP.AbstractVariable)
     N = nvars(H)
     n = nequations(H)
     # currently square system
     if N == n
-        return StraightLineHomotopy(homogenize(H.start), homogenize(H.target))
+        return StraightLineHomotopy(homogenize(H.start, var), homogenize(H.target, var))
     elseif N == n + 1
         if is_homogenous(H.start) && is_homogenous(H.start)
            return H
