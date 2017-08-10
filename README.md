@@ -13,13 +13,11 @@ Pkg.clone("git:://github.com/saschatimme/HomotopyContinuation.jl.git")
 And here is a simple example:
 ```julia
 using HomotopyContinuation
+using TypedPolynomials
 
-x = MPoly.generator(Complex128, :x)
-f = (x - 2.0) * (x - (2.5+ 4.0im))
-g = (x - 4.3im) * (x + (2.1 - 4im))
-
-F = MPoly.system([f])
-G = MPoly.system([g])
+@polyvar x
+F = [(x - 2.0) * (x - (2.5+ 4.0im))]
+G = [(x - 4.3im) * (x + (2.1 - 4im))]
 
 H = StraightLineHomotopy(G, F)
 
