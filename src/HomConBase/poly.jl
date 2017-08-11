@@ -6,17 +6,7 @@ is_homogenous(f::MP.AbstractPolynomial) = MP.mindeg(f) == MP.maxdeg(f)
 
 function homogenize(f::MP.AbstractPolynomial, variable::MP.AbstractVariable)
     deg = MP.maxdeg(f)
-    terms = MP.terms(f)
-    promoted_type = promote_type(typeof(variable), eltype(terms))
-    newterms = map(term -> begin
-        homvar_deg = deg - MP.deg(term)
-        if homvar_deg == 0
-            convert(promoted_type, term)
-       else
-            convert(promoted_type, term * variable^homvar_deg)
-        end
-    end, terms)
-    MP.polynomial(newterms)
+    MP.polynomial(map(term -> term * variable^(deg - MP.deg(term)), MP.terms(f)))
 end
 
 @inline deg(f::MP.AbstractPolynomial) = MP.maxdeg(f)
