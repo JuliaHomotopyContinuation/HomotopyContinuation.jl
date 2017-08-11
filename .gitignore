@@ -3,3 +3,4 @@
 *.jl.mem
 
 tst.jl
+*-checkpoint.ipynb
