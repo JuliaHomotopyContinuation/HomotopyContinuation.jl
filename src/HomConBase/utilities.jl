@@ -1,13 +1,17 @@
 """
-    projective(x::Vector)
+    projective(x, varindex)
 
-Embeds a vector `x` into projective space via `[1; x]`;
+Embeds a vector `x` into projective space assuming the "projective variable" has index `varindex`.
 """
-projective(x::Vector{T}) where {T<:Number} = [one(T); x]
+function projective(x::Vector{T}, index::Int) where {T<:Number}
+    res = copy(x)
+    insert!(res, index, one(T))
+    res
+end
 
 """
-    affine(x::Vector)
+    affine(x, varindex)
 
-Maps a projective vector `x` into affine space via `x[2:end]/x[1]`;
+Maps a projective vector `x` into affine space assuming the "projective variable" has index `varindex`.
 """
-affine(x::Vector{T}) where {T<:Number} = x[2:end]/x[1]
+affine(v::Vector{T}, i::Int) where {T<:Number} = [ v[1:i-1] ; v[i+1:end] ] / v[i]

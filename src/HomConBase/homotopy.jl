@@ -2,6 +2,7 @@ evaluate(H::AbstractHomotopy{T}, x::Vector{T}, t::Float64) where T = error("`eva
 startsystem(H::AbstractHomotopy) = error("`startsystem` not implemented for $(typeof(H))<:AbstractHomotopy")
 targetsystem(H::AbstractHomotopy) = error("`targetsystem` not implemented for $(typeof(H))<:AbstractHomotopy")
 nvars(H::AbstractHomotopy) = error("`nvars` not implemented for $(typeof(H))<:AbstractHomotopy")
+vars(H::AbstractHomotopy) = error("`vars` not implemented for $(typeof(H))<:AbstractHomotopy")
 nequations(H::AbstractHomotopy) = error("`nequations` not implemented for $(typeof(H))<:AbstractHomotopy")
 degrees(H::AbstractHomotopy) = error("`degrees` not implemented for $(typeof(H))<:AbstractHomotopy")
 jacobian(H::AbstractHomotopy) = error("`jacobian` not implemented for $(typeof(H))<:AbstractHomotopy")

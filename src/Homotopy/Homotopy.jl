@@ -6,7 +6,7 @@ module Homotopy
     const MP = MultivariatePolynomials
     using ..HomConBase
     import ..HomConBase: AbstractHomotopy, evaluate, startsystem, targetsystem, jacobian,
-        dt, homogenize, degrees, weyl_norm, nvars, nequations
+        dt, homogenize, degrees, weyl_norm, nvars, vars, nequations
     include("straight_line.jl")
     include("gamma_trick.jl")
 

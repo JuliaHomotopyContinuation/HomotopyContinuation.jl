@@ -1,24 +1,5 @@
 # This is complete garbage but I don't want to change the API and the Poly implementation at once
 import TypedPolynomials
-function prepare_homotopy(H::AbstractHomotopy{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
-    TypedPolynomials.@polyvar hom
-    is_projective(alg) ? homogenize(H, hom) : H
-end
-function prepare_start_value(H::AbstractHomotopy{T}, start_value::Vector{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
-    N = nvars(H)
-    if N == length(start_value)
-        return start_value
-    elseif N == length(start_value) + 1 && is_projective(alg)
-        return [1.0; start_value]
-    else
-        if is_projective(alg)
-            return error("A start_value has length $(length(start_value)). Excepted length $(N) or $(N-1).")
-        else 
-            return error("A start_value has length $(length(start_value)). Excepted length $(N).")
-        end
-    end
-end
-
 
 struct Result{T<:Complex,Alg<:AbstractPredictorCorrectorHomConAlgorithm}
     solution::Vector{T}
@@ -51,7 +32,7 @@ function solve(
 
     solutions = Vector{Result{T,typeof(algorithm)}}(total_start_values)
     for (index, start_value) in enumerate(start_values)
-        start_value = prepare_start_value(H, start_value, algorithm)
+        start_value = prepare_start_value(start_value, H, algorithm)
 
         if report_progress
             println("Start to track path $index")
@@ -150,18 +131,19 @@ function track_path(
         end
     end
 
-    if is_projective(algorithm)
+    homvarindex = hom_var_index(H, algorithm)
+    if isnull(homvarindex)
+        at_infinity = false
+        sol = x
+    else
+        i = get(homvarindex)
         # check for solutions at infinity
-        # assumes that the first variable is the artificial one
-        at_infinity = norm(x[1]) < tolerance_infinity
+        at_infinity = norm(x[i]) < tolerance_infinity
         if affine_result
-            sol = x[2:end] / x[1]
+            sol = affine(x, i)
         else
             sol = x
         end 
-    else
-        at_infinity = false
-        sol = x
     end
 
     converged = t ≈ 0 && norm(evaluate(H, x, 0.0)) < endgame_tolerance

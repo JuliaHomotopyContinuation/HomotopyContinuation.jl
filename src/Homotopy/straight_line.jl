@@ -66,6 +66,7 @@ function homogenize(H::StraightLineHomotopy, var::MP.AbstractVariable)
     end  
 end
 nvars(H::StraightLineHomotopy) = nvars(H.start)
+vars(H::StraightLineHomotopy) = vars(H.start)
 nequations(H::StraightLineHomotopy) = nequations(H.start)
 degrees(H::StraightLineHomotopy) = max.(degrees(H.start), degrees(H.target))
 startsystem(H::StraightLineHomotopy) = H.start

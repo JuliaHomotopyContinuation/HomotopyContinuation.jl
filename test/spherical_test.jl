@@ -1,7 +1,7 @@
 @testset "spherical" begin
 
     @testset "simplest system" begin
-        @TP.polyvar x
+        @TP.polyvar x z
         f = (x - 2.0) * (x - (2.5+ 4.0im))
         g = (x - 4.3im) * (x + (2.1 - 4im))
 
@@ -10,7 +10,7 @@
 
         H = StraightLineHomotopy(G, F)
 
-        res = solve(H, [[-2.1 + 4.0im], [4.3im]], PredictorCorrector.Spherical(), report_progress=false)
+        res = solve(H, [[-2.1 + 4.0im], [4.3im]], PredictorCorrector.Spherical(z), report_progress=false)
 
         @test res[1].retcode == :Success
         @test res[2].retcode == :Success

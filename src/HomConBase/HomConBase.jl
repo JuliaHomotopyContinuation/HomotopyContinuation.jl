@@ -38,7 +38,7 @@ module HomConBase
     
     export PolySystem, evaluate, jacobian, is_homogenous, homogenize, degrees, nvars, nequations, total_degree
 
-    export evaluate, startsystem, targetsystem, jacobian, dt, ∂t, nvars, degrees, nequations, is_homogenous, homogenize  # nvars, nequations, degrees, 
+    export evaluate, startsystem, targetsystem, jacobian, dt, ∂t, nvars, degrees, nequations, is_homogenous, homogenize, vars  # nvars, nequations, degrees, 
 
     export affine, projective
 end

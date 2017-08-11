@@ -76,6 +76,7 @@ function homogenize(H::GammaTrickHomotopy, var::MP.AbstractVariable)
     end  
 end
 nvars(H::GammaTrickHomotopy) = nvars(H.start)
+vars(H::GammaTrickHomotopy) = vars(H.start)
 nequations(H::GammaTrickHomotopy) = nequations(H.start)
 degrees(H::GammaTrickHomotopy) = max.(degrees(H.start), degrees(H.target))
 startsystem(H::GammaTrickHomotopy) = H.start

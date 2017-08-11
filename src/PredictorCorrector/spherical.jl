@@ -1,10 +1,13 @@
-struct Spherical <: AbstractPredictorCorrectorHomConAlgorithm end
+"""
+    Spherical(homogenization_variable)
+
+Spherical is a projective algorithm, i.e. you have to provide a variable with which the system will be homogenized.
+"""
+struct Spherical{V<:MP.AbstractVariable} <:AbstractPredictorCorrectorHomConAlgorithm
+    homogenization_variable::V
+end
 
 """
-```
-SphericalTangentPredictor
-```
-
 Spherical tangent predictor following the formulation of Chen[^1]. Denote by ``\hat{H}`` the lift of the homotopy ``H``
 as a projective mapping.
 Euler's method yields
@@ -69,4 +72,15 @@ function correct!(
     norm(res) < tol
 end
 
-is_projective(::Spherical) = true
+function hom_var_index(H::AbstractHomotopy, alg::Spherical)
+    index = findfirst(vars(H), alg.homogenization_variable)
+    Nullable(index, index > 0)
+end
+prepare_homotopy(H::AbstractHomotopy, alg::Spherical) = homogenize(H, alg.homogenization_variable)
+
+function prepare_start_value(start_value, H::AbstractHomotopy, alg::Spherical{<:MP.AbstractVariable})
+    if length(start_value) == nvars(H)
+        return start_value
+    end
+    projective(start_value, get(hom_var_index(H,alg)))
+end
