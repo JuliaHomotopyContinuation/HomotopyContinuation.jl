@@ -1,6 +1,6 @@
 prepare_homotopy(H::AbstractHomotopy{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}= is_projective(alg) ? homogenize(H) : H
 function prepare_start_value(H::AbstractHomotopy{T}, start_value::Vector{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
-    N = nvars(H)
+    N = nvariables(H)
     if N == length(start_value)
         return start_value
     elseif N == length(start_value) + 1 && is_projective(alg)
@@ -101,7 +101,7 @@ function track_path(
     trace::Vector{Vector{T}} = [];
 
     # we only need to compute these once
-    J_H = jacobian(H)
+    J_H = differentiate(H)
     ∂H∂t = ∂t(H)
 
     while t > 0 && k < max_iterations

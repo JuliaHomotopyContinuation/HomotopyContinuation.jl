@@ -1,37 +1,19 @@
 using HomotopyContinuation
+import TypedPolynomials
 using BenchmarkTools
-
-function polysystem()
-    a = 5
-    b = 4
-    c = 3
-    sθ, cθ, z = MPoly.generators(Complex128, :sθ, :cθ, :z)
-    f1 = cθ^2 + sθ^2 - (1.0 + 0im)*z^2
-    f2 = (a*cθ - b)^2 + (1.0 + 0im) * (a*sθ)^2 - c^2 * z^2
-    F = MPoly.system([f1, f2])
-
-    x = rand(Complex128, 3)
-
-    @benchmark evaluate($F, $x)
-end
-
-polysystem()
-println("Run polysystem evaluation benchmark:")
-polysystem_benchmark = polysystem()
-show(STDOUT, MIME"text/plain"(), polysystem_benchmark)
 
 function triangle()
     a = 5
     b = 4
     c = 3;
 
-    sθ, cθ = MPoly.generators(Complex128, :sθ, :cθ)
+    TypedPolynomials.@polyvar sθ cθ
     f1 = cθ^2 + sθ^2 - (1.0 + 0im)
     f2 = (a*cθ - b)^2 + (1.0 + 0im) * (a*sθ)^2 - c^2
-    F = MPoly.system([f1, f2])
+    F = PolySystem([f1, f2])
 
     # lets use a total degree homotopy
-    G, start_solutions = total_degree(F)
+    G, start_solutions = totaldegree(F)
 
     # we will use a simple straight line homotopy
     H = StraightLineHomotopy(G, F)
