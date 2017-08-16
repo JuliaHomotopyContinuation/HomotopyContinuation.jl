@@ -1,4 +1,4 @@
-@testset "spherical" begin
+@testset "Spherical" begin
 
     @testset "simplest system" begin
         TP.@polyvar x

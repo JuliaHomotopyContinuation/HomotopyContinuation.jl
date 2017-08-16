@@ -1,6 +1,6 @@
 using HomotopyContinuation
 
-@testset "affine" begin
+@testset "Affine" begin
 
     @testset "simplest system" begin
         TP.@polyvar x

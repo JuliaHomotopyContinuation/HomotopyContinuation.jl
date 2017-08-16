@@ -1,4 +1,4 @@
-@testset "straight_line" begin
+@testset "StraightLineHomotopy" begin
     TP.@polyvar x y a
     H = StraightLineHomotopy([y^2-x], [x^2+3.0y])
     @test typeof(H)<:StraightLineHomotopy{Float64}

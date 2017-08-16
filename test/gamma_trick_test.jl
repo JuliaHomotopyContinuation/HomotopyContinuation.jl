@@ -1,4 +1,4 @@
-@testset "straight_line" begin
+@testset "GammaTrickHomotopy" begin
 
     TP.@polyvar x y
 
