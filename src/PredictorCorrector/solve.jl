@@ -8,7 +8,7 @@ function prepare_start_value(H::AbstractHomotopy{T}, start_value::Vector{T}, alg
     else
         if is_projective(alg)
             return error("A start_value has length $(length(start_value)). Excepted length $(N) or $(N-1).")
-        else 
+        else
             return error("A start_value has length $(length(start_value)). Excepted length $(N).")
         end
     end
@@ -39,7 +39,7 @@ function solve(
         error("Expected as start values an iterable with elements of type Vector{$T} but got $(eltype(start_values))")
     end
     H = prepare_homotopy(H, algorithm)
-    
+
     total_start_values = length(start_values)
 
     if report_progress println("Total number of paths to track: $total_start_values") end
@@ -69,7 +69,7 @@ end
 Tracks the path from the given start_value. Reports additional infos in the result.
 """
 function track_path(
-    H::AbstractHomotopy{T},
+    H::AbstractHomotopy{S},
     start_value::Vector{T},
     algorithm::AbstractPredictorCorrectorHomConAlgorithm;
     initial_step_length=0.01,
@@ -88,17 +88,18 @@ function track_path(
     endgame_start=0.1,
     # precision_endgame::S=T
     endgame_strategy=:none
-) where {T<:Complex}
+) where {S<:Number,T<:Number}
+    V = promote_type(S,T)
     #some setup
     step_length = initial_step_length
     sucessive_successes = 0
     t = 1.0
     k = 0
-    x = copy(start_value)
-    u = similar(start_value)
+    x = copy(convert(Vector{V}, start_value))
+    u = similar(x)
 
     time_steps::Vector{Float64} = [];
-    trace::Vector{Vector{T}} = [];
+    trace::Vector{Vector{V}} = [];
 
     # we only need to compute these once
     J_H = differentiate(H)
@@ -153,7 +154,7 @@ function track_path(
             sol = x[2:end] / x[1]
         else
             sol = x
-        end 
+        end
     else
         at_infinity = false
         sol = x

@@ -3,14 +3,14 @@
 
 Embeds a vector `x` into projective space via `[1; x]`;
 """
-projective(x::Vector{T}) where {T<:Number} = [one(T); x]
+projective(x::Vector{T}) where T = [one(T); x] # TODO: shouldn't we have an option for a random patch?
 
 """
     affine(x::Vector)
 
 Maps a projective vector `x` into affine space via `x[2:end]/x[1]`;
 """
-affine(x::Vector{T}) where {T<:Number} = x[2:end]/x[1]
+affine(x::AbstractVector)= x[2:end]/x[1]
 
 function total_degree_helper(vars::Vector{Symbol}, degrees::Vector{Int}, b::Vector{T}) where {T<:Complex}
     n = length(vars)
@@ -59,6 +59,6 @@ end
 Returns `G`, `solutions` where `F` is a system with the equations ``w^{d_i}-b_i=0`` where ``w`` is a ``d_i``-th unit root with ``d_i = \text{deg}F_i``
 If `unit_roots=true` then ``b_i=1`` otherwise ``b_i`` is uniformly random drawn out of the interval [0,1].
 """
-function totaldegree(G::PolySystem{T}; kwargs...) where {T<:Complex}
-   totaldegree(T, variables(G), degrees(G); kwargs...)
+function totaldegree(G::PolySystem{T}; kwargs...) where {T<:Number}
+   totaldegree(promote_type(T, Complex128), variables(G), degrees(G); kwargs...)
 end

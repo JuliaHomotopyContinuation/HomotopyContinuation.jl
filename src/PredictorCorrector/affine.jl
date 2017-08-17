@@ -1,7 +1,7 @@
 struct Affine <: AbstractPredictorCorrectorHomConAlgorithm end
 
 """
-    predict
+    predict(alg::Affine, H, J_H, ∂H∂t, x, t, Δt)
 
 Tangent predictor. `dx_xt` and `dt_xt` are the evaluations of partial derivatives from our homotopy at x and t, i.e.
 ``D_xH(x,t)`` and ``D_tH(x,t)``.
@@ -14,20 +14,20 @@ We have ``v = D_xH^{-1}(x,t)·D_tH(x,t)``,
 therefore ``D_xH(x,t)·v = D_tH(x,t)``
 and thus ``v = \\(D_xH(x,t), D_tH(x,t)``
 """
-function predict(alg::Affine, H::AbstractHomotopy{T}, J_H, ∂H∂t, x::Vector{T}, t::Float64, Δt::Float64) where {T<:Complex}
+function predict(alg::Affine, H::AbstractHomotopy, J_H, ∂H∂t, x, t, Δt)
     x .- Δt .* \(J_H(x,t), ∂H∂t(x,t))
 end
 
 function correct!(
     u::Vector{T},
     alg::Affine,
-    H::AbstractHomotopy{T},
+    H::AbstractHomotopy,
     J_H,
     x::Vector{T},
-    t::Float64,
+    t,
     tol::Float64,
     max_iterations::Int
-) where {T<:Complex}
+) where {T}
     N = length(x)
     res = zeros(x)
     dx_xt = zeros(T, N, N)

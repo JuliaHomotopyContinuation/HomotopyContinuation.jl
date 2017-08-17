@@ -1,9 +1,8 @@
 struct Spherical <: AbstractPredictorCorrectorHomConAlgorithm end
 
 """
-```
-SphericalTangentPredictor
-```
+
+    predict(alg::Affine, H, J_H, ∂H∂t, x, t, Δt)
 
 Spherical tangent predictor following the formulation of Chen[^1]. Denote by ``\hat{H}`` the lift of the homotopy ``H``
 as a projective mapping.
@@ -28,7 +27,7 @@ and we can then obtain the spherical projection:
     “Spherical projective path tracking for homotopy continuation methods”.
     Communications in Information and Systems 12(3):195-220 (2012)
 """
-function predict(alg::Spherical, H::AbstractHomotopy{T}, J_H::F1, ∂H∂t::F2, x::Vector{T}, t::Float64, Δt::Float64) where {T<:Complex,F1,F2}
+function predict(alg::Spherical, H::AbstractHomotopy, J_H, ∂H∂t, x, t, Δt)
     dot_x = \([J_H(x,t); x'], [-∂H∂t(x,t); 0])
     norm_dot_x = norm(dot_x)
     # TODO: conditining? i.e. check singular values
@@ -38,10 +37,10 @@ end
 function correct!(
     u::Vector{T},
     alg::Spherical,
-    H::AbstractHomotopy{T},
+    H::AbstractHomotopy,
     J_H::F,
     x::Vector{T},
-    t::Float64,
+    t,
     tol::Float64,
     max_iterations::Int
 ) where {T,F}
