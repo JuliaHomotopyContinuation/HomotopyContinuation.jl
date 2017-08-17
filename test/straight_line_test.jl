@@ -1,5 +1,5 @@
 @testset "StraightLineHomotopy" begin
-    TP.@polyvar x y a
+    PolyImpl.@polyvar x y a
     H = StraightLineHomotopy([y^2-x], [x^2+3.0y])
     @test typeof(H)<:StraightLineHomotopy{Float64}
     @test_throws ErrorException StraightLineHomotopy([x^2+3.1y], [a])

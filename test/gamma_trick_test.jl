@@ -1,6 +1,6 @@
 @testset "GammaTrickHomotopy" begin
 
-    TP.@polyvar x y
+    PolyImpl.@polyvar x y
 
     H = GammaTrickHomotopy([y^2-x], [x^2+3y], 1.0+0im)
     @test typeof(H)<:GammaTrickHomotopy{Int64}
@@ -45,7 +45,7 @@
     H = GammaTrickHomotopy(g, f, 1.3+4im)
     @test H.γ ≈ 1.3+4im
 
-    TP.@polyvar a
+    PolyImpl.@polyvar a
 
     @test_throws ErrorException GammaTrickHomotopy([x^2+3y], [a], 1.0+0im)
     @test_throws ErrorException GammaTrickHomotopy([x^2+3y, y^2-x], [x^2+3y], 1.0+0im)

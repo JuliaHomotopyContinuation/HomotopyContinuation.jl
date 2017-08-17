@@ -1,6 +1,4 @@
 module TestSystems
-
-    import TypedPolynomials
     using ..HomConBase
 
     export cyclic5, cyclic5Solutions, cyclic7, cyclic7Solutions
@@ -15,6 +13,9 @@ module TestSystems
     """
     function cyclical(iter, n)
         m = length(iter)
+        if n == m
+            return [collect(iter)]
+        end
         values = collect(iter);
         res = Vector{Vector{eltype(values)}}()
         for k=0:m-1
@@ -23,11 +24,26 @@ module TestSystems
         res
     end
 
-    function cyclical_polys(vars)
-        n = length(vars)
-        F = map(k -> sum(map(prod, cyclical(vars, k))), 1:n-1)
-        push!(F, prod(vars) - 1)
-        PolySystem(F)
+
+    function monompoly(monomials::Vector{Vector{Int}}, totalvars)
+        exps = zeros(Int, totalvars, length(monomials))
+        for i in eachindex(monomials)
+            for var in monomials[i]
+                exps[var, i] = 1
+            end
+        end
+        coeffs = ones(Int, length(monomials))
+        Poly(exps, coeffs)
+    end
+
+
+    function cyclical_polys(n)
+        F = map(k -> monompoly(cyclical(1:n, k), n), 1:n-1)
+        # now we have to construct x₁x₂x₃...x_n - 1
+        exps = zeros(Int, n, 2)
+        exps[:,1] = 1
+        push!(F, Poly(exps, [1, -1]))
+        PolySystem(F, [Symbol("z$i") for i=1:n])
     end
 
     """
@@ -39,8 +55,7 @@ module TestSystems
     with applications to cyclic n-roots
     """
     function cyclic5()
-        TypedPolynomials.@polyvar z[1:5]
-        cyclical_polys(z)
+        cyclical_polys(5)
     end
 
     """
@@ -69,8 +84,7 @@ module TestSystems
     with applications to cyclic n-roots
     """
     function cyclic7()
-        TypedPolynomials.@polyvar z[1:7]
-        cyclical_polys(z)
+        cyclical_polys(7)
     end
 
     """

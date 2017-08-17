@@ -1,7 +1,7 @@
 using HomotopyContinuation
 using Base.Test
-import TypedPolynomials
-const TP = TypedPolynomials
+import DynamicPolynomials
+const PolyImpl = DynamicPolynomials
 
 include("base_utilities_test.jl")
 

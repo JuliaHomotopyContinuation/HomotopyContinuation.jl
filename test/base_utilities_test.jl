@@ -6,7 +6,7 @@
 
 
     @testset "total_degree" begin
-        @TypedPolynomials.polyvar x y
+        @PolyImpl.polyvar x y
 
         F = PolySystem([
             3.0x^2 + 2.0x * y - 1.0 * y^2,
