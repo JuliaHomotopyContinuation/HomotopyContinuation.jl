@@ -38,7 +38,7 @@ function GammaTrickHomotopy(start::PolySystem{T},target::PolySystem{T}, γ::Comp
     GammaTrickHomotopy{T}(start,target,γ)
 end
 # promote if they don't have the same coefficients
-function GammaTrickHomotopy(start::PolySystem,target::PolySystem, y::Complex128)
+function GammaTrickHomotopy(start::PolySystem,target::PolySystem, γ::Complex128)
     s, t = promote(start, target)
     GammaTrickHomotopy(s, t, γ)
 end
@@ -50,6 +50,16 @@ function GammaTrickHomotopy(start, target, seed::Int)
     θ = rand() * 2π - π
     GammaTrickHomotopy(start, target, exp(im * θ))
 end
+
+function Base.show(io::IO, H::GammaTrickHomotopy)
+    print(io, typeof(H), ":\n")
+    print(io, "* γ: ", H.γ, "\n")
+    println(io, "* start:")
+    println(io, H.start)
+    println(io, "* target:")
+    print(io, H.target)
+end
+
 
 function evaluate(H::GammaTrickHomotopy, x, t)
     (1 - t) * evaluate(H.target, x) + t * H.γ * evaluate(H.start, x)
