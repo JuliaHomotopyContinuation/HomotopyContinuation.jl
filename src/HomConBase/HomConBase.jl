@@ -1,42 +1,45 @@
-__precompile__()
-
 module HomConBase
 
+    #using Reexport
     import Base: eltype, gradient
+
+    import FixedPolySystem: Poly, PolySystem,
+        nvariables, variables, polynomials, degrees,
+        evaluate, evaluate!, differentiate,
+        ishomogenous, homogenize, homogenized, dehomogenize,
+        weyldot, weylnorm
+    # Exports from FixedPolySystem
+    export Poly, PolySystem,
+        nvariables, variables, polynomials, degrees,
+        evaluate, evaluate!, differentiate,
+        ishomogenous, homogenize, homogenized, dehomogenize,
+        weyldot, weylnorm
 
 
     export AbstractHomotopy
     abstract type AbstractHomotopy{T<:Number} end
 
     abstract type HomConAlgorithm end
-    
+
     export HomConAlgorithm
 
     # abstract type AbstractPredictorAlgorithm end
     # abstract type AbstractCorrectorAlgorithm end
     # export AbstractPredictorAlgorithm, AbstractCorrectorAlgorithm
-    
-    # Predictor Corrector
-    function correct! end
-    function predict end
 
 
     function init end
     function solve end
 
-    
+
     export init, solve
 
-    include("poly.jl")
-    include("polysystem.jl")
     include("homotopy.jl")
     include("utilities.jl")
 
-    export Poly, evaluate, gradient, homogenize, is_homogenous, deg, nvars, weyl_dot, weyl_norm, createpoly
-    
-    export PolySystem, evaluate, jacobian, is_homogenous, homogenize, degrees, nvars, nequations, total_degree
+    export evaluate, startsystem, targetsystem,
+        differentiate, dt, ∂t, nvariables, degrees,
+        nequations, ishomogenous, homogenize, homogenized, weylnorm
 
-    export evaluate, startsystem, targetsystem, jacobian, dt, ∂t, nvars, degrees, nequations, is_homogenous, homogenize  # nvars, nequations, degrees, 
-
-    export affine, projective
+    export affine, projective, totaldegree
 end

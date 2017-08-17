@@ -1,78 +1,128 @@
 """
-```
-StraightLineHomotopy(G, F)
-```
+    StraightLineHomotopy(start::PolySystem, target::PolySystem)
 
-The homotopy ``(1-t)F + tG``.
+Constructs the homotopy `t * start + (1-t) * target`.
 """
 struct StraightLineHomotopy{T<:Number} <: AbstractHomotopy{T}
-    start::Vector{Poly{T}}
-    target::Vector{Poly{T}}
+    start::PolySystem{T}
+    target::PolySystem{T}
 
-    function StraightLineHomotopy{T}(start::Vector{Poly{T}}, target::Vector{Poly{T}}) where {T<:Number}
-        N_start = nvars(start)
-        N_target = nvars(target)
-        n_start = nequations(start)
-        n_target = nequations(target)
-
-        if (N_start != N_target)
-            return error( "The number of unknowns of start and target system doesn't match." *
-                "The start system of the homotopy has $N_start unknowns and the target system has $N_target unknowns.")
+    function StraightLineHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}) where {T<:Number}
+        if (homogenized(start) != homogenized(target))
+            return error("start and target have to be both either homogenized or not")
+        end
+        if (nvariables(start) != nvariables(target))
+            return error("The number of unknowns of start and target system doesn't match." *
+                "The start system of the homotopy has $(nvariables(start)) unknowns " *
+                "and the target system has $(nvariables(target)) unknowns.")
         end
 
-        if (n_start != n_target)
-            return error( "The number of equations of start and target system doesn't match." *
-                "The start system of the homotopy has $n_start equations and the target system has $n_target equations.")
+        if (length(target) != length(start))
+            return error("The number of equations of start and target system doesn't match." *
+                "The start system of the homotopy has $(length(start)) equations " *
+                "and the target system has $(length(target)) equations.")
         end
 
         new(start, target)
     end
 end
 
-function StraightLineHomotopy(start::Vector{Poly{T}},target::Vector{Poly{T}}) where {T<:Number}
+function StraightLineHomotopy(start::PolySystem{T},target::PolySystem{T}) where {T<:Number}
     StraightLineHomotopy{T}(start,target)
 end
-
-function StraightLineHomotopy(start::Poly{T},target::Poly{T}) where {T<:Number}
-    StraightLineHomotopy([start], [target])
+# promote if they don't have the same coefficients
+function StraightLineHomotopy(start::PolySystem,target::PolySystem)
+    s, t = promote(start, target)
+    StraightLineHomotopy(s, t)
 end
+StraightLineHomotopy(s, t) = StraightLineHomotopy(PolySystem(s), PolySystem(t))
 
-function evaluate(H::StraightLineHomotopy{T}, x::Vector{T}, t::Float64) where {T<:Number}
-    (1-t) * evaluate(H.target, x) + t * evaluate(H.start, x)
+function evaluate(H::StraightLineHomotopy, x, t)
+    (1-t) .* evaluate(H.target, x) .+ t .* evaluate(H.start, x)
 end
+(H::StraightLineHomotopy)(x,t) = evaluate(H,x,t)
 
-function jacobian(H::StraightLineHomotopy{T}) where {T<:Number}
-    J_s = jacobian(H.start)
-    J_t = jacobian(H.target)
-
-    return (x::Vector{T}, t::Float64) -> t * J_s(x) + (1 - t) * J_t(x)
+function Base.show(io::IO, H::StraightLineHomotopy)
+    print(io, typeof(H), ":\n")
+    println(io, "* start:")
+    println(io, H.start)
+    println(io, "* target:")
+    print(io, H.target)
 end
-dt(H::StraightLineHomotopy{T}) where {T<:Number} = (x::Vector{T}, ::Float64) -> evaluate(H.start, x) - evaluate(H.target, x)
+"""
+    differentiate(H::StraightLineHomotopy)
 
+Differentiates `H` w.r.t. the place and returns an evaluation function
+`(x,t) -> t * J_s(x) + (1 - t) * J_t(x)`
+where `J_s` is the jacobian of the start system and
+`J_t` is the jacobian of the target system.
+"""
+function differentiate(H::StraightLineHomotopy)
+    J_s = differentiate(H.start)
+    J_t = differentiate(H.target)
+
+    (x, t) -> t .* J_s(x) .+ (1 - t) .* J_t(x)
+end
+"""
+    dt(H::StraightLineHomotopy)
+
+Differentiates `H` w.r.t. the the time and returns an evaluation function
+`(x,t) -> T`
+"""
+dt(H::StraightLineHomotopy) = (x, ::Number) -> evaluate(H.start, x) .- evaluate(H.target, x)
+
+"""
+    homogenize(H::StraightLineHomotopy)
+
+Make the start and target system of `H` homogenous.
+"""
 function homogenize(H::StraightLineHomotopy)
-    N = nvars(H)
-    n = nequations(H)
-    # currently square system
-    if N == n
-        return StraightLineHomotopy(homogenize(H.start), homogenize(H.target))
-    elseif N == n + 1
-        if is_homogenous(H.start) && is_homogenous(H.start)
-           return H
-        else
-            return error("The Homotopy has $(N) unknowns and $(n) equations. Expected that the polynomials are already homogenous which is not the case.")
-        end
-    else
-        return error("The Homotopy has $(N) unknowns and $(n) equations. Excepted $(n) equations and $(n) or $(n+1) unknowns.")
-    end  
+    StraightLineHomotopy(homogenize(H.start), homogenize(H.target))
 end
-nvars(H::StraightLineHomotopy) = nvars(H.start)
-nequations(H::StraightLineHomotopy) = nequations(H.start)
+
+"""
+    homogenized(H::StraightLineHomotopy)
+
+Checks whether `H` was homogenized.
+"""
+homogenized(H::StraightLineHomotopy) = homogenized(H.start)
+
+ishomogenous(H::StraightLineHomotopy) = ishomogenous(H.start) && ishomogenous(H.target)
+
+"""
+    nvariables(H::StraightLineHomotopy)
+
+The number variables of `H`.
+"""
+function nvariables(H::StraightLineHomotopy)
+    # Constructor guarantees that start and target have the same number of variables
+    nvariables(H.start)
+end
+function length(H::StraightLineHomotopy)
+    # Constructor guarantees that start and target have the same length
+    length(H.start)
+end
+"""
+    degrees(H::StraightLineHomotopy)
+
+The (total) degrees of the polynomials of the system `P`.
+"""
 degrees(H::StraightLineHomotopy) = max.(degrees(H.start), degrees(H.target))
+"""
+    startsystem(H::StraightLineHomotopy)
+
+The startsystem of `H`.
+"""
 startsystem(H::StraightLineHomotopy) = H.start
+"""
+    targetsystem(H::StraightLineHomotopy)
+
+The targetsystem of `H`.
+"""
 targetsystem(H::StraightLineHomotopy) = H.target
 
 """
-    weyl_norm(H, t)
+    weylnorm(H, t)
 
 Computes the weyl_norm of the homotopy to the given time `t`.
 
@@ -88,9 +138,9 @@ For ``H = (1-t)F+tG`` we have
 \end{align*}
 ```
 """
-function weyl_norm(H::StraightLineHomotopy{T}, t::Float64) where {T<:Complex}
+function weylnorm(H::StraightLineHomotopy{T}, t::Float64) where {T<:Complex}
     F = H.target
     G = H.start
 
-    sqrt((1-t)^2 * weyl_dot(F,F) + (1-t)*t*2*real(weyl_dot(F,G)) + t^2 * weyl_dot(G,G))
+    sqrt((1-t)^2 * weyldot(F,F) + (1-t)*t*2*real(weyldot(F,G)) + t^2 * weyldot(G,G))
 end

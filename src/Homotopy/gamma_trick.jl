@@ -1,40 +1,48 @@
 """
-    GammaTrickHomotopy(G, F[, γ])
+    GammaTrickHomotopy(start, target [, γ])
+    GammaTrickHomotopy(start, target [, seed])
 
-This yields the homotopy (1-t)F + tγ(t)G, with t from 1 to 0.
+Construct the homotopy (1-t)target + tγ(t)start, with t from 1 to 0.
 The gamma trick is a special type of homotopy interpolation.
 One chooses an ``γ`` uniformly from the (complex) unit circle.
 This yields a more generic interpolation.
 
 Possible to create it optionally with a seed.
 """
-struct GammaTrickHomotopy{T<:Complex} <: AbstractHomotopy{T}
-    start::Vector{Poly{T}}
-    target::Vector{Poly{T}}
-    γ::T
+struct GammaTrickHomotopy{T<:Number} <: AbstractHomotopy{T}
+    start::PolySystem{T}
+    target::PolySystem{T}
+    γ::Complex128
 
-    function GammaTrickHomotopy{T}(start::Vector{Poly{T}}, target::Vector{Poly{T}}, γ::T) where {T<:Complex}
-        N_start = nvars(start)
-        N_target = nvars(target)
-        n_start = nequations(start)
-        n_target = nequations(target)
-
-        if (N_start != N_target)
+    function GammaTrickHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}, γ::Complex128) where {T<:Number}
+        if (homogenized(start) != homogenized(target))
+            return error("start and target have to be both either homogenized or not")
+        end
+        if (nvariables(start) != nvariables(target))
             return error("The number of unknowns of start and target system doesn't match." *
-                "The start system of the homotopy has $N_start unknowns and the target system has $N_target unknowns.")
+                "The start system of the homotopy has $(nvariables(start)) unknowns " *
+                "and the target system has $(nvariables(target)) unknowns.")
         end
 
-        if (n_start != n_target)
+        if (length(target) != length(start))
             return error("The number of equations of start and target system doesn't match." *
-                "The start system of the homotopy has $n_start equations and the target system has $n_target equations.")
+                "The start system of the homotopy has $(length(start)) equations " *
+                "and the target system has $(length(target)) equations.")
         end
 
         new(start, target, γ)
     end
 end
 
-GammaTrickHomotopy(start::Vector{Poly{T}}, target::Vector{Poly{T}}, γ::T) where {T<:Complex} = GammaTrickHomotopy{T}(start, target, γ)
-GammaTrickHomotopy(start::Poly{T}, target::Poly{T}, γ::T) where {T<:Complex} = GammaTrickHomotopy([start], [target], γ)
+function GammaTrickHomotopy(start::PolySystem{T},target::PolySystem{T}, γ::Complex128) where {T<:Number}
+    GammaTrickHomotopy{T}(start,target,γ)
+end
+# promote if they don't have the same coefficients
+function GammaTrickHomotopy(start::PolySystem,target::PolySystem, γ::Complex128)
+    s, t = promote(start, target)
+    GammaTrickHomotopy(s, t, γ)
+end
+GammaTrickHomotopy(s, t, γ::Complex128) = GammaTrickHomotopy(PolySystem(s), PolySystem(t), γ)
 
 GammaTrickHomotopy(start, target) = GammaTrickHomotopy(start, target, exp(im * (rand() * 2π - π)))
 function GammaTrickHomotopy(start, target, seed::Int)
@@ -43,48 +51,99 @@ function GammaTrickHomotopy(start, target, seed::Int)
     GammaTrickHomotopy(start, target, exp(im * θ))
 end
 
-function evaluate(H::GammaTrickHomotopy{T}, x::Vector{T}, t::Float64) where {T<:Complex}
+function Base.show(io::IO, H::GammaTrickHomotopy)
+    print(io, typeof(H), ":\n")
+    print(io, "* γ: ", H.γ, "\n")
+    println(io, "* start:")
+    println(io, H.start)
+    println(io, "* target:")
+    print(io, H.target)
+end
+
+
+function evaluate(H::GammaTrickHomotopy, x, t)
     (1 - t) * evaluate(H.target, x) + t * H.γ * evaluate(H.start, x)
 end
-function evaluate(H::GammaTrickHomotopy{T}, x::Vector{S}, t::Float64) where {T<:Complex, S<:Number}
-    u = convert(Vector{T}, x)
-    (1 - t) * evaluate(H.target, u) + t * H.γ * evaluate(H.start, u)
-end
-
-function jacobian(H::GammaTrickHomotopy{T}) where {T<:Number}
-    J_s = jacobian(H.start)
-    J_t = jacobian(H.target)
-
-    return (x::Vector{T}, t::Float64) -> t * H.γ * J_s(x) + (1 - t) * J_t(x)
-end
-dt(H::GammaTrickHomotopy{T}) where {T<:Number} = (x::Vector{T}, ::Float64) -> evaluate(H.start, x) - evaluate(H.target, x)
-
-function homogenize(H::GammaTrickHomotopy)
-    N = nvars(H)
-    n = nequations(H)
-    # currently square system
-    if N == n
-        return GammaTrickHomotopy(homogenize(H.start), homogenize(H.target), H.γ)
-    elseif N == n + 1
-        if is_homogenous(H.start) && is_homogenous(H.start)
-           return H
-        else
-            return error("The Homotopy has $(N) unknowns and $(n) equations. Expected that the polynomials are already homogenous which is not the case.")
-        end
-    else
-        return error("The Homotopy has $(N) unknowns and $(n) equations. Excepted $(n) equations and $(n) or $(n+1) unknowns.")
-    end  
-end
-nvars(H::GammaTrickHomotopy) = nvars(H.start)
-nequations(H::GammaTrickHomotopy) = nequations(H.start)
-degrees(H::GammaTrickHomotopy) = max.(degrees(H.start), degrees(H.target))
-startsystem(H::GammaTrickHomotopy) = H.start
-targetsystem(H::GammaTrickHomotopy) = H.target
+(H::GammaTrickHomotopy)(x,t) = evaluate(H,x,t)
 
 """
-    weyl_norm(H, t)
+    differentiate(H::GammaTrickHomotopy)
 
-Computes the weyl_norm of the homotopy to the given time `t`.
+Differentiates `H` w.r.t. the place and returns an evaluation function
+`(x,t) -> t * H.γ * J_s(x) + (1 - t) * J_t(x)`
+where `J_s` is the jacobian of the start system and
+`J_t` is the jacobian of the target system.
+"""
+function differentiate(H::GammaTrickHomotopy)
+    J_s = differentiate(H.start)
+    J_t = differentiate(H.target)
+
+    (x, t) -> t .* H.γ .* J_s(x) .+ (1 - t) .* J_t(x)
+end
+
+"""
+    dt(H::GammaTrickHomotopy)
+
+Differentiates `H` w.r.t. the the time and returns an evaluation function
+`(x,t) -> T`
+"""
+dt(H::GammaTrickHomotopy) = (x, ::Number) -> H.γ * evaluate(H.start, x) .- evaluate(H.target, x)
+
+"""
+    homogenize(H::GammaTrickHomotopy)
+
+Make the start and target system of `H` homogenous.
+"""
+function homogenize(H::GammaTrickHomotopy)
+    GammaTrickHomotopy(homogenize(H.start), homogenize(H.target), H.γ)
+end
+
+"""
+    homogenized(H::GammaTrickHomotopy)
+
+Checks whether `H` was homogenized.
+"""
+homogenized(H::GammaTrickHomotopy) = homogenized(H.start)
+
+ishomogenous(H::GammaTrickHomotopy) = ishomogenous(H.start) && ishomogenous(H.target)
+
+"""
+    nvariables(H::GammaTrickHomotopy)
+
+The number variables of `H`.
+"""
+function nvariables(H::GammaTrickHomotopy)
+    # Constructor guarantees that start and target have the same number of variables
+    nvariables(H.start)
+end
+function length(H::GammaTrickHomotopy)
+    # Constructor guarantees that start and target have the same length
+    length(H.start)
+end
+"""
+    degrees(H::GammaTrickHomotopy)
+
+The (total) degrees of the polynomials of the system `P`.
+"""
+degrees(H::GammaTrickHomotopy) = max.(degrees(H.start), degrees(H.target))
+"""
+    startsystem(H::GammaTrickHomotopy)
+
+The startsystem of `H`.
+"""
+startsystem(H::GammaTrickHomotopy) = H.start
+"""
+    targetsystem(H::GammaTrickHomotopy)
+
+The targetsystem of `H`.
+"""
+targetsystem(H::GammaTrickHomotopy) = H.target
+
+
+"""
+    weylnorm(H, t)
+
+Computes the weylnorm of the homotopy to the given time `t`.
 
 ## Explanation
 For ``H = (1-t)F+tγG`` we have
@@ -98,8 +157,8 @@ For ``H = (1-t)F+tγG`` we have
 \end{align*}
 ```
 """
-function weyl_norm(H::GammaTrickHomotopy{T}, t::Float64) where {T<:Complex}
+function weylnorm(H::GammaTrickHomotopy{T}, t::Float64) where {T<:Complex}
     F = H.target
     G = H.start
-    sqrt((1 - t)^2 * weyl_dot(F, F) + (1 - t) * t * 2 * real(H.γ) * real(weyl_dot(F, G)) + t^2 * abs2(H.γ) * weyl_dot(G, G))
+    sqrt((1 - t)^2 * weyldot(F, F) + (1 - t) * t * 2 * real(H.γ) * real(weyldot(F, G)) + t^2 * abs2(H.γ) * weyldot(G, G))
 end

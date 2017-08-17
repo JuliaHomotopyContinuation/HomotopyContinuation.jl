@@ -1,6 +1,3 @@
-using HomotopyContinuation
-using Base.Test
-
 @testset "TestSystems" begin
     @testset "cyclic5 validate solutions" begin
         cyclic5 = TestSystems.cyclic5()

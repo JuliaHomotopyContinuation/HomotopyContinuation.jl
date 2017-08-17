@@ -1,46 +1,34 @@
-using HomotopyContinuation
-using Base.Test
+@testset "StraightLineHomotopy" begin
+    PolyImpl.@polyvar x y a
+    H = StraightLineHomotopy([y^2-x], [x^2+3.0y])
+    @test typeof(H)<:StraightLineHomotopy{Float64}
+    @test_throws ErrorException StraightLineHomotopy([x^2+3.1y], [a])
+    @test_throws ErrorException StraightLineHomotopy([x^2+3y, y^2-x], [x^2+3y])
 
-@testset "straight_line" begin
+    @test evaluate(H, [2.0, 1.0], 1.0) == [-1.0]
+    @test H([2.0, 1.0], 1.0) == [-1.0]
+    @test H([2.0, 1.0], 0.0) == [7.0]
 
-    @testset "interface" begin
-        x, y = MPoly.generators(Float64, :x, :y)
-        f = MPoly.system(x^2+3y)
-        g = MPoly.system(y^2-x)
+    J_H = differentiate(H)
 
-        H = StraightLineHomotopy(g, f)
-        @test typeof(H)<:StraightLineHomotopy{Float64}
-        a = MPoly.generators(Complex128, :a)
-        @test_throws MethodError StraightLineHomotopy(g, MPoly.system(a))
-        @test_throws ErrorException StraightLineHomotopy(MPoly.system(x^2+3y, y^2-x), MPoly.system(x^2+3y))
+    @test J_H([1.0, 1.0], 0.0) == [2 3]
+    @test J_H([1.0, 1.0], 1.0) == [-1 2]
 
-        @test evaluate(H, [2.0, 1.0], 1.0) == [-1.0]
-        @test evaluate(H, [2.0, 1.0], 0.0) == [7.0]
+    ∂H∂t = dt(H)
 
-        J_H = jacobian(H)
+    ## time derivate is independent of t
+    @test ∂H∂t([1.0,1.0], 0.23) == [-4]
 
-        @test J_H([1.0, 1.0], 0.0) == [2 3]
-        @test J_H([1.0, 1.0], 1.0) == [-1 2]
+    @test degrees(H) == [2]
+    @test startsystem(H) == PolySystem([y^2-x])
+    @test targetsystem(H) == PolySystem([x^2+3.0y])
 
-        ∂H∂t = dt(H)
+    H = StraightLineHomotopy([y^2-x, 3x + y], [x^2+3y, 2y-3x])
 
-        ## time derivate is independent of t
-        @test ∂H∂t([1.0,1.0], 0.23) == [-4]
-
-        @test degrees(H) == [2]
-        @test startsystem(H) == g
-        @test targetsystem(H) == f
-    end
-
-    @testset "homogenize" begin
-        x, y = MPoly.generators(Float64, :x, :y)
-        f = MPoly.system(x^2+3y, 2y-3x)
-        g = MPoly.system(y^2-x, 3x + y)
-
-        H = StraightLineHomotopy(g, f)
-
-        K = homogenize(H)
-        
-        @test nvars(K) == 3
-    end
+    @test homogenized(H) == false
+    K = homogenize(H)
+    @test ishomogenous(H) == false
+    @test homogenized(K)
+    @test ishomogenous(K)
+    @test nvariables(K) == 3
 end
