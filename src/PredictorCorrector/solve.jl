@@ -69,82 +69,27 @@ end
 Tracks the path from the given start_value. Reports additional infos in the result.
 """
 function track_path(
-    H::AbstractHomotopy{S},
-    start_value::Vector{T},
+    H::AbstractHomotopy{T},
+    startvalue::Vector{T},
     algorithm::AbstractPredictorCorrectorHomConAlgorithm;
-    initial_step_length=0.01,
-    tolerance=1e-8,
-    successfull_steps_until_step_length_increase=3,
-    step_length_increase_factor=2.0,
-    step_length_decrease_factor=0.5,
-    refine_solution_iterations=2,
-    max_iterations=10000,
-    tolerance_infinity=1e-4,
+    tolerance_infinity=1-8,
     affine_result=true,
-    track_trace=false,
-    iterations_correction_step=3,
-    # endgame
-    endgame_tolerance=1e-8,
-    endgame_start=0.1,
-    # precision_endgame::S=T
-    endgame_strategy=:none
-) where {S<:Number,T<:Number}
-    V = promote_type(S,T)
-    #some setup
-    step_length = initial_step_length
-    sucessive_successes = 0
-    t = 1.0
-    k = 0
-    x = copy(convert(Vector{V}, start_value))
-    u = similar(x)
+    trackpathkwargs...
+    # #endgame
+    # endgame_tolerance=1e-8,
+    # endgame_start=0.1,
+    # # precision_endgame::S=T
+    # endgame_strategy=:none
+) where {T<:Number}
+    pathresult = trackpath(H, startvalue, algorithm, 1.0, 0.0; trackpathkwargs...)
 
-    time_steps::Vector{Float64} = [];
-    trace::Vector{Vector{V}} = [];
+    t = pathresult.laststep
+    retcode = pathresult.returncode;
+    x = pathresult.result
+    k = pathresult.iterations
+    steps = pathresult.steps
+    trace = pathresult.trace
 
-    # we only need to compute these once
-    J_H = differentiate(H)
-    ∂H∂t = ∂t(H)
-
-    while t > 0 && k < max_iterations
-        if track_trace
-            push!(time_steps, t)
-            push!(trace, x)
-        end
-
-        Δt = min(step_length, t)
-        # println("t: $t Δt: $Δt")
-        # println("x:$x, norm: $(norm(evaluate(H,x,t)))")
-        if t <= endgame_start
-          tol = endgame_tolerance
-        else
-            tol = tolerance
-        end
-        u .= predict(algorithm, H, J_H, ∂H∂t, x, t, Δt)
-        # println("u: $u, norm: $(norm(evaluate(H,u,t-Δt)))")
-        converged = correct!(u, algorithm, H, J_H, x, t - Δt, tol, iterations_correction_step)
-        if converged
-            x .= u
-            t -= Δt
-            sucessive_successes += 1
-            if sucessive_successes == successfull_steps_until_step_length_increase
-                step_length *= step_length_increase_factor
-                sucessive_successes = 0
-            end
-        else
-            sucessive_successes = 0
-            step_length *= step_length_decrease_factor
-        end
-        # end
-        k += 1
-    end
-
-    # now we refine our solution
-    if t ≈ 0
-        refinement_converged = correct!(u, algorithm, H, J_H, x, 0.0, endgame_tolerance, iterations_correction_step)
-        if refinement_converged
-            x .= u
-        end
-    end
 
     if is_projective(algorithm)
         # check for solutions at infinity
@@ -160,18 +105,10 @@ function track_path(
         sol = x
     end
 
-    converged = t ≈ 0 && norm(evaluate(H, x, 0.0)) < endgame_tolerance
-
-    if k >= max_iterations
-        retcode = :MaxIterations
-    elseif !converged
-        retcode = :NotConverged
-    elseif at_infinity
+    if at_infinity
         retcode = :AtInfinity
-    else
-        retcode = :Success
     end
 
 
-    Result(sol, retcode, k, affine_result, start_value, algorithm, time_steps, trace)
+    Result(sol, retcode, k, affine_result, startvalue, algorithm, steps, trace)
 end

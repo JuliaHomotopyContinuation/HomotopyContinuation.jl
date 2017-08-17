@@ -26,6 +26,7 @@ module PredictorCorrector
 
     export correct!, predict
 
+    include("trackpath.jl")
     include("solve.jl")
     include("spherical.jl")
     include("affine.jl")
