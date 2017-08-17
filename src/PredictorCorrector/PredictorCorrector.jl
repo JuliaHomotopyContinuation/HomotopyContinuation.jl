@@ -3,9 +3,10 @@ module PredictorCorrector
     using ..Homotopy
     import ..HomConBase: HomConAlgorithm, AbstractHomotopy, solve
 
-    abstract type AbstractPredictorCorrectorHomConAlgorithm <: HomConAlgorithm end
+    export AbstractPredictorCorrectorAlgorithm
+    abstract type AbstractPredictorCorrectorAlgorithm{Projective} <: HomConAlgorithm end
 
-    export AbstractPredictorCorrectorHomConAlgorithm
+    const APCA{P} = AbstractPredictorCorrectorAlgorithm{P}
 
     """
         predict(alg, H, J_H, ∂H∂t, x, t, Δt)
@@ -26,7 +27,9 @@ module PredictorCorrector
 
     export correct!, predict
 
+    include("prepare.jl")
     include("trackpath.jl")
+    include("result_types.jl")
     include("solve.jl")
     include("spherical.jl")
     include("affine.jl")

@@ -1,42 +1,4 @@
 """
-    PathResult(result, returncode, startvalue, iterations, steps, trace)
-
-Construct a result of `trackpath`.
-
-## Fields
-* `result::Vector{T}`
-* `returncode::Symbol`: :Success or :MaxIterations or :Diverged
-* `startvalue::Vector{T}`
-* `iterations::Int`
-* `laststep::S`: If :Success this is just `finish`
-* `steps::Vector{S}`: Empty if `record_steps=false` (default)
-* `trace::Vector{Vector{T}}`: Empty if `record_trace=false` (default)
-"""
-struct PathResult{T<:Number, S<:Number}
-    result::Vector{T}
-    returncode::Symbol
-
-    startvalue::Vector{T}
-    iterations::Int
-    laststep::S
-    steps::Vector{S}
-    trace::Vector{Vector{T}}
-end
-
-function Base.show(io::IO, res::PathResult)
-    println(io, typeof(res),":")
-    println(io, "* result: ", result)
-    println(io, "* returncode: ", returncode)
-    println(io, "* startvalue: ", startvalue)
-    println(io, "* iterations: ", iterations)
-    println(io, "* laststep: ", laststep)
-    println(io, "* steps: ", length(steps), " entries")
-    println(io, "* trace: ", length(trace), " entries")
-end
-
-
-
-"""
     trackpath(H::AbstractHomotopy, startvalue, algorithm::PredictorCorrector, start, finish; kwargs...)
 
 Tracks the path ``z(t)`` which is implicitly defined via ``H(x,t)`` from
@@ -61,7 +23,7 @@ We reformulate the path ``z(t)`` as a path z(γ(s)) where γ: [1, 0] -> line fro
 function trackpath(
     H::AbstractHomotopy{T},
     startvalue::Vector{T},
-    algorithm::AbstractPredictorCorrectorHomConAlgorithm,
+    algorithm::AbstractPredictorCorrectorAlgorithm,
     start::S,
     finish::S;
     maxiterations=10000,

@@ -23,10 +23,6 @@ module HomConBase
 
     export HomConAlgorithm
 
-    # abstract type AbstractPredictorAlgorithm end
-    # abstract type AbstractCorrectorAlgorithm end
-    # export AbstractPredictorAlgorithm, AbstractCorrectorAlgorithm
-
 
     function init end
     function solve end
