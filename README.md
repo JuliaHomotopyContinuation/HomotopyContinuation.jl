@@ -11,7 +11,7 @@ Since this package is pre-release and also relies on couple of unreleased packag
 Pkg.clone("https://github.com/blegat/MultivariatePolynomials.jl.git");
 Pkg.clone("https://github.com/blegat/DynamicPolynomials.jl.git");
 Pkg.clone("https://github.com/saschatimme/FixedPolySystem.jl");
-Pkg.clone("git:://github.com/saschatimme/HomotopyContinuation.jl.git")
+Pkg.clone("https://github.com/saschatimme/HomotopyContinuation.jl.git")
 ```
 
 And here is a simple example:
