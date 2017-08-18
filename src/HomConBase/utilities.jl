@@ -60,5 +60,10 @@ Returns `G`, `solutions` where `F` is a system with the equations ``w^{d_i}-b_i=
 If `unit_roots=true` then ``b_i=1`` otherwise ``b_i`` is uniformly random drawn out of the interval [0,1].
 """
 function totaldegree(G::PolySystem{T}; kwargs...) where {T<:Number}
+    if nvariables(G) != length(G)
+        return error("In order to create a total degree start system your input system needs " *
+            "to have the same number of variables as number equations. Currently your system has " *
+            "$(nvariables(G)) variables and $(length(G)) equations.")
+    end
    totaldegree(promote_type(T, Complex128), variables(G), degrees(G); kwargs...)
 end

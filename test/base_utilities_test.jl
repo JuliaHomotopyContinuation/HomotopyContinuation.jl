@@ -25,5 +25,7 @@
 
         G, solutions = totaldegree(F, unit_roots=true)
         @test all(x -> norm(1 - abs2.(x)) < 1e-8, solutions)
+
+        @test_throws ErrorException totaldegree(PolySystem([x-1, x-2]))
     end
 end
