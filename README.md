@@ -25,5 +25,19 @@ g = (x - 4.3im) * (x + (2.1 - 4im))
 
 H = StraightLineHomotopy([g], [f])
 
-res = solve(H, [[-2.1 + 4.0im], [4.3im]], PredictorCorrector.Spherical())
+solve(H, [[-2.1 + 4.0im], [4.3im]])
+```
+
+and if you don't have a start system at hand we can use a total degree homotopy
+```julia
+using HomotopyContinuation
+using DynamicPolynomials
+
+@polyvar x
+f = (x - 2.0) * (x - (2.5+ 4.0im))
+F = PolySystem([f])
+G, startsolutions = totaldegree(F)
+H = StraightLineHomotopy(G, F)
+
+solve(H, startsolutions)
 ```
