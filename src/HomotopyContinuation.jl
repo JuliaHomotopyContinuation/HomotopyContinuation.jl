@@ -34,7 +34,7 @@ module HomotopyContinuation
     #PredictorCorrector exports
     export PredictorCorrector
     export correct!, predict
-    export Spherical, Affine, trackpath
+    export Spherical, Affine, trackpath, solve, cauchyendgame
 
     #
     include("TestSystems/TestSystems.jl")
