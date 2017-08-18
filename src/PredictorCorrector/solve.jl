@@ -1,177 +1,162 @@
-prepare_homotopy(H::AbstractHomotopy{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}= is_projective(alg) ? homogenize(H) : H
-function prepare_start_value(H::AbstractHomotopy{T}, start_value::Vector{T}, alg::AbstractPredictorCorrectorHomConAlgorithm) where {T<:Complex}
-    N = nvariables(H)
-    if N == length(start_value)
-        return start_value
-    elseif N == length(start_value) + 1 && is_projective(alg)
-        return [1.0; start_value]
-    else
-        if is_projective(alg)
-            return error("A start_value has length $(length(start_value)). Excepted length $(N) or $(N-1).")
-        else
-            return error("A start_value has length $(length(start_value)). Excepted length $(N).")
-        end
-    end
-end
+"""
+    solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, [algorithm,] endgame_start=0.1, kwargs...)
 
+Track the path ``x(t)`` implicitly defined by ``H(x(t),t)`` from `t=1` to `t=0` where
+`x(1)=startvalue`. Returns a [`Result`](@ref) instance.
 
-struct Result{T<:Complex,Alg<:AbstractPredictorCorrectorHomConAlgorithm}
-    solution::Vector{T}
-    retcode::Symbol
-    iterations::Int
-    affine_result::Bool
-    start_value::Vector{T}
-    algorithm::Alg
-    time_steps::Vector{Float64}
-    trace::Vector{Vector{T}}
-end
+It uses the defined `algorihm` for the prediction and correction step.
+If no `algorithm` is defined the in general best performing algorithm is choosen. Currently
+this is `Spherical`.
 
+## Optional arguments
+* `endgame_start=0.1`: When to switch to the Cauchy endgame, for a value of t=0.0 no endgame happens.
+*  optional arguments to [`pathtracking`](@ref)
+*  optional arguments to [`cauchyendgame`](@ref)
 
+    solve(H::AbstractHomotopy, startvalues, algorithm, report_progess=false, kwargs...)
+
+Track multiple paths with the given `startvalues`. Returns a vector of [`Result`](@ref) instances,
+one per start value.
+If `report_progess=true` the current progess will be logged.
+"""
+solve(H::AbstractHomotopy, startvalue_s; kwargs...) = solve(H, startvalue_s, Spherical(); kwargs...)
 function solve(
     H::AbstractHomotopy{T},
-    start_values,
-    algorithm::AbstractPredictorCorrectorHomConAlgorithm;
-    report_progress=true,
+    startvalues,
+    algorithm::APCA;
+    report_progess=false,
     kwargs...
 ) where {T<:Number}
 
-    if eltype(start_values) != Vector{T}
-        error("Expected as start values an iterable with elements of type Vector{$T} but got $(eltype(start_values))")
+    if eltype(startvalues) != Vector{T}
+        error("Expected as start values an iterable with elements of type Vector{$T} " *
+            "but got $(eltype(startvalues))")
     end
+
     H = prepare_homotopy(H, algorithm)
+    total_startvalues = length(startvalues)
 
-    total_start_values = length(start_values)
+    if report_progess
+        println("Total number of paths to track: $total_startvalues")
+    end
 
-    if report_progress println("Total number of paths to track: $total_start_values") end
-
-    solutions = Vector{Result{T,typeof(algorithm)}}(total_start_values)
-    for (index, start_value) in enumerate(start_values)
-        start_value = prepare_start_value(H, start_value, algorithm)
-
-        if report_progress
+    solutions = Vector{Result{T}}(total_startvalues)
+    for (index, startvalue) in enumerate(startvalues)
+        if report_progess
             println("Start to track path $index")
         end
-        sol = track_path(H, start_value, algorithm; kwargs...)
-        if report_progress println("Path $index returned: $(sol.retcode)") end
 
-        solutions[index] = sol
+        result = solve(H, startvalue, algorithm; homotopy_prepared=true, kwargs...)
+
+        if report_progess
+            println("Path $index returned: $(result.returncode)")
+        end
+
+        solutions[index] = result
     end
 
     solutions
 end
 
+function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{false};
+    homotopy_prepared=false,
+    trackpathkwargs...
+) where {T<:Number}
+    if !homotopy_prepared
+        H = prepare_homotopy(H, algorithm)
+    end
+    x = prepare_startvalue(H, startvalue, algorithm)
+    pathresult = trackpath(H, x, algorithm, 1.0, 0.0; trackpathkwargs...)
+    postprocess(pathresult, startvalue, algorithm)
+end
 
-
-
-"""
-    track_path(homotopy, start_value, config)
-
-Tracks the path from the given start_value. Reports additional infos in the result.
-"""
-function track_path(
-    H::AbstractHomotopy{S},
-    start_value::Vector{T},
-    algorithm::AbstractPredictorCorrectorHomConAlgorithm;
-    initial_step_length=0.01,
-    tolerance=1e-8,
-    successfull_steps_until_step_length_increase=3,
-    step_length_increase_factor=2.0,
-    step_length_decrease_factor=0.5,
-    refine_solution_iterations=2,
-    max_iterations=10000,
-    tolerance_infinity=1e-4,
-    affine_result=true,
-    track_trace=false,
-    iterations_correction_step=3,
-    # endgame
-    endgame_tolerance=1e-8,
+function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{true};
+    homotopy_prepared=false,
     endgame_start=0.1,
-    # precision_endgame::S=T
-    endgame_strategy=:none
-) where {S<:Number,T<:Number}
-    V = promote_type(S,T)
-    #some setup
-    step_length = initial_step_length
-    sucessive_successes = 0
-    t = 1.0
-    k = 0
-    x = copy(convert(Vector{V}, start_value))
-    u = similar(x)
-
-    time_steps::Vector{Float64} = [];
-    trace::Vector{Vector{V}} = [];
-
-    # we only need to compute these once
-    J_H = differentiate(H)
-    ∂H∂t = ∂t(H)
-
-    while t > 0 && k < max_iterations
-        if track_trace
-            push!(time_steps, t)
-            push!(trace, x)
-        end
-
-        Δt = min(step_length, t)
-        # println("t: $t Δt: $Δt")
-        # println("x:$x, norm: $(norm(evaluate(H,x,t)))")
-        if t <= endgame_start
-          tol = endgame_tolerance
-        else
-            tol = tolerance
-        end
-        u .= predict(algorithm, H, J_H, ∂H∂t, x, t, Δt)
-        # println("u: $u, norm: $(norm(evaluate(H,u,t-Δt)))")
-        converged = correct!(u, algorithm, H, J_H, x, t - Δt, tol, iterations_correction_step)
-        if converged
-            x .= u
-            t -= Δt
-            sucessive_successes += 1
-            if sucessive_successes == successfull_steps_until_step_length_increase
-                step_length *= step_length_increase_factor
-                sucessive_successes = 0
-            end
-        else
-            sucessive_successes = 0
-            step_length *= step_length_decrease_factor
-        end
-        # end
-        k += 1
+    # endgame kwargs copied from cauchyendgame.jl
+    prediction_tolerance=1e-4,
+    geometric_series_factor=0.5,
+    endgame_tolerance=1e-8,
+    samples_per_loop::Int=8,
+    max_winding_number::Int=8,
+    loopclosed_tolerance=1e-3,
+    tolerance_infinity=1e-8,
+    trackpathkwargs...
+) where {T<:Number}
+    if !homotopy_prepared
+        H = prepare_homotopy(H, algorithm)
     end
-
-    # now we refine our solution
-    if t ≈ 0
-        refinement_converged = correct!(u, algorithm, H, J_H, x, 0.0, endgame_tolerance, iterations_correction_step)
-        if refinement_converged
-            x .= u
-        end
+    x = prepare_startvalue(H, startvalue, algorithm)
+    pathresult = trackpath(H, x, algorithm, 1.0, endgame_start; trackpathkwargs...)
+    if nosuccess(pathresult) || (endgame_start <= 0.0)
+        return postprocess(pathresult, startvalue, algorithm, tolerance_infinity)
     end
+    endgameresult = cauchyendgame(H, pathresult.result, endgame_start, algorithm,
+        # this is really not optimal but don't know a better way for now...
+        prediction_tolerance=prediction_tolerance,
+        geometric_series_factor=geometric_series_factor,
+        endgame_tolerance=endgame_tolerance,
+        samples_per_loop=samples_per_loop,
+        max_winding_number=max_winding_number,
+        loopclosed_tolerance=loopclosed_tolerance,
+        tolerance_infinity=tolerance_infinity;
+        trackpathkwargs...
+        )
+    postprocess(pathresult, endgameresult, startvalue, algorithm, tolerance_infinity)
+end
 
-    if is_projective(algorithm)
-        # check for solutions at infinity
-        # assumes that the first variable is the artificial one
-        at_infinity = norm(x[1]) < tolerance_infinity
-        if affine_result
-            sol = x[2:end] / x[1]
-        else
-            sol = x
-        end
-    else
-        at_infinity = false
-        sol = x
-    end
+function postprocess(pathresult::PathResult, startvalue, ::APCA{true}, tolerance_infinity)
+    result = pathresult.result
 
-    converged = t ≈ 0 && norm(evaluate(H, x, 0.0)) < endgame_tolerance
+    affine_solution = result[2:end] / result[1]
+    projective_solution = result
+    solution = length(startvalue) == length(affine_solution) ? affine_solution : projective_solution
 
-    if k >= max_iterations
-        retcode = :MaxIterations
-    elseif !converged
-        retcode = :NotConverged
-    elseif at_infinity
-        retcode = :AtInfinity
-    else
-        retcode = :Success
-    end
+    returncode = atinfinity(result, tolerance_infinity) ? :AtInfinity : pathresult.returncode
 
+    Result(solution,
+           returncode,
+           pathresult.iterations,
+           0, #endgame_iterations
+           affine_solution,
+           projective_solution,
+           startvalue,
+           #pathresult.steps,
+           pathresult.trace)
+end
 
-    Result(sol, retcode, k, affine_result, start_value, algorithm, time_steps, trace)
+function postprocess(pathresult::PathResult, endgameresult::CauchyEndgameResult, startvalue, ::APCA{true}, tolerance_infinity)
+    result = endgameresult.result
+
+    affine_solution = result[2:end] / result[1]
+    projective_solution = result
+    solution = length(startvalue) == length(affine_solution) ? affine_solution : projective_solution
+
+    returncode = atinfinity(result, tolerance_infinity) ? :AtInfinity : endgameresult.returncode
+
+    Result(solution,
+           returncode,
+           pathresult.iterations,
+           endgameresult.iterations,
+           affine_solution,
+           projective_solution,
+           startvalue,
+           #pathresult.steps,
+           [pathresult.trace; endgameresult.trace])
+end
+
+function postprocess(pathresult::PathResult, startvalue, ::APCA{false})
+    solution = pathresult.result
+    affine_solution = solution
+    projective_solution = [1; solution]
+
+    Result(solution,
+           pathresult.returncode,
+           pathresult.iterations,
+           0, #endgame_iterations
+           affine_solution,
+           projective_solution,
+           startvalue,
+           #pathresult.steps,
+           pathresult.trace)
 end

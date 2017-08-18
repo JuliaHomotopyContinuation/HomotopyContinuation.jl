@@ -1,4 +1,4 @@
-struct Spherical <: AbstractPredictorCorrectorHomConAlgorithm end
+struct Spherical <: AbstractPredictorCorrectorAlgorithm{true} end
 
 """
 
@@ -67,5 +67,3 @@ function correct!(
 
     norm(res) < tol
 end
-
-is_projective(::Spherical) = true

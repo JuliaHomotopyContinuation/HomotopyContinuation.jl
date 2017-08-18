@@ -1,4 +1,4 @@
-struct Affine <: AbstractPredictorCorrectorHomConAlgorithm end
+struct Affine <: AbstractPredictorCorrectorAlgorithm{false} end
 
 """
     predict(alg::Affine, H, J_H, ∂H∂t, x, t, Δt)
@@ -43,5 +43,3 @@ function correct!(
 
     return norm(res) < tol
 end
-
-is_projective(::Affine) = false

@@ -34,7 +34,7 @@ module HomotopyContinuation
     #PredictorCorrector exports
     export PredictorCorrector
     export correct!, predict
-    export Spherical, Affine
+    export Spherical, Affine, trackpath
 
     #
     include("TestSystems/TestSystems.jl")
