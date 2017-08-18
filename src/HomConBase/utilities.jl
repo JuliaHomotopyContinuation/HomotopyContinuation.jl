@@ -62,7 +62,7 @@ If `unit_roots=true` then ``b_i=1`` otherwise ``b_i`` is uniformly random drawn 
 function totaldegree(G::PolySystem{T}; kwargs...) where {T<:Number}
     if nvariables(G) != length(G)
         return error("In order to create a total degree start system your input system needs " *
-            "to have the same number of variables as number equations. Currently your system has " *
+            "to have the same number of variables as number of equations. Currently your system has " *
             "$(nvariables(G)) variables and $(length(G)) equations.")
     end
    totaldegree(promote_type(T, Complex128), variables(G), degrees(G); kwargs...)
