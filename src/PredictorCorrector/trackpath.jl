@@ -28,8 +28,8 @@ function trackpath(
     finish::S;
     maxiterations=10000,
     tolerance=1e-4,
-    refinement_tolerance=1e-8,
-    initial_steplength=0.01,
+    refinement_tolerance=1e-12,
+    initial_steplength=0.05,
     successfull_steps_until_steplength_increase=3,
     steplength_increase_factor=2.0,
     steplength_decrease_factor=0.5,
@@ -105,12 +105,14 @@ function trackpath(
         refinement_converged = correct!(u, algorithm, H, J_H, x, γ(0.0), refinement_tolerance, 10)
         if refinement_converged
             x .= u
+        else
+
         end
     end
 
     if k >= maxiterations
         retcode = :MaxIterations
-    elseif norm(evaluate(H, x, γ(0.0))) > tolerance
+    elseif norm(evaluate(H, x, γ(0.0))) > refinement_tolerance
         retcode = :Diverged
     else
         retcode = :Success

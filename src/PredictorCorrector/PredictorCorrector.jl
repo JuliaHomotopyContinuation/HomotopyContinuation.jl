@@ -27,12 +27,16 @@ module PredictorCorrector
 
     export correct!, predict
 
-    include("prepare.jl")
-    include("trackpath.jl")
-    include("result_types.jl")
-    include("solve.jl")
+
+
     include("spherical.jl")
     include("affine.jl")
 
-    export Spherical, Affine, solve
+    include("prepare.jl")
+    include("trackpath.jl")
+    include("result_types.jl")
+    include("cauchyendgame.jl")
+    include("solve.jl")
+
+    export Spherical, Affine, solve, trackpath
 end
