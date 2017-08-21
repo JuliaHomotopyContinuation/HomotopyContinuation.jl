@@ -9,12 +9,12 @@ This yields a more generic interpolation.
 
 Possible to create it optionally with a seed.
 """
-struct GammaTrickHomotopy{T<:Number} <: AbstractHomotopy{T}
-    start::PolySystem{T}
-    target::PolySystem{T}
+struct GammaTrickHomotopy{T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}} <: AbstractHomotopy{T}
+    start::Start
+    target::Target
     γ::Complex128
 
-    function GammaTrickHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}, γ::Complex128) where {T<:Number}
+    function GammaTrickHomotopy{T, Start, Target}(start::AbstractPolySystem{T}, target::AbstractPolySystem{T}, γ::Complex128) where {T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}}
         if (homogenized(start) != homogenized(target))
             return error("start and target have to be both either homogenized or not")
         end
@@ -34,11 +34,11 @@ struct GammaTrickHomotopy{T<:Number} <: AbstractHomotopy{T}
     end
 end
 
-function GammaTrickHomotopy(start::PolySystem{T},target::PolySystem{T}, γ::Complex128) where {T<:Number}
-    GammaTrickHomotopy{T}(start,target,γ)
+function GammaTrickHomotopy(start::Start,target::Target, γ::Complex128) where {T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}}
+    GammaTrickHomotopy{T, Start, Target}(start,target,γ)
 end
 # promote if they don't have the same coefficients
-function GammaTrickHomotopy(start::PolySystem,target::PolySystem, γ::Complex128)
+function GammaTrickHomotopy(start::AbstractPolySystem,target::AbstractPolySystem, γ::Complex128)
     s, t = promote(start, target)
     GammaTrickHomotopy(s, t, γ)
 end

@@ -3,13 +3,13 @@ module HomConBase
     #using Reexport
     import Base: eltype, gradient
 
-    import FixedPolySystem: Poly, PolySystem,
+    import FixedPolySystem: AbstractPolySystem, Poly, PolySystem,
         nvariables, variables, polynomials, degrees,
         evaluate, evaluate!, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
         weyldot, weylnorm
     # Exports from FixedPolySystem
-    export Poly, PolySystem,
+    export AbstractPolySystem, Poly, PolySystem,
         nvariables, variables, polynomials, degrees,
         evaluate, evaluate!, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
