@@ -105,7 +105,7 @@ function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{tr
     postprocess(pathresult, endgameresult, startvalue, algorithm, tolerance_infinity)
 end
 
-function postprocess(pathresult::PathResult, startvalue, ::APCA{true}, tolerance_infinity)
+function postprocess(pathresult::PathResult{T}, startvalue, ::APCA{true}, tolerance_infinity) where T
     result = pathresult.result
 
     affine_solution = result[2:end] / result[1]
@@ -122,7 +122,8 @@ function postprocess(pathresult::PathResult, startvalue, ::APCA{true}, tolerance
            projective_solution,
            startvalue,
            #pathresult.steps,
-           pathresult.trace)
+           pathresult.trace,
+           Nullable{ConvergentCluster{T}}())
 end
 
 function postprocess(pathresult::PathResult, endgameresult::CauchyEndgameResult, startvalue, ::APCA{true}, tolerance_infinity)
@@ -142,10 +143,11 @@ function postprocess(pathresult::PathResult, endgameresult::CauchyEndgameResult,
            projective_solution,
            startvalue,
            #pathresult.steps,
-           [pathresult.trace; endgameresult.trace])
+           [pathresult.trace; endgameresult.trace],
+           endgameresult.convergent_cluster)
 end
 
-function postprocess(pathresult::PathResult, startvalue, ::APCA{false})
+function postprocess(pathresult::PathResult{T}, startvalue, ::APCA{false}) where T
     solution = pathresult.result
     affine_solution = solution
     projective_solution = [1; solution]
@@ -158,5 +160,6 @@ function postprocess(pathresult::PathResult, startvalue, ::APCA{false})
            projective_solution,
            startvalue,
            #pathresult.steps,
-           pathresult.trace)
+           pathresult.trace,
+           Nullable{ConvergentCluster{T}}())
 end
