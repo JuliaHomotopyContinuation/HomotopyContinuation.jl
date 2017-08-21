@@ -25,7 +25,7 @@ module HomotopyContinuation
     # Homotopy Exports
     export evaluate, startsystem, targetsystem, differentiate,
         dt, homogenize, homogenized, degrees, weylnorm, nvars, nequations
-    export StraightLineHomotopy, GammaTrickHomotopy
+    export StraightLineHomotopy, GammaTrickHomotopy, FixedHomotopy
 
 
     include("PredictorCorrector/PredictorCorrector.jl")
