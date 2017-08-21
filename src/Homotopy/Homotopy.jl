@@ -1,7 +1,7 @@
 module Homotopy
 
     using ..HomConBase
-    import ..HomConBase: AbstractHomotopy, evaluate,
+    import ..HomConBase: AbstractHomotopy, AbstractPolySystem, evaluate,
         startsystem, targetsystem,
         differentiate, dt,
         homogenize, ishomogenous, homogenized,

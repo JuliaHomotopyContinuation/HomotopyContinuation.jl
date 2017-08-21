@@ -1,13 +1,13 @@
 """
-    StraightLineHomotopy(start::PolySystem, target::PolySystem)
+    StraightLineHomotopy(start::AbstractPolySystem, target::AbstractPolySystem)
 
 Constructs the homotopy `t * start + (1-t) * target`.
 """
-struct StraightLineHomotopy{T<:Number} <: AbstractHomotopy{T}
-    start::PolySystem{T}
-    target::PolySystem{T}
+struct StraightLineHomotopy{T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}} <: AbstractHomotopy{T}
+    start::Start
+    target::Target
 
-    function StraightLineHomotopy{T}(start::PolySystem{T}, target::PolySystem{T}) where {T<:Number}
+    function StraightLineHomotopy{T, Start, Target}(start::Start, target::Target) where {T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}}
         if (homogenized(start) != homogenized(target))
             return error("start and target have to be both either homogenized or not")
         end
@@ -27,11 +27,11 @@ struct StraightLineHomotopy{T<:Number} <: AbstractHomotopy{T}
     end
 end
 
-function StraightLineHomotopy(start::PolySystem{T},target::PolySystem{T}) where {T<:Number}
-    StraightLineHomotopy{T}(start,target)
+function StraightLineHomotopy(start::Start,target::Target) where {T<:Number, Start<:AbstractPolySystem{T}, Target<:AbstractPolySystem{T}}
+    StraightLineHomotopy{T, Start, Target}(start,target)
 end
 # promote if they don't have the same coefficients
-function StraightLineHomotopy(start::PolySystem,target::PolySystem)
+function StraightLineHomotopy(start::AbstractPolySystem,target::AbstractPolySystem)
     s, t = promote(start, target)
     StraightLineHomotopy(s, t)
 end

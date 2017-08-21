@@ -3,7 +3,7 @@
     PolyImpl.@polyvar x y
 
     H = GammaTrickHomotopy([y^2-x], [x^2+3y], 1.0+0im)
-    @test typeof(H)<:GammaTrickHomotopy{Int64}
+    @test typeof(H)<:GammaTrickHomotopy{Int64, PolySystem{Int64}, PolySystem{Int64}}
 
     @test evaluate(H, [2.0+0im, 1.0], 1.0) == [-1.0+0im]
     @test H([2.0+0im, 1.0], 1.0) == [-1.0+0im]
