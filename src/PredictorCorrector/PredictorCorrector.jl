@@ -39,5 +39,5 @@ module PredictorCorrector
     include("solve.jl")
 
     export Spherical, Affine, solve, trackpath, cauchyendgame
-    export Result, CauchyEndgameResult, PathResult
+    export Result, CauchyEndgameResult, PathResult, ConvergentCluster
 end

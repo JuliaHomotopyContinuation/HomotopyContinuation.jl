@@ -34,7 +34,7 @@ function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true}
     while R > eps(Float64)
         res = trackpath(H, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
         if nosuccess(res)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs)
+            return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
         end
         R = λ*R
         push!(xs, res.result)
@@ -45,7 +45,7 @@ function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true}
         end
 
         if atinfinity(get(lastprediction, last(xs)), tolerance_infinity)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :AtInfinity, k, R, λ, xs)
+            return CauchyEndgameResult(get(lastprediction, last(xs)), :AtInfinity, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
         end
 
         if endgame_started || firstheuristic(R, λ, xs[end-3], xs[end-2], xs[end-1], xs[end])
@@ -60,7 +60,8 @@ function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true}
                     # the endgame terminates
                     Δprediction = projectivenorm(prediction, get(lastprediction))
                     if Δprediction < prediction_tolerance
-                        return CauchyEndgameResult(prediction, :Success, k, R, λ, xs)
+                        cluster = ConvergentCluster(samples[1:samples_per_loop:end], prediction, R)
+                        return CauchyEndgameResult(prediction, :Success, k, R, λ, xs, Nullable(cluster))
                     end
                 end
                 lastprediction = Nullable(prediction)
@@ -70,7 +71,7 @@ function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true}
         k += 1
     end
 
-    CauchyEndgameResult(get(lastprediction, last(xs)), :MachineEpsilon, k, R, λ, xs)
+    CauchyEndgameResult(get(lastprediction, last(xs)), :MachineEpsilon, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
 end
 
 atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
@@ -110,8 +111,6 @@ function loop(
         end
 
         # check whether the loop is closed. This can only happen if we finished one circle.
-        # As a tolerance we use `0.1*radius`. A fixed tolerance can be problematic for small
-        # values of the radius
         if k % samples_per_loop == 0
             loopnorm = projectivenorm(first(samples), pathresult.result)
             if loopnorm < loopclosed_tolerance

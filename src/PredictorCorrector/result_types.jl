@@ -23,8 +23,34 @@ struct PathResult{T<:Number, S<:Number}
     trace::Vector{Vector{T}}
 end
 
+
+
 """
-    CauchyEndgameResult(result, returncode, iterations, R, λ, trace)
+    ConvergentCluster(points, convergence_point, t)
+
+Construct a convergent cluster at time `t` with points ``w_1, ..., w_c`` where ``c`` is the
+winding number of the `convergence_point`.
+See Chapter 15.6 in The Numerical solution of systems of polynomials arising in
+engineering and science[^1] for more details.
+
+[^1]: Sommese, Andrew J., and Charles W. Wampler II. The Numerical solution of systems of polynomials arising in engineering and science. World Scientific, 2005.
+"""
+struct ConvergentCluster{T<:Number}
+    points::Vector{Vector{T}}
+    convergence_point::Vector{T}
+    t::Float64
+end
+
+function Base.show(io::IO, cluster::ConvergentCluster)
+    println(io, typeof(cluster),":")
+    println(io, "* cluster points: ", cluster.points)
+    println(io, "* convergence_point: ", cluster.convergence_point)
+    println(io, "* t: ", cluster.t)
+end
+
+
+"""
+    CauchyEndgameResult(result, returncode, iterations, R, λ, trace, nullable_cluster)
 
 Construct a result of a `cauchyendgame`.
 
@@ -33,9 +59,10 @@ Construct a result of a `cauchyendgame`.
 * `returncode::Symbol`: `:Success`, `:IllConditionedZone` (the path tracking failed)
 or `:MachineEpsilon`: (`t` got smaller than machine epsilon)
 * `iterations::Int`: How many iterations of the power series was done
-* `R`: The radius of the endgame zone
+* `R`: The radius when the endgame started
 * `λ`: The factor of the geometric series ``λ^kR``
 * `trace::Vector{Vector{T}}`: The points ``x(λ^kR)`` for `k=0,1,...,iterations`
+* `convergent_cluster::Nullable{ConvergentCluster{T}}`: The convergent cluster of the endgame.
 """
 struct CauchyEndgameResult{T<:Number}
     result::Vector{T}
@@ -44,10 +71,11 @@ struct CauchyEndgameResult{T<:Number}
     R::Float64
     λ::Float64
     trace::Vector{Vector{T}}
+    convergent_cluster::Nullable{ConvergentCluster{T}}
 end
 
 """
-    Result(solution, returncode, iterations, affine_solution, projective_solution, startvalue, steps, trace)
+    Result(solution, returncode, iterations, affine_solution, projective_solution, startvalue, steps, trace, nullable_cluster)
 
 Construct a result of `solve` with an `AbstractPredictorCorrectorAlgorithm`.
 
@@ -60,6 +88,7 @@ Construct a result of `solve` with an `AbstractPredictorCorrectorAlgorithm`.
 * `project_solution::Vector{T}`
 * `startvalue::Vector{T}`
 * `trace::Vector{Vector{T}}`: Empty if `record_trace=false` (default)
+* `convergent_cluster::Nullable{ConvergentCluster{T}}`: The convergent cluster of the endgame.
 """
 struct Result{T<:Number}
     solution::Vector{T}
@@ -74,9 +103,11 @@ struct Result{T<:Number}
     #* `steps::Vector{S}`: Empty if `record_steps=false` (default)
     #steps::Vector{Float64}
     trace::Vector{Vector{T}}
+
+    convergent_cluster::Nullable{ConvergentCluster{T}}
 end
 
-function Base.show(io::IO, ::MIME"text/plain", res::Result)
+function Base.show(io::IO, res::Result)
     println(io, typeof(res),":")
     println(io, "------------------------------")
     println(io, "* solution: ", res.solution)
@@ -89,9 +120,10 @@ function Base.show(io::IO, ::MIME"text/plain", res::Result)
     println(io, "* startvalue: ", res.startvalue)
     #println(io, "* steps: ", length(res.steps), " entries")
     println(io, "* trace: ", length(res.trace), " entries")
+    println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", res::CauchyEndgameResult)
+function Base.show(io::IO, res::CauchyEndgameResult)
     println(io, typeof(res),":")
     println(io, "------------------------------")
     println(io, "* result: ", res.result)
@@ -101,9 +133,10 @@ function Base.show(io::IO, ::MIME"text/plain", res::CauchyEndgameResult)
     println(io, "* R: ", res.R)
     println(io, "* λ: ", res.λ)
     println(io, "* trace: ", length(res.trace), " entries")
+    println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", res::PathResult)
+function Base.show(io::IO, res::PathResult)
     println(io, typeof(res),":")
     println(io, "------------------------------")
     println(io, "* result: ", res.result)
