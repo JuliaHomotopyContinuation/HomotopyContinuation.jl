@@ -15,8 +15,8 @@ It is based on "A Parallel Endgame " by Bates, Hauenstein and Sommese. [^1]
 
 [^1]: Bates, Daniel J., Jonathan D. Hauenstein, and Andrew J. Sommese. "A Parallel Endgame." Contemp. Math 556 (2011): 25-35.
 """
-function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true};
-    prediction_tolerance=1e-4,
+function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{true};
+    prediction_tolerance=1e-8,
     geometric_series_factor=0.5,
     endgame_tolerance=1e-8,
     samples_per_loop::Int=8,
@@ -24,7 +24,7 @@ function cauchyendgame(H::AbstractHomotopy, x, t::Float64, algorithm::APCA{true}
     loopclosed_tolerance=1e-3,
     tolerance_infinity=1e-8,
     pathtrackingkwargs...
-)
+) where {T}
     λ = geometric_series_factor
     R = t
     xs = [x]
