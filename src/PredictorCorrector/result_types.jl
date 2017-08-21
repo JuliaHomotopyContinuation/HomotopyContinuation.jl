@@ -120,7 +120,7 @@ function Base.show(io::IO, res::Result)
     println(io, "* startvalue: ", res.startvalue)
     #println(io, "* steps: ", length(res.steps), " entries")
     println(io, "* trace: ", length(res.trace), " entries")
-    printlnt(io, "* convergent cluster: ", get(map(string, convergent_cluster), "---"))
+    println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
 end
 
 function Base.show(io::IO, res::CauchyEndgameResult)
@@ -133,7 +133,7 @@ function Base.show(io::IO, res::CauchyEndgameResult)
     println(io, "* R: ", res.R)
     println(io, "* λ: ", res.λ)
     println(io, "* trace: ", length(res.trace), " entries")
-    printlnt(io, "* convergent cluster: ", get(map(string, convergent_cluster), "---"))
+    println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
 end
 
 function Base.show(io::IO, res::PathResult)
