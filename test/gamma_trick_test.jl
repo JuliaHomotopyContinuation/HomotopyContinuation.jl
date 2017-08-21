@@ -38,6 +38,8 @@
     @test ishomogenous(K)
     @test nvariables(K) == 3
     @test H.γ == K.γ
+    @test length(removepoly(H, 2)) == 1
+    @test removepoly(H, 1).γ == H.γ
 
     H = GammaTrickHomotopy([y^2-x], [x^2+3y])
     @test norm(H.γ) ≈ 1.0 atol=1e-8

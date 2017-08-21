@@ -70,6 +70,10 @@ function substitute(H::GammaTrickHomotopy, pair::Pair{Symbol,<:Number})
     GammaTrickHomotopy(substitute(H.start, pair), substitute(H.target, pair), H.γ)
 end
 
+function removepoly(H::GammaTrickHomotopy, i::Int)
+    GammaTrickHomotopy(removepoly(H.start,i), removepoly(H.target,i), H.γ)
+end
+
 """
     differentiate(H::GammaTrickHomotopy)
 
