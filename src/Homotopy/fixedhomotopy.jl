@@ -32,3 +32,4 @@ nvariables(H::FixedHomotopy) = nvariables(H.homotopy)
 degrees(H::FixedHomotopy) = degrees(H.homotopy)
 
 Base.length(H::FixedHomotopy) = length(H.homotopy)
+Base.eltype(::FixedHomotopy{T, H, S}) where {T, H, S} = T
