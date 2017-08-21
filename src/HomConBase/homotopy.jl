@@ -1,4 +1,5 @@
 evaluate(H::AbstractHomotopy, x, t) = error("`evaluate` not implemented for $(typeof(H))<:AbstractHomotopy")
+substitute(H::AbstractHomotopy, pair::Pair{Symbol,<:Number}) = error("`substitute` not implemented for $(typeof(H))<:AbstractHomotopy")
 startsystem(H::AbstractHomotopy) = error("`startsystem` not implemented for $(typeof(H))<:AbstractHomotopy")
 targetsystem(H::AbstractHomotopy) = error("`targetsystem` not implemented for $(typeof(H))<:AbstractHomotopy")
 nvariables(H::AbstractHomotopy) = error("`nvars` not implemented for $(typeof(H))<:AbstractHomotopy")

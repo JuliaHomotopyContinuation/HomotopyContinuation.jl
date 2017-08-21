@@ -5,7 +5,7 @@ module HomConBase
 
     import FixedPolySystem: AbstractPolySystem, Poly, PolySystem,
         nvariables, variables, polynomials, degrees,
-        evaluate, evaluate!, differentiate,
+        evaluate, evaluate!, substitute, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
         weyldot, weylnorm
     # Exports from FixedPolySystem
@@ -33,7 +33,7 @@ module HomConBase
     include("homotopy.jl")
     include("utilities.jl")
 
-    export evaluate, startsystem, targetsystem,
+    export evaluate, substitute, startsystem, targetsystem,
         differentiate, dt, ∂t, nvariables, degrees,
         nequations, ishomogenous, homogenize, homogenized, weylnorm
 

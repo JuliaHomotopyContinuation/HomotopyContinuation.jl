@@ -1,7 +1,7 @@
 module Homotopy
 
     using ..HomConBase
-    import ..HomConBase: AbstractHomotopy, AbstractPolySystem, evaluate,
+    import ..HomConBase: AbstractHomotopy, AbstractPolySystem, evaluate, substitute,
         startsystem, targetsystem,
         differentiate, dt,
         homogenize, ishomogenous, homogenized,
@@ -12,7 +12,7 @@ module Homotopy
     include("gamma_trick.jl")
     include("fixedhomotopy.jl")
 
-    export evaluate, startsystem, targetsystem, differentiate,
-        dt, homogenize, homogenized, degrees, weylnorm, nvars, nequations
+    export evaluate, substitute, startsystem, targetsystem, differentiate,
+        dt, homogenize, homogenized, degrees, weylnorm, nvariables
     export StraightLineHomotopy, GammaTrickHomotopy, FixedHomotopy
 end

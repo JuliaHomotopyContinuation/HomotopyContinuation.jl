@@ -9,6 +9,10 @@
     @test H([2.0+0im, 1.0], 1.0) == [-1.0+0im]
     @test evaluate(H, [2.0+0im, 1.0], 0.0) == [7.0+0im]
 
+    K = substitute(H, :y=>1.0)
+    @test K([1.0], 0.0) == [4.0]
+    @test K([1.0], 1.0) == [0.0]
+
     J_H = differentiate(H)
 
     @test J_H([1.0+0im, 1.0], 0.0) == [2 3+0im]

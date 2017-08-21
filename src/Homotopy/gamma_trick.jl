@@ -66,6 +66,10 @@ function evaluate(H::GammaTrickHomotopy, x, t)
 end
 (H::GammaTrickHomotopy)(x,t) = evaluate(H,x,t)
 
+function substitute(H::GammaTrickHomotopy, pair::Pair{Symbol,<:Number})
+    GammaTrickHomotopy(substitute(H.start, pair), substitute(H.target, pair), H.γ)
+end
+
 """
     differentiate(H::GammaTrickHomotopy)
 
