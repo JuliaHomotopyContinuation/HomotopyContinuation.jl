@@ -5,7 +5,7 @@ module Homotopy
         startsystem, targetsystem,
         differentiate, dt,
         homogenize, ishomogenous, homogenized,
-        degrees, weylnorm, nvariables
+        degrees, weylnorm, nvariables, coefftype
 
     import Base: length
     include("straight_line.jl")

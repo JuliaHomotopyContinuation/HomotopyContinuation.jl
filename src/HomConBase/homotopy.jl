@@ -17,3 +17,4 @@ weylnorm(H::AbstractHomotopy, t::Float64) = error("`weyl_norm` not implemented f
 
 @inline ∂t(H::AbstractHomotopy) = dt(H)
 eltype(H::AbstractHomotopy{T}) where {T<:Number} = T
+coefftype(H::AbstractHomotopy{T}) where {T<:Number} = T

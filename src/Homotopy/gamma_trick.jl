@@ -39,8 +39,10 @@ function GammaTrickHomotopy(start::Start,target::Target, γ::Complex128) where {
 end
 # promote if they don't have the same coefficients
 function GammaTrickHomotopy(start::AbstractPolySystem,target::AbstractPolySystem, γ::Complex128)
-    s, t = promote(start, target)
-    GammaTrickHomotopy(s, t, γ)
+    T = promote_type(coefftype(start), coefftype(target))
+    Start = promote_type(T, typeof(start))
+    Target = promote_type(T, typeof(target))
+    GammaTrickHomotopy{T, Start, Target}(convert(Start, start), convert(Target, target), γ)
 end
 GammaTrickHomotopy(s, t, γ::Complex128) = GammaTrickHomotopy(PolySystem(s), PolySystem(t), γ)
 
@@ -50,6 +52,18 @@ function GammaTrickHomotopy(start, target, seed::Int)
     θ = rand() * 2π - π
     GammaTrickHomotopy(start, target, exp(im * θ))
 end
+
+function Base.promote_type(::Type{GammaTrickHomotopy{T, Start, Target}}, ::Type{S}) where {S,T, Start, Target}
+    GammaTrickHomotopy{promote_type(T,S), promote_type(Start, S), promote_type(Target, S)}
+end
+function Base.promote_type(::Type{GammaTrickHomotopy{T, Start1, Target1}}, ::GammaTrickHomotopy{S, Start2, Target2}) where {S,T, Start1, Start2, Target1, Target2}
+    GammaTrickHomotopy{promote_type(T,S), promote_type(Start1, Start2), promote_type(Target1, Target2)}
+end
+
+function Base.convert(::Type{GammaTrickHomotopy{T, Start, Target}}, H::GammaTrickHomotopy) where {T, Start, Target}
+    GammaTrickHomotopy{T, Start, Target}(convert(Start, H.start), convert(Target, H.target), H.γ)
+end
+
 
 function Base.show(io::IO, H::GammaTrickHomotopy)
     print(io, typeof(H), ":\n")
