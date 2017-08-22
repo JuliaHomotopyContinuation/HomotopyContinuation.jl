@@ -25,6 +25,7 @@ function differentiate(H::FixedHomotopy)
     (x) -> dh(x, H.t)
 end
 
+substitute(H::FixedHomotopy, pair) = FixedHomotopy(substitute(H.homotopy, pair), H.t)
 homogenize(H::FixedHomotopy) = FixedHomotopy(homogenize(H.homotopy), H.t)
 homogenized(H::FixedHomotopy) = homogenized(H.homotopy)
 ishomogenous(H::FixedHomotopy) = ishomogenous(H.homotopy)

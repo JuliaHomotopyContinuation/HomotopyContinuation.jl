@@ -7,7 +7,7 @@ module HomotopyContinuation
     export AbstractHomotopy
     export HomConAlgorithm
     export init, solve
-    export evaluate, startsystem, targetsystem,
+    export evaluate, substitute, startsystem, targetsystem,
         differentiate, dt, ∂t, nvariables, degrees,
         nequations, ishomogenous, homogenize
     export affine, projective, totaldegree
@@ -15,7 +15,7 @@ module HomotopyContinuation
     # Exports from FixedPolySystem in HomConBase
     export Poly, PolySystem,
         nvariables, variables, polynomials,
-        evaluate, evaluate!, differentiate,
+        evaluate, evaluate!, substitute, removepoly, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
         weyldot, weylnorm
 
@@ -23,7 +23,7 @@ module HomotopyContinuation
 
     using .Homotopy
     # Homotopy Exports
-    export evaluate, startsystem, targetsystem, differentiate,
+    export substitute, removepoly, valuate, startsystem, targetsystem, differentiate,
         dt, homogenize, homogenized, degrees, weylnorm, nvars, nequations
     export StraightLineHomotopy, GammaTrickHomotopy, FixedHomotopy
 

@@ -9,6 +9,10 @@
     @test H([2.0+0im, 1.0], 1.0) == [-1.0+0im]
     @test evaluate(H, [2.0+0im, 1.0], 0.0) == [7.0+0im]
 
+    K = substitute(H, :y=>1.0)
+    @test K([1.0], 0.0) == [4.0]
+    @test K([1.0], 1.0) == [0.0]
+
     J_H = differentiate(H)
 
     @test J_H([1.0+0im, 1.0], 0.0) == [2 3+0im]
@@ -34,6 +38,8 @@
     @test ishomogenous(K)
     @test nvariables(K) == 3
     @test H.γ == K.γ
+    @test length(removepoly(H, 2)) == 1
+    @test removepoly(H, 1).γ == H.γ
 
     H = GammaTrickHomotopy([y^2-x], [x^2+3y])
     @test norm(H.γ) ≈ 1.0 atol=1e-8

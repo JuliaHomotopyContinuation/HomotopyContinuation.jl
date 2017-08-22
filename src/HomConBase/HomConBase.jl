@@ -1,17 +1,17 @@
 module HomConBase
 
     #using Reexport
-    import Base: eltype, gradient
+    import Base: eltype
 
     import FixedPolySystem: AbstractPolySystem, Poly, PolySystem,
-        nvariables, variables, polynomials, degrees,
-        evaluate, evaluate!, differentiate,
+        nvariables, variables, removepoly, degrees,
+        evaluate, evaluate!, substitute, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
         weyldot, weylnorm
     # Exports from FixedPolySystem
     export AbstractPolySystem, Poly, PolySystem,
         nvariables, variables, polynomials, degrees,
-        evaluate, evaluate!, differentiate,
+        evaluate, evaluate!, differentiate, substitute, removepoly,
         ishomogenous, homogenize, homogenized, dehomogenize,
         weyldot, weylnorm
 
@@ -33,9 +33,9 @@ module HomConBase
     include("homotopy.jl")
     include("utilities.jl")
 
-    export evaluate, startsystem, targetsystem,
+    export evaluate, substitute, startsystem, targetsystem,
         differentiate, dt, ∂t, nvariables, degrees,
-        nequations, ishomogenous, homogenize, homogenized, weylnorm
+        nequations, removepoly, ishomogenous, homogenize, homogenized, weylnorm
 
     export affine, projective, totaldegree
 end

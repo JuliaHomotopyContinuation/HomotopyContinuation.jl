@@ -42,6 +42,14 @@ function evaluate(H::StraightLineHomotopy, x, t)
 end
 (H::StraightLineHomotopy)(x,t) = evaluate(H,x,t)
 
+function substitute(H::StraightLineHomotopy, pair::Pair{Symbol,<:Number})
+    StraightLineHomotopy(substitute(H.start, pair), substitute(H.target, pair))
+end
+
+function removepoly(H::StraightLineHomotopy, i::Int)
+    StraightLineHomotopy(removepoly(H.start,i), removepoly(H.target,i))
+end
+
 function Base.show(io::IO, H::StraightLineHomotopy)
     print(io, typeof(H), ":\n")
     println(io, "* start:")
