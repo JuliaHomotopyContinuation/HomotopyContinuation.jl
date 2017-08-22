@@ -27,6 +27,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
 ) where {T}
     λ = geometric_series_factor
     R = t
+    steps = [R]
     xs = [x]
     lastprediction = Nullable(x, false)
     endgame_started = false
@@ -34,9 +35,10 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
     while R > eps(Float64)
         res = trackpath(H, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
         if nosuccess(res)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
+            return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
         end
         R = λ*R
+        push!(steps, R)
         push!(xs, res.result)
 
         # we need at least 4 points to start with our first heuristic
@@ -45,7 +47,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
         end
 
         if atinfinity(get(lastprediction, last(xs)), tolerance_infinity)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :AtInfinity, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
+            return CauchyEndgameResult(get(lastprediction, last(xs)), :AtInfinity, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
         end
 
         if endgame_started || firstheuristic(R, λ, xs[end-3], xs[end-2], xs[end-1], xs[end])
@@ -61,7 +63,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
                     Δprediction = projectivenorm(prediction, get(lastprediction))
                     if Δprediction < prediction_tolerance
                         cluster = ConvergentCluster(samples[1:samples_per_loop:end], prediction, R)
-                        return CauchyEndgameResult(prediction, :Success, k, R, λ, xs, Nullable(cluster))
+                        return CauchyEndgameResult(prediction, :Success, k, R, λ, xs, steps, Nullable(cluster))
                     end
                 end
                 lastprediction = Nullable(prediction)
@@ -71,7 +73,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
         k += 1
     end
 
-    CauchyEndgameResult(get(lastprediction, last(xs)), :MachineEpsilon, k, R, λ, xs, Nullable{ConvergentCluster{T}}())
+    CauchyEndgameResult(get(lastprediction, last(xs)), :MachineEpsilon, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
 end
 
 atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
