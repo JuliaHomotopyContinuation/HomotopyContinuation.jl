@@ -37,11 +37,7 @@ function StraightLineHomotopy(start::AbstractPolySystem,target::AbstractPolySyst
     Target = promote_type(T, typeof(target))
     StraightLineHomotopy{T, Start, Target}(convert(Start, start), convert(Target, target))
 end
-function StraightLineHomotopy(s, t)
-    @show s
-    @show t
-    StraightLineHomotopy(PolySystem(s), PolySystem(t))
-end
+StraightLineHomotopy(s, t) = StraightLineHomotopy(PolySystem(s), PolySystem(t))
 
 function evaluate(H::StraightLineHomotopy, x, t)
     (1-t) .* evaluate(H.target, x) .+ t .* evaluate(H.start, x)
