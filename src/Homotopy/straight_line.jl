@@ -32,8 +32,10 @@ function StraightLineHomotopy(start::Start,target::Target) where {T<:Number, Sta
 end
 # promote if they don't have the same coefficients
 function StraightLineHomotopy(start::AbstractPolySystem,target::AbstractPolySystem)
-    s, t = promote(start, target)
-    StraightLineHomotopy(s, t)
+    T = promote_type(coefftype(start), coefftype(target))
+    Start = promote_type(T, typeof(start))
+    Target = promote_type(T, typeof(target))
+    StraightLineHomotopy{T, Start, Target}(convert(Start, start), convert(Target, target))
 end
 StraightLineHomotopy(s, t) = StraightLineHomotopy(PolySystem(s), PolySystem(t))
 
@@ -57,6 +59,18 @@ function Base.show(io::IO, H::StraightLineHomotopy)
     println(io, "* target:")
     print(io, H.target)
 end
+
+function Base.promote_type(::Type{StraightLineHomotopy{T, Start, Target}}, ::Type{S}) where {S,T, Start, Target}
+    StraightLineHomotopy{promote_type(T,S), promote_type(Start, S), promote_type(Target, S)}
+end
+function Base.promote_type(::Type{StraightLineHomotopy{T, Start1, Target1}}, ::StraightLineHomotopy{S, Start2, Target2}) where {S,T, Start1, Start2, Target1, Target2}
+    StraightLineHomotopy{promote_type(T,S), promote_type(Start1, Start2), promote_type(Target1, Target2)}
+end
+
+function Base.convert(::Type{StraightLineHomotopy{T, Start, Target}}, H::StraightLineHomotopy) where {T, Start, Target}
+    StraightLineHomotopy{T, Start, Target}(convert(Start, H.start), convert(Target, H.target))
+end
+
 """
     differentiate(H::StraightLineHomotopy)
 

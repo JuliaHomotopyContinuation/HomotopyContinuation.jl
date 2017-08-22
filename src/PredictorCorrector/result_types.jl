@@ -71,6 +71,7 @@ struct CauchyEndgameResult{T<:Number}
     R::Float64
     λ::Float64
     trace::Vector{Vector{T}}
+    steps::Vector{Float64}
     convergent_cluster::Nullable{ConvergentCluster{T}}
 end
 
@@ -101,8 +102,8 @@ struct Result{T<:Number}
 
     startvalue::Vector{T}
     #* `steps::Vector{S}`: Empty if `record_steps=false` (default)
-    #steps::Vector{Float64}
     trace::Vector{Vector{T}}
+    steps::Vector{Float64}
 
     convergent_cluster::Nullable{ConvergentCluster{T}}
 end
@@ -118,7 +119,7 @@ function Base.show(io::IO, res::Result)
     println(io, "* affine_solution: ", res.affine_solution)
     println(io, "* projective_solution: ", res.projective_solution)
     println(io, "* startvalue: ", res.startvalue)
-    #println(io, "* steps: ", length(res.steps), " entries")
+    println(io, "* steps: ", length(res.steps), " entries")
     println(io, "* trace: ", length(res.trace), " entries")
     println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
 end

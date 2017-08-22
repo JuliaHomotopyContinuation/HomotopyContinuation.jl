@@ -7,7 +7,7 @@ module HomConBase
         nvariables, variables, removepoly, degrees,
         evaluate, evaluate!, substitute, differentiate,
         ishomogenous, homogenize, homogenized, dehomogenize,
-        weyldot, weylnorm
+        weyldot, weylnorm, coefftype
     # Exports from FixedPolySystem
     export AbstractPolySystem, Poly, PolySystem,
         nvariables, variables, polynomials, degrees,
@@ -35,7 +35,7 @@ module HomConBase
 
     export evaluate, substitute, startsystem, targetsystem,
         differentiate, dt, ∂t, nvariables, degrees,
-        nequations, removepoly, ishomogenous, homogenize, homogenized, weylnorm
+        nequations, removepoly, ishomogenous, homogenize, homogenized, weylnorm, coefftype
 
     export affine, projective, totaldegree
 end

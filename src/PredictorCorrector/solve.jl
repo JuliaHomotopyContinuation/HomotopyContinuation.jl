@@ -121,8 +121,8 @@ function postprocess(pathresult::PathResult{T}, startvalue, ::APCA{true}, tolera
            affine_solution,
            projective_solution,
            startvalue,
-           #pathresult.steps,
            pathresult.trace,
+           pathresult.steps,
            Nullable{ConvergentCluster{T}}())
 end
 
@@ -142,8 +142,8 @@ function postprocess(pathresult::PathResult, endgameresult::CauchyEndgameResult,
            affine_solution,
            projective_solution,
            startvalue,
-           #pathresult.steps,
            [pathresult.trace; endgameresult.trace],
+           [pathresult.steps; endgameresult.steps],
            endgameresult.convergent_cluster)
 end
 
@@ -159,7 +159,7 @@ function postprocess(pathresult::PathResult{T}, startvalue, ::APCA{false}) where
            affine_solution,
            projective_solution,
            startvalue,
-           #pathresult.steps,
            pathresult.trace,
+           pathresult.steps,
            Nullable{ConvergentCluster{T}}())
 end
