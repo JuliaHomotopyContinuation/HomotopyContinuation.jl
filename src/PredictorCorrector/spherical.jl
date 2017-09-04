@@ -31,7 +31,7 @@ function predict(alg::Spherical, H::AbstractHomotopy, J_H, ∂H∂t, x, t, Δt)
     dot_x = \([J_H(x,t); x'], [-∂H∂t(x,t); 0])
     norm_dot_x = norm(dot_x)
     # TODO: conditining? i.e. check singular values
-    cos(-norm_dot_x*Δt) .* x .+ sin(-norm_dot_x*Δt) .* dot_x ./ norm_dot_x
+    cos(-norm_dot_x*Δt) .* x .+ (sin(-norm_dot_x*Δt) / norm_dot_x) .* dot_x
 end
 
 function correct!(
@@ -62,7 +62,7 @@ function correct!(
 
         Δx .= \(dx_xt, res)
         norm_Δx = norm(Δx)
-        u .= cos(norm_Δx) .* u .+ sin(norm_Δx) .* Δx ./ norm_Δx
+        u .= cos(norm_Δx) .* u .+ (sin(norm_Δx) / norm_Δx) .* Δx
     end
 
     norm(res) < tol

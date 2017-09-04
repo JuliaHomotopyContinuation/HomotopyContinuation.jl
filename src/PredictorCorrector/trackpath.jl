@@ -25,6 +25,20 @@ function trackpath(
     startvalue::Vector{T},
     algorithm::AbstractPredictorCorrectorAlgorithm,
     start::S,
+    finish::S;kwargs...
+) where {S<:Number,T<:Number}
+    J_H = differentiate(H)
+    ∂H∂t = ∂t(H)
+    trackpath(H, J_H, ∂H∂t, startvalue, algorithm, start, finish; kwargs...)
+end
+
+function trackpath(
+    H::AbstractHomotopy{T},
+    J_H,
+    ∂H∂t,
+    startvalue::Vector{T},
+    algorithm::AbstractPredictorCorrectorAlgorithm,
+    start::S,
     finish::S;
     maxiterations=10000,
     tolerance=1e-4,
@@ -38,11 +52,6 @@ function trackpath(
     correction_step_maxiterations=3,
     debug=false
 ) where {S<:Number,T<:Number}
-
-    # we only need to compute these once
-    J_H = differentiate(H)
-    ∂H∂t = ∂t(H)
-
     # We want to track a path z(t) from z(start) to z(finish).
     # We reformulate it as a problem z(γ(s)) where γ: [1, 0] -> line from start to finish
     γlength = finish - start

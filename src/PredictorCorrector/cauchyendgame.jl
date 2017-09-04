@@ -1,5 +1,5 @@
 """
-    cauchyendgame(H::AbstractHomotopy, x, R, algorithm, kwargs..., pathtrackingkwargs...)
+    cauchyendgame(H::AbstractHomotopy, J_H, ∂H∂t, x, R, algorithm, kwargs..., pathtrackingkwargs...)
 
 Execute a cauchy endgame for `H` starting at radius `R`. This assumes that ``H(x,t)=0``.
 It is based on "A Parallel Endgame " by Bates, Hauenstein and Sommese. [^1]
@@ -15,7 +15,7 @@ It is based on "A Parallel Endgame " by Bates, Hauenstein and Sommese. [^1]
 
 [^1]: Bates, Daniel J., Jonathan D. Hauenstein, and Andrew J. Sommese. "A Parallel Endgame." Contemp. Math 556 (2011): 25-35.
 """
-function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{true};
+function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, algorithm::APCA{true};
     prediction_tolerance=1e-8,
     geometric_series_factor=0.5,
     endgame_tolerance=1e-8,
@@ -33,7 +33,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
     endgame_started = false
     k = 1
     while R > eps(Float64)
-        res = trackpath(H, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
+        res = trackpath(H, J_H, ∂H∂t, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
         if nosuccess(res)
             return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
         end
@@ -52,7 +52,7 @@ function cauchyendgame(H::AbstractHomotopy{T}, x, t::Float64, algorithm::APCA{tr
 
         if endgame_started || firstheuristic(R, λ, xs[end-3], xs[end-2], xs[end-1], xs[end])
             retcode, samples =
-                loop(H, last(xs), R, algorithm, samples_per_loop, max_winding_number,
+                loop(H, J_H, ∂H∂t, last(xs), R, algorithm, samples_per_loop, max_winding_number,
                     loopclosed_tolerance, endgame_tolerance, apply_heuristic=!endgame_started)
             if retcode == :Success
                 endgame_started = true
@@ -80,13 +80,15 @@ atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
 
 
 """
-    loop(H, x, radius, algorithm, samples_per_loop, max_winding_number, loopclosed_tolerance, apply_heuristic=true, pathtrackingkwargs...)
+    loop(H, J_H, ∂H∂t, x, radius, algorithm, samples_per_loop, max_winding_number, loopclosed_tolerance, apply_heuristic=true, pathtrackingkwargs...)
 
 Tracks the implicit defined path z(t) around the `n`-gon with vertices
 ``r⋅exp(i2πk/n)`` where `n=samples_per_loop`.
 """
 function loop(
     H::AbstractHomotopy{T},
+    J_H,
+    ∂H∂t,
     x,
     radius::Real,
     algorithm::APCA,
@@ -101,7 +103,7 @@ function loop(
     samples = [x]
     start = first(unitroots)
     for (k, finish) in enumerate(Iterators.drop(unitroots, 1))
-        pathresult = trackpath(H, samples[end], algorithm, start, finish; pathtrackingkwargs...)
+        pathresult = trackpath(H, J_H, ∂H∂t, samples[end], algorithm, start, finish; pathtrackingkwargs...)
         if pathresult.returncode != :Success
             return (:BadBranch, samples)
         end
