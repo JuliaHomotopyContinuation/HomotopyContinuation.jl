@@ -34,6 +34,8 @@ function solve(
     end
 
     H = prepare_homotopy(H, algorithm)
+    J_H = differentiate(H)
+    ∂H∂t = ∂t(H)
     total_startvalues = length(startvalues)
 
     if report_progess
@@ -46,7 +48,7 @@ function solve(
             println("Start to track path $index")
         end
 
-        result = solve(H, startvalue, algorithm; homotopy_prepared=true, kwargs...)
+        result = solve(H, J_H, ∂H∂t, startvalue, algorithm; kwargs...)
 
         if report_progess
             println("Path $index returned: $(result.returncode)")
@@ -58,20 +60,26 @@ function solve(
     solutions
 end
 
-function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{false};
+function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA;
     homotopy_prepared=false,
-    trackpathkwargs...
+    kwargs...
 ) where {T<:Number}
     if !homotopy_prepared
         H = prepare_homotopy(H, algorithm)
     end
+    J_H = differentiate(H)
+    ∂H∂t = ∂t(H)
+    solve(H, J_H, ∂H∂t, starvalue, algorithm; kwargs...)
+end
+function solve(H::AbstractHomotopy{T}, J_H, ∂H∂t, startvalue::Vector{T}, algorithm::APCA{false};
+    trackpathkwargs...
+) where {T<:Number}
     x = prepare_startvalue(H, startvalue, algorithm)
-    pathresult = trackpath(H, x, algorithm, 1.0, 0.0; trackpathkwargs...)
+    pathresult = trackpath(H, J_H, ∂H∂t, x, algorithm, 1.0, 0.0; trackpathkwargs...)
     postprocess(pathresult, startvalue, algorithm)
 end
 
-function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{true};
-    homotopy_prepared=false,
+function solve(H::AbstractHomotopy{T}, J_H, ∂H∂t, startvalue::Vector{T}, algorithm::APCA{true};
     endgame_start=0.1,
     # endgame kwargs copied from cauchyendgame.jl
     prediction_tolerance=1e-4,
@@ -80,18 +88,15 @@ function solve(H::AbstractHomotopy{T}, startvalue::Vector{T}, algorithm::APCA{tr
     samples_per_loop::Int=8,
     max_winding_number::Int=8,
     loopclosed_tolerance=1e-3,
-    tolerance_infinity=1e-8,
+    tolerance_infinity=1e-6,
     trackpathkwargs...
 ) where {T<:Number}
-    if !homotopy_prepared
-        H = prepare_homotopy(H, algorithm)
-    end
     x = prepare_startvalue(H, startvalue, algorithm)
-    pathresult = trackpath(H, x, algorithm, 1.0, endgame_start; trackpathkwargs...)
+    pathresult = trackpath(H, J_H, ∂H∂t, x, algorithm, 1.0, endgame_start; trackpathkwargs...)
     if nosuccess(pathresult) || (endgame_start <= 0.0)
         return postprocess(pathresult, startvalue, algorithm, tolerance_infinity)
     end
-    endgameresult = cauchyendgame(H, pathresult.result, endgame_start, algorithm,
+    endgameresult = cauchyendgame(H,  J_H, ∂H∂t, pathresult.result, endgame_start, algorithm,
         # this is really not optimal but don't know a better way for now...
         prediction_tolerance=prediction_tolerance,
         geometric_series_factor=geometric_series_factor,
