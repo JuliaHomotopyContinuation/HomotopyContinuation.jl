@@ -37,5 +37,5 @@ module HomConBase
         differentiate, dt, ∂t, nvariables, degrees,
         nequations, removepoly, ishomogenous, homogenize, homogenized, weylnorm, coefftype
 
-    export affine, projective, totaldegree
+    export affine, projective, totaldegree, randomsystem
 end

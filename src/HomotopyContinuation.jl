@@ -10,7 +10,7 @@ module HomotopyContinuation
     export evaluate, substitute, startsystem, targetsystem,
         differentiate, dt, ∂t, nvariables, degrees,
         nequations, ishomogenous, homogenize
-    export affine, projective, totaldegree
+    export affine, projective, totaldegree, randomsystem
 
     # Exports from FixedPolySystem in HomConBase
     export Poly, PolySystem,
