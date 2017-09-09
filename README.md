@@ -8,8 +8,6 @@ Getting started
 -----------
 Since this package is pre-release and also relies on couple of unreleased packages. To satisfy all dependencies you have to install it via
 ```sh
-Pkg.clone("https://github.com/blegat/MultivariatePolynomials.jl.git");
-Pkg.clone("https://github.com/blegat/DynamicPolynomials.jl.git");
 Pkg.clone("https://github.com/saschatimme/FixedPolySystem.jl");
 Pkg.clone("https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git")
 ```
