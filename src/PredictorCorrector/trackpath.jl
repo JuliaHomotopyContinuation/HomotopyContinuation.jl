@@ -1,3 +1,4 @@
+export trackpath, PathResult, result, returncode, iterations, startvalue, pathtrace, pathsteps, laststep, issuccessfull
 """
     trackpath(H::AbstractHomotopy, startvalue, algorithm::PredictorCorrector, start, finish; kwargs...)
 
@@ -25,21 +26,23 @@ function trackpath(
     startvalue::Vector{T},
     algorithm::AbstractPredictorCorrectorAlgorithm,
     start::S,
-    finish::S;kwargs...
+    finish::S;
+    kwargs...
 ) where {S<:Number,T<:Number}
-    J_H = differentiate(H)
-    ∂H∂t = ∂t(H)
-    trackpath(H, J_H, ∂H∂t, startvalue, algorithm, start, finish; kwargs...)
+    J_H! = Homotopy.jacobian!(H)
+    Hdt! = Homotopy.dt!(H)
+    trackpath(H, J_H!, Hdt!, startvalue, algorithm, start, finish; kwargs...)
 end
 
 function trackpath(
     H::AbstractHomotopy{T},
-    J_H,
-    ∂H∂t,
+    J_H!::Function, # result of Homotopy.jacobian!, i.e. takes (U, x, t)
+    Hdt!::Function, # result of Homotopy.dt!, i.e. takes (u, x, t)
     startvalue::Vector{T},
     algorithm::AbstractPredictorCorrectorAlgorithm,
     start::S,
     finish::S;
+    # !keep kwargs in sync with `istrackpathkwarg` below!
     maxiterations=10000,
     tolerance=1e-4,
     refinement_tolerance=1e-12,
@@ -58,8 +61,11 @@ function trackpath(
     γ(s) = start + (1 - s) * γlength
 
     # some setup before we start the main loop
+    n = nvariables(H)
     x = copy(startvalue)
     u = similar(x)
+    A = zeros(T, n, n)
+    b = zeros(T, n)
 
     steps::Vector{S} = [];
     trace::Vector{Vector{T}} = [];
@@ -70,25 +76,20 @@ function trackpath(
     k = 0
 
     while s > 0 && k < maxiterations
-        if record_steps
-            push!(steps, s)
-        end
-        if record_trace
-            push!(trace, x)
-        end
+        if record_steps; push!(steps, s); end
+        if record_trace; push!(trace, x); end
 
-        Δs= min(steplength, s)
-
-        u .= predict(algorithm, H, J_H, ∂H∂t, x, γ(s), Δs * γlength)
+        Δs = min(steplength, s)
+        predict!(u, A, b, H, J_H!, Hdt!, x, γ(s), Δs * γlength, algorithm)
 
         if debug
             println("")
             println("t: $t Δt: $Δt, iteration: $k")
-            println("x: $x, norm: $(norm(evaluate(H,x,t)))")
-            println("predicted: $x, norm: $(norm(evaluate(H,x,t)))")
+            println("x: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
+            println("predicted: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
         end
 
-        converged = correct!(u, algorithm, H, J_H, x, γ(s - Δs), tolerance, correction_step_maxiterations)
+        converged = correct!(u, A, b, H, J_H!, x, γ(s - Δs), tolerance, correction_step_maxiterations, algorithm)
 
         if converged
             x .= u
@@ -111,11 +112,9 @@ function trackpath(
     end
 
     if s ≈ 0 && norm(evaluate(H, x, γ(0.0))) < tolerance
-        refinement_converged = correct!(u, algorithm, H, J_H, x, γ(0.0), refinement_tolerance, 10)
+        refinement_converged = correct!(u, A, b, H, J_H!, x, γ(0.0), refinement_tolerance, 10, algorithm)
         if refinement_converged
             x .= u
-        else
-
         end
     end
 
@@ -129,3 +128,54 @@ function trackpath(
 
     PathResult(x, retcode, startvalue, k, γ(s), steps, trace)
 end
+
+function istrackpathkwarg(kwarg)
+    symb = first(kwarg)
+    symb == :maxiterations ||
+    symb == :tolerance ||
+    symb == :refinement_tolerance ||
+    symb == :initial_steplength ||
+    symb == :successfull_steps_until_steplength_increase ||
+    symb == :steplength_increase_factor ||
+    symb == :steplength_decrease_factor ||
+    symb == :record_trace ||
+    symb == :record_steps ||
+    symb == :correction_step_maxiterations ||
+    symb == :debug
+end
+trackpathkwargs(kwargs) = filter(istrackpathkwarg, kwargs)
+
+"""
+    PathResult(result, returncode, startvalue, iterations, laststep, steps, trace)
+
+Construct a result of `trackpath`.
+
+## Fields
+* `result::Vector{T}`
+* `returncode::Symbol`: :Success or :MaxIterations or :Diverged
+* `startvalue::Vector{T}`
+* `iterations::Int`
+* `laststep::S`: If :Success this is just `finish`
+* `steps::Vector{S}`: Empty if `record_steps=false` (default)
+* `trace::Vector{Vector{T}}`: Empty if `record_trace=false` (default)
+"""
+struct PathResult{T<:Number, S<:Number}
+    result::Vector{T}
+    returncode::Symbol
+
+    startvalue::Vector{T}
+    iterations::Int
+    laststep::S
+    steps::Vector{S}
+    trace::Vector{Vector{T}}
+end
+
+result(r::PathResult) = r.result
+returncode(r::PathResult) = r.returncode
+iterations(r::PathResult) = r.iterations
+startvalue(r::PathResult) = r.startvalue
+laststep(r::PathResult) = r.laststep
+pathtrace(r::PathResult) = r.trace
+pathsteps(r::PathResult) = r.steps
+
+issuccessfull(r::PathResult) = returncode(r) == :Success

@@ -1,9 +1,6 @@
 @testset "cauchyendgame" begin
      PolyImpl.@polyvar x
-     F = PolySystem([(x - 2.0)^4])
-     G, solutions = totaldegree(F)
-
-     H = StraightLineHomotopy(G,F)
+     H, solutions = totaldegree(StraightLineHomotopy{Complex128}, [(x - 2.0)^4])
 
      results = solve(H, solutions)
      for result in results
