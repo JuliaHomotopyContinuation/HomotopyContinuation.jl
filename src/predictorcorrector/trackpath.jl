@@ -3,9 +3,8 @@ export trackpath, PathResult, result, returncode, iterations, startvalue, pathtr
     trackpath(H::AbstractHomotopy, startvalue, algorithm::PredictorCorrector, start, finish; kwargs...)
 
 Tracks the path ``z(t)`` which is implicitly defined via ``H(x,t)`` from
-`z(start)=H(startvalue, start)` to `z(finish)= H(result, finish)` with the given
+`z(start)=H(startvalue, start)` to `z(finish) = H(result, finish)` with the given
 PredictorCorrector `algorithm`.
-
 We reformulate the path ``z(t)`` as a path z(γ(s)) where γ: [1, 0] -> line from start to finish
 
 ## Optional arguments
@@ -26,9 +25,7 @@ function trackpath(
     startvalue::Vector{T},
     algorithm::AbstractPredictorCorrectorAlgorithm,
     start::S,
-    finish::S;
-    kwargs...
-) where {S<:Number,T<:Number}
+    finish::S; kwargs...) where {S<:Number,T<:Number}
     J_H! = Homotopy.jacobian!(H)
     Hdt! = Homotopy.dt!(H)
     trackpath(H, J_H!, Hdt!, startvalue, algorithm, start, finish; kwargs...)
@@ -53,8 +50,7 @@ function trackpath(
     record_trace=false,
     record_steps=false,
     correction_step_maxiterations=3,
-    debug=false
-) where {S<:Number,T<:Number}
+    debug=false) where {S<:Number,T<:Number}
     # We want to track a path z(t) from z(start) to z(finish).
     # We reformulate it as a problem z(γ(s)) where γ: [1, 0] -> line from start to finish
     γlength = finish - start

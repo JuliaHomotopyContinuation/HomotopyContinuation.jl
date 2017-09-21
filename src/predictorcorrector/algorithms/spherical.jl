@@ -52,15 +52,14 @@ function predict!(
     scale!(v, -one(T))
     b[end] = zero(T)
 
-    # this computes A \ b and stores the result in b
+    # this computes A x = b and stores the result x in b
     LU = lufact!(A)
     A_ldiv_B!(LU, b)
-    # let's rename it to make the rest clearer
+    # lets rename it to make the rest clearer
     dot_x = b
 
     norm_dot_x = norm(dot_x)
     θ = -norm_dot_x*Δt
-    # TODO: conditioning? i.e. check singular values
     u .= cos(θ) .* x .+ (sin(θ) / norm_dot_x) .* dot_x
     u
 end
@@ -97,7 +96,7 @@ function correct!(
 
         filljacobi!(A, J_H!, u, t)
 
-        # this computes A \ b and stores the result in b
+        # this computes A x = b and stores the result x in b
         LU = lufact!(A)
         A_ldiv_B!(LU, b)
         # we rename the result for further computations to Δx

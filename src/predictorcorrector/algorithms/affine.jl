@@ -27,7 +27,7 @@ function predict!(
     # fill A and b
     J_H!(A, x, t)
     Hdt!(b, x, t)
-    # compute A \ b and store the result in b
+    # this computes A x = b and stores the result x in b
     LU = lufact!(A)
     A_ldiv_B!(LU, b)
 
@@ -57,7 +57,7 @@ function correct!(
             return false
         end
         J_H!(A, u, t)
-        # compute A \ b and store the result in b
+        # this computes A x = b and stores the result x in b
         LU = lufact!(A)
         A_ldiv_B!(LU, b)
         u .= u .- b
