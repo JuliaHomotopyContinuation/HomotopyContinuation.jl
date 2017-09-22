@@ -1,5 +1,6 @@
 module TestSystems
-    using ..HomConBase
+
+    import FixedPolynomials: Polynomial
 
     export cyclic5, cyclic5Solutions, cyclic7, cyclic7Solutions
 
@@ -25,25 +26,27 @@ module TestSystems
     end
 
 
-    function monompoly(monomials::Vector{Vector{Int}}, totalvars)
-        exps = zeros(Int, totalvars, length(monomials))
+    function monompoly(monomials::Vector{Vector{Int}}, vars)
+        exps = zeros(Int, length(vars), length(monomials))
         for i in eachindex(monomials)
             for var in monomials[i]
                 exps[var, i] = 1
             end
         end
-        coeffs = ones(Int, length(monomials))
-        Poly(exps, coeffs)
+        coeffs = ones(Complex128, length(monomials))
+        Polynomial(exps, coeffs, vars)
     end
 
 
     function cyclical_polys(n)
-        F = map(k -> monompoly(cyclical(1:n, k), n), 1:n-1)
+        vars = [Symbol("z$i") for i=1:n]
+
+        F = map(k -> monompoly(cyclical(1:n, k), vars), 1:n-1)
         # now we have to construct x₁x₂x₃...x_n - 1
         exps = zeros(Int, n, 2)
         exps[:,1] = 1
-        push!(F, Poly(exps, [1, -1]))
-        PolySystem(F, [Symbol("z$i") for i=1:n])
+        push!(F, Polynomial(exps, [1, -1], vars))
+        F
     end
 
     """

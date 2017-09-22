@@ -1,5 +1,35 @@
+export cauchyendgame, ConvergentCluster, CauchyEndgameResult, successfull, clusterpoints,
+    cluster_convergence_point, clustertime, geometric_series_factor, endgameradius
+
 """
-    cauchyendgame(H::AbstractHomotopy, J_H, ∂H∂t, x, R, algorithm, kwargs..., pathtrackingkwargs...)
+    ConvergentCluster(points, convergence_point, t)
+
+Construct a convergent cluster at time `t` with points ``w_1, ..., w_c`` where ``c`` is the
+winding number of the `convergence_point`.
+See Chapter 15.6 in The Numerical solution of systems of polynomials arising in
+engineering and science[^1] for more details.
+
+[^1]: Sommese, Andrew J., and Charles W. Wampler II. The Numerical solution of systems of polynomials arising in engineering and science. World Scientific, 2005.
+"""
+struct ConvergentCluster{T<:Number}
+    points::Vector{Vector{T}}
+    convergence_point::Vector{T}
+    t::Float64
+end
+
+function Base.show(io::IO, cluster::ConvergentCluster)
+    println(io, typeof(cluster),":")
+    println(io, "* cluster points: ", cluster.points)
+    println(io, "* convergence_point: ", cluster.convergence_point)
+    println(io, "* t: ", cluster.t)
+end
+
+clusterpoints(cc::ConvergentCluster) = cc.points
+cluster_convergence_point(cc::ConvergentCluster) = cc.convergence_point
+clustertime(cc::ConvergentCluster) = cc.t
+
+"""
+    cauchyendgame(H::AbstractHomotopy, J_H!, Hdt!, x, R, algorithm, kwargs..., pathtrackingkwargs...)
 
 Execute a cauchy endgame for `H` starting at radius `R`. This assumes that ``H(x,t)=0``.
 It is based on "A Parallel Endgame " by Bates, Hauenstein and Sommese. [^1]
@@ -15,7 +45,13 @@ It is based on "A Parallel Endgame " by Bates, Hauenstein and Sommese. [^1]
 
 [^1]: Bates, Daniel J., Jonathan D. Hauenstein, and Andrew J. Sommese. "A Parallel Endgame." Contemp. Math 556 (2011): 25-35.
 """
-function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, algorithm::APCA{true};
+function cauchyendgame(
+    H::AbstractHomotopy{T},
+    J_H!::Function,
+    Hdt!::Function,
+    x::Vector{T},
+    t::Float64,
+    algorithm::APCA{Val{true}};
     prediction_tolerance=1e-8,
     geometric_series_factor=0.5,
     endgame_tolerance=1e-8,
@@ -33,9 +69,12 @@ function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, alg
     endgame_started = false
     k = 1
     while R > eps(Float64)
-        res = trackpath(H, J_H, ∂H∂t, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
-        if nosuccess(res)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :IllConditionedZone, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
+        res = trackpath(H, J_H!, Hdt!, last(xs), algorithm, R, λ*R; pathtrackingkwargs...)
+        if !issuccessfull(res)
+            return CauchyEndgameResult(
+                get(lastprediction, last(xs)),
+                :IllConditionedZone,
+                k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
         end
         R = λ*R
         push!(steps, R)
@@ -47,13 +86,17 @@ function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, alg
         end
 
         if atinfinity(get(lastprediction, last(xs)), tolerance_infinity)
-            return CauchyEndgameResult(get(lastprediction, last(xs)), :AtInfinity, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
+            return CauchyEndgameResult(
+                get(lastprediction, last(xs)),
+                :AtInfinity,
+                k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
         end
 
         if endgame_started || firstheuristic(R, λ, xs[end-3], xs[end-2], xs[end-1], xs[end])
             retcode, samples =
-                loop(H, J_H, ∂H∂t, last(xs), R, algorithm, samples_per_loop, max_winding_number,
-                    loopclosed_tolerance, endgame_tolerance, apply_heuristic=!endgame_started)
+                loop(H, J_H!, Hdt!, last(xs), R, algorithm,
+                    samples_per_loop, max_winding_number, loopclosed_tolerance,
+                    endgame_tolerance, apply_heuristic=!endgame_started)
             if retcode == :Success
                 endgame_started = true
                 prediction = predict_with_cif(samples)
@@ -62,7 +105,8 @@ function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, alg
                     # the endgame terminates
                     Δprediction = projectivenorm(prediction, get(lastprediction))
                     if Δprediction < prediction_tolerance
-                        cluster = ConvergentCluster(samples[1:samples_per_loop:end], prediction, R)
+                        cluster =
+                            ConvergentCluster(samples[1:samples_per_loop:end], prediction, R)
                         return CauchyEndgameResult(prediction, :Success, k, R, λ, xs, steps, Nullable(cluster))
                     end
                 end
@@ -73,22 +117,86 @@ function cauchyendgame(H::AbstractHomotopy{T}, J_H, ∂H∂t, x, t::Float64, alg
         k += 1
     end
 
-    CauchyEndgameResult(get(lastprediction, last(xs)), :MachineEpsilon, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
+    CauchyEndgameResult(
+        get(lastprediction, last(xs)),
+        :MachineEpsilon, k, R, λ, xs, steps, Nullable{ConvergentCluster{T}}())
 end
 
-atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
+"""
+    CauchyEndgameResult(result, returncode, iterations, R, λ, trace, nullable_cluster)
+
+Construct a result of a `cauchyendgame`.
+
+## Fields
+* `result::Vector{T}`
+* `returncode::Symbol`: `:Success`, `:IllConditionedZone` (the path tracking failed)
+or `:MachineEpsilon`: (`t` got smaller than machine epsilon)
+* `iterations::Int`: How many iterations of the power series was done
+* `R`: The radius when the endgame started
+* `λ`: The factor of the geometric series ``λ^kR``
+* `trace::Vector{Vector{T}}`: The points ``x(λ^kR)`` for `k=0,1,...,iterations`
+* `convergent_cluster::Nullable{ConvergentCluster{T}}`: The convergent cluster of the endgame.
+"""
+struct CauchyEndgameResult{T<:Number}
+    result::Vector{T}
+    returncode::Symbol
+    iterations::Int
+    endgameradius::Float64
+    geometric_series_factor::Float64
+    trace::Vector{Vector{T}}
+    steps::Vector{Float64}
+    convergent_cluster::Nullable{ConvergentCluster{T}}
+end
+
+function Base.show(io::IO, res::CauchyEndgameResult)
+    println(io, typeof(res),":")
+    println(io, "------------------------------")
+    println(io, "* result: ", result(res))
+    println(io, "* returncode: ", returncode(res))
+    println(io, "------------------------------")
+    println(io, "* iterations: ", iterations(res))
+    println(io, "* endgameradius R: ", endgameradius(res))
+    println(io, "* geometric_series_factor λ: ", geometric_series_factor(res))
+    println(io, "* pathtrace: ", length(pathtrace(res)), " entries")
+    println(io, "* pathsteps: ", length(pathsteps(res)), " entries")
+    println(io, "* convergent cluster: ", get(map(string, convergent_cluster(res)), "---"))
+end
+
+result(r::CauchyEndgameResult) = r.result
+returncode(r::CauchyEndgameResult) = r.returncode
+iterations(r::CauchyEndgameResult) = r.iterations
+endgameradius(r::CauchyEndgameResult) = r.endgameradius
+geometric_series_factor(r::CauchyEndgameResult) = r.geometric_series_factor
+pathtrace(r::CauchyEndgameResult) = r.trace
+pathsteps(r::CauchyEndgameResult) = r.steps
+convergent_cluster(r::CauchyEndgameResult) = r.convergent_cluster
+
+issuccessfull(r::CauchyEndgameResult) = returncode(r) == :Success
+
+
+function iscauchykwarg(kwarg)
+    symb = first(kwarg)
+    symb == :prediction_tolerance ||
+    symb == :geometric_series_factor ||
+    symb == :endgame_tolerance ||
+    symb == :samples_per_loop ||
+    symb == :max_winding_number ||
+    symb == :loopclosed_tolerance ||
+    symb == :tolerance_infinity
+end
+cauchykwargs(kwargs) = filter(iscauchykwarg, kwargs)
 
 
 """
-    loop(H, J_H, ∂H∂t, x, radius, algorithm, samples_per_loop, max_winding_number, loopclosed_tolerance, apply_heuristic=true, pathtrackingkwargs...)
+    loop(H, J_H!, Hdt!, x, radius, algorithm, samples_per_loop, max_winding_number, loopclosed_tolerance, apply_heuristic=true, pathtrackingkwargs...)
 
 Tracks the implicit defined path z(t) around the `n`-gon with vertices
 ``r⋅exp(i2πk/n)`` where `n=samples_per_loop`.
 """
 function loop(
     H::AbstractHomotopy{T},
-    J_H,
-    ∂H∂t,
+    J_H!,
+    Hdt!,
     x,
     radius::Real,
     algorithm::APCA,
@@ -103,7 +211,7 @@ function loop(
     samples = [x]
     start = first(unitroots)
     for (k, finish) in enumerate(Iterators.drop(unitroots, 1))
-        pathresult = trackpath(H, J_H, ∂H∂t, samples[end], algorithm, start, finish; pathtrackingkwargs...)
+        pathresult = trackpath(H, J_H!, Hdt!, samples[end], algorithm, start, finish; pathtrackingkwargs...)
         if pathresult.returncode != :Success
             return (:BadBranch, samples)
         end
@@ -217,6 +325,7 @@ struct UnitRootsIterator
     order::Float64
 end
 UnitRootsIterator(r::Real, order::Real) = UnitRootsIterator(float(r), float(order))
+
 Base.start(::UnitRootsIterator) = 0
 Base.next(loop::UnitRootsIterator, k::Int) = (loop.radius *  exp(im * 2π * k / loop.order), k + 1)
 Base.done(::UnitRootsIterator, ::Int) = false
