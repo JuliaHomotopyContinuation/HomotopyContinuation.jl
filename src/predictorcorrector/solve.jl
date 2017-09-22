@@ -28,10 +28,9 @@ function solve(
     H::AbstractHomotopy{T},
     startvalues,
     algorithm::APCA;
-    report_progess=false,
+    report_progress=false,
     kwargs...
 ) where {T<:Number}
-
     if eltype(startvalues) != Vector{T}
         error("Expected as start values an iterable with elements of type Vector{$T} " *
             "but got $(eltype(startvalues))")
@@ -42,18 +41,18 @@ function solve(
     J_H! = Homotopy.jacobian!(H)
     Hdt! = Homotopy.dt!(H)
 
-    if report_progess
+    if report_progress
         println("Total number of paths to track: $length(startvalues)")
     end
 
     map(1:length(startvalues), startvalues) do index, startvalue
-        if report_progess
+        if report_progress
             println("Start to track path $index")
         end
 
         result = solve(H, J_H!, Hdt!, startvalue, algorithm; kwargs...)
 
-        if report_progess
+        if report_progress
             println("Path $index returned: $(result.returncode)")
         end
 

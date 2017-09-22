@@ -7,7 +7,7 @@
     H, start_solutions = totaldegree(StraightLineHomotopy, [f1, f2])
 
     #now we can solve
-    results = solve(H, start_solutions, SphericalPredictorCorrector())
+    results = solve(H, start_solutions, SphericalPredictorCorrector(), report_progress=true)
 
     result = first(filter(issuccessfull, results))
     # check accessors
@@ -64,4 +64,5 @@
     @test length(string(cc)) > 0
 
     @test endgameradius(endgameresult) == clustertime(cc)
+    @test length(string(endgameresult)) > 0
 end
