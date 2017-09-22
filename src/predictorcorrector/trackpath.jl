@@ -1,4 +1,5 @@
 export trackpath, PathResult, result, returncode, iterations, startvalue, pathtrace, pathsteps, laststep, issuccessfull
+
 """
     trackpath(H::AbstractHomotopy, startvalue, algorithm::PredictorCorrector, start, finish; kwargs...)
 
@@ -175,3 +176,17 @@ pathtrace(r::PathResult) = r.trace
 pathsteps(r::PathResult) = r.steps
 
 issuccessfull(r::PathResult) = returncode(r) == :Success
+
+Base.show(io::IO, res::PathResult) = printresult(io, res)
+function printresult(io::IO, res::PathResult)
+    println(io, typeof(res),":")
+    println(io, "------------------------------")
+    println(io, "* result: ", result(res))
+    println(io, "* returncode: ", returncode(res))
+    println(io, "------------------------------")
+    println(io, "* iterations: ", iterations(res))
+    println(io, "* startvalue: ", startvalue(res))
+    println(io, "* last timestep: ", laststep(res))
+    println(io, "* pathsteps: ", length(pathsteps(res)), " entries")
+    println(io, "* pathtrace: ", length(pathtrace(res)), " entries")
+end

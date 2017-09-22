@@ -1,4 +1,5 @@
-export cauchyendgame, ConvergentCluster, CauchyEndgameResult, successfull
+export cauchyendgame, ConvergentCluster, CauchyEndgameResult, successfull, clusterpoints,
+    cluster_convergence_point, clustertime, geometric_series_factor, endgameradius
 
 """
     ConvergentCluster(points, convergence_point, t)
@@ -22,6 +23,10 @@ function Base.show(io::IO, cluster::ConvergentCluster)
     println(io, "* convergence_point: ", cluster.convergence_point)
     println(io, "* t: ", cluster.t)
 end
+
+clusterpoints(cc::ConvergentCluster) = cc.points
+cluster_convergence_point(cc::ConvergentCluster) = cc.convergence_point
+clustertime(cc::ConvergentCluster) = cc.t
 
 """
     cauchyendgame(H::AbstractHomotopy, J_H!, Hdt!, x, R, algorithm, kwargs..., pathtrackingkwargs...)
@@ -136,8 +141,8 @@ struct CauchyEndgameResult{T<:Number}
     result::Vector{T}
     returncode::Symbol
     iterations::Int
-    R::Float64
-    λ::Float64
+    endgameradius::Float64
+    geometric_series_factor::Float64
     trace::Vector{Vector{T}}
     steps::Vector{Float64}
     convergent_cluster::Nullable{ConvergentCluster{T}}
@@ -146,17 +151,28 @@ end
 function Base.show(io::IO, res::CauchyEndgameResult)
     println(io, typeof(res),":")
     println(io, "------------------------------")
-    println(io, "* result: ", res.result)
-    println(io, "* returncode: ", res.returncode)
+    println(io, "* result: ", result(res))
+    println(io, "* returncode: ", returncode(res))
     println(io, "------------------------------")
-    println(io, "* iterations: ", res.iterations)
-    println(io, "* R: ", res.R)
-    println(io, "* λ: ", res.λ)
-    println(io, "* trace: ", length(res.trace), " entries")
-    println(io, "* convergent cluster: ", get(map(string, res.convergent_cluster), "---"))
+    println(io, "* iterations: ", iterations(res))
+    println(io, "* endgameradius R: ", endgameradius(res))
+    println(io, "* geometric_series_factor λ: ", geometric_series_factor(res))
+    println(io, "* pathtrace: ", length(pathtrace(res)), " entries")
+    println(io, "* pathsteps: ", length(pathsteps(res)), " entries")
+    println(io, "* convergent cluster: ", get(map(string, convergent_cluster(res)), "---"))
 end
 
-issuccessfull(result::CauchyEndgameResult) = result.returncode == :Success
+result(r::CauchyEndgameResult) = r.result
+returncode(r::CauchyEndgameResult) = r.returncode
+iterations(r::CauchyEndgameResult) = r.iterations
+endgameradius(r::CauchyEndgameResult) = r.endgameradius
+geometric_series_factor(r::CauchyEndgameResult) = r.geometric_series_factor
+pathtrace(r::CauchyEndgameResult) = r.trace
+pathsteps(r::CauchyEndgameResult) = r.steps
+convergent_cluster(r::CauchyEndgameResult) = r.convergent_cluster
+
+issuccessfull(r::CauchyEndgameResult) = returncode(r) == :Success
+
 
 function iscauchykwarg(kwarg)
     symb = first(kwarg)
@@ -169,8 +185,6 @@ function iscauchykwarg(kwarg)
     symb == :tolerance_infinity
 end
 cauchykwargs(kwargs) = filter(iscauchykwarg, kwargs)
-
-atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
 
 
 """

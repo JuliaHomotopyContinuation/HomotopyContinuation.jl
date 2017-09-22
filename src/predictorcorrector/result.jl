@@ -1,5 +1,6 @@
 export Result, solution, returncode, iterations, endgame_iterations, algorithm,
-    affine_solution, projective_solution, startvalue, pathtrace, pathsteps, issuccessfull
+    affine_solution, projective_solution, startvalue, pathtrace, pathsteps,
+    convergent_cluster, issuccessfull
 
 
 """
@@ -81,6 +82,8 @@ function Result(pathresult::PathResult, endgameresult::CauchyEndgameResult, star
            endgameresult.convergent_cluster)
 end
 
+atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
+
 function Result(pathresult::PathResult{T}, startvalue, alg::APCA{Val{false}}) where T
     solution = pathresult.result
     affine_solution = solution
@@ -99,6 +102,7 @@ function Result(pathresult::PathResult{T}, startvalue, alg::APCA{Val{false}}) wh
            Nullable{ConvergentCluster{T}}())
 end
 
+
 solution(r::Result) = r.solution
 returncode(r::Result) = r.returncode
 iterations(r::Result) = r.iterations
@@ -109,25 +113,26 @@ projective_solution(r::Result) = r.projective_solution
 startvalue(r::Result) = r.startvalue
 pathtrace(r::Result) = r.trace
 pathsteps(r::Result) = r.steps
+convergent_cluster(r::Result) = r.convergent_cluster
 
 
 issuccessfull(r::Result) = returncode(r) == :Success
 
 
-Base.show(io::IO, ::MIME"text/plain", res::Result) = printresult(io, res)
-Base.show(io::IO, ::MIME"text/html", res::Result) = printresult(io, res)
+#Base.show(io::IO, ::MIME"text/plain", res::Result) = printresult(io, res)
+Base.show(io::IO, res::Result) = printresult(io, res)
 function printresult(io::IO, res::Result)
     println(io, typeof(res),":")
     println(io, "------------------------------")
-    println(io, "* solution: ", solution(solution))
-    println(io, "* returncode: ", returncode(solution))
+    println(io, "* solution: ", solution(res))
+    println(io, "* returncode: ", returncode(res))
     println(io, "------------------------------")
     println(io, "* iterations: ", iterations(res))
     println(io, "* endgame_iterations: ", endgame_iterations(res))
     println(io, "* affine_solution: ", affine_solution(res))
     println(io, "* projective_solution: ", projective_solution(res))
     println(io, "* startvalue: ", startvalue(res))
-    println(io, "* pathsteps: ", length(pathsteps(steps)), " entries")
+    println(io, "* pathsteps: ", length(pathsteps(res)), " entries")
     println(io, "* pathtrace: ", length(pathtrace(res)), " entries")
     if !isnull(convergent_cluster(res))
         println(io, "* convergent cluster: ", get(map(string, convergent_cluster(res))))
