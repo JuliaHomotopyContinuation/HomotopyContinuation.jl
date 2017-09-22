@@ -8,7 +8,7 @@ Getting started
 -----------
 Since this package is pre-release and also relies on couple of unreleased packages. To satisfy all dependencies you have to install it via
 ```sh
-Pkg.clone("https://github.com/saschatimme/FixedPolySystem.jl");
+Pkg.clone("https://github.com/JuliaHomotopyContinuation/Homotopy.jl");
 Pkg.clone("https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git")
 ```
 
@@ -33,9 +33,7 @@ using DynamicPolynomials
 
 @polyvar x
 f = (x - 2.0) * (x - (2.5+ 4.0im))
-F = PolySystem([f])
-G, startsolutions = totaldegree(F)
-H = StraightLineHomotopy(G, F)
+H, startsolutions = totaldegree(StraightLineHomotopy, [f])
 
 solve(H, startsolutions)
 ```
