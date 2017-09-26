@@ -42,7 +42,7 @@ function solve(
     Hdt! = Homotopy.dt!(H)
 
     if report_progress
-        println("Total number of paths to track: $length(startvalues)")
+        println("Total number of paths to track: $(length(startvalues))")
     end
 
     map(1:length(startvalues), startvalues) do index, startvalue
