@@ -10,8 +10,10 @@ We reformulate the path ``z(t)`` as a path z(γ(s)) where γ: [1, 0] -> line fro
 
 ## Optional arguments
 * `maxiterations=10000`
-* `tolerance=1e-4`: The tolerance used for the correction step
-* `refinement_tolerance=1e-8`: The result will be refined to the given accuracy
+* `tolerance=1e-6`: The tolerance used for the correction step
+* `refinement_tolerance=1e-10`: The result will be refined to the given accuracy
+* `refinement_iterations=200`: The maximal number of iterations to achieve `refinement_tolerance`
+* `refinement_necessary=false`: Should a path be declared as not successfull if the refinement failed?
 * `initial_steplength=0.01`: The initial_steplength (w.r.t s)
 * `correction_step_maxiterations=3`
 * `successfull_steps_until_steplength_increase=3`
@@ -42,8 +44,10 @@ function trackpath(
     finish::S;
     # !keep kwargs in sync with `istrackpathkwarg` below!
     maxiterations=10000,
-    tolerance=1e-4,
-    refinement_tolerance=1e-12,
+    tolerance=1e-6,
+    refinement_tolerance=1e-10,
+    refinement_iterations=200,
+    refinement_necessary=false,
     initial_steplength=0.05,
     successfull_steps_until_steplength_increase=3,
     steplength_increase_factor=2.0,
@@ -109,7 +113,7 @@ function trackpath(
     end
 
     if s ≈ 0 && norm(evaluate(H, x, γ(0.0))) < tolerance
-        refinement_converged = correct!(u, A, b, H, J_H!, x, γ(0.0), refinement_tolerance, 10, algorithm)
+        refinement_converged = correct!(u, A, b, H, J_H!, x, γ(0.0), refinement_tolerance, refinement_iterations, algorithm)
         if refinement_converged
             x .= u
         end
@@ -117,8 +121,8 @@ function trackpath(
 
     if k >= maxiterations
         retcode = :MaxIterations
-    elseif norm(evaluate(H, x, γ(0.0))) > refinement_tolerance
-        retcode = :Diverged
+    elseif refinement_necessary && refinement_tolerance < norm(evaluate(H, x, γ(0.0))) < tolerance
+        retcode = :RefinementFailed
     else
         retcode = :Success
     end
@@ -131,6 +135,8 @@ function istrackpathkwarg(kwarg)
     symb == :maxiterations ||
     symb == :tolerance ||
     symb == :refinement_tolerance ||
+    symb == :refinement_iterations ||
+    symb == :refinement_necessary ||
     symb == :initial_steplength ||
     symb == :successfull_steps_until_steplength_increase ||
     symb == :steplength_increase_factor ||
