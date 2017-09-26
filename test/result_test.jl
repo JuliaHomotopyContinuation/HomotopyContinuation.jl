@@ -20,6 +20,7 @@
     @test any(x -> x == startvalue(result), start_solutions)
     # currently cauchyendgame always tracks the trace and steps...
     @test length(pathtrace(result)) > 0
+    @test length(first(pathtrace(result))) == 2
     @test length(pathsteps(result)) > 0
     @test length(pathsteps(result)) == length(pathtrace(result))
 

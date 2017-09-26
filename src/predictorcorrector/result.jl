@@ -44,8 +44,14 @@ function Result(pathresult::PathResult{T}, startvalue::Vector{T}, alg::APCA{Val{
 
     affine_solution = result[2:end] / result[1]
     projective_solution = result
-    solution = length(startvalue) == length(affine_solution) ? affine_solution : projective_solution
+    isaffine = length(startvalue) == length(affine_solution)
+    solution = isaffine ? affine_solution : projective_solution
     returncode = atinfinity(result, tolerance_infinity) ? :AtInfinity : pathresult.returncode
+
+    trace = pathresult.trace
+    if isaffine
+        trace = affine.(trace)
+    end
 
     Result(solution,
            returncode,
@@ -55,7 +61,7 @@ function Result(pathresult::PathResult{T}, startvalue::Vector{T}, alg::APCA{Val{
            affine_solution,
            projective_solution,
            startvalue,
-           pathresult.trace,
+           trace,
            pathresult.steps,
            Nullable{ConvergentCluster{T}}())
 end
@@ -63,9 +69,15 @@ end
 function Result(pathresult::PathResult, endgameresult::CauchyEndgameResult, startvalue::Vector, alg::APCA{Val{true}}, tolerance_infinity::Float64)
     result = endgameresult.result
 
-    affine_solution = result[2:end] / result[1]
+    affine_solution = affine(result)
     projective_solution = result
-    solution = length(startvalue) == length(affine_solution) ? affine_solution : projective_solution
+
+    isaffine = length(startvalue) == length(affine_solution)
+    solution =  isaffine ? affine_solution : projective_solution
+    trace = [pathresult.trace; endgameresult.trace]
+    if isaffine
+        trace = affine.(trace)
+    end
 
     returncode = atinfinity(result, tolerance_infinity) ? :AtInfinity : endgameresult.returncode
 
@@ -77,10 +89,12 @@ function Result(pathresult::PathResult, endgameresult::CauchyEndgameResult, star
            affine_solution,
            projective_solution,
            startvalue,
-           [pathresult.trace; endgameresult.trace],
+           trace,
            [pathresult.steps; endgameresult.steps],
            endgameresult.convergent_cluster)
 end
+
+affine(x::Vector) = x[2:end] ./ x[1]
 
 atinfinity(x, tolerance_infinity) = norm(normalize(x)[1]) < tolerance_infinity
 
