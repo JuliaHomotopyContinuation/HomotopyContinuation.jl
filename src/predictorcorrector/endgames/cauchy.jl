@@ -52,9 +52,9 @@ function cauchyendgame(
     x::Vector{T},
     t::Float64,
     algorithm::APCA{Val{true}};
-    prediction_tolerance=1e-8,
     geometric_series_factor=0.5,
-    endgame_tolerance=1e-8,
+    endgame_tolerance=1e-10,
+    prediction_tolerance=endgame_tolerance,
     samples_per_loop::Int=8,
     max_winding_number::Int=8,
     loopclosed_tolerance=1e-3,

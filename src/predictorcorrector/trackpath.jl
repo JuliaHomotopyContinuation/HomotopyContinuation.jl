@@ -45,7 +45,7 @@ function trackpath(
     # !keep kwargs in sync with `istrackpathkwarg` below!
     maxiterations=10000,
     tolerance=1e-6,
-    refinement_tolerance=1e-10,
+    refinement_tolerance=1e-12,
     refinement_iterations=200,
     refinement_necessary=false,
     initial_steplength=0.05,
