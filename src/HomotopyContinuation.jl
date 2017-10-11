@@ -5,6 +5,8 @@ module HomotopyContinuation
     using Reexport
     @reexport using Homotopy
 
+    import MultivariatePolynomials
+    const MP = MultivariatePolynomials
 
     abstract type AbstractHomotopyContinuationAlgorithm end
     export AbstractHomotopyContinuationAlgorithm
