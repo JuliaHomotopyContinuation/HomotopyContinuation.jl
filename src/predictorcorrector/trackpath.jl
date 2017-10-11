@@ -85,9 +85,9 @@ function trackpath(
 
         if debug
             println("")
-            println("t: $t Δt: $Δt, iteration: $k")
-            println("x: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
-            println("predicted: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
+            println("t: $s Δt: $Δs, iteration: $k")
+            println("x: $x, ∞-norm: $(norm(evaluate(H,x,s), Inf))")
+            println("predicted: $x, ∞-norm: $(norm(evaluate(H,x,s), Inf))")
         end
 
         converged = correct!(u, A, b, H, J_H!, x, γ(s - Δs), tolerance, correction_step_maxiterations, algorithm)
@@ -126,7 +126,6 @@ function trackpath(
     else
         retcode = :Success
     end
-
     PathResult(x, retcode, startvalue, k, γ(s), steps, trace)
 end
 
