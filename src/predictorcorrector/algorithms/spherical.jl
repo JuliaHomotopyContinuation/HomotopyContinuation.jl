@@ -10,23 +10,23 @@ end
 """
     predict(alg::Affine, H, J_H, Hdt, x, t, Δt)
 
-Spherical tangent predictor following the formulation of Chen[^1]. Denote by ``\hat{H}`` the lift of the homotopy ``H``
+Spherical tangent predictor following the formulation of Chen[^1]. Denote by ``\\hat{H}`` the lift of the homotopy ``H``
 as a projective mapping.
 Euler's method yields
 ```math
-\begin{bmatrix}
-D_x\hat{H}^(x,t) \\
+\\begin{bmatrix}
+D_x\\hat{H}^(x,t) \\\\
 x^{H}
-\end{bmatrix}
-\dot{x} =
-\begin{bmatrix}
--D_t\hat{H}^(x,t) \\
+\\end{bmatrix}
+\\dot{x} =
+\\begin{bmatrix}
+-D_t\\hat{H}^(x,t) \\\\
 0
-\end{bmatrix}
+\\end{bmatrix}
 ```
 and we can then obtain the spherical projection:
 ```math
-\cos(\norm{\dot{x}}_2 Δt) x + \sin(\norm{\dot{x}}_2 Δt) \frac{\dot{x}}{\norm{\dot{x}}_2}
+\\cos(\\norm{\\dot{x}}_2 Δt) x + \\sin(\\norm{\\dot{x}}_2 Δt) \\frac{\\dot{x}}{\\norm{\\dot{x}}_2}
 ```
 
 [^1]: Tianran Chen and Tien-Yien Li.
