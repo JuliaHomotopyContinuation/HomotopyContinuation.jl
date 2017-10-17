@@ -1,7 +1,4 @@
-export AbstractPredictorCorrectorAlgorithm
-abstract type AbstractPredictorCorrectorAlgorithm{Val} <: AbstractHomotopyContinuationAlgorithm end
 
-const APCA{P} = AbstractPredictorCorrectorAlgorithm{P}
 
 include("predictorcorrector/algorithms/interface.jl")
 include("predictorcorrector/algorithms/affine.jl")

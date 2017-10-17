@@ -304,31 +304,31 @@ function projectivenorm(a::Vector{<:Number}, b::Vector{<:Number})
     norm(a ./ a[i] .- b ./ b[i])
 end
 
-"""
-    predict_with_cif(samplepoints)
-
-Predict the value of a function based on the samplepoints using the cauchy integral formula.
-This function assumes that the samplepoints are sampled uniformly from a circle around 0,
-since then the integral (approximated with the trapezoidal rule) is simply the mean of
-all samplepoints.
-"""
-predict_with_cif(samplepoints) = mean(samplepoints)
-
-"""
-    UnitRootsIterator(r, n)
-
-Construct an infinite iterator which returns the `n`-th scalded unit roots, i.e.
-the values ``r⋅exp(i2πk/n)`` for ``k=0,1,...``.
-"""
-struct UnitRootsIterator
-    radius::Float64
-    order::Float64
-end
-UnitRootsIterator(r::Real, order::Real) = UnitRootsIterator(float(r), float(order))
-
-Base.start(::UnitRootsIterator) = 0
-Base.next(loop::UnitRootsIterator, k::Int) = (loop.radius *  exp(im * 2π * k / loop.order), k + 1)
-Base.done(::UnitRootsIterator, ::Int) = false
-Base.iteratorsize(::UnitRootsIterator) = Base.IsInfinite()
-Base.iteratoreltype(::UnitRootsIterator) = Base.HasEltype()
-Base.eltype(::UnitRootsIterator) = Complex128
+# """
+#     predict_with_cif(samplepoints)
+#
+# Predict the value of a function based on the samplepoints using the cauchy integral formula.
+# This function assumes that the samplepoints are sampled uniformly from a circle around 0,
+# since then the integral (approximated with the trapezoidal rule) is simply the mean of
+# all samplepoints.
+# """
+# predict_with_cif(samplepoints) = mean(samplepoints)
+#
+# """
+#     UnitRootsIterator(r, n)
+#
+# Construct an infinite iterator which returns the `n`-th scalded unit roots, i.e.
+# the values ``r⋅exp(i2πk/n)`` for ``k=0,1,...``.
+# """
+# struct UnitRootsIterator
+#     radius::Float64
+#     order::Float64
+# end
+# UnitRootsIterator(r::Real, order::Real) = UnitRootsIterator(float(r), float(order))
+#
+# Base.start(::UnitRootsIterator) = 0
+# Base.next(loop::UnitRootsIterator, k::Int) = (loop.radius *  exp(im * 2π * k / loop.order), k + 1)
+# Base.done(::UnitRootsIterator, ::Int) = false
+# Base.iteratorsize(::UnitRootsIterator) = Base.IsInfinite()
+# Base.iteratoreltype(::UnitRootsIterator) = Base.HasEltype()
+# Base.eltype(::UnitRootsIterator) = Complex128

@@ -116,7 +116,7 @@ end
 homogenize_if_necessary(H::AbstractHomotopy, alg::APCA{Val{true}}) = Homotopy.homogenize(H)
 homogenize_if_necessary(H::AbstractHomotopy, alg::APCA{Val{false}}) = H
 """
-    embed_projective_if_necessary(x, H, ::AbstractPredictorCorrectorAlgorithm{true})
+    embed_projective_if_necessary(x, H)
 
 Embeds a vector into the projective space if necessary, i.e. if it's length is one less
 than the number of variables of `H`. `H` is assumed to be homogenized. After the (eventual)

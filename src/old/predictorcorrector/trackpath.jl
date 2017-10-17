@@ -81,13 +81,14 @@ function trackpath(
         if record_trace; push!(trace, x); end
 
         Δs = min(steplength, s)
+
         predict!(u, A, b, H, J_H!, Hdt!, x, γ(s), Δs * γlength, algorithm)
 
         if debug
             println("")
-            println("t: $t Δt: $Δt, iteration: $k")
-            println("x: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
-            println("predicted: $x, ∞-norm: $(norm(evaluate(H,x,t), Inf))")
+            println("t: $s Δt: $Δs, iteration: $k")
+            println("x: $x, ∞-norm: $(norm(evaluate(H,x,γ(s)), Inf))")
+            println("predicted: $u, ∞-norm: $(norm(evaluate(H,u,γ(s - Δs)), Inf))")
         end
 
         converged = correct!(u, A, b, H, J_H!, x, γ(s - Δs), tolerance, correction_step_maxiterations, algorithm)
