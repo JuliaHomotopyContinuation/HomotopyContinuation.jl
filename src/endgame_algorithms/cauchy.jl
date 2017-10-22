@@ -12,7 +12,7 @@ end
 
 function CauchyEndgame(;
     samples_per_loop=8,
-    loopclosed_tolerance=1e-6,
+    loopclosed_tolerance=1e-5,
     L=0.75,
     #β=1e-8,
     K=0.5)

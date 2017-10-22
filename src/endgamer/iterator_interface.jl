@@ -61,8 +61,17 @@ end
 
     p, pprev = predictions[end], predictions[end-1]
 
-    if sqrt(projectivenorm2(p, pprev)) < options.abstol
+    prednorm = projectivenorm2(p, pprev)
+    if prednorm < options.abstol * options.abstol
         endgamer.status = Successfull
+    elseif npredictions > 2
+        pprev2 = predictions[end - 2]
+        # if we do not half our error we are satisfied with a less strict tolerance
+        if projectivenorm2(pprev, pprev2) / prednorm < 2
+            if prednorm < options.abstol
+                endgamer.status = Successfull
+            end
+        end
     end
 end
 

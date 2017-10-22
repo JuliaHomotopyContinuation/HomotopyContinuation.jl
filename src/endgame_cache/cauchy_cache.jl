@@ -98,8 +98,6 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
         retcode, sol = solution(tracker)
 
         if retcode != :success
-            @show tracker.t
-            @show retcode
             return :tracker_failed
         end
 
@@ -130,6 +128,8 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
         start = finish
     end
 
+    # TODO: Should we check that the windingnumber does not increase? For this we would
+    # need to change the initial windingnumber to something very high
     endgamer.windingnumber = c
     resize!(samples, c * samples_per_loop)
 
