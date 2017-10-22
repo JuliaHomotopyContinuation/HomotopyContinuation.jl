@@ -4,19 +4,15 @@ module HomotopyContinuation
 
     using Reexport
     @reexport using Homotopy
-
     using Parameters
-
     using HigherPrecision
 
     import MultivariatePolynomials
     const MP = MultivariatePolynomials
 
-
     abstract type AbstractPathtrackingAlgorithm end
-    abstract type AbstractEndgameAlgorithm end
-
     abstract type AbstractPathtrackerCache{T<:Complex} end
+    abstract type AbstractEndgameAlgorithm end
     abstract type AbstractEndgameCache end
 
     export AbstractPathtrackingAlgorithm, AbstractEndgameAlgorithm,
@@ -43,7 +39,6 @@ module HomotopyContinuation
     include("solver.jl")
 
     include("result.jl")
-    # include("predictorcorrector.jl")
 
     include("solve.jl")
     include("testsystems.jl")
