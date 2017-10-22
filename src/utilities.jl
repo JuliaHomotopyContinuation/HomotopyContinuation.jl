@@ -27,7 +27,7 @@ function projectivenorm2(a::AbstractVector{T}, b::AbstractVector{T}) where T
     bdiv = b[maxind]
 
     for i=1:length(a)
-        max(out, abs2(a[i] / adiv - b[i] / bdiv))
+        out = max(out, abs2(a[i] / adiv - b[i] / bdiv))
     end
     out
 end
