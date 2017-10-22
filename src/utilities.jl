@@ -3,6 +3,7 @@ _widen(T) = widen(T)
 # Wait until DoubleFloat64 is released
 # _widen(::Type{Float64}) = FastDouble
 
+affine(xs::AbstractVector) = xs[2:end] ./ x[1]
 
 """
     projectivenorm2(a, b)
