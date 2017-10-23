@@ -5,7 +5,7 @@ module HomotopyContinuation
     using Reexport
     @reexport using Homotopy
     using Parameters
-    using HigherPrecision
+    #using HigherPrecision
 
     import MultivariatePolynomials
     const MP = MultivariatePolynomials
