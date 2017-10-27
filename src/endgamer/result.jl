@@ -11,8 +11,7 @@ end
 
 function EndgamerResult(endgamer::Endgamer)
     @unpack windingnumber, tracker = endgamer
-    @unpack H, J_H! = tracker.low
-
+    @unpack H, cfg = tracker.low
 
 
     if endgamer.status == Successfull
@@ -24,7 +23,7 @@ function EndgamerResult(endgamer::Endgamer)
     end
 
 
-    res = evaluate(H, solution, 0.0)
+    res = evaluate(H, solution, 0.0, cfg)
     residual = norm(res)
 
     if is_projective(tracker.alg)
@@ -48,7 +47,7 @@ end
 
 function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
     windingnumber = 1
-    residual = norm(evaluate(endgamer.tracker.low.H, result.solution, 0.0))
+    residual = norm(evaluate(endgamer.tracker.low.H, result.solution, 0.0, endgamer.tracker.low.cfg))
     iterations = 0
     npredictions = 0
     EndgamerResult(

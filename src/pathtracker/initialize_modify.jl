@@ -45,23 +45,26 @@
     consecutive_successfull_steps = 0
 
     # Assemble the precision dependent types
-    J_H! = Homotopy.jacobian!(H)
-    Hdt! = Homotopy.dt!(H)
+    cfg = Homotopy.config(H)
     xnext = similar(x)
     cache = alg_cache(alg, H, x)
-    low = PathtrackerPrecisionValues{T, typeof(H), typeof(J_H!), typeof(Hdt!), Vector{Complex{T}}, typeof(cache)}(H, J_H!, Hdt!, x, xnext, cache)
+    low = PathtrackerPrecisionValues{
+        T, typeof(H), typeof(cfg), Vector{Complex{T}}, typeof(cache)
+        }(H, cfg, x, xnext, cache)
 
     highH = convert(promote_type(typeof(H), Complex{highprecisiontype}), H)
-    highJ_H! = Homotopy.jacobian!(H)
-    highHdt! = Homotopy.dt!(H)
+    highcfg = Homotopy.config(highH)
     highx0 = convert(Vector{Complex{highprecisiontype}}, x)
     highxnext = similar(highx0)
     highcache = alg_cache(alg, highH, highx0)
-    high = PathtrackerPrecisionValues{highprecisiontype, typeof(highH), typeof(highJ_H!), typeof(highHdt!), Vector{Complex{highprecisiontype}}, typeof(highcache)}(highH, highJ_H!, highHdt!, highx0, highxnext, highcache)
+    high = PathtrackerPrecisionValues{
+        highprecisiontype, typeof(highH), typeof(highcfg),
+        Vector{Complex{highprecisiontype}}, typeof(highcache)
+        }(highH, highcfg, highx0, highxnext, highcache)
 
     Pathtracker{T, highprecisiontype, Vector{Complex{T}}, Vector{Complex{highprecisiontype}}, algType,
-        typeof(low.H), typeof(high.H), typeof(low.J_H!), typeof(low.Hdt!),
-        typeof(high.J_H!), typeof(high.Hdt!),
+        typeof(low.H), typeof(high.H),
+        typeof(low.cfg), typeof(high.cfg),
         typeof(low.cache), typeof(high.cache),
         typeof(options)
         }(alg, low, high, usehigh,

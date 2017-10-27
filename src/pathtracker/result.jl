@@ -32,7 +32,7 @@ Get `(retcode, solution)` from `pathtracker`. This is more lightwheight than a
 end
 
 function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) where Low
-    @unpack H, J_H! = tracker.low
+    @unpack H, cfg = tracker.low
     if tracker.usehigh
         solution = convert.(Complex{Low}, tracker.high.x)
     else
@@ -49,7 +49,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     end
 
     if extended_analysis
-        jacobian = J_H!(zeros(Complex{Low}, length(H), nvariables(H)), solution, tracker.s)
+        jacobian = Homotopy.jacobian(H, solution, tracker.s, cfg)
 
         newton_residual = norm(jacobian \ res)
         condition_jacobian = cond(jacobian)

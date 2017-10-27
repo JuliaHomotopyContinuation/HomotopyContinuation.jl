@@ -14,13 +14,11 @@ end
 mutable struct PathtrackerPrecisionValues{
     T<:Real,
     HT<:AbstractHomotopy{Complex{T}},
-    F1,
-    F2,
+    Config<:AbstractHomotopyConfig{Complex{T}},
     xType<:AbstractVector{Complex{T}},
     Cache<:AbstractPathtrackerCache{Complex{T}}}
     H::HT
-    J_H!::F1
-    Hdt!::F2
+    cfg::Config
     x::xType
     xnext::xType
     cache::Cache
@@ -36,7 +34,8 @@ mutable struct Pathtracker{
     algType<:AbstractPathtrackingAlgorithm,
     LowHT<:AbstractHomotopy{Complex{LowPrecision}},
     HighHT<:AbstractHomotopy{Complex{HighPrecision}},
-    F1, F2, F3, F4,
+    LowConfig<:AbstractHomotopyConfig{Complex{LowPrecision}},
+    HighConfig<:AbstractHomotopyConfig{Complex{HighPrecision}},
     LowCache<:AbstractPathtrackerCache{Complex{LowPrecision}},
     HighCache<:AbstractPathtrackerCache{Complex{HighPrecision}},
     O<:PathtrackerOptions}
@@ -45,9 +44,9 @@ mutable struct Pathtracker{
 
     #startvalue::xLowType
     # low precision values
-    low::PathtrackerPrecisionValues{LowPrecision, LowHT, F1, F2, xLowType, LowCache}
+    low::PathtrackerPrecisionValues{LowPrecision, LowHT, LowConfig, xLowType, LowCache}
     # higher precision values
-    high::PathtrackerPrecisionValues{HighPrecision, HighHT, F3, F4, xHighType, HighCache}
+    high::PathtrackerPrecisionValues{HighPrecision, HighHT, HighConfig, xHighType, HighCache}
 
     usehigh::Bool
 

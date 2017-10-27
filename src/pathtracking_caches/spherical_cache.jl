@@ -22,20 +22,19 @@ end
 
 @inline function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::SphericalCache{Complex{T}}) where T
     @unpack s, ds = tracker
-    @unpack H, J_H!, Hdt!, x, xnext = values
+    @unpack H, cfg, x, xnext = values
     @unpack A, A_sub, b, b_sub = cache
 
     m = size(A,2)
 
     # PREDICT
-
     # put jacobian in A
-    J_H!(A_sub, x, s)
+    jacobian!(A_sub, H, x, s, cfg)
     for j=1:m
         A[end, j] = conj(x[j])
     end
     # put Hdt in b
-    Hdt!(b_sub, x, s)
+    dt!(b_sub, H, x, s, cfg, true)
     b[end] = zero(T)
 
     # this computes A x = b and stores the result x in b
@@ -50,11 +49,11 @@ end
     @unpack abstol, corrector_maxiters = tracker.options
     s += ds
 
-    tracker.step_sucessfull = correct!(xnext, s, H, J_H!, cache, abstol, corrector_maxiters)
+    tracker.step_sucessfull = correct!(xnext, s, H, cfg, cache, abstol, corrector_maxiters)
     nothing
 end
 
-@inline function correct!(xnext, s, H, J_H!, cache::SphericalCache{Complex{T}},
+@inline function correct!(xnext, s, H, cfg, cache::SphericalCache{Complex{T}},
     abstol::Float64,
     maxiters::Int) where T
     @unpack A, A_sub, b, b_sub = cache
@@ -62,7 +61,7 @@ end
     k = 0
     while true
         k += 1
-        Homotopy.evaluate!(b_sub, H, xnext, s)
+        evaluate!(b_sub, H, xnext, s, cfg)
         b[end] = zero(T)
 
         if norm(b, Inf) < abstol
@@ -72,7 +71,7 @@ end
         end
 
         # put jacobian in A
-        J_H!(A_sub, xnext, s)
+        jacobian!(A_sub, H, xnext, s, cfg, true)
         for j=1:m
             A[end, j] = conj(xnext[j])
         end

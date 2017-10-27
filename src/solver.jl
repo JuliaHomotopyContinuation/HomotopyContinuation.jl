@@ -126,20 +126,20 @@ end
 
 
 function refinesolution(solution, tracker::Pathtracker, windingnumber, abstol, maxiters)
-    @unpack H, J_H!, cache = tracker.low
+    @unpack H, cfg, cache = tracker.low
     # TODO: we should switch to a higher precision if necessary
     # Since we have the winding number available
     # See the cauchy endgame test, the refinement is nearly useless...
 
     sol = copy(solution)
-    correct!(sol, 0.0, H, J_H!, cache, abstol, maxiters)
+    correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
     sol
 end
 
 function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
-    @unpack H, J_H! = tracker.low
-    jacobian = J_H!(zeros(Complex{Low}, length(H), nvariables(H)), solution, 0.0)
-    res = evaluate(H, solution, 0.0)
+    @unpack H, cfg = tracker.low
+    res = evaluate(H, solution, 0.0, cfg)
+    jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
     residual = norm(res)
     newton_residual::Float64 = norm(jacobian \ res)
     condition_jacobian::Float64 = cond(jacobian)

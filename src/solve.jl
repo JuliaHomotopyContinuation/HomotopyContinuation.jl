@@ -18,6 +18,7 @@ function solve end
 function solve(
     H::AbstractHomotopy{Complex{T}},
     startvalues;
+    apply_gammatrick=true,
     pathtracking_algorithm=SphericalPredictorCorrector(),
     endgame=CauchyEndgame(),
     endgame_start::Float64=0.1,
@@ -34,6 +35,10 @@ function solve(
     initial_steplength::Float64=0.1,
     geometric_series_factor=0.5,
     max_winding_number=8) where {T}
+
+    if apply_gammatrick
+        gammatrick!(H)
+    end
 
     pathtracker = initialize(pathtracking_algorithm, H,
         highprecisiontype = high_precision_type,
@@ -60,13 +65,13 @@ end
 
 function solve(
     f::MP.AbstractPolynomial{T};
-    homotopytype=GammaTrickHomotopy,
+    homotopytype=StraightLineHomotopy,
     kwargs...) where {T<:Number}
       H, s = totaldegree(homotopytype, [f])
       solve(H, s; kwargs...)
 end
 function solve(f::Vector{<:MP.AbstractPolynomial{T}};
-    homotopytype=GammaTrickHomotopy,
+    homotopytype=StraightLineHomotopy,
     kwargs...) where {T<:Number}
      H, s = totaldegree(homotopytype, f)
      solve(H, s; kwargs...)
