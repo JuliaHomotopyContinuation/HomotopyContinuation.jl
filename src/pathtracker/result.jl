@@ -1,6 +1,6 @@
-struct PathtrackerResult{xType}
+struct PathtrackerResult{T}
     retcode::Symbol
-    solution::xType
+    solution::Vector{T}
     #startvalue::xType
     residual::Float64
     iterations::Int

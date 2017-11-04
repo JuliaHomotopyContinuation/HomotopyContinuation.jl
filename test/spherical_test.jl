@@ -10,7 +10,13 @@
     @test res[1].retcode == :success
     @test res[2].retcode == :success
 
-    @test real(res[1].solution) ≈ [2.0]
-    @test real(res[2].solution) ≈ [2.5]
-    @test imag(res[2].solution) ≈ [4.0]
+    if real.(res[1].solution) ≈ [2.5]
+        @test real.(res[1].solution) ≈ [2.5]
+        @test imag.(res[1].solution) ≈ [4.0]
+        @test real(res[2].solution) ≈ [2.0]
+    else
+        @test real.(res[2].solution) ≈ [2.5]
+        @test imag.(res[2].solution) ≈ [4.0]
+        @test real(res[1].solution) ≈ [2.0]
+    end
 end

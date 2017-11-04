@@ -93,7 +93,7 @@ function run!(endgamer::Endgamer)
     endgamer
 end
 
-function run!(endgamer::Endgamer, x, t)
+function run!(endgamer::Endgamer, x::AbstractVector, t)
     reset!(endgamer, x, t)
     run!(endgamer)
     endgamer

@@ -90,7 +90,7 @@ end
 
 function run!(
     tracker::Pathtracker{Low},
-    startvalue::AbstractVector{Complex{Low}},
+    startvalue::AbstractVector,
     start::Number=1.0,
     finish::Number=0.0) where {Low}
     reset!(tracker, startvalue, start, finish)

@@ -10,27 +10,53 @@ mutable struct PathtrackerOptions
     corrector_maxiters::Int
 end
 
+function PathtrackerOptions(;maxiters::Int=10_000,
+    verbose=false,
+    initial_steplength::Float64=0.1,
+    consecutive_successfull_steps_until_steplength_increase::Int=3,
+    steplength_increase_factor::Float64=2.0,
+    steplength_decrease_factor::Float64=inv(steplength_increase_factor),
+    path_precision::Float64=1e-6,
+    corrector_maxiters::Int=3)
+
+    PathtrackerOptions(
+        maxiters, verbose, initial_steplength,
+        consecutive_successfull_steps_until_steplength_increase,
+        steplength_increase_factor, steplength_decrease_factor,
+        path_precision, corrector_maxiters)
+end
+
+function is_pathtracker_options_kwarg(kwarg)
+    kwarg == :maxiters || 
+    kwarg == :verbose ||
+    kwarg == :initial_steplength ||
+    kwarg == :consecutive_successfull_steps_until_steplength_increase ||
+    kwarg == :steplength_increase_factor ||
+    kwarg == :steplength_decrease_factor ||
+    kwarg == :path_precision ||
+    kwarg == :corrector_maxiters
+end
+
 # This holds all structures which depend on the given precision
 mutable struct PathtrackerPrecisionValues{
     T<:Real,
     HT<:AbstractHomotopy{Complex{T}},
     Config<:AbstractHomotopyConfig{Complex{T}},
-    xType<:AbstractVector{Complex{T}},
+    #xType<:AbstractVector{Complex{T}},
     Cache<:AbstractPathtrackerCache{Complex{T}}}
     H::HT
     cfg::Config
-    x::xType
-    xnext::xType
+    x::Vector{Complex{T}}
+    xnext::Vector{Complex{T}}
     cache::Cache
 end
+
 
 # ATTENTION:
 # If you change something here you probably also want to change `initialize` and `reset!` !
 mutable struct Pathtracker{
     LowPrecision<:Real,
     HighPrecision<:Real,
-    xLowType<:AbstractVector{Complex{LowPrecision}},
-    xHighType<:AbstractVector{Complex{HighPrecision}},
     algType<:AbstractPathtrackingAlgorithm,
     LowHT<:AbstractHomotopy{Complex{LowPrecision}},
     HighHT<:AbstractHomotopy{Complex{HighPrecision}},
@@ -44,9 +70,9 @@ mutable struct Pathtracker{
 
     #startvalue::xLowType
     # low precision values
-    low::PathtrackerPrecisionValues{LowPrecision, LowHT, LowConfig, xLowType, LowCache}
+    low::PathtrackerPrecisionValues{LowPrecision, LowHT, LowConfig, LowCache}
     # higher precision values
-    high::PathtrackerPrecisionValues{HighPrecision, HighHT, HighConfig, xHighType, HighCache}
+    high::PathtrackerPrecisionValues{HighPrecision, HighHT, HighConfig, HighCache}
 
     usehigh::Bool
 
@@ -60,4 +86,60 @@ mutable struct Pathtracker{
     step_sucessfull::Bool
     consecutive_successfull_steps::Int
     options::O
+end
+
+is_pathtracker_kwarg(kwarg) = is_pathtracker_options_kwarg(kwarg)
+
+function Pathtracker(
+    alg::algType,
+    H::AbstractHomotopy{Complex{T}},
+    x0::AbstractVector,
+    s_start,
+    s_end,
+    HT #=highprecisiontype=#; kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:Real}
+
+    options = PathtrackerOptions(kwargs...)
+
+    x = Vector{Complex{T}}(length(x0))
+    x .= x0
+    if is_projective(alg)
+        H = homogenize(H)
+        embed_projective_if_necessary!(x, H)
+    end
+
+    usehigh = false
+    iter = 0
+    t = 1.0
+    startvalue = copy(x)
+    steplength = options.initial_steplength
+    s = convert(Complex{T}, s_start)
+    sdiff = convert(Complex{T}, s_end) - s
+    ds = steplength * sdiff
+    snext = s
+    step_sucessfull = false
+    consecutive_successfull_steps = 0
+
+    # Assemble the precision dependent types
+    cfg = Homotopy.config(H)
+    xnext = similar(x)
+    cache = alg_cache(alg, H, x)
+    low = PathtrackerPrecisionValues{T, typeof(H), typeof(cfg), typeof(cache)}(H, cfg, x, xnext, cache)
+
+    highH = convert(promote_type(typeof(H), Complex{HT}), H)
+    highcfg = Homotopy.config(highH)
+    highx0 = convert(Vector{Complex{HT}}, x)
+    highxnext = similar(highx0)
+    highcache = alg_cache(alg, highH, highx0)
+    high = PathtrackerPrecisionValues{
+        HT, typeof(highH), typeof(highcfg), typeof(highcache)
+        }(highH, highcfg, highx0, highxnext, highcache)
+
+    Pathtracker{T, HT, algType,
+        typeof(low.H), typeof(high.H),
+        typeof(low.cfg), typeof(high.cfg),
+        typeof(low.cache), typeof(high.cache),
+        typeof(options)
+        }(alg, low, high, usehigh,
+        iter, t, steplength, s, sdiff, ds, snext,
+        step_sucessfull, consecutive_successfull_steps, options)
 end

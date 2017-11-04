@@ -4,6 +4,7 @@ import DynamicPolynomials
 const PolyImpl = DynamicPolynomials
 
 #include("affine_test.jl")
+include("solver_test.jl")
 include("spherical_test.jl")
 include("cauchyendgame_test.jl")
 #include("result_test.jl")

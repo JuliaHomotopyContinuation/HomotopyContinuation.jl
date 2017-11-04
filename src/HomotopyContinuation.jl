@@ -22,7 +22,7 @@ module HomotopyContinuation
     include("utilities.jl")
 
     include("pathtracker/type.jl")
-    include("pathtracker/initialize_modify.jl")
+    include("pathtracker/modify.jl")
     include("pathtracker/interface.jl")
     include("pathtracker/result.jl")
 
@@ -30,12 +30,13 @@ module HomotopyContinuation
     include("pathtracking_caches/spherical_cache.jl")
 
     include("endgamer/type.jl")
-    include("endgamer/initialize_modify.jl")
+    include("endgamer/modify.jl")
     include("endgamer/iterator_interface.jl")
     include("endgamer/result.jl")
     include("endgame_algorithms/cauchy.jl")
     include("endgame_cache/cauchy_cache.jl")
 
+    include("solver_options.jl")
     include("solver.jl")
 
     include("result.jl")

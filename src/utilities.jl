@@ -1,9 +1,29 @@
+filter_kwargs(predicate, kwargs) = filter( x -> predicate(first(x)), kwargs)
+
 # we define our own widen
 _widen(T) = widen(T)
 # Wait until DoubleFloat64 is released
 # _widen(::Type{Float64}) = FastDouble
 
 affine(xs::AbstractVector) = xs[2:end] ./ x[1]
+
+"""
+    embed_projective_if_necessary(x, H)
+
+Embeds a vector into the projective space if necessary, i.e. if it's length is one less
+than the number of variables of `H`. `H` is assumed to be homogenized. After the (eventual)
+embedding the value is normalized.
+"""
+function embed_projective_if_necessary!(x::AbstractVector{T}, H::AbstractHomotopy{T}) where T
+    N = Homotopy.nvariables(H)
+    n = length(x)
+    if N - 1 == n
+        unshift!(x, one(T))
+    elseif N != n
+        error("A start value has length $n. Excepted length $N or $(N-1).")
+    end
+    x
+end
 
 """
     projectivenorm2(a, b)

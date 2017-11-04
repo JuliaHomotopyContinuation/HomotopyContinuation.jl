@@ -1,6 +1,8 @@
+export Result
+
 struct PathResult{T}
     retcode::Symbol
-    solution::T
+    solution::Vector{T}
 
     residual::Float64
     newton_residual::Float64
@@ -8,7 +10,7 @@ struct PathResult{T}
     windingnumber::Int
     homogenous_coordinate_magnitude::Float64
 
-    startvalue::T
+    startvalue::Vector{T}
 
     iterations::Int
     endgame_iterations::Int
@@ -16,7 +18,7 @@ struct PathResult{T}
 end
 
 
-struct Result{T} <: AbstractVector{PathResult{T}}
+mutable struct Result{T} <: AbstractVector{PathResult{T}}
     pathresults::Vector{PathResult{T}}
 end
 

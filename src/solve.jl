@@ -15,64 +15,171 @@ of the given `homotopytype` and uses the given `algorithm` for pathtracking.
 """
 function solve end
 
+function solve(f::MP.AbstractPolynomial{T}; homotopytype=StraightLineHomotopy, kwargs...) where {T<:Number}
+      H, s = totaldegree(homotopytype, [f])
+      solve(Solver(H, s; kwargs...))
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}};
+    homotopytype=StraightLineHomotopy,
+    kwargs...) where {T<:Number}
+     H, s = totaldegree(homotopytype, F)
+     solve(Solver(H, s; kwargs...))
+end
+
+function solve(H::AbstractHomotopy{T}; kwargs...) where {T<:Real}
+    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
+    cH = convert(HT, H)
+    solve(Solver(cH, startvalues; kwargs...))
+end
+
+function solve(
+    H::AbstractHomotopy{T},
+    startvalues; kwargs...) where {T<:Real}
+    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
+    cH = convert(HT, H)
+    solve(Solver(cH, startvalues; kwargs...))
+end
+
 function solve(
     H::AbstractHomotopy{Complex{T}},
-    startvalues;
-    apply_gammatrick=true,
-    pathtracking_algorithm=SphericalPredictorCorrector(),
-    endgame=CauchyEndgame(),
-    endgame_start::Float64=0.1,
-    abstol::Float64=1e-8,
-    refinement_maxiters::Int=100,
-    verbose::Bool=false,
-    high_precision_type = _widen(T),
-    maxiters::Int=10_000,
-    consecutive_successfull_steps_until_steplength_increase::Int=3,
-    steplength_increase_factor::Float64=2.0,
-    steplength_decrease_factor::Float64=inv(steplength_increase_factor),
-    path_precision::Float64=1e-6,
-    corrector_maxiters::Int=3,
-    initial_steplength::Float64=0.1,
-    geometric_series_factor=0.5,
-    max_winding_number=8) where {T}
-
-    if apply_gammatrick
-        gammatrick!(H)
-    end
-
-    pathtracker = initialize(pathtracking_algorithm, H,
-        highprecisiontype = high_precision_type,
-        maxiters = maxiters,
-        verbose = verbose,
-        consecutive_successfull_steps_until_steplength_increase = consecutive_successfull_steps_until_steplength_increase,
-        steplength_increase_factor = steplength_increase_factor,
-        steplength_decrease_factor = steplength_decrease_factor,
-        abstol = path_precision,
-        corrector_maxiters = corrector_maxiters,
-        initial_steplength = initial_steplength)
-
-    endgamer = initialize(
-        endgame,
-        pathtracker,
-        geometric_series_factor=geometric_series_factor,
-        max_winding_number=max_winding_number)
-
-    options = SolverOptions(endgame_start, abstol, refinement_maxiters, verbose)
-
-    solver = Solver(H, pathtracker, endgamer, startvalues, options)
-    solve(solver)
+    startvalues; kwargs...) where {T<:Integer}
+    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
+    cH = convert(HT, H)
+    solve(Solver(cH, startvalues; kwargs...))
 end
 
 function solve(
-    f::MP.AbstractPolynomial{T};
-    homotopytype=StraightLineHomotopy,
-    kwargs...) where {T<:Number}
-      H, s = totaldegree(homotopytype, [f])
-      solve(H, s; kwargs...)
+    H::AbstractHomotopy{Complex{T}},
+    startvalues, HT=widen(T); kwargs...) where {T}
+    solve(Solver(H, startvalues, HT; kwargs...))
 end
-function solve(f::Vector{<:MP.AbstractPolynomial{T}};
-    homotopytype=StraightLineHomotopy,
-    kwargs...) where {T<:Number}
-     H, s = totaldegree(homotopytype, f)
-     solve(H, s; kwargs...)
+
+# This currently relies on the fact that we can keep all solutions in memory. This could
+# not be viable for big systems...
+# The main problem for a pure streaming / iterator solution is the pathcrossing check
+# We need the @inline here for the typeinference
+function solve(solver::Solver)
+    @unpack options, pathtracker, endgamer, startvalues = solver
+    @unpack endgame_start = options
+
+    # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
+    # return a tuple or something like that
+    endgame_start_results = map(startvalues) do startvalue
+        run!(pathtracker, startvalue, 1.0, endgame_start)
+        # do we need informations about  condition_jacobian?
+        PathtrackerResult(pathtracker, false)
+    end
+
+
+    # TODO: Rerun failed paths with higher precision.
+
+    # TODO: We can add a first pathcrossing check here:
+    # Check whether two endgame_start_results solutions are "close".
+    # Since the paths should all be unique this should not happen
+    # If we find two of them we should rerun them with tighter bounds
+
+    # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
+    # return a tuple or something like that
+    if endgame_start > 0.0
+        endgame_results = map(endgame_start_results) do result
+            if result.retcode == :success
+                run!(endgamer, result.solution, endgame_start)
+                EndgamerResult(endgamer)
+            else
+                # We just carry over the result from the failed path.
+                # This should not happen since we catch things above, but you never know...
+                EndgamerResult(endgamer, result)
+            end
+        end
+    else
+        # we just carry over the results to make the rest of the code clearer
+        endgame_results = map(r -> EndgamerResult(endgamer, r), endgame_start_results)
+    end
+
+    # TODO: We can do a second pathcrossing check here:
+    # The cauchy endgame will give us the winding number. This gives the multiplicity.
+    # So we should have a match between the winding number and the number of solutions
+    # at a given point. Otherwise some pathcrossing happend.
+
+    # Refine solution pass
+
+    results = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
+        refine_and_pathresult(s, esr, er, pathtracker, options.abstol, options.refinement_maxiters)
+    end
+
+    # Return solution
+    Result(results)
+end
+
+
+
+function refine_and_pathresult(
+    startvalue,
+    endgame_start_result::PathtrackerResult{T},
+    endgamer_result::EndgamerResult,
+    pathtracker,
+    abstol,
+    refinement_maxiters) where T
+    @unpack retcode, solution, windingnumber = endgamer_result
+
+    # we refine the solution if possible
+    if retcode == :success
+        solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
+    end
+
+    residual, newton_residual, condition_jacobian = residual_estimates(solution, pathtracker)
+
+    # check whether startvalue was affine and our solution is projective
+    N = length(startvalue)
+    if length(solution) == N + 1
+        # make affine
+        # This is a more memory efficient variant from:
+        # solution = solution[2:end] / solution[1]
+        homog_var = solution[1]
+        for i=2:N+1
+            solution[i - 1] = solution[i] / homog_var
+        end
+        resize!(solution, N)
+
+        homogenous_coordinate_magnitude = norm(homog_var)
+    else
+        homogenous_coordinate_magnitude = 1.0
+    end
+
+    PathResult{T}(
+        retcode,
+        solution,
+        residual,
+        newton_residual,
+        condition_jacobian,
+        windingnumber,
+        homogenous_coordinate_magnitude,
+        copy(startvalue),
+        endgame_start_result.iterations,
+        endgamer_result.iterations,
+        endgamer_result.npredictions
+        )
+end
+
+
+function refinesolution(solution, tracker::Pathtracker, windingnumber, abstol, maxiters)
+    @unpack H, cfg, cache = tracker.low
+    # TODO: we should switch to a higher precision if necessary
+    # Since we have the winding number available
+    # See the cauchy endgame test, the refinement is nearly useless...
+
+    sol = copy(solution)
+    correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
+    sol
+end
+
+function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
+    @unpack H, cfg = tracker.low
+    res = evaluate(H, solution, 0.0, cfg)
+    jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
+    residual = norm(res)
+    newton_residual::Float64 = norm(jacobian \ res)
+    condition_jacobian::Float64 = cond(jacobian)
+
+    residual, newton_residual, condition_jacobian
 end

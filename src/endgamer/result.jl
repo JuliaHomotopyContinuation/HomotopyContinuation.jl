@@ -1,6 +1,8 @@
-struct EndgamerResult{xType}
+export EndgamerResult
+
+struct EndgamerResult{T}
     retcode::Symbol
-    solution::xType
+    solution::Vector{T}
     residual::Float64
     iterations::Int
     npredictions::Int
