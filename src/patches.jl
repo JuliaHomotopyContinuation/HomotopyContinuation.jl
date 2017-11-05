@@ -1,7 +1,7 @@
 ####
 # Currently the generic (non-BLAS) A_ldiv_B! method with LU factorization does not update
 # the RHS. It is already fixed on master (https://github.com/JuliaLang/julia/pull/22774)
-# but not in v0.6.0.
+# but not in v0.6.1.
 # This are the revelenvt parts of the PR from the fix
 
 _apply_ipiv!(A::Base.LinAlg.LU, B::StridedVecOrMat) = _ipiv!(A, 1 : length(A.ipiv), B)
