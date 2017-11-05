@@ -27,7 +27,9 @@ module HomotopyContinuation
     include("pathtracker/result.jl")
 
     include("pathtracking_algorithms/spherical.jl")
+    include("pathtracking_algorithms/affine.jl")
     include("pathtracking_caches/spherical_cache.jl")
+    include("pathtracking_caches/affine_cache.jl")
 
     include("endgamer/type.jl")
     include("endgamer/modify.jl")
