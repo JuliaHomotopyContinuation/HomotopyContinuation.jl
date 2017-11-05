@@ -3,7 +3,7 @@ using Base.Test
 import DynamicPolynomials
 const PolyImpl = DynamicPolynomials
 
-#include("affine_test.jl")
+include("affine_test.jl")
 include("solver_test.jl")
 include("spherical_test.jl")
 include("cauchyendgame_test.jl")
