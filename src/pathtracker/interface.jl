@@ -97,3 +97,7 @@ function run!(
     run!(tracker)
     tracker
 end
+
+
+# optional methods
+precondition!(tracker, low, cache) = nothing

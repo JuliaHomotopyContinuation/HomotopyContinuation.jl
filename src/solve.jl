@@ -15,49 +15,18 @@ of the given `homotopytype` and uses the given `algorithm` for pathtracking.
 """
 function solve end
 
-function solve(f::MP.AbstractPolynomial{T}; homotopytype=StraightLineHomotopy, kwargs...) where {T<:Number}
-      H, s = totaldegree(homotopytype, [f])
-      solve(Solver(H, s; kwargs...))
-end
-function solve(F::Vector{<:MP.AbstractPolynomial{T}};
-    homotopytype=StraightLineHomotopy,
-    kwargs...) where {T<:Number}
-     H, s = totaldegree(homotopytype, F)
-     solve(Solver(H, s; kwargs...))
-end
+# This are just convenience wrappers to pass arguments to Solver.
+# Solver currently takes up to 5 positional arguments.
+solve(a, b, c, d, e; kwargs...) = solve(Solver(a, b, c, d, e; kwargs...))
+solve(a, b, c, d; kwargs...) = solve(Solver(a, b, c, d; kwargs...))
+solve(a, b, c; kwargs...) = solve(Solver(a, b, c; kwargs...))
+solve(a, b; kwargs...) = solve(Solver(a, b; kwargs...))
+solve(a; kwargs...) = solve(Solver(a; kwargs...))
 
-function solve(H::AbstractHomotopy{T}; kwargs...) where {T<:Real}
-    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
-    cH = convert(HT, H)
-    solve(Solver(cH, startvalues; kwargs...))
-end
-
-function solve(
-    H::AbstractHomotopy{T},
-    startvalues; kwargs...) where {T<:Real}
-    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
-    cH = convert(HT, H)
-    solve(Solver(cH, startvalues; kwargs...))
-end
-
-function solve(
-    H::AbstractHomotopy{Complex{T}},
-    startvalues; kwargs...) where {T<:Integer}
-    HT = promote_type(typeof(H), Complex{promote_type(Float64, T)})
-    cH = convert(HT, H)
-    solve(Solver(cH, startvalues; kwargs...))
-end
-
-function solve(
-    H::AbstractHomotopy{Complex{T}},
-    startvalues, HT=widen(T); kwargs...) where {T}
-    solve(Solver(H, startvalues, HT; kwargs...))
-end
 
 # This currently relies on the fact that we can keep all solutions in memory. This could
 # not be viable for big systems...
 # The main problem for a pure streaming / iterator solution is the pathcrossing check
-# We need the @inline here for the typeinference
 function solve(solver::Solver)
     @unpack options, pathtracker, endgamer, startvalues = solver
     @unpack endgame_start = options
@@ -110,8 +79,6 @@ function solve(solver::Solver)
     # Return solution
     Result(results)
 end
-
-
 
 function refine_and_pathresult(
     startvalue,
