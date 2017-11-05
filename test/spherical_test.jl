@@ -4,7 +4,7 @@
         [(x - 4.3im) * (x + (2.1 - 4im))],
         [(x - 2.0) * (x - (2.5+ 4.0im))])
 
-    res = solve(H, [[-2.1 + 4.0im], [4.3im]], SphericalPredictorCorrector(), endgame_start=0.0)
+    res = solve(H, [[-2.1 + 4.0im], [4.3im]], SphericalPredictorCorrector(), endgame_start=0.0, apply_gammatrick=false)
 
     @test res[1].retcode == :success
     @test res[2].retcode == :success

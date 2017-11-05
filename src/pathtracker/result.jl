@@ -1,3 +1,5 @@
+export PathtrackerResult, solution
+
 struct PathtrackerResult{T}
     retcode::Symbol
     solution::Vector{T}

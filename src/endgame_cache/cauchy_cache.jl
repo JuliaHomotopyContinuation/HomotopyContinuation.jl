@@ -94,7 +94,7 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
     start = first(unitroots)
     c = 1
     for (k, finish) in enumerate(Iterators.drop(unitroots, 1))
-        run!(tracker, samples[k], start, finish)
+        track!(tracker, samples[k], start, finish)
         retcode, sol = solution(tracker)
 
         if retcode != :success

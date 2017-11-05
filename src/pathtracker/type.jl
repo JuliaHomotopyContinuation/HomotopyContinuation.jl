@@ -1,3 +1,5 @@
+export Pathtracker
+
 # This are the options set by the user
 mutable struct PathtrackerOptions
     maxiters::Int
@@ -90,13 +92,13 @@ end
 
 is_pathtracker_kwarg(kwarg) = is_pathtracker_options_kwarg(kwarg)
 
+
 function Pathtracker(
-    alg::algType,
     H::AbstractHomotopy{Complex{T}},
-    x0::AbstractVector,
-    s_start,
-    s_end,
-    HT #=highprecisiontype=#; kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:Real}
+    alg::algType,
+    x0=zeros(Complex{T}, nvariables(H)),
+    s_start=1.0,
+    s_end=0.0, HT::Type{S}=widen(T); kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
 
     options = PathtrackerOptions(kwargs...)
 

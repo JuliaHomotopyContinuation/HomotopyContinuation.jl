@@ -23,7 +23,7 @@ module HomotopyContinuation
 
     include("pathtracker/type.jl")
     include("pathtracker/modify.jl")
-    include("pathtracker/interface.jl")
+    include("pathtracker/iterator_interface.jl")
     include("pathtracker/result.jl")
 
     include("pathtracking_algorithms/spherical.jl")

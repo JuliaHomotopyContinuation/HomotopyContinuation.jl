@@ -46,8 +46,8 @@ function Solver(
     solver_options = SolverOptions(;solver_options_kwargs...)
 
     pathtracker_kwargs = filter_kwargs(is_pathtracker_kwarg, kwargs)
-    pathtracker = Pathtracker(
-        pathtracking_algorithm, H, first(startvalues), 1.0,
+    pathtracker = Pathtracker(H,
+        pathtracking_algorithm, first(startvalues), 1.0,
         solver_options.endgame_start, HT; pathtracker_kwargs...)
 
     endgamer_kwargs = filter_kwargs(is_endgamer_kwarg, kwargs)

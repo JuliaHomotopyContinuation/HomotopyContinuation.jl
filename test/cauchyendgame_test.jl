@@ -2,7 +2,6 @@
      PolyImpl.@polyvar x
      H, solutions = totaldegree(StraightLineHomotopy{Complex128}, [(x - 2.0)^4])
 
-
      results = solve(H, solutions, SphericalPredictorCorrector(), CauchyEndgame())
 
      for result in results

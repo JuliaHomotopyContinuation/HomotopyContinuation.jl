@@ -34,7 +34,7 @@ function solve(solver::Solver)
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
     endgame_start_results = map(startvalues) do startvalue
-        run!(pathtracker, startvalue, 1.0, endgame_start)
+        track!(pathtracker, startvalue, 1.0, endgame_start)
         # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)
     end
@@ -52,7 +52,7 @@ function solve(solver::Solver)
     if endgame_start > 0.0
         endgame_results = map(endgame_start_results) do result
             if result.retcode == :success
-                run!(endgamer, result.solution, endgame_start)
+                endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
             else
                 # We just carry over the result from the failed path.

@@ -1,4 +1,21 @@
-## IETARATOR
+export track!
+
+function track!(tracker::Pathtracker, startvalue::AbstractVector, start::Number=1.0, finish::Number=0.0)
+    reset!(tracker, startvalue, start, finish)
+    track!(tracker)
+    tracker
+end
+
+function track!(tracker::Pathtracker)
+    start(tracker)
+    is_done = done(tracker, 0)
+    while !is_done
+        next(tracker, 0)
+        is_done = done(tracker, 0)
+    end
+end
+
+
 function Base.start(tracker::Pathtracker)
     precondition!(tracker, tracker.low, tracker.low.cache)
     return 0
@@ -25,6 +42,7 @@ end
     false
 end
 Base.eltype(::T) where {T<:Pathtracker} = T
+
 
 #TODO: Should a user need more hooks?
 @inline function step!(tracker::Pathtracker)
@@ -76,26 +94,6 @@ end
         copy!(tracker.low.x, tracker.low.xnext)
     end
     nothing
-end
-
-function run!(tracker::Pathtracker)
-    precondition!(tracker, tracker.low, tracker.low.cache)
-    while tracker.t > 0 && tracker.iter < tracker.options.maxiters
-        step!(tracker)
-    end
-    if tracker.iter ≥ tracker.options.maxiters && tracker.options.verbose
-        warn("Interrupted. Larger `maxiters` necessary.")
-    end
-end
-
-function run!(
-    tracker::Pathtracker{Low},
-    startvalue::AbstractVector,
-    start::Number=1.0,
-    finish::Number=0.0) where {Low}
-    reset!(tracker, startvalue, start, finish)
-    run!(tracker)
-    tracker
 end
 
 
