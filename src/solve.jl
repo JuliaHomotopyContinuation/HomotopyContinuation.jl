@@ -23,6 +23,11 @@ solve(a, b, c; kwargs...) = solve(Solver(a, b, c; kwargs...))
 solve(a, b; kwargs...) = solve(Solver(a, b; kwargs...))
 solve(a; kwargs...) = solve(Solver(a; kwargs...))
 
+solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(Solver(a, [b], c, d, e; kwargs...))
+solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(Solver(a, [b], c, d; kwargs...))
+solve(a, b::Vector{<:Number}, c; kwargs...) = solve(Solver(a, [b], c; kwargs...))
+solve(a, b::Vector{<:Number}; kwargs...) = solve(Solver(a, [b]; kwargs...))
+
 
 # This currently relies on the fact that we can keep all solutions in memory. This could
 # not be viable for big systems...
