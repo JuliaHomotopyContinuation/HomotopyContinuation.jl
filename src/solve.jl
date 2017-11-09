@@ -32,13 +32,13 @@ solve(a, b::Vector{<:Number}; kwargs...) = solve(Solver(a, [b]; kwargs...))
 # This currently relies on the fact that we can keep all solutions in memory. This could
 # not be viable for big systems...
 # The main problem for a pure streaming / iterator solution is the pathcrossing check
-function solve(solver::Solver)
+function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     @unpack options, pathtracker, endgamer, startvalues = solver
     @unpack endgame_start = options
 
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
-    endgame_start_results = map(startvalues) do startvalue
+    endgame_start_results::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
         track!(pathtracker, startvalue, 1.0, endgame_start)
         # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)
@@ -54,8 +54,9 @@ function solve(solver::Solver)
 
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
+    endgame_results = Vector{EndgamerResult{T}}(length(endgame_start_results))
     if endgame_start > 0.0
-        endgame_results = map(endgame_start_results) do result
+        map!(endgame_results, endgame_start_results) do result
             if result.retcode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
@@ -67,7 +68,7 @@ function solve(solver::Solver)
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = map(r -> EndgamerResult(endgamer, r), endgame_start_results)
+        map!(endgame_results, r -> EndgamerResult(endgamer, r), endgame_start_results)
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -77,7 +78,7 @@ function solve(solver::Solver)
 
     # Refine solution pass
 
-    results = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
+    results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
         refine_and_pathresult(s, esr, er, pathtracker, options.abstol, options.refinement_maxiters)
     end
 
