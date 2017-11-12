@@ -3,6 +3,7 @@ export EndgamerResult
 struct EndgamerResult{T}
     retcode::Symbol
     solution::Vector{T}
+    startvalue::Vector{T}
     residual::Float64
     iterations::Int
     npredictions::Int
@@ -40,6 +41,7 @@ function EndgamerResult(endgamer::Endgamer)
     EndgamerResult(
         retcode,
         solution,
+        copy(endgamer.startvalue),
         residual,
         iterations,
         npredictions,
@@ -55,6 +57,7 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
     EndgamerResult(
         result.retcode,
         result.solution,
+        copy(endgamer.startvalue),
         residual,
         iterations,
         npredictions,

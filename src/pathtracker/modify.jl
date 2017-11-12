@@ -1,7 +1,7 @@
 function reset!(tracker::Pathtracker{Low}, x0, s_start, s_end) where Low
     # TODO: we should carry over the original options
     setprecisionvalues!(tracker, x0)
-
+    tracker.startvalue .= tracker.low.x
     #tracker.startvalue = copy(tracker.low.x)
 
     tracker.iter = 0
@@ -13,6 +13,7 @@ function reset!(tracker::Pathtracker{Low}, x0, s_start, s_end) where Low
     tracker.snext = tracker.s
     tracker.step_sucessfull = false
     tracker.consecutive_successfull_steps = 0
+
     tracker
 end
 

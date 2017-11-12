@@ -3,7 +3,7 @@ export PathtrackerResult, solution
 struct PathtrackerResult{T}
     retcode::Symbol
     solution::Vector{T}
-    #startvalue::xType
+    startvalue::Vector{T}
     residual::Float64
     iterations::Int
     homogenous_coordinate_magnitude::Float64
@@ -70,7 +70,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     PathtrackerResult(
         retcode,
         solution,
-        #copy(tracker.startvalue),
+        copy(tracker.startvalue),
         residual,
         tracker.iter,
         homogenous_coordinate_magnitude,

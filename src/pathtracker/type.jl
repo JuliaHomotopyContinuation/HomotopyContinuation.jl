@@ -75,7 +75,6 @@ mutable struct Pathtracker{
     low::PathtrackerPrecisionValues{LowPrecision, LowHT, LowConfig, LowCache}
     # higher precision values
     high::PathtrackerPrecisionValues{HighPrecision, HighHT, HighConfig, HighCache}
-
     usehigh::Bool
 
     iter::Int
@@ -88,6 +87,8 @@ mutable struct Pathtracker{
     step_sucessfull::Bool
     consecutive_successfull_steps::Int
     options::O
+
+    startvalue::Vector{Complex{LowPrecision}}
 end
 
 is_pathtracker_kwarg(kwarg) = is_pathtracker_options_kwarg(kwarg)
@@ -143,5 +144,5 @@ function Pathtracker(
         typeof(options)
         }(alg, low, high, usehigh,
         iter, t, steplength, s, sdiff, ds, snext,
-        step_sucessfull, consecutive_successfull_steps, options)
+        step_sucessfull, consecutive_successfull_steps, options, copy(x))
 end

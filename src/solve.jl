@@ -38,7 +38,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
 
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
-    endgame_start_results::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
+    endgame_start_results::Vector{PathtrackerResult{T}} = pmap(startvalues) do startvalue
         track!(pathtracker, startvalue, 1.0, endgame_start)
         # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)

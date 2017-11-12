@@ -24,6 +24,8 @@ mutable struct Endgamer{Low, algType<:AbstractEndgameAlgorithm,Cache<:AbstractEn
     failurecode::Symbol
 
     options::EndgamerOptions
+
+    startvalue::Vector{Complex{Low}}
 end
 
 function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker;
@@ -37,7 +39,7 @@ function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker{Low}, x, R
     abstol=tracker.options.abstol) where Low
     predictions = Vector{Vector{Complex{Low}}}()
     xs::Vector{Vector{Complex{Low}}} = [x]
-
+    startvalue = convert(Vector{Complex{Low}}, x)
     iter = 0
     windingnumber = 1
     status = NotStarted
@@ -47,7 +49,7 @@ function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker{Low}, x, R
     options = EndgamerOptions(geometric_series_factor, abstol, max_winding_number)
 
     Endgamer(alg, cache, tracker, predictions, xs, iter, R, windingnumber,
-        status, failurecode, options)
+        status, failurecode, options, startvalue)
 end
 
 function is_endgamer_kwarg(kwarg)
