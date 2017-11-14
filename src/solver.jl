@@ -18,6 +18,11 @@ mutable struct Solver{
     options::SolverOptions
 end
 
+function Base.deepcopy(s::Solver)
+    Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
+        deepcopy(s.endgamer), deepcopy(s.startvalues), deepcopy(s.options))
+end
+
 function Solver(
     H::AH{Complex{T}},
     startvalues,

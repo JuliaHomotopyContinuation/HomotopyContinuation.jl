@@ -8,7 +8,6 @@ function endgame!(endgamer::Endgamer, x::AbstractVector, t)
 end
 
 function endgame!(endgamer::Endgamer)
-    # TODO: Is the iterator fast enough to just is it directly?
     start(endgamer)
     is_done = done(endgamer, 0)
     while !is_done

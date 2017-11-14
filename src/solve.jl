@@ -54,9 +54,9 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
 
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
-    endgame_results = Vector{EndgamerResult{T}}(length(endgame_start_results))
+    endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
-        map!(endgame_results, endgame_start_results) do result
+        endgame_results = pmap(endgame_start_results) do result
             if result.retcode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
@@ -68,7 +68,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        map!(endgame_results, r -> EndgamerResult(endgamer, r), endgame_start_results)
+        endgame_results = pmap(endgame_results, r -> EndgamerResult(endgamer, r), endgame_start_results)
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -84,6 +84,10 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
 
     # Return solution
     Result(results)
+end
+
+function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
+
 end
 
 function refine_and_pathresult(
