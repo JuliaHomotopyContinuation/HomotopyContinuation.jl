@@ -4,5 +4,5 @@
     tracker = Pathtracker(H, SphericalPredictorCorrector(), first(s))
     track!(tracker)
     result = PathtrackerResult(tracker)
-    @test result.retcode == :success
+    @test result.returncode == :success
 end

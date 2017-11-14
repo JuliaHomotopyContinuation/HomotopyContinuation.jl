@@ -57,7 +57,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
         endgame_results = pmap(endgame_start_results) do result
-            if result.retcode == :success
+            if result.returncode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
             else
@@ -68,7 +68,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = pmap(endgame_results, r -> EndgamerResult(endgamer, r), endgame_start_results)
+        endgame_results = map(r -> EndgamerResult(endgamer, r), endgame_start_results)
     end
 
     # TODO: We can do a second pathcrossing check here:

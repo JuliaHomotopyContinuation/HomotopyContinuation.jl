@@ -6,7 +6,7 @@ struct PathtrackerResult{T}
     startvalue::Vector{T}
     residual::Float64
     iterations::Int
-    homogenous_coordinate_magnitude::Float64
+    angle_to_infinity::Float64
 
     # Extended analysis
     newton_residual::Float64
@@ -61,9 +61,9 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     end
 
     if is_projective(tracker.alg)
-        homogenous_coordinate_magnitude = convert(Float64, abs(first(solution)))
+        angle_to_infinity = convert(Float64, abs(first(solution)))
     else
-        homogenous_coordinate_magnitude = 1.0
+        angle_to_infinity = 1.0
     end
 
 
@@ -73,7 +73,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
         copy(tracker.startvalue),
         residual,
         tracker.iter,
-        homogenous_coordinate_magnitude,
+        angle_to_infinity,
         newton_residual,
         condition_jacobian)
 end

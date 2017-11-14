@@ -7,7 +7,7 @@ struct EndgamerResult{T}
     residual::Float64
     iterations::Int
     npredictions::Int
-    homogenous_coordinate_magnitude::Float64
+    angle_to_infinity::Float64
     windingnumber::Int
 end
 
@@ -30,9 +30,9 @@ function EndgamerResult(endgamer::Endgamer)
     residual = norm(res)
 
     if is_projective(tracker.alg)
-        homogenous_coordinate_magnitude = convert(Float64, abs(first(solution)))
+        angle_to_infinity = convert(Float64, abs(first(solution)))
     else
-        homogenous_coordinate_magnitude = 1.0
+        angle_to_infinity = 1.0
     end
 
     iterations = endgamer.iter
@@ -45,7 +45,7 @@ function EndgamerResult(endgamer::Endgamer)
         residual,
         iterations,
         npredictions,
-        homogenous_coordinate_magnitude,
+        angle_to_infinity,
         windingnumber)
 end
 
@@ -61,6 +61,6 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
         residual,
         iterations,
         npredictions,
-        result.homogenous_coordinate_magnitude,
+        result.angle_to_infinity,
         windingnumber)
 end
