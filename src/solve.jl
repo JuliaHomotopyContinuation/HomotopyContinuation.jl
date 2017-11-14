@@ -86,9 +86,6 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     Result(results)
 end
 
-function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
-
-end
 
 function refine_and_pathresult(
     startvalue,
