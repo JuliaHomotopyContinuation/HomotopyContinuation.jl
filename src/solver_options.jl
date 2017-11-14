@@ -7,7 +7,7 @@ struct SolverOptions
 end
 
 function SolverOptions(;abstol::Float64=1e-8,
-    tol::Float64=1e-12,
+    tol::Float64=1e-10,
     endgame_start::Float64=0.1,
     refinement_maxiters::Int=100,
     verbose=false)

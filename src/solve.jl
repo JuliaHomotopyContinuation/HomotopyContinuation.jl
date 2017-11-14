@@ -57,7 +57,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
         endgame_results = pmap(endgame_start_results) do result
-            if result.returncode == :success
+            if result.returncode == :isolated
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
             else
@@ -100,6 +100,7 @@ function refine_and_pathresult(
     # we refine the solution if possible
     if returncode == :success
         solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
+        returncode = :isolated
     end
 
     residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
@@ -122,8 +123,14 @@ function refine_and_pathresult(
         angle_to_infinity = NaN
     end
 
-    if windingnumber > 1 || condition_number > inv(tol)
-        returncode = :Singular
+    if windingnumber > 1 || condition_number > inv(sqrt(abstol))
+        returncode = :singular
+    end
+
+    if norm(imag(solution)) < condition_number * sqrt(abstol)
+        real_solution = true
+    else
+        real_solution = false
     end
 
     PathResult{T}(
@@ -134,6 +141,7 @@ function refine_and_pathresult(
         condition_number,
         windingnumber,
         angle_to_infinity,
+        real_solution,
         copy(startvalue),
         endgame_start_result.iterations,
         endgamer_result.iterations,

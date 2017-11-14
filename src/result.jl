@@ -9,6 +9,7 @@ struct PathResult{T}
     condition_number::Float64
     windingnumber::Int
     angle_to_infinity::Float64
+    real_solution::Bool
 
     startvalue::Vector{T}
 
@@ -31,6 +32,7 @@ function Base.show(io::IO, r::PathResult)
     println(io, "* condition_number: $(r.condition_number)")
     println(io, "* windingnumber: $(r.windingnumber)")
     println(io, "* angle_to_infinity: $(r.angle_to_infinity)")
+    println(io, "* real_solution: $(r.real_solution)")
 end
 
 
@@ -53,7 +55,7 @@ Base.size(result::Result) = size(result.pathresults)
 function Base.show(io::IO, result::Result{T}) where T
     println(io, typeof(result), ":")
     println(io, "* Total number of paths: $(length(result.pathresults))")
-    println(io, "* Number of successfull paths: $(sum(r -> r.returncode == :success ? 1 : 0, result.pathresults))")
+    println(io, "* Number of successfull paths: $(sum(r -> r.returncode == :isolated ? 1 : 0, result.pathresults))")
 end
 
 
@@ -69,7 +71,7 @@ end
         pathresults_t = Juno.render(i, s.pathresults)
         t[:children] = [
             Juno.render(i, Text("Total number of paths → $(length(s.pathresults))")),
-            Juno.render(i, Text("Number of successfull paths → $(sum(r -> r.returncode == :success ? 1 : 0, s.pathresults))")),
+            Juno.render(i, Text("Number of successfull paths → $(sum(r -> r.returncode == :isolated ? 1 : 0, s.pathresults))")),
             pathresults_t]
         return t
     end
