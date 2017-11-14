@@ -150,6 +150,6 @@ end
 function Pathtracker(
     H::AbstractHomotopy{Complex{T}},
     alg::algType,
-    HT::Type{S}=widen(T); kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
+    HT::Type{S}; kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
     Pathtracker(H, alg, zeros(Complex{T}, nvariables(H)), 1.0, 0.0, HT; kwargs...)
 end
