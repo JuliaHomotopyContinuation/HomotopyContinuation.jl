@@ -10,7 +10,7 @@ struct PathtrackerResult{T}
 
     # Extended analysis
     newton_residual::Float64
-    condition_jacobian::Float64
+    condition_number::Float64
 end
 
 """
@@ -54,10 +54,10 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
         jacobian = Homotopy.jacobian(H, solution, tracker.s, cfg)
 
         newton_residual = norm(jacobian \ res)
-        condition_jacobian = cond(jacobian)
+        condition_number = cond(jacobian)
     else
         newton_residual = NaN
-        condition_jacobian = NaN
+        condition_number = NaN
     end
 
     if is_projective(tracker.alg)
@@ -75,5 +75,5 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
         tracker.iter,
         angle_to_infinity,
         newton_residual,
-        condition_jacobian)
+        condition_number)
 end

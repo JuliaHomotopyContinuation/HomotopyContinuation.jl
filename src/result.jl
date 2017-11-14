@@ -6,7 +6,7 @@ struct PathResult{T}
 
     residual::Float64
     newton_residual::Float64
-    condition_jacobian::Float64
+    condition_number::Float64
     windingnumber::Int
     angle_to_infinity::Float64
 
@@ -28,7 +28,7 @@ function Base.show(io::IO, r::PathResult)
     println(io, "---------------------------------------------")
     println(io, "* newton_residual: $(r.newton_residual)")
     println(io, "* residual: $(r.residual)")
-    println(io, "* condition_jacobian: $(r.condition_jacobian)")
+    println(io, "* condition_number: $(r.condition_number)")
     println(io, "* windingnumber: $(r.windingnumber)")
     println(io, "* angle_to_infinity: $(r.angle_to_infinity)")
 end

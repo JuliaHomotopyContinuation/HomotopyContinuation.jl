@@ -159,7 +159,7 @@ function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
     jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
     residual = norm(res)
     newton_residual::Float64 = norm(jacobian \ res)
-    condition_jacobian::Float64 = cond(jacobian)
+    condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
 
-    residual, newton_residual, condition_jacobian
+    residual, newton_residual, condition_number
 end
