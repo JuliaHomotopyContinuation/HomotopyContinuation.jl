@@ -1,7 +1,7 @@
 export EndgamerResult
 
 struct EndgamerResult{T}
-    retcode::Symbol
+    returncode::Symbol
     solution::Vector{T}
     startvalue::Vector{T}
     residual::Float64
@@ -18,11 +18,11 @@ function EndgamerResult(endgamer::Endgamer)
 
 
     if endgamer.status == Successfull
-        retcode = :success
+        returncode = :success
         solution = copy(endgamer.predictions[end])
     else
         solution = endgamer.xs[end]
-        retcode = endgamer.failurecode
+        returncode = endgamer.failurecode
     end
 
 
@@ -39,7 +39,7 @@ function EndgamerResult(endgamer::Endgamer)
     npredictions = length(endgamer.predictions)
 
     EndgamerResult(
-        retcode,
+        returncode,
         solution,
         copy(endgamer.startvalue),
         residual,
@@ -55,7 +55,7 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
     iterations = 0
     npredictions = 0
     EndgamerResult(
-        result.retcode,
+        result.returncode,
         result.solution,
         copy(endgamer.startvalue),
         residual,

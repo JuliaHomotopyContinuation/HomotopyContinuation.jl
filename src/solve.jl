@@ -79,7 +79,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     # Refine solution pass
 
     results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
-        refine_and_pathresult(s, esr, er, pathtracker, options.abstol, options.refinement_maxiters)
+        refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.tol, options.refinement_maxiters)
     end
 
     # Return solution
@@ -93,41 +93,47 @@ function refine_and_pathresult(
     endgamer_result::EndgamerResult,
     pathtracker,
     abstol,
+    tol,
     refinement_maxiters) where T
-    @unpack retcode, solution, windingnumber = endgamer_result
+    @unpack returncode, solution, windingnumber = endgamer_result
 
     # we refine the solution if possible
-    if retcode == :success
+    if returncode == :success
         solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
     end
 
-    residual, newton_residual, condition_jacobian = residual_estimates(solution, pathtracker)
+    residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
 
     # check whether startvalue was affine and our solution is projective
     N = length(startvalue)
     if length(solution) == N + 1
         # make affine
-        # This is a more memory efficient variant from:
-        # solution = solution[2:end] / solution[1]
-        homog_var = solution[1]
-        for i=2:N+1
-            solution[i - 1] = solution[i] / homog_var
-        end
-        resize!(solution, N)
 
-        homogenous_coordinate_magnitude = norm(homog_var)
+        homog_var = solution[1]
+        solution = solution[2:end]
+        angle_to_infinity = atan(abs(homog_var)/norm(solution))
+        if angle_to_infinity < tol
+            returncode = :at_infinity
+        end
+
+        scale!(solution, inv(homog_var))
+
     else
-        homogenous_coordinate_magnitude = 1.0
+        angle_to_infinity = NaN
+    end
+
+    if windingnumber > 1 || condition_number > inv(tol)
+        returncode = :Singular
     end
 
     PathResult{T}(
-        retcode,
+        returncode,
         solution,
         residual,
         newton_residual,
-        condition_jacobian,
+        condition_number,
         windingnumber,
-        homogenous_coordinate_magnitude,
+        angle_to_infinity,
         copy(startvalue),
         endgame_start_result.iterations,
         endgamer_result.iterations,

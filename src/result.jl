@@ -1,14 +1,14 @@
 export Result
 
 struct PathResult{T}
-    retcode::Symbol
+    returncode::Symbol
     solution::Vector{T}
 
     residual::Float64
     newton_residual::Float64
     condition_jacobian::Float64
     windingnumber::Int
-    homogenous_coordinate_magnitude::Float64
+    angle_to_infinity::Float64
 
     startvalue::Vector{T}
 

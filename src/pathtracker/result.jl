@@ -1,7 +1,7 @@
 export PathtrackerResult, solution
 
 struct PathtrackerResult{T}
-    retcode::Symbol
+    returncode::Symbol
     solution::Vector{T}
     startvalue::Vector{T}
     residual::Float64
@@ -16,21 +16,21 @@ end
 """
     solution(pathtracker)
 
-Get `(retcode, solution)` from `pathtracker`. This is more lightwheight than a
+Get `(returncode, solution)` from `pathtracker`. This is more lightwheight than a
 `PathtrackerResult`.
 """
 @inline function solution(tracker::Pathtracker)
     if tracker.iter ≥ tracker.options.maxiters
-        retcode = :max_iterations
+        returncode = :max_iterations
     else
-        retcode = :success
+        returncode = :success
     end
     if tracker.usehigh
         solution = convert.(Complex{Low}, tracker.high.x)
     else
         solution = copy(tracker.low.x)
     end
-    retcode, solution
+    returncode, solution
 end
 
 function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) where Low
@@ -45,9 +45,9 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     residual = norm(res)
 
     if tracker.iter ≥ tracker.options.maxiters
-        retcode = :max_iterations
+        returncode = :max_iterations
     else
-        retcode = :success
+        returncode = :success
     end
 
     if extended_analysis
@@ -68,7 +68,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
 
 
     PathtrackerResult(
-        retcode,
+        returncode,
         solution,
         copy(tracker.startvalue),
         residual,
