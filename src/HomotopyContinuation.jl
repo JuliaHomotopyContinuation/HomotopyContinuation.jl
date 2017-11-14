@@ -5,6 +5,7 @@ module HomotopyContinuation
     using Reexport
     @reexport using Homotopy
     using Parameters
+    using Requires
     #using HigherPrecision
 
     import MultivariatePolynomials
