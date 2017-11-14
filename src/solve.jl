@@ -115,6 +115,43 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
     Result(results)
 end
 
+"""
+    check_crossed_paths(paths::Vector{PathtrackerResult{T}} [, tolerance=1e-12])
+
+Split the given paths in two arrays. One for all paths were no path-crossing happend and
+one for the paths where we assume that path crossing happnened.
+This assumes that the paths were not tracked until t=0.
+With probability 1 all solutions should be different. Thus, if two solutions are too similar
+(given the passed `tolerance`) we assume hat path crossing happened.
+"""
+function check_crossed_paths(paths::Vector{PathtrackerResult{T}}, tol=1e-12) where T
+    crossed_paths = Vector{PathtrackerResult{T}}()
+    good_paths = Vector{PathtrackerResult{T}}()
+    path_handled = falses(length(paths))
+
+    for i=1:length(paths)-1
+        if path_handled[i]
+            continue
+        end
+        r = paths[i]
+        x0 = paths[i].solution
+        crossing = false
+        for j=i+1:length(paths)
+            if !path_handled[j] && projectivenorm2(x0, paths[j].solution) < tol
+                push!(crossed_paths, paths[j])
+                crossing = true
+                path_handled[j] = true
+            end
+        end
+        if crossing
+            push!(crossed_paths, r)
+        else
+            push!(good_paths, r)
+        end
+    end
+
+    good_paths, crossed_paths
+end
 
 function refine_and_pathresult(
     startvalue,
