@@ -6,8 +6,8 @@
 
     res = solve(H, [[-2.1 + 4.0im], [4.3im]], SphericalPredictorCorrector(), endgame_start=0.0, apply_gammatrick=false)
 
-    @test res[1].returncode == :success
-    @test res[2].returncode == :success
+    @test res[1].returncode == :isolated
+    @test res[2].returncode == :isolated
 
     if real.(res[1].solution) ≈ [2.5]
         @test real.(res[1].solution) ≈ [2.5]

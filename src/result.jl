@@ -6,7 +6,7 @@ struct PathResult{T}
 
     residual::Float64
     newton_residual::Float64
-    condition_number::Float64
+    log10_condition_number::Float64
     windingnumber::Int
     angle_to_infinity::Float64
     real_solution::Bool
@@ -24,15 +24,15 @@ function Base.show(io::IO, r::PathResult)
     println(io, "* solution: $(r.solution)")
     println(io, "---------------------------------------------")
     println(io, "* iterations: $(r.iterations)")
-    println(io, "* endgame_iterations: $(r.endgame_iterations)")
+    println(io, "* endgame iterations: $(r.endgame_iterations)")
     println(io, "* npredictions: $(r.npredictions)")
     println(io, "---------------------------------------------")
-    println(io, "* newton_residual: $(r.newton_residual)")
-    println(io, "* residual: $(r.residual)")
-    println(io, "* condition_number: $(r.condition_number)")
+    println(io, "* newton_residual: $(@sprintf "%.3e" r.newton_residual)")
+    println(io, "* residual: $(@sprintf "%.3e" r.residual)")
+    println(io, "* log10 of the condition_number: $(@sprintf "%.3e" r.log10_condition_number)")
     println(io, "* windingnumber: $(r.windingnumber)")
-    println(io, "* angle_to_infinity: $(r.angle_to_infinity)")
-    println(io, "* real_solution: $(r.real_solution)")
+    println(io, "* angle to infinity: $(round(r.angle_to_infinity,3))")
+    println(io, "* real solution: $(r.real_solution)")
 end
 
 

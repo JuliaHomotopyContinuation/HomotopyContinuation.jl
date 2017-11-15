@@ -54,7 +54,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
         jacobian = Homotopy.jacobian(H, solution, tracker.s, cfg)
 
         newton_residual = norm(jacobian \ res)
-        condition_number = cond(jacobian)
+        condition_number =  Homotopy.κ(H, solution, 0.0, cfg)
     else
         newton_residual = NaN
         condition_number = NaN

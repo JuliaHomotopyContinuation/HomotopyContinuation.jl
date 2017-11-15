@@ -57,7 +57,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
         endgame_results = pmap(endgame_start_results) do result
-            if result.returncode == :isolated
+            if result.returncode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
             else
@@ -79,7 +79,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     # Refine solution pass
 
     results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
-        refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.tol, options.refinement_maxiters)
+        refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.at_infinity_tol, options.singular_tol, options.refinement_maxiters)
     end
 
     # Return solution
@@ -93,7 +93,8 @@ function refine_and_pathresult(
     endgamer_result::EndgamerResult,
     pathtracker,
     abstol,
-    tol,
+    at_infinity_tol,
+    singular_tol,
     refinement_maxiters) where T
     @unpack returncode, solution, windingnumber = endgamer_result
 
@@ -111,23 +112,25 @@ function refine_and_pathresult(
         # make affine
 
         homog_var = solution[1]
-        solution = solution[2:end]
-        angle_to_infinity = atan(abs(homog_var)/norm(solution))
-        if angle_to_infinity < tol
+        affine_var = solution[2:end]
+        angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
+        if angle_to_infinity < at_infinity_tol
             returncode = :at_infinity
+            a, index = findmax(abs2.(affine_var))
+            scale!(solution, inv(affine_var[index]))
+        else
+            scale!(affine_var, inv(homog_var))
+            solution = affine_var
         end
-
-        scale!(solution, inv(homog_var))
-
     else
         angle_to_infinity = NaN
     end
 
-    if windingnumber > 1 || condition_number > inv(sqrt(abstol))
+    if windingnumber > 1 || condition_number > singular_tol
         returncode = :singular
     end
 
-    if norm(imag(solution)) < condition_number * sqrt(abstol)
+    if norm(imag(solution)) < condition_number * abstol
         real_solution = true
     else
         real_solution = false
@@ -138,7 +141,7 @@ function refine_and_pathresult(
         solution,
         residual,
         newton_residual,
-        condition_number,
+        log10(condition_number),
         windingnumber,
         angle_to_infinity,
         real_solution,
@@ -167,6 +170,8 @@ function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
     jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
     residual = norm(res)
     newton_residual::Float64 = norm(jacobian \ res)
+
+
     condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
 
     residual, newton_residual, condition_number
