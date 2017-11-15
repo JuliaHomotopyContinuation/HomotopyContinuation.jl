@@ -127,7 +127,11 @@ function refine_and_pathresult(
     end
 
     if windingnumber > 1 || condition_number > singular_tol
-        returncode = :singular
+        if returncode != :at_infinity
+            returncode = :singular
+        else
+            returncode = :singular_at_infinity
+        end
     end
 
     if norm(imag(solution)) < condition_number * abstol
