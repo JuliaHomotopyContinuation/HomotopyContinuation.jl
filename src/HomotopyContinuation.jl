@@ -47,5 +47,7 @@ module HomotopyContinuation
     include("solve.jl")
     include("testsystems.jl")
 
+    include("auxiliary_functions.jl")
+
     export TestSystems
 end # module

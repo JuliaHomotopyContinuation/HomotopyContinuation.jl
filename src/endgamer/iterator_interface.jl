@@ -82,9 +82,9 @@ end
     λR = λ * R
     # we should track with high precision if necessary
     track!(tracker, last(xs), R, λR)
-    retcode, sol = solution(tracker)
+    returncode, sol = solution(tracker)
 
-    if retcode != :success
+    if returncode != :success
         endgamer.status = Failed
         endgamer.failurecode = :ill_conditioned_zone
         return nothing

@@ -24,20 +24,20 @@ function predict!(endgamer, cache::CauchyEndgameCache)
     end
 
     # now we need to collect sample points, stored into the cache
-    retcode = loop!(endgamer, xs[end], R, cache)
-    if retcode == :success
+    returncode = loop!(endgamer, xs[end], R, cache)
+    if returncode == :success
         prediction = predict_with_cif(cache.samples)
         push!(predictions, prediction)
-    elseif retcode == :tracker_failed || retcode == :winding_number_too_high
+    elseif returncode == :tracker_failed || returncode == :winding_number_too_high
         # TODO: Can we do something here?
         endgamer.status = Failed
-        endgamer.failurecode = retcode
-    elseif retcode == :heuristic_failed
+        endgamer.failurecode = returncode
+    elseif returncode == :heuristic_failed
         # everthing okay
     else
         endgamer.status = Failed
-        endgamer.failurecode = retcode
-        warn("Unhandled retcode $(retcode) in `predict!`")
+        endgamer.failurecode = returncode
+        warn("Unhandled returncode $(returncode) in `predict!`")
     end
 end
 
@@ -95,9 +95,9 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
     c = 1
     for (k, finish) in enumerate(Iterators.drop(unitroots, 1))
         track!(tracker, samples[k], start, finish)
-        retcode, sol = solution(tracker)
+        returncode, sol = solution(tracker)
 
-        if retcode != :success
+        if returncode != :success
             return :tracker_failed
         end
 
