@@ -63,17 +63,17 @@ solve(H::AH, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve
 # The main problem for a pure streaming / iterator solution is the pathcrossing check
 function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T}}
     @unpack options, pathtracker, endgamer = solver
-    @unpack endgame_start = options
+    @unpack endgame_start, pathcrossing_check = options
 
-    # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
-    # return a tuple or something like that
-    endgame_start_results::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
+    tracked_paths::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
         track!(pathtracker, startvalue, 1.0, endgame_start)
-        # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)
     end
 
 
+    if pathcrossing_check
+        pathcrossing_check!(tracked_paths)
+    end
     # TODO: Rerun failed paths with higher precision.
 
     # TODO: We can add a first pathcrossing check here:
@@ -85,7 +85,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
     # return a tuple or something like that
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
-        endgame_results = pmap(endgame_start_results) do result
+        endgame_results = map(tracked_paths) do result
             if result.retcode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
@@ -97,7 +97,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = pmap(r -> EndgamerResult(endgamer, r), endgame_start_results)
+        endgame_results = pmap(r -> EndgamerResult(endgamer, r), tracked_paths)
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -107,12 +107,51 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
 
     # Refine solution pass
 
-    results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
+    results::Vector{PathResult{T}} = map(startvalues, tracked_paths, endgame_results) do s, esr, er
         refine_and_pathresult(s, esr, er, pathtracker, options.abstol, options.refinement_maxiters)
     end
 
     # Return solution
     Result(results)
+end
+
+function pathcrossing_check!(tracked_paths::Vector{PathResult{T}}, solver)
+    @unpack pathtracker = solver
+    @unpack endgame_start, pathcrossing_tolerance = options
+     # PATH CROSSING CHECK 1
+     # get a list of paths where path crossing happened
+     crossed_paths_indices = check_crossed_paths(tracked_paths, pathcrossing_tolerance)
+     user_pathtracker_options = deepcopy(pathtracker.options)
+
+     if !isempty(crossed_paths)
+          # We try again with a tighter pathtracking tolerance
+         pathtracker.options.abstol *= 1e-2
+
+         for i in crossed_paths_indices
+              track!(pathtracker, tracked_paths[i].startvalue, 1.0, endgame_start)
+              tracked_paths[i] = PathtrackerResult(pathtracker, false)
+         end
+
+         crossed_paths_indices = check_crossed_paths(tracked_paths[crossed_paths_indices], pathcrossing_tolerance)
+     end
+     if !isempty(crossed_paths) && pathracker.options.corrector_maxiters > 1
+          # We try again with less newton correcotr steps
+         pathtracker.options.corrector_maxiters -= 1
+
+         for i in crossed_paths_indices
+              track!(pathtracker, tracked_paths[i].startvalue, 1.0, endgame_start)
+              tracked_paths[i] = PathtrackerResult(pathtracker, false)
+         end
+
+         crossed_paths_indices = check_crossed_paths(tracked_paths[crossed_paths_indices])
+     end
+
+     # TODO: SWITCH TO HIGHER PRECISION
+
+
+     # get the defaults back
+     solver.pathtracker.options = user_pathtracker_options
+     return isempty(crossed_paths)
 end
 
 """
@@ -124,33 +163,33 @@ This assumes that the paths were not tracked until t=0.
 With probability 1 all solutions should be different. Thus, if two solutions are too similar
 (given the passed `tolerance`) we assume hat path crossing happened.
 """
-function check_crossed_paths(paths::Vector{PathtrackerResult{T}}, tol=1e-12) where T
+function check_crossed_paths(
+    paths::Vector{PathtrackerResult{T}}, tol)::Vector{Int} where T
     crossed_paths = Vector{PathtrackerResult{T}}()
-    good_paths = Vector{PathtrackerResult{T}}()
     path_handled = falses(length(paths))
 
+    # we will use the squared norm (its cheaper to compute)
+    tolerance = tol * tol
     for i=1:length(paths)-1
         if path_handled[i]
             continue
         end
         r = paths[i]
-        x0 = paths[i].solution
+        x0 = r.solution
         crossing = false
         for j=i+1:length(paths)
-            if !path_handled[j] && projectivenorm2(x0, paths[j].solution) < tol
-                push!(crossed_paths, paths[j])
+            if !path_handled[j] && projectivenorm2(x0, paths[j].solution) < tolerance
+                push!(crossed_paths, j)
                 crossing = true
                 path_handled[j] = true
             end
         end
         if crossing
-            push!(crossed_paths, r)
-        else
-            push!(good_paths, r)
+            push!(crossed_paths, i)
         end
     end
 
-    good_paths, crossed_paths
+    crossed_paths
 end
 
 function refine_and_pathresult(
