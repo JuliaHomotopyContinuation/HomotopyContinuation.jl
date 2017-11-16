@@ -1,13 +1,13 @@
 export EndgamerResult
 
 struct EndgamerResult{T}
-    retcode::Symbol
+    returncode::Symbol
     solution::Vector{T}
     startvalue::Vector{T}
     residual::Float64
     iterations::Int
     npredictions::Int
-    homogenous_coordinate_magnitude::Float64
+    angle_to_infinity::Float64
     windingnumber::Int
 end
 
@@ -18,11 +18,11 @@ function EndgamerResult(endgamer::Endgamer)
 
 
     if endgamer.status == Successfull
-        retcode = :success
+        returncode = :success
         solution = copy(endgamer.predictions[end])
     else
         solution = endgamer.xs[end]
-        retcode = endgamer.failurecode
+        returncode = endgamer.failurecode
     end
 
 
@@ -30,22 +30,22 @@ function EndgamerResult(endgamer::Endgamer)
     residual = norm(res)
 
     if is_projective(tracker.alg)
-        homogenous_coordinate_magnitude = convert(Float64, abs(first(solution)))
+        angle_to_infinity = convert(Float64, abs(first(solution)))
     else
-        homogenous_coordinate_magnitude = 1.0
+        angle_to_infinity = 1.0
     end
 
     iterations = endgamer.iter
     npredictions = length(endgamer.predictions)
 
     EndgamerResult(
-        retcode,
+        returncode,
         solution,
         copy(endgamer.startvalue),
         residual,
         iterations,
         npredictions,
-        homogenous_coordinate_magnitude,
+        angle_to_infinity,
         windingnumber)
 end
 
@@ -55,12 +55,12 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
     iterations = 0
     npredictions = 0
     EndgamerResult(
-        result.retcode,
+        result.returncode,
         result.solution,
         copy(endgamer.startvalue),
         residual,
         iterations,
         npredictions,
-        result.homogenous_coordinate_magnitude,
+        result.angle_to_infinity,
         windingnumber)
 end
