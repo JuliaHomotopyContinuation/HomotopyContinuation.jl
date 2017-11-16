@@ -15,30 +15,59 @@ of the given `homotopytype` and uses the given `algorithm` for pathtracking.
 """
 function solve end
 
-# This are just convenience wrappers to pass arguments to Solver.
-# Solver currently takes up to 5 positional arguments.
-solve(a, b, c, d, e; kwargs...) = solve(Solver(a, b, c, d, e; kwargs...))
-solve(a, b, c, d; kwargs...) = solve(Solver(a, b, c, d; kwargs...))
-solve(a, b, c; kwargs...) = solve(Solver(a, b, c; kwargs...))
-solve(a, b; kwargs...) = solve(Solver(a, b; kwargs...))
-solve(a; kwargs...) = solve(Solver(a; kwargs...))
+solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(a, [b], c, d, e; kwargs...)
+solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(a, [b], c, d; kwargs...)
+solve(a, b::Vector{<:Number}, c; kwargs...) = solve(a, [b], c; kwargs...)
+solve(a, b::Vector{<:Number}; kwargs...) = solve(a, [b]; kwargs...)
 
-solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(Solver(a, [b], c, d, e; kwargs...))
-solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(Solver(a, [b], c, d; kwargs...))
-solve(a, b::Vector{<:Number}, c; kwargs...) = solve(Solver(a, [b], c; kwargs...))
-solve(a, b::Vector{<:Number}; kwargs...) = solve(Solver(a, [b]; kwargs...))
+solve(f::MP.AbstractPolynomial; kwargs...) = solve([f]; kwargs...)
+solve(f::MP.AbstractPolynomial, pa::APA; kwargs...) = solve([f], pa; kwargs...)
+solve(f::MP.AbstractPolynomial, pa::APA, ea::AEA; kwargs...) = solve([f], pa, ea; kwargs...)
+solve(f::MP.AbstractPolynomial, HT; kwargs...) = solve([f], HT; kwargs...)
+solve(f::MP.AbstractPolynomial, HT, pa::APA; kwargs...) = solve([f], HT, pa; kwargs...)
+solve(f::MP.AbstractPolynomial, HT, pa::APA, ea::AEA; kwargs...) = solve([f], HT, pa, ea; kwargs...)
+
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s, pa; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA, ea::AEA; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s, pa, ea; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s, pa; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA, ea::AEA; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s, pa, ea; kwargs...)
+end
+
+solve(H::AH, s; kwargs...) = solve(Solver(H; kwargs...), s)
+solve(H::AH, s, pa::APA; kwargs...) = solve(Solver(H, pa; kwargs...), s)
+solve(H::AH, s, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...), s)
+solve(H::AH, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve(Solver(H, pa, ea, HPT; kwargs...), s)
 
 
 # This currently relies on the fact that we can keep all solutions in memory. This could
 # not be viable for big systems...
 # The main problem for a pure streaming / iterator solution is the pathcrossing check
-function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
-    @unpack options, pathtracker, endgamer, startvalues = solver
+function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T}}
+    @unpack options, pathtracker, endgamer = solver
     @unpack endgame_start = options
 
     # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
     # return a tuple or something like that
-    endgame_start_results::Vector{PathtrackerResult{T}} = pmap(startvalues) do startvalue
+    endgame_start_results::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
         track!(pathtracker, startvalue, 1.0, endgame_start)
         # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)
@@ -86,6 +115,43 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     Result(results)
 end
 
+"""
+    check_crossed_paths(paths::Vector{PathtrackerResult{T}} [, tolerance=1e-12])
+
+Split the given paths in two arrays. One for all paths were no path-crossing happend and
+one for the paths where we assume that path crossing happnened.
+This assumes that the paths were not tracked until t=0.
+With probability 1 all solutions should be different. Thus, if two solutions are too similar
+(given the passed `tolerance`) we assume hat path crossing happened.
+"""
+function check_crossed_paths(paths::Vector{PathtrackerResult{T}}, tol=1e-12) where T
+    crossed_paths = Vector{PathtrackerResult{T}}()
+    good_paths = Vector{PathtrackerResult{T}}()
+    path_handled = falses(length(paths))
+
+    for i=1:length(paths)-1
+        if path_handled[i]
+            continue
+        end
+        r = paths[i]
+        x0 = paths[i].solution
+        crossing = false
+        for j=i+1:length(paths)
+            if !path_handled[j] && projectivenorm2(x0, paths[j].solution) < tol
+                push!(crossed_paths, paths[j])
+                crossing = true
+                path_handled[j] = true
+            end
+        end
+        if crossing
+            push!(crossed_paths, r)
+        else
+            push!(good_paths, r)
+        end
+    end
+
+    good_paths, crossed_paths
+end
 
 function refine_and_pathresult(
     startvalue,

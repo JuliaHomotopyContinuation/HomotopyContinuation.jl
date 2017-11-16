@@ -146,3 +146,10 @@ function Pathtracker(
         iter, t, steplength, s, sdiff, ds, snext,
         step_sucessfull, consecutive_successfull_steps, options, copy(x))
 end
+
+function Pathtracker(
+    H::AbstractHomotopy{Complex{T}},
+    alg::algType,
+    HT::Type{S}; kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
+    Pathtracker(H, alg, zeros(Complex{T}, nvariables(H)), 1.0, 0.0, HT; kwargs...)
+end
