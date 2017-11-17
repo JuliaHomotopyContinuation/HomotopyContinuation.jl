@@ -1,6 +1,8 @@
 struct SolverOptions
     endgame_start::Float64
     abstol::Float64
+    at_infinity_tol::Float64
+    singular_tol::Float64
     refinement_maxiters::Int
     verbose::Bool
     pathcrossing_tolerance::Float64
@@ -8,6 +10,8 @@ struct SolverOptions
 end
 
 function SolverOptions(;abstol::Float64=1e-8,
+    at_infinity_tol::Float64=1e-10,
+    singular_tol::Float64=1e4,
     endgame_start::Float64=0.1,
     refinement_maxiters::Int=100,
     verbose=false,

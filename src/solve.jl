@@ -87,7 +87,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = pmap(r -> EndgamerResult(endgamer, r), tracked_paths)
+        endgame_results = map(r -> EndgamerResult(endgamer, r), tracked_paths)
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -97,8 +97,8 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
 
     # Refine solution pass
 
-    results::Vector{PathResult{T}} = map(startvalues, tracked_paths, endgame_results) do s, esr, er
-        refine_and_pathresult(s, esr, er, pathtracker, options.abstol, options.refinement_maxiters)
+    results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
+        refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.at_infinity_tol, options.singular_tol, options.refinement_maxiters)
     end
 
     # Return solution
@@ -202,41 +202,62 @@ function refine_and_pathresult(
     endgamer_result::EndgamerResult,
     pathtracker,
     abstol,
+    at_infinity_tol,
+    singular_tol,
     refinement_maxiters) where T
-    @unpack retcode, solution, windingnumber = endgamer_result
+    @unpack returncode, solution, windingnumber = endgamer_result
 
     # we refine the solution if possible
-    if retcode == :success
+    if returncode == :success
         solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
+        returncode = :isolated
     end
 
-    residual, newton_residual, condition_jacobian = residual_estimates(solution, pathtracker)
+    residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
 
     # check whether startvalue was affine and our solution is projective
     N = length(startvalue)
     if length(solution) == N + 1
         # make affine
-        # This is a more memory efficient variant from:
-        # solution = solution[2:end] / solution[1]
-        homog_var = solution[1]
-        for i=2:N+1
-            solution[i - 1] = solution[i] / homog_var
-        end
-        resize!(solution, N)
 
-        homogenous_coordinate_magnitude = norm(homog_var)
+        homog_var = solution[1]
+        affine_var = solution[2:end]
+        angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
+        if angle_to_infinity < at_infinity_tol
+            returncode = :at_infinity
+            a, index = findmax(abs2.(affine_var))
+            scale!(solution, inv(affine_var[index]))
+        else
+            scale!(affine_var, inv(homog_var))
+            solution = affine_var
+        end
     else
-        homogenous_coordinate_magnitude = 1.0
+        angle_to_infinity = NaN
+    end
+
+    if windingnumber > 1 || condition_number > singular_tol
+        if returncode != :at_infinity
+            returncode = :singular
+        else
+            returncode = :singular_at_infinity
+        end
+    end
+
+    if norm(imag(solution)) < condition_number * abstol
+        real_solution = true
+    else
+        real_solution = false
     end
 
     PathResult{T}(
-        retcode,
+        returncode,
         solution,
         residual,
         newton_residual,
-        condition_jacobian,
+        log10(condition_number),
         windingnumber,
-        homogenous_coordinate_magnitude,
+        angle_to_infinity,
+        real_solution,
         copy(startvalue),
         endgame_start_result.iterations,
         endgamer_result.iterations,
@@ -267,7 +288,9 @@ function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
     jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
     residual = norm(res)
     newton_residual::Float64 = norm(jacobian \ res)
-    condition_jacobian::Float64 = cond(jacobian)
 
-    residual, newton_residual, condition_jacobian
+
+    condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
+
+    residual, newton_residual, condition_number
 end
