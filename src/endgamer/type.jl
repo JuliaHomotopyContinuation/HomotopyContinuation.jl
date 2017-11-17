@@ -30,12 +30,12 @@ end
 
 function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker;
     kwargs...)
-    Endgamer(alg, tracker, tracker.low.x, convert(Float64, real(tracker.s)))
+    Endgamer(alg, tracker, tracker.low.x, convert(Float64, real(tracker.s)); kwargs...)
 end
 
 function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker{Low}, x, R::Float64;
     geometric_series_factor=0.5,
-    max_winding_number=8,
+    max_winding_number=16,
     abstol=tracker.options.abstol) where Low
     predictions = Vector{Vector{Complex{Low}}}()
     xs::Vector{Vector{Complex{Low}}} = [x]

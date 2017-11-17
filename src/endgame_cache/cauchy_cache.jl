@@ -23,6 +23,7 @@ function predict!(endgamer, cache::CauchyEndgameCache)
         return nothing
     end
 
+
     # now we need to collect sample points, stored into the cache
     returncode = loop!(endgamer, xs[end], R, cache, alg.samples_per_loop)
     if returncode == :winding_number_too_high
@@ -127,6 +128,8 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache, samples_per
         end
 
         if c > max_winding_number
+            # distances = map(s -> projectivenorm2(x, s), samples)
+            # @show distances
             return :winding_number_too_high
         end
 
@@ -138,8 +141,6 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache, samples_per
         start = finish
     end
 
-    # TODO: Should we check that the windingnumber does not increase? For this we would
-    # need to change the initial windingnumber to something very high
     endgamer.windingnumber = c
     resize!(samples, c * samples_per_loop)
 
