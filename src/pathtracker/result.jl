@@ -22,6 +22,8 @@ Get `(retcode, solution)` from `pathtracker`. This is more lightwheight than a
 @inline function solution(tracker::Pathtracker)
     if tracker.iter ≥ tracker.options.maxiters
         retcode = :max_iterations
+    elseif tracker.hit_singular_exception
+        retcode = :singularity
     else
         retcode = :success
     end
@@ -35,23 +37,13 @@ end
 
 function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) where Low
     @unpack H, cfg = tracker.low
-    if tracker.usehigh
-        solution = convert.(Complex{Low}, tracker.high.x)
-    else
-        solution = copy(tracker.low.x)
-    end
+    retcode, sol = solution(tracker)
 
-    res = evaluate(H, solution, tracker.s)
+    res = evaluate(H, sol, tracker.s)
     residual = norm(res)
 
-    if tracker.iter ≥ tracker.options.maxiters
-        retcode = :max_iterations
-    else
-        retcode = :success
-    end
-
     if extended_analysis
-        jacobian = Homotopy.jacobian(H, solution, tracker.s, cfg)
+        jacobian = Homotopy.jacobian(H, sol, tracker.s, cfg)
 
         newton_residual = norm(jacobian \ res)
         condition_jacobian = cond(jacobian)
@@ -61,7 +53,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     end
 
     if is_projective(tracker.alg)
-        homogenous_coordinate_magnitude = convert(Float64, abs(first(solution)))
+        homogenous_coordinate_magnitude = convert(Float64, abs(first(sol)))
     else
         homogenous_coordinate_magnitude = 1.0
     end
@@ -69,7 +61,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
 
     PathtrackerResult(
         retcode,
-        solution,
+        sol,
         copy(tracker.startvalue),
         residual,
         tracker.iter,

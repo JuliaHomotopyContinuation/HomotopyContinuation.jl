@@ -251,9 +251,14 @@ function refinesolution(solution, tracker::Pathtracker, windingnumber, abstol, m
     # TODO: we should switch to a higher precision if necessary
     # Since we have the winding number available
     # See the cauchy endgame test, the refinement is nearly useless...
-
     sol = copy(solution)
-    correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
+    try
+        correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
+    catch err
+        if !isa(err, Base.LinAlg.SingularException)
+            throw(err)
+        end
+    end
     sol
 end
 

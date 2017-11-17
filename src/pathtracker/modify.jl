@@ -19,10 +19,11 @@ end
 
 function setprecisionvalues!(tracker::Pathtracker{Low, High}, x0::AbstractVector) where {Low, High}
     N = length(tracker.low.x)
-    if length(x0) == N - 1
+    n = length(x0)
+    if n == N - 1
         tracker.low.x[2:end] .= x0
         tracker.low.x[1] = one(Low)
-    elseif length(x0) == N
+    elseif n == N
         tracker.low.x .= x0
     else
         error("A start value has length $n. Excepted length $N or $(N-1).")

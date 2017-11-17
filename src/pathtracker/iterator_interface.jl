@@ -7,11 +7,19 @@ function track!(tracker::Pathtracker, startvalue::AbstractVector, start::Number=
 end
 
 function track!(tracker::Pathtracker)
-    start(tracker)
-    is_done = done(tracker, 0)
-    while !is_done
-        next(tracker, 0)
+    try
+        start(tracker)
         is_done = done(tracker, 0)
+        while !is_done
+            next(tracker, 0)
+            is_done = done(tracker, 0)
+        end
+    catch err
+        if isa(err, Base.LinAlg.SingularException)
+            tracker.hit_singular_exception = true
+        else
+            throw(err)
+        end
     end
 end
 
