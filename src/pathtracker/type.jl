@@ -101,7 +101,7 @@ function Pathtracker(
     s_start=1.0,
     s_end=0.0, HT::Type{S}=widen(T); kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
 
-    options = PathtrackerOptions(kwargs...)
+    options = PathtrackerOptions(;kwargs...)
 
     x = Vector{Complex{T}}(length(x0))
     x .= x0

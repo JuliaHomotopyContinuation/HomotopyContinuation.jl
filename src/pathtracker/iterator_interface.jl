@@ -97,5 +97,7 @@ end
 end
 
 
+is_projective_tracker(t::Pathtracker) = is_projective(t.alg)
+
 # optional methods
 precondition!(tracker, low, cache) = nothing
