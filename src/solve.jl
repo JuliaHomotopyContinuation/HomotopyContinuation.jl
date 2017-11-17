@@ -133,7 +133,6 @@ function pathcrossing_check!(tracked_paths::Vector{PathtrackerResult{T}}, solver
           # We try again with less newton correcotr steps
          pathtracker.options.corrector_maxiters = min(pathtracker.options.corrector_maxiters - 1, 2)
 
-         @show pathtracker.options
          for i in crossed_paths_indices
               track!(pathtracker, tracked_paths[i].startvalue, 1.0, endgame_start)
               tracked_paths[i] = PathtrackerResult(pathtracker, false)
