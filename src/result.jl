@@ -100,8 +100,6 @@ struct Result{T} <: AbstractVector{PathResult{T}}
     pathresults::Vector{PathResult{T}}
 end
 
-Result(pathresults::Vector{PathResult{T}}) where T = Result{T}(pathresults)
-
 Base.start(result::Result) = start(result.pathresults)
 Base.next(result::Result, state) = next(result.pathresults, state)
 Base.done(result::Result, state) = done(result.pathresults, state)
