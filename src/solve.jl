@@ -76,7 +76,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
         endgame_results = map(tracked_paths) do result
-            if result.retcode == :success
+            if result.returncode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
             else
@@ -97,7 +97,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
 
     # Refine solution pass
 
-    results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
+    results::Vector{PathResult{T}} = map(startvalues, tracked_paths, endgame_results) do s, esr, er
         refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.at_infinity_tol, options.singular_tol, options.refinement_maxiters)
     end
 

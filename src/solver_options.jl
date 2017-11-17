@@ -18,13 +18,14 @@ function SolverOptions(;abstol::Float64=1e-8,
     pathcrossing_tolerance=1e-8,
     pathcrossing_check=true)
     SolverOptions(
-        endgame_start, abstol, refinement_maxiters,
+        endgame_start, abstol, at_infinity_tol, singular_tol, refinement_maxiters,
         verbose, pathcrossing_tolerance, pathcrossing_check)
 end
 
 function is_solver_options_kwarg(kwarg)
     kwarg == :endgame_start ||
     kwarg == :abstol ||
+    kwarg == :at_infinity_tol ||
     kwarg == :refinement_maxiters ||
     kwarg == :verbose ||
     kwarg == :pathcrossing_tolerance ||
