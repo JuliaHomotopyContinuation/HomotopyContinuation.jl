@@ -3,6 +3,7 @@ export Result
 struct PathResult{T}
     returncode::Symbol
     solution::Vector{T}
+    singular::Bool
 
     residual::Float64
     newton_residual::Float64
@@ -18,10 +19,69 @@ struct PathResult{T}
     npredictions::Int
 end
 
+function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerResult{T}, endgamer_result::EndgamerResult, solver::Solver) where T
+    @unpack pathtracker, options = solver
+    @unpack at_infinity_tol, singular_tol, abstol = options
+
+    @unpack returncode, solution, windingnumber = endgamer_result
+
+    if returncode == :success
+        returncode = :isolated
+    end
+
+    residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
+
+    # check whether startvalue was affine and our solution is projective
+    N = length(startvalue)
+    if length(solution) == N + 1
+        # make affine
+
+        homog_var = solution[1]
+        affine_var = solution[2:end]
+        angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
+        if angle_to_infinity < at_infinity_tol
+            returncode = :at_infinity
+            a, index = findmax(abs2.(affine_var))
+            scale!(solution, inv(affine_var[index]))
+        else
+            scale!(affine_var, inv(homog_var))
+            solution = affine_var
+        end
+    else
+        angle_to_infinity = NaN
+    end
+
+    singular = windingnumber > 1 || condition_number > singular_tol
+
+    if norm(imag(solution)) < condition_number * abstol
+        real_solution = true
+    else
+        real_solution = false
+    end
+
+    PathResult{T}(
+        returncode,
+        solution,
+        singular,
+        residual,
+        newton_residual,
+        log10(condition_number),
+        windingnumber,
+        angle_to_infinity,
+        real_solution,
+        convert(typeof(solution), startvalue),
+        trackedpath_result.iterations,
+        endgamer_result.iterations,
+        endgamer_result.npredictions
+        )
+end
+
+
 function Base.show(io::IO, r::PathResult)
     println(io, typeof(r), ":")
     println(io, "* returncode: $(r.returncode)")
     println(io, "* solution: $(r.solution)")
+    println(io, "* singular: $(r.singular)")
     println(io, "---------------------------------------------")
     println(io, "* iterations: $(r.iterations)")
     println(io, "* endgame iterations: $(r.endgame_iterations)")
@@ -36,9 +96,11 @@ function Base.show(io::IO, r::PathResult)
 end
 
 
-mutable struct Result{T} <: AbstractVector{PathResult{T}}
+struct Result{T} <: AbstractVector{PathResult{T}}
     pathresults::Vector{PathResult{T}}
 end
+
+Result(pathresults::Vector{PathResult{T}}) where T = Result{T}(pathresults)
 
 Base.start(result::Result) = start(result.pathresults)
 Base.next(result::Result, state) = next(result.pathresults, state)
@@ -71,7 +133,8 @@ end
         pathresults_t = Juno.render(i, s.pathresults)
         t[:children] = [
             Juno.render(i, Text("Total number of paths → $(length(s.pathresults))")),
-            Juno.render(i, Text("Number of successfull paths → $(sum(r -> r.returncode == :isolated ? 1 : 0, s.pathresults))")),
+            Juno.render(i, Text("# isolated solutions → $(sum(r -> r.returncode == :isolated, s.pathresults))")),
+            Juno.render(i, Text("# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")),
             pathresults_t]
         return t
     end

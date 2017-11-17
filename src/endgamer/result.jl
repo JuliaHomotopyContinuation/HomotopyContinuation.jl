@@ -64,3 +64,15 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
         result.angle_to_infinity,
         windingnumber)
 end
+
+function refined_solution(r::EndgamerResult{T}, refined_sol::Vector{T}) where T
+    EndgamerResult(
+        r.returncode,
+        refined_sol,
+        r.startvalue,
+        r.residual,
+        r.iterations,
+        r.npredictions,
+        r.angle_to_infinity,
+        r.windingnumber)
+end
