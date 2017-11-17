@@ -11,7 +11,7 @@ function SolverOptions(;abstol::Float64=1e-8,
     endgame_start::Float64=0.1,
     refinement_maxiters::Int=100,
     verbose=false,
-    pathcrossing_tolerance=1e-5,
+    pathcrossing_tolerance=1e-8,
     pathcrossing_check=true)
     SolverOptions(
         endgame_start, abstol, refinement_maxiters,
