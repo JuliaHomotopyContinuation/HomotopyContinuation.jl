@@ -15,48 +15,24 @@ of the given `homotopytype` and uses the given `algorithm` for pathtracking.
 """
 function solve end
 
-# This are just convenience wrappers to pass arguments to Solver.
-# Solver currently takes up to 5 positional arguments.
-solve(a, b, c, d, e; kwargs...) = solve(Solver(a, b, c, d, e; kwargs...))
-solve(a, b, c, d; kwargs...) = solve(Solver(a, b, c, d; kwargs...))
-solve(a, b, c; kwargs...) = solve(Solver(a, b, c; kwargs...))
-solve(a, b; kwargs...) = solve(Solver(a, b; kwargs...))
-solve(a; kwargs...) = solve(Solver(a; kwargs...))
-
-solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(Solver(a, [b], c, d, e; kwargs...))
-solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(Solver(a, [b], c, d; kwargs...))
-solve(a, b::Vector{<:Number}, c; kwargs...) = solve(Solver(a, [b], c; kwargs...))
-solve(a, b::Vector{<:Number}; kwargs...) = solve(Solver(a, [b]; kwargs...))
-
-
 # This currently relies on the fact that we can keep all solutions in memory. This could
 # not be viable for big systems...
 # The main problem for a pure streaming / iterator solution is the pathcrossing check
-function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
-    @unpack options, pathtracker, endgamer, startvalues = solver
-    @unpack endgame_start = options
+function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T}}
+    @unpack options, pathtracker, endgamer = solver
+    @unpack endgame_start, pathcrossing_check = options
 
-    # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
-    # return a tuple or something like that
-    endgame_start_results::Vector{PathtrackerResult{T}} = pmap(startvalues) do startvalue
+    tracked_paths::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
         track!(pathtracker, startvalue, 1.0, endgame_start)
-        # do we need informations about  condition_jacobian?
         PathtrackerResult(pathtracker, false)
     end
+    if pathcrossing_check
+        pathcrossing_check!(tracked_paths, solver)
+    end
 
-
-    # TODO: Rerun failed paths with higher precision.
-
-    # TODO: We can add a first pathcrossing check here:
-    # Check whether two endgame_start_results solutions are "close".
-    # Since the paths should all be unique this should not happen
-    # If we find two of them we should rerun them with tighter bounds
-
-    # TODO: pmap. Will this preserve the order of the arguments? Otherwise we have to
-    # return a tuple or something like that
     endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
-        endgame_results = pmap(endgame_start_results) do result
+        endgame_results = map(tracked_paths) do result
             if result.returncode == :success
                 endgame!(endgamer, result.solution, endgame_start)
                 EndgamerResult(endgamer)
@@ -68,7 +44,7 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = map(r -> EndgamerResult(endgamer, r), endgame_start_results)
+        endgame_results = map(r -> EndgamerResult(endgamer, r), tracked_paths)
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -77,95 +53,76 @@ function solve(solver::Solver{AH}) where {T, AH<:AbstractHomotopy{T}}
     # at a given point. Otherwise some pathcrossing happend.
 
     # Refine solution pass
+    refined_endgame_results = map(r -> refineresult(r, solver), endgame_results)
 
-    results::Vector{PathResult{T}} = map(startvalues, endgame_start_results, endgame_results) do s, esr, er
-        refine_and_pathresult(s, esr, er, pathtracker, options.abstol,  options.at_infinity_tol, options.singular_tol, options.refinement_maxiters)
+    pathresults = broadcast(startvalues, tracked_paths, refined_endgame_results) do a, b, c
+        PathResult(a, b, c, solver)
     end
-
     # Return solution
-    Result(results)
+    Result(pathresults)
 end
 
+solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(a, [b], c, d, e; kwargs...)
+solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(a, [b], c, d; kwargs...)
+solve(a, b::Vector{<:Number}, c; kwargs...) = solve(a, [b], c; kwargs...)
+solve(a, b::Vector{<:Number}; kwargs...) = solve(a, [b]; kwargs...)
 
-function refine_and_pathresult(
-    startvalue,
-    endgame_start_result::PathtrackerResult{T},
-    endgamer_result::EndgamerResult,
-    pathtracker,
-    abstol,
-    at_infinity_tol,
-    singular_tol,
-    refinement_maxiters) where T
-    @unpack returncode, solution, windingnumber = endgamer_result
+solve(f::MP.AbstractPolynomial; kwargs...) = solve([f]; kwargs...)
+solve(f::MP.AbstractPolynomial, pa::APA; kwargs...) = solve([f], pa; kwargs...)
+solve(f::MP.AbstractPolynomial, pa::APA, ea::AEA; kwargs...) = solve([f], pa, ea; kwargs...)
+solve(f::MP.AbstractPolynomial, HT; kwargs...) = solve([f], HT; kwargs...)
+solve(f::MP.AbstractPolynomial, HT, pa::APA; kwargs...) = solve([f], HT, pa; kwargs...)
+solve(f::MP.AbstractPolynomial, HT, pa::APA, ea::AEA; kwargs...) = solve([f], HT, pa, ea; kwargs...)
 
-    # we refine the solution if possible
-    if returncode == :success
-        solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
-        returncode = :isolated
-    end
-
-    residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
-
-    # check whether startvalue was affine and our solution is projective
-    N = length(startvalue)
-    if length(solution) == N + 1
-        # make affine
-
-        homog_var = solution[1]
-        affine_var = solution[2:end]
-        angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
-        if angle_to_infinity < at_infinity_tol
-            returncode = :at_infinity
-            a, index = findmax(abs2.(affine_var))
-            scale!(solution, inv(affine_var[index]))
-        else
-            scale!(affine_var, inv(homog_var))
-            solution = affine_var
-        end
-    else
-        angle_to_infinity = NaN
-    end
-
-    if windingnumber > 1 || condition_number > singular_tol
-        if returncode != :at_infinity
-            returncode = :singular
-        else
-            returncode = :singular_at_infinity
-        end
-    end
-
-    if norm(imag(solution)) < condition_number * abstol
-        real_solution = true
-    else
-        real_solution = false
-    end
-
-    PathResult{T}(
-        returncode,
-        solution,
-        residual,
-        newton_residual,
-        log10(condition_number),
-        windingnumber,
-        angle_to_infinity,
-        real_solution,
-        copy(startvalue),
-        endgame_start_result.iterations,
-        endgamer_result.iterations,
-        endgamer_result.npredictions
-        )
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s, pa; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA, ea::AEA; kwargs...) where T
+      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
+      solve(H, s, pa, ea; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s, pa; kwargs...)
+end
+function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA, ea::AEA; kwargs...) where {T, AHT<:AH}
+      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
+      solve(H, s, pa, ea; kwargs...)
 end
 
+solve(H::AH, s; kwargs...) = solve(Solver(H; kwargs...), s)
+solve(H::AH, s, pa::APA; kwargs...) = solve(Solver(H, pa; kwargs...), s)
+solve(H::AH, s, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...), s)
+solve(H::AH, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve(Solver(H, pa, ea, HPT; kwargs...), s)
 
-function refinesolution(solution, tracker::Pathtracker, windingnumber, abstol, maxiters)
-    @unpack H, cfg, cache = tracker.low
-    # TODO: we should switch to a higher precision if necessary
-    # Since we have the winding number available
-    # See the cauchy endgame test, the refinement is nearly useless...
-
-    sol = copy(solution)
-    correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
-    sol
+function refineresult(r::EndgamerResult, solver)
+    if r.returncode == :success
+        @unpack abstol, refinement_maxiters = solver.options
+        @unpack H, cfg, cache = solver.pathtracker.low
+        # TODO: we should switch to a higher precision if necessary
+        # Since we have the winding number available
+        # See the cauchy endgame test, the refinement is nearly useless...
+        sol = copy(r.solution)
+        try
+            correct!(sol, 0.0, H, cfg, cache, abstol, refinement_maxiters)
+        catch err
+            if !isa(err, Base.LinAlg.SingularException)
+                throw(err)
+            end
+        end
+        return refined_solution(r, sol)
+    else
+        return r
+    end
 end
 
 function residual_estimates(solution, tracker::Pathtracker{Low}) where Low

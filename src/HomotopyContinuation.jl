@@ -43,7 +43,7 @@ module HomotopyContinuation
     include("solver.jl")
 
     include("result.jl")
-
+    include("pathcrossing.jl")
     include("solve.jl")
     include("testsystems.jl")
 

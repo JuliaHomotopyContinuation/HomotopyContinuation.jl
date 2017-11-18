@@ -87,6 +87,7 @@ mutable struct Pathtracker{
     step_sucessfull::Bool
     consecutive_successfull_steps::Int
     options::O
+    hit_singular_exception::Bool
 
     startvalue::Vector{Complex{LowPrecision}}
 end
@@ -101,7 +102,7 @@ function Pathtracker(
     s_start=1.0,
     s_end=0.0, HT::Type{S}=widen(T); kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
 
-    options = PathtrackerOptions(kwargs...)
+    options = PathtrackerOptions(;kwargs...)
 
     x = Vector{Complex{T}}(length(x0))
     x .= x0
@@ -137,6 +138,8 @@ function Pathtracker(
         HT, typeof(highH), typeof(highcfg), typeof(highcache)
         }(highH, highcfg, highx0, highxnext, highcache)
 
+    hit_singular_exception = false
+
     Pathtracker{T, HT, algType,
         typeof(low.H), typeof(high.H),
         typeof(low.cfg), typeof(high.cfg),
@@ -144,5 +147,13 @@ function Pathtracker(
         typeof(options)
         }(alg, low, high, usehigh,
         iter, t, steplength, s, sdiff, ds, snext,
-        step_sucessfull, consecutive_successfull_steps, options, copy(x))
+        step_sucessfull, consecutive_successfull_steps, options,
+        hit_singular_exception, copy(x))
+end
+
+function Pathtracker(
+    H::AbstractHomotopy{Complex{T}},
+    alg::algType,
+    HT::Type{S}; kwargs...) where {algType<:AbstractPathtrackingAlgorithm, T<:AbstractFloat, S<:AbstractFloat}
+    Pathtracker(H, alg, zeros(Complex{T}, nvariables(H)), 1.0, 0.0, HT; kwargs...)
 end

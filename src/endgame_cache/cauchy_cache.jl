@@ -23,13 +23,23 @@ function predict!(endgamer, cache::CauchyEndgameCache)
         return nothing
     end
 
+
     # now we need to collect sample points, stored into the cache
-    returncode = loop!(endgamer, xs[end], R, cache)
-    if returncode == :success
+    returncode = loop!(endgamer, xs[end], R, cache, alg.samples_per_loop)
+    if returncode == :winding_number_too_high
+        # There are two possibilities, either the winding number is really too high
+        # or we just don't have enough samples
+        # So we try it again with a higher number of samples as default
+        returncode = loop!(endgamer, xs[end], R, cache, 3 * alg.samples_per_loop)
+        if returncode == :winding_number_too_high
+            endgamer.status = Failed
+            endgamer.failurecode = returncode
+            return nothing
+        end
+    elseif returncode == :success
         prediction = predict_with_cif(cache.samples)
         push!(predictions, prediction)
-    elseif returncode == :tracker_failed || returncode == :winding_number_too_high
-        # TODO: Can we do something here?
+    elseif returncode == :tracker_failed
         endgamer.status = Failed
         endgamer.failurecode = returncode
     elseif returncode == :heuristic_failed
@@ -39,6 +49,7 @@ function predict!(endgamer, cache::CauchyEndgameCache)
         endgamer.failurecode = returncode
         warn("Unhandled returncode $(returncode) in `predict!`")
     end
+    nothing
 end
 
 """
@@ -76,10 +87,10 @@ end
 Tracks the implicit defined path z(t) around the `n`-gon with vertices
 ``r⋅exp(i2πk/n)`` where `n=samples_per_loop`.
 """
-function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
+function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache, samples_per_loop)
     @unpack tracker, alg, windingnumber, status, options = endgamer
     @unpack max_winding_number, abstol= options
-    @unpack samples_per_loop, loopclosed_tolerance = alg
+    @unpack loopclosed_tolerance = alg
     @unpack samples = cache
 
     if length(samples) != windingnumber * samples_per_loop
@@ -117,6 +128,8 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
         end
 
         if c > max_winding_number
+            # distances = map(s -> projectivenorm2(x, s), samples)
+            # @show distances
             return :winding_number_too_high
         end
 
@@ -128,8 +141,6 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache)
         start = finish
     end
 
-    # TODO: Should we check that the windingnumber does not increase? For this we would
-    # need to change the initial windingnumber to something very high
     endgamer.windingnumber = c
     resize!(samples, c * samples_per_loop)
 

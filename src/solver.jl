@@ -7,32 +7,48 @@ const AEA = AbstractEndgameAlgorithm
 mutable struct Solver{
     H<:AH,
     P<:Pathtracker,
-    E<:Endgamer,
-    StartIter}
+    E<:Endgamer}
     homotopy::H
     pathtracker::P
     endgamer::E
 
-    startvalues::StartIter
+    #startvalues::StartIter
 
     options::SolverOptions
 end
 
 function Base.deepcopy(s::Solver)
     Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
-        deepcopy(s.endgamer), deepcopy(s.startvalues), deepcopy(s.options))
+        deepcopy(s.endgamer), deepcopy(s.options))
+end
+
+function Solver(H::AH{T}; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
+    HT = promote_type(typeof(H), promote_type(Complex128, T))
+    Solver(convert(HT, H); kwargs...)
+end
+function Solver(H::AH{T}, pa::APA; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
+    HT = promote_type(typeof(H), promote_type(Complex128, T))
+    Solver(convert(HT, H), pa; kwargs...)
+end
+function Solver(H::AH{T}, pa::APA, ea::AEA; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
+    HT = promote_type(typeof(H), promote_type(Complex128, T))
+    Solver(convert(HT, H), pa, ea; kwargs...)
+end
+function Solver(H::AH{T}, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
+    HT = promote_type(typeof(H), promote_type(Complex128, T))
+    Solver(convert(HT, H), pa, ea, HPT; kwargs...)
 end
 
 function Solver(
     H::AH{Complex{T}},
-    startvalues,
+    #startvalues,
     pathtracking_algorithm::PA=SphericalPredictorCorrector(),
     endgame::EA=CauchyEndgame(),
     HT=widen(T);
     apply_gammatrick=true,
     kwargs...) where {T<:AbstractFloat, PA<:APA, EA<:AEA}
 
-    # I love to have pathtracking_algorithm, endgame and HT as kwarg, but currently (0.6.1)
+    # I would love to have pathtracking_algorithm, endgame and HT as kwarg, but currently (0.6.1)
     # Julia will not dispatch on kwargs. Hence, to get type stability we need is a positional
     # argument
 
@@ -51,14 +67,12 @@ function Solver(
     solver_options = SolverOptions(;solver_options_kwargs...)
 
     pathtracker_kwargs = filter_kwargs(is_pathtracker_kwarg, kwargs)
-    pathtracker = Pathtracker(H,
-        pathtracking_algorithm, first(startvalues), 1.0,
-        solver_options.endgame_start, HT; pathtracker_kwargs...)
+    pathtracker = Pathtracker(H, pathtracking_algorithm, HT; pathtracker_kwargs...)
 
     endgamer_kwargs = filter_kwargs(is_endgamer_kwarg, kwargs)
     endgamer = Endgamer(endgame, pathtracker; endgamer_kwargs...)
 
-    Solver{typeof(H), typeof(pathtracker), typeof(endgamer), typeof(startvalues)}(H, pathtracker, endgamer, startvalues, solver_options)
+    Solver{typeof(H), typeof(pathtracker), typeof(endgamer)}(H, pathtracker, endgamer, solver_options)
 end
 
 function assert_valid_kwargs(kwargs)
@@ -74,55 +88,4 @@ function assert_valid_kwargs(kwargs)
         end
     end
     nothing
-end
-
-
-# Convenience constructors
-Solver(f::MP.AbstractPolynomial; kwargs...) = Solver([f]; kwargs...)
-Solver(f::MP.AbstractPolynomial, pa::APA; kwargs...) = Solver([f], pa; kwargs...)
-Solver(f::MP.AbstractPolynomial, pa::APA, ea::AEA; kwargs...) = Solver([f], pa, ea; kwargs...)
-Solver(f::MP.AbstractPolynomial, HT; kwargs...) = Solver([f], HT; kwargs...)
-Solver(f::MP.AbstractPolynomial, HT, pa::APA; kwargs...) = Solver([f], HT, pa; kwargs...)
-Solver(f::MP.AbstractPolynomial, HT, pa::APA, ea::AEA; kwargs...) = Solver([f], HT, pa, ea; kwargs...)
-
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}; kwargs...) where T
-      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
-      Solver(H, s; kwargs...)
-end
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA; kwargs...) where T
-      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
-      Solver(H, s, pa; kwargs...)
-end
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}, pa::APA, ea::AEA; kwargs...) where T
-      H, s = totaldegree(StraightLineHomotopy{promote_type(Complex128, T)}, F)
-      Solver(H, s, pa, ea; kwargs...)
-end
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}; kwargs...) where {T, AHT<:AH}
-      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
-      Solver(H, s; kwargs...)
-end
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA; kwargs...) where {T, AHT<:AH}
-      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
-      Solver(H, s, pa; kwargs...)
-end
-function Solver(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA, ea::AEA; kwargs...) where {T, AHT<:AH}
-      H, s = totaldegree(promote_type(AHT, promote_type(Complex128, T)), F)
-      Solver(H, s, pa, ea; kwargs...)
-end
-
-function Solver(H::AH{T}, s; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
-    HT = promote_type(typeof(H), promote_type(Complex128, T))
-    Solver(convert(HT, H), s; kwargs...)
-end
-function Solver(H::AH{T}, s, pa::APA; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
-    HT = promote_type(typeof(H), promote_type(Complex128, T))
-    Solver(convert(HT, H), s, pa; kwargs...)
-end
-function Solver(H::AH{T}, s, pa::APA, ea::AEA; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
-    HT = promote_type(typeof(H), promote_type(Complex128, T))
-    Solver(convert(HT, H), s, pa, ea; kwargs...)
-end
-function Solver(H::AH{T}, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
-    HT = promote_type(typeof(H), promote_type(Complex128, T))
-    Solver(convert(HT, H), s, pa, ea, HPT; kwargs...)
 end

@@ -22,46 +22,38 @@ Get `(returncode, solution)` from `pathtracker`. This is more lightwheight than 
 @inline function solution(tracker::Pathtracker)
     if tracker.iter ≥ tracker.options.maxiters
         returncode = :max_iterations
+    elseif tracker.hit_singular_exception
+        returncode = :singularity
     else
         returncode = :success
     end
     if tracker.usehigh
-        solution = convert.(Complex{Low}, tracker.high.x)
+        sol = convert.(Complex{Low}, tracker.high.x)
     else
-        solution = copy(tracker.low.x)
+        sol = copy(tracker.low.x)
     end
-    returncode, solution
+    returncode, sol
 end
 
 function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) where Low
     @unpack H, cfg = tracker.low
-    if tracker.usehigh
-        solution = convert.(Complex{Low}, tracker.high.x)
-    else
-        solution = copy(tracker.low.x)
-    end
+    returncode, sol = solution(tracker)
 
-    res = evaluate(H, solution, tracker.s)
+    res = evaluate(H, sol, tracker.s)
     residual = norm(res)
 
-    if tracker.iter ≥ tracker.options.maxiters
-        returncode = :max_iterations
-    else
-        returncode = :success
-    end
-
     if extended_analysis
-        jacobian = Homotopy.jacobian(H, solution, tracker.s, cfg)
+        jacobian = Homotopy.jacobian(H, sol, tracker.s, cfg)
 
         newton_residual = norm(jacobian \ res)
-        condition_number =  Homotopy.κ(H, solution, 0.0, cfg)
+        condition_number =  Homotopy.κ(H, sol, 0.0, cfg)
     else
         newton_residual = NaN
         condition_number = NaN
     end
 
     if is_projective(tracker.alg)
-        angle_to_infinity = convert(Float64, abs(first(solution)))
+        angle_to_infinity = convert(Float64, abs(first(sol)))
     else
         angle_to_infinity = 1.0
     end
@@ -69,7 +61,7 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
 
     PathtrackerResult(
         returncode,
-        solution,
+        sol,
         copy(tracker.startvalue),
         residual,
         tracker.iter,
