@@ -104,76 +104,6 @@ solve(H::AH, s, pa::APA; kwargs...) = solve(Solver(H, pa; kwargs...), s)
 solve(H::AH, s, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...), s)
 solve(H::AH, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve(Solver(H, pa, ea, HPT; kwargs...), s)
 
-
-
-function refine_and_pathresult(
-    startvalue,
-    endgame_start_result::PathtrackerResult{T},
-    endgamer_result::EndgamerResult,
-    pathtracker,
-    abstol,
-    at_infinity_tol,
-    singular_tol,
-    refinement_maxiters) where T
-    @unpack returncode, solution, windingnumber = endgamer_result
-
-    # we refine the solution if possible
-    if returncode == :success
-        solution = refinesolution(solution, pathtracker, windingnumber, abstol, refinement_maxiters)
-        returncode = :isolated
-    end
-
-    residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
-
-    # check whether startvalue was affine and our solution is projective
-    N = length(startvalue)
-    if length(solution) == N + 1
-        # make affine
-
-        homog_var = solution[1]
-        affine_var = solution[2:end]
-        angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
-        if angle_to_infinity < at_infinity_tol
-            returncode = :at_infinity
-            a, index = findmax(abs2.(affine_var))
-            scale!(solution, inv(affine_var[index]))
-        else
-            scale!(affine_var, inv(homog_var))
-            solution = affine_var
-        end
-    else
-        angle_to_infinity = NaN
-    end
-
-    if windingnumber > 1 || condition_number > singular_tol
-        if returncode != :at_infinity
-            returncode = :singular
-        else
-            returncode = :singular_at_infinity
-        end
-    end
-
-    if norm(imag(solution)) < condition_number * abstol
-        real_solution = true
-    else
-        real_solution = false
-    end
-
-    PathResult{T}(
-        returncode,
-        solution,
-        residual,
-        newton_residual,
-        log10(condition_number),
-        windingnumber,
-        angle_to_infinity,
-        real_solution,
-        copy(startvalue),
-        endgame_start_result.iterations,
-        endgamer_result.iterations,
-        endgamer_result.npredictions)
-end
-
 function refineresult(r::EndgamerResult, solver)
     if r.returncode == :success
         @unpack abstol, refinement_maxiters = solver.options
@@ -193,23 +123,6 @@ function refineresult(r::EndgamerResult, solver)
     else
         return r
     end
-end
-
-
-function refinesolution(solution, tracker::Pathtracker, windingnumber, abstol, maxiters)
-    @unpack H, cfg, cache = tracker.low
-    # TODO: we should switch to a higher precision if necessary
-    # Since we have the winding number available
-    # See the cauchy endgame test, the refinement is nearly useless...
-    sol = copy(solution)
-    try
-        correct!(sol, 0.0, H, cfg, cache, abstol, maxiters)
-    catch err
-        if !isa(err, Base.LinAlg.SingularException)
-            throw(err)
-        end
-    end
-    sol
 end
 
 function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
