@@ -77,6 +77,16 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
 end
 
 
+function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
+    @unpack H, cfg, cache = tracker.low
+    residual, newton_residual = residuals(H, solution, 0.0, cfg, cache)
+
+    condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
+
+    residual, newton_residual, condition_number
+end
+
+
 function Base.show(io::IO, r::PathResult)
     println(io, typeof(r), ":")
     println(io, "* returncode: $(r.returncode)")

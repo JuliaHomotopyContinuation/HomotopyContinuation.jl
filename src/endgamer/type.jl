@@ -36,7 +36,7 @@ end
 function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker{Low}, x, R::Float64;
     geometric_series_factor=0.5,
     max_winding_number=16,
-    abstol=tracker.options.abstol) where Low
+    endgame_abstol=tracker.options.abstol) where Low
     predictions = Vector{Vector{Complex{Low}}}()
     xs::Vector{Vector{Complex{Low}}} = [x]
     startvalue = convert(Vector{Complex{Low}}, x)
@@ -46,7 +46,7 @@ function Endgamer(alg::AbstractEndgameAlgorithm, tracker::Pathtracker{Low}, x, R
     failurecode = :default_failure_code
 
     cache = alg_cache(alg, tracker)
-    options = EndgamerOptions(geometric_series_factor, abstol, max_winding_number)
+    options = EndgamerOptions(geometric_series_factor, endgame_abstol, max_winding_number)
 
     Endgamer(alg, cache, tracker, predictions, xs, iter, R, windingnumber,
         status, failurecode, options, startvalue)
@@ -55,5 +55,5 @@ end
 function is_endgamer_kwarg(kwarg)
     kwarg == :geometric_series_factor || 
     kwarg == :max_winding_number ||
-    kwarg == :abstol
+    kwarg == :endgame_abstol
 end

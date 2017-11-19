@@ -1,4 +1,4 @@
-struct SphericalCache{T, aType<:AbstractMatrix{T}, asub, bType<:AbstractVector{T}, bsub} <: AbstractPathtrackerCache{T}
+mutable struct SphericalCache{T, aType<:AbstractMatrix{T}, asub, bType<:AbstractVector{T}, bsub} <: AbstractPathtrackerCache{T}
     A::aType # this is a NxN matrix
     # we store the views since the allocate currently
     A_sub::asub # this is the Nx(N-1) submatrix where the jacobian is stored
@@ -18,9 +18,10 @@ end
 
 function precondition!(tracker, values::PathtrackerPrecisionValues{T}, cache::SphericalCache{Complex{T}}) where T
     normalize!(values.x)
+    nothing
 end
 
-@inline function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::SphericalCache{Complex{T}}) where T
+function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::SphericalCache{Complex{T}}) where T
     @unpack s, ds = tracker
     @unpack H, cfg, x, xnext = values
     @unpack A, A_sub, b, b_sub = cache
@@ -49,14 +50,19 @@ end
     @unpack abstol, corrector_maxiters = tracker.options
     s += ds
 
-    tracker.step_sucessfull = correct!(xnext, s, H, cfg, cache, abstol, corrector_maxiters)
+    tracker.step_sucessfull = correct!(xnext, s, H, cfg, abstol, corrector_maxiters, cache)
     nothing
 end
 
-@inline function correct!(xnext, s, H, cfg, cache::SphericalCache{Complex{T}},
+function correct!(xnext,
+    s,
+    H,
+    cfg,
     abstol::Float64,
-    maxiters::Int) where T
+    maxiters::Int,
+    cache::SphericalCache{Complex{T}}) where T
     @unpack A, A_sub, b, b_sub = cache
+
     m = size(A,2)
     k = 0
     while true
@@ -75,7 +81,6 @@ end
         for j=1:m
             A[end, j] = conj(xnext[j])
         end
-
         # this computes A x = b and stores the result x in b
         LU = lufact!(A)
         # there is a bug in v0.6.0 see patches.jl
@@ -83,4 +88,33 @@ end
         xnext .= xnext .- b
         normalize!(xnext)
     end
+end
+
+function residuals(H, x, t, cfg, cache::SphericalCache)
+    @unpack A, A_sub, b, b_sub = cache
+    evaluate!(b_sub, H, x, t, cfg)
+    b[end] = 0
+    residual = norm(b, Inf)
+
+    # put jacobian in A
+    jacobian!(A_sub, H, x, t, cfg, true)
+    A[end, :] .= conj.(x)
+
+    LU = lufact!(A)
+    my_A_ldiv_B!(LU, b)
+    newton_residual = norm(b)
+
+    residual, newton_residual
+end
+
+function setup_workers(cache::SphericalCache)
+    # We need this to get pmap working:
+    # Otherwise the references A_sub and b_sub would point
+    # to the initial array and we would get singular exceptions since
+    # the top of A and b will not get filled
+    #
+    # We can get rid of all of that if @view doesn't allocate anymore
+    cache.A_sub = @view cache.A[1:end-1,:]
+    cache.b_sub = @view cache.b[1:end-1]
+    nothing
 end
