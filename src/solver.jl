@@ -17,6 +17,7 @@ mutable struct Solver{
     options::SolverOptions
 end
 
+Base.copy(s::Solver) = deepcopy(s)
 function Base.deepcopy(s::Solver)
     Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
         deepcopy(s.endgamer), deepcopy(s.options))

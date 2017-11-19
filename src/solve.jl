@@ -15,36 +15,45 @@ of the given `homotopytype` and uses the given `algorithm` for pathtracking.
 """
 function solve end
 
-# This currently relies on the fact that we can keep all solutions in memory. This could
-# not be viable for big systems...
-# The main problem for a pure streaming / iterator solution is the pathcrossing check
+
 function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T}}
     @unpack options, pathtracker, endgamer = solver
-    @unpack endgame_start, pathcrossing_check = options
+    @unpack endgame_start, pathcrossing_check, parallel_type, batch_size = options
 
-    tracked_paths::Vector{PathtrackerResult{T}} = map(startvalues) do startvalue
-        track!(pathtracker, startvalue, 1.0, endgame_start)
-        PathtrackerResult(pathtracker, false)
+    wp = CachingPool(workers())
+    # pmap(wp, i -> setup_workers(i, solver), workers())
+
+    if parallel_type == :pmap
+        tracked_paths = pmap(wp,
+            s -> track_to_endgame_zone(s, solver), startvalues,
+            batch_size=batch_size):: Vector{PathtrackerResult{T}}
+    else
+        tracked_paths = map(
+            s -> track_to_endgame_zone(s, solver), startvalues
+            )::Vector{PathtrackerResult{T}}
     end
+
     if pathcrossing_check
-        pathcrossing_check!(tracked_paths, solver)
+        if parallel_type == :pmap
+            pathcrossing_check!(tracked_paths, solver, wp)
+        else
+            pathcrossing_check!(tracked_paths, solver)
+        end
     end
 
-    endgame_results = Vector{EndgamerResult{T}}()
     if endgame_start > 0.0
-        endgame_results = map(tracked_paths) do result
-            if result.returncode == :success
-                endgame!(endgamer, result.solution, endgame_start)
-                EndgamerResult(endgamer)
-            else
-                # We just carry over the result from the failed path.
-                # This should not happen since we catch things above, but you never know...
-                EndgamerResult(endgamer, result)
-            end
+        if parallel_type == :pmap
+            endgame_results = pmap(wp,
+                r -> track_endgame(r, solver), tracked_paths,
+                batch_size=batch_size)::Vector{EndgamerResult{T}}
+        else
+            endgame_results = map(
+                r -> track_endgame(r, solver), tracked_paths
+                )::Vector{EndgamerResult{T}}
         end
     else
         # we just carry over the results to make the rest of the code clearer
-        endgame_results = map(r -> EndgamerResult(endgamer, r), tracked_paths)
+        endgame_results = map(r -> EndgamerResult(endgamer, r), tracked_paths)::Vector{EndgamerResult{T}}
     end
 
     # TODO: We can do a second pathcrossing check here:
@@ -53,14 +62,56 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
     # at a given point. Otherwise some pathcrossing happend.
 
     # Refine solution pass
-    refined_endgame_results = map(r -> refineresult(r, solver), endgame_results)
+    if parallel_type == :pmap
+        refined_endgame_results = pmap(wp,
+            r -> refineresult(r, solver), endgame_results,
+            batch_size=batch_size)::Vector{EndgamerResult{T}}
+    else
+        refined_endgame_results = map(
+            r -> refineresult(r, solver), endgame_results
+            )::Vector{EndgamerResult{T}}
+    end
 
-    pathresults = broadcast(startvalues, tracked_paths, refined_endgame_results) do a, b, c
+    pathresults::Vector{PathResult{T}} = broadcast(startvalues, tracked_paths, refined_endgame_results) do a, b, c
         PathResult(a, b, c, solver)
     end
-    # Return solution
+    # # Return solution
     Result(pathresults)
 end
+
+"""
+    setup_workers(s::Solver)
+
+Ensure that everything is properly setup on each worker. Currently `@view`
+in SphericalCache makes some problems. Maybe we can get rid of this at a later
+point (e.g. if `@view` does not allocate anymore).
+"""
+function setup_workers(s::Solver)
+    setup_workers(s.pathtracker.low.cache)
+    setup_workers(s.pathtracker.high.cache)
+end
+
+track_to_endgame_zone(startvalues::AbstractVector, solver) = map(r -> track_to_endgame_zone(r, solver), startvalues)
+function track_to_endgame_zone(startvalue::AbstractVector{<:Number}, solver)
+      setup_workers(solver)
+      track!(solver.pathtracker, startvalue, 1.0, solver.options.endgame_start)
+      PathtrackerResult(solver.pathtracker, false)
+end
+track_to_endgame_zone(svs::AbstractVector, solver) = map(r -> track_to_endgame_zone(r, solver), sv)
+
+
+function track_endgame(tracked_path_result, solver)
+    setup_workers(solver)
+    if tracked_path_result.returncode == :success
+        endgame!(solver.endgamer, tracked_path_result.solution, solver.options.endgame_start)
+        EndgamerResult(solver.endgamer)
+    else
+        # We just carry over the result from the failed path.
+        # This should not happen since we catch things above, but you never know...
+        EndgamerResult(solver.endgamer, tracked_path_result)
+    end
+end
+track_endgame(rs::AbstractVector, solver) = map(r -> track_endgame(r, solver), rs)
 
 solve(a, b::Vector{<:Number}, c, d, e; kwargs...) = solve(a, [b], c, d, e; kwargs...)
 solve(a, b::Vector{<:Number}, c, d; kwargs...) = solve(a, [b], c, d; kwargs...)
@@ -105,6 +156,7 @@ solve(H::AH, s, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...
 solve(H::AH, s, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve(Solver(H, pa, ea, HPT; kwargs...), s)
 
 function refineresult(r::EndgamerResult, solver)
+    setup_workers(solver)
     if r.returncode == :success
         @unpack abstol, refinement_maxiters = solver.options
         @unpack H, cfg, cache = solver.pathtracker.low
@@ -113,7 +165,7 @@ function refineresult(r::EndgamerResult, solver)
         # See the cauchy endgame test, the refinement is nearly useless...
         sol = copy(r.solution)
         try
-            correct!(sol, 0.0, H, cfg, cache, abstol, refinement_maxiters)
+            correct!(sol, 0.0, H, cfg, abstol, refinement_maxiters, cache)
         catch err
             if !isa(err, Base.LinAlg.SingularException)
                 throw(err)
@@ -123,17 +175,4 @@ function refineresult(r::EndgamerResult, solver)
     else
         return r
     end
-end
-
-function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
-    @unpack H, cfg = tracker.low
-    res = evaluate(H, solution, 0.0, cfg)
-    jacobian = Homotopy.jacobian(H, solution, 0.0, cfg, true)
-    residual = norm(res)
-    newton_residual::Float64 = norm(jacobian \ res)
-
-
-    condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
-
-    residual, newton_residual, condition_number
 end

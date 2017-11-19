@@ -7,19 +7,23 @@ struct SolverOptions
     verbose::Bool
     pathcrossing_tolerance::Float64
     pathcrossing_check::Bool
+    parallel_type::Symbol
+    batch_size::Int
 end
 
-function SolverOptions(;abstol::Float64=1e-8,
+function SolverOptions(;abstol::Float64=1e-12,
     at_infinity_tol::Float64=1e-10,
     singular_tol::Float64=1e4,
     endgame_start::Float64=0.1,
     refinement_maxiters::Int=100,
     verbose=false,
     pathcrossing_tolerance=1e-8,
-    pathcrossing_check=true)
+    pathcrossing_check=true,
+    parallel_type=:pmap,
+    batch_size::Int=1)
     SolverOptions(
         endgame_start, abstol, at_infinity_tol, singular_tol, refinement_maxiters,
-        verbose, pathcrossing_tolerance, pathcrossing_check)
+        verbose, pathcrossing_tolerance, pathcrossing_check, parallel_type, batch_size)
 end
 
 function is_solver_options_kwarg(kwarg)
@@ -29,5 +33,7 @@ function is_solver_options_kwarg(kwarg)
     kwarg == :refinement_maxiters ||
     kwarg == :verbose ||
     kwarg == :pathcrossing_tolerance ||
-    kwarg == :pathcrossing_check
+    kwarg == :pathcrossing_check ||
+    kwarg == :parallel_type ||
+    kwarg == :batch_size
 end

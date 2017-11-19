@@ -1,3 +1,4 @@
+addprocs(4)
 using HomotopyContinuation
 using Base.Test
 import DynamicPolynomials

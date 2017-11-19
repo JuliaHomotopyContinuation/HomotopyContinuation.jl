@@ -11,7 +11,7 @@ function alg_cache(alg::AffinePredictorCorrector, H::AbstractHomotopy, x::Abstra
 end
 
 
-@inline function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::AffineCache{Complex{T}}) where T
+function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::AffineCache{Complex{T}}) where T
     @unpack s, ds = tracker
     @unpack H, cfg, x, xnext = values
     @unpack A, b = cache
@@ -33,13 +33,14 @@ end
 
     # CORRECT
     @unpack abstol, corrector_maxiters = tracker.options
-    tracker.step_sucessfull = correct!(xnext, s + ds, H, cfg, cache, abstol, corrector_maxiters)
+    tracker.step_sucessfull = correct!(xnext, s + ds, H, cfg, abstol, corrector_maxiters, cache)
     nothing
 end
 
-@inline function correct!(xnext, s, H, cfg, cache::AffineCache{Complex{T}},
+function correct!(xnext, s, H, cfg,
     abstol::Float64,
-    maxiters::Int) where T
+    maxiters::Int,
+    cache::AffineCache{Complex{T}}) where T
     @unpack A, b = cache
     m = size(A,2)
     k = 0

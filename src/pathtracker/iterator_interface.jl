@@ -109,3 +109,14 @@ is_projective_tracker(t::Pathtracker) = is_projective(t.alg)
 
 # optional methods
 precondition!(tracker, low, cache) = nothing
+
+function residuals(H, x, t, cfg, cache)
+    res = evaluate(H, x, t, cfg)
+    jacobian = Homotopy.jacobian(H, x, t, cfg, true)
+    residual = norm(res, Inf)
+    newton_residual::Float64 = norm(jacobian \ res)
+
+    residual, newton_residual
+end
+
+setup_workers(cache) = nothing
