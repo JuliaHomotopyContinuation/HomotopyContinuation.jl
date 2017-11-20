@@ -22,8 +22,10 @@ Get `(returncode, solution)` from `pathtracker`. This is more lightwheight than 
 @inline function solution(tracker::Pathtracker)
     if tracker.iter ≥ tracker.options.maxiters
         returncode = :max_iterations
-    elseif tracker.hit_singular_exception
+    elseif tracker.status == :singular_exception
         returncode = :singularity
+    elseif tracker.status == :invalid_startvalue
+        returncode = :invalid_startvalue
     else
         returncode = :success
     end

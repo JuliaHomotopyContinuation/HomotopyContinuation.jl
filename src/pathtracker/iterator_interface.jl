@@ -16,7 +16,7 @@ function track!(tracker::Pathtracker)
         end
     catch err
         if isa(err, Base.LinAlg.SingularException)
-            tracker.hit_singular_exception = true
+            tracker.status = :singular_exception
         else
             throw(err)
         end
@@ -26,7 +26,10 @@ end
 
 function Base.start(tracker::Pathtracker)
     precondition!(tracker, tracker.low, tracker.low.cache)
-    return 0
+
+    if norm(evaluate(tracker.low.H, tracker.low.x, tracker.s, tracker.low.cfg)) > tracker.options.abstol * 1e-2
+        tracker.status = :invalid_startvalue
+    end
 end
 
 @inline function Base.next(tracker::Pathtracker, state)
@@ -44,6 +47,10 @@ end
         return true
     end
     if tracker.t ≤ 0.0
+        return true
+    end
+
+    if tracker.status == :invalid_startvalue
         return true
     end
 
