@@ -150,6 +150,11 @@ function solve(F::Vector{<:MP.AbstractPolynomial{T}}, ::Type{AHT}, pa::APA, ea::
       solve(H, s, pa, ea; kwargs...)
 end
 
+solve(H::AH, s::Vector{<:Number}; kwargs...) = solve(Solver(H; kwargs...), s)
+solve(H::AH, s::Vector{<:Number}, pa::APA; kwargs...) = solve(Solver(H, pa; kwargs...), s)
+solve(H::AH, s::Vector{<:Number}, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...), s)
+solve(H::AH, s::Vector{<:Number}, pa::APA, ea::AEA, HPT::Type{<:AbstractFloat}; kwargs...) = solve(Solver(H, pa, ea, HPT; kwargs...), s)
+
 solve(H::AH, s; kwargs...) = solve(Solver(H; kwargs...), s)
 solve(H::AH, s, pa::APA; kwargs...) = solve(Solver(H, pa; kwargs...), s)
 solve(H::AH, s, pa::APA, ea::AEA; kwargs...) = solve(Solver(H, pa, ea; kwargs...), s)
