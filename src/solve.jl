@@ -91,7 +91,6 @@ function setup_workers(s::Solver)
     setup_workers(s.pathtracker.high.cache)
 end
 
-track_to_endgame_zone(startvalues::AbstractVector, solver) = map(r -> track_to_endgame_zone(r, solver), startvalues)
 function track_to_endgame_zone(startvalue::AbstractVector{<:Number}, solver)
       setup_workers(solver)
       track!(solver.pathtracker, startvalue, 1.0, solver.options.endgame_start)
