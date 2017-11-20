@@ -27,7 +27,7 @@ end
 function Base.start(tracker::Pathtracker)
     precondition!(tracker, tracker.low, tracker.low.cache)
 
-    if norm(evaluate(tracker.low.H, tracker.low.x, tracker.s, tracker.low.cfg)) > tracker.options.abstol * 1e-2
+    if norm(evaluate(tracker.low.H, tracker.low.x, tracker.s, tracker.low.cfg)) > 0.1
         tracker.status = :invalid_startvalue
     end
 end
