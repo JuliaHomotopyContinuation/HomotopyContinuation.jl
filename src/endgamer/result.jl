@@ -27,7 +27,7 @@ function EndgamerResult(endgamer::Endgamer)
 
 
     res = evaluate(H, solution, 0.0, cfg)
-    residual = norm(res)
+    residual = convert(Float64, norm(res))
 
     if is_projective(tracker.alg)
         angle_to_infinity = convert(Float64, abs(first(solution)))

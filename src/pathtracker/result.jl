@@ -19,7 +19,7 @@ end
 Get `(returncode, solution)` from `pathtracker`. This is more lightwheight than a
 `PathtrackerResult`.
 """
-@inline function solution(tracker::Pathtracker)
+@inline function solution(tracker::Pathtracker{Low}) where {Low}
     if tracker.iter ≥ tracker.options.maxiters
         returncode = :max_iterations
     elseif tracker.hit_singular_exception
@@ -40,13 +40,13 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     returncode, sol = solution(tracker)
 
     res = evaluate(H, sol, tracker.s)
-    residual = norm(res)
+    residual = convert(Float64, norm(res))
 
     if extended_analysis
         jacobian = Homotopy.jacobian(H, sol, tracker.s, cfg)
 
-        newton_residual = norm(jacobian \ res)
-        condition_number =  Homotopy.κ(H, sol, 0.0, cfg)
+        newton_residual = convert(Float64, norm(jacobian \ res))
+        condition_number =  convert(Float64, Homotopy.κ(H, sol, 0.0, cfg))
     else
         newton_residual = NaN
         condition_number = NaN
