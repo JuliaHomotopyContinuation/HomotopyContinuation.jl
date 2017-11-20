@@ -8,7 +8,7 @@ Filters the solutions which satisfy the constraints.
 """
 function solutions(result::Result; isolated=true, at_infinity=true, only_real=false, singular=true)
     filter(result) do r
-        if isolated && r.returncode == :isolated ||
+        if isolated && r.returncode == :success ||
            at_infinity && r.returncode == :at_infinity
 
             if only_real && singular
@@ -58,7 +58,7 @@ Filters the isolated solutions from the all the solutions in R.
 """
 
 function isolated_solutions(ComplexResults::Result)
-    filter(S -> S.returncode == :isolated, ComplexResults)
+    filter(S -> S.returncode == :success, ComplexResults)
 end
 
 """
