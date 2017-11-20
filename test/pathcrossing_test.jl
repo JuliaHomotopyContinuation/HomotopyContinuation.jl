@@ -9,10 +9,11 @@
     end
     crossed_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-8, true)
 
-    @test length(crossed_indices) ≥ 0
+    before = length(crossed_indices)
+    @test before ≥ 0
     HomotopyContinuation.pathcrossing_check!(tracked_paths, solver)
     crossed_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-8, true)
-    @test isempty(crossed_indices)
+    @test before == 0 || before > length(crossed_indices)
 
     res = solve(H, startvalues, parallel_type=:none, path_precision=1e-3, corrector_maxiters=5, apply_gammatrick=false)
 end
