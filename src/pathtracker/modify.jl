@@ -1,4 +1,12 @@
-function reset!(tracker::Pathtracker{Low}, x0, s_start, s_end) where Low
+export setup_pathtracker!
+
+"""
+    setup_pathtracker!(tracker, x0, s_start, s_end)
+
+Reset the given pathtracker `tracker` and set it up to track `x0` form `s_start` to
+`s_end`.
+"""
+function setup_pathtracker!(tracker::Pathtracker{Low}, x0, s_start, s_end) where Low
     # TODO: we should carry over the original options
     setprecisionvalues!(tracker, x0)
     tracker.startvalue .= tracker.low.x

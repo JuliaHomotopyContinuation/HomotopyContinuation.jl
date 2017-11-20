@@ -1,7 +1,16 @@
-export track!
+export track!, current_value
 
+"""
+    track!(pathtracker, x0, s_start, s_target)
+
+Track a startvalue `x0` from `s_start` to `s_target` using the given `pathtracker`.
+
+    track!(pathtracker)
+
+Run the given `pathtracker`. You can use this in combination with [`setup_pathtracker!`](@ref).
+"""
 function track!(tracker::Pathtracker, startvalue::AbstractVector, start::Number=1.0, finish::Number=0.0)
-    reset!(tracker, startvalue, start, finish)
+    setup_pathtracker!(tracker, startvalue, start, finish)
     track!(tracker)
     tracker
 end
@@ -113,6 +122,18 @@ end
 
 
 is_projective_tracker(t::Pathtracker) = is_projective(t.alg)
+
+"""
+    current_value(pathtracker)
+
+Get the current value of the pathtracker.
+"""
+function current_value(p::Pathtracker)
+    if tracker.usehigh
+        p.low.x .= p.high.x
+    end
+    copy(p.low.x)
+end
 
 # optional methods
 precondition!(tracker, low, cache) = nothing

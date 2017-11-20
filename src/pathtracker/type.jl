@@ -54,6 +54,27 @@ mutable struct PathtrackerPrecisionValues{
 end
 
 
+"""
+    Pathtracker(H::AbstractHomotopy{T}, alg, [HT::Type=widen(T)]; kwargs...)
+
+Construct a Pathtracker object. This contains all informations to track a single path
+for `H` with the given pathtracking algorithm `alg`. The optional type `HT`
+is used if the pathracker decides to switch to a high precision mode.
+
+The following keyword arguments are supported:
+
+* `path_precision=1e-6`: The precision for which a correction step is decleared successfull.
+* `corrector_maxiters=3`: The maximal number of correction iterations. A higher value as 3 is not recommended.
+* `initial_steplength=0.1`: The initial steplength a preditor-corrector algorithm uses.
+* `consecutive_successfull_steps_until_steplength_increase=3`:
+    The number of consecutive successfull steps until the step length is increased multiplied
+    with the factor `steplength_increase_factor`.
+* `steplength_increase_factor=2.0`
+* `steplength_decrease_factor=inv(steplength_increase_factor)`: If a correction step fails the step length is multiplied
+    with this factor.
+* `maxiters=10_000`: The maximum number of iterations.
+* `vebose=false`: Print additional informations / warnings during the computation.
+"""
 # ATTENTION:
 # If you change something here you probably also want to change `initialize` and `reset!` !
 mutable struct Pathtracker{
