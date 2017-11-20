@@ -42,4 +42,10 @@
     @test solve(H, [[4], [-4]], SphericalPredictorCorrector()) isa Result{Complex128}
     @test solve(H, [[4], [-4]], SphericalPredictorCorrector(), CauchyEndgame()) isa Result{Complex128}
     @test solve(H, [[4], [-4]], SphericalPredictorCorrector(), CauchyEndgame(), BigFloat) isa Result{Complex128}
+
+
+
+    H, s = randomhomotopy(StraightLineHomotopy, 3)
+
+    @test first(solve(H, [rand(Complex128, 3)])).returncode == :invalid_startvalue
 end

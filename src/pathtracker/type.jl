@@ -87,7 +87,7 @@ mutable struct Pathtracker{
     step_sucessfull::Bool
     consecutive_successfull_steps::Int
     options::O
-    hit_singular_exception::Bool
+    status::Symbol
 
     startvalue::Vector{Complex{LowPrecision}}
 end
@@ -138,7 +138,7 @@ function Pathtracker(
         HT, typeof(highH), typeof(highcfg), typeof(highcache)
         }(highH, highcfg, highx0, highxnext, highcache)
 
-    hit_singular_exception = false
+    status = :default
 
     Pathtracker{T, HT, algType,
         typeof(low.H), typeof(high.H),
@@ -148,7 +148,7 @@ function Pathtracker(
         }(alg, low, high, usehigh,
         iter, t, steplength, s, sdiff, ds, snext,
         step_sucessfull, consecutive_successfull_steps, options,
-        hit_singular_exception, copy(x))
+        status, copy(x))
 end
 
 function Pathtracker(
