@@ -25,9 +25,6 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
 
     @unpack returncode, solution, windingnumber = endgamer_result
 
-    if returncode == :success
-        returncode = :isolated
-    end
 
     residual, newton_residual, condition_number = residual_estimates(solution, pathtracker)
 
@@ -124,8 +121,9 @@ Base.size(result::Result) = size(result.pathresults)
 
 function Base.show(io::IO, result::Result{T}) where T
     println(io, typeof(result), ":")
-    println(io, "* Total number of paths: $(length(result.pathresults))")
-    println(io, "* Number of successfull paths: $(sum(r -> r.returncode == :isolated ? 1 : 0, result.pathresults))")
+    println(io, "# paths: $(length(result.pathresults))")
+    println(io, "# successfull paths: $(sum(r -> r.returncode == :success ? 1 : 0, result.pathresults))")
+    println(io, "# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")
 end
 
 
@@ -140,8 +138,8 @@ end
         t = Juno.render(i, Juno.defaultrepr(s))
         pathresults_t = Juno.render(i, s.pathresults)
         t[:children] = [
-            Juno.render(i, Text("Total number of paths → $(length(s.pathresults))")),
-            Juno.render(i, Text("# isolated solutions → $(sum(r -> r.returncode == :isolated, s.pathresults))")),
+            Juno.render(i, Text("# paths → $(length(s.pathresults))")),
+            Juno.render(i, Text("# successfull paths → $(sum(r -> r.returncode == :success, s.pathresults))")),
             Juno.render(i, Text("# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")),
             pathresults_t]
         return t
