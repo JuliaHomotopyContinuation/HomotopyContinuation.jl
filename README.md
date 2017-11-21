@@ -1,4 +1,4 @@
-# HomotopyContinuation.jl [WIP]
+# HomotopyContinuation.jl
 | **Documentation** | **Build Status** |
 |:-----------------:|:----------------:|
 | [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] |
