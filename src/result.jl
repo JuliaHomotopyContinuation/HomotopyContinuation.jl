@@ -141,6 +141,8 @@ end
             Juno.render(i, Text("# paths → $(length(s.pathresults))")),
             Juno.render(i, Text("# successfull paths → $(sum(r -> r.returncode == :success, s.pathresults))")),
             Juno.render(i, Text("# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")),
+            Juno.render(i, Text("# singular solutions → $(sum(r -> r.singular, s.pathresults))")),
+            Juno.render(i, Text("# real solutions → $(sum(r -> r.real_solution, s.pathresults))")),
             pathresults_t]
         return t
     end
