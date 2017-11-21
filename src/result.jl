@@ -17,6 +17,7 @@ struct PathResult{T}
     iterations::Int
     endgame_iterations::Int
     npredictions::Int
+    predictions::Vector{Vector{T}}
 end
 
 function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerResult{T}, endgamer_result::EndgamerResult, solver::Solver) where T
@@ -69,20 +70,24 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
         convert(typeof(solution), startvalue),
         trackedpath_result.iterations,
         endgamer_result.iterations,
-        endgamer_result.npredictions
+        endgamer_result.npredictions,
+        endgamer_result.predictions
         )
 end
 
 
-function residual_estimates(solution, tracker::Pathtracker{Low}) where Low
+function residual_estimates(x, tracker::Pathtracker{Low}) where Low
     @unpack H, cfg, cache = tracker.low
-    residual, newton_residual = residuals(H, solution, 0.0, cfg, cache)
 
-    condition_number::Float64 = Homotopy.κ(H, solution, 0.0, cfg)
+    res = evaluate(H, x, 0.0, cfg)
+    jacobian = Homotopy.jacobian(H, x, 0.0, cfg, true)
+    residual = norm(res, Inf)
+    newton_residual::Float64 = norm(pinv(jacobian) * res)
+
+    condition_number::Float64 = Homotopy.κ(H, x, 0.0, cfg)
 
     residual, newton_residual, condition_number
 end
-
 
 function Base.show(io::IO, r::PathResult)
     println(io, typeof(r), ":")

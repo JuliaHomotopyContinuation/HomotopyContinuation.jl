@@ -19,14 +19,16 @@ function predict!(endgamer, cache::CauchyEndgameCache)
         return nothing
     end
 
-    if status == NotStarted && !firstheuristic(R, λ, xs[end - 3], xs[end - 2], xs[end - 1], xs[end], alg.L)
+    if length(xs) < 10 && status == NotStarted && !firstheuristic(R, λ, xs[end - 3], xs[end - 2], xs[end - 1], xs[end], alg.L)
         return nothing
     end
 
 
     # now we need to collect sample points, stored into the cache
     returncode = loop!(endgamer, xs[end], R, cache, alg.samples_per_loop)
-    if returncode == :winding_number_too_high
+    npredictions = length(endgamer.predictions)
+
+    if returncode == :winding_number_too_high && npredictions > 2
         # There are two possibilities, either the winding number is really too high
         # or we just don't have enough samples
         # So we try it again with a higher number of samples as default
@@ -34,9 +36,10 @@ function predict!(endgamer, cache::CauchyEndgameCache)
         if returncode == :winding_number_too_high
             endgamer.status = Failed
             endgamer.failurecode = returncode
+            endgamer.windingnumber = endgamer.options.max_winding_number
             return nothing
         end
-    elseif returncode == :success
+    elseif returncode == :success || returncode == :winding_number_too_high
         prediction = predict_with_cif(cache.samples)
         push!(predictions, prediction)
     elseif returncode == :tracker_failed
@@ -113,7 +116,7 @@ function loop!(endgamer, x, radius::Real, cache::CauchyEndgameCache, samples_per
         end
 
         # apply the second heuristic to tell us whether it makes sense to start the endgame
-        if !started && k == samples_per_loop && windingnumber == 1 &&
+        if !started && k == samples_per_loop && windingnumber == 1 && length(endgamer.xs) < 10 &&
             !secondheuristic(radius, samples, abstol, alg.K)
             return :heuristic_failed
         end

@@ -7,6 +7,7 @@ struct EndgamerResult{T}
     residual::Float64
     iterations::Int
     npredictions::Int
+    predictions::Vector{Vector{T}}
     angle_to_infinity::Float64
     windingnumber::Int
 end
@@ -45,6 +46,7 @@ function EndgamerResult(endgamer::Endgamer)
         residual,
         iterations,
         npredictions,
+        deepcopy(endgamer.predictions),
         angle_to_infinity,
         windingnumber)
 end
@@ -61,6 +63,7 @@ function EndgamerResult(endgamer::Endgamer, result::PathtrackerResult)
         residual,
         iterations,
         npredictions,
+        Vector{typeof(result.solution)}(),
         result.angle_to_infinity,
         windingnumber)
 end
@@ -73,6 +76,7 @@ function refined_solution(r::EndgamerResult{T}, refined_sol::Vector{T}) where T
         r.residual,
         r.iterations,
         r.npredictions,
+        deepcopy(r.predictions),
         r.angle_to_infinity,
         r.windingnumber)
 end

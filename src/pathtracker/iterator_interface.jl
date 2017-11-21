@@ -9,8 +9,11 @@ Track a startvalue `x0` from `s_start` to `s_target` using the given `pathtracke
 
 Run the given `pathtracker`. You can use this in combination with [`setup_pathtracker!`](@ref).
 """
-function track!(tracker::Pathtracker, startvalue::AbstractVector, start::Number=1.0, finish::Number=0.0)
+function track!(tracker::Pathtracker, startvalue::AbstractVector, start::Number=1.0, finish::Number=0.0, usehigh=false)
     setup_pathtracker!(tracker, startvalue, start, finish)
+    if tracker.usehigh == false
+        tracker.usehigh = usehigh
+    end
     track!(tracker)
     tracker
 end
@@ -137,14 +140,5 @@ end
 
 # optional methods
 precondition!(tracker, low, cache) = nothing
-
-function residuals(H, x, t, cfg, cache)
-    res = evaluate(H, x, t, cfg)
-    jacobian = Homotopy.jacobian(H, x, t, cfg, true)
-    residual = norm(res, Inf)
-    newton_residual::Float64 = norm(jacobian \ res)
-
-    residual, newton_residual
-end
 
 setup_workers(cache) = nothing

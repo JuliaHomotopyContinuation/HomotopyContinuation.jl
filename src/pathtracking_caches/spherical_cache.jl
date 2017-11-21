@@ -90,22 +90,6 @@ function correct!(xnext,
     end
 end
 
-function residuals(H, x, t, cfg, cache::SphericalCache)
-    @unpack A, A_sub, b, b_sub = cache
-    evaluate!(b_sub, H, x, t, cfg)
-    b[end] = 0
-    residual = norm(b, Inf)
-
-    # put jacobian in A
-    jacobian!(A_sub, H, x, t, cfg, true)
-    A[end, :] .= conj.(x)
-
-    LU = lufact!(A)
-    my_A_ldiv_B!(LU, b)
-    newton_residual = norm(b)
-
-    residual, newton_residual
-end
 
 function setup_workers(cache::SphericalCache)
     # We need this to get pmap working:
