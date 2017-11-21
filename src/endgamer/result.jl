@@ -1,5 +1,20 @@
 export EndgamerResult
 
+"""
+    EndgamerResult(endgamer, extended_analysis=false)
+
+Reads the result from the current pathtracker state.
+A `EndgamerResult` contains:
+* `returncode`: One of `:ill_conditioned_zone`, `:success`, `:windingnumber_too_high`
+* `solution::Vector{T}`: The solution.
+* `startvalue::Vector{T}`: The solution.
+* `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
+* `iterations`: The number of iterations the pathtracker needed.
+* `npredictions`: The number of predictions
+* `predictions`: All predictions for further introspection (e.g. the path failed)
+* `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
+* `windingnumber`: The estimated winding number
+"""
 struct EndgamerResult{T}
     returncode::Symbol
     solution::Vector{T}
