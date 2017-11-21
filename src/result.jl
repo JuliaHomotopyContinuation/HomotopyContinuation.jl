@@ -1,4 +1,4 @@
-export Result, gammatrick_gamma
+export Result, gammatrick_gamma, PathResult
 
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
