@@ -19,6 +19,9 @@ is less than `at_infinity_tol`.
 `singular_tol` then the root is declared as singular.
 * `refinement_maxiters=100`: The maximal number of newton iterations to achieve `abstol`.
 * `verbose=false`: Print additional warnings / informations
+* `apply_gammatrick=true`: This modifies the start system to make it generic.
+* `gamma=apply_gammatrick ? exp(im*2π*rand()) : complex(1.0)`: You can overwrite the default gamma.
+    This is useful if you want to rerun only some paths.
 * `pathcrossing_tolerance`: The tolerance for when two paths are considered to be crossed.
 * `pathcrossing_check=true`: Enable the pathcrossing check.
 * `parallel_type=:pmap`: Currently there are two modes: `:pmap` will use `pmap` for parallelism
@@ -34,6 +37,7 @@ mutable struct Solver{
     pathtracker::P
     endgamer::E
 
+    gamma::Complex128
     #startvalues::StartIter
 
     options::SolverOptions
@@ -42,7 +46,7 @@ end
 Base.copy(s::Solver) = deepcopy(s)
 function Base.deepcopy(s::Solver)
     Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
-        deepcopy(s.endgamer), deepcopy(s.options))
+        deepcopy(s.endgamer), copy(s.gamma), deepcopy(s.options))
 end
 
 function Solver(H::AH{T}; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
@@ -69,6 +73,7 @@ function Solver(
     endgame::EA=CauchyEndgame(),
     HT=widen(T);
     apply_gammatrick=true,
+    gamma=apply_gammatrick ? exp(im*rand()*2π) : complex(1.0),
     kwargs...) where {T<:AbstractFloat, PA<:APA, EA<:AEA}
 
     # I would love to have pathtracking_algorithm, endgame and HT as kwarg, but currently (0.6.1)
@@ -82,9 +87,8 @@ function Solver(
     # To fix this behaviour, we manually check for any invalid kwargs
     assert_valid_kwargs(kwargs)
 
-    if apply_gammatrick
-        gammatrick!(H)
-    end
+    @show typeof(gamma)
+    H = gammatrick(H, gamma)
 
     solver_options_kwargs = filter_kwargs(is_solver_options_kwarg, kwargs)
     solver_options = SolverOptions(;solver_options_kwargs...)
@@ -95,7 +99,7 @@ function Solver(
     endgamer_kwargs = filter_kwargs(is_endgamer_kwarg, kwargs)
     endgamer = Endgamer(endgame, pathtracker; endgamer_kwargs...)
 
-    Solver{typeof(H), typeof(pathtracker), typeof(endgamer)}(H, pathtracker, endgamer, solver_options)
+    Solver{typeof(H), typeof(pathtracker), typeof(endgamer)}(H, pathtracker, endgamer, gamma, solver_options)
 end
 
 function assert_valid_kwargs(kwargs)

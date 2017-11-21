@@ -87,7 +87,7 @@ function solve(solver::Solver{AH}, startvalues) where {T, AH<:AbstractHomotopy{T
         PathResult(a, b, c, solver)
     end
     # # Return solution
-    Result(pathresults)
+    Result(pathresults, solver)
 end
 
 """

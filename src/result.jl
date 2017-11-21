@@ -1,4 +1,4 @@
-export Result
+export Result, gammatrick_gamma
 
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
@@ -133,10 +133,19 @@ function Base.show(io::IO, r::PathResult)
     println(io, "* real solution: $(r.real_solution)")
 end
 
+"""
+    Result(pathresults, solver)
 
+A thin wrapper around the [`PathResult`](@ref)s of the `Solver` instance.
+`Result` behaves like an array of `PathResult`s but also contains some additional
+informations. For example you can obtain the γ which was used for the gammatrick.
+"""
 struct Result{T} <: AbstractVector{PathResult{T}}
+    gamma::Complex128
     pathresults::Vector{PathResult{T}}
 end
+
+Result(pathresults, solver) = Result(solver.gamma, pathresults)
 
 Base.start(result::Result) = start(result.pathresults)
 Base.next(result::Result, state) = next(result.pathresults, state)
@@ -149,6 +158,12 @@ Base.endof(result::Result) = endof(result.pathresults)
 Base.size(result::Result, dim) = size(result.pathresults, dim)
 Base.size(result::Result) = size(result.pathresults)
 
+"""
+    gammatrick_gamma(result)
+
+Return the γ which was used for the gammatrick.
+"""
+gammatrick_gamma(r::Result) = r.gamma
 
 function Base.show(io::IO, result::Result{T}) where T
     println(io, typeof(result), ":")
@@ -157,6 +172,7 @@ function Base.show(io::IO, result::Result{T}) where T
     println(io, "# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")
     println(io, "# singular solutions → $(sum(r -> r.singular, s.pathresults))")
     println(io, "# real solutions → $(sum(r -> r.real_solution, s.pathresults))")
+    # println(io, "gamma → $(result.gamma)")
 end
 
 
@@ -176,6 +192,7 @@ end
             Juno.render(i, Text("# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")),
             Juno.render(i, Text("# singular solutions → $(sum(r -> r.singular, s.pathresults))")),
             Juno.render(i, Text("# real solutions → $(sum(r -> r.real_solution, s.pathresults))")),
+            # Juno.render(i, Text("gamma → $(s.gamma)")),
             pathresults_t]
         return t
     end
