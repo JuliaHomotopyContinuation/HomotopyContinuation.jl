@@ -1,5 +1,31 @@
 export Result
 
+"""
+    PathResult(startvalue, pathtracker_result, endgamer_result, solver)
+
+Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
+[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
+is the [`EndgamerResult`](@ref) resulting from the corresponding endgame.
+
+A `PathResult` contains:
+* `returncode`: One of `:success`, `:at_infinity` or any error code from the `EndgamerResult`
+* `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space
+and the solution is at infinity then the projective solution is given. Otherwise
+an affine solution is given if the startvalue was affine and a projective solution
+is given if the startvalue was projective.
+* `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
+* `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
+* `log10_condition_number`: A high condition number indicates singularty. See [`Homotopy.κ`](@ref) for details.
+    The value is the logarithmic condition number (with base 10).
+* `windingnumber`: The estimated winding number
+* `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
+* `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
+* `startvalue`: The startvalue of the path
+* `iterations`: The number of iterations the pathtracker needed.
+* `endgame_iterations`: The number of steps in the geometric series the endgamer did.
+* `npredictions`: The number of predictions the endgamer did.
+* `predictions`: The predictions of the endgamer.
+"""
 struct PathResult{T}
     returncode::Symbol
     solution::Vector{T}
@@ -129,6 +155,8 @@ function Base.show(io::IO, result::Result{T}) where T
     println(io, "# paths: $(length(result.pathresults))")
     println(io, "# successfull paths: $(sum(r -> r.returncode == :success ? 1 : 0, result.pathresults))")
     println(io, "# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")
+    println(io, "# singular solutions → $(sum(r -> r.singular, s.pathresults))")
+    println(io, "# real solutions → $(sum(r -> r.real_solution, s.pathresults))")
 end
 
 
