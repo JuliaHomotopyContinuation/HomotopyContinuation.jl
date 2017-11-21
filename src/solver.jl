@@ -8,7 +8,7 @@ const AEA = AbstractEndgameAlgorithm
     Solver(homotopy, pathtracking_algorithm=SphericalPredictorCorrector(), endgame=CauchyEndgame(); kwargs...)
 
 Create a mutable `Solver` struct. This contains a
-[`Pathtracker`](@ref) and an [`Endgamer`](@ref) so everything you need to solve the given
+[`Pathtracker`](@ref) and an [`Endgamer`](@ref), everything you need to solve the given
 homotopy. `Solver` supports the following options:
 
 * `endgame_start=0.1`: Where the endgame starts
@@ -19,12 +19,24 @@ is less than `at_infinity_tol`.
 `singular_tol` then the root is declared as singular.
 * `refinement_maxiters=100`: The maximal number of newton iterations to achieve `abstol`.
 * `verbose=false`: Print additional warnings / informations
-* `pathcrossing_tolerance`: The tolerance for when two paths are considered to be crossed.
+* `pathcrossing_tolerance=1e-8`: The tolerance for when two paths are considered to be crossed.
 * `pathcrossing_check=true`: Enable the pathcrossing check.
 * `parallel_type=:pmap`: Currently there are two modes: `:pmap` will use `pmap` for parallelism
 and `:none` will use the standard `map`. `:pmap` is by defautl enabled since it works reliable,
 but if you develop new algorithms you probably want to disable parallelism.
 * `batch_size=1`: The `batch_size` for `pmap` if `parallel_type` is `:pmap`.
+
+For instance, to solve the homotopy `H` with starting values `s` with no endgame and a singular tolerance of 1e5, write
+
+```julia
+    solve(H, s, endgame_start=0.0, singular_tol=1e5)
+```
+
+To solve the polynomial system ``f`` with the same options write
+
+```julia
+    solve(f, endgame_start=0.0, singular_tol=1e5)
+```
 """
 mutable struct Solver{
     H<:AH,
