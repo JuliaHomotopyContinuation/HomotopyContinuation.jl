@@ -4,6 +4,28 @@ const AH{T} = AbstractHomotopy{T}
 const APA = AbstractPathtrackingAlgorithm
 const AEA = AbstractEndgameAlgorithm
 
+"""
+    Solver(homotopy, pathtracking_algorithm=SphericalPredictorCorrector(), endgame=CauchyEndgame(); kwargs...)
+
+Create a mutable `Solver` struct. This contains a
+[`Pathtracker`](@ref) and an [`Endgamer`](@ref) so everything you need to solve the given
+homotopy. `Solver` supports the following options:
+
+* `endgame_start=0.1`: Where the endgame starts
+* `abstol=1e-12`: The desired accuracy of the final roots
+* `at_infinity_tol=1e-10`: An point is at infinity if the maginitude of the homogenous variable
+is less than `at_infinity_tol`.
+* `singular_tol=1e4`: If the winding number is 1 but the condition number is larger than
+`singular_tol` then the root is declared as singular.
+* `refinement_maxiters=100`: The maximal number of newton iterations to achieve `abstol`.
+* `verbose=false`: Print additional warnings / informations
+* `pathcrossing_tolerance`: The tolerance for when two paths are considered to be crossed.
+* `pathcrossing_check=true`: Enable the pathcrossing check.
+* `parallel_type=:pmap`: Currently there are two modes: `:pmap` will use `pmap` for parallelism
+and `:none` will use the standard `map`. `:pmap` is by defautl enabled since it works reliable,
+but if you develop new algorithms you probably want to disable parallelism.
+* `batch_size=1`: The `batch_size` for `pmap` if `parallel_type` is `:pmap`.
+"""
 mutable struct Solver{
     H<:AH,
     P<:Pathtracker,
