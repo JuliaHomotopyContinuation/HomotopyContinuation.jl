@@ -48,18 +48,16 @@ mutable struct Solver{
     homotopy::H
     pathtracker::P
     endgamer::E
-
-    gamma::Complex128
     #startvalues::StartIter
 
     options::SolverOptions
 end
 
-Base.copy(s::Solver) = deepcopy(s)
-function Base.deepcopy(s::Solver)
-    Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
-        deepcopy(s.endgamer), copy(s.gamma), deepcopy(s.options))
-end
+# Base.copy(s::Solver) = deepcopy(s)
+# function Base.deepcopy(s::Solver)
+#     Solver(deepcopy(s.homotopy), deepcopy(s.pathtracker),
+#         deepcopy(s.endgamer),  deepcopy(s.options))
+# end
 
 function Solver(H::AH{T}; kwargs...) where {T<:Union{Complex{<:Integer}, Real}}
     HT = promote_type(typeof(H), promote_type(Complex128, T))
@@ -84,8 +82,6 @@ function Solver(
     pathtracking_algorithm::PA=SphericalPredictorCorrector(),
     endgame::EA=CauchyEndgame(),
     HT=widen(T);
-    apply_gammatrick=true,
-    gamma=apply_gammatrick ? exp(im*rand()*2π) : complex(1.0),
     kwargs...) where {T<:AbstractFloat, PA<:APA, EA<:AEA}
 
     # I would love to have pathtracking_algorithm, endgame and HT as kwarg, but currently (0.6.1)
@@ -99,11 +95,15 @@ function Solver(
     # To fix this behaviour, we manually check for any invalid kwargs
     assert_valid_kwargs(kwargs)
 
-    @show typeof(gamma)
-    H = gammatrick(H, gamma)
-
     solver_options_kwargs = filter_kwargs(is_solver_options_kwarg, kwargs)
     solver_options = SolverOptions(;solver_options_kwargs...)
+
+    γ = one(Complex128)
+    if solver_options.apply_gammatrick
+        γ = solver_options.gamma
+    end
+    H = convert(typeof(H), gammatrick(H, convert(Complex{T}, γ)))
+
 
     pathtracker_kwargs = filter_kwargs(is_pathtracker_kwarg, kwargs)
     pathtracker = Pathtracker(H, pathtracking_algorithm, HT; pathtracker_kwargs...)
@@ -111,7 +111,7 @@ function Solver(
     endgamer_kwargs = filter_kwargs(is_endgamer_kwarg, kwargs)
     endgamer = Endgamer(endgame, pathtracker; endgamer_kwargs...)
 
-    Solver{typeof(H), typeof(pathtracker), typeof(endgamer)}(H, pathtracker, endgamer, gamma, solver_options)
+    Solver{typeof(H), typeof(pathtracker), typeof(endgamer)}(H, pathtracker, endgamer, solver_options)
 end
 
 function assert_valid_kwargs(kwargs)

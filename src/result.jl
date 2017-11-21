@@ -15,7 +15,7 @@ an affine solution is given if the startvalue was affine and a projective soluti
 is given if the startvalue was projective.
 * `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
 * `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
-* `log10_condition_number`: A high condition number indicates singularty. See [`Homotopy.κ`](@ref) for details.
+* `log10_condition_number`: A high condition number indicates singularty. See [`Homotopies.κ`](@ref) for details.
     The value is the logarithmic condition number (with base 10).
 * `windingnumber`: The estimated winding number
 * `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
@@ -106,11 +106,11 @@ function residual_estimates(x, tracker::Pathtracker{Low}) where Low
     @unpack H, cfg, cache = tracker.low
 
     res = evaluate(H, x, 0.0, cfg)
-    jacobian = Homotopy.jacobian(H, x, 0.0, cfg, true)
+    jacobian = Homotopies.jacobian(H, x, 0.0, cfg, true)
     residual = norm(res, Inf)
     newton_residual::Float64 = norm(pinv(jacobian) * res)
 
-    condition_number::Float64 = Homotopy.κ(H, x, 0.0, cfg)
+    condition_number::Float64 = Homotopies.κ(H, x, 0.0, cfg)
 
     residual, newton_residual, condition_number
 end
@@ -145,7 +145,7 @@ struct Result{T} <: AbstractVector{PathResult{T}}
     pathresults::Vector{PathResult{T}}
 end
 
-Result(pathresults, solver) = Result(solver.gamma, pathresults)
+Result(pathresults, solver) = Result(#=solver.gamma=# rand(Complex128), pathresults)
 
 Base.start(result::Result) = start(result.pathresults)
 Base.next(result::Result, state) = next(result.pathresults, state)

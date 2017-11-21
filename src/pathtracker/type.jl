@@ -145,13 +145,13 @@ function Pathtracker(
     consecutive_successfull_steps = 0
 
     # Assemble the precision dependent types
-    cfg = Homotopy.config(H)
+    cfg = Homotopies.config(H)
     xnext = similar(x)
     cache = alg_cache(alg, H, x)
     low = PathtrackerPrecisionValues{T, typeof(H), typeof(cfg), typeof(cache)}(H, cfg, x, xnext, cache)
 
     highH = convert(promote_type(typeof(H), Complex{HT}), H)
-    highcfg = Homotopy.config(highH)
+    highcfg = Homotopies.config(highH)
     highx0 = convert(Vector{Complex{HT}}, x)
     highxnext = similar(highx0)
     highcache = alg_cache(alg, highH, highx0)

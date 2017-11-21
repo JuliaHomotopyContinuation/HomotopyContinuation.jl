@@ -15,7 +15,7 @@ than the number of variables of `H`. `H` is assumed to be homogenized. After the
 embedding the value is normalized.
 """
 function embed_projective_if_necessary!(x::AbstractVector{T}, H::AbstractHomotopy{T}) where T
-    N = Homotopy.nvariables(H)
+    N = Homotopies.nvariables(H)
     n = length(x)
     if N - 1 == n
         unshift!(x, one(T))

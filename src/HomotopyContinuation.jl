@@ -3,7 +3,7 @@ __precompile__()
 module HomotopyContinuation
 
     using Reexport
-    @reexport using Homotopy
+    @reexport using Homotopies
     using Parameters
     using Requires
     #using HigherPrecision

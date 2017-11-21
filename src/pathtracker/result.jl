@@ -12,7 +12,7 @@ A `PathtrackerResult` contains:
 * `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
 If `extended_analysis=true` there is also:
 * `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
-* `condition_number`: A high condition number indicates singularty. See [`Homotopy.κ`](@ref) for details.
+* `condition_number`: A high condition number indicates singularty. See [`Homotopies.κ`](@ref) for details.
 """
 struct PathtrackerResult{T}
     returncode::Symbol
@@ -59,10 +59,10 @@ function PathtrackerResult(tracker::Pathtracker{Low}, extended_analysis=true) wh
     residual = convert(Float64, norm(res))
 
     if extended_analysis
-        jacobian = Homotopy.jacobian(H, sol, tracker.s, cfg)
+        jacobian = Homotopies.jacobian(H, sol, tracker.s, cfg)
 
         newton_residual = convert(Float64, norm(jacobian \ res))
-        condition_number =  convert(Float64, Homotopy.κ(H, sol, 0.0, cfg))
+        condition_number =  convert(Float64, Homotopies.κ(H, sol, 0.0, cfg))
     else
         newton_residual = NaN
         condition_number = NaN
