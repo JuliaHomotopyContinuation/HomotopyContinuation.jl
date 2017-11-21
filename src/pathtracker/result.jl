@@ -1,5 +1,19 @@
 export PathtrackerResult, solution
 
+"""
+    PathtrackerResult(pathtracker, extended_analysis=false)
+
+Reads the result from the current pathtracker state.
+A `PathtrackerResult` contains:
+* `returncode`: One of `:max_iterations`, `:singularity`, `:invalid_startvalue`, `:success`.
+* `solution::Vector{T}`: The solution.
+* `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
+* `iterations`: The number of iterations the pathtracker needed.
+* `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
+If `extended_analysis=true` there is also:
+* `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
+* `condition_number`: A high condition number indicates singularty. See [`Homotopy.κ`](@ref) for details.
+"""
 struct PathtrackerResult{T}
     returncode::Symbol
     solution::Vector{T}

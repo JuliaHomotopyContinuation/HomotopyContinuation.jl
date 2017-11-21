@@ -1,8 +1,16 @@
 export endgame!
 
+"""
+    endgame!(endgamer, x, R)
 
+Play the endgame for `x` starting from time `R`.
+
+    endgame!(endgamer)
+
+Start the endgamer. You probably want to setup things in prior with [`setup_endgamer!`](@ref).
+"""
 function endgame!(endgamer::Endgamer, x::AbstractVector, t)
-    reset!(endgamer, x, t)
+    setup_endgamer!(endgamer, x, t)
     endgame!(endgamer)
     endgamer
 end

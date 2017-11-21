@@ -1,4 +1,12 @@
-function reset!(endgamer::Endgamer, x, R)
+export setup_endgamer!
+
+
+"""
+    setup_endgamer!(endgamer, x, R)
+
+Setup `endgamer` to play the endgame starting from `x` at time `R`.
+"""
+function setup_endgamer!(endgamer::Endgamer, x, R)
     endgamer.R = R
     endgamer.iter = 0
     endgamer.windingnumber = 1
