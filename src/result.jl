@@ -1,4 +1,4 @@
-export Result
+export Result, PathResult
 
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
