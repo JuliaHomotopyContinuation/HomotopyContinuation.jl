@@ -1,17 +1,28 @@
 export solve
 
 """
+```
     solve(H::AbstractHomotopy, startvalues_s, [algorithm]; kwargs...)
+```
 
 Solve the homotopy `H` via homotopy continuation with the given `startvalues_s` and the given
 `algorithm`.
 
+```
+    solve(f::Vector{<:MP.AbstractPolynomial{T}})
+```
 
-    solve(f::Vector{<:MP.AbstractPolynomial{T}}; homotopytype=GeodesicOnTheSphere, algorithm=SphericalPredictorCorrector(), kwargs...)
-    solve(f::MP.AbstractPolynomial{T}; homotopytype=GeodesicOnTheSphere, algorithm=SphericalPredictorCorrector(), kwargs...)
+Solves the polynomial system `f` via homotopy continuation. This uses a totaldegree homotopy of type StraightLineHomotopy and the SphericalPredictorCorrector pathtracking routine. To specify homotopy and pathtracker, use
 
-Solves the polynomial system `f` via homotopy continuation. This uses a totaldegree homotopy
-of the given `homotopytype` and uses the given `algorithm` for pathtracking.
+    solve(f::Vector{<:MP.AbstractPolynomial{T}}, [homotopy], [algorithm])
+
+Default is homotopy = StraightLineHomotopy and algorithm = SphericalPredictorCorrector. For instance, use
+
+```
+solve(f, StraightLineHomotopy, AffinePredictorCorrector())
+```
+
+for solving ``f`` with a GeodesicOnTheSphere homotopy and the AffinePredictorCorrector pathtracking routine.
 """
 function solve end
 
