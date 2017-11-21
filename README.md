@@ -110,8 +110,8 @@ We solve some more elaborate systems in the [example section](@ref examples).
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
-[docs-stable-url]: https://JuliaHomotopyContinuation.github.io/HomotopyContinuation.jl/stable
-[docs-latest-url]: https://JuliaHomotopyContinuation.github.io/HomotopyContinuation.jl/latest
+[docs-stable-url]: https://JuliaHomotopyContinuation.github.io/stable
+[docs-latest-url]: https://JuliaHomotopyContinuation.github.io/latest
 
 [build-img]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl.svg?branch=master
 [build-url]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl
