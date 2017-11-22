@@ -18,7 +18,7 @@ Pkg.add("JuliaHomotopyContinuation");
 HomotopyContinuation.jl aims at having easy-to-understand top-level commands. For instance, suppose we wanted to solve the following system
 
 ```math
-f= \begin{bmatrix} x^2+y\\ y^2-1\end{bmatrix}.  
+f= [x^2+y, y^2-1].  
 ```
 
 First, we have to define ``f`` in Julia. For this purpose
@@ -38,8 +38,6 @@ using HomotopyContinuation # load the module HomotopyContinuation
 
 solve(f) # solves for f=0
 ```
-
-(see [here](@ref solveroptions) for a list of options that can be passed to `solve`).
 
 The last command will return a type `HomotopyContinuation.Result{Complex{Float64}}` of length 4 (one entry for each solution):
 
@@ -77,7 +75,7 @@ npredictions → 2
 predictions → Vector{Complex{Float64}}[2]
 ```
 
-The returncode tells us that the pathtracking was successfull. What do the entries of that table tell us? Let us consider the most relevant (for a complete list of explanations consider [this](@ref result) section).
+The returncode tells us that the pathtracking was successfull. What do the entries of that table tell us? Let us consider the most relevant.
 
 - `solution`: the zero that is computed (here it is ``[-1,-1]``).
 - `singular`: boolean that shows whether the zero is singular.
@@ -90,7 +88,7 @@ Suppose we were only interested in the real solutions. The command to extract th
 ```julia
 solutions(solve(f), only_real=true)
 ```
-(a detailed explanation of the `solutions` function is [here](@ref solutions)). Indeed, we have
+Indeed, we have
 
 ```julia-repl
 julia> [ans[i].solution for i=1:2]
@@ -102,9 +100,9 @@ Complex{Float64}[2]
 -1.00… + 2.72e-15…im
 -1.00… + 1.44e-15…im
 ```
-which are the two real zeros of `f`. By assigning the boolean values in the [`solutions`](@ref solutions) function we can filter the solutions given by `solve(f)` according to our needs.
+which are the two real zeros of `f`. By assigning the boolean values in the `solutions` function we can filter the solutions given by `solve(f)` according to our needs.
 
-We solve some more elaborate systems in the [example section](@ref examples).
+We solve some more elaborate systems in the example section.
 
 `JuliaHomotopyContinuation` also supports input of type `BigFloat`.
 
