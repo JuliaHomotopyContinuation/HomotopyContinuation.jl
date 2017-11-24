@@ -49,7 +49,7 @@ end
 function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerResult{T}, endgamer_result::EndgamerResult, solver::Solver) where T
     @unpack pathtracker, options = solver
     @unpack at_infinity_tol, singular_tol, abstol = options
-
+    @unpack alg = pathtracker
     @unpack returncode, solution, windingnumber = endgamer_result
 
 
@@ -59,7 +59,6 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
     N = length(startvalue)
     if length(solution) == N + 1
         # make affine
-
         homog_var = solution[1]
         affine_var = solution[2:end]
         angle_to_infinity = atan(abs(homog_var)/norm(affine_var))
@@ -71,12 +70,14 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
             scale!(affine_var, inv(homog_var))
             solution = affine_var
         end
-    else
+    elseif is_projective(alg)
         angle_to_infinity = NaN
 
-        #postprocessing the solution vector
-        a, index = findmax(abs2.(solution))
+        # postprocessing the solution vector
+        a, index = findmax(abs.(solution))
         scale!(solution, a * inv(solution[index]))
+    else
+        angle_to_infinity = NaN
     end
 
     singular = windingnumber > 1 || condition_number > singular_tol
