@@ -73,6 +73,10 @@ function PathResult(startvalue::AbstractVector, trackedpath_result::PathtrackerR
         end
     else
         angle_to_infinity = NaN
+
+        #postprocessing the solution vector
+        a, index = findmax(abs2.(solution))
+        scale!(solution, a * inv(solution[index]))
     end
 
     singular = windingnumber > 1 || condition_number > singular_tol
