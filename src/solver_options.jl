@@ -35,6 +35,7 @@ function is_solver_options_kwarg(kwarg)
     kwarg == :endgame_start ||
     kwarg == :abstol ||
     kwarg == :at_infinity_tol ||
+    kwarg == :singular_tol ||
     kwarg == :refinement_maxiters ||
     kwarg == :verbose ||
     kwarg == :pathcrossing_tolerance ||
