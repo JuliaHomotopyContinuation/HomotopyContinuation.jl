@@ -11,7 +11,7 @@ The aim of this project is twofold: establishing a fast numerical polynomial sol
 
 You can simply install this package via the Julia package manager
 ```julia
-Pkg.add("JuliaHomotopyContinuation");
+Pkg.add("HomotopyContinuation");
 ```
 
 ## A first example
