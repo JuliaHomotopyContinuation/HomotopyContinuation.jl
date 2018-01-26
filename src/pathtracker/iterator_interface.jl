@@ -42,6 +42,8 @@ function Base.start(tracker::Pathtracker)
     if norm(evaluate(tracker.low.H, tracker.low.x, tracker.s, tracker.low.cfg)) > 0.1
         tracker.status = :invalid_startvalue
     end
+    
+    return 0
 end
 
 @inline function Base.next(tracker::Pathtracker, state)
