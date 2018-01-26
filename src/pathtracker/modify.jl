@@ -21,6 +21,7 @@ function setup_pathtracker!(tracker::Pathtracker{Low}, x0, s_start, s_end) where
     tracker.snext = tracker.s
     tracker.step_sucessfull = false
     tracker.consecutive_successfull_steps = 0
+    tracker.status = :default
 
     tracker
 end
