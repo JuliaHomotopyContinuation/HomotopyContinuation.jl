@@ -20,6 +20,9 @@ module HomotopyContinuation
         AbstractPathtrackerCache, AbstractEndgameCache
 
     include("Systems.jl")
+    include("NewHomotopies.jl")
+
+
     include("patches.jl")
     include("utilities.jl")
 

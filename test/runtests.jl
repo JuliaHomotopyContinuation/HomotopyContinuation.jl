@@ -1,10 +1,10 @@
 #addprocs(4)
 using HomotopyContinuation
-using Base.Test
+using Compat.Test
 import DynamicPolynomials
 const PolyImpl = DynamicPolynomials
 
-include("systems_test.jl")
+
 include("pathtracker_test.jl")
 include("solver_test.jl")
 include("affine_test.jl")
@@ -14,4 +14,8 @@ include("pathcrossing_test.jl")
 #include("result_test.jl")
 include("test_systems_test.jl")
 include("solve_test.jl")
-include("patch_test.jl")
+# include("patch_test.jl")
+
+using TestSystems
+include("systems_test.jl")
+include("new_homotopies_test.jl")
