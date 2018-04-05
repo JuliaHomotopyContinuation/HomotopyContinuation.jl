@@ -4,6 +4,7 @@ using Base.Test
 import DynamicPolynomials
 const PolyImpl = DynamicPolynomials
 
+include("systems_test.jl")
 include("pathtracker_test.jl")
 include("solver_test.jl")
 include("affine_test.jl")

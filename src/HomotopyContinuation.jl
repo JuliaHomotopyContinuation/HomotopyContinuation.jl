@@ -19,6 +19,7 @@ module HomotopyContinuation
     export AbstractPathtrackingAlgorithm, AbstractEndgameAlgorithm,
         AbstractPathtrackerCache, AbstractEndgameCache
 
+    include("Systems.jl")
     include("patches.jl")
     include("utilities.jl")
 
