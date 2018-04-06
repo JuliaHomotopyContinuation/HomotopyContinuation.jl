@@ -108,7 +108,7 @@ Base.size(S::AbstractSystem{M, N}) where {M, N} = (M, N)
 # StaticPolynomialsSystem implementation
 
 """
-    SPSystem(polynomials) <: AbstractSystem
+    SPSystem(polynomials, vars) <: AbstractSystem
 
 Create a system using the `StaticPolynomials` package.
 """
@@ -117,6 +117,7 @@ struct SPSystem{M, N, T, S<:SP.AbstractSystem{T, M, N}} <: AbstractSystem{M, N}
 end
 
 SPSystem(s::S) where {T,M,N,S<:SP.AbstractSystem{T,M,N}} = SPSystem{M, N, T, S}(s)
+SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.system(polys, vars))
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.system(polys))
 
 evaluate!(u, F::SPSystem, x) = SP.evaluate!(u, F.system, x)

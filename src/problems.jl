@@ -1,0 +1,159 @@
+module Problems
+
+using ..Utilites
+import ..Systems: SPSystem
+import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
+
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
+
+# STAGE 1 exports
+export AbstractDynamicProblem,
+    AbstractStartTargetProblem,
+    AbstractParameterProblem,
+    StartTargetProblem,
+    TotalDegreeProblem
+
+# STAGE 2 exports
+export AbstractProblem,
+    AbstractProjectiveProblem,
+    HomogenizationStrategy,
+    NullHomogenization,
+    DefaultHomogenization,
+    ProjectiveStartTargetProblem,
+    homotopy,
+    homogenization_strategy
+
+
+
+# STAGE 1
+
+abstract type AbstractDynamicProblem end
+
+abstract type AbstractStartTargetProblem <: AbstractDynamicProblem end
+abstract type AbstractParameterProblem <: AbstractDynamicProblem end
+
+"""
+    StartTargetProblem(start::Vector{<:MP.AbstractPolynomial}, target::Vector{<:MP.AbstractPolynomial})
+
+Construct a `StartTargetProblem` out of two systems of polynomials.
+"""
+struct StartTargetProblem{P1<:MP.AbstractPolynomialLike, P2<:MP.AbstractPolynomialLike} <: AbstractStartTargetProblem
+    start::Vector{P1}
+    target::Vector{P2}
+
+    function StartTargetProblem{P1, P2}(start::Vector{P1}, target::Vector{P2}) where {P1<:MP.AbstractPolynomialLike, P2<:MP.AbstractPolynomialLike}
+        @assert length(start) == length(target) "Cannot construct `StartTargetProblem` since the lengths of `start` and `target` don't match."
+        @assert nvariables(start) == nvariables(target) "Cannot construct `StartTargetProblem` since the number of variables of `start` and `target` don't match."
+        @assert ishomogenous(start) == ishomogenous(target) "Cannot construct `StartTargetProblem` since `start` is homogenous and  `target` not or the other way around."
+        new(start, target)
+    end
+end
+function StartTargetProblem(start::Vector{P1}, target::Vector{P2}) where {P1<:MP.AbstractPolynomialLike, P2<:MP.AbstractPolynomialLike}
+    StartTargetProblem{P1, P2}(start, target)
+end
+
+
+"""
+    TotalDegreeProblem(system::Vector{<:MP.AbstractPolynomial})
+
+Construct a `TotalDegreeProblem`. This indicates that the system `system`
+is the target system and a total degree system should be assembled.
+"""
+struct TotalDegreeProblem{P1<:MP.AbstractPolynomialLike} <: AbstractStartTargetProblem
+    system::Vector{P1}
+end
+
+
+# STAGE 2
+
+abstract type AbstractProblem end
+abstract type AbstractProjectiveProblem <: AbstractProblem end
+
+
+# The HomogenizationStrategy will be useful if we have multi-homogenous stuff
+"""
+    HomogenizationStrategy
+
+Abstract type for describing the homogenization strategy.
+"""
+abstract type HomogenizationStrategy end
+
+"""
+    NullHomogenization()
+
+Homogenization was not necessary since it is already homogenous.
+"""
+struct NullHomogenization <: HomogenizationStrategy end
+
+"""
+    DefaultHomogenization()
+
+Homogenization by adding a new variable with highest precedence.
+"""
+struct DefaultHomogenization <: HomogenizationStrategy end
+
+"""
+    ProjectiveProblem(prob::TotalDegreeProblem; options...)
+    ProjectiveProblem(prob::StartTargetProblem; options...)
+
+Construct a `ProjectiveProblem`. This steps constructs a homotopy and homogenizes
+the systems if necessary. The options are
+* `system=SPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
+is called with `system(polys, variables)` where `variables` determines the variable ordering.
+* `homotopy=StraightLineHomotopy`: A constructor to construct a [`NewHomotopies.AbstractStartTargetHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
+is called with `homotopy(start, target)` where `start` and `target` are systems constructed
+with `system`.
+"""
+struct ProjectiveStartTargetProblem{H<:AbstractStartTargetHomotopy, HS<:HomogenizationStrategy} <: AbstractProjectiveProblem
+    homotopy::H
+    homogenization_strategy::HS
+end
+
+function ProjectiveStartTargetProblem(prob::TotalDegreeProblem; kwargs...)
+    ProjectiveStartTargetProblem(totaldegree(prob.system), prob.system; kwargs...)
+end
+
+function ProjectiveStartTargetProblem(prob::StartTargetProblem; kwargs...)
+    ProjectiveStartTargetProblem(prob.start, prob.target; kwargs...)
+end
+function ProjectiveStartTargetProblem(
+    s::Vector{<:MP.AbstractPolynomialLike},
+    t::Vector{<:MP.AbstractPolynomialLike};
+    system=SPSystem,
+    homotopy=StraightLineHomotopy)
+
+    if ishomogenous(s)
+        homogenization_strategy = NullHomogenization()
+        start = system(s)
+        target = system(t)
+    # TODO: Multihomogenous...
+    else
+        homogenization_strategy = DefaultHomogenization()
+        vars = allvariables(s)
+        homvar = uniquevar(s)
+        var_ordering = [homvar; vars]
+
+        start = system(homogenize(s, homvar), var_ordering)
+        target = system(homogenize(t, homvar), var_ordering)
+    end
+    H = homotopy(start, target)
+
+    ProjectiveStartTargetProblem(H, homogenization_strategy)
+end
+
+"""
+    homotopy(prob::ProjectiveStartTargetProblem)
+
+Get the homotopy stored in the problem `prob`.
+"""
+homotopy(prob::ProjectiveStartTargetProblem) = prob.homotopy
+
+"""
+    homogenization_strategy(prob::ProjectiveStartTargetProblem)
+
+Get the [`HomogenizationStrategy`](@ref) stored in the problem `prob`.
+"""
+homogenization_strategy(prob::ProjectiveStartTargetProblem) = prob.homogenization_strategy
+
+end

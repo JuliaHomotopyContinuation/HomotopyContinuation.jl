@@ -19,3 +19,5 @@ include("solve_test.jl")
 using TestSystems
 include("systems_test.jl")
 include("new_homotopies_test.jl")
+include("utilities_test.jl")
+include("problem_test.jl")

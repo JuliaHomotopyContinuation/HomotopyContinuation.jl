@@ -4,12 +4,15 @@ module HomotopyContinuation
 
     using Reexport
     @reexport using Homotopies
+    import Homotopies: ishomogenous, homogenize
     using Parameters
     using Requires
     #using HigherPrecision
 
     import MultivariatePolynomials
     const MP = MultivariatePolynomials
+
+    const MPPolyVec{T} = Vector{<:MP.AbstractPolynomial{T}}
 
     abstract type AbstractPathtrackingAlgorithm end
     abstract type AbstractPathtrackerCache{T<:Complex} end
@@ -19,12 +22,14 @@ module HomotopyContinuation
     export AbstractPathtrackingAlgorithm, AbstractEndgameAlgorithm,
         AbstractPathtrackerCache, AbstractEndgameCache
 
-    include("Systems.jl")
-    include("NewHomotopies.jl")
-
 
     include("patches.jl")
     include("utilities.jl")
+
+
+    include("Systems.jl")
+    include("NewHomotopies.jl")
+    include("problems.jl")
 
     include("pathtracker/type.jl")
     include("pathtracker/modify.jl")
