@@ -31,6 +31,7 @@ module HomotopyContinuation
     include("NewHomotopies.jl")
     include("problems.jl")
     include("predictors.jl")
+    include("correctors.jl")
 
     include("pathtracker/type.jl")
     include("pathtracker/modify.jl")
