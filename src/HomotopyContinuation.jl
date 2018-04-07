@@ -30,6 +30,7 @@ module HomotopyContinuation
     include("Systems.jl")
     include("NewHomotopies.jl")
     include("problems.jl")
+    include("predictors.jl")
 
     include("pathtracker/type.jl")
     include("pathtracker/modify.jl")

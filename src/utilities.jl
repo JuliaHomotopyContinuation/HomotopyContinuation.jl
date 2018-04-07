@@ -8,7 +8,8 @@ export allvariables,
     ishomogenous,
     uniquevar,
     homogenize,
-    totaldegree
+    totaldegree,
+    solve_with_lu_inplace!
 
 
 """
@@ -105,6 +106,14 @@ function totaldegree(F::Vector{<:MP.AbstractPolynomialLike})
 
     out
 end
+
+"""
+    solve_with_lu_inplace!(A, b)
+
+Solves ``Ax =b`` inplace. The result is stored in `b`. This method also overrides
+the contents of `A`.
+"""
+solve_with_lu_inplace!(A, b) = A_ldiv_B!(lufact!(A), b)
 
 end
 
