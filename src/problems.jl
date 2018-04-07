@@ -1,6 +1,6 @@
 module Problems
 
-using ..Utilites
+using ..Utilities
 import ..Systems: SPSystem
 import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
 

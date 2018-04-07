@@ -1,4 +1,4 @@
-module Utilites
+module Utilities
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials

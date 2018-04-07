@@ -1,4 +1,4 @@
-const Utils = HomotopyContinuation.Utilites
+const Utils = HomotopyContinuation.Utilities
 
 @testset "Utilities" begin
     PolyImpl.@polyvar x y z
