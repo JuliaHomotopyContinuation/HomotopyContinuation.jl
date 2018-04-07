@@ -19,6 +19,8 @@ export AbstractHomotopy,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt
 
+export HomotopyWithCache
+
 
 """
     AbstractHomotopy{M, N}
@@ -77,14 +79,14 @@ function cache end
 
 Evaluate the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-evaluate!(u, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate!(u, F, x, t, c)
+evaluate!(u, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate!(u, H, x, t, c)
 
 """
     evaluate(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
 
 Evaluate the homotopy `H` at `(x, t)`.
 """
-evaluate(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate(F, x, t, c)
+evaluate(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 """
     dt!(u, H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
@@ -105,14 +107,14 @@ dt(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = dt(H, x, t, c)
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-jacobian!(U, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian!(U, F, x, t, c)
+jacobian!(U, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian!(U, H, x, t, c)
 
 """
     jacobian(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)`.
 """
-jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian(F, x, t, c)
+jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian(H, x, t, c)
 
 
 # Optional
@@ -165,6 +167,31 @@ end
 
 # derive
 Base.size(H::AbstractHomotopy{M, N}) where {M, N} = (M, N)
+
+struct HomotopyWithCache{M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache} <: AbstractHomotopy{M, N}
+    homotopy::H
+    cache::C
+end
+
+# TODO: What to do with cache? Should we dispatch at the top on the NullCache similar to the Systems case?
+function HomotopyWithCache(hom::H, cache::C) where {M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache}
+    HomotopyWithCache{M, N, H, C}(hom, cache)
+end
+HomotopyWithCache(hom::AbstractHomotopy, x, t) = HomotopyWithCache(hom, cache(H, x, t))
+
+(H::HomotopyWithCache)(x, t) = evaluate(H, x, t)
+
+evaluate(H::HomotopyWithCache, x, t) = evaluate(H.homotopy, x, t, H.cache)
+evaluate!(u, H::HomotopyWithCache, x, t) = evaluate!(u, H.homotopy, x, t, H.cache)
+jacobian(H::HomotopyWithCache, x, t) = jacobian(H.homotopy, x, t, H.cache)
+jacobian!(U, H::HomotopyWithCache, x, t) = jacobian!(U, H.homotopy, x, t, H.cache)
+dt(H::HomotopyWithCache, x, t) = dt(H.homotopy, x, t, H.cache)
+dt!(u, H::HomotopyWithCache, x, t) = dt!(u, H.homotopy, x, t, H.cache)
+jacobian_and_dt(H::HomotopyWithCache, x, t) = jacobian_and_dt(H.homotopy, x, t, H.cache)
+jacobian_and_dt!(U, u, H::HomotopyWithCache, x, t) = jacobian_and_dt!(U, u, H.homotopy, x, t, H.cache)
+evaluate_and_jacobian(H::HomotopyWithCache, x, t) = evaluate_and_jacobian(H.homotopy, x, t, H.cache)
+evaluate_and_jacobian!(u, U, H::HomotopyWithCache, x, t) = evaluate_and_jacobian!(u, U, H.homotopy, x, t, H.cache)
+
 
 # Default caches
 """
