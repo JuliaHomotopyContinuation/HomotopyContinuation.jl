@@ -36,8 +36,10 @@ module HomotopyContinuation
     include("dev/problems.jl")
     include("dev/predictors.jl")
     include("dev/correctors.jl")
-    include("dev/predictor_corrector.jl")
     include("dev/affine_patches.jl")
+    include("dev/step_size.jl")
+    include("dev/path_trackers.jl")
+
 
     include("patches.jl")
     include("utilities.jl")
