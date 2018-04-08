@@ -22,7 +22,8 @@ export AbstractProblem,
     DefaultHomogenization,
     ProjectiveStartTargetProblem,
     homotopy,
-    homogenization_strategy
+    homogenization_strategy,
+    emebd
 
 
 
@@ -94,16 +95,21 @@ Homogenization by adding a new variable with highest precedence.
 struct DefaultHomogenization <: AbstractHomogenizationStrategy end
 
 """
-    ProjectiveProblem(prob::TotalDegreeProblem; options...)
-    ProjectiveProblem(prob::StartTargetProblem; options...)
+    ProjectiveStartTargetProblem(prob::TotalDegreeProblem; options...)
+    ProjectiveStartTargetProblem(prob::StartTargetProblem; options...)
+    ProjectiveStartTargetProblem(start<:Vector{<:Polynomial}, target::Vector{<:MP.Polynomial}; options...)
 
-Construct a `ProjectiveProblem`. This steps constructs a homotopy and homogenizes
+Construct a `ProjectiveStartTargetProblem`. This steps constructs a homotopy and homogenizes
 the systems if necessary. The options are
 * `system=SPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
 is called with `system(polys, variables)` where `variables` determines the variable ordering.
 * `homotopy=StraightLineHomotopy`: A constructor to construct a [`NewHomotopies.AbstractStartTargetHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
 with `system`.
+
+    ProjectiveStartTargetProblem(H::AbstractHomotopy)
+
+Construct a `ProjectiveProblem`. The homotopy `H` needs to be homogenous.
 """
 struct ProjectiveStartTargetProblem{H<:AbstractStartTargetHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
     homotopy::H
@@ -141,6 +147,9 @@ function ProjectiveStartTargetProblem(
 
     ProjectiveStartTargetProblem(H, homogenization_strategy)
 end
+function ProjectiveStartTargetProblem(H::AbstractHomotopy)
+    ProjectiveStartTargetProblem(H, NullHomogenization())
+end
 
 """
     homotopy(prob::ProjectiveStartTargetProblem)
@@ -155,5 +164,27 @@ homotopy(prob::ProjectiveStartTargetProblem) = prob.homotopy
 Get the [`HomogenizationStrategy`](@ref) stored in the problem `prob`.
 """
 homogenization_strategy(prob::ProjectiveStartTargetProblem) = prob.homogenization_strategy
+
+
+"""
+    embed(prob::ProjectiveStartTargetProblem, x)
+
+Embed the solution `x` into projective space if necessary.
+"""
+function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, NullHomogenization}, x) where {M, N}
+    length(x) != N && throw(error("The length of the intial solution is $(length(x)) but expected length $N."))
+    return x
+end
+function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, DefaultHomogenization}, x) where {M, N}
+    if length(x) == N
+        return x
+    elseif length(x) == N - 1
+        return [one(eltype(x)); x]
+    end
+
+    throw(error("The length of the intial solution is $(length(x)) but expected length $N or $(N-1)."))
+end
+
+
 
 end

@@ -28,7 +28,9 @@ module HomotopyContinuation
         Problems,
         Predictors,
         Correctors,
-        AffinePatches
+        AffinePatches,
+        PathTrackers,
+        Utilities
 
     include("dev/utilities.jl")
     include("dev/systems.jl")

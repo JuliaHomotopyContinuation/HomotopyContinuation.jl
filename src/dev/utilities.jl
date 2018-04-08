@@ -108,6 +108,61 @@ function totaldegree(F::Vector{<:MP.AbstractPolynomialLike})
 end
 
 """
+    totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
+
+Returns an iterator of the solutions of the total degree startsystem of `F`.
+See [`totaldegree`](@ref) for more details.
+"""
+function totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
+    TotalDegreeSolutionIterator(MP.maxdegree.(F), ishomogenous(F))
+end
+
+
+"""
+    TotalDegreeSolutionIterator(degrees, homogenous::Bool)
+
+Given the `Vector`s `degrees` `TotalDegreeSolutionIterator` enumerates all solutions
+of the system
+```math
+\\begin{align*}
+    z_1^{d_1} - 1 &= 0 \\\\
+    z_1^{d_2} - 1 &= 0 \\\\
+    &\\vdots \\\\
+    z_n^{d_n} - 1 &= 0 \\\\
+\\end{align*}
+```
+where ``d_i`` is `degrees[i]`. If `homogenous` is `true` then
+the solutions of the system will be embedded in projective space by the map
+`x → [1.0; x]`.
+"""
+struct TotalDegreeSolutionIterator{Iter}
+    degrees::Vector{Int}
+    homogenous::Bool
+    iterator::Iter
+end
+function TotalDegreeSolutionIterator(degrees::Vector{Int}, homogenous::Bool)
+    iterator = Base.Iterators.product(map(d -> 0:d-1, degrees)...)
+    TotalDegreeSolutionIterator(degrees, homogenous, iterator)
+end
+
+Base.start(iter::TotalDegreeSolutionIterator) = start(iter.iterator)
+function Base.next(iter::TotalDegreeSolutionIterator, state)
+    indices, nextstate = next(iter.iterator, state)
+
+    value = Complex{Float64}[]
+    if iter.homogenous
+        push!(value, complex(1.0, 0.0))
+    end
+    for (i, k) in zip(1:length(indices), indices)
+        push!(value, cis(2π * k / iter.degrees[i]))
+    end
+    value, nextstate
+end
+Base.done(iter::TotalDegreeSolutionIterator, state) = done(iter.iterator, state)
+Base.length(iter::TotalDegreeSolutionIterator) = length(iter.iterator)
+Base.eltype(iter::TotalDegreeSolutionIterator) = Vector{Complex{Float64}}
+
+"""
     solve_with_lu_inplace!(A, b)
 
 Solves ``Ax =b`` inplace. The result is stored in `b`. This method also overrides

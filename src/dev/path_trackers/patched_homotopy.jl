@@ -8,17 +8,18 @@ import ..NewHomotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCac
 import ..NewHomotopies
 
 """
-    PatchedHomotopy(H::AbstractHomotopy, patch::AbstractAffinePatch)
+    PatchedHomotopy(H::AbstractHomotopy, v::Vector)
 
 Augment the homotopy `H` with the given patch. This results in the system `[H(x,t); v ⋅ x - 1]`
 where `v` is defined by `patch`.
 """
-struct PatchedHomotopy{M, N, H<:AbstractHomotopy, P<:AbstractAffinePatch} <: AbstractHomotopy{M, N}
+struct PatchedHomotopy{M, N, H<:AbstractHomotopy, V<:AbstractVector} <: AbstractHomotopy{M, N}
     homotopy::H
-    patch::P
+    patch::V
 end
-function PatchedHomotopy(hom::H, patch::P) where {M, N, H<:AbstractHomotopy{M, N}, P<:AbstractAffinePatch}
-   PatchedHomotopy{M+1, N, H, P}(hom, patch)
+
+function PatchedHomotopy(hom::H, patch::V) where {M, N, H<:AbstractHomotopy{M, N}, V}
+   PatchedHomotopy{M+1, N, H, V}(hom, patch)
 end
 
 """
@@ -30,15 +31,13 @@ patch(H::PatchedHomotopy) = H.patch
 
 struct PatchedHomotopyCache{HC, T} <: AbstractHomotopyCache
     cache::HC
-    patch::Vector{T}
     A::Matrix{T} # intermediate storage of the jacobian
     b::Vector{T} # intermediate storage for the evaluation
 end
 
 function NewHomotopies.cache(ph::PatchedHomotopy, x, t)
     H = HomotopyWithCache(ph.homotopy, x, t)
-    patch = init_patch(ph.patch, H, x, t)
-    PatchedHomotopyCache(H.cache, patch, jacobian(H, x, t), H(x, t))
+    PatchedHomotopyCache(H.cache, jacobian(H, x, t), H(x, t))
 end
 
 function evaluate!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
@@ -50,7 +49,7 @@ function evaluate!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) w
     # v⋅x - 1
     out = -one(eltype(x))
     @inbounds for i=1:N
-        out = muladd(conj(c.patch[i]), x[i], out)
+        out = muladd(conj(H.patch[i]), x[i], out)
     end
     @inbounds u[M] = out
     u
@@ -63,7 +62,7 @@ function jacobian!(U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) w
     end
     # gradient of v⋅x - 1 => v'
     @inbounds for j=1:N
-        U[M, j] = conj(c.patch[i])
+        U[M, j] = conj(H.patch[j])
     end
     U
 end
@@ -85,7 +84,7 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::Patched
         U[i, j] = c.A[i, j]
     end
     @inbounds for j=1:N
-        U[M, j] = conj(c.patch[i])
+        U[M, j] = conj(H.patch[i])
     end
     # eval
     @inbounds for i=1:(M-1)
@@ -94,7 +93,7 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::Patched
     # v⋅x - 1
     out = -one(eltype(x))
     @inbounds for i=1:N
-        out = muladd(conj(c.patch[i]), x[i], out)
+        out = muladd(conj(H.patch[i]), x[i], out)
     end
     @inbounds u[M] = out
 
@@ -110,7 +109,7 @@ function jacobian_and_dt!(U, u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomoto
     end
     # gradient of v⋅x - 1 => v'
     @inbounds for j=1:N
-        U[M, j] = conj(c.patch[i])
+        U[M, j] = conj(H.patch[i])
     end
     # dt
     @inbounds for i=1:(M-1)

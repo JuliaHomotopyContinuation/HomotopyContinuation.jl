@@ -11,6 +11,7 @@ export AbstractHomotopy,
     ParameterHomotopy,
     AbstractHomotopyCache,
     StartTargetHomotopyCache,
+    nvariables,
     #start,
     target,
     cache,
@@ -168,6 +169,14 @@ end
 
 # derive
 Base.size(H::AbstractHomotopy{M, N}) where {M, N} = (M, N)
+
+"""
+    nvariables(H::AbstractHomotopy)
+
+Returns the number of variables of the homotopy `H`.
+"""
+nvariables(H::AbstractHomotopy{M, N}) where {M, N} = N
+
 
 struct HomotopyWithCache{M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache} <: AbstractHomotopy{M, N}
     homotopy::H

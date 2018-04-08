@@ -30,6 +30,13 @@ Initialize the state for the given step length type.
 """
 function state end
 
+"""
+    reset!(state::AbstractStepSizeState)
+
+Reset the state to the initial state again.
+"""
+function reset! end
+
 
 # FIXME: The API is not stable. This needs to be modified for verified pathtracking.
 
