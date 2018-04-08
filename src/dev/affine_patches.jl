@@ -1,10 +1,9 @@
 module AffinePatches
 
-import ..NewHomotopies
-
 export AbstractPatch,
     AbstractLocalAffinePatch,
     precondition!,
+    init_patch,
     update_patch!,
     OrthogonalPatch
 
@@ -32,8 +31,17 @@ Precondition the start solution `x` for the use of this affine patch.
 """
 function precondition! end
 
+
 """
-    update_patch!(v, ::AbstractLocalAffinePatch, H, x, t)
+    init_patch(::AbstractAffinePatch, x)
+
+Initialize the patch.
+"""
+function init_patch end
+
+
+"""
+    update_patch!(v, ::AbstractLocalAffinePatch, x)
 
 Update the patch depending on the local state. This is called after
 each successfull step.
@@ -43,7 +51,8 @@ function update_patch! end
 struct OrthogonalPatch <: AbstractLocalAffinePatch end
 
 precondition!(x, ::OrthogonalPatch) = normalize!(x)
-function update_patch!(v, ::OrthogonalPatch, H, x, t)
+init_patch(::OrthogonalPatch, x) = x
+function update_patch!(v, ::OrthogonalPatch, x)
     v .= x
     nothing
 end
