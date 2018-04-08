@@ -1,0 +1,138 @@
+import ..AffinePatches: AbstractAffinePatch
+import ..NewHomotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCache,
+    evaluate!, evaluate,
+    jacobian!, jacobian,
+    evaluate_and_jacobian!, evaluate_and_jacobian,
+    dt!, dt,
+    jacobian_and_dt!, jacobian_and_dt
+import ..NewHomotopies
+
+"""
+    PatchedHomotopy(H::AbstractHomotopy, patch::AbstractAffinePatch)
+
+Augment the homotopy `H` with the given patch. This results in the system `[H(x,t); v ⋅ x - 1]`
+where `v` is defined by `patch`.
+"""
+struct PatchedHomotopy{M, N, H<:AbstractHomotopy, P<:AbstractAffinePatch} <: AbstractHomotopy{M, N}
+    homotopy::H
+    patch::P
+end
+function PatchedHomotopy(hom::H, patch::P) where {M, N, H<:AbstractHomotopy{M, N}, P<:AbstractAffinePatch}
+   PatchedHomotopy{M+1, N, H, P}(hom, patch)
+end
+
+"""
+    patch(H::PatchedHomotopy)
+
+Get the used patch.
+"""
+patch(H::PatchedHomotopy) = H.patch
+
+struct PatchedHomotopyCache{HC, T} <: AbstractHomotopyCache
+    cache::HC
+    patch::Vector{T}
+    A::Matrix{T} # intermediate storage of the jacobian
+    b::Vector{T} # intermediate storage for the evaluation
+end
+
+function NewHomotopies.cache(ph::PatchedHomotopy, x, t)
+    H = HomotopyWithCache(ph.homotopy, x, t)
+    patch = init_patch(ph.patch, H, x, t)
+    PatchedHomotopyCache(H.cache, patch, jacobian(H, x, t), H(x, t))
+end
+
+function evaluate!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    # H(x, t)
+    evaluate!(c.b, H.homotopy, x, t, c.cache)
+    @inbounds for i=1:(M-1)
+        u[i] = c.b[i]
+    end
+    # v⋅x - 1
+    out = -one(eltype(x))
+    @inbounds for i=1:N
+        out = muladd(conj(c.patch[i]), x[i], out)
+    end
+    @inbounds u[M] = out
+    u
+end
+function jacobian!(U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    # J_H(x, t)
+    jacobian!(c.A, H.homotopy, x, t, c.cache)
+    @inbounds for j=1:N, i=1:(M-1)
+        U[i, j] = c.A[i, j]
+    end
+    # gradient of v⋅x - 1 => v'
+    @inbounds for j=1:N
+        U[M, j] = conj(c.patch[i])
+    end
+    U
+end
+
+function dt!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
+    dt!(c.b, H.homotopy, x, t, c.cache)
+    @inbounds for i=1:(M-1)
+        u[i] = c.b[i]
+    end
+    @inbounds u[M] = zero(eltype(u))
+    u
+end
+
+function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    evaluate_and_jacobian!(c.b, c.A, H.homotopy, x, t, c.cache)
+    # jacobian
+    @inbounds for j=1:N, i=1:(M-1)
+        U[i, j] = c.A[i, j]
+    end
+    @inbounds for j=1:N
+        U[M, j] = conj(c.patch[i])
+    end
+    # eval
+    @inbounds for i=1:(M-1)
+        u[i] = c.b[i]
+    end
+    # v⋅x - 1
+    out = -one(eltype(x))
+    @inbounds for i=1:N
+        out = muladd(conj(c.patch[i]), x[i], out)
+    end
+    @inbounds u[M] = out
+
+    nothing
+end
+
+function jacobian_and_dt!(U, u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    # J_H(x, t)
+    jacobian_and_dt!(c.A, c.b, H.homotopy, x, t, c.cache)
+    # jacobian
+    @inbounds for j=1:N, i=1:(M-1)
+        U[i, j] = c.A[i, j]
+    end
+    # gradient of v⋅x - 1 => v'
+    @inbounds for j=1:N
+        U[M, j] = conj(c.patch[i])
+    end
+    # dt
+    @inbounds for i=1:(M-1)
+        u[i] = c.b[i]
+    end
+    u[M] = zero(eltype(u))
+
+    nothing
+end
+
+function evaluate(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    evaluate!(similar(c.b, M), H, x, t, c)
+end
+function jacobian(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    jacobian!(similar(c.A, M, N), H, x, t, c)
+end
+function dt(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+    dt!(similar(c.b, M), H, x, t, c)
+end
+function jacobian_and_dt(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    jacobian_and_dt!(similar(c.A, M, N), similar(c.b, M), H, x, t, c)
+end
+function evaluate_and_jacobian(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    evaluate_and_jacobian!(similar(c.b, M), similar(c.A, M, N), H, x, t, c)
+end
