@@ -1,3 +1,11 @@
+import ..Predictors
+import ..Correctors
+
+export PredictorCorrector,
+    PredictorCorrectorCache,
+    cache,
+    step!
+
 """
     PredictorCorrector(predictor::Predictors.AbstractPredictor, corrector::Correctors.AbstractCorrector)
 
@@ -15,7 +23,7 @@ struct PredictorCorrectorCache{P<:Predictors.AbstractPredictorCache, C<:Correcto
 end
 
 """
-    cache(PC::PredictorCorrector, H, x, t)
+    cache(PC::PredictorCorrector, H::HomotopyWithCache, x, t)
 
 Assemble the cache for `PC`.
 """
@@ -27,7 +35,7 @@ function cache(PC::PredictorCorrector, H, x, t)
 end
 
 """
-    step!(xnext, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, x, t, dt, tol)
+    step!(xnext, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, x, t, dt, tol)
 
 Perform a prediction-correction step and store the result in xnext. Returns `true` if
 the correction was sucessfull, otherwise `false`.
