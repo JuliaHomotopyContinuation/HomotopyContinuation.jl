@@ -27,7 +27,8 @@ module HomotopyContinuation
         NewHomotopies,
         Problems,
         Predictors,
-        Correctors
+        Correctors,
+        AffinePatches
 
     include("dev/utilities.jl")
     include("dev/systems.jl")
@@ -36,6 +37,7 @@ module HomotopyContinuation
     include("dev/predictors.jl")
     include("dev/correctors.jl")
     include("dev/predictor_corrector.jl")
+    include("dev/affine_patches.jl")
 
     include("patches.jl")
     include("utilities.jl")

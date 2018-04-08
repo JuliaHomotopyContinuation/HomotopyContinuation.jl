@@ -1,5 +1,4 @@
 @testset "Problems" begin
-    const Problems = HomotopyContinuation.Problems
     F = equations(katsura5())
     G = equations(cyclic6())
 
@@ -11,7 +10,7 @@
     PP2 = Problems.ProjectiveStartTargetProblem(P2)
     @test PP2 isa Problems.ProjectiveStartTargetProblem
 
-    @test Problems.homotopy(PP2) isa HomotopyContinuation.NewHomotopies.StraightLineHomotopy
+    @test Problems.homotopy(PP2) isa NewHomotopies.StraightLineHomotopy
 
     @test Problems.homogenization_strategy(PP2) == Problems.DefaultHomogenization()
 
