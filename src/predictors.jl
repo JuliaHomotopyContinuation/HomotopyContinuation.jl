@@ -1,6 +1,7 @@
 module Predictors
 
 using ..NewHomotopies
+using ..Utilities
 
 export AbstractPredictor,
     AbstractPredictorCache,
@@ -47,13 +48,13 @@ end
 
 cache(::Euler, H, x, t) = EulerCache(jacobian(H, x, t), dt(H, x, t))
 
-function predict!(xnext, ::Euler, ::EulerCache, H::HomotopyWithCache{N, N}, x, t, dt) where N
+function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache{N, N}, x, t, dt) where N
     A, b = cache.A, cache.b
 
     jacobian_and_dt!(A, b, H, x, t)
     solve_with_lu_inplace!(A, b)
 
-    @. xnext = x - ds * b
+    @. xnext = x - dt * b
 
     nothing
 end

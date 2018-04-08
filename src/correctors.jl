@@ -31,9 +31,16 @@ function correct! end
 
 
 # Newton
+"""
+    Newton(;maxiters=3)
+
+* `maxiters`: Maximal number of iterations until a correction is declared as failed.
+"""
 struct Newton <: AbstractCorrector
-    max_iters::Int
+    maxiters::Int
 end
+Newton(;maxiters=3) = Newton(maxiters)
+
 
 struct NewtonCache{T} <: AbstractCorrectorCache
     A::Matrix{T}
@@ -46,19 +53,19 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
     NewtonCache(A, b)
 end
 
-function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N}, x, t, tol) where N
+function correct!(xnext, alg::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N}, x, t, tol) where N
     A, b = cache.A, cache.b
-    evaluate_and_jacobian!(A, b, H, x, t)
+    evaluate_and_jacobian!(b, A, H, x, t)
     solve_with_lu_inplace!(A, b)
     @. xnext = xnext - b
 
     k = 1
-    while k
+    while true
         evaluate!(b, H, xnext, t)
 
         if norm(b, Inf) < tol
             return true
-        elseif k ≥ maxiters
+        elseif k ≥ alg.maxiters
             return false
         end
 
