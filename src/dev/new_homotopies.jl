@@ -215,7 +215,6 @@ struct StartTargetHomotopyCache{SC, TC, T1, T2} <: AbstractHomotopyCache
     u::Vector{T1} # for evaluation
     U::Matrix{T2} # for Jacobian
 end
-const STHC{SC, TC, T1, T2} = StartTargetHomotopyCache{SC, TC, T1, T2}
 
 function cache(H::AbstractStartTargetHomotopy{M, N}, x, t) where {M, N}
     start_cache = Systems.cache(H.start, x)
@@ -250,26 +249,24 @@ function StraightLineHomotopy(start::S, target::T; gamma=cis(2π * rand())) wher
     StraightLineHomotopy{M, N, S, T}(start, target, gamma)
 end
 
-const SLH{M, N, Start, Target} = StraightLineHomotopy{M, N, Start, Target}
-
-start(H::SLH) = H.start
-target(H::SLH) = H.target
+start(H::StraightLineHomotopy) = H.start
+target(H::StraightLineHomotopy) = H.target
 
 """
     gamma(H::StraightLineHomotopy)
 
 Obtain the gamma used in the StraightLineHomotopy.
 """
-Base.Math.gamma(H::SLH) = H.gamma
+Base.Math.gamma(H::StraightLineHomotopy) = H.gamma
 
 """
     γ(H)
 
 Obtain the gamma used in the StraightLineHomotopy.
 """
-γ(H::SLH) = gamma(H)
+γ(H::StraightLineHomotopy) = gamma(H)
 
-function evaluate!(u, H::SLH, x, t, c::STHC)
+function evaluate!(u, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.evaluate!(c.u, start(H), x, c.start)
     Systems.evaluate!(u, target(H), x, c.target)
 
@@ -277,13 +274,13 @@ function evaluate!(u, H::SLH, x, t, c::STHC)
 
     u
 end
-function evaluate(H::SLH, x, t, c::STHC)
+function evaluate(H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     G = Systems.evaluate(start(H), x, c.start)
     F = Systems.evaluate(target(H), x, c.target)
     (γ(H) * t) * G + (1 - t) * F
 end
 
-function dt!(u, H::SLH, x, t, c::STHC)
+function dt!(u, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.evaluate!(c.u, start(H), x, c.start)
     Systems.evaluate!(u, target(H), x, c.target)
 
@@ -291,13 +288,13 @@ function dt!(u, H::SLH, x, t, c::STHC)
 
     u
 end
-function dt(H::SLH, x, t, c::STHC)
+function dt(H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     G = Systems.evaluate(start(H), x, c.start)
     F = Systems.evaluate(target(H), x, c.target)
     γ(H) .* G .- F
 end
 
-function jacobian!(U, H::SLH, x, t, c::STHC)
+function jacobian!(U, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.jacobian!(c.U, start(H), x, c.start)
     Systems.jacobian!(U, target(H), x, c.target)
 
@@ -305,13 +302,13 @@ function jacobian!(U, H::SLH, x, t, c::STHC)
 
     U
 end
-function jacobian(H::SLH, x, t, c::STHC)
+function jacobian(H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     G = Systems.jacobian(start(H), x, c.start)
     F = Systems.jacobian(target(H), x, c.target)
     (γ(H) * t) .* G .+ (1 - t) .* F
 end
 
-function evaluate_and_jacobian!(u, U, H::SLH, x, t, c::STHC)
+function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.evaluate_and_jacobian!(c.u, c.U, start(H), x, c.start)
     Systems.evaluate_and_jacobian!(u, U, target(H), x, c.target)
 
@@ -321,7 +318,7 @@ function evaluate_and_jacobian!(u, U, H::SLH, x, t, c::STHC)
     nothing
 end
 
-function jacobian_and_dt!(U, u, H::SLH, x, t, c::STHC)
+function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.evaluate_and_jacobian!(c.u, c.U, start(H), x, c.start)
     Systems.evaluate_and_jacobian!(u, U, target(H), x, c.target)
 
