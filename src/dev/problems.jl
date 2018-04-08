@@ -17,7 +17,7 @@ export AbstractDynamicProblem,
 # STAGE 2 exports
 export AbstractProblem,
     AbstractProjectiveProblem,
-    HomogenizationStrategy,
+    AbstractHomogenizationStrategy,
     NullHomogenization,
     DefaultHomogenization,
     ProjectiveStartTargetProblem,
@@ -73,25 +73,25 @@ abstract type AbstractProjectiveProblem <: AbstractProblem end
 
 # The HomogenizationStrategy will be useful if we have multi-homogenous stuff
 """
-    HomogenizationStrategy
+    AbstractHomogenizationStrategy
 
 Abstract type for describing the homogenization strategy.
 """
-abstract type HomogenizationStrategy end
+abstract type AbstractHomogenizationStrategy end
 
 """
     NullHomogenization()
 
 Homogenization was not necessary since it is already homogenous.
 """
-struct NullHomogenization <: HomogenizationStrategy end
+struct NullHomogenization <: AbstractHomogenizationStrategy end
 
 """
     DefaultHomogenization()
 
 Homogenization by adding a new variable with highest precedence.
 """
-struct DefaultHomogenization <: HomogenizationStrategy end
+struct DefaultHomogenization <: AbstractHomogenizationStrategy end
 
 """
     ProjectiveProblem(prob::TotalDegreeProblem; options...)
@@ -105,7 +105,7 @@ is called with `system(polys, variables)` where `variables` determines the varia
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
 with `system`.
 """
-struct ProjectiveStartTargetProblem{H<:AbstractStartTargetHomotopy, HS<:HomogenizationStrategy} <: AbstractProjectiveProblem
+struct ProjectiveStartTargetProblem{H<:AbstractStartTargetHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
     homotopy::H
     homogenization_strategy::HS
 end
