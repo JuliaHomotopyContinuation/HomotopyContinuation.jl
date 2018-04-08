@@ -84,9 +84,9 @@ jacobian(F::AbstractSystem, x, ::NullCache) = jacobian(F, x)
 Evaluate the system `F` and its Jacobian at `x` and store the results in `u` (evalution)
 and `U` (Jacobian).
 """
-function evaluate_and_jacobian!(u, U, S::AbstractSystem, x::AbstractVector, cache)
-    evaluate!(u, S, x, cache)
-    jacobian!(U, S, x, cache)
+function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache)
+    evaluate!(u, F, x, cache)
+    jacobian!(U, F, x, cache)
     nothing
 end
 
@@ -95,9 +95,9 @@ end
 
 Evaluate the system `F` and its Jacobian at `x`.
 """
-function evaluate_and_jacobian(S::AbstractSystem, x::AbstractVector, cache)
-    u = evaluate(S, x, cache)
-    U = jacobian(S, x, cache)
+function evaluate_and_jacobian(F::AbstractSystem, x, cache)
+    u = evaluate(F, x, cache)
+    U = jacobian(F, x, cache)
     u, U
 end
 

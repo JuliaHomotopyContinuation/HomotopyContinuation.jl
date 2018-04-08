@@ -16,6 +16,7 @@ export AbstractHomotopy,
     cache,
     evaluate!, evaluate,
     jacobian!, jacobian,
+    evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt
 
@@ -177,7 +178,7 @@ end
 function HomotopyWithCache(hom::H, cache::C) where {M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache}
     HomotopyWithCache{M, N, H, C}(hom, cache)
 end
-HomotopyWithCache(hom::AbstractHomotopy, x, t) = HomotopyWithCache(hom, cache(H, x, t))
+HomotopyWithCache(H::AbstractHomotopy, x, t) = HomotopyWithCache(H, cache(H, x, t))
 
 (H::HomotopyWithCache)(x, t) = evaluate(H, x, t)
 
