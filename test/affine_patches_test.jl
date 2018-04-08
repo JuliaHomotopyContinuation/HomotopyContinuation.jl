@@ -7,7 +7,9 @@
     AffinePatches.precondition!(x, patch)
     @test norm(x) ≈ 1.0
 
-    v = zeros(x)
-    AffinePatches.update_patch!(v, patch, (), x, ())
+    v = AffinePatches.init_patch(patch, x)
     @test v == x
+    y = rand(Complex{Float64}, 10)
+    AffinePatches.update_patch!(v, patch, y)
+    @test v == y
 end
