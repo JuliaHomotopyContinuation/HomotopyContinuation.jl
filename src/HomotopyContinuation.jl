@@ -26,6 +26,11 @@ module HomotopyContinuation
     include("patches.jl")
     include("utilities.jl")
 
+    export Systems,
+        NewHomotopies,
+        Problems,
+        Predictors,
+        Correctors
 
     include("Systems.jl")
     include("NewHomotopies.jl")
