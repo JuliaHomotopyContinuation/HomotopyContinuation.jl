@@ -23,21 +23,22 @@ module HomotopyContinuation
         AbstractPathtrackerCache, AbstractEndgameCache
 
 
-    include("patches.jl")
-    include("utilities.jl")
-
     export Systems,
         NewHomotopies,
         Problems,
         Predictors,
         Correctors
 
-    include("Systems.jl")
-    include("NewHomotopies.jl")
-    include("problems.jl")
-    include("predictors.jl")
-    include("correctors.jl")
-    include("predictor_corrector.jl")
+    include("dev/utilities.jl")
+    include("dev/systems.jl")
+    include("dev/new_homotopies.jl")
+    include("dev/problems.jl")
+    include("dev/predictors.jl")
+    include("dev/correctors.jl")
+    include("dev/predictor_corrector.jl")
+
+    include("patches.jl")
+    include("utilities.jl")
 
     include("pathtracker/type.jl")
     include("pathtracker/modify.jl")
