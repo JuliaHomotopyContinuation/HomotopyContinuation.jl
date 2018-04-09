@@ -8,7 +8,7 @@
     @test iter isa PathTrackers.TrackerIterator{<:PathTrackers.ProjectiveTracker,
         <:PathTrackers.ProjectiveState, <:PathTrackers.ProjectiveTrackerCache}
 
-    @test iter.state.status == :default
+    @test iter.state.status == :ok
 
     iter = PathTrackers.pathtracker(P.homotopy, collect(1:9), 1.0, 0.0)
     @test iter.state.x isa Vector{Complex{Float64}}

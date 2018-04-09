@@ -103,6 +103,9 @@ mutable struct HeuristicStepSizeState <: AbstractStepSizeState
 end
 
 state(step::HeuristicStepSize) = HeuristicStepSizeState(0)
+function reset!(state::HeuristicStepSizeState)
+    state.consecutive_successes = 0
+end
 
 isrelative(::HeuristicStepSize) = true
 initial_steplength(step::HeuristicStepSize) = step.initial

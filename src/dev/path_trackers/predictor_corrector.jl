@@ -40,7 +40,7 @@ end
 Perform a prediction-correction step and store the result in xnext. Returns `true` if
 the correction was sucessfull, otherwise `false`.
 """
-function step!(xnext, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, x, t, dt, tol)
+@inline function step!(xnext, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, x, t, dt, tol)
     Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, dt)
-    Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t, tol)
+    Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t - dt, tol)
 end

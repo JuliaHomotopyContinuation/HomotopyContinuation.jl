@@ -84,7 +84,7 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::Patched
         U[i, j] = c.A[i, j]
     end
     @inbounds for j=1:N
-        U[M, j] = conj(H.patch[i])
+        U[M, j] = conj(H.patch[j])
     end
     # eval
     @inbounds for i=1:(M-1)
@@ -101,19 +101,19 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::Patched
 end
 
 function jacobian_and_dt!(U, u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
-    # J_H(x, t)
-    jacobian_and_dt!(c.A, c.b, H.homotopy, x, t, c.cache)
+    A, b = c.A, c.b
+    jacobian_and_dt!(A, b, H.homotopy, x, t, c.cache)
     # jacobian
     @inbounds for j=1:N, i=1:(M-1)
-        U[i, j] = c.A[i, j]
+        U[i, j] = A[i, j]
     end
     # gradient of v⋅x - 1 => v'
     @inbounds for j=1:N
-        U[M, j] = conj(H.patch[i])
+        U[M, j] = conj(H.patch[j])
     end
     # dt
     @inbounds for i=1:(M-1)
-        u[i] = c.b[i]
+        u[i] = b[i]
     end
     u[M] = zero(eltype(u))
 
