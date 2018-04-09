@@ -9,6 +9,7 @@ import ..AffinePatches: AbstractAffinePatch
 import ..StepSize
 import ..StepSize: AbstractStepSize, AbstractStepSizeState
 import ..Problems: ProjectiveStartTargetProblem
+import ..Problems
 
 export AbstractPathTracker,
     AbstractPathTrackerCache,
@@ -26,11 +27,11 @@ include("path_trackers/predictor_corrector.jl")
 include("path_trackers/projective_tracker.jl")
 
 
-function pathtracker(prob::ProjectiveStartTargetProblem; kwargs...)
-    ProjectiveTracker(prob.homotopy; kwargs...)
+function pathtracker(H::AbstractHomotopy, x, start, target; tracker=ProjectiveTracker, kwargs...)
+    pathtracker(tracker(H; kwargs...), x, start, target)
 end
 
-function iterator(tracker::AbstractPathTracker{<:AbstractHomotopy{M, N}}, x, start, target) where {M, N}
+function pathtracker(tracker::AbstractPathTracker{<:AbstractHomotopy{M, N}}, x, start, target) where {M, N}
     @assert length(x) == N "Expected initial solution to have length $N but got $(length(x))."
     tracker_state = state(tracker, x, start, target)
     tracker_cache = cache(tracker, tracker_state)

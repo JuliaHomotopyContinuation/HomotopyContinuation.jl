@@ -1,10 +1,18 @@
 """
-    pathtracker(problem::Problems.AbstractProblem; options...)::AbstractPathTracker
+     pathtracker(H::NewHomotopies.AbstractHomotopy, x₀, t₁, t₀; tracker=ProjectiveTracker, options...)::TrackerIterator
 
-Create a path tracker suitable for the specific problem. The options depend
-on the chosen path tracker.
+Create a path tracker to track `x₀` from `t₁` to `t₀`. The homotopy `H` needs to be
+compatible with the chosen path tracker `tracker`. The options depend
+on the chosen path tracker for the default case see [`ProjectiveTracker`](@ref).
 """
 function pathtracker end
+
+"""
+     iterator(::AbstractPathTracker, x₀, t₁, t₀)
+
+Construct an iterator to track `x₀` from `t₁` to `t₀`.
+"""
+function iterator end
 
 """
     Options(;tolerance=1e-7, maxiters=10_000)

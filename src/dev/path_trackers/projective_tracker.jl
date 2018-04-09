@@ -1,7 +1,7 @@
 export ProjectiveTracker
 
 """
-    ProjectiveTracker(H::AbstractHomotopy; options...)
+    ProjectiveTracker(H::AbstractHomotopy; options...) <: AbstractPathTracker
 
 Construct a path tracker for a projective homotopy `H`.
 The options are
