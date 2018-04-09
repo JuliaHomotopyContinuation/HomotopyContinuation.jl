@@ -52,7 +52,7 @@ mutable struct ProjectiveState{T<:Number, S<:AbstractStepSizeState} <: AbstractP
 
     x::Vector{T}
     xnext::Vector{T}
-    patch::Vector{T}
+    patch::Vector{T} # This vector will also be used in the cache.
     #randomization::Matrix{T}
 end
 
@@ -69,7 +69,9 @@ function state(tracker::ProjectiveTracker, x::Vector, start, target)
     iter = 0
     status = :default
 
-    x = copy(x)
+    # We have to make sure that the element type of x is invariant under evaluation
+    T_invariant = eltype(NewHomotopies.evaluate(tracker.homotopy, x, start))
+    x = convert.(T_invariant, x)
     AffinePatches.precondition!(x, tracker.patch)
     xnext = copy(x)
     patch = AffinePatches.init_patch(tracker.patch, x)

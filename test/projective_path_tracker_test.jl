@@ -9,4 +9,7 @@
     iter = PathTrackers.iterator(tracker, Problems.embed(P, sols[123]), 1.0, 0.0)
     @test iter isa PathTrackers.TrackerIterator{<:PathTrackers.ProjectiveTracker,
         <:PathTrackers.ProjectiveState, <:PathTrackers.ProjectiveTrackerCache}
+
+    iter = PathTrackers.iterator(tracker, ones(Int, 9), 1.0, 0.0)
+    @test iter.state.x isa Vector{Complex{Float64}}
 end
