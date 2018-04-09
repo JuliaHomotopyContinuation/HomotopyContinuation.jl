@@ -39,7 +39,7 @@ end
 
 
 function setup!(iter::TrackerIterator, x₀, t₁, t₀)
-     reset!(iter.state, iter.tracker, x₀, t₁, t₀)
+     reset!(iter.state, iter.tracker, iter.cache, x₀, t₁, t₀)
      iter
 end
 
