@@ -67,11 +67,16 @@ function state(tracker::ProjectiveTracker, x::Vector, start, target)
     steplength = StepSize.initial_steplength(tracker.step)
     steplength_state = StepSize.state(tracker.step)
     iter = 0
-    status = :default
+
+    value = NewHomotopies.evaluate(tracker.homotopy, x, start)
+    if norm(value) > 1e-4
+        status = :invalid_startvalue
+    else
+        status = :default
+    end
 
     # We have to make sure that the element type of x is invariant under evaluation
-    T_invariant = eltype(NewHomotopies.evaluate(tracker.homotopy, x, start))
-    x = convert.(T_invariant, x)
+    x = convert.(eltype(value), x)
     AffinePatches.precondition!(x, tracker.patch)
     xnext = copy(x)
     patch = AffinePatches.init_patch(tracker.patch, x)
@@ -86,7 +91,12 @@ function reset!(state::ProjectiveState, tracker::ProjectiveTracker, x, start, ta
     state.t = 1.0
     StepSize.reset!(state.steplength_state)
     state.iter = 0
-    state.status = :default
+
+    if norm(NewHomotopies.evaluate(tracker.homotopy, x, start)) > 1e-4
+        status = :invalid_startvalue
+    else
+        status = :default
+    end
 
     state.x .= x
     AffinePatches.precondition!(state.x, tracker.patch)
