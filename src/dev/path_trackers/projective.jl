@@ -1,0 +1,185 @@
+import ..NewHomotopies
+import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, AbstractHomotopyCache, HomotopyWithCache
+import ..Predictors
+import ..Correctors
+import ..PredictionCorrection: PredictorCorrector, PredictorCorrectorCache
+import ..PredictionCorrection
+import ..AffinePatches
+import ..AffinePatches: AbstractAffinePatch
+import ..StepSize
+import ..StepSize: AbstractStepSize, AbstractStepSizeState
+
+export Projective
+
+include("projective/patched_homotopy.jl")
+
+"""
+    Projective(H::AbstractHomotopy; options...) <: AbstractPathTracker
+
+Construct a path tracker for a projective homotopy `H`.
+The options are
+* `patch::AffinePatches.AbstractAffinePatch`:
+The affine patch used to embed the homotopy into affine space (from projective space).
+The default is [`AffinePatches.OrthogonalPatch`](@ref).
+* `predictor::Predictors.AbstractPredictor`:
+The predictor used during in the predictor-corrector scheme. The default is
+`[Predictors.Euler`](@ref)()`.
+* `corrector::Correctors.AbstractCorrector`:
+The corrector used during in the predictor-corrector scheme. The default is
+[`Correctors.Newton`](@ref).
+* `step::StepSize.AbstractStepSize`
+The step size logic used to determine changes of the step size. The default is
+[`StepSize.HeuristicStepSize`](@ref).
+"""
+struct Projective{H<:AbstractHomotopy, Patch<:AbstractAffinePatch, P, C, S<:AbstractStepSize} <: AbstractPathTrackerMethod
+    homotopy::H
+    patch::Patch
+    # randomize::Randomizer
+    predictor_corrector::PredictorCorrector{P, C}
+    step::S
+end
+
+function Projective(H::AbstractHomotopy;
+    patch::AffinePatches.AbstractAffinePatch=AffinePatches.OrthogonalPatch(),
+    predictor::Predictors.AbstractPredictor=Predictors.Euler(),
+    corrector::Correctors.AbstractCorrector=Correctors.Newton(),
+    step::StepSize.AbstractStepSize=StepSize.HeuristicStepSize())
+
+    Projective(
+        H,
+        patch,
+        PredictorCorrector(predictor, corrector), step)
+end
+
+# STATE
+
+mutable struct ProjectiveState{T<:Number, S<:AbstractStepSizeState} <: AbstractPathTrackerState
+    # Our start time
+    start::Float64
+    # Our target time
+    target::Float64
+    # The relative progress. `t` always goes from 1.0 to 0.0
+    t::Float64
+    # The current step length. This is always relative.
+    steplength::Float64
+    steplength_state::S
+    iter::Int
+    status::Symbol
+
+    x::Vector{T}
+    patch::Vector{T} # This vector will also be used in the cache.
+    #randomization::Matrix{T}
+end
+
+"""
+    get_t(state::ProjectiveState)
+
+Get the current absolute `t`.
+"""
+get_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
+
+
+struct ProjectiveCache{M, N, H<:PatchedHomotopy{M, N}, HC<:PatchedHomotopyCache, P, C} <: AbstractPathTrackerCache
+    homotopy::HomotopyWithCache{M, N, H, HC}
+    predictor_corrector::PredictorCorrectorCache{P, C}
+end
+
+
+# INITIAL CONSTRUCTION
+
+function state(method::Projective, x::Vector, start, target)
+    checkstart(method.homotopy, x)
+
+    t = 1.0
+    steplength = StepSize.initial_steplength(method.step)
+    steplength_state = StepSize.state(method.step)
+    iter = 0
+
+    value = NewHomotopies.evaluate(method.homotopy, x, start)
+    if norm(value) > 1e-4
+        status = :invalid_startvalue
+    else
+        status = :ok
+    end
+
+    # We have to make sure that the element type of x is invariant under evaluation
+    x = convert.(eltype(value), x)
+    patch = AffinePatches.init_patch(method.patch, x)
+    AffinePatches.precondition!(patch, x, method.patch)
+
+    ProjectiveState(start, target, t, steplength, steplength_state, iter, status, x, patch)
+end
+
+function checkstart(H, x)
+    N = NewHomotopies.nvariables(H)
+    N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
+end
+
+
+function cache(method::Projective, state::ProjectiveState)
+    PH = PatchedHomotopy(method.homotopy, state.patch)
+    H = NewHomotopies.HomotopyWithCache(PH, state.x, get_t(state))
+    pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, state.x, get_t(state))
+
+    ProjectiveCache(H, pc_cache)
+end
+
+# UPDATES
+
+function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target)
+    checkstart(method.homotopy, x)
+
+    state.t = 1.0
+    state.steplength = StepSize.initial_steplength(method.step)
+    StepSize.reset!(state.steplength_state)
+    state.iter = 0
+    state.x .= x
+    AffinePatches.precondition!(state.patch, state.x, method.patch)
+
+    if norm(cache.homotopy(state.x, start)) > 1e-4
+        state.status = :invalid_startvalue
+    else
+        state.status = :ok
+    end
+    state
+end
+
+# ITERATION
+
+function step!(method::Projective, state::ProjectiveState, cache::ProjectiveCache, options::Options)
+    state.iter += 1
+
+    H, x, t = cache.homotopy, state.x, get_t(state)
+    Δt = state.steplength * (state.start - state.target)
+
+    step_successfull, status = PredictionCorrection.predict_correct!(x,
+        method.predictor_corrector,
+        cache.predictor_corrector,
+        H, t, Δt, options.tolerance)
+
+    if step_successfull
+        state.t = max(state.t - state.steplength, 0.0)
+        # Since x changed we should update the patch
+        AffinePatches.update_patch!(state.patch, method.patch, x)
+    end
+    #  update steplength
+    update_stepsize!(state, method.step, step_successfull)
+    nothing
+end
+
+function update_stepsize!(state::ProjectiveState, step::StepSize.AbstractStepSize, step_successfull)
+    new_steplength, status = StepSize.update(state.steplength, step, state.steplength_state, step_successfull)
+    if status != :ok
+        state.status = status
+    end
+    if StepSize.isrelative(step)
+        state.steplength = min(new_steplength, state.t)
+    else
+        state.steplength = min(new_steplength, state.t) / (state.start - state.target)
+    end
+    nothing
+end
+
+function isdone(method::Projective, state::ProjectiveState, cache::ProjectiveCache, options::Options)
+    state.t == 0.0 || state.status != :ok || state.iter ≥ options.maxiters
+end

@@ -1,42 +1,92 @@
 module PathTrackers
 
-import ..NewHomotopies
-import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, AbstractHomotopyCache, HomotopyWithCache
-import ..Predictors
-import ..Correctors
-import ..AffinePatches
-import ..AffinePatches: AbstractAffinePatch
-import ..StepSize
-import ..StepSize: AbstractStepSize, AbstractStepSizeState
-import ..Problems: ProjectiveStartTargetProblem
-import ..Problems
-
 export AbstractPathTracker,
     AbstractPathTrackerCache,
     AbstractPathTrackerState,
     Options
 
-abstract type AbstractPathTracker{H<:AbstractHomotopy} end
-abstract type AbstractPathTrackerCache end
+"""
+     AbstractPathTrackerMethod
+
+A `PathTrackerConfig` holds informations like the homotopy, algorithms used etc.
+"""
+abstract type AbstractPathTrackerMethod end
+
+"""
+     AbstractPathTrackerState
+
+A `PathTrackerState` holds the current state. This is information which is reseted
+after each run.
+"""
 abstract type AbstractPathTrackerState end
 
+"""
+     AbstractPathTrackerCache
 
-include("path_trackers/interface.jl")
-include("path_trackers/patched_homotopy.jl")
-include("path_trackers/predictor_corrector.jl")
-include("path_trackers/projective_tracker.jl")
+A `PathTrackerCache` holds all data structures to avoid allocations.
+"""
+abstract type AbstractPathTrackerCache end
 
+"""
+    Options(;tolerance=1e-7, maxiters=10_000)
 
-function pathtracker(H::AbstractHomotopy, x, start, target; tracker=ProjectiveTracker, kwargs...)
-    pathtracker(tracker(H; kwargs...), x, start, target)
+The options used for the pathtracker.
+* `tolerance`: The precision used to track a value.
+* `maxiters`: The maximal number of trackerations.
+"""
+mutable struct Options
+    tolerance::Float64
+    maxiters::Int64
+end
+function Options(;tolerance=1e-7, maxiters=10_000)
+    Options(tolerance, maxiters)
 end
 
-function pathtracker(tracker::AbstractPathTracker{<:AbstractHomotopy{M, N}}, x, start, target) where {M, N}
-    @assert length(x) == N "Expected initial solution to have length $N but got $(length(x))."
-    tracker_state = state(tracker, x, start, target)
-    tracker_cache = cache(tracker, tracker_state)
-    TrackerIterator(tracker, tracker_state, tracker_cache)
-end
 
+# INITIAL CONSTRUCTION
+
+"""
+    state(method::AbstractPathTrackerMethod, x₀, t₁, t₀)::AbstractPathTrackerState
+
+Initialize the necessary state to track a path from `t₁` to `t₀` starting
+from `x₀`.
+"""
+function state end
+
+
+"""
+    cache(method::AbstractPathTrackerMethod, state::AbstractPathTrackerState)::AbstractPathTrackerCache
+
+Initialize the cache to track paths.
+"""
+function cache end
+
+# UPDATES
+
+"""
+    reset!(state::AbstractPathTrackerState, ::AbstractPathTrackerMethod, ::AbstractPathTrackerCache, x₀, t₁, t₀)
+
+Reset the state to track a path from `t₁` to `t₀` starting from `x₀`.
+"""
+function reset! end
+
+# ITERATION
+
+"""
+    step!(::AbstractPathTrackerMethod, ::AbstractPathTrackerState, AbstractPathTrackerCache, options::Options)
+
+Make one step in the path tracking method.
+"""
+function step! end
+
+"""
+    isdone(::AbstractPathTrackerMethod, ::AbstractPathTrackerState, AbstractPathTrackerCache, options::Options)
+
+Check whether the path tracking terminated.
+"""
+function isdone end
+
+# Implementation
+include("path_trackers/projective.jl")
 
 end

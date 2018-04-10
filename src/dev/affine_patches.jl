@@ -25,9 +25,11 @@ abstract type AbstractLocalAffinePatch <: AbstractAffinePatch end
 
 
 """
-    precondition!(x, ::AbstractAffinePatch)
+    precondition!(v, x, ::AbstractAffinePatch)
 
-Precondition the start solution `x` for the use of this affine patch.
+This is called at the beginning of a tracked path.
+`v` is the patch and `x` is the start solution. Modify both such that
+`v` is properly setup and `v⋅x-1=0` holds.
 """
 function precondition! end
 
@@ -50,7 +52,11 @@ function update_patch! end
 
 struct OrthogonalPatch <: AbstractLocalAffinePatch end
 
-precondition!(x, ::OrthogonalPatch) = normalize!(x)
+function precondition!(v, x, ::OrthogonalPatch)
+    normalize!(x)
+    v .= x
+end
+
 init_patch(::OrthogonalPatch, x) = x
 function update_patch!(v, ::OrthogonalPatch, x)
     v .= x

@@ -1,4 +1,4 @@
-import ..AffinePatches: AbstractAffinePatch
+# import ..AffinePatches: AbstractAffinePatch
 import ..NewHomotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCache,
     evaluate!, evaluate,
     jacobian!, jacobian,

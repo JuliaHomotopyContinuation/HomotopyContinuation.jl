@@ -12,8 +12,13 @@
 
     start_sols = Problems.embed.(P, sols)
 
-    iter = PathTrackers.pathtracker(P.homotopy, start_sols[1], 1.0, 0.0)
-    PathTrackers.track!(iter)
-    x = iter.state.x
+    s = start_sols[1]
+    tracker = PathTracking.PathTracker(P.homotopy, s, 1.0, 0.0)
+    PathTracking.track!(tracker)
+    x = tracker.state.x
+    @test norm(x[2:end] / x[1] - A \ b) < 1e-8
+
+    PathTracking.track!(tracker, s, 1.0, 0.0)
+    x = tracker.state.x
     @test norm(x[2:end] / x[1] - A \ b) < 1e-8
 end
