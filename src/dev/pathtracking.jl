@@ -6,7 +6,10 @@ import ..NewHomotopies: AbstractHomotopy
 
 export Projective,
      PathTracker,
-     track!
+     track!,
+     current_t,
+     current_x,
+     current_status
 """
      PathTracker(H::NewHomotopies.AbstractHomotopy, x₀, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
 
@@ -36,6 +39,16 @@ function PathTracker(method::AbstractPathTrackerMethod, x, start, target, option
     PathTracker(method, tracker_state, tracker_cache, options)
 end
 
+"""
+    track!(tracker, x₀, t₁, t₀)
+
+Track a value `x₀` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
+
+    track!(tracker)
+
+Run the given `tracker` with the set values. This is useful to call directly
+after construction of a `PathTracker`.
+"""
 function track!(tracker::PathTracker)
      while !PathTrackers.isdone(tracker.method, tracker.state, tracker.cache, tracker.options)
           PathTrackers.step!(tracker.method, tracker.state, tracker.cache, tracker.options)
@@ -47,6 +60,27 @@ function track!(tracker::PathTracker, x₀, t₁, t₀)
      PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₀, t₁, t₀)
      track!(tracker)
 end
+
+"""
+    current_t(tracker::PathTracker)
+
+Get the current `t` from the tracker.
+"""
+current_t(tracker) = PathTrackers.current_t(tracker.state)
+
+"""
+    current_x(tracker::PathTracker)
+
+Get the current solution `x` from the tracker.
+"""
+current_x(tracker) = PathTrackers.current_x(tracker.state)
+
+"""
+    current_status(tracker::PathTracker)
+
+Get the current status from the tracker.
+"""
+current_status(tracker) = PathTrackers.current_status(tracker.state)
 
 # Iterator interface
 Base.start(::PathTracker) = 0

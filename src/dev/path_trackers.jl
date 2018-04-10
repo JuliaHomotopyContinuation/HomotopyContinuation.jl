@@ -3,7 +3,15 @@ module PathTrackers
 export AbstractPathTracker,
     AbstractPathTrackerCache,
     AbstractPathTrackerState,
-    Options
+    Options,
+    state,
+    cache,
+    reset!,
+    step!,
+    isdone,
+    current_t,
+    current_x,
+    current_status
 
 """
      AbstractPathTrackerMethod
@@ -85,6 +93,28 @@ function step! end
 Check whether the path tracking terminated.
 """
 function isdone end
+
+# Access
+"""
+    current_t(state::AbstractPathTrackerState)
+
+Get the current absolute `t` from the state `state`.
+"""
+function current_t end
+
+"""
+    current_x(state::AbstractPathTrackerState)
+
+Get the current solution `x` from the state `state`.
+"""
+function current_x end
+
+"""
+    current_status(state::AbstractPathTrackerState)
+
+Get the current status from the state `state`.
+"""
+function current_status end
 
 # Implementation
 include("path_trackers/projective.jl")

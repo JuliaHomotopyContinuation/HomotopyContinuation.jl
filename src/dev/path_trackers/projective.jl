@@ -72,12 +72,26 @@ mutable struct ProjectiveState{T<:Number, S<:AbstractStepSizeState} <: AbstractP
 end
 
 """
-    get_t(state::ProjectiveState)
+    current_t(state::ProjectiveState)
 
 Get the current absolute `t`.
 """
-get_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
+current_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
 
+"""
+    current_x(state::ProjectiveState)
+
+Get the current solution `x`.
+"""
+current_x(state::ProjectiveState) = state.x
+
+
+"""
+    current_status(state::ProjectiveState)
+
+Get the current status.
+"""
+current_status(state::ProjectiveState) = state.status
 
 struct ProjectiveCache{M, N, H<:PatchedHomotopy{M, N}, HC<:PatchedHomotopyCache, P, C} <: AbstractPathTrackerCache
     homotopy::HomotopyWithCache{M, N, H, HC}
@@ -118,8 +132,8 @@ end
 
 function cache(method::Projective, state::ProjectiveState)
     PH = PatchedHomotopy(method.homotopy, state.patch)
-    H = NewHomotopies.HomotopyWithCache(PH, state.x, get_t(state))
-    pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, state.x, get_t(state))
+    H = NewHomotopies.HomotopyWithCache(PH, state.x, current_t(state))
+    pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, state.x, current_t(state))
 
     ProjectiveCache(H, pc_cache)
 end
@@ -149,7 +163,7 @@ end
 function step!(method::Projective, state::ProjectiveState, cache::ProjectiveCache, options::Options)
     state.iter += 1
 
-    H, x, t = cache.homotopy, state.x, get_t(state)
+    H, x, t = cache.homotopy, state.x, current_t(state)
     Δt = state.steplength * (state.start - state.target)
 
     step_successfull, status = PredictionCorrection.predict_correct!(x,
