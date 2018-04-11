@@ -1,10 +1,11 @@
 module PathTracking
 
-import ..PathTrackers: AbstractPathTrackerMethod, AbstractPathTrackerCache, AbstractPathTrackerState, Projective
+import ..PathTrackers: AbstractPathTrackerMethod, AbstractPathTrackerCache, AbstractPathTrackerState, Projective, Options
 import ..PathTrackers
 import ..NewHomotopies: AbstractHomotopy
 
 export Projective,
+     Options,
      PathTracker,
      PathTrackerResult,
      track,
