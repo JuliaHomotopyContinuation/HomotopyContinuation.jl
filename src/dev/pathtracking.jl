@@ -12,6 +12,7 @@ export Projective,
      track!,
      current_t,
      current_x,
+     current_iter,
      current_status
 """
      PathTracker(H::NewHomotopies.AbstractHomotopy, x₀, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
@@ -59,6 +60,7 @@ struct PathTrackerResult{T}
      x::Vector{T}
      t::Float64
      res::Float64
+     iters::Int
 end
 
 """
@@ -66,11 +68,22 @@ end
 
 Track a value `x₀` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 This returns a `PathTrackerResult`. This modifies tracker.
+
+    track(tracker, xs, t₁, t₀)::Vector{PathTrackerResult}
+
+Track all values in xs from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 """
-function track(tracker::PathTracker, x₀, t₁, t₀)
+function track(tracker::PathTracker, x₀::AbstractVector{<:Number}, t₁, t₀)
      PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₀, t₁, t₀)
      track!(tracker)
      result(tracker)
+end
+function track(tracker::PathTracker, xs, t₁, t₀)
+     map(xs) do x₀
+          PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₀, t₁, t₀)
+          track!(tracker)
+          result(tracker)
+     end
 end
 
 """
@@ -103,7 +116,7 @@ function result(tracker::PathTracker)
           res = NaN
      end
      x = copy(current_x(tracker))
-     PathTrackerResult(successfull, returncode, x, current_t(tracker), res)
+     PathTrackerResult(successfull, returncode, x, current_t(tracker), res, current_iter(tracker))
 end
 
 
@@ -121,6 +134,13 @@ Get the current solution `x` from the tracker. Note this is *not* a copy. If
 you want to store it persistent you need to make a copy.
 """
 current_x(tracker) = PathTrackers.current_x(tracker.state)
+
+"""
+    current_iter(tracker::PathTracker)
+
+Get the number of the current iteration from the tracker.
+"""
+current_iter(tracker) = PathTrackers.current_iter(tracker.state)
 
 """
     current_status(tracker::PathTracker)

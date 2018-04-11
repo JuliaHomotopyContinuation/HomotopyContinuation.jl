@@ -117,6 +117,14 @@ Get the current solution `x` from the state `state`.
 function current_x end
 
 """
+    current_iter(state::AbstractPathTrackerState)
+
+Get the current number of iterations from the  state `state`.
+"""
+function current_iter end
+
+
+"""
     current_status(state::AbstractPathTrackerState)
 
 Get the current status from the state `state`.

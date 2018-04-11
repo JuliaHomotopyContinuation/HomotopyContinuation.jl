@@ -73,26 +73,10 @@ mutable struct ProjectiveState{T<:Number, S<:AbstractStepSizeState} <: AbstractP
     #randomization::Matrix{T}
 end
 
-"""
-    current_t(state::ProjectiveState)
 
-Get the current absolute `t`.
-"""
 current_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
-
-"""
-    current_x(state::ProjectiveState)
-
-Get the current solution `x`.
-"""
 current_x(state::ProjectiveState) = state.x
-
-
-"""
-    current_status(state::ProjectiveState)
-
-Get the current status.
-"""
+current_iter(state::ProjectiveState) = state.iter
 current_status(state::ProjectiveState) = state.status
 
 struct ProjectiveCache{M, N, H<:PatchedHomotopy{M, N}, HC<:PatchedHomotopyCache, P, C} <: AbstractPathTrackerCache
@@ -206,7 +190,6 @@ end
 
 function refine!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
     H, x, t = cache.homotopy, state.x, current_t(state)
-
     PredictionCorrection.refine!(x,
         method.predictor_corrector, cache.predictor_corrector,
         H, t, options.refinement_tol, options.corrector_maxiters)
