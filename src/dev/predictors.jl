@@ -22,9 +22,9 @@ function cache end
 
 
 """
-    predict!(xnext, ::AbstractPredictor, ::AbstractPredictorCache, H::HomotopyWithCache, x, t, dt)
+    predict!(xnext, ::AbstractPredictor, ::AbstractPredictorCache, H::HomotopyWithCache, x, t, Δt)
 
-Perform a prediction step for the value of `x` such that ``H(x, t+dt) ≈ 0``.
+Perform a prediction step for the value of `x` with step size `Δt`.
 """
 function predict! end
 
@@ -48,13 +48,13 @@ end
 
 cache(::Euler, H, x, t) = EulerCache(jacobian(H, x, t), dt(H, x, t))
 
-function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache{N, N}, x, t, dt) where N
+function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache{N, N}, x, t, Δt) where N
     A, b = cache.A, cache.b
 
     jacobian_and_dt!(A, b, H, x, t)
     solve_with_lu_inplace!(A, b)
 
-    @. xnext = x - dt * b
+    @. xnext = x - Δt * b
 
     nothing
 end

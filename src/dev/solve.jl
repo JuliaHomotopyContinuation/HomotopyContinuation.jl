@@ -7,6 +7,7 @@ const MP = MultivariatePolynomials
 
 export solve
 
+# External
 function solve(F::Vector{<:MP.AbstractPolynomial}; kwargs...)
     TDP = Problems.TotalDegreeProblem(F)
     start_solutions = Utilities.totaldegree_solutions(F)
@@ -18,6 +19,7 @@ function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolyno
     solve(STP, start_solutions; kwargs...)
 end
 
+# Internal
 function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
     system=Systems.SPSystem,
     homotopy=NewHomotopies.StraightLineHomotopy,

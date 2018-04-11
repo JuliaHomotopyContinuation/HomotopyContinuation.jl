@@ -44,18 +44,21 @@ function cache(PC::PredictorCorrector, H, x, t)
 end
 
 """
-    predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, t, dt, tol, maxiters)
+    predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, t, Δt, tol, maxiters)
 
 Perform a prediction-correction step and store the result in `x` if successfull. Returns `(true, :ok)` if
 the correction was sucessfull, otherwise `(false, status)` where `status` is either `:ok` or an error code.
 """
-@inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, dt, tol, maxiters)
+@inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, Δt, tol, maxiters)
     try
         xnext = cache.xnext
-        Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, dt)
-        result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t - dt, tol, maxiters)
+        # @show norm(x)
+        @show t Δt
+        Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
+        result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
         if result.converged
             x .= xnext
+            normalize!(x)
             return (true, :ok)
         else
             return (false, :ok)

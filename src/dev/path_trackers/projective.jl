@@ -75,6 +75,7 @@ end
 
 
 current_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
+current_Δt(state::ProjectiveState) = state.steplength * (state.target - state.start)
 current_x(state::ProjectiveState) = state.x
 current_iter(state::ProjectiveState) = state.iter
 current_status(state::ProjectiveState) = state.status
@@ -149,18 +150,15 @@ end
 function step!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
     state.iter += 1
 
-    H, x, t = cache.homotopy, state.x, current_t(state)
-    Δt = state.steplength * (state.start - state.target)
-
-    step_successfull, status = PredictionCorrection.predict_correct!(x,
+    step_successfull, status = PredictionCorrection.predict_correct!(state.x,
         method.predictor_corrector,
         cache.predictor_corrector,
-        H, t, Δt, options.tol, options.corrector_maxiters)
+        cache.homotopy, current_t(state), current_Δt(state), options.tol, options.corrector_maxiters)
 
     if step_successfull
         state.t = max(state.t - state.steplength, 0.0)
         # Since x changed we should update the patch
-        AffinePatches.update_patch!(state.patch, method.patch, x)
+        AffinePatches.update_patch!(state.patch, method.patch, state.x)
     end
     #  update steplength
     update_stepsize!(state, method.step, step_successfull)
