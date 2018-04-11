@@ -36,20 +36,25 @@ A `PathTrackerCache` holds all data structures to avoid allocations.
 abstract type AbstractPathTrackerCache end
 
 """
-    Options(;tolerance=1e-7, maxiters=10_000)
+    Options(;options..)
 
-The options used for the pathtracker.
-* `tolerance`: The precision used to track a value.
-* `maxiters`: The maximal number of trackerations.
+The possible options used for the pathtracker are:
+* `tol=1e-7`: The precision used to track a value.
+* `corrector_maxiters=3`: The maximal number of correction steps in a single step.
+* `refinement_tol=max(1e-15, tolerance^2)`: The precision used to refine the final value.
+* `refinement_maxiters=3`: The maximal number of correction steps used to refine the final value.
+* `maxiters=10_000`: The maximal number of iterations.
 """
 mutable struct Options
-    tolerance::Float64
-    maxiters::Int64
+    tol::Float64
+    refinement_tol::Float64
+    refinement_maxiters::Float64
+    corrector_maxiters::Int
+    maxiters::Int
 end
-function Options(;tolerance=1e-7, maxiters=10_000)
-    Options(tolerance, maxiters)
+function Options(;tol=1e-7, refinement_tol=max(1e-15, tol^2), corrector_maxiters=3, refinement_maxiters=20, maxiters=10_000)
+    Options(tol, refinement_tol, refinement_maxiters, corrector_maxiters, maxiters)
 end
-
 
 # INITIAL CONSTRUCTION
 
@@ -81,18 +86,20 @@ function reset! end
 # ITERATION
 
 """
-    step!(::AbstractPathTrackerMethod, ::AbstractPathTrackerState, AbstractPathTrackerCache, options::Options)
+    step!(::AbstractPathTrackerState, ::AbstractPathTrackerMethod, AbstractPathTrackerCache, options::Options)
 
 Make one step in the path tracking method.
 """
 function step! end
 
 """
-    isdone(::AbstractPathTrackerMethod, ::AbstractPathTrackerState, AbstractPathTrackerCache, options::Options)
+    check_terminated!(state::AbstractPathTrackerState, ::AbstractPathTrackerMethod, AbstractPathTrackerCache, options::Options)
 
-Check whether the path tracking terminated.
+Check whether the path tracking terminated and update `status` in `state` accordingly.
+If the path reached its target set the state to `:success`. Every state other
+than `:ok` will be interpreted as a termination of the algorithm.
 """
-function isdone end
+function check_terminated! end
 
 # Access
 """

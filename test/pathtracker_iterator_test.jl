@@ -14,12 +14,9 @@
 
     s = start_sols[1]
     tracker = PathTracking.PathTracker(P.homotopy, s, 1.0, 0.0)
-    PathTracking.track!(tracker)
-    x = PathTracking.current_x(tracker)
-    @test PathTracking.current_t(tracker) == 0.0
-    @test norm(x[2:end] / x[1] - A \ b) < 1e-8
+    result = PathTracking.track(tracker, s, 1.0, 0.0)
 
-    PathTracking.track!(tracker, s, 1.0, 0.0)
-    x = PathTracking.current_x(tracker)
-    @test norm(x[2:end] / x[1] - A \ b) < 1e-8
+    @test result.t == 0.0
+    x = result.x
+    @test norm(x[2:end] / x[1] - A \ b) < 1e-12
 end

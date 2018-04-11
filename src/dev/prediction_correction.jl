@@ -44,17 +44,17 @@ function cache(PC::PredictorCorrector, H, x, t)
 end
 
 """
-    predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, t, dt, tol)
+    predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, t, dt, tol, maxiters)
 
-Perform a prediction-correction step and store the result in xnext. Returns `true` if
-the correction was sucessfull, otherwise `false`.
+Perform a prediction-correction step and store the result in `x` if successfull. Returns `(true, :ok)` if
+the correction was sucessfull, otherwise `(false, status)` where `status` is either `:ok` or an error code.
 """
-@inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, dt, tol)
+@inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, dt, tol, maxiters)
     try
         xnext = cache.xnext
         Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, dt)
-        successfull = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t - dt, tol)
-        if successfull
+        result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t - dt, tol, maxiters)
+        if result.converged
             x .= xnext
             return (true, :ok)
         else
@@ -63,6 +63,30 @@ the correction was sucessfull, otherwise `false`.
     catch err
         warn(err)
         return (false, :predictor_corrector_failed)
+    end
+end
+
+"""
+    refine!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H::HomotopyWithCache, t, tol, maxiters)
+
+Perform a correction step and store the result in `x` if the new residual is better than the initial one.
+Returns the achieved residual.
+"""
+@inline function refine!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, tol, maxiters)
+    res₀ = norm(H(x, t), Inf)
+    if res₀ < tol
+        return res₀
+    end
+    try
+        result = Correctors.correct!(cache.xnext, PC.corrector, cache.corrector, H, x, t, tol, maxiters)
+        if result.converged && result.res < res₀
+            x .= cache.xnext
+            return result.res
+        end
+        return res₀
+    catch err
+        warn(err)
+        return res₀
     end
 end
 

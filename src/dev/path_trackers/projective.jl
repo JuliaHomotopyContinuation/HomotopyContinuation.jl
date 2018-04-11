@@ -8,6 +8,8 @@ import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch
 import ..StepSize
 import ..StepSize: AbstractStepSize, AbstractStepSizeState
+import StaticArrays: SVector
+
 
 export Projective
 
@@ -160,7 +162,7 @@ end
 
 # ITERATION
 
-function step!(method::Projective, state::ProjectiveState, cache::ProjectiveCache, options::Options)
+function step!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
     state.iter += 1
 
     H, x, t = cache.homotopy, state.x, current_t(state)
@@ -169,7 +171,7 @@ function step!(method::Projective, state::ProjectiveState, cache::ProjectiveCach
     step_successfull, status = PredictionCorrection.predict_correct!(x,
         method.predictor_corrector,
         cache.predictor_corrector,
-        H, t, Δt, options.tolerance)
+        H, t, Δt, options.tol, options.corrector_maxiters)
 
     if step_successfull
         state.t = max(state.t - state.steplength, 0.0)
@@ -194,6 +196,18 @@ function update_stepsize!(state::ProjectiveState, step::StepSize.AbstractStepSiz
     nothing
 end
 
-function isdone(method::Projective, state::ProjectiveState, cache::ProjectiveCache, options::Options)
-    state.t == 0.0 || state.status != :ok || state.iter ≥ options.maxiters
+function check_terminated!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
+    if state.t == 0.0
+        state.status = :success
+    elseif state.iter ≥ options.maxiters
+        state.status = :maxiters
+    end
+end
+
+function refine!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
+    H, x, t = cache.homotopy, state.x, current_t(state)
+
+    PredictionCorrection.refine!(x,
+        method.predictor_corrector, cache.predictor_corrector,
+        H, t, options.refinement_tol, options.corrector_maxiters)
 end

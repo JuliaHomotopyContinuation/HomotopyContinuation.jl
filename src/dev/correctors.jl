@@ -14,6 +14,20 @@ abstract type AbstractCorrector end
 abstract type AbstractCorrectorCache end
 
 """
+    Result{T}
+
+Structure holding information about a `correct!` step. The fields are
+* `converged::Bool` Indicating whether the correction was successfull
+* `res::T` The residual of the final result.
+* `iters::Int` The number of iterations used.
+"""
+struct Result{T}
+    converged::Bool
+    res::T
+    iters::Int
+end
+
+"""
     cache(::AbstractCorrector, ::HomotopyWithCache{M, N}, x, t)::AbstractCorrectorCache
 
 Construct a cache to avoid allocations.
@@ -22,25 +36,22 @@ function cache end
 
 
 """
-    correct!(xnext, ::AbstractCorrector, ::AbstractCorrectorCache, H::HomotopyWithCache, x, t, tol)
+    correct!(xnext, ::AbstractCorrector, ::AbstractCorrectorCache, H::HomotopyWithCache, x, t, tol)::Result
 
-Perform a correction step such that in the end `H(xnext,t) < tol`. Return `true` if the
-correction was successfull otherwise return `false`.
+Perform a correction step such that in the end `H(xnext,t) < tol`.
+Returns a [`Result`](@ref).
 """
 function correct! end
 
 
 # Newton
 """
-    Newton(;maxiters=3)
+    Newton()
 
-* `maxiters`: Maximal number of iterations until a correction is declared as failed.
+A classical simple Newton operator for square linear systems using the LU factorization
+to solve the linear systems.
 """
-struct Newton <: AbstractCorrector
-    maxiters::Int
-end
-Newton(;maxiters=3) = Newton(maxiters)
-
+struct Newton <: AbstractCorrector end
 
 struct NewtonCache{T} <: AbstractCorrectorCache
     A::Matrix{T}
@@ -53,7 +64,7 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
     NewtonCache(A, b)
 end
 
-function correct!(xnext, alg::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N}, x, t, tol) where N
+function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N}, x, t, tol, maxiters) where N
     A, b = cache.A, cache.b
     evaluate_and_jacobian!(b, A, H, x, t)
     solve_with_lu_inplace!(A, b)
@@ -63,10 +74,11 @@ function correct!(xnext, alg::Newton, cache::NewtonCache, H::HomotopyWithCache{N
     while true
         evaluate!(b, H, xnext, t)
 
-        if norm(b, Inf) < tol
-            return true
-        elseif k ≥ alg.maxiters
-            return false
+        res = norm(b, Inf)
+        if res < tol
+            return Result(true, res, k)
+        elseif k ≥ maxiters
+            return Result(false, res, k)
         end
 
         k += 1
