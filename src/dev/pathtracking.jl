@@ -49,20 +49,20 @@ function PathTracker(method::AbstractPathTrackerMethod, x::AbstractVector{<:Numb
 end
 
 """
-     PathTrackerResult{T}
+     PathTrackerResult{V<:AbstractVector}
 
 Containing the result of a tracked path. The fields are
 * `successfull::Bool` Indicating whether tracking was successfull.
 * `returncode::Symbol` A return code, which gives an indication what
  happened if the tracking was not successfull
-* `x::Vector{T}` The result.
+* `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 * `res::Float64` The residual at `(x, t)`.
 """
-struct PathTrackerResult{T}
+struct PathTrackerResult{V<:AbstractVector}
      successfull::Bool
      returncode::Symbol
-     x::Vector{T}
+     x::V
      t::Float64
      res::Float64
      iters::Int
@@ -120,11 +120,12 @@ function result(tracker::PathTracker)
      else
           res = NaN
      end
-     x = copy(current_x(tracker))
-     PathTrackers.normalize_result!(x)
+     x = final_x(tracker)
      PathTrackerResult(successfull, returncode, x, current_t(tracker), res, current_iter(tracker))
 end
 
+final_x(tracker) = copy(current_x(tracker))
+final_x(tracker::PathTracker{<:Projective}) = ProjectiveVector(copy(current_x(tracker)))
 
 """
     current_t(tracker::PathTracker)

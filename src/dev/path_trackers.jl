@@ -109,16 +109,6 @@ Try to refine the current solution to the precision defined in `options`.
 """
 function refine! end
 
-"""
-    normalize_result!(x, ::AbstractPathTrackerMethod)
-
-If there is a normalized value for `x` then use this.
-
-## Example
-If `x` is an element in projective space, we normalize `x` s.t.  ``||x||₂=1``.
-"""
-function normalize_result! end
-
 # Access
 """
     current_t(state::AbstractPathTrackerState)

@@ -9,7 +9,12 @@ export allvariables,
     uniquevar,
     homogenize,
     totaldegree,
-    solve_with_lu_inplace!
+    solve_with_lu_inplace!,
+    ProjectiveVector,
+    sine_distance,
+    dₛᵢₙ,
+    riemann_distance,
+    distance
 
 
 """
@@ -169,5 +174,65 @@ Solves ``Ax =b`` inplace. The result is stored in `b`. This method also override
 the contents of `A`.
 """
 solve_with_lu_inplace!(A, b) = A_ldiv_B!(lufact!(A), b)
+
+
+"""
+    ProjectiveVector(v::Vector)
+
+Wrap a vector `v` to indicate that it is an projective vector.
+The vector `v` is *not* copied. It will also be normalized.
+"""
+struct ProjectiveVector{T} <: AbstractVector{T}
+    data::Vector{T}
+
+    ProjectiveVector{T}(data::Vector{T}) where T = new(normalize!(data))
+end
+ProjectiveVector(data::Vector{T}) where T = ProjectiveVector{T}(data)
+
+Base.size(v::ProjectiveVector) = size(v.data)
+Base.getindex(v::ProjectiveVector, i::Int) = getindex(v.data, i)
+# Base.setindex!(v::ProjectiveVector, x, i::Int) = setindex!(v.data, x, Int)
+Base.IndexStyle(::Type{<:ProjectiveVector}) = Base.IndexLinear()
+Base.length(v::ProjectiveVector) = length(v.data)
+
+"""
+    riemann_distance(v::ProjectiveVector, w::ProjectiveVector)
+
+Compute the Riemann distance between `v` and `w`. This is defined as
+``\\arccos|⟨v, w⟩|``.
+
+For details see: P. 283, Prop. 14.12 in
+Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algorithms. Vol. 349. Springer Science & Business Media, 2013.
+"""
+riemann_distance(v::ProjectiveVector, w::ProjectiveVector) = acos(abs(v ⋅ w))
+
+"""
+    sine_distance(v::ProjectiveVector, w::ProjectiveVector)
+
+Compute the sine distance between `v` and `w`. This is defined as
+``\\sin \\arccos|⟨v, w⟩|``. This defines a metric.
+
+For details see: P. 284 in
+Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algorithms. Vol. 349. Springer Science & Business Media, 2013.
+"""
+sine_distance(v::ProjectiveVector, w::ProjectiveVector) = sin(riemann_distance(v, w))
+
+"""
+    dₛᵢₙ(v, w)
+
+See  [`sine_distance`](v, w).
+"""
+dₛᵢₙ(v::ProjectiveVector, w::ProjectiveVector) = sine_distance(v, w)
+
+
+"""
+    distance(v, w)
+
+Compute the distance between `v` and `w`.
+"""
+distance(v::ProjectiveVector, w::ProjectiveVector) = dₛᵢₙ(v, w)
+
+
+# Parallelization
 
 end
