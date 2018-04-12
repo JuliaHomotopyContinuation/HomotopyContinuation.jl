@@ -117,6 +117,7 @@ function result(tracker::PathTracker)
           res = NaN
      end
      x = copy(current_x(tracker))
+     PathTrackers.normalize_result!(x)
      PathTrackerResult(successfull, returncode, x, current_t(tracker), res, current_iter(tracker))
 end
 

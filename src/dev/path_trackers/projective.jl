@@ -192,3 +192,5 @@ function refine!(state::ProjectiveState, method::Projective, cache::ProjectiveCa
         method.predictor_corrector, cache.predictor_corrector,
         H, t, options.refinement_tol, options.corrector_maxiters)
 end
+
+normalize_x!(x, method::Projective) = normalize!(x)
