@@ -98,7 +98,7 @@ end
 
 function cache(::RK4, H, x, t)
     k1 = dt(H, x, t)
-    RK4Cache(jacobian(H, x, t), k1, copy(k1), copy(k1), copy(k1), copy(k1))
+    RK4Cache(jacobian(H, x, t), k1, copy(k1), copy(k1), copy(k1))
 end
 #
 function predict!(xnext, ::RK4, cache::RK4Cache, H::HomotopyWithCache{N, N}, x, t, Δt) where N
