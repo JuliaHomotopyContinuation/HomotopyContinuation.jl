@@ -14,7 +14,8 @@ export allvariables,
     sine_distance,
     dₛᵢₙ,
     riemann_distance,
-    distance
+    distance,
+    batches
 
 
 """
@@ -255,6 +256,32 @@ const get_num_BLAS_threads = function() # anonymous so it will be serialized whe
     end
 
     return nothing
+end
+
+
+"""
+    batches(nthreads, n)
+
+Create a list of unit ranges with exponential dropoff to distribute `n` tasks
+over `nthreads` Threads.
+"""
+function batches(nthreads, n)
+    packages = Vector{UnitRange{Int}}()
+    i = 1
+    k = 1
+    while i < n
+        package_length = max(ceil(Int, n * 2.0^(-k) / nthreads), 1)
+        for tid=1:nthreads
+            r = i:min(n, i + package_length)
+            push!(packages, r)
+            i += length(r)
+            if i ≥ n
+                break
+            end
+        end
+        k += 1
+    end
+    packages
 end
 
 end
