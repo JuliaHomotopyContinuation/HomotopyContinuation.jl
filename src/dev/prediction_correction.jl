@@ -56,7 +56,6 @@ the correction was sucessfull, otherwise `(false, status)` where `status` is eit
         result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
         if result.converged
             x .= xnext
-            normalize!(x)
             return (true, :ok)
         else
             return (false, :ok)

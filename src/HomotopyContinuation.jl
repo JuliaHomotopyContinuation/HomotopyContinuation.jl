@@ -46,6 +46,7 @@ module HomotopyContinuation
     include("dev/path_trackers.jl")
     include("dev/pathtracking.jl")
 
+    include("dev/solving.jl")
     include("dev/solve.jl")
 
     #

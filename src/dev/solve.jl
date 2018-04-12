@@ -1,9 +1,10 @@
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
+
 import .Problems
 import .Systems
 import .NewHomotopies
-import .PathTracking
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
+import .Solving
 
 export solve
 
@@ -28,12 +29,7 @@ function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
     solve(P, start_solutions; kwargs...)
 end
 
-function solve(prob::Problems.ProjectiveStartTargetProblem, start_solutions; kwargs...)
-    xs = map(x -> Problems.embed(prob, x), start_solutions)
-    @assert length(xs) > 1 "start solutions are empty"
-    t₁ = 1.0
-    t₀ = 0.0
-    tracker = PathTracking.PathTracker(prob.homotopy, first(xs), t₁, t₀)
-
-    PathTracking.track(tracker, xs, t₁, t₀)
+function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; kwargs...)
+    solver = Solving.Solver(prob, start_solutions, t₁, t₀)
+    Solving.solve(solver)
 end

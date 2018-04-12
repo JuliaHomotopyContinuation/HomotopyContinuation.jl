@@ -3,6 +3,7 @@ module PathTracking
 import ..PathTrackers: AbstractPathTrackerMethod, AbstractPathTrackerCache, AbstractPathTrackerState, Projective, Options
 import ..PathTrackers
 import ..NewHomotopies: AbstractHomotopy
+import ..Problems
 
 export Projective,
      Options,
@@ -34,11 +35,14 @@ struct PathTracker{Method<:AbstractPathTrackerMethod, S<:AbstractPathTrackerStat
      state::S
      cache::C
 end
-function PathTracker(H::AbstractHomotopy, x, start, target; options=PathTrackers.Options(), method=Projective, kwargs...)
+function PathTracker(prob::Problems.AbstractProblem, x₀::AbstractVector{<:Number}, t₁, t₀; kwargs...)
+     PathTracker(prob.homotopy, Problems.embed(prob, x₀), t₁, t₀; kwargs...)
+end
+function PathTracker(H::AbstractHomotopy, x::AbstractVector{<:Number}, start, target; options=PathTrackers.Options(), method=Projective, kwargs...)
     PathTracker(method(H; kwargs...), x, start, target, options)
 end
 
-function PathTracker(method::AbstractPathTrackerMethod, x, start, target, options=PathTrackers.Options())
+function PathTracker(method::AbstractPathTrackerMethod, x::AbstractVector{<:Number}, start, target, options=PathTrackers.Options())
     tracker_state = PathTrackers.state(method, x, start, target)
     tracker_cache = PathTrackers.cache(method, tracker_state)
     PathTracker(method, options, tracker_state, tracker_cache)
