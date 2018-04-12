@@ -4,6 +4,7 @@ import ..PathTrackers: AbstractPathTrackerMethod, AbstractPathTrackerCache, Abst
 import ..PathTrackers
 import ..NewHomotopies: AbstractHomotopy
 import ..Problems
+using ..Utilities
 
 export Projective,
      Options,
