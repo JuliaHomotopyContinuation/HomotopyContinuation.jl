@@ -8,6 +8,8 @@ import ..Problems
 export Projective,
      Options,
      PathTracker,
+     tol, refinement_tol, refinement_maxiters, corrector_maxiters,
+     set_tol!, set_refinement_tol!, set_refinement_maxiters!, set_corrector_maxiters!,
      PathTrackerResult,
      track,
      # advanced
@@ -47,6 +49,76 @@ function PathTracker(method::AbstractPathTrackerMethod, x::AbstractVector{<:Numb
     tracker_cache = PathTrackers.cache(method, tracker_state)
     PathTracker(method, options, tracker_state, tracker_cache)
 end
+
+# Access + modifications
+"""
+     tol(tracker::PathTracker)
+
+Current tolerance.
+"""
+tol(tracker::PathTracker) = tracker.options.tol
+
+"""
+     refinement_tol(tracker::PathTracker)
+
+Current refinement tolerance.
+"""
+refinement_tol(tracker::PathTracker) = tracker.options.refinement_tol
+
+"""
+     refinement_maxiters(tracker::PathTracker)
+
+Current refinement maxiters.
+"""
+refinement_maxiters(tracker::PathTracker) = tracker.options.refinement_maxiters
+
+"""
+     corrector_maxiters(tracker::PathTracker)
+
+Current correction maxiters.
+"""
+corrector_maxiters(tracker::PathTracker) = tracker.options.corrector_maxiters
+
+"""
+     set_tol!(tracker::PathTracker, tol)
+
+Set the current tolerance to `tol`.
+"""
+function set_tol!(tracker::PathTracker, tol)
+     tracker.options.tol = tol
+     tol
+end
+
+"""
+     set_refinement_maxiters!(tracker::PathTracker, tol)
+
+Set the current refinement tolerance to `tol`.
+"""
+function set_refinement_tol!(tracker::PathTracker, tol)
+     tracker.options.refinement_tol = tol
+     tol
+end
+
+"""
+     set_refinement_maxiters!(tracker::PathTracker, n)
+
+Set the current refinement maxiters to `n`.
+"""
+function set_refinement_maxiters!(tracker::PathTracker, n)
+     tracker.options.refinement_maxiters = n
+     n
+end
+
+"""
+     set_corrector_maxiters!(tracker::PathTracker, n)
+
+Set the current correction maxiters to `n`.
+"""
+function set_corrector_maxiters!(tracker::PathTracker, n)
+     tracker.options.corrector_maxiters = n
+     n
+end
+
 
 """
      PathTrackerResult{V<:AbstractVector}
