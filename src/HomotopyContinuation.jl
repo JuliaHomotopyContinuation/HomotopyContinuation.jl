@@ -28,6 +28,7 @@ module HomotopyContinuation
         Problems,
         Predictors,
         Correctors,
+        StepSize,
         AffinePatches,
         PathTracking,
         Utilities

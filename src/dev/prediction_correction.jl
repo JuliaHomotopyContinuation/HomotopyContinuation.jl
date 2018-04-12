@@ -52,8 +52,6 @@ the correction was sucessfull, otherwise `(false, status)` where `status` is eit
 @inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, Δt, tol, maxiters)
     try
         xnext = cache.xnext
-        # @show norm(x)
-        @show t Δt
         Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
         result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
         if result.converged

@@ -25,7 +25,7 @@ The affine patch used to embed the homotopy into affine space (from projective s
 The default is [`AffinePatches.OrthogonalPatch`](@ref).
 * `predictor::Predictors.AbstractPredictor`:
 The predictor used during in the predictor-corrector scheme. The default is
-`[Predictors.Euler`](@ref)()`.
+`[Predictors.RK4`](@ref)()`.
 * `corrector::Correctors.AbstractCorrector`:
 The corrector used during in the predictor-corrector scheme. The default is
 [`Correctors.Newton`](@ref).
@@ -43,7 +43,7 @@ end
 
 function Projective(H::AbstractHomotopy;
     patch::AffinePatches.AbstractAffinePatch=AffinePatches.OrthogonalPatch(),
-    predictor::Predictors.AbstractPredictor=Predictors.Euler(),
+    predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     step::StepSize.AbstractStepSize=StepSize.HeuristicStepSize())
 
