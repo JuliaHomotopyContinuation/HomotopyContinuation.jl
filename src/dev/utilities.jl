@@ -204,7 +204,7 @@ Compute the Riemann distance between `v` and `w`. This is defined as
 For details see: P. 283, Prop. 14.12 in
 Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algorithms. Vol. 349. Springer Science & Business Media, 2013.
 """
-riemann_distance(v::ProjectiveVector, w::ProjectiveVector) = acos(abs(v ⋅ w))
+riemann_distance(v::ProjectiveVector, w::ProjectiveVector) = acos(clamp(abs(v ⋅ w), 0.0, 1.0))
 
 """
     sine_distance(v::ProjectiveVector, w::ProjectiveVector)
@@ -234,5 +234,27 @@ distance(v::ProjectiveVector, w::ProjectiveVector) = dₛᵢₙ(v, w)
 
 
 # Parallelization
+
+# This is into 0.7 but we need it for 0.6 as well
+const get_num_BLAS_threads = function() # anonymous so it will be serialized when called
+    blas = Base.LinAlg.BLAS.vendor()
+    # Wrap in a try to catch unsupported blas versions
+    try
+        if blas == :openblas
+            return ccall((:openblas_get_num_threads, Base.libblas_name), Cint, ())
+        elseif blas == :openblas64
+            return ccall((:openblas_get_num_threads64_, Base.libblas_name), Cint, ())
+        elseif blas == :mkl
+            return ccall((:MKL_Get_Max_Num_Threads, Base.libblas_name), Cint, ())
+        end
+
+        # OSX BLAS looks at an environment variable
+        if Sys.isapple()
+            return ENV["VECLIB_MAXIMUM_THREADS"]
+        end
+    end
+
+    return nothing
+end
 
 end
