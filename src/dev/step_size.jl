@@ -74,7 +74,8 @@ function update end
         increase_factor=2.0,
         decrease_factor=inv(increase_factor),
         consecutive_successes_necessary=3,
-        minimal_stepsize=eps())
+        maximal_stepsize=0.1
+        minimal_stepsize=1e-14)
 
 The step length is defined as follows. Initially the step length is `initial`.
 If `consecutive_successes_necessary` consecutive steps were sucessfull the step length
@@ -86,16 +87,20 @@ struct HeuristicStepSize <: AbstractStepSize
     increase_factor::Float64
     decrease_factor::Float64
     consecutive_successes_necessary::Int
+    maximal_stepsize::Float64
     minimal_stepsize::Float64
+
 end
 function HeuristicStepSize(;initial=0.1,
     increase_factor=2.0,
     decrease_factor=inv(increase_factor),
-    consecutive_successes_necessary=3,
-    minimal_stepsize=eps())
+    consecutive_successes_necessary=5,
+    maximal_stepsize=0.1,
+    minimal_stepsize=1e-14)
 
     HeuristicStepSize(initial, increase_factor,
-        decrease_factor, consecutive_successes_necessary, minimal_stepsize)
+        decrease_factor, consecutive_successes_necessary, maximal_stepsize,
+        minimal_stepsize)
 end
 
 mutable struct HeuristicStepSizeState <: AbstractStepSizeState
@@ -114,7 +119,8 @@ function update(curr_steplength, step::HeuristicStepSize, state::HeuristicStepSi
     if success
         if (state.consecutive_successes += 1) == step.consecutive_successes_necessary
             state.consecutive_successes = 0
-            return (step.increase_factor * curr_steplength, :ok)
+            new_stepsize = min(step.maximal_stepsize, step.increase_factor * curr_steplength)
+            return (new_stepsize, :ok)
         end
         return (curr_steplength, :ok)
     end
