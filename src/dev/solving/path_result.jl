@@ -92,7 +92,7 @@ function PathResult(::Problems.DefaultHomogenization,
         newton_res = Inf
         solution = x₀
         # isreal = false
-        condition_number = 0.0
+        condition = 0.0
     else
         # We want to evaluate on the affine patch we are interested in
         scale!(x₀, inv(hom_part))
