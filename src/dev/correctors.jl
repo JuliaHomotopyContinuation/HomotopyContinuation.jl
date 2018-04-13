@@ -5,6 +5,7 @@ using ..Utilities
 
 export AbstractCorrector,
     AbstractCorrectorCache,
+    Result,
     cache,
     correct!,
     Newton, NewtonCache
