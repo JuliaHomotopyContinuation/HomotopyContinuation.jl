@@ -6,8 +6,8 @@ import ..PredictionCorrection: PredictorCorrector, PredictorCorrectorCache
 import ..PredictionCorrection
 import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch
-import ..StepSize
-import ..StepSize: AbstractStepSize, AbstractStepSizeState
+import ..StepLength
+import ..StepLength: AbstractStepLength, AbstractStepLengthState
 import StaticArrays: SVector
 
 
@@ -29,11 +29,11 @@ The predictor used during in the predictor-corrector scheme. The default is
 * `corrector::Correctors.AbstractCorrector`:
 The corrector used during in the predictor-corrector scheme. The default is
 [`Correctors.Newton`](@ref).
-* `step::StepSize.AbstractStepSize`
+* `step::StepLength.AbstractStepLength`
 The step size logic used to determine changes of the step size. The default is
-[`StepSize.HeuristicStepSize`](@ref).
+[`StepLength.HeuristicStepLength`](@ref).
 """
-struct Projective{H<:AbstractHomotopy, Patch<:AbstractAffinePatch, P, C, S<:AbstractStepSize} <: AbstractPathTrackerMethod
+struct Projective{H<:AbstractHomotopy, Patch<:AbstractAffinePatch, P, C, S<:AbstractStepLength} <: AbstractPathTrackerMethod
     homotopy::H
     patch::Patch
     # randomize::Randomizer
@@ -45,7 +45,7 @@ function Projective(H::AbstractHomotopy;
     patch::AffinePatches.AbstractAffinePatch=AffinePatches.OrthogonalPatch(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    step::StepSize.AbstractStepSize=StepSize.HeuristicStepSize())
+    step::StepLength.AbstractStepLength=StepLength.HeuristicStepLength())
 
     Projective(
         H,
@@ -55,7 +55,7 @@ end
 
 # STATE
 
-mutable struct ProjectiveState{T<:Number, S<:AbstractStepSizeState} <: AbstractPathTrackerState
+mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
     # Our start time
     start::Float64
     # Our target time
@@ -92,8 +92,8 @@ function state(method::Projective, x::Vector, start, target)
     checkstart(method.homotopy, x)
 
     t = 1.0
-    steplength = StepSize.initial_steplength(method.step)
-    steplength_state = StepSize.state(method.step)
+    steplength = StepLength.initial_steplength(method.step)
+    steplength_state = StepLength.state(method.step)
     iter = 0
 
     value = NewHomotopies.evaluate(method.homotopy, x, start)
@@ -131,8 +131,8 @@ function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCac
     checkstart(method.homotopy, x)
 
     state.t = 1.0
-    state.steplength = StepSize.initial_steplength(method.step)
-    StepSize.reset!(state.steplength_state)
+    state.steplength = StepLength.initial_steplength(method.step)
+    StepLength.reset!(state.steplength_state)
     state.iter = 0
     state.x .= x
     AffinePatches.precondition!(state.patch, state.x, method.patch)
@@ -161,16 +161,16 @@ function step!(state::ProjectiveState, method::Projective, cache::ProjectiveCach
         AffinePatches.update_patch!(state.patch, method.patch, state.x)
     end
     #  update steplength
-    update_stepsize!(state, method.step, step_successfull)
+    update_steplength!(state, method.step, step_successfull)
     nothing
 end
 
-function update_stepsize!(state::ProjectiveState, step::StepSize.AbstractStepSize, step_successfull)
-    new_steplength, status = StepSize.update(state.steplength, step, state.steplength_state, step_successfull)
+function update_steplength!(state::ProjectiveState, step::StepLength.AbstractStepLength, step_successfull)
+    new_steplength, status = StepLength.update(state.steplength, step, state.steplength_state, step_successfull)
     if status != :ok
         state.status = status
     end
-    if StepSize.isrelative(step)
+    if StepLength.isrelative(step)
         state.steplength = min(new_steplength, state.t)
     else
         state.steplength = min(new_steplength, state.t) / (state.start - state.target)

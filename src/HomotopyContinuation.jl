@@ -41,7 +41,7 @@ module HomotopyContinuation
     include("dev/correctors.jl")
     include("dev/prediction_correction.jl")
     include("dev/affine_patches.jl")
-    include("dev/step_size.jl")
+    include("dev/step_length.jl")
 
     include("dev/path_trackers.jl")
     include("dev/pathtracking.jl")
