@@ -39,9 +39,9 @@ abstract type AbstractPathTrackerCache end
     Options(;options..)
 
 The possible options used for the pathtracker are:
-* `tol=1e-7`: The precision used to track a value.
-* `corrector_maxiters=3`: The maximal number of correction steps in a single step.
-* `refinement_tol=max(1e-15, tolerance^2)`: The precision used to refine the final value.
+* `tol=1e-5`: The precision used to track a value.
+* `corrector_maxiters=2`: The maximal number of correction steps in a single step.
+* `refinement_tol=1e-11`: The precision used to refine the final value.
 * `refinement_maxiters=3`: The maximal number of correction steps used to refine the final value.
 * `maxiters=10_000`: The maximal number of iterations.
 """
@@ -52,7 +52,7 @@ mutable struct Options
     corrector_maxiters::Int
     maxiters::Int
 end
-function Options(;tol=1e-7, refinement_tol=max(1e-15, tol^2), corrector_maxiters=3, refinement_maxiters=20, maxiters=10_000)
+function Options(;tol=1e-5, refinement_tol=1e-11, corrector_maxiters=2, refinement_maxiters=20, maxiters=10_000)
     Options(tol, refinement_tol, refinement_maxiters, corrector_maxiters, maxiters)
 end
 
