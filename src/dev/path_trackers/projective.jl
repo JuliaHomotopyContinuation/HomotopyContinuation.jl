@@ -133,6 +133,8 @@ function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCac
     checkstart(method.homotopy, x)
 
     state.t = 1.0
+    state.start = start
+    state.target = target
     state.steplength = StepLength.initial_steplength(method.step)
     StepLength.reset!(state.steplength_state)
     state.iter = 0

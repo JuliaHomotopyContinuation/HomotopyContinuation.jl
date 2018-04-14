@@ -13,9 +13,11 @@
     start_sols = Problems.embed.(P, sols)
 
     s = start_sols[1]
-    tracker = PathTracking.PathTracker(P.homotopy, s, 1.0, 0.0)
-    result = PathTracking.track(tracker, s, 1.0, 0.0)
+    # intilizae tracker with random start and target to see whether it is properly resetetted
+    tracker = PathTracking.PathTracker(P.homotopy, s, rand(), rand())
 
+    result = PathTracking.track(tracker, s, 1.0, 0.0)
+    @test result.returncode == :success
     @test result.t == 0.0
     x = result.x
     @test norm(x[2:end] / x[1] - A \ b) < 1e-12
