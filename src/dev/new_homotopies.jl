@@ -288,6 +288,7 @@ function evaluate(H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     F = Systems.evaluate(target(H), x, c.target)
     (γ(H) * t) * G + (1 - t) * F
 end
+(H::StraightLineHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 function dt!(u, H::StraightLineHomotopy, x, t, c::StartTargetHomotopyCache)
     Systems.evaluate!(c.u, start(H), x, c.start)
