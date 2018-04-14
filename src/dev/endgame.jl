@@ -84,11 +84,10 @@ function play!(endgamer::Endgamer, x, t)
 
     moveforward!(endgamer)
     moveforward!(endgamer)
-    # we try to get to the target without an endgame
-    try_to_jump_to_target!(endgamer)
-
     while state.status == :ok
         if state.npredictions > 0 && state.windingnumber_estimate == 1
+            # if we have one prediction we also have an estimate for the winding number
+            # since the heuristics ensure that we are in the endgame convergence zone
             try_to_jump_to_target!(endgamer)
         end
         predict!(endgamer)
