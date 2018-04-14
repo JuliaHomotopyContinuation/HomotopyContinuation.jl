@@ -204,7 +204,7 @@ function refine!(state::ProjectiveState, method::Projective, cache::ProjectiveCa
     H, x, t = cache.homotopy, state.x, current_t(state)
     PredictionCorrection.refine!(x,
         method.predictor_corrector, cache.predictor_corrector,
-        H, t, options.refinement_tol, options.corrector_maxiters)
+        H, t, options.refinement_tol, options.refinement_maxiters)
 end
 
 normalize_x!(x, method::Projective) = normalize!(x)
