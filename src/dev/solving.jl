@@ -67,7 +67,8 @@ function solve(solver::Solver)
     nblas_threads = Utilities.get_num_BLAS_threads()
     BLAS.set_num_threads(1)
 
-    t_endgame = solver.options.endgame_start
+    # t_endgame = solver.options.endgame_start
+    t_endgame = 0.0
     # Phase 1 Track until endgame zone
     pre_endgame_paths = dmap(solver.options, solver.start_solutions) do x₀
         trackpath(solver, x₀, solver.t₁, t_endgame)

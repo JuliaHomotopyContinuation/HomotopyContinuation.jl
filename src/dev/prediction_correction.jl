@@ -84,7 +84,8 @@ Returns the achieved residual.
             return result.res
         end
         return res₀
-    catch
+    catch err
+        warn(err)
         return res₀
     end
 end

@@ -52,7 +52,7 @@ mutable struct Options
     corrector_maxiters::Int
     maxiters::Int
 end
-function Options(;tol=1e-5, refinement_tol=1e-13, corrector_maxiters=3, refinement_maxiters=20, maxiters=10_000)
+function Options(;tol=1e-5, refinement_tol=1e-11, corrector_maxiters=3, refinement_maxiters=20, maxiters=10_000)
     Options(tol, refinement_tol, refinement_maxiters, corrector_maxiters, maxiters)
 end
 

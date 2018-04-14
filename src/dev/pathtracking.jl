@@ -176,7 +176,7 @@ If the tracking was successfull it is `:success`.
      track!(x₀, tracker, x₁, t₁, t₀ [, reset_steplength=true])
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`
-and store the result in `x₁`. Returns a `Symbol` indicating the status.
+and store the result in `x₀`. Returns a `Symbol` indicating the status.
 If the tracking was successfull it is `:success`.
 """
 function track!(tracker::PathTracker)
@@ -188,13 +188,17 @@ function track!(tracker::PathTracker)
      current_status(tracker)
 end
 function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
+     track!(tracker::PathTracker, x₁, t₁, t₀)
+     x₀ .= current_x(tracker)
+     current_status(tracker)
+end
+function track!(tracker::PathTracker, x₁, t₁, t₀)
      PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₁, t₁, t₀)
      track!(tracker)
      returncode = current_status(tracker)
      if returncode == :success
           PathTrackers.refine!(tracker.state, tracker.method, tracker.cache, tracker.options)
      end
-     x₀ .= current_x(tracker)
      current_status(tracker)
 end
 

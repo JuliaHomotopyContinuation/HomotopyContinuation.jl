@@ -31,7 +31,8 @@ module HomotopyContinuation
         StepSize,
         AffinePatches,
         PathTracking,
-        Utilities
+        Utilities,
+        Endgame
 
     include("dev/utilities.jl")
     include("dev/systems.jl")
@@ -45,6 +46,7 @@ module HomotopyContinuation
 
     include("dev/path_trackers.jl")
     include("dev/pathtracking.jl")
+    include("dev/endgame.jl")
 
     include("dev/solving.jl")
     include("dev/solve.jl")
