@@ -57,11 +57,11 @@ end
 
 # STATE
 
-mutable struct ProjectiveState{ST<:Number, T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
+mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
     # Our start point in space
-    start::ST
+    start::Complex{Float64}
     # Our target point in space
-    target::ST
+    target::Complex{Float64}
     t::Float64 # The relative progress. `t` always goes from 1.0 to 0.0
     Δt::Float64 # Δt is the current relative step width
     steplength::S
@@ -79,9 +79,9 @@ current_x(state::ProjectiveState) = state.x
 current_iter(state::ProjectiveState) = state.iter
 current_status(state::ProjectiveState) = state.status
 
-struct ProjectiveCache{M, N, H<:PatchedHomotopy{M, N}, HC<:PatchedHomotopyCache, P, C} <: AbstractPathTrackerCache
-    homotopy::HomotopyWithCache{M, N, H, HC}
-    predictor_corrector::PredictorCorrectorCache{P, C}
+struct ProjectiveCache{H<:HomotopyWithCache, PC <:PredictorCorrectorCache} <: AbstractPathTrackerCache
+    homotopy::H
+    predictor_corrector::PC
 end
 
 
@@ -90,7 +90,8 @@ end
 function state(method::Projective, x::Vector, t₁, t₀)
     checkstart(method.homotopy, x)
 
-    start, target = promote(t₁, t₀)
+    start = convert(Complex{Float64}, t₁)
+    target = convert(Complex{Float64}, t₀)
     steplength = StepLength.state(method.steplength, start, target)
     t = 1.0
     Δt = min(StepLength.relsteplength(steplength), 1.0)
@@ -127,7 +128,7 @@ end
 
 # UPDATES
 
-function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target, reset_steplength=true)
+function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target)
     checkstart(method.homotopy, x)
 
     state.start = start
@@ -196,6 +197,7 @@ function check_terminated!(state::ProjectiveState, method::Projective, cache::Pr
     elseif state.iter ≥ options.maxiters
         state.status = :maxiters
     end
+    nothing
 end
 
 function refine!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)

@@ -71,7 +71,7 @@ end
 
 function PathResult(::Problems.DefaultHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    pathtracker_result::PathTracking.PathTrackerResult{<:ProjectiveVector}, x₁, t₀, v, J)
+    pathtracker_result::PathTracking.PathTrackerResult{T, <:ProjectiveVector}, x₁, t₀, v, J) where T
     realtol = 1e-6
     angle_to_infinity_tol = 1e-8
     # we need to make the solution affine + check for infinity

@@ -132,11 +132,11 @@ Otherwise the return code gives an indication what happened.
 * `t::Float64` The `t` when the path tracker stopped.
 * `res::Float64` The residual at `(x, t)`.
 """
-struct PathTrackerResult{V<:AbstractVector}
+struct PathTrackerResult{T, V<:AbstractVector}
      successfull::Bool
      returncode::Symbol
      x::V
-     t::Float64
+     t::T
      res::Float64
      iters::Int
 end
