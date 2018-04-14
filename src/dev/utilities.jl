@@ -12,7 +12,7 @@ export allvariables,
     solve_with_lu_inplace!,
     ProjectiveVector,
     sine_distance,
-    dₛᵢₙ,
+    dsin,
     riemann_distance,
     distance,
     batches
@@ -219,11 +219,11 @@ Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algor
 sine_distance(v::ProjectiveVector, w::ProjectiveVector) = sin(riemann_distance(v, w))
 
 """
-    dₛᵢₙ(v, w)
+    dsin(v, w)
 
 See  [`sine_distance`](v, w).
 """
-dₛᵢₙ(v::ProjectiveVector, w::ProjectiveVector) = sine_distance(v, w)
+dsin(v::ProjectiveVector, w::ProjectiveVector) = sine_distance(v, w)
 
 
 """
@@ -231,7 +231,7 @@ dₛᵢₙ(v::ProjectiveVector, w::ProjectiveVector) = sine_distance(v, w)
 
 Compute the distance between `v` and `w`.
 """
-distance(v::ProjectiveVector, w::ProjectiveVector) = dₛᵢₙ(v, w)
+distance(v::ProjectiveVector, w::ProjectiveVector) = dsin(v, w)
 
 
 # Parallelization
