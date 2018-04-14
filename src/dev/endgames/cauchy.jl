@@ -115,18 +115,26 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
     Θk₋₁ = R * unitroots[k]
     Θk = Θk₋₁
     xk₋₁ = samples_buffer[k] .= x
-    normalize!(xk₋₁)
 
-    while true
+    # we need to bring the values on a fixed affine patch
+    # otherwise this all *does not work* properly.
+    # In order to avoid to deal with at_infinity choose a
+    # simple patch which should be good
+    maxind, _ = findmax(abs2, xk₋₁) # defined in Utilities
+    scale!(xk₋₁, inv(xk₋₁[maxind]))
+
+    while c ≤ 50 # fallback if everything fails...
+        k += 1
         # We go around the unit circle in an `n`-gon
-        Θk = R * unitroots[(k + 1) % samples_per_loop + 1]
-        xk = samples_buffer[k+1]
+        Θk = R * unitroots[(k - 1) % samples_per_loop + 1]
+        xk = samples_buffer[k]
         retcode = PathTracking.track!(xk, tracker, xk₋₁, Θk₋₁, Θk)
         tracker.state.iter
         if retcode != :success
+            @show retcode
             return (:loop_failed_tracking_failed, 0)
         end
-        normalize!(xk)
+        scale!(xk, inv(xk[maxind]))
 
         # to avoid unnecessary work we can use a nice heuristic after one loop
         if check_heuristic &&
@@ -136,30 +144,26 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
            return :(:heuristic_failed, 0)
         end
 
-        Δ = infinity_norm(samples_buffer[1], xk)
-        if k % samples_per_loop == 0
+        if (k - 1) % samples_per_loop == 0
+            @show c
             # Check wether the loop is closed
-
-            if infinity_norm(samples_buffer[1], xk) < PathTracking.tol(tracker) * 1e2
-                break
-            else
-                c += 1
-                if length(samples_buffer) < c * samples_per_loop + 1
-                    extendsamples_buffer!(cache, samples_per_loop)
-                end
+            Δ = infinity_norm(samples_buffer[1], xk)
+            if Δ < PathTracking.tol(tracker)
+                return (:success, c)
             end
-        end
 
-        if c > 30
-            return (:loop_failed_winding_number_too_high, c)
+            c += 1
+            if length(samples_buffer) < c * samples_per_loop + 1
+                extendsamples_buffer!(cache, samples_per_loop)
+            end
         end
 
         Θk₋₁ = Θk
         xk₋₁ = xk
-        k += 1
     end
 
-    return (:success, c)
+    return
+    (:loop_failed_winding_number_too_high, 0)
 end
 
 function extendsamples_buffer!(cache, samples_per_loop)

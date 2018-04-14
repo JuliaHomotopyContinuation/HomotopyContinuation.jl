@@ -259,6 +259,19 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
 end
 infinity_norm(z) = norm(z, Inf) # fallback
 
+
+function Base.findmax(f, xs)
+    i, el = 1, f(xs[1])
+    for k=2:length(xs)
+        v = f(xs[2])
+        if v > el
+            el = v
+            i = k
+        end
+    end
+    i, el
+end
+
 # Parallelization
 
 # This is into 0.7 but we need it for 0.6 as well

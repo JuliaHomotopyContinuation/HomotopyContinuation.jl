@@ -54,7 +54,7 @@ function reset!(state::EndgamerState, x, R::Float64)
     state.iter = 0
     state.R = R
     state.status = :ok
-    state.windingnumber_estimate = 1
+    state.windingnumber_estimate = 0
 end
 
 
