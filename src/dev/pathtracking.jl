@@ -185,7 +185,21 @@ function track!(tracker::PathTracker)
           PathTrackers.step!(state, method, cache, options)
           PathTrackers.check_terminated!(state, method, cache, options)
      end
-     nothing
+     current_status(tracker)
+end
+function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
+     PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₁, t₁, t₀)
+     track!(tracker)
+     returncode = current_status(tracker)
+     if returncode == :success
+          PathTrackers.refine!(tracker.state, tracker.method, tracker.cache, tracker.options)
+     end
+     x₀ .= current_x(tracker)
+     current_status(tracker)
+end
+
+function reset!(tracker::PathTracker, x₁, t₁, t₀)
+     PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₁, t₁, t₀)
 end
 
 """

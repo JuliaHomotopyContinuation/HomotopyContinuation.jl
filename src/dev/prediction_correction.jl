@@ -61,8 +61,7 @@ the correction was sucessfull, otherwise `(false, status)` where `status` is eit
         else
             return (false, :ok)
         end
-    catch err
-        warn(err)
+    catch
         return (false, :predictor_corrector_failed)
     end
 end
@@ -85,8 +84,7 @@ Returns the achieved residual.
             return result.res
         end
         return res₀
-    catch err
-        warn(err)
+    catch
         return res₀
     end
 end

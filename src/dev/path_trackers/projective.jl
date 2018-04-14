@@ -40,7 +40,7 @@ struct Projective{H<:AbstractHomotopy, Patch<:AbstractAffinePatch, P, C, S<:Abst
     patch::Patch
     # randomize::Randomizer
     predictor_corrector::PredictorCorrector{P, C}
-    step::S
+    steplength::S
 end
 
 function Projective(H::AbstractHomotopy;
@@ -57,16 +57,14 @@ end
 
 # STATE
 
-mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
-    # Our start time
-    start::Float64
-    # Our target time
-    target::Float64
-    # The relative progress. `t` always goes from 1.0 to 0.0
-    t::Float64
-    # The current step length. This is always relative.
-    steplength::Float64
-    steplength_state::S
+mutable struct ProjectiveState{ST<:Number, T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
+    # Our start point in space
+    start::ST
+    # Our target point in space
+    target::ST
+    t::Float64 # The relative progress. `t` always goes from 1.0 to 0.0
+    Δt::Float64 # Δt is the current relative step width
+    steplength::S
     iter::Int
     status::Symbol
 
@@ -75,9 +73,8 @@ mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: Abstrac
     #randomization::Matrix{T}
 end
 
-
 current_t(state::ProjectiveState) = (1-state.t) * state.target + state.t * state.start
-current_Δt(state::ProjectiveState) = state.steplength * (state.target - state.start)
+current_Δt(state::ProjectiveState) = state.Δt * (state.target - state.start)
 current_x(state::ProjectiveState) = state.x
 current_iter(state::ProjectiveState) = state.iter
 current_status(state::ProjectiveState) = state.status
@@ -90,12 +87,13 @@ end
 
 # INITIAL CONSTRUCTION
 
-function state(method::Projective, x::Vector, start, target)
+function state(method::Projective, x::Vector, t₁, t₀)
     checkstart(method.homotopy, x)
 
+    start, target = promote(t₁, t₀)
+    steplength = StepLength.state(method.steplength, start, target)
     t = 1.0
-    steplength = StepLength.initial_steplength(method.step)
-    steplength_state = StepLength.state(method.step)
+    Δt = min(StepLength.relsteplength(steplength), 1.0)
     iter = 0
 
     value = NewHomotopies.evaluate(method.homotopy, x, start)
@@ -110,7 +108,7 @@ function state(method::Projective, x::Vector, start, target)
     patch = AffinePatches.init_patch(method.patch, x)
     AffinePatches.precondition!(patch, x, method.patch)
 
-    ProjectiveState(start, target, t, steplength, steplength_state, iter, status, x, patch)
+    ProjectiveState(start, target, t, Δt, steplength, iter, status, x, patch)
 end
 
 function checkstart(H, x)
@@ -129,14 +127,15 @@ end
 
 # UPDATES
 
-function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target)
+function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target, reset_steplength=true)
     checkstart(method.homotopy, x)
 
-    state.t = 1.0
     state.start = start
     state.target = target
-    state.steplength = StepLength.initial_steplength(method.step)
-    StepLength.reset!(state.steplength_state)
+    StepLength.reset!(state.steplength, method.steplength, start, target)
+    state.t = 1.0
+    state.Δt = min(StepLength.relsteplength(state.steplength), 1.0)
+
     state.iter = 0
     state.x .= x
     AffinePatches.precondition!(state.patch, state.x, method.patch)
@@ -159,27 +158,36 @@ function step!(state::ProjectiveState, method::Projective, cache::ProjectiveCach
         cache.predictor_corrector,
         cache.homotopy, current_t(state), current_Δt(state), options.tol, options.corrector_maxiters)
 
+    update_t_and_steplength!(state, method.steplength, step_successfull)
+
     if step_successfull
-        state.t = max(state.t - state.steplength, 0.0)
+        # state.t = max(state.t - state.steplength, 0.0)
         # Since x changed we should update the patch
         AffinePatches.update_patch!(state.patch, method.patch, state.x)
     end
-    #  update steplength
-    update_steplength!(state, method.step, step_successfull)
     nothing
 end
 
-function update_steplength!(state::ProjectiveState, step::StepLength.AbstractStepLength, step_successfull)
-    new_steplength, status = StepLength.update(state.steplength, step, state.steplength_state, step_successfull)
+function update_t_and_steplength!(state::ProjectiveState, step::StepLength.AbstractStepLength, step_successfull)
+    if step_successfull
+        state.t -= state.Δt
+    end
+
+    status = StepLength.update!(state.steplength, step, step_successfull)
     if status != :ok
         state.status = status
+        return nothing
     end
-    if StepLength.isrelative(step)
-        state.steplength = min(new_steplength, state.t)
+
+    relsteplength = StepLength.relsteplength(state.steplength)
+    state.Δt = min(relsteplength, state.t)
+    # Due to numerical errors we would sometimes be at t=0.1+2eps() and we would just
+    # due a step of size 0.1 and then again one of size 2eps() which is quite wasteful.
+    if relsteplength + 5e-16 > state.t
+        state.Δt = state.t
     else
-        state.steplength = min(new_steplength, state.t) / (state.start - state.target)
+        state.Δt = relsteplength
     end
-    nothing
 end
 
 function check_terminated!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)

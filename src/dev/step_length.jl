@@ -5,7 +5,8 @@ export AbstractStepLength,
     HeuristicStepLength,
     HeuristicStepLengthState,
     state,
-    initial_steplength,
+    reset!,
+    relsteplength,
     update!
 
 """
@@ -24,14 +25,14 @@ Abstract type representing the state of a `AbstractStepLength` implementation.
 abstract type AbstractStepLengthState end
 
 """
-    state(::AbstractStepLength)::AbstractStepLengthState
+    state(::AbstractStepLength, start, target)::AbstractStepLengthState
 
 Initialize the state for the given step length type.
 """
 function state end
 
 """
-    reset!(state::AbstractStepLengthState)
+    reset!(state::AbstractStepLengthState, step::AbstractStepLength, start, target)
 
 Reset the state to the initial state again.
 """
@@ -39,33 +40,28 @@ function reset! end
 
 
 # FIXME: The API is not stable. This needs to be modified for verified pathtracking.
+"""
+    current_steplength(::AbstractStepLengthState)
+
+Return the current step length of a path.
+"""
+function current_steplength end
 
 """
-    isrelative(::AbstractStepLength)
+    relsteplength(state)
 
-Indicate whether the returned step length is relative or absolute, i.e.,
-if we want to track from `1` to `5`. A relative step length of `0.1` would result
-in an effective step length of `0.4` while an absolute step length of `0.1` would result
-in an effective step length of `0.1`.
+Return the current steplength in a relative measure.
 """
-function isrelative end
+function relsteplength end
 
 """
-    initial_steplength(::AbstractStepLength)
+    update!(state::AbstractStepLengthState, step::AbstractStepLength, success::Bool)
 
-Return the initial step length of a path.
-"""
-function initial_steplength end
-
-"""
-    update(curr_steplength, step::AbstractStepLength, state::AbstractStepLengthState, success::Bool)
-
-Returns `(t, status)` where `t` is the new step length and `status` is either
+Returns a status which is either
 `:ok` (usually) or  any symbol indicating why the update failed (e.g. `:steplength_too_small` if the step size is too small).
-The argument `success` indicates whether the step was successfull. This
-modifies `state` if necessary.
+The argument `success` indicates whether the step was successfull.
 """
-function update end
+function update! end
 
 
 # Implementation
@@ -89,7 +85,6 @@ struct HeuristicStepLength <: AbstractStepLength
     consecutive_successes_necessary::Int
     maximal_steplength::Float64
     minimal_steplength::Float64
-
 end
 function HeuristicStepLength(;initial=0.1,
     increase_factor=2.0,
@@ -105,36 +100,49 @@ end
 
 mutable struct HeuristicStepLengthState <: AbstractStepLengthState
     consecutive_successes::Int
+    steplength::Float64
+    length_start_target::Float64
 end
 
-state(step::HeuristicStepLength) = HeuristicStepLengthState(0)
-function reset!(state::HeuristicStepLengthState)
+function state(step::HeuristicStepLength, start, target)
+    length_start_target = convert(Float64, abs(start-target))
+    steplength = min(step.initial, length_start_target)
+    HeuristicStepLengthState(0, steplength, length_start_target)
+end
+function reset!(state::HeuristicStepLengthState, step::HeuristicStepLength, start, target)
     state.consecutive_successes = 0
+    state.length_start_target = convert(Float64, abs(start-target))
+    state.steplength = min(step.initial, state.length_start_target)
 end
 
-isrelative(::HeuristicStepLength) = true
-initial_steplength(step::HeuristicStepLength) = step.initial
 
-function update(curr_steplength, step::HeuristicStepLength, state::HeuristicStepLengthState, success)
+relsteplength(state::HeuristicStepLengthState) = state.steplength / state.length_start_target
+
+function update!(state::HeuristicStepLengthState, step::HeuristicStepLength, success)
+    curr_steplength = state.steplength
     if success
         if (state.consecutive_successes += 1) == step.consecutive_successes_necessary
+            # try to increase step length
             state.consecutive_successes = 0
-            new_steplength = min(step.maximal_steplength, step.increase_factor * curr_steplength)
-            return (new_steplength, :ok)
+            state.steplength = min(
+                step.maximal_steplength,
+                step.increase_factor * curr_steplength,
+                state.length_start_target)
+            return :ok
         end
-        return (curr_steplength, :ok)
+        return :ok
     end
     # reset successes
     state.consecutive_successes = 0
 
     # we decrease the steplength
-    new_steplength = step.decrease_factor * curr_steplength
+    state.steplength = step.decrease_factor * curr_steplength
 
-    if new_steplength < step.minimal_steplength
-        return (new_steplength, :steplength_too_small)
+    if state.steplength < step.minimal_steplength
+        return :steplength_too_small
     end
 
-    (new_steplength, :ok)
+    :ok
 end
 
 end
