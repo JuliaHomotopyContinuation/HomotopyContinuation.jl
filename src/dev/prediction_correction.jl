@@ -2,6 +2,7 @@ module PredictionCorrection
 
 import ..Predictors
 import ..Correctors
+using ..Utilities
 
 export PredictorCorrector,
     PredictorCorrectorCache,
@@ -73,7 +74,7 @@ Perform a correction step and store the result in `x` if the new residual is bet
 Returns the achieved residual.
 """
 @inline function refine!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, tol, maxiters)
-    res₀ = norm(H(x, t), Inf)
+    res₀ = infinity_norm(H(x, t))
     if res₀ < tol
         return res₀
     end

@@ -1,3 +1,5 @@
+import StaticArrays: SVector
+
 import ..NewHomotopies
 import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, AbstractHomotopyCache, HomotopyWithCache
 import ..Predictors
@@ -8,7 +10,7 @@ import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch
 import ..StepLength
 import ..StepLength: AbstractStepLength, AbstractStepLengthState
-import StaticArrays: SVector
+using ..Utilities
 
 
 export Projective
@@ -97,7 +99,7 @@ function state(method::Projective, x::Vector, start, target)
     iter = 0
 
     value = NewHomotopies.evaluate(method.homotopy, x, start)
-    if norm(value) > 1e-4
+    if infinity_norm(value) > 1e-4
         status = :invalid_startvalue
     else
         status = :ok
@@ -137,7 +139,7 @@ function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCac
     state.x .= x
     AffinePatches.precondition!(state.patch, state.x, method.patch)
 
-    if norm(cache.homotopy(state.x, start)) > 1e-4
+    if infinity_norm(cache.homotopy(state.x, start)) > 1e-4
         state.status = :invalid_startvalue
     else
         state.status = :ok

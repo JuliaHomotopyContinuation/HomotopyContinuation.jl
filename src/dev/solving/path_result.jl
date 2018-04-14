@@ -1,4 +1,5 @@
 import ..NewHomotopies
+using ..Utilities
 
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
@@ -61,8 +62,8 @@ function PathResult(::Problems.NullHomogenization,
     angle_to_infinity = NaN
 
     NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
-    res = norm(v, Inf)
-    newton_res = norm(J \ v, Inf)
+    res = infinity_norm(v)
+    newton_res = infinity_norm(J \ v)
     condition = cond(J)
 
     PathResult(returncode, solution, res, newton_res, condition, angle_to_infinity, x₁, iters)
@@ -81,7 +82,7 @@ function PathResult(::Problems.DefaultHomogenization,
     hom_part = x₀[1]
     affine_part = x₀[2:end]
 
-    angle_to_infinity = atan(abs(hom_part)/norm(affine_part))
+    angle_to_infinity = atan(abs(hom_part)/infinity_norm(affine_part))
 
     if angle_to_infinity < angle_to_infinity_tol
         returncode = :at_infinity
@@ -97,8 +98,8 @@ function PathResult(::Problems.DefaultHomogenization,
         # We want to evaluate on the affine patch we are interested in
         scale!(x₀, inv(hom_part))
         NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
-        res = norm(v, Inf)
-        newton_res = norm(J \ v, Inf)
+        res = infinity_norm(v)
+        newton_res = infinity_norm(J \ v)
         scale!(affine_part, inv(hom_part))
         solution = affine_part
         # isreal = maximum(z -> abs(imag(z)), z) < realtol

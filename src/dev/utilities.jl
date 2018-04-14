@@ -15,6 +15,7 @@ export allvariables,
     dsin,
     riemann_distance,
     distance,
+    infinity_norm,
     batches
 
 
@@ -233,6 +234,30 @@ Compute the distance between `v` and `w`.
 """
 distance(v::ProjectiveVector, w::ProjectiveVector) = dsin(v, w)
 
+
+"""
+    infinity_norm(z)
+
+Compute the ∞-norm of `z`. If `z` is a complex vector this is more efficient
+than `norm(z, Inf)`.
+
+    infinity_norm(z₁, z₂)
+
+Compute the ∞-norm of `z₁-z₂`.
+"""
+infinity_norm(z::AbstractVector{<:Complex}) = sqrt(maximum(abs2, z))
+function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:Complex})
+    m = abs2(z₁[1] - z₂[1])
+    n₁, n₂ = length(z₁), length(z₂)
+    if n₁ ≠ n₂
+        return convert(typeof(m), Inf)
+    end
+    @inbounds for k=2:n₁
+        m = max(m, abs2(z₁[k] - z₂[k]))
+    end
+    sqrt(m)
+end
+infinity_norm(z) = norm(z, Inf) # fallback
 
 # Parallelization
 

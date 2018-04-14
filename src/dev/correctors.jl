@@ -75,7 +75,7 @@ function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N
     while true
         evaluate!(b, H, xnext, t)
 
-        res = norm(b, Inf)
+        res = infinity_norm(b)
         if res < tol
             return Result(true, res, k)
         elseif k ≥ maxiters
