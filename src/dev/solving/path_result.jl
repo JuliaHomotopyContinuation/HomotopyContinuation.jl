@@ -34,10 +34,10 @@ struct PathResult{T}
     # singular::Bool
 
     residual::Float64
-    newton_residual::Float64
+    # newton_residual::Float64
     condition_number::Float64
     # windingnumber::Int
-    angle_to_infinity::Float64
+    # angle_to_infinity::Float64
     # real::Bool
 
     start_solution::Vector{T}
@@ -63,52 +63,54 @@ function PathResult(::Problems.NullHomogenization,
 
     NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
     res = infinity_norm(v)
-    newton_res = infinity_norm(J \ v)
+    # newton_res = infinity_norm(J \ v)
     condition = cond(J)
 
-    PathResult(returncode, solution, res, newton_res, condition, angle_to_infinity, x₁, iters)
+    PathResult(returncode, solution, res, condition, angle_to_infinity, x₁, iters)
 end
 
 function PathResult(::Problems.DefaultHomogenization,
     H::NewHomotopies.HomotopyWithCache,
     pathtracker_result::PathTracking.PathTrackerResult{T, <:ProjectiveVector}, x₁, t₀, v, J) where T
     realtol = 1e-6
-    angle_to_infinity_tol = 1e-8
+    maxnorm = 1e6
     # we need to make the solution affine + check for infinity
     x₀ = pathtracker_result.x.data
     returncode = pathtracker_result.returncode
     iters = pathtracker_result.iters
 
+    NewHomotopies.evaluate!(v, H, x₀, t₀)
+    orig_res = infinity_norm(v)
     hom_part = x₀[1]
-    affine_part = x₀[2:end]
+    scale!(x₀, inv(x₀[1]))
 
-    angle_to_infinity = atan(abs(hom_part)/infinity_norm(affine_part))
+    if returncode != :at_infinity && infinity_norm(x₀) > maxnorm
+        returncode = :at_infinity
+    end
 
-    if angle_to_infinity < angle_to_infinity_tol
+    NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
+    res = infinity_norm(v)
+    if res > 0.1
         returncode = :at_infinity
     end
 
     if returncode == :at_infinity
-        res = Inf
-        newton_res = Inf
+        # res = re
+        # newton_res = Inf
         solution = x₀
         # isreal = false
         condition = 0.0
     else
         # We want to evaluate on the affine patch we are interested in
-        scale!(x₀, inv(hom_part))
-        NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
-        res = infinity_norm(v)
-        newton_res = infinity_norm(J \ v)
-        scale!(affine_part, inv(hom_part))
-        solution = affine_part
+        # newton_res = infinity_norm(J \ v)
+        solution = x₀[2:end]
         # isreal = maximum(z -> abs(imag(z)), z) < realtol
 
         J_affine = @view J[:,2:end]
-        condition = cond(J_affine)
+        condition = cond(J)
     end
 
-    PathResult(returncode, solution, res, newton_res, condition, angle_to_infinity, x₁, iters)
+    PathResult(returncode, solution, res, condition, x₁, iters)
 end
 
 function pathresults(solver::Solver, results)
