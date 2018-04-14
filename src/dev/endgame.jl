@@ -123,7 +123,6 @@ end
     state = endgamer.state
     if state.npredictions > 1
         Δ = infinity_norm(state.p, state.pprev)
-        @show Δ, state.p, state.pprev
         if Δ < endgamer.options.tol
             state.status = :success
         end

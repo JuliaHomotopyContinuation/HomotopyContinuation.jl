@@ -131,7 +131,6 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
         retcode = PathTracking.track!(xk, tracker, xk₋₁, Θk₋₁, Θk)
         tracker.state.iter
         if retcode != :success
-            @show retcode
             return (:loop_failed_tracking_failed, 0)
         end
         scale!(xk, inv(xk[maxind]))
@@ -145,7 +144,6 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
         end
 
         if (k - 1) % samples_per_loop == 0
-            @show c
             # Check wether the loop is closed
             Δ = infinity_norm(samples_buffer[1], xk)
             if Δ < PathTracking.tol(tracker)
