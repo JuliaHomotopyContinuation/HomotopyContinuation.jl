@@ -20,13 +20,13 @@ export Projective,
      current_iter,
      current_status
 """
-     PathTracker(H::NewHomotopies.AbstractHomotopy, x₀, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
+     PathTracker(H::NewHomotopies.AbstractHomotopy, x₁, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
 
-Create a `PathTracker` to track `x₀` from `t₁` to `t₀`. The homotopy `H` needs to be
+Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H` needs to be
 compatible with the chosen path tracker method `tracker`. The `method_options` depend
 on the chosen path tracker for the default case see [`Projective`](@ref).
 
-     PathTracker(method::AbstractPathTrackerMethod, x₀, t₁, t₀, options)
+     PathTracker(method::AbstractPathTrackerMethod, x₁, t₁, t₀, options)
 
 If a method is already assembled this constructor is beneficial.
 """
@@ -38,8 +38,8 @@ struct PathTracker{Method<:AbstractPathTrackerMethod, S<:AbstractPathTrackerStat
      state::S
      cache::C
 end
-function PathTracker(prob::Problems.AbstractProblem, x₀::AbstractVector{<:Number}, t₁, t₀; kwargs...)
-     PathTracker(prob.homotopy, Problems.embed(prob, x₀), t₁, t₀; kwargs...)
+function PathTracker(prob::Problems.AbstractProblem, x₁::AbstractVector{<:Number}, t₁, t₀; kwargs...)
+     PathTracker(prob.homotopy, Problems.embed(prob, x₁), t₁, t₀; kwargs...)
 end
 function PathTracker(H::AbstractHomotopy, x::AbstractVector{<:Number}, start, target; options=PathTrackers.Options(), method=Projective, kwargs...)
     PathTracker(method(H; kwargs...), x, start, target, options)
@@ -126,8 +126,8 @@ end
 
 Containing the result of a tracked path. The fields are
 * `successfull::Bool` Indicating whether tracking was successfull.
-* `returncode::Symbol` A return code, which gives an indication what
- happened if the tracking was not successfull
+* `returncode::Symbol` If the tracking was successfull then it is `:success`.
+Otherwise the return code gives an indication what happened.
 * `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 * `res::Float64` The residual at `(x, t)`.
@@ -142,34 +142,42 @@ struct PathTrackerResult{V<:AbstractVector}
 end
 
 """
-    track(tracker, x₀, t₁, t₀)::PathTrackerResult
+    track(tracker, x₁, t₁, t₀)::PathTrackerResult
 
-Track a value `x₀` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
+Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 This returns a `PathTrackerResult`. This modifies tracker.
 
     track(tracker, xs, t₁, t₀)::Vector{PathTrackerResult}
 
 Track all values in xs from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 """
-function track(tracker::PathTracker, x₀::AbstractVector{<:Number}, t₁, t₀)
-     PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₀, t₁, t₀)
+function track(tracker::PathTracker, x₁::AbstractVector{<:Number}, t₁, t₀)
+     PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₁, t₁, t₀)
      track!(tracker)
      result(tracker)
 end
 function track(tracker::PathTracker, xs, t₁, t₀)
-     map(xs) do x₀
-          PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₀, t₁, t₀)
+     map(xs) do x₁
+          PathTrackers.reset!(tracker.state, tracker.method, tracker.cache, x₁, t₁, t₀)
           track!(tracker)
           result(tracker)
      end
 end
 
-"""
 
+
+"""
     track!(tracker)
 
 Run the given `tracker` with the set values. This is useful to call directly
-after construction of a `PathTracker`.
+after construction of a `PathTracker`. Returns a `Symbol` indicating the status.
+If the tracking was successfull it is `:success`.
+
+     track!(x₀, tracker, x₁, t₁, t₀ [, reset_steplength=true])
+
+Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`
+and store the result in `x₁`. Returns a `Symbol` indicating the status.
+If the tracking was successfull it is `:success`.
 """
 function track!(tracker::PathTracker)
      method, state, cache, options = tracker.method, tracker.state, tracker.cache, tracker.options
