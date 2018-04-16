@@ -30,6 +30,7 @@ is given if the startvalue was projective.
 struct PathResult{T}
     returncode::Symbol
     solution::Vector{T}
+    t::Float64
     # isolated::Bool
     # singular::Bool
 
@@ -44,16 +45,17 @@ struct PathResult{T}
     #
     iterations::Int
     # endgame_iterations::Int
-    # npredictions::Int
+    npredictions::Int
     # predictions::Vector{Vector{T}}
 end
 
 
 function PathResult(::Problems.NullHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    pathtracker_result::PathTracking.PathTrackerResult{<:ProjectiveVector}, x₁, t₀, v, J)
+    x₁, x₀, t₀, returncode::Symbol, iters::Int, npredictions::Int, v, J)
+    # pathtracker_result::PathTracking.PathTrackerResult{<:ProjectiveVector}, x₁, t₀, v, J)
     realtol = 1e-6
-    angle_to_infinity_tol = 1e-8
+    # angle_to_infinity_tol = 1e-8
     # we need to make the solution affine + check for infinity
     x₀ = pathtracker_result.x.data
     returncode = pathtracker_result.returncode
@@ -66,67 +68,69 @@ function PathResult(::Problems.NullHomogenization,
     # newton_res = infinity_norm(J \ v)
     condition = cond(J)
 
-    PathResult(returncode, solution, res, condition, angle_to_infinity, x₁, iters)
+    PathResult(returncode, solution, res, condition, x₁, iters, npredictions)
 end
 
 function PathResult(::Problems.DefaultHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    pathtracker_result::PathTracking.PathTrackerResult{T, <:ProjectiveVector}, x₁, t₀, v, J) where T
-    realtol = 1e-6
-    maxnorm = 1e6
-    # we need to make the solution affine + check for infinity
-    x₀ = pathtracker_result.x.data
-    returncode = pathtracker_result.returncode
-    iters = pathtracker_result.iters
+    x₁::Vector, t₀, x, t, returncode::Symbol, iters::Int, npredictions::Int, v, J)
 
-    NewHomotopies.evaluate!(v, H, x₀, t₀)
-    orig_res = infinity_norm(v)
-    hom_part = x₀[1]
-    scale!(x₀, inv(x₀[1]))
+    # We want to evaluate on the affine patch we are interested in
+    hom_part = x[1]
+    scale!(x, inv(x[1]))
 
-    if returncode != :at_infinity && infinity_norm(x₀) > maxnorm
-        returncode = :at_infinity
-    end
-
-    NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
+    NewHomotopies.evaluate_and_jacobian!(v, J, H, x, t₀)
     res = infinity_norm(v)
     if res > 0.1
         returncode = :at_infinity
     end
 
     if returncode == :at_infinity
-        # res = re
-        # newton_res = Inf
-        solution = x₀
-        # isreal = false
+        solution = x
         condition = 0.0
     else
-        # We want to evaluate on the affine patch we are interested in
-        # newton_res = infinity_norm(J \ v)
-        solution = x₀[2:end]
-        # isreal = maximum(z -> abs(imag(z)), z) < realtol
-
-        J_affine = @view J[:,2:end]
-        condition = cond(J)
+        solution = x[2:end]
+        condition = cond(@view J[:,2:end])
     end
 
-    PathResult(returncode, solution, res, condition, x₁, iters)
+    PathResult(returncode, solution, t, res, condition, x₁, iters, npredictions)
 end
 
 function pathresults(solver::Solver, results)
     pathresults(solver.prob, results, solver.start_solutions, solver.t₀)
 end
 
-function pathresults(prob::Problems.AbstractProblem, trackedpath_results, start_solutions, t₀)
+
+function pathresults(prob::Problems.AbstractProblem,
+    results::Vector{<:Endgame.EndgamerResult},
+    start_solutions, t₀)
+    r = results[1]
+    H = NewHomotopies.HomotopyWithCache(prob.homotopy, r.x, t₀)
+    v, J = NewHomotopies.evaluate_and_jacobian(H, r.x, t₀)
+    pathresults(prob.homogenization_strategy, H, results, start_solutions, t₀, v, J)
+end
+
+ function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
+     results::Vector{<:Endgame.EndgamerResult},
+     start_solutions, t₀, v, J)
+     map(results, start_solutions) do r, x₁
+         PathResult(strategy, H, x₁, t₀, r.x, r.t, r.returncode, r.iters, r.npredictions, v, J)
+     end
+ end
+
+function pathresults(prob::Problems.AbstractProblem,
+    trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
+    start_solutions, t₀)
     r = trackedpath_results[1]
     H = NewHomotopies.HomotopyWithCache(prob.homotopy, r.x.data, r.t)
     v, J = NewHomotopies.evaluate_and_jacobian(H, r.x.data, r.t)
     pathresults(prob.homogenization_strategy, H, trackedpath_results, start_solutions, t₀, v, J)
 end
 
- function pathresults(strategy::Problems.AbstractHomogenizationStrategy,
-     H, trackedpath_results, start_solutions, t₀, v, J)
+function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
+     trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
+     start_solutions, t₀, v, J)
      map(trackedpath_results, start_solutions) do r, x₁
-         PathResult(strategy, H, r, x₁, t₀, v, J)
+         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, 0, v, J)
      end
- end
+end

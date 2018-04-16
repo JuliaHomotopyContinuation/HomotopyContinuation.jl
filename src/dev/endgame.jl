@@ -6,15 +6,25 @@ using ..Utilities
 
 abstract type AbstractEndgame end
 
+"""
+    EndgameOptions
+
+Options:
+* `geomseries_factor=0.3`
+* `tol=1e-12`
+* `minradius=1e-20`
+* `maxnorm=1e6`
+"""
 struct EndgameOptions
     λ::Float64
     tol::Float64
     minradius::Float64
     maxnorm::Float64
+    maxwindingnumber::Float64
 end
 
-function EndgameOptions(;geomseries_factor=0.3, tol=1e-12, minradius=1e-20, maxnorm=1e6)
-    EndgameOptions(geomseries_factor, tol, minradius, maxnorm)
+function EndgameOptions(;geomseries_factor=0.3, tol=1e-10, minradius=1e-20, maxnorm=1e5, maxwindingnumber=12)
+    EndgameOptions(geomseries_factor, tol, minradius, maxnorm, maxwindingnumber)
 end
 
 include("endgames/cauchy.jl")
@@ -58,6 +68,10 @@ function reset!(state::EndgamerState, x, R::Float64)
 end
 
 
+"""
+    Endgamer(endgame, pathtracker, t=0.1, options=EndgameOptions())
+
+"""
 struct Endgamer{E<:AbstractEndgame, EC, ES, P<:PathTracking.PathTracker, T}
     alg::E
     alg_cache::EC
@@ -76,6 +90,42 @@ function Endgamer(alg::AbstractEndgame, tracker::PathTracking.PathTracker, t=0.1
     Endgamer(alg, alg_cache, alg_state, tracker, EndgamerState(x, t), options)
 end
 
+
+"""
+    EndgamerResult(endgamer)
+
+## Fields
+* `returncode::Symbol`
+* `x::Vector{T}`: The solution or last prediction.
+* `npredictions`: The number of predictions.
+* `iters`: The number of iterations.
+"""
+struct EndgamerResult{T}
+    returncode::Symbol
+    x::Vector{T}
+    t::Float64
+    windingnumber_estimate::Int
+    npredictions::Int
+    iters::Int
+end
+
+function EndgamerResult(endgamer::Endgamer)
+    S = endgamer.state
+
+    EndgamerResult(S.status, copy(S.p), S.R, S.windingnumber_estimate, S.npredictions, S.iter)
+end
+
+
+function play(endgamer::Endgamer, x, t)
+    play!(endgamer, x, t)
+    EndgamerResult(endgamer)
+end
+
+"""
+    play!(endgamer::Endgamer, x, t)
+
+Run the `Endgamer` `endgamer` starting from `(x, t)`.
+"""
 function play!(endgamer::Endgamer, x, t)
     reset!(endgamer.state, x, t)
     reset!(endgamer.alg_state, endgamer.alg, x)
@@ -85,11 +135,11 @@ function play!(endgamer::Endgamer, x, t)
     moveforward!(endgamer)
     moveforward!(endgamer)
     while state.status == :ok
-        if state.npredictions > 0 && state.windingnumber_estimate == 1
-            # if we have one prediction we also have an estimate for the winding number
-            # since the heuristics ensure that we are in the endgame convergence zone
-            try_to_jump_to_target!(endgamer)
-        end
+        # if state.npredictions > 0 && state.windingnumber_estimate == 1
+        #     # if we have one prediction we also have an estimate for the winding number
+        #     # since the heuristics ensure that we are in the endgame convergence zone
+        #     try_to_jump_to_target!(endgamer)
+        # end
         predict!(endgamer)
         checkconvergence!(endgamer)
         moveforward!(endgamer)
@@ -97,6 +147,11 @@ function play!(endgamer::Endgamer, x, t)
     endgamer
 end
 
+"""
+    predict!(endgamer::Endgamer)
+
+Try to predict the value of the path `x(t)` and `t=0.0`.
+"""
 @inline function predict!(endgamer::Endgamer)
     endgamer.state.status == :ok || return nothing
 
@@ -110,6 +165,9 @@ end
     if retcode == :success
         state.npredictions += 1
         state.windingnumber_estimate = windingnumber
+        if infinity_norm(p, 1) > endgamer.options.maxnorm
+            endgamer.state.status = :at_infinity
+        end
     elseif retcode ≠ :heuristic_failed
         state.status = retcode
     end
@@ -117,6 +175,11 @@ end
     return nothing
 end
 
+"""
+    checkconvergence!(endgamer)
+
+Try to check whether the endgame is converged.
+"""
 @inline function checkconvergence!(endgamer::Endgamer)
     endgamer.state.status == :ok || return nothing
 
@@ -124,20 +187,26 @@ end
     if state.npredictions > 1
         Δ = infinity_norm(state.p, state.pprev)
         if Δ < endgamer.options.tol
+            state.R = 0.0
             state.status = :success
         end
     end
 end
 
 
-@inline function moveforward!(endgamer::Endgamer)
+"""
+    moveforward!(endgamer)
+
+Move the nearer to `0.0` by using the `geomseries_factor` of `EndgameOptions`.
+"""
+function moveforward!(endgamer::Endgamer)
     endgamer.state.status == :ok || return nothing
 
     state = endgamer.state
 
-    λ = endgamer.options.λ
     state.iter += 1
 
+    λ = endgamer.options.λ
     λR = λ * state.R
     if λR < endgamer.options.minradius
         state.status = :minradius_reached
@@ -145,19 +214,20 @@ end
 
     x = state.xs[3]
     retcode = PathTracking.track!(x, endgamer.tracker, state.xs[1], state.R, λ * state.R)
-    normalize!(x)
-    state.xs = (x, state.xs[1], state.xs[2])
-
     if retcode != :success
         state.status = :ill_conditioned_zone
         return nothing
     end
-
-    if infinity_norm(x) > endgamer.options.maxnorm
+    if infinity_norm(x, 1) > endgamer.options.maxnorm
         state.status = :at_infinity
+        state.p .= x
     end
 
+    normalize!(x)
+    state.xs = (x, state.xs[1], state.xs[2])
+
     state.R = λR
+
     nothing
 end
 
@@ -168,7 +238,7 @@ We try to reach the target without using an endgame. If the path tracking failed
 we simply proceed as nothing was. This works well when we actually don't
 need an endgame at all.
 """
-@inline function try_to_jump_to_target!(endgamer::Endgamer)
+function try_to_jump_to_target!(endgamer::Endgamer)
     state = endgamer.state
 
     if state.status != :ok
@@ -178,6 +248,7 @@ need an endgame at all.
     retcode = PathTracking.track!(endgamer.tracker, state.xs[1], state.R, 0.0)
     if retcode == :success
         state.p .= PathTracking.current_x(endgamer.tracker)
+        state.R = 0.0
         state.status = :success
         state.npredictions += 1
     end

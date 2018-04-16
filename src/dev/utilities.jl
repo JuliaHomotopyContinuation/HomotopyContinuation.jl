@@ -257,6 +257,14 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
     end
     sqrt(m)
 end
+function infinity_norm(z::AbstractVector{<:Complex}, eᵢ::Int)
+    normalizer = inv(z[eᵢ])
+    m = abs2(z[1] * normalizer)
+    @inbounds for k=2:length(z)
+        m = max(m, abs2(z[k] * normalizer))
+    end
+    sqrt(m)
+end
 infinity_norm(z) = norm(z, Inf) # fallback
 
 

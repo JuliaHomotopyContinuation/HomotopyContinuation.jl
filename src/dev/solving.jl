@@ -3,6 +3,7 @@ module Solving
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
+import ..Endgame
 import ..NewHomotopies
 import ..PathTracking
 import ..Problems
@@ -18,10 +19,10 @@ struct SolverOptions
 end
 
 
-struct Solver{P<:Problems.AbstractProblem, M, S, C, V<:AbstractVector}
+struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker, E<:Endgame.Endgamer, V<:AbstractVector}
     prob::P
-    tracker::PathTracking.PathTracker{M, S, C}
-    #endgamer::
+    tracker::T
+    endgamer::E
     t₁::Float64
     t₀::Float64
     start_solutions::Vector{V}
@@ -29,7 +30,7 @@ struct Solver{P<:Problems.AbstractProblem, M, S, C, V<:AbstractVector}
 end
 
 
-function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀;
+function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     endgame_start=0.1,
     pathcrossing_tol=1e-10,
     kwargs...)
@@ -39,7 +40,7 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀;
     Solver(prob, start_solutions, t₁, t₀, options; kwargs...)
 end
 
-function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
+function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; endgame=Endgame.Cauchy(), endgame_options=Endgame.EndgameOptions(), kwargs...)
     @assert !isempty(start_solutions) "`start_solutions` are empty"
     if start_solutions isa Vector
         x₁s = start_solutions
@@ -50,8 +51,10 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₀ isa AbstractVector
 
     tracker = PathTracking.PathTracker(prob, x₀, t₁, t₀; kwargs...)
+    endgamer = Endgame.Endgamer(endgame, tracker, options.endgame_start, endgame_options)
     Solver(prob,
         tracker,
+        endgamer,
         t₁, t₀,
         x₁s,
         options)
@@ -67,8 +70,7 @@ function solve(solver::Solver)
     nblas_threads = Utilities.get_num_BLAS_threads()
     BLAS.set_num_threads(1)
 
-    # t_endgame = solver.options.endgame_start
-    t_endgame = 0.0
+    t_endgame = solver.options.endgame_start
     # Phase 1 Track until endgame zone
     pre_endgame_paths = dmap(solver.options, solver.start_solutions) do x₀
         trackpath(solver, x₀, solver.t₁, t_endgame)
@@ -83,10 +85,13 @@ function solve(solver::Solver)
     ncrossedpaths, crossing_indices = pathcrossing_check!(pre_endgame_paths, solver)
 
     BLAS.set_num_threads(nblas_threads)
-    # pre_endgame_paths
-    return pathresults(solver, pre_endgame_paths)
-end
 
+    endgame_results = dmap(solver.options, pre_endgame_paths) do r
+        Endgame.play(solver.endgamer, r.x.data, t_endgame)
+    end
+    # pre_endgame_paths
+    return pathresults(solver, endgame_results)
+end
 
 
 trackpath(solver, x₀, t₁, t₀) = PathTracking.track(solver.tracker, Problems.embed(solver.prob, x₀), t₁, t₀)

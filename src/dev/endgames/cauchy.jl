@@ -82,9 +82,12 @@ function predict!(prediction, alg::Cauchy, state::CauchyState, cache::CauchyCach
     if check_heuristic && !cycleheuristic!(state, alg, xs, R, λ)
         return :heuristic_failed, 0
     end
-    retcode, windingnumber =
-        loop!(cache, alg, tracker, xs[1], R,
-              alg.samples_per_loop, options.tol, check_heuristic)
+    out = loop!(cache, alg, tracker, xs[1], R,
+          alg.samples_per_loop, options.tol, check_heuristic, options)
+
+    retcode, windingnumber = out
+        # loop!(cache, alg, tracker, xs[1], R,
+        #       alg.samples_per_loop, options.tol, check_heuristic)
 
     if retcode != :success
         return retcode, 0
@@ -103,7 +106,7 @@ Track `x` along a regular `n`-gon around the origin with radius `R` using `track
 The loop is considered closed if the distance is less than `tol`.
 Assumption is ``H(x, R)≈0``.
 """
-function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop, tol, check_heuristic=true)
+function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop, tol, check_heuristic, options::EndgameOptions)
     samples_buffer = cache.samples
     unitroots = cache.unitroots
 
@@ -123,13 +126,12 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
     maxind, _ = findmax(abs2, xk₋₁) # defined in Utilities
     scale!(xk₋₁, inv(xk₋₁[maxind]))
 
-    while c ≤ 50 # fallback if everything fails...
+    while c ≤ options.maxwindingnumber # fallback if everything fails...
         k += 1
         # We go around the unit circle in an `n`-gon
         Θk = R * unitroots[(k - 1) % samples_per_loop + 1]
         xk = samples_buffer[k]
         retcode = PathTracking.track!(xk, tracker, xk₋₁, Θk₋₁, Θk)
-        tracker.state.iter
         if retcode != :success
             return (:loop_failed_tracking_failed, 0)
         end
@@ -140,13 +142,13 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
            k == samples_per_loop &&
            !ratioheuristic(R, samples_buffer, samples_per_loop, tol, alg.K)
 
-           return :(:heuristic_failed, 0)
+           return (:heuristic_failed, 0)
         end
-
         if (k - 1) % samples_per_loop == 0
             # Check wether the loop is closed
             Δ = infinity_norm(samples_buffer[1], xk)
-            if Δ < PathTracking.tol(tracker)
+            isclosed = Δ < PathTracking.tol(tracker) * 1e3
+            if isclosed
                 return (:success, c)
             end
 
@@ -160,8 +162,7 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
         xk₋₁ = xk
     end
 
-    return
-    (:loop_failed_winding_number_too_high, 0)
+    return (:heuristic_failed, 0)
 end
 
 function extendsamples_buffer!(cache, samples_per_loop)
