@@ -31,44 +31,27 @@ struct PathResult{T}
     returncode::Symbol
     solution::Vector{T}
     t::Float64
-    # isolated::Bool
-    # singular::Bool
 
     residual::Float64
-    # newton_residual::Float64
     condition_number::Float64
-    # windingnumber::Int
-    # angle_to_infinity::Float64
-    # real::Bool
+    windingnumber::Int
 
     start_solution::Vector{T}
-    #
+
     iterations::Int
-    # endgame_iterations::Int
     npredictions::Int
-    # predictions::Vector{Vector{T}}
 end
 
 
 function PathResult(::Problems.NullHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    x₁, x₀, t₀, returncode::Symbol, iters::Int, npredictions::Int, v, J)
-    # pathtracker_result::PathTracking.PathTrackerResult{<:ProjectiveVector}, x₁, t₀, v, J)
-    realtol = 1e-6
-    # angle_to_infinity_tol = 1e-8
-    # we need to make the solution affine + check for infinity
-    x₀ = pathtracker_result.x.data
-    returncode = pathtracker_result.returncode
-    iters = pathtracker_result.iters
-
-    angle_to_infinity = NaN
+    x₁, t₀, x, t, returncode::Symbol, iters::Int, npredictions::Int, v, J)
 
     NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
     res = infinity_norm(v)
-    # newton_res = infinity_norm(J \ v)
     condition = cond(J)
 
-    PathResult(returncode, solution, res, condition, x₁, iters, npredictions)
+    PathResult(returncode, x, t, res, condition, x₁, iters, npredictions)
 end
 
 function PathResult(::Problems.DefaultHomogenization,
@@ -94,6 +77,20 @@ function PathResult(::Problems.DefaultHomogenization,
     end
 
     PathResult(returncode, solution, t, res, condition, x₁, iters, npredictions)
+end
+
+function Base.show(io::IO, r::PathResult)
+    println(io, typeof(r), ":")
+    println(io, "* returncode: $(r.returncode)")
+    println(io, "* solution: $(r.solution)")
+    println(io, "* t: $(r.t)")
+    println(io, "---------------------------------------------")
+    println(io, "* iterations: $(r.iterations)")
+    println(io, "* npredictions: $(r.npredictions)")
+    println(io, "---------------------------------------------")
+    println(io, "* residual: $(@sprintf "%.3e" r.residual)")
+    println(io, "* log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
+    println(io, "* windingnumber: $(r.windingnumber)")
 end
 
 function pathresults(solver::Solver, results)
