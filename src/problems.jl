@@ -2,7 +2,7 @@ module Problems
 
 using ..Utilities
 import ..Systems: SPSystem
-import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
+import ..Homotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
@@ -103,7 +103,7 @@ Construct a `ProjectiveStartTargetProblem`. This steps constructs a homotopy and
 the systems if necessary. The options are
 * `system=SPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
 is called with `system(polys, variables)` where `variables` determines the variable ordering.
-* `homotopy=StraightLineHomotopy`: A constructor to construct a [`NewHomotopies.AbstractStartTargetHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
+* `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractStartTargetHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
 with `system`.
 

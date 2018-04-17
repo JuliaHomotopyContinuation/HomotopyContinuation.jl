@@ -1,7 +1,5 @@
-import StaticArrays: SVector
-
-import ..NewHomotopies
-import ..NewHomotopies: AbstractHomotopy, AbstractStartTargetHomotopy, AbstractHomotopyCache, HomotopyWithCache
+import ..Homotopies
+import ..Homotopies: AbstractHomotopy, AbstractStartTargetHomotopy, AbstractHomotopyCache, HomotopyWithCache
 import ..Predictors
 import ..Correctors
 import ..PredictionCorrection: PredictorCorrector, PredictorCorrectorCache
@@ -97,7 +95,7 @@ function state(method::Projective, x::Vector, t₁, t₀)
     Δt = min(StepLength.relsteplength(steplength), 1.0)
     iter = 0
 
-    value = NewHomotopies.evaluate(method.homotopy, x, start)
+    value = Homotopies.evaluate(method.homotopy, x, start)
     if infinity_norm(value) > 1e-4
         status = :invalid_startvalue
     else
@@ -113,14 +111,14 @@ function state(method::Projective, x::Vector, t₁, t₀)
 end
 
 function checkstart(H, x)
-    N = NewHomotopies.nvariables(H)
+    N = Homotopies.nvariables(H)
     N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
 end
 
 
 function cache(method::Projective, state::ProjectiveState)
     PH = PatchedHomotopy(method.homotopy, state.patch)
-    H = NewHomotopies.HomotopyWithCache(PH, state.x, current_t(state))
+    H = Homotopies.HomotopyWithCache(PH, state.x, current_t(state))
     pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, state.x, current_t(state))
 
     ProjectiveCache(H, pc_cache)

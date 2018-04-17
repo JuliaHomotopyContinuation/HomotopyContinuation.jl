@@ -1,6 +1,6 @@
 module Correctors
 
-using ..NewHomotopies
+using ..Homotopies
 using ..Utilities
 
 export AbstractCorrector,

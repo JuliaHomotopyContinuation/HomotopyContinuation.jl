@@ -3,7 +3,7 @@
     x = rand(Complex{Float64}, 7)
     xnext = copy(x)
     t = rand()
-    H = NewHomotopies.HomotopyWithCache(NewHomotopies.StraightLineHomotopy(F, F), x, t)
+    H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
 
     predictor = Predictors.Euler()
     @test predictor isa Predictors.Euler

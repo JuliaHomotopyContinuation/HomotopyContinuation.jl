@@ -4,7 +4,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 import ..Endgame
-import ..NewHomotopies
+import ..Homotopies
 import ..PathTracking
 import ..Problems
 import ..Systems

@@ -2,7 +2,7 @@ module PathTracking
 
 import ..PathTrackers: AbstractPathTrackerMethod, AbstractPathTrackerCache, AbstractPathTrackerState, Projective, Options
 import ..PathTrackers
-import ..NewHomotopies: AbstractHomotopy
+import ..Homotopies: AbstractHomotopy
 import ..Problems
 using ..Utilities
 
@@ -20,7 +20,7 @@ export Projective,
      current_iter,
      current_status
 """
-     PathTracker(H::NewHomotopies.AbstractHomotopy, x₁, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
+     PathTracker(H::Homotopies.AbstractHomotopy, x₁, t₁, t₀; options=Options(), method=Projective, method_options...)::PathTracker
 
 Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H` needs to be
 compatible with the chosen path tracker method `tracker`. The `method_options` depend

@@ -1,4 +1,4 @@
-import ..NewHomotopies
+import ..Homotopies
 using ..Utilities
 
 """
@@ -44,10 +44,10 @@ end
 
 
 function PathResult(::Problems.NullHomogenization,
-    H::NewHomotopies.HomotopyWithCache,
+    H::Homotopies.HomotopyWithCache,
     x₁, t₀, x, t, returncode::Symbol, iters::Int, multiplicity::Int, npredictions::Int, v, J)
 
-    NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
+    Homotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
     res = infinity_norm(v)
     condition = cond(J)
 
@@ -55,14 +55,14 @@ function PathResult(::Problems.NullHomogenization,
 end
 
 function PathResult(::Problems.DefaultHomogenization,
-    H::NewHomotopies.HomotopyWithCache,
+    H::Homotopies.HomotopyWithCache,
     x₁::Vector, t₀, x, t, returncode::Symbol, iters::Int, multiplicity, npredictions::Int, v, J)
 
     # We want to evaluate on the affine patch we are interested in
     hom_part = x[1]
     scale!(x, inv(x[1]))
 
-    NewHomotopies.evaluate_and_jacobian!(v, J, H, x, t₀)
+    Homotopies.evaluate_and_jacobian!(v, J, H, x, t₀)
     res = infinity_norm(v)
     if res > 0.1
         returncode = :at_infinity
@@ -102,8 +102,8 @@ function pathresults(prob::Problems.AbstractProblem,
     results::Vector{<:Endgame.EndgamerResult},
     start_solutions, t₀)
     r = results[1]
-    H = NewHomotopies.HomotopyWithCache(prob.homotopy, r.x, t₀)
-    v, J = NewHomotopies.evaluate_and_jacobian(H, r.x, t₀)
+    H = Homotopies.HomotopyWithCache(prob.homotopy, r.x, t₀)
+    v, J = Homotopies.evaluate_and_jacobian(H, r.x, t₀)
     pathresults(prob.homogenization_strategy, H, results, start_solutions, t₀, v, J)
 end
 
@@ -119,8 +119,8 @@ function pathresults(prob::Problems.AbstractProblem,
     trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
     start_solutions, t₀)
     r = trackedpath_results[1]
-    H = NewHomotopies.HomotopyWithCache(prob.homotopy, r.x.data, r.t)
-    v, J = NewHomotopies.evaluate_and_jacobian(H, r.x.data, r.t)
+    H = Homotopies.HomotopyWithCache(prob.homotopy, r.x.data, r.t)
+    v, J = Homotopies.evaluate_and_jacobian(H, r.x.data, r.t)
     pathresults(prob.homogenization_strategy, H, trackedpath_results, start_solutions, t₀, v, J)
 end
 

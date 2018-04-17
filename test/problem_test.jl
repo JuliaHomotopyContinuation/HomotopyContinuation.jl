@@ -10,7 +10,7 @@
     PP2 = Problems.ProjectiveStartTargetProblem(P2)
     @test PP2 isa Problems.ProjectiveStartTargetProblem
 
-    @test Problems.homotopy(PP2) isa NewHomotopies.StraightLineHomotopy
+    @test Problems.homotopy(PP2) isa Homotopies.StraightLineHomotopy
 
     @test Problems.homogenization_strategy(PP2) == Problems.DefaultHomogenization()
 

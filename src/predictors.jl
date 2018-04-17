@@ -1,6 +1,6 @@
 module Predictors
 
-using ..NewHomotopies
+using ..Homotopies
 using ..Utilities
 
 export AbstractPredictor,

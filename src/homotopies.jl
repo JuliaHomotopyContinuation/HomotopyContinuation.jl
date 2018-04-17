@@ -1,4 +1,4 @@
-module NewHomotopies
+module Homotopies
 
 import ..Systems
 import ..Systems: AbstractSystem, AbstractSystemCache

@@ -8,7 +8,7 @@ module HomotopyContinuation
     export AffinePatches,
         Correctors,
         Endgame,
-        NewHomotopies,
+        Homotopies,
         PathTracking,
         Predictors,
         Problems,
@@ -18,7 +18,7 @@ module HomotopyContinuation
 
     include("utilities.jl")
     include("systems.jl")
-    include("new_homotopies.jl")
+    include("homotopies.jl")
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")

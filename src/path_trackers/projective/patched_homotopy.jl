@@ -1,11 +1,11 @@
 # import ..AffinePatches: AbstractAffinePatch
-import ..NewHomotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCache,
+import ..Homotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCache,
     evaluate!, evaluate,
     jacobian!, jacobian,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt
-import ..NewHomotopies
+import ..Homotopies
 
 """
     PatchedHomotopy(H::AbstractHomotopy, v::Vector)
@@ -35,7 +35,7 @@ struct PatchedHomotopyCache{HC, T} <: AbstractHomotopyCache
     b::Vector{T} # intermediate storage for the evaluation
 end
 
-function NewHomotopies.cache(ph::PatchedHomotopy, x, t)
+function Homotopies.cache(ph::PatchedHomotopy, x, t)
     H = HomotopyWithCache(ph.homotopy, x, t)
     PatchedHomotopyCache(H.cache, jacobian(H, x, t), H(x, t))
 end

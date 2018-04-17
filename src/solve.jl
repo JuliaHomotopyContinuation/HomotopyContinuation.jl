@@ -3,7 +3,7 @@ const MP = MultivariatePolynomials
 
 import .Problems
 import .Systems
-import .NewHomotopies
+import .Homotopies
 import .Solving
 
 export solve
@@ -36,7 +36,7 @@ end
 # Internal
 function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
     system=Systems.SPSystem,
-    homotopy=NewHomotopies.StraightLineHomotopy,
+    homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)
     P = Problems.ProjectiveStartTargetProblem(prob, system=system, homotopy=homotopy)
     solve(P, start_solutions; kwargs...)

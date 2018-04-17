@@ -1,5 +1,2 @@
-julia 0.6.1
-Homotopies
-Reexport 0.0.3
-Parameters 0.8.0
-Requires
+julia 0.6.0
+StaticPolynomials

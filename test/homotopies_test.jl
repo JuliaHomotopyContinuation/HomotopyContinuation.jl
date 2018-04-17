@@ -1,5 +1,5 @@
 @testset "StraightLineHomotopy" begin
-    Hom = HomotopyContinuation.NewHomotopies
+    Hom = HomotopyContinuation.Homotopies
     Systems = HomotopyContinuation.Systems
 
     fs = TestSystems.equations(katsura5())
