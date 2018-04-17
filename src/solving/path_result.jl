@@ -34,7 +34,7 @@ struct PathResult{T}
 
     residual::Float64
     condition_number::Float64
-    windingnumber::Int
+    multiplicity::Int
 
     start_solution::Vector{T}
 
@@ -45,18 +45,18 @@ end
 
 function PathResult(::Problems.NullHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    x₁, t₀, x, t, returncode::Symbol, iters::Int, npredictions::Int, v, J)
+    x₁, t₀, x, t, returncode::Symbol, iters::Int, multiplicity::Int, npredictions::Int, v, J)
 
     NewHomotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
     res = infinity_norm(v)
     condition = cond(J)
 
-    PathResult(returncode, x, t, res, condition, x₁, iters, npredictions)
+    PathResult(returncode, x, t, res, condition, multiplicity, x₁, iters, npredictions)
 end
 
 function PathResult(::Problems.DefaultHomogenization,
     H::NewHomotopies.HomotopyWithCache,
-    x₁::Vector, t₀, x, t, returncode::Symbol, iters::Int, npredictions::Int, v, J)
+    x₁::Vector, t₀, x, t, returncode::Symbol, iters::Int, multiplicity, npredictions::Int, v, J)
 
     # We want to evaluate on the affine patch we are interested in
     hom_part = x[1]
@@ -76,7 +76,7 @@ function PathResult(::Problems.DefaultHomogenization,
         condition = cond(@view J[:,2:end])
     end
 
-    PathResult(returncode, solution, t, res, condition, x₁, iters, npredictions)
+    PathResult(returncode, solution, t, res, condition, multiplicity, x₁, iters, npredictions)
 end
 
 function Base.show(io::IO, r::PathResult)
@@ -90,7 +90,7 @@ function Base.show(io::IO, r::PathResult)
     println(io, "---------------------------------------------")
     println(io, "* residual: $(@sprintf "%.3e" r.residual)")
     println(io, "* log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
-    println(io, "* windingnumber: $(r.windingnumber)")
+    println(io, "* multiplicity: $(r.multiplicity)")
 end
 
 function pathresults(solver::Solver, results)
@@ -111,7 +111,7 @@ end
      results::Vector{<:Endgame.EndgamerResult},
      start_solutions, t₀, v, J)
      map(results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x, r.t, r.returncode, r.iters, r.npredictions, v, J)
+         PathResult(strategy, H, x₁, t₀, r.x, r.t, r.returncode, r.iters, r.windingnumber_estimate, r.npredictions, v, J)
      end
  end
 
@@ -128,6 +128,6 @@ function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
      trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
      start_solutions, t₀, v, J)
      map(trackedpath_results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, 0, v, J)
+         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, 1, 0, v, J)
      end
 end

@@ -2,7 +2,7 @@
     A = rand(3, 3)
     b = rand(3)
 
-    PolyImpl.@polyvar x y z
+    @polyvar x y z
     F = A * [x, y, z] - b
 
     P1 = Problems.TotalDegreeProblem(F)
@@ -26,7 +26,7 @@
     retcode = PathTracking.track!(x_inter, tracker, s, 1.0, 0.1)
     @test retcode == :success
     x_final = zero(x_inter)
-    retcode = PathTracking.track!(x_final, tracker, x_inter, 0.1, 0.0, false)
+    retcode = PathTracking.track!(x_final, tracker, x_inter, 0.1, 0.0)
     @test retcode == :success
     tracker
     @test PathTracking.current_iter(tracker) < 3

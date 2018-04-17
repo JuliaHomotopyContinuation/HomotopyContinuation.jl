@@ -14,7 +14,7 @@
 
     @test Problems.homogenization_strategy(PP2) == Problems.DefaultHomogenization()
 
-    PolyImpl.@polyvar x y
+    @polyvar x y
 
     P = Problems.StartTargetProblem([x^2+y^2, x^4+y^4], [x^3,y^3])
 end
