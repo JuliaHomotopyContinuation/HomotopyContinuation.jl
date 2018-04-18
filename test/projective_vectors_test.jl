@@ -7,7 +7,6 @@ using Compat.Test
 
     z = PVector(x, 1)
     infinity_norm(z)
-
     @test z isa PVector{Complex{Float64}}
     @test z.homvar == 1
     @test PVector(x, 3).homvar == 3
@@ -46,4 +45,6 @@ using Compat.Test
     @test sqrt(maximum(abs2, raw(z2))) ≈ infnorm
     normalize!(z2)
     @test infinity_norm(z2) ≈ infnorm
+
+    @test z2 == copy(z2)
 end

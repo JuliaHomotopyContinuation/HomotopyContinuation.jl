@@ -195,7 +195,6 @@ end
 function at_infinity(z::PVector{<:Real}, maxnorm)
     at_inf = false
     tol = maxnorm * abs(z.data[z.homvar])
-    @show tol
     for k in 1:length(z)
         if k == z.homvar
             continue
@@ -229,13 +228,22 @@ struct ProdPVector{T} <: AbstractProjectiveVector{T}
     pvectors::Vector{PVector{T, VecView{T}}}
 end
 
-function ProdPVector(vs) where T
+function ProdPVector(vs)
     data = copy(vs[1].data);
     for k=2:length(vs)
         append!(data, vs[k].data)
     end
     pvectors = _create_pvectors(data, vs)
     ProdPVector(data, pvectors)
+end
+
+function (==)(v::ProdPVector, w::ProdPVector)
+    for (vᵢ, wᵢ) in zip(pvectors(v), pvectors(w))
+        if vᵢ != wᵢ
+            return false
+        end
+    end
+    true
 end
 
 function _create_pvectors(data, vs)
@@ -250,10 +258,10 @@ function _create_pvectors(data, vs)
     pvectors
 end
 
-function Base.copy(z::PVector{T, V}) where {T, V}
+function Base.copy(z::ProdPVector)
     data = copy(z.data)
-    pvectors = _create_pvectors(data, vs)
-    PVector{T, V}(data, z.homvar)
+    new_pvectors = _create_pvectors(data, pvectors(z))
+    ProdPVector(data, new_pvectors)
 end
 
 """
