@@ -41,11 +41,11 @@ end
 function PathTracker(prob::Problems.AbstractProblem, x₁::AbstractVector{<:Number}, t₁, t₀; kwargs...)
      PathTracker(prob.homotopy, Problems.embed(prob, x₁), t₁, t₀; kwargs...)
 end
-function PathTracker(H::AbstractHomotopy, x::AbstractVector{<:Number}, start, target; options=PathTrackers.Options(), method=Projective, kwargs...)
+function PathTracker(H::AbstractHomotopy, x, start, target; options=PathTrackers.Options(), method=Projective, kwargs...)
     PathTracker(method(H; kwargs...), x, start, target, options)
 end
 
-function PathTracker(method::AbstractPathTrackerMethod, x::AbstractVector{<:Number}, start, target, options=PathTrackers.Options())
+function PathTracker(method::AbstractPathTrackerMethod, x, start, target, options=PathTrackers.Options())
     tracker_state = PathTrackers.state(method, x, start, target)
     tracker_cache = PathTrackers.cache(method, tracker_state)
     PathTracker(method, options, tracker_state, tracker_cache)
@@ -219,12 +219,8 @@ function result(tracker::PathTracker)
      else
           res = NaN
      end
-     x = final_x(tracker)
-     PathTrackerResult(successfull, returncode, x, current_t(tracker), res, current_iter(tracker))
+     PathTrackerResult(successfull, returncode, copy(tracker.state.x), current_t(tracker), res, current_iter(tracker))
 end
-
-final_x(tracker) = copy(current_x(tracker))
-final_x(tracker::PathTracker{<:Projective}) = ProjectiveVector(copy(current_x(tracker)))
 
 """
     current_t(tracker::PathTracker)

@@ -1,4 +1,5 @@
 using ..Utilities
+import ..ProjectiveVectors
 
 """
     pathcrossing_check!(tracked_paths, solver)
@@ -73,7 +74,7 @@ function check_crossed_paths(paths, tol)
         x = paths[i].x
         crossing = false
         for j=i+1:length(paths)
-            if !path_handled[j] && distance(x, paths[j].x) < tol
+            if !path_handled[j] && ProjectiveVectors.infinity_norm(x, paths[j].x) < tol
                 push!(crossed_path_indices, j)
                 crossing = true
                 path_handled[j] = true

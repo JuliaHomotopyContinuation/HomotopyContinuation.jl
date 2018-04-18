@@ -8,6 +8,8 @@ import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch
 import ..StepLength
 import ..StepLength: AbstractStepLength, AbstractStepLengthState
+import ..ProjectiveVectors
+import ..ProjectiveVectors: AbstractProjectiveVector, PVector
 using ..Utilities
 
 
@@ -55,7 +57,7 @@ end
 
 # STATE
 
-mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: AbstractPathTrackerState
+mutable struct ProjectiveState{V<:AbstractProjectiveVector, S<:AbstractStepLengthState} <: AbstractPathTrackerState
     # Our start point in space
     start::Complex{Float64}
     # Our target point in space
@@ -66,8 +68,8 @@ mutable struct ProjectiveState{T<:Number, S<:AbstractStepLengthState} <: Abstrac
     iter::Int
     status::Symbol
 
-    x::Vector{T}
-    patch::Vector{T} # This vector will also be used in the cache.
+    x::V
+    patch::V # This vector will also be used in the cache.
     #randomization::Matrix{T}
 end
 
@@ -85,7 +87,7 @@ end
 
 # INITIAL CONSTRUCTION
 
-function state(method::Projective, x::Vector, t₁, t₀)
+function state(method::Projective, x::PVector, t₁, t₀)
     checkstart(method.homotopy, x)
 
     start = convert(Complex{Float64}, t₁)
@@ -95,7 +97,7 @@ function state(method::Projective, x::Vector, t₁, t₀)
     Δt = min(StepLength.relsteplength(steplength), 1.0)
     iter = 0
 
-    value = Homotopies.evaluate(method.homotopy, x, start)
+    value = Homotopies.evaluate(method.homotopy, raw(x), start)
     if infinity_norm(value) > 1e-4
         status = :invalid_startvalue
     else
@@ -103,7 +105,7 @@ function state(method::Projective, x::Vector, t₁, t₀)
     end
 
     # We have to make sure that the element type of x is invariant under evaluation
-    x = convert.(eltype(value), x)
+    x = ProjectiveVectors.converteltype(x, eltype(value))
     patch = AffinePatches.init_patch(method.patch, x)
     AffinePatches.precondition!(patch, x, method.patch)
 
@@ -119,14 +121,14 @@ end
 function cache(method::Projective, state::ProjectiveState)
     PH = PatchedHomotopy(method.homotopy, state.patch)
     H = Homotopies.HomotopyWithCache(PH, state.x, current_t(state))
-    pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, state.x, current_t(state))
+    pc_cache = PredictionCorrection.cache(method.predictor_corrector, H, raw(state.x), current_t(state))
 
     ProjectiveCache(H, pc_cache)
 end
 
 # UPDATES
 
-function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x, start, target)
+function reset!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, x::AbstractProjectiveVector, start, target)
     checkstart(method.homotopy, x)
 
     state.start = start
@@ -152,7 +154,7 @@ end
 function step!(state::ProjectiveState, method::Projective, cache::ProjectiveCache, options::Options)
     state.iter += 1
 
-    step_successfull, status = PredictionCorrection.predict_correct!(state.x,
+    step_successfull, status = PredictionCorrection.predict_correct!(raw(state.x),
         method.predictor_corrector,
         cache.predictor_corrector,
         cache.homotopy, current_t(state), current_Δt(state), options.tol, options.corrector_maxiters)

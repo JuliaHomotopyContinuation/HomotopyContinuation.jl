@@ -51,8 +51,8 @@ with `samples_per_loop + 1`.
 * `unitroots::Vector{Complex{Float64}}` Vector of length `samples_per_loop`
 holding the values ``exp(i2π k/N)`` for ``k=0,..,N-1`` where ``N`` is `samples_per_loop`.
 """
-struct CauchyCache{T}
-    samples::Vector{Vector{T}}
+struct CauchyCache{V<:AbstractVector}
+    samples::Vector{V}
     unitroots::Vector{Complex{Float64}}
 end
 
@@ -146,7 +146,7 @@ function loop!(cache::CauchyCache, alg::Cauchy, tracker, x, R, samples_per_loop,
         end
         if (k - 1) % samples_per_loop == 0
             # Check wether the loop is closed
-            Δ = infinity_norm(samples_buffer[1], xk)
+            Δ = unsafe_infinity_norm(samples_buffer[1], xk)
             isclosed = Δ < PathTracking.tol(tracker) * 1e3
             if isclosed
                 return (:success, c)

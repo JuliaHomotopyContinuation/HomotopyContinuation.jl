@@ -1,8 +1,10 @@
 module ProjectiveVectors
 
 import Base: ==
+import ..Utilities: infinity_norm
 
-export PVector,
+export AbstractProjectiveVector,
+    PVector,
     ProdPVector,
     raw,
     homvar,
@@ -14,9 +16,10 @@ export PVector,
     pvectors,
     infinity_norm,
     infinity_norm_fast,
-    unsafe_infinity_norm
+    unsafe_infinity_norm,
+    converteltype
 
-abstract type ProjectiveVector{T} end
+abstract type AbstractProjectiveVector{T} <: AbstractVector{T} end
 
 """
     PVector(z, homvar)
@@ -27,7 +30,7 @@ Note that the constructor *does not* perform the embedding but rather
 is a simple wrapper. In order to embed an affine vector use
 [`embed`](@ref).
 """
-struct PVector{T, V<:AbstractVector{T}} <: ProjectiveVector{T}
+struct PVector{T, V<:AbstractVector{T}} <: AbstractProjectiveVector{T}
     data::V
     homvar::Int
 
@@ -37,6 +40,8 @@ struct PVector{T, V<:AbstractVector{T}} <: ProjectiveVector{T}
     end
 end
 PVector(x::V, homvar::Int) where {T, V<:AbstractVector{T}} = PVector{T, V}(x, homvar)
+
+Base.copy(z::PVector{T, V}) where {T, V} = PVector{T, V}(copy(z.data), z.homvar)
 
 """
     raw(z::PVector)
@@ -54,14 +59,15 @@ Get the index of the homogenous variable.
 """
 homvar(z::PVector) = z.homvar
 
-Base.length(z::PVector) = length(z.data)
-Base.getindex(z::PVector, i) = getindex(z.data, i)
-Base.getindex(z::PVector, i...) = getindex(z.data, i...)
-Base.endof(z::PVector) = endof(z.data)
-
 (==)(v::PVector, w::PVector) = v.homvar == w.homvar && v.data == w.data
 
 Base.copy(z::PVector) = PVector(copy(z.data), z.homvar)
+
+"""
+    converteltype(v::PVector, T)
+"""
+converteltype(v::PVector, ::Type{T}) where T = PVector(convert.(T, v.data), v.homvar)
+converteltype(v::PVector{T}, ::Type{T}) where T = copy(v)
 
 """
     embed(x::Vector, homvar)::PVector
@@ -200,12 +206,11 @@ function at_infinity(z::PVector{<:Real}, maxnorm)
     false
 end
 
-Base.LinAlg.norm(v::PVector, p=2) = norm(v.data, p)
-function Base.LinAlg.normalize!(v::PVector, p=2)
+Base.LinAlg.norm(v::PVector, p::Real=2) = norm(v.data, p)
+function Base.LinAlg.normalize!(v::PVector, p::Real=2)
     normalize!(v.data, p)
     v
 end
-
 
 
 const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
@@ -215,7 +220,7 @@ const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
 Construct a product of `PVector`s. This
 """
-struct ProdPVector{T} <: ProjectiveVector{T}
+struct ProdPVector{T} <: AbstractProjectiveVector{T}
     data::Vector{T}
     # It is faster to use a tuple instead but this puts
     # additional stress on the compiler and makes things
@@ -224,12 +229,17 @@ struct ProdPVector{T} <: ProjectiveVector{T}
     pvectors::Vector{PVector{T, VecView{T}}}
 end
 
-function ProdPVector(vs::Vector{PVector{T, Vector{T}}}) where T
+function ProdPVector(vs) where T
     data = copy(vs[1].data);
     for k=2:length(vs)
         append!(data, vs[k].data)
     end
-    pvectors = Vector{PVector{T, VecView{T}}}()
+    pvectors = _create_pvectors(data, vs)
+    ProdPVector(data, pvectors)
+end
+
+function _create_pvectors(data, vs)
+    pvectors = Vector{PVector{eltype(data), VecView{eltype(data)}}}()
     k = 1
     for i = 1:length(vs)
         n = length(vs[i])
@@ -237,8 +247,24 @@ function ProdPVector(vs::Vector{PVector{T, Vector{T}}}) where T
         push!(pvectors, PVector(vdata, homvar(vs[i])))
         k += n
     end
+    pvectors
+end
+
+function Base.copy(z::PVector{T, V}) where {T, V}
+    data = copy(z.data)
+    pvectors = _create_pvectors(data, vs)
+    PVector{T, V}(data, z.homvar)
+end
+
+"""
+    converteltype(v::ProdPVector, T)
+"""
+function converteltype(v::ProdPVector, ::Type{T}) where T
+    data = convert.(T, v.data)
+    pvectors = _create_pvectors(data, vs)
     ProdPVector(data, pvectors)
 end
+converteltype(v::ProdPVector{T}, ::Type{T}) where T = v
 
 """
     pvectors(z::ProdPVector)
@@ -290,7 +316,7 @@ function affine!(v::ProdPVector)
     v
 end
 
-function Base.LinAlg.normalize!(v::ProdPVector, p=2)
+function Base.LinAlg.normalize!(v::ProdPVector, p::Real=2)
     for w in pvectors(v)
         normalize!(w, p)
     end
@@ -307,5 +333,15 @@ function infinity_norm(v::ProdPVector, w::ProdPVector)
     end
     m
 end
+
+
+# AbstractVector interface
+
+Base.size(z::AbstractProjectiveVector) = size(z.data)
+Base.length(z::AbstractProjectiveVector) = length(z.data)
+Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
+Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
+Base.endof(z::AbstractProjectiveVector) = endof(z.data)
+Base.eltype(z::AbstractProjectiveVector{T}) where T = T
 
 end
