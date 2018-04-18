@@ -269,8 +269,7 @@ end
 """
 function converteltype(v::ProdPVector, ::Type{T}) where T
     data = convert.(T, v.data)
-    pvectors = _create_pvectors(data, vs)
-    ProdPVector(data, pvectors)
+    ProdPVector(data, _create_pvectors(data, pvectors(v)))
 end
 converteltype(v::ProdPVector{T}, ::Type{T}) where T = v
 
@@ -310,7 +309,7 @@ end
 
 For each projective vector of the product return associated affine patch.
 """
-affine(z::ProdPVector) = affine.(v.pvectors)
+affine(z::ProdPVector) = affine.(z.pvectors)
 
 """
     affine!(z::ProdPVector)
@@ -336,7 +335,7 @@ function infinity_norm(v::ProdPVector, w::ProdPVector)
     p₁ = pvectors(v)
     p₂ = pvectors(w)
     m = infinity_norm(p₁[1], p₂[1])
-    for k=2:length(p1)
+    for k=2:length(p₁)
         m = max(m, infinity_norm(p₁[k], p₂[k]))
     end
     m
