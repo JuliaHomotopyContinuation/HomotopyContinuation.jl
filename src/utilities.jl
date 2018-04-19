@@ -175,63 +175,6 @@ solve_with_lu_inplace!(A, b) = A_ldiv_B!(lufact!(A), b)
 
 
 """
-    ProjectiveVector(v::Vector)
-
-Wrap a vector `v` to indicate that it is an projective vector.
-The vector `v` is *not* copied. It will also be normalized.
-"""
-struct ProjectiveVector{T} <: AbstractVector{T}
-    data::Vector{T}
-
-    ProjectiveVector{T}(data::Vector{T}) where T = new(normalize!(data))
-end
-ProjectiveVector(data::Vector{T}) where T = ProjectiveVector{T}(data)
-
-Base.size(v::ProjectiveVector) = size(v.data)
-Base.getindex(v::ProjectiveVector, i::Int) = getindex(v.data, i)
-# Base.setindex!(v::ProjectiveVector, x, i::Int) = setindex!(v.data, x, Int)
-Base.IndexStyle(::Type{<:ProjectiveVector}) = Base.IndexLinear()
-Base.length(v::ProjectiveVector) = length(v.data)
-
-"""
-    riemann_distance(v::ProjectiveVector, w::ProjectiveVector)
-
-Compute the Riemann distance between `v` and `w`. This is defined as
-``\\arccos|⟨v, w⟩|``.
-
-For details see: P. 283, Prop. 14.12 in
-Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algorithms. Vol. 349. Springer Science & Business Media, 2013.
-"""
-riemann_distance(v::ProjectiveVector, w::ProjectiveVector) = acos(clamp(abs(v ⋅ w), 0.0, 1.0))
-
-"""
-    sine_distance(v::ProjectiveVector, w::ProjectiveVector)
-
-Compute the sine distance between `v` and `w`. This is defined as
-``\\sin \\arccos|⟨v, w⟩|``. This defines a metric.
-
-For details see: P. 284 in
-Bürgisser, Peter, and Felipe Cucker. Condition: The geometry of numerical algorithms. Vol. 349. Springer Science & Business Media, 2013.
-"""
-sine_distance(v::ProjectiveVector, w::ProjectiveVector) = sin(riemann_distance(v, w))
-
-"""
-    dsin(v, w)
-
-See  [`sine_distance`](v, w).
-"""
-dsin(v::ProjectiveVector, w::ProjectiveVector) = sine_distance(v, w)
-
-
-"""
-    distance(v, w)
-
-Compute the distance between `v` and `w`.
-"""
-distance(v::ProjectiveVector, w::ProjectiveVector) = dsin(v, w)
-
-
-"""
     infinity_norm(z)
 
 Compute the ∞-norm of `z`. If `z` is a complex vector this is more efficient
@@ -293,29 +236,29 @@ const get_num_BLAS_threads = function() # anonymous so it will be serialized whe
 end
 
 
-"""
-    batches(nthreads, n)
-
-Create a list of unit ranges with exponential dropoff to distribute `n` tasks
-over `nthreads` Threads.
-"""
-function batches(nthreads, n)
-    packages = Vector{UnitRange{Int}}()
-    i = 1
-    k = 1
-    while i < n
-        package_length = max(ceil(Int, n * 2.0^(-k) / nthreads), 1)
-        for tid=1:nthreads
-            r = i:min(n, i + package_length)
-            push!(packages, r)
-            i += length(r)
-            if i ≥ n
-                break
-            end
-        end
-        k += 1
-    end
-    packages
-end
+# """
+#     batches(nthreads, n)
+#
+# Create a list of unit ranges with exponential dropoff to distribute `n` tasks
+# over `nthreads` Threads.
+# """
+# function batches(nthreads, n)
+#     packages = Vector{UnitRange{Int}}()
+#     i = 1
+#     k = 1
+#     while i < n
+#         package_length = max(ceil(Int, n * 2.0^(-k) / nthreads), 1)
+#         for tid=1:nthreads
+#             r = i:min(n, i + package_length)
+#             push!(packages, r)
+#             i += length(r)
+#             if i ≥ n
+#                 break
+#             end
+#         end
+#         k += 1
+#     end
+#     packages
+# end
 
 end
