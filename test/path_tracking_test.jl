@@ -31,7 +31,7 @@
     R = PathTracking.track(t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
     @test R isa PathTracking.PathTrackerResult
     @test R.returncode == :success
-    @test R.res < 1e-11
+    @test R.res < 1e-7
 
     out = Problems.embed(P, first(start_sols))
     retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
@@ -89,5 +89,5 @@ end
     PathTracking.fixpatch!(tracker, true)
     PathTracking.track(tracker, r1.x, 0.1, 0.0)
 
-    @test r1.x == PathTracking.patch(tracker.cache)
+    @test all(r1.x .≈ PathTracking.patch(tracker.cache))
 end
