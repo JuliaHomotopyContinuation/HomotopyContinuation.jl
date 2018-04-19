@@ -12,11 +12,13 @@ module HomotopyContinuation
         PathTracking,
         Predictors,
         Problems,
+        ProjectiveVectors,
         StepSize,
         Systems,
         Utilities
 
     include("utilities.jl")
+    include("projective_vectors.jl")
     include("systems.jl")
     include("homotopies.jl")
     include("problems.jl")

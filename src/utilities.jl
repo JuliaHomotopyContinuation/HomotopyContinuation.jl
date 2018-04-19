@@ -10,12 +10,8 @@ export allvariables,
     homogenize,
     totaldegree,
     solve_with_lu_inplace!,
-    ProjectiveVector,
-    sine_distance,
-    dsin,
-    riemann_distance,
-    distance,
     infinity_norm,
+    unsafe_infinity_norm,
     batches
 
 
@@ -257,15 +253,7 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
     end
     sqrt(m)
 end
-function infinity_norm(z::AbstractVector{<:Complex}, eᵢ::Int)
-    normalizer = inv(z[eᵢ])
-    m = abs2(z[1] * normalizer)
-    @inbounds for k=2:length(z)
-        m = max(m, abs2(z[k] * normalizer))
-    end
-    sqrt(m)
-end
-infinity_norm(z) = norm(z, Inf) # fallback
+unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 
 function Base.findmax(f, xs)

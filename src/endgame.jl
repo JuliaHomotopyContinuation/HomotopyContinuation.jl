@@ -29,12 +29,12 @@ end
 
 include("endgames/cauchy.jl")
 
-mutable struct EndgamerState{T}
-    xs::NTuple{3, Vector{T}}
+mutable struct EndgamerState{V}
+    xs::NTuple{3, V}
     R::Float64
 
-    p::Vector{T}
-    pprev::Vector{T}
+    p::V
+    pprev::V
 
     npredictions::Int
     iter::Int
@@ -100,9 +100,9 @@ end
 * `npredictions`: The number of predictions.
 * `iters`: The number of iterations.
 """
-struct EndgamerResult{T}
+struct EndgamerResult{V}
     returncode::Symbol
-    x::Vector{T}
+    x::V
     t::Float64
     windingnumber_estimate::Int
     npredictions::Int
@@ -165,7 +165,7 @@ Try to predict the value of the path `x(t)` and `t=0.0`.
     if retcode == :success
         state.npredictions += 1
         state.windingnumber_estimate = windingnumber
-        if infinity_norm(p, 1) > endgamer.options.maxnorm
+        if infinity_norm(p) > endgamer.options.maxnorm
             endgamer.state.status = :at_infinity
         end
     elseif retcode ≠ :heuristic_failed
@@ -218,7 +218,7 @@ function moveforward!(endgamer::Endgamer)
         state.status = :ill_conditioned_zone
         return nothing
     end
-    if infinity_norm(x, 1) > endgamer.options.maxnorm
+    if infinity_norm(x) > endgamer.options.maxnorm
         state.status = :at_infinity
         state.p .= x
     end

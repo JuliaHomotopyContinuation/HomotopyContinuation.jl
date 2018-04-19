@@ -1,5 +1,7 @@
 module AffinePatches
 
+import ..ProjectiveVectors: PVector, raw
+
 export AbstractPatch,
     AbstractLocalAffinePatch,
     precondition!,

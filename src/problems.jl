@@ -1,11 +1,14 @@
 module Problems
 
-using ..Utilities
-import ..Systems: SPSystem
-import ..Homotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
-
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
+
+
+import ..Homotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
+import ..ProjectiveVectors
+import ..Systems: SPSystem
+
+using ..Utilities
 
 # STAGE 1 exports
 export AbstractDynamicProblem,
@@ -23,9 +26,7 @@ export AbstractProblem,
     ProjectiveStartTargetProblem,
     homotopy,
     homogenization_strategy,
-    emebd
-
-
+    embed
 
 # STAGE 1
 
@@ -177,9 +178,9 @@ function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, Null
 end
 function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, DefaultHomogenization}, x) where {M, N}
     if length(x) == N
-        return x
+        return ProjectiveVectors.PVector(x, 1)
     elseif length(x) == N - 1
-        return [one(eltype(x)); x]
+        return ProjectiveVectors.embed(x, 1)
     end
     throw(error("The length of the intial solution is $(length(x)) but expected length $N or $(N-1)."))
 end

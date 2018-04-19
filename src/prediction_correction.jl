@@ -51,19 +51,19 @@ Perform a prediction-correction step and store the result in `x` if successfull.
 the correction was sucessfull, otherwise `(false, status)` where `status` is either `:ok` or an error code.
 """
 @inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, Δt, tol, maxiters)
-    try
-        xnext = cache.xnext
-        Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
-        result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
-        if result.converged
-            x .= xnext
-            return (true, :ok)
-        else
-            return (false, :ok)
-        end
-    catch
-        return (false, :predictor_corrector_failed)
+    # try
+    xnext = cache.xnext
+    Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
+    result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
+    if result.converged
+        x .= xnext
+        return (true, :ok)
+    else
+        return (false, :ok)
     end
+    # catch err
+    #     return (false, :predictor_corrector_failed)
+    # end
 end
 
 """
