@@ -32,7 +32,7 @@ end
 
 function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     endgame_start=0.1,
-    pathcrossing_tol=1e-10,
+    pathcrossing_tol=1e-6,
     kwargs...)
     !(t₀ ≤ endgame_start ≤ t₁) && throw(error("`endgame_start` has to be between `t₁` and`t₀`"))
 

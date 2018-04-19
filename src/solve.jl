@@ -43,6 +43,6 @@ function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
 end
 
 function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; kwargs...)
-    solver = Solving.Solver(prob, start_solutions, t₁, t₀)
+    solver = Solving.Solver(prob, start_solutions, t₁, t₀; kwargs...)
     Solving.solve(solver)
 end
