@@ -65,7 +65,7 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
     NewtonCache(A, b)
 end
 
-function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache{N, N}, x, t, tol, maxiters) where N
+function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, t, tol, maxiters)
     A, b = cache.A, cache.b
     evaluate_and_jacobian!(b, A, H, x, t)
     solve_with_lu_inplace!(A, b)

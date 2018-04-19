@@ -28,7 +28,7 @@ abstract type AbstractPredictor end
 abstract type AbstractPredictorCache end
 
 """
-    cache(::AbstractPredictor, ::HomotopyWithCache{M, N}, x, t)::AbstractPredictorCache
+    cache(::AbstractPredictor, ::HomotopyWithCache, x, t)::AbstractPredictorCache
 
 Construct a cache to avoid allocations.
 """
@@ -75,7 +75,7 @@ function minus_x_prime!(out, H, x, t, A)
 end
 
 
-function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache{N, N}, x, t, Δt) where N
+function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t, Δt)
     minus_x_prime!(cache.b, H, x, t, cache.A)
     @. xnext = x - Δt * cache.b
     nothing
@@ -101,7 +101,7 @@ function cache(::RK4, H, x, t)
     RK4Cache(jacobian(H, x, t), k1, copy(k1), copy(k1), copy(k1))
 end
 #
-function predict!(xnext, ::RK4, cache::RK4Cache, H::HomotopyWithCache{N, N}, x, t, Δt) where N
+function predict!(xnext, ::RK4, cache::RK4Cache, H::HomotopyWithCache, x, t, Δt)
     mk₁, mk₂, mk₃, mk₄ = cache.k1, cache.k2, cache.k3, cache.k4
 
     minus_x_prime!(mk₁, H, x, t, cache.A)

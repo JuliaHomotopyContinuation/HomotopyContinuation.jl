@@ -13,14 +13,18 @@ import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
 
 Augment the homotopy `H` with the given patch `v`. This results in the system `[H(x,t); v ⋅ x - 1]`
 """
-struct PatchedHomotopy{M, N, H<:AbstractHomotopy, V<:AbstractProjectiveVector} <: AbstractHomotopy{M, N}
+struct PatchedHomotopy{H<:AbstractHomotopy, V<:AbstractProjectiveVector} <: AbstractHomotopy
     homotopy::H
     patch::V
+    size::NTuple{2, Int}
 end
 
-function PatchedHomotopy(hom::H, patch::V) where {M, N, H<:AbstractHomotopy{M, N}, V<:PVector}
-   PatchedHomotopy{M+1, N, H, V}(hom, patch)
+function PatchedHomotopy(H::AbstractHomotopy, patch::PVector)
+    m, n = size(H)
+    PatchedHomotopy(H, patch, (m+1, n))
 end
+
+Base.size(H::PatchedHomotopy{Hom, <:PVector}) where Hom = H.size
 
 """
     patch(H::PatchedHomotopy)
@@ -40,7 +44,8 @@ function Homotopies.cache(ph::PatchedHomotopy, x, t)
     PatchedHomotopyCache(H.cache, jacobian(H, x, t), H(x, t))
 end
 
-function evaluate!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function evaluate!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     # H(x, t)
     evaluate!(c.b, H.homotopy, x, t, c.cache)
     @inbounds for i=1:(M-1)
@@ -54,7 +59,8 @@ function evaluate!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) w
     @inbounds u[M] = out
     u
 end
-function jacobian!(U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function jacobian!(U, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     # J_H(x, t)
     jacobian!(c.A, H.homotopy, x, t, c.cache)
     @inbounds for j=1:N, i=1:(M-1)
@@ -67,7 +73,8 @@ function jacobian!(U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) w
     U
 end
 
-function dt!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function dt!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
     dt!(c.b, H.homotopy, x, t, c.cache)
     @inbounds for i=1:(M-1)
@@ -77,7 +84,8 @@ function dt!(u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {
     u
 end
 
-function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     evaluate_and_jacobian!(c.b, c.A, H.homotopy, x, t, c.cache)
     # jacobian
     @inbounds for j=1:N, i=1:(M-1)
@@ -100,7 +108,8 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy{M, N}, x, t, c::Patched
     nothing
 end
 
-function jacobian_and_dt!(U, u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function jacobian_and_dt!(U, u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     A, b = c.A, c.b
     jacobian_and_dt!(A, b, H.homotopy, x, t, c.cache)
     # jacobian
@@ -120,18 +129,23 @@ function jacobian_and_dt!(U, u, H::PatchedHomotopy{M, N}, x, t, c::PatchedHomoto
     nothing
 end
 
-function evaluate(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function evaluate(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     evaluate!(similar(c.b, M), H, x, t, c)
 end
-function jacobian(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function jacobian(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     jacobian!(similar(c.A, M, N), H, x, t, c)
 end
-function dt(H::PatchedHomotopy{M, N}, x, t, c::PatchedHomotopyCache) where {M, N}
+function dt(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     dt!(similar(c.b, M), H, x, t, c)
 end
 function jacobian_and_dt(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     jacobian_and_dt!(similar(c.A, M, N), similar(c.b, M), H, x, t, c)
 end
 function evaluate_and_jacobian(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
+    M, N = size(H)
     evaluate_and_jacobian!(similar(c.b, M), similar(c.A, M, N), H, x, t, c)
 end

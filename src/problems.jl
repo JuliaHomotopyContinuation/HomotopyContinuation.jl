@@ -172,11 +172,13 @@ homogenization_strategy(prob::ProjectiveStartTargetProblem) = prob.homogenizatio
 
 Embed the solution `x` into projective space if necessary.
 """
-function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, NullHomogenization}, x) where {M, N}
+function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, NullHomogenization}, x)
+    M, N = size(homotopy(prob))
     length(x) != N && throw(error("The length of the intial solution is $(length(x)) but expected length $N."))
     return x
 end
-function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy{M, N}, DefaultHomogenization}, x) where {M, N}
+function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, DefaultHomogenization}, x)
+    M, N = size(homotopy(prob))
     if length(x) == N
         return ProjectiveVectors.PVector(x, 1)
     elseif length(x) == N - 1

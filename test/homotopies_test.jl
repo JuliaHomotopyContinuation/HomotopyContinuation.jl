@@ -14,7 +14,6 @@
 
     H = Hom.StraightLineHomotopy(F, G)
     @test H isa Hom.AbstractStartTargetHomotopy
-    @test H isa Hom.AbstractStartTargetHomotopy{6, 6}
     @test size(H) == (6, 6)
 
     Hom.evaluate!(u, H, x, t)
