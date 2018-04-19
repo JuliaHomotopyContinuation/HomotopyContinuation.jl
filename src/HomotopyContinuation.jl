@@ -28,7 +28,6 @@ module HomotopyContinuation
     include("affine_patches.jl")
     include("step_length.jl")
 
-    include("path_trackers.jl")
     include("path_tracking.jl")
     include("endgame.jl")
 

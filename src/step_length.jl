@@ -50,7 +50,8 @@ function current_steplength end
 """
     relsteplength(state)
 
-Return the current steplength in a relative measure.
+Return the current steplength in a relative measure. This is always a positive
+number and always between 0.0 and 1.0.
 """
 function relsteplength end
 
@@ -116,7 +117,7 @@ function reset!(state::HeuristicStepLengthState, step::HeuristicStepLength, star
 end
 
 
-relsteplength(state::HeuristicStepLengthState) = state.steplength / state.length_start_target
+relsteplength(state::HeuristicStepLengthState) = min(state.steplength / state.length_start_target, 1.0)
 
 function update!(state::HeuristicStepLengthState, step::HeuristicStepLength, success)
     curr_steplength = state.steplength

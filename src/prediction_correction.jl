@@ -50,20 +50,20 @@ end
 Perform a prediction-correction step and store the result in `x` if successfull. Returns `(true, :ok)` if
 the correction was sucessfull, otherwise `(false, status)` where `status` is either `:ok` or an error code.
 """
-@inline function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, Δt, tol, maxiters)
-    # try
-    xnext = cache.xnext
-    Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
-    result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
-    if result.converged
-        x .= xnext
-        return (true, :ok)
-    else
-        return (false, :ok)
+function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, Δt, tol, maxiters)
+    try
+        xnext = cache.xnext
+        Predictors.predict!(xnext, PC.predictor, cache.predictor, H, x, t, Δt)
+        result = Correctors.correct!(xnext, PC.corrector, cache.corrector, H, xnext, t + Δt, tol, maxiters)
+        if result.converged
+            x .= xnext
+            return (true, :ok)
+        else
+            return (false, :ok)
+        end
+    catch err
+        return (false, :predictor_corrector_failed)
     end
-    # catch err
-    #     return (false, :predictor_corrector_failed)
-    # end
 end
 
 """
@@ -72,20 +72,18 @@ end
 Perform a correction step and store the result in `x` if the new residual is better than the initial one.
 Returns the achieved residual.
 """
-@inline function refine!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, tol, maxiters)
-    res₀ = infinity_norm(H(x, t))
+function refine!(x, PC::PredictorCorrector, cache::PredictorCorrectorCache, H, t, tol, maxiters, res₀)
     if res₀ < tol
         return res₀
     end
     try
         result = Correctors.correct!(cache.xnext, PC.corrector, cache.corrector, H, x, t, tol, maxiters)
-        if result.converged && result.res < res₀
+        if result.res < res₀
             x .= cache.xnext
             return result.res
         end
         return res₀
-    catch err
-        warn(err)
+    catch
         return res₀
     end
 end
