@@ -61,6 +61,7 @@ end
 
 init_patch(::OrthogonalPatch, x) = x
 function update_patch!(v, ::OrthogonalPatch, x)
+    normalize!(x)
     v .= x
     nothing
 end

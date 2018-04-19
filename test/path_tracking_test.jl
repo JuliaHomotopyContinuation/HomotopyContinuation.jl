@@ -31,7 +31,7 @@
     R = PathTracking.track(t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
     @test R isa PathTracking.PathTrackerResult
     @test R.returncode == :success
-    @test R.res < 1e-11
+    @test R.res < 1e-7
 
     out = Problems.embed(P, first(start_sols))
     retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
@@ -73,4 +73,21 @@ end
     @test PathTracking.curriters(tracker) < 3
     x = PathTracking.currx(tracker)
     @test norm(x[2:end] / x[1] - A \ b) < 1e-12
+end
+
+@testset "fixedpatch" begin
+
+    F = equations(katsura5())
+    TDP = Problems.TotalDegreeProblem(F)
+    P = Problems.ProjectiveStartTargetProblem(TDP)
+    start_sols = Utilities.totaldegree_solutions(F) |> collect
+
+    # test construction
+    tracker = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1)
+    r1 = PathTracking.track(tracker, Problems.embed(P, start_sols[1]), 1.0, 0.1)
+
+    PathTracking.fixpatch!(tracker, true)
+    PathTracking.track(tracker, r1.x, 0.1, 0.0)
+
+    @test all(r1.x .≈ PathTracking.patch(tracker.cache))
 end

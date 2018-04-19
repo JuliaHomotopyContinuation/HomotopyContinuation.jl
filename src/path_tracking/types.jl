@@ -19,21 +19,19 @@ export PathTracker,
     set_tol!,
     set_corrector_maxiters!,
     set_refinement_tol!,
-    set_refinement_maxiters!
+    set_refinement_maxiters!,
+    fixpatch!
 
 
-"""
-    Options(;options..)
 
-The possible options used for the pathtracker are:
-
-"""
 mutable struct Options
     tol::Float64
     corrector_maxiters::Int
     refinement_tol::Float64
     refinement_maxiters::Int
     maxiters::Int
+    # we can disable an updating of the patch
+    fixedpatch::Bool
 end
 
 mutable struct State{S<:StepLength.AbstractStepLengthState}
@@ -153,7 +151,8 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.Abs
     refinement_tol=1e-11,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
-    maxiters=10_000)
+    maxiters=10_000,
+    fixedpatch=false)
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
@@ -161,7 +160,7 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.Abs
 
     state = State(H, steplength, x, t₁, t₀)
     cache = Cache(H, patch, predictor_corrector, state, x)
-    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters)
+    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters, fixedpatch)
 
     PathTracker(H, patch, predictor_corrector, steplength, state, options, x, cache)
 end
@@ -275,6 +274,16 @@ Set the current correction maxiters to `n`.
 function set_corrector_maxiters!(tracker::PathTracker, n)
      tracker.options.corrector_maxiters = n
      n
+end
+
+"""
+     fixedpatch!(tracker::PathTracker, flag::Bool)
+
+Set whether the current (local) affine patch should be fixed and shouldn't be updatet anymore.
+"""
+function fixpatch!(tracker::PathTracker, flag)
+     tracker.options.fixedpatch = flag
+     nothing
 end
 
 
