@@ -58,10 +58,12 @@ function setup!(tracker::PathTracker, x₁, t₁, t₀)
     S.Δt = StepLength.relsteplength(S.steplength)
     S.status = :ok
 
-    # TODO: We don't need to reset this if the tracker merely stopped and resumes now
     S.iters = 0
     tracker.x .= x₁
-    AffinePatches.precondition!(patch(tracker.cache), tracker.x, tracker.patch)
+    if !tracker.options.fixedpatch
+        AffinePatches.precondition!(patch(tracker.cache), tracker.x, tracker.patch)
+    end
+
     checkstartvalue!(tracker)
     tracker
 end
@@ -94,7 +96,7 @@ function step!(tracker)
 
     update_t_Δt!(tracker.state, tracker.steplength, step_successfull)
 
-    if step_successfull
+    if step_successfull && !tracker.options.fixedpatch
         # Since x changed we should update the patch
         AffinePatches.update_patch!(patch(cache), tracker.patch, currx(tracker))
     end
