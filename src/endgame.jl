@@ -83,7 +83,7 @@ end
 
 
 function Endgamer(alg::AbstractEndgame, tracker::PathTracking.PathTracker, t=0.1, options=EndgameOptions())
-    x = PathTracking.current_x(tracker)
+    x = PathTracking.currx(tracker)
     alg_cache = cache(alg, x)
     alg_state = state(alg, x)
 

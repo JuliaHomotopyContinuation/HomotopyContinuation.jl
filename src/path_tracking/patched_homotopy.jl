@@ -6,20 +6,19 @@ import ..Homotopies: AbstractHomotopy, AbstractHomotopyCache, HomotopyWithCache,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt
 import ..Homotopies
-import ..ProjectiveVectors: AbstractProjectiveVector, raw
+import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
 
 """
-    PatchedHomotopy(H::AbstractHomotopy, v::Vector)
+    PatchedHomotopy(H::AbstractHomotopy, v::AbstractProjectiveVector)
 
-Augment the homotopy `H` with the given patch. This results in the system `[H(x,t); v ⋅ x - 1]`
-where `v` is defined by `patch`.
+Augment the homotopy `H` with the given patch `v`. This results in the system `[H(x,t); v ⋅ x - 1]`
 """
 struct PatchedHomotopy{M, N, H<:AbstractHomotopy, V<:AbstractProjectiveVector} <: AbstractHomotopy{M, N}
     homotopy::H
     patch::V
 end
 
-function PatchedHomotopy(hom::H, patch::V) where {M, N, H<:AbstractHomotopy{M, N}, V}
+function PatchedHomotopy(hom::H, patch::V) where {M, N, H<:AbstractHomotopy{M, N}, V<:PVector}
    PatchedHomotopy{M+1, N, H, V}(hom, patch)
 end
 
