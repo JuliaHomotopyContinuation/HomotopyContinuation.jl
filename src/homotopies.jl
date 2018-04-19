@@ -25,11 +25,11 @@ export HomotopyWithCache
 
 
 """
-    AbstractHomotopy{M, N}
+    AbstractHomotopy
 
-Representing a homotopy between `M` functions in `N` variables.
+Representing a homotopy.
 """
-abstract type AbstractHomotopy{M, N} end
+abstract type AbstractHomotopy end
 
 """
     AbstractStartTargetHomotopy
@@ -37,7 +37,7 @@ abstract type AbstractHomotopy{M, N} end
 An homotopy with an explicit start and an explicit target system.
 The systems should be of type [`AbstractSystem`](@ref).
 """
-abstract type AbstractStartTargetHomotopy{M, N} <: AbstractHomotopy{M, N} end
+abstract type AbstractStartTargetHomotopy <: AbstractHomotopy end
 
 """
     start(::AbstractStartTargetHomotopy{M,N})::AbstractSystem{M,N}
@@ -54,7 +54,7 @@ Returns the target system.
 function target end
 
 
-abstract type AbstractParameterHomotopy{M, N} <: AbstractHomotopy{M, N} end
+abstract type AbstractParameterHomotopy <: AbstractHomotopy end
 
 
 # Cache
@@ -167,26 +167,20 @@ function jacobian_and_dt(H::AbstractHomotopy, x, t, c=cache(H, x, t))
 end
 
 
-# derive
-Base.size(H::AbstractHomotopy{M, N}) where {M, N} = (M, N)
 
 """
     nvariables(H::AbstractHomotopy)
 
 Returns the number of variables of the homotopy `H`.
 """
-nvariables(H::AbstractHomotopy{M, N}) where {M, N} = N
+nvariables(H::AbstractHomotopy) = last(size(H))
 
 
-struct HomotopyWithCache{M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache} <: AbstractHomotopy{M, N}
+struct HomotopyWithCache{H<:AbstractHomotopy, C<:AbstractHomotopyCache} <: AbstractHomotopy
     homotopy::H
     cache::C
 end
 
-# TODO: What to do with cache? Should we dispatch at the top on the NullCache similar to the Systems case?
-function HomotopyWithCache(hom::H, cache::C) where {M, N, H<:AbstractHomotopy{M, N}, C<:AbstractHomotopyCache}
-    HomotopyWithCache{M, N, H, C}(hom, cache)
-end
 HomotopyWithCache(H::AbstractHomotopy, x, t) = HomotopyWithCache(H, cache(H, x, t))
 
 (H::HomotopyWithCache)(x, t) = evaluate(H, x, t)
@@ -224,7 +218,7 @@ struct StartTargetHomotopyCache{SC, TC, T1, T2} <: AbstractHomotopyCache
     U::Matrix{T2} # for Jacobian
 end
 
-function cache(H::AbstractStartTargetHomotopy{M, N}, x, t) where {M, N}
+function cache(H::AbstractStartTargetHomotopy, x, t)
     start_cache = Systems.cache(H.start, x)
     target_cache = Systems.cache(H.target, x)
 
@@ -241,24 +235,20 @@ end
 
 Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
 """
-struct StraightLineHomotopy{
-    M, N,
-    Start<:AbstractSystem{M, N},
-    Target<:AbstractSystem{M, N}
-    } <: AbstractStartTargetHomotopy{M, N}
-    start::Start
-    target::Target
-
+struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractStartTargetHomotopy
+    start::S
+    target::T
     gamma::Complex{Float64}
-end
-function StraightLineHomotopy(start::S, target::T; gamma=cis(2π * rand())) where
-    {M, N, S<:AbstractSystem{M, N}, T<:AbstractSystem{M, N}}
 
-    StraightLineHomotopy{M, N, S, T}(start, target, gamma)
+end
+function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem; gamma=cis(2π * rand()))
+    StraightLineHomotopy(start, target, gamma)
 end
 
 start(H::StraightLineHomotopy) = H.start
 target(H::StraightLineHomotopy) = H.target
+
+Base.size(H::StraightLineHomotopy) = size(H.start)
 
 """
     gamma(H::StraightLineHomotopy)

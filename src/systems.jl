@@ -19,11 +19,11 @@ export NullCache,
     SPSystem
 
 """
-    AbstractSystem{M, N}
+    AbstractSystem
 
-Representing a system of `M` functions in `N` variables.
+Representing a system of polynomials.
 """
-abstract type AbstractSystem{M, N} end
+abstract type AbstractSystem end
 
 """
     AbstractSystemCache
@@ -101,9 +101,6 @@ function evaluate_and_jacobian(F::AbstractSystem, x, cache)
     u, U
 end
 
-# Derived
-Base.size(S::AbstractSystem{M, N}) where {M, N} = (M, N)
-
 
 # StaticPolynomialsSystem implementation
 
@@ -112,13 +109,14 @@ Base.size(S::AbstractSystem{M, N}) where {M, N} = (M, N)
 
 Create a system using the `StaticPolynomials` package.
 """
-struct SPSystem{M, N, T, S<:SP.AbstractSystem{T, M, N}} <: AbstractSystem{M, N}
+struct SPSystem{S<:SP.AbstractSystem} <: AbstractSystem
     system::S
 end
 
-SPSystem(s::S) where {T,M,N,S<:SP.AbstractSystem{T,M,N}} = SPSystem{M, N, T, S}(s)
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.system(polys, vars))
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.system(polys))
+
+Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))
 
 evaluate!(u, F::SPSystem, x) = SP.evaluate!(u, F.system, x)
 evaluate(F::SPSystem, x) = SP.evaluate(F.system, x)
