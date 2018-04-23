@@ -13,7 +13,7 @@ module HomotopyContinuation
         Predictors,
         Problems,
         ProjectiveVectors,
-        StepSize,
+        StepLength,
         Systems,
         Utilities
 

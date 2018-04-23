@@ -40,7 +40,7 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     Solver(prob, start_solutions, t₁, t₀, options; kwargs...)
 end
 
-function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; endgame=Endgame.Cauchy(), endgame_options=Endgame.EndgameOptions(), kwargs...)
+function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
     @assert !isempty(start_solutions) "`start_solutions` are empty"
     if start_solutions isa Vector
         x₁s = start_solutions
@@ -51,7 +51,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₀ isa AbstractVector
 
     tracker = PathTracking.PathTracker(prob, x₀, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(endgame, tracker, options.endgame_start, endgame_options)
+    endgamer = Endgame.Endgamer(tracker, options.endgame_start)
     Solver(prob,
         tracker,
         endgamer,

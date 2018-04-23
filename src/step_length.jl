@@ -91,7 +91,7 @@ function HeuristicStepLength(;initial=0.1,
     increase_factor=2.0,
     decrease_factor=inv(increase_factor),
     consecutive_successes_necessary=5,
-    maximal_steplength=0.1,
+    maximal_steplength=max(0.1, initial),
     minimal_steplength=1e-14)
 
     HeuristicStepLength(initial, increase_factor,
