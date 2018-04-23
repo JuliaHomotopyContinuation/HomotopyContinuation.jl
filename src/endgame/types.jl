@@ -16,7 +16,7 @@ struct Options
     max_extrapolation_samples::Int
 end
 
-function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-20, maxnorm=1e5, maxwindingnumber=12, max_extrapolation_samples=5)
+function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-20, maxnorm=1e4, maxwindingnumber=12, max_extrapolation_samples=5)
     Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
 end
 
@@ -120,5 +120,5 @@ end
 function EndgamerResult(endgamer::Endgamer)
     S = endgamer.state
 
-    EndgamerResult(S.status, copy(S.p), S.R, S.windingnumber_estimate, S.npredictions, S.iter)
+    EndgamerResult(S.status, copy(S.p), S.R, S.windingnumber_estimate, S.npredictions, S.iters)
 end

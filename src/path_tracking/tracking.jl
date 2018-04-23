@@ -76,7 +76,7 @@ end
 
 function checkstartvalue!(tracker)
     res = currresidual(tracker)
-    if res > tracker.options.tol
+    if res > tracker.options.tol * 10
         tracker.state.status = :invalid_startvalue
     end
     nothing

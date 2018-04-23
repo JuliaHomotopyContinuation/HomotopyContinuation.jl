@@ -29,6 +29,7 @@ end
 function play(endgamer, x, R)
     setup!(endgamer, x, R)
     play!(endgamer)
+    EndgamerResult(endgamer)
 end
 
 function play!(endgamer)
@@ -39,13 +40,13 @@ function play!(endgamer)
         if !confident_in_windingnumber(state, endgamer.options)
             estimate_windingnumber!(endgamer)
         end
-        if confident_in_windingnumber(state, endgamer.options) &&
-            state.windingnumber_estimate == 1
-
-            try_to_jump_to_target!(endgamer)
-        else
-            predict!(endgamer)
-        end
+        # if confident_in_windingnumber(state, endgamer.options) &&
+        #     state.windingnumber_estimate == 1
+        #
+        #     try_to_jump_to_target!(endgamer)
+        # else
+        predict!(endgamer)
+        # end
 
         checkterminate!(state, endgamer.options)
     end
@@ -117,14 +118,17 @@ function estimate_windingnumber!(endgamer)
     # We use the last samples for the prediction
     range = max(1, nsamples - options.max_extrapolation_samples - 1):nsamples
     extrapolated_w = extrapolate_winding_number(
-        rand(state.logabs_samples),
+        state.logabs_samples[1],
         range,
         options.sampling_factor,
         endgamer.cache.windingnumber_extrapolation_buffer)
 
     # we round since the winding number is an integer
     w = round(Int, extrapolated_w)
-    if w == state.windingnumber_estimate
+    if w < 1
+        state.cons_matching_estimates = 0
+        state.windingnumber_estimate = 1
+    elseif w == state.windingnumber_estimate
         state.cons_matching_estimates += 1
     else
         state.cons_matching_estimates = 0

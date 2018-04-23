@@ -29,7 +29,6 @@ function pathcrossing_check!(tracked_paths, solver)
     original_corrector_maxiters = PathTracking.corrector_maxiters(tracker)
 
     PathTracking.set_tol!(tracker, min(original_tol * 1e-2, 1e-8))
-
     dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, solver.start_solutions) do x₀
         trackpath(solver, x₀, t₁, t₀)
     end
@@ -37,6 +36,8 @@ function pathcrossing_check!(tracked_paths, solver)
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
 
     if isempty(crossed_paths_indices)
+        PathTracking.set_tol!(tracker, original_tol)
+
         return (ncrossedpaths, [])
     end
 
