@@ -111,7 +111,7 @@ end
      results::Vector{<:Endgame.EndgamerResult},
      start_solutions, t₀, v, J)
      map(results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, r.windingnumber, r.npredictions, v, J)
+         PathResult(strategy, H, x₁, t₀, r.x.data, real(r.t), r.returncode, r.iters, r.windingnumber, r.npredictions, v, J)
      end
  end
 
@@ -128,6 +128,6 @@ function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
      trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
      start_solutions, t₀, v, J)
      map(trackedpath_results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, 1, 0, v, J)
+         PathResult(strategy, H, x₁, t₀, r.x.data, real(r.t), r.returncode, r.iters, 1, 0, v, J)
      end
 end

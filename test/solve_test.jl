@@ -7,6 +7,14 @@
     @test count(r -> r.returncode == :success, result) == 32
     result = solve(F,  tol=1e-5)
     @test count(r -> r.returncode == :success, result) == 32
+
+    @test string.(result) isa Vector{String}
+end
+
+@testset "solve - no endgame" begin
+    F = equations(katsura5())
+    # no endgame
+    @test count(r -> r.returncode == :success, solve(F, endgame_start=0.0)) == 32
 end
 
 @testset "Path Crossing" begin
