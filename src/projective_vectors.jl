@@ -1,7 +1,7 @@
 module ProjectiveVectors
 
 import Base: ==
-import ..Utilities: infinity_norm
+import ..Utilities: infinity_norm, unsafe_infinity_norm
 
 export AbstractProjectiveVector,
     PVector,
@@ -12,7 +12,6 @@ export AbstractProjectiveVector,
     affine!,
     embed,
     at_infinity,
-    raw,
     pvectors,
     infinity_norm,
     infinity_norm_fast,
@@ -51,6 +50,7 @@ the vector into some function which does not know the
 projective structure.
 """
 raw(z::PVector) = z.data
+raw(z) = z
 
 """
     homvar(z::PVector)

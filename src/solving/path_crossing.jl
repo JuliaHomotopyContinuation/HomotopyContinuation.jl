@@ -17,6 +17,7 @@ function pathcrossing_check!(tracked_paths, solver)
 
     # We start with a list of all indices where some crossing happened.
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
+    @show 1 crossed_paths_indices
 
     ncrossedpaths = length(crossed_paths_indices)
     # No paths crossed -> done :)
@@ -34,6 +35,7 @@ function pathcrossing_check!(tracked_paths, solver)
     end
 
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
+    @show 2 crossed_paths_indices
 
     if isempty(crossed_paths_indices)
         PathTracking.set_tol!(tracker, original_tol)
@@ -42,7 +44,8 @@ function pathcrossing_check!(tracked_paths, solver)
     end
 
     # Now we are trying it with less corrector steps
-    PathTracking.set_corrector_maxiters!(tracker, min(original_corrector_maxiters - 1, 3))
+    PathTracking.set_tol!(tracker, 1e-13)
+    PathTracking.set_corrector_maxiters!(tracker, 1)
 
     dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, solver.start_solutions) do x₀
         trackpath(solver, x₀, t₁, t₀)
@@ -53,6 +56,7 @@ function pathcrossing_check!(tracked_paths, solver)
     PathTracking.set_corrector_maxiters!(tracker, original_corrector_maxiters)
 
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
+    @show crossed_paths_indices
 
     return (ncrossedpaths, crossed_paths_indices)
 end

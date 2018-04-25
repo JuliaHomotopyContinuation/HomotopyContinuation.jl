@@ -40,13 +40,8 @@ function play!(endgamer)
         if !confident_in_windingnumber(state, endgamer.options)
             estimate_windingnumber!(endgamer)
         end
-        # if confident_in_windingnumber(state, endgamer.options) &&
-        #     state.windingnumber_estimate == 1
-        #
-        #     try_to_jump_to_target!(endgamer)
-        # else
+
         predict!(endgamer)
-        # end
 
         checkterminate!(state, endgamer.options)
     end
@@ -191,16 +186,17 @@ function predict!(endgamer::Endgamer)
     state = endgamer.state
 
     # We do a prediction if we have at least 2 estimates
-    if state.cons_matching_estimates ≥ 2
+    # or at least 10 iterations
+    if state.cons_matching_estimates ≥ 2 || state.iters > 10
         state.pprev .= state.p
+
 
         # we try to fit a power series
         buffer = endgamer.cache.fitpowerseries_buffer
-        range = max(1, state.nsamples - state.cons_matching_estimates + 1):state.nsamples
+        range = max(1, state.nsamples - 5):state.nsamples
         resize_buffer!(buffer, length(range))
         fitpowerseries!(state.p, state.samples, range, endgamer.options.sampling_factor,
             state.windingnumber_estimate, buffer)
-
         state.npredictions += 1
     end
     nothing
