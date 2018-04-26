@@ -16,7 +16,7 @@ struct Options
     max_extrapolation_samples::Int
 end
 
-function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-12, maxnorm=1e4, maxwindingnumber=12, max_extrapolation_samples=5)
+function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-12, maxnorm=1e5, maxwindingnumber=12, max_extrapolation_samples=5)
     Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
 end
 
@@ -28,6 +28,7 @@ mutable struct State{V, T}
     # The data structure is that `logabs_samples` Contains a vector for each
     # coordinate.
     logabs_samples::Vector{Vector{T}}
+    directions::Vector{T}
 
     R::Float64
 
@@ -53,6 +54,7 @@ function State(x, R₀::Float64)
     samples = [copy(x)]
     nsamples = 1
     logabs_samples = [[logabs(x[i])] for i=1:length(x)]
+    directions = zeros(typeof(logabs_samples[1][1]), length(x))
 
     p = copy(x)
     pprev = copy(x)
@@ -63,21 +65,24 @@ function State(x, R₀::Float64)
     status = :ok
     windingnumber_estimate = 1
     cons_matching_estimates = 0
-    State(samples, nsamples, logabs_samples,
+    State(samples, nsamples, logabs_samples, directions,
         R₀, p, pprev, npredictions, iters, status,
         windingnumber_estimate,
         cons_matching_estimates)
 end
 
 struct Cache{V}
-    windingnumber_extrapolation_buffer::Vector{Float64}
+    # windingnumber_extrapolation_buffer::Vector{Float64}
+    windingnumbers::Vector{Int}
+    direction_buffer::Vector{Float64}
     fitpowerseries_buffer::Vector{V}
 end
 
 function Cache(state::State, options::Options)
-    windingnumber_extrapolation_buffer = zeros(options.max_extrapolation_samples + 1)
+    windingnumbers = zeros(Int, length(state.logabs_samples))
+    direction_buffer = zeros(options.max_extrapolation_samples + 1)
     fitpowerseries_buffer = deepcopy(state.samples)
-    Cache(windingnumber_extrapolation_buffer,
+    Cache(windingnumbers, direction_buffer,
         fitpowerseries_buffer)
 end
 

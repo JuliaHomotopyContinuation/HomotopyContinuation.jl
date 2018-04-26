@@ -1,3 +1,5 @@
+import ..ProjectiveVectors
+
 function setup!(endgamer, x, R::Float64)
     state = endgamer.state
 
@@ -13,6 +15,7 @@ function setup!(endgamer, x, R::Float64)
         empty!(state.logabs_samples[i])
         push!(state.logabs_samples[i], logabs(x[i]))
     end
+    state.directions .= 0.0
 
     state.npredictions = 0
     state.iters = 0
@@ -37,11 +40,11 @@ function play!(endgamer)
     while state.status == :ok
         nextsample!(endgamer)
 
-        if !confident_in_windingnumber(state, endgamer.options)
-            estimate_windingnumber!(endgamer)
-        end
+        estimate_windingnumber!(endgamer)
 
-        predict!(endgamer)
+        if !checkatinfinity!(endgamer)
+            predict!(endgamer)
+        end
 
         checkterminate!(state, endgamer.options)
     end
@@ -57,6 +60,7 @@ function confident_in_windingnumber(state::State, options::Options)
     end
     true
 end
+
 
 """
     nextsample!(endgamer)
@@ -74,7 +78,6 @@ function nextsample!(endgamer::Endgamer)
 
     retcode = PathTracking.track!(endgamer.tracker, state.samples[state.nsamples], R, λR)
     if retcode != :success
-        warn(retcode)
         state.status = :tracker_failed
         return nothing
     end
@@ -95,13 +98,10 @@ function update_samples!(state, options, x, λR)
         state.samples[state.nsamples] .= x
     end
 
-    # We only need to add new logabs samples if we are still unsure about the
-    # winding number
-    if !confident_in_windingnumber(state, options)
-        for i=1:length(x)
-            push!(state.logabs_samples[i], logabs(x[i]))
-        end
+    for i=1:length(x)
+        push!(state.logabs_samples[i], logabs(x[i]))
     end
+
     nothing
 end
 
@@ -110,16 +110,13 @@ function estimate_windingnumber!(endgamer)
     nsamples = length(state.logabs_samples[1])
     # We need at least 4 samples to estimate the winding number
     nsamples < 4 && return nothing
-    # We use the last samples for the prediction
-    range = max(1, nsamples - options.max_extrapolation_samples - 1):nsamples
-    extrapolated_w = extrapolate_winding_number(
-        state.logabs_samples[1],
-        range,
-        options.sampling_factor,
-        endgamer.cache.windingnumber_extrapolation_buffer)
 
-    # we round since the winding number is an integer
-    w = round(Int, extrapolated_w)
+    logh = fastlog(options.sampling_factor)
+    map!(endgamer.cache.windingnumbers, state.logabs_samples) do samples
+        windingnumber(samples, logh)
+    end
+    w = majority(endgamer.cache.windingnumbers)
+
     if w < 1
         state.cons_matching_estimates = 0
         state.windingnumber_estimate = 1
@@ -133,49 +130,159 @@ function estimate_windingnumber!(endgamer)
     nothing
 end
 
+"""
+    majority(values)
+
+Returns the value which occurs most often in `values`. If there is a tie
+the first one is chosen.
+"""
+function majority(vec::Vector{Int})
+    maxval = 0
+    maxnvals = 0
+    n = length(vec)
+    for i=1:n-1
+        nvals = 1
+        v = vec[i]
+        if v == maxval
+            continue
+        end
+        for j=i+1:n
+            if vec[j] == v
+                nvals += 1
+            end
+        end
+        if nvals > maxnvals
+            maxnvals = nvals
+            maxval = v
+        end
+    end
+    maxval
+end
+
+checkatinfinity!(endgamer) = checkatinfinity!(endgamer, endgamer.state.samples[1])
+function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
+    cache, options, state = endgamer.cache, endgamer.options, endgamer.state
+
+    if state.cons_matching_estimates < 2
+        return false
+    end
+
+    nsamples = length(state.logabs_samples[1])
+    h = options.sampling_factor
+    logh = log(h)
+    w = 1
+
+    homvar = ProjectiveVectors.homvar(x)
+
+    range = max(1, nsamples - options.max_extrapolation_samples + 1):nsamples
+    w₀ = direction(state.logabs_samples[homvar], range, h, logh, cache.direction_buffer)
+
+    maxΔ = abs(w₀ - state.directions[homvar])
+    state.directions[homvar] = w₀
+
+    for (i, samples) in enumerate(state.logabs_samples)
+        i == homvar && continue
+        wᵢ = direction(samples, range, h, logh, cache.direction_buffer)
+        maxΔ = max(maxΔ, abs(wᵢ - state.directions[i]))
+        state.directions[i] = wᵢ
+    end
+
+    if maxΔ > 1e-2
+        return false
+    end
+
+    for (i, wᵢ) in enumerate(state.directions)
+        i == homvar && continue
+        w = wᵢ - w₀
+        if w * state.windingnumber_estimate < -0.99
+            state.status = :at_infinity
+            return true
+        end
+    end
+
+    false
+end
+
+function direction(samples, range, h, logh, buffer)
+    d = inv(1 - h)
+    n = length(range)
+    for (i, k) in enumerate(range.start:range.stop-1)
+        buffer[i] = samples[k+1] - samples[k]
+    end
+    for k=2:n-1, i=1:n-k
+        buffer[i] = muladd((buffer[i+1] - buffer[i]), d, buffer[i])
+    end
+    buffer[1] / logh
+end
+
 
 """
-    extrapolate_winding_number(logabs_samples, range, h, buffer)
+    windingnumber(logabs_samples, logh)
 
-Extrapolate an estimate of the winding number from `logabs_samples[range]`.
+Estimate the current winding number from the samples.
 `logabs_samples` represent the sample points obtained from the geometric
 path samples ``log|x(h^k₀)|``.
-The extrapolation scheme can be interpreted as a special form of Richardson extrapoliation
-and is described in [^1].
-The buffer is needed to avoid allocations and it needs to be at least of length
-`length(range)-1`.
+We compute an error expansion of the fractional power series of the path
+to approximate the winding number. See [^1] for details.
 
 [^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
 """
-function extrapolate_winding_number(logabs_samples, range, h, buffer)
-    # put consecutive differences into buffer
-    cons_diffs = buffer # rename for clarity
-    for (i, k) in enumerate(range.start:range.stop-1)
-        cons_diffs[i] = logabs_samples[k] - logabs_samples[k + 1]
-    end
-    # no we need to compute the error expansion
-    log_err_exp = cons_diffs
-    for i = 1:length(range)-2
-        log_err_exp[i] = logabs(cons_diffs[i] - cons_diffs[i + 1])
-    end
+function windingnumber(logabs_samples, logh)
+    nsamples = length(logabs_samples)
+    Δ = logabs_samples[nsamples-3] - logabs_samples[nsamples-2]
+    Δ1 = logabs_samples[nsamples-2] - logabs_samples[nsamples-1]
+    Δ2 = logabs_samples[nsamples-1] - logabs_samples[nsamples]
 
-    logh = fastlog(h)
-    extrapolation = log_err_exp # we rename the buffer again
-
-    n = length(range) - 3
-    for i = 1:n
-        extrapolation[i] = log_err_exp[i+1] - log_err_exp[i]
-    end
-    w = logh / extrapolation[n]
-    for k = 1:n-1
-        d = inv(h^(k/w) - 1.0)
-        for i=1:n-k
-            extrapolation[i] = muladd((extrapolation[i] - extrapolation[i+1]), d, extrapolation[i])
-        end
-        w = logh / extrapolation[n - k]
-    end
-    w
+    return round(Int, logh / logabs((Δ1 - Δ2) / (Δ - Δ1)))
 end
+
+#
+# It turns out that this extrapolation scheme doesn't seem to work better
+# than the naive way.
+#
+#
+# """
+#     extrapolate_winding_number(logabs_samples, range, h, buffer)
+#
+# Extrapolate an estimate of the winding number from `logabs_samples[range]`.
+# `logabs_samples` represent the sample points obtained from the geometric
+# path samples ``log|x(h^k₀)|``.
+# The extrapolation scheme can be interpreted as a special form of Richardson extrapoliation
+# and is described in [^1].
+# The buffer is needed to avoid allocations and it needs to be at least of length
+# `length(range)-1`.
+#
+# [^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+# """
+# function extrapolate_winding_number(logabs_samples, range, h, buffer)
+#     # put consecutive differences into buffer
+#     cons_diffs = buffer # rename for clarity
+#     for (i, k) in enumerate(range.start:range.stop-1)
+#         cons_diffs[i] = logabs_samples[k] - logabs_samples[k + 1]
+#     end
+#     # no we need to compute the error expansion
+#     log_err_exp = cons_diffs
+#     for i = 1:length(range)-2
+#         log_err_exp[i] = logabs(cons_diffs[i] - cons_diffs[i + 1])
+#     end
+#
+#     logh = fastlog(h)
+#     extrapolation = log_err_exp # we rename the buffer again
+#
+#     n = length(range) - 3
+#     for i = 1:n
+#         extrapolation[i] = log_err_exp[i+1] - log_err_exp[i]
+#     end
+#     w = logh / extrapolation[n]
+#     for k = 1:n-1
+#         d = inv(h^(k/w) - 1.0)
+#         for i=1:n-k
+#             extrapolation[i] = muladd((extrapolation[i] - extrapolation[i+1]), d, extrapolation[i])
+#         end
+#         w = logh / extrapolation[n - k]
+#     end
+#     w
+# end
 
 fastlog(z) = Base.Math.JuliaLibm.log(z)
 
@@ -189,8 +296,6 @@ function predict!(endgamer::Endgamer)
     # or at least 10 iterations
     if state.cons_matching_estimates ≥ 2 || state.iters > 10
         state.pprev .= state.p
-
-
         # we try to fit a power series
         buffer = endgamer.cache.fitpowerseries_buffer
         range = max(1, state.nsamples - 5):state.nsamples
@@ -268,29 +373,4 @@ function checkterminate!(state, options)
         end
     end
     return nothing
-end
-
-
-"""
-    try_to_jump_to_target!(endgamer)
-
-We try to reach the target without using an endgame. If the path tracking failed
-we simply proceed as nothing was. This works well when we actually don't
-need an endgame at all.
-"""
-function try_to_jump_to_target!(endgamer::Endgamer)
-    state = endgamer.state
-
-    if state.status != :ok
-       return nothing
-   end
-
-    retcode = PathTracking.track!(endgamer.tracker, state.samples[end], state.R, 0.0)
-    if retcode == :success
-        state.p .= PathTracking.currx(endgamer.tracker)
-        state.R = 0.0
-        state.status = :success
-        state.npredictions += 1
-    end
-    nothing
 end

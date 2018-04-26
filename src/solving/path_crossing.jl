@@ -17,7 +17,6 @@ function pathcrossing_check!(tracked_paths, solver)
 
     # We start with a list of all indices where some crossing happened.
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
-    @show 1 crossed_paths_indices
 
     ncrossedpaths = length(crossed_paths_indices)
     # No paths crossed -> done :)
@@ -35,7 +34,6 @@ function pathcrossing_check!(tracked_paths, solver)
     end
 
     crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
-    @show 2 crossed_paths_indices
 
     if isempty(crossed_paths_indices)
         PathTracking.set_tol!(tracker, original_tol)
