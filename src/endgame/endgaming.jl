@@ -163,11 +163,12 @@ checkatinfinity!(endgamer) = checkatinfinity!(endgamer, endgamer.state.samples[1
 function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
     cache, options, state = endgamer.cache, endgamer.options, endgamer.state
 
-    if state.cons_matching_estimates < 2
+    nsamples = length(state.logabs_samples[1])
+
+    if nsamples < 8 || state.cons_matching_estimates < 3
         return false
     end
 
-    nsamples = length(state.logabs_samples[1])
     h = options.sampling_factor
     logh = log(h)
     w = 1
