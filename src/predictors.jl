@@ -109,7 +109,7 @@ function predict!(xnext, ::RK4, cache::RK4Cache, H::HomotopyWithCache, x, t, Δt
     @. xnext = x - 0.5Δt * mk₁
     minus_x_prime!(mk₂, H, xnext, t + 0.5Δt, cache.A)
 
-    @. xnext .= x - 0.5Δt * mk₂
+    @. xnext = x - 0.5Δt * mk₂
     minus_x_prime!(mk₃, H, xnext, t + 0.5Δt, cache.A)
 
     @. xnext = x - Δt * mk₃

@@ -1,5 +1,20 @@
 import ..Homotopies
+import ..ProjectiveVectors: raw
 using ..Utilities
+
+
+struct PathResultCache{Hom, T}
+    H::Hom
+    v::Vector{T}
+    J::Matrix{T}
+end
+
+function PathResultCache(prob::Problems.AbstractProblem, r)
+    H = Homotopies.HomotopyWithCache(prob.homotopy, raw(r.x), rand())
+    v, J = Homotopies.evaluate_and_jacobian(H, raw(r.x), rand())
+    PathResultCache(H, v, J)
+end
+
 
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
@@ -27,61 +42,86 @@ is given if the startvalue was projective.
 * `npredictions`: The number of predictions the endgamer did.
 * `predictions`: The predictions of the endgamer.
 """
-struct PathResult{T}
+struct PathResult{T1, T2, T3}
     returncode::Symbol
-    solution::Vector{T}
-    t::Float64
+    returncode_detail::Symbol
+
+    solution::Vector{T1}
+    t::T2
 
     residual::Float64
     condition_number::Float64
-    multiplicity::Int
+    windingnumber::Int
 
-    start_solution::Vector{T}
+    start_solution::Vector{T3}
 
     iterations::Int
     npredictions::Int
 end
 
 
-function PathResult(::Problems.NullHomogenization,
-    H::Homotopies.HomotopyWithCache,
-    x₁, t₀, x, t, returncode::Symbol, iters::Int, multiplicity::Int, npredictions::Int, v, J)
-
-    Homotopies.evaluate_and_jacobian!(v, J, H, x₀, t₀)
-    res = infinity_norm(v)
-    condition = cond(J)
-
-    PathResult(returncode, x, t, res, condition, multiplicity, x₁, iters, npredictions)
+function PathResult(prob::Problems.AbstractProblem, x₁, t₀, r, cache::PathResultCache)
+    PathResult(prob.homogenization_strategy, x₁, t₀, r, cache)
 end
-
-function PathResult(::Problems.DefaultHomogenization,
-    H::Homotopies.HomotopyWithCache,
-    x₁::Vector, t₀, x, t, returncode::Symbol, iters::Int, multiplicity, npredictions::Int, v, J)
-
-    # We want to evaluate on the affine patch we are interested in
-    hom_part = x[1]
-    scale!(x, inv(x[1]))
-
-    Homotopies.evaluate_and_jacobian!(v, J, H, x, t₀)
+function PathResult(::Problems.NullHomogenization, x₁, t₀, r, cache::PathResultCache)
+    returncode, returncode_detail = makereturncode(r.returncode)
+    x = raw(r.x)
+    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(v)
-    if res > 0.1
+
+    if returncode != :success
+        condition = 0.0
+    else
+        condition = cond(J)
+    end
+
+    windingnumber, npredictions = windingnumber_npredictions(r)
+
+    PathResult(returncode, returncode_detail, x, real(r.t), res, condition, windingnumber, x₁, r.iters, npredictions)
+end
+function PathResult(::Problems.DefaultHomogenization, x₁, t₀, r, cache::PathResultCache)
+    returncode = r.returncode
+
+    ProjectiveVectors.affine!(r.x)
+    x = raw(r.x)
+
+    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
+    res = infinity_norm(cache.v)
+    if res > 0.1 && r.t == t₀ && returncode == :success
         returncode = :at_infinity
     end
 
-    if returncode == :at_infinity
+    returncode, returncode_detail = makereturncode(returncode)
+
+    if returncode != :success
         solution = x
         condition = 0.0
     else
         solution = x[2:end]
-        condition = cond(@view J[:,2:end])
+        condition = cond(@view cache.J[:,2:end])
     end
 
-    PathResult(returncode, solution, t, res, condition, multiplicity, x₁, iters, npredictions)
+    windingnumber, npredictions = windingnumber_npredictions(r)
+
+    PathResult(returncode, returncode_detail, solution, real(r.t), res, condition, windingnumber, x₁, r.iters, npredictions)
 end
 
-function Base.show(io::IO, r::PathResult)
+function makereturncode(retcode)
+    if retcode != :at_infinity && retcode != :success
+        :path_failed, retcode
+    else
+        retcode, :none
+    end
+end
+windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npredictions)
+windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
+
+function Base.show(io::IO, ::MIME"text/plain", r::PathResult)
     println(io, typeof(r), ":")
     println(io, "* returncode: $(r.returncode)")
+    if r.returncode_detail != :none
+        println(io, "* returncode_detail: $(r.returncode_detail)")
+    end
     println(io, "* solution: $(r.solution)")
     println(io, "* t: $(r.t)")
     println(io, "---------------------------------------------")
@@ -90,44 +130,5 @@ function Base.show(io::IO, r::PathResult)
     println(io, "---------------------------------------------")
     println(io, "* residual: $(@sprintf "%.3e" r.residual)")
     println(io, "* log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
-    println(io, "* multiplicity: $(r.multiplicity)")
-end
-
-function pathresults(solver::Solver, results)
-    pathresults(solver.prob, results, solver.start_solutions, solver.t₀)
-end
-
-
-function pathresults(prob::Problems.AbstractProblem,
-    results::Vector{<:Endgame.EndgamerResult},
-    start_solutions, t₀)
-    r = results[1]
-    H = Homotopies.HomotopyWithCache(prob.homotopy, r.x, t₀)
-    v, J = Homotopies.evaluate_and_jacobian(H, r.x, t₀)
-    pathresults(prob.homogenization_strategy, H, results, start_solutions, t₀, v, J)
-end
-
- function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
-     results::Vector{<:Endgame.EndgamerResult},
-     start_solutions, t₀, v, J)
-     map(results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, r.windingnumber_estimate, r.npredictions, v, J)
-     end
- end
-
-function pathresults(prob::Problems.AbstractProblem,
-    trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
-    start_solutions, t₀)
-    r = trackedpath_results[1]
-    H = Homotopies.HomotopyWithCache(prob.homotopy, r.x.data, r.t)
-    v, J = Homotopies.evaluate_and_jacobian(H, r.x.data, r.t)
-    pathresults(prob.homogenization_strategy, H, trackedpath_results, start_solutions, t₀, v, J)
-end
-
-function pathresults(strategy::Problems.AbstractHomogenizationStrategy, H,
-     trackedpath_results::Vector{<:PathTracking.PathTrackerResult},
-     start_solutions, t₀, v, J)
-     map(trackedpath_results, start_solutions) do r, x₁
-         PathResult(strategy, H, x₁, t₀, r.x.data, r.t, r.returncode, r.iters, 1, 0, v, J)
-     end
+    println(io, "* windingnumber: $(r.windingnumber)")
 end

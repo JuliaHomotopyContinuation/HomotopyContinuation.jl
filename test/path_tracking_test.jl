@@ -61,7 +61,7 @@ end
     @test result.returncode == :success
     @test result.t == 0.0
     x = result.x
-    @test norm(x[2:end] / x[1] - A \ b) < 1e-12
+    @test norm(x[2:end] / x[1] - A \ b) < 1e-6
 
     x_inter = copy(s)
     retcode = PathTracking.track!(x_inter, tracker, s, 1.0, 0.1)
@@ -72,7 +72,7 @@ end
     tracker
     @test PathTracking.curriters(tracker) < 3
     x = PathTracking.currx(tracker)
-    @test norm(x[2:end] / x[1] - A \ b) < 1e-12
+    @test norm(x[2:end] / x[1] - A \ b) < 1e-6
 end
 
 @testset "fixedpatch" begin
@@ -86,6 +86,7 @@ end
     tracker = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1)
     r1 = PathTracking.track(tracker, Problems.embed(P, start_sols[1]), 1.0, 0.1)
 
+    PathTracking.setup!(tracker, r1.x, 0.1, 0.0)
     PathTracking.fixpatch!(tracker, true)
     PathTracking.track(tracker, r1.x, 0.1, 0.0)
 

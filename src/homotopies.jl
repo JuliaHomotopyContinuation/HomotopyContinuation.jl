@@ -241,8 +241,15 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractStar
     gamma::Complex{Float64}
 
 end
-function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem; gamma=cis(2π * rand()))
+function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem; gamma=randomish_gamma())
     StraightLineHomotopy(start, target, gamma)
+end
+
+function randomish_gamma()
+    # Usually values near 1, i, -i, -1 are not good randomization
+    # Therefore we artificially constrain the choices
+    theta = rand() * 0.30 + 0.075 + (rand(Bool) ? 0.0 : 0.5)
+    cis(2π * theta)
 end
 
 start(H::StraightLineHomotopy) = H.start

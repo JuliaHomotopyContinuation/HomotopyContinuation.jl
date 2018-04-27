@@ -35,9 +35,12 @@ end
 
 # Internal
 function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
+    seed=rand(100:10_000),
     system=Systems.SPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)
+    println("Seed used: $(seed)")
+    srand(seed)
     P = Problems.ProjectiveStartTargetProblem(prob, system=system, homotopy=homotopy)
     solve(P, start_solutions; kwargs...)
 end

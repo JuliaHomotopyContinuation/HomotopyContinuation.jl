@@ -40,7 +40,7 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     Solver(prob, start_solutions, t₁, t₀, options; kwargs...)
 end
 
-function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; endgame=Endgame.Cauchy(), endgame_options=Endgame.EndgameOptions(), kwargs...)
+function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
     @assert !isempty(start_solutions) "`start_solutions` are empty"
     if start_solutions isa Vector
         x₁s = start_solutions
@@ -51,7 +51,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₀ isa AbstractVector
 
     tracker = PathTracking.PathTracker(prob, x₀, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(endgame, tracker, options.endgame_start, endgame_options)
+    endgamer = Endgame.Endgamer(tracker, options.endgame_start)
     Solver(prob,
         tracker,
         endgamer,
@@ -76,21 +76,29 @@ function solve(solver::Solver)
         trackpath(solver, x₀, solver.t₁, t_endgame)
     end
 
-    if solver.t₀ == t_endgame
-        BLAS.set_num_threads(nblas_threads)
-        # return pre_endgame_paths
-        return pathresults(solver, pre_endgame_paths)
-    end
+    # We want to avoid allocations in the analysis
+    result_cache = PathResultCache(solver.prob, pre_endgame_paths[1])
 
-    ncrossedpaths, crossing_indices = pathcrossing_check!(pre_endgame_paths, solver)
+    if solver.t₀ == t_endgame
+        results = map(1:length(pre_endgame_paths), pre_endgame_paths) do i, r
+            PathResult(solver.prob, solver.start_solutions[i], solver.t₀, r, result_cache)
+        end
+    else
+        ncrossedpaths, crossing_indices = pathcrossing_check!(pre_endgame_paths, solver)
+
+        results = map(1:length(pre_endgame_paths), pre_endgame_paths) do i, r
+            x₁ = solver.start_solutions[i]
+            if r.returncode == :success
+                PathResult(solver.prob, x₁, solver.t₀, Endgame.play(solver.endgamer, r.x, t_endgame), result_cache)
+            else
+                PathResult(solver.prob, x₁, solver.t₀, r, result_cache)
+            end
+        end
+    end
 
     BLAS.set_num_threads(nblas_threads)
 
-    endgame_results = dmap(solver.options, pre_endgame_paths) do r
-        Endgame.play(solver.endgamer, r.x.data, t_endgame)
-    end
-    # pre_endgame_paths
-    return pathresults(solver, endgame_results)
+    results
 end
 
 

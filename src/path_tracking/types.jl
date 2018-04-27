@@ -147,7 +147,7 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.Abs
     patch::AffinePatches.AbstractAffinePatch=AffinePatches.OrthogonalPatch(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     steplength::StepLength.AbstractStepLength=StepLength.HeuristicStepLength(),
-    tol=1e-5,
+    tol=1e-7,
     refinement_tol=1e-11,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,

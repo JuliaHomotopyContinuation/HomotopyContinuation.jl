@@ -12,6 +12,8 @@ export allvariables,
     solve_with_lu_inplace!,
     infinity_norm,
     unsafe_infinity_norm,
+    logabs,
+    fastlog,
     batches
 
 
@@ -211,6 +213,38 @@ function Base.findmax(f, xs)
     i, el
 end
 
+"""
+    logabs(z)
+
+The log absolute map `log(abs(z))`.
+"""
+logabs(z::Complex) = 0.5 * fastlog(abs2(z))
+logabs(x) = fastlog(abs(x))
+
+fastlog(z) = Base.Math.JuliaLibm.log(z)
+
+#
+# mutable struct VectorOfVectors{V<:AbstractVector} <: AbstractVector
+#     data::Vector{V}
+#     length::Int
+# end
+# Base.size(v::VectorOfVectors) = (v.length,)
+# Base.length(v::VectorOfVectors) = v.length
+# Base.eltype(v::VectorOfVectors{V}) where V = V
+# function Base.getindex(v::VectorOfVectors, i::Integer)
+#     @boundscheck 1 ≤ i < v.length
+#     getindex(v.data, i)
+# end
+# function Base.setindex!(v::VectorOfVectors, x, i)
+#     if 1 ≤ i < v.length
+#         Base.setindex!(v.data, x, i)
+#     else
+#
+
+
+
+
+
 # Parallelization
 
 # This is into 0.7 but we need it for 0.6 as well
@@ -234,31 +268,5 @@ const get_num_BLAS_threads = function() # anonymous so it will be serialized whe
 
     return nothing
 end
-
-
-# """
-#     batches(nthreads, n)
-#
-# Create a list of unit ranges with exponential dropoff to distribute `n` tasks
-# over `nthreads` Threads.
-# """
-# function batches(nthreads, n)
-#     packages = Vector{UnitRange{Int}}()
-#     i = 1
-#     k = 1
-#     while i < n
-#         package_length = max(ceil(Int, n * 2.0^(-k) / nthreads), 1)
-#         for tid=1:nthreads
-#             r = i:min(n, i + package_length)
-#             push!(packages, r)
-#             i += length(r)
-#             if i ≥ n
-#                 break
-#             end
-#         end
-#         k += 1
-#     end
-#     packages
-# end
 
 end
