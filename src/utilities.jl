@@ -13,6 +13,7 @@ export allvariables,
     infinity_norm,
     unsafe_infinity_norm,
     logabs,
+    fastlog,
     batches
 
 
@@ -217,9 +218,10 @@ end
 
 The log absolute map `log(abs(z))`.
 """
-logabs(z::Complex) = 0.5 * Base.Math.JuliaLibm.log(abs2(z))
-logabs(x) = Base.Math.JuliaLibm.log(abs(x))
+logabs(z::Complex) = 0.5 * fastlog(abs2(z))
+logabs(x) = fastlog(abs(x))
 
+fastlog(z) = Base.Math.JuliaLibm.log(z)
 
 #
 # mutable struct VectorOfVectors{V<:AbstractVector} <: AbstractVector

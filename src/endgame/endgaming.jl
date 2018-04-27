@@ -105,6 +105,15 @@ function update_samples!(state, options, x, λR)
     nothing
 end
 
+"""
+    estimate_windingnumber!(endgamer)
+
+This estimates the winding number of the path ``x(t)`` at ``x(0)``.
+For this we look at consecutive differences of samples obtained
+from the geometric series. The windingnumber is estimated coordinate wise
+and since it is the same for each coordinate we take the most common
+result.
+"""
 function estimate_windingnumber!(endgamer)
     state, options = endgamer.state, endgamer.options
     nsamples = length(state.logabs_samples[1])
@@ -117,6 +126,7 @@ function estimate_windingnumber!(endgamer)
     end
     w = majority(endgamer.cache.windingnumbers)
 
+    # w < 1 is just wrong
     if w < 1
         state.cons_matching_estimates = 0
         state.windingnumber_estimate = 1
@@ -129,6 +139,28 @@ function estimate_windingnumber!(endgamer)
 
     nothing
 end
+
+
+"""
+    windingnumber(logabs_samples, logh)
+
+Estimate the current winding number from the samples.
+`logabs_samples` represent the sample points obtained from the geometric
+path samples ``log|x(h^k₀)|``.
+We compute an error expansion of the fractional power series of the path
+to approximate the winding number. See [^1] for details.
+
+[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+"""
+function windingnumber(logabs_samples, logh)
+    nsamples = length(logabs_samples)
+    Δ = logabs_samples[nsamples-3] - logabs_samples[nsamples-2]
+    Δ1 = logabs_samples[nsamples-2] - logabs_samples[nsamples-1]
+    Δ2 = logabs_samples[nsamples-1] - logabs_samples[nsamples]
+
+    return round(Int, logh / logabs((Δ1 - Δ2) / (Δ - Δ1)))
+end
+
 
 """
     majority(values)
@@ -159,13 +191,25 @@ function majority(vec::Vector{Int})
     maxval
 end
 
+
+
+"""
+    checkatinfinity!(endgamer)
+
+We compute an error expansion of the fractional power series of the path
+to approximate the "direction" of the path. See [^1] for details.
+
+[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+"""
 checkatinfinity!(endgamer) = checkatinfinity!(endgamer, endgamer.state.samples[1])
 function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
     cache, options, state = endgamer.cache, endgamer.options, endgamer.state
 
     nsamples = length(state.logabs_samples[1])
 
-    if nsamples < 8 || state.cons_matching_estimates < 3
+    # We want to be somewhat sure about the winding number before we estimate the
+    # direction since otherwise we can get wrong results
+    if state.cons_matching_estimates < 3
         return false
     end
 
@@ -188,6 +232,7 @@ function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
         state.directions[i] = wᵢ
     end
 
+    # We want that the estimates stabilize before we use these
     if maxΔ > 1e-2
         return false
     end
@@ -195,6 +240,8 @@ function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
     for (i, wᵢ) in enumerate(state.directions)
         i == homvar && continue
         w = wᵢ - w₀
+        # For this to be true the direction has to be negative and
+        # the winding number may not be underestimated.
         if w * state.windingnumber_estimate < -0.99
             state.status = :at_infinity
             return true
@@ -216,26 +263,6 @@ function direction(samples, range, h, logh, buffer)
     buffer[1] / logh
 end
 
-
-"""
-    windingnumber(logabs_samples, logh)
-
-Estimate the current winding number from the samples.
-`logabs_samples` represent the sample points obtained from the geometric
-path samples ``log|x(h^k₀)|``.
-We compute an error expansion of the fractional power series of the path
-to approximate the winding number. See [^1] for details.
-
-[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
-"""
-function windingnumber(logabs_samples, logh)
-    nsamples = length(logabs_samples)
-    Δ = logabs_samples[nsamples-3] - logabs_samples[nsamples-2]
-    Δ1 = logabs_samples[nsamples-2] - logabs_samples[nsamples-1]
-    Δ2 = logabs_samples[nsamples-1] - logabs_samples[nsamples]
-
-    return round(Int, logh / logabs((Δ1 - Δ2) / (Δ - Δ1)))
-end
 
 #
 # It turns out that this extrapolation scheme doesn't seem to work better
@@ -285,7 +312,7 @@ end
 #     w
 # end
 
-fastlog(z) = Base.Math.JuliaLibm.log(z)
+
 
 """
     predict!(endgamer)
