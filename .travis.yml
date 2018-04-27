@@ -27,7 +27,7 @@ matrix:
 
 ## uncomment the following lines to override the default test script
 script:
- - julia --color=yes -e 'Pkg.clone("https://github.com/JuliaHomotopyContinuation/TestSystems.jl.git"); Pkg.clone("https://github.com/saschatimme/StaticPolynomials.jl.git"); Pkg.clone(pwd()); Pkg.build("HomotopyContinuation"); Pkg.test("HomotopyContinuation"; coverage=true)'
+ - julia --color=yes -e 'Pkg.clone("https://github.com/JuliaHomotopyContinuation/TestSystems.jl.git"); Pkg.clone("https://github.com/JuliaAlgebra/StaticPolynomials.jl.git"); Pkg.clone(pwd()); Pkg.build("HomotopyContinuation"); Pkg.test("HomotopyContinuation"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("HomotopyContinuation")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
