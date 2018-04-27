@@ -47,5 +47,5 @@ end
 
 function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; kwargs...)
     solver = Solving.Solver(prob, start_solutions, t₁, t₀; kwargs...)
-    Solving.solve(solver)
+    Solving.solve(solver, start_solutions)
 end

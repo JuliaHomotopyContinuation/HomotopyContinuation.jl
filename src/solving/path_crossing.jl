@@ -8,7 +8,7 @@ Check for possble path crossings and correct them if possible. Updates the track
 and returns a tuple `(n, indices)` where `n` is the number of initial crossed paths
 and `indices` are the indices which could not be resolved.
 """
-function pathcrossing_check!(tracked_paths, solver)
+function pathcrossing_check!(tracked_paths, solver, start_solutions)
     t₁ = solver.t₁
     t₀ = solver.options.endgame_start
     tracker = solver.tracker
@@ -29,7 +29,7 @@ function pathcrossing_check!(tracked_paths, solver)
     original_corrector_maxiters = PathTracking.corrector_maxiters(tracker)
 
     PathTracking.set_tol!(tracker, min(original_tol * 1e-2, 1e-8))
-    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, solver.start_solutions) do x₀
+    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, start_solutions) do x₀
         trackpath(solver, x₀, t₁, t₀)
     end
 
@@ -45,7 +45,7 @@ function pathcrossing_check!(tracked_paths, solver)
     PathTracking.set_tol!(tracker, 1e-13)
     PathTracking.set_corrector_maxiters!(tracker, 1)
 
-    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, solver.start_solutions) do x₀
+    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, start_solutions) do x₀
         trackpath(solver, x₀, t₁, t₀)
     end
 

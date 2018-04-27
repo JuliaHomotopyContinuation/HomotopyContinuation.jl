@@ -19,13 +19,12 @@ struct SolverOptions
 end
 
 
-struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker, E<:Endgame.Endgamer, V<:AbstractVector}
+struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker, E<:Endgame.Endgamer}
     prob::P
     tracker::T
     endgamer::E
     t₁::Float64
     t₀::Float64
-    start_solutions::Vector{V}
     options::SolverOptions
 end
 
@@ -41,13 +40,7 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
 end
 
 function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
-    @assert !isempty(start_solutions) "`start_solutions` are empty"
-    if start_solutions isa Vector
-        x₁s = start_solutions
-    else
-        x₁s = collect(start_solutions)
-    end
-    x₀ = first(x₁s)
+    x₀ = first(start_solutions)
     @assert x₀ isa AbstractVector
 
     tracker = PathTracking.PathTracker(prob, x₀, t₁, t₀; kwargs...)
@@ -56,14 +49,14 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         tracker,
         endgamer,
         t₁, t₀,
-        x₁s,
         options)
 end
 
 include("solving/path_crossing.jl")
 include("solving/path_result.jl")
 
-function solve(solver::Solver)
+solve(solver::Solver, start_solutions) = solve(solver, collect(start_solutions))
+function solve(solver::Solver, start_solutions::AbstractVector)
     # We set the number of BLAS threads to 1 since we multithread by ourself.
     # But even if we would not, the overhead of the threading is so large
     # that the single threaded version is around two times faster (at least on Mac Julia v0.6.2)
@@ -72,7 +65,7 @@ function solve(solver::Solver)
 
     t_endgame = solver.options.endgame_start
     # Phase 1 Track until endgame zone
-    pre_endgame_paths = dmap(solver.options, solver.start_solutions) do x₀
+    pre_endgame_paths = map(start_solutions) do x₀
         trackpath(solver, x₀, solver.t₁, t_endgame)
     end
 
@@ -80,14 +73,13 @@ function solve(solver::Solver)
     result_cache = PathResultCache(solver.prob, pre_endgame_paths[1])
 
     if solver.t₀ == t_endgame
-        results = map(1:length(pre_endgame_paths), pre_endgame_paths) do i, r
-            PathResult(solver.prob, solver.start_solutions[i], solver.t₀, r, result_cache)
+        results = map(start_solutions, pre_endgame_paths) do x₁, r
+            PathResult(solver.prob, x₁, solver.t₀, r, result_cache)
         end
     else
-        ncrossedpaths, crossing_indices = pathcrossing_check!(pre_endgame_paths, solver)
+        ncrossedpaths, crossing_indices = pathcrossing_check!(pre_endgame_paths, solver, start_solutions)
 
-        results = map(1:length(pre_endgame_paths), pre_endgame_paths) do i, r
-            x₁ = solver.start_solutions[i]
+        results = map(start_solutions, pre_endgame_paths) do x₁, r
             if r.returncode == :success
                 PathResult(solver.prob, x₁, solver.t₀, Endgame.play(solver.endgamer, r.x, t_endgame), result_cache)
             else
