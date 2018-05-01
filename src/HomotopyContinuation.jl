@@ -2,52 +2,37 @@ __precompile__()
 
 module HomotopyContinuation
 
-    using Reexport
-    @reexport using Homotopies
-    using Parameters
-    using Requires
-    #using HigherPrecision
+    import DynamicPolynomials: @polyvar
+    export @polyvar
 
-    import MultivariatePolynomials
-    const MP = MultivariatePolynomials
+    export AffinePatches,
+        Correctors,
+        Endgame,
+        Homotopies,
+        PathTracking,
+        Predictors,
+        Problems,
+        ProjectiveVectors,
+        Solving,
+        StepLength,
+        Systems,
+        Utilities
 
-    abstract type AbstractPathtrackingAlgorithm end
-    abstract type AbstractPathtrackerCache{T<:Complex} end
-    abstract type AbstractEndgameAlgorithm end
-    abstract type AbstractEndgameCache end
-
-    export AbstractPathtrackingAlgorithm, AbstractEndgameAlgorithm,
-        AbstractPathtrackerCache, AbstractEndgameCache
-
-    include("patches.jl")
     include("utilities.jl")
+    include("parallel.jl")
+    include("projective_vectors.jl")
+    include("systems.jl")
+    include("homotopies.jl")
+    include("problems.jl")
+    include("predictors.jl")
+    include("correctors.jl")
+    include("prediction_correction.jl")
+    include("affine_patches.jl")
+    include("step_length.jl")
 
-    include("pathtracker/type.jl")
-    include("pathtracker/modify.jl")
-    include("pathtracker/iterator_interface.jl")
-    include("pathtracker/result.jl")
+    include("path_tracking.jl")
+    include("endgame.jl")
 
-    include("pathtracking_algorithms/spherical.jl")
-    include("pathtracking_algorithms/affine.jl")
-    include("pathtracking_caches/spherical_cache.jl")
-    include("pathtracking_caches/affine_cache.jl")
-
-    include("endgamer/type.jl")
-    include("endgamer/modify.jl")
-    include("endgamer/iterator_interface.jl")
-    include("endgamer/result.jl")
-    include("endgame_algorithms/cauchy.jl")
-    include("endgame_cache/cauchy_cache.jl")
-
-    include("solver_options.jl")
-    include("solver.jl")
-
-    include("result.jl")
-    include("pathcrossing.jl")
+    include("solving.jl")
     include("solve.jl")
-    include("testsystems.jl")
-
-    include("auxiliary_functions.jl")
-
-    export TestSystems
-end # module
+end #
