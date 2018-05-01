@@ -45,7 +45,12 @@ function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
     solve(P, start_solutions; kwargs...)
 end
 
-function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; kwargs...)
+function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; threading=true, kwargs...)
     solver = Solving.Solver(prob, start_solutions, t₁, t₀; kwargs...)
-    Solving.solve(solver)
+    if threading && Threads.nthreads() > 1
+        solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
+        Solving.solve(solvers, start_solutions)
+    else
+        Solving.solve(solver, start_solutions)
+    end
 end

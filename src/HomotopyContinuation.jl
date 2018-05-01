@@ -13,11 +13,13 @@ module HomotopyContinuation
         Predictors,
         Problems,
         ProjectiveVectors,
+        Solving,
         StepLength,
         Systems,
         Utilities
 
     include("utilities.jl")
+    include("parallel.jl")
     include("projective_vectors.jl")
     include("systems.jl")
     include("homotopies.jl")

@@ -9,9 +9,9 @@ struct PathResultCache{Hom, T}
     J::Matrix{T}
 end
 
-function PathResultCache(prob::Problems.AbstractProblem, r)
-    H = Homotopies.HomotopyWithCache(prob.homotopy, raw(r.x), rand())
-    v, J = Homotopies.evaluate_and_jacobian(H, raw(r.x), rand())
+function PathResultCache(prob::Problems.AbstractProblem, x)
+    H = Homotopies.HomotopyWithCache(prob.homotopy, raw(x), rand())
+    v, J = Homotopies.evaluate_and_jacobian(H, raw(x), rand())
     PathResultCache(H, v, J)
 end
 
