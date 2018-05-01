@@ -247,8 +247,9 @@ fastlog(z) = Base.Math.JuliaLibm.log(z)
 
 # Parallelization
 
+get_num_BLAS_threads() = convert(Int, _get_num_BLAS_threads())
 # This is into 0.7 but we need it for 0.6 as well
-const get_num_BLAS_threads = function() # anonymous so it will be serialized when called
+const _get_num_BLAS_threads = function() # anonymous so it will be serialized when called
     blas = Base.LinAlg.BLAS.vendor()
     # Wrap in a try to catch unsupported blas versions
     try

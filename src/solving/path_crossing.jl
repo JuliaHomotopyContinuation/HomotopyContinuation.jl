@@ -1,63 +1,79 @@
 using ..Utilities
 import ..ProjectiveVectors
 
+
 """
-    pathcrossing_check!(tracked_paths, solver)
+    pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
 Check for possble path crossings and correct them if possible. Updates the tracked paths
 and returns a tuple `(n, indices)` where `n` is the number of initial crossed paths
 and `indices` are the indices which could not be resolved.
 """
-function pathcrossing_check!(tracked_paths, solver, start_solutions)
-    t₁ = solver.t₁
-    t₀ = solver.options.endgame_start
-    tracker = solver.tracker
-
-    cross_tol = solver.options.pathcrossing_tol
+function pathcrossing_check!(tracked_paths, solvers, start_solutions)
+    t₁, t_endgame, _ = t₁_t_endgame_t₀(solvers)
 
     # We start with a list of all indices where some crossing happened.
-    crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
 
-    ncrossedpaths = length(crossed_paths_indices)
+    ncrossedpaths = length(crossed_path_indices)
     # No paths crossed -> done :)
     if ncrossedpaths == 0
-        return (0, [])
+        return (0, Int[])
     end
 
     # Now we are trying it with tighter precision to avoid the jumping
-    original_tol = PathTracking.tol(tracker)
-    original_corrector_maxiters = PathTracking.corrector_maxiters(tracker)
+    original_tol = tol(solvers)
+    original_corrector_maxiters = corrector_maxiters(solvers)
 
-    PathTracking.set_tol!(tracker, min(original_tol * 1e-2, 1e-8))
-    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, start_solutions) do x₀
-        trackpath(solver, x₀, t₁, t₀)
+    set_tol!(solvers, min(original_tol * 1e-2, 1e-10))
+
+    Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+        x₁ = start_solutions[k]
+        tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
     end
 
-    crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
 
-    if isempty(crossed_paths_indices)
-        PathTracking.set_tol!(tracker, original_tol)
+    if !isempty(crossed_path_indices)
+        # Now we are trying it with less corrector steps and even smaller tol
+        set_tol!(solvers, min(original_tol * 1e-3, 1e-12))
+        set_corrector_maxiters!(solvers, 1)
 
-        return (ncrossedpaths, [])
-    end
-
-    # Now we are trying it with less corrector steps
-    PathTracking.set_tol!(tracker, 1e-13)
-    PathTracking.set_corrector_maxiters!(tracker, 1)
-
-    dmap_indices!(tracked_paths, solver.options, crossed_paths_indices, start_solutions) do x₀
-        trackpath(solver, x₀, t₁, t₀)
+        Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+            x₁ = start_solutions[k]
+            tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
+        end
+        crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
     end
 
     # No we reset the options
-    PathTracking.set_tol!(tracker, original_tol)
-    PathTracking.set_corrector_maxiters!(tracker, original_corrector_maxiters)
+    set_tol!(solvers, original_tol)
+    set_corrector_maxiters!(solvers, original_corrector_maxiters)
 
-    crossed_paths_indices = check_crossed_paths(tracked_paths, cross_tol)
-    @show crossed_paths_indices
-
-    return (ncrossedpaths, crossed_paths_indices)
+    return (ncrossedpaths, crossed_path_indices)
 end
+
+cross_tol(solver::Solver) = solver.options.pathcrossing_tol
+cross_tol(solvers::Solvers) = cross_tol(solvers[1])
+
+tol(solver::Solver) = PathTracking.tol(solver.tracker)
+tol(solvers::Solvers) = tol(solvers[1])
+corrector_maxiters(solver::Solver) = PathTracking.corrector_maxiters(solver.tracker)
+corrector_maxiters(solvers::Solvers) = corrector_maxiters(solvers[1])
+
+set_tol!(solver::Solver, tol) = PathTracking.set_tol!(solver.tracker, tol)
+function set_tol!(solvers::Solvers, tol)
+    for solver in solvers
+        set_tol!(solver, tol)
+    end
+end
+set_corrector_maxiters!(solver::Solver, n) = PathTracking.set_corrector_maxiters!(solver.tracker, n)
+function set_corrector_maxiters!(solvers::Solvers, n)
+    for solver in solvers
+        set_corrector_maxiters!(solver, n)
+    end
+end
+
 
 """
     check_crossed_paths(paths, tol)
@@ -67,7 +83,7 @@ indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
 function check_crossed_paths(paths, tol)
-    #TODO: This should be multithreaded...
+    #TODO: This should be multithreaded... AND is really expensive...5
     crossed_path_indices = Int[]
     path_handled = falses(length(paths))
     for i=1:length(paths)-1
