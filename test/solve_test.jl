@@ -26,5 +26,7 @@ end
     F = equations(katsura5())
     # this will have two crossed paths
     srand(120)
+    @test count(r -> r.returncode == :success, solve(F, tol=1e-1, threading=true)) == 32
+    srand(120)
     @test count(r -> r.returncode == :success, solve(F, tol=1e-1, threading=false)) == 32
 end
