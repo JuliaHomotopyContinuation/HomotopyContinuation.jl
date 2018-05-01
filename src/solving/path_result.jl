@@ -1,6 +1,9 @@
+import Juno
+
 import ..Homotopies
 import ..ProjectiveVectors: raw
 using ..Utilities
+
 
 
 struct PathResultCache{Hom, T}
@@ -116,19 +119,24 @@ end
 windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
-function Base.show(io::IO, ::MIME"text/plain", r::PathResult)
-    println(io, typeof(r), ":")
+function Base.show(io::IO, r::PathResult)
+    if !haskey(io, :compact)
+        println(io, typeof(r), ":")
+        print(io, " ")
+    end
     println(io, "* returncode: $(r.returncode)")
     if r.returncode_detail != :none
-        println(io, "* returncode_detail: $(r.returncode_detail)")
+        println(io, " * returncode_detail: $(r.returncode_detail)")
     end
-    println(io, "* solution: $(r.solution)")
-    println(io, "* t: $(r.t)")
-    println(io, "---------------------------------------------")
-    println(io, "* iterations: $(r.iterations)")
-    println(io, "* npredictions: $(r.npredictions)")
-    println(io, "---------------------------------------------")
-    println(io, "* residual: $(@sprintf "%.3e" r.residual)")
-    println(io, "* log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
-    println(io, "* windingnumber: $(r.windingnumber)")
+    println(io, " * solution: $(r.solution)")
+    println(io, " * t: $(r.t)")
+    println(io, " ---------------------------------------------")
+    println(io, " * iterations: $(r.iterations)")
+    println(io, " * npredictions: $(r.npredictions)")
+    println(io, " ---------------------------------------------")
+    println(io, " * residual: $(@sprintf "%.3e" r.residual)")
+    println(io, " * log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
+    println(io, " * windingnumber: $(r.windingnumber)")
 end
+
+Juno.render(i::Juno.Inline, x::PathResult) = Juno.render(i, Juno.defaultrepr(x))
