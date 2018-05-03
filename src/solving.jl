@@ -3,6 +3,8 @@ module Solving
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
+import ProgressMeter
+
 import ..Endgame
 import ..Homotopies
 import ..PathTracking
@@ -12,7 +14,6 @@ import ..Systems
 
 export Solver,
     solve
-
 
 include("solving/path_result.jl")
 include("solving/types.jl")
