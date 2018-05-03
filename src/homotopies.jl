@@ -208,4 +208,5 @@ struct NullCache <: AbstractHomotopyCache end
 
 # StraightLineHomotopy implementation
 include("homotopies/straight_line.jl")
+include("homotopies/fixed_point.jl")
 end

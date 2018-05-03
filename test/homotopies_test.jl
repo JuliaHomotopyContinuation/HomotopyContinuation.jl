@@ -1,7 +1,4 @@
 @testset "StraightLineHomotopy" begin
-    Hom = HomotopyContinuation.Homotopies
-    Systems = HomotopyContinuation.Systems
-
     fs = TestSystems.equations(katsura5())
 
     F = Systems.SPSystem(fs)
@@ -12,40 +9,89 @@
     u = zeros(Complex{Float64}, 6)
     U = zeros(Complex{Float64}, 6, 6)
 
-    H = Hom.StraightLineHomotopy(F, G)
-    @test H isa Hom.AbstractStartTargetHomotopy
+    H = Homotopies.StraightLineHomotopy(F, G)
+    @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
 
-    Hom.evaluate!(u, H, x, t)
-    @test Hom.evaluate(H, x, t) == u
+    Homotopies.evaluate!(u, H, x, t)
+    @test Homotopies.evaluate(H, x, t) == u
 
-    Hom.dt!(u, H, x, t)
-    @test Hom.dt(H, x, t) == u
+    Homotopies.dt!(u, H, x, t)
+    @test Homotopies.dt(H, x, t) == u
 
-    Hom.jacobian!(U, H, x, t)
-    @test Hom.jacobian(H, x, t) == U
+    Homotopies.jacobian!(U, H, x, t)
+    @test Homotopies.jacobian(H, x, t) == U
 
-    Hom.evaluate_and_jacobian!(u, U, H, x, t)
-    @test Hom.evaluate_and_jacobian(H, x, t) == (u, U)
+    Homotopies.evaluate_and_jacobian!(u, U, H, x, t)
+    @test Homotopies.evaluate_and_jacobian(H, x, t) == (u, U)
 
-    Hom.jacobian_and_dt!(U, u, H, x, t)
-    @test Hom.jacobian_and_dt(H, x, t) == (U, u)
+    Homotopies.jacobian_and_dt!(U, u, H, x, t)
+    @test Homotopies.jacobian_and_dt(H, x, t) == (U, u)
 
-    cache = Hom.cache(H, x, t)
-    @test cache isa Hom.StraightLineHomotopyCache
+    cache = Homotopies.cache(H, x, t)
+    @test cache isa Homotopies.StraightLineHomotopyCache
 
-    Hom.evaluate!(u, H, x, t, cache)
-    @test Hom.evaluate(H, x, t, cache) == u
+    Homotopies.evaluate!(u, H, x, t, cache)
+    @test Homotopies.evaluate(H, x, t, cache) == u
 
-    Hom.dt!(u, H, x, t, cache)
-    @test Hom.dt(H, x, t, cache) == u
+    Homotopies.dt!(u, H, x, t, cache)
+    @test Homotopies.dt(H, x, t, cache) == u
 
-    Hom.jacobian!(U, H, x, t, cache)
-    @test Hom.jacobian(H, x, t, cache) == U
+    Homotopies.jacobian!(U, H, x, t, cache)
+    @test Homotopies.jacobian(H, x, t, cache) == U
 
-    Hom.evaluate_and_jacobian!(u, U, H, x, t, cache)
-    @test Hom.evaluate_and_jacobian(H, x, t, cache) == (u, U)
+    Homotopies.evaluate_and_jacobian!(u, U, H, x, t, cache)
+    @test Homotopies.evaluate_and_jacobian(H, x, t, cache) == (u, U)
 
-    Hom.jacobian_and_dt!(U, u, H, x, t, cache)
-    @test Hom.jacobian_and_dt(H, x, t, cache) == (U, u)
+    Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
+    @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
+end
+
+@testset "FixedPointHomotopy" begin
+    fs = TestSystems.equations(katsura5())
+
+    F = Systems.SPSystem(fs)
+    G = Systems.SPSystem(3.52 .* fs)
+
+    x = rand(Complex{Float64}, 6)
+    t = rand()
+    u = zeros(Complex{Float64}, 6)
+    U = zeros(Complex{Float64}, 6, 6)
+
+    H = Homotopies.StraightLineHomotopy(F, G)
+    @test H isa Homotopies.AbstractHomotopy
+    @test size(H) == (6, 6)
+
+    Homotopies.evaluate!(u, H, x, t)
+    @test Homotopies.evaluate(H, x, t) == u
+
+    Homotopies.dt!(u, H, x, t)
+    @test Homotopies.dt(H, x, t) == u
+
+    Homotopies.jacobian!(U, H, x, t)
+    @test Homotopies.jacobian(H, x, t) == U
+
+    Homotopies.evaluate_and_jacobian!(u, U, H, x, t)
+    @test Homotopies.evaluate_and_jacobian(H, x, t) == (u, U)
+
+    Homotopies.jacobian_and_dt!(U, u, H, x, t)
+    @test Homotopies.jacobian_and_dt(H, x, t) == (U, u)
+
+    cache = Homotopies.cache(H, x, t)
+    @test cache isa Homotopies.StraightLineHomotopyCache
+
+    Homotopies.evaluate!(u, H, x, t, cache)
+    @test Homotopies.evaluate(H, x, t, cache) == u
+
+    Homotopies.dt!(u, H, x, t, cache)
+    @test Homotopies.dt(H, x, t, cache) == u
+
+    Homotopies.jacobian!(U, H, x, t, cache)
+    @test Homotopies.jacobian(H, x, t, cache) == U
+
+    Homotopies.evaluate_and_jacobian!(u, U, H, x, t, cache)
+    @test Homotopies.evaluate_and_jacobian(H, x, t, cache) == (u, U)
+
+    Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
+    @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
 end
