@@ -1,3 +1,4 @@
 julia 0.6.0
-StaticPolynomials
+StaticPolynomials 0.1
+ProgressMeter v0.5.5
 Juno

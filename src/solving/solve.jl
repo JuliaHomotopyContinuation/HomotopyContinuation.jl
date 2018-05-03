@@ -5,6 +5,9 @@ solve(solver, start_solutions) = solve(solver, collect(start_solutions))
 function solve(solvers, start_solutions::AbstractVector)
     nblas_threads = single_thread_blas()
 
+    if report_progress(solvers)
+        println("$(length(start_solutions)) paths to track")
+    end
     endgame_zone_results = track_to_endgamezone(solvers, start_solutions)
     results = endgame(solvers, start_solutions, endgame_zone_results)
 
@@ -29,16 +32,34 @@ end
 
 t₁_t_endgame_t₀(solver::Solver) = solver.t₁, solver.options.endgame_start, solver.t₀
 t₁_t_endgame_t₀(solvers::Solvers) = t₁_t_endgame_t₀(solvers[1])
+report_progress(solver::Solver) = solver.options.report_progress
+report_progress(solvers::Solvers) = report_progress(solvers[1])
 
 function track_to_endgamezone(solvers, start_solutions)
     t₁, t_endgame, _ = t₁_t_endgame_t₀(solvers)
-    Parallel.tmap(solvers, start_solutions) do solver, tid, x₁
-        trackpath(solver, x₁, t₁, t_endgame)
+    n = length(start_solutions)
+
+    if report_progress(solvers)
+        p = ProgressMeter.Progress(n, 0.5, "Tracking paths to endgame zone...") # minimum update interval: 1 second
+
+        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+            if tid == 1
+                ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k - 1),))
+            end
+            trackpath(solver, start_solutions[k], t₁, t_endgame)
+        end
+
+        ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
+    else
+        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+            trackpath(solver, start_solutions[k], t₁, t_endgame)
+        end
     end
+
+    result
 end
 
 @inline trackpath(solver::Solver, x₁, t₁, t₀) = PathTracking.track(solver.tracker, Problems.embed(solver.prob, x₁), t₁, t₀)
-
 
 function endgame(solvers, start_solutions, endgame_zone_results)
     _, t_endgame, t₀ = t₁_t_endgame_t₀(solvers)
@@ -50,16 +71,37 @@ function endgame(solvers, start_solutions, endgame_zone_results)
             PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
         end
     end
-    ncrossedpaths, crossing_indices =
-        pathcrossing_check!(endgame_zone_results, solvers, start_solutions)
 
-    Parallel.tmap(solvers, 1:n) do solver, tid, k
-        x₁, r = start_solutions[k], endgame_zone_results[k]
-        if r.returncode == :success
-            result = Endgame.play(solver.endgamer, r.x, t_endgame)
-            PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
-        else
-            PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+    report_progress(solvers) && println("Checking for crossed paths...")
+    ncrossedpaths, crossing_indices = pathcrossing_check!(endgame_zone_results, solvers, start_solutions)
+
+    if report_progress(solvers)
+        p = ProgressMeter.Progress(n, 0.5, "Running endgame...")
+
+        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+            x₁, r = start_solutions[k], endgame_zone_results[k]
+            if tid == 1
+                ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k-1),))
+            end
+            if r.returncode == :success
+                result = Endgame.play(solver.endgamer, r.x, t_endgame)
+                PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
+            else
+                PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+            end
+        end
+        ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
+    else
+        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+            x₁, r = start_solutions[k], endgame_zone_results[k]
+            if r.returncode == :success
+                result = Endgame.play(solver.endgamer, r.x, t_endgame)
+                PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
+            else
+                PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+            end
         end
     end
+
+    result
 end
