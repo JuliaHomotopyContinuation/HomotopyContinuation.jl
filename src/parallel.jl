@@ -17,6 +17,7 @@ end
     dst = Vector{typeof(dst₁)}(n)
     dst[1] = dst₁
     i = Threads.Atomic{Int}(2)
+    blocksize = min(blocksize, div(blocksize, length(solvers)))
 
     function threads_fun()
         tid = Threads.threadid()
@@ -37,6 +38,7 @@ end
 
 function tforeach(f::F, solvers::AbstractVector, src; blocksize=20) where {F<:Function}
     i = Threads.Atomic{Int}(1)
+    blocksize = min(blocksize, div(blocksize, length(solvers)))
     function threads_fun()
         tid = Threads.threadid()
         solver = solvers[tid]
