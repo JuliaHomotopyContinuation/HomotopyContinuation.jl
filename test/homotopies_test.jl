@@ -32,7 +32,7 @@
     @test Hom.jacobian_and_dt(H, x, t) == (U, u)
 
     cache = Hom.cache(H, x, t)
-    @test cache isa Hom.StartTargetHomotopyCache
+    @test cache isa Hom.StraightLineHomotopyCache
 
     Hom.evaluate!(u, H, x, t, cache)
     @test Hom.evaluate(H, x, t, cache) == u

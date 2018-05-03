@@ -14,7 +14,8 @@ export allvariables,
     unsafe_infinity_norm,
     logabs,
     fastlog,
-    batches
+    batches,
+    randomish_gamma
 
 
 """
@@ -242,7 +243,12 @@ fastlog(z) = Base.Math.JuliaLibm.log(z)
 #
 
 
-
+function randomish_gamma()
+    # Usually values near 1, i, -i, -1 are not good randomization
+    # Therefore we artificially constrain the choices
+    theta = rand() * 0.30 + 0.075 + (rand(Bool) ? 0.0 : 0.5)
+    cis(2π * theta)
+end
 
 
 # Parallelization
