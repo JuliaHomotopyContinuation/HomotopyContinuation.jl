@@ -1,3 +1,5 @@
+export FixedPointHomotopy, FixedPointHomotopyCache
+
 """
     FixedPointHomotopy(F, x₀; gamma=exp(i * 2π*rand()))
 

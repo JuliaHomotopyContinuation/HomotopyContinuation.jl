@@ -1,3 +1,5 @@
+export PatchedHomotopy, PatchedHomotopyCache
+
 import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch, AbstractAffinePatchState
 import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
@@ -11,6 +13,11 @@ struct PatchedHomotopy{H<:AbstractHomotopy, PS<:AbstractAffinePatchState} <: Abs
     homotopy::H
     patch::PS
 end
+
+function PatchedHomotopy(H::AbstractHomotopy, p::AbstractAffinePatch, x)
+    PatchedHomotopy(H, AffinePatches.state(p, x₀))
+end
+
 
 function Base.size(H::PatchedHomotopy)
     m, n = size(H.homotopy)

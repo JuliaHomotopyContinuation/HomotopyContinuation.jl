@@ -1,3 +1,5 @@
+export StraightLineHomotopy, StraightLineHomotopyCache
+
 """
     StraightLineHomotopy(G, F; gamma=exp(i * 2π*rand()))
 
@@ -38,9 +40,6 @@ function cache(H::StraightLineHomotopy, x, t)
     StraightLineHomotopyCache(start_cache, target_cache, u, U)
 end
 
-start(H::StraightLineHomotopy) = H.start
-target(H::StraightLineHomotopy) = H.target
-
 Base.size(H::StraightLineHomotopy) = size(H.start)
 
 """
@@ -58,8 +57,8 @@ Obtain the gamma used in the StraightLineHomotopy.
 γ(H::StraightLineHomotopy) = gamma(H)
 
 function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    Systems.evaluate!(c.u, start(H), x, c.start)
-    Systems.evaluate!(u, target(H), x, c.target)
+    Systems.evaluate!(c.u, H.start, x, c.start)
+    Systems.evaluate!(u, H.target, x, c.target)
 
     u .= (γ(H) * t) .* c.u .+ (1 - t) .* u
 
@@ -67,8 +66,8 @@ function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCach
 end
 
 function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    Systems.evaluate!(c.u, start(H), x, c.start)
-    Systems.evaluate!(u, target(H), x, c.target)
+    Systems.evaluate!(c.u, H.start, x, c.start)
+    Systems.evaluate!(u, H.target, x, c.target)
 
     u .= γ(H) .* c.u .- u
 
@@ -76,8 +75,8 @@ function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
 end
 
 function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    Systems.jacobian!(c.U, start(H), x, c.start)
-    Systems.jacobian!(U, target(H), x, c.target)
+    Systems.jacobian!(c.U, H.start, x, c.start)
+    Systems.jacobian!(U, H.target, x, c.target)
 
     U .= (γ(H) * t) .* c.U .+ (1 - t) .* U
 
@@ -85,8 +84,8 @@ function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCach
 end
 
 function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    Systems.evaluate_and_jacobian!(c.u, c.U, start(H), x, c.start)
-    Systems.evaluate_and_jacobian!(u, U, target(H), x, c.target)
+    Systems.evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
+    Systems.evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
     u .= (γ(H) * t) .* c.u .+ (1 - t) .* u
     U .= (γ(H) * t) .* c.U .+ (1 - t) .* U
@@ -95,8 +94,8 @@ function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::Straight
 end
 
 function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    Systems.evaluate_and_jacobian!(c.u, c.U, start(H), x, c.start)
-    Systems.evaluate_and_jacobian!(u, U, target(H), x, c.target)
+    Systems.evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
+    Systems.evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
     U .= (γ(H) * t) .* c.U .+ (1 - t) .* U
     u .= γ(H) .* c.u .- u
