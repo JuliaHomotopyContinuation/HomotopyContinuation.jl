@@ -21,7 +21,8 @@ export AbstractHomotopy,
     jacobian!, jacobian,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
-    jacobian_and_dt!, jacobian_and_dt
+    jacobian_and_dt!, jacobian_and_dt,
+    precondition!, update!
 
 export HomotopyWithCache
 
@@ -78,52 +79,54 @@ function cache end
 
 # Homotopy API
 
+# Base.size
+
 """
-    evaluate!(u, H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    evaluate!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-evaluate!(u, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate!(u, H, x, t, c)
+evaluate!
 
 """
-    evaluate(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    evaluate(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` at `(x, t)`.
 """
-evaluate(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+evaluate
 
 """
-    dt!(u, H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    dt!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-dt!(u, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = dt!(u, H, x, t, c)
+dt!
 
 """
-    dt(H::AbstractHomotopy, x::AbstractVector [, cache::AbstractHomotopyCache])
+    dt(H::AbstractHomotopy, x::AbstractVector, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` at `(x, t)`.
 """
-dt(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = dt(H, x, t, c)
+dt
 
 """
-    jacobian!(u, H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    jacobian!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-jacobian!(U, H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian!(U, H, x, t, c)
+jacobian!
 
 """
-    jacobian(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    jacobian(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)`.
 """
-jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t)) = jacobian(H, x, t, c)
+jacobian
 
 
 # Optional
 """
-    evaluate_and_jacobian!(u, U, F, x, t [, cache::AbstractHomotopyCache])
+    evaluate_and_jacobian!(u, U, F, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` and its Jacobian at `(x, t)` and store the results in `u` (evalution)
 and `U` (Jacobian).
@@ -135,7 +138,7 @@ function evaluate_and_jacobian!(u, U, H::AbstractHomotopy, x, t, c=cache(H, x, t
 end
 
 """
-    evaluate_and_jacobian(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    evaluate_and_jacobian(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` and its Jacobian at `(x, t)`.
 """
@@ -146,7 +149,7 @@ function evaluate_and_jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t))
 end
 
 """
-    jacobian_and_dt!(U, u, H, x, t [, cache::AbstractHomotopyCache])
+    jacobian_and_dt!(U, u, H, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)` and store the results in `u` (evalution)
 and `v` (∂t).
@@ -158,7 +161,7 @@ function jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c=cache(H, x, t))
 end
 
 """
-    evaluate_and_dt(H::AbstractHomotopy, x, t [, cache::AbstractHomotopyCache])
+    evaluate_and_dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)`.
 """
@@ -168,14 +171,31 @@ function jacobian_and_dt(H::AbstractHomotopy, x, t, c=cache(H, x, t))
     U, u
 end
 
-
-
 """
     nvariables(H::AbstractHomotopy)
 
 Returns the number of variables of the homotopy `H`.
 """
 nvariables(H::AbstractHomotopy) = last(size(H))
+
+"""
+    precondition!(H::AbstractHomotopy, x, t, cache)
+
+Prepare a homotopy for things like pathtracking starting at `x` and `t`.
+This can modify `x` as well as `H` and anything in `cache`.
+By default this is a no-op. If `H` wraps another homotopy this should call
+`precondition!` on this as well.
+"""
+precondition!(H::AbstractHomotopy, x, t, cache) = nothing
+"""
+    update!(H::AbstractHomotopy, x, t, cache)
+
+Update a homotopy for new values of `x` and `x`, i.e., update an affine patch.
+This can modify `x` as well as `H` and anything in `cache`.
+By default this is a no-op. If `H` wraps another homotopy this should call
+`update!` on this as well.
+"""
+update!(H::AbstractHomotopy, x, t, cache) = nothing
 
 
 struct HomotopyWithCache{H<:AbstractHomotopy, C<:AbstractHomotopyCache} <: AbstractHomotopy
@@ -197,16 +217,11 @@ jacobian_and_dt(H::HomotopyWithCache, x, t) = jacobian_and_dt(H.homotopy, x, t, 
 jacobian_and_dt!(U, u, H::HomotopyWithCache, x, t) = jacobian_and_dt!(U, u, H.homotopy, x, t, H.cache)
 evaluate_and_jacobian(H::HomotopyWithCache, x, t) = evaluate_and_jacobian(H.homotopy, x, t, H.cache)
 evaluate_and_jacobian!(u, U, H::HomotopyWithCache, x, t) = evaluate_and_jacobian!(u, U, H.homotopy, x, t, H.cache)
-
-# Default caches
-"""
-    NullCache
-
-An empty cache if no cache is necessary.
-"""
-struct NullCache <: AbstractHomotopyCache end
+precondition!(H, x, t) = precondition!(H.homotopy, x, t, H.cache)
+update!(H, x, t) = update!(H.homotopy, x, t, H.cache)
 
 # StraightLineHomotopy implementation
 include("homotopies/straight_line.jl")
 include("homotopies/fixed_point.jl")
+include("homotopies/patched_homotopy.jl")
 end

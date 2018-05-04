@@ -4,7 +4,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 
-import ..Homotopies: AbstractHomotopy, AbstractStartTargetHomotopy, StraightLineHomotopy
+import ..Homotopies: AbstractHomotopy, StraightLineHomotopy
 import ..ProjectiveVectors
 import ..Systems: SPSystem
 
@@ -104,7 +104,7 @@ Construct a `ProjectiveStartTargetProblem`. This steps constructs a homotopy and
 the systems if necessary. The options are
 * `system=SPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
 is called with `system(polys, variables)` where `variables` determines the variable ordering.
-* `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractStartTargetHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
+* `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
 with `system`.
 
@@ -112,7 +112,7 @@ with `system`.
 
 Construct a `ProjectiveProblem`. The homotopy `H` needs to be homogenous.
 """
-struct ProjectiveStartTargetProblem{H<:AbstractStartTargetHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
+struct ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
     homotopy::H
     homogenization_strategy::HS
 end

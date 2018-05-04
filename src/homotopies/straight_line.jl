@@ -12,6 +12,7 @@ end
 function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem; gamma=randomish_gamma())
     StraightLineHomotopy(start, target, gamma)
 end
+(H::StraightLineHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 """
     StraightLineHomotopyCache
@@ -64,12 +65,6 @@ function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCach
 
     u
 end
-function evaluate(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    G = Systems.evaluate(start(H), x, c.start)
-    F = Systems.evaluate(target(H), x, c.target)
-    (γ(H) * t) * G + (1 - t) * F
-end
-(H::StraightLineHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
     Systems.evaluate!(c.u, start(H), x, c.start)
@@ -79,11 +74,6 @@ function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
 
     u
 end
-function dt(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    G = Systems.evaluate(start(H), x, c.start)
-    F = Systems.evaluate(target(H), x, c.target)
-    γ(H) .* G .- F
-end
 
 function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
     Systems.jacobian!(c.U, start(H), x, c.start)
@@ -92,11 +82,6 @@ function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCach
     U .= (γ(H) * t) .* c.U .+ (1 - t) .* U
 
     U
-end
-function jacobian(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    G = Systems.jacobian(start(H), x, c.start)
-    F = Systems.jacobian(target(H), x, c.target)
-    (γ(H) * t) .* G .+ (1 - t) .* F
 end
 
 function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
@@ -117,4 +102,17 @@ function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StraightLineHo
     u .= γ(H) .* c.u .- u
 
     nothing
+end
+
+function evaluate(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    M, N = size(H)
+    evaluate!(similar(c.u, M), H, x, t, c)
+end
+function jacobian(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    M, N = size(H)
+    jacobian!(similar(c.U, M, N), H, x, t, c)
+end
+function dt(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    M, N = size(H)
+    dt!(similar(c.u, M), H, x, t, c)
 end
