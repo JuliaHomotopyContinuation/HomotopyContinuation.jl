@@ -1,4 +1,6 @@
 @testset "solve" begin
+    @polyvar x
+    @test count(r -> r.returncode == :success, solve([x - 1])) == 1
     F = equations(katsura5())
     @test count(r -> r.returncode == :success, solve(F, threading=false)) == 32
 
