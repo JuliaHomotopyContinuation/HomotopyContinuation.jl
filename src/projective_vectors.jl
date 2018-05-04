@@ -210,6 +210,7 @@ function Base.LinAlg.normalize!(v::PVector, p::Real=2)
     v
 end
 
+Base.LinAlg.dot(v::PVector, w::PVector) = dot(v.data, w.data)
 
 const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
