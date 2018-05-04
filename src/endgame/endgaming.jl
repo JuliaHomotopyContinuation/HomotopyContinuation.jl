@@ -158,7 +158,11 @@ function windingnumber(logabs_samples, logh)
     Δ1 = logabs_samples[nsamples-2] - logabs_samples[nsamples-1]
     Δ2 = logabs_samples[nsamples-1] - logabs_samples[nsamples]
 
-    return round(Int, logh / logabs((Δ1 - Δ2) / (Δ - Δ1)))
+    w = logh / logabs((Δ1 - Δ2) / (Δ - Δ1))
+    if !isfinite(w) # we have Δ == Δ1
+        return 0
+    end
+    return round(Int, w)
 end
 
 
