@@ -5,13 +5,10 @@ import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
 
 export AbstractPatch,
     AbstractLocalAffinePatch,
+    state,
     precondition!,
-    init_patch,
-    update_patch!,
-    OrthogonalPatch
+    update!
 
-# TODO: This currently does not support products of project spaces. Stil need to figure
-# out how to do this best. So I'm punting on that for now...
 """
     AbstractAffinePatch
 
@@ -27,6 +24,12 @@ This holds the actual patch information.
 """
 abstract type AbstractAffinePatchState end
 
+"""
+    state(::AbstractAffinePatch, x)::AbstractAffinePatchState
+
+Construct the state of the path from `x`.
+"""
+state
 
 """
     precondition!(v::AbstractAffinePatchState, x)
@@ -35,15 +38,12 @@ Modify both such that `v` is properly setup and `v⋅x-1=0` holds.
 """
 precondition!
 
-
 """
     update_patch!(::AbstractAffinePatchState, x)
 
 Update the patch depending on the local state.
 """
 update!(::AbstractAffinePatchState, x) = nothing
-
-
 
 
 include("affine_patches/orthogonal_patch.jl")
