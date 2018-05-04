@@ -1,10 +1,7 @@
-import ..AffinePatches
 import ..Correctors
 import ..Homotopies
 import ..PredictionCorrection
 import ..Predictors
-import ..Problems
-import ..ProjectiveVectors
 import ..StepLength
 
 using ..Utilities
@@ -19,10 +16,7 @@ export PathTracker,
     set_tol!,
     set_corrector_maxiters!,
     set_refinement_tol!,
-    set_refinement_maxiters!,
-    fixpatch!
-
-
+    set_refinement_maxiters!
 
 mutable struct Options
     tol::Float64
@@ -30,15 +24,13 @@ mutable struct Options
     refinement_tol::Float64
     refinement_maxiters::Int
     maxiters::Int
-    # we can disable an updating of the patch
-    fixedpatch::Bool
 end
 
-mutable struct State{S<:StepLength.AbstractStepLengthState}
+mutable struct State{T, S<:StepLength.AbstractStepLengthState}
     # Our start point in space
-    start::Complex{Float64}
+    start::T
     # Our target point in space
-    target::Complex{Float64}
+    target::T
     steplength::S
     t::Float64 # The relative progress. `t` always goes from 1.0 to 0.0
     Δt::Float64 # Δt is the current relative step width
@@ -46,13 +38,10 @@ mutable struct State{S<:StepLength.AbstractStepLengthState}
     status::Symbol
 end
 
-function State(H::Homotopies.AbstractHomotopy, step,
-    x₁::ProjectiveVectors.AbstractProjectiveVector,
-    t₁, t₀)
+function State(H::Homotopies.AbstractHomotopy, step, x₁::AbstractVector, t₁, t₀)
     checkstart(H, x₁)
 
-    start = convert(Complex{Float64}, t₁)
-    target = convert(Complex{Float64}, t₀)
+    start, target = promote(t₁, t₀)
     steplength = StepLength.state(step, start, target)
     t = 1.0
     Δt = min(StepLength.relsteplength(steplength), 1.0)
@@ -62,6 +51,7 @@ function State(H::Homotopies.AbstractHomotopy, step,
 
     State(start, target, steplength, t, Δt, iters, status)
 end
+
 function checkstart(H, x)
     N = Homotopies.nvariables(H)
     N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
@@ -72,12 +62,10 @@ struct Cache{H<:Homotopies.HomotopyWithCache, PC<:PredictionCorrection.Predictor
     predictor_corrector::PC
     out::Vector{T}
 end
-function Cache(homotopy, patch, predictor_corrector, state::State, x₁)
-    patched = PatchedHomotopy(homotopy, copy(x₁))
-    raw_x₁ = ProjectiveVectors.raw(x₁)
-    H = Homotopies.HomotopyWithCache(patched, raw_x₁, state.start)
-    pc_cache = PredictionCorrection.cache(predictor_corrector, H, raw_x₁, state.start)
-    out = H(raw_x₁, state.start)
+function Cache(homotopy, predictor_corrector, state::State, x₁)
+    H = Homotopies.HomotopyWithCache(homotopy, x₁, state.start)
+    pc_cache = PredictionCorrection.cache(predictor_corrector, H, x₁, state.start)
+    out = H(x₁, state.start)
     Cache(H, pc_cache, out)
 end
 
@@ -92,9 +80,6 @@ needs to be homogenous.
 The corrector used during in the predictor-corrector scheme. The default is
 [`Correctors.Newton`](@ref).
 * `corrector_maxiters=2`: The maximal number of correction steps in a single step.
-* `patch::AffinePatches.AbstractAffinePatch`:
-The affine patch used to embed the homotopy into affine space (from projective space).
-The default is [`AffinePatches.OrthogonalPatch`](@ref).
 * `predictor::Predictors.AbstractPredictor`:
 The predictor used during in the predictor-corrector scheme. The default is
 `[Predictors.RK4`](@ref)()`.
@@ -111,18 +96,15 @@ If a method is already assembled this constructor is beneficial.
 """
 struct PathTracker{
     H<:Homotopies.AbstractHomotopy,
-    AP<:AffinePatches.AbstractAffinePatch,
     P<:Predictors.AbstractPredictor,
     Corr<:Correctors.AbstractCorrector,
     SL<:StepLength.AbstractStepLength,
     S<:State,
     C<:Cache,
-    V<:ProjectiveVectors.AbstractProjectiveVector}
+    V<:AbstractVector}
 
     # these are fixed
     homotopy::H
-    patch::AP
-    # randomize::Randomizer
     predictor_corrector::PredictionCorrection.PredictorCorrector{P, Corr}
     steplength::SL
 
@@ -136,33 +118,25 @@ struct PathTracker{
     cache::C
 end
 
-function PathTracker(prob::Problems.AbstractProblem, x₁::AbstractVector, t₁, t₀; kwargs...)
-     PathTracker(prob, Problems.embed(prob, x₁), t₁, t₀; kwargs...)
-end
-function PathTracker(prob::Problems.AbstractProblem, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀; kwargs...)
-     PathTracker(prob.homotopy, x₁, t₁, t₀; kwargs...)
-end
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
+function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    patch::AffinePatches.AbstractAffinePatch=AffinePatches.OrthogonalPatch(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     steplength::StepLength.AbstractStepLength=StepLength.HeuristicStepLength(),
     tol=1e-7,
     refinement_tol=1e-11,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
-    maxiters=10_000,
-    fixedpatch=false)
+    maxiters=10_000)
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
-    x = ProjectiveVectors.converteltype(x₁, eltype(Homotopies.evaluate(H, ProjectiveVectors.raw(x₁), t₁)))
+    x = similar(x₁, eltype(Homotopies.evaluate(H, x₁, t₁, Homotopies.cache(H, x₁, t₁))))
 
     state = State(H, steplength, x, t₁, t₀)
-    cache = Cache(H, patch, predictor_corrector, state, x)
-    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters, fixedpatch)
+    cache = Cache(H, predictor_corrector, state, x)
+    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters)
 
-    PathTracker(H, patch, predictor_corrector, steplength, state, options, x, cache)
+    PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", tracker::PathTracker)
@@ -277,17 +251,6 @@ function set_corrector_maxiters!(tracker::PathTracker, n)
 end
 
 """
-     fixedpatch!(tracker::PathTracker, flag::Bool)
-
-Set whether the current (local) affine patch should be fixed and shouldn't be updatet anymore.
-"""
-function fixpatch!(tracker::PathTracker, flag)
-     tracker.options.fixedpatch = flag
-     nothing
-end
-
-
-"""
      PathTrackerResult(tracker)
 
 Containing the result of a tracked path. The fields are
@@ -298,7 +261,7 @@ Otherwise the return code gives an indication what happened.
 * `t::Float64` The `t` when the path tracker stopped.
 * `res::Float64` The residual at `(x, t)`.
 """
-struct PathTrackerResult{T, V<:AbstractVector}
+struct PathTrackerResult{V<:AbstractVector, T}
      returncode::Symbol
      x::V
      t::T

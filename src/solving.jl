@@ -5,6 +5,7 @@ const MP = MultivariatePolynomials
 
 import ProgressMeter
 
+import ..AffinePatches
 import ..Endgame
 import ..Homotopies
 import ..PathTracking

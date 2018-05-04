@@ -38,10 +38,10 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
 end
 
 function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
-    x₀ = first(start_solutions)
-    @assert x₀ isa AbstractVector
+    x₁ = first(start_solutions)
+    @assert x₁ isa AbstractVector
 
-    tracker = PathTracking.PathTracker(prob, x₀, t₁, t₀; kwargs...)
+    tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
     endgamer = Endgame.Endgamer(tracker, options.endgame_start)
     cache = SolverCache(prob, tracker)
     Solver(prob,
@@ -50,6 +50,12 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         t₁, t₀,
         options,
         cache)
+end
+
+function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+    x = Problems.embed(prob, x₁)
+    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
+    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
 end
 
 const Solvers = Vector{<:Solver}
