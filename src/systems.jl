@@ -17,5 +17,6 @@ import ..SystemsBase: AbstractSystem,
     evaluate_and_jacobian!
 
 include("systems/sp_system.jl")
+include("systems/fixed_homotopy.jl")
 
 end

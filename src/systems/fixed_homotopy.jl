@@ -16,23 +16,23 @@ struct FixedHomotopyCache{HC<:HB.AbstractHomotopyCache} <: AbstractSystemCache
     cache::HC
 end
 
-cache(FH::FixedHomotopy, x) = HB.cache(FH.H, x, FH.t)
+cache(FH::FixedHomotopy, x) = FixedHomotopyCache(HB.cache(FH.H, x, FH.t))
 
 Base.size(F::FixedHomotopy) = size(F.H)
 
 function evaluate!(u, F::FixedHomotopy, x, c::FixedHomotopyCache)
-    HB.evaluate!(u, F.H, x, F.t, c)
+    HB.evaluate!(u, F.H, x, F.t, c.cache)
 end
-evaluate(F::FixedHomotopy, x, c::FixedHomotopyCache) = HB.evaluate(F.H, x, F.t, c)
+evaluate(F::FixedHomotopy, x, c::FixedHomotopyCache) = HB.evaluate(F.H, x, F.t, c.cache)
 function jacobian!(U, F::FixedHomotopy, x, c::FixedHomotopyCache)
-    HB.jacobian!(U, F.H, x, F.t, c)
+    HB.jacobian!(U, F.H, x, F.t, c.cache)
 end
 function jacobian(F::FixedHomotopy, x, c::FixedHomotopyCache)
-    HB.jacobian(F.H, x, F.t, c)
+    HB.jacobian(F.H, x, F.t, c.cache)
 end
 function evaluate_and_jacobian!(u, U, F::FixedHomotopy, x, c::FixedHomotopyCache)
-    HB.evaluate_and_jacobian!(u, U, F.H, x, F.t, c)
+    HB.evaluate_and_jacobian!(u, U, F.H, x, F.t, c.cache)
 end
 function evaluate_and_jacobian(F::FixedHomotopy, x, c::FixedHomotopyCache)
-    HB.evaluate_and_jacobian(F.H, x, F.t, c)
+    HB.evaluate_and_jacobian(F.H, x, F.t, c.cache)
 end

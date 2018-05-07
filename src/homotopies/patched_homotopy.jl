@@ -15,7 +15,7 @@ struct PatchedHomotopy{H<:AbstractHomotopy, PS<:AbstractAffinePatchState} <: Abs
 end
 
 function PatchedHomotopy(H::AbstractHomotopy, p::AbstractAffinePatch, x)
-    PatchedHomotopy(H, AffinePatches.state(p, x₀))
+    PatchedHomotopy(H, AffinePatches.state(p, x))
 end
 
 

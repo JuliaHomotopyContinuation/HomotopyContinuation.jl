@@ -21,7 +21,7 @@ end
 An simple cache for `StartTargetHomotopy`s consisting of the caches for the
 start and target system as well as a `Vector` and a `Matrix`.
 """
-struct FixedPointHomotopyCache{SC, T1, T2} <: AbstractHomotopyCache
+struct FixedPointHomotopyCache{SC} <: AbstractHomotopyCache
     F::SC
 end
 
@@ -61,19 +61,19 @@ end
 
 function dt!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     Systems.evaluate!(u, H.F, x, c.F)
-    u .= γ(H) .* x .- u
+    u .= γ(H) .* (x .- H.x₀) .- u
 
     u
 end
 function dt(H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     F = Systems.evaluate(H.F, x, c.F)
-    γ(H) .* x .- F
+    γ(H) .* (x .- H.x₀) .- F
 end
 
 function jacobian!(U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     Systems.jacobian!(U, H.F, x, c.F)
 
-    U .= (-t) .* U
+    U .= (1 - t) .* U
     γt = γ(H) * t
     for i=1:length(x)
         U[i, i] += γt
@@ -83,7 +83,7 @@ end
 function jacobian(H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     U = Systems.jacobian(H.F, x, c.F)
 
-    U .= (-t) .* U
+    U .= (1 - t) .* U
     γt = γ(H) * t
     for i=1:length(x)
         U[i, i] += γt
@@ -95,7 +95,7 @@ function evaluate_and_jacobian!(u, U, H::FixedPointHomotopy, x, t, c::FixedPoint
     Systems.evaluate_and_jacobian!(u, U, H.F, x, c.F)
 
     u .= (γ(H) * t) .* (x .- H.x₀) .+ (1 - t) .* u
-    U .= (-t) .* U
+    U .= (1 - t) .* U
     γt = γ(H) * t
     for i=1:length(x)
         U[i, i] += γt
@@ -108,12 +108,12 @@ end
 function jacobian_and_dt!(U, u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     Systems.evaluate_and_jacobian!(u, U, H.F, x, c.F)
 
-    U .= (-t) .* U
+    U .= (1 - t) .* U
     γt = γ(H) * t
     for i=1:length(x)
         U[i, i] += γt
     end
-    u .= γ(H) .* x .- u
+    u .= γ(H) .* (x .- H.x₀) .- u
 
     nothing
 end
