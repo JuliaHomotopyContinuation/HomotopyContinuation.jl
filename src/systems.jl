@@ -8,6 +8,7 @@ const SP = StaticPolynomials
 import ..HomotopiesBase
 import ..SystemsBase: AbstractSystem,
     AbstractSystemCache,
+    NullCache,
     cache,
     evaluate,
     evaluate!,
@@ -15,6 +16,8 @@ import ..SystemsBase: AbstractSystem,
     jacobian!,
     evaluate_and_jacobian,
     evaluate_and_jacobian!
+
+export NullCache
 
 include("systems/sp_system.jl")
 include("systems/fixed_homotopy.jl")

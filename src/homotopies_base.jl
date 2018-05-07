@@ -58,7 +58,7 @@ function evaluate! end
 
 Evaluate the homotopy `H` at `(x, t)`.
 """
-function evaluate end
+evaluate(H::AbstractHomotopy, x, t) = evaluate(H, x, t, cache(H, x, t))
 
 """
     dt!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -72,7 +72,7 @@ function dt! end
 
 Evaluate the homotopy `H` at `(x, t)`.
 """
-function dt end
+dt(H::AbstractHomotopy, x, t) = dt(H, x, t, cache(H, x, t))
 
 """
     jacobian!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -87,6 +87,7 @@ function jacobian! end
 Evaluate the Jacobian of the homotopy `H` at `(x, t)`.
 """
 function jacobian end
+jacobian(H::AbstractHomotopy, x, t) = jacobian(H, x, t, cache(H, x, t))
 
 
 # Optional

@@ -14,7 +14,6 @@ function SolverCache(prob, tracker)
     SolverCache(pathresult)
 end
 
-
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker, E<:Endgame.Endgamer, C<:SolverCache}
     prob::P
     tracker::T

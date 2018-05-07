@@ -1,97 +1,61 @@
-@testset "StraightLineHomotopy" begin
-    fs = TestSystems.equations(katsura5())
-
-    F = Systems.SPSystem(fs)
-    G = Systems.SPSystem(3.52 .* fs)
-
-    x = rand(Complex{Float64}, 6)
+function testevaluations(H, x)
+    m, n = size(H)
     t = rand()
-    u = zeros(Complex{Float64}, 6)
-    U = zeros(Complex{Float64}, 6, 6)
+    u = zeros(Complex{Float64}, m)
+    U = zeros(Complex{Float64}, m, n)
 
+    cache = Homotopies.cache(H, x, t)
+
+    Homotopies.evaluate!(u, H, x, t, cache)
+    @test Homotopies.evaluate(H, x, t, cache) == u
+    @test Homotopies.evaluate(H, x, t) == u
+
+    Homotopies.dt!(u, H, x, t, cache)
+    @test Homotopies.dt(H, x, t, cache) == u
+    @test Homotopies.dt(H, x, t) == u
+
+    Homotopies.jacobian!(U, H, x, t, cache)
+    @test Homotopies.jacobian(H, x, t, cache) == U
+    @test Homotopies.jacobian(H, x, t) == U
+
+    Homotopies.evaluate_and_jacobian!(u, U, H, x, t, cache)
+    @test Homotopies.evaluate_and_jacobian(H, x, t, cache) == (u, U)
+    @test (u, U) == (Homotopies.evaluate(H, x, t), Homotopies.jacobian(H, x, t))
+
+    Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
+    @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
+    @test (U, u) == (Homotopies.jacobian(H, x, t), Homotopies.dt(H, x, t))
+end
+
+@testset "StraightLineHomotopy" begin
+    F = Systems.SPSystem(TestSystems.equations(katsura5()))
+    G = Systems.SPSystem(TestSystems.equations(cyclic6()))
     H = Homotopies.StraightLineHomotopy(F, G)
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
 
-    Homotopies.evaluate!(u, H, x, t)
-    @test Homotopies.evaluate(H, x, t) == u
 
-    Homotopies.dt!(u, H, x, t)
-    @test Homotopies.dt(H, x, t) == u
-
-    Homotopies.jacobian!(U, H, x, t)
-    @test Homotopies.jacobian(H, x, t) == U
-
-    Homotopies.evaluate_and_jacobian!(u, U, H, x, t)
-    @test Homotopies.evaluate_and_jacobian(H, x, t) == (u, U)
-
-    Homotopies.jacobian_and_dt!(U, u, H, x, t)
-    @test Homotopies.jacobian_and_dt(H, x, t) == (U, u)
-
-    cache = Homotopies.cache(H, x, t)
-    @test cache isa Homotopies.StraightLineHomotopyCache
-
-    Homotopies.evaluate!(u, H, x, t, cache)
-    @test Homotopies.evaluate(H, x, t, cache) == u
-
-    Homotopies.dt!(u, H, x, t, cache)
-    @test Homotopies.dt(H, x, t, cache) == u
-
-    Homotopies.jacobian!(U, H, x, t, cache)
-    @test Homotopies.jacobian(H, x, t, cache) == U
-
-    Homotopies.evaluate_and_jacobian!(u, U, H, x, t, cache)
-    @test Homotopies.evaluate_and_jacobian(H, x, t, cache) == (u, U)
-
-    Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
-    @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
+    testevaluations(H, rand(Complex{Float64}, 6))
 end
 
 @testset "FixedPointHomotopy" begin
-    fs = TestSystems.equations(katsura5())
-
-    F = Systems.SPSystem(fs)
-    G = Systems.SPSystem(3.52 .* fs)
-
-    x = rand(Complex{Float64}, 6)
-    t = rand()
-    u = zeros(Complex{Float64}, 6)
-    U = zeros(Complex{Float64}, 6, 6)
-
-    H = Homotopies.StraightLineHomotopy(F, G)
+    F = Systems.SPSystem(TestSystems.equations(katsura5()))
+    H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
 
-    Homotopies.evaluate!(u, H, x, t)
-    @test Homotopies.evaluate(H, x, t) == u
+    testevaluations(H, rand(Complex{Float64}, 6))
+end
 
-    Homotopies.dt!(u, H, x, t)
-    @test Homotopies.dt(H, x, t) == u
+@testset "PatchedHomotopy" begin
+    F = Systems.SPSystem(TestSystems.equations(katsura5()))
+    G = Systems.SPSystem(TestSystems.equations(cyclic6()))
+    x = ProjectiveVectors.PVector(rand(Complex{Float64}, 6), 1)
+    H = Homotopies.PatchedHomotopy(Homotopies.StraightLineHomotopy(F, G),
+        AffinePatches.OrthogonalPatch(),
+        x)
+    @test H isa Homotopies.AbstractHomotopy
+    @test size(H) == (7, 6)
 
-    Homotopies.jacobian!(U, H, x, t)
-    @test Homotopies.jacobian(H, x, t) == U
-
-    Homotopies.evaluate_and_jacobian!(u, U, H, x, t)
-    @test Homotopies.evaluate_and_jacobian(H, x, t) == (u, U)
-
-    Homotopies.jacobian_and_dt!(U, u, H, x, t)
-    @test Homotopies.jacobian_and_dt(H, x, t) == (U, u)
-
-    cache = Homotopies.cache(H, x, t)
-    @test cache isa Homotopies.StraightLineHomotopyCache
-
-    Homotopies.evaluate!(u, H, x, t, cache)
-    @test Homotopies.evaluate(H, x, t, cache) == u
-
-    Homotopies.dt!(u, H, x, t, cache)
-    @test Homotopies.dt(H, x, t, cache) == u
-
-    Homotopies.jacobian!(U, H, x, t, cache)
-    @test Homotopies.jacobian(H, x, t, cache) == U
-
-    Homotopies.evaluate_and_jacobian!(u, U, H, x, t, cache)
-    @test Homotopies.evaluate_and_jacobian(H, x, t, cache) == (u, U)
-
-    Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
-    @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
+    testevaluations(H, x)
 end

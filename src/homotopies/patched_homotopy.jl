@@ -18,7 +18,6 @@ function PatchedHomotopy(H::AbstractHomotopy, p::AbstractAffinePatch, x)
     PatchedHomotopy(H, AffinePatches.state(p, x))
 end
 
-
 function Base.size(H::PatchedHomotopy)
     m, n = size(H.homotopy)
     (m + AffinePatches.nequations(H.patch), n)
