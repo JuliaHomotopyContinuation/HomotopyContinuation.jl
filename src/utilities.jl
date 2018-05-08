@@ -188,31 +188,19 @@ than `norm(z, Inf)`.
 Compute the ∞-norm of `z₁-z₂`.
 """
 infinity_norm(z::AbstractVector{<:Complex}) = sqrt(maximum(abs2, z))
-function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:Complex})
-    m = abs2(z₁[1] - z₂[1])
-    n₁, n₂ = length(z₁), length(z₂)
-    if n₁ ≠ n₂
-        return convert(typeof(m), Inf)
-    end
-    @inbounds for k=2:n₁
-        m = max(m, abs2(z₁[k] - z₂[k]))
-    end
-    sqrt(m)
-end
-unsafe_infinity_norm(v, w) = infinity_norm(v, w)
+# function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:Complex})
+#     m = abs2(z₁[1] - z₂[1])
+#     n₁, n₂ = length(z₁), length(z₂)
+#     if n₁ ≠ n₂
+#         return convert(typeof(m), Inf)
+#     end
+#     @inbounds for k=2:n₁
+#         m = max(m, abs2(z₁[k] - z₂[k]))
+#     end
+#     sqrt(m)
+# end
+# unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
-
-function Base.findmax(f, xs)
-    i, el = 1, f(xs[1])
-    for k=2:length(xs)
-        v = f(xs[2])
-        if v > el
-            el = v
-            i = k
-        end
-    end
-    i, el
-end
 
 """
     logabs(z)
