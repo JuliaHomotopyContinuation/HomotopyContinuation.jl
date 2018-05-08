@@ -6,17 +6,7 @@ import ..StepLength
 
 using ..Utilities
 
-export PathTracker,
-    t, Δt,
-    status, value,
-    tol,
-    corrector_maxiters,
-    refinement_tol,
-    refinement_maxiters,
-    set_tol!,
-    set_corrector_maxiters!,
-    set_refinement_tol!,
-    set_refinement_maxiters!
+export PathTracker
 
 mutable struct Options
     tol::Float64
@@ -24,6 +14,7 @@ mutable struct Options
     refinement_tol::Float64
     refinement_maxiters::Int
     maxiters::Int
+    update_homotopies::Bool
 end
 
 mutable struct State{T, S<:StepLength.AbstractStepLengthState}
@@ -50,11 +41,6 @@ function State(H::Homotopies.AbstractHomotopy, step, x₁::AbstractVector, t₁,
     status = :ok
 
     State(start, target, steplength, t, Δt, iters, status)
-end
-
-function checkstart(H, x)
-    N = Homotopies.nvariables(H)
-    N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
 end
 
 struct Cache{H<:Homotopies.HomotopyWithCache, PC<:PredictionCorrection.PredictorCorrectorCache, T}
@@ -126,7 +112,8 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
     refinement_tol=1e-11,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
-    maxiters=10_000)
+    maxiters=10_000,
+    update_homotopies=true)
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
@@ -134,120 +121,9 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     state = State(H, steplength, x, t₁, t₀)
     cache = Cache(H, predictor_corrector, state, x)
-    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters)
+    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters, update_homotopies)
 
     PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
-end
-
-function Base.show(io::IO, ::MIME"text/plain", tracker::PathTracker)
-    print("PathTracker")
-end
-
-"""
-     currt(tracker::PathTracker)
-
-Current `t`.
-"""
-currt(tracker::PathTracker) = currt(tracker.state)
-currt(state::State) = (1-state.t) * state.target + state.t * state.start
-
-"""
-     Δt(tracker::PathTracker)
-
-Current steplength `Δt`.
-"""
-currΔt(tracker::PathTracker) = currΔt(tracker.state)
-currΔt(state::State) = state.Δt * (state.target - state.start)
-
-"""
-     iters(tracker::PathTracker)
-
-Current number of iterations.
-"""
-curriters(tracker::PathTracker) = curriters(tracker.state)
-curriters(state::State) = state.iters
-
-"""
-     status(tracker::PathTracker)
-
-Current status.
-"""
-currstatus(tracker::PathTracker) = currstatus(tracker.state)
-currstatus(state::State) = state.status
-
-"""
-    currx(tracker::PathTracker)
-
-Return the current value of `x`.
-"""
-currx(tracker::PathTracker) = tracker.x
-
-"""
-     tol(tracker::PathTracker)
-
-Current tolerance.
-"""
-tol(tracker::PathTracker) = tracker.options.tol
-
-"""
-     refinement_tol(tracker::PathTracker)
-
-Current refinement tolerance.
-"""
-refinement_tol(tracker::PathTracker) = tracker.options.refinement_tol
-
-"""
-     refinement_maxiters(tracker::PathTracker)
-
-Current refinement maxiters.
-"""
-refinement_maxiters(tracker::PathTracker) = tracker.options.refinement_maxiters
-
-"""
-     corrector_maxiters(tracker::PathTracker)
-
-Current correction maxiters.
-"""
-corrector_maxiters(tracker::PathTracker) = tracker.options.corrector_maxiters
-
-"""
-     set_tol!(tracker::PathTracker, tol)
-
-Set the current tolerance to `tol`.
-"""
-function set_tol!(tracker::PathTracker, tol)
-     tracker.options.tol = tol
-     tol
-end
-
-"""
-     set_refinement_maxiters!(tracker::PathTracker, tol)
-
-Set the current refinement tolerance to `tol`.
-"""
-function set_refinement_tol!(tracker::PathTracker, tol)
-     tracker.options.refinement_tol = tol
-     tol
-end
-
-"""
-     set_refinement_maxiters!(tracker::PathTracker, n)
-
-Set the current refinement maxiters to `n`.
-"""
-function set_refinement_maxiters!(tracker::PathTracker, n)
-     tracker.options.refinement_maxiters = n
-     n
-end
-
-"""
-     set_corrector_maxiters!(tracker::PathTracker, n)
-
-Set the current correction maxiters to `n`.
-"""
-function set_corrector_maxiters!(tracker::PathTracker, n)
-     tracker.options.corrector_maxiters = n
-     n
 end
 
 """
