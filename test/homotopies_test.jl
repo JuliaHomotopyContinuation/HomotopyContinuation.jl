@@ -27,7 +27,7 @@ function testevaluations(H, x)
     @test (U, u) == (Homotopies.jacobian(H, x, t), Homotopies.dt(H, x, t))
 end
 
-@testset "StraightLineHomotopy" begin
+@testset "Homotopies.StraightLineHomotopy" begin
     F = Systems.SPSystem(TestSystems.equations(katsura5()))
     G = Systems.SPSystem(TestSystems.equations(cyclic6()))
     H = Homotopies.StraightLineHomotopy(F, G)
@@ -38,7 +38,7 @@ end
     testevaluations(H, rand(Complex{Float64}, 6))
 end
 
-@testset "FixedPointHomotopy" begin
+@testset "Homotopies.FixedPointHomotopy" begin
     F = Systems.SPSystem(TestSystems.equations(katsura5()))
     H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))
     @test H isa Homotopies.AbstractHomotopy
@@ -47,7 +47,7 @@ end
     testevaluations(H, rand(Complex{Float64}, 6))
 end
 
-@testset "PatchedHomotopy" begin
+@testset "Homotopies.PatchedHomotopy" begin
     F = Systems.SPSystem(TestSystems.equations(katsura5()))
     G = Systems.SPSystem(TestSystems.equations(cyclic6()))
     x = ProjectiveVectors.PVector(rand(Complex{Float64}, 6), 1)
