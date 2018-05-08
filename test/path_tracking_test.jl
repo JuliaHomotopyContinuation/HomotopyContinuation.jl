@@ -5,18 +5,19 @@
     TDP = Problems.TotalDegreeProblem(F)
     P = Problems.ProjectiveStartTargetProblem(TDP)
     start_sols = Utilities.totaldegree_solutions(F) |> collect
-
+    x₁ = Problems.embed(P, first(start_sols))
+    H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
     # test construction
-    t1 = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1)
+    t1 = PathTracking.PathTracker(H, x₁, 1.0, 0.1)
 
     @test t1 isa PathTracking.PathTracker
     @test length(t1.x) == 7
 
-    t2 = PathTracking.PathTracker(P, Problems.embed(P, first(start_sols)), 1.0, 0.1)
+    t2 = PathTracking.PathTracker(H, x₁, 1.0, 0.1)
     @test t2 isa PathTracking.PathTracker
     @test length(t2.x) == 7
 
-    t3 = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1, predictor=Predictors.Euler())
+    t3 = PathTracking.PathTracker(H, x₁, 1.0, 0.1, predictor=Predictors.Euler())
     @test t3.predictor_corrector.predictor isa Predictors.Euler
 
 
