@@ -9,7 +9,7 @@ A random patch. The vector has norm 1.
 struct RandomPatch <: AbstractAffinePatch end
 
 struct RandomPatchState{V<:AbstractProjectiveVector} <: AbstractAffinePatchState
-    v::V # this is already conjugated
+    v::V
 end
 
 function state(::RandomPatch, x::AbstractProjectiveVector)
