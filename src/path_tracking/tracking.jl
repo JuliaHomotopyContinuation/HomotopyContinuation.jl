@@ -96,7 +96,7 @@ function step!(tracker)
 
     update_t_Δt!(tracker.state, tracker.steplength, step_successfull)
 
-    if step_successfull
+    if step_successfull && tracker.options.update_homotopies
         # Since x changed we should update the patch
         Homotopies.update!(cache.homotopy, currx(tracker), currt(tracker))
     end
