@@ -134,11 +134,3 @@ end
 
 
 Juno.render(i::Juno.Inline, x::PathResult) = Juno.render(i, Juno.defaultrepr(x))
-
-# function Juno.render(i::Juno.Inline, x::Vector{PathResult})
-#         t = Juno.render(i, Juno.defaultrepr(x))
-#         t[:children] = [
-#             Juno.render(i, Text("hallo world"))
-#             ]
-#         return t
-#     end
