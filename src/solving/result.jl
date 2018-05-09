@@ -70,9 +70,9 @@ function solutions_at_infinity(R::Result; compact = false)
     end
 end
 
-function singular_solutions(R::Result; compact = false)
+function singular_solutions(R::Result; compact = false, tol = Inf)
     K = filter(
-    s -> s.windingnumber > 1 &&
+    s -> (s.windingnumber > 1 || s.condition_number > tol) &&
     (s.returncode == :success || s.returncode == :at_infinity),
     R.path_results)
     if !compact
@@ -159,7 +159,7 @@ function Juno.render(i::Juno.Inline, r::Result)
         end
         if r.singular > 0
                 push!(t[:children],
-                Juno.render(i, Text("Singular solutions:")),
+                Juno.render(i, Text("Singular solutions (windingnumber > 1):")),
                 Juno.render(i, round.(singular_solutions(r, compact = true), 4)))
         end
         if r.failed > 0
