@@ -72,7 +72,7 @@ function Base.show(io::IO, r::Result)
             println(io, "---------------------------------")
             println(io, "Finite solutions:")
             for s in r.finite_solutions
-                println(io, "$(s.solution)")
+                println(io, "$(round.(s.solution,4))")
             end
         end
 
@@ -81,7 +81,7 @@ function Base.show(io::IO, r::Result)
             println(io, "---------------------------------")
             println(io, "Solutions at infinity:")
             for s in r.solutions_at_infinity
-                println(io, "$(s.solution)")
+                println(io, "$(round.(s.solution,4))")
             end
         end
 
@@ -89,7 +89,7 @@ function Base.show(io::IO, r::Result)
             println(io, "---------------------------------")
             println(io, "Singular solutions (windingnumber > 1):")
             for s in r.singular_solutions
-                println(io, "$(s.solution)")
+                println(io, "$(round.(s.solution,4))")
             end
         end
         println(io, "---------------------------------")
