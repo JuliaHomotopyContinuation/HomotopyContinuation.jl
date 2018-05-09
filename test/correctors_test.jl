@@ -1,9 +1,14 @@
-@testset "Correctors" begin
+function setup_square_corrector_test()
     F = Systems.SPSystem(equations(katsura6()))
     x = rand(Complex{Float64}, 7)
     xnext = copy(x)
     t = rand()
     H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
+    H, x, xnext, t
+end
+
+@testset "Correctors.Newton" begin
+    H, x, xnext, t = setup_square_corrector_test()
 
     corrector = Correctors.Newton()
     @test corrector isa Correctors.Newton
