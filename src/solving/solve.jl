@@ -79,29 +79,27 @@ function endgame(solvers, start_solutions, endgame_zone_results)
         p = ProgressMeter.Progress(n, 0.5, "Running endgame...")
 
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
-            x₁, r = start_solutions[k], endgame_zone_results[k]
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k-1),))
             end
-            if r.returncode == :success
-                result = Endgame.play(solver.endgamer, r.x, t_endgame)
-                PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
-            else
-                PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
-            end
+            runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
         end
         ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
     else
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
-            x₁, r = start_solutions[k], endgame_zone_results[k]
-            if r.returncode == :success
-                result = Endgame.play(solver.endgamer, r.x, t_endgame)
-                PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
-            else
-                PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
-            end
+            runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
         end
     end
 
     result
+end
+
+@inline function runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
+    x₁, r = start_solutions[k], endgame_zone_results[k]
+    if r.returncode == :success
+        result = Endgame.play(solver.endgamer, r.x, t_endgame)
+        return PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
+    else
+        return PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+    end
 end

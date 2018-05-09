@@ -66,8 +66,7 @@ Base.copy(z::PVector) = PVector(copy(z.data), z.homvar)
 """
     converteltype(v::PVector, T)
 """
-converteltype(v::PVector, ::Type{T}) where T = PVector(convert.(T, v.data), v.homvar)
-converteltype(v::PVector{T}, ::Type{T}) where T = copy(v)
+Base.similar(v::PVector, ::Type{T}) where T = PVector(convert.(T, v.data), v.homvar)
 
 """
     embed(x::Vector, homvar)::PVector
@@ -211,6 +210,7 @@ function Base.LinAlg.normalize!(v::PVector, p::Real=2)
     v
 end
 
+Base.LinAlg.dot(v::PVector, w::PVector) = dot(v.data, w.data)
 
 const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
@@ -264,14 +264,10 @@ function Base.copy(z::ProdPVector)
     ProdPVector(data, new_pvectors)
 end
 
-"""
-    converteltype(v::ProdPVector, T)
-"""
-function converteltype(v::ProdPVector, ::Type{T}) where T
+function Base.similar(v::ProdPVector, ::Type{T}) where T
     data = convert.(T, v.data)
     ProdPVector(data, _create_pvectors(data, pvectors(v)))
 end
-converteltype(v::ProdPVector{T}, ::Type{T}) where T = v
 
 """
     pvectors(z::ProdPVector)

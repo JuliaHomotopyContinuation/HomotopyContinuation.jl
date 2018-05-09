@@ -21,13 +21,17 @@ module HomotopyContinuation
     include("utilities.jl")
     include("parallel.jl")
     include("projective_vectors.jl")
+    include("affine_patches.jl")
+
+    include("systems_base.jl")
+    include("homotopies_base.jl")
     include("systems.jl")
     include("homotopies.jl")
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")
     include("prediction_correction.jl")
-    include("affine_patches.jl")
+
     include("step_length.jl")
 
     include("path_tracking.jl")

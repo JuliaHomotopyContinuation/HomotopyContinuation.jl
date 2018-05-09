@@ -69,12 +69,10 @@ function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, 
     A, b = cache.A, cache.b
     evaluate_and_jacobian!(b, A, H, x, t)
     solve_with_lu_inplace!(A, b)
-    @. xnext = xnext - b
-
+    @. xnext = x - b
     k = 1
     while true
         evaluate!(b, H, xnext, t)
-
         res = infinity_norm(b)
         if res < tol
             return Result(true, res, k)
