@@ -13,7 +13,7 @@ function solve(solvers, start_solutions::AbstractVector)
 
     BLAS.set_num_threads(nblas_threads)
 
-    results
+    Result(results)
 end
 
 """

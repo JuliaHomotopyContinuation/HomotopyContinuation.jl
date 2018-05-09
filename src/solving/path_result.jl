@@ -1,5 +1,3 @@
-import Juno
-
 import ..Homotopies
 import ..ProjectiveVectors: raw
 using ..Utilities
@@ -34,8 +32,7 @@ an affine solution is given if the startvalue was affine and a projective soluti
 is given if the startvalue was projective.
 * `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
 * `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
-* `log10_condition_number`: A high condition number indicates singularty. See [`Homotopies.κ`](@ref) for details.
-    The value is the logarithmic condition number (with base 10).
+* `condition_number`: A high condition number indicates singularty. See [`Homotopies.κ`](@ref) for details.
 * `windingnumber`: The estimated winding number
 * `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
@@ -120,23 +117,28 @@ windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npre
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
-    if !haskey(io, :compact)
-        println(io, typeof(r), ":")
-        print(io, " ")
-    end
-    println(io, "* returncode: $(r.returncode)")
-    if r.returncode_detail != :none
-        println(io, " * returncode_detail: $(r.returncode_detail)")
-    end
-    println(io, " * solution: $(r.solution)")
-    println(io, " * t: $(r.t)")
-    println(io, " ---------------------------------------------")
-    println(io, " * iterations: $(r.iterations)")
-    println(io, " * npredictions: $(r.npredictions)")
-    println(io, " ---------------------------------------------")
-    println(io, " * residual: $(@sprintf "%.3e" r.residual)")
-    println(io, " * log10 of the condition_number: $(@sprintf "%.3e" log10(r.condition_number))")
-    println(io, " * windingnumber: $(r.windingnumber)")
+        println(io, " ---------------------------------------------")
+        println(io, "* returncode: $(r.returncode)")
+        if r.returncode_detail != :none
+            println(io, " * returncode_detail: $(r.returncode_detail)")
+        end
+        println(io, " * solution: $(r.solution)")
+        println(io, " * t: $(r.t)")
+        println(io, " * iterations: $(r.iterations)")
+        println(io, " * npredictions: $(r.npredictions)")
+        println(io, " * residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " * condition_number: $(@sprintf "%.3e" r.condition_number)")
+        println(io, " * windingnumber: $(r.windingnumber)")
 end
 
+
+
 Juno.render(i::Juno.Inline, x::PathResult) = Juno.render(i, Juno.defaultrepr(x))
+
+# function Juno.render(i::Juno.Inline, x::Vector{PathResult})
+#         t = Juno.render(i, Juno.defaultrepr(x))
+#         t[:children] = [
+#             Juno.render(i, Text("hallo world"))
+#             ]
+#         return t
+#     end
