@@ -2,8 +2,6 @@ module Systems
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
-import StaticPolynomials
-const SP = StaticPolynomials
 
 import ..HomotopiesBase
 import ..SystemsBase: AbstractSystem,
@@ -21,5 +19,6 @@ export NullCache
 
 include("systems/sp_system.jl")
 include("systems/fixed_homotopy.jl")
+include("systems/fp_system.jl")
 
 end
