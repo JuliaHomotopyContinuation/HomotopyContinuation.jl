@@ -150,22 +150,22 @@ function Juno.render(i::Juno.Inline, r::Result)
         if r.finite > 0
                 push!(t[:children],
                 Juno.render(i, Text("Finite solutions:")),
-                Juno.render(i, finite_solutions(r, compact = true)))
+                Juno.render(i, round.(finite_solutions(r, compact = true), 4)))
         end
         if r.at_infinity > 0
                 push!(t[:children],
                 Juno.render(i, Text("Solutions at ∞:")),
-                Juno.render(i, solutions_at_infinity(r, compact = true)))
+                Juno.render(i, round.(solutions_at_infinity(r, compact = true), 4)))
         end
         if r.singular > 0
                 push!(t[:children],
                 Juno.render(i, Text("Singular solutions:")),
-                Juno.render(i, singular_solutions(r, compact = true)))
+                Juno.render(i, round.(singular_solutions(r, compact = true), 4)))
         end
         if r.failed > 0
                 push!(t[:children],
                 Juno.render(i, Text("Failed Paths:")),
-                Juno.render(i, failed_paths(r, compact = true)))
+                Juno.render(i, round.(failed_paths(r, compact = true), 4)))
         end
         return t
     end
