@@ -1,4 +1,4 @@
-export RK4, RK4Cache
+export RK4
 
 
 """

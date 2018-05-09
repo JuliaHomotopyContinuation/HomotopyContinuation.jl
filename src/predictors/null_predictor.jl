@@ -1,4 +1,4 @@
-export NullPredictor, NullPredictorCache
+export NullPredictor
 
 """
     NullPredictor()

@@ -1,4 +1,4 @@
-export Euler, EulerCache
+export Euler
 
 """
     Euler()
