@@ -32,10 +32,6 @@ function play(endgamer, x, R)
 end
 
 function play!(endgamer)
-    old_update_homotopies = PathTracking.update_homotopies(endgamer.tracker)
-    # We want to fix the patch or any other local state
-    PathTracking.set_update_homotopies!(endgamer.tracker, false)
-
     state = endgamer.state
     while state.status == :ok
         nextsample!(endgamer)
@@ -50,7 +46,6 @@ function play!(endgamer)
     end
 
     # cleanup
-    PathTracking.set_update_homotopies!(endgamer.tracker, old_update_homotopies)
     endgamer
 end
 
@@ -76,7 +71,8 @@ function nextsample!(endgamer::Endgamer)
     R, λ = state.R, endgamer.options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(endgamer.tracker, state.samples[state.nsamples], R, λR)
+    retcode = PathTracking.track!(endgamer.tracker, state.samples[state.nsamples], R, λR,
+        precondition=false, checkstartvalue=false, emit_update=false)
     if retcode != :success
         state.status = :tracker_failed
         return nothing
