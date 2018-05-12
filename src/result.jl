@@ -177,9 +177,9 @@ function Base.show(io::IO, result::Result{T}) where T
     println(io, typeof(result), ":")
     println(io, "# paths: $(length(result.pathresults))")
     println(io, "# successfull paths: $(sum(r -> r.returncode == :success ? 1 : 0, result.pathresults))")
-    println(io, "# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, s.pathresults))")
-    println(io, "# singular solutions → $(sum(r -> r.singular, s.pathresults))")
-    println(io, "# real solutions → $(sum(r -> r.real_solution, s.pathresults))")
+    println(io, "# solutions at infinity → $(sum(r -> r.returncode == :at_infinity, result.pathresults))")
+    println(io, "# singular solutions → $(sum(r -> r.singular, result.pathresults))")
+    println(io, "# real solutions → $(sum(r -> r.real_solution, result.pathresults))")
     # println(io, "gamma → $(result.gamma)")
 end
 
