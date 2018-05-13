@@ -8,8 +8,8 @@ This returns a `PathTrackerResult`. This modifies tracker.
 
 Track all values in xs from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 """
-function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀)
-     track!(tracker, x₁, t₁, t₀)
+function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...)
+     track!(tracker, x₁, t₁, t₀; kwargs...)
      PathTrackerResult(tracker)
 end
 

@@ -12,13 +12,15 @@ function setup!(endgamer, x, R::Float64)
         push!(state.logabs_samples[i], logabs(x[i]))
     end
     state.directions .= 0.0
+    state.directions_matching .= 0
+    state.n_directions_matching = 0
 
     state.npredictions = 0
     state.iters = 0
     state.R = R
     state.status = :ok
 
-    state.windingnumber_estimate = 1
+    state.windingnumber = 1
     state.cons_matching_estimates = 0
 
     nothing
@@ -32,14 +34,16 @@ function play(endgamer, x, R)
 end
 
 function play!(endgamer)
-    state = endgamer.state
+    state, options, cache = endgamer.state, endgamer.options, endgamer.cache
     while state.status == :ok
-        nextsample!(endgamer)
+        nextsample!(endgamer.tracker, state, options)
 
-        estimate_windingnumber!(endgamer)
+        if state.nsamples > 3 # directions! and windingnumber! need at least 4 samples
+            directions!(state, options, cache)
+            estimate_windingnumber!(state, options, cache)
 
-        if !checkatinfinity!(endgamer)
-            predict!(endgamer)
+            predict!(state, options, cache)
+            checkatinfinity!(state, options, cache)
         end
 
         checkterminate!(state, endgamer.options)
@@ -48,6 +52,8 @@ function play!(endgamer)
     # cleanup
     endgamer
 end
+
+nsamples(state) = length(state.logabs_samples[1])
 
 function confident_in_windingnumber(state::State, options::Options)
     if state.cons_matching_estimates < 5
@@ -62,16 +68,13 @@ end
 
 Obtain a new sample on the geometric series and add it to `endgamer`.
 """
-function nextsample!(endgamer::Endgamer)
-    state = endgamer.state
+function nextsample!(tracker::PathTracking.PathTracker, state, options)
     state.iters += 1
 
-    state.status == :ok || return nothing
-
-    R, λ = state.R, endgamer.options.sampling_factor
+    R, λ = state.R, options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(endgamer.tracker, state.samples[state.nsamples], R, λR,
+    retcode = PathTracking.track!(tracker, state.samples[state.nsamples], R, λR,
         precondition=false, checkstartvalue=false, emit_update=false)
     if retcode != :success
         state.status = :tracker_failed
@@ -80,7 +83,7 @@ function nextsample!(endgamer::Endgamer)
 
     state.R = λR
     # now we have to add the new sample point to samples
-    update_samples!(state, endgamer.options, PathTracking.currx(endgamer.tracker), λR)
+    update_samples!(state, options, PathTracking.currx(tracker), λR)
 
     nothing
 end
@@ -101,8 +104,64 @@ function update_samples!(state, options, x, λR)
     nothing
 end
 
+
 """
-    estimate_windingnumber!(endgamer)
+    directions!(state, options, cache)
+
+Estimate the lowest order exponent of the fractional power series representation
+of x(t).
+"""
+function directions!(state, options, cache)
+    h = options.sampling_factor
+    logh = fastlog(h)
+    range = samples_range(state, options)
+    buffer = cache.direction_buffer
+    stable = true
+    for (i, samplesᵢ) in enumerate(state.logabs_samples)
+        dᵢ = extrapolate_direction(samplesᵢ, range, h, logh, buffer)
+        if abs(state.directions[i] - dᵢ) < 0.0005
+            state.directions_matching[i] += 1
+            state.directions[i] = dᵢ
+        else
+            state.directions_matching[i] = 0
+            state.directions[i] = dᵢ
+        end
+    end
+
+    if stable
+        state.n_directions_matching += 1
+    else
+        state.n_directions_matching = 0
+    end
+    # @show state.n_directions_matching
+    state.n_directions_matching
+end
+
+"""
+    extrapolate_direction(samples, range, h, logh, buffer)
+
+Compute the directions by using Richardson extrapolation as explained
+in Section 4 of [^1].
+
+[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+"""
+function extrapolate_direction(samples, range, h, logh, buffer)
+    d = inv(1 - h)
+    n = length(range)
+    for i=1:n-1
+        buffer[i] = samples[range[i+1]] - samples[range[i]]
+    end
+
+    @inbounds begin
+        for k=2:n-1, i=1:n-k
+            buffer[i] = muladd((buffer[i+1] - buffer[i]), d, buffer[i])
+        end
+    end
+    buffer[1] / logh
+end
+
+"""
+    estimate_windingnumber!(state, options, cache)
 
 This estimates the winding number of the path ``x(t)`` at ``x(0)``.
 For this we look at consecutive differences of samples obtained
@@ -110,32 +169,33 @@ from the geometric series. The windingnumber is estimated coordinate wise
 and since it is the same for each coordinate we take the most common
 result.
 """
-function estimate_windingnumber!(endgamer)
-    state, options = endgamer.state, endgamer.options
-    nsamples = length(state.logabs_samples[1])
-    # We need at least 4 samples to estimate the winding number
-    nsamples < 4 && return nothing
-
+function estimate_windingnumber!(state, options, cache)
     logh = fastlog(options.sampling_factor)
-    map!(endgamer.cache.windingnumbers, state.logabs_samples) do samples
+    map!(cache.windingnumbers, state.logabs_samples) do samples
         windingnumber(samples, logh)
     end
-    w = majority(endgamer.cache.windingnumbers)
+    w = majority(cache.windingnumbers)
 
     # w < 1 is just wrong
     if w < 1
         state.cons_matching_estimates = 0
-        state.windingnumber_estimate = 1
-    elseif w == state.windingnumber_estimate
+        state.windingnumber = 1
+    elseif w == state.windingnumber
         state.cons_matching_estimates += 1
     else
         state.cons_matching_estimates = 0
-        state.windingnumber_estimate = w
+        state.windingnumber = w
     end
 
     nothing
 end
 
+function samples_range(state, options)
+    samples_range(length(state.logabs_samples[1]), options)
+end
+function samples_range(nsamples::Int, options)
+    max(1, nsamples - options.max_extrapolation_samples + 1):nsamples
+end
 
 """
     windingnumber(logabs_samples, logh)
@@ -194,55 +254,34 @@ end
 
 
 """
-    checkatinfinity!(endgamer)
+    checkatinfinity!(state, options, cache)
 
 We compute an error expansion of the fractional power series of the path
 to approximate the "direction" of the path. See [^1] for details.
 
 [^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
 """
-checkatinfinity!(endgamer) = checkatinfinity!(endgamer, endgamer.state.samples[1])
-function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
-    cache, options, state = endgamer.cache, endgamer.options, endgamer.state
-
-    nsamples = length(state.logabs_samples[1])
-
-    # We want to be somewhat sure about the winding number before we estimate the
-    # direction since otherwise we can get wrong results
-    if state.cons_matching_estimates < 3
+function checkatinfinity!(state, options, cache)
+    i₀ = ProjectiveVectors.homvar(state.samples[1])
+    if state.n_directions_matching < 1
         return false
     end
+    # return false
+    m = state.windingnumber
+    r₀ = state.directions[i₀]
 
-    h = options.sampling_factor
-    logh = log(h)
-    w = 1
-
-    homvar = ProjectiveVectors.homvar(x)
-
-    range = max(1, nsamples - options.max_extrapolation_samples + 1):nsamples
-    w₀ = direction(state.logabs_samples[homvar], range, h, logh, cache.direction_buffer)
-
-    maxΔ = abs(w₀ - state.directions[homvar])
-    state.directions[homvar] = w₀
-
-    for (i, samples) in enumerate(state.logabs_samples)
-        i == homvar && continue
-        wᵢ = direction(samples, range, h, logh, cache.direction_buffer)
-        maxΔ = max(maxΔ, abs(wᵢ - state.directions[i]))
-        state.directions[i] = wᵢ
-    end
-
-    # We want that the estimates stabilize before we use these
-    if maxΔ > 1e-2
-        return false
-    end
-
-    for (i, wᵢ) in enumerate(state.directions)
-        i == homvar && continue
-        w = wᵢ - w₀
-        # For this to be true the direction has to be negative and
-        # the winding number may not be underestimated.
-        if w * state.windingnumber_estimate < -0.99
+    if state.directions_matching[i₀] > 4 &&  r₀ > 0.02 # we assume a winding number of at most 50
+        for (i, rᵢ) in enumerate(state.directions)
+            i == i₀ && continue
+            # rᵢ should be really near zero
+            if rᵢ < 0.001 && state.directions_matching[i] > 4
+                state.status = :at_infinity
+                return true
+            end
+        end
+    else
+        p = state.npredictions > 0 ? state.p : state.samples[state.nsamples]
+        if infinity_norm(p) > options.maxnorm
             state.status = :at_infinity
             return true
         end
@@ -250,19 +289,6 @@ function checkatinfinity!(endgamer, x::ProjectiveVectors.PVector)
 
     false
 end
-
-function direction(samples, range, h, logh, buffer)
-    d = inv(1 - h)
-    n = length(range)
-    for (i, k) in enumerate(range.start:range.stop-1)
-        buffer[i] = samples[k+1] - samples[k]
-    end
-    for k=2:n-1, i=1:n-k
-        buffer[i] = muladd((buffer[i+1] - buffer[i]), d, buffer[i])
-    end
-    buffer[1] / logh
-end
-
 
 #
 # It turns out that this extrapolation scheme doesn't seem to work better
@@ -285,8 +311,9 @@ end
 # function extrapolate_winding_number(logabs_samples, range, h, buffer)
 #     # put consecutive differences into buffer
 #     cons_diffs = buffer # rename for clarity
-#     for (i, k) in enumerate(range.start:range.stop-1)
-#         cons_diffs[i] = logabs_samples[k] - logabs_samples[k + 1]
+#     n = length(range)
+#     for i=1:n-1
+#         cons_diffs[i] = logabs_samples[range[i]] - logabs_samples[range[i+1]]
 #     end
 #     # no we need to compute the error expansion
 #     log_err_exp = cons_diffs
@@ -317,33 +344,15 @@ end
 """
     predict!(endgamer)
 """
-function predict!(endgamer::Endgamer)
-    state = endgamer.state
+function predict!(state, options, cache)
+    state.pprev .= state.p
+    # we try to fit a power series
+    buffer = cache.fitpowerseries_buffer
+    range = samples_range(state.nsamples, options)
+    fitpowerseries!(state.p, state.samples, range, options.sampling_factor,
+        state.windingnumber, buffer)
+    state.npredictions += 1
 
-    # We do a prediction if we have at least 2 estimates
-    # or at least 10 iterations
-    if state.cons_matching_estimates ≥ 2 || state.iters > 10
-        state.pprev .= state.p
-        # we try to fit a power series
-        buffer = endgamer.cache.fitpowerseries_buffer
-        range = max(1, state.nsamples - 5):state.nsamples
-        resize_buffer!(buffer, length(range))
-        fitpowerseries!(state.p, state.samples, range, endgamer.options.sampling_factor,
-            state.windingnumber_estimate, buffer)
-        state.npredictions += 1
-    end
-    nothing
-end
-
-function resize_buffer!(buffer, target_length)
-    n = length(buffer)
-    if target_length ≤ n
-        return nothing
-    end
-
-    for _=1:target_length-n
-        push!(buffer, copy(buffer[1]))
-    end
     nothing
 end
 
@@ -361,11 +370,10 @@ at section 4 and 5 in [^1].
 function fitpowerseries!(p, samples, range, h, w, buffer)
     r = (1 / h)^(1/w)
     n = length(range)
-    @assert length(buffer) ≥ n - 1
 
     d = inv(r - 1)
-    @inbounds for (i, k) in enumerate(range.start:range.stop-1)
-        @. buffer[i] = (r * samples[k+1] - samples[k]) * d
+    for i = 1:n-1
+        @. buffer[i] = (r * samples[range[i+1]] - samples[range[i]]) * d
     end
     r_pow = r
     for k=2:n-1
@@ -396,8 +404,6 @@ function checkterminate!(state, options)
         if Δ < options.tol
             state.R = 0.0
             state.status = :success
-        elseif infinity_norm(state.p) > options.maxnorm
-            state.status = :at_infinity
         end
     end
     return nothing
