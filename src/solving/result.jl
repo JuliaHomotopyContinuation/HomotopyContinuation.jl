@@ -3,8 +3,8 @@
     Result(Vector{PathResult})
 
 Constructs a summary of `PathResult`s.  A `Result` contains:
-* `path_results` the vector of PathResults
-* `tracked`: length of `path_results`
+* `PathResults` the vector of PathResults
+* `tracked`: length of `PathResults`
 * `finite`: Number of finite_solutions.
 * `at_infinity`: Number of solutions at infinity.
 * `singular`: Number of singular solutions.
@@ -12,7 +12,7 @@ Constructs a summary of `PathResult`s.  A `Result` contains:
 """
 
 struct Result
-    path_results::Vector{PathResult}
+    PathResults::Vector{PathResult}
     tracked::Int
     finite::Int
     at_infinity::Int
@@ -40,17 +40,13 @@ function convert(Result, S::Vector{PathResult})
     count(s -> s.returncode == :path_failed, S)
     )
 end
-# * `finite_solutions(; compact = false)`: returns all finite solutions. `compact = true` returns only the computed roots with no additional information.
-# * `solutions_at_infinity(; compact = false)`: returns all solutions at Infinity.
-# * `singular_solutions(; compact = false)`: returns all solution with windingnumber > 1.
-# * `real_solutions(; compact = false, tol = 1e-10)`: returns all real solutions, that is all points with imaginary part at most `tol`.
-# * `failed_paths()`: returns all failed paths.
+
 
 function finite_solutions(R::Result; compact = false)
     I = filter(
     s -> (s.returncode == :success) &&
     s.windingnumber == 1,
-    R.path_results)
+    R.PathResults)
     if !compact
         return convert(Result, I)
     else
@@ -62,7 +58,7 @@ function solutions_at_infinity(R::Result; compact = false)
     J = filter(
     s -> (s.returncode == :at_infinity) &&
     s.windingnumber == 1,
-    R.path_results)
+    R.PathResults)
     if !compact
         return convert(Result, J)
     else
@@ -74,7 +70,7 @@ function singular_solutions(R::Result; compact = false, tol = Inf)
     K = filter(
     s -> (s.windingnumber > 1 || s.condition_number > tol) &&
     (s.returncode == :success || s.returncode == :at_infinity),
-    R.path_results)
+    R.PathResults)
     if !compact
         return convert(Result, K)
     else
@@ -85,7 +81,7 @@ end
 function failed_paths(R::Result; compact = false)
     F = filter(
     s -> s.returncode == :path_failed,
-    R.path_results)
+    R.PathResults)
     if !compact
         return convert(Result, F)
     else
@@ -96,7 +92,7 @@ end
 function real_solutions(R::Result; compact = false, tol = 1e-10)
     real_sols = filter(
     s -> sqrt(maximum(abs2, imag.(s.solution))) < tol,
-    R.path_results)
+    R.PathResults)
     if !compact
         return convert(Result, real_sols)
     else
