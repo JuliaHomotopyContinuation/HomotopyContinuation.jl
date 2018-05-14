@@ -5,18 +5,19 @@
     TDP = Problems.TotalDegreeProblem(F)
     P = Problems.ProjectiveStartTargetProblem(TDP)
     start_sols = Utilities.totaldegree_solutions(F) |> collect
-
+    x₁ = Problems.embed(P, first(start_sols))
+    H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
     # test construction
-    t1 = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1)
+    t1 = PathTracking.PathTracker(H, x₁, 1.0, 0.1)
 
     @test t1 isa PathTracking.PathTracker
     @test length(t1.x) == 7
 
-    t2 = PathTracking.PathTracker(P, Problems.embed(P, first(start_sols)), 1.0, 0.1)
+    t2 = PathTracking.PathTracker(H, x₁, 1.0, 0.1)
     @test t2 isa PathTracking.PathTracker
     @test length(t2.x) == 7
 
-    t3 = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1, predictor=Predictors.Euler())
+    t3 = PathTracking.PathTracker(H, x₁, 1.0, 0.1, predictor=Predictors.Euler())
     @test t3.predictor_corrector.predictor isa Predictors.Euler
 
 
@@ -54,8 +55,9 @@ end
     start_sols = Problems.embed.(P, sols)
 
     s = start_sols[1]
+    H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.RandomPatch(), s)
     # intilizae tracker with random start and target to see whether it is properly resetetted
-    tracker = PathTracking.PathTracker(P.homotopy, s, rand(), rand())
+    tracker = PathTracking.PathTracker(H, s, rand(), rand())
 
     result = PathTracking.track(tracker, s, 1.0, 0.0)
     @test result.returncode == :success
@@ -81,14 +83,14 @@ end
     TDP = Problems.TotalDegreeProblem(F)
     P = Problems.ProjectiveStartTargetProblem(TDP)
     start_sols = Utilities.totaldegree_solutions(F) |> collect
-
+    x1 = Problems.embed(P, start_sols[1])
+    patch = AffinePatches.state(AffinePatches.OrthogonalPatch(), x1)
+    H = Homotopies.PatchedHomotopy(P.homotopy, patch)
     # test construction
-    tracker = PathTracking.PathTracker(P, first(start_sols), 1.0, 0.1)
-    r1 = PathTracking.track(tracker, Problems.embed(P, start_sols[1]), 1.0, 0.1)
+    tracker = PathTracking.PathTracker(H, x1, 1.0, 0.1)
+    r1 = PathTracking.track(tracker, x1, 1.0, 0.1)
 
-    PathTracking.setup!(tracker, r1.x, 0.1, 0.0)
-    PathTracking.fixpatch!(tracker, true)
-    PathTracking.track(tracker, r1.x, 0.1, 0.0)
-
-    @test all(r1.x .≈ PathTracking.patch(tracker.cache))
+    PathTracking.set_update_homotopies!(tracker, false)
+    PathTracking.track!(tracker, r1.x, 0.1, 0.0)
+    @test all(conj.(normalize!(r1.x)) .≈ patch.v_conj)
 end

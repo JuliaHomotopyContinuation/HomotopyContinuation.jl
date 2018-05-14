@@ -57,6 +57,6 @@ using Compat.Test
     @test abs(infinity_norm(z2, z2)) < 1e-15
 
 
-    converted = converteltype(ProdPVector([PVector(rand(Float64, 3), 2), PVector(rand(Float64, 7), 3)]), Complex{Float64})
+    converted = similar(ProdPVector([PVector(rand(Float64, 3), 2), PVector(rand(Float64, 7), 3)]), Complex{Float64})
     @test converted isa ProdPVector{Complex{Float64}}
 end

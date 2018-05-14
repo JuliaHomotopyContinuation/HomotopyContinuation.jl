@@ -3,11 +3,7 @@ import ..ProjectiveVectors
 function setup!(endgamer, x, R::Float64)
     state = endgamer.state
 
-    # We want to fix the patch, but before we need to make sure that we are on the correct
-    # local patch. Hence disable fixpatch, do the normal setup, and enable the patch fixing again
-    PathTracking.fixpatch!(endgamer.tracker, false)
     PathTracking.setup!(endgamer.tracker, x, R, 0.0)
-    PathTracking.fixpatch!(endgamer.tracker, true)
 
     state.samples[1] .= x
     state.nsamples = 1
@@ -36,6 +32,10 @@ function play(endgamer, x, R)
 end
 
 function play!(endgamer)
+    old_update_homotopies = PathTracking.update_homotopies(endgamer.tracker)
+    # We want to fix the patch or any other local state
+    PathTracking.set_update_homotopies!(endgamer.tracker, false)
+
     state = endgamer.state
     while state.status == :ok
         nextsample!(endgamer)
@@ -50,7 +50,7 @@ function play!(endgamer)
     end
 
     # cleanup
-    PathTracking.fixpatch!(endgamer.tracker, false)
+    PathTracking.set_update_homotopies!(endgamer.tracker, old_update_homotopies)
     endgamer
 end
 

@@ -8,7 +8,7 @@ This returns a `PathTrackerResult`. This modifies tracker.
 
 Track all values in xs from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 """
-function track(tracker::PathTracker, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀)
+function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀)
      track!(tracker, x₁, t₁, t₀)
      PathTrackerResult(tracker)
 end
@@ -60,9 +60,8 @@ function setup!(tracker::PathTracker, x₁, t₁, t₀)
 
     S.iters = 0
     tracker.x .= x₁
-    if !tracker.options.fixedpatch
-        AffinePatches.precondition!(patch(tracker.cache), tracker.x, tracker.patch)
-    end
+
+    Homotopies.precondition!(tracker.cache.homotopy, tracker.x, t₁)
 
     checkstartvalue!(tracker)
     tracker
@@ -88,7 +87,7 @@ function step!(tracker)
 
     state.iters += 1
     step_successfull, status = PredictionCorrection.predict_correct!(
-        raw(currx(tracker)),
+        currx(tracker),
         tracker.predictor_corrector,
         cache.predictor_corrector,
         cache.homotopy, currt(state), currΔt(state),
@@ -97,9 +96,9 @@ function step!(tracker)
 
     update_t_Δt!(tracker.state, tracker.steplength, step_successfull)
 
-    if step_successfull && !tracker.options.fixedpatch
+    if step_successfull && tracker.options.update_homotopies
         # Since x changed we should update the patch
-        AffinePatches.update_patch!(patch(cache), tracker.patch, currx(tracker))
+        Homotopies.update!(cache.homotopy, currx(tracker), currt(tracker))
     end
     nothing
 end

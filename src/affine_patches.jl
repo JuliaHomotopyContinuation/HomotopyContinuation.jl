@@ -1,69 +1,53 @@
 module AffinePatches
 
-import ..ProjectiveVectors: PVector, raw
+import ..ProjectiveVectors
+import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
 
 export AbstractPatch,
     AbstractLocalAffinePatch,
+    state,
     precondition!,
-    init_patch,
-    update_patch!,
-    OrthogonalPatch
+    update!
 
-# TODO: This currently does not support products of project spaces. Stil need to figure
-# out how to do this best. So I'm punting on that for now...
 """
     AbstractAffinePatch
 
 An affine patch is a hyperplane defined by ``v⋅x-1=0``.
 """
 abstract type AbstractAffinePatch end
-
-"""
-    AbstractLocalAffinePatch
-
-An affine patch is a hyperplane defined by ``v⋅x-1=0``.
-"""
 abstract type AbstractLocalAffinePatch <: AbstractAffinePatch end
 
+"""
+    AbstractAffinePatchState
+
+This holds the actual patch information.
+"""
+abstract type AbstractAffinePatchState end
 
 """
-    precondition!(v, x, ::AbstractAffinePatch)
+    state(::AbstractAffinePatch, x)::AbstractAffinePatchState
 
-This is called at the beginning of a tracked path.
-`v` is the patch and `x` is the start solution. Modify both such that
-`v` is properly setup and `v⋅x-1=0` holds.
+Construct the state of the path from `x`.
 """
-function precondition! end
-
+state
 
 """
-    init_patch(::AbstractAffinePatch, x)
+    precondition!(v::AbstractAffinePatchState, x)
 
-Initialize the patch.
+Modify both such that `v` is properly setup and `v⋅x-1=0` holds.
 """
-function init_patch end
-
+precondition!
 
 """
-    update_patch!(v, ::AbstractLocalAffinePatch, x)
+    update_patch!(::AbstractAffinePatchState, x)
 
-Update the patch depending on the local state. This is called after
-each successfull step.
+Update the patch depending on the local state.
 """
-function update_patch! end
+update!(::AbstractAffinePatchState, x) = nothing
 
-struct OrthogonalPatch <: AbstractLocalAffinePatch end
 
-function precondition!(v, x, ::OrthogonalPatch)
-    normalize!(x)
-    v .= x
-end
-
-init_patch(::OrthogonalPatch, x) = x
-function update_patch!(v, ::OrthogonalPatch, x)
-    normalize!(x)
-    v .= x
-    nothing
-end
+include("affine_patches/orthogonal_patch.jl")
+include("affine_patches/embedding_patch.jl")
+include("affine_patches/random_patch.jl")
 
 end

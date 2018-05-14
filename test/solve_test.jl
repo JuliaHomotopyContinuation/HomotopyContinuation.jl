@@ -13,6 +13,10 @@
     result = solve(F).PathResults
     @test count(r -> r.returncode == :success, result) == 32
 
+    @test count(r -> r.returncode == :success, solve(F, patch=AffinePatches.RandomPatch())) == 32
+    @test count(r -> r.returncode == :success, solve(F, patch=AffinePatches.EmbeddingPatch())) == 32
+    @test count(r -> r.returncode == :success, solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
+
     @test string.(result) isa Vector{String}
 end
 

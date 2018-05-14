@@ -1,11 +1,14 @@
 module Solving
 
+using Compat
+
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 import ProgressMeter
 import Juno
 
+import ..AffinePatches
 import ..Endgame
 import ..Homotopies
 import ..PathTracking
