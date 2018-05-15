@@ -16,7 +16,7 @@ struct Options
     max_extrapolation_samples::Int
 end
 
-function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-12, maxnorm=1e5, maxwindingnumber=12, max_extrapolation_samples=5)
+function Options(;sampling_factor=0.6, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=12, max_extrapolation_samples=5)
     Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
 end
 
@@ -28,16 +28,19 @@ mutable struct State{V, T}
     # The data structure is that `logabs_samples` Contains a vector for each
     # coordinate.
     logabs_samples::Vector{Vector{T}}
-    directions::Vector{T}
+    directions::Vector{Float64}
+    directions_matching::Vector{Int}
+    n_directions_matching::Int
 
     R::Float64
 
     # prediction and previous prediction
     p::V
     pprev::V
-
     # number of predictions so far
     npredictions::Int
+
+
     # number of iterations so far
     iters::Int
 
@@ -45,7 +48,7 @@ mutable struct State{V, T}
     status::Symbol
 
     # current estimate of winding number
-    windingnumber_estimate::Int
+    windingnumber::Int
     # consecutive matching estimates
     cons_matching_estimates::Int
 end
@@ -54,7 +57,9 @@ function State(x, R₀::Float64)
     samples = [copy(x)]
     nsamples = 1
     logabs_samples = [[logabs(x[i])] for i=1:length(x)]
-    directions = zeros(typeof(logabs_samples[1][1]), length(x))
+    directions = fill(0.0, length(x))
+    directions_matching = fill(0, length(x))
+    n_directions_matching = 0
 
     p = copy(x)
     pprev = copy(x)
@@ -63,11 +68,12 @@ function State(x, R₀::Float64)
     iters = 0
 
     status = :ok
-    windingnumber_estimate = 1
+    windingnumber = 1
     cons_matching_estimates = 0
-    State(samples, nsamples, logabs_samples, directions,
+    State(samples, nsamples, logabs_samples,
+        directions, directions_matching, n_directions_matching,
         R₀, p, pprev, npredictions, iters, status,
-        windingnumber_estimate,
+        windingnumber,
         cons_matching_estimates)
 end
 
@@ -80,8 +86,8 @@ end
 
 function Cache(state::State, options::Options)
     windingnumbers = zeros(Int, length(state.logabs_samples))
-    direction_buffer = zeros(options.max_extrapolation_samples + 1)
-    fitpowerseries_buffer = deepcopy(state.samples)
+    direction_buffer = zeros(options.max_extrapolation_samples)
+    fitpowerseries_buffer = [deepcopy(state.samples[1]) for _=1:options.max_extrapolation_samples]
     Cache(windingnumbers, direction_buffer,
         fitpowerseries_buffer)
 end
@@ -125,5 +131,10 @@ end
 function EndgamerResult(endgamer::Endgamer)
     S = endgamer.state
 
-    EndgamerResult(S.status, copy(S.p), S.R, S.windingnumber_estimate, S.npredictions, S.iters)
+    if S.npredictions == 0
+        x = copy(S.samples[S.nsamples])
+    else
+        x = copy(S.p)
+    end
+    EndgamerResult(S.status, x, S.R, S.windingnumber, S.npredictions, S.iters)
 end
