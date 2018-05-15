@@ -166,7 +166,6 @@ Get the [`HomogenizationStrategy`](@ref) stored in the problem `prob`.
 """
 homogenization_strategy(prob::ProjectiveStartTargetProblem) = prob.homogenization_strategy
 
-
 """
     embed(prob::ProjectiveStartTargetProblem, x)
 

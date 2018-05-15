@@ -69,7 +69,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     if t₀ == t_endgame
         return Parallel.tmap(solvers, 1:n) do solver, tid, k
             x₁, r = start_solutions[k], endgame_zone_results[k]
-            PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
+            PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
         end
     end
 
@@ -98,8 +98,8 @@ end
     x₁, r = start_solutions[k], endgame_zone_results[k]
     if r.returncode == :success
         result = Endgame.play(solver.endgamer, r.x, t_endgame)
-        return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
+        return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
     else
-        return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
+        return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
     end
 end
