@@ -3,6 +3,7 @@ export solution,
     isfailed, isatinfinity, issingular
 
 import ..Homotopies
+import ..ProjectiveVectors
 import ..ProjectiveVectors: raw
 using ..Utilities
 
@@ -64,7 +65,7 @@ struct PathResult{T1, T2, T3}
 end
 
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
-    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache)
+    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
 function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Compat.Nothing)
     returncode, returncode_detail = makereturncode(r.returncode)
