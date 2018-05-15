@@ -3,6 +3,8 @@
     @test nfinite(solve([x - 1])) == 1
     F = equations(katsura5())
     @test nfinite(solve(F, threading=false)) == 32
+    @test nfinite(solve(F, system=Systems.SPSystem, threading=false)) == 32
+    @test nfinite(solve(F, system=Systems.FPSystem, threading=false)) == 32
 
     @test nfinite(solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
     result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)
