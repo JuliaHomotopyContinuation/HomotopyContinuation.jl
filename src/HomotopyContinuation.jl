@@ -45,11 +45,11 @@ module HomotopyContinuation
         nfinite, nsingular, natinfinity, nfailed,
         finite, results, failed, atinfinity,
         solution, residual, start_solution, issuccess,
-        isfailed, isatinfinity, isfinite, issingular
+        isfailed, isatinfinity, issingular
 
     export nresults,
         nfinite, nsingular, natinfinity, nfailed,
         finite, results, failed, atinfinity,
         solution, residual, start_solution, issuccess,
-        isfailed, isatinfinity, isfinite, issingular
+        isfailed, isatinfinity, issingular
 end #

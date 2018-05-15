@@ -1,6 +1,6 @@
 export solution,
     residual, start_solution, issuccess,
-    isfailed, isatinfinity, isfinite, issingular
+    isfailed, isatinfinity, issingular
 
 import ..Homotopies
 import ..ProjectiveVectors: raw
@@ -206,7 +206,7 @@ isatinfinity(r::PathResult) = r.returncode == :at_infinity
 
 Checks whether the path result is finite.
 """
-isfinite(r::PathResult) = r.returncode == :success
+Base.isfinite(r::PathResult) = r.returncode == :success
 
 """
     issingular(pathresult; tol=1e10)

@@ -1,6 +1,7 @@
 using HomotopyContinuation
 using Compat.Test
 using TestSystems
+import Juno
 
 # We order the tests such that isolated things are tested first
 include("utilities_test.jl")

@@ -90,14 +90,14 @@ R = solve(F)
 # This gives us all solutions considered real (but still as a complex vector).
 realsolutions = results(solution, R, only_real=true)
 """
-results(R::Results; kwargs...) = results(identity, R; kwargs...)
+results(R::AffineResult; kwargs...) = results(identity, R; kwargs...)
 function results(f::Function, R::AffineResult;
-    only_real=false, realtol=1e-6, include_singular=true, singulartol=1e10,
-    include_atinfinity=false)
+    onlyreal=false, realtol=1e-6, includesingular=true, singulartol=1e10,
+    includeatinfinity=false)
     [f(r) for r in R if
-        (!only_real || isreal(r, realtol)) &&
-        (include_singular || !issingular(r, singulartol)) &&
-        (include_atinfinity || isfinite(r))]
+        (!onlyreal || isreal(r, realtol)) &&
+        (includesingular || !issingular(r, singulartol)) &&
+        (includeatinfinity || isfinite(r))]
 end
 
 
@@ -127,7 +127,7 @@ function finite(f::Function, R::AffineResults; include_singular=true, tol=1e10)
     if include_singular
         [f(r) for r in R if isfinite(r)]
     else
-        [f(r) for r in R if isfiniter(r) && !issingular(r, tol)]
+        [f(r) for r in R if isfinite(r) && !issingular(r, tol)]
     end
 end
 
