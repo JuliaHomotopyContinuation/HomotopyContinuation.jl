@@ -64,7 +64,7 @@ struct PathResult{T1, T2, T3}
 end
 
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(prob.homogenization_strategy, k, x₁, t₀, r, cache)
+    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache)
 end
 function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
@@ -87,9 +87,9 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
     returncode = r.returncode
 
     ProjectiveVectors.affine!(r.x)
-    x = raw(r.x)
+    # x = raw(r.x)
 
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
+    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
     if res > 0.1 && r.t == t₀ && returncode == :success
         returncode = :at_infinity
@@ -97,18 +97,20 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
 
     returncode, returncode_detail = makereturncode(returncode)
 
+    intermediate_sol = ProjectiveVectors.affine(x_e)
+
     if returncode != :success
-        solution = x
+        solution = raw(r.x)
         condition = 0.0
     else
-        solution = x[2:end]
+        solution = ProjectiveVectors.affine(r.x)
         condition = cond(@view cache.J[:,2:end])
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
 
     PathResult(returncode, returncode_detail, solution, real(r.t), res,
-        condition, windingnumber, k, x₁, x_e, r.iters, npredictions)
+        condition, windingnumber, k, x₁, intermediate_sol, r.iters, npredictions)
 end
 
 function makereturncode(retcode)

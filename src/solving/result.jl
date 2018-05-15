@@ -25,7 +25,7 @@ Base.start(r::Result) = start(r.pathresults)
 Base.next(r::Result, state) = next(r.pathresults, state)
 Base.done(r::Result, state) = done(r.pathresults, state)
 function Base.iteratorsize(::Type{AffineResult{T1,T2,T3}}) where {T1, T2, T3}
-    iteratorsize(Vector{PathResult{T1, T2, T3}})
+    Base.HasLength()
 end
 Base.eltype(r::Result) = eltype(r.pathresults)
 
@@ -137,21 +137,21 @@ end
 Get all results where the solutions are real with the given tolerance `tol`.
 See [`isreal`](@ref) for details regarding the determination of 'realness'.
 """
-Base.real(R::Results; tol=1e-6) = [r for R if isreal(r, tol)]
+Base.real(R::Results; tol=1e-6) = [r for r in R if isreal(r, tol)]
 
 """
     failed(result)
 
 Get all results where the path tracking failed.
 """
-failed(R::Result) = [r for R if isfailed(r)]
+failed(R::Result) = [r for r in R if isfailed(r)]
 
 """
     atinfinity(result::AffineResult)
 
 Get all results where the solutions is at infinity.
 """
-atinfinity(R::Result) = [r for R if isatinfinity(r)]
+atinfinity(R::Result) = [r for r in R if isatinfinity(r)]
 
 function Base.show(io::IO, r::AffineResult)
     println(io, "-----------------------------------------------")
