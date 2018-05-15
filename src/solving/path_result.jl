@@ -1,8 +1,10 @@
+export solution,
+    residual, start_solution, issuccess,
+    isfailed, isatinfinity, isfinite, issingular
+
 import ..Homotopies
 import ..ProjectiveVectors: raw
 using ..Utilities
-
-
 
 struct PathResultCache{Hom, T}
     H::Hom
@@ -53,17 +55,18 @@ struct PathResult{T1, T2, T3}
     condition_number::Float64
     windingnumber::Int
 
+    pathnumber::Int
     start_solution::Vector{T3}
+    endgame_start_solution::Vector{T1}
 
     iterations::Int
     npredictions::Int
 end
 
-
-function PathResult(prob::Problems.AbstractProblem, x₁, t₀, r, cache::PathResultCache)
-    PathResult(prob.homogenization_strategy, x₁, t₀, r, cache)
+function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
+    PathResult(prob.homogenization_strategy, k, x₁, t₀, r, cache)
 end
-function PathResult(::Problems.NullHomogenization, x₁, t₀, r, cache::PathResultCache)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(r.x)
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
@@ -77,9 +80,10 @@ function PathResult(::Problems.NullHomogenization, x₁, t₀, r, cache::PathRes
 
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    PathResult(returncode, returncode_detail, x, real(r.t), res, condition, windingnumber, x₁, r.iters, npredictions)
+    PathResult(returncode, returncode_detail, x, real(r.t), res, condition,
+        windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.DefaultHomogenization, x₁, t₀, r, cache::PathResultCache)
+function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode = r.returncode
 
     ProjectiveVectors.affine!(r.x)
@@ -103,7 +107,8 @@ function PathResult(::Problems.DefaultHomogenization, x₁, t₀, r, cache::Path
 
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    PathResult(returncode, returncode_detail, solution, real(r.t), res, condition, windingnumber, x₁, r.iters, npredictions)
+    PathResult(returncode, returncode_detail, solution, real(r.t), res,
+        condition, windingnumber, k, x₁, x_e, r.iters, npredictions)
 end
 
 function makereturncode(retcode)
@@ -117,20 +122,111 @@ windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npre
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
+    iscompact = get(io, :compact, false)
+
+    if iscompact
+        println(io, "* returncode: $(r.returncode)")
+        println(io, " * solution: ", r.solution)
+        println(io, " * residual: $(@sprintf "%.3e" r.residual)")
+    else
         println(io, " ---------------------------------------------")
         println(io, "* returncode: $(r.returncode)")
         if r.returncode_detail != :none
             println(io, " * returncode_detail: $(r.returncode_detail)")
         end
-        println(io, " * solution: $(r.solution)")
-        println(io, " * t: $(r.t)")
-        println(io, " * iterations: $(r.iterations)")
-        println(io, " * npredictions: $(r.npredictions)")
+        println(io, " * solution: ", r.solution)
         println(io, " * residual: $(@sprintf "%.3e" r.residual)")
         println(io, " * condition_number: $(@sprintf "%.3e" r.condition_number)")
         println(io, " * windingnumber: $(r.windingnumber)")
+        println(io, " ----")
+        println(io, " * path number: ", r.pathnumber)
+        println(io, " * start_solution: ", r.start_solution)
+        println(io, " ----")
+        println(io, " * t: ", r.t)
+        println(io, " * iterations: ", r.iterations)
+        println(io, " * npredictions: $(r.npredictions)")
+
+
+    end
+
 end
 
+function Juno.render(i::Juno.Inline, x::PathResult{T1, T2, T3}) where {T1, T2, T3}
+    t = Juno.render(i, Juno.defaultrepr(x))
+    t[:head] = Juno.render(i, Text("PathResult"))
+    t
+end
 
+"""
+    solution(pathresult)
 
-Juno.render(i::Juno.Inline, x::PathResult) = Juno.render(i, Juno.defaultrepr(x))
+Get the solution of the path.
+"""
+solution(r::PathResult) = r.solution
+
+"""
+    residual(pathresult)
+
+Get the residual of the solution ``x`` of the path, i.e., ``||H(x, t)||_{\\infty}``.
+"""
+residual(r::PathResult) = r.residual
+
+"""
+    residual(pathresult)
+
+Get the residual of the solution ``x`` of the path, i.e., ``||H(x, t)||_{\\infty}``.
+"""
+start_solution(r::PathResult) = r.start_solution
+
+"""
+    issuccess(pathresult)
+
+Checks whether the path is successfull.
+"""
+issuccess(r::PathResult) = r.returncode == :success
+
+"""
+    isfailed(pathresult)
+
+Checks whether the path failed.
+"""
+isfailed(r::PathResult) = r.returncode == :path_failed
+
+"""
+    isatinfinity(pathresult)
+
+Checks whether the path goes to infinity.
+"""
+isatinfinity(r::PathResult) = r.returncode == :at_infinity
+
+"""
+    isfinite(pathresult)
+
+Checks whether the path result is finite.
+"""
+isfinite(r::PathResult) = r.returncode == :success
+
+"""
+    issingular(pathresult; tol=1e10)
+    issingular(pathresult, tol)
+
+Checks whether the path result is singular. This true if
+the winding number > 1 or if the condition number of the Jacobian
+is larger than `tol`.
+"""
+issingular(r::PathResult; tol=1e10) = issingular(r, tol)
+function issingular(r::PathResult, tol::Real)
+    r.windingnumber > 1 || r.condition_number > tol
+end
+
+"""
+    isreal(pathresult; tol=1e-6)
+    isreal(pathresult, tol)
+
+Determine whether infinity norm of the imaginary part of the so
+"""
+Base.isreal(r::PathResult; tol=1e-6) = isreal(r, tol)
+function Base.isreal(r::PathResult, tol::Real)
+    sqrt(maximum(_abs2imag, r.solution)) < tol
+end
+_abs2imag(x) = abs2(imag(x))

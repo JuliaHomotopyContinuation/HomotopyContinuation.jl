@@ -13,7 +13,8 @@ function solve(solvers, start_solutions::AbstractVector)
 
     BLAS.set_num_threads(nblas_threads)
 
-    convert(Result, results)
+    # TODO: Check problem
+    AffineResult(results)
 end
 
 """
@@ -68,7 +69,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     if t₀ == t_endgame
         return Parallel.tmap(solvers, 1:n) do solver, tid, k
             x₁, r = start_solutions[k], endgame_zone_results[k]
-            PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+            PathResult(solver.prob, k, x₁, t₀, r, solver.cache.pathresult)
         end
     end
 
@@ -98,8 +99,8 @@ end
     x₁, r = start_solutions[k], endgame_zone_results[k]
     if r.returncode == :success
         result = Endgame.play(solver.endgamer, r.x, t_endgame)
-        return PathResult(solver.prob, x₁, t₀, result, solver.cache.pathresult)
+        return PathResult(solver.prob, k, x₁, t₀, result, solver.cache.pathresult)
     else
-        return PathResult(solver.prob, x₁, t₀, r, solver.cache.pathresult)
+        return PathResult(solver.prob, k, x₁, t₀, r, solver.cache.pathresult)
     end
 end
