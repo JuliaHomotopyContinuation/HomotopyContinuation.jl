@@ -3,6 +3,8 @@
     @test count(r -> r.returncode == :success, solve([x - 1])) == 1
     F = equations(katsura5())
     @test count(r -> r.returncode == :success, solve(F, threading=false)) == 32
+    @test count(r -> r.returncode == :success, solve(F, system=Systems.SPSystem, threading=false)) == 32
+    @test count(r -> r.returncode == :success, solve(F, system=Systems.FPSystem, threading=false)) == 32
 
     @test count(r -> r.returncode == :success, solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
     result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)

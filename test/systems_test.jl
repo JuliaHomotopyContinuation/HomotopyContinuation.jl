@@ -54,3 +54,23 @@ end
     Systems.evaluate_and_jacobian!(u, U, F, x, cache)
     @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
 end
+
+@testset "Systems.FPSystem" begin
+    F = Systems.FPSystem(TestSystems.equations(katsura5()))
+    x = rand(Complex{Float64}, 6)
+    u = zeros(Complex{Float64}, 6)
+    U = zeros(Complex{Float64}, 6, 6)
+
+    cache = Systems.cache(F, x)
+    @test cache isa Systems.FPSystemCache
+    u = zeros(Complex{Float64}, 6)
+    Systems.evaluate!(u, F, x, cache)
+    @test Systems.evaluate(F, x, cache) == u
+
+    U = zeros(Complex{Float64}, 6, 6)
+    Systems.jacobian!(U, F, x, cache)
+    @test Systems.jacobian(F, x, cache) == U
+
+    Systems.evaluate_and_jacobian!(u, U, F, x, cache)
+    @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
+end
