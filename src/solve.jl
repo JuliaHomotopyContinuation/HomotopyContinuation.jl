@@ -36,7 +36,7 @@ end
 # Internal
 function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
     seed=rand(100:10_000),
-    system=Systems.SPSystem,
+    system=Systems.FPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)
     println("Seed used: $(seed)")
