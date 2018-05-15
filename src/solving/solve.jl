@@ -75,7 +75,6 @@ function endgame(solvers, start_solutions, endgame_zone_results)
 
     report_progress(solvers) && println("Checking for crossed paths...")
     ncrossedpaths, crossing_indices = pathcrossing_check!(endgame_zone_results, solvers, start_solutions)
-
     if report_progress(solvers)
         p = ProgressMeter.Progress(n, 0.5, "Running endgame...")
 

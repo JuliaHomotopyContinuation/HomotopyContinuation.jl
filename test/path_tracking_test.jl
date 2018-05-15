@@ -90,7 +90,6 @@ end
     tracker = PathTracking.PathTracker(H, x1, 1.0, 0.1)
     r1 = PathTracking.track(tracker, x1, 1.0, 0.1)
 
-    PathTracking.set_update_homotopies!(tracker, false)
-    PathTracking.track!(tracker, r1.x, 0.1, 0.0)
+    PathTracking.track!(tracker, r1.x, 0.1, 0.0, emit_update=false)
     @test all(conj.(normalize!(r1.x)) .≈ patch.v_conj)
 end
