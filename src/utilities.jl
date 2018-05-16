@@ -9,7 +9,7 @@ export allvariables,
     uniquevar,
     homogenize,
     totaldegree,
-    solve_with_lu_inplace!,
+    ldiv_lu!, blas_ldiv_lu!,
     infinity_norm,
     unsafe_infinity_norm,
     logabs,
@@ -17,6 +17,18 @@ export allvariables,
     batches,
     randomish_gamma
 
+
+"""
+    ldiv_lu!(A, b)
+
+Solve ``Ax=b`` inplace using a pure Julia LU-factorization. This overwrites `A` and `b`
+and stores the result in `b`. This is faster than the BLAS version [`blas_ldiv_lu!`](@ref) but seems to loose
+around 2 digits of precision.
+"""
+function ldiv_lu!(A::StridedMatrix, b::StridedVector)
+    A_ldiv_B!(LinAlg.generic_lufact!(A), b)
+    b
+end
 
 """
     allvariables(polys)
@@ -169,15 +181,6 @@ Base.length(iter::TotalDegreeSolutionIterator) = length(iter.iterator)
 Base.eltype(iter::TotalDegreeSolutionIterator) = Vector{Complex{Float64}}
 
 """
-    solve_with_lu_inplace!(A, b)
-
-Solves ``Ax =b`` inplace. The result is stored in `b`. This method also overrides
-the contents of `A`.
-"""
-solve_with_lu_inplace!(A, b) = A_ldiv_B!(lufact!(A), b)
-
-
-"""
     infinity_norm(z)
 
 Compute the ∞-norm of `z`. If `z` is a complex vector this is more efficient
@@ -211,25 +214,6 @@ logabs(z::Complex) = 0.5 * fastlog(abs2(z))
 logabs(x) = fastlog(abs(x))
 
 fastlog(z) = Base.Math.JuliaLibm.log(z)
-
-#
-# mutable struct VectorOfVectors{V<:AbstractVector} <: AbstractVector
-#     data::Vector{V}
-#     length::Int
-# end
-# Base.size(v::VectorOfVectors) = (v.length,)
-# Base.length(v::VectorOfVectors) = v.length
-# Base.eltype(v::VectorOfVectors{V}) where V = V
-# function Base.getindex(v::VectorOfVectors, i::Integer)
-#     @boundscheck 1 ≤ i < v.length
-#     getindex(v.data, i)
-# end
-# function Base.setindex!(v::VectorOfVectors, x, i)
-#     if 1 ≤ i < v.length
-#         Base.setindex!(v.data, x, i)
-#     else
-#
-
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization

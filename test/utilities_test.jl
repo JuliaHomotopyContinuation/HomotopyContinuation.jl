@@ -10,4 +10,13 @@
 
     @test Utilities.ishomogenous(Utilities.homogenize([x^2+y^2+x*y, x^4+1]))
     @test Utilities.nvariables(Utilities.homogenize([x^2+y^2+x*y, x^4+1])) == 3
+
+    A = rand(Complex{Float64}, 12, 12)
+    b = rand(Complex{Float64}, 12)
+    C = zero(A)
+    d = zero(b)
+
+    C .= A
+    d .= b
+    @test norm(Utilities.ldiv_lu!(C, d) - A \ b) < 1e-13
 end
