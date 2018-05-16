@@ -14,10 +14,12 @@ function SolverCache(prob, tracker)
     SolverCache(pathresult)
 end
 
-struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker, E<:Endgame.Endgamer, C<:SolverCache}
+struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
+        E<:Endgame.Endgamer, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
     prob::P
     tracker::T
     endgamer::E
+    patchswitcher::PS
     t₁::Float64
     t₀::Float64
     options::SolverOptions
@@ -42,10 +44,13 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
 
     tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
     endgamer = Endgame.Endgamer(tracker, options.endgame_start)
+    switcher = patchswitcher(prob, x₁, t₀; kwargs...)
+
     cache = SolverCache(prob, tracker)
     Solver(prob,
         tracker,
         endgamer,
+        switcher,
         t₁, t₀,
         options,
         cache)
@@ -55,6 +60,13 @@ function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t�
     x = Problems.embed(prob, x₁)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
+end
+
+function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+    x = Problems.embed(prob, x₁)
+    p₁ = AffinePatches.state(patch, x)
+    p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
+    PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)
 end
 
 const Solvers = Vector{<:Solver}

@@ -3,6 +3,7 @@ export solution,
     isfailed, isatinfinity, issingular
 
 import ..Homotopies
+import ..ProjectiveVectors
 import ..ProjectiveVectors: raw
 using ..Utilities
 
@@ -63,10 +64,10 @@ struct PathResult{T1, T2, T3}
     npredictions::Int
 end
 
-function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache)
+function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
+    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Compat.Nothing)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(r.x)
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
@@ -83,11 +84,11 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     PathResult(returncode, returncode_detail, x, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
     returncode = r.returncode
+    windingnumber, npredictions = windingnumber_npredictions(r)
 
-    ProjectiveVectors.affine!(r.x)
-    # x = raw(r.x)
+    switch_to_affine!(r.x, returncode, windingnumber, patchswitcher)
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
@@ -107,7 +108,6 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
         condition = cond(@view cache.J[:,2:end])
     end
 
-    windingnumber, npredictions = windingnumber_npredictions(r)
 
     PathResult(returncode, returncode_detail, solution, real(r.t), res,
         condition, windingnumber, k, x₁, intermediate_sol, r.iters, npredictions)
@@ -120,6 +120,16 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
+
+function switch_to_affine!(x::ProjectiveVectors.PVector, returncode, windingnumber, patchswitcher)
+    if returncode == :success && windingnumber == 1 && abs2(x[x.homvar]) < 1.0
+        PatchSwitching.switch!(x, patchswitcher)
+    elseif returncode != :at_infinity
+        ProjectiveVectors.affine!(x)
+    end
+    x
+end
+
 windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 

@@ -9,6 +9,7 @@ module HomotopyContinuation
         Correctors,
         Endgame,
         Homotopies,
+        PatchSwitching,
         PathTracking,
         Predictors,
         Problems,
@@ -36,6 +37,8 @@ module HomotopyContinuation
 
     include("path_tracking.jl")
     include("endgame.jl")
+
+    include("patch_switching.jl")
 
     include("solving.jl")
     include("solve.jl")
