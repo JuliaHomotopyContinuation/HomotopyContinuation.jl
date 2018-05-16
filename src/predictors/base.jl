@@ -50,6 +50,6 @@ to be able to store the Jacobian of `H`.
 """
 function minus_x_prime!(out, H, x, t, A)
     jacobian_and_dt!(A, out, H, x, t)
-    solve_with_lu_inplace!(A, out)
+    ldiv_lu!(A, out)
     out
 end

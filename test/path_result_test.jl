@@ -14,6 +14,10 @@
     @test length(results(R, includesingular=false, singulartol=1e9)) == 32
     @test length(results(R, includeatinfinity=true)) == 32
 
+end
+
+@testset "PathResult Juno" begin
+    R = solve(equations(katsura5()))
     @test_nowarn Juno.render(Juno.Inline(), R)
     @test_nowarn Juno.render(Juno.Inline(), R[1])
 end
