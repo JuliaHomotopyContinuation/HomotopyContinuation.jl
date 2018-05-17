@@ -1,6 +1,6 @@
 using HomotopyContinuation
 using Compat.Test
-using TestSystems
+using PolynomialTestSystems
 import Juno
 using Atom
 

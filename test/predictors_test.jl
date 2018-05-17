@@ -1,5 +1,5 @@
 function setup_prediction_test()
-    F = Systems.SPSystem(equations(katsura6()))
+    F = Systems.SPSystem(equations(katsura(6)))
     x = rand(Complex{Float64}, 7)
     xnext = copy(x)
     t = rand()

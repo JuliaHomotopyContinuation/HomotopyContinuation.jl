@@ -1,6 +1,6 @@
 @testset "Problems" begin
-    F = equations(katsura5())
-    G = equations(cyclic6())
+    F = equations(katsura(5))
+    G = equations(cyclic(6))
 
     P1 = Problems.StartTargetProblem(G, F)
     P2 = Problems.TotalDegreeProblem(F)
