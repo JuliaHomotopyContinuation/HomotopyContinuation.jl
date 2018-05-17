@@ -24,6 +24,7 @@ Base.getindex(r::Result, I) = getindex(r.pathresults, I)
 Base.start(r::Result) = start(r.pathresults)
 Base.next(r::Result, state) = next(r.pathresults, state)
 Base.done(r::Result, state) = done(r.pathresults, state)
+Base.endof(r::Result) = endof(r.pathresults)
 function Base.iteratorsize(::Type{AffineResult{T1,T2,T3}}) where {T1, T2, T3}
     Base.HasLength()
 end
