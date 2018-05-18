@@ -1,5 +1,5 @@
 export nresults, nfinite, nsingular, natinfinity, nfailed,
-    finite, results, failed, atinfinity
+    finite, results, failed, atinfinity, singular
 
 abstract type Result end
 
@@ -131,6 +131,15 @@ function finite(f::Function, R::AffineResults; include_singular=true, tol=1e10)
         [f(r) for r in R if isfinite(r) && !issingular(r, tol)]
     end
 end
+
+"""
+    singular(result; tol=1e10)
+
+Get all singular solutions. A solution is considered singular
+if its windingnumber is larger than 1 or the condition number is larger than `tol`.
+"""
+singular(R::Result; tol=1e10) = [r for r in R if (isfinite(r) && issingular(r, tol))]
+
 
 """
     real(result, tol=1e-6)
