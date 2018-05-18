@@ -19,12 +19,7 @@ import ..Systems
 
 export Solver,
     solve,
-    Result,
-    finite_solutions,
-    solutions_at_infinity,
-    singular_solutions,
-    failed_paths,
-    real_solutions
+    Result
 
 include("solving/path_result.jl")
 include("solving/result.jl")

@@ -46,13 +46,13 @@ module HomotopyContinuation
 
     import .Solving: nresults,
         nfinite, nsingular, natinfinity, nfailed,
-        finite, results, failed, atinfinity,
+        finite, results, failed, atinfinity, singular,
         solution, residual, start_solution, issuccess,
         isfailed, isatinfinity, issingular
 
     export nresults,
         nfinite, nsingular, natinfinity, nfailed,
-        finite, results, failed, atinfinity,
+        finite, results, failed, atinfinity, singular,
         solution, residual, start_solution, issuccess,
         isfailed, isatinfinity, issingular
 end #
