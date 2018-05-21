@@ -1,7 +1,7 @@
 @testset "solve" begin
     @polyvar x
     @test nfinite(solve([x - 1])) == 1
-    F = equations(katsura5())
+    F = equations(katsura(5))
     @test nfinite(solve(F, threading=false)) == 32
     @test nfinite(solve(F, system=Systems.SPSystem, threading=false)) == 32
     @test nfinite(solve(F, system=Systems.FPSystem, threading=false)) == 32
@@ -18,12 +18,10 @@
     @test nfinite(solve(F, patch=AffinePatches.RandomPatch())) == 32
     @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
     @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
-
-
 end
 
 @testset "solve - no endgame" begin
-    F = equations(katsura5())
+    F = equations(katsura(5))
     # no endgame
     @test nfinite(solve(F, endgame_start=0.0)) == 32
 
@@ -31,7 +29,7 @@ end
 end
 
 @testset "Path Crossing" begin
-    F = equations(katsura5())
+    F = equations(katsura(5))
     # this will have two crossed paths
     srand(120)
     @test nfinite(solve(F, tol=1e-1, threading=true)) == 32

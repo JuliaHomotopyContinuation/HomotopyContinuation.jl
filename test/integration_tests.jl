@@ -1,7 +1,9 @@
 @testset "integration tests" begin
-    @test all(issuccess, solve(equations(katsura10())))
-    @test all(issuccess, solve(equations(katsura10()), report_progress=false))
+    @test all(issuccess, solve(equations(katsura(10))))
+    @test all(issuccess, solve(equations(katsura(10)), report_progress=false))
 
-    @test nfinite(solve(equations(cyclic6()))) == 156
-    @test nfinite(solve(equations(cyclic7()))) == 924
+    @test nfinite(solve(equations(cyclic(6)))) == 156
+    R = solve(equations(cyclic(7)))
+    @test nfinite(R) == 924
+    @test nfailed(R) < 20
 end

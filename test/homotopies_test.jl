@@ -28,8 +28,8 @@ function testevaluations(H, x)
 end
 
 @testset "Homotopies.StraightLineHomotopy" begin
-    F = Systems.SPSystem(TestSystems.equations(katsura5()))
-    G = Systems.SPSystem(TestSystems.equations(cyclic6()))
+    F = Systems.SPSystem(equations(katsura(5)))
+    G = Systems.SPSystem(equations(cyclic(6)))
     H = Homotopies.StraightLineHomotopy(F, G)
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
@@ -39,7 +39,7 @@ end
 end
 
 @testset "Homotopies.FixedPointHomotopy" begin
-    F = Systems.SPSystem(TestSystems.equations(katsura5()))
+    F = Systems.SPSystem(equations(katsura(5)))
     H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
@@ -48,8 +48,8 @@ end
 end
 
 @testset "Homotopies.PatchedHomotopy" begin
-    F = Systems.SPSystem(TestSystems.equations(katsura5()))
-    G = Systems.SPSystem(TestSystems.equations(cyclic6()))
+    F = Systems.SPSystem(equations(katsura(5)))
+    G = Systems.SPSystem(equations(cyclic(6)))
     x = ProjectiveVectors.PVector(rand(Complex{Float64}, 6), 1)
     H = Homotopies.PatchedHomotopy(Homotopies.StraightLineHomotopy(F, G),
         AffinePatches.OrthogonalPatch(),

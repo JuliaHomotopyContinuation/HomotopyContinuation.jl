@@ -1,5 +1,5 @@
 @testset "SPSystem" begin
-    fs = TestSystems.equations(katsura5())
+    fs = equations(katsura(5))
 
     F = Systems.SPSystem(fs)
 
@@ -32,8 +32,8 @@
 end
 
 @testset "Systems.FixedHomotopy" begin
-    f = Systems.SPSystem(TestSystems.equations(katsura5()))
-    g = Systems.SPSystem(TestSystems.equations(cyclic6()))
+    f = Systems.SPSystem(equations(katsura(5)))
+    g = Systems.SPSystem(equations(cyclic(6)))
     H = Homotopies.StraightLineHomotopy(f, g)
 
     F = Systems.FixedHomotopy(H, 0.23)
@@ -56,7 +56,7 @@ end
 end
 
 @testset "Systems.FPSystem" begin
-    F = Systems.FPSystem(TestSystems.equations(katsura5()))
+    F = Systems.FPSystem(equations(katsura(5)))
     x = rand(Complex{Float64}, 6)
     u = zeros(Complex{Float64}, 6)
     U = zeros(Complex{Float64}, 6, 6)

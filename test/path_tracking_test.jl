@@ -1,6 +1,6 @@
 
 @testset "PathTracking" begin
-    F = equations(katsura5())
+    F = equations(katsura(5))
 
     TDP = Problems.TotalDegreeProblem(F)
     P = Problems.ProjectiveStartTargetProblem(TDP)
@@ -78,8 +78,7 @@ end
 end
 
 @testset "fixedpatch" begin
-
-    F = equations(katsura5())
+    F = equations(katsura(5))
     TDP = Problems.TotalDegreeProblem(F)
     P = Problems.ProjectiveStartTargetProblem(TDP)
     start_sols = Utilities.totaldegree_solutions(F) |> collect
