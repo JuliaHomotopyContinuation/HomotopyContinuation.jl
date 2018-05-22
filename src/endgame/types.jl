@@ -131,7 +131,7 @@ end
 function EndgamerResult(endgamer::Endgamer)
     S = endgamer.state
 
-    if S.npredictions == 0
+    if S.npredictions == 0 || S.status == :at_infinity
         x = copy(S.samples[S.nsamples])
     else
         x = copy(S.p)
