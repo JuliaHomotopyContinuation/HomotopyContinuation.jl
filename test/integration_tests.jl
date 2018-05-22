@@ -5,5 +5,5 @@
     @test nfinite(solve(equations(cyclic(6)))) == 156
     R = solve(equations(cyclic(7)))
     @test nfinite(R) == 924
-    @test nfailed(R) < 20
+    @test nfailed(R) == 0
 end
