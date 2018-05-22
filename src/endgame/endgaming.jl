@@ -42,7 +42,10 @@ function play!(endgamer)
             directions!(state, options, cache)
             estimate_windingnumber!(state, options, cache)
 
-            predict!(state, options, cache)
+            if state.nsamples > 30 || state.n_directions_matching > 0
+                predict!(state, options, cache)
+            end
+
             checkatinfinity!(state, options, cache)
         end
 
@@ -53,7 +56,7 @@ function play!(endgamer)
     endgamer
 end
 
-nsamples(state) = length(state.logabs_samples[1])
+nsamples(state) = length(state.nsamples)
 
 function confident_in_windingnumber(state::State, options::Options)
     if state.cons_matching_estimates < 5
@@ -88,7 +91,7 @@ function nextsample!(tracker::PathTracking.PathTracker, state, options)
     nothing
 end
 
-function update_samples!(state, options, x, λR)
+function update_samples!(state, options, x::ProjectiveVectors.PVector, λR)
     if state.nsamples == length(state.samples)
         push!(state.samples, copy(x))
         state.nsamples += 1
@@ -97,8 +100,12 @@ function update_samples!(state, options, x, λR)
         state.samples[state.nsamples] .= x
     end
 
+    i₀ = x.homvar
+    logabs_x₀ = logabs(x[i₀])
     for i=1:length(x)
-        push!(state.logabs_samples[i], logabs(x[i]))
+        if i ≠ i₀
+            push!(state.logabs_samples[i], logabs(x[i]) - logabs_x₀)
+        end
     end
 
     nothing
@@ -114,27 +121,30 @@ of x(t).
 function directions!(state, options, cache)
     h = options.sampling_factor
     logh = fastlog(h)
-    range = samples_range(state, options)
+    range = samples_range(state.nsamples, options)
     buffer = cache.direction_buffer
-    stable = true
-    for (i, samplesᵢ) in enumerate(state.logabs_samples)
+    i₀ = state.samples[1].homvar
+	all_matching = true
+    for i=1:length(state.logabs_samples)
+        i == i₀ && continue
+
+        samplesᵢ = state.logabs_samples[i]
         dᵢ = extrapolate_direction(samplesᵢ, range, h, logh, buffer)
-        if abs(state.directions[i] - dᵢ) < 0.0005
+        Δ =  abs(state.directions[i] - dᵢ)
+        state.directions[i] = dᵢ
+        if Δ < 1e-4
             state.directions_matching[i] += 1
-            state.directions[i] = dᵢ
         else
+			all_matching = false
             state.directions_matching[i] = 0
-            state.directions[i] = dᵢ
         end
     end
-
-    if stable
-        state.n_directions_matching += 1
-    else
-        state.n_directions_matching = 0
-    end
-    # @show state.n_directions_matching
-    state.n_directions_matching
+	if all_matching
+		state.n_directions_matching += 1
+	else
+		state.n_directions_matching = 0
+	end
+	nothing
 end
 
 """
@@ -146,15 +156,18 @@ in Section 4 of [^1].
 [^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
 """
 function extrapolate_direction(samples, range, h, logh, buffer)
-    d = inv(1 - h)
     n = length(range)
     for i=1:n-1
         buffer[i] = samples[range[i+1]] - samples[range[i]]
     end
 
     @inbounds begin
-        for k=2:n-1, i=1:n-k
-            buffer[i] = muladd((buffer[i+1] - buffer[i]), d, buffer[i])
+        c_k = 1
+        for k=2:n-1
+            c_k *= h
+            for i=1:n-k
+                buffer[i] = (buffer[i+1] - c_k * buffer[i]) / (1 - c_k)
+            end
         end
     end
     buffer[1] / logh
@@ -171,8 +184,10 @@ result.
 """
 function estimate_windingnumber!(state, options, cache)
     logh = fastlog(options.sampling_factor)
-    map!(cache.windingnumbers, state.logabs_samples) do samples
-        windingnumber(samples, logh)
+    i₀ = state.samples[1].homvar
+    for i=1:length(state.logabs_samples)
+        i == i₀ && continue
+        cache.windingnumbers[i] = windingnumber(state.logabs_samples[i], logh)
     end
     w = majority(cache.windingnumbers)
 
@@ -191,7 +206,7 @@ function estimate_windingnumber!(state, options, cache)
 end
 
 function samples_range(state, options)
-    samples_range(length(state.logabs_samples[1]), options)
+    samples_range(nsamples(state), options)
 end
 function samples_range(nsamples::Int, options)
     max(1, nsamples - options.max_extrapolation_samples + 1):nsamples
@@ -208,7 +223,7 @@ to approximate the winding number. See [^1] for details.
 
 [^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
 """
-function windingnumber(logabs_samples, logh)
+@inline function windingnumber(logabs_samples, logh)
     nsamples = length(logabs_samples)
     Δ = logabs_samples[nsamples-3] - logabs_samples[nsamples-2]
     Δ1 = logabs_samples[nsamples-2] - logabs_samples[nsamples-1]
@@ -263,23 +278,21 @@ to approximate the "direction" of the path. See [^1] for details.
 """
 function checkatinfinity!(state, options, cache)
     i₀ = ProjectiveVectors.homvar(state.samples[1])
-    if state.n_directions_matching < 1
-        return false
-    end
-    # return false
     m = state.windingnumber
-    r₀ = state.directions[i₀]
-
-    if state.directions_matching[i₀] > 4 &&  r₀ > 0.02 # we assume a winding number of at most 50
-        for (i, rᵢ) in enumerate(state.directions)
-            i == i₀ && continue
-            # rᵢ should be really near zero
-            if rᵢ < 0.001 && state.directions_matching[i] > 4
+    # r₀ = state.directions[i₀]
+    all_matching = true
+    for (i, rᵢ) in enumerate(state.directions)
+        i == i₀ && continue
+        if state.directions_matching[i] > 8
+            if rᵢ < -0.02
                 state.status = :at_infinity
                 return true
             end
+        else
+            all_matching = false
         end
-    else
+    end
+    if !all_matching
         p = state.npredictions > 0 ? state.p : state.samples[state.nsamples]
         if infinity_norm(p) > options.maxnorm
             state.status = :at_infinity
