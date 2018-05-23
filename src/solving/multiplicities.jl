@@ -1,5 +1,6 @@
 import Base: isless, collect
 import ..ProjectiveVectors
+import ..Utilities
 
 ## The structure for sorting the solutions is a binary search tree (BST).
 ## First, we cluster the points by ordering them w.r.t the the absolute value of their first entry.
@@ -21,12 +22,13 @@ end
 
 function compare(x, y, tol)
     # if ProjectiveVectors.infinity_norm(x, y) > tol
-    if norm(x-y) > tol
+    if infinity_norm(x-y) > tol
         return false
     else
         return true
     end
 end
+
 
 
 function push_for_clustering!(node::BST, i, vectors, τ)
