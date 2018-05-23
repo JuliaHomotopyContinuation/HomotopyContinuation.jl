@@ -83,26 +83,30 @@ indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
 function check_crossed_paths(paths, tol)
-    #TODO: This should be multithreaded... AND is really expensive...5
-    crossed_path_indices = Int[]
-    path_handled = falses(length(paths))
-    for i=1:length(paths)-1
-        if path_handled[i]
-            continue
-        end
-        x = paths[i].x
-        crossing = false
-        for j=i+1:length(paths)
-            if !path_handled[j] && ProjectiveVectors.infinity_norm(x, paths[j].x) < tol
-                push!(crossed_path_indices, j)
-                crossing = true
-                path_handled[j] = true
-            end
-        end
-        if crossing
-            push!(crossed_path_indices, i)
-        end
-    end
 
-    crossed_path_indices
+    mults = multiplicities([ProjectiveVectors.affine(p.x) for p in paths], tol)
+    vcat(filter(m -> length(m) > 1, mults)...)
+    # 
+    # #TODO: This should be multithreaded... AND is really expensive...5
+    # crossed_path_indices = Int[]
+    # path_handled = falses(length(paths))
+    # for i=1:length(paths)-1
+    #     if path_handled[i]
+    #         continue
+    #     end
+    #     x = paths[i].x
+    #     crossing = false
+    #     for j=i+1:length(paths)
+    #         if !path_handled[j] && ProjectiveVectors.infinity_norm(x, paths[j].x) < tol
+    #             push!(crossed_path_indices, j)
+    #             crossing = true
+    #             path_handled[j] = true
+    #         end
+    #     end
+    #     if crossing
+    #         push!(crossed_path_indices, i)
+    #     end
+    # end
+    #
+    # crossed_path_indices
 end
