@@ -18,5 +18,5 @@
 
     C .= A
     d .= b
-    @test norm(Utilities.ldiv_lu!(C, d) - A \ b) < 1e-13
+    @test norm(Utilities.ldiv_lu!(C, d) - A \ b) < 1e-12
 end

@@ -1,7 +1,6 @@
 using ..Utilities
 import ..ProjectiveVectors
 
-
 """
     pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
@@ -82,27 +81,27 @@ Check whether two solutions are closer than the given tolerance since this
 indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
-function check_crossed_paths(paths, tol)
-    #TODO: This should be multithreaded... AND is really expensive...5
-    crossed_path_indices = Int[]
-    path_handled = falses(length(paths))
-    for i=1:length(paths)-1
-        if path_handled[i]
-            continue
-        end
-        x = paths[i].x
-        crossing = false
-        for j=i+1:length(paths)
-            if !path_handled[j] && ProjectiveVectors.infinity_norm(x, paths[j].x) < tol
-                push!(crossed_path_indices, j)
-                crossing = true
-                path_handled[j] = true
-            end
-        end
-        if crossing
-            push!(crossed_path_indices, i)
-        end
+function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTracking.PathTrackerResult}
+    V = map(p -> ProjectiveVectors.affine(p.x), paths)
+    check_crossed_paths(V, tol)
+end
+function check_crossed_paths(V::Vector{Vector{T}}, tol) where {T<:Number}
+    root = BST([1], Nullable{BST}(), Nullable{BST}())
+    for i in 2:length(V)
+        push_for_clustering!(root, i, V, tol)
     end
 
-    crossed_path_indices
+    crossed = Int[]
+    foreach(root) do m
+        clusterroot = BST([1], Nullable{BST}(), Nullable{BST}())
+        for i in 2:length(m)
+            push_for_identifying_multiplicities!(clusterroot, i, V[m], tol)
+        end
+        foreach(clusterroot) do n
+            if length(n) > 1
+                append!(crossed, m[n])
+            end
+        end
+    end
+    crossed
 end

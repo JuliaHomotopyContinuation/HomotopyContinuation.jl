@@ -6,6 +6,7 @@ using Atom
 
 # We order the tests such that isolated things are tested first
 include("utilities_test.jl")
+include("multiplicities_test.jl")
 include("projective_vectors_test.jl")
 include("systems_test.jl")
 include("homotopies_test.jl")
