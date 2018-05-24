@@ -62,8 +62,10 @@ function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCa
             return (false, :ok)
         end
     catch err
-        if !(err isa Base.LinAlg.SingularException)
-            warn("Predictor or Corrector throw with:")
+        if err isa InterruptException
+            throw(err)
+        elseif !(err isa Base.LinAlg.SingularException)
+            warn("Cached the following expression thrown from Predictor or Corrector:")
             warn(err)
         end
         return (false, :predictor_corrector_failed)
