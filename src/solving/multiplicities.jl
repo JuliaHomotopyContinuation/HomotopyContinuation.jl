@@ -13,7 +13,7 @@ mutable struct BST
 end
 
 function Base.isless(x::Vector{T}, y::Vector{S}) where {S,T <: Number}
-    if abs(normalize(x)[1]) < abs(normalize(y)[1])
+    if abs(x[1]) < abs(y[1])
         return true
     else
         return false
@@ -22,7 +22,7 @@ end
 
 function compare(x, y, tol)
     # if ProjectiveVectors.infinity_norm(x, y) > tol
-    if infinity_norm(x-y) > tol
+    if abs(abs(x[1]) - abs(y[1])) > tol
         return false
     else
         return true
@@ -52,7 +52,7 @@ function push_for_clustering!(node::BST, i, vectors, τ)
 end
 
 function push_for_identifying_multiplicities!(node::BST, i, vectors, τ)
-    if compare(vectors[i], vectors[node.pos[1]], τ)
+    if infinity_norm(vectors[i] - vectors[node.pos[1]]) < τ
         push!(node.pos, i)
     else
         if isnull(node.left)
