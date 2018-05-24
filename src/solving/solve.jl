@@ -82,24 +82,33 @@ function endgame(solvers, start_solutions, endgame_zone_results)
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k-1),))
             end
-            runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
+            runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         end
         ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
     else
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
-            runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
+            runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         end
     end
 
     result
 end
 
-@inline function runendgame(solver, tid, k, start_solutions, endgame_zone_results, t_endgame, t₀)
+function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
+    t₁, t_endgame, t₀ = t₁_t_endgame_t₀(solver)
     x₁, r = start_solutions[k], endgame_zone_results[k]
     if r.returncode == :success
         result = Endgame.play(solver.endgamer, r.x, t_endgame)
+        if result.returncode == :tracker_failed
+            result = Endgame.play(solver.endgamer, Problems.embed(solver.prob, x₁), 1.0)
+        end
         return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
     else
-        return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
+        result = Endgame.play(solver.endgamer, Problems.embed(solver.prob, x₁), 1.0)
+        if result.returncode == :success || result.returncode == :at_infinity
+            return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
+        else
+            return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
+        end
     end
 end
