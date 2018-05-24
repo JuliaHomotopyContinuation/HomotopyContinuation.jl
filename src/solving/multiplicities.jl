@@ -1,58 +1,36 @@
-import Base: isless, collect
-import ..ProjectiveVectors
-import ..Utilities
+using ..Utilities
 
 ## The structure for sorting the solutions is a binary search tree (BST).
 ## First, we cluster the points by ordering them w.r.t the the absolute value of their first entry.
 ## Then, we compare the points pairwise in each cluster.
-
 mutable struct BST
     pos::Vector{Int}
     left::Nullable{BST}
     right::Nullable{BST}
 end
 
-function Base.isless(x::Vector{T}, y::Vector{S}) where {S,T <: Number}
-    if abs(x[1]) < abs(y[1])
-        return true
-    else
-        return false
-    end
-end
-
-function compare(x, y, tol)
-    # if ProjectiveVectors.infinity_norm(x, y) > tol
-    if abs(abs(x[1]) - abs(y[1])) > tol
-        return false
-    else
-        return true
-    end
-end
-
-
-
 function push_for_clustering!(node::BST, i, vectors, τ)
-    if compare(vectors[i], vectors[node.pos[1]], τ)
+    xᵢ, y = abs(vectors[i][1]), abs(vectors[node.pos[1]][1])
+    if abs(xᵢ - y) < τ
         push!(node.pos, i)
-    else
-        if vectors[i] < vectors[node.pos[1]]
-            if isnull(node.left)
-                node.left = BST([i], Nullable{BST}(), Nullable{BST}())
-            else
-                push_for_clustering!(node.left.value, i, vectors, τ)
-            end
+    elseif xᵢ < y
+        if isnull(node.left)
+            node.left = BST([i], Nullable{BST}(), Nullable{BST}())
         else
-            if isnull(node.right)
-                node.right = BST([i], Nullable{BST}(), Nullable{BST}())
-            else
-                push_for_clustering!(node.right.value, i, vectors, τ)
-            end
+            push_for_clustering!(get(node.left), i, vectors, τ)
+        end
+    else
+        if isnull(node.right)
+            node.right = BST([i], Nullable{BST}(), Nullable{BST}())
+        else
+            push_for_clustering!(get(node.right), i, vectors, τ)
         end
     end
 end
 
 function push_for_identifying_multiplicities!(node::BST, i, vectors, τ)
-    if infinity_norm(vectors[i] - vectors[node.pos[1]]) < τ
+    # This compares with the infinity_norm but avoids a temporary vector allocation
+    if infinity_norm(vectors[i], vectors[node.pos[1]]) < τ
         push!(node.pos, i)
     else
         if isnull(node.left)
@@ -63,45 +41,50 @@ function push_for_identifying_multiplicities!(node::BST, i, vectors, τ)
     end
 end
 
-function Base.collect(node::BST)
-    if isnull(node.left)
-        if isnull(node.right)
-            return [node.pos]
-        else
-            return [[node.pos]; collect(node.right.value)]
-        end
-    else
-        if isnull(node.right)
-            return [[node.pos]; collect(node.left.value)]
-        else
-            return [[node.pos]; collect(node.left.value); collect(node.right.value)]
-        end
+function Base.foreach(f::F, node::BST) where {F<:Function}
+    f(node.pos)
+    if !isnull(node.left)
+        foreach(f, get(node.left))
     end
+    if !isnull(node.right)
+        foreach(f, get(node.right))
+    end
+    nothing
 end
 
+# Currently we do not need this since `foreach` is sufficient, but maybe its useful later
+#
+# Base.collect(node::BST) = collectpositions!(Vector{Int}[], node)
+# function collectpositions!(positions, node::BST)
+#     push!(positions, node.pos)
+#     if !isnull(node.left)
+#         collectpositions!(positions, get(node.left))
+#     end
+#     if !isnull(node.right)
+#         collectpositions!(positions, get(node.right))
+#     end
+#     positions
+# end
+#
 
 """
     multiplicities(V, tol)
 
 Returns an array of arrays of integers. Each array v in V contains all indices i,j such that V[i] and V[j] have distance at most tol.
 """
-
 function multiplicities(V::Vector{Vector{T}}, tol) where {T<:Number}
-
     root = BST([1], Nullable{BST}(), Nullable{BST}())
     for i in 2:length(V)
         push_for_clustering!(root, i, V, tol)
     end
 
-    M = collect(root)
     mults = Vector{Int}[]
-
-    for m in M
-        root = BST([1], Nullable{BST}(), Nullable{BST}())
+    foreach(root) do m
+        clusterroot = BST([1], Nullable{BST}(), Nullable{BST}())
         for i in 2:length(m)
-            push_for_identifying_multiplicities!(root, i, V[m], tol)
+            push_for_identifying_multiplicities!(clusterroot, i, V[m], tol)
         end
-        for n in collect(root)
+        foreach(clusterroot) do n
             push!(mults, m[n])
         end
     end

@@ -29,6 +29,14 @@ end
 end
 
 @testset "Path Crossing" begin
+    srand(123)
+    n = 10_000
+    x = [rand(Complex128, 8) for _=1:n]
+    for y in x[1:20]
+        push!(x, y + (rand(Complex128, 8) .* 1e-9))
+    end
+    @test sort(Solving.check_crossed_paths(x, 1e-8)) == [collect(1:20); collect(n+1:n+20)]
+
     F = equations(katsura(5))
     # this will have two crossed paths
     srand(120)
