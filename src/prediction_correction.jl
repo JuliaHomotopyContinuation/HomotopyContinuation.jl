@@ -1,5 +1,6 @@
 module PredictionCorrection
 
+import ..Homotopies
 import ..Predictors
 import ..Correctors
 using ..Utilities
@@ -59,6 +60,8 @@ function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCa
             x .= xnext
             return (true, :ok)
         else
+            # we have to reset any patch updates
+            Homotopies.update!(H, x, t)
             return (false, :ok)
         end
     catch err
@@ -68,6 +71,8 @@ function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCa
             warn("Cached the following expression thrown from Predictor or Corrector:")
             warn(err)
         end
+        # we have to reset any patch updates
+        Homotopies.update!(H, x, t)
         return (false, :predictor_corrector_failed)
     end
 end
