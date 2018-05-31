@@ -54,7 +54,7 @@ using Compat.Test
 
     @test z2 == copy(z2)
 
-    @test abs(infinity_norm(z2, z2)) < 1e-15
+    @test abs(infinity_norm(z2, z2)) < 1e-14
 
 
     converted = similar(ProdPVector([PVector(rand(Float64, 3), 2), PVector(rand(Float64, 7), 3)]), Complex{Float64})
