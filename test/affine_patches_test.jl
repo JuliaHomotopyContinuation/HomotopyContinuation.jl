@@ -48,3 +48,20 @@ end
     AffinePatches.jacobian!(U, patch, x)
     @test U == reshape(conj.(patch.v), 1, 3)
 end
+
+@testset "AffinePatches.FixedPatch" begin
+    x = ProjectiveVectors.PVector(rand(Complex{Float64}, 3), 1)
+    patch = AffinePatches.state(AffinePatches.FixedPatch(), x)
+    @test patch isa AffinePatches.FixedPatchState
+    @test AffinePatches.nequations(patch) == 1
+
+    AffinePatches.precondition!(patch, x)
+    u = [0.0im]
+    AffinePatches.evaluate!(u, patch, x)
+    u
+    @test u[1] ≈ 0.0 atol=1e-15
+
+    U = zeros(Complex{Float64}, 1, 3)
+    AffinePatches.jacobian!(U, patch, x)
+    @test U == reshape(patch.v_conj, 1, 3)
+end

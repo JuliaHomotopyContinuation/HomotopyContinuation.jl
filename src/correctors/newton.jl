@@ -21,13 +21,13 @@ end
 
 function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, t, tol, maxiters)
     A, b = cache.A, cache.b
-    Homotopies.update!(H, x, t)
+    Homotopies.update!(H, x, t) # we have to update local affine patches
     evaluate_and_jacobian!(b, A, H, x, t)
     ldiv_lu!(A, b)
     @. xnext = x - b
     k = 1
     while true
-        Homotopies.update!(H, xnext, t)
+        Homotopies.update!(H, xnext, t) # we have to update local affine patches
         evaluate!(b, H, xnext, t)
         res = infinity_norm(b)
         if res < tol
