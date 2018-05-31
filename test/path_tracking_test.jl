@@ -76,19 +76,3 @@ end
     x = PathTracking.currx(tracker)
     @test norm(x[2:end] / x[1] - A \ b) < 1e-6
 end
-
-@testset "fixedpatch" begin
-    F = equations(katsura(5))
-    TDP = Problems.TotalDegreeProblem(F)
-    P = Problems.ProjectiveStartTargetProblem(TDP)
-    start_sols = Utilities.totaldegree_solutions(F) |> collect
-    x1 = Problems.embed(P, start_sols[1])
-    patch = AffinePatches.state(AffinePatches.OrthogonalPatch(), x1)
-    H = Homotopies.PatchedHomotopy(P.homotopy, patch)
-    # test construction
-    tracker = PathTracking.PathTracker(H, x1, 1.0, 0.1)
-    r1 = PathTracking.track(tracker, x1, 1.0, 0.1)
-
-    PathTracking.track!(tracker, r1.x, 0.1, 0.0, emit_update=false)
-    @test all(conj.(normalize!(r1.x)) .≈ patch.v_conj)
-end
