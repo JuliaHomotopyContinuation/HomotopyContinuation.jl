@@ -23,6 +23,7 @@ function precondition!(state::OrthogonalPatchState, x)
 end
 function update!(state::OrthogonalPatchState, x)
     raw(state.v_conj) .= conj.(raw(x))
+    normalize!(raw(state.v_conj))
     nothing
 end
 
