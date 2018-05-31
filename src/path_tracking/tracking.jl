@@ -29,8 +29,8 @@ function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀)
-    setup!(tracker, x₁, t₁, t₀)
+function track!(tracker::PathTracker, x₁, t₁, t₀; kwargs...)
+    setup!(tracker, x₁, t₁, t₀; kwargs...)
 
     while currstatus(tracker) == :ok
         step!(tracker)
@@ -48,7 +48,7 @@ end
 
 Setup `pathtracker` to track `x₁` from `t₁` to `t₀`.
 """
-function setup!(tracker::PathTracker, x₁, t₁, t₀, checkstartvalue=true)
+function setup!(tracker::PathTracker, x₁, t₁, t₀; checkstartvalue=true, precondition=true)
     S = tracker.state
 
     S.start = t₁
@@ -61,7 +61,9 @@ function setup!(tracker::PathTracker, x₁, t₁, t₀, checkstartvalue=true)
     S.iters = 0
     tracker.x .= x₁
 
-    Homotopies.precondition!(tracker.cache.homotopy, tracker.x, t₁)
+    if precondition
+        Homotopies.precondition!(tracker.cache.homotopy, tracker.x, t₁)
+    end
 
     if checkstartvalue
         checkstartvalue!(tracker)
