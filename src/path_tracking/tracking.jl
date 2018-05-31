@@ -29,11 +29,11 @@ function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀; emit_update=true, kwargs...)
-    setup!(tracker, x₁, t₁, t₀; kwargs...)
+function track!(tracker::PathTracker, x₁, t₁, t₀)
+    setup!(tracker, x₁, t₁, t₀)
 
     while currstatus(tracker) == :ok
-        step!(tracker, emit_update)
+        step!(tracker)
         check_terminated!(tracker)
     end
     returncode = currstatus(tracker)
@@ -44,11 +44,11 @@ function track!(tracker::PathTracker, x₁, t₁, t₀; emit_update=true, kwargs
 end
 
 """
-    setup!(pathtracker, x₁, t₁, t₀)
+    setup!(pathtracker, x₁, t₁, t₀, checkstartvalue=true))
 
 Setup `pathtracker` to track `x₁` from `t₁` to `t₀`.
 """
-function setup!(tracker::PathTracker, x₁, t₁, t₀; precondition=true, checkstartvalue=true)
+function setup!(tracker::PathTracker, x₁, t₁, t₀, checkstartvalue=true)
     S = tracker.state
 
     S.start = t₁
@@ -61,9 +61,8 @@ function setup!(tracker::PathTracker, x₁, t₁, t₀; precondition=true, check
     S.iters = 0
     tracker.x .= x₁
 
-    if precondition
-        Homotopies.precondition!(tracker.cache.homotopy, tracker.x, t₁)
-    end
+    Homotopies.precondition!(tracker.cache.homotopy, tracker.x, t₁)
+
     if checkstartvalue
         checkstartvalue!(tracker)
     end
@@ -98,11 +97,6 @@ function step!(tracker, emit_update=true)
         tracker.options.corrector_maxiters)
 
     update_t_Δt!(tracker.state, tracker.steplength, step_successfull)
-
-    if step_successfull && emit_update
-        # Since x changed we should update the patch
-        Homotopies.update!(cache.homotopy, currx(tracker), currt(tracker))
-    end
     nothing
 end
 
