@@ -53,3 +53,15 @@ end
     srand(120)
     @test nfinite(solve(F, tol=1e-1, threading=false)) == 32
 end
+
+@testset "Affine vs projective" begin
+    @polyvar x y z
+    f = [x-y, y-z]
+    g = [x-1, y-1]
+
+    F = solve(f)
+    G = solve(g)
+
+    @test length(F[1].solution) == 3
+    @test length(G[1].solution) == 2
+end
