@@ -43,7 +43,8 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₁ isa AbstractVector
 
     tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(egpathtracker(prob, x₁, t₁, t₀; kwargs...), options.endgame_start)
+    endgametracker = endgamepathtracker(prob, x₁, t₁, t₀; kwargs...)
+    endgamer = Endgame.Endgamer(endgametracker, 1.0+0im)
     switcher = patchswitcher(prob, x₁, t₀; kwargs...)
 
     cache = SolverCache(prob, tracker)
@@ -56,20 +57,22 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         cache)
 end
 
-function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(),
+    endgame_predictor=nothing, kwargs...)
     x = Problems.embed(prob, x₁)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
-    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
+    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
 
-function egpathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=nothing, kwargs...)
+function endgamepathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀;
+    patch=nothing, kwargs...)
     x = Problems.embed(prob, x₁)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(AffinePatches.FixedPatch(), x))
-    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
+    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
 
-
-function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), endgame_predictor=nothing,
+    kwargs...)
     x = Problems.embed(prob, x₁)
     p₁ = AffinePatches.state(patch, x)
     p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)

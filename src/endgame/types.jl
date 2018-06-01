@@ -14,82 +14,115 @@ struct Options
     maxnorm::Float64
     maxwindingnumber::Float64
     max_extrapolation_samples::Int
+    truncate_infinity::Bool
 end
 
-function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=12, max_extrapolation_samples=6)
-    Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
+function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5,
+        maxwindingnumber=12, max_extrapolation_samples=4,
+        truncate_infinity=true)
+    Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber,
+        max_extrapolation_samples, truncate_infinity)
 end
 
-mutable struct State{V, T}
-    # Samples of the solution path obtained from a geometric series
-    # defined by x(λ^k R₀).
-    samples::Vector{V}
-    nsamples::Int
-    # The data structure is that `logabs_samples` Contains a vector for each
-    # coordinate.
-    logabs_samples::Vector{Vector{T}}
-    directions::Vector{Float64}
-    directions_matching::Vector{Int}
-    n_directions_matching::Int
-
-    R::Float64
-
+mutable struct State{V<:ProjectiveVectors.AbstractProjectiveVector, C, T}
+    # Current value
+    x::V
     # prediction and previous prediction
     p::V
     pprev::V
-    # number of predictions so far
+    pbest::V
+    pbest_delta::Float64
+    # Samples of the solution path obtained from a geometric series
+    # defined by x(λ^k R₀).
+    # The raw vectors are stored.
+    samples::Matrix{C}
+    nsamples::Int
+    # The data structure is that `logabs_samples` Contains a vector for each
+    # coordinate.
+    logabs_samples::Matrix{T}
+    directions::Matrix{T}
+
+    R::Float64
     npredictions::Int
-
-
-    # number of iterations so far
     iters::Int
-
     # current status
     status::Symbol
-
     # current estimate of winding number
     windingnumber::Int
-    # consecutive matching estimates
-    cons_matching_estimates::Int
+    in_endgame_zone::Bool
 end
 
-function State(x, R₀::Float64)
-    samples = [copy(x)]
+function State(x, R₀, options)
+    n = maxsamples(R₀, options)
+
+    R = real(R₀)
+
+    samples = fill(zero(eltype(x)), length(x), n)
     nsamples = 1
-    logabs_samples = [[logabs(x[i])] for i=1:length(x)]
-    directions = fill(0.0, length(x))
-    directions_matching = fill(0, length(x))
-    n_directions_matching = 0
+    directions = fill(NaN, length(x), n)
+    logabs_samples = copy(directions)
 
     p = copy(x)
     pprev = copy(x)
+    pbest = copy(x)
+    pbest_delta = Inf
 
     npredictions = 0
     iters = 0
 
     status = :ok
     windingnumber = 1
-    cons_matching_estimates = 0
-    State(samples, nsamples, logabs_samples,
-        directions, directions_matching, n_directions_matching,
-        R₀, p, pprev, npredictions, iters, status,
-        windingnumber,
-        cons_matching_estimates)
+    in_endgame_zone = false
+
+    State(copy(x), p, pprev, pbest, pbest_delta, samples, nsamples, logabs_samples,
+        directions,
+        R, npredictions, iters, status,
+        windingnumber, in_endgame_zone)
+end
+
+function maxsamples(R₀, options)
+    ceil(Int, log(options.sampling_factor, options.minradius / real(R₀))) + 2
+end
+
+
+function reset!(state::State, x, R)
+    state.nsamples = 1
+    state.x .= x
+    for i = 1:length(x)
+        state.samples[i, 1] = x[i]
+        state.logabs_samples[i, 1] = logabs(x[i])
+    end
+
+    state.pbest_delta = Inf
+
+    state.npredictions = 0
+    state.iters = 0
+    state.R = R
+    state.status = :ok
+
+    state.windingnumber = 0
+    state.in_endgame_zone = false
+    nothing
 end
 
 struct Cache{V}
-    # windingnumber_extrapolation_buffer::Vector{Float64}
+    log_sampling_factor::Float64
     windingnumbers::Vector{Int}
-    direction_buffer::Vector{Float64}
-    fitpowerseries_buffer::Vector{V}
+    unitroots::Vector{Complex128}
+    direction_buffer::Matrix{Float64}
+    xbuffer::V
+    pbuffer::V
 end
 
 function Cache(state::State, options::Options)
-    windingnumbers = zeros(Int, length(state.logabs_samples))
-    direction_buffer = zeros(options.max_extrapolation_samples)
-    fitpowerseries_buffer = [deepcopy(state.samples[1]) for _=1:options.max_extrapolation_samples]
-    Cache(windingnumbers, direction_buffer,
-        fitpowerseries_buffer)
+    log_sampling_factor = log(options.sampling_factor)
+    windingnumbers = zeros(Int, length(state.x))
+    unitroots = Vector{Complex128}()
+    direction_buffer = zeros(length(state.x), options.max_extrapolation_samples)
+    pbuffer = copy(state.x)
+    xbuffer = copy(state.x)
+    Cache(log_sampling_factor, windingnumbers, unitroots, direction_buffer,
+        pbuffer, xbuffer)
 end
 
 """
@@ -105,7 +138,7 @@ end
 
 function Endgamer(tracker::PathTracking.PathTracker, R₀=0.1; options::Options=Options())
     x = PathTracking.currx(tracker)
-    state = State(x, R₀)
+    state = State(x, R₀, options)
     Endgamer(tracker, state, Cache(state, options), options)
 end
 
@@ -123,18 +156,20 @@ struct EndgamerResult{V}
     returncode::Symbol
     x::V
     t::Float64
+    res::Float64
     windingnumber::Int
     npredictions::Int
     iters::Int
 end
 
 function EndgamerResult(endgamer::Endgamer)
-    S = endgamer.state
+    state = endgamer.state
 
-    if S.npredictions == 0 || S.status == :at_infinity
-        x = copy(S.samples[S.nsamples])
+    if state.npredictions == 0 || state.status == :at_infinity
+        x = copy(state.x)
     else
-        x = copy(S.p)
+        x = copy(state.pbest)
     end
-    EndgamerResult(S.status, x, S.R, S.windingnumber, S.npredictions, S.iters)
+    EndgamerResult(state.status, x, real(state.R), state.pbest_delta,
+        state.windingnumber, state.npredictions, state.iters)
 end

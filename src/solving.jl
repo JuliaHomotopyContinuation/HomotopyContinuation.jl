@@ -13,6 +13,7 @@ import ..Endgame
 import ..Homotopies
 import ..PathTracking
 import ..Parallel
+import ..Predictors
 import ..Problems
 import ..PatchSwitching
 import ..Systems

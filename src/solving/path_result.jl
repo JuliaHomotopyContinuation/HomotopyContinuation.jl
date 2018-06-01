@@ -164,7 +164,7 @@ function Base.show(io::IO, r::PathResult)
 end
 
 function Juno.render(i::Juno.Inline, x::PathResult{T1, T2, T3}) where {T1, T2, T3}
-    t = Juno.render(i, Juno.defaultrepr(x))
+    t = Juno.render(i, Juno.defaultrepr(x, true))
     t[:head] = Juno.render(i, Text("PathResult"))
     t
 end
