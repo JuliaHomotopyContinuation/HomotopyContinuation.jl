@@ -67,19 +67,20 @@ end
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Compat.Nothing)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(r.x)
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
-    res = infinity_norm(v)
+    res = infinity_norm(cache.v)
 
     if returncode != :success
         condition = 0.0
     else
-        condition = cond(J)
+        condition = cond(cache.J)
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
+
 
     PathResult(returncode, returncode_detail, x, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
