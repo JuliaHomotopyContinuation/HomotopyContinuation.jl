@@ -84,7 +84,6 @@ function maxsamples(R₀, options)
     ceil(Int, log(options.sampling_factor, options.minradius / real(R₀))) + 2
 end
 
-
 function reset!(state::State, x, R)
     state.nsamples = 1
     state.x .= x

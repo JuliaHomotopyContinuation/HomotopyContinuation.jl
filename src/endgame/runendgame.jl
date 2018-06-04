@@ -4,6 +4,15 @@ import ..Homotopies
 function setup!(endgamer, x, R)
     PathTracking.setup!(endgamer.tracker, x, R, 0.0im)
     reset!(endgamer.state, x, R)
+
+    # The endgame fails if we already have a solution. Hence we check it now.
+    r = PathTracking.residual(endgamer.tracker, x, 0.0)
+    if abs(r) < endgamer.options.tol
+        endgamer.state.pbest .= x
+        endgamer.state.pbest_delta = r
+        endgamer.state.status = :success
+        endgamer.state.R = 0.0im
+    end
     nothing
 end
 

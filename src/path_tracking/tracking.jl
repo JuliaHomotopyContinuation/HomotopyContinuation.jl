@@ -72,10 +72,13 @@ function setup!(tracker::PathTracker, x₁, t₁, t₀; checkstartvalue=true, pr
 end
 patch(cache::Cache) = cache.homotopy.homotopy.patch # this is a little bit hacky...
 
-function currresidual(tracker)
-    Homotopies.evaluate!(tracker.cache.out, tracker.cache.homotopy, currx(tracker), currt(tracker))
+currresidual(tracker) = residual(tracker, currx(tracker), currt(tracker))
+
+function residual(tracker, x, t)
+    Homotopies.evaluate!(tracker.cache.out, tracker.cache.homotopy, x, t)
     infinity_norm(tracker.cache.out)
 end
+
 
 function checkstartvalue!(tracker)
     res = currresidual(tracker)
