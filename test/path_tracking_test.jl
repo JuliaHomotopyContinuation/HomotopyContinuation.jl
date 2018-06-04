@@ -84,11 +84,24 @@ end
     start_sols = Utilities.totaldegree_solutions(F) |> collect
     x1 = Problems.embed(P, start_sols[1])
     patch = AffinePatches.state(AffinePatches.OrthogonalPatch(), x1)
+    fixedpatch = AffinePatches.state(AffinePatches.FixedPatch(), x1)
     H = Homotopies.PatchedHomotopy(P.homotopy, patch)
+    FH = Homotopies.PatchedHomotopy(P.homotopy, fixedpatch)
     # test construction
     tracker = PathTracking.PathTracker(H, x1, 1.0, 0.1)
-    r1 = PathTracking.track(tracker, x1, 1.0, 0.1)
+    fixedtracker = PathTracking.PathTracker(FH, x1, 1.0, 0.1)
 
-    PathTracking.track!(tracker, r1.x, 0.1, 0.0, emit_update=false)
-    @test all(conj.(normalize!(r1.x)) .≈ patch.v_conj)
+    r1 = PathTracking.track(fixedtracker, x1, 1.0, 0.1)
+    v1 = copy(fixedpatch.v_conj)
+    PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, precondition=false)
+    @test v1 == fixedpatch.v_conj
+    PathTracking.track!(fixedtracker, PathTracking.currx(tracker), 0.05, 0.01, precondition=false)
+    @test v1 == fixedpatch.v_conj
+    PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, precondition=true)
+    @test v1 != fixedpatch.v_conj
+
+    r1 = PathTracking.track(tracker, x1, 1.0, 0.1)
+    v1 = copy(patch.v_conj)
+    PathTracking.track!(tracker, r1.x, 0.1, 0.0)
+    @test v1 != patch.v_conj
 end

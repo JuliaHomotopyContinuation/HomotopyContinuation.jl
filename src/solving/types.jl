@@ -43,7 +43,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₁ isa AbstractVector
 
     tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(tracker, options.endgame_start)
+    endgamer = Endgame.Endgamer(egpathtracker(prob, x₁, t₁, t₀; kwargs...), options.endgame_start)
     switcher = patchswitcher(prob, x₁, t₀; kwargs...)
 
     cache = SolverCache(prob, tracker)
@@ -61,6 +61,13 @@ function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t�
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
 end
+
+function egpathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=nothing, kwargs...)
+    x = Problems.embed(prob, x₁)
+    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(AffinePatches.FixedPatch(), x))
+    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
+end
+
 
 function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     x = Problems.embed(prob, x₁)

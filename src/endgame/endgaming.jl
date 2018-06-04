@@ -77,8 +77,7 @@ function nextsample!(tracker::PathTracking.PathTracker, state, options)
     R, λ = state.R, options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(tracker, state.samples[state.nsamples], R, λR,
-        precondition=false, checkstartvalue=false, emit_update=false)
+    retcode = PathTracking.track!(tracker, state.samples[state.nsamples], R, λR, precondition=false)
     if retcode != :success
         state.status = :tracker_failed
         return nothing

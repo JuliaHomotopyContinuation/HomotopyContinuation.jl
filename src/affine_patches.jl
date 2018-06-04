@@ -49,5 +49,6 @@ update!(::AbstractAffinePatchState, x) = nothing
 include("affine_patches/orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")
 include("affine_patches/random_patch.jl")
+include("affine_patches/fixed_patch.jl")
 
 end
