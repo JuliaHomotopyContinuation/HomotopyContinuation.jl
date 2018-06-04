@@ -183,7 +183,7 @@ function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, DefaultHom
     elseif length(x) == N - 1
         return ProjectiveVectors.embed(x, 1)
     end
-    throw(error("The length of the intial solution is $(length(x)) but expected length $N or $(N-1)."))
+    throw(error("The length of the initial solution is $(length(x)) but expected length $N or $(N-1)."))
 end
 
 
