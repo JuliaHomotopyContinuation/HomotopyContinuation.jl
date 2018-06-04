@@ -28,6 +28,15 @@ end
     @test nfinite(solve(F, endgame_start=0.0, threading=false)) == 32
 end
 
+@testset "Singular solutions" begin
+    @polyvar x y z
+    z = 1
+    F = [x^2 + 2*y^2 + 2*im*y*z, (18 + 3*im)*x*y + 7*im*y^2 - (3 - 18*im)*x*z - 14*y*z - 7*im*z^2]
+    result = solve(F)
+    @test nsingular(result) == 3
+    @test all(r -> r.windingnumber == 3, singular(result))
+end
+
 @testset "Path Crossing" begin
     srand(123)
     n = 10_000
