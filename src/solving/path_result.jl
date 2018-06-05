@@ -21,14 +21,14 @@ end
 
 
 """
-    PathResult(startvalue, pathtracker_result, endgame_result, solver)
+    PathResult(startvalue, pathtracker_result, endgamer_result, solver)
 
 Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
-[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgame_result`
-is the [`Result`](@ref) resulting from the corresponding endgame.
+[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
+is the [`EndgamerResult`](@ref) resulting from the corresponding endgame.
 
 A `PathResult` contains:
-* `returncode`: One of `:success`, `:at_infinity` or any error code from the `Result`
+* `returncode`: One of `:success`, `:at_infinity` or any error code from the `EndgamerResult`
 * `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space
 and the solution is at infinity then the projective solution is given. Otherwise
 an affine solution is given if the startvalue was affine and a projective solution
@@ -41,9 +41,9 @@ is given if the startvalue was projective.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
 * `startvalue`: The startvalue of the path
 * `iterations`: The number of iterations the pathtracker needed.
-* `endgame_iterations`: The number of steps in the geometric series the endgame did.
-* `npredictions`: The number of predictions the endgame did.
-* `predictions`: The predictions of the endgame.
+* `endgame_iterations`: The number of steps in the geometric series the endgamer did.
+* `npredictions`: The number of predictions the endgamer did.
+* `predictions`: The predictions of the endgamer.
 """
 struct PathResult{T1, T2, T3}
     returncode::Symbol
@@ -69,7 +69,7 @@ function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache
 end
 function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     returncode, returncode_detail = makereturncode(r.returncode)
-    x = raw(r.x)
+    x = raw(align_axis!(copy(r.x)))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(cache.v)
 
@@ -93,13 +93,16 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
+    if res > 0.1 && r.t == t₀ && returncode == :success
+        returncode = :at_infinity
+    end
 
     returncode, returncode_detail = makereturncode(returncode)
 
     intermediate_sol = ProjectiveVectors.affine(x_e)
 
     if returncode != :success
-        solution = raw(r.x)
+        solution = copy(raw(r.x))
         condition = 0.0
     else
         solution = ProjectiveVectors.affine(r.x)
@@ -128,7 +131,31 @@ function switch_to_affine!(x::ProjectiveVectors.PVector, returncode, windingnumb
     x
 end
 
-windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
+"""
+    align_axis!(x)
+
+Multiplies `x` with a complex number of norm 1 such that the largest
+entry is real.
+"""
+function align_axis!(x)
+    maxval = abs2(x[1])
+    maxind = 1
+    for i=2:length(x)
+        val = abs2(x[i])
+        if val > maxval
+            maxval = val
+            maxind = i
+        end
+    end
+
+    v = conj(x[maxind]) / sqrt(maxval)
+    for i=1:length(x)
+        x[i] *= v
+    end
+    x
+end
+
+windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
