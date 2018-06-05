@@ -92,9 +92,6 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
-    if res > 0.1 && r.t == t₀ && returncode == :success
-        returncode = :at_infinity
-    end
 
     returncode, returncode_detail = makereturncode(returncode)
 

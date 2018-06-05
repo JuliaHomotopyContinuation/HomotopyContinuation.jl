@@ -1,27 +1,13 @@
-"""
-    Options(;options)
+export Endgamer, EndgamerResult
 
-## Options
-* `sampling_factor=0.3`
-* `tol=1e-12`
-* `minradius=1e-20`
-* `maxnorm=1e6`
-"""
 struct Options
+    # See Endgamer docstring for explanations
     sampling_factor::Float64
     tol::Float64
     minradius::Float64
     maxnorm::Float64
     maxwindingnumber::Float64
     max_extrapolation_samples::Int
-    truncate_infinity::Bool
-end
-
-function Options(;sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5,
-        maxwindingnumber=12, max_extrapolation_samples=4,
-        truncate_infinity=true)
-    Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber,
-        max_extrapolation_samples, truncate_infinity)
 end
 
 mutable struct State{V<:ProjectiveVectors.AbstractProjectiveVector, C, T}
@@ -125,8 +111,23 @@ function Cache(state::State, options::Options)
 end
 
 """
-    Endgamer(endgame, pathtracker, R₀=0.1, options=EndgameOptions())
+    Endgamer(H, x; options...)
 
+Construct an `Endgamer` to run the endgame for paths of the type of `x` and the homotopy
+`H`.
+
+## Options
+* `sampling_factor=0.5` During the endgame we approach ``0`` by the geometric series ``h^kR₀``
+where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runendgame`.
+* `tol=1e-10` This is the tolerance necessary to declare the endgame converged.
+* `minradius=1e-15` A path is declared false if the endgame didn't finished until then.
+* `maxnorm=1e5` If our original problem is affine we declare a path at infinity if the infinity norm
+with respect to the standard patch is larger than `maxnorm`.
+* `maxwindingnumber=12` The maximal windingnumber we try to find using Cauchys integral formula.
+* `max_extrapolation_samples=4` During the endgame a Richardson extrapolation is used to improve the accuracy
+of certain approximations. This is the maximal number of samples used for this.
+* `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
+to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
 struct Endgamer{P<:PathTracking.PathTracker, V}
     tracker::P
@@ -135,12 +136,17 @@ struct Endgamer{P<:PathTracking.PathTracker, V}
     options::Options
 end
 
-function Endgamer(tracker::PathTracking.PathTracker, R₀=0.1; options::Options=Options())
-    x = PathTracking.currx(tracker)
-    state = State(x, R₀, options)
+function Endgamer(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
+    sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=12,
+    max_extrapolation_samples=4, patch=nothing, pathtrackerkwargs...)
+
+    options = Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
+    H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
+    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
+    state = State(x, complex(0.1,0.0), options)
+
     Endgamer(tracker, state, Cache(state, options), options)
 end
-
 
 """
     EndgamerResult(endgamer)
@@ -148,6 +154,9 @@ end
 ## Fields
 * `returncode::Symbol`
 * `x::Vector{T}`: The solution or last prediction.
+* `t::Float64`: The point in time corresponding to `x`.
+* `res::Float64`: The residual of the homotopy at `x` and `t`.
+* `windingnumber::Int`: The windingnumber estimated by the endgame. It can be 0 if no estimation happened.
 * `npredictions`: The number of predictions.
 * `iters`: The number of iterations.
 """

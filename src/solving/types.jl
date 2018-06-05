@@ -41,11 +41,11 @@ end
 function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
+    x = Problems.embed(prob, x₁)
 
-    tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
-    endgametracker = endgamepathtracker(prob, x₁, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(endgametracker, 1.0+0im)
-    switcher = patchswitcher(prob, x₁, t₀; kwargs...)
+    tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
+    endgamer = Endgame.Endgamer(prob.homotopy, x; kwargs...)
+    switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)
     Solver(prob,
@@ -57,24 +57,14 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         cache)
 end
 
-function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(),
+function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(),
     endgame_predictor=nothing, kwargs...)
-    x = Problems.embed(prob, x₁)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
 
-function endgamepathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀;
-    patch=nothing, kwargs...)
-    x = Problems.embed(prob, x₁)
-    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(AffinePatches.FixedPatch(), x))
-    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
-end
-
-function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), endgame_predictor=nothing,
-    kwargs...)
-    x = Problems.embed(prob, x₁)
-    p₁ = AffinePatches.state(patch, x)
+function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
+    p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
     p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
     PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)
 end

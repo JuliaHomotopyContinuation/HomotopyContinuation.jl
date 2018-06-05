@@ -1,5 +1,8 @@
 module Endgame
 
+import ..AffinePatches
+import ..Homotopies
+import ..Problems
 import ..PathTracking
 import ..ProjectiveVectors
 using ..Utilities
