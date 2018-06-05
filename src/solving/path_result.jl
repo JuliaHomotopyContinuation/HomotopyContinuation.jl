@@ -93,9 +93,6 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
-    if res > 0.1 && r.t == t₀ && returncode == :success
-        returncode = :at_infinity
-    end
 
     returncode, returncode_detail = makereturncode(returncode)
 
@@ -122,7 +119,7 @@ function makereturncode(retcode)
     end
 end
 
-function switch_to_affine!(x::ProjectiveVectors.PVector, returncode, windingnumber, patchswitcher)
+function switch_to_affine!(x::ProjectiveVectors.PVector{<:Complex, Int}, returncode, windingnumber, patchswitcher)
     if returncode == :success && windingnumber == 1 && abs2(x[x.homvar]) < 1.0
         PatchSwitching.switch!(x, patchswitcher)
     elseif returncode != :at_infinity

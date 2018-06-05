@@ -21,12 +21,12 @@ function precondition!(state::EmbeddingPatchState, x::AbstractProjectiveVector)
     ProjectiveVectors.affine!(x)
 end
 
-function evaluate!(u, state::EmbeddingPatchState, x::PVector)
+function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, Int}) where {T}
     u[end] = x[ProjectiveVectors.homvar(x)] - one(eltype(x))
     nothing
 end
 
-function jacobian!(U, state::EmbeddingPatchState, x::PVector)
+function jacobian!(U, state::EmbeddingPatchState, x::PVector{T, Int}) where {T}
     i = ProjectiveVectors.homvar(x)
     for j=1:size(U, 2)
         U[end, j] = j == i ? one(eltype(x)) : zero(eltype(x))
