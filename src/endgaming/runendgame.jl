@@ -224,7 +224,7 @@ end
 
 
 function tracktoend!(state, tracker)
-    retcode = PathTracking.track!(tracker, state.samples[state.nsamples], state.R, 0.0, precondition=false)
+    retcode = PathTracking.track!(tracker, state.x, state.R, 0.0, precondition=false)
     if retcode == :success
         state.R = 0.0
         state.pbest .= PathTracking.currx(tracker)
