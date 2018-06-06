@@ -14,7 +14,6 @@ mutable struct Options
     refinement_tol::Float64
     refinement_maxiters::Int
     maxiters::Int
-    update_homotopies::Bool
 end
 
 mutable struct State{T, S<:StepLength.AbstractStepLengthState}
@@ -112,8 +111,7 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
     refinement_tol=1e-11,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
-    maxiters=10_000,
-    update_homotopies=true)
+    maxiters=10_000)
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
@@ -123,10 +121,15 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     state = State(H, steplength, x, t₁, t₀)
     cache = Cache(H, predictor_corrector, state, x)
-    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters, update_homotopies)
+    options = Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters)
 
     PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
 end
+
+const PATH_TRACKER_KWARGS = [:corrector, :predictor, :steplength,
+    :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
+    :maxiters]
+
 
 """
      PathTrackerResult(tracker)
