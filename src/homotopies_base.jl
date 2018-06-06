@@ -4,6 +4,7 @@ import ..SystemsBase: AbstractSystem, AbstractSystemCache
 
 export AbstractHomotopy,
     AbstractHomotopyCache,
+    NullCache,
     nvariables,
     cache,
     evaluate!,
@@ -34,12 +35,23 @@ A cache to avoid allocations for the evaluation of an [`AbstractHomotopy`](@ref)
 abstract type AbstractHomotopyCache end
 
 """
+    NullCache
+
+The default `AbstractHomotopyCache` containing nothing.
+"""
+struct NullCache <: AbstractHomotopyCache end
+
+"""
     cache(H::AbstractHomotopy, x, t)
 
 Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
 of `x`.
 """
 function cache end
+cache(H, x, t) = NullCache()
+
+
+
 
 
 # Homotopy API
@@ -59,6 +71,11 @@ function evaluate! end
 Evaluate the homotopy `H` at `(x, t)`.
 """
 evaluate(H::AbstractHomotopy, x, t) = evaluate(H, x, t, cache(H, x, t))
+function evaluate(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
+    u = fill(zero(eltype(x)), size(H)[1])
+    evaluate!(u, H, x, t, cache)
+    u
+end
 
 """
     dt!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -73,6 +90,11 @@ function dt! end
 Evaluate the homotopy `H` at `(x, t)`.
 """
 dt(H::AbstractHomotopy, x, t) = dt(H, x, t, cache(H, x, t))
+function dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
+    u = fill(zero(eltype(x)), size(H)[1])
+    dt!(u, H, x, t, cache)
+    u
+end
 
 """
     jacobian!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -86,9 +108,12 @@ function jacobian! end
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)`.
 """
-function jacobian end
 jacobian(H::AbstractHomotopy, x, t) = jacobian(H, x, t, cache(H, x, t))
-
+function jacobian(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
+    U = fill(zero(eltype(x)), size(H))
+    jacobian!(U, H, x, t, cache)
+    U
+end
 
 # Optional
 """
