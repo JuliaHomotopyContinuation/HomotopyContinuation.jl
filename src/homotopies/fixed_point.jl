@@ -53,35 +53,16 @@ function evaluate!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
 
     u
 end
-function evaluate(H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    F = Systems.evaluate(H.F, x, c.F)
-    (γ(H) * t) * (x - H.x₀) + (1 - t) * F
-end
 (H::FixedPointHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 function dt!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     Systems.evaluate!(u, H.F, x, c.F)
     u .= γ(H) .* (x .- H.x₀) .- u
-
     u
-end
-function dt(H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    F = Systems.evaluate(H.F, x, c.F)
-    γ(H) .* (x .- H.x₀) .- F
 end
 
 function jacobian!(U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     Systems.jacobian!(U, H.F, x, c.F)
-
-    U .= (1 - t) .* U
-    γt = γ(H) * t
-    for i=1:length(x)
-        U[i, i] += γt
-    end
-    U
-end
-function jacobian(H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    U = Systems.jacobian(H.F, x, c.F)
 
     U .= (1 - t) .* U
     γt = γ(H) * t

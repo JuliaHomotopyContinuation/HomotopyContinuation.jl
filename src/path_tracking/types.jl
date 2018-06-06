@@ -117,7 +117,9 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
-    x = similar(x₁, eltype(Homotopies.evaluate(H, x₁, t₁, Homotopies.cache(H, x₁, t₁))))
+    u = Vector{Any}(size(H)[1])
+    Homotopies.evaluate!(u, H, x₁, t₁, Homotopies.cache(H, x₁, t₁))
+    x = similar(x₁, typeof(u[1]))
 
     state = State(H, steplength, x, t₁, t₀)
     cache = Cache(H, predictor_corrector, state, x)

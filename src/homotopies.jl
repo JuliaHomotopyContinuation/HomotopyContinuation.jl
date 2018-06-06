@@ -2,6 +2,7 @@ module Homotopies
 
 import ..HomotopiesBase: AbstractHomotopy,
     AbstractHomotopyCache,
+    NullCache,
     nvariables,
     cache,
     evaluate!, evaluate,
@@ -17,6 +18,7 @@ import ..Utilities: randomish_gamma
 
 export AbstractHomotopy,
     AbstractHomotopyCache,
+    NullCache,
     nvariables,
     cache,
     evaluate!, evaluate,
