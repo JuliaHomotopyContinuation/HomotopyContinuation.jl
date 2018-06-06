@@ -23,7 +23,7 @@ Start the given endgame to run from `x` at `t` towards `t=0`.
 
 ## Math / Algorithm
 
-The Endgame uses an mix out of the Cauchy endgame and the power series endgame.
+The Endgame is a hybrid of the Cauchy endgame and the power series endgame.
 
 ### Power series representation
 Each path ``x(t)`` has an asymptotic expansion as a fractional power series
