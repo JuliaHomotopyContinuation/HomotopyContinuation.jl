@@ -19,7 +19,7 @@ end
 function runendgame(endgamer, x, R)
     setup!(endgamer, x, R)
     runendgame!(endgamer)
-    EndgamerResult(endgamer)
+    Result(endgamer)
 end
 
 function runendgame!(endgamer)

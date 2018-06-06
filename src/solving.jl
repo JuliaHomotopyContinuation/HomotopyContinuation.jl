@@ -9,7 +9,7 @@ import ProgressMeter
 import Juno
 
 import ..AffinePatches
-import ..Endgame
+import ..Endgaming
 import ..Homotopies
 import ..PathTracking
 import ..Parallel

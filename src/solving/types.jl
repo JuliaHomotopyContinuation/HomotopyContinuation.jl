@@ -15,7 +15,7 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgame.Endgamer, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
+        E<:Endgaming.Endgame, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
     prob::P
     tracker::T
     endgamer::E
@@ -44,7 +44,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     x = Problems.embed(prob, x₁)
 
     tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(prob.homotopy, x; kwargs...)
+    endgamer = Endgaming.Endgame(prob.homotopy, x; kwargs...)
     switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)

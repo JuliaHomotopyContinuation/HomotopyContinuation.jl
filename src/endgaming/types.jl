@@ -1,7 +1,7 @@
-export Endgamer, EndgamerResult
+export Endgame, Result
 
 struct Options
-    # See Endgamer docstring for explanations
+    # See Endgame docstring for explanations
     sampling_factor::Float64
     tol::Float64
     minradius::Float64
@@ -111,9 +111,9 @@ function Cache(state::State, options::Options)
 end
 
 """
-    Endgamer(H, x; options...)
+    Endgame(H, x; options...)
 
-Construct an `Endgamer` to run the endgame for paths of the type of `x` and the homotopy
+Construct an `Endgame` to run the endgame for paths of the type of `x` and the homotopy
 `H`.
 
 ## Options
@@ -129,14 +129,14 @@ of certain approximations. This is the maximal number of samples used for this.
 * `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
-struct Endgamer{P<:PathTracking.PathTracker, V}
+struct Endgame{P<:PathTracking.PathTracker, V}
     tracker::P
     state::State{V}
     cache::Cache
     options::Options
 end
 
-function Endgamer(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
+function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
     sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=12,
     max_extrapolation_samples=4, patch=nothing, pathtrackerkwargs...)
 
@@ -145,11 +145,11 @@ function Endgamer(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractP
     tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
     state = State(x, complex(0.1,0.0), options)
 
-    Endgamer(tracker, state, Cache(state, options), options)
+    Endgame(tracker, state, Cache(state, options), options)
 end
 
 """
-    EndgamerResult(endgamer)
+    Result(endgamer)
 
 ## Fields
 * `returncode::Symbol`
@@ -160,7 +160,7 @@ end
 * `npredictions`: The number of predictions.
 * `iters`: The number of iterations.
 """
-struct EndgamerResult{V}
+struct Result{V}
     returncode::Symbol
     x::V
     t::Float64
@@ -170,7 +170,7 @@ struct EndgamerResult{V}
     iters::Int
 end
 
-function EndgamerResult(endgamer::Endgamer)
+function Result(endgamer::Endgame)
     state = endgamer.state
 
     if state.npredictions == 0 || state.status == :at_infinity
@@ -178,6 +178,6 @@ function EndgamerResult(endgamer::Endgamer)
     else
         x = copy(state.pbest)
     end
-    EndgamerResult(state.status, x, real(state.R), state.pbest_delta,
+    Result(state.status, x, real(state.R), state.pbest_delta,
         state.windingnumber, state.npredictions, state.iters)
 end

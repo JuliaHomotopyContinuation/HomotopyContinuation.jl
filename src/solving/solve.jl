@@ -99,20 +99,20 @@ function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
     x₁, r = start_solutions[k], endgame_zone_results[k]
     if r.returncode == :success
         # Run endgame
-        result = Endgame.runendgame(solver.endgamer, r.x, t_endgame)
+        result = Endgaming.runendgame(solver.endgamer, r.x, t_endgame)
         # If the tracker failed we are probably to late with the endgame.
         if result.returncode == :tracker_failed
             # Rerun with something more away
             new_t = 0.3*(t₁ - t_endgame)
             pr = trackpath(solver::Solver, x₁, t₁, new_t)
             if pr.returncode == :success
-                result = Endgame.runendgame(solver.endgamer, pr.x, new_t)
+                result = Endgaming.runendgame(solver.endgamer, pr.x, new_t)
             end
         end
         return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
     else
         # If we even didn't come to the endgame zone we start earlier.
-        result = Endgame.runendgame(solver.endgamer, Problems.embed(solver.prob, x₁), 1.0)
+        result = Endgaming.runendgame(solver.endgamer, Problems.embed(solver.prob, x₁), 1.0)
         if result.returncode == :success || result.returncode == :at_infinity
             return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
         else

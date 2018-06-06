@@ -7,7 +7,7 @@ module HomotopyContinuation
 
     export AffinePatches,
         Correctors,
-        Endgame,
+        Endgaming,
         Homotopies,
         PatchSwitching,
         PathTracking,
@@ -36,7 +36,7 @@ module HomotopyContinuation
     include("step_length.jl")
 
     include("path_tracking.jl")
-    include("endgame.jl")
+    include("endgaming.jl")
 
     include("patch_switching.jl")
 

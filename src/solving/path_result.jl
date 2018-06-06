@@ -25,10 +25,10 @@ end
 
 Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
 [`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
-is the [`EndgamerResult`](@ref) resulting from the corresponding endgame.
+is the [`Result`](@ref) resulting from the corresponding endgame.
 
 A `PathResult` contains:
-* `returncode`: One of `:success`, `:at_infinity` or any error code from the `EndgamerResult`
+* `returncode`: One of `:success`, `:at_infinity` or any error code from the `Result`
 * `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space
 and the solution is at infinity then the projective solution is given. Otherwise
 an affine solution is given if the startvalue was affine and a projective solution
@@ -127,7 +127,7 @@ function switch_to_affine!(x::ProjectiveVectors.PVector, returncode, windingnumb
     x
 end
 
-windingnumber_npredictions(r::Endgame.EndgamerResult) = (r.windingnumber, r.npredictions)
+windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
