@@ -1,3 +1,26 @@
+"""
+    update_directions!(state, options, cache)
+
+### Math
+Each path ``x(t)`` has an asymptotic expansion as a fractional power series
+```math
+xᵢ(t) = a t^{\\frac{wᵢ}{m}} (1 + ∑_{j≥1} aᵢⱼt^{\\frac{j}{m}})
+```
+We want to approximate the ratio ``wᵢ/m``. If ``wᵢ/m > 0`` we have that ``xᵢ(t)`` goes to
+``0`` and if ``wᵢ/m < 0`` we have that ``xᵢ(t)`` goes to ``∞``.
+Since we have `t^{(k)}=h^kR₀` in the endgame we can approximate it by computing
+```julia
+\\log(x(t^{(k)})) - \\log(x(t^{(k-1)})) ≈ wᵢ/m \\log(h) + \\mathcal{O}(h^{1/m})
+```
+See [^1] for some more details.
+
+
+This function approximates ``wᵢ/m`` using Richardson extrapolation and stores them in
+`state.directions`.
+
+
+[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+"""
 function update_directions!(state, options, cache)
     h, logh = options.sampling_factor, cache.log_sampling_factor
     S = state.logabs_samples

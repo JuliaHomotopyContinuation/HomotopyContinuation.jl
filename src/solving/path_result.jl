@@ -21,10 +21,10 @@ end
 
 
 """
-    PathResult(startvalue, pathtracker_result, endgamer_result, solver)
+    PathResult(startvalue, pathtracker_result, endgame_result, solver)
 
 Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
-[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
+[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgame_result`
 is the [`Result`](@ref) resulting from the corresponding endgame.
 
 A `PathResult` contains:
@@ -41,9 +41,9 @@ is given if the startvalue was projective.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
 * `startvalue`: The startvalue of the path
 * `iterations`: The number of iterations the pathtracker needed.
-* `endgame_iterations`: The number of steps in the geometric series the endgamer did.
-* `npredictions`: The number of predictions the endgamer did.
-* `predictions`: The predictions of the endgamer.
+* `endgame_iterations`: The number of steps in the geometric series the endgame did.
+* `npredictions`: The number of predictions the endgame did.
+* `predictions`: The predictions of the endgame.
 """
 struct PathResult{T1, T2, T3}
     returncode::Symbol

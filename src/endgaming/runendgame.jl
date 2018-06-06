@@ -1,46 +1,81 @@
 import ..ProjectiveVectors
 import ..Homotopies
 
-function setup!(endgamer, x, R)
-    PathTracking.setup!(endgamer.tracker, x, R, 0.0im)
-    reset!(endgamer.state, x, R)
+function setup!(endgame, x, R)
+    PathTracking.setup!(endgame.tracker, x, R, 0.0im)
+    reset!(endgame.state, x, R)
 
     # The endgame fails if we already have a solution. Hence we check it now.
-    r = PathTracking.residual(endgamer.tracker, x, 0.0)
-    if abs(r) < endgamer.options.tol
-        endgamer.state.pbest .= x
-        endgamer.state.pbest_delta = r
-        endgamer.state.status = :success
-        endgamer.state.R = 0.0im
+    r = PathTracking.residual(endgame.tracker, x, 0.0)
+    if abs(r) < endgame.options.tol
+        endgame.state.pbest .= x
+        endgame.state.pbest_delta = r
+        endgame.state.status = :success
+        endgame.state.R = 0.0im
     end
     nothing
 end
 
-function runendgame(endgamer, x, R)
-    setup!(endgamer, x, R)
-    runendgame!(endgamer)
-    Result(endgamer)
+"""
+    runendgame(endgame, x, t)
+
+Start the given endgame to run from `x` at `t` towards `t=0`.
+
+## Math / Algorithm
+
+The Endgame uses an mix out of the Cauchy endgame and the power series endgame.
+
+### Power series representation
+Each path ``x(t)`` has an asymptotic expansion as a fractional power series
+```math
+xᵢ(t) = a t^{\\frac{wᵢ}{m}} (1 + ∑_{j≥1} aᵢⱼt^{\\frac{j}{m}})
+```
+We want to approximate the ratio ``wᵢ/m``. If ``wᵢ/m > 0`` we have that ``xᵢ(t)`` goes to
+``0`` and if ``wᵢ/m < 0`` we have that ``xᵢ(t)`` goes to ``∞``.
+Since we have `t^{(k)}=h^kR₀` in the endgame we can approximate it by computing
+```julia
+\\log(x(t^{(k)})) - \\log(x(t^{(k-1)})) ≈ wᵢ/m \\log(h) + \\mathcal{O}(h^{1/m})
+```
+See [^1] for some more details.
+
+
+### Cauchy
+
+The main idea is to use [Cauchy's integral formula](https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula)
+to predict the solution of the path ``x(t)``, i.e. ``x(0)``.
+At each iteration we are at some point ``(x, t)``. We then track the polygon defined
+by ``te^{i2πk/n}`` until we end again at ``x``. Here ``n`` is the number of samples we take
+per loop. See [^2] for some more details.
+
+
+[^1]: Huber, Birkett, and Jan Verschelde. "Polyhedral end games for polynomial continuation." Numerical Algorithms 18.1 (1998): 91-108.
+[^2]: Bates, Daniel J., Jonathan D. Hauenstein, and Andrew J. Sommese. "A Parallel Endgame." Contemp. Math 556 (2011): 25-35.
+"""
+function runendgame(endgame, x, R)
+    setup!(endgame, x, R)
+    runendgame!(endgame)
+    Result(endgame)
 end
 
-function runendgame!(endgamer)
-    state, tracker, options, cache = endgamer.state, endgamer.tracker, endgamer.options, endgamer.cache
+function runendgame!(endgame)
+    state, tracker, options, cache = endgame.state, endgame.tracker, endgame.options, endgame.cache
     while state.status == :ok
         nextsample!(tracker, state, options)
         update_derived_from_samples!(state, options, cache)
         if in_endgame_zone!(state)
             predict_infinity_check!(state, tracker, options, cache)
         end
-        checkterminate!(state, endgamer.options)
+        checkterminate!(state, endgame.options)
     end
 
-    endgamer
+    endgame
 end
 
 
 """
-    nextsample!(endgamer)
+    nextsample!(endgame)
 
-Obtain a new sample on the geometric series and add it to `endgamer`.
+Obtain a new sample on the geometric series and add it to `endgame`.
 """
 function nextsample!(tracker::PathTracking.PathTracker, state, options)
     state.iters += 1
@@ -73,20 +108,16 @@ function update_derived_from_samples!(state, options, cache)
 end
 
 function in_endgame_zone!(state)
-    if state.in_endgame_zone
-        return true
-    end
+    n, dirs = state.nsamples, state.directions
+
+    state.in_endgame_zone && return true
 
     if state.R < 1e-8
         state.in_endgame_zone = true
         return true
     end
 
-    n, dirs = state.nsamples, state.directions
-
-    if n < 5
-        return false
-    end
+    n < 5 && return false
 
     for i=1:length(state.x)
         di_n = dirs[i, n]
@@ -130,14 +161,15 @@ end
 
 checkatinfinity(state, options) = checkatinfinity(state, options, state.x)
 function checkatinfinity(state, options, x::ProjectiveVectors.PVector)
+    # TODO: This should probably be customizable
     LOOKBACK = 1
     TOL = 1e-3
     MIN_LOGABS = -4.605170185988091 # = log(0.01)
+    MIN_AT_INFINITY_RATIO = 0.032
 
     i₀ = ProjectiveVectors.homvar(x)
     n = state.nsamples
     dirs = state.directions
-
 
     # We want the homogenization variable to be at least somewhat small
     if state.R > 1e-8 && state.logabs_samples[i₀, n] > MIN_LOGABS
@@ -146,7 +178,7 @@ function checkatinfinity(state, options, x::ProjectiveVectors.PVector)
     for i=1:length(x)
         i == i₀ && continue
         di_n = dirs[i, n] - dirs[i₀, n]
-        di_n > -0.032 && continue
+        di_n > -MIN_AT_INFINITY_RATIO && continue
         # Okay the current direction is negative now we check whether we
         # have at least some stability
         k = n - 1
@@ -165,7 +197,6 @@ function checkatinfinity(state, options, x::ProjectiveVectors.PVector)
 end
 
 function predict_infinity_check!(state, tracker, options, cache)
-    # @show state.path_type
 
     path_type = analyze_finite_atinfinity(state, options, cache)
     if path_type == :finite
@@ -211,7 +242,7 @@ end
 
 
 """
-    checkterminate!(endgamer)
+    checkterminate!(endgame)
 
 Try to check whether the endgame is converged.
 """

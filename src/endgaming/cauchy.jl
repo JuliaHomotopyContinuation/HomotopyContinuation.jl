@@ -27,8 +27,7 @@ prediction of `x(0)`.
 """
 function determine_windingnumber!(state, tracker, options, cache)
     samples_per_loop = 4
-    tol = 1e-3
-    MAX_C = 15
+    tol = options.cauchy_loop_closed_tolerance
     unitroots = setup_unitroots!(cache, samples_per_loop)
     x = state.x
     xk1 = cache.xbuffer .= x
@@ -39,7 +38,7 @@ function determine_windingnumber!(state, tracker, options, cache)
     k = c = 1
     # we try to approximate the maximum size of the loop to normalize our error
     dmax = 0.0
-    while c ≤ MAX_C
+    while c ≤ options.maxwindingnumber
         k += 1
         θk = R * unitroots[(k - 1) % samples_per_loop + 1]
         # We go around the unit circle in an `n`-gon
@@ -72,14 +71,17 @@ end
 """
     predict_cif!(state, tracker, options, cache)
 
-Try to predict the value of `x(0)` using cauchys integral formula.
+Try to predict the value of `x(0)` using [Cauchy's integral formula](https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula)
+At each iteration we are at some point ``(x, t)``. We then track the polygon defined
+by ``te^{i2πk/n}`` until we end again at ``x``. Here ``n`` is the number of samples we take
+per loop.
 This assumes that the correct windingnumber was determined previously.
 Returns a symbol indicating whether the prdiction was successfull.
 """
 function predict_cif!(state, tracker, options, cache)
     state.windingnumber ≠ 0 || return :windingnumber_0
 
-    samples_per_loop = 4
+    samples_per_loop = options.cauchy_samples_per_loop
     R = state.R
     θk = θk1 = complex(R, 0.0)
     unitroots = setup_unitroots!(cache, samples_per_loop)

@@ -18,7 +18,7 @@ struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
         E<:Endgaming.Endgame, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
     prob::P
     tracker::T
-    endgamer::E
+    endgame::E
     patchswitcher::PS
     t₁::Float64
     t₀::Float64
@@ -44,13 +44,13 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     x = Problems.embed(prob, x₁)
 
     tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
-    endgamer = Endgaming.Endgame(prob.homotopy, x; kwargs...)
+    endgame = Endgaming.Endgame(prob.homotopy, x; kwargs...)
     switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)
     Solver(prob,
         tracker,
-        endgamer,
+        endgame,
         switcher,
         t₁, t₀,
         options,

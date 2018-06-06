@@ -8,6 +8,8 @@ struct Options
     maxnorm::Float64
     maxwindingnumber::Float64
     max_extrapolation_samples::Int
+    cauchy_loop_closed_tolerance::Float64
+    cauchy_samples_per_loop::Int
 end
 
 mutable struct State{V<:ProjectiveVectors.AbstractProjectiveVector, C, T}
@@ -123,9 +125,14 @@ where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runen
 * `minradius=1e-15` A path is declared false if the endgame didn't finished until then.
 * `maxnorm=1e5` If our original problem is affine we declare a path at infinity if the infinity norm
 with respect to the standard patch is larger than `maxnorm`.
-* `maxwindingnumber=12` The maximal windingnumber we try to find using Cauchys integral formula.
+* `maxwindingnumber=15` The maximal windingnumber we try to find using Cauchys integral formula.
 * `max_extrapolation_samples=4` During the endgame a Richardson extrapolation is used to improve the accuracy
 of certain approximations. This is the maximal number of samples used for this.
+* `cauchy_loop_closed_tolerance=1e-3` The tolerance for which is used to determine whether a loop is closed.
+The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.
+* `cauchy_samples_per_loop=6` The number of samples used to predict an endpoint. A higher number of samples should result
+in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop
+and ``n`` is `cauchy_samples_per_loop`.
 * `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
@@ -137,10 +144,14 @@ struct Endgame{P<:PathTracking.PathTracker, V}
 end
 
 function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
-    sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=12,
-    max_extrapolation_samples=4, patch=nothing, pathtrackerkwargs...)
+    sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=15,
+    max_extrapolation_samples=4,
+    cauchy_loop_closed_tolerance=1e-3, cauchy_samples_per_loop=6,
+    patch=nothing, pathtrackerkwargs...)
 
-    options = Options(sampling_factor, tol, minradius, maxnorm, maxwindingnumber, max_extrapolation_samples)
+    options = Options(sampling_factor, tol, minradius, maxnorm,
+        maxwindingnumber, max_extrapolation_samples,
+        cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
     H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
     tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
     state = State(x, complex(0.1,0.0), options)
@@ -149,7 +160,7 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
 end
 
 """
-    Result(endgamer)
+    Result(endgame)
 
 ## Fields
 * `returncode::Symbol`
@@ -170,8 +181,8 @@ struct Result{V}
     iters::Int
 end
 
-function Result(endgamer::Endgame)
-    state = endgamer.state
+function Result(endgame::Endgame)
+    state = endgame.state
 
     if state.npredictions == 0 || state.status == :at_infinity
         x = copy(state.x)
