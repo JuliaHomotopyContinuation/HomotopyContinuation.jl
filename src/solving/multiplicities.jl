@@ -1,93 +1,148 @@
 using ..Utilities
 
-## The structure for sorting the solutions is a binary search tree (BST).
-## First, we cluster the points by ordering them w.r.t the the absolute value of their first entry.
+## The structure for sorting the solutions is a k search tree.
+## First, we cluster the points by ordering them w.r.t. the the absolute value of their entries and w.r.t. the arguments of the entries.
 ## Then, we compare the points pairwise in each cluster.
-mutable struct BST
-    pos::Vector{Int}
-    left::Nullable{BST}
-    right::Nullable{BST}
+mutable struct SearchTree
+    node::Vector{Int}
+    left::Nullable{SearchTree}
+    right::Nullable{SearchTree}
 end
 
-function push_for_clustering!(node::BST, i, vectors, τ)
-    xᵢ, y = abs(vectors[i][1]), abs(vectors[node.pos[1]][1])
-    if abs(xᵢ - y) < τ
-        push!(node.pos, i)
-    elseif xᵢ < y
-        if isnull(node.left)
-            node.left = BST([i], Nullable{BST}(), Nullable{BST}())
-        else
-            push_for_clustering!(get(node.left), i, vectors, τ)
+SearchTree(i::Int) = SearchTree([i], Nullable{SearchTree}(), Nullable{SearchTree}())
+
+
+function cluster_by_norm!(current::SearchTree, i, vectors, nvars, τ)
+    added = false
+    j = 1
+    while !added && j ≤ nvars
+        Δ = abs(vectors[i][j]) - abs(vectors[current.node[1]][j])
+        if Δ < (- τ)
+            added = true
+            if isnull(current.left)
+                current.left = SearchTree(i)
+            else
+                cluster_by_norm!(get(current.left), i, vectors, nvars, τ)
+            end
+        elseif Δ > τ
+            added = true
+            if isnull(current.right)
+                current.right = SearchTree(i)
+            else
+                cluster_by_norm!(get(current.right), i, vectors, nvars, τ)
+            end
         end
+        j += 1
+    end
+
+    if !added
+        push!(current.node, i)
+    end
+end
+
+function cluster_by_angle!(current::SearchTree, i, vectors, nvars, τ)
+    added = false
+    j = 2
+    α = angle(vectors[i][1])
+    β = angle(vectors[current.node[1]][1])
+    while !added && j ≤ nvars
+        Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
+        if Δ < (- τ)
+            added = true
+            if isnull(current.left)
+                current.left = SearchTree(i)
+            else
+                cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
+            end
+        elseif Δ > τ
+            added = true
+            if isnull(current.right)
+                current.right = SearchTree(i)
+            else
+                cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+            end
+        end
+        j += 1
+    end
+
+    if !added
+        push!(current.node, i)
+    end
+end
+
+function push_for_identifying_multiplicities!(current::SearchTree, i, vectors, τ, distance::F) where {F<:Function}
+    # This compares with the distance function
+    if distance(vectors[i], vectors[current.node[1]]) < τ
+        push!(current.node, i)
     else
-        if isnull(node.right)
-            node.right = BST([i], Nullable{BST}(), Nullable{BST}())
+        if isnull(current.left)
+            current.left = SearchTree(i)
         else
-            push_for_clustering!(get(node.right), i, vectors, τ)
+            push_for_identifying_multiplicities!(get(current.left), i, vectors, τ)
         end
     end
 end
 
-function push_for_identifying_multiplicities!(node::BST, i, vectors, τ)
-    # This compares with the infinity_norm but avoids a temporary vector allocation
-    if infinity_norm(vectors[i], vectors[node.pos[1]]) < τ
-        push!(node.pos, i)
-    else
-        if isnull(node.left)
-            node.left = BST([i], Nullable{BST}(), Nullable{BST}())
-        else
-            push_for_identifying_multiplicities!(node.left.value, i, vectors, τ)
-        end
-    end
-end
 
-function Base.foreach(f::F, node::BST) where {F<:Function}
-    f(node.pos)
-    if !isnull(node.left)
-        foreach(f, get(node.left))
+function Base.foreach(f::F, t::SearchTree) where {F<:Function}
+    f(t.node)
+    if !isnull(t.left)
+        foreach(f, get(t.left))
     end
-    if !isnull(node.right)
-        foreach(f, get(node.right))
+    if !isnull(t.right)
+        foreach(f, get(t.right))
     end
+
     nothing
 end
 
-# Currently we do not need this since `foreach` is sufficient, but maybe its useful later
-#
-# Base.collect(node::BST) = collectpositions!(Vector{Int}[], node)
-# function collectpositions!(positions, node::BST)
-#     push!(positions, node.pos)
-#     if !isnull(node.left)
-#         collectpositions!(positions, get(node.left))
-#     end
-#     if !isnull(node.right)
-#         collectpositions!(positions, get(node.right))
-#     end
-#     positions
-# end
-#
 
 """
-    multiplicities(V, tol)
+    multiplicities(vectors, tol, distance)
 
-Returns an array of arrays of integers. Each array v in V contains all indices i,j such that V[i] and V[j] have distance at most tol.
+Returns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.
 """
-function multiplicities(V::Vector{Vector{T}}, tol) where {T<:Number}
-    root = BST([1], Nullable{BST}(), Nullable{BST}())
-    for i in 2:length(V)
-        push_for_clustering!(root, i, V, tol)
+function multiplicities(vectors::Vector{Vector{T}}, tol, distance::F) where {T<:Number, F<:Function}
+    nvars = length(vectors[1])
+    # root0 is for sorting by norm
+    n = length(vectors)
+    root0 = SearchTree(1)
+    for i in 2:n
+        cluster_by_norm!(root0, i, vectors, nvars, tol)
     end
 
-    mults = Vector{Int}[]
-    foreach(root) do m
-        clusterroot = BST([1], Nullable{BST}(), Nullable{BST}())
-        for i in 2:length(m)
-            push_for_identifying_multiplicities!(clusterroot, i, V[m], tol)
+    mults::Vector{Vector{Int}} = Vector{Vector{Int}}()
+    foreach(root0) do m0
+        if length(m0) == 1
+            return nothing
         end
-        foreach(clusterroot) do n
-            push!(mults, m[n])
+
+        #root1 is for sorting by argument.
+        root1 = SearchTree(m0[1])
+        for i in Iterators.drop(m0, 1)
+            cluster_by_angle!(root1, i, vectors, nvars, tol)
+        end
+
+        foreach(root1) do m1
+            if length(m1) == 1
+                return nothing
+            end
+
+            #root2 is for sorting by Fubini-Study distance
+            root2 = SearchTree(m1[1])
+            for i in Iterators.drop(m1, 1)
+                push_for_identifying_multiplicities!(root2, i, vectors, tol, distance)
+            end
+            foreach(root2) do m2
+                if length(m2) == 1
+                    return nothing
+                end
+
+                push!(mults, m2)
+                nothing
+            end
+            nothing
         end
     end
-
-    mults
+    mults::Vector{Vector{Int}}
 end

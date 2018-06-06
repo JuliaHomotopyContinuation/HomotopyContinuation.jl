@@ -38,18 +38,31 @@ end
 end
 
 @testset "Path Crossing" begin
-    srand(123)
-    n = 10_000
-    x = [rand(Complex128, 8) for _=1:n]
-    for y in x[1:20]
-        push!(x, y + (rand(Complex128, 8) .* 1e-9))
+    # This tests that we indeed detect path crossings
+    srand(2337)
+    F = equations(cyclic(6))
+    P = Problems.ProjectiveStartTargetProblem(Problems.TotalDegreeProblem(F))
+    start_sols = Utilities.totaldegree_solutions(F) |> collect
+    x₁ = Problems.embed(P, start_sols[1])
+    H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
+    tracker = PathTracking.PathTracker(H, x₁, 1.0, 0.1, tol=1e-3)
+    tracked_paths = map(start_sols) do x
+        PathTracking.track(tracker, Problems.embed(P, x), 1.0, 0.1)
     end
-    @test sort(Solving.check_crossed_paths(x, 1e-8)) == [collect(1:20); collect(n+1:n+20)]
 
-    F = equations(katsura(5))
-    # this will have two crossed paths
-    srand(120)
-    @test nfinite(solve(F, tol=1e-1, threading=true)) == 32
-    srand(120)
-    @test nfinite(solve(F, tol=1e-1, threading=false)) == 32
+    crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-2)
+    @test length(crossed_path_indices) > 0
+
+    tracker = PathTracking.PathTracker(H, x₁, 1.0, 0.1, tol=1e-8)
+    tracked_paths = map(start_sols) do x
+        PathTracking.track(tracker, Problems.embed(P, x), 1.0, 0.1)
+    end
+    crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-7)
+    @test isempty(crossed_path_indices)
+
+    # Test that we resolve path crossings
+    F = equations(cyclic(6))
+    # this will have three crossed paths
+    @test nfinite(solve(F, tol=1e-3, seed=2337, threading=false)) ≤ 156
+    @test nfinite(solve(F, tol=1e-3, seed=2337)) ≤ 156
 end

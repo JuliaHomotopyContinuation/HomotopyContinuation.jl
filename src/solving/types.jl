@@ -1,6 +1,5 @@
 struct SolverOptions
     endgame_start::Float64
-    pathcrossing_tol::Float64
     report_progress::Bool
 end
 
@@ -29,12 +28,11 @@ end
 
 function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     endgame_start=0.1,
-    pathcrossing_tol=1e-6,
     report_progress=true,
     kwargs...)
     !(t₀ ≤ endgame_start ≤ t₁) && throw(error("`endgame_start` has to be between `t₁` and`t₀`"))
 
-    options = SolverOptions(endgame_start, pathcrossing_tol, report_progress)
+    options = SolverOptions(endgame_start, report_progress)
     Solver(prob, start_solutions, t₁, t₀, options; kwargs...)
 end
 
