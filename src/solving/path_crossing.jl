@@ -10,9 +10,10 @@ and `indices` are the indices which could not be resolved.
 """
 function pathcrossing_check!(tracked_paths, solvers, start_solutions)
     t₁, t_endgame, _ = t₁_t_endgame_t₀(solvers)
-
+    original_tol = tol(solvers)
+    cross_tol = original_tol * 10
     # We start with a list of all indices where some crossing happened.
-    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
 
     ncrossedpaths = length(crossed_path_indices)
     # No paths crossed -> done :)
@@ -31,7 +32,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
         tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
     end
 
-    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
 
     if !isempty(crossed_path_indices)
         # Now we are trying it with less corrector steps and even smaller tol
@@ -42,7 +43,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
             x₁ = start_solutions[k]
             tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
         end
-        crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol(solvers))
+        crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
     end
 
     # No we reset the options
@@ -51,9 +52,6 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
     return (ncrossedpaths, crossed_path_indices)
 end
-
-cross_tol(solver::Solver) = solver.options.pathcrossing_tol
-cross_tol(solvers::Solvers) = cross_tol(solvers[1])
 
 tol(solver::Solver) = PathTracking.tol(solver.tracker)
 tol(solvers::Solvers) = tol(solvers[1])
@@ -83,25 +81,7 @@ This assumes that the paths were not tracked until t=0.
 """
 function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTracking.PathTrackerResult}
     V = map(p -> normalize(ProjectiveVectors.raw(p.x)), paths)
-    vcat(multiplicities(V, tol, (x,y) -> 1 - abs(dot(x,y)))...)
+    vcat(multiplicities(V, tol, fubini_study)...)
 end
-# function check_crossed_paths(V::Vector{Vector{T}}, tol) where {T<:Number}
-#     root = BST([1], Nullable{BST}(), Nullable{BST}())
-#     for i in 2:length(V)
-#         push_for_clustering!(root, i, V, tol)
-#     end
-#
-#     crossed = Int[]
-#     foreach(root) do m
-#         clusterroot = BST([1], Nullable{BST}(), Nullable{BST}())
-#         for i in 2:length(m)
-#             push_for_identifying_multiplicities!(clusterroot, i, V[m], tol)
-#         end
-#         foreach(clusterroot) do n
-#             if length(n) > 1
-#                 append!(crossed, m[n])
-#             end
-#         end
-#     end
-#     crossed
-# end
+
+fubini_study(x,y) = 1 - abs(dot(x,y))
