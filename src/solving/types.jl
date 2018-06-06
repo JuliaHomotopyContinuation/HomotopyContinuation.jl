@@ -15,10 +15,10 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgame.Endgamer, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
+        E<:Endgaming.Endgame, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
     prob::P
     tracker::T
-    endgamer::E
+    endgame::E
     patchswitcher::PS
     t₁::Float64
     t₀::Float64
@@ -41,37 +41,30 @@ end
 function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
+    x = Problems.embed(prob, x₁)
 
-    tracker = pathtracker(prob, x₁, t₁, t₀; kwargs...)
-    endgamer = Endgame.Endgamer(egpathtracker(prob, x₁, t₁, t₀; kwargs...), options.endgame_start)
-    switcher = patchswitcher(prob, x₁, t₀; kwargs...)
+    tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
+    endgame = Endgaming.Endgame(prob.homotopy, x; kwargs...)
+    switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)
     Solver(prob,
         tracker,
-        endgamer,
+        endgame,
         switcher,
         t₁, t₀,
         options,
         cache)
 end
 
-function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
-    x = Problems.embed(prob, x₁)
+function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(),
+    endgame_predictor=nothing, kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
-    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
+    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
 
-function egpathtracker(prob::Problems.ProjectiveStartTargetProblem, x₁, t₁, t₀; patch=nothing, kwargs...)
-    x = Problems.embed(prob, x₁)
-    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(AffinePatches.FixedPatch(), x))
-    PathTracking.PathTracker(H, x, t₁, t₀; kwargs...)
-end
-
-
-function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
-    x = Problems.embed(prob, x₁)
-    p₁ = AffinePatches.state(patch, x)
+function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
+    p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
     p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
     PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)
 end
