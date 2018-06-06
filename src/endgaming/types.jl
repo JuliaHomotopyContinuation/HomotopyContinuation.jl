@@ -159,6 +159,10 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
     Endgame(tracker, state, Cache(state, options), options)
 end
 
+const ENDGAME_KWARGS = [:sampling_factor, :tol, :minradius, :maxnorm,
+    :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
+    :cauchy_samples_per_loop]
+
 """
     Result(endgame)
 
