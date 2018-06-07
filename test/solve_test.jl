@@ -28,10 +28,6 @@ end
     @test nfinite(solve(F, endgame_start=0.0, threading=false)) == 32
 end
 
-@testset "solve - kwargs" begin
-    @test_throws ErrorException solve(equations(cyclic(5)), def=0.4, abc=23)
-end
-
 @testset "Singular solutions" begin
     @polyvar x y z
     z = 1

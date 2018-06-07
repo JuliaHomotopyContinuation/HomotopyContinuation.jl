@@ -1,7 +1,5 @@
 module Utilities
 
-using Compat
-
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
@@ -17,8 +15,7 @@ export allvariables,
     logabs,
     fastlog,
     batches,
-    randomish_gamma,
-    filterkwargs
+    randomish_gamma
 
 
 """
@@ -225,15 +222,6 @@ function randomish_gamma()
     cis(2π * theta)
 end
 
-"""
-    filterkwargs(kwargs, allowed_kwargs)
-
-Remove all keyword arguments out of `kwargs` where the keyword is not contained
-in `allowed_kwargs`.
-"""
-filterkwargs(kwargs, allowed_kwargs) = filter(kwargs) do kw
-    any(equalto(first(kw)), allowed_kwargs)
-end
 
 # Parallelization
 
