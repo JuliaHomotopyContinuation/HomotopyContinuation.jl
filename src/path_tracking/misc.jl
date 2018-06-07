@@ -5,7 +5,6 @@ export currt, currΔt,
     corrector_maxiters,
     refinement_tol,
     refinement_maxiters,
-    update_homotopies, update_homotopies!,
     set_tol!,
     set_corrector_maxiters!,
     set_refinement_tol!,
@@ -131,21 +130,4 @@ Set the current correction maxiters to `n`.
 function set_corrector_maxiters!(tracker::PathTracker, n)
      tracker.options.corrector_maxiters = n
      n
-end
-
-"""
-    update_homotopies(tracker::PathTracker)
-
-Returns whether the current tracker calls `Homotopies.update!` after a
-successfull update.
-"""
-update_homotopies(tracker::PathTracker) = tracker.options.update_homotopies
-
-"""
-    set_update_homotopies!(tracker::PathTracker, bool)
-
-Enable/disable the calls to `Homotopies.update!` after a successfull step.
-"""
-function set_update_homotopies!(tracker::PathTracker, bool)
-    tracker.options.update_homotopies = bool
 end
