@@ -56,6 +56,9 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         cache)
 end
 
+allowed_kwargs() = [:patch, PathTracking.allowed_kwargs...,
+    Endgaming.allowed_kwargs...]
+
 function check_kwargs(kwargs)
     invalids = invalid_kwargs(kwargs)
     if !isempty(invalids)
@@ -69,27 +72,26 @@ function check_kwargs(kwargs)
             first_el = false
         end
         msg *= "\nAllowed keywords are\n"
-        msg *= join(ALLOWED_KWARGS, ", ")
+        msg *= join(allowed_kwargs(), ", ")
         throw(ErrorException(msg))
     end
 end
 function invalid_kwargs(kwargs)
     invalids = []
+    allowed = allowed_kwargs()
     for kwarg in kwargs
         kw = first(kwarg)
-        if !any(equalto(kw), ALLOWED_KWARGS)
+        if !any(equalto(kw), allowed)
             push!(invalids, kwarg)
         end
     end
     invalids
 end
 
-const ALLOWED_KWARGS = [:patch, PathTracking.PATH_TRACKER_KWARGS..., Endgaming.ENDGAME_KWARGS...]
-
 function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
-    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀);
-        filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
+    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
+        # filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
 end
 
 function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
