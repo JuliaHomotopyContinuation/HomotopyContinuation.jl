@@ -15,7 +15,8 @@ export allvariables,
     logabs,
     fastlog,
     batches,
-    randomish_gamma
+    randomish_gamma,
+    filterkwargs
 
 
 """
@@ -222,6 +223,15 @@ function randomish_gamma()
     cis(2π * theta)
 end
 
+"""
+    filterkwargs(kwargs, allowed_kwargs)
+
+Remove all keyword arguments out of `kwargs` where the keyword is not contained
+in `allowed_kwargs`.
+"""
+function filterkwargs(kwargs, allowed_kwargs)
+    [kwarg for kwarg in kwargs if any(kw -> kw == first(kwarg), allowed_kwargs)]
+end
 
 # Parallelization
 
