@@ -1,6 +1,4 @@
-using HomotopyContinuation
 using HomotopyContinuation.ProjectiveVectors
-using Compat.Test
 
 @testset "ProjectiveVectors" begin
     x = rand(Complex{Float64}, 4)
@@ -33,30 +31,35 @@ using Compat.Test
     @test at_infinity(PVector([2.3 + 0.2im, 1e-5, 4], 2), 1e5) == true
     @test at_infinity(PVector([2.3 + 0.2im, 1e-4, 4], 2), 1e5) == false
 
-    x1 = PVector(rand(Complex{Float64}, 3), 2)
-    x2 = PVector(rand(Complex{Float64}, 7), 3)
-    z2 = ProdPVector([x1, x2])
-    @test affine(z2) == [affine(x1), affine(x2)]
+    z2 = PVector(x)
+    @test z2 isa PVector{<:Complex, Nothing}
+    @test_throws MethodError affine(z2)
+    @test affine(z2, 1) == affine(z)
 
-    @test length.(pvectors(z2)) == [3, 7]
-    @test homvar.(pvectors(z2)) == [2, 3]
-
-    @test at_infinity(z2, 1e5) == false
-    @test at_infinity(z2, 1e-1) == true
-    normalize!(z2)
-    all(v -> norm(v) ≈ 1.0, pvectors(z2))
-
-    infnorm = infinity_norm(z2)
-    affine!(z2)
-    @test sqrt(maximum(abs2, raw(z2))) ≈ infnorm
-    normalize!(z2)
-    @test infinity_norm(z2) ≈ infnorm
-
-    @test z2 == copy(z2)
-
-    @test abs(infinity_norm(z2, z2)) < 1e-14
-
-
-    converted = similar(ProdPVector([PVector(rand(Float64, 3), 2), PVector(rand(Float64, 7), 3)]), Complex{Float64})
-    @test converted isa ProdPVector{Complex{Float64}}
+    # x1 = PVector(rand(Complex{Float64}, 3), 2)
+    # x2 = PVector(rand(Complex{Float64}, 7), 3)
+    # z2 = ProdPVector([x1, x2])
+    # @test affine(z2) == [affine(x1), affine(x2)]
+    #
+    # @test length.(pvectors(z2)) == [3, 7]
+    # @test homvar.(pvectors(z2)) == [2, 3]
+    #
+    # @test at_infinity(z2, 1e5) == false
+    # @test at_infinity(z2, 1e-1) == true
+    # normalize!(z2)
+    # all(v -> norm(v) ≈ 1.0, pvectors(z2))
+    #
+    # infnorm = infinity_norm(z2)
+    # affine!(z2)
+    # @test sqrt(maximum(abs2, raw(z2))) ≈ infnorm
+    # normalize!(z2)
+    # @test infinity_norm(z2) ≈ infnorm
+    #
+    # @test z2 == copy(z2)
+    #
+    # @test abs(infinity_norm(z2, z2)) < 1e-14
+    #
+    #
+    # converted = similar(ProdPVector([PVector(rand(Float64, 3), 2), PVector(rand(Float64, 7), 3)]), Complex{Float64})
+    # @test converted isa ProdPVector{Complex{Float64}}
 end
