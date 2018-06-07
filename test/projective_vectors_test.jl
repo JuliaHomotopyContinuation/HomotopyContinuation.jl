@@ -24,6 +24,7 @@ using HomotopyContinuation.ProjectiveVectors
     inf_z = infinity_norm(z)
     affine!(z)
     @test unsafe_infinity_norm(z, z) ≈ 0.0
+    @test infinity_norm(z, z) ≈ 0.0 atol=1e-15
 
     @test at_infinity(z, 1e5) == false
     @test at_infinity(PVector([2, 1e-7, 4], 2), 1e5) == true

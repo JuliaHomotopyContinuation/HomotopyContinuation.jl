@@ -7,6 +7,7 @@
     @test finite(R) isa Vector{<:Solving.PathResult}
 
     @test length(finite(R, onlysmooth=false)) == 4
+    @test length(finite(R, onlysmooth=true)) == 4
     @test isempty(failed(R))
     @test length(real(R, tol=1e-7)) == 2
     @test length(atinfinity(R)) == 572
@@ -35,6 +36,14 @@
     @test_nowarn Juno.render(Juno.Inline(), R[1])
     @test nsmooth(R) == 0
     @test nsingular(R) == 3
+
+    @polyvar x y z
+    R = solve([(x-3z),(y-2z)])
+    @test R isa Solving.ProjectiveResult
+    @test_nowarn string(R)
+    @test_nowarn Juno.render(Juno.Inline(), R)
+    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    @test nsmooth(R) == 1
 
     @polyvar x y z
     R = solve([(x-3z)^3,(y-2z)])

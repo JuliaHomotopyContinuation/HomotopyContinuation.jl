@@ -231,7 +231,7 @@ function Juno.render(i::Juno.Inline, r::ProjectiveResult)
         #
         n = nsmooth(r)
         if n > 0
-            t_result = Juno.render(i, finite(r))
+            t_result = Juno.render(i, smooth(r))
             t_result[:head] = Juno.render(i, Text("$n smooth solutions"))
             push!(t[:children], t_result)
         end
