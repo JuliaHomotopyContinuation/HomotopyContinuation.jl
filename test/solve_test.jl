@@ -64,4 +64,6 @@ end
 
     @test length(F[1].solution) == 3
     @test length(G[1].solution) == 2
+    @test F[1].solution_type == :projective
+    @test G[1].solution_type == :affine
 end
