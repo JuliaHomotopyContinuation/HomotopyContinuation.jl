@@ -1,4 +1,8 @@
-export Endgame, Result
+export Endgame, Result, allowed_kwargs
+
+const allowed_kwargs = [:sampling_factor, :tol, :minradius, :maxnorm,
+    :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
+    :cauchy_samples_per_loop]
 
 struct Options
     # See Endgame docstring for explanations

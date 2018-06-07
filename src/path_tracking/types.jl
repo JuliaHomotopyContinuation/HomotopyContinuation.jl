@@ -6,7 +6,11 @@ import ..StepLength
 
 using ..Utilities
 
-export PathTracker
+export PathTracker, allowed_kwargs
+
+const allowed_kwargs = [:corrector, :predictor, :steplength,
+    :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
+    :maxiters]
 
 mutable struct Options
     tol::Float64
@@ -125,10 +129,6 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
 end
-
-# const PATH_TRACKER_KWARGS = [:corrector, :predictor, :steplength,
-#     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
-#     :maxiters]
 
 
 """
