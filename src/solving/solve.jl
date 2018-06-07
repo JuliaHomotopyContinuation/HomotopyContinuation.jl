@@ -13,9 +13,12 @@ function solve(solvers, start_solutions::AbstractVector)
 
     BLAS.set_num_threads(nblas_threads)
 
-    if results[1].solution_type == :affine
+    if all(r -> r.solution_type == :affine, results)
         AffineResult(results)
+    elseif all(r -> r.solution_type == :projective, results)
+        ProjectiveResult(results)
     else
+        warn("Something went wrong. There are both affine and projective solutions.")
         ProjectiveResult(results)
     end
 end
