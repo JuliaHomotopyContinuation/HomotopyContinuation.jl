@@ -73,8 +73,8 @@ end
 
 @testset "Affine vs projective" begin
     @polyvar x y z
-    f = [x-y, y-z]
-    g = [x-1, y-1]
+    f = [x-2y, y-2z]
+    g = [x-2, y-2]
 
     F = solve(f)
     G = solve(g)
