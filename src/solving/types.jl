@@ -25,7 +25,6 @@ struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
     cache::C
 end
 
-
 function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
     endgame_start=0.1,
     report_progress=true,
@@ -41,6 +40,8 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     @assert x₁ isa AbstractVector
     x = Problems.embed(prob, x₁)
 
+    check_kwargs(kwargs)
+
     tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
     endgame = Endgaming.Endgame(prob.homotopy, x; kwargs...)
     switcher = patchswitcher(prob, x, t₀)
@@ -55,10 +56,42 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         cache)
 end
 
-function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(),
-    endgame_predictor=nothing, kwargs...)
+allowed_kwargs() = [:patch, PathTracking.allowed_kwargs...,
+    Endgaming.allowed_kwargs...]
+
+function check_kwargs(kwargs)
+    invalids = invalid_kwargs(kwargs)
+    if !isempty(invalids)
+        msg = "Unexpected keyword argument(s): "
+        first_el = true
+        for kwarg in invalids
+            if !first_el
+                msg *= ", "
+            end
+            msg *= "$(first(kwarg))=$(last(kwarg))"
+            first_el = false
+        end
+        msg *= "\nAllowed keywords are\n"
+        msg *= join(allowed_kwargs(), ", ")
+        throw(ErrorException(msg))
+    end
+end
+function invalid_kwargs(kwargs)
+    invalids = []
+    allowed = allowed_kwargs()
+    for kwarg in kwargs
+        kw = first(kwarg)
+        if !any(equalto(kw), allowed)
+            push!(invalids, kwarg)
+        end
+    end
+    invalids
+end
+
+function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
+        # filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
 end
 
 function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
