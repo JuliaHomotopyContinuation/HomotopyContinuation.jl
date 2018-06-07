@@ -1,6 +1,9 @@
 export solution,
     residual, start_solution, issuccess,
-    isfailed, isatinfinity, issingular
+    isfailed, isaffine, isprojective,
+    isatinfinity, issingular, issmooth
+
+
 
 import ..Homotopies
 import ..ProjectiveVectors
@@ -50,6 +53,7 @@ struct PathResult{T1, T2, T3}
     returncode_detail::Symbol
 
     solution::Vector{T1}
+    solution_type::Symbol
     t::T2
 
     residual::Float64
@@ -82,7 +86,7 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     windingnumber, npredictions = windingnumber_npredictions(r)
 
 
-    PathResult(returncode, returncode_detail, x, real(r.t), res, condition,
+    PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
 function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
@@ -107,7 +111,7 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
     end
 
 
-    PathResult(returncode, returncode_detail, solution, real(r.t), res,
+    PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
         condition, windingnumber, k, x₁, intermediate_sol, r.iters, npredictions)
 end
 
@@ -227,31 +231,66 @@ Checks whether the path failed.
 isfailed(r::PathResult) = r.returncode == :path_failed
 
 """
+    isaffine(pathresult; tol=1e10)
+
+Checks whether the path result is affine.
+"""
+isaffine(r::PathResult) = r.solution_type == :affine
+
+"""
+    isprojective(pathresult; tol=1e10)
+
+Checks whether the path result is affine.
+"""
+isprojective(r::PathResult) = r.solution_type == :projective
+
+"""
     isatinfinity(pathresult)
 
 Checks whether the path goes to infinity.
 """
-isatinfinity(r::PathResult) = r.returncode == :at_infinity
+isatinfinity(r::PathResult) = (r.returncode == :at_infinity && isaffine(r))
+
 
 """
     isfinite(pathresult)
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathResult) = r.returncode == :success
+Base.isfinite(r::PathResult) = (r.returncode == :success && isaffine(r))
 
 """
     issingular(pathresult; tol=1e10)
     issingular(pathresult, tol)
 
-Checks whether the path result is singular. This true if
+Checks whether the path result is singular. This is true if
 the winding number > 1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    r.windingnumber > 1 || r.condition_number > tol
+    if isprojective(r)
+        (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
+    else
+        (r.windingnumber > 1 || r.condition_number > tol) && isfinite(r) && issuccess(r)
+    end
 end
+
+"""
+    issmooth(pathresult; tol=1e10)
+
+Checks whether the path result is smooth. This is true if
+it is not singular.
+"""
+issmooth(r::PathResult; tol=1e10) = issmooth(r, tol)
+function issmooth(r::PathResult, tol::Real)
+    if isprojective(r)
+        r.windingnumber ≤ 1 && r.condition_number ≤ tol
+    else
+        r.windingnumber ≤ 1 && r.condition_number ≤ tol && isfinite(r)
+    end
+end
+
 
 """
     isreal(pathresult; tol=1e-6)

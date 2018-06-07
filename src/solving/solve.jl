@@ -13,8 +13,11 @@ function solve(solvers, start_solutions::AbstractVector)
 
     BLAS.set_num_threads(nblas_threads)
 
-    # TODO: Check problem
-    AffineResult(results)
+    if results[1].solution_type == :affine
+        AffineResult(results)
+    else
+        ProjectiveResult(results)
+    end
 end
 
 """
