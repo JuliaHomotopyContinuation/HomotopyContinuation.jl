@@ -2,6 +2,7 @@ using HomotopyContinuation
 using Compat.Test
 using PolynomialTestSystems
 import Juno
+using Compat
 using Atom
 
 # We order the tests such that isolated things are tested first
