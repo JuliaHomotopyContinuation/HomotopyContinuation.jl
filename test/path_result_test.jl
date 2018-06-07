@@ -5,13 +5,13 @@
     @test nfinite(R) == 4
     @test finite(R) isa Vector{<:Solving.PathResult}
 
-    @test length(finite(R, onlysmooth=false)) == 4
+    @test length(finite(R, include_singular=false)) == 4
     @test isempty(failed(R))
     @test length(real(R, tol=1e-7)) == 2
     @test length(atinfinity(R)) == 572
     @test length(results(R, onlyreal=true, realtol=1e-8)) == 2
-    @test length(results(R, onlysmooth=true, singulartol=1e9)) == 4
-    @test length(results(R, onlyfinite=false)) == 576
+    @test length(results(R, includesingular=false, singulartol=1e9)) == 4
+    @test length(results(R, includeatinfinity=true)) == 576
 
     @test_nowarn results(solution, R)
     @test_nowarn results(start_solution, R)

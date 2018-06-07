@@ -1,4 +1,3 @@
-using Compat
 import ..ProjectiveVectors
 import ..Homotopies
 
@@ -137,18 +136,14 @@ function in_endgame_zone!(state)
     state.in_endgame_zone = true
 end
 
-analyze_finite_atinfinity(s, o, c) = analyze_finite_atinfinity(s.x, s, o, c)
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Int}, state, options, cache)
+function analyze_finite_atinfinity(state, options, cache)
     checkfinite(state) && return :finite
     checkatinfinity(state, options) && return :at_infinity
     :unknown
 end
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Nothing}, state, options, cache)
-    :projective
-end
 
 checkfinite(state) = checkfinite(state, state.x)
-function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex, Int})
+function checkfinite(state, x::ProjectiveVectors.PVector)
     i₀ = ProjectiveVectors.homvar(x)
     d_i₀ = state.directions[i₀, state.nsamples]
     if abs(d_i₀) < 1e-3
@@ -165,7 +160,8 @@ function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex, Int})
 end
 
 checkatinfinity(state, options) = checkatinfinity(state, options, state.x)
-function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex, Int})
+function checkatinfinity(state, options, x::ProjectiveVectors.PVector)
+    # TODO: This should probably be customizable
     LOOKBACK = 1
     TOL = 1e-3
     MIN_LOGABS = -4.605170185988091 # = log(0.01)
@@ -203,7 +199,7 @@ end
 function predict_infinity_check!(state, tracker, options, cache)
 
     path_type = analyze_finite_atinfinity(state, options, cache)
-    if path_type == :finite || path_type == :projective
+    if path_type == :finite
         # we need to determine the windingnumber
         if state.windingnumber == 0
             determine_windingnumber!(state, tracker, options, cache)
@@ -241,12 +237,9 @@ end
 
 function checkatinfinity_norm(state, options)
     p = state.npredictions > 0 ? state.p : state.x
-    checkatinfinity_norm(p, options)
+    infinity_norm(p) > options.maxnorm
 end
-checkatinfinity_norm(v::ProjectiveVectors.PVector{<:Complex, Nothing}, options) = false
-function checkatinfinity_norm(v::ProjectiveVectors.PVector{<:Complex, Int}, options)
-    infinity_norm(v) > options.maxnorm
-end
+
 
 """
     checkterminate!(endgame)

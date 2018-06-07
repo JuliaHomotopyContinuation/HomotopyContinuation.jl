@@ -44,17 +44,15 @@ module HomotopyContinuation
     include("solve.jl")
 
 
-    import .Solving: solution,
-        residual, start_solution, issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, issmooth,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth
+    import .Solving: nresults,
+        nfinite, nsingular, natinfinity, nfailed,
+        finite, results, failed, atinfinity, singular,
+        solution, residual, start_solution, issuccess,
+        isfailed, isatinfinity, issingular
 
-    export solution,
-        residual, start_solution, issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, issmooth,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth
+    export nresults,
+        nfinite, nsingular, natinfinity, nfailed,
+        finite, results, failed, atinfinity, singular,
+        solution, residual, start_solution, issuccess,
+        isfailed, isatinfinity, issingular
 end #
