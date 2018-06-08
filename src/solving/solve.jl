@@ -5,9 +5,6 @@ solve(solver, start_solutions) = solve(solver, collect(start_solutions))
 function solve(solvers, start_solutions::AbstractVector)
     nblas_threads = single_thread_blas()
 
-    if report_progress(solvers)
-        println("$(length(start_solutions)) paths to track")
-    end
     endgame_zone_results = track_to_endgamezone(solvers, start_solutions)
     results = endgame(solvers, start_solutions, endgame_zone_results)
 
@@ -49,7 +46,7 @@ function track_to_endgamezone(solvers, start_solutions)
     n = length(start_solutions)
 
     if report_progress(solvers)
-        p = ProgressMeter.Progress(n, 0.5, "Tracking paths to endgame zone...") # minimum update interval: 1 second
+        p = ProgressMeter.Progress(n, 0.5, "Tracking $(length(start_solutions)) paths to endgame zone...") # minimum update interval: 1 second
 
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
@@ -81,18 +78,18 @@ function endgame(solvers, start_solutions, endgame_zone_results)
         end
     end
 
-    report_progress(solvers) && println("Checking for crossed paths...")
+    # report_progress(solvers) && println("Checking for crossed paths...")
     ncrossedpaths, crossing_indices = pathcrossing_check!(endgame_zone_results, solvers, start_solutions)
     if report_progress(solvers)
-        p = ProgressMeter.Progress(n, 0.5, "Running endgame...")
+        p = ProgressMeter.Progress(n, 0.5, "Running endgame for $(length(endgame_zone_results)) paths...")
 
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
-                ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k-1),))
+                ProgressMeter.update!(p, max(1, k-1), showvalues=((:completed, k-1),))
             end
             runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         end
-        ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
+        ProgressMeter.update!(p, n, showvalues=((:completed, n),))
     else
         result = Parallel.tmap(solvers, 1:n) do solver, tid, k
             runendgame(solver, tid, k, start_solutions, endgame_zone_results)
