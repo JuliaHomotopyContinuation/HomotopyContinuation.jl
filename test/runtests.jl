@@ -2,6 +2,7 @@ using HomotopyContinuation
 using Compat.Test
 using PolynomialTestSystems
 import Juno
+using Compat
 using Atom
 
 # We order the tests such that isolated things are tested first
@@ -16,5 +17,5 @@ include("correctors_test.jl")
 include("affine_patches_test.jl")
 include("path_tracking_test.jl")
 include("solve_test.jl")
-include("path_result_test.jl")
+include("result_test.jl")
 include("integration_tests.jl")

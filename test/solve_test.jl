@@ -70,3 +70,17 @@ end
     @test nfinite(solve(F, tol=1e-3, seed=2337, threading=false)) ≤ 156
     @test nfinite(solve(F, tol=1e-3, seed=2337)) ≤ 156
 end
+
+@testset "Affine vs projective" begin
+    @polyvar x y z
+    f = [x-2y, y-2z]
+    g = [x-2, y-2]
+
+    F = solve(f)
+    G = solve(g)
+
+    @test length(F[1].solution) == 3
+    @test length(G[1].solution) == 2
+    @test F[1].solution_type == :projective
+    @test G[1].solution_type == :affine
+end

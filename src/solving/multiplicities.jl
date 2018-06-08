@@ -78,7 +78,7 @@ function push_for_identifying_multiplicities!(current::SearchTree, i, vectors, �
         if isnull(current.left)
             current.left = SearchTree(i)
         else
-            push_for_identifying_multiplicities!(get(current.left), i, vectors, τ)
+            push_for_identifying_multiplicities!(get(current.left), i, vectors, τ, distance)
         end
     end
 end

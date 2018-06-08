@@ -6,7 +6,7 @@ const MP = MultivariatePolynomials
 
 import ..Homotopies: AbstractHomotopy, StraightLineHomotopy
 import ..ProjectiveVectors
-import ..Systems: SPSystem
+import ..Systems: SPSystem, FPSystem
 
 using ..Utilities
 
@@ -102,7 +102,7 @@ struct DefaultHomogenization <: AbstractHomogenizationStrategy end
 
 Construct a `ProjectiveStartTargetProblem`. This steps constructs a homotopy and homogenizes
 the systems if necessary. The options are
-* `system=SPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
+* `system=FPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
 is called with `system(polys, variables)` where `variables` determines the variable ordering.
 * `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
@@ -127,7 +127,7 @@ end
 function ProjectiveStartTargetProblem(
     s::Vector{<:MP.AbstractPolynomialLike},
     t::Vector{<:MP.AbstractPolynomialLike};
-    system=SPSystem,
+    system=FPSystem,
     homotopy=StraightLineHomotopy)
 
     if ishomogenous(s)
@@ -174,7 +174,7 @@ Embed the solution `x` into projective space if necessary.
 function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, NullHomogenization}, x)
     M, N = size(homotopy(prob))
     length(x) != N && throw(error("The length of the intial solution is $(length(x)) but expected length $N."))
-    return x
+    return ProjectiveVectors.PVector(x, indmax(abs2.(x)))
 end
 function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, DefaultHomogenization}, x)
     M, N = size(homotopy(prob))

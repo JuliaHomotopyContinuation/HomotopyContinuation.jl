@@ -1,6 +1,9 @@
 export solution,
     residual, start_solution, issuccess,
-    isfailed, isatinfinity, issingular
+    isfailed, isaffine, isprojective,
+    isatinfinity, issingular, issmooth
+
+
 
 import ..Homotopies
 import ..ProjectiveVectors
@@ -21,14 +24,14 @@ end
 
 
 """
-    PathResult(startvalue, pathtracker_result, endgame_result, solver)
+    PathResult(startvalue, pathtracker_result, endgamer_result, solver)
 
 Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
-[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgame_result`
-is the [`Result`](@ref) resulting from the corresponding endgame.
+[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
+is the [`EndgamerResult`](@ref) resulting from the corresponding endgame.
 
 A `PathResult` contains:
-* `returncode`: One of `:success`, `:at_infinity` or any error code from the `Result`
+* `returncode`: One of `:success`, `:at_infinity` or any error code from the `EndgamerResult`
 * `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space
 and the solution is at infinity then the projective solution is given. Otherwise
 an affine solution is given if the startvalue was affine and a projective solution
@@ -41,15 +44,16 @@ is given if the startvalue was projective.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
 * `startvalue`: The startvalue of the path
 * `iterations`: The number of iterations the pathtracker needed.
-* `endgame_iterations`: The number of steps in the geometric series the endgame did.
-* `npredictions`: The number of predictions the endgame did.
-* `predictions`: The predictions of the endgame.
+* `endgame_iterations`: The number of steps in the geometric series the endgamer did.
+* `npredictions`: The number of predictions the endgamer did.
+* `predictions`: The predictions of the endgamer.
 """
 struct PathResult{T1, T2, T3}
     returncode::Symbol
     returncode_detail::Symbol
 
     solution::Vector{T1}
+    solution_type::Symbol
     t::T2
 
     residual::Float64
@@ -67,21 +71,22 @@ end
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Compat.Nothing)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     returncode, returncode_detail = makereturncode(r.returncode)
-    x = raw(r.x)
+    x = raw(align_axis!(copy(r.x)))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
-    res = infinity_norm(v)
+    res = infinity_norm(cache.v)
 
     if returncode != :success
         condition = 0.0
     else
-        condition = cond(J)
+        condition = cond(cache.J)
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    PathResult(returncode, returncode_detail, x, real(r.t), res, condition,
+
+    PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
 function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
@@ -98,7 +103,7 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
     intermediate_sol = ProjectiveVectors.affine(x_e)
 
     if returncode != :success
-        solution = raw(r.x)
+        solution = copy(raw(r.x))
         condition = 0.0
     else
         solution = ProjectiveVectors.affine(r.x)
@@ -106,7 +111,7 @@ function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cac
     end
 
 
-    PathResult(returncode, returncode_detail, solution, real(r.t), res,
+    PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
         condition, windingnumber, k, x₁, intermediate_sol, r.iters, npredictions)
 end
 
@@ -118,11 +123,35 @@ function makereturncode(retcode)
     end
 end
 
-function switch_to_affine!(x::ProjectiveVectors.PVector, returncode, windingnumber, patchswitcher)
+function switch_to_affine!(x::ProjectiveVectors.PVector{<:Complex, Int}, returncode, windingnumber, patchswitcher)
     if returncode == :success && windingnumber == 1 && abs2(x[x.homvar]) < 1.0
         PatchSwitching.switch!(x, patchswitcher)
     elseif returncode != :at_infinity
         ProjectiveVectors.affine!(x)
+    end
+    x
+end
+
+"""
+    align_axis!(x)
+
+Multiplies `x` with a complex number of norm 1 such that the largest
+entry is real.
+"""
+function align_axis!(x)
+    maxval = abs2(x[1])
+    maxind = 1
+    for i=2:length(x)
+        val = abs2(x[i])
+        if val > maxval
+            maxval = val
+            maxind = i
+        end
+    end
+
+    v = conj(x[maxind]) / sqrt(maxval)
+    for i=1:length(x)
+        x[i] *= v
     end
     x
 end
@@ -202,31 +231,66 @@ Checks whether the path failed.
 isfailed(r::PathResult) = r.returncode == :path_failed
 
 """
+    isaffine(pathresult; tol=1e10)
+
+Checks whether the path result is affine.
+"""
+isaffine(r::PathResult) = r.solution_type == :affine
+
+"""
+    isprojective(pathresult; tol=1e10)
+
+Checks whether the path result is affine.
+"""
+isprojective(r::PathResult) = r.solution_type == :projective
+
+"""
     isatinfinity(pathresult)
 
 Checks whether the path goes to infinity.
 """
-isatinfinity(r::PathResult) = r.returncode == :at_infinity
+isatinfinity(r::PathResult) = (r.returncode == :at_infinity && isaffine(r))
+
 
 """
     isfinite(pathresult)
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathResult) = r.returncode == :success
+Base.isfinite(r::PathResult) = (r.returncode == :success && isaffine(r))
 
 """
     issingular(pathresult; tol=1e10)
     issingular(pathresult, tol)
 
-Checks whether the path result is singular. This true if
+Checks whether the path result is singular. This is true if
 the winding number > 1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    r.windingnumber > 1 || r.condition_number > tol
+    if isprojective(r)
+        (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
+    else
+        (r.windingnumber > 1 || r.condition_number > tol) && isfinite(r) && issuccess(r)
+    end
 end
+
+"""
+    issmooth(pathresult; tol=1e10)
+
+Checks whether the path result is smooth. This is true if
+it is not singular.
+"""
+issmooth(r::PathResult; tol=1e10) = issmooth(r, tol)
+function issmooth(r::PathResult, tol::Real)
+    if isprojective(r)
+        r.windingnumber ≤ 1 && r.condition_number ≤ tol
+    else
+        r.windingnumber ≤ 1 && r.condition_number ≤ tol && isfinite(r)
+    end
+end
+
 
 """
     isreal(pathresult; tol=1e-6)

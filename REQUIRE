@@ -3,3 +3,5 @@ FixedPolynomials v0.3
 Juno
 ProgressMeter v0.5.5
 StaticPolynomials 0.1
+Compat 0.61
+DynamicPolynomials v0.0.3
