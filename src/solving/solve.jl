@@ -14,12 +14,12 @@ function solve(solvers, start_solutions::AbstractVector)
     BLAS.set_num_threads(nblas_threads)
 
     if all(r -> r.solution_type == :affine, results)
-        AffineResult(results)
+        AffineResult(results, seed(solvers))
     elseif all(r -> r.solution_type == :projective, results)
-        ProjectiveResult(results)
+        ProjectiveResult(results, seed(solvers))
     else
         warn("Something went wrong. There are both affine and projective solutions.")
-        ProjectiveResult(results)
+        ProjectiveResult(results, seed(solvers))
     end
 end
 
@@ -37,6 +37,8 @@ function single_thread_blas()
     nblas_threads
 end
 
+seed(solver::Solver) = solver.seed
+seed(solvers::Solvers) = seed(solvers[1])
 t₁_t_endgame_t₀(solver::Solver) = solver.t₁, solver.options.endgame_start, solver.t₀
 t₁_t_endgame_t₀(solvers::Solvers) = t₁_t_endgame_t₀(solvers[1])
 report_progress(solver::Solver) = solver.options.report_progress

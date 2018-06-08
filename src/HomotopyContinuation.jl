@@ -49,12 +49,12 @@ module HomotopyContinuation
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, issmooth,
         nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth
+        finite, results, failed, atinfinity, singular, smooth, seed
 
     export solution,
         residual, start_solution, issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, issmooth,
         nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth
+        finite, results, failed, atinfinity, singular, smooth, seed
 end #

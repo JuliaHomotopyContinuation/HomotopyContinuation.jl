@@ -20,6 +20,11 @@
     @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
 end
 
+@testset "solve - random seed" begin
+    R = solve(equations(katsura(5)), seed=1234)
+    @test seed(R) == 1234
+end
+
 @testset "solve - no endgame" begin
     F = equations(katsura(5))
     # no endgame
