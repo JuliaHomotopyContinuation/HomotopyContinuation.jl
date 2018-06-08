@@ -21,21 +21,22 @@ struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
     patchswitcher::PS
     t₁::Float64
     t₀::Float64
+    seed::Int
     options::SolverOptions
     cache::C
 end
 
-function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀=0.0;
+function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, seed=0;
     endgame_start=0.1,
     report_progress=true,
     kwargs...)
     !(t₀ ≤ endgame_start ≤ t₁) && throw(error("`endgame_start` has to be between `t₁` and`t₀`"))
 
     options = SolverOptions(endgame_start, report_progress)
-    Solver(prob, start_solutions, t₁, t₀, options; kwargs...)
+    Solver(prob, start_solutions, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, options::SolverOptions; kwargs...)
+function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, seed, options::SolverOptions; kwargs...)
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
     x = Problems.embed(prob, x₁)
@@ -52,6 +53,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
         endgame,
         switcher,
         t₁, t₀,
+        seed,
         options,
         cache)
 end

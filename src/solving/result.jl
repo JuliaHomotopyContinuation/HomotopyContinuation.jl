@@ -1,5 +1,5 @@
 export nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-    finite, results, failed, atinfinity, singular, smooth
+    finite, results, failed, atinfinity, singular, smooth, seed
 
 abstract type Result end
 
@@ -10,9 +10,11 @@ Constructs a summary of `PathResult`s.
 """
 struct ProjectiveResult{T1, T2, T3} <: Result
     pathresults::Vector{PathResult{T1, T2, T3}}
+    seed::Int
 end
 struct AffineResult{T1, T2, T3} <: Result
     pathresults::Vector{PathResult{T1, T2, T3}}
+    seed::Int
 end
 
 Base.length(r::Result) = length(r.pathresults)
@@ -70,6 +72,12 @@ The number of smooth solutions.
 """
 nsmooth(R::Result; tol = 1e10) = count(r -> issmooth(r, tol), R)
 
+"""
+    seed(result)
+
+The random seed used in the computation.
+"""
+seed(result::Result) = result.seed
 
 const AffineResults = Union{AffineResult, Vector{<:PathResult}}
 const ProjectiveResults = Union{ProjectiveResult, Vector{<:PathResult}}
@@ -175,6 +183,7 @@ function Base.show(io::IO, r::AffineResult)
     println(io, "# singular finite solutions:  $(nsingular(r))")
     println(io, "# solutions at infinity:  $(natinfinity(r))")
     println(io, "# failed paths:  $(nfailed(r))")
+    println(io, "Random seed used: $(seed(r))")
     println(io, "-----------------------------------------------")
 end
 
@@ -184,6 +193,7 @@ function Base.show(io::IO, r::ProjectiveResult)
     println(io, "# smooth solutions:  $(nsmooth(r))")
     println(io, "# singular solutions:  $(nsingular(r))")
     println(io, "# failed paths:  $(nfailed(r))")
+    println(io, "Random seed used: $(seed(r))")
     println(io, "-----------------------------------------------")
 end
 
@@ -220,6 +230,7 @@ function Juno.render(i::Juno.Inline, r::AffineResult)
             t_result[:head] = Juno.render(i, Text("$n paths failed"))
             push!(t[:children], t_result)
         end
+        push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
 
         return t
 end
@@ -249,6 +260,7 @@ function Juno.render(i::Juno.Inline, r::ProjectiveResult)
             t_result[:head] = Juno.render(i, Text("$n paths failed"))
             push!(t[:children], t_result)
         end
+        push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
 
         return t
 end

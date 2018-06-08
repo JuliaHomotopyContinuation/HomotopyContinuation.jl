@@ -22,31 +22,40 @@ Solve the system `F` by tracking the each solution of
 function solve end
 
 # External
-function solve(F::Vector{<:MP.AbstractPolynomial}; kwargs...)
+function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
+    srand(seed)
     TDP = Problems.TotalDegreeProblem(F)
     start_solutions = Utilities.totaldegree_solutions(F)
-    solve(TDP, start_solutions; kwargs...)
+    solve(TDP, start_solutions, seed; kwargs...)
 end
 
-function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, start_solutions; kwargs...)
+function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
+    srand(seed)
     STP = Problems.StartTargetProblem(G, F)
-    solve(STP, start_solutions; kwargs...)
+
+    solve(STP, promote_startsolutions(startsolutions), seed; kwargs...)
 end
+
+promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
+function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
+    PT = promote_type(typeof(xs[1][1]), Complex{Float64})
+    map(s -> convert.(PT, s), xs)
+end
+
+randseed() = rand(1_000:1_000_000)
 
 # Internal
-function solve(prob::Problems.AbstractDynamicProblem, start_solutions;
-    seed=rand(100:10_000),
+function solve(prob::Problems.AbstractDynamicProblem, start_solutions, seed;
     system=Systems.FPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)
-    println("Seed used: $(seed)")
-    srand(seed)
+
     P = Problems.ProjectiveStartTargetProblem(prob, system=system, homotopy=homotopy)
-    solve(P, start_solutions; kwargs...)
+    solve(P, start_solutions, seed; kwargs...)
 end
 
-function solve(prob::Problems.AbstractProblem, start_solutions, t₁=1.0, t₀=0.0; threading=true, kwargs...)
-    solver = Solving.Solver(prob, start_solutions, t₁, t₀; kwargs...)
+function solve(prob::Problems.AbstractProblem, start_solutions, seed; threading=true, kwargs...)
+    solver = Solving.Solver(prob, start_solutions, 1.0, 0.0, seed; kwargs...)
     if threading && Threads.nthreads() > 1
         solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
         Solving.solve(solvers, start_solutions)
