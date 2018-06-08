@@ -6,6 +6,8 @@ import .Systems
 import .Homotopies
 import .Solving
 
+using .Utilities
+
 export solve
 
 
@@ -24,6 +26,8 @@ function solve end
 # External
 function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
     srand(seed)
+    F = filter(f -> !iszero(f), F)
+    checkfinite_dimensional(F)
     TDP = Problems.TotalDegreeProblem(F)
     start_solutions = Utilities.totaldegree_solutions(F)
     solve(TDP, start_solutions, seed; kwargs...)
@@ -31,9 +35,22 @@ end
 
 function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
     srand(seed)
+    @assert length(G) == length(F)
+    checkfinite_dimensional(F)
     STP = Problems.StartTargetProblem(G, F)
 
     solve(STP, promote_startsolutions(startsolutions), seed; kwargs...)
+end
+
+function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
+    N = MP.nvariables(F)
+    n = length(F)
+    # square system and each polynomial is non-zero
+    if n ≥ N ||
+       n == N - 1 && ishomogenous(F)
+        return
+    end
+    throw(AssertionError("The input system will not result in a finite number of solutions."))
 end
 
 promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs

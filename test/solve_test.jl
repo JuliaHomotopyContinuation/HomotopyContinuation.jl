@@ -25,6 +25,11 @@
     F = [x+2, y-3]
     @test nfinite(solve(G, F, [[2, -3]])) == 1
     @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
+
+    # Check invalid inputs
+    @polyvar x y
+    @test_throws AssertionError solve([x-2y+2, 0])
+    @test_throws AssertionError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 end
 
 @testset "solve - random seed" begin
