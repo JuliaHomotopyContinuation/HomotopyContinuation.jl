@@ -22,12 +22,7 @@ Base.start(r::Result) = start(r.pathresults)
 Base.next(r::Result, state) = next(r.pathresults, state)
 Base.done(r::Result, state) = done(r.pathresults, state)
 Base.endof(r::Result) = endof(r.pathresults)
-function Base.iteratorsize(::Type{AffineResult{T1,T2,T3}}) where {T1, T2, T3}
-    Base.HasLength()
-end
-function Base.iteratorsize(::Type{ProjectiveResult{T1,T2,T3}}) where {T1, T2, T3}
-    Base.HasLength()
-end
+Base.iteratorsize(::Type{<:Result}) = Base.HasLength()
 Base.eltype(r::Result) = eltype(r.pathresults)
 
 """
@@ -38,16 +33,11 @@ The number of proper solutions.
 nresults(R::Result) = count(issuccess, R)
 
 """
-    nresults(result)
+    nresults(affineresult)
 
 The number of finite solutions.
 """
-function nfinite(R::Result)
-    if typeof(R)<:ProjectiveResult
-        warn("Results are projective")
-    end
-    count(isfinite, R)
-end
+nfinite(R::AffineResult) = count(isfinite, R)
 
 """
     nsingular(result; tol=1e10)
@@ -60,16 +50,11 @@ nsingular(R::Result; tol=1e10) = count(R) do r
 end
 
 """
-    natinfinity(result)
+    natinfinity(affineresult)
 
 The number of solutions at infinity.
 """
-function natinfinity(R::Result)
-    if typeof(R)<:ProjectiveResult
-        warn("Results are projective")
-    end
-    count(isatinfinity, R)
-end
+natinfinity(R::AffineResult) = count(isatinfinity, R)
 
 """
     nafailed(result)
@@ -83,9 +68,7 @@ nfailed(R::Result) = count(isfailed, R)
 
 The number of smooth solutions.
 """
-nsmooth(R::Result; tol = 1e10) = count(R) do r
-    issmooth(r, tol)
-end
+nsmooth(R::Result; tol = 1e10) = count(r -> issmooth(r, tol), R)
 
 
 const AffineResults = Union{AffineResult, Vector{<:PathResult}}
@@ -143,10 +126,7 @@ the contained `solution` is indeed a solution of the system.
 Additionally you can apply a transformation `f` on each result.
 """
 finite(R::Results; kwargs...) = finite(identity, R; kwargs...)
-function finite(f::Function, R::Results; onlysmooth=false, tol=1e10)
-    if typeof(R)<:ProjectiveResult
-        warn("Results are projective")
-    end
+function finite(f::Function, R::AffineResults; onlysmooth=false, tol=1e10)
     if !onlysmooth
         [f(r) for r in R if isfinite(r)]
     else
@@ -184,10 +164,7 @@ failed(R::Result) = [r for r in R if isfailed(r)]
 
 Get all results where the solutions is at infinity.
 """
-function atinfinity(R::Result)
-    if typeof(R)<:ProjectiveResult
-        warn("Results are projective")
-    end
+function atinfinity(R::AffineResults)
     [r for r in R if isatinfinity(r)]
 end
 
@@ -254,14 +231,14 @@ function Juno.render(i::Juno.Inline, r::ProjectiveResult)
         #
         n = nsmooth(r)
         if n > 0
-            t_result = Juno.render(i, finite(r))
+            t_result = Juno.render(i, smooth(r))
             t_result[:head] = Juno.render(i, Text("$n smooth solutions"))
             push!(t[:children], t_result)
         end
 
         n = nsingular(r)
         if n > 0
-            t_result = Juno.render(i, atinfinity(r))
+            t_result = Juno.render(i, singular(r))
             t_result[:head] = Juno.render(i, Text("$n singular solutions"))
             push!(t[:children], t_result)
         end
