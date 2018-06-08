@@ -29,10 +29,17 @@ function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
     solve(TDP, start_solutions, seed; kwargs...)
 end
 
-function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, start_solutions; seed=randseed(), kwargs...)
+function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
     srand(seed)
     STP = Problems.StartTargetProblem(G, F)
-    solve(STP, start_solutions, seed; kwargs...)
+
+    solve(STP, promote_startsolutions(startsolutions), seed; kwargs...)
+end
+
+promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
+function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
+    PT = promote_type(typeof(xs[1][1]), Complex{Float64})
+    map(s -> convert.(PT, s), xs)
 end
 
 randseed() = rand(1_000:1_000_000)

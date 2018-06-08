@@ -18,11 +18,24 @@
     @test nfinite(solve(F, patch=AffinePatches.RandomPatch())) == 32
     @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
     @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
+
+    @polyvar x y
+
+    G = [x-2, y+3]
+    F = [x+2, y-3]
+    @test nfinite(solve(G, F, [[2, -3]])) == 1
+    @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 end
 
 @testset "solve - random seed" begin
     R = solve(equations(katsura(5)), seed=1234)
     @test seed(R) == 1234
+
+    @polyvar x y
+
+    G = [x-2, y+3]
+    F = [x+2, y-3]
+    @test seed(solve(G, F, [[2, -3]], seed=222)) == 222
 end
 
 @testset "solve - no endgame" begin
