@@ -4,6 +4,7 @@ export solution,
     isatinfinity, issingular, issmooth
 
 
+using Compat
 
 import ..Homotopies
 import ..ProjectiveVectors
@@ -71,7 +72,7 @@ end
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
     PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Nothing)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(align_axis!(copy(r.x)))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)

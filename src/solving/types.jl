@@ -14,7 +14,7 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgaming.Endgame, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
+        E<:Endgaming.Endgame, PS<:Union{Nothing,PatchSwitching.PatchSwitcher}, C<:SolverCache}
     prob::P
     tracker::T
     endgame::E
@@ -96,6 +96,9 @@ function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀;
         # filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
 end
 
+function patchswitcher(prob::Problems.ProjectiveStartTargetProblem{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}
+    nothing
+end
 function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
     p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
     p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
