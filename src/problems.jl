@@ -174,7 +174,7 @@ Embed the solution `x` into projective space if necessary.
 function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, NullHomogenization}, x)
     M, N = size(homotopy(prob))
     length(x) != N && throw(error("The length of the intial solution is $(length(x)) but expected length $N."))
-    return ProjectiveVectors.PVector(x, indmax(abs2.(x)))
+    return ProjectiveVectors.PVector(x, nothing)
 end
 function embed(prob::ProjectiveStartTargetProblem{<:AbstractHomotopy, DefaultHomogenization}, x)
     M, N = size(homotopy(prob))
