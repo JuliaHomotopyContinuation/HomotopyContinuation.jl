@@ -16,6 +16,7 @@ SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.system(poly
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.system(polys))
 
 Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))
+Base.length(F::SPSystem) = SP.npolynomials(F.system)
 
 evaluate!(u, F::SPSystem, x) = SP.evaluate!(u, F.system, x)
 evaluate(F::SPSystem, x) = SP.evaluate(F.system, x)

@@ -4,7 +4,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 
-import ..Homotopies: AbstractHomotopy, StraightLineHomotopy
+using ..Homotopies
 import ..ProjectiveVectors
 import ..Systems: SPSystem, FPSystem
 
@@ -46,8 +46,8 @@ struct StartTargetProblem{P1<:MP.AbstractPolynomialLike, P2<:MP.AbstractPolynomi
 
     function StartTargetProblem{P1, P2}(start::Vector{P1}, target::Vector{P2}) where {P1<:MP.AbstractPolynomialLike, P2<:MP.AbstractPolynomialLike}
         @assert length(start) == length(target) "Cannot construct `StartTargetProblem` since the lengths of `start` and `target` don't match."
-        @assert nvariables(start) == nvariables(target) "Cannot construct `StartTargetProblem` since the number of variables of `start` and `target` don't match."
-        @assert ishomogenous(start) == ishomogenous(target) "Cannot construct `StartTargetProblem` since `start` is homogenous and  `target` not or the other way around."
+        @assert Utilities.nvariables(start) == Utilities.nvariables(target) "Cannot construct `StartTargetProblem` since the number of variables of `start` and `target` don't match."
+        @assert Utilities.ishomogenous(start) == Utilities.ishomogenous(target) "Cannot construct `StartTargetProblem` since `start` is homogenous and  `target` not or the other way around."
         new(start, target)
     end
 end
@@ -64,6 +64,18 @@ is the target system and a total degree system should be assembled.
 """
 struct TotalDegreeProblem{P1<:MP.AbstractPolynomialLike} <: AbstractStartTargetProblem
     system::Vector{P1}
+end
+
+"""
+    ParameterProblem(system::Vector{<:MP.AbstractPolynomial}, x::Vector{<:MP.AbstractMonomialLike}, p::Vector{<:MP.AbstractMonomialLike})
+
+Construct a `ParameterProblem`. This indicates that the system `system` has variables `x` and parameters `p`.
+"""
+struct ParameterProblem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractMonomialLike, T1<:Number, T2<:Number} <: AbstractParameterProblem
+    system::Vector{P}
+    parameters::Vector{V}
+    start::Vector{T1}
+    target::Vector{T2}
 end
 
 
@@ -95,6 +107,21 @@ Homogenization by adding a new variable with highest precedence.
 """
 struct DefaultHomogenization <: AbstractHomogenizationStrategy end
 
+
+"""
+    ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy}
+
+Construct a `ProjectiveStartTargetProblem` by initializing a homotopy `H` and a homogenization strategy `HS`. The homotopy `H` needs to be homogenous.
+"""
+
+struct ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
+    homotopy::H
+    homogenization_strategy::HS
+end
+function ProjectiveStartTargetProblem(H::AbstractHomotopy)
+    ProjectiveStartTargetProblem(H, NullHomogenization())
+end
+
 """
     ProjectiveStartTargetProblem(prob::TotalDegreeProblem; options...)
     ProjectiveStartTargetProblem(prob::StartTargetProblem; options...)
@@ -107,15 +134,7 @@ is called with `system(polys, variables)` where `variables` determines the varia
 * `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
 is called with `homotopy(start, target)` where `start` and `target` are systems constructed
 with `system`.
-
-    ProjectiveStartTargetProblem(H::AbstractHomotopy)
-
-Construct a `ProjectiveProblem`. The homotopy `H` needs to be homogenous.
 """
-struct ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
-    homotopy::H
-    homogenization_strategy::HS
-end
 
 function ProjectiveStartTargetProblem(prob::TotalDegreeProblem; kwargs...)
     ProjectiveStartTargetProblem(totaldegree(prob.system), prob.system; kwargs...)
@@ -148,8 +167,34 @@ function ProjectiveStartTargetProblem(
 
     ProjectiveStartTargetProblem(H, homogenization_strategy)
 end
-function ProjectiveStartTargetProblem(H::AbstractHomotopy)
-    ProjectiveStartTargetProblem(H, NullHomogenization())
+
+"""
+    ProjectiveStartTargetProblem(prob::ParameterProblem; options...)
+"""
+
+function ProjectiveStartTargetProblem(prob::ParameterProblem;
+    system = FPSystem, homotopy = ParameterHomotopy)
+
+    variables = setdiff(allvariables(prob.system), prob.parameters)
+
+    if ishomogenous(prob.system, variables)
+        homogenization_strategy = NullHomogenization()
+        var_ordering = [variables; prob.parameters]
+        var_indices = 1:length(variables)
+        param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
+        f = system(prob.system, var_ordering)
+    else
+        homogenization_strategy = DefaultHomogenization()
+        homvar = uniquevar(prob.system)
+        var_ordering = [homvar; variables; prob.parameters]
+        var_indices = 1:(length(variables)+1)
+        param_indices = (length(variables)+2):(length(variables)+length(prob.parameters)+1)
+        f = system(homogenize(prob.system, homvar), var_ordering)
+    end
+
+    H = homotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
+
+    ProjectiveStartTargetProblem(H, homogenization_strategy)
 end
 
 """

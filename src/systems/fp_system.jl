@@ -1,7 +1,7 @@
 import FixedPolynomials
 const FP = FixedPolynomials
 
-export FPSystem
+export FPSystem, differentiate
 
 """
     FPSystem(polynomials, vars) <: AbstractSystem
@@ -14,6 +14,7 @@ end
 
 FPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = FPSystem(FP.System(polys, vars))
 FPSystem(polys::Vector{<:MP.AbstractPolynomial}) = FPSystem(FP.System(polys))
+FPSystem(polys::Vector{<:FP.Polynomial}) = FPSystem(FP.System(polys))
 
 struct FPSystemCache{JC<:FP.JacobianConfig} <: AbstractSystemCache
     config::JC
@@ -22,6 +23,7 @@ end
 cache(F::FPSystem, x) = FPSystemCache(FP.config(F.system, x))
 
 Base.size(F::FPSystem) = (length(F.system), FP.nvariables(F.system))
+Base.length(F::FPSystem) = length(F.system)
 
 evaluate!(u, F::FPSystem, x, c::FPSystemCache) = FP.evaluate!(u, F.system, x, c.config)
 evaluate(F::FPSystem, x, c::FPSystemCache) = FP.evaluate(F.system, x, c.config)
@@ -32,4 +34,12 @@ function evaluate_and_jacobian!(u, U, F::FPSystem, x, c::FPSystemCache)
 end
 function evaluate_and_jacobian(F::FPSystem, x, c::FPSystemCache)
     FP.evaluate_and_jacobian(F.system, x, c.config)
+end
+"""
+    differentiate(F::AbstractSystem, v)
+
+Compute the derivatives of `F` wrt to the `i`-th variable for `i in v`.
+"""
+function differentiate(F::FPSystem, v)
+    FPSystem(vec(map(i -> FP.differentiate(F.system[i[1]], i[2]), Base.product(1:length(F), v))))
 end
