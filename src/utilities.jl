@@ -126,6 +126,12 @@ function totaldegree(F::Vector{<:MP.AbstractPolynomialLike})
     out
 end
 
+function totaldegree(degrees::Vector{Int}, vars)
+    map(1:length(degrees)) do k
+        vars[k]^degrees[k] - 1
+    end
+end
+
 """
     totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
 

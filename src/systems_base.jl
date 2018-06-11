@@ -70,6 +70,8 @@ Evaluate the Jacobian of the system `F` at `x`.
 """
 jacobian(F::AbstractSystem, x, ::NullCache) = jacobian(F, x)
 
+Base.size(::T) where {T<:AbstractSystem} = error("You need to define Base.size for $T." *
+    "This should return a tuple `(m, n)`` where `m` is the number of polynomials and `n` the number of unknowns.")
 
 # Optional
 """
@@ -94,5 +96,8 @@ function evaluate_and_jacobian(F::AbstractSystem, x, cache)
     U = jacobian(F, x, cache)
     u, U
 end
+
+Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
+Base.length(F::AbstractSystem) = size(F, 1)
 
 end

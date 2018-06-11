@@ -70,7 +70,7 @@ struct PathResult{T1, T2, T3}
 end
 
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
-    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
+    PathResult(prob.homogenization, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
 function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Nothing)
     returncode, returncode_detail = makereturncode(r.returncode)
@@ -90,7 +90,7 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
+function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
     returncode = r.returncode
     windingnumber, npredictions = windingnumber_npredictions(r)
 
