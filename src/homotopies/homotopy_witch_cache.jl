@@ -9,6 +9,7 @@ HomotopyWithCache(H::AbstractHomotopy, x, t) = HomotopyWithCache(H, cache(H, x, 
 
 (H::HomotopyWithCache)(x, t) = evaluate(H, x, t)
 
+Base.size(H::HomotopyWithCache) = size(H.homotopy)
 evaluate(H::HomotopyWithCache, x, t) = evaluate(H.homotopy, x, t, H.cache)
 evaluate!(u, H::HomotopyWithCache, x, t) = evaluate!(u, H.homotopy, x, t, H.cache)
 jacobian(H::HomotopyWithCache, x, t) = jacobian(H.homotopy, x, t, H.cache)
