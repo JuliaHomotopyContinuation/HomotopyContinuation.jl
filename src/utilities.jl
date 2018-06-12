@@ -20,10 +20,16 @@ export allvariables,
     solve!
 
 
+"""
+    solve!(A, b)
+
+Solve ``Ax=b`` inplace. This overwrites `A` and `b`
+and stores the result in `b`.
+"""
 function solve!(A::Matrix, b::Vector)
     m, n = size(A)
     if m == n
-        A_ldiv_B!(lufact!(A), b)
+        A_ldiv_B!(LinAlg.generic_lufact!(A), b)
     else
         A_ldiv_B!(qrfact!(A), b)
     end
