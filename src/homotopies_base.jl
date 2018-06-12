@@ -56,8 +56,6 @@ cache(H, x, t) = NullCache()
 
 # Homotopy API
 
-# Base.size
-
 """
     evaluate!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
