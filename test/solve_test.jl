@@ -102,3 +102,13 @@ end
     @test F[1].solution_type == :projective
     @test G[1].solution_type == :affine
 end
+
+@testset "Parameter Homotopies" begin
+    @polyvar x a y b
+    F = [x^2-a, x*y-a+b]
+    p = [a, b]
+    S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im]])
+
+    S[1].solution ≈ [complex(√2), -complex(√2)]
+    nfinite(S) == 1
+end

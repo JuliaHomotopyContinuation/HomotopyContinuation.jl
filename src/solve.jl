@@ -36,6 +36,16 @@ function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolyno
     solve(STP, promote_startsolutions(startsolutions), seed; kwargs...)
 end
 
+function solve(F::Vector{<:MP.AbstractPolynomial}, p::Vector{<:MP.AbstractVariable}, a_1::Vector{<:Number}, a_2::Vector{<:Number}, startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
+    srand(seed)
+    STP = Problems.ParameterProblem(F, p, a_1, a_2)
+
+    @assert length(p) == length(a_1) "Number of parameters must match"
+    @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
+    solve(STP, promote_startsolutions(startsolutions), seed; homotopy = Homotopies.ParameterHomotopy, kwargs...)
+end
+
+
 promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
 function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
     PT = promote_type(typeof(xs[1][1]), Complex{Float64})

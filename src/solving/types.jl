@@ -46,7 +46,7 @@ function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t�
     tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
     endgame = Endgaming.Endgame(prob.homotopy, x; kwargs...)
     switcher = patchswitcher(prob, x, t₀)
-    
+
     cache = SolverCache(prob, tracker)
     Solver(prob,
         tracker,

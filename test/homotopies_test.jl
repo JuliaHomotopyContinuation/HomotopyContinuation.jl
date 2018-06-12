@@ -38,6 +38,17 @@ end
     testevaluations(H, rand(Complex{Float64}, 6))
 end
 
+@testset "Homotopies.ParameterHomotopy" begin
+    F = Systems.FPSystem(equations(katsura(5)))
+    parameters = [5, 6]
+    H = Homotopies.ParameterHomotopy(F, parameters, rand(2), rand(2))
+    @test H isa Homotopies.AbstractHomotopy
+    @test size(H) == (6, 4)
+
+    
+    testevaluations(H, rand(Complex{Float64}, 4))
+end
+
 @testset "Homotopies.FixedPointHomotopy" begin
     F = Systems.SPSystem(equations(katsura(5)))
     H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))

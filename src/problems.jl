@@ -67,11 +67,11 @@ struct TotalDegreeProblem{P1<:MP.AbstractPolynomialLike} <: AbstractStartTargetP
 end
 
 """
-    ParameterProblem(system::Vector{<:MP.AbstractPolynomial}, x::Vector{<:MP.AbstractMonomialLike}, p::Vector{<:MP.AbstractMonomialLike})
+    ParameterProblem(system::Vector{<:MP.AbstractPolynomial}, x::Vector{<:MP.AbstractVariable}, p::Vector{<:MP.AbstractVariable})
 
 Construct a `ParameterProblem`. This indicates that the system `system` has variables `x` and parameters `p`.
 """
-struct ParameterProblem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractMonomialLike, T1<:Number, T2<:Number} <: AbstractParameterProblem
+struct ParameterProblem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable, T1<:Number, T2<:Number} <: AbstractParameterProblem
     system::Vector{P}
     parameters::Vector{V}
     start::Vector{T1}
@@ -177,6 +177,7 @@ function ProjectiveStartTargetProblem(prob::ParameterProblem;
 
     variables = setdiff(allvariables(prob.system), prob.parameters)
 
+
     if ishomogenous(prob.system, variables)
         homogenization_strategy = NullHomogenization()
         var_ordering = [variables; prob.parameters]
@@ -189,7 +190,7 @@ function ProjectiveStartTargetProblem(prob::ParameterProblem;
         var_ordering = [homvar; variables; prob.parameters]
         var_indices = 1:(length(variables)+1)
         param_indices = (length(variables)+2):(length(variables)+length(prob.parameters)+1)
-        f = system(homogenize(prob.system, homvar), var_ordering)
+        f = system(homogenize(prob.system, variables, homvar), var_ordering)
     end
 
     H = homotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)

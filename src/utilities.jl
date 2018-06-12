@@ -61,20 +61,20 @@ ishomogenous(f::MP.AbstractPolynomialLike) = MP.mindegree(f) == MP.maxdegree(f)
 ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}) = all(ishomogenous, F)
 
 """
-    ishomogenous(f::MP.AbstractPolynomialLike, v::Vector{<:MP.AbstractMonomialLike})
+    ishomogenous(f::MP.AbstractPolynomialLike, v::Vector{<:MP.AbstractVariable})
 
 Checks whether `f` is homogenous in the variables `v`.
 
-    ishomogenous(polys::Vector{MP.AbstractPolynomialLike}, v::Vector{<:MP.AbstractMonomialLike})
+    ishomogenous(polys::Vector{MP.AbstractPolynomialLike}, v::Vector{<:MP.AbstractVariable})
 
 Checks whether each polynomial in `polys` is homogenous in the variables `v`.
 """
-function ishomogenous(f::MP.AbstractPolynomialLike, variables::Vector{T}) where {T<:MP.AbstractMonomialLike}
+function ishomogenous(f::MP.AbstractPolynomialLike, variables::Vector{T}) where {T<:MP.AbstractVariable}
  var_indices = findin(MP.variables(f), variables)
  degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
  minimum(degrees) == maximum(degrees)
 end
-function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}) where {T<:MP.AbstractMonomialLike}
+function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}) where {T<:MP.AbstractVariable}
  all(f -> ishomogenous(f, variables), F)
 end
 """
@@ -102,22 +102,22 @@ end
 homogenize(F::Vector{<:MP.AbstractPolynomialLike}, var=uniquevar(F)) = homogenize.(F, var)
 
 """
-    homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractMonomialLike}, variable=uniquevar(f))
+    homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))
 
 Homogenize the variables `v` in the polynomial `f` by using the given variable `variable`.
 
-    homogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractMonomialLike}, variable=uniquevar(F))
+    homogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))
 
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
-function homogenize(f::MP.AbstractPolynomialLike, variables::Vector{T}, var=uniquevar(f)) where {T<:MP.AbstractMonomialLike}
+function homogenize(f::MP.AbstractPolynomialLike, variables::Vector{T}, var=uniquevar(f)) where {T<:MP.AbstractVariable}
     var_indices = findin(MP.variables(f), variables)
     degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
     d = maximum(degrees)
     MP.polynomial(map(i -> var^(d - degrees[i]) * f[i], 1:length(f)))
 end
-function homogenize(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}, var=uniquevar(F)) where {T<:MP.AbstractMonomialLike}
-    homogenize.(F, variables, var)
+function homogenize(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}, var=uniquevar(F)) where {T<:MP.AbstractVariable}
+    map(f -> homogenize(f, variables, var), F)
 end
 
 
