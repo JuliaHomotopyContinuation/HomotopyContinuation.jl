@@ -12,6 +12,7 @@ module HomotopyContinuation
         PatchSwitching,
         PathTracking,
         Predictors,
+        Input,
         Problems,
         ProjectiveVectors,
         Solving,
@@ -28,6 +29,7 @@ module HomotopyContinuation
     include("homotopies_base.jl")
     include("systems.jl")
     include("homotopies.jl")
+    include("input.jl")
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")
