@@ -17,6 +17,8 @@ cache(::Euler, H, x, t) = EulerCache(jacobian(H, x, t), dt(H, x, t))
 
 function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t, Δt)
     minus_x_prime!(cache.b, H, x, t, cache.A)
-    @. xnext = x - Δt * cache.b
+    for i=1:length(x)
+        xnext[i] = x[i] - Δt * cache.b[i]
+    end
     nothing
 end

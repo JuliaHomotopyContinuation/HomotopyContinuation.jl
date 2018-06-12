@@ -16,8 +16,19 @@ export allvariables,
     fastlog,
     batches,
     randomish_gamma,
-    filterkwargs
+    filterkwargs,
+    solve!
 
+
+function solve!(A::Matrix, b::Vector)
+    m, n = size(A)
+    if m == n
+        A_ldiv_B!(lufact!(A), b)
+    else
+        A_ldiv_B!(qrfact!(A), b)
+    end
+    b
+end
 
 """
     ldiv_lu!(A, b)

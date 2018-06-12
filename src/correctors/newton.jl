@@ -21,10 +21,14 @@ end
 
 function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, t, tol, maxiters)
     A, b = cache.A, cache.b
+    M, N = size(H)
     Homotopies.update!(H, x, t) # we have to update local affine patches
     evaluate_and_jacobian!(b, A, H, x, t)
-    ldiv_lu!(A, b)
-    @. xnext = x - b
+    solve!(A, b)
+    for i = 1:N
+        xnext[i] -= b[i]
+    end
+
     k = 1
     while true
         Homotopies.update!(H, xnext, t) # we have to update local affine patches
@@ -40,7 +44,9 @@ function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, 
         # put jacobian in A
         jacobian!(A, H, xnext, t)
 
-        ldiv_lu!(A, b)
-        @. xnext = xnext - b
+        solve!(A, b)
+        for i = 1:N
+            xnext[i] -= b[i]
+        end
     end
 end

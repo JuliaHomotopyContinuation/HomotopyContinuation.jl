@@ -78,10 +78,13 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(cache.v)
 
+
     if returncode != :success
-        condition = 0.0
+        condition = Inf
     else
-        condition = cond(cache.J)
+        σ = svdvals(cache.J)
+        n = size(cache.H)[2]
+        condition = σ[1]/σ[n-1]
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
@@ -105,7 +108,7 @@ function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::Pat
 
     if returncode != :success
         solution = copy(raw(r.x))
-        condition = 0.0
+        condition = Inf
     else
         solution = ProjectiveVectors.affine(r.x)
         condition = cond(@view cache.J[:,2:end])
@@ -286,7 +289,7 @@ it is not singular.
 isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
 function isnonsingular(r::PathResult, tol::Real)
     if isprojective(r)
-        r.windingnumber ≤ 1 && r.condition_number ≤ tol
+        r.windingnumber ≤ 1 && r.condition_number ≤ tol && r.returncode == :success
     else
         r.windingnumber ≤ 1 && r.condition_number ≤ tol && isfinite(r)
     end
