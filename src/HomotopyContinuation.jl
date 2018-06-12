@@ -2,8 +2,8 @@ __precompile__()
 
 module HomotopyContinuation
 
-    import DynamicPolynomials: @polyvar
-    export @polyvar
+    import DynamicPolynomials: @polyvar, PolyVar
+    export @polyvar, PolyVar
 
     export AffinePatches,
         Correctors,
