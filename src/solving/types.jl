@@ -14,7 +14,7 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgaming.Endgame, PS<:PatchSwitching.PatchSwitcher, C<:SolverCache}
+        E<:Endgaming.Endgame, PS<:Union{Nothing,PatchSwitching.PatchSwitcher}, C<:SolverCache}
     prob::P
     tracker::T
     endgame::E
@@ -36,7 +36,7 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, see
     Solver(prob, start_solutions, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.ProjectiveStartTargetProblem, start_solutions, t₁, t₀, seed, options::SolverOptions; kwargs...)
+function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions; kwargs...)
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
     x = Problems.embed(prob, x₁)
@@ -90,13 +90,16 @@ function invalid_kwargs(kwargs)
     invalids
 end
 
-function pathtracker(prob::Problems.ProjectiveStartTargetProblem, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+function pathtracker(prob::Problems.Projective, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
         # filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
 end
 
-function patchswitcher(prob::Problems.ProjectiveStartTargetProblem, x, t₀)
+function patchswitcher(prob::Problems.Projective{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}
+    nothing
+end
+function patchswitcher(prob::Problems.Projective, x, t₀)
     p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
     p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
     PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)

@@ -28,6 +28,15 @@ export AbstractHomotopy,
     jacobian_and_dt!, jacobian_and_dt,
     precondition!, update!
 
+# This has to be here otherwise the compiler crashes
+"""
+    Base.size(H::AbstractHomotopy)
+
+Returns a tuple `(m, n)` indicating that `H` is a homotopy of `m` polynomials `m` in `n` variables.
+"""
+Base.size(::H) where {H<:AbstractHomotopy} = error("Obligatory to define `Base.size($H)`")
+
+
 include("homotopies/homotopy_witch_cache.jl")
 
 include("homotopies/straight_line.jl")

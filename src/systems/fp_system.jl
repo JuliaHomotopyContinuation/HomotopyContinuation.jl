@@ -6,7 +6,7 @@ export FPSystem, differentiate
 """
     FPSystem(polynomials, vars) <: AbstractSystem
 
-Create a system using the `StaticPolynomials` package.
+Create a system using the `FixedPolynomials` package.
 """
 struct FPSystem{T} <: AbstractSystem
     system::FP.System{T}

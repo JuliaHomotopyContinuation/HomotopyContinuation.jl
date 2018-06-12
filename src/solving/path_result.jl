@@ -1,9 +1,10 @@
-export solution,
+export PathResult, solution,
     residual, start_solution, issuccess,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, issmooth
 
 
+using Compat
 
 import ..Homotopies
 import ..ProjectiveVectors
@@ -69,9 +70,9 @@ struct PathResult{T1, T2, T3}
 end
 
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
-    PathResult(prob.homogenization_strategy, k, x₁, x_e, t₀, r, cache, patchswitcher)
+    PathResult(prob.homogenization, k, x₁, x_e, t₀, r, cache, patchswitcher)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Nothing)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(align_axis!(copy(r.x)))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
@@ -89,7 +90,7 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.DefaultHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
+function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
     returncode = r.returncode
     windingnumber, npredictions = windingnumber_npredictions(r)
 
@@ -231,16 +232,16 @@ Checks whether the path failed.
 isfailed(r::PathResult) = r.returncode == :path_failed
 
 """
-    isaffine(pathresult; tol=1e10)
+    isaffine(pathresult)
 
 Checks whether the path result is affine.
 """
 isaffine(r::PathResult) = r.solution_type == :affine
 
 """
-    isprojective(pathresult; tol=1e10)
+    isprojective(pathresult)
 
-Checks whether the path result is affine.
+Checks whether the path result is projective.
 """
 isprojective(r::PathResult) = r.solution_type == :projective
 

@@ -12,6 +12,7 @@ module HomotopyContinuation
         PatchSwitching,
         PathTracking,
         Predictors,
+        Input,
         Problems,
         ProjectiveVectors,
         Solving,
@@ -28,6 +29,7 @@ module HomotopyContinuation
     include("homotopies_base.jl")
     include("systems.jl")
     include("homotopies.jl")
+    include("input.jl")
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")
@@ -44,17 +46,25 @@ module HomotopyContinuation
     include("solve.jl")
 
 
-    import .Solving: solution,
+    import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
         residual, start_solution, issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, issmooth,
         nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
         finite, results, failed, atinfinity, singular, smooth, seed
 
-    export solution,
+    export AffineResult, ProjectiveResult, PathResult, solution,
         residual, start_solution, issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, issmooth,
         nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
         finite, results, failed, atinfinity, singular, smooth, seed
+
+    import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
+    export StraightLineHomotopy, FixedPointHomotopy
+
+    import .Systems: FPSystem, SPSystem
+    export FPSystem, SPSystem
+
+
 end #

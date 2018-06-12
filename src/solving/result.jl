@@ -1,17 +1,28 @@
-export nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
+export AffineResult, ProjectiveResult, nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
     finite, results, failed, atinfinity, singular, smooth, seed
 
+"""
+    Result
+
+Abstract super type of [`ProjectiveResult`](@ref) and [`AffineResult`](@ref).
+"""
 abstract type Result end
 
 """
-    Result(Vector{PathResult})
+    ProjectiveResult <: Result
 
-Constructs a summary of `PathResult`s.
+The result of a homogenous system of polynomials.
 """
 struct ProjectiveResult{T1, T2, T3} <: Result
     pathresults::Vector{PathResult{T1, T2, T3}}
     seed::Int
 end
+
+"""
+    AffineResult <: Result
+
+The result of an (non-homogenous) system of polynomials.
+"""
 struct AffineResult{T1, T2, T3} <: Result
     pathresults::Vector{PathResult{T1, T2, T3}}
     seed::Int
@@ -85,9 +96,7 @@ const Results = Union{Result, Vector{<:PathResult}}
 
 # Filtering
 """
-    results(result; only_real=false, realtol=1e-6,
-        onlysmooth=true, singulartol=1e10,
-        onlyfinite=true)
+    results(result; only_real=false, realtol=1e-6, onlysmooth=true, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
 
