@@ -1,6 +1,9 @@
+using Compat
+
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
+import .Input
 import .Problems
 import .Systems
 import .Homotopies
@@ -28,18 +31,19 @@ function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
     srand(seed)
     F = filter(f -> !iszero(f), F)
     checkfinite_dimensional(F)
-    TDP = Problems.TotalDegreeProblem(F)
-    start_solutions = Utilities.totaldegree_solutions(F)
-    solve(TDP, start_solutions, seed; kwargs...)
+    solve(Input.TotalDegree(F), seed; kwargs...)
 end
 
 function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
     srand(seed)
     @assert length(G) == length(F)
     checkfinite_dimensional(F)
-    STP = Problems.StartTargetProblem(G, F)
+    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; kwargs...)
+end
 
-    solve(STP, promote_startsolutions(startsolutions), seed; kwargs...)
+function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
+    srand(seed)
+	solve(Input.TotalDegree(F), seed; kwargs...)
 end
 
 function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
@@ -53,6 +57,7 @@ function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
     throw(AssertionError("The input system will not result in a finite number of solutions."))
 end
 
+
 promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
 function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
     PT = promote_type(typeof(xs[1][1]), Complex{Float64})
@@ -62,13 +67,14 @@ end
 randseed() = rand(1_000:1_000_000)
 
 # Internal
-function solve(prob::Problems.AbstractDynamicProblem, start_solutions, seed;
+function solve(input::Input.AbstractInput, seed;
+	homvar::Union{Nothing, Int}=nothing,
     system=Systems.FPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)
 
-    P = Problems.ProjectiveStartTargetProblem(prob, system=system, homotopy=homotopy)
-    solve(P, start_solutions, seed; kwargs...)
+    p, startsolutions = Problems.problem_startsolutions(input, homvar=homvar, system=system, homotopy=homotopy)
+    solve(p, startsolutions, seed; kwargs...)
 end
 
 function solve(prob::Problems.AbstractProblem, start_solutions, seed; threading=true, kwargs...)

@@ -19,18 +19,30 @@
     @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
     @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
 
-    @polyvar x y
+    @polyvar x y z
 
     G = [x-2, y+3]
     F = [x+2, y-3]
     @test nfinite(solve(G, F, [[2, -3]])) == 1
     @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
+
+    F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(5))))
+    result = solve(F, homvar=6)
+    @test nfinite(result) == 70
+    @test natinfinity(result) == 50
+
+    # cyclic_hom = Utilities.homogenize(equations(cyclic(5)))
+    # F = Systems.FPSystem(cyclic_hom)
+    # G = Systems.FPSystem(Problems.totaldegree(cyclic_hom, Utilities.allvariables(cyclic_hom), Utilities.allvariables(cyclic_hom)[end]))
+    # result = solve(G, F)
+
     # Check invalid inputs
     @polyvar x y
     @test_throws AssertionError solve([x-2y+2, 0])
     @test_throws AssertionError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 end
+
 
 @testset "solve - random seed" begin
     R = solve(equations(katsura(5)), seed=1234)
@@ -68,8 +80,7 @@ end
     # This tests that we indeed detect path crossings
     srand(2337)
     F = equations(cyclic(6))
-    P = Problems.ProjectiveStartTargetProblem(Problems.TotalDegreeProblem(F))
-    start_sols = Utilities.totaldegree_solutions(F) |> collect
+    P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
     x₁ = Problems.embed(P, start_sols[1])
     H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
     tracker = PathTracking.PathTracker(H, x₁, 1.0, 0.1, tol=1e-3)

@@ -2,9 +2,7 @@
 @testset "PathTracking" begin
     F = equations(katsura(5))
 
-    TDP = Problems.TotalDegreeProblem(F)
-    P = Problems.ProjectiveStartTargetProblem(TDP)
-    start_sols = Utilities.totaldegree_solutions(F) |> collect
+    P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
     x₁ = Problems.embed(P, first(start_sols))
     H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
     # test construction
@@ -47,10 +45,7 @@ end
     @polyvar x y z
     F = A * [x, y, z] - b
 
-    P1 = Problems.TotalDegreeProblem(F)
-    P = Problems.ProjectiveStartTargetProblem(P1)
-
-    sols = Utilities.totaldegree_solutions(F) |> collect
+    P, sols = Problems.problem_startsolutions(Input.TotalDegree(F))
 
     start_sols = Problems.embed.(P, sols)
 
@@ -79,9 +74,7 @@ end
 
 @testset "fixedpatch" begin
     F = equations(katsura(5))
-    TDP = Problems.TotalDegreeProblem(F)
-    P = Problems.ProjectiveStartTargetProblem(TDP)
-    start_sols = Utilities.totaldegree_solutions(F) |> collect
+    P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
     x1 = Problems.embed(P, start_sols[1])
     patch = AffinePatches.state(AffinePatches.OrthogonalPatch(), x1)
     fixedpatch = AffinePatches.state(AffinePatches.FixedPatch(), x1)
