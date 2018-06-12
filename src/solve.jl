@@ -59,11 +59,12 @@ end
 
 function solve(F::Vector{<:MP.AbstractPolynomial}, p::Vector{<:MP.AbstractVariable}, a_1::Vector{<:Number}, a_2::Vector{<:Number}, startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
     srand(seed)
-    STP = Problems.ParameterProblem(F, p, a_1, a_2)
 
     @assert length(p) == length(a_1) "Number of parameters must match"
     @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
-    solve(STP, promote_startsolutions(startsolutions), seed; homotopy = Homotopies.ParameterHomotopy, kwargs...)
+
+    STP =
+    solve(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
 

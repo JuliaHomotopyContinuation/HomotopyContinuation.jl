@@ -7,8 +7,8 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 
-import ..Input: AbstractInput, TotalDegree, StartTarget, MPPolys
-import ..Homotopies: AbstractHomotopy, StraightLineHomotopy
+import ..Input: AbstractInput, TotalDegree, StartTarget, ParameterSystem, MPPolys
+import ..Homotopies: AbstractHomotopy, StraightLineHomotopy, ParameterHomotopy
 import ..ProjectiveVectors
 import ..Systems: AbstractSystem, SPSystem, FPSystem
 import ..Systems
@@ -28,19 +28,6 @@ export AbstractProblem,
 
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
-
-"""
-    ParameterProblem(system::Vector{<:MP.AbstractPolynomial}, x::Vector{<:MP.AbstractVariable}, p::Vector{<:MP.AbstractVariable})
-
-Construct a `ParameterProblem`. This indicates that the system `system` has variables `x` and parameters `p`.
-"""
-struct ParameterProblem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable, T1<:Number, T2<:Number} <: AbstractParameterProblem
-    system::Vector{P}
-    parameters::Vector{V}
-    start::Vector{T1}
-    target::Vector{T2}
-end
-
 
 abstract type AbstractProblem end
 
@@ -74,21 +61,6 @@ function Homogenization(homvar::MP.AbstractVariable, variables::Vector{<:MP.Abst
         throw(error("homvar $homvar doesn't occur in the variables!"))
     end
     Homogenization(homvaridx)
-end
-
-
-"""
-    ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy}
-
-Construct a `ProjectiveStartTargetProblem` by initializing a homotopy `H` and a homogenization strategy `HS`. The homotopy `H` needs to be homogenous.
-"""
-
-struct ProjectiveStartTargetProblem{H<:AbstractHomotopy, HS<:AbstractHomogenizationStrategy} <: AbstractProjectiveProblem
-    homotopy::H
-    homogenization_strategy::HS
-end
-function ProjectiveStartTargetProblem(H::AbstractHomotopy)
-    ProjectiveStartTargetProblem(H, NullHomogenization())
 end
 
 """
@@ -213,12 +185,8 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, 
     end
 end
 
-function ProjectiveStartTargetProblem(prob::ParameterProblem;
-    system = FPSystem, homotopy = ParameterHomotopy)
-
+function problem_startsolutions(prob::ParameterSystem; system=FPSystem, kwargs...)
     variables = setdiff(allvariables(prob.system), prob.parameters)
-
-
     if ishomogenous(prob.system, variables)
         homogenization_strategy = NullHomogenization()
         var_ordering = [variables; prob.parameters]
@@ -226,7 +194,7 @@ function ProjectiveStartTargetProblem(prob::ParameterProblem;
         param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
         f = system(prob.system, var_ordering)
     else
-        homogenization_strategy = DefaultHomogenization()
+        homogenization_strategy = Homogenization(1)
         homvar = uniquevar(prob.system)
         var_ordering = [homvar; variables; prob.parameters]
         var_indices = 1:(length(variables)+1)
@@ -234,15 +202,11 @@ function ProjectiveStartTargetProblem(prob::ParameterProblem;
         f = system(homogenize(prob.system, variables, homvar), var_ordering)
     end
 
-    H = homotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
+    H = ParameterHomotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
 
-    ProjectiveStartTargetProblem(H, homogenization_strategy)
+    Projective(H, homogenization_strategy), prob.startsolutions
 end
 
-
-# function Projective(H::AbstractHomotopy)
-#     Projective(H, NullHomogenization())
-# end
 
 function check_homogenous_degrees(F::AbstractSystem)
     n, N = size(F)
@@ -343,24 +307,6 @@ function totaldegree(degrees::Vector{Int}, vars, _homvar::Nothing)
         vars[k]^d - 1
     end
 end
-#
-# function totaldegree(F::Vector{<:MP.AbstractPolynomialLike}, vars)
-#     out = zeros(F)
-#     if ishomogenous(F)
-#         @assert length(out) + 1 ≥ length(vars)
-#         for k=2:length(vars)
-#             d = MP.maxdegree(F[k - 1])
-#             out[k - 1] = vars[k]^d - vars[1]^d
-#         end
-#     else
-#         @assert length(out) ≥ length(vars)
-#         for k=1:length(vars)
-#             out[k] = vars[k]^MP.maxdegree(F[k]) - 1
-#         end
-#     end
-#
-#     out
-# end
 
 """
     totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
