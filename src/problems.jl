@@ -7,8 +7,8 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 
-import ..Input: AbstractInput, TotalDegree, StartTarget, MPPolys
-import ..Homotopies: AbstractHomotopy, StraightLineHomotopy
+import ..Input: AbstractInput, TotalDegree, StartTarget, ParameterSystem, MPPolys
+import ..Homotopies: AbstractHomotopy, StraightLineHomotopy, ParameterHomotopy
 import ..ProjectiveVectors
 import ..Systems: AbstractSystem, SPSystem, FPSystem
 import ..Systems
@@ -28,7 +28,6 @@ export AbstractProblem,
 
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
-
 
 abstract type AbstractProblem end
 
@@ -186,11 +185,38 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, 
     end
 end
 
+function problem_startsolutions(prob::ParameterSystem, homvar; system=FPSystem, kwargs...)
+    variables = setdiff(allvariables(prob.system), prob.parameters)
+    if ishomogenous(prob.system, variables)
+        if homvar === nothing
+            homogenization = NullHomogenization()
+            var_ordering = [variables; prob.parameters]
+            var_indices = 1:length(variables)
+            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
+            f = system(prob.system, var_ordering)
+        else
+            homogenization = Homogenization(homvar, variables)
+            var_ordering = [variables; prob.parameters]
+            var_indices = 1:length(variables)
+            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
+            f = system(prob.system, var_ordering)
+        end
+    elseif homvar === nothing
+        homogenization = Homogenization(1)
+        homvar = uniquevar(prob.system)
+        var_ordering = [homvar; variables; prob.parameters]
+        var_indices = 1:(length(variables)+1)
+        param_indices = (length(variables)+2):(length(variables)+length(prob.parameters)+1)
+        f = system(homogenize(prob.system, variables, homvar), var_ordering)
+    else
+        throw(error("Input system is not homogenous although `homvar` was passed."))
+    end
 
+    H = ParameterHomotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
 
-# function Projective(H::AbstractHomotopy)
-#     Projective(H, NullHomogenization())
-# end
+    Projective(H, homogenization), prob.startsolutions
+end
+
 
 function check_homogenous_degrees(F::AbstractSystem)
     n, N = size(F)
@@ -291,24 +317,6 @@ function totaldegree(degrees::Vector{Int}, vars, _homvar::Nothing)
         vars[k]^d - 1
     end
 end
-#
-# function totaldegree(F::Vector{<:MP.AbstractPolynomialLike}, vars)
-#     out = zeros(F)
-#     if ishomogenous(F)
-#         @assert length(out) + 1 ≥ length(vars)
-#         for k=2:length(vars)
-#             d = MP.maxdegree(F[k - 1])
-#             out[k - 1] = vars[k]^d - vars[1]^d
-#         end
-#     else
-#         @assert length(out) ≥ length(vars)
-#         for k=1:length(vars)
-#             out[k] = vars[k]^MP.maxdegree(F[k]) - 1
-#         end
-#     end
-#
-#     out
-# end
 
 """
     totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})

@@ -40,6 +40,7 @@ Base.size(::H) where {H<:AbstractHomotopy} = error("Obligatory to define `Base.s
 include("homotopies/homotopy_witch_cache.jl")
 
 include("homotopies/straight_line.jl")
+include("homotopies/parameter_homotopies.jl")
 include("homotopies/fixed_point.jl")
 include("homotopies/patched_homotopy.jl")
 include("homotopies/patch_switcher_homotopy.jl")

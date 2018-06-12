@@ -11,7 +11,8 @@ using ..Utilities
 # STAGE 1 exports
 export AbstractInput,
     StartTarget,
-    TotalDegree
+    TotalDegree,
+    ParameterSystem
 
 
 abstract type AbstractInput end
@@ -48,5 +49,20 @@ is the target system and a total degree system should be assembled.
 struct TotalDegree{S<:Inputs} <: AbstractInput
     system::S
 end
+
+
+"""
+    ParameterSystem(system::Vector{<:MP.AbstractPolynomial}, x::Vector{<:MP.AbstractVariable}, p::Vector{<:MP.AbstractVariable})
+
+Construct a `ParameterSystem`. This indicates that the system `system` has variables `x` and parameters `p`.
+"""
+struct ParameterSystem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable, T1<:Number, T2<:Number, V1<:AbstractVector} <: AbstractInput
+    system::Vector{P}
+    parameters::Vector{V}
+    start::Vector{T1}
+    target::Vector{T2}
+    startsolutions::Vector{V1}
+end
+
 
 end

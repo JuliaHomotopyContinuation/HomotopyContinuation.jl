@@ -27,18 +27,18 @@ Solve the system `F` by tracking the each solution of
 function solve end
 
 # External
-function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
+function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothing, kwargs...)
     srand(seed)
     F = filter(f -> !iszero(f), F)
-    checkfinite_dimensional(F)
-    solve(Input.TotalDegree(F), seed; kwargs...)
+    checkfinite_dimensional(F, homvar)
+    solve(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
 end
 
-function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
+function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; homvar=nothing, seed=randseed(), kwargs...)
     srand(seed)
     @assert length(G) == length(F)
-    checkfinite_dimensional(F)
-    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; kwargs...)
+    checkfinite_dimensional(F, homvar)
+    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
 end
 
 function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
@@ -46,8 +46,8 @@ function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
 	solve(Input.TotalDegree(F), seed; kwargs...)
 end
 
-function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
-    N = MP.nvariables(F)
+function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
+    N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
     n = length(F)
     # square system and each polynomial is non-zero
     if n ≥ N ||
@@ -55,6 +55,16 @@ function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
         return
     end
     throw(AssertionError("The input system will not result in a finite number of solutions."))
+end
+
+function solve(F::Vector{<:MP.AbstractPolynomial}, p::Vector{<:MP.AbstractVariable}, a_1::Vector{<:Number}, a_2::Vector{<:Number}, startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
+    srand(seed)
+
+    @assert length(p) == length(a_1) "Number of parameters must match"
+    @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
+
+    STP =
+    solve(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
 
@@ -68,7 +78,7 @@ randseed() = rand(1_000:1_000_000)
 
 # Internal
 function solve(input::Input.AbstractInput, seed;
-	homvar::Union{Nothing, Int}=nothing,
+	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing,
     system=Systems.FPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)

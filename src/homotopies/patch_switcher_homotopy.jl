@@ -90,13 +90,10 @@ end
 
 function dt!(u, H::PatchSwitcherHomotopy, x::AbstractProjectiveVector, t, c::PatchSwitcherHomotopyCache)
     M, N = size(H.homotopy)
-    # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
     @inbounds for i=1:M
         u[i] = zero(eltype(u))
     end
-    for i=1:AffinePatches.nequations(H.start_patch)
-        u[M+i] = zero(eltype(u))
-    end
+    _patches_dt!(u, H, x, t, c)
     u
 end
 

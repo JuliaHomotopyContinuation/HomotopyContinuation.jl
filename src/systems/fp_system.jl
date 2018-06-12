@@ -1,7 +1,7 @@
 import FixedPolynomials
 const FP = FixedPolynomials
 
-export FPSystem
+export FPSystem, differentiate
 
 """
     FPSystem(polynomials, vars) <: AbstractSystem
@@ -22,6 +22,7 @@ end
 cache(F::FPSystem, x) = FPSystemCache(FP.config(F.system, x))
 
 Base.size(F::FPSystem) = (length(F.system), FP.nvariables(F.system))
+Base.length(F::FPSystem) = length(F.system)
 
 evaluate!(u, F::FPSystem, x, c::FPSystemCache) = FP.evaluate!(u, F.system, x, c.config)
 evaluate(F::FPSystem, x, c::FPSystemCache) = FP.evaluate(F.system, x, c.config)
