@@ -121,8 +121,8 @@ function affine(z::PVector{T}, i::Int) where T
         if k == i
             continue
         end
-        i = k < i ? k : k - 1
-        x[i] = z.data[k] * normalizer
+        j = k < i ? k : k - 1
+        x[j] = z.data[k] * normalizer
     end
     x
 end
