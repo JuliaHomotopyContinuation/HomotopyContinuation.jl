@@ -1,5 +1,5 @@
-export AffineResult, ProjectiveResult, nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-    finite, results, failed, atinfinity, singular, smooth, seed
+export AffineResult, ProjectiveResult, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
+    finite, results, failed, atinfinity, singular, nonsingular, seed
 
 """
     Result
@@ -77,11 +77,11 @@ The number of failed paths.
 nfailed(R::Result) = count(isfailed, R)
 
 """
-    smooth(result)
+    nnonsingular(result)
 
-The number of smooth solutions.
+The number of non-singular solutions.
 """
-nsmooth(R::Result; tol = 1e10) = count(r -> issmooth(r, tol), R)
+nnonsingular(R::Result; tol = 1e10) = count(r -> isnonsingular(r, tol), R)
 
 """
     seed(result)
@@ -96,7 +96,7 @@ const Results = Union{Result, Vector{<:PathResult}}
 
 # Filtering
 """
-    results(result; only_real=false, realtol=1e-6, onlysmooth=true, singulartol=1e10, onlyfinite=true)
+    results(result; only_real=false, realtol=1e-6, onlynonsingular=true, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
 
@@ -114,22 +114,22 @@ realsolutions = results(solution, R, only_real=true)
 """
 results(R::Result; kwargs...) = results(identity, R; kwargs...)
 function results(f::Function, R::Result;
-    onlyreal=false, realtol=1e-6, onlysmooth=false, singulartol=1e10,
+    onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10,
     onlyfinite=true)
     [f(r) for r in R if
         (!onlyreal || isreal(r, realtol)) &&
-        (!onlysmooth || issmooth(r, singulartol)) &&
+        (!onlynonsingular || isnonsingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r))]
 end
 
 """
-    smooth(result::AffineResult)
+    nonsingular(result::AffineResult)
 
-Return all `PathResult`s for which the solution is smooth.
+Return all `PathResult`s for which the solution is non-singular.
 """
-smooth(R::Results; kwargs...) = smooth(identity, R; kwargs...)
-function smooth(f::Function, R::Results; tol=1e10)
-    [f(r) for r in R if issmooth(r, tol)]
+nonsingular(R::Results; kwargs...) = nonsingular(identity, R; kwargs...)
+function nonsingular(f::Function, R::Results; tol=1e10)
+    [f(r) for r in R if isnonsingular(r, tol)]
 end
 
 """
@@ -143,11 +143,11 @@ the contained `solution` is indeed a solution of the system.
 Additionally you can apply a transformation `f` on each result.
 """
 finite(R::Results; kwargs...) = finite(identity, R; kwargs...)
-function finite(f::Function, R::AffineResults; onlysmooth=false, tol=1e10)
-    if !onlysmooth
+function finite(f::Function, R::AffineResults; onlynonsingular=false, tol=1e10)
+    if !onlynonsingular
         [f(r) for r in R if isfinite(r)]
     else
-        [f(r) for r in R if isfinite(r) && issmooth(r, tol)]
+        [f(r) for r in R if isfinite(r) && isnonsingular(r, tol)]
     end
 end
 
@@ -188,7 +188,7 @@ end
 function Base.show(io::IO, r::AffineResult)
     println(io, "-----------------------------------------------")
     println(io, "Paths tracked: $(length(r))")
-    println(io, "# smooth finite solutions:  $(nsmooth(r))")
+    println(io, "# non-singular finite solutions:  $(nnonsingular(r))")
     println(io, "# singular finite solutions:  $(nsingular(r))")
     println(io, "# solutions at infinity:  $(natinfinity(r))")
     println(io, "# failed paths:  $(nfailed(r))")
@@ -199,7 +199,7 @@ end
 function Base.show(io::IO, r::ProjectiveResult)
     println(io, "-----------------------------------------------")
     println(io, "Paths tracked: $(length(r))")
-    println(io, "# smooth solutions:  $(nsmooth(r))")
+    println(io, "# non-singular solutions:  $(nnonsingular(r))")
     println(io, "# singular solutions:  $(nsingular(r))")
     println(io, "# failed paths:  $(nfailed(r))")
     println(io, "Random seed used: $(seed(r))")
@@ -212,10 +212,10 @@ function Juno.render(i::Juno.Inline, r::AffineResult)
         t[:children] = [
             Juno.render(i, Text("Paths tracked → $(length(r))"))]
         #
-        n = nsmooth(r)
+        n = nnonsingular(r)
         if n > 0
             t_result = Juno.render(i, finite(r))
-            t_result[:head] = Juno.render(i, Text("$n finite smooth solutions"))
+            t_result[:head] = Juno.render(i, Text("$n finite non-singular solutions"))
             push!(t[:children], t_result)
         end
 
@@ -249,24 +249,36 @@ function Juno.render(i::Juno.Inline, r::ProjectiveResult)
         t[:children] = [
             Juno.render(i, Text("Paths tracked → $(length(r))"))]
         #
-        n = nsmooth(r)
-        if n > 0
-            t_result = Juno.render(i, smooth(r))
-            t_result[:head] = Juno.render(i, Text("$n smooth solutions"))
+        n = nnonsingular(r)
+        if n > 1
+            t_result = Juno.render(i, nonsingular(r))
+            t_result[:head] = Juno.render(i, Text("$n non-singular solutions"))
+            push!(t[:children], t_result)
+        elseif n == 1
+            t_result = Juno.render(i, nonsingular(r))
+            t_result[:head] = Juno.render(i, Text("$n non-singular solution"))
             push!(t[:children], t_result)
         end
 
         n = nsingular(r)
-        if n > 0
+        if n > 1
             t_result = Juno.render(i, singular(r))
             t_result[:head] = Juno.render(i, Text("$n singular solutions"))
+            push!(t[:children], t_result)
+        elseif n == 1
+            t_result = Juno.render(i, singular(r))
+            t_result[:head] = Juno.render(i, Text("$n singular solution"))
             push!(t[:children], t_result)
         end
 
         n = nfailed(r)
-        if n > 0
+        if n > 1
             t_result = Juno.render(i, failed(r))
             t_result[:head] = Juno.render(i, Text("$n paths failed"))
+            push!(t[:children], t_result)
+        elseif n == 1
+            t_result = Juno.render(i, failed(r))
+            t_result[:head] = Juno.render(i, Text("$n path failed"))
             push!(t[:children], t_result)
         end
         push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))

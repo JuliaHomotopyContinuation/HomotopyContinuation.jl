@@ -49,16 +49,16 @@ module HomotopyContinuation
     import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
         residual, start_solution, issuccess,
         isfailed, isaffine, isprojective,
-        isatinfinity, issingular, issmooth,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth, seed
+        isatinfinity, issingular, isnonsingular,
+        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
+        finite, results, failed, atinfinity, singular, nonsingular, seed
 
     export AffineResult, ProjectiveResult, PathResult, solution,
         residual, start_solution, issuccess,
         isfailed, isaffine, isprojective,
-        isatinfinity, issingular, issmooth,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nsmooth,
-        finite, results, failed, atinfinity, singular, smooth, seed
+        isatinfinity, issingular, isnonsingular,
+        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
+        finite, results, failed, atinfinity, singular, nonsingular, seed
 
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
     export StraightLineHomotopy, FixedPointHomotopy
