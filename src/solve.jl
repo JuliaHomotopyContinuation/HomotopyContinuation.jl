@@ -27,18 +27,18 @@ Solve the system `F` by tracking the each solution of
 function solve end
 
 # External
-function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), kwargs...)
+function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothing, kwargs...)
     srand(seed)
     F = filter(f -> !iszero(f), F)
-    checkfinite_dimensional(F)
-    solve(Input.TotalDegree(F), seed; kwargs...)
+    checkfinite_dimensional(F, homvar)
+    solve(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
 end
 
-function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; seed=randseed(), kwargs...)
+function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; homvar=nothing, seed=randseed(), kwargs...)
     srand(seed)
     @assert length(G) == length(F)
-    checkfinite_dimensional(F)
-    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; kwargs...)
+    checkfinite_dimensional(F, homvar)
+    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
 end
 
 function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
@@ -46,8 +46,8 @@ function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
 	solve(Input.TotalDegree(F), seed; kwargs...)
 end
 
-function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial})
-    N = MP.nvariables(F)
+function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
+    N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
     n = length(F)
     # square system and each polynomial is non-zero
     if n ≥ N ||
@@ -78,7 +78,7 @@ randseed() = rand(1_000:1_000_000)
 
 # Internal
 function solve(input::Input.AbstractInput, seed;
-	homvar::Union{Nothing, Int}=nothing,
+	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing,
     system=Systems.FPSystem,
     homotopy=Homotopies.StraightLineHomotopy,
     kwargs...)

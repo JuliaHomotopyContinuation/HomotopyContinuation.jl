@@ -19,6 +19,11 @@
     @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
     @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
 
+    @polyvar w
+    F = equations(cyclic(5))
+    result = solve(Utilities.homogenize(F, w), homvar=w)
+    @test result isa AffineResult
+
     @polyvar x y z
 
     G = [x-2, y+3]
@@ -32,6 +37,13 @@
     @test nfinite(result) == 70
     @test natinfinity(result) == 50
 
+    # test numerical homogenous check fails
+    @polyvar x y z
+    G = Systems.FPSystem([x-2z, y^2+3z])
+    @test_throws ErrorException solve(G, homvar=3)
+
+    # invalid homvar
+    @test_throws AssertionError solve([x-2z, y^2+3z], homvar=z)
     # cyclic_hom = Utilities.homogenize(equations(cyclic(5)))
     # F = Systems.FPSystem(cyclic_hom)
     # G = Systems.FPSystem(Problems.totaldegree(cyclic_hom, Utilities.allvariables(cyclic_hom), Utilities.allvariables(cyclic_hom)[end]))
@@ -125,6 +137,18 @@ end
     p = [a, b]
     S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im]])
 
-    S[1].solution ≈ [complex(√2), -complex(√2)]
-    nfinite(S) == 1
+    @test S[1].solution ≈ [complex(√2), -complex(√2)]
+    @test nfinite(S) == 1
+
+    @polyvar x a y b z
+    F = [x^2-a*z^2, x*y-(a-b)*z^2]
+    p = [a, b]
+    S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]])
+    @test S isa Solving.ProjectiveResult
+    @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
+    @test nsmooth(S) == 1
+
+    S2 = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]], homvar=z)
+    @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
+    @test nfinite(S2) == 1
 end

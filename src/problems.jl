@@ -185,26 +185,36 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, 
     end
 end
 
-function problem_startsolutions(prob::ParameterSystem; system=FPSystem, kwargs...)
+function problem_startsolutions(prob::ParameterSystem, homvar; system=FPSystem, kwargs...)
     variables = setdiff(allvariables(prob.system), prob.parameters)
     if ishomogenous(prob.system, variables)
-        homogenization_strategy = NullHomogenization()
-        var_ordering = [variables; prob.parameters]
-        var_indices = 1:length(variables)
-        param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
-        f = system(prob.system, var_ordering)
-    else
-        homogenization_strategy = Homogenization(1)
+        if homvar === nothing
+            homogenization = NullHomogenization()
+            var_ordering = [variables; prob.parameters]
+            var_indices = 1:length(variables)
+            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
+            f = system(prob.system, var_ordering)
+        else
+            homogenization = Homogenization(homvar, variables)
+            var_ordering = [variables; prob.parameters]
+            var_indices = 1:length(variables)
+            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
+            f = system(prob.system, var_ordering)
+        end
+    elseif homvar === nothing
+        homogenization = Homogenization(1)
         homvar = uniquevar(prob.system)
         var_ordering = [homvar; variables; prob.parameters]
         var_indices = 1:(length(variables)+1)
         param_indices = (length(variables)+2):(length(variables)+length(prob.parameters)+1)
         f = system(homogenize(prob.system, variables, homvar), var_ordering)
+    else
+        throw(error("Input system is not homogenous although `homvar` was passed."))
     end
 
     H = ParameterHomotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
 
-    Projective(H, homogenization_strategy), prob.startsolutions
+    Projective(H, homogenization), prob.startsolutions
 end
 
 
