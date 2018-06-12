@@ -70,7 +70,6 @@ Evaluate the Jacobian of the system `F` at `x`.
 """
 jacobian(F::AbstractSystem, x, ::NullCache) = jacobian(F, x)
 
-
 # Optional
 """
     evaluate_and_jacobian!(u, U, F, x [, cache::AbstractSystemCache])
@@ -94,5 +93,6 @@ function evaluate_and_jacobian(F::AbstractSystem, x, cache)
     U = jacobian(F, x, cache)
     u, U
 end
+
 
 end

@@ -4,7 +4,11 @@ makedocs(
     format = :html,
     sitename = "HomotopyContinuation.jl",
     pages = [
-        "Introduction" => "index.md"
+        "Introduction" => "index.md",
+        "Solving" => "solving.md",
+        "Systems" => "systems.md",
+        "Homotopies" => "homotopies.md",
+        "Predictors" => "predictors.md"
         ]
 )
 

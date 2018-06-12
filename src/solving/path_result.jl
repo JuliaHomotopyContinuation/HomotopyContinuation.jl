@@ -1,4 +1,4 @@
-export solution,
+export PathResult, solution,
     residual, start_solution, issuccess,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, issmooth
@@ -232,16 +232,16 @@ Checks whether the path failed.
 isfailed(r::PathResult) = r.returncode == :path_failed
 
 """
-    isaffine(pathresult; tol=1e10)
+    isaffine(pathresult)
 
 Checks whether the path result is affine.
 """
 isaffine(r::PathResult) = r.solution_type == :affine
 
 """
-    isprojective(pathresult; tol=1e10)
+    isprojective(pathresult)
 
-Checks whether the path result is affine.
+Checks whether the path result is projective.
 """
 isprojective(r::PathResult) = r.solution_type == :projective
 
