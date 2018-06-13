@@ -234,7 +234,7 @@ function check_homogenous_degrees(F::AbstractSystem)
 
     degrees = map(y2, y) do y2ᵢ, yᵢ
         # y2ᵢ = 2^dᵢ yᵢ
-        float_dᵢ = log2(y2ᵢ / yᵢ)
+        float_dᵢ = log2(abs(y2ᵢ / yᵢ))
         dᵢ = round(Int, float_dᵢ)
         if abs(dᵢ - float_dᵢ) > 1e-10
             throw(error("Input system is not homogenous by our numerical check."))
@@ -366,7 +366,7 @@ Base.start(iter::TotalDegreeSolutionIterator) = start(iter.iterator)
 function Base.next(iter::TotalDegreeSolutionIterator, state)
     indices, nextstate = next(iter.iterator, state)
 
-    value = Complex{Float64}[]
+    value = Vector{Complex{Float64}}()
     if iter.homogenous
         push!(value, complex(1.0, 0.0))
     end
@@ -377,6 +377,6 @@ function Base.next(iter::TotalDegreeSolutionIterator, state)
 end
 Base.done(iter::TotalDegreeSolutionIterator, state) = done(iter.iterator, state)
 Base.length(iter::TotalDegreeSolutionIterator) = length(iter.iterator)
-Base.eltype(iter::TotalDegreeSolutionIterator) = Vector{Complex{Float64}}
+Base.eltype(iter::Type{<:TotalDegreeSolutionIterator}) = Vector{Complex{Float64}}
 
 end
