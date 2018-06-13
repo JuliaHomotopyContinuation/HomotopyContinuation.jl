@@ -43,8 +43,8 @@ function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, op
 
     check_kwargs(kwargs)
 
-    tracker = pathtracker(prob, x, t₁, t₀; kwargs...)
-    endgame = Endgaming.Endgame(prob.homotopy, x; kwargs...)
+    tracker = pathtracker(prob, x, t₁, t₀;  filterkwargs(kwargs, PathTracking.allowed_kwargs)...)
+    endgame = Endgaming.Endgame(prob.homotopy, x; filterkwargs(kwargs, Endgaming.allowed_kwargs)...)
     switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)
@@ -93,7 +93,6 @@ end
 function pathtracker(prob::Problems.Projective, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
-        # filterkwargs(kwargs, PathTracking.PATH_TRACKER_KWARGS)...)
 end
 
 function patchswitcher(prob::Problems.Projective{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}
