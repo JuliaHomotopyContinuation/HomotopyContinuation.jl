@@ -1,7 +1,7 @@
 export PathResult, solution,
     residual, start_solution, issuccess,
     isfailed, isaffine, isprojective,
-    isatinfinity, issingular, isnonsingular
+    isatinfinity, issingular, issmooth
 
 
 using Compat
@@ -278,13 +278,13 @@ function issingular(r::PathResult, tol::Real)
 end
 
 """
-    isnonsingular(pathresult; tol=1e10)
+    issmooth(pathresult; tol=1e10)
 
-Checks whether the path result is non-singular. This is true if
+Checks whether the path result is smooth. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
-function isnonsingular(r::PathResult, tol::Real)
+issmooth(r::PathResult; tol=1e10) = issmooth(r, tol)
+function issmooth(r::PathResult, tol::Real)
     if isprojective(r)
         r.windingnumber ≤ 1 && r.condition_number ≤ tol
     else
