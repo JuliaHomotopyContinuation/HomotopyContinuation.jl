@@ -18,14 +18,15 @@ results
 failed
 atinfinity
 singular
-smooth
+nonsingular
 seed
 nresults
 nfinite
 nsingular
+nnonsingular
 natinfinity
 nfailed
-nsmooth
+
 ```
 ## PathResult
 ```@docs
@@ -38,5 +39,5 @@ isaffine
 isprojective
 isatinfinity
 issingular
-issmooth
+isnonsingular
 ```

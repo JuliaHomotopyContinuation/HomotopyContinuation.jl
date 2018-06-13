@@ -146,7 +146,7 @@ end
     S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]])
     @test S isa Solving.ProjectiveResult
     @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
-    @test nsmooth(S) == 1
+    @test nnonsingular(S) == 1
 
     S2 = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]], homvar=z)
     @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
