@@ -162,7 +162,7 @@ end
     L₂ = rand(Complex128, 4) ⋅ [x, y, z, w]
     S = solve([f; L₁], [f; L₂], [[1, 1, 1, 1]])
 
-    @test nsmooth(S) == 1
+    @test nonsingular(S) == 1
 
 
     f = [x*z-y^2, y-z^2, x-y*z]
