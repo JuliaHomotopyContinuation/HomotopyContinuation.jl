@@ -328,10 +328,10 @@ function totaldegree_solutions(F::Vector{AP}, homogenization) where {AP<:MP.Abst
     totaldegree_solutions(MP.maxdegree.(F), homogenization)
 end
 function totaldegree_solutions(degrees::Vector{Int}, ::NullHomogenization)
-    TotalDegreeSolutionIterator(degrees, true)
+    TotalDegreeSolutionIterator(degrees, true) |> collect
 end
 function totaldegree_solutions(degrees::Vector{Int}, ::Homogenization)
-    TotalDegreeSolutionIterator(degrees, false)
+    TotalDegreeSolutionIterator(degrees, false) |> collect
 end
 
 
