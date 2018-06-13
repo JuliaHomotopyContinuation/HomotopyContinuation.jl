@@ -113,8 +113,8 @@ end
     # Test that we resolve path crossings
     F = equations(cyclic(6))
     # this will have three crossed paths
-    @test nfinite(solve(F, tol=1e-3, seed=2337, threading=false)) ≤ 156
-    @test nfinite(solve(F, tol=1e-3, seed=2337)) ≤ 156
+    @test nfinite(solve(F, tol=1e-3, seed=2337, threading=false)) < 158
+    @test nfinite(solve(F, tol=1e-3, seed=2337)) < 158
 end
 
 @testset "Affine vs projective" begin
@@ -151,4 +151,24 @@ end
     S2 = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]], homvar=z)
     @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
     @test nfinite(S2) == 1
+end
+
+@testset "Overdetermined" begin
+    @polyvar x y z w
+    a = [0.713865+0.345317im, 0.705182+0.455495im, 0.9815+0.922608im, 0.337617+0.508932im]
+
+    f = [x*z-y^2, y*w-z^2, x*w-y*z]
+    L₁ = [1, -1, 1, -1] ⋅ [x, y, z, w]
+    L₂ = rand(Complex128, 4) ⋅ [x, y, z, w]
+    S = solve([f; L₁], [f; L₂], [[1, 1, 1, 1]])
+
+    @test nnonsingular(S) == 1
+
+
+    f = [x*z-y^2, y-z^2, x-y*z]
+    L₁ = [1, -1, 1, -1] ⋅ [x, y, z, 1]
+    L₂ = rand(Complex128, 4) ⋅ [x, y, z, 1]
+    S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
+
+    @test nfinite(S) == 1
 end
