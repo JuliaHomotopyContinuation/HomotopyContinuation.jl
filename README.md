@@ -5,8 +5,7 @@
 | [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url] |
 
 
-`HomotopyContinuation.jl` is a package for solving polynomial systems via homotopy continuation where the number of polynomials
-match the number of variables.
+`HomotopyContinuation.jl` is a package for solving polynomial systems with only finitely many solution using numerical homotopy continuation.
 
 You can simply install this package via the Julia package manager
 ```julia
