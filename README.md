@@ -67,6 +67,7 @@ julia> real(result)[1]
  * t: 0.0
  * iterations: 4
  * npredictions: 1
+  ---------------------------------------------
 ```
 
 The returncode tells us that the pathtracking was successfull. What do the other entries of that table tell us? Let us consider the most relevant.
