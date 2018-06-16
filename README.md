@@ -55,7 +55,7 @@ where we can see that there are 2 real solutions, `(⁴√(2³),-√2)` and `(-�
 ```julia
 julia> real(result)[1]
  ---------------------------------------------
-* returncode: success
+ * returncode: success
  * solution: Complex{Float64}[1.68179+1.27738e-17im, -1.41421-1.18454e-17im]
  * residual: 4.454e-16
  * condition_number: 1.933e+00
@@ -67,7 +67,7 @@ julia> real(result)[1]
  * t: 0.0
  * iterations: 4
  * npredictions: 1
-  ---------------------------------------------
+ ---------------------------------------------
 ```
 
 The returncode tells us that the pathtracking was successfull. What do the other entries of that table tell us? Let us consider the most relevant.
