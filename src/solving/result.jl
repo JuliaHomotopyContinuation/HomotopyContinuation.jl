@@ -111,6 +111,7 @@ R = solve(F)
 
 # This gives us all solutions considered real (but still as a complex vector).
 realsolutions = results(solution, R, only_real=true)
+```
 """
 results(R::Result; kwargs...) = results(identity, R; kwargs...)
 function results(f::Function, R::Result;
