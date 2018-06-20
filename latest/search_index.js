@@ -13,44 +13,52 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Introduction",
     "category": "section",
-    "text": "Homotopy.Continuation.jl is a package for solving systems of polynomials with only finitely many solutions using numerical homotopy continuation. If this is your first time reading this documentation, we recommend you start with the getting started guide."
+    "text": "Homotopy.Continuation.jl is a package for solving systems of polynomials with only finitely many solutions using numerical homotopy continuation. If this is your first time reading this documentation, we recommend you start with the quick start guide."
 },
 
 {
-    "location": "index.html#References-1",
+    "location": "index.html#Contents-1",
     "page": "Introduction",
-    "title": "References",
+    "title": "Contents",
     "category": "section",
-    "text": "Pages = [\"solving.md\", \"systems.md\", \"homotopies.md\", \"predictors.md\"]"
+    "text": "Pages = [\"solving.md\", \"systems.md\", \"homotopies.md\", \"predictors-correctors.md\"]"
 },
 
 {
     "location": "solving.html#",
-    "page": "Solving",
-    "title": "Solving",
+    "page": "Solving Polynomial Systems",
+    "title": "Solving Polynomial Systems",
     "category": "page",
     "text": ""
 },
 
 {
-    "location": "solving.html#Solving-systems-1",
-    "page": "Solving",
-    "title": "Solving systems",
+    "location": "solving.html#Solving-Polynomial-Systems-1",
+    "page": "Solving Polynomial Systems",
+    "title": "Solving Polynomial Systems",
     "category": "section",
-    "text": ""
+    "text": "At the heart of the package is the solve function. It takes a bunch of different input combinations and returns an AffineResult or ProjectiveResult depending on the input."
 },
 
 {
     "location": "solving.html#HomotopyContinuation.solve",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.solve",
     "category": "function",
     "text": "solve(F; options...)\n\nSolve the system F using a total degree homotopy. F can be\n\nVector{<:MultivariatePolynomials.AbstractPolynomial} (e.g. constructed by @polyvar)\nSystems.AbstractSystem (the system has to represent a homogenous polynomial system.)\n\nExample\n\nAssume we want to solve the system F(xy) = (x^2+y^2+1 2x+3y-1).\n\n@polyvar x y\nsolve([x^2+y^2+1, 2x+3y-1])\n\nIf you polynomial system is already homogenous, but you would like to consider it as an affine system you can do\n\n@polyvar x y z\nsolve([x^2+y^2+z^2, 2x+3y-z], homvar=z)\n\nThis would result in the same result as solve([x^2+y^2+1, 2x+3y-1]).\n\nTo solve F by a custom Systems.AbstractSystem you can do\n\n@polyvar x y z\n# The system `F` has to be homgoenous system\nF = Systems.SPSystem([x^2+y^2+z^2, 2x+3y-z]) # Systems.SPSystem <: Systems.AbstractSystem\n# To solve the original affine system we have to tell that the homogenization variable has index 3\nsolve(F, homvar=3)\n\nStart Target Homotopy\n\nsolve(G, F, start_solutions; options...)\n\nSolve the system F by tracking the each provided solution of G (as provided by start_solutions).\n\nExample\n\n@polyvar x y\nG = [x^2-1,y-1]\nF = [x^2+y^2+z^2, 2x+3y-z]\nsolve(G, F, [[1, 1], [-1, 1]])\n\nParameter Homotopy\n\nsolve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial}, parametervariables, startparameters, targetparameters, startsolutions)\n\nConstruct a parameter homotopy H(xt) = F(x tp+(1-t)p) where p₁ is startparameters, p₀ is targetparameters and the parametervariables are the variables of F which should be considerd parameters.\n\nExample\n\nWe want to solve a parameter homotopy H(xt) = F(x t1 0+(1-t)2 4) where\n\nF(x a) = (x^2-a xx-a+a)\n\nand let\'s say we are only intersted in tracking of 11. This can be accomplished as follows\n\n@polyvar x[1:2] a[1:2]\nF = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]\np₁ = [1, 0]\np₀ = [2, 4]\nstartsolutions = [[1, 1]]\nsolve(F, a, p₁, p₀, startsolutions)\n\nAbstract Homotopy\n\nsolve(H::Homotopies.AbstractHomotopy, start_solutions; options...)\n\nSolve the homotopy H by tracking the each solution of H( t) (as provided by start_solutions) from t=1 to t=0.\n\nOptions\n\nGeneral options:\n\nseed::Int: The random seed used during the computations.\nhomvar::Union{Int,MultivariatePolynomials.AbstractVariable}: This considers the homogenous system F as an affine system which was homogenized by homvar. If F is an AbstractSystem homvar is the index (i.e. Int) of the homogenization variable. If F is an AbstractVariables (e.g. created by @polyvar x) homvar is the actual variable used in the system F.\nendgame_start=0.1: The value oft` for which the endgame is started.\nreport_progress=true: Whether a progress bar should be printed to STDOUT.\n\nPathtracking specific:\n\ncorrector::Correctors.AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is Correctors.Newton.\ncorrector_maxiters=2: The maximal number of correction steps in a single step.\npredictor::Predictors.AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Predictors.RK4.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-11: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\ninitial_steplength=0.1: The initial step size for the predictor.\nsteplength_increase_factor=2.0: The factor with which the step size is increased after steplength_consecutive_successes_necessary consecutive successes.\nsteplength_decrease_factor=inv(increase_factor): The factor with which the step size is decreased after a step failed.\nsteplength_consecutive_successes_necessary=5: The numer of consecutive successes necessary until the step size is increased by steplength_increase_factor.\nmaximal_steplength=max(0.1, initial_steplength): The maximal step length.\nminimal_steplength=1e-14: The minimal step size. If the size of step is below this the path is considered failed.\n\nEndgame specific options\n\ncauchy_loop_closed_tolerance=1e-3: The tolerance for which is used to determine whether a loop is closed. The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.\ncauchy_samples_per_loop=6: The number of samples used to predict an endpoint. A higher number of samples should result in a better approximation. Note that the error should be roughly t^n where t is the current time of the loop and n is cauchy_samples_per_loop.\negtol=1e-10: This is the tolerance necessary to declare the endgame converged.\nmaxnorm=1e5: If our original problem is affine we declare a path at infinity if the infinity norm with respect to the standard patch is larger than maxnorm.\nmaxwindingnumber=15: The maximal windingnumber we try to find using Cauchys integral formula.\nmax_extrapolation_samples=4: During the endgame a Richardson extrapolation is used to improve the accuracy of certain approximations. This is the maximal number of samples used for this.\nminradius=1e-15: A path is declared false if the endgame didn\'t finished until then.\nsampling_factor=0.5: During the endgame we approach 0 by the geometric series h^kR where h is sampling_factor and R₀ the endgame start provided in runendgame.\n\n\n\n"
 },
 
 {
+    "location": "solving.html#The-*solve*-function-1",
+    "page": "Solving Polynomial Systems",
+    "title": "The solve function",
+    "category": "section",
+    "text": "solve"
+},
+
+{
     "location": "solving.html#HomotopyContinuation.Solving.AffineResult",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.AffineResult",
     "category": "type",
     "text": "AffineResult <: Result\n\nThe result of an (non-homogenous) system of polynomials.\n\n\n\n"
@@ -58,31 +66,15 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.ProjectiveResult",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.ProjectiveResult",
     "category": "type",
     "text": "ProjectiveResult <: Result\n\nThe result of a homogenous system of polynomials.\n\n\n\n"
 },
 
 {
-    "location": "solving.html#solve-1",
-    "page": "Solving",
-    "title": "solve",
-    "category": "section",
-    "text": "solveDepending on the input solve returns one of the following typesAffineResult\nProjectiveResult"
-},
-
-{
-    "location": "solving.html#HomotopyContinuation.Solving.finite",
-    "page": "Solving",
-    "title": "HomotopyContinuation.Solving.finite",
-    "category": "function",
-    "text": "finite(result::AffineResult)\n\nReturn all PathResults for which the result is successfull and the contained solution is indeed a solution of the system.\n\nfinite(f::Function, result)\n\nAdditionally you can apply a transformation f on each result.\n\n\n\n"
-},
-
-{
     "location": "solving.html#HomotopyContinuation.Solving.results",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.results",
     "category": "function",
     "text": "results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n"
@@ -90,15 +82,15 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.solutions",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solutions",
     "category": "function",
-    "text": "solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply. If onlyreal is Val{true} this returns the real solutions. This is different than applying results(solution, result, onlyreal=true).\n\nExample\n\n```julia julia> @polyvar x y julia> result = solve([(x-2)y, y+x+3]); julia> solutions(result, Val{true}) [[2.0, -5.0], [-3.0, 0.0]] julia> solutions(result) [[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
+    "text": "solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply. If onlyreal is Val{true} this returns the real solutions. This is different than applying results(solution, result, onlyreal=true).\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result, Val{true})\n[[2.0, -5.0], [-3.0, 0.0]]\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
 },
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.failed",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.failed",
     "category": "function",
     "text": "failed(result)\n\nGet all results where the path tracking failed.\n\n\n\n"
@@ -106,7 +98,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.atinfinity",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.atinfinity",
     "category": "function",
     "text": "atinfinity(result::AffineResult)\n\nGet all results where the solutions is at infinity.\n\n\n\n"
@@ -114,7 +106,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.singular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.singular",
     "category": "function",
     "text": "singular(result; tol=1e10)\n\nGet all singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than tol.\n\n\n\n"
@@ -122,15 +114,23 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nonsingular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nonsingular",
     "category": "function",
     "text": "nonsingular(result::AffineResult)\n\nReturn all PathResults for which the solution is non-singular.\n\n\n\n"
 },
 
 {
+    "location": "solving.html#HomotopyContinuation.Solving.finite",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.finite",
+    "category": "function",
+    "text": "finite(result::AffineResult)\n\nReturn all PathResults for which the result is successfull and the contained solution is indeed a solution of the system.\n\nfinite(f::Function, result)\n\nAdditionally you can apply a transformation f on each result.\n\n\n\n"
+},
+
+{
     "location": "solving.html#HomotopyContinuation.Solving.seed",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.seed",
     "category": "function",
     "text": "seed(result)\n\nThe random seed used in the computation.\n\n\n\n"
@@ -138,7 +138,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nresults",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nresults",
     "category": "function",
     "text": "nresults(result)\n\nThe number of proper solutions.\n\n\n\n"
@@ -146,7 +146,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nfinite",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nfinite",
     "category": "function",
     "text": "nresults(affineresult)\n\nThe number of finite solutions.\n\n\n\n"
@@ -154,7 +154,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nsingular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nsingular",
     "category": "function",
     "text": "nsingular(result; tol=1e10)\n\nThe number of singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than tol.\n\n\n\n"
@@ -162,7 +162,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nnonsingular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nnonsingular",
     "category": "function",
     "text": "nnonsingular(result; tol=1e-10)\n\nThe number of non-singular solutions.\n\n\n\n"
@@ -170,7 +170,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.natinfinity",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.natinfinity",
     "category": "function",
     "text": "natinfinity(affineresult)\n\nThe number of solutions at infinity.\n\n\n\n"
@@ -178,23 +178,31 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.nfailed",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nfailed",
     "category": "function",
     "text": "nafailed(result)\n\nThe number of failed paths.\n\n\n\n"
 },
 
 {
-    "location": "solving.html#Result-1",
-    "page": "Solving",
-    "title": "Result",
+    "location": "solving.html#The-result-of-*solve*-1",
+    "page": "Solving Polynomial Systems",
+    "title": "The result of solve",
     "category": "section",
-    "text": "finite\nresults\nsolutions\nfailed\natinfinity\nsingular\nnonsingular\nseed\nnresults\nnfinite\nnsingular\nnnonsingular\nnatinfinity\nnfailed\n"
+    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nsolutions\nfailed\natinfinity\nsingular\nnonsingular\nfinite\nseedIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
+},
+
+{
+    "location": "solving.html#HomotopyContinuation.Solving.PathResult",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.PathResult",
+    "category": "type",
+    "text": "PathResult(startvalue, pathtracker_result, endgamer_result, solver)\n\nA PathResult is the result of the tracking of a path (inclusive endgame). Its fields are\n\nreturncode: One of :success, :at_infinity or any error code from the EndgamerResult\nsolution::Vector{T}: The solution vector. If the algorithm computed in projective space and the solution is at infinity then the projective solution is given. Otherwise an affine solution is given if the startvalue was affine and a projective solution is given if the startvalue was projective.\nresidual::Float64: The value of the infinity norm of H(solution, 0).\nnewton_residual: The value of the 2-norm of J_H(textsolution)^-1H(textsolution 0)\ncondition_number: This is the condition number of the Jacobian at the solution. A high condition number indicates a singularity.\nwindingnumber: The estimated winding number\nangle_to_infinity: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is 0.\nreal_solution: Indicates whether the solution is real given the defined tolerance at_infinity_tol (from the solver options).\nstartvalue: The startvalue of the path\niterations: The number of iterations the pathtracker needed.\nendgame_iterations: The number of steps in the geometric series the endgamer did.\nnpredictions: The number of predictions the endgamer did.\npredictions: The predictions of the endgamer.\n\n\n\n"
 },
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.solution",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solution",
     "category": "function",
     "text": "solution(pathresult)\n\nGet the solution of the path.\n\n\n\n"
@@ -202,23 +210,23 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.residual",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.residual",
     "category": "function",
     "text": "residual(pathresult)\n\nGet the residual of the solution x of the path, i.e., H(x t)_infty.\n\n\n\n"
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.start_solution",
-    "page": "Solving",
-    "title": "HomotopyContinuation.Solving.start_solution",
+    "location": "solving.html#HomotopyContinuation.Solving.startsolution",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.startsolution",
     "category": "function",
-    "text": "residual(pathresult)\n\nGet the residual of the solution x of the path, i.e., H(x t)_infty.\n\n\n\n"
+    "text": "startsolution(pathresult)\n\nGet the start solution of the solution x of the path.\n\n\n\n"
 },
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.issuccess",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.issuccess",
     "category": "function",
     "text": "issuccess(pathresult)\n\nChecks whether the path is successfull.\n\n\n\n"
@@ -226,7 +234,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.isfailed",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isfailed",
     "category": "function",
     "text": "isfailed(pathresult)\n\nChecks whether the path failed.\n\n\n\n"
@@ -234,7 +242,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.isaffine",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isaffine",
     "category": "function",
     "text": "isaffine(pathresult)\n\nChecks whether the path result is affine.\n\n\n\n"
@@ -242,7 +250,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.isprojective",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isprojective",
     "category": "function",
     "text": "isprojective(pathresult)\n\nChecks whether the path result is projective.\n\n\n\n"
@@ -250,7 +258,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.isatinfinity",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isatinfinity",
     "category": "function",
     "text": "isatinfinity(pathresult)\n\nChecks whether the path goes to infinity.\n\n\n\n"
@@ -258,7 +266,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.issingular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.issingular",
     "category": "function",
     "text": "issingular(pathresult; tol=1e10)\nissingular(pathresult, tol)\n\nChecks whether the path result is singular. This is true if the winding number > 1 or if the condition number of the Jacobian is larger than tol.\n\n\n\n"
@@ -266,7 +274,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#HomotopyContinuation.Solving.isnonsingular",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isnonsingular",
     "category": "function",
     "text": "isnonsingular(pathresult; tol=1e10)\n\nChecks whether the path result is non-singular. This is true if it is not singular.\n\n\n\n"
@@ -274,10 +282,10 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "solving.html#PathResult-1",
-    "page": "Solving",
+    "page": "Solving Polynomial Systems",
     "title": "PathResult",
     "category": "section",
-    "text": "solution\nresidual\nstart_solution\nissuccess\nisfailed\nisaffine\nisprojective\nisatinfinity\nissingular\nisnonsingular"
+    "text": "For each path we return a PathResult containing the detailed information about the single path.PathResultThe following helper functions are providedsolution\nresidual\nstartsolution\nissuccess\nisfailed\nisaffine\nisprojective\nisatinfinity\nissingular\nisnonsingular"
 },
 
 {
@@ -441,14 +449,6 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Homotopies-1",
-    "page": "Homotopies",
-    "title": "Homotopies",
-    "category": "section",
-    "text": ""
-},
-
-{
     "location": "homotopies.html#HomotopyContinuation.Homotopies.StraightLineHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.StraightLineHomotopy",
@@ -465,19 +465,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Pre-defined-homotopies-1",
+    "location": "homotopies.html#Homotopies-1",
     "page": "Homotopies",
-    "title": "Pre-defined homotopies",
+    "title": "Homotopies",
     "category": "section",
-    "text": "StraightLineHomotopy\nFixedPointHomotopy"
+    "text": "A homotopy is a functionH mathbbC^N  mathbbC  mathbbC^n (xt)  H(xt)where H( t) is a polynomial system for all tmathbbC. The following homotopies are available by defaultStraightLineHomotopy\nFixedPointHomotopy"
 },
 
 {
-    "location": "homotopies.html#Interface-for-custom-homotopies-1",
+    "location": "homotopies.html#Homotopy-Interface-1",
     "page": "Homotopies",
-    "title": "Interface for custom homotopies",
+    "title": "Homotopy Interface",
     "category": "section",
-    "text": ""
+    "text": "The great thing is that you are not limited to the homotopies provided by default. You can define your own homotopy by defining a struct with super type Homotopies.AbstractHomotopy. For this the following interface has to be defined."
 },
 
 {
@@ -541,7 +541,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "Mandatory",
     "category": "section",
-    "text": "Homotopies.evaluate!\nHomotopies.jacobian!\nHomotopies.dt!\nBase.size(::Homotopies.AbstractHomotopy)"
+    "text": "The following methods are mandatory to implement.Homotopies.evaluate!\nHomotopies.jacobian!\nHomotopies.dt!\nBase.size(::Homotopies.AbstractHomotopy)"
 },
 
 {
@@ -621,7 +621,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "Optional",
     "category": "section",
-    "text": "Homotopies.cache\nHomotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
+    "text": "The following are optional to implement but usually you want to define at least cache.Homotopies.cache\nHomotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
 },
 
 {
