@@ -137,6 +137,7 @@ julia> solutions(result, Val{true})
 [[2.0, -5.0], [-3.0, 0.0]]
 julia> solutions(result)
 [[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]
+```
 """
 function solutions(result::Result, onlyreal=Val{false}; kwargs...)
     if onlyreal === Val{true}

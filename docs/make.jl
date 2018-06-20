@@ -5,7 +5,7 @@ makedocs(
     sitename = "HomotopyContinuation.jl",
     pages = [
         "Introduction" => "index.md",
-        "Solving" => "solving.md",
+        "Solving Polynomial Systems" => "solving.md",
         "Systems" => "systems.md",
         "Homotopies" => "homotopies.md",
         "Predictors and Correctors" => "predictors-correctors.md"

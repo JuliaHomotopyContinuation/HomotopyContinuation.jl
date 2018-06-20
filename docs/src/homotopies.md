@@ -1,11 +1,21 @@
 # Homotopies
 
-## Pre-defined homotopies
+A homotopy is a function
+```math
+H: \mathbb{C}^N × \mathbb{C} → \mathbb{C}^n, (x,t) ↦ H(x,t)
+```
+where ``H(⋅, t)`` is a polynomial system for all ``t∈\mathbb{C}``.
+The following homotopies are available by default
 ```@docs
 StraightLineHomotopy
 FixedPointHomotopy
 ```
-## Interface for custom homotopies
+
+## Homotopy Interface
+
+The great thing is that you are not limited to the homotopies provided by default.
+You can define your own homotopy by defining a struct with super type [`Homotopies.AbstractHomotopy`](@ref).
+For this the following interface has to be defined.
 
 ### Abstract types
 ```@docs
@@ -14,6 +24,7 @@ Homotopies.AbstractHomotopyCache
 ```
 
 ### Mandatory
+The following methods are mandatory to implement.
 ```@docs
 Homotopies.evaluate!
 Homotopies.jacobian!
@@ -21,6 +32,8 @@ Homotopies.dt!
 Base.size(::Homotopies.AbstractHomotopy)
 ```
 ### Optional
+The following are optional to implement but usually you want to define at least
+[`cache`](@ref).
 ```@docs
 Homotopies.cache
 Homotopies.evaluate_and_jacobian!

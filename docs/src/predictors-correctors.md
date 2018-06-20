@@ -12,7 +12,6 @@ Predictors.Euler
 Predictors.NullPredictor
 ```
 
-
 ## Correctors
 ```@docs
 Correctors.Newton

@@ -1,5 +1,5 @@
 export PathResult, solution,
-    residual, start_solution, issuccess,
+    residual, startsolution, issuccess,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
@@ -27,19 +27,13 @@ end
 """
     PathResult(startvalue, pathtracker_result, endgamer_result, solver)
 
-Construct a `PathResult` for a given `startvalue`. `pathtracker_result` is the
-[`PathtrackerResult`](@ref) until the endgame radius is reached. `endgamer_result`
-is the [`EndgamerResult`](@ref) resulting from the corresponding endgame.
-
-A `PathResult` contains:
+A `PathResult` is the result of the tracking of a path (inclusive endgame).
+Its fields are
 * `returncode`: One of `:success`, `:at_infinity` or any error code from the `EndgamerResult`
-* `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space
-and the solution is at infinity then the projective solution is given. Otherwise
-an affine solution is given if the startvalue was affine and a projective solution
-is given if the startvalue was projective.
+* `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space and the solution is at infinity then the projective solution is given. Otherwise an affine solution is given if the startvalue was affine and a projective solution is given if the startvalue was projective.
 * `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
 * `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
-* `condition_number`: A high condition number indicates singularty. See [`Homotopies.κ`](@ref) for details.
+* `condition_number`: This is the condition number of the Jacobian at the solution. A high condition number indicates a singularity.
 * `windingnumber`: The estimated winding number
 * `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
@@ -214,11 +208,11 @@ Get the residual of the solution ``x`` of the path, i.e., ``||H(x, t)||_{\\infty
 residual(r::PathResult) = r.residual
 
 """
-    residual(pathresult)
+    startsolution(pathresult)
 
-Get the residual of the solution ``x`` of the path, i.e., ``||H(x, t)||_{\\infty}``.
+Get the start solution of the solution ``x`` of the path.
 """
-start_solution(r::PathResult) = r.start_solution
+startsolution(r::PathResult) = r.start_solution
 
 """
     issuccess(pathresult)

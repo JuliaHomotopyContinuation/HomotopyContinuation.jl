@@ -18,7 +18,7 @@
     @test length(nonsingular(R)) == 4
 
     @test_nowarn results(solution, R)
-    @test_nowarn results(start_solution, R)
+    @test_nowarn results(startsolution, R)
     @test_nowarn results(residual, R)
     @test_nowarn results(issingular, R)
     @test count(results(isreal, R)) == 2
