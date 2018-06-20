@@ -96,7 +96,7 @@ const Results = Union{Result, Vector{<:PathResult}}
 
 # Filtering
 """
-    results(result; only_real=false, realtol=1e-6, onlynonsingular=true, singulartol=1e10, onlyfinite=true)
+    results(result; only_real=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
 
