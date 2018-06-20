@@ -77,7 +77,7 @@ The number of failed paths.
 nfailed(R::Result) = count(isfailed, R)
 
 """
-    nnonsingular(result)
+    nnonsingular(result; tol=1e-10)
 
 The number of non-singular solutions.
 """
