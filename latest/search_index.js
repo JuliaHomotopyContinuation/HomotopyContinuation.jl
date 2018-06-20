@@ -85,7 +85,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving",
     "title": "HomotopyContinuation.Solving.results",
     "category": "function",
-    "text": "results(result; only_real=false, realtol=1e-6, onlynonsingular=true, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, only_real=true)\n\n\n\n"
+    "text": "results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n"
+},
+
+{
+    "location": "solving.html#HomotopyContinuation.Solving.solutions",
+    "page": "Solving",
+    "title": "HomotopyContinuation.Solving.solutions",
+    "category": "function",
+    "text": "solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply. If onlyreal is Val{true} this returns the real solutions. This is different than applying results(solution, result, onlyreal=true).\n\nExample\n\n```julia julia> @polyvar x y julia> result = solve([(x-2)y, y+x+3]); julia> solutions(result, Val{true}) [[2.0, -5.0], [-3.0, 0.0]] julia> solutions(result) [[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
 },
 
 {
@@ -157,7 +165,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving",
     "title": "HomotopyContinuation.Solving.nnonsingular",
     "category": "function",
-    "text": "nnonsingular(result)\n\nThe number of non-singular solutions.\n\n\n\n"
+    "text": "nnonsingular(result; tol=1e-10)\n\nThe number of non-singular solutions.\n\n\n\n"
 },
 
 {
@@ -181,7 +189,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving",
     "title": "Result",
     "category": "section",
-    "text": "finite\nresults\nfailed\natinfinity\nsingular\nnonsingular\nseed\nnresults\nnfinite\nnsingular\nnnonsingular\nnatinfinity\nnfailed\n"
+    "text": "finite\nresults\nsolutions\nfailed\natinfinity\nsingular\nnonsingular\nseed\nnresults\nnfinite\nnsingular\nnnonsingular\nnatinfinity\nnfailed\n"
 },
 
 {
