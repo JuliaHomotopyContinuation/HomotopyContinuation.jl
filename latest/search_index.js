@@ -85,7 +85,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving",
     "title": "HomotopyContinuation.Solving.results",
     "category": "function",
-    "text": "results(result; only_real=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, only_real=true)\n\n\n\n"
+    "text": "results(result; only_real=false, realtol=1e-6, onlynonsingular=true, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, only_real=true)\n\n\n\n"
 },
 
 {
