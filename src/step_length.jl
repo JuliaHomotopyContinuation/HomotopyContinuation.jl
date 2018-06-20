@@ -70,8 +70,8 @@ function update! end
     HeuristicStepLength(;initial=0.1,
         increase_factor=2.0,
         decrease_factor=inv(increase_factor),
-        consecutive_successes_necessary=3,
-        maximal_steplength=0.1
+        consecutive_successes_necessary=5,
+        maximal_steplength=max(0.1, initial),
         minimal_steplength=1e-14)
 
 The step length is defined as follows. Initially the step length is `initial`.

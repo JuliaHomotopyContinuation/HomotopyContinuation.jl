@@ -16,6 +16,7 @@ import ..Parallel
 import ..Predictors
 import ..Problems
 import ..PatchSwitching
+import ..StepLength
 import ..Systems
 
 export Solver,

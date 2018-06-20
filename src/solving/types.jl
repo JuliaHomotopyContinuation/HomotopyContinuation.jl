@@ -36,15 +36,29 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, see
     Solver(prob, start_solutions, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions; kwargs...)
+function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions;
+    initial_steplength=0.1,
+    steplength_increase_factor=2.0,
+    steplength_decrease_factor=inv(steplength_increase_factor),
+    steplength_consecutive_successes_necessary=5,
+    maximal_steplength=max(0.1, initial_steplength),
+    minimal_steplength=1e-14,
+    kwargs...)
+
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
     x = Problems.embed(prob, x₁)
 
     check_kwargs(kwargs)
 
-    tracker = pathtracker(prob, x, t₁, t₀;  filterkwargs(kwargs, PathTracking.allowed_kwargs)...)
-    endgame = Endgaming.Endgame(prob.homotopy, x; filterkwargs(kwargs, Endgaming.allowed_kwargs)...)
+    # We make it easier to change step length specific changes
+    steplength = StepLength.HeuristicStepLength(initial_steplength, steplength_increase_factor,
+        steplength_decrease_factor, steplength_consecutive_successes_necessary, maximal_steplength,
+        minimal_steplength)
+
+
+    tracker = pathtracker(prob, x, t₁, t₀;  steplength=steplength, filterkwargs(kwargs, PathTracking.allowed_kwargs)...)
+    endgame = Endgaming.Endgame(prob.homotopy, x; steplength=steplength, filterkwargs(kwargs, Endgaming.allowed_kwargs)...)
     switcher = patchswitcher(prob, x, t₀)
 
     cache = SolverCache(prob, tracker)
