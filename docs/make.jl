@@ -8,7 +8,7 @@ makedocs(
         "Solving" => "solving.md",
         "Systems" => "systems.md",
         "Homotopies" => "homotopies.md",
-        "Predictors" => "predictors.md"
+        "Predictors and Correctors" => "predictors-correctors.md"
         ]
 )
 

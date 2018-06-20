@@ -77,7 +77,7 @@ The predictor used during in the predictor-corrector scheme. The default is
 * `steplength::StepLength.AbstractStepLength`
 The step size logic used to determine changes of the step size. The default is
 [`StepLength.HeuristicStepLength`](@ref).
-* `tol=1e-5`: The precision used to track a value.
+* `tol=1e-7`: The precision used to track a value.
 
      PathTracker(method::AbstractPathTrackerMethod, x₁, t₁, t₀, options)
 

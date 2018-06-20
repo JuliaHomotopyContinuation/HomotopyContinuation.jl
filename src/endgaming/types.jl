@@ -125,7 +125,7 @@ Construct an `Endgame` to run the endgame for paths of the type of `x` and the h
 ## Options
 * `sampling_factor=0.5` During the endgame we approach ``0`` by the geometric series ``h^kR₀``
 where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runendgame`.
-* `tol=1e-10` This is the tolerance necessary to declare the endgame converged.
+* `egtol=1e-10` This is the tolerance necessary to declare the endgame converged.
 * `minradius=1e-15` A path is declared false if the endgame didn't finished until then.
 * `maxnorm=1e5` If our original problem is affine we declare a path at infinity if the infinity norm
 with respect to the standard patch is larger than `maxnorm`.
@@ -148,12 +148,12 @@ struct Endgame{P<:PathTracking.PathTracker, V}
 end
 
 function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
-    sampling_factor=0.5, tol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=15,
+    sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=15,
     max_extrapolation_samples=4,
     cauchy_loop_closed_tolerance=1e-3, cauchy_samples_per_loop=6,
     patch=nothing, pathtrackerkwargs...)
 
-    options = Options(sampling_factor, tol, minradius, maxnorm,
+    options = Options(sampling_factor, egtol, minradius, maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
     H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
