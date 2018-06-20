@@ -157,7 +157,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving",
     "title": "HomotopyContinuation.Solving.nnonsingular",
     "category": "function",
-    "text": "nnonsingular(result; tol=1e-10)\n\nThe number of non-singular solutions.\n\n\n\n"
+    "text": "nnonsingular(result)\n\nThe number of non-singular solutions.\n\n\n\n"
 },
 
 {
