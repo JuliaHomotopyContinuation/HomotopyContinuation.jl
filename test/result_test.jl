@@ -23,6 +23,11 @@
     @test_nowarn results(issingular, R)
     @test count(results(isreal, R)) == 2
 
+    @test length(solutions(R)) == 4
+    @test solutions(R) isa Vector{Vector{Complex128}}
+    @test solutions(R, Val{true}, realtol=1e-8) isa Vector{Vector{Float64}}
+    @test length(solutions(R, Val{true}, realtol=1e-8)) == 2
+
     @test_nowarn string(R)
     @test_nowarn string(R[end])
 
