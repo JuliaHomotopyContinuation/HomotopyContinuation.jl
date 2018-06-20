@@ -15,6 +15,7 @@ ProjectiveResult
 ```@docs
 finite
 results
+solutions
 failed
 atinfinity
 singular

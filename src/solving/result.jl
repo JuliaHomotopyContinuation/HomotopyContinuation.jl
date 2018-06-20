@@ -1,5 +1,5 @@
 export AffineResult, ProjectiveResult, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-    finite, results, failed, atinfinity, singular, nonsingular, seed
+    finite, results, failed, atinfinity, singular, nonsingular, seed, solutions
 
 """
     Result
@@ -96,7 +96,7 @@ const Results = Union{Result, Vector{<:PathResult}}
 
 # Filtering
 """
-    results(result; only_real=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
 
@@ -110,7 +110,7 @@ Additionally you can apply a transformation `f` on each result.
 R = solve(F)
 
 # This gives us all solutions considered real (but still as a complex vector).
-realsolutions = results(solution, R, only_real=true)
+realsolutions = results(solution, R, onlyreal=true)
 ```
 """
 results(R::Result; kwargs...) = results(identity, R; kwargs...)
@@ -121,6 +121,29 @@ function results(f::Function, R::Result;
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r))]
+end
+
+"""
+    solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+
+Return all solution (as `Vector`s) for which the given conditions apply. If `onlyreal` is
+`Val{true}` this returns the *real* solutions. This is different than applying `results(solution, result, onlyreal=true)`.
+
+## Example
+```julia
+julia> @polyvar x y
+julia> result = solve([(x-2)y, y+x+3]);
+julia> solutions(result, Val{true})
+[[2.0, -5.0], [-3.0, 0.0]]
+julia> solutions(result)
+[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]
+"""
+function solutions(result::Result, onlyreal=Val{false}; kwargs...)
+    if onlyreal === Val{true}
+        results(r -> real.(solution(r)), result; onlyreal=true, kwargs...)
+    else
+        results(r -> solution(r), result; onlyreal=false, kwargs...)
+    end
 end
 
 """
