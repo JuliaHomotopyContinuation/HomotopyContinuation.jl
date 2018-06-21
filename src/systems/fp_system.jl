@@ -6,7 +6,7 @@ export FPSystem, differentiate
 """
     FPSystem(polynomials, vars) <: AbstractSystem
 
-Create a system using the `FixedPolynomials` package.
+Create a polynomial system using the [`FixedPolynomials`](https://github.com/JuliaAlgebra/FixedPolynomials.jl) package.
 """
 struct FPSystem{T} <: AbstractSystem
     system::FP.System{T}
