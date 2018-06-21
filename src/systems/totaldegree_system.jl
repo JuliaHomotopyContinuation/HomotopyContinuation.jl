@@ -35,6 +35,8 @@ end
 
 Base.size(F::TotalDegreeSystem) = (length(F.degrees), length(F.degrees) + 1)
 
+cache(::TotalDegreeSystem, x) = NullCache()
+
 function evaluate!(u, F::TotalDegreeSystem, x)
     for i=1:length(F.degrees)
         d = F.degrees[i]
@@ -72,15 +74,15 @@ function jacobian(F::TotalDegreeSystem, x)
 end
 
 function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x)
-    U .= zero(x)
+    U .= zero(eltype(x))
     hidx = F.hom_idx
     for i=1:length(F.degrees)
         d = F.degrees[i]
         didx = F.degree_idxs[i]
         if d == 1
             u[i] = x[didx] - x[hidx]
-            U[i, didx] = one(x)
-            U[i, hidx] = -one(x)
+            U[i, didx] = one(eltype(x))
+            U[i, hidx] = -one(eltype(x))
         elseif d > 1
             xd = x[didx]^(d-1)
             xh = x[hidx]^(d-1)
