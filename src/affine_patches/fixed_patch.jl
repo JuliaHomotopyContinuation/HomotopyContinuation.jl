@@ -2,7 +2,6 @@ export FixedPatch
 
 """
     FixedPatch()
-
 """
 struct FixedPatch <: AbstractLocalAffinePatch end
 

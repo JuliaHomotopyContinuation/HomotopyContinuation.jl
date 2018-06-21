@@ -13,31 +13,37 @@ StraightLineHomotopy
 FixedPointHomotopy
 ```
 
-## Homotopy interface
+We also provide more specialised homotopies, which are mostly used internally currently
+but could be useful in conjunction with the [`PathTracking.PathTracker`](@ref) primitive.
+```@docs
+Homotopies.PatchedHomotopy
+Homotopies.PatchSwitcherHomotopy
+```
+
+## Interface for custom homotopies
 
 The great thing is that you are not limited to the homotopies provided by default.
 You can define your own homotopy by defining a struct with super type [`Homotopies.AbstractHomotopy`](@ref).
 For this the following interface has to be defined.
 
-### Abstract types
+### Types
 ```@docs
 Homotopies.AbstractHomotopy
 Homotopies.AbstractHomotopyCache
+Homotopies.NullCache
 ```
 
 ### Mandatory
 The following methods are mandatory to implement.
 ```@docs
+Homotopies.cache
 Homotopies.evaluate!
 Homotopies.jacobian!
 Homotopies.dt!
 Base.size(::Homotopies.AbstractHomotopy)
 ```
 ### Optional
-The following are optional to implement but usually you want to define at least
-[`Homotopies.cache`](@ref).
 ```@docs
-Homotopies.cache
 Homotopies.evaluate_and_jacobian!
 Homotopies.evaluate_and_jacobian
 Homotopies.jacobian_and_dt!

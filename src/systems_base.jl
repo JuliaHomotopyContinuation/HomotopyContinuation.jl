@@ -34,10 +34,10 @@ An empty cache if no cache is necessary.
 struct NullCache <: AbstractSystemCache end
 
 """
-    cache(F::AbstractSystem, x)
+    cache(F::AbstractSystem, x)::AbstractSystemCache
 
 Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
-of `x`. The default implementation returns a `NullCache`.
+of `x`. The default implementation returns a [`NullCache`](@ref).
 """
 cache(F::AbstractSystem, x) = NullCache()
 

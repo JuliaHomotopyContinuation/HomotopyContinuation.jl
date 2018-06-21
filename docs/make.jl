@@ -8,7 +8,9 @@ makedocs(
         "Solving Polynomial Systems" => "solving.md",
         "Systems" => "systems.md",
         "Homotopies" => "homotopies.md",
-        "Predictors and Correctors" => "predictors-correctors.md"
+        "Predictors and Correctors" => "predictors-correctors.md",
+        "Path tracker" => "pathtracking.md",
+        "Reference" => "reference.md"
         ]
 )
 

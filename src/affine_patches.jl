@@ -3,7 +3,7 @@ module AffinePatches
 import ..ProjectiveVectors
 import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
 
-export AbstractPatch,
+export AbstractAffinePatch,
     AbstractLocalAffinePatch,
     state,
     precondition!,
@@ -29,14 +29,14 @@ abstract type AbstractAffinePatchState end
 
 Construct the state of the path from `x`.
 """
-state
+function state end
 
 """
     precondition!(v::AbstractAffinePatchState, x)
 
 Modify both such that `v` is properly setup and `v⋅x-1=0` holds.
 """
-precondition!
+function precondition! end
 
 """
     update_patch!(::AbstractAffinePatchState, x)

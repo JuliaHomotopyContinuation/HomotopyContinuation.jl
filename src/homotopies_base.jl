@@ -42,16 +42,13 @@ The default `AbstractHomotopyCache` containing nothing.
 struct NullCache <: AbstractHomotopyCache end
 
 """
-    cache(H::AbstractHomotopy, x, t)
+    cache(H::AbstractHomotopy, x, t)::AbstractHomotopyCache
 
 Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
-of `x`.
+of `x`. The default implementation returns [`HomotopiesBase.NullCache`](@ref).
 """
 function cache end
 cache(H, x, t) = NullCache()
-
-
-
 
 
 # Homotopy API

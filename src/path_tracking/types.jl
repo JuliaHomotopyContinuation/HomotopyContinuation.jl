@@ -62,7 +62,7 @@ end
      PathTracker(H::Homotopies.AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker
 
 Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
-needs to be homogenous.
+needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 
 ## Options
 * `corrector::Correctors.AbstractCorrector`:
@@ -78,10 +78,6 @@ The predictor used during in the predictor-corrector scheme. The default is
 The step size logic used to determine changes of the step size. The default is
 [`StepLength.HeuristicStepLength`](@ref).
 * `tol=1e-7`: The precision used to track a value.
-
-     PathTracker(method::AbstractPathTrackerMethod, x₁, t₁, t₀, options)
-
-If a method is already assembled this constructor is beneficial.
 """
 struct PathTracker{
     H<:Homotopies.AbstractHomotopy,

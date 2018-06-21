@@ -2,11 +2,7 @@
     track(tracker, x₁, t₁, t₀)::PathTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
-This returns a `PathTrackerResult`. This modifies tracker.
-
-    track(tracker, xs, t₁, t₀)::Vector{PathTrackerResult}
-
-Track all values in xs from `t₁` to `t₀` using the given `PathTracker` `tracker`.
+This returns a `PathTrackerResult`. This modifies `tracker`.
 """
 function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...)
      track!(tracker, x₁, t₁, t₀; kwargs...)
@@ -14,12 +10,17 @@ function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...
 end
 
 """
-     track!(x₀, tracker, x₁, t₁, t₀)
+     track!(tracker, x₁, t₁, t₀; checkstartvalue=true, precondition=true)
 
-Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`
-and store the result in `x₀` if the tracking was successfull.
+Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 Returns a `Symbol` indicating the status.
 If the tracking was successfull it is `:success`.
+If `predcondition` is `true` then [`Homotopies.precondition!`](@ref) is called at the beginning
+of the tracking.
+
+    track!(x₀, tracker, x₁, t₁, t₀)
+
+Additionally also stores the result in `x₀` if the tracking was successfull.
 """
 function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
      track!(tracker, x₁, t₁, t₀)
@@ -46,7 +47,8 @@ end
 """
     setup!(pathtracker, x₁, t₁, t₀, checkstartvalue=true))
 
-Setup `pathtracker` to track `x₁` from `t₁` to `t₀`.
+Setup `pathtracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
+pathtracker as an iterator.
 """
 function setup!(tracker::PathTracker, x₁, t₁, t₀; checkstartvalue=true, precondition=true)
     S = tracker.state
@@ -89,7 +91,7 @@ function checkstartvalue!(tracker)
     nothing
 end
 
-function step!(tracker, emit_update=true)
+function step!(tracker)
     state, cache = tracker.state, tracker.cache
 
     state.iters += 1

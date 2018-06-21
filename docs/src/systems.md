@@ -12,6 +12,7 @@ We provide the following systems by default.
 ```@docs
 FPSystem
 SPSystem
+Systems.FixedHomotopy
 ```
 
 ## Interface for custom systems
@@ -22,15 +23,17 @@ evaluate it. For this you can define your own homotopy by defining a
 struct with super type [`Systems.AbstractSystem`](@ref).
 For this the following interface has to be defined.
 
-### Abstract types
+### Types
 ```@docs
 Systems.AbstractSystem
 Systems.AbstractSystemCache
+Systems.NullCache
 ```
 
 ### Mandatory
 The following methods are mandatory to implement.
 ```@docs
+Systems.cache
 Systems.evaluate!
 Systems.evaluate
 Systems.jacobian!
@@ -43,7 +46,6 @@ The following methods are mandatory to implement.
 The following are optional to implement but usually you want to define at least
 [`Systems.cache`](@ref).
 ```@docs
-Systems.cache
 Systems.evaluate_and_jacobian!
 Systems.evaluate_and_jacobian
 ```
