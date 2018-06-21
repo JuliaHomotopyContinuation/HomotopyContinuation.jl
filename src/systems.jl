@@ -20,6 +20,7 @@ export NullCache
 include("systems/sp_system.jl")
 include("systems/fixed_homotopy.jl")
 include("systems/fp_system.jl")
+include("systems/totaldegree_system.jl")
 
 # This has to be here otherwise the compiler crashes
 """
