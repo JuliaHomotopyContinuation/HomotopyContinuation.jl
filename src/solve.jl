@@ -88,6 +88,10 @@ solve(F, a, p₁, p₀, startsolutions)
 
 Solve the homotopy `H` by tracking the each solution of
 ``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
+Note that `H` has to be a homotopy between *homogenous* polynomial systems.
+If it should be considered as an affine system indicate which is the index
+of the homogenization variable, e.g. `solve(H, startsolutions, homvar=3)`
+if the third variable is the homogenization variable.
 
 
 # Options
@@ -170,6 +174,10 @@ function solve(F::Vector{<:MP.AbstractPolynomial},
     solve(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
+function solve(H::Homotopies.AbstractHomotopy, startsolutions; seed=randseed(), kwargs...)
+    srand(seed)
+	solve(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
+end
 
 promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
 function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})

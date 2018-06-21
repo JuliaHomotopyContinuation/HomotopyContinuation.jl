@@ -39,58 +39,58 @@ struct NullCache <: AbstractSystemCache end
 Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
 of `x`. The default implementation returns a [`NullCache`](@ref).
 """
-cache(F::AbstractSystem, x) = NullCache()
+function cache end
 
 """
-    evaluate!(u, F::AbstractSystem, x [, cache::AbstractSystemCache])
+    evaluate!(u, F::AbstractSystem, x , cache::AbstractSystemCache)
 
 Evaluate the system `F` at `x` and store the result in `u`.
 """
-evaluate!(u, F::AbstractSystem, x, ::NullCache) = evaluate!(u, F, x)
+function evaluate! end
 
 """
-    evaluate(F::AbstractSystem, x::AbstractVector [, cache::AbstractSystemCache])
+    evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))
 
 Evaluate the system `F` at `x`.
 """
-evaluate(F::AbstractSystem, x, ::NullCache) = evaluate(F, x)
+evaluate(F::AbstractSystem, x, c=cache(F, x)) = evaluate(F, x, c)
 
 
 """
-    jacobian!(u, F::AbstractSystem, x [, cache::AbstractSystemCache])
+    jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)
 
 Evaluate the Jacobian of the system `F` at `x` and store the result in `u`.
 """
-jacobian!(U, F::AbstractSystem, x, ::NullCache) = jacobian!(U, F, x)
+function jacobian! end
 
 """
-    jacobian(F::AbstractSystem, x [, cache::AbstractSystemCache])
+    jacobian(F::AbstractSystem, x, cache=cache(F, x))
 
 Evaluate the Jacobian of the system `F` at `x`.
 """
-jacobian(F::AbstractSystem, x, ::NullCache) = jacobian(F, x)
+jacobian(F::AbstractSystem, x, c=cache(F, x)) = jacobian(F, x, c)
 
 # Optional
 """
-    evaluate_and_jacobian!(u, U, F, x [, cache::AbstractSystemCache])
+    evaluate_and_jacobian!(u, U, F, x , cache::AbstractSystemCache)
 
 Evaluate the system `F` and its Jacobian at `x` and store the results in `u` (evalution)
 and `U` (Jacobian).
 """
-function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache)
+function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache::AbstractSystemCache)
     evaluate!(u, F, x, cache)
     jacobian!(U, F, x, cache)
     nothing
 end
 
 """
-    evaluate_and_jacobian(F::AbstractSystem, x [, cache::AbstractSystemCache])
+    evaluate_and_jacobian(F::AbstractSystem, x , cache=cache(F, x))
 
 Evaluate the system `F` and its Jacobian at `x`.
 """
-function evaluate_and_jacobian(F::AbstractSystem, x, cache)
-    u = evaluate(F, x, cache)
-    U = jacobian(F, x, cache)
+function evaluate_and_jacobian(F::AbstractSystem, x, c=cache(F, x))
+    u = evaluate(F, x, c)
+    U = jacobian(F, x, c)
     u, U
 end
 
