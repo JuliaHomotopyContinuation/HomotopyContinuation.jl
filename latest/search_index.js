@@ -301,7 +301,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Polynomial systems",
     "category": "section",
-    "text": ""
+    "text": "Polynomial systems can be represented in numerous ways in a computer and each representation has certain tradeoffs. For our purposes the most important thing is that it is fast to evaluate the system. Therefore we automatically convert an input given by DynamicPolynomials to another representation more suitable for numerically evaluations. The default is currently FPSystem."
 },
 
 {
@@ -309,7 +309,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.Systems.FPSystem",
     "category": "type",
-    "text": "FPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a system using the FixedPolynomials package.\n\n\n\n"
+    "text": "FPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a polynomial system using the FixedPolynomials package.\n\n\n\n"
 },
 
 {
@@ -317,15 +317,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.Systems.SPSystem",
     "category": "type",
-    "text": "SPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a system using the StaticPolynomials package.\n\n\n\n"
+    "text": "SPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a system using the StaticPolynomials package. Note that StaticPolynomials leverages Julias metaprogramming capabilities to automatically generate functions to evaluate the system and its Jacobian. These generated functions are very fast but at the cost of possibly large compile times. The compile time depends on the size of the support of the polynomial system. If you intend to solve a large system or you need to solve a system with the same support but different coefficients even large compile times can be worthwile. As a general rule of thumb this usually is twice as fast as solving the same system using FPSystem.\n\nExample\n\nYou can use SPSystem as follows with solve\n\n@polyvar x y\nF = [x^2+3y^4-2, 2y^2+3x*y+4]\nsolve(F, system=SPSystem)\n\n\n\n"
 },
 
 {
-    "location": "systems.html#Pre-defined-systems-1",
+    "location": "systems.html#Default-systems-1",
     "page": "Systems",
-    "title": "Pre-defined systems",
+    "title": "Default systems",
     "category": "section",
-    "text": "FPSystem\nSPSystem"
+    "text": "We provide the following systems by default.FPSystem\nSPSystem"
 },
 
 {
@@ -333,7 +333,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Interface for custom systems",
     "category": "section",
-    "text": ""
+    "text": "The great thing is that you are not limited to the systems provided by default. Maybe your polynomial system has a particular structure which you want to use to efficiently evaluate it. For this you can define your own homotopy by defining a struct with super type Systems.AbstractSystem. For this the following interface has to be defined."
 },
 
 {
@@ -405,7 +405,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Mandatory",
     "category": "section",
-    "text": "Systems.evaluate!\nSystems.evaluate\nSystems.jacobian!\nSystems.jacobian\nBase.size(::Systems.AbstractSystem)"
+    "text": "The following methods are mandatory to implement.Systems.evaluate!\nSystems.evaluate\nSystems.jacobian!\nSystems.jacobian\nBase.size(::Systems.AbstractSystem)"
 },
 
 {
@@ -437,7 +437,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Optional",
     "category": "section",
-    "text": "Systems.cache\nSystems.evaluate_and_jacobian!\nSystems.evaluate_and_jacobian"
+    "text": "The following methods are mandatory to implement. The following are optional to implement but usually you want to define at least Systems.cache.Systems.cache\nSystems.evaluate_and_jacobian!\nSystems.evaluate_and_jacobian"
 },
 
 {
@@ -446,6 +446,14 @@ var documenterSearchIndex = {"docs": [
     "title": "Homotopies",
     "category": "page",
     "text": ""
+},
+
+{
+    "location": "homotopies.html#Homotopies-1",
+    "page": "Homotopies",
+    "title": "Homotopies",
+    "category": "section",
+    "text": "A homotopy is a functionH mathbbC^N  mathbbC  mathbbC^n (xt)  H(xt)where H( t) is a polynomial system for all tmathbbC."
 },
 
 {
@@ -465,17 +473,17 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Homotopies-1",
+    "location": "homotopies.html#Default-homotopies-1",
     "page": "Homotopies",
-    "title": "Homotopies",
+    "title": "Default homotopies",
     "category": "section",
-    "text": "A homotopy is a functionH mathbbC^N  mathbbC  mathbbC^n (xt)  H(xt)where H( t) is a polynomial system for all tmathbbC. The following homotopies are available by defaultStraightLineHomotopy\nFixedPointHomotopy"
+    "text": "The following homotopies are available by defaultStraightLineHomotopy\nFixedPointHomotopy"
 },
 
 {
-    "location": "homotopies.html#Homotopy-Interface-1",
+    "location": "homotopies.html#Homotopy-interface-1",
     "page": "Homotopies",
-    "title": "Homotopy Interface",
+    "title": "Homotopy interface",
     "category": "section",
     "text": "The great thing is that you are not limited to the homotopies provided by default. You can define your own homotopy by defining a struct with super type Homotopies.AbstractHomotopy. For this the following interface has to be defined."
 },
@@ -621,7 +629,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "Optional",
     "category": "section",
-    "text": "The following are optional to implement but usually you want to define at least cache.Homotopies.cache\nHomotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
+    "text": "The following are optional to implement but usually you want to define at least Homotopies.cache.Homotopies.cache\nHomotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
 },
 
 {
