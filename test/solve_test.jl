@@ -31,11 +31,26 @@
     @test nfinite(solve(G, F, [[2, -3]])) == 1
     @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
-
     F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(5))))
     result = solve(F, homvar=6)
     @test nfinite(result) == 70
     @test natinfinity(result) == 50
+
+    prob, startsolutions = Problems.problem_startsolutions(Input.TotalDegree(F))
+
+    result = solve(prob.homotopy, map(startsolutions) do s
+        ProjectiveVectors.raw(Problems.embed(prob, s))
+    end)
+    @test result isa ProjectiveResult
+    @test nnonsingular(result) == 32
+
+    result = solve(prob.homotopy, map(startsolutions) do s
+        ProjectiveVectors.raw(Problems.embed(prob, s))
+    end, homvar=prob.homogenization.homvaridx)
+    @test result isa AffineResult
+    @test nnonsingular(result) == 32
+    @test nfinite(result) == 32
+
 
     # test numerical homogenous check fails
     @polyvar x y z

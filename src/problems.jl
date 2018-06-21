@@ -6,7 +6,7 @@ import DynamicPolynomials
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
-
+import ..Input
 import ..Input: AbstractInput, TotalDegree, StartTarget, ParameterSystem, MPPolys
 import ..Homotopies: AbstractHomotopy, StraightLineHomotopy, ParameterHomotopy
 import ..ProjectiveVectors
@@ -185,6 +185,16 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, 
     end
 end
 
+function problem_startsolutions(input::Input.Homotopy, homvar::Int; kwargs...)
+    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
+    Projective(input.H, Homogenization(homvar)), input.startsolutions
+end
+
+function problem_startsolutions(input::Input.Homotopy, homvar::Nothing; kwargs...)
+    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
+    Projective(input.H, NullHomogenization()), input.startsolutions
+end
+
 function problem_startsolutions(prob::ParameterSystem, homvar; system=FPSystem, kwargs...)
     variables = setdiff(allvariables(prob.system), prob.parameters)
     if ishomogenous(prob.system, variables)
@@ -220,13 +230,13 @@ end
 
 function check_homogenous_degrees(F::AbstractSystem)
     n, N = size(F)
-    if n ≠ N - 1
+    if n < N - 1
         throw(error("Input system is not homogenous! It has $n polynomials in $N variables according to `size`."))
     end
     # The number of variables match, but it still cannot be homogenous.
     # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
-    x = randn(N)
+    x = rand(Complex128, N)
     cache = Systems.cache(F, x)
     y = Systems.evaluate(F, x, cache)
     scale!(x, 2)
