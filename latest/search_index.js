@@ -21,7 +21,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Contents",
     "category": "section",
-    "text": "Pages = [\"solving.md\", \"systems.md\", \"homotopies.md\", \"predictors-correctors.md\"]"
+    "text": "Pages = [\"solving.md\", \"systems.md\", \"homotopies.md\", \"predictors-correctors.md\", \"pathtracking.md\", \"reference.md\"]"
 },
 
 {
@@ -321,11 +321,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "systems.html#HomotopyContinuation.Systems.FixedHomotopy",
+    "page": "Systems",
+    "title": "HomotopyContinuation.Systems.FixedHomotopy",
+    "category": "type",
+    "text": "FixedHomotopy(H, t) <: AbstractSystem\n\nFix a homotopy H(x,t) at t\n\n\n\n"
+},
+
+{
     "location": "systems.html#Default-systems-1",
     "page": "Systems",
     "title": "Default systems",
     "category": "section",
-    "text": "We provide the following systems by default.FPSystem\nSPSystem"
+    "text": "We provide the following systems by default.FPSystem\nSPSystem\nSystems.FixedHomotopy"
 },
 
 {
@@ -353,11 +361,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Abstract-types-1",
+    "location": "systems.html#HomotopyContinuation.SystemsBase.NullCache",
     "page": "Systems",
-    "title": "Abstract types",
+    "title": "HomotopyContinuation.SystemsBase.NullCache",
+    "category": "type",
+    "text": "NullCache\n\nAn empty cache if no cache is necessary.\n\n\n\n"
+},
+
+{
+    "location": "systems.html#Types-1",
+    "page": "Systems",
+    "title": "Types",
     "category": "section",
-    "text": "Systems.AbstractSystem\nSystems.AbstractSystemCache"
+    "text": "Systems.AbstractSystem\nSystems.AbstractSystemCache\nSystems.NullCache"
+},
+
+{
+    "location": "systems.html#HomotopyContinuation.SystemsBase.cache",
+    "page": "Systems",
+    "title": "HomotopyContinuation.SystemsBase.cache",
+    "category": "function",
+    "text": "cache(F::AbstractSystem, x)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x. The default implementation returns a NullCache.\n\n\n\n"
 },
 
 {
@@ -365,7 +389,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate!",
     "category": "function",
-    "text": "evaluate!(u, F::AbstractSystem, x [, cache::AbstractSystemCache])\n\nEvaluate the system F at x and store the result in u.\n\n\n\n"
+    "text": "evaluate!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the system F at x and store the result in u.\n\n\n\n"
 },
 
 {
@@ -373,7 +397,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate",
     "category": "function",
-    "text": "evaluate(F::AbstractSystem, x::AbstractVector [, cache::AbstractSystemCache])\n\nEvaluate the system F at x.\n\n\n\n"
+    "text": "evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))\n\nEvaluate the system F at x.\n\n\n\n"
 },
 
 {
@@ -381,7 +405,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian!",
     "category": "function",
-    "text": "jacobian!(u, F::AbstractSystem, x [, cache::AbstractSystemCache])\n\nEvaluate the Jacobian of the system F at x and store the result in u.\n\n\n\n"
+    "text": "jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and store the result in u.\n\n\n\n"
 },
 
 {
@@ -389,7 +413,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian",
     "category": "function",
-    "text": "jacobian(F::AbstractSystem, x [, cache::AbstractSystemCache])\n\nEvaluate the Jacobian of the system F at x.\n\n\n\n"
+    "text": "jacobian(F::AbstractSystem, x, cache=cache(F, x))\n\nEvaluate the Jacobian of the system F at x.\n\n\n\n"
 },
 
 {
@@ -405,15 +429,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Mandatory",
     "category": "section",
-    "text": "The following methods are mandatory to implement.Systems.evaluate!\nSystems.evaluate\nSystems.jacobian!\nSystems.jacobian\nBase.size(::Systems.AbstractSystem)"
-},
-
-{
-    "location": "systems.html#HomotopyContinuation.SystemsBase.cache",
-    "page": "Systems",
-    "title": "HomotopyContinuation.SystemsBase.cache",
-    "category": "function",
-    "text": "cache(F::AbstractSystem, x)\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x. The default implementation returns a NullCache.\n\n\n\n"
+    "text": "The following methods are mandatory to implement.Systems.cache\nSystems.evaluate!\nSystems.evaluate\nSystems.jacobian!\nSystems.jacobian\nBase.size(::Systems.AbstractSystem)"
 },
 
 {
@@ -421,7 +437,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian!",
     "category": "function",
-    "text": "evaluate_and_jacobian!(u, U, F, x [, cache::AbstractSystemCache])\n\nEvaluate the system F and its Jacobian at x and store the results in u (evalution) and U (Jacobian).\n\n\n\n"
+    "text": "evaluate_and_jacobian!(u, U, F, x , cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and store the results in u (evalution) and U (Jacobian).\n\n\n\n"
 },
 
 {
@@ -429,7 +445,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian",
     "category": "function",
-    "text": "evaluate_and_jacobian(F::AbstractSystem, x [, cache::AbstractSystemCache])\n\nEvaluate the system F and its Jacobian at x.\n\n\n\n"
+    "text": "evaluate_and_jacobian(F::AbstractSystem, x , cache=cache(F, x))\n\nEvaluate the system F and its Jacobian at x.\n\n\n\n"
 },
 
 {
@@ -437,7 +453,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "Optional",
     "category": "section",
-    "text": "The following methods are mandatory to implement. The following are optional to implement but usually you want to define at least Systems.cache.Systems.cache\nSystems.evaluate_and_jacobian!\nSystems.evaluate_and_jacobian"
+    "text": "The following methods are mandatory to implement. The following are optional to implement but usually you want to define at least Systems.cache.Systems.evaluate_and_jacobian!\nSystems.evaluate_and_jacobian"
 },
 
 {
@@ -473,17 +489,33 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "homotopies.html#HomotopyContinuation.Homotopies.PatchedHomotopy",
+    "page": "Homotopies",
+    "title": "HomotopyContinuation.Homotopies.PatchedHomotopy",
+    "category": "type",
+    "text": "PatchedHomotopy(H::AbstractHomotopy, patch, v::AbstractProjectiveVector)\n\nAugment the homotopy H with the given patch v. This results in the system [H(x,t); v ⋅ x - 1]\n\n\n\n"
+},
+
+{
+    "location": "homotopies.html#HomotopyContinuation.Homotopies.PatchSwitcherHomotopy",
+    "page": "Homotopies",
+    "title": "HomotopyContinuation.Homotopies.PatchSwitcherHomotopy",
+    "category": "type",
+    "text": "PatchSwitcherHomotopy(H::AbstractHomotopy, patch, v::AbstractProjectiveVector)\n\nAugment the homotopy H with the given patch v. This results in the system [H(x,t); v ⋅ x - 1]\n\n\n\n"
+},
+
+{
     "location": "homotopies.html#Default-homotopies-1",
     "page": "Homotopies",
     "title": "Default homotopies",
     "category": "section",
-    "text": "The following homotopies are available by defaultStraightLineHomotopy\nFixedPointHomotopy"
+    "text": "The following homotopies are available by defaultStraightLineHomotopy\nFixedPointHomotopyWe also provide more specialised homotopies, which are mostly used internally currently but could be useful in conjunction with the PathTracking.PathTracker primitive.Homotopies.PatchedHomotopy\nHomotopies.PatchSwitcherHomotopy"
 },
 
 {
-    "location": "homotopies.html#Homotopy-interface-1",
+    "location": "homotopies.html#Interface-for-custom-homotopies-1",
     "page": "Homotopies",
-    "title": "Homotopy interface",
+    "title": "Interface for custom homotopies",
     "category": "section",
     "text": "The great thing is that you are not limited to the homotopies provided by default. You can define your own homotopy by defining a struct with super type Homotopies.AbstractHomotopy. For this the following interface has to be defined."
 },
@@ -505,11 +537,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Abstract-types-1",
+    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.NullCache",
     "page": "Homotopies",
-    "title": "Abstract types",
+    "title": "HomotopyContinuation.HomotopiesBase.NullCache",
+    "category": "type",
+    "text": "NullCache\n\nThe default AbstractHomotopyCache containing nothing.\n\n\n\n"
+},
+
+{
+    "location": "homotopies.html#Types-1",
+    "page": "Homotopies",
+    "title": "Types",
     "category": "section",
-    "text": "Homotopies.AbstractHomotopy\nHomotopies.AbstractHomotopyCache"
+    "text": "Homotopies.AbstractHomotopy\nHomotopies.AbstractHomotopyCache\nHomotopies.NullCache"
+},
+
+{
+    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.cache",
+    "page": "Homotopies",
+    "title": "HomotopyContinuation.HomotopiesBase.cache",
+    "category": "function",
+    "text": "cache(H::AbstractHomotopy, x, t)::AbstractHomotopyCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x. The default implementation returns HomotopiesBase.NullCache.\n\n\n\n"
 },
 
 {
@@ -549,15 +597,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "Mandatory",
     "category": "section",
-    "text": "The following methods are mandatory to implement.Homotopies.evaluate!\nHomotopies.jacobian!\nHomotopies.dt!\nBase.size(::Homotopies.AbstractHomotopy)"
-},
-
-{
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.cache",
-    "page": "Homotopies",
-    "title": "HomotopyContinuation.HomotopiesBase.cache",
-    "category": "function",
-    "text": "cache(H::AbstractHomotopy, x, t)\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x.\n\n\n\n"
+    "text": "The following methods are mandatory to implement.Homotopies.cache\nHomotopies.evaluate!\nHomotopies.jacobian!\nHomotopies.dt!\nBase.size(::Homotopies.AbstractHomotopy)"
 },
 
 {
@@ -629,7 +669,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "Optional",
     "category": "section",
-    "text": "The following are optional to implement but usually you want to define at least Homotopies.cache.Homotopies.cache\nHomotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
+    "text": "Homotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
 },
 
 {
@@ -694,6 +734,294 @@ var documenterSearchIndex = {"docs": [
     "title": "Correctors",
     "category": "section",
     "text": "Correctors.Newton"
+},
+
+{
+    "location": "pathtracking.html#",
+    "page": "Path tracker",
+    "title": "Path tracker",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "pathtracking.html#Path-tracking-1",
+    "page": "Path tracker",
+    "title": "Path tracking",
+    "category": "section",
+    "text": "We also export a path tracking primitive to make the core path tracking routine available for other applications. At the heart is a PathTracking.PathTracker object which holds all the state."
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.PathTracker",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.PathTracker",
+    "category": "type",
+    "text": " PathTracker(H::Homotopies.AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nOptions\n\ncorrector::Correctors.AbstractCorrector:\n\nThe corrector used during in the predictor-corrector scheme. The default is Correctors.Newton.\n\ncorrector_maxiters=2: The maximal number of correction steps in a single step.\npredictor::Predictors.AbstractPredictor:\n\nThe predictor used during in the predictor-corrector scheme. The default is [Predictors.RK4](@ref)()`.\n\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-11: The precision used to refine the final value.\nsteplength::StepLength.AbstractStepLength\n\nThe step size logic used to determine changes of the step size. The default is StepLength.HeuristicStepLength.\n\ntol=1e-7: The precision used to track a value.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.PathTrackerResult",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.PathTrackerResult",
+    "category": "type",
+    "text": " PathTrackerResult(tracker)\n\nContaining the result of a tracked path. The fields are\n\nsuccessfull::Bool Indicating whether tracking was successfull.\nreturncode::Symbol If the tracking was successfull then it is :success.\n\nOtherwise the return code gives an indication what happened.\n\nx::V The result.\nt::Float64 The t when the path tracker stopped.\nres::Float64 The residual at (x, t).\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.StepLength.HeuristicStepLength",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.StepLength.HeuristicStepLength",
+    "category": "type",
+    "text": "HeuristicStepLength(;initial=0.1,\n    increase_factor=2.0,\n    decrease_factor=inv(increase_factor),\n    consecutive_successes_necessary=5,\n    maximal_steplength=max(0.1, initial),\n    minimal_steplength=1e-14)\n\nThe step length is defined as follows. Initially the step length is initial. If consecutive_successes_necessary consecutive steps were sucessfull the step length is increased by the factor increase_factor. If a step fails, i.e. the corrector does not converge, the steplength is reduced by the factor decrease_factor.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#Types-1",
+    "page": "Path tracker",
+    "title": "Types",
+    "category": "section",
+    "text": "PathTracking.PathTracker\nPathTracking.PathTrackerResult\nStepLength.HeuristicStepLength"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.track!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.track!",
+    "category": "function",
+    "text": " track!(tracker, x₁, t₁, t₀; checkstartvalue=true, precondition=true)\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. Returns a Symbol indicating the status. If the tracking was successfull it is :success. If predcondition is true then Homotopies.precondition! is called at the beginning of the tracking.\n\ntrack!(x₀, tracker, x₁, t₁, t₀)\n\nAdditionally also stores the result in x₀ if the tracking was successfull.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.track",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.track",
+    "category": "function",
+    "text": "track(tracker, x₁, t₁, t₀)::PathTrackerResult\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. This returns a PathTrackerResult. This modifies tracker.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.setup!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.setup!",
+    "category": "function",
+    "text": "setup!(pathtracker, x₁, t₁, t₀, checkstartvalue=true))\n\nSetup pathtracker to track x₁ from t₁ to t₀. Use this if you want to use the pathtracker as an iterator.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currx",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.currx",
+    "category": "function",
+    "text": "currx(tracker::PathTracker)\n\nReturn the current value of x.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currt",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.currt",
+    "category": "function",
+    "text": " currt(tracker::PathTracker)\n\nCurrent t.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currΔt",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.currΔt",
+    "category": "function",
+    "text": " Δt(tracker::PathTracker)\n\nCurrent steplength Δt.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.curriters",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.curriters",
+    "category": "function",
+    "text": " iters(tracker::PathTracker)\n\nCurrent number of iterations.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currstatus",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.currstatus",
+    "category": "function",
+    "text": " status(tracker::PathTracker)\n\nCurrent status.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.tol",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.tol",
+    "category": "function",
+    "text": " tol(tracker::PathTracker)\n\nCurrent tolerance.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.corrector_maxiters",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.corrector_maxiters",
+    "category": "function",
+    "text": " corrector_maxiters(tracker::PathTracker)\n\nCurrent correction maxiters.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.refinement_tol",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.refinement_tol",
+    "category": "function",
+    "text": " refinement_tol(tracker::PathTracker)\n\nCurrent refinement tolerance.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.refinement_maxiters",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.refinement_maxiters",
+    "category": "function",
+    "text": " refinement_maxiters(tracker::PathTracker)\n\nCurrent refinement maxiters.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_tol!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.set_tol!",
+    "category": "function",
+    "text": " set_tol!(tracker::PathTracker, tol)\n\nSet the current tolerance to tol.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_corrector_maxiters!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.set_corrector_maxiters!",
+    "category": "function",
+    "text": " set_corrector_maxiters!(tracker::PathTracker, n)\n\nSet the current correction maxiters to n.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_refinement_tol!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.set_refinement_tol!",
+    "category": "function",
+    "text": " set_refinement_maxiters!(tracker::PathTracker, tol)\n\nSet the current refinement tolerance to tol.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_refinement_maxiters!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTracking.set_refinement_maxiters!",
+    "category": "function",
+    "text": " set_refinement_maxiters!(tracker::PathTracker, n)\n\nSet the current refinement maxiters to n.\n\n\n\n"
+},
+
+{
+    "location": "pathtracking.html#Methods-1",
+    "page": "Path tracker",
+    "title": "Methods",
+    "category": "section",
+    "text": "To track from a start to an endpoint with the PathTracker we provide the following routines.PathTracking.track!\nPathTracking.track\nPathTracking.setup!To introspect the current state and change settings we provide the following routines.PathTracking.currx\nPathTracking.currt\nPathTracking.currΔt\nPathTracking.curriters\nPathTracking.currstatus\nPathTracking.tol\nPathTracking.corrector_maxiters\nPathTracking.refinement_tol\nPathTracking.refinement_maxiters\nPathTracking.set_tol!\nPathTracking.set_corrector_maxiters!\nPathTracking.set_refinement_tol!\nPathTracking.set_refinement_maxiters!"
+},
+
+{
+    "location": "reference.html#",
+    "page": "Reference",
+    "title": "Reference",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "reference.html#Reference-1",
+    "page": "Reference",
+    "title": "Reference",
+    "category": "section",
+    "text": ""
+},
+
+{
+    "location": "reference.html#Input-1",
+    "page": "Reference",
+    "title": "Input",
+    "category": "section",
+    "text": "We support any polynomials which follow the MultivariatePolynomials interface. By default we export the @polyvar and PolyVar routines from the DynamicPolynomials implementation. With these you can simply create variables# Create variables x, y, z\n@polyvar x y z\nf = x^2+y^2+z^2\n\n# You can also create an array of variables\n@polyvar x[1:3] # This creates x1, x2, x3 accessed by x[1], x[2], x[3]\nf = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2\n\n# Also you can create matrices of variables\n# This creates x1_1, x1_2, x2_1, x2_2 accessed by\n# x[1,1], x[1,2], x[2,1], x[2,2]\n@polyvar x[1:2, 1:2]"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.OrthogonalPatch",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.OrthogonalPatch",
+    "category": "type",
+    "text": "OrthogonalPatch()\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.EmbeddingPatch",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.EmbeddingPatch",
+    "category": "type",
+    "text": "EmbeddingPatch()\n\nHolds an AbstractProjectiveVector onto its affine patch. With this the effect is basically the same as tracking in affine space.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.RandomPatch",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.RandomPatch",
+    "category": "type",
+    "text": "RandomPatch()\n\nA random patch. The vector has norm 1.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.FixedPatch",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.FixedPatch",
+    "category": "type",
+    "text": "FixedPatch()\n\n\n\n"
+},
+
+{
+    "location": "reference.html#AffinePatches-1",
+    "page": "Reference",
+    "title": "AffinePatches",
+    "category": "section",
+    "text": "Affine patches are there to augment projective system such that they can be considered as (locally) affine system. By default the following patches are definedAffinePatches.OrthogonalPatch\nAffinePatches.EmbeddingPatch\nAffinePatches.RandomPatch\nAffinePatches.FixedPatch"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.AbstractAffinePatch",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.AbstractAffinePatch",
+    "category": "type",
+    "text": "AbstractAffinePatch\n\nAn affine patch is a hyperplane defined by vx-1=0.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.state",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.state",
+    "category": "function",
+    "text": "state(::AbstractAffinePatch, x)::AbstractAffinePatchState\n\nConstruct the state of the path from x.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.precondition!",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.precondition!",
+    "category": "function",
+    "text": "precondition!(v::AbstractAffinePatchState, x)\n\nModify both such that v is properly setup and v⋅x-1=0 holds.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.AffinePatches.update!",
+    "page": "Reference",
+    "title": "HomotopyContinuation.AffinePatches.update!",
+    "category": "function",
+    "text": "update_patch!(::AbstractAffinePatchState, x)\n\nUpdate the patch depending on the local state.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#Interface-1",
+    "page": "Reference",
+    "title": "Interface",
+    "category": "section",
+    "text": "Each patch has to follow the following interface.AffinePatches.AbstractAffinePatch\nAffinePatches.state\nAffinePatches.precondition!\nAffinePatches.update!"
 },
 
 ]}
