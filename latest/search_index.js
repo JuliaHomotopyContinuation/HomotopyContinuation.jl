@@ -85,15 +85,31 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solutions",
     "category": "function",
-    "text": "solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply. If onlyreal is Val{true} this returns the real solutions. This is different than applying results(solution, result, onlyreal=true).\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result, Val{true})\n[[2.0, -5.0], [-3.0, 0.0]]\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
+    "text": "solutions(result; onlyreal=true, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.failed",
+    "location": "solving.html#HomotopyContinuation.Solving.realsolutions",
     "page": "Solving Polynomial Systems",
-    "title": "HomotopyContinuation.Solving.failed",
+    "title": "HomotopyContinuation.Solving.realsolutions",
     "category": "function",
-    "text": "failed(result)\n\nGet all results where the path tracking failed.\n\n\n\n"
+    "text": "realsolutions(result; tol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all real solution (as Vectors of reals) for which the given conditions apply.\n\nExample\n\n```julia julia> @polyvar x y julia> result = solve([(x-2)y, y+x+3]); julia> realsolutions(result) [[2.0, -5.0], [-3.0, 0.0]]\n\n\n\n"
+},
+
+{
+    "location": "solving.html#HomotopyContinuation.Solving.finite",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.finite",
+    "category": "function",
+    "text": "finite(result::AffineResult)\n\nReturn all PathResults for which the result is successfull and the contained solution is indeed a solution of the system.\n\nfinite(f::Function, result)\n\nAdditionally you can apply a transformation f on each result.\n\n\n\n"
+},
+
+{
+    "location": "solving.html#Base.real-Tuple{Union{Array{#s29,1} where #s29<:HomotopyContinuation.Solving.PathResult, HomotopyContinuation.Solving.Result}}",
+    "page": "Solving Polynomial Systems",
+    "title": "Base.real",
+    "category": "method",
+    "text": "real(result, tol=1e-6)\n\nGet all results where the solutions are real with the given tolerance tol. See isreal for details regarding the determination of \'realness\'.\n\n\n\n"
 },
 
 {
@@ -121,11 +137,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.finite",
+    "location": "solving.html#HomotopyContinuation.Solving.failed",
     "page": "Solving Polynomial Systems",
-    "title": "HomotopyContinuation.Solving.finite",
+    "title": "HomotopyContinuation.Solving.failed",
     "category": "function",
-    "text": "finite(result::AffineResult)\n\nReturn all PathResults for which the result is successfull and the contained solution is indeed a solution of the system.\n\nfinite(f::Function, result)\n\nAdditionally you can apply a transformation f on each result.\n\n\n\n"
+    "text": "failed(result)\n\nGet all results where the path tracking failed.\n\n\n\n"
 },
 
 {
@@ -141,7 +157,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nresults",
     "category": "function",
-    "text": "nresults(result)\n\nThe number of proper solutions.\n\n\n\n"
+    "text": "nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nThe number of solutions which satisfy the corresponding predicates.\n\nExample\n\nresult = solve(F)\n# Get all non-singular results where all imaginary parts are smaller than 1e-8\nnresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)\n\n\n\n"
 },
 
 {
@@ -149,7 +165,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nfinite",
     "category": "function",
-    "text": "nresults(affineresult)\n\nThe number of finite solutions.\n\n\n\n"
+    "text": "nfinite(affineresult)\n\nThe number of finite solutions.\n\n\n\n"
+},
+
+{
+    "location": "solving.html#HomotopyContinuation.Solving.nreal",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.nreal",
+    "category": "function",
+    "text": "nreal(result; tol=1e-6)\n\nThe number of real solutions where all imaginary parts of each solution are smaller than tol.\n\n\n\n"
 },
 
 {
@@ -189,7 +213,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "The result of solve",
     "category": "section",
-    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nsolutions\nfailed\natinfinity\nsingular\nnonsingular\nfinite\nseedIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
+    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nsolutions\nrealsolutions\nfinite\nBase.real(::Solving.Results)\natinfinity\nsingular\nnonsingular\nfailed\nseedIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnreal\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
 },
 
 {
@@ -222,6 +246,14 @@ var documenterSearchIndex = {"docs": [
     "title": "HomotopyContinuation.Solving.startsolution",
     "category": "function",
     "text": "startsolution(pathresult)\n\nGet the start solution of the solution x of the path.\n\n\n\n"
+},
+
+{
+    "location": "solving.html#Base.isreal-Tuple{HomotopyContinuation.Solving.PathResult}",
+    "page": "Solving Polynomial Systems",
+    "title": "Base.isreal",
+    "category": "method",
+    "text": "isreal(pathresult; tol=1e-6)\nisreal(pathresult, tol)\n\nDetermine whether infinity norm of the imaginary part of the so\n\n\n\n"
 },
 
 {
@@ -285,7 +317,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "PathResult",
     "category": "section",
-    "text": "For each path we return a PathResult containing the detailed information about the single path.PathResultThe following helper functions are providedsolution\nresidual\nstartsolution\nissuccess\nisfailed\nisaffine\nisprojective\nisatinfinity\nissingular\nisnonsingular"
+    "text": "For each path we return a PathResult containing the detailed information about the single path.PathResultThe following helper functions are providedsolution\nresidual\nstartsolution\nBase.isreal(::PathResult)\nissuccess\nisfailed\nisaffine\nisprojective\nisatinfinity\nissingular\nisnonsingular"
 },
 
 {
@@ -941,7 +973,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "Input",
     "category": "section",
-    "text": "We support any polynomials which follow the MultivariatePolynomials interface. By default we export the @polyvar and PolyVar routines from the DynamicPolynomials implementation. With these you can simply create variables# Create variables x, y, z\n@polyvar x y z\nf = x^2+y^2+z^2\n\n# You can also create an array of variables\n@polyvar x[1:3] # This creates x1, x2, x3 accessed by x[1], x[2], x[3]\nf = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2\n\n# Also you can create matrices of variables\n# This creates x1_1, x1_2, x2_1, x2_2 accessed by\n# x[1,1], x[1,2], x[2,1], x[2,2]\n@polyvar x[1:2, 1:2]"
+    "text": "We support any polynomials which follow the MultivariatePolynomials interface. By default we export the routines @polyvar, PolyVar, differentiate and variables from the DynamicPolynomials implementation. With these you can simply create variables# Create variables x, y, z\n@polyvar x y z\nf = x^2+y^2+z^2\n\n# You can also create an array of variables\n@polyvar x[1:3] # This creates x1, x2, x3 accessed by x[1], x[2], x[3]\nf = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2\n\n# Also you can create matrices of variables\n# This creates x1_1, x1_2, x2_1, x2_2 accessed by\n# x[1,1], x[1,2], x[2,1], x[2,2]\n@polyvar x[1:2, 1:2]"
 },
 
 {
