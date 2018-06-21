@@ -36,6 +36,8 @@
     @test nfinite(result) == 70
     @test natinfinity(result) == 50
 
+
+    F = equations(katsura(5))
     prob, startsolutions = Problems.problem_startsolutions(Input.TotalDegree(F))
 
     result = solve(prob.homotopy, map(startsolutions) do s
