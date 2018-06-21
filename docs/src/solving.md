@@ -22,11 +22,13 @@ In order to analyze a `Result` we provide the following helper functions
 ```@docs
 results
 solutions
-failed
+realsolutions
+finite
+Base.real(::Solving.Results)
 atinfinity
 singular
 nonsingular
-finite
+failed
 seed
 ```
 
@@ -35,6 +37,7 @@ also provide the following helper functions.
 ```@docs
 nresults
 nfinite
+nreal
 nsingular
 nnonsingular
 natinfinity
@@ -53,6 +56,7 @@ The following helper functions are provided
 solution
 residual
 startsolution
+Base.isreal(::PathResult)
 issuccess
 isfailed
 isaffine

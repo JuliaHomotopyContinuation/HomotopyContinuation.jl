@@ -10,10 +10,13 @@
     @test length(finite(R, onlynonsingular=true)) == 4
     @test isempty(failed(R))
     @test length(real(R, tol=1e-7)) == 2
+    @test nreal(R, tol=1e-7) == 2
     @test length(atinfinity(R)) == 572
     @test length(results(R, onlyreal=true, realtol=1e-8)) == 2
     @test length(results(R, onlynonsingular=true, singulartol=1e9)) == 4
+    @test nresults(R, onlynonsingular=true, singulartol=1e9) == 4
     @test length(results(R, onlyfinite=false)) == 576
+    @test nresults(R, onlyfinite=false) == 576
     @test nnonsingular(R) == 4
     @test length(nonsingular(R)) == 4
 
@@ -25,8 +28,8 @@
 
     @test length(solutions(R)) == 4
     @test solutions(R) isa Vector{Vector{Complex128}}
-    @test solutions(R, Val{true}, realtol=1e-8) isa Vector{Vector{Float64}}
-    @test length(solutions(R, Val{true}, realtol=1e-8)) == 2
+    @test realsolutions(R, realtol=1e-8) isa Vector{Vector{Float64}}
+    @test length(realsolutions(R, realtol=1e-8)) == 2
 
     @test_nowarn string(R)
     @test_nowarn string(R[end])

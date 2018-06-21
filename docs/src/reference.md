@@ -2,7 +2,8 @@
 
 ## Input
 We support any polynomials which follow the [MultivariatePolynomials](https://github.com/JuliaAlgebra/MultivariatePolynomials.jl)
-interface. By default we export the `@polyvar` and `PolyVar` routines
+interface. By default we export the routines `@polyvar`, `PolyVar`, `differentiate`
+and `variables`
 from the [DynamicPolynomials](https://github.com/JuliaAlgebra/DynamicPolynomials.jl)
 implementation.
 With these you can simply create variables
