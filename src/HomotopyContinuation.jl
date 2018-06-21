@@ -2,8 +2,8 @@ __precompile__()
 
 module HomotopyContinuation
 
-    import DynamicPolynomials: @polyvar, PolyVar
-    export @polyvar, PolyVar
+    import DynamicPolynomials: @polyvar, PolyVar, differentiate, variables
+    export @polyvar, PolyVar, differentiate, variables
 
     export AffinePatches,
         Correctors,
@@ -51,14 +51,14 @@ module HomotopyContinuation
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, solutions, failed, atinfinity, singular, nonsingular, seed
+        finite, results, solutions, realsolutions, failed, atinfinity, singular, nonsingular, seed, nreal
 
     export AffineResult, ProjectiveResult, PathResult, solution,
         residual, startsolution, issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, solutions, failed, atinfinity, singular, nonsingular, seed
+        finite, results, solutions, realsolutions, failed, atinfinity, singular, nonsingular, seed, nreal
 
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
     export StraightLineHomotopy, FixedPointHomotopy

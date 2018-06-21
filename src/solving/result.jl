@@ -1,5 +1,7 @@
-export AffineResult, ProjectiveResult, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-    finite, results, failed, atinfinity, singular, nonsingular, seed, solutions
+export AffineResult, ProjectiveResult,
+    nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
+    finite, results, failed, atinfinity, singular, nonsingular, seed,
+    solutions, realsolutions
 
 """
     Result
@@ -39,14 +41,28 @@ Base.iteratorsize(::Type{<:Result}) = Base.HasLength()
 Base.eltype(r::Result) = eltype(r.pathresults)
 
 """
-    nresults(result)
+    nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
-The number of proper solutions.
+The number of solutions which satisfy the corresponding predicates.
+
+## Example
+```julia
+result = solve(F)
+# Get all non-singular results where all imaginary parts are smaller than 1e-8
+nresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)
+```
 """
-nresults(R::Result) = count(issuccess, R)
+function nresults(R::Result; onlyreal=false, realtol=1e-6,
+    onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    count(R) do r
+        (!onlyreal || isreal(r, realtol)) &&
+        (!onlynonsingular || isnonsingular(r, singulartol)) &&
+        (!onlyfinite || isfinite(r) || isprojective(r))
+    end
+end
 
 """
-    nresults(affineresult)
+    nfinite(affineresult)
 
 The number of finite solutions.
 """
@@ -82,6 +98,15 @@ nfailed(R::Result) = count(isfailed, R)
 The number of non-singular solutions.
 """
 nnonsingular(R::Result; tol = 1e10) = count(r -> isnonsingular(r, tol), R)
+
+"""
+    nreal(result; tol=1e-6)
+
+The number of real solutions where all imaginary parts of each solution
+are smaller than `tol`.
+"""
+nreal(R::Result; tol = 1e-6) = count(r -> isreal(r, tol), R)
+
 
 """
     seed(result)
@@ -124,27 +149,36 @@ function results(f::Function, R::Result;
 end
 
 """
-    solutions(result, onlyreal=Val{false};realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    solutions(result; onlyreal=true, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
-Return all solution (as `Vector`s) for which the given conditions apply. If `onlyreal` is
-`Val{true}` this returns the *real* solutions. This is different than applying `results(solution, result, onlyreal=true)`.
+Return all solution (as `Vector`s) for which the given conditions apply.
 
 ## Example
 ```julia
 julia> @polyvar x y
 julia> result = solve([(x-2)y, y+x+3]);
-julia> solutions(result, Val{true})
-[[2.0, -5.0], [-3.0, 0.0]]
 julia> solutions(result)
 [[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]
 ```
 """
-function solutions(result::Result, onlyreal=Val{false}; kwargs...)
-    if onlyreal === Val{true}
-        results(r -> real.(solution(r)), result; onlyreal=true, kwargs...)
-    else
-        results(r -> solution(r), result; onlyreal=false, kwargs...)
-    end
+function solutions(result::Result; kwargs...)
+    results(r -> solution(r), result; onlyreal=false, kwargs...)
+end
+
+"""
+    realsolutions(result; tol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+
+Return all real solution (as `Vector`s of reals) for which the given conditions apply.
+
+## Example
+```julia
+julia> @polyvar x y
+julia> result = solve([(x-2)y, y+x+3]);
+julia> realsolutions(result)
+[[2.0, -5.0], [-3.0, 0.0]]
+"""
+function realsolutions(result::Result; onlyreal=true, tol=1e-6, kwargs...)
+    results(r -> real.(solution(r)), result; onlyreal=true, realtol=tol, kwargs...)
 end
 
 """
