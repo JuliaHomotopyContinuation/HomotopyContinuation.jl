@@ -98,17 +98,17 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing;
     F = prob.system
     variables = MP.variables(F)
     F_ishom = ishomogenous(F)
-    G = F_ishom ? totaldegree(F, variables, variables[1]) : totaldegree(F, variables)
     if F_ishom
-        start = totaldegree_solutions(G, NullHomogenization())
-        Projective(system(G), system(F), NullHomogenization(); kwargs...), start
+        G = Systems.TotalDegreeSystem(F, variables, variables[1])
+        start = totaldegree_solutions(F, NullHomogenization())
+        Projective(G, system(F), NullHomogenization(); kwargs...), start
     else
         # We create a new variable to homogenize the system
         homvar = uniquevar(F)
         homogenization = Homogenization(1)
         var_ordering = [homvar; variables]
         proj = Projective(
-            system(homogenize(G, homvar), var_ordering),
+            Systems.TotalDegreeSystem(F, var_ordering, homvar),
             system(homogenize(F, homvar), var_ordering), homogenization; kwargs...)
         start = totaldegree_solutions(F, homogenization)
         proj, start
@@ -118,11 +118,10 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, homvar::MP.Abstra
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
     variables = MP.variables(prob.system)
     homogenization = Homogenization(homvar, variables)
-    G = totaldegree(prob.system, variables, homvar)
-    start = totaldegree_solutions(G, homogenization)
+    start = totaldegree_solutions(prob.system, homogenization)
 
     proj = Projective(
-        system(homogenize(G, homvar), variables),
+        Systems.TotalDegreeSystem(prob.system, variables, homvar),
         system(homogenize(prob.system, homvar), variables), homogenization; kwargs...)
     proj, start
 end
@@ -134,7 +133,7 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
     @assert n + 1 == N "Input system is not a square homogenous system!"
 
     DynamicPolynomials.@polyvar z[1:N]
-    G = system(totaldegree(degrees, z, z[1]), z)
+    G = Systems.TotalDegreeSystem(degrees, collect(2:N), 1)
     homogenization = NullHomogenization()
 
     proj = Projective(G, prob.system, homogenization; kwargs...)
@@ -149,10 +148,8 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
     # system needs to be homogenous
     @assert n + 1 == N "Input system is not a square homogenous system!"
 
-    DynamicPolynomials.@polyvar z[1:N]
-    G = system(totaldegree(degrees, z, z[homvaridx]), z)
     homogenization = Homogenization(homvaridx)
-
+    G = Systems.TotalDegreeSystem(degrees, [1:homvaridx-1;homvaridx+1:N], homvaridx)
     proj = Projective(G, prob.system, homogenization; kwargs...)
     start = totaldegree_solutions(degrees, homogenization)
 
@@ -280,49 +277,9 @@ end
 
 
 """
-    totaldegree(F::Vector{<:MP.AbstractPolynomialLike})
-
-Construct a total degree start system for the system `F`.
-This is the system
-```math
-\\begin{align*}
-    z_1^{d_1} &- 1\\\\
-    z_1^{d_2} &- 1\\\\
-    &\\vdots \\\\
-    z_n^{d_n} &- 1\\\\
-\\end{align*}
-```
-where ``d_i`` is the degree of the ``i``-th polynomial of `F`.
-
-## Example
-```julia
-julia> @polyvar x y;
-julia> totaldegree([x^2 + y + 1, x^2*y^2 - 2])
-[x^2 - 1, y^4 - 1]
-```
-"""
-function totaldegree(F::Vector{<:MP.AbstractPolynomialLike}, vars, homvar=nothing)
-    totaldegree(MP.maxdegree.(F), vars, homvar)
-end
-function totaldegree(degrees::Vector{Int}, vars, homvar::MP.AbstractVariable)
-    filtered_vars = filter(v -> v != homvar, vars)
-    map(1:length(degrees)) do k
-        d = degrees[k]
-        filtered_vars[k]^d - homvar^d
-    end
-end
-function totaldegree(degrees::Vector{Int}, vars, _homvar::Nothing)
-    map(1:length(degrees)) do k
-        d = degrees[k]
-        vars[k]^d - 1
-    end
-end
-
-"""
     totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
 
 Returns an iterator of the solutions of the total degree startsystem of `F`.
-See [`totaldegree`](@ref) for more details.
 """
 function totaldegree_solutions(F::Vector{AP}, homogenization) where {AP<:MP.AbstractPolynomialLike}
     totaldegree_solutions(MP.maxdegree.(F), homogenization)

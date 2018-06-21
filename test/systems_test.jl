@@ -74,3 +74,27 @@ end
     Systems.evaluate_and_jacobian!(u, U, F, x, cache)
     @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
 end
+
+@testset "Systems.TotalDegreeSystem" begin
+    @polyvar x y z
+
+    F = Systems.SPSystem([x^4-z^4, y^3-z^3])
+    w = rand(Complex128, 3)
+
+    G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3], [x, y, z], z)
+    @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
+    @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
+    u, U = Systems.evaluate_and_jacobian(F, w)
+    @test u ≈ Systems.evaluate(F, w)
+    @test U ≈ Systems.jacobian(G, w)
+
+    @polyvar x y z t
+    F = Systems.SPSystem([x^4-z^4, y^3-z^3, t-z])
+    G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3, t-z], [x, y, z, t], z)
+    w = rand(Complex128, 4)
+    @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
+    @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
+    u, U = Systems.evaluate_and_jacobian(F, w)
+    @test u ≈ Systems.evaluate(F, w)
+    @test U ≈ Systems.jacobian(G, w)
+end
