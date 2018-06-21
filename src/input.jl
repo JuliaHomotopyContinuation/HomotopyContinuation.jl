@@ -5,6 +5,7 @@ using Compat
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
+import ..Homotopies
 import ..Systems
 using ..Utilities
 
@@ -37,6 +38,12 @@ struct StartTarget{P1<:Inputs, P2<:Inputs, V<:AbstractVector} <: AbstractInput
 end
 function StartTarget(start::P1, target::P2, startsolutions::Vector{V}) where {P1<:Inputs, P2<:Inputs, V<:AbstractVector}
     StartTarget{P1, P2, V}(start, target, startsolutions)
+end
+
+
+struct Homotopy{Hom<:Homotopies.AbstractHomotopy, V} <: AbstractInput
+    H::Hom
+    startsolutions::Vector{V}
 end
 
 
