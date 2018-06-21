@@ -37,7 +37,7 @@ Base.size(F::TotalDegreeSystem) = (length(F.degrees), length(F.degrees) + 1)
 
 cache(::TotalDegreeSystem, x) = NullCache()
 
-function evaluate!(u, F::TotalDegreeSystem, x)
+function evaluate!(u, F::TotalDegreeSystem, x, ::NullCache)
     for i=1:length(F.degrees)
         d = F.degrees[i]
         dix = F.degree_idxs[i]
@@ -45,13 +45,13 @@ function evaluate!(u, F::TotalDegreeSystem, x)
     end
     u
 end
-function evaluate(F::TotalDegreeSystem, x)
+function evaluate(F::TotalDegreeSystem, x, cache::NullCache)
     u = similar(x, size(F, 1))
-    evaluate!(u, F, x)
+    evaluate!(u, F, x, cache)
     u
 end
 
-function jacobian!(U, F::TotalDegreeSystem, x)
+function jacobian!(U, F::TotalDegreeSystem, x, ::NullCache)
     U .= zero(eltype(x))
     hidx = F.hom_idx
     for i=1:length(F.degrees)
@@ -67,13 +67,13 @@ function jacobian!(U, F::TotalDegreeSystem, x)
     end
     U
 end
-function jacobian(F::TotalDegreeSystem, x)
+function jacobian(F::TotalDegreeSystem, x, cache::NullCache)
     U = similar(x, size(F))
-    jacobian!(U, F, x)
+    jacobian!(U, F, x, cache)
     U
 end
 
-function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x)
+function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x, ::NullCache)
     U .= zero(eltype(x))
     hidx = F.hom_idx
     for i=1:length(F.degrees)
@@ -94,9 +94,9 @@ function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x)
     nothing
 end
 
-function evaluate_and_jacobian(F::TotalDegreeSystem, x)
+function evaluate_and_jacobian(F::TotalDegreeSystem, x, cache::NullCache)
     u = similar(x, size(F, 1))
     U = similar(x, size(F))
-    evaluate_and_jacobian!(u, U, F, x)
+    evaluate_and_jacobian!(u, U, F, x, cache)
     u, U
 end
