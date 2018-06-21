@@ -1,8 +1,8 @@
 # <img src="https://i.imgur.com/8ycOn14.png" height="80">
-| **Documentation** | **Build Status** |
-|:-----------------:|:----------------:|
-| [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] |
-| [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url] |
+| **Documentation** | **Build Status** | **References to cite** |
+|:-----------------:|:----------------:|:-----------------------:|
+| [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] | [![DOI](https://zenodo.org/badge/99226144.svg)](https://zenodo.org/badge/latestdoi/99226144) |
+| [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url] | [arXiv:1711.10911](https://arxiv.org/abs/1711.10911) |
 
 
 `HomotopyContinuation.jl` is a package for solving polynomial systems with only finitely many solution using numerical homotopy continuation.
