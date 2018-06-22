@@ -164,6 +164,10 @@ Returns the number of variables of the homotopy `H`.
 """
 nvariables(H::AbstractHomotopy) = last(size(H))
 
+Base.size(F::AbstractHomotopy, i::Integer) = size(F)[i]
+Base.length(F::AbstractSystem) = size(F, 1)
+
+
 """
     precondition!(H::AbstractHomotopy, x, t, cache)
 
