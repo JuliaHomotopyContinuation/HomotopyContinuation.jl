@@ -69,5 +69,5 @@ end
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (7, 6)
 
-    InterfaceTest.homotopy(H)
+    InterfaceTest.homotopy(H, x)
 end

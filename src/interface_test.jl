@@ -1,11 +1,11 @@
 module InterfaceTest
-    import ..Homotopies
-    import Base.Test: @test
+
+import ..Homotopies
+import Base.Test: @test
 
 
-    function homotopy(H::Homotopies.AbstractHomotopy)
+function homotopy(H::Homotopies.AbstractHomotopy, x=rand(Complex{Float64}, size(H, 1)) )
         m, n = size(H)
-        x = rand(Complex{Float64}, n)
         t = rand()
         u = zeros(Complex{Float64}, m)
         U = zeros(Complex{Float64}, m, n)
@@ -31,5 +31,6 @@ module InterfaceTest
         Homotopies.jacobian_and_dt!(U, u, H, x, t, cache)
         @test Homotopies.jacobian_and_dt(H, x, t, cache) == (U, u)
         @test (U, u) == (Homotopies.jacobian(H, x, t), Homotopies.dt(H, x, t))
-    end
+end
+
 end
