@@ -4,7 +4,7 @@ import ..Homotopies
 import Base.Test: @test
 
 
-function homotopy(H::Homotopies.AbstractHomotopy, x=rand(Complex{Float64}, size(H, 1)) )
+function homotopy(H::Homotopies.AbstractHomotopy, x=rand(Complex{Float64}, size(H, 2)) )
         m, n = size(H)
         t = rand()
         u = zeros(Complex{Float64}, m)

@@ -50,9 +50,7 @@ function Ut_mul_x!(cache, U, x, t)
         buffer[i, 1] = U[i,2] * s + U[i,1] * c
         buffer[i, 2] = U[i,2] * c - U[i,1] * s
     end
-    # now we have to compute out * U^T (resp. U^H since U complex)
-    A_mul_Bc!(U_t, buffer, U)
-    A_mul_B!(cache.y, Ut!(cache, U, t), x)
+    A_mul_B!(cache.y, A_mul_Bc!(U_t, buffer, U) x)
 end
 
 """
@@ -84,12 +82,6 @@ function Homotopies.jacobian!(out, H::RandomUnitaryPath, x, t, cache)
     A_mul_B!(out, cache.jac_buffer, cache.U_t)
 end
 
-function Homotopies.evaluate_and_jacobian!(val, jac, H::RandomUnitaryPath, x, t, cache)
-    y = Ut_mul_x!(cache, H.U, x, t)
-    Homotopies.evaluate_and_jacobian!(val, cache.jac_buffer, H.straightline, y, t, cache.straightline)
-    A_mul_B!(jac, cache.jac_buffer, cache.U_t)
-end
-
 function Homotopies.dt!(out, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
     # chain rule
@@ -100,12 +92,17 @@ function Homotopies.dt!(out, H::RandomUnitaryPath, x, t, cache)
     out .+= cache.dt_buffer
 end
 
+function Homotopies.evaluate_and_jacobian!(val, jac, H::RandomUnitaryPath, x, t, cache)
+    y = Ut_mul_x!(cache, H.U, x, t)
+    Homotopies.evaluate_and_jacobian!(val, cache.jac_buffer, H.straightline, y, t, cache.straightline)
+    A_mul_B!(jac, cache.jac_buffer, cache.U_t)
+end
+
 function Homotopies.jacobian_and_dt!(jac, dt, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
     # chain rule
     Homotopies.jacobian_and_dt!(cache.jac_buffer, dt, H.straightline, y, t, cache.straightline)
     A_mul_B!(jac, cache.jac_buffer, cache.U_t)
-
     y_dot = U_dot_t_mul_x!(cache, H.U, x, t)
     A_mul_B!(cache.dt_buffer, cache.jac_buffer, y_dot)
 
@@ -122,7 +119,7 @@ end
 
 F = Systems.SPSystem([x^2*y-3x*z, z^2*x+3y^2])
 G = Systems.SPSystem([z*x^2-3x*y^2, z^3*x-2x*y*z^2])
-
+size(RandomUnitaryPath(G, F))
 InterfaceTest.homotopy(RandomUnitaryPath(G, F))
 
 
