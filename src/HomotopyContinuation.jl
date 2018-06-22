@@ -9,6 +9,7 @@ module HomotopyContinuation
         Correctors,
         Endgaming,
         Homotopies,
+        InterfaceTest,
         PatchSwitching,
         PathTracking,
         Predictors,
@@ -45,6 +46,7 @@ module HomotopyContinuation
     include("solving.jl")
     include("solve.jl")
 
+    include("interface_test.jl")
 
     import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
         residual, startsolution, issuccess,
