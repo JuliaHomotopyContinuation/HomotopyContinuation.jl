@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>How to set up your own homotopy · Julia Homotopy Continuation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Julia Homotopy Continuation logo"/></a><h1>Julia Homotopy Continuation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search.html"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="index.html">Introduction</a></li><li><a class="toctext" href="examples.html">Examples</a></li><li><a class="toctext" href="Homotopy.html">Setting up homotopies</a></li><li><a class="toctext" href="solve.html">Solving homotopies</a></li><li><a class="toctext" href="pathtracker.html">Pathtracking</a></li><li><a class="toctext" href="endgame.html">Endgame</a></li><li class="current"><a class="toctext" href="set_up_homotopy.html">How to set up your own homotopy</a><ul class="internal"><li><a class="toctext" href="#Adapt-the-struct-and-its-constructors-1">Adapt the struct and its constructors</a></li><li><a class="toctext" href="#Adapt-the-evaluation-functions.-1">Adapt the evaluation functions.</a></li><li><a class="toctext" href="#Include-rotation_and_straightline.jl-in-Homotopies.jl.-1">Include <code>rotation_and_straightline.jl</code> in <code>Homotopies.jl</code>.</a></li><li><a class="toctext" href="#The-complete-code-1">The complete code</a></li></ul></li><li><a class="toctext" href="set_up_pathtracker.html">How to set up your own pathtracking algorithm</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href="set_up_homotopy.html">How to set up your own homotopy</a></li></ul><a class="edit-page" href="https://github.com/JuliaHomotopyContinuation/juliahomotopycontinuation.github.io/blob/source/docs/src/set_up_homotopy.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>How to set up your own homotopy</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="How-to-set-up-your-own-homotopy-1" href="#How-to-set-up-your-own-homotopy-1">How to set up your own homotopy</a></h1><p>We shall illustrate how to set up your own homotopy by work out the following example.</p><p>For a polynomial systems <span>$f,g$</span> we want to define the homotopy</p><div>\[H(x,t) = t * f( U(t) x ) + (1 - t) * g( U(t) x )\]</div><p>where <span>$U(t)$</span> is a random path in the space of unitary matrices with <span>$U(0) = U(1) = I$</span>, the identity matrix. I.e.,</p><div>\[U(t) = U \begin{bmatrix}
+\cos(2π t) &amp; -\sin(2π t) &amp; 0 &amp;\cdots &amp; 0\\
+\sin(2π t) &amp; \cos(2π t) &amp; 0 &amp;\cdots &amp; 0\\
+0 &amp; 0 &amp; 1 &amp;\cdots &amp; 0\\
+0 &amp; 0 &amp; 0 &amp;\cdots &amp; 0\\
+0 &amp; 0 &amp; 0 &amp;\cdots &amp; 1
+\end{bmatrix} U^T.\]</div><p>with a random unitary matrix <code>U</code>.</p><p>To start we make a copy of the file <code>straigthline.jl</code> (or of any other appropriate file like <code>geodesic_on_the_sphere.jl</code>) and rename it <code>rotation_and_straightline.jl</code>. Now we have to do two things:</p><ul><li><p>Adapt the struct and its constructors.</p></li><li><p>Adapt the evaluation functions.</p></li><li><p>Include <code>rotation_and_straightline.jl</code> in <code>Homotopies.jl</code>.</p></li></ul><h2><a class="nav-anchor" id="Adapt-the-struct-and-its-constructors-1" href="#Adapt-the-struct-and-its-constructors-1">Adapt the struct and its constructors</a></h2><p>We now assume that the file we copied is <code>straigthline.jl</code>. It is convenient to make a search-and-replace on <code>StraightLineHomotopy</code> and replace it by <code>RotationAndStraightLine</code>. </p><p>First we adapt the contructor. Note that in the initialization of the struct we sample a random matrix and extract a unitary matrix <span>$U$</span> from its QR-decomposition. From this we define the function <span>$U(t)$</span> and save it together with its derivative in the struct.</p><pre><code class="language-julia">
+mutable struct RotationAndStraightLine{T&lt;:Number} &lt;: AbstractPolynomialHomotopy{T}
+    start::Vector{FP.Polynomial{T}}
+    target::Vector{FP.Polynomial{T}}
+    U::Function
+    U_dot::Function
+
+    function RotationAndStraightLine{T}(start::Vector{FP.Polynomial{T}}, target::Vector{FP.Polynomial{T}}) where {T&lt;:Number}
+        @assert length(start) == length(target) &quot;Expected the same number of polynomials, but got $(length(start)) and $(length(target))&quot;
+
+
+        s_nvars = maximum(FP.nvariables.(start))
+        @assert all(s_nvars .== FP.nvariables.(start)) &quot;Not all polynomials of the start system have $(s_nvars) variables.&quot;
+
+        t_nvars = maximum(FP.nvariables.(target))
+        @assert all(t_nvars .== FP.nvariables.(target)) &quot;Not all polynomials of the target system have $(t_nvars) variables.&quot;
+
+        @assert s_nvars == t_nvars &quot;Expected start and target system to have the same number of variables, but got $(s_nvars) and $(t_nvars).&quot;
+
+        U = qrfact(randn(s_nvars,s_nvars) + im * randn(s_nvars,s_nvars))[:Q]
+
+        function U_fct(t)
+                (cos(2 * pi * t) - 1) .* U[:,1] * U[:,1]&#39; - sin(2 * pi * t) .* U[:,2] * U[:,1]&#39; + sin(2 * pi * t) .* U[:,1] * U[:,2]&#39; + (cos(2 * pi * t) - 1) .* U[:,2] * U[:,2]&#39; + eye(U)
+        end
+
+        function U_dot(t)
+                2 * pi .* (-sin(2 * pi * t) .* U[:,1] * U[:,1]&#39; - cos(2 * pi * t) .* U[:,2] * U[:,1]&#39; + cos(2 * pi * t) .* U[:,1] * U[:,2]&#39; - sin(2 * pi * t) .* U[:,2] * U[:,2]&#39;)
+        end
+
+        new(start, target, U_fct, U_dot)
+    end
+
+    function RotationAndStraightLine{T}(start, target) where {T&lt;:Number}
+        s, t = construct(T, start, target)
+        RotationAndStraightLine{T}(s, t)
+    end
+end
+
+
+function RotationAndStraightLine(start, target)
+    T, s, t = construct(start, target)
+    RotationAndStraightLine{T}(s, t)
+end</code></pre><p>The conversion functions are adapted easily with copy-and-paste.</p><pre><code class="language-julia">#
+# SHOW
+#
+function Base.deepcopy(H::RotationAndStraightLine)
+    RotationAndStraightLine(deepcopy(H.start), deepcopy(H.target))
+end
+#
+# PROMOTION AND CONVERSION
+#ß
+Base.promote_rule(::Type{RotationAndStraightLine{T}}, ::Type{RotationAndStraightLine{S}}) where {S&lt;:Number,T&lt;:Number} = RotationAndStraightLine{promote_type(T,S)}
+Base.promote_rule(::Type{RotationAndStraightLine}, ::Type{S}) where {S&lt;:Number} = RotationAndStraightLine{S}
+Base.promote_rule(::Type{RotationAndStraightLine{T}}, ::Type{S}) where {S&lt;:Number,T&lt;:Number} = RotationAndStraightLine{promote_type(T,S)}
+Base.convert(::Type{RotationAndStraightLine{T}}, H::RotationAndStraightLine) where {T} = RotationAndStraightLine{T}(H.start, H.target)</code></pre><h2><a class="nav-anchor" id="Adapt-the-evaluation-functions.-1" href="#Adapt-the-evaluation-functions.-1">Adapt the evaluation functions.</a></h2><p>The essential part of the homotopy struct are the evaluation functions. Here is where we define the orthogonal rotation.</p><p>The function to be edited are <code>evaluate</code>, <code>jacobian</code>, <code>dt</code> and <code>weylnorm</code>. For fast evaluation there is a function <code>evaluate_start_target</code> that evaluates start and target system efficiently.</p><p>The function that evaluates the homotopy at <span>$x$</span> at time <span>$t$</span> is</p><pre><code class="language-julia">#
+# EVALUATION + DIFFERENTATION
+#
+function evaluate!(u::AbstractVector, H::RotationAndStraightLine{T}, x::Vector, t::Number) where T
+    y = H.U(t) * x
+    for i = 1:length(H.target)
+        f = H.target[i]
+        g = H.start[i]
+        u[i] = (one(T) - t) * FP.evaluate(f, y) + t * FP.evaluate(g, y)
+    end
+    u
+end
+(H::RotationAndStraightLine)(x,t) = evaluate(H,x,t)
+
+function evaluate!(u::AbstractVector{T}, H::RotationAndStraightLine, x::Vector, t::Number, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_start_target!(cfg, H, y, precomputed)
+    u .= (one(t) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+end</code></pre><p>The derivative of the homotopy with respect to <span>$x$</span> is</p><pre><code class="language-julia">function jacobian!(u::AbstractMatrix, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    U = H.U(t)
+    y = U * x
+    jacobian_start_target!(cfg, H, y, precomputed)
+    u .= ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * U
+end
+
+function jacobian!(r::JacobianDiffResult, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    U = H.U(t)
+    y = U * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+
+    r.value .= (one(t) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+    r.jacobian .= ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * U
+    r
+end</code></pre><p>The derivative of the homotopy with respect to <span>$t$</span> is</p><pre><code class="language-julia">function dt!(u, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+
+    u .= value_start(cfg) .- value_target(cfg) .+ ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * H.U_dot(t) * x
+end
+
+function dt!(r::DtDiffResult, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+    r.value .= (one(T) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+    r.dt .= value_start(cfg) .- value_target(cfg) .+ ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * H.U_dot(t) * x
+    r
+end</code></pre><p>Finally, we adapt the function to compute the Weylnorm. Note that precomposing with unitary matrices preserves the Weyl inner product.</p><pre><code class="language-julia">function weylnorm(H::RotationAndStraightLine{T})  where {T&lt;:Number}
+    f = FP.homogenize.(H.start)
+    g = FP.homogenize.(H.target)
+    λ_1 = FP.weyldot(f,f)
+    λ_2 = FP.weyldot(f,g)
+    λ_3 = FP.weyldot(g,g)
+
+    function (t)
+        sqrt(abs2(one(T) - t) * λ_1 + 2 * real((one(T) - t) * conj(t) * λ_2) + abs2(t) * λ_3)
+    end
+end</code></pre><h2><a class="nav-anchor" id="Include-rotation_and_straightline.jl-in-Homotopies.jl.-1" href="#Include-rotation_and_straightline.jl-in-Homotopies.jl.-1">Include <code>rotation_and_straightline.jl</code> in <code>Homotopies.jl</code>.</a></h2><p>To enable <code>julia</code> to recognize our new homotopy, we have to include the following line in the <code>Homotopies.jl</code> file</p><pre><code class="language-julia">include(&quot;homotopies/rotation_and_straightline.jl&quot;)</code></pre><p>Now we are ready to use <code>RotationAndStraightLine</code> as homotopy type:</p><pre><code class="language-julia">import DynamicPolynomials: @polyvar
+using HomotopyContinuation
+
+@polyvar x y
+
+f = [x^2 - x*y]
+H = RotationAndStraightLine(f,f)
+
+solve(H,[0.0, 1.0 + im * 0.0])</code></pre><p>gives another solution of <span>$f$</span>. The technique of making loops in the space of polynomials to track zeros to other zeros is called monodromy..</p><h2><a class="nav-anchor" id="The-complete-code-1" href="#The-complete-code-1">The complete code</a></h2><p>After having completed all of the above tasks, we have the following <code>rotation_and_straightline.jl</code> file:</p><pre><code class="language-julia">export RotationAndStraightLine
+
+&quot;&quot;&quot;
+    RotationAndStraightLine(start, target)
+
+Construct the homotopy `t * start( U(t) x ) + (1-t) * target( U(t) x)`,
+
+where `U(t)` is a path in the space of orthogonal matrices with `U(0)=U(1)=I`, the identity matrix.
+
+`start` and `target` have to match and to be one of the following
+* `Vector{&lt;:MP.AbstractPolynomial}` where `MP` is [`MultivariatePolynomials`](https://github.com/blegat/MultivariatePolynomials.jl)
+* `MP.AbstractPolynomial`
+* `Vector{&lt;:FP.Polynomial}` where `FP` is [`FixedPolynomials`](https://github.com/saschatimme/FixedPolynomials.jl)
+
+
+    RotationAndStraightLine{T}(start, target)
+
+You can also force a specific coefficient type `T`.
+&quot;&quot;&quot;
+mutable struct RotationAndStraightLine{T&lt;:Number} &lt;: AbstractPolynomialHomotopy{T}
+    start::Vector{FP.Polynomial{T}}
+    target::Vector{FP.Polynomial{T}}
+    U::Function
+    U_dot::Function
+
+    function RotationAndStraightLine{T}(start::Vector{FP.Polynomial{T}}, target::Vector{FP.Polynomial{T}}) where {T&lt;:Number}
+        @assert length(start) == length(target) &quot;Expected the same number of polynomials, but got $(length(start)) and $(length(target))&quot;
+
+
+        s_nvars = maximum(FP.nvariables.(start))
+        @assert all(s_nvars .== FP.nvariables.(start)) &quot;Not all polynomials of the start system have $(s_nvars) variables.&quot;
+
+        t_nvars = maximum(FP.nvariables.(target))
+        @assert all(t_nvars .== FP.nvariables.(target)) &quot;Not all polynomials of the target system have $(t_nvars) variables.&quot;
+
+        @assert s_nvars == t_nvars &quot;Expected start and target system to have the same number of variables, but got $(s_nvars) and $(t_nvars).&quot;
+
+        U = qrfact(randn(s_nvars,s_nvars) + im * randn(s_nvars,s_nvars))[:Q]
+
+        function U_fct(t)
+                (cos(2 * pi * t) - 1) .* U[:,1] * U[:,1]&#39; - sin(2 * pi * t) .* U[:,2] * U[:,1]&#39; + sin(2 * pi * t) .* U[:,1] * U[:,2]&#39; + (cos(2 * pi * t) - 1) .* U[:,2] * U[:,2]&#39; + eye(U)
+        end
+
+        function U_dot(t)
+                2 * pi .* (-sin(2 * pi * t) .* U[:,1] * U[:,1]&#39; - cos(2 * pi * t) .* U[:,2] * U[:,1]&#39; + cos(2 * pi * t) .* U[:,1] * U[:,2]&#39; - sin(2 * pi * t) .* U[:,2] * U[:,2]&#39;)
+        end
+
+        new(start, target, U_fct, U_dot)
+    end
+
+    function RotationAndStraightLine{T}(start, target) where {T&lt;:Number}
+        s, t = construct(T, start, target)
+        RotationAndStraightLine{T}(s, t)
+    end
+end
+
+
+function RotationAndStraightLine(start, target)
+    T, s, t = construct(start, target)
+    RotationAndStraightLine{T}(s, t)
+end
+
+
+const RotationAndStraightLine{T} = RotationAndStraightLine{T}
+
+#
+# SHOW
+#
+function Base.deepcopy(H::RotationAndStraightLine)
+    RotationAndStraightLine(deepcopy(H.start), deepcopy(H.target))
+end
+
+#
+# PROMOTION AND CONVERSION
+#ß
+Base.promote_rule(::Type{RotationAndStraightLine{T}}, ::Type{RotationAndStraightLine{S}}) where {S&lt;:Number,T&lt;:Number} = RotationAndStraightLine{promote_type(T,S)}
+Base.promote_rule(::Type{RotationAndStraightLine}, ::Type{S}) where {S&lt;:Number} = RotationAndStraightLine{S}
+Base.promote_rule(::Type{RotationAndStraightLine{T}}, ::Type{S}) where {S&lt;:Number,T&lt;:Number} = RotationAndStraightLine{promote_type(T,S)}
+Base.convert(::Type{RotationAndStraightLine{T}}, H::RotationAndStraightLine) where {T} = RotationAndStraightLine{T}(H.start, H.target)
+
+
+#
+# EVALUATION + DIFFERENTATION
+#
+function evaluate!(u::AbstractVector, H::RotationAndStraightLine{T}, x::Vector, t::Number) where T
+    y = H.U(t) * x
+    for i = 1:length(H.target)
+        f = H.target[i]
+        g = H.start[i]
+        u[i] = (one(T) - t) * FP.evaluate(f, y) + t * FP.evaluate(g, y)
+    end
+    u
+end
+(H::RotationAndStraightLine)(x,t) = evaluate(H,x,t)
+
+
+function evaluate!(u::AbstractVector{T}, H::RotationAndStraightLine, x::Vector, t::Number, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_start_target!(cfg, H, y, precomputed)
+    u .= (one(t) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+end
+
+function jacobian!(u::AbstractMatrix, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    U = H.U(t)
+    y = U * x
+    jacobian_start_target!(cfg, H, y, precomputed)
+    u .= ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * U
+end
+
+function jacobian!(r::JacobianDiffResult, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    U = H.U(t)
+    y = U * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+
+    r.value .= (one(t) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+    r.jacobian .= ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * U
+    r
+end
+
+function dt!(u, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+
+    u .= value_start(cfg) .- value_target(cfg) .+ ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * H.U_dot(t) * x
+end
+
+function dt!(r::DtDiffResult, H::RotationAndStraightLine{T}, x::AbstractVector, t, cfg::PolynomialHomotopyConfig, precomputed=false) where {T&lt;:Number}
+    y = H.U(t) * x
+    evaluate_and_jacobian_start_target!(cfg, H, y)
+    r.value .= (one(T) - t) .* value_target(cfg) .+ t .* value_start(cfg)
+    r.dt .= value_start(cfg) .- value_target(cfg) .+ ((one(t) - t) .* jacobian_target(cfg) .+ t .* jacobian_start(cfg)) * H.U_dot(t) * x
+    r
+end
+
+function weylnorm(H::RotationAndStraightLine{T})  where {T&lt;:Number}
+    f = FP.homogenize.(H.start)
+    g = FP.homogenize.(H.target)
+    λ_1 = FP.weyldot(f,f)
+    λ_2 = FP.weyldot(f,g)
+    λ_3 = FP.weyldot(g,g)
+
+    function (t)
+        sqrt(abs2(one(T) - t) * λ_1 + 2 * real((one(T) - t) * conj(t) * λ_2) + abs2(t) * λ_3)
+    end
+end</code></pre><footer><hr/><a class="previous" href="endgame.html"><span class="direction">Previous</span><span class="title">Endgame</span></a><a class="next" href="set_up_pathtracker.html"><span class="direction">Next</span><span class="title">How to set up your own pathtracking algorithm</span></a></footer></article></body></html>

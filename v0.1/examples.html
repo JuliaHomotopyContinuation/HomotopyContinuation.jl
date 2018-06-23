@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · Julia Homotopy Continuation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Julia Homotopy Continuation logo"/></a><h1>Julia Homotopy Continuation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search.html"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="index.html">Introduction</a></li><li class="current"><a class="toctext" href="examples.html">Examples</a><ul class="internal"><li><a class="toctext" href="#Computing-the-degree-of-a-variety-1">Computing the degree of a variety</a></li><li><a class="toctext" href="#Using-different-types-of-homotopies-1">Using different types of homotopies</a></li><li><a class="toctext" href="#Using-different-types-of-pathrackers-1">Using different types of pathrackers</a></li><li><a class="toctext" href="#R-Serial-Link-Robots-1">6-R Serial-Link Robots</a></li></ul></li><li><a class="toctext" href="Homotopy.html">Setting up homotopies</a></li><li><a class="toctext" href="solve.html">Solving homotopies</a></li><li><a class="toctext" href="pathtracker.html">Pathtracking</a></li><li><a class="toctext" href="endgame.html">Endgame</a></li><li><a class="toctext" href="set_up_homotopy.html">How to set up your own homotopy</a></li><li><a class="toctext" href="set_up_pathtracker.html">How to set up your own pathtracking algorithm</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href="examples.html">Examples</a></li></ul><a class="edit-page" href="https://github.com/JuliaHomotopyContinuation/juliahomotopycontinuation.github.io/blob/source/docs/src/examples.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Examples</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="examples-1" href="#examples-1">Examples</a></h1><h2><a class="nav-anchor" id="Computing-the-degree-of-a-variety-1" href="#Computing-the-degree-of-a-variety-1">Computing the degree of a variety</a></h2><p>Consider the projective variety in the 2-dimensional complex projective space <span>$CP^2$</span>.</p><div>\[V = \{ x^2 + y^2 - z^2 = 0 \}\]</div><p>The degree of <span>$V$</span> is the number of intersection points of <span>$V$</span> with a generic line.   Let us see what it is. First we initialize the defining equation of <span>$V$</span>.</p><pre><code class="language-julia">import DynamicPolynomials: @polyvar
+
+@polyvar x y z
+f = x^2 + y^2 - z^2</code></pre><p>Let us sample the equation of a random line.</p><pre><code class="language-julia">L = randn(1,3) * [x; y; z]</code></pre><p>Now we compute the number of solutions to <span>$[f=0, L=0]$</span>.</p><pre><code class="language-julia">using HomotopyContinuation
+solve([f; L])</code></pre><p>We find two distinct solutions and conclude that the degree of <span>$V$</span> is 2.</p><h2><a class="nav-anchor" id="Using-different-types-of-homotopies-1" href="#Using-different-types-of-homotopies-1">Using different types of homotopies</a></h2><p>The following example is from Section 7.3 of</p><p>[The numerical solution of systems of polynomials, Sommese, Wampler].</p><p>Consider a triangle with sides a,b,c and let θ be the angle opposite of c. The goal is to compute θ from a,b,c. We define sθ := sin θ and cθ := cos θ. The polynomial corresponding system is.</p><pre><code class="language-julia">import DynamicPolynomials: @polyvar
+
+a = 5
+b = 4
+c = 3
+
+@polyvar sθ cθ
+f = [cθ^2 + sθ^2 - 1, (a * cθ - b)^2 + (a * sθ)^2 - c^2]</code></pre><p>To set up a <a href="Homotopy.html#totaldegree-1">totaldegree</a> homotopy of type StraightLineHomotopy we have to write</p><pre><code class="language-julia">using HomotopyContinuation
+H, s = totaldegree(StraightLineHomotopy, f)</code></pre><p>This sets up a homotopy <code>H</code> of the specified type using a random starting system that comes with a vector <code>s</code> of solutions. To solve for f = 0 we execute</p><pre><code class="language-julia">solve(H, s)</code></pre><p>If instead we wanted to use GeodesicOnTheSphere as homotopy type, we write</p><pre><code class="language-julia">H, s = totaldegree(GeodesicOnTheSphere, f)
+solve(H, s)</code></pre><p>The angles are of course only the real solutions of f = 0. We get them by using</p><pre><code class="language-julia">solution(ans, only_real=true)</code></pre><h2><a class="nav-anchor" id="Using-different-types-of-pathrackers-1" href="#Using-different-types-of-pathrackers-1">Using different types of pathrackers</a></h2><p>The following polynomial system is the example from Section 5.1 from</p><p>[Decoupled molecules with binding polynomials of bidegree (n,2), Ren, Martini, Torres]</p><p>It is called a binding polynomial.</p><pre><code class="language-julia">using HomotopyContinuation
+import DynamicPolynomials: @polyvar
+
+@polyvar w[1:6]
+
+f = [
+    11*(2*w[1]+3*w[3]+5*w[5])+13*(2*w[2]+3*w[4]+5*w[6]),
+    11*(6*w[1]*w[3]+10*w[1]*w[5]+15*w[3]*w[5])+13*(6*w[2]*w[4]+10*w[2]*w[6]+15*w[4]*w[6]),
+    330*w[1]*w[3]*w[5]+390*w[2]*w[4]*w[6],
+    143*(2*w[1]*w[2]+3*w[3]*w[4]+5*w[5]*w[6]),
+    143*(6*w[1]*w[2]*w[3]*w[4]+10*w[1]*w[2]*w[5]*w[6]+15*w[3]*w[4]*w[5]*w[6]),
+    4290*w[1]*w[2]*w[3]*w[4]*w[5]*w[6]
+    ]</code></pre><p>Suppose we wanted to solve <span>$f(w)=a$</span>, where</p><pre><code class="language-julia">a=[71, 73, 79, 101, 103, 107]</code></pre><p>To get an initial solution we compute a random forward solution.</p><pre><code class="language-julia">w_0 = randn(6)
+a_0 = map(p -&gt; p(w =&gt; w_0), f)</code></pre><p>Now we set up the homotopy.</p><pre><code class="language-julia">H = StraightLineHomotopy(f-a_0, f-a)</code></pre><p>and compute a backward solution with starting value <span>$w_0$</span> by</p><pre><code class="language-julia">solve(H, w_0)</code></pre><p>By default the <code>solve</code> function uses <code>SphericalPredictorCorrector</code> as the pathtracking routing. To use the <code>AffinePredictorCorrector</code> instead we must write</p><pre><code class="language-julia">solve(H, w_0, AffinePredictorCorrector())</code></pre><p>The system <span>$f=0$</span> has 72 simple non-real roots. The command</p><pre><code class="language-julia">    S = solve(f-a);
+    solutions(S, singular = false)</code></pre><p>however, only returns 62. The reason is that the remaining 10 solutions are ill-conditioned. We find all 72 solutions by</p><pre><code class="language-julia">    S = solve(f-a, singular_tol=1e8);
+    solutions(S, singular = false)</code></pre><p>The default of <code>singular_tol</code> in <code>JuliaHomotopyContinuation</code> is <span>$1e4$</span>.</p><h2><a class="nav-anchor" id="R-Serial-Link-Robots-1" href="#R-Serial-Link-Robots-1">6-R Serial-Link Robots</a></h2><p>The following example is from Section 9.4 of</p><p>[The numerical solution of systems of polynomials, Sommese, Wampler].</p><p>Consider a robot that consists of 7 links connected by 6 joints. The first link is fixed on the ground and the last link has a hand. The problem of determining the position of the hand when knowing the arrangement of the joints is called forward problem. The problem of determining any arrangement of joints that realized a fixed position of the hand is called backward problem. Let us denote by <span>$z_1,...,z_6$</span> the unit vectors that point in the direction of the joint axes.  They satisfy the following polynomial equations</p><div>\[z_i ⋅ z_i = 1\\
+
+z_i ⋅ z_{i+1} = \cos α_i\\
+
+a_1 * z_1 × z_2 + ... + a_5 * z_5 × z_6 + a_6 * z_2 + ... + a_9 * z_5 = p\]</div><p>for some <span>$(α,a)$</span> and a known <span>$p$</span> (see the aforementioned reference for a detailed explanation on how these numbers are to be interpreted).</p><p>In this notation the forward problem consists of computing <span>$(α,a)$</span> given the <span>$z_i$</span> and <span>$p$</span>. The backward problem consists of computing  <span>$z_i$</span> that realize some fixed <span>$(α,a,z_1,z_6)$</span> (knowing <span>$z_1,z_6$</span> means that the position where the robot is attached to the ground  and the position where its hand should be are fixed).</p><p>We now compute first a forward solution <span>$(α_0, a_0)$</span>, and then use <span>$(α_0, a_0)$</span> to compute a solution for the backward problem imposed by some random <span>$(α, a)$</span>.</p><pre><code class="language-julia">using HomotopyContinuation
+import DynamicPolynomials: @polyvar
+
+@polyvar z2[1:3] z3[1:3] z4[1:3] z5[1:3]
+z1 = [1, 0, 0]
+z6 = [1, 0, 0]
+p = [1, 1, 0]
+z = [z1, z2, z3, z4, z5, z6]
+
+f = [z[i] ⋅ z[i] for i=2:5]
+g = [z[i] ⋅ z[i+1] for i=1:5]
+h = hcat([[z[i] × z[i+1] for i=1:5]; [z[i] for i=2:5]]...)
+
+α = randexp(5)
+a = randexp(9)</code></pre><p>Let us compute a random forward solution.</p><pre><code class="language-julia">z_0=rand(3,4); # Compute a random assignment for the variable z
+for i = 1:4
+    z_0[:,i] = z_0[:,i]./ norm(z_0[:,i]) # normalize the columns of z_0 to norm 1
+end</code></pre><p>We want to compute the angles <span>$\arccos g(z_0)$</span>.</p><pre><code class="language-julia">z_0 = vec(z_0) # vectorize z_0, because the evaluate function takes vectors as input
+
+# compute the forward solution of α
+α_0 = map(p -&gt; acos(p([z2; z3; z4; z5] =&gt; z_0)), g)
+
+# evaluate h at z_0
+h_0 = map(p -&gt; p([z2; z3; z4; z5] =&gt; z_0), h)
+a_0 = h_0\p</code></pre><p>Now we have forward solutions <span>$α_0$</span> and <span>$a_0$</span>. From this we construct the following StraightLineHomotopy.</p><pre><code class="language-julia">H = StraightLineHomotopy([f-1; g-cos.(α_0); h*a_0-p], [f-1; g-cos.(α); h*a-p])</code></pre><p>To compute a backward solution with starting value <span>$z_0$</span> we finally execute</p><pre><code class="language-julia">solve(H, z_0)</code></pre><p>To compute all the backward solutions we may perform a totaldegree homotopy. Although the Bezout number of the system is 1024 the generic number of solutions is 16. We find all 16 solutions by</p><pre><code class="language-julia">H, s = totaldegree(StraightLineHomotopy, [f-1; g-cos.(α_0); h*a_0-p])
+solutions(solve(H, s), singular=false)</code></pre><p>On a MacBook Pro with 2,6 GHz Intel Core i7 and 16 GB RAM memory the above operation takes about 572 seconds. With parallel computing provided by the <code>addprocs()</code> command in <code>Julia</code> it takes about 93 seconds.</p><footer><hr/><a class="previous" href="index.html"><span class="direction">Previous</span><span class="title">Introduction</span></a><a class="next" href="Homotopy.html"><span class="direction">Next</span><span class="title">Setting up homotopies</span></a></footer></article></body></html>

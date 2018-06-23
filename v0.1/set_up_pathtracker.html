@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>How to set up your own pathtracking algorithm · Julia Homotopy Continuation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Julia Homotopy Continuation logo"/></a><h1>Julia Homotopy Continuation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search.html"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="index.html">Introduction</a></li><li><a class="toctext" href="examples.html">Examples</a></li><li><a class="toctext" href="Homotopy.html">Setting up homotopies</a></li><li><a class="toctext" href="solve.html">Solving homotopies</a></li><li><a class="toctext" href="pathtracker.html">Pathtracking</a></li><li><a class="toctext" href="endgame.html">Endgame</a></li><li><a class="toctext" href="set_up_homotopy.html">How to set up your own homotopy</a></li><li class="current"><a class="toctext" href="set_up_pathtracker.html">How to set up your own pathtracking algorithm</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href="set_up_pathtracker.html">How to set up your own pathtracking algorithm</a></li></ul><a class="edit-page" href="https://github.com/JuliaHomotopyContinuation/juliahomotopycontinuation.github.io/blob/source/docs/src/set_up_pathtracker.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>How to set up your own pathtracking algorithm</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="How-to-set-up-your-own-pathtracking-algorithm-1" href="#How-to-set-up-your-own-pathtracking-algorithm-1">How to set up your own pathtracking algorithm</a></h1><p>We want to illustrate how to setup your own pathtracking algorithm by the already implemented <code>AffinePredictorCorrector</code>.</p><p>First you have to define a subtype of <code>AbstractPathtrackingAlgorithm</code>. This is the user facing part.</p><pre><code class="language-julia">struct AffinePredictorCorrector &lt;: AbstractPathtrackingAlgorithm
+end</code></pre><p>Note that you could also allow the user to set certain options, e.g. maybe you want to give him/her the choice between an explicit Euler method and a Runge-Kutta method.</p><p>You also have to clarify whether the algorithm will work in the projective or affine space. Here we want to work in affine space.</p><pre><code class="language-julia">is_projective(::AffinePredictorCorrector) = false</code></pre><p>Now you have to define a struct which is subtype of <code>AbstractPathtrackerCache</code>. This is used for the internal dispatch and also serves as an cache to avoid memory allocations. We will need a working matrix and a vector. Thus we define the following</p><pre><code class="language-julia">struct AffineCache{T} &lt;: AbstractPathtrackerCache{T}
+    A::Matrix{T}
+    b::Vector{T}
+end</code></pre><p>Then you have to define a new method for <code>alg_cache(algorithm, homotopy, x)</code> which will create our <code>AffineCache</code>:</p><pre><code class="language-julia">function alg_cache(alg::AffinePredictorCorrector, H::AbstractHomotopy, x::AbstractVector{T}) where T
+    n = length(x)
+    A = zeros(T, n, n)
+    b = zeros(T, n)
+    AffineCache(A, b)
+end</code></pre><p>We are already half way done! Now comes the interesting part. We have to define two methods. The first one is a correction method. For us this is a simple newton iteration.</p><pre><code class="language-julia">function correct!(x, # the startvalue
+    t, # current &#39;time&#39;
+    H, # the homotopy itself
+    cfg, # An AbstractHomotopyConfiguration for efficient evaluation
+    abstol::Float64, # the target accuracy
+    maxiters::Int, # the maximal number of iterations
+    cache::AffineCache{Complex{T}} # our defined Cache
+    ) where T
+    @unpack A, b = cache
+    m = size(A,2)
+    k = 0
+    while true
+        k += 1
+        evaluate!(b, H, x, t, cfg)
+
+        if norm(b, Inf) &lt; abstol
+            return true
+        elseif k &gt; maxiters
+            return false
+        end
+
+        # put jacobian in A
+        jacobian!(A, H, x, t, cfg, true)
+
+        # this computes A x = b and stores the result x in b
+        LU = lufact!(A)
+        # there is a bug in v0.6.0 see patches.jl
+        my_A_ldiv_B!(LU, b)
+        x .= x .- b
+    end
+end</code></pre><p>This method will be used for the refinement of the final solutions. But we can also use it for the next method. We now want to define the method which will actually be used during the pathtracking! For this we have to define the method <code>perform_step!(pathtracker, values, cache::AffineCache)</code>. The <a href="pathtracker.html#HomotopyContinuation.Pathtracker"><code>Pathtracker</code></a> will invoke this function at each iteration.</p><pre><code class="language-julia">function perform_step!(tracker, values::PathtrackerPrecisionValues{T}, cache::AffineCache{Complex{T}}) where T
+    @unpack s, ds = tracker # s is our current &#39;time&#39;, ds the step length
+    @unpack H, cfg, x, xnext = values
+    @unpack A, b = cache
+
+    m = size(A,2)
+
+    # PREDICT
+    # put jacobian in A
+    jacobian!(A, H, x, s, cfg)
+    # put Hdt in b
+    dt!(b, H, x, s, cfg, true)
+
+    # this computes A x = b and stores the result x in b
+    LU = lufact!(A)
+    # there is a bug in v0.6.0 see patches.jl
+    my_A_ldiv_B!(LU, b)
+
+    xnext .= x .- ds .* b
+
+    # CORRECT
+    @unpack abstol, corrector_maxiters = tracker.options
+    tracker.step_sucessfull = correct!(xnext, s + ds, H, cfg, abstol, corrector_maxiters, cache)
+    nothing
+end</code></pre><p>With this in place you are ready to go! Now you can simply solve a system using your own pathracking algorithm, e.g. using <code>solve(F, AffinePredictorCorrector())</code>.</p><footer><hr/><a class="previous" href="set_up_homotopy.html"><span class="direction">Previous</span><span class="title">How to set up your own homotopy</span></a></footer></article></body></html>

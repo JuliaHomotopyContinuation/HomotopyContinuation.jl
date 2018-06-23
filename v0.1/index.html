@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Introduction · Julia Homotopy Continuation</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link href="assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Julia Homotopy Continuation logo"/></a><h1>Julia Homotopy Continuation</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="search.html"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li class="current"><a class="toctext" href="index.html">Introduction</a><ul class="internal"><li><a class="toctext" href="#A-first-example-1">A first example</a></li></ul></li><li><a class="toctext" href="examples.html">Examples</a></li><li><a class="toctext" href="Homotopy.html">Setting up homotopies</a></li><li><a class="toctext" href="solve.html">Solving homotopies</a></li><li><a class="toctext" href="pathtracker.html">Pathtracking</a></li><li><a class="toctext" href="endgame.html">Endgame</a></li><li><a class="toctext" href="set_up_homotopy.html">How to set up your own homotopy</a></li><li><a class="toctext" href="set_up_pathtracker.html">How to set up your own pathtracking algorithm</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href="index.html">Introduction</a></li></ul><a class="edit-page" href="https://github.com/JuliaHomotopyContinuation/juliahomotopycontinuation.github.io/blob/source/docs/src/index.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Introduction</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Introduction-1" href="#Introduction-1">Introduction</a></h1><p><code>HomotopyContinuation.jl</code> is a package for solving square polynomial systems via homotopy continuation.</p><p>The aim of this project is twofold: establishing a fast numerical polynomial solver in <code>Julia</code> and at the same time providing a highly customizable algorithmic environment for researchers for designing and performing individual experiments.</p><p>You can simply install this package via the Julia package manager</p><pre><code class="language-julia">Pkg.add(&quot;HomotopyContinuation&quot;);</code></pre><h2><a class="nav-anchor" id="A-first-example-1" href="#A-first-example-1">A first example</a></h2><p>HomotopyContinuation.jl aims at having easy-to-understand top-level commands. For instance, suppose we wanted to solve the following system</p><div>\[f= \begin{bmatrix} x^2+y\\ y^2-1\end{bmatrix}.  \]</div><p>First, we have to define <span>$f$</span> in Julia. For this purpose HomotopyContinuation.jl provides an interface to <a href="https://github.com/JuliaAlgebra/MultivariatePolynomials.jl">MultivariatePolynomials.jl</a> for human-readable and easy constructable input. In the following we will use the <a href="https://github.com/JuliaAlgebra/DynamicPolynomials.jl">DynamicPolynomials.jl</a> implementation of that interface.</p><pre><code class="language-julia">import DynamicPolynomials: @polyvar # @polyvar is a function for initializing variables.
+
+@polyvar x y # initialize the variables x y
+f = [x^2+y, y^2-1]</code></pre><p>To solve  <span>$f=0$</span> we execute the following command.</p><pre><code class="language-julia">using HomotopyContinuation # load the module HomotopyContinuation
+
+solve(f) # solves for f=0</code></pre><p>(see <a href="solve.html#solveroptions-1">here</a> for a list of options that can be passed to <code>solve</code>).</p><p>The last command will return a type <code>HomotopyContinuation.Result{Complex{Float64}}</code> of length 4 (one entry for each solution):</p><pre><code class="language-julia-repl">julia&gt; ans
+
+julia&gt; HomotopyContinuation.Result{Complex{Float64}}
+# paths → 4
+# successfull paths → 4
+# solutions at infinity → 0
+# singular solutions → 0
+# real solutions → 2
+HomotopyContinuation.PathResult{Complex{Float64}}[4]</code></pre><p>Let us see what is the information that we get. Four paths were attempted to be solved, four of which were completed successfully. Since we tried to solve an affine system, the algorithm checks whether there are solutions at infinity: in this case there are none. None of the solutions is singular and two of them are real. To access the first solution in the array we write</p><pre><code class="language-julia-repl">julia&gt; ans[1]
+
+julia&gt; HomotopyContinuation.PathResult{Complex{Float64}}
+returncode → :success
+solution → Complex{Float64}[2]
+singular → false
+residual → 1.02e-15…
+newton_residual → 8.95e-16…
+log10_condition_number → 0.133…
+windingnumber → 1
+angle_to_infinity → 0.615…
+real_solution → true
+startvalue → Complex{Float64}[2]
+iterations → 17
+endgame_iterations → 5
+npredictions → 2
+predictions → Vector{Complex{Float64}}[2]</code></pre><p>The returncode tells us that the pathtracking was successfull. What do the other entries of the table tell us? Let us consider the most relevant  (for a complete list of explanations consider <a href="solve.html#result-1">this</a> section).</p><ul><li><p><code>solution</code>: the zero that is computed (here it is <span>$[-1,-1]$</span>).</p></li><li><p><code>singular</code>: boolean that shows whether the zero is singular.</p></li><li><p><code>residual</code>: the computed value of <span>$|f([-1,-1])|$</span>.</p></li><li><p><code>angle_to_infinity</code>: the algorithms homogenizes the system <span>$f$</span> and then computes all solutions in projective space. The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is <span>$0$</span>.</p></li><li><p><code>real_solution</code>: boolean that shows whether the zero is real.</p></li></ul><p>Suppose we were only interested in the real solutions. The command to extract them is</p><pre><code class="language-julia">solutions(solve(f), only_real=true)</code></pre><p>(a detailed explanation of the <code>solutions</code> function is <a href="solve.html#solutions-1">here</a>). Indeed, we have</p><pre><code class="language-julia-repl">julia&gt; [ans[i].solution for i=1:2]
+julia&gt; Vector{Complex{Float64}}[2]
+Complex{Float64}[2]
+1.00… - 2.66e-15…im
+-1.00… + 1.33e-15…im
+Complex{Float64}[2]
+-1.00… + 2.72e-15…im
+-1.00… + 1.44e-15…im</code></pre><p>which are the two real zeros of <code>f</code>. By assigning the boolean values in the <a href="solve.html#solutions-1"><code>solutions</code></a> function we can filter the solutions given by <code>solve(f)</code> according to our needs.</p><p>We solve some more elaborate systems in the <a href="examples.html#examples-1">example section</a>.</p><p><code>JuliaHomotopyContinuation</code> also supports input of type <code>BigFloat</code>.</p><footer><hr/><a class="next" href="examples.html"><span class="direction">Next</span><span class="title">Examples</span></a></footer></article></body></html>
