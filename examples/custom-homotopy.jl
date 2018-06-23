@@ -50,7 +50,7 @@ function Ut_mul_x!(cache, U, x, t)
         buffer[i, 1] = U[i,2] * s + U[i,1] * c
         buffer[i, 2] = U[i,2] * c - U[i,1] * s
     end
-    A_mul_B!(cache.y, A_mul_Bc!(U_t, buffer, U) x)
+    A_mul_B!(cache.y, A_mul_Bc!(U_t, buffer, U), x)
 end
 
 """
