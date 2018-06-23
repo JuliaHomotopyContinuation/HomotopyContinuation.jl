@@ -20,7 +20,7 @@ struct RandomUnitaryPathCache{C, T1, T2} <: Homotopies.AbstractHomotopyCache
     straightline::C
     U_t::Matrix{Complex128}
     y::Vector{T1}
-    # More emporary storage necessary to avoid allocations
+    # More temporary storage necessary to avoid allocations
     jac::Matrix{T2} # holds a jacobian
     dt::Vector{T2} # holds a derivative w.r.t. t
     U::Matrix{Complex128} # holds something like U
@@ -51,6 +51,8 @@ function Ut_mul_x!(cache, U, x, t)
         cache.U[i, 1] = U[i,2] * s + U[i,1] * c
         cache.U[i, 2] = U[i,2] * c - U[i,1] * s
     end
+    # U(t) = cache.U * U'
+    # y = U(t) * x
     A_mul_B!(cache.y, A_mul_Bc!(cache.U_t, cache.U, U), x)
 end
 
@@ -67,7 +69,8 @@ function U_dot_t_mul_x!(cache, U, x, t)
         cache.U[i, 1] =  U[i,2] * c - U[i,1] * s
         cache.U[i, 2] = -U[i,2] * s - U[i,1] * c
     end
-
+    # U'(t) = cache.U * U'
+    # y' = U'(t) * x
     A_mul_B!(cache.y, A_mul_Bc!(cache.U_t, cache.U, U), x)
 end
 
@@ -104,7 +107,6 @@ function Homotopies.jacobian_and_dt!(jac, dt, H::RandomUnitaryPath, x, t, cache)
     y_dot = U_dot_t_mul_x!(cache, H.U, x, t) # y_dot = U'(t)x
     A_mul_B!(cache.dt, cache.jac, y_dot) # dt = J_H(y, t) * y_dot
     dt .+= cache.dt
-    nothing
 end
 
 # Test the implementation
