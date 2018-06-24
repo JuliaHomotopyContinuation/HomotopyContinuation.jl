@@ -3,7 +3,7 @@
 `Homotopy.Continuation.jl` is a package for solving systems of polynomials with
 only finitely many solutions using numerical homotopy continuation.
 If this is your first time reading this documentation, we recommend you start with the
-[quick start guide](http://www.JuliaHomotopyContinuation.org/guides/quick-start).
+[getting started guide](http://www.JuliaHomotopyContinuation.org/guides/latest/get-started).
 
 ## Contents
 ```@contents
