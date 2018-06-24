@@ -977,6 +977,38 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "reference.html#HomotopyContinuation.Utilities.ishomogenous",
+    "page": "Reference",
+    "title": "HomotopyContinuation.Utilities.ishomogenous",
+    "category": "function",
+    "text": "ishomogenous(f::MP.AbstractPolynomialLike)\n\nChecks whether f is homogenous.\n\nishomogenous(polys::Vector{MP.AbstractPolynomialLike})\n\nChecks whether each polynomial in polys is homogenous.\n\n\n\nishomogenous(f::MP.AbstractPolynomialLike, v::Vector{<:MP.AbstractVariable})\n\nChecks whether f is homogenous in the variables v.\n\nishomogenous(polys::Vector{MP.AbstractPolynomialLike}, v::Vector{<:MP.AbstractVariable})\n\nChecks whether each polynomial in polys is homogenous in the variables v.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.Utilities.uniquevar",
+    "page": "Reference",
+    "title": "HomotopyContinuation.Utilities.uniquevar",
+    "category": "function",
+    "text": "uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)\nuniquevar(F::Vector{<:MP.AbstractPolynomialLike}, tag=:x0)\n\nCreates a unique variable.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#HomotopyContinuation.Utilities.homogenize",
+    "page": "Reference",
+    "title": "HomotopyContinuation.Utilities.homogenize",
+    "category": "function",
+    "text": "homogenize(f::MP.AbstractPolynomial, variable=uniquevar(f))\n\nHomogenize the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, variable=uniquevar(F))\n\nHomogenize each polynomial in F by using the given variable variable.\n\n\n\nhomogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))\n\nHomogenize the variables v in the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))\n\nHomogenize the variables v in each polynomial in F by using the given variable variable.\n\n\n\n"
+},
+
+{
+    "location": "reference.html#Utilities-1",
+    "page": "Reference",
+    "title": "Utilities",
+    "category": "section",
+    "text": "ishomogenous\nuniquevar\nhomogenize"
+},
+
+{
     "location": "reference.html#HomotopyContinuation.AffinePatches.OrthogonalPatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.OrthogonalPatch",
