@@ -8,7 +8,6 @@ export allvariables,
     ishomogenous,
     uniquevar,
     homogenize,
-    totaldegree,
     ldiv_lu!, blas_ldiv_lu!,
     infinity_norm,
     unsafe_infinity_norm,
@@ -94,6 +93,7 @@ end
 function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}) where {T<:MP.AbstractVariable}
  all(f -> ishomogenous(f, variables), F)
 end
+
 """
     uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)
     uniquevar(F::Vector{<:MP.AbstractPolynomialLike}, tag=:x0)

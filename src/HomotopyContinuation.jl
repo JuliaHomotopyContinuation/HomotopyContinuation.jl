@@ -68,5 +68,8 @@ module HomotopyContinuation
     import .Systems: FPSystem, SPSystem
     export FPSystem, SPSystem
 
+    import .Utilities: homogenize, uniquevar, ishomogenous
+    export homogenize, uniquevar, ishomogenous
+
 
 end #

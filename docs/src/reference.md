@@ -22,6 +22,14 @@ f = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2
 @polyvar x[1:2, 1:2]
 ```
 
+## Utilities
+
+```@docs
+ishomogenous
+uniquevar
+homogenize
+```
+
 ## AffinePatches
 Affine patches are there to augment projective system such that they can be considered
 as (locally) affine system. By default the following patches are defined
