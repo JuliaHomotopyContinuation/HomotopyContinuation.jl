@@ -38,7 +38,7 @@ Random seed used: 622483
 ```
 Let us see what is the information that we get. Four paths were attempted to be solved, four of which were completed successfully. Since we tried to solve an affine system, the algorithm checks whether there are solutions at infinity: in this case there are none. With *solutions at infinity* we mean solutions of the [homogenization](https://en.wikipedia.org/wiki/Homogeneous_polynomial#Homogenization) of the system which are no solutions of the affine system. None of the solutions are singular and two of them are real.
 
-Assume we are only interested in the *real* solutions. We can obtain these `result` by 
+Assume we are only interested in the *real* solutions. We can obtain these `result` by
 ```julia
 julia> real(result)
 2-element Array{HomotopyContinuation.Solving.PathResult{Complex{Float64},Float64,Complex{Float64}},1}:
@@ -79,8 +79,8 @@ To extract the solutions you can do
 ```julia
 julia> results(solution, result)
 4-element Array{Array{Complex{Float64},1},1}:
- Complex{Float64}[4.44089e-15+1.68179im, 1.41421-8.88178e-16im] 
- Complex{Float64}[1.86717e-16-1.68179im, 1.41421-6.50354e-17im] 
+ Complex{Float64}[4.44089e-15+1.68179im, 1.41421-8.88178e-16im]
+ Complex{Float64}[1.86717e-16-1.68179im, 1.41421-6.50354e-17im]
  Complex{Float64}[1.68179+1.27738e-17im, -1.41421-1.18454e-17im]
  Complex{Float64}[-1.68179+1.104e-18im, -1.41421+2.03235e-18im]
 ```
@@ -89,15 +89,15 @@ or
 results(solution, result, onlyreal=true)
 2-element Array{Array{Complex{Float64},1},1}:
  Complex{Float64}[1.68179+1.27738e-17im, -1.41421-1.18454e-17im]
- Complex{Float64}[-1.68179+1.104e-18im, -1.41421+2.03235e-18im] 
+ Complex{Float64}[-1.68179+1.104e-18im, -1.41421+2.03235e-18im]
 ```
 to obtain only real solutions.
 See the documentation for more possibilities to analyze `result`.
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
-[docs-stable-url]: https://JuliaHomotopyContinuation.github.io/HomotopyContinuation.jl/v0.1.0
-[docs-latest-url]: https://JuliaHomotopyContinuation.github.io/HomotopyContinuation.jl/latest
+[docs-stable-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/v0.1.0
+[docs-latest-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/latest
 
 [build-img]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl.svg?branch=master
 [build-url]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl
