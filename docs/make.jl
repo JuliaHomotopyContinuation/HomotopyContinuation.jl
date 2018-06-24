@@ -2,7 +2,7 @@ using Documenter, HomotopyContinuation
 
 makedocs(
     format = :html,
-    sitename = "HomotopyContinuation.jl",
+    sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
         "Solving Polynomial Systems" => "solving.md",
