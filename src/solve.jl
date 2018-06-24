@@ -43,6 +43,10 @@ F = Systems.SPSystem([x^2+y^2+z^2, 2x+3y-z]) # Systems.SPSystem <: Systems.Abstr
 # To solve the original affine system we have to tell that the homogenization variable has index 3
 solve(F, homvar=3)
 ```
+or equivalently (in this case) by
+```julia
+solve([x^2+y^2+z^2, 2x+3y-z], system=Systems.SPSystem)
+```
 
 # Start Target Homotopy
 
@@ -97,6 +101,12 @@ if the third variable is the homogenization variable.
 # Options
 General options:
 
+* `system=[FPSystem](@ref)`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). This constructor is only
+applied to the input of `solve`. The constructor
+is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and
+`variables` determines the variable ordering.
+* `homotopy=[StraightLineHomotopy](@ref)`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref). The constructor
+is called with `homotopy(start, target)` where `start` and `target` are homogenous [`Systems.AbstractSystem`](@ref)s.
 * `seed::Int`: The random seed used during the computations.
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogenous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
 * `endgame_start=0.1``: The value of `t` for which the endgame is started.
