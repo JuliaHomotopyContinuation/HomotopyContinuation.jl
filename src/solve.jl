@@ -107,6 +107,7 @@ General options:
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogenous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
 * `endgame_start=0.1`: The value of `t` for which the endgame is started.
 * `report_progress=true`: Whether a progress bar should be printed to `STDOUT`.
+* `threading=true`: Enable or disable multi-threading.
 
 Pathtracking specific:
 * `corrector::Correctors.AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Correctors.Newton`](@ref).
