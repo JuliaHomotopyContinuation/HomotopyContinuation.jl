@@ -84,4 +84,4 @@ function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTracking.Pat
     vcat(multiplicities(V, tol, fubini_study)...)
 end
 
-fubini_study(x,y) = 1 - abs(dot(x,y))
+fubini_study(x,y) = acos(min(1.0, abs(dot(x,y))))

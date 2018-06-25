@@ -46,20 +46,22 @@ function cluster_by_angle!(current::SearchTree, i, vectors, nvars, τ)
     α = angle(vectors[i][1])
     β = angle(vectors[current.node[1]][1])
     while !added && j ≤ nvars
-        Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
-        if Δ < (- τ)
-            added = true
-            if isnull(current.left)
-                current.left = SearchTree(i)
-            else
-                cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
-            end
-        elseif Δ > τ
-            added = true
-            if isnull(current.right)
-                current.right = SearchTree(i)
-            else
-                cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+        if abs(vectors[i][j]) > 0.1 && abs(vectors[current.node[1]][j]) > 0.1
+            Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
+            if Δ < (- τ)
+                added = true
+                if isnull(current.left)
+                    current.left = SearchTree(i)
+                else
+                    cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
+                end
+            elseif Δ > τ
+                added = true
+                if isnull(current.right)
+                    current.right = SearchTree(i)
+                else
+                    cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+                end
             end
         end
         j += 1
@@ -102,6 +104,8 @@ end
 
 Returns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.
 """
+
+
 function multiplicities(vectors::Vector{Vector{T}}, tol, distance::F) where {T<:Number, F<:Function}
     nvars = length(vectors[1])
     # root0 is for sorting by norm

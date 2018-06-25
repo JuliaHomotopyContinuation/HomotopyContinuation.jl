@@ -244,6 +244,19 @@ function atinfinity(R::AffineResults)
     [r for r in R if isatinfinity(r)]
 end
 
+
+"""
+    multiplicities(R::Result, tol)
+
+Return a vector of vector of PathResults. Each vector of pathresults are solutions that appear with multiplicities in 'V'. Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
+"""
+function multiplicities(R::Result, tol)
+    multiplicities(R.pathresults, tol)
+end
+
+
+
+####Show functions
 function Base.show(io::IO, r::AffineResult)
     println(io, "-----------------------------------------------")
     println(io, "Paths tracked: $(length(r))")

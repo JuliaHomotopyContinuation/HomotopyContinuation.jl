@@ -78,7 +78,11 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     else
         σ = svdvals(cache.J)
         n = size(cache.H)[2]
-        condition = σ[1]/σ[n-1]
+        if n>2
+            condition = σ[1]/σ[n-1]
+        else
+            condition = inv(σ[1])
+        end
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
@@ -301,3 +305,28 @@ function Base.isreal(r::PathResult, tol::Real)
     sqrt(maximum(_abs2imag, r.solution)) < tol
 end
 _abs2imag(x) = abs2(imag(x))
+
+
+"""
+    multiplicities(V::Vector{PathResult}, tol)
+
+Return a vector of vector of PathResults. Each vector of pathresults are solutions that appear with multiplicities in 'V'. Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
+"""
+function multiplicities(V::Vector{PathResult{T1,T2,T3}}, tol) where {T1,T2,T3}
+
+    output = Vector{Vector{PathResult}}()
+    if all(v -> v.solution_type == :affine, V)
+        M = multiplicities(solution.(V), tol, Utilities.infinity_norm)
+        for m in M
+            push!(output, V[m])
+        end
+    elseif all(v -> v.solution_type == :projective, V)
+        M = multiplicities(normalize.(solution.(V)), tol, (x,y) -> acos(min(1.0, abs(dot(x,y)))))
+        for m in M
+            push!(output, V[m])
+        end
+    else
+        warn("Input contains both affine and projective data. Empty vector is returned.")
+    end
+    output
+end
