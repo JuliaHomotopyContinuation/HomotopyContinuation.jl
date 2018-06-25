@@ -104,8 +104,6 @@ end
 
 Returns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.
 """
-
-
 function multiplicities(vectors::Vector{Vector{T}}, tol, distance::F) where {T<:Number, F<:Function}
     nvars = length(vectors[1])
     # root0 is for sorting by norm

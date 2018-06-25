@@ -33,13 +33,16 @@ In order to analyze a `Result` we provide the following helper functions
 results
 solutions
 realsolutions
+uniquesolutions
 finite
 Base.real(::Solving.Results)
 atinfinity
 singular
 nonsingular
 failed
+multiplicities
 seed
+
 ```
 
 If you are interested in the number of solutions of a certain kind we

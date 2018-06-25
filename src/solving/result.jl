@@ -1,7 +1,7 @@
 export AffineResult, ProjectiveResult,
     nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
     finite, results, failed, atinfinity, singular, nonsingular, seed,
-    solutions, realsolutions
+    solutions, realsolutions, multiplicities, uniquesolutions
 
 """
     Result
@@ -37,8 +37,8 @@ Base.start(r::Result) = start(r.pathresults)
 Base.next(r::Result, state) = next(r.pathresults, state)
 Base.done(r::Result, state) = done(r.pathresults, state)
 Base.endof(r::Result) = endof(r.pathresults)
-Base.iteratorsize(::Type{<:Result}) = Base.HasLength()
-Base.eltype(r::Result) = eltype(r.pathresults)
+Base.eltype(r::Type{AffineResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1, T2, T3}
+Base.eltype(r::Type{ProjectiveResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1,T2,T3}
 
 """
     nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
@@ -245,13 +245,82 @@ function atinfinity(R::AffineResults)
 end
 
 
-"""
-    multiplicities(R::Result, tol)
 
-Return a vector of vector of PathResults. Each vector of pathresults are solutions that appear with multiplicities in 'V'. Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
 """
-function multiplicities(R::Result, tol)
-    multiplicities(R.pathresults, tol)
+    multiplicities(V::Results; tol=1e-6)
+
+Returns a `Vector` of `Vector{PathResult}`s grouping the `PathResult`s whose solutions appear with multiplicities *greater* 1 in 'V'.
+Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
+"""
+function multiplicities(V::Results; tol=1e-6)
+    output = Vector{Vector{PathResult}}()
+    if all(v -> v.solution_type == :affine, V)
+        M = multiplicities(map(solution, V), tol, infinity_norm)
+        for m in M
+            push!(output, V[m])
+        end
+    elseif all(v -> v.solution_type == :projective, V)
+        M = multiplicities(map(v -> normalize(solution(v)), V), tol, fubini_study)
+        for m in M
+            push!(output, V[m])
+        end
+    else
+        warn("Input contains both affine and projective data. Empty vector is returned.")
+    end
+    output
+end
+
+"""
+    uniquesolutions(R::Result; tol=1e-6, multiplicities=false)
+
+Return all *unique* solutions. If `multiplicities` is `true`, then
+all *unique* solutions with their correspnding multiplicities as pairs `(s, m)`
+where `s` is the solution and `m` the multiplicity are returned.
+
+## Example
+```julia-repl
+julia> @polyvar x;
+julia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)
+[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]
+julia> uniquesolutions([(x-3)^3*(x+2)])
+[[3.0+0.0im], [-2.0+0.0im]]
+```
+"""
+function uniquesolutions(R::Result; tol=1e-6, multiplicities=false)
+    uniquesolutions(R, Val{multiplicities}, tol=tol)
+end
+
+function uniquesolutions(R::Result, ::Type{Val{B}}; tol=1e-6) where B
+    if R isa AffineResult
+        M = multiplicities(map(solution, R), tol, infinity_norm)
+    elseif R isa ProjectiveResult
+        M = multiplicities(map(v -> normalize(solution(v)), R), tol, fubini_study)
+    end
+    _uniquesolutions(R, M, Val{B})
+end
+
+function _uniquesolutions(R::Results, multiplicities, T::Type{Val{B}}) where B
+    indicator = trues(length(R))
+    uniques = map(multiplicities) do m
+        for k in m
+            indicator[k] = false
+        end
+        if T === Val{true}
+            (solution(R[m[1]]), length(m))
+        else
+            solution(R[m[1]])
+        end
+    end
+    for (k, r) in enumerate(R)
+        if indicator[k]
+            if T == Val{true}
+                push!(uniques, (solution(r), 1))
+            else
+                push!(uniques, solution(r))
+            end
+        end
+    end
+    uniques
 end
 
 

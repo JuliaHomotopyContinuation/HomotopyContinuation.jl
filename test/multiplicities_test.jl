@@ -19,26 +19,3 @@
     P = Solving.multiplicities(X, 1e-5, (x,y) -> 1-abs(dot(x,y)))
     @test length(P) == 3
 end
-
-
-@testset "Multiplicities_Result" begin
-
-    @polyvar x y z
-    f = (x-1*y)*(x-1.01*y)
-    g = x - y - z
-    S = solve([f;g])
-    @test length(multiplicities(S, 1e-1)) == 1
-    @test length(multiplicities(S, 1e-5)) == 0
-    @test length(multiplicities(S.pathresults, 1e-1)) == 1
-    @test length(multiplicities(S.pathresults, 1e-5)) == 0
-
-    @polyvar x y z
-    f = (x-1)*(x-1.01)
-    g = x - 1 - z
-    S = solve([f;g])
-    @test length(multiplicities(S, 1e-1)) == 1
-    @test length(multiplicities(S, 1e-5)) == 0
-    @test length(multiplicities(S.pathresults, 1e-1)) == 1
-    @test length(multiplicities(S.pathresults, 1e-5)) == 0
-    @test norm(solution(S[1]) - solution(S[2])) < 1e-1
-end
