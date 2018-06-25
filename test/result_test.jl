@@ -92,4 +92,13 @@ end
     @test length(uniquesolutions(R, multiplicities=true)) == 2
     a, b = uniquesolutions(R, multiplicities=true)
     @test (a[2] == 3 && b[2] == 1) || (b[2] == 3 && a[2] == 1)
+
+    @polyvar x y
+    f = (x-3y)^3*(x-2y)
+    R = solve([f])
+    @test length(uniquesolutions(R)) == 2
+    @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
+    @test length(uniquesolutions(R, multiplicities=true)) == 2
+    a, b = uniquesolutions(R, multiplicities=true)
+    @test (a[2] == 3 && b[2] == 1) || (b[2] == 3 && a[2] == 1)
 end
