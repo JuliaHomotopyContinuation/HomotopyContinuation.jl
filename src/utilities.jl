@@ -11,6 +11,7 @@ export allvariables,
     ldiv_lu!, blas_ldiv_lu!,
     infinity_norm,
     unsafe_infinity_norm,
+    fubini_study,
     logabs,
     fastlog,
     batches,
@@ -162,6 +163,13 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
 end
 unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
+
+"""
+    fubini_study(x, y)
+
+Computes the Fubini-Study norm of `x` and `y`.
+"""
+fubini_study(x,y) = acos(min(1.0, abs(dot(x,y))))
 
 """
     logabs(z)

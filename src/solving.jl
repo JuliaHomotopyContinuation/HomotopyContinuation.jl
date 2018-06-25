@@ -24,8 +24,8 @@ export Solver,
     multiplicities,
     Result
 
-include("solving/path_result.jl")
 include("solving/multiplicities.jl")
+include("solving/path_result.jl")
 include("solving/result.jl")
 include("solving/types.jl")
 include("solving/solve.jl")

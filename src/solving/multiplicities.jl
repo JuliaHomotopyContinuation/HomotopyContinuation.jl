@@ -46,20 +46,22 @@ function cluster_by_angle!(current::SearchTree, i, vectors, nvars, τ)
     α = angle(vectors[i][1])
     β = angle(vectors[current.node[1]][1])
     while !added && j ≤ nvars
-        Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
-        if Δ < (- τ)
-            added = true
-            if isnull(current.left)
-                current.left = SearchTree(i)
-            else
-                cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
-            end
-        elseif Δ > τ
-            added = true
-            if isnull(current.right)
-                current.right = SearchTree(i)
-            else
-                cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+        if abs(vectors[i][j]) > 0.1 && abs(vectors[current.node[1]][j]) > 0.1
+            Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
+            if Δ < (- τ)
+                added = true
+                if isnull(current.left)
+                    current.left = SearchTree(i)
+                else
+                    cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
+                end
+            elseif Δ > τ
+                added = true
+                if isnull(current.right)
+                    current.right = SearchTree(i)
+                else
+                    cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+                end
             end
         end
         j += 1

@@ -78,7 +78,11 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     else
         σ = svdvals(cache.J)
         n = size(cache.H)[2]
-        condition = σ[1]/σ[n-1]
+        if n>2
+            condition = σ[1]/σ[n-1]
+        else
+            condition = inv(σ[1])
+        end
     end
 
     windingnumber, npredictions = windingnumber_npredictions(r)
