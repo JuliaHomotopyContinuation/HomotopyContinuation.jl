@@ -158,7 +158,7 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
     H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
     tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
-    state = State(x, complex(0.1,0.0), options)
+    state = State(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)
 end
