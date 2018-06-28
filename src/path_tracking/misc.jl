@@ -11,7 +11,7 @@ export currt, currΔt,
     set_refinement_maxiters!
 
 function Base.show(io::IO, ::MIME"text/plain", tracker::PathTracker)
-    print("PathTracker")
+    print(io, "PathTracker()")
 end
 
 """
