@@ -34,7 +34,7 @@ currt(tracker::PathTracker) = currt(tracker.state)
 currt(state::State) = (1-state.t) * state.target + state.t * state.start
 
 """
-     Δt(tracker::PathTracker)
+     currΔt(tracker::PathTracker)
 
 Current steplength `Δt`.
 """
@@ -42,7 +42,7 @@ currΔt(tracker::PathTracker) = currΔt(tracker.state)
 currΔt(state::State) = state.Δt * (state.target - state.start)
 
 """
-     iters(tracker::PathTracker)
+     curriters(tracker::PathTracker)
 
 Current number of iterations.
 """
@@ -50,7 +50,7 @@ curriters(tracker::PathTracker) = curriters(tracker.state)
 curriters(state::State) = state.iters
 
 """
-     status(tracker::PathTracker)
+     currstatus(tracker::PathTracker)
 
 Current status.
 """
