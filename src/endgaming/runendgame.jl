@@ -207,12 +207,6 @@ function predict_infinity_check!(state, tracker, options, cache)
         # we need to determine the windingnumber
         if state.windingnumber == 0
             determine_windingnumber!(state, tracker, options, cache)
-            # If we found that the windingnumber is one then
-            # then we have a non-singular solution and can simply
-            # track to the solution.
-            if state.windingnumber == 1
-                tracktoend!(state, tracker)
-            end
             return
         else
             predict_cif!(state, tracker, options, cache)
@@ -225,19 +219,6 @@ function predict_infinity_check!(state, tracker, options, cache)
 
     nothing
 end
-
-
-function tracktoend!(state, tracker)
-    retcode = PathTracking.track!(tracker, state.x, state.R, 0.0, precondition=false)
-    if retcode == :success
-        state.R = 0.0
-        state.pbest .= PathTracking.currx(tracker)
-        state.pbest_delta = PathTracking.currresidual(tracker)
-        state.status = :success
-    end
-    nothing
-end
-
 
 function checkatinfinity_norm(state, options)
     p = state.npredictions > 0 ? state.p : state.x
