@@ -1,6 +1,6 @@
 export AffineResult, ProjectiveResult,
     nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
-    finite, results, failed, atinfinity, singular, nonsingular, seed,
+    finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
     solutions, realsolutions, multiplicities, uniquesolutions
 
 """
@@ -30,6 +30,7 @@ struct AffineResult{T1, T2, T3} <: Result
     seed::Int
 end
 
+
 Base.length(r::Result) = length(r.pathresults)
 Base.getindex(r::Result, I) = getindex(r.pathresults, I)
 
@@ -39,6 +40,10 @@ Base.done(r::Result, state) = done(r.pathresults, state)
 Base.endof(r::Result) = endof(r.pathresults)
 Base.eltype(r::Type{AffineResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1, T2, T3}
 Base.eltype(r::Type{ProjectiveResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1,T2,T3}
+
+const AffineResults = Union{AffineResult, Vector{<:PathResult}}
+const ProjectiveResults = Union{ProjectiveResult, Vector{<:PathResult}}
+const Results = Union{Result, Vector{<:PathResult}}
 
 """
     nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
@@ -53,10 +58,11 @@ nresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)
 ```
 """
 function nresults(R::Result; onlyreal=false, realtol=1e-6,
-    onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    onlynonsingular=false, onlysingular=false, singulartol=1e10, onlyfinite=true)
     count(R) do r
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
+        (!onlysingular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r))
     end
 end
@@ -74,7 +80,7 @@ nfinite(R::AffineResult) = count(isfinite, R)
 The number of singular solutions. A solution is considered singular
 if its windingnumber is larger than 1 or the condition number is larger than `tol`.
 """
-nsingular(R::Result; tol=1e10) = count(R) do r
+nsingular(R::Results; tol=1e10) = count(R) do r
     issingular(r, tol)
 end
 
@@ -115,43 +121,54 @@ The random seed used in the computation.
 """
 seed(result::Result) = result.seed
 
-const AffineResults = Union{AffineResult, Vector{<:PathResult}}
-const ProjectiveResults = Union{ProjectiveResult, Vector{<:PathResult}}
-const Results = Union{Result, Vector{<:PathResult}}
+
 
 # Filtering
 """
-    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
-
-    results(f::Function, result; kwargs...)
-
-Additionally you can apply a transformation `f` on each result.
 
 ## Example
 
 ```julia
 R = solve(F)
 
+# This gives us all PathResults considered non-singular and real (but still as a complex vector).
+realsolutions = results(R, onlyreal=true, onlynonsingular=true)
+```
+"""
+results(R::Results; kwargs...) = mapresults(identity, R; kwargs...)
+# fallback since we introduced mapresults only in 0.2.1
+results(f::Function, R::Results; kwargs...) = mapresults(f, R; kwargs...)
+
+"""
+    mapresults(f::Function, result; conditions...)
+
+Apply the function `f` to all `PathResult`s for which the given conditions apply. For the possible
+conditions see [`results`](@ref).
+
+## Example
+```julia
 # This gives us all solutions considered real (but still as a complex vector).
 realsolutions = results(solution, R, onlyreal=true)
 ```
 """
-results(R::Result; kwargs...) = results(identity, R; kwargs...)
-function results(f::Function, R::Result;
-    onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10,
+function mapresults(f::Function, R::Results;
+    onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysingular=false, singulartol=1e10,
     onlyfinite=true)
     [f(r) for r in R if
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
+        (!onlysingular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r))]
 end
 
 """
-    solutions(result; onlyreal=true, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    solutions(result; conditions...)
 
 Return all solution (as `Vector`s) for which the given conditions apply.
+For the possible conditions see [`results`](@ref).
 
 ## Example
 ```julia
@@ -161,14 +178,16 @@ julia> solutions(result)
 [[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]
 ```
 """
-function solutions(result::Result; kwargs...)
-    results(r -> solution(r), result; onlyreal=false, kwargs...)
+function solutions(result::Results; kwargs...)
+    mapresults(solution, result; kwargs...)
 end
 
 """
-    realsolutions(result; tol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
+    realsolutions(result; tol=1e-6, conditions...)
 
 Return all real solution (as `Vector`s of reals) for which the given conditions apply.
+For the possible conditions see [`results`](@ref). Note that `onlyreal` is always `true`
+and `realtol` is now `tol`.
 
 ## Example
 ```julia
@@ -177,38 +196,34 @@ julia> result = solve([(x-2)y, y+x+3]);
 julia> realsolutions(result)
 [[2.0, -5.0], [-3.0, 0.0]]
 """
-function realsolutions(result::Result; onlyreal=true, tol=1e-6, kwargs...)
-    results(r -> real.(solution(r)), result; onlyreal=true, realtol=tol, kwargs...)
+function realsolutions(result::Results; onlyreal=true, tol=1e-6, kwargs...)
+    mapresults(r -> real.(solution(r)), result; onlyreal=true, realtol=tol, kwargs...)
 end
 
 """
-    nonsingular(result::AffineResult)
+    nonsingular(result::Results; conditions...)
 
-Return all `PathResult`s for which the solution is non-singular.
+Return all `PathResult`s for which the solution is non-singular. This is just a shorthand
+for `results(R; onlynonsingular=true, conditions...)`. For the possible conditions see [`results`](@ref).
 """
-nonsingular(R::Results; kwargs...) = nonsingular(identity, R; kwargs...)
-function nonsingular(f::Function, R::Results; tol=1e10)
-    [f(r) for r in R if isnonsingular(r, tol)]
-end
+nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 
 """
-    finite(result::AffineResult)
+    singular(result::Results; conditions...)
 
-Return all `PathResult`s for which the result is successfull and
-the contained `solution` is indeed a solution of the system.
-
-    finite(f::Function, result)
-
-Additionally you can apply a transformation `f` on each result.
+Return all `PathResult`s for which the solution is singular. This is just a shorthand
+for `results(R; onlysingular=true, conditions...)`. For the possible conditions see [`results`](@ref).
 """
-finite(R::Results; kwargs...) = finite(identity, R; kwargs...)
-function finite(f::Function, R::AffineResults; onlynonsingular=false, tol=1e10)
-    if !onlynonsingular
-        [f(r) for r in R if isfinite(r)]
-    else
-        [f(r) for r in R if isfinite(r) && isnonsingular(r, tol)]
-    end
-end
+singular(R::Results; kwargs...) = results(R; onlysingular=true, kwargs...)
+
+
+"""
+    finite(result::AffineResults; conditions...)
+
+Return all `PathResult`s for which the solution is finite. This is just a shorthand
+for `results(R; onlyfinite=true, conditions...)`. For the possible conditions see [`results`](@ref).
+"""
+finite(R::Results; kwargs...) = results(R; onlyfinite=true, kwargs...)
 
 
 """
@@ -217,7 +232,7 @@ end
 Get all singular solutions. A solution is considered singular
 if its windingnumber is larger than 1 or the condition number is larger than `tol`.
 """
-singular(R::Result; tol=1e10) = [r for r in R if (issuccess(r) && issingular(r, tol))]
+singular(R::Results; tol=1e10) = [r for r in R if (issuccess(r) && issingular(r, tol))]
 
 
 """
@@ -233,7 +248,7 @@ Base.real(R::Results; tol=1e-6) = [r for r in R if isreal(r, tol)]
 
 Get all results where the path tracking failed.
 """
-failed(R::Result) = [r for r in R if isfailed(r)]
+failed(R::Results) = [r for r in R if isfailed(r)]
 
 """
     atinfinity(result::AffineResult)
@@ -286,13 +301,13 @@ julia> uniquesolutions([(x-3)^3*(x+2)])
 [[3.0+0.0im], [-2.0+0.0im]]
 ```
 """
-function uniquesolutions(R::Result; tol=1e-6, multiplicities=false)
+function uniquesolutions(R::Results; tol=1e-6, multiplicities=false)
     uniquesolutions(R, Val{multiplicities}, tol=tol)
 end
 
-function uniquesolutions(R::Result, ::Type{Val{B}}; tol=1e-6) where B
+function uniquesolutions(R::Results, ::Type{Val{B}}; tol=1e-6) where B
     if R isa AffineResult
-        M = multiplicities(map(solution, R), tol, infinity_norm)
+        M = multiplicities(map(solution, filter(isfinite, R)), tol, infinity_norm)
     elseif R isa ProjectiveResult
         M = multiplicities(map(v -> normalize(solution(v)), R), tol, fubini_study)
     end
@@ -312,7 +327,7 @@ function _uniquesolutions(R::Results, multiplicities, T::Type{Val{B}}) where B
         end
     end
     for (k, r) in enumerate(R)
-        if indicator[k]
+        if indicator[k] && isfinite(r)
             if T == Val{true}
                 push!(uniques, (solution(r), 1))
             else
