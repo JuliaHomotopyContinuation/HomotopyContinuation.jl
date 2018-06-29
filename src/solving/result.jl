@@ -214,7 +214,9 @@ nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 Return all `PathResult`s for which the solution is singular. This is just a shorthand
 for `results(R; onlysingular=true, conditions...)`. For the possible conditions see [`results`](@ref).
 """
-singular(R::Results; kwargs...) = results(R; onlysingular=true, kwargs...)
+function singular(R::Results; singulartol=1e10, tol=singulartol, kwargs...)
+    results(R; onlysingular=true, singulartol=tol, kwargs...)
+end
 
 
 """
@@ -224,16 +226,6 @@ Return all `PathResult`s for which the solution is finite. This is just a shorth
 for `results(R; onlyfinite=true, conditions...)`. For the possible conditions see [`results`](@ref).
 """
 finite(R::Results; kwargs...) = results(R; onlyfinite=true, kwargs...)
-
-
-"""
-    singular(result; tol=1e10)
-
-Get all singular solutions. A solution is considered singular
-if its windingnumber is larger than 1 or the condition number is larger than `tol`.
-"""
-singular(R::Results; tol=1e10) = [r for r in R if (issuccess(r) && issingular(r, tol))]
-
 
 """
     real(result, tol=1e-6)
