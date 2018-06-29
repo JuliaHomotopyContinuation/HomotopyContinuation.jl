@@ -31,6 +31,9 @@
     @test R isa PathTracking.PathTrackerResult
     @test R.returncode == :success
     @test R.res < 1e-7
+    @test_nowarn show(stdout, R)
+    @test_nowarn Juno.render(Juno.Inline(), R)
+
 
     out = Problems.embed(P, first(start_sols))
     retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)

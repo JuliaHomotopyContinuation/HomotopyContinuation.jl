@@ -1,3 +1,5 @@
+import Juno
+
 import ..Correctors
 import ..Homotopies
 import ..PredictionCorrection
@@ -151,3 +153,14 @@ function PathTrackerResult(tracker::PathTracker)
           copy(currx(tracker)), currt(tracker),
           currresidual(tracker), curriters(tracker))
 end
+
+function Base.show(io::IO, result::PathTrackerResult)
+    println(io, "PathTrackerResult{", typeof(result.x), ",", typeof(result.t) ,"}:")
+    println(io, " * returncode → :$(result.returncode)")
+    println(io, " * x → $(result.x)")
+    println(io, " * t → $(result.t)")
+    println(io, " * res → $(result.res)")
+    println(io, " * iters → $(result.iters)")
+end
+
+Juno.render(i::Juno.Inline, r::PathTrackerResult) = Juno.render(i, Juno.defaultrepr(r))
