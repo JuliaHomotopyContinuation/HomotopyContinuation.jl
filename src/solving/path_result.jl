@@ -165,12 +165,12 @@ function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
 
     if iscompact
-        println(io, "* returncode: $(r.returncode)")
+        println(io, " * returncode: $(r.returncode)")
         println(io, " * solution: ", r.solution)
         println(io, " * residual: $(@sprintf "%.3e" r.residual)")
     else
         println(io, " ---------------------------------------------")
-        println(io, "* returncode: $(r.returncode)")
+        println(io, " * returncode: $(r.returncode)")
         if r.returncode_detail != :none
             println(io, " * returncode_detail: $(r.returncode_detail)")
         end
@@ -185,10 +185,7 @@ function Base.show(io::IO, r::PathResult)
         println(io, " * t: ", r.t)
         println(io, " * iterations: ", r.iterations)
         println(io, " * npredictions: $(r.npredictions)")
-
-
     end
-
 end
 
 function Juno.render(i::Juno.Inline, x::PathResult{T1, T2, T3}) where {T1, T2, T3}
@@ -259,7 +256,7 @@ isatinfinity(r::PathResult) = (r.returncode == :at_infinity && isaffine(r))
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathResult) = (r.returncode == :success && isaffine(r))
+Base.isfinite(r::PathResult) = r.returncode == :success # we don't check isaffine to make other code easier
 
 """
     issingular(pathresult; tol=1e10)
@@ -271,11 +268,7 @@ is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    if isprojective(r)
-        (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
-    else
-        (r.windingnumber > 1 || r.condition_number > tol) && isfinite(r) && issuccess(r)
-    end
+    (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
 end
 
 """
@@ -285,13 +278,7 @@ Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
 isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
-function isnonsingular(r::PathResult, tol::Real)
-    if isprojective(r)
-        r.windingnumber ≤ 1 && r.condition_number ≤ tol && r.returncode == :success
-    else
-        r.windingnumber ≤ 1 && r.condition_number ≤ tol && isfinite(r)
-    end
-end
+isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && issuccess(r)
 
 
 """

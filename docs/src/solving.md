@@ -31,6 +31,7 @@ the used random seed for the computation.
 In order to analyze a `Result` we provide the following helper functions
 ```@docs
 results
+mapresults
 solutions
 realsolutions
 uniquesolutions

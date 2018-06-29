@@ -8,22 +8,28 @@
 
     @test length(finite(R, onlynonsingular=false)) == 4
     @test length(finite(R, onlynonsingular=true)) == 4
+    @test length(finite(R, onlysingular=true)) == 0
     @test isempty(failed(R))
     @test length(real(R, tol=1e-7)) == 2
     @test nreal(R, tol=1e-7) == 2
     @test length(atinfinity(R)) == 572
     @test length(results(R, onlyreal=true, realtol=1e-8)) == 2
     @test length(results(R, onlynonsingular=true, singulartol=1e9)) == 4
+    @test length(finite(results(R, onlyreal=true))) == 2
     @test nresults(R, onlynonsingular=true, singulartol=1e9) == 4
     @test length(results(R, onlyfinite=false)) == 576
     @test nresults(R, onlyfinite=false) == 576
     @test nnonsingular(R) == 4
     @test length(nonsingular(R)) == 4
+    @test length(singular(R)) == 0
+    @test length(singular(real(R))) == 0
 
-    @test_nowarn results(solution, R)
-    @test_nowarn results(startsolution, R)
-    @test_nowarn results(residual, R)
-    @test_nowarn results(issingular, R)
+    @test_nowarn mapresults(solution, R)
+    @test_nowarn mapresults(startsolution, R)
+    @test_nowarn mapresults(residual, R)
+    @test_nowarn mapresults(issingular, R)
+    @test count(mapresults(isreal, R)) == 2
+    # test fallback
     @test count(results(isreal, R)) == 2
 
     @test length(solutions(R)) == 4
@@ -33,6 +39,9 @@
 
     @test_nowarn string(R)
     @test_nowarn string(R[end])
+    @test_nowarn show(IOContext(stdout, :compact=>true), R)
+    @test_nowarn show(IOContext(stdout, :compact=>true), R[end])
+
 
     @test_nowarn Juno.render(Juno.Inline(), R)
     @test_nowarn Juno.render(Juno.Inline(), R[1])

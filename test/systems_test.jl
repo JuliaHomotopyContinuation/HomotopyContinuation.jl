@@ -4,6 +4,7 @@
     F = Systems.SPSystem(fs)
 
     @test size(F) == (6, 6)
+    @test length(F) == 6
     x = rand(Complex{Float64}, 6)
     cache = Systems.cache(F, x)
     @test cache isa Systems.NullCache

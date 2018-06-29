@@ -8,6 +8,18 @@
     # test construction
     t1 = PathTracking.PathTracker(H, x₁, 1.0, 0.1)
 
+    @test_nowarn PathTracking.currΔt(t1)
+
+    rtol = PathTracking.refinement_tol(t1)
+    @test_nowarn PathTracking.set_refinement_tol!(t1, 5e-5)
+    @test PathTracking.refinement_tol(t1) == 5e-5
+    PathTracking.set_refinement_tol!(t1, rtol)
+
+    rmaxiter = PathTracking.refinement_maxiters(t1)
+    @test_nowarn PathTracking.set_refinement_maxiters!(t1, 11)
+    @test PathTracking.refinement_maxiters(t1) == 11
+    PathTracking.set_refinement_maxiters!(t1, rmaxiter)
+
     @test t1 isa PathTracking.PathTracker
     @test length(t1.x) == 7
 
@@ -31,6 +43,9 @@
     @test R isa PathTracking.PathTrackerResult
     @test R.returncode == :success
     @test R.res < 1e-7
+    @test_nowarn show(stdout, R)
+    @test_nowarn Juno.render(Juno.Inline(), R)
+
 
     out = Problems.embed(P, first(start_sols))
     retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
