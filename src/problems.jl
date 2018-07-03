@@ -102,8 +102,9 @@ for details.
 # TOTALDEGREE
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
     F = prob.system
-    n, N = size(F)
+    n = length(F)
     variables = MP.variables(F)
+    N = length(variables)
     F_ishom = ishomogenous(F)
     if F_ishom
         # N = n+1 is the only valid size configuration
@@ -133,12 +134,12 @@ end
 
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, homvar::MP.AbstractVariable; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
-    n, N = size(prob.system)
+    n = length(prob.system)
+    N = length(variables)
+    variables = MP.variables(prob.system)
     if n + 1 > N
         throw(AssertionError(overdetermined_error_msg))
     end
-
-    variables = MP.variables(prob.system)
     homogenization = Homogenization(homvar, variables)
     start = totaldegree_solutions(prob.system, homogenization)
 
