@@ -168,7 +168,7 @@ end
     solutions(result; conditions...)
 
 Return all solution (as `Vector`s) for which the given conditions apply.
-For the possible conditions see [`results`](@ref).
+For the possible `conditions` see [`results`](@ref).
 
 ## Example
 ```julia
@@ -186,7 +186,7 @@ end
     realsolutions(result; tol=1e-6, conditions...)
 
 Return all real solution (as `Vector`s of reals) for which the given conditions apply.
-For the possible conditions see [`results`](@ref). Note that `onlyreal` is always `true`
+For the possible `conditions` see [`results`](@ref). Note that `onlyreal` is always `true`
 and `realtol` is now `tol`.
 
 ## Example
@@ -204,7 +204,7 @@ end
     nonsingular(result::Results; conditions...)
 
 Return all `PathResult`s for which the solution is non-singular. This is just a shorthand
-for `results(R; onlynonsingular=true, conditions...)`. For the possible conditions see [`results`](@ref).
+for `results(R; onlynonsingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
 """
 nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 
@@ -212,7 +212,7 @@ nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
     singular(result::Results; conditions...)
 
 Return all `PathResult`s for which the solution is singular. This is just a shorthand
-for `results(R; onlysingular=true, conditions...)`. For the possible conditions see [`results`](@ref).
+for `results(R; onlysingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
 """
 function singular(R::Results; singulartol=1e10, tol=singulartol, kwargs...)
     results(R; onlysingular=true, singulartol=tol, kwargs...)
@@ -223,7 +223,7 @@ end
     finite(result::AffineResults; conditions...)
 
 Return all `PathResult`s for which the solution is finite. This is just a shorthand
-for `results(R; onlyfinite=true, conditions...)`. For the possible conditions see [`results`](@ref).
+for `results(R; onlyfinite=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
 """
 finite(R::Results; kwargs...) = results(R; onlyfinite=true, kwargs...)
 
@@ -278,11 +278,12 @@ function multiplicities(V::Results; tol=1e-6)
 end
 
 """
-    uniquesolutions(R::Result; tol=1e-6, multiplicities=false)
+    uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)
 
 Return all *unique* solutions. If `multiplicities` is `true`, then
 all *unique* solutions with their correspnding multiplicities as pairs `(s, m)`
 where `s` is the solution and `m` the multiplicity are returned.
+For the possible `conditions` see [`results`](@ref).
 
 ## Example
 ```julia-repl
@@ -293,37 +294,38 @@ julia> uniquesolutions([(x-3)^3*(x+2)])
 [[3.0+0.0im], [-2.0+0.0im]]
 ```
 """
-function uniquesolutions(R::Results; tol=1e-6, multiplicities=false)
-    uniquesolutions(R, Val{multiplicities}, tol=tol)
+function uniquesolutions(R::Results; tol=1e-6, multiplicities=false, conditions...)
+    uniquesolutions(R, Val{multiplicities}; tol=tol, conditions...)
 end
 
-function uniquesolutions(R::Results, ::Type{Val{B}}; tol=1e-6) where B
+function uniquesolutions(R::Results, ::Type{Val{B}}; tol=1e-6, conditions...) where B
+    sols = solutions(R; conditions...)
     if R isa AffineResult
-        M = multiplicities(map(solution, filter(isfinite, R)), tol, infinity_norm)
+        M = multiplicities(sols, tol, infinity_norm)
     elseif R isa ProjectiveResult
-        M = multiplicities(map(v -> normalize(solution(v)), R), tol, fubini_study)
+        M = multiplicities(normalize.(sols), tol, fubini_study)
     end
-    _uniquesolutions(R, M, Val{B})
+    _uniquesolutions(sols, M, Val{B})
 end
 
-function _uniquesolutions(R::Results, multiplicities, T::Type{Val{B}}) where B
-    indicator = trues(length(R))
+function _uniquesolutions(solutions, multiplicities, T::Type{Val{B}}) where B
+    indicator = trues(length(solutions))
     uniques = map(multiplicities) do m
         for k in m
             indicator[k] = false
         end
         if T === Val{true}
-            (solution(R[m[1]]), length(m))
+            (solutions[m[1]], length(m))
         else
-            solution(R[m[1]])
+            solutions[m[1]]
         end
     end
-    for (k, r) in enumerate(R)
-        if indicator[k] && isfinite(r)
+    for (k, s) in enumerate(solutions)
+        if indicator[k]
             if T == Val{true}
-                push!(uniques, (solution(r), 1))
+                push!(uniques, (s, 1))
             else
-                push!(uniques, solution(r))
+                push!(uniques, s)
             end
         end
     end
