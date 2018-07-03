@@ -141,6 +141,10 @@ function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothi
     srand(seed)
     F = filter(f -> !iszero(f), F)
     checkfinite_dimensional(F, homvar)
+    # square system and each polynomial is non-zero
+    if length(F) == MP.nvariables(F) && ishomogenous(F)
+        throw(AssertionError("The input system is a square homogenous system. This will result in an at least 1 dimensional solution space."))
+    end
     solve(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
 end
 
@@ -159,7 +163,7 @@ end
 function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
     N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
     n = length(F)
-    # square system and each polynomial is non-zero
+
     if n ≥ N ||
        n == N - 1 && ishomogenous(F)
         return
@@ -177,7 +181,6 @@ function solve(F::Vector{<:MP.AbstractPolynomial},
     @assert length(p) == length(a_1) "Number of parameters must match"
     @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
 
-    STP =
     solve(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
