@@ -7,8 +7,10 @@
     @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
     @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x, z+x])
     # homogenous overdetermiend
-    @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x, z+x])
+    @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
+    @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
     @test_throws AssertionError solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+    @test_throws AssertionError solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
     @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3])
 end
