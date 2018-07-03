@@ -77,7 +77,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.results",
     "category": "function",
-    "text": "results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nresults(f::Function, result; kwargs...)\n\nAdditionally you can apply a transformation f on each result.\n\nExample\n\nR = solve(F)\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n"
+    "text": "results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all PathResults for which the given conditions apply.\n\nExample\n\nR = solve(F)\n\n# This gives us all PathResults considered non-singular and real (but still as a complex vector).\nrealsolutions = results(R, onlyreal=true, onlynonsingular=true)\n\n\n\n"
+},
+
+{
+    "location": "solving.html#HomotopyContinuation.Solving.mapresults",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Solving.mapresults",
+    "category": "function",
+    "text": "mapresults(f::Function, result; conditions...)\n\nApply the function f to all PathResults for which the given conditions apply. For the possible conditions see results.\n\nExample\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n"
 },
 
 {
@@ -85,7 +93,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solutions",
     "category": "function",
-    "text": "solutions(result; onlyreal=true, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all solution (as Vectors) for which the given conditions apply.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
+    "text": "solutions(result; conditions...)\n\nReturn all solution (as Vectors) for which the given conditions apply. For the possible conditions see results.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n"
 },
 
 {
@@ -93,7 +101,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.realsolutions",
     "category": "function",
-    "text": "realsolutions(result; tol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)\n\nReturn all real solution (as Vectors of reals) for which the given conditions apply.\n\nExample\n\n```julia julia> @polyvar x y julia> result = solve([(x-2)y, y+x+3]); julia> realsolutions(result) [[2.0, -5.0], [-3.0, 0.0]]\n\n\n\n"
+    "text": "realsolutions(result; tol=1e-6, conditions...)\n\nReturn all real solution (as Vectors of reals) for which the given conditions apply. For the possible conditions see results. Note that onlyreal is always true and realtol is now tol.\n\nExample\n\n```julia julia> @polyvar x y julia> result = solve([(x-2)y, y+x+3]); julia> realsolutions(result) [[2.0, -5.0], [-3.0, 0.0]]\n\n\n\n"
 },
 
 {
@@ -101,7 +109,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.uniquesolutions",
     "category": "function",
-    "text": "uniquesolutions(R::Result; tol=1e-6, multiplicities=false)\n\nReturn all unique solutions. If multiplicities is true, then all unique solutions with their correspnding multiplicities as pairs (s, m) where s is the solution and m the multiplicity are returned.\n\nExample\n\njulia> @polyvar x;\njulia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)\n[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]\njulia> uniquesolutions([(x-3)^3*(x+2)])\n[[3.0+0.0im], [-2.0+0.0im]]\n\n\n\n"
+    "text": "uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)\n\nReturn all unique solutions. If multiplicities is true, then all unique solutions with their correspnding multiplicities as pairs (s, m) where s is the solution and m the multiplicity are returned. For the possible conditions see results.\n\nExample\n\njulia> @polyvar x;\njulia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)\n[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]\njulia> uniquesolutions([(x-3)^3*(x+2)])\n[[3.0+0.0im], [-2.0+0.0im]]\n\n\n\n"
 },
 
 {
@@ -109,7 +117,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.finite",
     "category": "function",
-    "text": "finite(result::AffineResult)\n\nReturn all PathResults for which the result is successfull and the contained solution is indeed a solution of the system.\n\nfinite(f::Function, result)\n\nAdditionally you can apply a transformation f on each result.\n\n\n\n"
+    "text": "finite(result::AffineResults; conditions...)\n\nReturn all PathResults for which the solution is finite. This is just a shorthand for results(R; onlyfinite=true, conditions...). For the possible conditions see results.\n\n\n\n"
 },
 
 {
@@ -133,7 +141,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.singular",
     "category": "function",
-    "text": "singular(result; tol=1e10)\n\nGet all singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than tol.\n\n\n\n"
+    "text": "singular(result::Results; conditions...)\n\nReturn all PathResults for which the solution is singular. This is just a shorthand for results(R; onlysingular=true, conditions...). For the possible conditions see results.\n\n\n\n"
 },
 
 {
@@ -141,7 +149,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nonsingular",
     "category": "function",
-    "text": "nonsingular(result::AffineResult)\n\nReturn all PathResults for which the solution is non-singular.\n\n\n\n"
+    "text": "nonsingular(result::Results; conditions...)\n\nReturn all PathResults for which the solution is non-singular. This is just a shorthand for results(R; onlynonsingular=true, conditions...). For the possible conditions see results.\n\n\n\n"
 },
 
 {
@@ -229,7 +237,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "The result of solve",
     "category": "section",
-    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nsolutions\nrealsolutions\nuniquesolutions\nfinite\nBase.real(::Solving.Results)\natinfinity\nsingular\nnonsingular\nfailed\nmultiplicities\nseed\nIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnreal\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
+    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nmapresults\nsolutions\nrealsolutions\nuniquesolutions\nfinite\nBase.real(::Solving.Results)\natinfinity\nsingular\nnonsingular\nfailed\nmultiplicities\nseed\nIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnreal\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
 },
 
 {
@@ -877,7 +885,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currΔt",
     "category": "function",
-    "text": " Δt(tracker::PathTracker)\n\nCurrent steplength Δt.\n\n\n\n"
+    "text": " currΔt(tracker::PathTracker)\n\nCurrent steplength Δt.\n\n\n\n"
 },
 
 {
@@ -885,7 +893,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.curriters",
     "category": "function",
-    "text": " iters(tracker::PathTracker)\n\nCurrent number of iterations.\n\n\n\n"
+    "text": " curriters(tracker::PathTracker)\n\nCurrent number of iterations.\n\n\n\n"
 },
 
 {
@@ -893,7 +901,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currstatus",
     "category": "function",
-    "text": " status(tracker::PathTracker)\n\nCurrent status.\n\n\n\n"
+    "text": " currstatus(tracker::PathTracker)\n\nCurrent status.\n\n\n\n"
 },
 
 {
