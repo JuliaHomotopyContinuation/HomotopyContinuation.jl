@@ -94,7 +94,7 @@ end
 problem_startsolutions(prob::AbstractInput; homvar=nothing, kwargs...) = problem_startsolutions(prob, homvar; kwargs...)
 
 const overdetermined_error_msg = """
-The input system is overdetermined therefore it necessary to provide an explicit start system.
+The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
 See
     https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
 for details.
