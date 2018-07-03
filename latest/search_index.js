@@ -109,7 +109,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.uniquesolutions",
     "category": "function",
-    "text": "uniquesolutions(R::Result; tol=1e-6, multiplicities=false)\n\nReturn all unique solutions. If multiplicities is true, then all unique solutions with their correspnding multiplicities as pairs (s, m) where s is the solution and m the multiplicity are returned.\n\nExample\n\njulia> @polyvar x;\njulia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)\n[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]\njulia> uniquesolutions([(x-3)^3*(x+2)])\n[[3.0+0.0im], [-2.0+0.0im]]\n\n\n\n"
+    "text": "uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)\n\nReturn all unique solutions. If multiplicities is true, then all unique solutions with their correspnding multiplicities as pairs (s, m) where s is the solution and m the multiplicity are returned. For the possible conditions see results.\n\nExample\n\njulia> @polyvar x;\njulia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)\n[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]\njulia> uniquesolutions([(x-3)^3*(x+2)])\n[[3.0+0.0im], [-2.0+0.0im]]\n\n\n\n"
 },
 
 {
