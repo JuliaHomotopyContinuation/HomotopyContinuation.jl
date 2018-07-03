@@ -135,8 +135,8 @@ end
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, homvar::MP.AbstractVariable; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
     n = length(prob.system)
-    N = length(variables)
     variables = MP.variables(prob.system)
+    N = length(variables)
     if n + 1 > N
         throw(AssertionError(overdetermined_error_msg))
     end
