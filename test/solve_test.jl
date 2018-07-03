@@ -1,3 +1,18 @@
+@testset "solve - invalid input" begin
+    @polyvar x y z
+    @test_throws AssertionError solve([x-2y+2, 0])
+    @test_throws AssertionError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
+
+    # non homogenous overdetermiend
+    @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
+    @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x, z+x])
+    # homogenous overdetermiend
+    @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x, z+x])
+    @test_throws AssertionError solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+
+    @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3])
+end
+
 @testset "solve" begin
     @polyvar x
     @test nfinite(solve([x - 1])) == 1
@@ -65,11 +80,6 @@
     # F = Systems.FPSystem(cyclic_hom)
     # G = Systems.FPSystem(Problems.totaldegree(cyclic_hom, Utilities.allvariables(cyclic_hom), Utilities.allvariables(cyclic_hom)[end]))
     # result = solve(G, F)
-
-    # Check invalid inputs
-    @polyvar x y
-    @test_throws AssertionError solve([x-2y+2, 0])
-    @test_throws AssertionError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 end
 
 

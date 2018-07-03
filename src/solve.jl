@@ -160,6 +160,9 @@ function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
     N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
     n = length(F)
     # square system and each polynomial is non-zero
+    if n == N && ishomogenous(F)
+        throw(AssertionError("The input system is a square homogenous system. This will result in an at least 1 dimensional solution space."))
+    end
     if n ≥ N ||
        n == N - 1 && ishomogenous(F)
         return

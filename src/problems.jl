@@ -93,16 +93,32 @@ end
 # We dispatch every input to the two argument case
 problem_startsolutions(prob::AbstractInput; homvar=nothing, kwargs...) = problem_startsolutions(prob, homvar; kwargs...)
 
+const overdetermined_error_msg = """
+The input system is overdetermined therefore it necessary to provide an explicit start system.
+See
+    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
+for details.
+"""
 # TOTALDEGREE
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
     F = prob.system
+    n, N = size(F)
     variables = MP.variables(F)
     F_ishom = ishomogenous(F)
     if F_ishom
+        # N = n+1 is the only valid size configuration
+        if n + 1 > N
+            throw(AssertionError(overdetermined_error_msg))
+        end
+
         G = Systems.TotalDegreeSystem(F, variables, variables[1])
         start = totaldegree_solutions(F, NullHomogenization())
         Projective(G, system(F), NullHomogenization(); kwargs...), start
     else
+        # N = n is the only valid size configuration
+        if n > N
+            throw(AssertionError(overdetermined_error_msg))
+        end
         # We create a new variable to homogenize the system
         homvar = uniquevar(F)
         homogenization = Homogenization(1)
@@ -114,8 +130,14 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing;
         proj, start
     end
 end
+
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, homvar::MP.AbstractVariable; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
+    n, N = size(prob.system)
+    if n + 1 > N
+        throw(AssertionError(overdetermined_error_msg))
+    end
+
     variables = MP.variables(prob.system)
     homogenization = Homogenization(homvar, variables)
     start = totaldegree_solutions(prob.system, homogenization)
@@ -130,6 +152,9 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
     n, N = size(prob.system)
     degrees = check_homogenous_degrees(prob.system)
     # system needs to be homogenous
+    if n + 1 > N
+        throw(AssertionError(overdetermined_error_msg))
+    end
     @assert n + 1 == N "Input system is not a square homogenous system!"
 
     DynamicPolynomials.@polyvar z[1:N]
@@ -144,8 +169,11 @@ end
 
 function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Int; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
-    degrees = check_homogenous_degrees(prob.system)
     # system needs to be homogenous
+    degrees = check_homogenous_degrees(prob.system)
+    if n + 1 > N
+        throw(AssertionError(overdetermined_error_msg))
+    end
     @assert n + 1 == N "Input system is not a square homogenous system!"
 
     homogenization = Homogenization(homvaridx)
@@ -155,6 +183,8 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
 
     proj, start
 end
+
+
 
 # START TARGET
 function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, homvar; system=DEFAULT_SYSTEM, kwargs...) where
