@@ -27,7 +27,7 @@ end
         end
     end
 
-    ccall(:jl_threading_run, Ref{Void}, (Any,), threads_fun)
+    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), threads_fun)
 
     dst
 end
@@ -48,7 +48,7 @@ function tforeach(f::F, solvers::AbstractVector, src; blocksize=20) where {F<:Fu
         end
     end
 
-    ccall(:jl_threading_run, Ref{Void}, (Any,), threads_fun)
+    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), threads_fun)
 
     nothing
 end

@@ -1,5 +1,5 @@
 using HomotopyContinuation
-using Compat.Test
+using Test
 using PolynomialTestSystems
 import Juno
 using Compat

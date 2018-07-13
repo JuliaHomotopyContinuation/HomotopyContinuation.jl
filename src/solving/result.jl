@@ -272,7 +272,7 @@ function multiplicities(V::Results; tol=1e-6)
             push!(output, V[m])
         end
     else
-        warn("Input contains both affine and projective data. Empty vector is returned.")
+        @warn("Input contains both affine and projective data. Empty vector is returned.")
     end
     output
 end

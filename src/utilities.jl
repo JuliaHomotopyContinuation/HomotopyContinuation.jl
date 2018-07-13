@@ -87,7 +87,7 @@ Checks whether `f` is homogenous in the variables `v`.
 Checks whether each polynomial in `polys` is homogenous in the variables `v`.
 """
 function ishomogenous(f::MP.AbstractPolynomialLike, variables::Vector{T}) where {T<:MP.AbstractVariable}
- var_indices = findin(MP.variables(f), variables)
+ var_indices = findall(in(variables), MP.variables(f))
  degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
  minimum(degrees) == maximum(degrees)
 end
@@ -129,7 +129,7 @@ Homogenize the variables `v` in the polynomial `f` by using the given variable `
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
 function homogenize(f::MP.AbstractPolynomialLike, variables::Vector{T}, var=uniquevar(f)) where {T<:MP.AbstractVariable}
-    var_indices = findin(MP.variables(f), variables)
+    var_indices = findall(in(variables), MP.variables(f))
     degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
     d = maximum(degrees)
     MP.polynomial(map(i -> var^(d - degrees[i]) * f[i], 1:length(f)))
@@ -218,6 +218,7 @@ const _get_num_BLAS_threads = function() # anonymous so it will be serialized wh
         if Sys.isapple()
             return ENV["VECLIB_MAXIMUM_THREADS"]
         end
+    catch
     end
 
     return nothing

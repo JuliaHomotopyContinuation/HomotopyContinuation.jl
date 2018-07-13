@@ -2,7 +2,7 @@ using HomotopyContinuation
 
 struct RandomUnitaryPath{Start<:Systems.AbstractSystem,Target<:Systems.AbstractSystem} <: Homotopies.AbstractHomotopy
     straightline::StraightLineHomotopy{Start, Target}
-    U::Matrix{Complex128}
+    U::Matrix{ComplexF64}
 end
 
 function RandomUnitaryPath(start::Systems.AbstractSystem, target::Systems.AbstractSystem)
@@ -18,12 +18,12 @@ Base.size(H::RandomUnitaryPath) = size(H.straightline)
 # Cache for efficient evaluation
 struct RandomUnitaryPathCache{C, T1, T2} <: Homotopies.AbstractHomotopyCache
     straightline::C
-    U_t::Matrix{Complex128}
+    U_t::Matrix{ComplexF64}
     y::Vector{T1}
     # More temporary storage necessary to avoid allocations
     jac::Matrix{T2} # holds a jacobian
     dt::Vector{T2} # holds a derivative w.r.t. t
-    U::Matrix{Complex128} # holds something like U
+    U::Matrix{ComplexF64} # holds something like U
 end
 
 function Homotopies.cache(H::RandomUnitaryPath, x, t)

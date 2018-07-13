@@ -68,7 +68,7 @@ function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCa
         if err isa InterruptException
             throw(err)
         elseif !(err isa Base.LinAlg.SingularException)
-            warn("Cached the following expression thrown from Predictor or Corrector:")
+            @warn("Cached the following expression thrown from Predictor or Corrector:")
             warn(err)
         end
         # we have to reset any patch updates

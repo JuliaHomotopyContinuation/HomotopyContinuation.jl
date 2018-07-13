@@ -189,7 +189,7 @@ function solve(H::Homotopies.AbstractHomotopy, startsolutions; seed=randseed(), 
 	solve(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
-promote_startsolutions(xs::Vector{Vector{Complex128}}) = xs
+promote_startsolutions(xs::Vector{Vector{ComplexF64}}) = xs
 function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
     PT = promote_type(typeof(xs[1][1]), Complex{Float64})
     map(s -> convert.(PT, s), xs)

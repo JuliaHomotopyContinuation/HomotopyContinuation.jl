@@ -15,7 +15,7 @@ function solve(solvers, start_solutions::AbstractVector)
     elseif all(r -> r.solution_type == :projective, results)
         ProjectiveResult(results, seed(solvers))
     else
-        warn("Something went wrong. There are both affine and projective solutions.")
+        @warn("Something went wrong. There are both affine and projective solutions.")
         ProjectiveResult(results, seed(solvers))
     end
 end

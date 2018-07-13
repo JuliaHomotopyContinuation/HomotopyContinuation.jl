@@ -264,7 +264,7 @@ function check_homogenous_degrees(F::AbstractSystem)
     # The number of variables match, but it still cannot be homogenous.
     # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
-    x = rand(Complex128, N)
+    x = rand(ComplexF64, N)
     cache = Systems.cache(F, x)
     y = Systems.evaluate(F, x, cache)
     scale!(x, 2)
