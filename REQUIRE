@@ -1,6 +1,5 @@
 julia 0.7-beta
 FixedPolynomials v0.3
-Juno
 ProgressMeter v0.5.5
 StaticPolynomials 0.2.1
 Compat 0.61

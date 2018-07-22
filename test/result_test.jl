@@ -43,14 +43,14 @@
     @test_nowarn show(IOContext(stdout, :compact=>true), R[end])
 
 
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    # @test_nowarn Juno.render(Juno.Inline(), R)
+    # @test_nowarn Juno.render(Juno.Inline(), R[1])
 
     @polyvar x y z
     R = solve([(x-3)^3,(y-2)])
     @test R isa Solving.AffineResult
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    # @test_nowarn Juno.render(Juno.Inline(), R)
+    # @test_nowarn Juno.render(Juno.Inline(), R[1])
     @test nnonsingular(R) == 0
     @test nsingular(R) == 3
 
@@ -58,15 +58,15 @@
     R = solve([(x-3z),(y-2z)])
     @test R isa Solving.ProjectiveResult
     @test_nowarn string(R)
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    # @test_nowarn Juno.render(Juno.Inline(), R)
+    # @test_nowarn Juno.render(Juno.Inline(), R[1])
     @test nnonsingular(R) == 1
 
     @polyvar x y z
     R = solve([(x-3z)^3,(y-2z)])
     @test R isa Solving.ProjectiveResult
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    # @test_nowarn Juno.render(Juno.Inline(), R)
+    # @test_nowarn Juno.render(Juno.Inline(), R[1])
     @test nnonsingular(R) == 0
     @test nsingular(R) == 3
 end

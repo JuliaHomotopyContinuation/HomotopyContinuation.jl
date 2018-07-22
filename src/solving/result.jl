@@ -355,73 +355,73 @@ function Base.show(io::IO, r::ProjectiveResult)
     println(io, "Random seed used: $(seed(r))")
     println(io, "-----------------------------------------------")
 end
-
-
-function Juno.render(i::Juno.Inline, r::AffineResult)
-        t = Juno.render(i, Juno.defaultrepr(r))
-        t[:children] = [
-            Juno.render(i, Text("Paths tracked → $(length(r))"))]
-        #
-        n = nnonsingular(r)
-        if n > 0
-            t_result = Juno.render(i, finite(r))
-            t_result[:head] = Juno.render(i, Text("$n finite non-singular $(plural("solution", n))"))
-            push!(t[:children], t_result)
-        end
-
-        n = nsingular(r)
-        if n > 0
-            t_result = Juno.render(i, finite(r))
-            t_result[:head] = Juno.render(i, Text("$n finite singular $(plural("solution", n))"))
-            push!(t[:children], t_result)
-        end
-
-        n = natinfinity(r)
-        if n > 0
-            t_result = Juno.render(i, atinfinity(r))
-            t_result[:head] = Juno.render(i, Text("$n $(plural("solution", n)) at ∞"))
-            push!(t[:children], t_result)
-        end
-
-        n = nfailed(r)
-        if n > 0
-            t_result = Juno.render(i, failed(r))
-            t_result[:head] = Juno.render(i, Text("$n paths failed"))
-            push!(t[:children], t_result)
-        end
-        push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
-
-        return t
-end
-
-function Juno.render(i::Juno.Inline, r::ProjectiveResult)
-        t = Juno.render(i, Juno.defaultrepr(r))
-        t[:children] = [
-            Juno.render(i, Text("Paths tracked → $(length(r))"))]
-        #
-        n = nnonsingular(r)
-        if n > 0
-            t_result = Juno.render(i, nonsingular(r))
-            t_result[:head] = Juno.render(i, Text("$n non-singular $(plural("solution", n))"))
-            push!(t[:children], t_result)
-        end
-
-        n = nsingular(r)
-        if n > 0
-            t_result = Juno.render(i, singular(r))
-            t_result[:head] = Juno.render(i, Text("$n singular $(plural("solution", n))"))
-            push!(t[:children], t_result)
-        end
-
-        n = nfailed(r)
-        if n > 0
-            t_result = Juno.render(i, failed(r))
-            t_result[:head] = Juno.render(i, Text("$n $(plural("path", n)) failed"))
-            push!(t[:children], t_result)
-        end
-        push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
-
-        return t
-end
+#
+#
+# function Juno.render(i::Juno.Inline, r::AffineResult)
+#         t = Juno.render(i, Juno.defaultrepr(r))
+#         t[:children] = [
+#             Juno.render(i, Text("Paths tracked → $(length(r))"))]
+#         #
+#         n = nnonsingular(r)
+#         if n > 0
+#             t_result = Juno.render(i, finite(r))
+#             t_result[:head] = Juno.render(i, Text("$n finite non-singular $(plural("solution", n))"))
+#             push!(t[:children], t_result)
+#         end
+#
+#         n = nsingular(r)
+#         if n > 0
+#             t_result = Juno.render(i, finite(r))
+#             t_result[:head] = Juno.render(i, Text("$n finite singular $(plural("solution", n))"))
+#             push!(t[:children], t_result)
+#         end
+#
+#         n = natinfinity(r)
+#         if n > 0
+#             t_result = Juno.render(i, atinfinity(r))
+#             t_result[:head] = Juno.render(i, Text("$n $(plural("solution", n)) at ∞"))
+#             push!(t[:children], t_result)
+#         end
+#
+#         n = nfailed(r)
+#         if n > 0
+#             t_result = Juno.render(i, failed(r))
+#             t_result[:head] = Juno.render(i, Text("$n paths failed"))
+#             push!(t[:children], t_result)
+#         end
+#         push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
+#
+#         return t
+# end
+#
+# function Juno.render(i::Juno.Inline, r::ProjectiveResult)
+#         t = Juno.render(i, Juno.defaultrepr(r))
+#         t[:children] = [
+#             Juno.render(i, Text("Paths tracked → $(length(r))"))]
+#         #
+#         n = nnonsingular(r)
+#         if n > 0
+#             t_result = Juno.render(i, nonsingular(r))
+#             t_result[:head] = Juno.render(i, Text("$n non-singular $(plural("solution", n))"))
+#             push!(t[:children], t_result)
+#         end
+#
+#         n = nsingular(r)
+#         if n > 0
+#             t_result = Juno.render(i, singular(r))
+#             t_result[:head] = Juno.render(i, Text("$n singular $(plural("solution", n))"))
+#             push!(t[:children], t_result)
+#         end
+#
+#         n = nfailed(r)
+#         if n > 0
+#             t_result = Juno.render(i, failed(r))
+#             t_result[:head] = Juno.render(i, Text("$n $(plural("path", n)) failed"))
+#             push!(t[:children], t_result)
+#         end
+#         push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
+#
+#         return t
+# end
 
 plural(singularstr, n) = n > 1 ? singularstr * "s" : singularstr

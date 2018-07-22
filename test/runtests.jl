@@ -1,7 +1,7 @@
 using HomotopyContinuation
 using Test
 using PolynomialTestSystems
-import Juno
+# import Juno
 using Compat
 using Atom
 

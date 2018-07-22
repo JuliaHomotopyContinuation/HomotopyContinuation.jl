@@ -1,4 +1,4 @@
-import Juno
+# import Juno
 
 import ..Correctors
 import ..Homotopies
@@ -163,4 +163,4 @@ function Base.show(io::IO, result::PathTrackerResult)
     println(io, " * iters → $(result.iters)")
 end
 
-Juno.render(i::Juno.Inline, r::PathTrackerResult) = Juno.render(i, Juno.defaultrepr(r))
+# Juno.render(i::Juno.Inline, r::PathTrackerResult) = Juno.render(i, Juno.defaultrepr(r))
