@@ -2,7 +2,7 @@
     F = equations(katsura(5))
     G = equations(cyclic(6))
 
-    P1 = Input.StartTarget(G, F, [rand(Complex128, 6), rand(Complex128, 6)])
+    P1 = Input.StartTarget(G, F, [rand(ComplexF64, 6), rand(ComplexF64, 6)])
     (PP1, start1) = Problems.problem_startsolutions(P1)
     @test PP1 isa Problems.Projective
     @test length(start1) == 2
@@ -24,14 +24,14 @@
     @test Problems.homogenization(P) == Problems.NullHomogenization()
 
     @test_throws ErrorException Problems.problem_startsolutions(Input.StartTarget(
-        [x^2+y^2+z^2, x^4+y^4+z^3], [x^3+z^3,y^3-z^3], [rand(Complex128, 3)]))
+        [x^2+y^2+z^2, x^4+y^4+z^3], [x^3+z^3,y^3-z^3], [rand(ComplexF64, 3)]))
 
     P, start = Problems.problem_startsolutions(Input.StartTarget(
-        [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(Complex128, 3)]))
+        [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(ComplexF64, 3)]))
     @test Problems.homogenization(P) == Problems.NullHomogenization()
 
     P, start = Problems.problem_startsolutions(Input.StartTarget(
-        [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(Complex128, 3)]), homvar=z)
+        [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(ComplexF64, 3)]), homvar=z)
     @test Problems.homogenization(P) == Problems.Homogenization(3)
 
 

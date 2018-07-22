@@ -188,7 +188,7 @@ end
 
     f = [x*z-y^2, y*w-z^2, x*w-y*z]
     L₁ = [1, -1, 1, -1] ⋅ [x, y, z, w]
-    L₂ = rand(Complex128, 4) ⋅ [x, y, z, w]
+    L₂ = rand(ComplexF64, 4) ⋅ [x, y, z, w]
     S = solve([f; L₁], [f; L₂], [[1, 1, 1, 1]])
 
     @test nnonsingular(S) == 1
@@ -196,7 +196,7 @@ end
 
     f = [x*z-y^2, y-z^2, x-y*z]
     L₁ = [1, -1, 1, -1] ⋅ [x, y, z, 1]
-    L₂ = rand(Complex128, 4) ⋅ [x, y, z, 1]
+    L₂ = rand(ComplexF64, 4) ⋅ [x, y, z, 1]
     S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
 
     @test nfinite(S) == 1

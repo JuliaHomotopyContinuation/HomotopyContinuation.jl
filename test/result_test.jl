@@ -33,7 +33,7 @@
     @test count(results(isreal, R)) == 2
 
     @test length(solutions(R)) == 4
-    @test solutions(R) isa Vector{Vector{Complex128}}
+    @test solutions(R) isa Vector{Vector{ComplexF64}}
     @test realsolutions(R, realtol=1e-8) isa Vector{Vector{Float64}}
     @test length(realsolutions(R, realtol=1e-8)) == 2
 

@@ -44,15 +44,15 @@ end
     H = Homotopies.ParameterHomotopy(F, parameters, rand(2), rand(2))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 4)
-    @test gamma(H) isa Complex128
-    @test Homotopies.γ(H) isa Complex128
+    @test gamma(H) isa ComplexF64
+    @test Homotopies.γ(H) isa ComplexF64
 
     InterfaceTest.homotopy(H)
 end
 
 @testset "Homotopies.FixedPointHomotopy" begin
     F = Systems.SPSystem(equations(katsura(5)))
-    H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))
+    H = Homotopies.FixedPointHomotopy(F, rand(ComplexF64, 6))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
 
