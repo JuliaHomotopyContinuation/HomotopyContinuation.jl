@@ -5,6 +5,7 @@ export PathResult, solution,
 
 
 using Compat
+using Printf
 
 import ..Homotopies
 import ..ProjectiveVectors
