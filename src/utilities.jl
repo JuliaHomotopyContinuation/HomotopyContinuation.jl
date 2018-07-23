@@ -13,7 +13,6 @@ export allvariables,
     unsafe_infinity_norm,
     fubini_study,
     logabs,
-    fastlog,
     batches,
     randomish_gamma,
     filterkwargs,
@@ -176,10 +175,9 @@ fubini_study(x,y) = acos(min(1.0, abs(dot(x,y))))
 
 The log absolute map `log(abs(z))`.
 """
-logabs(z::Complex) = 0.5 * fastlog(abs2(z))
-logabs(x) = fastlog(abs(x))
+logabs(z::Complex) = 0.5 * log(abs2(z))
+logabs(x) = log(abs(x))
 
-fastlog(z) = Base.Math.JuliaLibm.log(z)
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
