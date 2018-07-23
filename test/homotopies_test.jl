@@ -4,6 +4,7 @@
     H = Homotopies.StraightLineHomotopy(F, G)
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
+    @test Homotopies.gamma(H) isa ComplexF64
     InterfaceTest.homotopy(H)
 end
 
@@ -44,7 +45,7 @@ end
     H = Homotopies.ParameterHomotopy(F, parameters, rand(2), rand(2))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 4)
-    @test gamma(H) isa ComplexF64
+    @test Homotopies.gamma(H) isa ComplexF64
     @test Homotopies.γ(H) isa ComplexF64
 
     InterfaceTest.homotopy(H)

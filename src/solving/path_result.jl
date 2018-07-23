@@ -1,5 +1,5 @@
 export PathResult, solution,
-    residual, startsolution, issuccess,
+    residual, startsolution, #issuccess,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
@@ -110,7 +110,7 @@ function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::Pat
         condition = Inf
     else
         solution = ProjectiveVectors.affine(r.x)
-        condition = cond(@view cache.J[:,2:end])
+        condition = LinearAlgebra.cond(@view cache.J[:,2:end])
     end
 
 
@@ -221,7 +221,7 @@ startsolution(r::PathResult) = r.start_solution
 
 Checks whether the path is successfull.
 """
-issuccess(r::PathResult) = r.returncode == :success
+LinearAlgebra.issuccess(r::PathResult) = r.returncode == :success
 
 """
     isfailed(pathresult)
@@ -269,7 +269,7 @@ is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
+    (r.windingnumber > 1 || r.condition_number > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
@@ -279,7 +279,7 @@ Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
 isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
-isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && issuccess(r)
+isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
 """

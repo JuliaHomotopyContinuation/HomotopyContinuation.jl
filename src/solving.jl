@@ -1,6 +1,7 @@
 module Solving
 
 using Compat
+using LinearAlgebra
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials

@@ -80,8 +80,8 @@ Base.similar(v::PVector, ::Type{T}) where T = PVector(convert.(T, v.data), v.hom
 """
 function embed(x::Vector{T}, homvar) where T
     k = 1
-    data = Vector{T}(length(x) + 1)
-    for k in 1:length(data)
+    data = Vector{T}(undef, length(x) + 1)
+    @inbounds for k in 1:length(data)
         if k == homvar
             data[k] = one(T)
         else
@@ -116,9 +116,9 @@ Return the corresponding affine vector with xᵢ=1.
 """
 affine(z::PVector{T, Int}) where {T} = affine(z, z.homvar)
 function affine(z::PVector{T}, i::Int) where T
-    x = Vector{T}(length(z) - 1)
+    x = Vector{T}(undef, length(z) - 1)
     normalizer = inv(z.data[i])
-    for k in 1:length(z)
+    @inbounds for k in 1:length(z)
         if k == i
             continue
         end
@@ -133,7 +133,7 @@ end
 
 Bring the projective vector on associated affine patch.
 """
-affine!(z::PVector{T, Int}) where T = scale!(z.data, affine_normalizer(z))
+affine!(z::PVector{T, Int}) where T = LinearAlgebra.rmul!(z.data, affine_normalizer(z))
 
 """
     infinity_norm(z::PVector{T, Int})
@@ -154,7 +154,7 @@ end
 function infinity_norm(z₁::PVector{<:Complex, Int}, z₂::PVector{<:Complex, Int})
     normalizer₁ = affine_normalizer(z₁)
     normalizer₂ = -affine_normalizer(z₂)
-    m = abs2(muladd(z₁[1], normalizer₁, z₂[1] * normalizer₂))
+    @inbounds m = abs2(muladd(z₁[1], normalizer₁, z₂[1] * normalizer₂))
     n₁, n₂ = length(z₁), length(z₂)
     if n₁ ≠ n₂
         return convert(typeof(m), Inf)
@@ -172,7 +172,7 @@ Compute the ∞-norm of `z₁-z₂`. This *does not* bring both vectors on their
 affine patch before computing the norm.
 """
 function unsafe_infinity_norm(z₁::PVector, z₂::PVector)
-    m = abs2(z₁[1] - z₂[1])
+    @inbounds m = abs2(z₁[1] - z₂[1])
     n₁, n₂ = length(z₁), length(z₂)
     if n₁ ≠ n₂
         return convert(typeof(m), Inf)
@@ -192,8 +192,8 @@ its affine vector is larger than `maxnorm`.
 """
 function at_infinity(z::PVector{<:Complex, Int}, maxnorm)
     at_inf = false
-    tol = maxnorm * maxnorm * abs2(z.data[z.homvar])
-    for k in 1:length(z)
+    @inbounds tol = maxnorm * maxnorm * abs2(z.data[z.homvar])
+    @inbounds for k in 1:length(z)
         if k == z.homvar
             continue
         # we avoid the sqrt here by using the squared comparison
@@ -205,8 +205,8 @@ function at_infinity(z::PVector{<:Complex, Int}, maxnorm)
 end
 function at_infinity(z::PVector{<:Real, Int}, maxnorm)
     at_inf = false
-    tol = maxnorm * abs(z.data[z.homvar])
-    for k in 1:length(z)
+    @inbounds tol = maxnorm * abs(z.data[z.homvar])
+    @inbounds for k in 1:length(z)
         if k == z.homvar
             continue
         elseif abs(z.data[k]) > tol
@@ -218,11 +218,11 @@ end
 
 LinearAlgebra.norm(v::PVector, p::Real=2) = norm(v.data, p)
 function LinearAlgebra.normalize!(v::PVector, p::Real=2)
-    normalize!(v.data, p)
+    LinearAlgebra.normalize!(v.data, p)
     v
 end
 
-LinearAlgebra.dot(v::PVector, w::PVector) = dot(v.data, w.data)
+LinearAlgebra.dot(v::PVector, w::PVector) = LinearAlgebra.dot(v.data, w.data)
 
 const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 #
@@ -356,6 +356,6 @@ Base.size(z::AbstractProjectiveVector) = size(z.data)
 Base.length(z::AbstractProjectiveVector) = length(z.data)
 Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
 Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
-Base.endof(z::AbstractProjectiveVector) = endof(z.data)
+Base.lastindex(z::AbstractProjectiveVector) = lastindex(z.data)
 
 end

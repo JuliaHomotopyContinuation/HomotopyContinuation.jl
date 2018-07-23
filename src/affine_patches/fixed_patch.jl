@@ -26,12 +26,12 @@ function evaluate!(u, state::FixedPatchState, x::PVector)
     @inbounds for i=1:length(x)
         out += state.v_conj[i] * x[i]
     end
-    u[end] = out
+    @inbounds u[end] = out
     nothing
 end
 
 function jacobian!(U, state::FixedPatchState, x::PVector)
-    for j=1:size(U, 2)
+    @inbounds for j=1:size(U, 2)
         U[end, j] = state.v_conj[j]
     end
     nothing

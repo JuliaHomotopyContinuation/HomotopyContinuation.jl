@@ -2,6 +2,7 @@ module AffinePatches
 
 import ..ProjectiveVectors
 import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
+import LinearAlgebra
 
 export AbstractAffinePatch,
     AbstractLocalAffinePatch,

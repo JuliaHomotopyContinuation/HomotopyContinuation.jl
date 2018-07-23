@@ -2,8 +2,9 @@ using HomotopyContinuation
 using Test
 using PolynomialTestSystems
 # import Juno
-using Compat
+# using Compat
 using LinearAlgebra
+using Random
 # using Atom
 
 # We order the tests such that isolated things are tested first

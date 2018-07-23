@@ -16,6 +16,6 @@
     O = Solving.multiplicities([U;U], 1e-5, Utilities.infinity_norm)
     @test length(O) == 20
 
-    P = Solving.multiplicities(X, 1e-5, (x,y) -> 1-abs(dot(x,y)))
+    P = Solving.multiplicities(X, 1e-5, (x,y) -> 1-abs(LinearAlgebra.dot(x,y)))
     @test length(P) == 3
 end

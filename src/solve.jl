@@ -2,6 +2,7 @@ using Compat
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
+import Random
 
 import .Input
 import .Problems
@@ -138,7 +139,7 @@ function solve end
 
 # External
 function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothing, kwargs...)
-    srand(seed)
+    Random.srand(seed)
     F = filter(f -> !iszero(f), F)
     checkfinite_dimensional(F, homvar)
     # square system and each polynomial is non-zero
@@ -149,14 +150,14 @@ function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothi
 end
 
 function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; homvar=nothing, seed=randseed(), kwargs...)
-    srand(seed)
+    Random.srand(seed)
     @assert length(G) == length(F)
     checkfinite_dimensional(F, homvar)
     solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
 end
 
 function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
-    srand(seed)
+    Random.srand(seed)
 	solve(Input.TotalDegree(F), seed; kwargs...)
 end
 
@@ -176,7 +177,7 @@ function solve(F::Vector{<:MP.AbstractPolynomial},
     a_1::Vector{<:Number},
     a_2::Vector{<:Number},
     startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
-    srand(seed)
+    Random.srand(seed)
 
     @assert length(p) == length(a_1) "Number of parameters must match"
     @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
@@ -185,7 +186,7 @@ function solve(F::Vector{<:MP.AbstractPolynomial},
 end
 
 function solve(H::Homotopies.AbstractHomotopy, startsolutions; seed=randseed(), kwargs...)
-    srand(seed)
+    Random.srand(seed)
 	solve(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 

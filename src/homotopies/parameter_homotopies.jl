@@ -1,6 +1,8 @@
 import ..Utilities
 import MultivariatePolynomials
 const MP=MultivariatePolynomials
+import LinearAlgebra
+
 export ParameterHomotopy, ParameterHomotopyCache, gamma
 
 """
@@ -51,11 +53,12 @@ end
 An simple cache for `ParameterHomotopy`s consisting of the caches for the
 polynomial, the solution vector and arrays for derivatives.
 """
-struct ParameterHomotopyCache{fC, T, S} <: AbstractHomotopyCache
+struct ParameterHomotopyCache{fC, T, S, T2} <: AbstractHomotopyCache
     f::fC
     z::Vector{T} # z is the vector z = [x; ta + (1-t)b]
     U::Matrix{S} # for storing the jacobian
     U_t::Matrix{S} # for storing the partial derivatives wrt t
+    start_target_diff::Vector{T2} # parameters start - target
 end
 
 function cache(H::ParameterHomotopy, x, t)
@@ -69,7 +72,7 @@ function cache(H::ParameterHomotopy, x, t)
         U_t = reshape(U_t, H.npolys, 1)
     end
 
-    ParameterHomotopyCache(f_cache, z, U, U_t)
+    ParameterHomotopyCache(f_cache, z, U, U_t, H.start - H.target)
 end
 
 Base.size(H::ParameterHomotopy) = (H.npolys, H.nvariables)
@@ -93,7 +96,7 @@ function update_z!(c::ParameterHomotopyCache, H, x, t)
         c.z[i] = x[i]
     end
     for (i,j) in enumerate(H.parameters)
-        c.z[j] = t .* H.start[i] + (1-t) .* H.target[i]
+        c.z[j] = t * H.start[i] + (1-t) * H.target[i]
     end
 end
 
@@ -112,7 +115,7 @@ function dt!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
             c.U_t[i,j1] = c.U[i,j2]
         end
     end
-    A_mul_B!(u, c.U_t, H.start - H.target)
+    LinearAlgebra.mul!(u, c.U_t, c.start_target_diff)
 
     u
 end
@@ -155,7 +158,7 @@ function jacobian_and_dt!(U, u, H::ParameterHomotopy, x, t, c::ParameterHomotopy
             c.U_t[i,j1] = c.U[i,j2]
         end
     end
-    A_mul_B!(u, c.U_t, H.start - H.target)
+    LinearAlgebra.mul!(u, c.U_t, c.start_target_diff)
 
     nothing
 end

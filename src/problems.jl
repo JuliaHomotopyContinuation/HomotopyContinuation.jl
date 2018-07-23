@@ -3,6 +3,7 @@ module Problems
 using Compat
 
 import DynamicPolynomials
+import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
@@ -267,7 +268,7 @@ function check_homogenous_degrees(F::AbstractSystem)
     x = rand(ComplexF64, N)
     cache = Systems.cache(F, x)
     y = Systems.evaluate(F, x, cache)
-    scale!(x, 2)
+    LinearAlgebra.rmul!(x, 2)
     y2 = Systems.evaluate(F, x, cache)
 
     degrees = map(y2, y) do y2ᵢ, yᵢ

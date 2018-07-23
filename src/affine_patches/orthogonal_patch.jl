@@ -18,12 +18,12 @@ end
 nequations(::OrthogonalPatchState) = 1
 
 function precondition!(state::OrthogonalPatchState, x)
-    normalize!(x)
+    LinearAlgebra.normalize!(x)
     update!(state, x)
 end
 function update!(state::OrthogonalPatchState, x)
     raw(state.v_conj) .= conj.(raw(x))
-    normalize!(raw(state.v_conj))
+    LinearAlgebra.normalize!(raw(state.v_conj))
     nothing
 end
 
@@ -37,7 +37,7 @@ function evaluate!(u, state::OrthogonalPatchState, x)
 end
 
 function jacobian!(U, state::OrthogonalPatchState, x)
-    for j=1:size(U, 2)
+    @inbounds for j=1:size(U, 2)
         U[end, j] = state.v_conj[j]
     end
     nothing

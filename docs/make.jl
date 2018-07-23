@@ -1,4 +1,5 @@
 using Documenter, HomotopyContinuation
+import LinearAlgebra
 
 makedocs(
     format = :html,

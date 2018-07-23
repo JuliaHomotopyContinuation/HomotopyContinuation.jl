@@ -17,7 +17,9 @@ export allvariables,
     batches,
     randomish_gamma,
     filterkwargs,
-    solve!
+    solve!,
+    set_num_BLAS_threads,
+    get_num_BLAS_threads
 
 
 """
@@ -157,7 +159,7 @@ unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 Computes the Fubini-Study norm of `x` and `y`.
 """
-fubini_study(x,y) = acos(min(1.0, abs(dot(x,y))))
+fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
 
 """
     logabs(z)
@@ -187,10 +189,11 @@ end
 
 # Parallelization
 
+set_num_BLAS_threads(n) = LinearAlgebra.BLAS.set_num_threads(n)
 get_num_BLAS_threads() = convert(Int, _get_num_BLAS_threads())
 # This is into 0.7 but we need it for 0.6 as well
 const _get_num_BLAS_threads = function() # anonymous so it will be serialized when called
-    blas = Base.LinAlg.BLAS.vendor()
+    blas = LinearAlgebra.BLAS.vendor()
     # Wrap in a try to catch unsupported blas versions
     try
         if blas == :openblas

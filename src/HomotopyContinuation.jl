@@ -57,7 +57,7 @@ module HomotopyContinuation
         nonsingular, seed, nreal, multiplicities, uniquesolutions
 
     export AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, issuccess,
+        residual, startsolution, #issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
@@ -73,5 +73,8 @@ module HomotopyContinuation
     import .Utilities: homogenize, uniquevar, ishomogenous
     export homogenize, uniquevar, ishomogenous
 
+
+    import LinearAlgebra: issuccess
+    export issuccess
 
 end #

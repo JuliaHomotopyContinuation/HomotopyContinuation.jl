@@ -62,7 +62,7 @@ end
 
     P, sols = Problems.problem_startsolutions(Input.TotalDegree(F))
 
-    start_sols = Problems.embed.(P, sols)
+    start_sols = Problems.embed.(Ref(P), sols)
 
     s = start_sols[1]
     H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.RandomPatch(), s)

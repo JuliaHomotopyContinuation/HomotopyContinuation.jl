@@ -17,22 +17,22 @@ function state(::RandomPatch, x::AbstractProjectiveVector)
     for i=1:length(v)
         v[i] = rand(eltype(v))
     end
-    normalize!(v)
+    LinearAlgebra.normalize!(v)
     RandomPatchState(v)
 end
 nequations(::RandomPatchState) = 1
 
 function precondition!(state::RandomPatchState, x::PVector)
-    scale!(raw(x), inv(dot(state.v, x)))
+    LinearAlgebra.rmul!(raw(x), inv(LinearAlgebra.dot(state.v, x)))
 end
 
 function evaluate!(u, state::RandomPatchState, x)
-    u[end] = dot(state.v, x) - one(eltype(x))
+    u[end] = LinearAlgebra.dot(state.v, x) - one(eltype(x))
     nothing
 end
 
 function jacobian!(U, state::RandomPatchState, x)
-    for j=1:size(U, 2)
+    @inbounds for j=1:size(U, 2)
         U[end, j] = conj(state.v[j])
     end
     nothing
