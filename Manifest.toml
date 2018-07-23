@@ -35,8 +35,8 @@ uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 version = "0.0.7"
 
 [[FixedPolynomials]]
-deps = ["MultivariatePolynomials"]
-git-tree-sha1 = "75ffb7501936e3945b4e1c727b2e270dfbedf47d"
+deps = ["Compat", "MultivariatePolynomials"]
+path = "/Users/sascha/.julia/dev/FixedPolynomials"
 uuid = "3dd14ad9-0029-526e-86e9-8aa0bdd2ab0d"
 version = "0.3.1"
 
