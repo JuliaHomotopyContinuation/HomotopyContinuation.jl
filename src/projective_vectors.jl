@@ -1,5 +1,6 @@
 module ProjectiveVectors
 
+using LinearAlgebra
 import Base: ==
 import ..Utilities: infinity_norm, unsafe_infinity_norm
 
@@ -215,13 +216,13 @@ function at_infinity(z::PVector{<:Real, Int}, maxnorm)
     false
 end
 
-Base.LinAlg.norm(v::PVector, p::Real=2) = norm(v.data, p)
-function Base.LinAlg.normalize!(v::PVector, p::Real=2)
+LinearAlgebra.norm(v::PVector, p::Real=2) = norm(v.data, p)
+function LinearAlgebra.normalize!(v::PVector, p::Real=2)
     normalize!(v.data, p)
     v
 end
 
-Base.LinAlg.dot(v::PVector, w::PVector) = dot(v.data, w.data)
+LinearAlgebra.dot(v::PVector, w::PVector) = dot(v.data, w.data)
 
 const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 #
@@ -330,7 +331,7 @@ const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 #     v
 # end
 #
-# function Base.LinAlg.normalize!(v::ProdPVector, p::Real=2)
+# function LinearAlgebra.normalize!(v::ProdPVector, p::Real=2)
 #     for w in pvectors(v)
 #         normalize!(w, p)
 #     end
