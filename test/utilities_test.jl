@@ -12,10 +12,12 @@
 
     A = rand(Complex{Float64}, 12, 12)
     b = rand(Complex{Float64}, 12)
-    C = zero(A)
-    d = zero(b)
+    C, d = copy(A), copy(b)
+    @test norm(Utilities.solve!(C, d) - A \ b) < 1e-10
 
-    C .= A
-    d .= b
-    @test norm(Utilities.ldiv_lu!(C, d) - A \ b) < 1e-10 
+    A = rand(Complex{Float64}, 15, 12)
+    b = rand(Complex{Float64}, 15)
+    C, d = copy(A), copy(b)
+    Utilities.solve!(C, d)
+    @test norm(d[1:12] - A \ b) < 1e-10
 end

@@ -1,5 +1,6 @@
 module Utilities
 
+import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
@@ -25,25 +26,13 @@ export allvariables,
 Solve ``Ax=b`` inplace. This overwrites `A` and `b`
 and stores the result in `b`.
 """
-function solve!(A::Matrix, b::Vector)
+function solve!(A::StridedMatrix, b::StridedVecOrMat)
     m, n = size(A)
     if m == n
-        A_ldiv_B!(LinAlg.generic_lufact!(A), b)
+        LinearAlgebra.ldiv!(LinearAlgebra.generic_lufact!(A), b)
     else
-        A_ldiv_B!(qrfact!(A), b)
+        LinearAlgebra.ldiv!(LinearAlgebra.qr!(A), b)
     end
-    b
-end
-
-"""
-    ldiv_lu!(A, b)
-
-Solve ``Ax=b`` inplace using a pure Julia LU-factorization. This overwrites `A` and `b`
-and stores the result in `b`. This is faster than the BLAS version [`blas_ldiv_lu!`](@ref) but seems to loose
-around 2 digits of precision.
-"""
-function ldiv_lu!(A::StridedMatrix, b::StridedVector)
-    A_ldiv_B!(LinAlg.generic_lufact!(A), b)
     b
 end
 
@@ -116,7 +105,7 @@ function homogenize(f::MP.AbstractPolynomialLike, var=uniquevar(f))
     d = MP.maxdegree(f)
     MP.polynomial(map(t -> var^(d - MP.degree(t)) * t, MP.terms(f)))
 end
-homogenize(F::Vector{<:MP.AbstractPolynomialLike}, var=uniquevar(F)) = homogenize.(F, var)
+homogenize(F::Vector{<:MP.AbstractPolynomialLike}, var=uniquevar(F)) = homogenize.(F, Ref(var))
 
 """
     homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))

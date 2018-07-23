@@ -3,7 +3,8 @@ using Test
 using PolynomialTestSystems
 # import Juno
 using Compat
-using Atom
+using LinearAlgebra
+# using Atom
 
 # We order the tests such that isolated things are tested first
 include("utilities_test.jl")
