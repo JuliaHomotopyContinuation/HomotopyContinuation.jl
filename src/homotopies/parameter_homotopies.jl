@@ -1,7 +1,7 @@
 import ..Utilities
 import MultivariatePolynomials
 const MP=MultivariatePolynomials
-export ParameterHomotopy, ParameterHomotopyCache
+export ParameterHomotopy, ParameterHomotopyCache, gamma
 
 """
     ParameterHomotopy(f, variables, parameters, start, target; gamma=exp(i * 2π*rand()))
@@ -79,7 +79,7 @@ Base.size(H::ParameterHomotopy) = (H.npolys, H.nvariables)
 
 Obtain the gamma used in the ParameterHomotopy.
 """
-Base.Math.gamma(H::ParameterHomotopy) = H.gamma
+gamma(H::ParameterHomotopy) = H.gamma
 
 """
     γ(H)
