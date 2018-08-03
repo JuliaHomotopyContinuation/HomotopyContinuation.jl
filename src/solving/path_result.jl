@@ -3,8 +3,6 @@ export PathResult, solution,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
-
-using Compat
 using Printf
 
 import ..Homotopies

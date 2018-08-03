@@ -1,6 +1,5 @@
 module Solving
 
-using Compat
 using LinearAlgebra
 
 import MultivariatePolynomials

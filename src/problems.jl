@@ -1,7 +1,5 @@
 module Problems
 
-using Compat
-
 import DynamicPolynomials
 import LinearAlgebra
 import MultivariatePolynomials

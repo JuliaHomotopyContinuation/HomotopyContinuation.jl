@@ -1,8 +1,6 @@
 using HomotopyContinuation
 using Test
 using PolynomialTestSystems
-# import Juno
-# using Compat
 using LinearAlgebra
 using Random
 # using Atom

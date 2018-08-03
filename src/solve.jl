@@ -1,5 +1,3 @@
-using Compat
-
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 import Random

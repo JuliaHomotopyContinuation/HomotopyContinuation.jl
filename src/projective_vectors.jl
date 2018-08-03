@@ -4,8 +4,6 @@ using LinearAlgebra
 import Base: ==
 import ..Utilities: infinity_norm, unsafe_infinity_norm
 
-using Compat
-
 export AbstractProjectiveVector,
     PVector,
     ProdPVector,

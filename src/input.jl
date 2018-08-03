@@ -1,7 +1,5 @@
 module Input
 
-using Compat
-
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
