@@ -168,7 +168,6 @@ checkatinfinity(state, options) = checkatinfinity(state, options, state.x)
 function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex, Int})
     LOOKBACK = 1
     TOL = 1e-3
-    MIN_LOGABS = -4.605170185988091 # = log(0.01)
     MIN_AT_INFINITY_RATIO = 0.032
 
     i₀ = ProjectiveVectors.homvar(x)
@@ -176,7 +175,7 @@ function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex,
     dirs = state.directions
 
     # We want the homogenization variable to be at least somewhat small
-    if state.R > 1e-8 && state.logabs_samples[i₀, n] > MIN_LOGABS
+    if state.R > 1e-8 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
         return false
     end
     for i=1:length(x)

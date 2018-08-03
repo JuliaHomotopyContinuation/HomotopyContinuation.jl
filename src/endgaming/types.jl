@@ -1,6 +1,6 @@
 export Endgame, Result, allowed_kwargs
 
-const allowed_kwargs = [:sampling_factor, :tol, :minradius, :maxnorm,
+const allowed_kwargs = [:sampling_factor, :tol, :minradius, :maxnorm, :minimal_maxnorm,
     :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
     :cauchy_samples_per_loop]
 
@@ -10,6 +10,7 @@ struct Options
     tol::Float64
     minradius::Float64
     maxnorm::Float64
+    minimal_maxnorm::Float64
     maxwindingnumber::Float64
     max_extrapolation_samples::Int
     cauchy_loop_closed_tolerance::Float64
@@ -129,6 +130,8 @@ where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runen
 * `minradius=1e-15` A path is declared false if the endgame didn't finished until then.
 * `maxnorm=1e5` If our original problem is affine we declare a path at infinity if the infinity norm
 with respect to the standard patch is larger than `maxnorm`.
+* `minimal_maxnorm=min(1e3, maxnorm)` A path is **not** declared going to infinity if the infinity norm
+with respect to the standard patch is not larger than `minimal_maxnorm`.
 * `maxwindingnumber=15` The maximal windingnumber we try to find using Cauchys integral formula.
 * `max_extrapolation_samples=4` During the endgame a Richardson extrapolation is used to improve the accuracy
 of certain approximations. This is the maximal number of samples used for this.
@@ -148,12 +151,13 @@ struct Endgame{P<:PathTracking.PathTracker, V}
 end
 
 function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
-    sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, maxwindingnumber=15,
+    sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, minimal_maxnorm=min(1e3, maxnorm),
+    maxwindingnumber=15,
     max_extrapolation_samples=4,
     cauchy_loop_closed_tolerance=1e-3, cauchy_samples_per_loop=6,
     patch=nothing, pathtrackerkwargs...)
 
-    options = Options(sampling_factor, egtol, minradius, maxnorm,
+    options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
     H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
