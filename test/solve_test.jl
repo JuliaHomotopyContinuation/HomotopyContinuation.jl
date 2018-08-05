@@ -119,7 +119,7 @@ end
 
 @testset "Path Crossing" begin
     # This tests that we indeed detect path crossings
-    srand(2337)
+    Random.seed!(2337)
     F = equations(cyclic(6))
     P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
     x₁ = Problems.embed(P, start_sols[1])
