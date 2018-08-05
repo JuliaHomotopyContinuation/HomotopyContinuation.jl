@@ -1,5 +1,3 @@
-__precompile__()
-
 module HomotopyContinuation
 
     import DynamicPolynomials: @polyvar, PolyVar, differentiate, variables
