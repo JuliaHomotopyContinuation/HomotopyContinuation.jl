@@ -34,9 +34,8 @@ end
 Base.length(r::Result) = length(r.pathresults)
 Base.getindex(r::Result, I) = getindex(r.pathresults, I)
 
-Base.start(r::Result) = start(r.pathresults)
-Base.next(r::Result, state) = next(r.pathresults, state)
-Base.done(r::Result, state) = done(r.pathresults, state)
+Base.iterate(r::Result) = iterate(r.pathresults)
+Base.iterate(r::Result, state) = iterate(r.pathresults, state)
 Base.lastindex(r::Result) = lastindex(r.pathresults)
 Base.eltype(r::Type{AffineResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1, T2, T3}
 Base.eltype(r::Type{ProjectiveResult{T1, T2, T3}}) where {T1, T2, T3} = PathResult{T1,T2,T3}

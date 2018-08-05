@@ -359,20 +359,27 @@ function TotalDegreeSolutionIterator(degrees::Vector{Int}, homogenous::Bool)
     TotalDegreeSolutionIterator(degrees, homogenous, iterator)
 end
 
-Base.start(iter::TotalDegreeSolutionIterator) = start(iter.iterator)
-function Base.next(iter::TotalDegreeSolutionIterator, state)
-    indices, nextstate = next(iter.iterator, state)
+function Base.iterate(iter::TotalDegreeSolutionIterator)
+    indices, state = iterate(iter.iterator)
+    _value(iter, indices), state
+end
+function Base.iterate(iter::TotalDegreeSolutionIterator, state)
+    it = iterate(iter.iterator, state)
+    it === nothing && return nothing
+    _value(iter, it[1]), it[2]
+end
 
+function _value(iter::TotalDegreeSolutionIterator, indices)
     value = Vector{Complex{Float64}}()
     if iter.homogenous
         push!(value, complex(1.0, 0.0))
     end
-    for (i, k) in zip(1:length(indices), indices)
+    for (i, k) in enumerate(indices)
         push!(value, cis(2π * k / iter.degrees[i]))
     end
-    value, nextstate
+    value
 end
-Base.done(iter::TotalDegreeSolutionIterator, state) = done(iter.iterator, state)
+
 Base.length(iter::TotalDegreeSolutionIterator) = length(iter.iterator)
 Base.eltype(iter::Type{<:TotalDegreeSolutionIterator}) = Vector{Complex{Float64}}
 
