@@ -10,16 +10,16 @@
     @test cache isa Systems.NullCache
     u = zeros(Complex{Float64}, 6)
     Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) == u
-    @test Systems.evaluate(F, x) == u
+    @test Systems.evaluate(F, x, cache) ≈ u
+    @test Systems.evaluate(F, x) ≈ u
 
     U = zeros(Complex{Float64}, 6, 6)
     Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) == U
-    @test Systems.jacobian(F, x) == U
+    @test Systems.jacobian(F, x, cache) ≈ U
+    @test Systems.jacobian(F, x) ≈ U
 
     Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
+    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
 end
 
 @testset "Systems.FixedHomotopy" begin
@@ -36,14 +36,14 @@ end
     @test cache isa Systems.FixedHomotopyCache
     u = zeros(Complex{Float64}, 6)
     Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) == u
+    @test Systems.evaluate(F, x, cache) ≈ u
 
     U = zeros(Complex{Float64}, 6, 6)
     Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) == U
+    @test Systems.jacobian(F, x, cache) ≈ U
 
     Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
+    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
 end
 
 @testset "Systems.FPSystem" begin
@@ -56,14 +56,14 @@ end
     @test cache isa Systems.FPSystemCache
     u = zeros(Complex{Float64}, 6)
     Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) == u
+    @test Systems.evaluate(F, x, cache) ≈ u
 
     U = zeros(Complex{Float64}, 6, 6)
     Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) == U
+    @test Systems.jacobian(F, x, cache) ≈ U
 
     Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test Systems.evaluate_and_jacobian(F, x, cache) == (u, U)
+    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
 end
 
 @testset "Systems.TotalDegreeSystem" begin

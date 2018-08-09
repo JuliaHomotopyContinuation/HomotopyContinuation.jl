@@ -1,7 +1,7 @@
 export AffineResult, ProjectiveResult,
     nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
     finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
-    solutions, realsolutions, multiplicities, uniquesolutions
+    solutions, realsolutions, multiplicities, uniquesolutions, statistics
 
 """
     Result
@@ -64,6 +64,50 @@ function nresults(R::Result; onlyreal=false, realtol=1e-6,
         (!onlysingular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r))
     end
+end
+
+"""
+    statistics(R::Result; onlyreal=false, realtol=1e-6,
+        onlynonsingular=false, onlysingular=false, singulartol=1e10)
+
+Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
+
+## Example
+```julia
+julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
+(nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
+"""
+statistics(R::Result; kwargs...) = statistics(R.pathresults; kwargs...)
+function statistics(R::Vector{<:PathResult}; onlyreal=false, realtol=1e-6,
+    onlynonsingular=false, onlysingular=false, singulartol=1e10)
+
+    failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
+
+    for r in R
+        if isfailed(r)
+            failed += 1
+        elseif issingular(r, singulartol)
+            if isreal(r, realtol)
+                real_singular += 1
+            end
+            singular += 1
+        elseif !isprojective(r) && !isfinite(r)
+            atinfinity += 1
+        else # finite, nonsingular
+            if isreal(r, realtol)
+                real_nonsingular += 1
+            end
+            nonsingular += 1
+        end
+    end
+    (nonsingular = nonsingular,
+    singular = singular,
+    real_nonsingular = real_nonsingular,
+    real_singular = real_singular,
+    real = real_nonsingular + real_singular,
+    atinfinity = atinfinity,
+    failed = failed,
+    total = length(R))
 end
 
 """
@@ -334,93 +378,100 @@ end
 
 
 ####Show functions
-function Base.show(io::IO, r::AffineResult)
-    println(io, "-----------------------------------------------")
-    println(io, "Paths tracked: $(length(r))")
-    println(io, "# non-singular finite solutions:  $(nnonsingular(r))")
-    println(io, "# singular finite solutions:  $(nsingular(r))")
-    println(io, "# solutions at infinity:  $(natinfinity(r))")
-    println(io, "# failed paths:  $(nfailed(r))")
-    println(io, "Random seed used: $(seed(r))")
-    println(io, "-----------------------------------------------")
+function Base.show(io::IO, ::MIME"text/plain", x::AffineResult)
+    s = statistics(x)
+    println(io, "AffineResult with $(length(x)) tracked paths")
+    println(io, "==================================")
+    println(io, "• $(s.nonsingular) non-singular finite $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
+    println(io, "• $(s.singular) non-singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.atinfinity) non-singular finite $(plural("solution", s.nonsingular))")
+    println(io, "• $(s.failed) non-singular finite $(plural("solution", s.failed))")
+    println(io, "• random seed: $(seed(x))")
 end
 
-function Base.show(io::IO, r::ProjectiveResult)
-    println(io, "-----------------------------------------------")
-    println(io, "Paths tracked: $(length(r))")
-    println(io, "# non-singular solutions:  $(nnonsingular(r))")
-    println(io, "# singular solutions:  $(nsingular(r))")
-    println(io, "# failed paths:  $(nfailed(r))")
-    println(io, "Random seed used: $(seed(r))")
-    println(io, "-----------------------------------------------")
+function Base.show(io::IO, ::MIME"text/plain", r::ProjectiveResult)
+    println(io, "ProjectiveResult with $(length(x)) tracked paths")
+    println(io, "==================================")
+    println(io, "• $(s.nonsingular) non-singular finite $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
+    println(io, "• $(s.singular) non-singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.atinfinity) non-singular finite $(plural("solution", s.nonsingular))")
+    println(io, "• $(s.failed) non-singular finite $(plural("solution", s.failed))")
+    println(io, "• random seed: $(seed(x))")
 end
-#
-#
-# function Juno.render(i::Juno.Inline, r::AffineResult)
-#         t = Juno.render(i, Juno.defaultrepr(r))
-#         t[:children] = [
-#             Juno.render(i, Text("Paths tracked → $(length(r))"))]
-#         #
-#         n = nnonsingular(r)
-#         if n > 0
-#             t_result = Juno.render(i, finite(r))
-#             t_result[:head] = Juno.render(i, Text("$n finite non-singular $(plural("solution", n))"))
-#             push!(t[:children], t_result)
-#         end
-#
-#         n = nsingular(r)
-#         if n > 0
-#             t_result = Juno.render(i, finite(r))
-#             t_result[:head] = Juno.render(i, Text("$n finite singular $(plural("solution", n))"))
-#             push!(t[:children], t_result)
-#         end
-#
-#         n = natinfinity(r)
-#         if n > 0
-#             t_result = Juno.render(i, atinfinity(r))
-#             t_result[:head] = Juno.render(i, Text("$n $(plural("solution", n)) at ∞"))
-#             push!(t[:children], t_result)
-#         end
-#
-#         n = nfailed(r)
-#         if n > 0
-#             t_result = Juno.render(i, failed(r))
-#             t_result[:head] = Juno.render(i, Text("$n paths failed"))
-#             push!(t[:children], t_result)
-#         end
-#         push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
-#
-#         return t
-# end
-#
-# function Juno.render(i::Juno.Inline, r::ProjectiveResult)
-#         t = Juno.render(i, Juno.defaultrepr(r))
-#         t[:children] = [
-#             Juno.render(i, Text("Paths tracked → $(length(r))"))]
-#         #
-#         n = nnonsingular(r)
-#         if n > 0
-#             t_result = Juno.render(i, nonsingular(r))
-#             t_result[:head] = Juno.render(i, Text("$n non-singular $(plural("solution", n))"))
-#             push!(t[:children], t_result)
-#         end
-#
-#         n = nsingular(r)
-#         if n > 0
-#             t_result = Juno.render(i, singular(r))
-#             t_result[:head] = Juno.render(i, Text("$n singular $(plural("solution", n))"))
-#             push!(t[:children], t_result)
-#         end
-#
-#         n = nfailed(r)
-#         if n > 0
-#             t_result = Juno.render(i, failed(r))
-#             t_result[:head] = Juno.render(i, Text("$n $(plural("path", n)) failed"))
-#             push!(t[:children], t_result)
-#         end
-#         push!(t[:children], Juno.render(i, Text("Random seed used → $(seed(r))")))
-#
-#         return t
-# end
 
-plural(singularstr, n) = n > 1 ? singularstr * "s" : singularstr
+TreeViews.hastreeview(::AffineResult) = true
+TreeViews.hastreeview(::ProjectiveResult) = true
+TreeViews.numberofnodes(::AffineResult) = 6
+TreeViews.numberofnodes(::ProjectiveResult) = 5
+TreeViews.treelabel(io::IO, x::AffineResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">AffineResult</span>")
+TreeViews.treelabel(io::IO, x::ProjectiveResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">ProjectiveResult</span>")
+
+function TreeViews.nodelabel(io::IO, x::AffineResult, i::Int, ::MIME"application/juno+inline")
+    s = statistics(x)
+    if i == 1
+        print(io, "Paths tracked")
+    elseif i == 2 && s.nonsingular > 0
+        print(io, "$(s.nonsingular) finite non-singular ($(s.real_nonsingular) real)")
+    elseif i == 3 && s.singular > 0
+        print(io, "$(s.singular) finite singular ($(s.real_singular) real)")
+    elseif i == 4 && s.atinfinity > 0
+        print(io, "$(s.atinfinity) atinfinity")
+    elseif i == 5 && s.failed > 0
+        print(io, "$(s.failed) failed")
+    elseif i == 6
+        print(io, "Random seed used")
+    end
+
+end
+function TreeViews.treenode(r::AffineResult, i::Integer)
+    s = statistics(r)
+    if i == 1
+        return length(r)
+    elseif i == 2 && s.nonsingular > 0
+        return finite(r, onlynonsingular=true)
+    elseif i == 3 && s.singular > 0
+        return finite(r, onlysingular=true)
+    elseif i == 4 && s.atinfinity > 0
+        return atinfinity(r)
+    elseif i == 5 && s.failed > 0
+        return failed(r)
+    elseif i == 6
+        return seed(r)
+    end
+    missing
+end
+
+function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"application/juno+inline")
+    s = statistics(x)
+    if i == 1
+        print(io, "Paths tracked")
+    elseif i == 2 && s.nonsingular > 0
+        print(io, "$(s.nonsingular) non-singular ($(s.real_nonsingular) real)")
+    elseif i == 3 && s.singular > 0
+        print(io, "$(s.singular) singular ($(s.real_singular) real)")
+    elseif i == 4 && s.failed > 0
+        print(io, "$(s.failed) failed")
+    elseif i == 5
+        print(io, "Random seed used")
+    end
+
+end
+function TreeViews.treenode(r::ProjectiveResult, i::Integer)
+    s = statistics(r)
+    if i == 1
+        return length(r)
+    elseif i == 2 && s.nonsingular > 0
+        return finite(r, onlynonsingular=true)
+    elseif i == 3 && s.singular > 0
+        return finite(r, onlysingular=true)
+    elseif i == 4 && s.failed > 0
+        return failed(r)
+    elseif i == 5
+        return seed(r)
+    end
+    missing
+end
+
+plural(singularstr, n) = n == 1 ? singularstr :  singularstr * "s"

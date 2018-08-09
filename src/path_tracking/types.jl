@@ -1,4 +1,4 @@
-# import Juno
+import TreeViews
 
 import ..Correctors
 import ..Homotopies
@@ -154,13 +154,16 @@ function PathTrackerResult(tracker::PathTracker)
           currresidual(tracker), curriters(tracker))
 end
 
-function Base.show(io::IO, result::PathTrackerResult)
+function Base.show(io::IO, ::MIME"text/plain", result::PathTrackerResult)
     println(io, "PathTrackerResult{", typeof(result.x), ",", typeof(result.t) ,"}:")
-    println(io, " * returncode → :$(result.returncode)")
-    println(io, " * x → $(result.x)")
-    println(io, " * t → $(result.t)")
-    println(io, " * res → $(result.res)")
-    println(io, " * iters → $(result.iters)")
+    println(io, " • returncode → :$(result.returncode)")
+    println(io, " • x → $(result.x)")
+    println(io, " • t → $(result.t)")
+    println(io, " • res → $(result.res)")
+    println(io, " • iters → $(result.iters)")
 end
 
-# Juno.render(i::Juno.Inline, r::PathTrackerResult) = Juno.render(i, Juno.defaultrepr(r))
+TreeViews.hastreeview(::PathTrackerResult) = true
+
+TreeViews.treelabel(io::IO, x::PathTrackerResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathTrackerResult{$(typeof(x.x)),$( typeof(x.t))}</span>")

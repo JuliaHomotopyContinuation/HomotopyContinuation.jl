@@ -52,7 +52,7 @@ module HomotopyContinuation
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions
+        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
     export AffineResult, ProjectiveResult, PathResult, solution,
         residual, startsolution, #issuccess,
@@ -60,7 +60,7 @@ module HomotopyContinuation
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions
+        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
     export StraightLineHomotopy, FixedPointHomotopy

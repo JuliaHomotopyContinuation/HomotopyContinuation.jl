@@ -3,7 +3,16 @@ using Test
 using PolynomialTestSystems
 using LinearAlgebra
 using Random
-# using Atom
+import TreeViews
+
+function test_treeviews(x)
+    @test TreeViews.hastreeview(x)
+    @test_nowarn TreeViews.treelabel(devnull, x, MIME"application/juno+inline"())
+    for i=1:TreeViews.numberofnodes(x)
+        @test_nowarn TreeViews.nodelabel(devnull, x, i, MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treenode(x, i)
+    end
+end
 
 # We order the tests such that isolated things are tested first
 include("utilities_test.jl")
