@@ -1,4 +1,3 @@
-using Compat
 import ..ProjectiveVectors
 import ..Homotopies
 

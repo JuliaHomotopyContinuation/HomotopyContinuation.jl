@@ -1,7 +1,7 @@
 module InterfaceTest
 
 import ..Homotopies
-import Base.Test: @test
+import Test: @test
 
 
 function homotopy(H::Homotopies.AbstractHomotopy, x=rand(Complex{Float64}, size(H, 2)) )

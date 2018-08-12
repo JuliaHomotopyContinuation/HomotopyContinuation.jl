@@ -1,10 +1,9 @@
 export PathResult, solution,
-    residual, startsolution, issuccess,
+    residual, startsolution, #issuccess,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
-
-using Compat
+using Printf
 
 import ..Homotopies
 import ..ProjectiveVectors
@@ -109,7 +108,7 @@ function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::Pat
         condition = Inf
     else
         solution = ProjectiveVectors.affine(r.x)
-        condition = cond(@view cache.J[:,2:end])
+        condition = LinearAlgebra.cond(@view cache.J[:,2:end])
     end
 
 
@@ -161,38 +160,37 @@ end
 windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
-function Base.show(io::IO, r::PathResult)
+function Base.show(io::IO, ::MIME"text/plain", r::PathResult)
     iscompact = get(io, :compact, false)
 
     if iscompact
-        println(io, " * returncode: $(r.returncode)")
-        println(io, " * solution: ", r.solution)
-        println(io, " * residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " • returncode: $(r.returncode)")
+        println(io, " • solution: ", r.solution)
+        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
     else
-        println(io, " ---------------------------------------------")
-        println(io, " * returncode: $(r.returncode)")
+        println(io, "PathResult")
+        println(io, "==========")
+        println(io, " • returncode: $(r.returncode)")
         if r.returncode_detail != :none
-            println(io, " * returncode_detail: $(r.returncode_detail)")
+            println(io, " • returncode_detail: $(r.returncode_detail)")
         end
-        println(io, " * solution: ", r.solution)
-        println(io, " * residual: $(@sprintf "%.3e" r.residual)")
-        println(io, " * condition_number: $(@sprintf "%.3e" r.condition_number)")
-        println(io, " * windingnumber: $(r.windingnumber)")
-        println(io, " ----")
-        println(io, " * path number: ", r.pathnumber)
-        println(io, " * start_solution: ", r.start_solution)
-        println(io, " ----")
-        println(io, " * t: ", r.t)
-        println(io, " * iterations: ", r.iterations)
-        println(io, " * npredictions: $(r.npredictions)")
+        println(io, " • solution: ", r.solution)
+        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " • condition_number: $(@sprintf "%.3e" r.condition_number)")
+        println(io, " • windingnumber: $(r.windingnumber)")
+        println(io, "")
+        println(io, " • path number: ", r.pathnumber)
+        println(io, " • start_solution: ", r.start_solution)
+        println(io, "")
+        println(io, " • t: ", r.t)
+        println(io, " • iterations: ", r.iterations)
+        println(io, " • npredictions: $(r.npredictions)")
     end
 end
 
-function Juno.render(i::Juno.Inline, x::PathResult{T1, T2, T3}) where {T1, T2, T3}
-    t = Juno.render(i, Juno.defaultrepr(x, true))
-    t[:head] = Juno.render(i, Text("PathResult"))
-    t
-end
+TreeViews.hastreeview(::PathResult) = true
+TreeViews.treelabel(io::IO, x::PathResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathResult</span>")
 
 """
     solution(pathresult)
@@ -220,7 +218,7 @@ startsolution(r::PathResult) = r.start_solution
 
 Checks whether the path is successfull.
 """
-issuccess(r::PathResult) = r.returncode == :success
+LinearAlgebra.issuccess(r::PathResult) = r.returncode == :success
 
 """
     isfailed(pathresult)
@@ -268,7 +266,7 @@ is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    (r.windingnumber > 1 || r.condition_number > tol) && issuccess(r)
+    (r.windingnumber > 1 || r.condition_number > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
@@ -278,7 +276,7 @@ Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
 isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
-isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && issuccess(r)
+isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
 """

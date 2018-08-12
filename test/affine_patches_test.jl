@@ -12,7 +12,7 @@
 
     U = zeros(Complex{Float64}, 1, 3)
     AffinePatches.jacobian!(U, patch, x)
-    @test U == reshape(conj.(normalize(x)), 1, 3)
+    @test U == reshape(conj.(LinearAlgebra.normalize(x)), 1, 3)
 end
 
 @testset "AffinePatches.EmbeddingPatch" begin

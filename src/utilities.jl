@@ -1,5 +1,6 @@
 module Utilities
 
+import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
@@ -13,11 +14,12 @@ export allvariables,
     unsafe_infinity_norm,
     fubini_study,
     logabs,
-    fastlog,
     batches,
     randomish_gamma,
     filterkwargs,
-    solve!
+    solve!,
+    set_num_BLAS_threads,
+    get_num_BLAS_threads
 
 
 """
@@ -26,25 +28,13 @@ export allvariables,
 Solve ``Ax=b`` inplace. This overwrites `A` and `b`
 and stores the result in `b`.
 """
-function solve!(A::Matrix, b::Vector)
+function solve!(A::StridedMatrix, b::StridedVecOrMat)
     m, n = size(A)
     if m == n
-        A_ldiv_B!(LinAlg.generic_lufact!(A), b)
+        LinearAlgebra.ldiv!(LinearAlgebra.generic_lufact!(A), b)
     else
-        A_ldiv_B!(qrfact!(A), b)
+        LinearAlgebra.ldiv!(LinearAlgebra.qr!(A), b)
     end
-    b
-end
-
-"""
-    ldiv_lu!(A, b)
-
-Solve ``Ax=b`` inplace using a pure Julia LU-factorization. This overwrites `A` and `b`
-and stores the result in `b`. This is faster than the BLAS version [`blas_ldiv_lu!`](@ref) but seems to loose
-around 2 digits of precision.
-"""
-function ldiv_lu!(A::StridedMatrix, b::StridedVector)
-    A_ldiv_B!(LinAlg.generic_lufact!(A), b)
     b
 end
 
@@ -87,7 +77,7 @@ Checks whether `f` is homogenous in the variables `v`.
 Checks whether each polynomial in `polys` is homogenous in the variables `v`.
 """
 function ishomogenous(f::MP.AbstractPolynomialLike, variables::Vector{T}) where {T<:MP.AbstractVariable}
- var_indices = findin(MP.variables(f), variables)
+ var_indices = findall(in(variables), MP.variables(f))
  degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
  minimum(degrees) == maximum(degrees)
 end
@@ -117,7 +107,7 @@ function homogenize(f::MP.AbstractPolynomialLike, var=uniquevar(f))
     d = MP.maxdegree(f)
     MP.polynomial(map(t -> var^(d - MP.degree(t)) * t, MP.terms(f)))
 end
-homogenize(F::Vector{<:MP.AbstractPolynomialLike}, var=uniquevar(F)) = homogenize.(F, var)
+homogenize(F::Vector{<:MP.AbstractPolynomialLike}, var=uniquevar(F)) = homogenize.(F, Ref(var))
 
 """
     homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))
@@ -129,7 +119,7 @@ Homogenize the variables `v` in the polynomial `f` by using the given variable `
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
 function homogenize(f::MP.AbstractPolynomialLike, variables::Vector{T}, var=uniquevar(f)) where {T<:MP.AbstractVariable}
-    var_indices = findin(MP.variables(f), variables)
+    var_indices = findall(in(variables), MP.variables(f))
     degrees = map(t -> sum(MultivariatePolynomials.exponents(t)[var_indices]), f)
     d = maximum(degrees)
     MP.polynomial(map(i -> var^(d - degrees[i]) * f[i], 1:length(f)))
@@ -169,17 +159,16 @@ unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 Computes the Fubini-Study norm of `x` and `y`.
 """
-fubini_study(x,y) = acos(min(1.0, abs(dot(x,y))))
+fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
 
 """
     logabs(z)
 
 The log absolute map `log(abs(z))`.
 """
-logabs(z::Complex) = 0.5 * fastlog(abs2(z))
-logabs(x) = fastlog(abs(x))
+logabs(z::Complex) = 0.5 * log(abs2(z))
+logabs(x) = log(abs(x))
 
-fastlog(z) = Base.Math.JuliaLibm.log(z)
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
@@ -200,10 +189,11 @@ end
 
 # Parallelization
 
+set_num_BLAS_threads(n) = LinearAlgebra.BLAS.set_num_threads(n)
 get_num_BLAS_threads() = convert(Int, _get_num_BLAS_threads())
 # This is into 0.7 but we need it for 0.6 as well
 const _get_num_BLAS_threads = function() # anonymous so it will be serialized when called
-    blas = Base.LinAlg.BLAS.vendor()
+    blas = LinearAlgebra.BLAS.vendor()
     # Wrap in a try to catch unsupported blas versions
     try
         if blas == :openblas
@@ -218,6 +208,7 @@ const _get_num_BLAS_threads = function() # anonymous so it will be serialized wh
         if Sys.isapple()
             return ENV["VECLIB_MAXIMUM_THREADS"]
         end
+    catch
     end
 
     return nothing

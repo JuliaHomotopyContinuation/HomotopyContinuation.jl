@@ -1,9 +1,23 @@
-using HomotopyContinuation
-using Compat.Test
+using Test
+sleep(0.1)
+using LinearAlgebra
+sleep(0.1)
+using Random
+sleep(0.1)
+import TreeViews
+sleep(0.1)
 using PolynomialTestSystems
-import Juno
-using Compat
-using Atom
+sleep(0.1)
+using HomotopyContinuation
+
+function test_treeviews(x)
+    @test TreeViews.hastreeview(x)
+    @test_nowarn TreeViews.treelabel(devnull, x, MIME"application/juno+inline"())
+    for i=1:TreeViews.numberofnodes(x)
+        @test_nowarn TreeViews.nodelabel(devnull, x, i, MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treenode(x, i)
+    end
+end
 
 # We order the tests such that isolated things are tested first
 include("utilities_test.jl")

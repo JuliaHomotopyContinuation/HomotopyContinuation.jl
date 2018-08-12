@@ -5,11 +5,11 @@ using ..Utilities
 ## Then, we compare the points pairwise in each cluster.
 mutable struct SearchTree
     node::Vector{Int}
-    left::Nullable{SearchTree}
-    right::Nullable{SearchTree}
+    left::Union{Nothing, SearchTree}
+    right::Union{Nothing, SearchTree}
 end
 
-SearchTree(i::Int) = SearchTree([i], Nullable{SearchTree}(), Nullable{SearchTree}())
+SearchTree(i::Int) = SearchTree([i], nothing, nothing)
 
 
 function cluster_by_norm!(current::SearchTree, i, vectors, nvars, τ)
@@ -19,17 +19,17 @@ function cluster_by_norm!(current::SearchTree, i, vectors, nvars, τ)
         Δ = abs(vectors[i][j]) - abs(vectors[current.node[1]][j])
         if Δ < (- τ)
             added = true
-            if isnull(current.left)
+            if current.left === nothing
                 current.left = SearchTree(i)
             else
-                cluster_by_norm!(get(current.left), i, vectors, nvars, τ)
+                cluster_by_norm!(current.left, i, vectors, nvars, τ)
             end
         elseif Δ > τ
             added = true
-            if isnull(current.right)
+            if current.right === nothing
                 current.right = SearchTree(i)
             else
-                cluster_by_norm!(get(current.right), i, vectors, nvars, τ)
+                cluster_by_norm!(current.right, i, vectors, nvars, τ)
             end
         end
         j += 1
@@ -59,17 +59,17 @@ function cluster_by_angle!(current::SearchTree, i, vectors, nvars, τ)
             Δ = abs(angle(vectors[i][j]) - α) - abs(angle(vectors[current.node[1]][j]) - β)
             if Δ < (- τ)
                 added = true
-                if isnull(current.left)
+                if current.left === nothing
                     current.left = SearchTree(i)
                 else
-                    cluster_by_angle!(get(current.left), i, vectors, nvars, τ)
+                    cluster_by_angle!(current.left, i, vectors, nvars, τ)
                 end
             elseif Δ > τ
                 added = true
-                if isnull(current.right)
+                if current.right === nothing
                     current.right = SearchTree(i)
                 else
-                    cluster_by_angle!(get(current.right), i, vectors, nvars, τ)
+                    cluster_by_angle!(current.right, i, vectors, nvars, τ)
                 end
             end
         end
@@ -86,10 +86,10 @@ function push_for_identifying_multiplicities!(current::SearchTree, i, vectors, �
     if distance(vectors[i], vectors[current.node[1]]) < τ
         push!(current.node, i)
     else
-        if isnull(current.left)
+        if current.left === nothing
             current.left = SearchTree(i)
         else
-            push_for_identifying_multiplicities!(get(current.left), i, vectors, τ, distance)
+            push_for_identifying_multiplicities!(current.left, i, vectors, τ, distance)
         end
     end
 end
@@ -97,11 +97,11 @@ end
 
 function Base.foreach(f::F, t::SearchTree) where {F<:Function}
     f(t.node)
-    if !isnull(t.left)
-        foreach(f, get(t.left))
+    if t.left !== nothing
+        foreach(f, t.left)
     end
-    if !isnull(t.right)
-        foreach(f, get(t.right))
+    if t.right !== nothing
+        foreach(f, t.right)
     end
 
     nothing

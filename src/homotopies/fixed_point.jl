@@ -1,4 +1,4 @@
-export FixedPointHomotopy, FixedPointHomotopyCache
+export FixedPointHomotopy, FixedPointHomotopyCache, gamma
 
 """
     FixedPointHomotopy(F, x₀; gamma=exp(i * 2π*rand()))
@@ -37,7 +37,7 @@ Base.size(H::FixedPointHomotopy) = size(H.F)
 
 Obtain the gamma used in the FixedPointHomotopy.
 """
-Base.Math.gamma(H::FixedPointHomotopy) = H.gamma
+gamma(H::FixedPointHomotopy) = H.gamma
 
 """
     γ(H)

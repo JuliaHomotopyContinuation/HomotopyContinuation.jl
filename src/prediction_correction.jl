@@ -1,5 +1,7 @@
 module PredictionCorrection
 
+import LinearAlgebra
+
 import ..Homotopies
 import ..Predictors
 import ..Correctors
@@ -67,8 +69,8 @@ function predict_correct!(x, PC::PredictorCorrector, cache::PredictorCorrectorCa
     catch err
         if err isa InterruptException
             throw(err)
-        elseif !(err isa Base.LinAlg.SingularException)
-            warn("Cached the following expression thrown from Predictor or Corrector:")
+        elseif !(err isa LinearAlgebra.SingularException)
+            @warn("Cached the following expression thrown from Predictor or Corrector:")
             warn(err)
         end
         # we have to reset any patch updates

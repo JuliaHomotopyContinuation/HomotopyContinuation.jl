@@ -4,7 +4,8 @@ os:
   - linux
   # - osx
 julia:
-  - 0.6
+  - 0.7
+  - 1.0
   - nightly
 notifications:
   email: false
@@ -25,9 +26,12 @@ matrix:
 #before_script: # homebrew for mac
 #  - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; fi
 
+env:
+   - JULIA_NUM_THREADS=2
 ## uncomment the following lines to override the default test script
-script:
- - JULIA_NUM_THREADS=2 julia --color=yes -e 'Pkg.clone(pwd()); Pkg.build("HomotopyContinuation"); Pkg.test("HomotopyContinuation"; coverage=true)'
+# script:
+#  - julia --color=yes -e 'Pkg.clone(pwd()); Pkg.build("HomotopyContinuation")'
+#  - JULIA_NUM_THREADS=2 julia --depwarn=error --color=yes -e 'using Pkg; Pkg.test("HomotopyContinuation"; coverage=true)'
 after_success:
   # push coverage results to Codecov
   - julia -e 'cd(Pkg.dir("HomotopyContinuation")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'

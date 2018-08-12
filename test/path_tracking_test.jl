@@ -43,9 +43,8 @@
     @test R isa PathTracking.PathTrackerResult
     @test R.returncode == :success
     @test R.res < 1e-7
-    @test_nowarn show(stdout, R)
-    @test_nowarn Juno.render(Juno.Inline(), R)
-
+    @test_nowarn show(devnull, R)
+    @test_nowarn TreeViews.treelabel(devnull, R, MIME"application/juno+inline"())
 
     out = Problems.embed(P, first(start_sols))
     retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
@@ -62,7 +61,7 @@ end
 
     P, sols = Problems.problem_startsolutions(Input.TotalDegree(F))
 
-    start_sols = Problems.embed.(P, sols)
+    start_sols = Problems.embed.(Ref(P), sols)
 
     s = start_sols[1]
     H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.RandomPatch(), s)

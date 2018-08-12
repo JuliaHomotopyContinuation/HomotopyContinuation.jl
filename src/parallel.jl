@@ -3,7 +3,7 @@ module Parallel
 @inline function tmap(f::F, solver::S, src; blocksize=20) where {F<:Function, S}
     n = length(src)
     dst₁ = f(solver, 1, src[1])
-    dst = Vector{typeof(dst₁)}(n)
+    dst = Vector{typeof(dst₁)}(undef, n)
     dst[1] = dst₁
     for k=2:n
         dst[k] = f(solver, 1, src[k])
@@ -14,7 +14,7 @@ end
 @inline function tmap(f::F, solvers::Vector{S}, src; blocksize=20) where {F<:Function, S}
     n = length(src)
     dst₁ = f(solvers[1], 1, src[1])
-    dst = Vector{typeof(dst₁)}(n)
+    dst = Vector{typeof(dst₁)}(undef, n)
     dst[1] = dst₁
     i = Threads.Atomic{Int}(2)
     blocksize = min(blocksize, div(blocksize, length(solvers)))
@@ -27,7 +27,7 @@ end
         end
     end
 
-    ccall(:jl_threading_run, Ref{Void}, (Any,), threads_fun)
+    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), threads_fun)
 
     dst
 end
@@ -48,7 +48,7 @@ function tforeach(f::F, solvers::AbstractVector, src; blocksize=20) where {F<:Fu
         end
     end
 
-    ccall(:jl_threading_run, Ref{Void}, (Any,), threads_fun)
+    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), threads_fun)
 
     nothing
 end

@@ -71,7 +71,7 @@ solution
 residual
 startsolution
 Base.isreal(::PathResult)
-issuccess
+LinearAlgebra.issuccess(::PathResult)
 isfailed
 isaffine
 isprojective

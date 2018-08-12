@@ -19,7 +19,7 @@ using HomotopyContinuation.ProjectiveVectors
     @test z[2:end] == x[2:end]
 
     @test all(affine(z) .≈ (z[2:end] ./ z[1]))
-    normalize!(z)
+    LinearAlgebra.normalize!(z)
 
     inf_z = infinity_norm(z)
     affine!(z)

@@ -1,5 +1,3 @@
-__precompile__()
-
 module HomotopyContinuation
 
     import DynamicPolynomials: @polyvar, PolyVar, differentiate, variables
@@ -54,15 +52,15 @@ module HomotopyContinuation
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions
+        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
     export AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, issuccess,
+        residual, startsolution, #issuccess,
         isfailed, isaffine, isprojective,
         isatinfinity, issingular, isnonsingular,
         nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions
+        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
     export StraightLineHomotopy, FixedPointHomotopy
@@ -73,5 +71,8 @@ module HomotopyContinuation
     import .Utilities: homogenize, uniquevar, ishomogenous
     export homogenize, uniquevar, ishomogenous
 
+
+    import LinearAlgebra: issuccess
+    export issuccess
 
 end #

@@ -33,24 +33,23 @@
     @test count(results(isreal, R)) == 2
 
     @test length(solutions(R)) == 4
-    @test solutions(R) isa Vector{Vector{Complex128}}
+    @test solutions(R) isa Vector{Vector{ComplexF64}}
     @test realsolutions(R, realtol=1e-8) isa Vector{Vector{Float64}}
     @test length(realsolutions(R, realtol=1e-8)) == 2
 
     @test_nowarn string(R)
     @test_nowarn string(R[end])
-    @test_nowarn show(IOContext(stdout, :compact=>true), R)
-    @test_nowarn show(IOContext(stdout, :compact=>true), R[end])
+    @test_nowarn show(IOContext(devnull, :compact=>true), R)
+    @test_nowarn show(IOContext(devnull, :compact=>true), R[end])
 
-
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    test_treeviews(R)
+    @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
 
     @polyvar x y z
     R = solve([(x-3)^3,(y-2)])
     @test R isa Solving.AffineResult
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    test_treeviews(R)
+    @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
     @test nnonsingular(R) == 0
     @test nsingular(R) == 3
 
@@ -58,15 +57,15 @@
     R = solve([(x-3z),(y-2z)])
     @test R isa Solving.ProjectiveResult
     @test_nowarn string(R)
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    test_treeviews(R)
+    @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
     @test nnonsingular(R) == 1
 
     @polyvar x y z
     R = solve([(x-3z)^3,(y-2z)])
     @test R isa Solving.ProjectiveResult
-    @test_nowarn Juno.render(Juno.Inline(), R)
-    @test_nowarn Juno.render(Juno.Inline(), R[1])
+    test_treeviews(R)
+    @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
     @test nnonsingular(R) == 0
     @test nsingular(R) == 3
 end

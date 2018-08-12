@@ -97,7 +97,7 @@ function invalid_kwargs(kwargs)
     allowed = allowed_kwargs()
     for kwarg in kwargs
         kw = first(kwarg)
-        if !any(equalto(kw), allowed)
+        if !any(isequal(kw), allowed)
             push!(invalids, kwarg)
         end
     end

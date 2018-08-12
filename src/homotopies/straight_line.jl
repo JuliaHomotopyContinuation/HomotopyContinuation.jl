@@ -1,4 +1,4 @@
-export StraightLineHomotopy, StraightLineHomotopyCache
+export StraightLineHomotopy, StraightLineHomotopyCache, gamma
 
 """
     StraightLineHomotopy(G, F; gamma=exp(i * 2π*rand()))
@@ -47,7 +47,7 @@ Base.size(H::StraightLineHomotopy) = size(H.start)
 
 Obtain the gamma used in the StraightLineHomotopy.
 """
-Base.Math.gamma(H::StraightLineHomotopy) = H.gamma
+gamma(H::StraightLineHomotopy) = H.gamma
 
 """
     γ(H)

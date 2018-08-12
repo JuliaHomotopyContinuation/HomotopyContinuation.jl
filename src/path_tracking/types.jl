@@ -1,4 +1,4 @@
-import Juno
+import TreeViews
 
 import ..Correctors
 import ..Homotopies
@@ -117,7 +117,7 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     predictor_corrector = PredictionCorrection.PredictorCorrector(predictor, corrector)
     # We have to make sure that the element type of x is invariant under evaluation
-    u = Vector{Any}(size(H)[1])
+    u = Vector{Any}(undef, size(H)[1])
     Homotopies.evaluate!(u, H, x₁, t₁, Homotopies.cache(H, x₁, t₁))
     x = similar(x₁, typeof(u[1]))
 
@@ -154,13 +154,16 @@ function PathTrackerResult(tracker::PathTracker)
           currresidual(tracker), curriters(tracker))
 end
 
-function Base.show(io::IO, result::PathTrackerResult)
+function Base.show(io::IO, ::MIME"text/plain", result::PathTrackerResult)
     println(io, "PathTrackerResult{", typeof(result.x), ",", typeof(result.t) ,"}:")
-    println(io, " * returncode → :$(result.returncode)")
-    println(io, " * x → $(result.x)")
-    println(io, " * t → $(result.t)")
-    println(io, " * res → $(result.res)")
-    println(io, " * iters → $(result.iters)")
+    println(io, " • returncode → :$(result.returncode)")
+    println(io, " • x → $(result.x)")
+    println(io, " • t → $(result.t)")
+    println(io, " • res → $(result.res)")
+    println(io, " • iters → $(result.iters)")
 end
 
-Juno.render(i::Juno.Inline, r::PathTrackerResult) = Juno.render(i, Juno.defaultrepr(r))
+TreeViews.hastreeview(::PathTrackerResult) = true
+
+TreeViews.treelabel(io::IO, x::PathTrackerResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathTrackerResult{$(typeof(x.x)),$( typeof(x.t))}</span>")

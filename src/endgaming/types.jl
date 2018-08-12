@@ -100,7 +100,7 @@ end
 struct Cache{V}
     log_sampling_factor::Float64
     windingnumbers::Vector{Int}
-    unitroots::Vector{Complex128}
+    unitroots::Vector{ComplexF64}
     direction_buffer::Matrix{Float64}
     xbuffer::V
     pbuffer::V
@@ -109,7 +109,7 @@ end
 function Cache(state::State, options::Options)
     log_sampling_factor = log(options.sampling_factor)
     windingnumbers = zeros(Int, length(state.x))
-    unitroots = Vector{Complex128}()
+    unitroots = Vector{ComplexF64}()
     direction_buffer = zeros(length(state.x), options.max_extrapolation_samples)
     pbuffer = copy(state.x)
     xbuffer = copy(state.x)

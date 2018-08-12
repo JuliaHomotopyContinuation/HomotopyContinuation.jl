@@ -80,6 +80,6 @@ indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
 function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTracking.PathTrackerResult}
-    V = map(p -> normalize(ProjectiveVectors.raw(p.x)), paths)
+    V = map(p -> LinearAlgebra.normalize(ProjectiveVectors.raw(p.x)), paths)
     vcat(multiplicities(V, tol, fubini_study)...)
 end

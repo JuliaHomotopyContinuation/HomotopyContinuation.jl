@@ -1,8 +1,7 @@
 module Problems
 
-using Compat
-
 import DynamicPolynomials
+import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
@@ -264,10 +263,10 @@ function check_homogenous_degrees(F::AbstractSystem)
     # The number of variables match, but it still cannot be homogenous.
     # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
-    x = rand(Complex128, N)
+    x = rand(ComplexF64, N)
     cache = Systems.cache(F, x)
     y = Systems.evaluate(F, x, cache)
-    scale!(x, 2)
+    LinearAlgebra.rmul!(x, 2)
     y2 = Systems.evaluate(F, x, cache)
 
     degrees = map(y2, y) do y2ᵢ, yᵢ
@@ -360,20 +359,27 @@ function TotalDegreeSolutionIterator(degrees::Vector{Int}, homogenous::Bool)
     TotalDegreeSolutionIterator(degrees, homogenous, iterator)
 end
 
-Base.start(iter::TotalDegreeSolutionIterator) = start(iter.iterator)
-function Base.next(iter::TotalDegreeSolutionIterator, state)
-    indices, nextstate = next(iter.iterator, state)
+function Base.iterate(iter::TotalDegreeSolutionIterator)
+    indices, state = iterate(iter.iterator)
+    _value(iter, indices), state
+end
+function Base.iterate(iter::TotalDegreeSolutionIterator, state)
+    it = iterate(iter.iterator, state)
+    it === nothing && return nothing
+    _value(iter, it[1]), it[2]
+end
 
+function _value(iter::TotalDegreeSolutionIterator, indices)
     value = Vector{Complex{Float64}}()
     if iter.homogenous
         push!(value, complex(1.0, 0.0))
     end
-    for (i, k) in zip(1:length(indices), indices)
+    for (i, k) in enumerate(indices)
         push!(value, cis(2π * k / iter.degrees[i]))
     end
-    value, nextstate
+    value
 end
-Base.done(iter::TotalDegreeSolutionIterator, state) = done(iter.iterator, state)
+
 Base.length(iter::TotalDegreeSolutionIterator) = length(iter.iterator)
 Base.eltype(iter::Type{<:TotalDegreeSolutionIterator}) = Vector{Complex{Float64}}
 

@@ -1,12 +1,12 @@
 module Solving
 
-using Compat
+using LinearAlgebra
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
 import ProgressMeter
-import Juno
+import TreeViews
 
 import ..AffinePatches
 import ..Endgaming

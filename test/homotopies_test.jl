@@ -4,6 +4,7 @@
     H = Homotopies.StraightLineHomotopy(F, G)
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
+    @test Homotopies.gamma(H) isa ComplexF64
     InterfaceTest.homotopy(H)
 end
 
@@ -21,21 +22,21 @@ end
     U = zeros(Complex{Float64}, m, n)
 
     Homotopies.evaluate!(u, H, x, t)
-    @test Homotopies.evaluate(H, x, t) == u
+    @test Homotopies.evaluate(H, x, t) ≈ u
 
     Homotopies.dt!(u, H, x, t)
-    @test Homotopies.dt(H, x, t) == u
+    @test Homotopies.dt(H, x, t) ≈ u
 
     Homotopies.jacobian!(U, H, x, t)
-    @test Homotopies.jacobian(H, x, t) == U
+    @test Homotopies.jacobian(H, x, t) ≈ U
 
     Homotopies.evaluate_and_jacobian!(u, U, H, x, t)
-    @test Homotopies.evaluate_and_jacobian(H, x, t) == (u, U)
-    @test (u, U) == (Homotopies.evaluate(H, x, t), Homotopies.jacobian(H, x, t))
+    @test all(Homotopies.evaluate_and_jacobian(H, x, t) .≈ (u, U))
+    @test all((u, U) .≈ (Homotopies.evaluate(H, x, t), Homotopies.jacobian(H, x, t)))
 
     Homotopies.jacobian_and_dt!(U, u, H, x, t)
-    @test Homotopies.jacobian_and_dt(H, x, t) == (U, u)
-    @test (U, u) == (Homotopies.jacobian(H, x, t), Homotopies.dt(H, x, t))
+    @test all(Homotopies.jacobian_and_dt(H, x, t) .≈ (U, u))
+    @test all((U, u) .≈ (Homotopies.jacobian(H, x, t), Homotopies.dt(H, x, t)))
 end
 
 @testset "Homotopies.ParameterHomotopy" begin
@@ -44,15 +45,15 @@ end
     H = Homotopies.ParameterHomotopy(F, parameters, rand(2), rand(2))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 4)
-    @test gamma(H) isa Complex128
-    @test Homotopies.γ(H) isa Complex128
+    @test Homotopies.gamma(H) isa ComplexF64
+    @test Homotopies.γ(H) isa ComplexF64
 
     InterfaceTest.homotopy(H)
 end
 
 @testset "Homotopies.FixedPointHomotopy" begin
     F = Systems.SPSystem(equations(katsura(5)))
-    H = Homotopies.FixedPointHomotopy(F, rand(Complex128, 6))
+    H = Homotopies.FixedPointHomotopy(F, rand(ComplexF64, 6))
     @test H isa Homotopies.AbstractHomotopy
     @test size(H) == (6, 6)
 

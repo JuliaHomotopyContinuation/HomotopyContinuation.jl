@@ -25,7 +25,7 @@ function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, 
     Homotopies.update!(H, x, t) # we have to update local affine patches
     evaluate_and_jacobian!(b, A, H, x, t)
     solve!(A, b)
-    for i = 1:N
+    @inbounds for i = 1:N
         xnext[i] -= b[i]
     end
 
@@ -45,7 +45,7 @@ function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, 
         jacobian!(A, H, xnext, t)
 
         solve!(A, b)
-        for i = 1:N
+        @inbounds for i = 1:N
             xnext[i] -= b[i]
         end
     end
