@@ -1,4 +1,4 @@
-@testset "Path Tracking" begin
+@testset "PathTracking" begin
     @testset "General" begin
         F = equations(katsura(5))
 
@@ -31,11 +31,11 @@
         @test t3.predictor_corrector.predictor isa Predictors.Euler
 
 
-        PathTracking.setup!(t1, Problems.embed(P, start_sols[2]), 1.0, 0.4)
+        PathTracking.setup!(t1, Problems.embed(P, first(start_sols)), 1.0, 0.4)
         @test PathTracking.currstatus(t1) == :ok
         @test PathTracking.currt(t1) == 1.0
 
-        PathTracking.setup!(t1, Problems.embed(P, start_sols[2]), 0.5, 0.4)
+        PathTracking.setup!(t1, Problems.embed(P, first(start_sols)), 0.5, 0.4)
         @test PathTracking.currstatus(t1) == :invalid_startvalue
         @test PathTracking.currt(t1) == 0.5
 
@@ -61,7 +61,7 @@
 
         P, sols = Problems.problem_startsolutions(Input.TotalDegree(F))
 
-        start_sols = Problems.embed.(Ref(P), sols)
+        start_sols = map(s -> Problems.embed(P,s), sols)
 
         s = start_sols[1]
         H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.RandomPatch(), s)
@@ -86,10 +86,10 @@
         @test norm(x[2:end] / x[1] - A \ b) < 1e-6
     end
 
-    @testset "Fixed Patch" begin
+    @testset "fixedpatch" begin
         F = equations(katsura(5))
         P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
-        x1 = Problems.embed(P, start_sols[1])
+        x1 = Problems.embed(P, first(start_sols))
         patch = AffinePatches.state(AffinePatches.OrthogonalPatch(), x1)
         fixedpatch = AffinePatches.state(AffinePatches.FixedPatch(), x1)
         H = Homotopies.PatchedHomotopy(P.homotopy, patch)

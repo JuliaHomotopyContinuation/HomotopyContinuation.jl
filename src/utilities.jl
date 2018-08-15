@@ -17,10 +17,35 @@ export allvariables,
     batches,
     randomish_gamma,
     filterkwargs,
+    splitkwargs,
     solve!,
     set_num_BLAS_threads,
-    get_num_BLAS_threads
+    get_num_BLAS_threads,
+    check_zero_dimensional,
+    randseed
 
+"""
+    check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
+
+Check that the given polynomial system can have zero dimensional components.
+"""
+function check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
+    N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
+    n = length(F)
+
+    if n ≥ N ||
+       n == N - 1 && ishomogenous(F)
+        return
+    end
+    throw(AssertionError("The input system will not result in a finite number of solutions."))
+end
+
+"""
+    randseed(range=1_000:1_000_000)
+
+Return a random seed in the range `range`.
+"""
+randseed(range=1_000:1_000_000) = rand(range)
 
 """
     solve!(A, b)
@@ -185,6 +210,25 @@ in `allowed_kwargs`.
 """
 function filterkwargs(kwargs, allowed_kwargs)
     [kwarg for kwarg in kwargs if any(kw -> kw == first(kwarg), allowed_kwargs)]
+end
+
+"""
+    splitkwargs(kwargs, supported_keywords)
+
+Split the vector of `kwargs` in two vectors, the first contains all `kwargs`
+whose keywords appear in `supported_keywords` and the rest the other one.
+"""
+function splitkwargs(kwargs, supported_keywords)
+    supported = []
+    rest = []
+    for kwarg in kwargs
+        if any(kw -> kw == first(kwarg), supported_keywords)
+            push!(supported, kwarg)
+        else
+            push!(rest, kwarg)
+        end
+    end
+    supported, rest
 end
 
 # Parallelization
