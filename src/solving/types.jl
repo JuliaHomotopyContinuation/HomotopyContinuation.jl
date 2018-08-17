@@ -36,65 +36,37 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, see
     Solver(prob, start_solutions, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions;
-    initial_steplength=0.1,
-    steplength_increase_factor=2.0,
-    steplength_decrease_factor=inv(steplength_increase_factor),
-    steplength_consecutive_successes_necessary=5,
-    maximal_steplength=max(0.1, initial_steplength),
-    minimal_steplength=1e-14,
-    kwargs...)
+function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions;kwargs...)
 
     x₁ = first(start_solutions)
     @assert x₁ isa AbstractVector
     x = Problems.embed(prob, x₁)
 
+    slkwargs, kwargs = splitkwargs(kwargs, StepLength.allowed_keywords)
+    steplength = StepLength.HeuristicStepLength(;slkwargs...)
+
+    tracker = pathtracker(prob, x, t₁, t₀; steplength=steplength,
+        filterkwargs(kwargs, PathTracking.allowed_keywords)...)
+
+    endgame = Endgaming.Endgame(prob.homotopy, x; steplength=steplength,
+        filterkwargs(kwargs, Endgaming.allowed_keywords)...)
+
     check_kwargs(kwargs)
 
-    # We make it easier to change step length specific changes
-    steplength = StepLength.HeuristicStepLength(initial_steplength, steplength_increase_factor,
-        steplength_decrease_factor, steplength_consecutive_successes_necessary, maximal_steplength,
-        minimal_steplength)
-
-
-    tracker = pathtracker(prob, x, t₁, t₀;  steplength=steplength, filterkwargs(kwargs, PathTracking.allowed_kwargs)...)
-    endgame = Endgaming.Endgame(prob.homotopy, x; steplength=steplength, filterkwargs(kwargs, Endgaming.allowed_kwargs)...)
-    switcher = patchswitcher(prob, x, t₀)
-
-    cache = SolverCache(prob, tracker)
-    Solver(prob,
-        tracker,
-        endgame,
-        switcher,
-        t₁, t₀,
-        seed,
-        options,
-        cache)
+    Solver(prob, tracker, endgame, patchswitcher(prob, x, t₀),
+        t₁, t₀, seed, options, SolverCache(prob, tracker))
 end
 
-allowed_kwargs() = [:patch, PathTracking.allowed_kwargs...,
-    Endgaming.allowed_kwargs...]
+allowed_keywords() = [:patch,
+    PathTracking.allowed_keywords...,
+    StepLength.allowed_keywords...,
+    Endgaming.allowed_keywords...]
 
-function check_kwargs(kwargs)
-    invalids = invalid_kwargs(kwargs)
-    if !isempty(invalids)
-        msg = "Unexpected keyword argument(s): "
-        first_el = true
-        for kwarg in invalids
-            if !first_el
-                msg *= ", "
-            end
-            msg *= "$(first(kwarg))=$(last(kwarg))"
-            first_el = false
-        end
-        msg *= "\nAllowed keywords are\n"
-        msg *= join(allowed_kwargs(), ", ")
-        throw(ErrorException(msg))
-    end
-end
+check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
+
 function invalid_kwargs(kwargs)
     invalids = []
-    allowed = allowed_kwargs()
+    allowed = allowed_keywords()
     for kwarg in kwargs
         kw = first(kwarg)
         if !any(isequal(kw), allowed)

@@ -8,9 +8,9 @@ import ..StepLength
 
 using ..Utilities
 
-export PathTracker, allowed_kwargs
+export PathTracker, allowed_keywords
 
-const allowed_kwargs = [:corrector, :predictor, :steplength,
+const allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
     :maxiters]
 

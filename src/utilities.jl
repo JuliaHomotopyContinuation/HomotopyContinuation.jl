@@ -22,7 +22,34 @@ export allvariables,
     set_num_BLAS_threads,
     get_num_BLAS_threads,
     check_zero_dimensional,
-    randseed
+    randseed,
+    check_kwargs_empty
+
+
+"""
+    check_kwargs_empty(kwargs, [allowed_kwargs])
+
+Chack that the list of `kwargs` is empty. If not, print all unsupported keywords
+with their arguments.
+"""
+function check_kwargs_empty(kwargs, allowed_kwargs=[])
+    if !isempty(kwargs)
+        msg = "Unexpected keyword argument(s): "
+        first_el = true
+        for kwarg in kwargs
+            if !first_el
+                msg *= ", "
+            end
+            msg *= "$(first(kwarg))=$(last(kwarg))"
+            first_el = false
+        end
+        if !isempty(allowed_kwargs)
+            msg *= "\nAllowed keywords are\n"
+            msg *= join(allowed_kwargs, ", ")
+        end
+        throw(ErrorException(msg))
+    end
+end
 
 """
     check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
