@@ -7,15 +7,17 @@ function setup_square_corrector_test()
     H, x, xnext, t
 end
 
-@testset "Correctors.Newton" begin
-    H, x, xnext, t = setup_square_corrector_test()
+@testset "Correctors" begin
+    @testset "Newton" begin
+        H, x, xnext, t = setup_square_corrector_test()
 
-    corrector = Correctors.Newton()
-    @test corrector isa Correctors.Newton
-    corrector_cache = Correctors.cache(corrector, H, x, t)
-    @test corrector_cache isa Correctors.NewtonCache
+        corrector = Correctors.Newton()
+        @test corrector isa Correctors.Newton
+        corrector_cache = Correctors.cache(corrector, H, x, t)
+        @test corrector_cache isa Correctors.NewtonCache
 
-    # check that this doesn't throw
-    out = Correctors.correct!(xnext, corrector, corrector_cache, H, x, t, 1e-7, 3)
-    @test out isa Correctors.Result
+        # check that this doesn't throw
+        out = Correctors.correct!(xnext, corrector, corrector_cache, H, x, t, 1e-7, 3)
+        @test out isa Correctors.Result
+    end
 end

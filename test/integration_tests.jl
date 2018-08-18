@@ -1,4 +1,4 @@
-@testset "integration tests" begin
+@testset "Integration Tests" begin
     @test all(issuccess, solve(equations(katsura(10))))
     @test all(issuccess, solve(equations(katsura(10)), report_progress=false))
 
