@@ -17,71 +17,74 @@ function setup_overdetermined_prediction_test()
     H, x, xnext, t
 end
 
-@testset "Predictors.NullPredictor" begin
-    H, x, xnext, t = setup_prediction_test()
+@testset "Predictors" begin
 
-    predictor = Predictors.NullPredictor()
-    @test predictor isa Predictors.NullPredictor
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.NullPredictorCache
+    @testset "NullPredictor" begin
+        H, x, xnext, t = setup_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
-    @test xnext == x
+        predictor = Predictors.NullPredictor()
+        @test predictor isa Predictors.NullPredictor
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.NullPredictorCache
 
-    H, x, xnext, t = setup_overdetermined_prediction_test()
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test xnext == x
 
-    predictor = Predictors.NullPredictor()
-    @test predictor isa Predictors.NullPredictor
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.NullPredictorCache
+        H, x, xnext, t = setup_overdetermined_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
-    @test xnext == x
-end
+        predictor = Predictors.NullPredictor()
+        @test predictor isa Predictors.NullPredictor
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.NullPredictorCache
 
-@testset "Predictors.Euler" begin
-    H, x, xnext, t = setup_prediction_test()
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test xnext == x
+    end
 
-    predictor = Predictors.Euler()
-    @test predictor isa Predictors.Euler
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.EulerCache
+    @testset "Euler" begin
+        H, x, xnext, t = setup_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        predictor = Predictors.Euler()
+        @test predictor isa Predictors.Euler
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.EulerCache
 
-    H, x, xnext, t = setup_overdetermined_prediction_test()
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
 
-    predictor = Predictors.Euler()
-    @test predictor isa Predictors.Euler
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.EulerCache
+        H, x, xnext, t = setup_overdetermined_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        predictor = Predictors.Euler()
+        @test predictor isa Predictors.Euler
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.EulerCache
 
-end
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
 
-@testset "Predictors.RK4" begin
-    H, x, xnext, t = setup_prediction_test()
+    end
 
-    predictor = Predictors.RK4()
-    @test predictor isa Predictors.RK4
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.RK4Cache
+    @testset "RK4" begin
+        H, x, xnext, t = setup_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        predictor = Predictors.RK4()
+        @test predictor isa Predictors.RK4
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.RK4Cache
 
-    H, x, xnext, t = setup_overdetermined_prediction_test()
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
 
-    predictor = Predictors.RK4()
-    @test predictor isa Predictors.RK4
-    predictor_cache = Predictors.cache(predictor, H, x, t)
-    @test predictor_cache isa Predictors.RK4Cache
+        H, x, xnext, t = setup_overdetermined_prediction_test()
 
-    # check that this doesn't throw
-    @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        predictor = Predictors.RK4()
+        @test predictor isa Predictors.RK4
+        predictor_cache = Predictors.cache(predictor, H, x, t)
+        @test predictor_cache isa Predictors.RK4Cache
+
+        # check that this doesn't throw
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+    end
 end

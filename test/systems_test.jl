@@ -1,91 +1,94 @@
-@testset "SPSystem" begin
-    fs = equations(katsura(5))
+@testset "Systems" begin
 
-    F = Systems.SPSystem(fs)
+    @testset "SPSystem" begin
+        fs = equations(katsura(5))
 
-    @test size(F) == (6, 6)
-    @test length(F) == 6
-    x = rand(Complex{Float64}, 6)
-    cache = Systems.cache(F, x)
-    @test cache isa Systems.NullCache
-    u = zeros(Complex{Float64}, 6)
-    Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) ≈ u
-    @test Systems.evaluate(F, x) ≈ u
+        F = Systems.SPSystem(fs)
 
-    U = zeros(Complex{Float64}, 6, 6)
-    Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) ≈ U
-    @test Systems.jacobian(F, x) ≈ U
+        @test size(F) == (6, 6)
+        @test length(F) == 6
+        x = rand(Complex{Float64}, 6)
+        cache = Systems.cache(F, x)
+        @test cache isa Systems.NullCache
+        u = zeros(Complex{Float64}, 6)
+        Systems.evaluate!(u, F, x, cache)
+        @test Systems.evaluate(F, x, cache) ≈ u
+        @test Systems.evaluate(F, x) ≈ u
 
-    Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
-end
+        U = zeros(Complex{Float64}, 6, 6)
+        Systems.jacobian!(U, F, x, cache)
+        @test Systems.jacobian(F, x, cache) ≈ U
+        @test Systems.jacobian(F, x) ≈ U
 
-@testset "Systems.FixedHomotopy" begin
-    f = Systems.SPSystem(equations(katsura(5)))
-    g = Systems.SPSystem(equations(cyclic(6)))
-    H = Homotopies.StraightLineHomotopy(f, g)
+        Systems.evaluate_and_jacobian!(u, U, F, x, cache)
+        @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
+    end
 
-    F = Systems.FixedHomotopy(H, 0.23)
-    x = rand(Complex{Float64}, 6)
-    u = zeros(Complex{Float64}, 6)
-    U = zeros(Complex{Float64}, 6, 6)
+    @testset "FixedHomotopy" begin
+        f = Systems.SPSystem(equations(katsura(5)))
+        g = Systems.SPSystem(equations(cyclic(6)))
+        H = Homotopies.StraightLineHomotopy(f, g)
 
-    cache = Systems.cache(F, x)
-    @test cache isa Systems.FixedHomotopyCache
-    u = zeros(Complex{Float64}, 6)
-    Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) ≈ u
+        F = Systems.FixedHomotopy(H, 0.23)
+        x = rand(Complex{Float64}, 6)
+        u = zeros(Complex{Float64}, 6)
+        U = zeros(Complex{Float64}, 6, 6)
 
-    U = zeros(Complex{Float64}, 6, 6)
-    Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) ≈ U
+        cache = Systems.cache(F, x)
+        @test cache isa Systems.FixedHomotopyCache
+        u = zeros(Complex{Float64}, 6)
+        Systems.evaluate!(u, F, x, cache)
+        @test Systems.evaluate(F, x, cache) ≈ u
 
-    Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
-end
+        U = zeros(Complex{Float64}, 6, 6)
+        Systems.jacobian!(U, F, x, cache)
+        @test Systems.jacobian(F, x, cache) ≈ U
 
-@testset "Systems.FPSystem" begin
-    F = Systems.FPSystem(equations(katsura(5)))
-    x = rand(Complex{Float64}, 6)
-    u = zeros(Complex{Float64}, 6)
-    U = zeros(Complex{Float64}, 6, 6)
+        Systems.evaluate_and_jacobian!(u, U, F, x, cache)
+        @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
+    end
 
-    cache = Systems.cache(F, x)
-    @test cache isa Systems.FPSystemCache
-    u = zeros(Complex{Float64}, 6)
-    Systems.evaluate!(u, F, x, cache)
-    @test Systems.evaluate(F, x, cache) ≈ u
+    @testset "FPSystem" begin
+        F = Systems.FPSystem(equations(katsura(5)))
+        x = rand(Complex{Float64}, 6)
+        u = zeros(Complex{Float64}, 6)
+        U = zeros(Complex{Float64}, 6, 6)
 
-    U = zeros(Complex{Float64}, 6, 6)
-    Systems.jacobian!(U, F, x, cache)
-    @test Systems.jacobian(F, x, cache) ≈ U
+        cache = Systems.cache(F, x)
+        @test cache isa Systems.FPSystemCache
+        u = zeros(Complex{Float64}, 6)
+        Systems.evaluate!(u, F, x, cache)
+        @test Systems.evaluate(F, x, cache) ≈ u
 
-    Systems.evaluate_and_jacobian!(u, U, F, x, cache)
-    @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
-end
+        U = zeros(Complex{Float64}, 6, 6)
+        Systems.jacobian!(U, F, x, cache)
+        @test Systems.jacobian(F, x, cache) ≈ U
 
-@testset "Systems.TotalDegreeSystem" begin
-    @polyvar x y z
+        Systems.evaluate_and_jacobian!(u, U, F, x, cache)
+        @test all(Systems.evaluate_and_jacobian(F, x, cache) .≈ (u, U))
+    end
 
-    F = Systems.SPSystem([x^4-z^4, y^3-z^3])
-    w = rand(ComplexF64, 3)
+    @testset "TotalDegreeSystem" begin
+        @polyvar x y z
 
-    G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3], [x, y, z], z)
-    @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
-    @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
-    u, U = Systems.evaluate_and_jacobian(F, w)
-    @test u ≈ Systems.evaluate(F, w)
-    @test U ≈ Systems.jacobian(G, w)
+        F = Systems.SPSystem([x^4-z^4, y^3-z^3])
+        w = rand(ComplexF64, 3)
 
-    @polyvar x y z t
-    F = Systems.SPSystem([x^4-z^4, y^3-z^3, t-z])
-    G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3, t-z], [x, y, z, t], z)
-    w = rand(ComplexF64, 4)
-    @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
-    @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
-    u, U = Systems.evaluate_and_jacobian(G, w)
-    @test u ≈ Systems.evaluate(F, w)
-    @test U ≈ Systems.jacobian(F, w)
+        G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3], [x, y, z], z)
+        @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
+        @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
+        u, U = Systems.evaluate_and_jacobian(F, w)
+        @test u ≈ Systems.evaluate(F, w)
+        @test U ≈ Systems.jacobian(G, w)
+
+        @polyvar x y z t
+        F = Systems.SPSystem([x^4-z^4, y^3-z^3, t-z])
+        G = Systems.TotalDegreeSystem([x^4-z^4, y^3-z^3, t-z], [x, y, z, t], z)
+        w = rand(ComplexF64, 4)
+        @test Systems.evaluate(F, w) ≈ Systems.evaluate(G, w)
+        @test Systems.jacobian(F, w) ≈ Systems.jacobian(G, w)
+        u, U = Systems.evaluate_and_jacobian(G, w)
+        @test u ≈ Systems.evaluate(F, w)
+        @test U ≈ Systems.jacobian(F, w)
+    end
 end
