@@ -53,6 +53,7 @@
         @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
+        @test_nowarn sprint(show, R)
 
         @polyvar x y z
         R = solve([(x-3z),(y-2z)])
@@ -69,6 +70,12 @@
         @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
+
+        @polyvar x y z
+        V = x^2 + y^2 - z^2
+        L = randn(1,3) * [x, y, z]
+        R = solve([V; L])
+        @test_nowarn sprint(show, R)
     end
 
     @testset "multiplicities" begin

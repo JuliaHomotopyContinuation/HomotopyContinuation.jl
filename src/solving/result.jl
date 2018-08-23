@@ -389,7 +389,8 @@ function Base.show(io::IO, ::MIME"text/plain", x::AffineResult)
     println(io, "• random seed: $(seed(x))")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", r::ProjectiveResult)
+function Base.show(io::IO, ::MIME"text/plain", x::ProjectiveResult)
+    s = statistics(x)
     println(io, "ProjectiveResult with $(length(x)) tracked paths")
     println(io, "==================================")
     println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
