@@ -1,10 +1,12 @@
 import TreeViews
 
+import ..AffinePatches
 import ..Correctors
 import ..Homotopies
 import ..PredictionCorrection
 import ..Predictors
 import ..StepLength
+import ..Problems
 
 using ..Utilities
 
@@ -127,6 +129,19 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
 end
+
+"""
+    PathTracker(problem::Problems.AbstractProblem, x₁, t₁, t₀; kwargs...)
+
+Construct a [`PathTracking.PathTracker`](@ref) from the given `problem`.
+"""
+function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+    y₁ = Problems.embed(prob, x₁)
+    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, y₁))
+    PathTracker(H, y₁, complex(t₁), complex(t₀); kwargs...)
+end
+
+Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
 
 
 """
