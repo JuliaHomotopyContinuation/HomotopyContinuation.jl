@@ -134,19 +134,20 @@ Endgame specific options
 """
 function solve end
 
-function solve(args...; seed=randseed(), kwargs...)
-    supported, rest = splitkwargs(kwargs, Problems.supported_kwargs)
-    p, startsolutions = Problems.problem_startsolutions(args...; seed=seed, supported...)
-    solve(p, startsolutions; rest...)
+function solve(args...; threading=true, kwargs...)
+    solver, startsolutions = Solving.solver_startsolutions(args...; kwargs...)
+    solve(solver, startsolutions, threading=threading)
 end
 
 # Internal
-function solve(prob::Problems.AbstractProblem, start_solutions; threading=true, kwargs...)
-    solver = Solving.Solver(prob, start_solutions, 1.0, 0.0, prob.seed; kwargs...)
+function solve(solver::Solving.Solver, start_solutions; threading=true)
     if threading && Threads.nthreads() > 1
         solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
-        Solving.solve(solvers, start_solutions)
+        solve(solvers, start_solutions, threading=true)
     else
         Solving.solve(solver, start_solutions)
     end
+end
+function solve(solvers::AbstractVector{<:Solving.Solver}, start_solutions; threading=true)
+    Solving.solve(threading ? solvers : solvers[1], start_solutions)
 end

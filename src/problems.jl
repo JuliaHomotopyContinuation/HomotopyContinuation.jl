@@ -102,53 +102,50 @@ Base.broadcastable(P::AbstractProblem) = Ref(P)
 """
 function problem_startsolutions end
 
-function problem_startsolutions(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothing, kwargs...)
+function problem_startsolutions(args...; seed=randseed(), kwargs...)
     Random.seed!(seed)
+    _problem_startsolutions(args..., seed; kwargs...)
+end
+
+function _problem_startsolutions(F::Vector{<:MP.AbstractPolynomial}, seed::Int; homvar=nothing, kwargs...)
     F = filter(f -> !iszero(f), F)
     check_zero_dimensional(F, homvar)
     # square system and each polynomial is non-zero
     if length(F) == MP.nvariables(F) && ishomogenous(F)
         throw(AssertionError("The input system is a square homogenous system. This will result in an at least 1 dimensional solution space."))
     end
-    problem_startsolutions(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
+    _problem_startsolutions(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
 end
 
-function problem_startsolutions(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; homvar=nothing, seed=randseed(), kwargs...)
-    Random.seed!(seed)
+function _problem_startsolutions(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions, seed; homvar=nothing, kwargs...)
     @assert length(G) == length(F) "Start and target system don't have the same length"
     check_zero_dimensional(F, homvar)
-    problem_startsolutions(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
+    _problem_startsolutions(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
 end
 
-function problem_startsolutions(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
-    Random.seed!(seed)
-	problem_startsolutions(Input.TotalDegree(F), seed; kwargs...)
+function _problem_startsolutions(F::Systems.AbstractSystem, seed; kwargs...)
+	_problem_startsolutions(Input.TotalDegree(F), seed; kwargs...)
 end
 
-function problem_startsolutions(F::Vector{<:MP.AbstractPolynomial},
+function _problem_startsolutions(F::Vector{<:MP.AbstractPolynomial},
     p::Vector{<:MP.AbstractVariable},
     a_1::Vector{<:Number},
     a_2::Vector{<:Number},
-    startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
-    Random.seed!(seed)
+    startsolutions, seed::Int; homotopy=nothing, kwargs...)
 
     @assert length(p) == length(a_1) "Number of parameters must match"
     @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
 
-    problem_startsolutions(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
+    _problem_startsolutions(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
-function problem_startsolutions(H::AbstractHomotopy, startsolutions; seed=randseed(), kwargs...)
-    Random.seed!(seed)
-	problem_startsolutions(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
+function _problem_startsolutions(H::AbstractHomotopy, startsolutions, seed::Int; kwargs...)
+    _problem_startsolutions(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
 end
 
-function problem_startsolutions(input::Input.AbstractInput, seed;
-	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing,
-    system=Systems.FPSystem,
-    homotopy=StraightLineHomotopy)
-
-    problem_startsolutions(input, seed=seed, homvar=homvar, system=system, homotopy=homotopy)
+function _problem_startsolutions(input::AbstractInput, seed::Int;
+	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing, kwargs...)
+    _problem_startsolutions(input, homvar, seed; kwargs...)
 end
 
 promote_startsolutions(iter) = promote_startsolutions(collect(iter))
@@ -158,9 +155,6 @@ function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
     map(s -> convert.(PT, s), xs)
 end
 
-function problem_startsolutions(prob::AbstractInput; seed=randseed(), homvar=nothing, kwargs...)
-    problem_startsolutions(prob, homvar, seed; kwargs...)
-end
 
 const overdetermined_error_msg = """
 The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
@@ -169,7 +163,7 @@ See
 for details.
 """
 # TOTALDEGREE
-function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
+function _problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
     F = prob.system
     n = length(F)
     variables = MP.variables(F)
@@ -201,7 +195,7 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing,
     end
 end
 
-function problem_startsolutions(prob::TotalDegree{Vector{AP}},
+function _problem_startsolutions(prob::TotalDegree{Vector{AP}},
     homvar::MP.AbstractVariable, seed; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
     n = length(prob.system)
@@ -219,7 +213,7 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}},
     proj, start
 end
 
-function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
+function _problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
     degrees = check_homogenous_degrees(prob.system)
     # system needs to be homogenous
@@ -238,7 +232,7 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
     proj, start
 end
 
-function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
+function _problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
     # system needs to be homogenous
     degrees = check_homogenous_degrees(prob.system)
@@ -258,7 +252,7 @@ end
 
 
 # START TARGET
-function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...) where
+function _problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...) where
     {AP1<:MP.AbstractPolynomialLike, AP2<:MP.AbstractPolynomialLike, V}
 
     F, G = prob.target, prob.start
@@ -283,17 +277,17 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, 
     end
 end
 
-function problem_startsolutions(input::Input.Homotopy, homvar::Int, seed; kwargs...)
+function _problem_startsolutions(input::Input.Homotopy, homvar::Int, seed; kwargs...)
     check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
     Projective(input.H, Homogenization(homvar), seed), input.startsolutions
 end
 
-function problem_startsolutions(input::Input.Homotopy, homvar::Nothing, seed; kwargs...)
+function _problem_startsolutions(input::Input.Homotopy, homvar::Nothing, seed; kwargs...)
     check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
     Projective(input.H, NullHomogenization(), seed), input.startsolutions
 end
 
-function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
+function _problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
     variables = setdiff(allvariables(prob.system), prob.parameters)
     if ishomogenous(prob.system, variables)
         if homvar === nothing

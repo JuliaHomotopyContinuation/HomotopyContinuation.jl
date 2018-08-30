@@ -37,32 +37,37 @@ function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, see
 end
 
 function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions;kwargs...)
-
-    x₁ = first(start_solutions)
-    @assert x₁ isa AbstractVector
-    x = Problems.embed(prob, x₁)
+    x₁= Problems.embed(prob, start_solution_sample(start_solutions))
 
     slkwargs, kwargs = splitkwargs(kwargs, StepLength.allowed_keywords)
     steplength = StepLength.HeuristicStepLength(;slkwargs...)
 
-    tracker = pathtracker(prob, x, t₁, t₀; steplength=steplength,
+    tracker = pathtracker(prob, x₁, t₁, t₀; steplength=steplength,
         filterkwargs(kwargs, PathTracking.allowed_keywords)...)
 
-    endgame = Endgaming.Endgame(prob.homotopy, x; steplength=steplength,
+    endgame = Endgaming.Endgame(prob.homotopy, x₁; steplength=steplength,
         filterkwargs(kwargs, Endgaming.allowed_keywords)...)
 
     check_kwargs(kwargs)
 
-    Solver(prob, tracker, endgame, patchswitcher(prob, x, t₀),
+    Solver(prob, tracker, endgame, patchswitcher(prob, x₁, t₀),
         t₁, t₀, seed, options, SolverCache(prob, tracker))
 end
 
+function solver_startsolutions(args...; kwargs...)
+    supported, rest = splitkwargs(kwargs, Problems.supported_kwargs)
+    prob, startsolutions = Problems.problem_startsolutions(args...; supported...)
+    Solver(prob, startsolutions, 1.0, 0.0, prob.seed; rest...), startsolutions
+end
+
+start_solution_sample(xs) = first(xs)
+start_solution_sample(x::AbstractVector{<:Number}) = x
+
+check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
 allowed_keywords() = [:patch,
     PathTracking.allowed_keywords...,
     StepLength.allowed_keywords...,
     Endgaming.allowed_keywords...]
-
-check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
 
 function invalid_kwargs(kwargs)
     invalids = []
@@ -76,7 +81,7 @@ function invalid_kwargs(kwargs)
     invalids
 end
 
-function pathtracker(prob::Problems.Projective, x, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+function pathtracker(prob::Problems.Projective, x::AbstractVector, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
     PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
