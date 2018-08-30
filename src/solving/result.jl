@@ -398,6 +398,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::ProjectiveResult)
     println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• random seed: $(seed(x))")
 end
+Base.print(io::IO, r::Union{AffineResult, ProjectiveResult}) = show(io::IO, MIME"text/plain"(), r)
 
 TreeViews.hastreeview(::AffineResult) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
