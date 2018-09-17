@@ -22,31 +22,26 @@ end
 function correct!(xnext, ::Newton, cache::NewtonCache, H::HomotopyWithCache, x, t, tol, maxiters)
     A, b = cache.A, cache.b
     M, N = size(H)
-    Homotopies.update!(H, x, t) # we have to update local affine patches
-    evaluate_and_jacobian!(b, A, H, x, t)
-    solve!(A, b)
-    @inbounds for i = 1:N
-        xnext[i] -= b[i]
-    end
 
-    k = 1
+    x .= xnext
+
+    k = 0
     while true
         Homotopies.update!(H, xnext, t) # we have to update local affine patches
-        evaluate!(b, H, xnext, t)
-        res = infinity_norm(b)
-        if res < tol
-            return Result(true, res, k)
-        elseif k ≥ maxiters
-            return Result(false, res, k)
-        end
-
-        k += 1
-        # put jacobian in A
-        jacobian!(A, H, xnext, t)
-
+        evaluate_and_jacobian!(b, A, H, xnext, t)
+        # solve linear system and store result in b
         solve!(A, b)
+        Δ = infinity_norm(b)
         @inbounds for i = 1:N
             xnext[i] -= b[i]
         end
+
+        if Δ < tol
+            return Result(true, Δ, k)
+        elseif k ≥ maxiters
+            return Result(false, Δ, k)
+        end
+
+        k += 1
     end
 end
