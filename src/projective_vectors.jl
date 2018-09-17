@@ -74,7 +74,13 @@ homvar(z::PVector) = z.homvar
 Base.similar(v::PVector, ::Type{T}) where T = PVector(convert.(T, v.data), v.homvar)
 
 """
-    embed(x::Vector, homvar)::PVector
+    embed(x::Vector, homvar::Union{Nothing, Int})::PVector
+
+Embed a vector `x` into projective space with homogenization variable `homvar`.
+
+    embed(z::PVector, x::Vector)
+
+Embed a vector `x` into projective space the same way `x` was embedded.
 """
 function embed(x::Vector{T}, homvar) where T
     k = 1
@@ -89,6 +95,8 @@ function embed(x::Vector{T}, homvar) where T
     end
     PVector(data, homvar)
 end
+embed(z::PVector, x::Vector) = embed(x, z.homvar)
+
 
 """
     affine_normalizer(z::PVector)

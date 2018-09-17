@@ -7,6 +7,7 @@ import ..PredictionCorrection
 import ..Predictors
 import ..StepLength
 import ..Problems
+import ..ProjectiveVectors
 
 using ..Utilities
 
@@ -90,7 +91,7 @@ struct PathTracker{
     SL<:StepLength.AbstractStepLength,
     S<:State,
     C<:Cache,
-    V<:AbstractVector}
+    V<:ProjectiveVectors.AbstractProjectiveVector}
 
     # these are fixed
     homotopy::H
@@ -107,7 +108,7 @@ struct PathTracker{
     cache::C
 end
 
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
+function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     steplength::StepLength.AbstractStepLength=StepLength.HeuristicStepLength(),
