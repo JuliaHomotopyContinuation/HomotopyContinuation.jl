@@ -3,7 +3,11 @@
 We also export a path tracking primitive to make the core path tracking routine
 available for other applications.
 At the heart is a [`PathTracking.PathTracker`](@ref) object which holds
-all the state.
+all the state. The easiest way to construct a `PathTracker` is to use the [`pathtracker_startsolutions`](@ref) routine.
+
+```@docs
+pathtracker_startsolutions
+```
 
 ## Types
 ```@docs
