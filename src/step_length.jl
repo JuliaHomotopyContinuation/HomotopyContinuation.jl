@@ -64,6 +64,12 @@ The argument `success` indicates whether the step was successfull.
 """
 function update! end
 
+const allowed_keywords = [
+    :initial_steplength, :steplength_decrease_factor, :steplength_increase_factor,
+    :steplength_consecutive_successes_necessary,
+    :maximal_steplength, :minimal_steplength
+]
+
 
 # Implementation
 """
@@ -88,9 +94,13 @@ struct HeuristicStepLength <: AbstractStepLength
     minimal_steplength::Float64
 end
 function HeuristicStepLength(;initial=0.1,
+    initial_steplength=initial,
     increase_factor=2.0,
+    steplength_increase_factor=increase_factor,
     decrease_factor=inv(increase_factor),
+    steplength_decrease_factor=decrease_factor,
     consecutive_successes_necessary=5,
+    steplength_consecutive_successes_necessary=consecutive_successes_necessary,
     maximal_steplength=max(0.1, initial),
     minimal_steplength=1e-14)
 

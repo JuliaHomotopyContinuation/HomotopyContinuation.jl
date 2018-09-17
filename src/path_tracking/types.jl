@@ -1,16 +1,19 @@
 import TreeViews
 
+import ..AffinePatches
 import ..Correctors
 import ..Homotopies
 import ..PredictionCorrection
 import ..Predictors
 import ..StepLength
+import ..Problems
+import ..ProjectiveVectors
 
 using ..Utilities
 
-export PathTracker, allowed_kwargs
+export PathTracker, allowed_keywords
 
-const allowed_kwargs = [:corrector, :predictor, :steplength,
+const allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
     :maxiters]
 
@@ -88,7 +91,7 @@ struct PathTracker{
     SL<:StepLength.AbstractStepLength,
     S<:State,
     C<:Cache,
-    V<:AbstractVector}
+    V<:ProjectiveVectors.AbstractProjectiveVector}
 
     # these are fixed
     homotopy::H
@@ -105,7 +108,7 @@ struct PathTracker{
     cache::C
 end
 
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
+function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     steplength::StepLength.AbstractStepLength=StepLength.HeuristicStepLength(),
@@ -127,6 +130,19 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::AbstractVector, t₁,
 
     PathTracker(H, predictor_corrector, steplength, state, options, x, cache)
 end
+
+"""
+    PathTracker(problem::Problems.AbstractProblem, x₁, t₁, t₀; kwargs...)
+
+Construct a [`PathTracking.PathTracker`](@ref) from the given `problem`.
+"""
+function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
+    y₁ = Problems.embed(prob, x₁)
+    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, y₁))
+    PathTracker(H, y₁, complex(t₁), complex(t₀); kwargs...)
+end
+
+Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
 
 
 """

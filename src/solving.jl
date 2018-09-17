@@ -19,6 +19,8 @@ import ..PatchSwitching
 import ..StepLength
 import ..Systems
 
+using ..Utilities
+
 export Solver,
     solve,
     multiplicities,
@@ -27,7 +29,7 @@ export Solver,
 include("solving/multiplicities.jl")
 include("solving/path_result.jl")
 include("solving/result.jl")
-include("solving/types.jl")
+include("solving/solver.jl")
 include("solving/solve.jl")
 
 

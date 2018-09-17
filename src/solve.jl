@@ -1,6 +1,5 @@
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
-import Random
 
 import .Input
 import .Problems
@@ -135,84 +134,20 @@ Endgame specific options
 """
 function solve end
 
-# External
-function solve(F::Vector{<:MP.AbstractPolynomial}; seed=randseed(), homvar=nothing, kwargs...)
-    Random.seed!(seed)
-    F = filter(f -> !iszero(f), F)
-    checkfinite_dimensional(F, homvar)
-    # square system and each polynomial is non-zero
-    if length(F) == MP.nvariables(F) && ishomogenous(F)
-        throw(AssertionError("The input system is a square homogenous system. This will result in an at least 1 dimensional solution space."))
-    end
-    solve(Input.TotalDegree(F), seed; homvar=homvar, kwargs...)
+function solve(args...; threading=true, kwargs...)
+    solver, startsolutions = Solving.solver_startsolutions(args...; kwargs...)
+    solve(solver, startsolutions, threading=threading)
 end
-
-function solve(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolynomial}, startsolutions; homvar=nothing, seed=randseed(), kwargs...)
-    Random.seed!(seed)
-    @assert length(G) == length(F)
-    checkfinite_dimensional(F, homvar)
-    solve(Input.StartTarget(G, F, promote_startsolutions(startsolutions)), seed; homvar=homvar, kwargs...)
-end
-
-function solve(F::Systems.AbstractSystem; seed=randseed(), kwargs...)
-    Random.seed!(seed)
-	solve(Input.TotalDegree(F), seed; kwargs...)
-end
-
-function checkfinite_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
-    N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
-    n = length(F)
-
-    if n ≥ N ||
-       n == N - 1 && ishomogenous(F)
-        return
-    end
-    throw(AssertionError("The input system will not result in a finite number of solutions."))
-end
-
-function solve(F::Vector{<:MP.AbstractPolynomial},
-    p::Vector{<:MP.AbstractVariable},
-    a_1::Vector{<:Number},
-    a_2::Vector{<:Number},
-    startsolutions; seed=randseed(), homotopy=nothing, kwargs...)
-    Random.seed!(seed)
-
-    @assert length(p) == length(a_1) "Number of parameters must match"
-    @assert length(a_1) == length(a_2) "Start and target parameters must have the same length"
-
-    solve(Input.ParameterSystem(F, p, a_1, a_2, promote_startsolutions(startsolutions)), seed; kwargs...)
-end
-
-function solve(H::Homotopies.AbstractHomotopy, startsolutions; seed=randseed(), kwargs...)
-    Random.seed!(seed)
-	solve(Input.Homotopy(H, promote_startsolutions(startsolutions)), seed; kwargs...)
-end
-
-promote_startsolutions(xs::Vector{Vector{ComplexF64}}) = xs
-function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
-    PT = promote_type(typeof(xs[1][1]), Complex{Float64})
-    map(s -> convert.(PT, s), xs)
-end
-
-randseed() = rand(1_000:1_000_000)
 
 # Internal
-function solve(input::Input.AbstractInput, seed;
-	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing,
-    system=Systems.FPSystem,
-    homotopy=Homotopies.StraightLineHomotopy,
-    kwargs...)
-
-    p, startsolutions = Problems.problem_startsolutions(input, homvar=homvar, system=system, homotopy=homotopy)
-    solve(p, startsolutions, seed; kwargs...)
-end
-
-function solve(prob::Problems.AbstractProblem, start_solutions, seed; threading=true, kwargs...)
-    solver = Solving.Solver(prob, start_solutions, 1.0, 0.0, seed; kwargs...)
+function solve(solver::Solving.Solver, start_solutions; threading=true)
     if threading && Threads.nthreads() > 1
         solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
-        Solving.solve(solvers, start_solutions)
+        solve(solvers, start_solutions, threading=true)
     else
         Solving.solve(solver, start_solutions)
     end
+end
+function solve(solvers::AbstractVector{<:Solving.Solver}, start_solutions; threading=true)
+    Solving.solve(threading ? solvers : solvers[1], start_solutions)
 end
