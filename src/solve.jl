@@ -112,8 +112,8 @@ Pathtracking specific:
 * `corrector_maxiters=2`: The maximal number of correction steps in a single step.
 * `predictor::Predictors.AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Predictors.RK4`](@ref).
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
-* `refinement_tol=1e-11`: The precision used to refine the final value.
-* `tol=1e-7`: The precision used to track a value.
+* `refinement_tol=1e-8`: The precision used to refine the final value.
+* `tol=1e-6`: The precision used to track a value.
 * `initial_steplength=0.1`: The initial step size for the predictor.
 * `steplength_increase_factor=2.0`: The factor with which the step size is increased after `steplength_consecutive_successes_necessary` consecutive successes.
 * `steplength_decrease_factor=inv(increase_factor)`: The factor with which the step size is decreased after a step failed.

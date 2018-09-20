@@ -78,11 +78,11 @@ The corrector used during in the predictor-corrector scheme. The default is
 The predictor used during in the predictor-corrector scheme. The default is
 `[Predictors.RK4`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
-* `refinement_tol=1e-11`: The precision used to refine the final value.
+* `refinement_tol=1e-8`: The precision used to refine the final value.
 * `steplength::StepLength.AbstractStepLength`
 The step size logic used to determine changes of the step size. The default is
 [`StepLength.HeuristicStepLength`](@ref).
-* `tol=1e-7`: The precision used to track a value.
+* `tol=1e-6`: The precision used to track a value.
 """
 struct PathTracker{
     H<:Homotopies.AbstractHomotopy,
@@ -112,8 +112,8 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.Abs
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.RK4(),
     steplength::StepLength.AbstractStepLength=StepLength.HeuristicStepLength(),
-    tol=1e-7,
-    refinement_tol=1e-11,
+    tol=1e-6,
+    refinement_tol=1e-8,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
     maxiters=10_000)

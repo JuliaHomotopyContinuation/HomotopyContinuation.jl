@@ -1,6 +1,6 @@
 @testset "Result" begin
     @testset "Result+PathResult" begin
-        R = solve(equations(heart()), seed=9459)
+        R = solve(equations(heart()), seed=506435)
         @test R isa Solving.AffineResult
         @test natinfinity(R) == 572
         @test nfinite(R) == 4
@@ -11,8 +11,8 @@
         @test length(finite(R, onlynonsingular=true)) == 4
         @test length(finite(R, onlysingular=true)) == 0
         @test isempty(failed(R))
-        @test length(real(R, tol=1e-7)) == 2
-        @test nreal(R, tol=1e-7) == 2
+        @test length(real(R, tol=1e-6)) == 2
+        @test nreal(R, tol=1e-6) == 2
         @test length(atinfinity(R)) == 572
         @test length(results(R, onlyreal=true, realtol=1e-8)) == 2
         @test length(results(R, onlynonsingular=true, singulartol=1e9)) == 4

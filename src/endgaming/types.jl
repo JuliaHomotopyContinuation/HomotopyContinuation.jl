@@ -1,6 +1,6 @@
 export Endgame, Result, allowed_keywords
 
-const allowed_keywords = [:sampling_factor, :tol, :minradius, :maxnorm, :minimal_maxnorm,
+const allowed_keywords = [:sampling_factor, :egtol, :minradius, :maxnorm, :minimal_maxnorm,
     :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
     :cauchy_samples_per_loop]
 
