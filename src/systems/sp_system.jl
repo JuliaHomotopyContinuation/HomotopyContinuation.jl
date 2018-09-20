@@ -22,12 +22,12 @@ F = [x^2+3y^4-2, 2y^2+3x*y+4]
 solve(F, system=SPSystem)
 ```
 """
-struct SPSystem{S<:SP.AbstractSystem} <: AbstractSystem
+struct SPSystem{S<:SP.PolynomialSystem} <: AbstractSystem
     system::S
 end
 
-SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.system(polys, vars))
-SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.system(polys))
+SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.PolynomialSystem(polys, vars))
+SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.PolynomialSystem(polys))
 
 Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))
 
