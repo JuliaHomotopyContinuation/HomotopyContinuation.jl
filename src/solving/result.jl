@@ -238,6 +238,7 @@ julia> @polyvar x y
 julia> result = solve([(x-2)y, y+x+3]);
 julia> realsolutions(result)
 [[2.0, -5.0], [-3.0, 0.0]]
+```
 """
 function realsolutions(result::Results; onlyreal=true, tol=1e-6, kwargs...)
     mapresults(r -> real.(solution(r)), result; onlyreal=true, realtol=tol, kwargs...)
