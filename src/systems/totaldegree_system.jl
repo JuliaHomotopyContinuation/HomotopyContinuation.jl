@@ -17,7 +17,7 @@ struct TotalDegreeSystem <: AbstractSystem
     end
 end
 
-function TotalDegreeSystem(F::Vector{<:MP.AbstractPolynomialLike}, vars, homvar=nothing)
+function TotalDegreeSystem(F::Vector{<:MP.AbstractPolynomialLike}, vars, homvar)
     TotalDegreeSystem(MP.maxdegree.(F), vars, homvar)
 end
 function TotalDegreeSystem(degrees::Vector{Int}, vars::Vector{<:MP.AbstractVariable}, homvar::MP.AbstractVariable)

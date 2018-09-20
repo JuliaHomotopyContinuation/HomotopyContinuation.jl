@@ -108,6 +108,11 @@ function problem_startsolutions(args...; seed=randseed(), kwargs...)
     _problem_startsolutions(args..., seed; kwargs...)
 end
 
+
+#########
+# Input
+#########
+
 function _problem_startsolutions(F::Vector{<:MP.AbstractPolynomial}, seed::Int; homvar=nothing, kwargs...)
     F = filter(f -> !iszero(f), F)
     check_zero_dimensional(F, homvar)
@@ -149,6 +154,17 @@ function _problem_startsolutions(input::AbstractInput, seed::Int;
     _problem_startsolutions(input, homvar, seed; kwargs...)
 end
 
+function _problem_startsolutions(input::Input.Homotopy, homvar::Int, seed; kwargs...)
+    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
+    Projective(input.H, Homogenization(homvar), seed), input.startsolutions
+end
+
+function _problem_startsolutions(input::Input.Homotopy, homvar::Nothing, seed; kwargs...)
+    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
+    Projective(input.H, NullHomogenization(), seed), input.startsolutions
+end
+
+
 promote_startsolutions(iter) = promote_startsolutions(collect(iter))
 promote_startsolutions(xs::Vector{Vector{ComplexF64}}) = xs
 function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
@@ -163,54 +179,35 @@ See
     https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
 for details.
 """
-# TOTALDEGREE
-function _problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
-    F = prob.system
-    n = length(F)
-    variables = MP.variables(F)
-    N = length(variables)
-    F_ishom = ishomogenous(F)
-    if F_ishom
-        # N = n+1 is the only valid size configuration
-        if n + 1 > N
-            throw(AssertionError(overdetermined_error_msg))
-        end
 
+
+##############
+# TOTALDEGREE
+##############
+
+function _problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
+    F, variables, homogenization = homogenize_if_necessary(prob.system)
+    if homogenization == NullHomogenization()
         G = Systems.TotalDegreeSystem(F, variables, variables[1])
         start = totaldegree_solutions(F, NullHomogenization())
         Projective(G, system(F), NullHomogenization(), seed; kwargs...), start
-    else
-        # N = n is the only valid size configuration
-        if n > N
-            throw(AssertionError(overdetermined_error_msg))
-        end
-        # We create a new variable to homogenize the system
-        homvar = uniquevar(F)
-        homogenization = Homogenization(1)
-        var_ordering = [homvar; variables]
+    elseif homogenization isa Homogenization
         proj = Projective(
-            Systems.TotalDegreeSystem(F, var_ordering, homvar),
-            system(homogenize(F, homvar), var_ordering), homogenization, seed; kwargs...)
-        start = totaldegree_solutions(F, homogenization)
-        proj, start
+            Systems.TotalDegreeSystem(F, variables, variables[homogenization.homvaridx]),
+            system(F, variables), homogenization, seed; kwargs...)
+        proj, totaldegree_solutions(F, homogenization)
     end
 end
 
 function _problem_startsolutions(prob::TotalDegree{Vector{AP}},
     homvar::MP.AbstractVariable, seed; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
     @assert ishomogenous(prob.system) "Input system is not homogenous although `homvar=$(homvar)` was passed."
-    n = length(prob.system)
-    variables = MP.variables(prob.system)
-    N = length(variables)
-    if n + 1 > N
-        throw(AssertionError(overdetermined_error_msg))
-    end
-    homogenization = Homogenization(homvar, variables)
-    start = totaldegree_solutions(prob.system, homogenization)
+    F, variables, homogenization = homogenize_if_necessary(prob.system; homvar=homvar)
 
+    start = totaldegree_solutions(prob.system, homogenization)
     proj = Projective(
         Systems.TotalDegreeSystem(prob.system, variables, homvar),
-        system(homogenize(prob.system, homvar), variables), homogenization, seed; kwargs...)
+        system(F, variables), homogenization, seed; kwargs...)
     proj, start
 end
 
@@ -251,8 +248,10 @@ function _problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx:
 end
 
 
-
+###############
 # START TARGET
+###############
+
 function _problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...) where
     {AP1<:MP.AbstractPolynomialLike, AP2<:MP.AbstractPolynomialLike, V}
 
@@ -278,48 +277,62 @@ function _problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}, V},
     end
 end
 
-function _problem_startsolutions(input::Input.Homotopy, homvar::Int, seed; kwargs...)
-    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
-    Projective(input.H, Homogenization(homvar), seed), input.startsolutions
-end
-
-function _problem_startsolutions(input::Input.Homotopy, homvar::Nothing, seed; kwargs...)
-    check_homogenous_degrees(Systems.FixedHomotopy(input.H, rand()))
-    Projective(input.H, NullHomogenization(), seed), input.startsolutions
-end
+#####################
+# Parameter homotopy
+#####################
 
 function _problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
-    variables = setdiff(allvariables(prob.system), prob.parameters)
-    if ishomogenous(prob.system, variables)
-        if homvar === nothing
-            homogenization = NullHomogenization()
-            var_ordering = [variables; prob.parameters]
-            var_indices = 1:length(variables)
-            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
-            f = system(prob.system, var_ordering)
-        else
-            homogenization = Homogenization(homvar, variables)
-            var_ordering = [variables; prob.parameters]
-            var_indices = 1:length(variables)
-            param_indices = (length(variables)+1):(length(variables)+length(prob.parameters))
-            f = system(prob.system, var_ordering)
-        end
-    elseif homvar === nothing
-        homogenization = Homogenization(1)
-        homvar = uniquevar(prob.system)
-        var_ordering = [homvar; variables; prob.parameters]
-        var_indices = 1:(length(variables)+1)
-        param_indices = (length(variables)+2):(length(variables)+length(prob.parameters)+1)
-        f = system(homogenize(prob.system, variables, homvar), var_ordering)
-    else
-        throw(error("Input system is not homogenous although `homvar` was passed."))
-    end
+    F, variables, homogenization = homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
 
-    H = ParameterHomotopy(f, collect(var_indices), collect(param_indices), prob.start, prob.target)
+    H = ParameterHomotopy(F, variables, prob.parameters, prob.p₁, prob.p₀)
 
     Projective(H, homogenization, seed), prob.startsolutions
 end
 
+##########
+# HELPERS
+##########
+
+"""
+    homogenize_if_necessary(F::Vector{<:MP.AbstractPolynomialLike})
+
+Homogenizes the system `F` if necessary and returns the (new) system `F` its variables
+and a subtype of [`AbstractHomogenization`] indicating whether it was homegenized.
+If it was homogenized and no then the new variable is the **first one**.
+"""
+function homogenize_if_necessary(F::Vector{<:MP.AbstractPolynomialLike}; homvar=nothing, parameters=nothing)
+    variables = MP.variables(F)
+    if parameters !== nothing
+        variables = setdiff(variables, parameters)
+    end
+
+    n, N = length(F), length(variables)
+    if ishomogenous(F; parameters=parameters)
+        # N = n+1 is the only valid size configuration
+        if n + 1 > N
+            throw(AssertionError(overdetermined_error_msg))
+        end
+        if homvar === nothing
+            F, variables, NullHomogenization()
+        else
+            F, variables, Homogenization(homvar, variables)
+        end
+    else
+        # N = n is the only valid size configuration
+        if n > N
+            throw(AssertionError(overdetermined_error_msg))
+        end
+        if homvar !== nothing
+            error("Input system is not homogenous although `homvar` was passed.")
+        end
+        # We create a new variable to homogenize the system
+        homvar = uniquevar(F)
+        push!(variables, homvar)
+        sort!(variables, rev=true)
+
+        homogenize(F, homvar; parameters=parameters), variables, Homogenization(homvar, variables)
+    end
+end
 
 function check_homogenous_degrees(F::AbstractSystem)
     n, N = size(F)

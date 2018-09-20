@@ -26,7 +26,7 @@ struct SPSystem{S<:SP.PolynomialSystem} <: AbstractSystem
     system::S
 end
 
-SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.PolynomialSystem(polys, vars))
+SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.PolynomialSystem(polys, variables=vars))
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.PolynomialSystem(polys))
 
 Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))

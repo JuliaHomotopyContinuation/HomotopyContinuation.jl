@@ -41,13 +41,13 @@
     end
 
     @testset "ParameterHomotopy" begin
-        F = Systems.FPSystem(equations(katsura(5)))
-        parameters = [5, 6]
-        H = Homotopies.ParameterHomotopy(F, parameters, rand(2), rand(2))
+        F = equations(katsura(5))
+        vars = variables(F)
+        H = Homotopies.ParameterHomotopy(F, vars[1:4], vars[5:6], rand(2), rand(2))
         @test H isa Homotopies.AbstractHomotopy
         @test size(H) == (6, 4)
-        @test Homotopies.gamma(H) isa ComplexF64
-        @test Homotopies.γ(H) isa ComplexF64
+        # @test Homotopies.gamma(H) isa ComplexF64
+        # @test Homotopies.γ(H) isa ComplexF64
 
         InterfaceTest.homotopy(H)
     end

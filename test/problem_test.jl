@@ -13,7 +13,7 @@
     @test length(start2) == 720
 
     @test Problems.homotopy(PP2) isa Homotopies.AbstractHomotopy
-    @test Problems.homogenization(PP2) == Problems.Homogenization(1)
+    @test Problems.homogenization(PP2) == Problems.Homogenization(7)
 
     @polyvar x y z
     F = [x^2+y^2+2z^2, x+y+3z]
