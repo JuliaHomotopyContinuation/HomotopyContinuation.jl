@@ -5,4 +5,4 @@ StaticPolynomials 0.3 0.4
 DynamicPolynomials 0.1 0.2
 MultivariatePolynomials 0.2 0.3
 TreeViews 0.3 0.4
-StaticArrays 0.8.3
+StaticArrays 0.8.3 0.9.0
