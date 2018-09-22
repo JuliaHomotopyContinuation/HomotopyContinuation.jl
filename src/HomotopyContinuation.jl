@@ -1,7 +1,7 @@
 module HomotopyContinuation
 
-    import DynamicPolynomials: @polyvar, PolyVar, differentiate, variables
-    export @polyvar, PolyVar, differentiate, variables
+    import DynamicPolynomials: @polyvar
+    export @polyvar
 
     export AffinePatches,
         Correctors,

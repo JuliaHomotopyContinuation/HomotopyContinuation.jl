@@ -3,3 +3,6 @@
 *.jl.mem
 *.jld
 tst.jl
+
+docs/Manifest.toml
+Manifest.toml
