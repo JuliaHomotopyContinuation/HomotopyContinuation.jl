@@ -18,7 +18,7 @@ makedocs(
 deploydocs(
     repo   = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git",
     target = "build",
-    julia = "1.0",
+    julia = "0.7",
     osname = "linux",
     deps   = nothing,
     make   = nothing
