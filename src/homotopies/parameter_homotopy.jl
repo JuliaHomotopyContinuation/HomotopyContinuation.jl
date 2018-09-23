@@ -22,7 +22,7 @@ end
 function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁, p₀) where {N, NVars, NParams, T}
     @assert length(p₁) == length(p₀) == NParams
 
-    ParameterHomotopy(F, promote(MVector{N}(p₁), MVector{N}(p₀))...)
+    ParameterHomotopy(F, promote(MVector{NParams}(p₁), MVector{NParams}(p₀))...)
 end
 
 function ParameterHomotopy(F, variables, parameters, p₁, p₀)
