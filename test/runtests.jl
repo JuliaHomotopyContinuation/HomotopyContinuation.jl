@@ -1,5 +1,7 @@
 using Test
 sleep(0.1)
+using DynamicPolynomials
+sleep(0.1)
 using LinearAlgebra
 sleep(0.1)
 using Random

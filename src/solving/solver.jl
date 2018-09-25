@@ -26,18 +26,22 @@ struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
     cache::C
 end
 
-function Solver(prob::Problems.AbstractProblem, start_solutions, t₁, t₀, seed=0;
+function Solver(prob::Problems.AbstractProblem, start_solutions, args...; kwargs...) where {T<:AbstractVector}
+    Solver(prob, Utilities.start_solution_sample(start_solutions), args...; kwargs...)
+end
+
+function Solver(prob::Problems.AbstractProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed=0;
     endgame_start=0.1,
     report_progress=true,
     kwargs...)
     !(t₀ ≤ endgame_start ≤ t₁) && throw(error("`endgame_start` has to be between `t₁` and`t₀`"))
 
     options = SolverOptions(endgame_start, report_progress)
-    Solver(prob, start_solutions, t₁, t₀, seed, options; kwargs...)
+    Solver(prob, startsolutionsample, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, options::SolverOptions;kwargs...)
-    x₁= Problems.embed(prob, start_solution_sample(start_solutions))
+function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
+    x₁= Problems.embed(prob, startsolutionsample)
 
     slkwargs, kwargs = splitkwargs(kwargs, StepLength.allowed_keywords)
     steplength = StepLength.HeuristicStepLength(;slkwargs...)
@@ -55,13 +59,10 @@ function Solver(prob::Problems.Projective, start_solutions, t₁, t₀, seed, op
 end
 
 function solver_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs, Problems.supported_kwargs)
+    supported, rest = splitkwargs(kwargs, Problems.supported_keywords)
     prob, startsolutions = Problems.problem_startsolutions(args...; supported...)
     Solver(prob, startsolutions, 1.0, 0.0, prob.seed; rest...), startsolutions
 end
-
-start_solution_sample(xs) = first(xs)
-start_solution_sample(x::AbstractVector{<:Number}) = x
 
 check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
 allowed_keywords() = [:patch,

@@ -21,9 +21,9 @@ export allvariables,
     solve!,
     set_num_BLAS_threads,
     get_num_BLAS_threads,
-    check_zero_dimensional,
     randseed,
-    check_kwargs_empty
+    check_kwargs_empty,
+    start_solution_sample
 
 
 """
@@ -51,21 +51,7 @@ function check_kwargs_empty(kwargs, allowed_kwargs=[])
     end
 end
 
-"""
-    check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
 
-Check that the given polynomial system can have zero dimensional components.
-"""
-function check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial}, homvar)
-    N = homvar === nothing ? MP.nvariables(F) : MP.nvariables(F) - 1
-    n = length(F)
-
-    if n ≥ N ||
-       n == N - 1 && ishomogenous(F)
-        return
-    end
-    throw(AssertionError("The input system will not result in a finite number of solutions."))
-end
 
 """
     randseed(range=1_000:1_000_000)
@@ -286,6 +272,18 @@ function splitkwargs(kwargs, supported_keywords)
     end
     supported, rest
 end
+
+
+start_solution_sample(xs) = first(xs) |> promote_start_solution
+start_solution_sample(x::AbstractVector{<:Number}) = promote_start_solution(x )
+
+promote_start_solution(x::AbstractVector{ComplexF64}) = x
+function promote_start_solution(x)
+    x_new =similar(x, promote_type(eltype(x), ComplexF64), length(x))
+    copyto!(x_new, x)
+    x_new
+end
+
 
 # Parallelization
 

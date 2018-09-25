@@ -1,9 +1,12 @@
-import ..Utilities
+export StaticParameterHomotopy, ParameterHomotopyCache, gamma
+
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
 import StaticPolynomials
 const SP = StaticPolynomials
 import StaticArrays: MVector, SVector
 
-export StaticParameterHomotopy, ParameterHomotopyCache, gamma
+import ..Utilities
 
 """
     ParameterHomotopy(F, variables, parameters, p₁, p₀)
@@ -17,15 +20,28 @@ struct ParameterHomotopy{N, NVars, NParams, T<:Number, PolyTuple} <: AbstractHom
     F::SP.PolynomialSystem{N, NVars, NParams, PolyTuple}
     p₁::MVector{NParams, T}
     p₀::MVector{NParams, T}
+    γ₁::ComplexF64
+    γ₀::ComplexF64
 end
 
-function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁, p₀) where {N, NVars, NParams, T}
+function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁, p₀;
+    start_gamma=randn(ComplexF64), γ₀ = start_gamma,
+    target_gamma=randn(ComplexF64), γ₁ = target_gamma
+    ) where {N, NVars, NParams, T}
     @assert length(p₁) == length(p₀) == NParams
 
-    ParameterHomotopy(F, promote(MVector{NParams}(p₁), MVector{NParams}(p₀))...)
+    ParameterHomotopy(F, promote(MVector{NParams}(p₁), MVector{NParams}(p₀))..., γ₁, γ₀)
 end
 
-function ParameterHomotopy(F, variables, parameters, p₁, p₀)
+function ParameterHomotopy(F::Vector{T}, parameters::AbstractVector{V};
+    start_parameters=randn(ComplexF64, length(parameters)), p₁ = start_parameters,
+    target_parameters=randn(ComplexF64, length(parameters)), p₀ = target_parameters,
+    kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
+    G = SP.PolynomialSystem(F; parameters=parameters)
+    ParameterHomotopy(G, p₁, p₀; kwargs...)
+end
+
+function ParameterHomotopy(F::Vector{T}, variables, parameters, p₁, p₀) where {T<:MP.AbstractPolynomialLike}
     G = SP.PolynomialSystem(F; variables=variables, parameters=parameters)
     ParameterHomotopy(G, p₁, p₀)
 end

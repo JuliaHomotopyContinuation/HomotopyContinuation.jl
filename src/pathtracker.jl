@@ -8,9 +8,9 @@ does it. This als0 takes the same input arguments as `solve`. This is convenient
 to investigate single paths.
 """
 function pathtracker_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs, Problems.supported_kwargs)
+    supported, rest = splitkwargs(kwargs, Problems.supported_keywords)
     prob, startsolutions = Problems.problem_startsolutions(args...; supported...)
-    tracker = PathTracking.PathTracker(prob, first(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
+    tracker = PathTracking.PathTracker(prob, Utilities.start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
 
     (tracker=tracker, startsolutions=startsolutions)
 end
