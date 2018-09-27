@@ -62,11 +62,19 @@ solve(G, F, [[1, 1], [-1, 1]])
 ```
 
 # Parameter Homotopy
-    solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial}, parametervariables, startparameters, targetparameters, startsolutions)
+    solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
+        startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=randn(ComplexF64), γ₀=randn(ComplexF64))
 
-Construct a parameter homotopy ``H(x,t) := F(x; tp₁+(1-t)p₀)`` where `p₁` is `startparameters`, `p₀` is `targetparameters`
-and the `parametervariables` are the variables of `F` which should be considerd parameters.
+    solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
+            startsolutions; parameters::Vector{<:MP.AbstractVariable},
+            startparameters, targetparameters,
+            startgamma=randn(ComplexF64), targetgamma=randn(ComplexF64))
 
+Construct a parameter homotopy
+```math
+H(x,t) := F(x; \\frac{tγ₁p₁+(1-t)γ₀p₀}{tγ₁+(1-t)γ₀})
+``` where ``p₁`` is either `p₁` or `startparameters`, where ``p₀`` is either `p₀` or `targetparameters`
+and `parameters` are the variables of `F` which should be considered as parameters.
 
 ## Example
 We want to solve a parameter homotopy ``H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])`` where
@@ -78,10 +86,10 @@ This can be accomplished as follows
 ```julia
 @polyvar x[1:2] a[1:2]
 F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
-p₁ = [1, 0]
-p₀ = [2, 4]
 startsolutions = [[1, 1]]
-solve(F, a, p₁, p₀, startsolutions)
+solve(F, startsolutions, parameters=a, p₁=p₁, p₀=p₀)
+# If you don't like unicode this is also possible
+solve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p₀)
 ```
 
 # Abstract Homotopy

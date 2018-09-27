@@ -86,8 +86,8 @@ for details.
 """
 
 
-const supported_keywords = [:parameters, :start_parameters, :target_parameters,
-                            :target_gamma, :start_gamma, :p₁, :p₀, :γ₁, :γ₀]
+const supported_keywords = [:parameters, :startparameters, :targetparameters,
+                            :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
 
 """
     input(F::Vector{<:MP.AbstractPolynomial})::TotalDegree
@@ -129,11 +129,17 @@ function input(G::Vector{<:MP.AbstractPolynomial}, F::Vector{<:MP.AbstractPolyno
 end
 
 function input(F::Vector{<:MP.AbstractPolynomial}, startsolutions;
-    parameters::Vector{<:MP.AbstractVariable}=error("parameters notdefined"),
-    start_parameters=randn(ComplexF64, length(parameters)), p₁ = start_parameters,
-    target_parameters=randn(ComplexF64, length(parameters)), p₀ = target_parameters,
-    start_gamma=randn(ComplexF64), γ₁ = start_gamma,
-    target_gamma=randn(ComplexF64), γ₀ = target_gamma)
+    parameters::Vector{<:MP.AbstractVariable}=error("parameters not defined"),
+    startparameters=nothing, p₁ = startparameters,
+    targetparameters=nothing, p₀ = targetparameters,
+    startgamma=randn(ComplexF64), γ₁ = startgamma,
+    targetgamma=randn(ComplexF64), γ₀ = targetgamma)
+
+    if p₁ === nothing
+        error("!`startparameters=` or `p₁=` need to be passed as argument")
+    elseif p₀ === nothing
+        error("!`targetparameters=` or `p₀=` need to be passed as argument")
+    end
 
     if !(length(parameters) == length(p₁) == length(p₀))
         error("Number of parameters doesn't match!")
