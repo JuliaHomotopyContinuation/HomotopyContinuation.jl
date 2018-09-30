@@ -96,7 +96,7 @@ See the documentation for more possibilities to analyze `result`.
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
-[docs-stable-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/v0.1.0
+[docs-stable-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/stable
 [docs-latest-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/latest
 
 [build-img]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl.svg?branch=master
