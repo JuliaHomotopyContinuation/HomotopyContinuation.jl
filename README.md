@@ -1,4 +1,5 @@
-# <img src="https://i.imgur.com/8ycOn14.png" height="80">
+<img src="https://i.imgur.com/8ycOn14.png" height="120">
+
 | **Documentation** | **Build Status** | **References to cite** |
 |:-----------------:|:----------------:|:-----------------------:|
 | [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] | [![DOI](https://zenodo.org/badge/99226144.svg)](https://zenodo.org/badge/latestdoi/99226144) |
