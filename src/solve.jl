@@ -63,18 +63,26 @@ solve(G, F, [[1, 1], [-1, 1]])
 
 # Parameter Homotopy
     solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
-        startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=randn(ComplexF64), γ₀=randn(ComplexF64))
+        startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=nothing, γ₀=nothing)
+
+Solve the parameter homotopy
+```math
+H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀))
+```,
+where `p₁` and `p₀` are a vector of parameter values for ``F`` and
+`γ₁` and `γ₀` are complex numbers. If `γ₁` or `γ₀` is `nothing`, it is assumed
+that `γ₁` and `γ₀` are ``1``.
+The input `parameters` specifies the parameter variables of `F`
+which should be considered as parameters.
+Neccessarily, ``length(parameters) == length(p₁) == length(p₀)``.
 
     solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
             startsolutions; parameters::Vector{<:MP.AbstractVariable},
             startparameters, targetparameters,
             startgamma=randn(ComplexF64), targetgamma=randn(ComplexF64))
 
-Construct a parameter homotopy
-```math
-H(x,t) := F(x; \\frac{tγ₁p₁+(1-t)γ₀p₀}{tγ₁+(1-t)γ₀})
-``` where ``p₁`` is either `p₁` or `startparameters`, where ``p₀`` is either `p₀` or `targetparameters`
-and `parameters` are the variables of `F` which should be considered as parameters.
+This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
+    `γ₁=start_gamma`, γ₀=`target_gamma`.
 
 ## Example
 We want to solve a parameter homotopy ``H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])`` where

@@ -10,6 +10,7 @@ import ..Utilities
 
 """
     ParameterHomotopy(F, parameters;
+        variables=setdiff(MP.variables(F), parameters),
         p₁=randn(ComplexF64, length(parameters)),
         p₀=randn(ComplexF64, length(parameters)),
         γ₁=nothing, γ₀=nothing)
@@ -28,12 +29,13 @@ Note that `p₁` and `p₀` are stored as a tuple `p` of `SVectors` and `γ₁` 
 are stored as a tuple `γ` or as `γ=nothing`
 
     ParameterHomotopy(F, parameters;
-        start_parameters=randn(ComplexF64, length(parameters)),
-        target_parameters=randn(ComplexF64, length(parameters)),
-        start_gamma=nothing, target_gamma=nothing)
+        variables=setdiff(MP.variables(F), parameters),
+        startparameters=randn(ComplexF64, length(parameters)),
+        targetparameters=randn(ComplexF64, length(parameters)),
+        startgamma=nothing, targetgamma=nothing)
 
-This is a non-unicode variant. `γ₁=start_parameters`, `γ₀=target_parameters`,
-`γ₁=start_gamma`, γ₀=`target_gamma`.
+This is a non-unicode variant where `γ₁=startparameters`, `γ₀=targetparameters`,
+`γ₁=startgamma`, `γ₀=targetgamma`.
 """
 mutable struct ParameterHomotopy{N, NVars, NParams, T<:Number, PolyTuple} <: AbstractHomotopy
     F::SP.PolynomialSystem{N, NVars, NParams, PolyTuple}
@@ -41,26 +43,31 @@ mutable struct ParameterHomotopy{N, NVars, NParams, T<:Number, PolyTuple} <: Abs
     γ::Union{Nothing, NTuple{2, ComplexF64}}
 end
 
-function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁, p₀;
-    start_gamma=nothing, γ₀ = start_gamma,
-    target_gamma=nothing, γ₁ = target_gamma
+function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁::AbstractVector, p₀::AbstractVector;
+    startgamma=nothing, γ₀ = startgamma,
+    targetgamma=nothing, γ₁ = targetgamma
     ) where {N, NVars, NParams, T}
-    @assert length(p₁) == length(p₀) == NParams
 
-    if start_gamma === nothing || target_gamma === nothing
+    if !(length(p₁) == length(p₀) == NParams)
+        error("Length of parameters provided doesn't match the number of parameters.")
+    end
+
+    if startgamma === nothing || targetgamma === nothing
         γ = nothing
     else
         γ = (γ₁, γ₀)
     end
-
-    ParameterHomotopy(F, promote(MVector{NParams}(p₁), MVector{NParams}(p₀)), γ)
+    p = promote(SVector{NParams}(p₁), SVector{NParams}(p₀))
+    ParameterHomotopy(F, p, γ)
 end
 
-function ParameterHomotopy(F::Vector{T}, parameters::AbstractVector{V};
-    start_parameters=randn(ComplexF64, length(parameters)), p₁ = start_parameters,
-    target_parameters=randn(ComplexF64, length(parameters)), p₀ = target_parameters,
+function ParameterHomotopy(F::Vector{T},
+    parameters::AbstractVector{V};
+    variables=setdiff(MP.variables(F), parameters),
+    startparameters=randn(ComplexF64, length(parameters)), p₁ = startparameters,
+    targetparameters=randn(ComplexF64, length(parameters)), p₀ = targetparameters,
     kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
-    G = SP.PolynomialSystem(F; parameters=parameters)
+    G = SP.PolynomialSystem(F; variables=variables, parameters=parameters)
     ParameterHomotopy(G, p₁, p₀; kwargs...)
 end
 
@@ -70,17 +77,16 @@ cache(::ParameterHomotopy, x, t) = NullCache()
 
 Base.size(H::ParameterHomotopy{N, NVars}) where {N, NVars} = (N, NVars)
 
-p₁(H::ParameterHomotopy) = SVector(H.p₁)
-p₀(H::ParameterHomotopy) = SVector(H.p₀)
-
 @inline function p(H::ParameterHomotopy, t)
+    p₁, p₀ = H.p
     if H.γ === nothing
-        return t * p₁(H) + (1 - t) * p₀(H))
+        return t * p₁ + (1 - t) * p₀
+    else
+        γ₁, γ₀ = H.γ
+        ₜγ₁, γ₀_₁₋ₜ = t * γ₁, (1 - t) * γ₀
+        γ = (ₜγ₁ + γ₀_₁₋ₜ)
+        return (@fastmath ₜγ₁ / γ) * p₁ + (@fastmath γ₀_₁₋ₜ / γ) * p₀
     end
-    ⁠γ₁, ⁠γ₀ = H.γ
-    ₜγ₁, ₁₋ₜγ₀ = t * γ₁, (1 - t) * γ₀
-    γ = (ₜγ₁ + ₁₋ₜγ₀)
-    (@fastmath ₜγ₁ / γ) * p₁(H) + (@fastmath ₁₋ₜγ₀ / γ) * p₀(H))
 end
 
 function evaluate!(u, H::ParameterHomotopy, x, t, c::NullCache)
@@ -97,19 +103,20 @@ end
 
 function dt!(u, H::ParameterHomotopy, x, t, c::NullCache)
     # apply chain rule to H(x, p(t))
-    if h === nothing
-        pₜ = p(t)
-        ∂pₜ∂t = p₁(H) - p₀(H)
+    p₁, p₀ = H.p
+    if H.γ === nothing
+        pₜ = p(H, t)
+        ∂pₜ∂t = p₁ - p₀
         ∂H∂p = SP.differentiate_parameters(H.F, x, pₜ)
         u .= ∂H∂p * ∂pₜ∂t
     else
         # copy from p(t) since we need some of the substructures
-        ⁠γ₁, ⁠γ₀ = H.γ
-        ₜγ₁, ₁₋ₜγ₀ = t * γ₁, (1 - t) * γ₀
-        γ = (ₜγ₁ + ₁₋ₜγ₀)
-        pₜ = (@fastmath ₜγ₁ / γ) * p₁(H) + (@fastmath ₁₋ₜγ₀ / γ) * p₀(H))
+        γ₁, γ₀ = H.γ
+        ₜγ₁, γ₀_₁₋ₜ = t * γ₁, (1 - t) * γ₀
+        γ = (ₜγ₁ + γ₀_₁₋ₜ)
+        pₜ = (@fastmath ₜγ₁ / γ) * p₁(H) + (@fastmath γ₀_₁₋ₜ / γ) * p₀(H)
         # quotient rule to get the derivative of p(t)
-        ∂pₜ∂t = (@fastmath H.γ₁ * H.γ₀ / (y * γ)) * (p₁(H) - p₀(H))
+        ∂pₜ∂t = (@fastmath γ₁ * γ₀ / (y * γ)) * (p₁ - p₀)
         ∂H∂p = SP.differentiate_parameters(H.F, x, pₜ)
         u .= ∂H∂p * ∂pₜ∂t
     end

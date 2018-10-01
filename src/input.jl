@@ -74,8 +74,8 @@ struct ParameterSystem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable} <: 
     p₁::Vector
     p₀::Vector
     startsolutions
-    y₁::ComplexF64
-    y₀::ComplexF64
+    γ₁::Union{Nothing, ComplexF64}
+    γ₀::Union{Nothing, ComplexF64}
 end
 
 const overdetermined_error_msg = """
@@ -132,8 +132,8 @@ function input(F::Vector{<:MP.AbstractPolynomial}, startsolutions;
     parameters::Vector{<:MP.AbstractVariable}=error("parameters not defined"),
     startparameters=nothing, p₁ = startparameters,
     targetparameters=nothing, p₀ = targetparameters,
-    startgamma=randn(ComplexF64), γ₁ = startgamma,
-    targetgamma=randn(ComplexF64), γ₀ = targetgamma)
+    startgamma=nothing, γ₁ = startgamma,
+    targetgamma=nothing, γ₀ = targetgamma)
 
     if p₁ === nothing
         error("!`startparameters=` or `p₁=` need to be passed as argument")

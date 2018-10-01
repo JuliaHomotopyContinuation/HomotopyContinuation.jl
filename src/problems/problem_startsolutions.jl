@@ -148,7 +148,8 @@ end
 function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
     F, variables, homogenization = homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
 
-    H = ParameterHomotopy(F, variables, prob.parameters, prob.p₁, prob.p₀)
+    H = ParameterHomotopy(F, prob.parameters, variables=variables,
+						  p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
     Projective(H, homogenization, seed), prob.startsolutions
 end
