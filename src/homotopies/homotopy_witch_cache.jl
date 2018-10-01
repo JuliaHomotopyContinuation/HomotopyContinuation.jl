@@ -22,3 +22,4 @@ evaluate_and_jacobian(H::HomotopyWithCache, x, t) = evaluate_and_jacobian(H.homo
 evaluate_and_jacobian!(u, U, H::HomotopyWithCache, x, t) = evaluate_and_jacobian!(u, U, H.homotopy, x, t, H.cache)
 precondition!(H, x, t) = precondition!(H.homotopy, x, t, H.cache)
 update!(H, x, t) = update!(H.homotopy, x, t, H.cache)
+basehomotopy(H::HomotopyWithCache) = H.homotopy

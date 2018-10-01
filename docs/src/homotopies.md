@@ -52,4 +52,5 @@ Homotopies.jacobian
 Homotopies.dt
 Homotopies.precondition!
 Homotopies.update!
+Homotopies.basehomotopy
 ```

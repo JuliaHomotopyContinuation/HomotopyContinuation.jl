@@ -13,7 +13,8 @@ export AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!
+    precondition!, update!,
+    basehomotopy
 
 
 """
@@ -186,5 +187,13 @@ By default this is a no-op. If `H` wraps another homotopy this should call
 `update!` on this as well.
 """
 update!(H::AbstractHomotopy, x, t, cache) = nothing
+
+"""
+    basehomotopy(H::AbstractHomotopy)
+
+Returns the 'proper' homotopy describing the problem. Any wrapper homotopy
+recursively calls `wrappedhomotopy` with the wrapped homotopy as argument.
+"""
+basehomotopy(H::AbstractHomotopy) = H
 
 end
