@@ -64,8 +64,8 @@ Construct a `ParameterSystem`. This indicates that the system `system` has varia
 struct ParameterSystem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable, T1<:Number, T2<:Number, V1<:AbstractVector} <: AbstractInput
     system::Vector{P}
     parameters::Vector{V}
-    start::Vector{T1}
-    target::Vector{T2}
+    p₁::Vector{T1}
+    p₀::Vector{T2}
     startsolutions::Vector{V1}
 end
 
