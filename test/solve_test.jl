@@ -1,21 +1,21 @@
 @testset "solve" begin
     @testset "Invalid input" begin
         @polyvar x y z
-        @test_throws AssertionError solve([x-2y+2, 0])
-        @test_throws AssertionError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
+        @test_throws ErrorException solve([x-2y+2, 0])
+        @test_throws ErrorException solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 
         # non homogenous overdetermiend
-        @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
-        @test_throws AssertionError solve([x-2z, y^2+3z, z^3+x, z+x])
+        @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
+        @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x, z+x])
         # homogenous overdetermiend
-        @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
-        @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
-        @test_throws AssertionError solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
-        @test_throws AssertionError solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
+        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
+        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
+        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
-        @test_throws AssertionError solve([x-2z, y^2+3z^2, z^3+x^3])
+        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3])
 
-        @test_throws AssertionError solve([x-2z, y^2+3z], homvar=z)
+        @test_throws ErrorException solve([x-2z, y^2+3z], homvar=z)
 
         # invalid kwargs
         @test_throws ErrorException solve(equations(cyclic(5)), def=0.4, abc=23)
@@ -158,20 +158,25 @@
         @polyvar x a y b
         F = [x^2-a, x*y-a+b]
         p = [a, b]
-        S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im]])
+        S = solve(F, [[1.0, 1.0 + 0.0*im]], parameters=p, p₁=[1, 0], p₀=[2, 4])
+        # S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im]])
 
         @test S[1].solution ≈ [complex(√2), -complex(√2)]
         @test nfinite(S) == 1
 
         @polyvar x a y b z
         F = [x^2-a*z^2, x*y-(a-b)*z^2]
-        p = [a, b]
-        S = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]])
+        S = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], startparameters=[1, 0], targetparameters=[2, 4])
         @test S isa Solving.ProjectiveResult
         @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
         @test nnonsingular(S) == 1
 
-        S2 = solve(F, p, [1, 0], [2, 4], [[1.0, 1.0 + 0.0*im, 1.0]], homvar=z)
+        S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], homvar=z)
+        @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
+        @test nfinite(S2) == 1
+
+        γ₁, γ₀ =randn(ComplexF64, 2)
+        S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], γ₁=γ₁, γ₀=γ₀, homvar=z)
         @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
         @test nfinite(S2) == 1
     end

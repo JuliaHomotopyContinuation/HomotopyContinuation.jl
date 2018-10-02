@@ -122,7 +122,7 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.Abs
     # We have to make sure that the element type of x is invariant under evaluation
     u = Vector{Any}(undef, size(H)[1])
     Homotopies.evaluate!(u, H, x₁, t₁, Homotopies.cache(H, x₁, t₁))
-    x = similar(x₁, typeof(u[1]))
+    x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
 
     state = State(H, steplength, x, t₁, t₀)
     cache = Cache(H, predictor_corrector, state, x)

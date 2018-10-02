@@ -52,7 +52,7 @@ Base.copy(z::PVector) = PVector(copy(z.data), z.homvar)
 """
     raw(z::PVector)
 
-Access the underlying vector of `z`. This is useful to pass
+access_input the underlying vector of `z`. This is useful to pass
 the vector into some function which does not know the
 projective structure.
 """
@@ -297,7 +297,7 @@ const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 # """
 #     raw(z::ProdPVector)
 #
-# Access the underlying vector of the product `z`. Note that this
+# access_input the underlying vector of the product `z`. Note that this
 # is only a single vector. This is useful to pass
 # the vector into some function which does not know the
 # projective structure.
