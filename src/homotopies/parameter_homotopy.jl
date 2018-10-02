@@ -52,7 +52,7 @@ function ParameterHomotopy(F::SP.PolynomialSystem{N, NVars, NParams, T}, p₁::A
         error("Length of parameters provided doesn't match the number of parameters.")
     end
 
-    if startgamma === nothing || targetgamma === nothing
+    if γ₁ === nothing || γ₀ === nothing
         γ = nothing
     else
         γ = (γ₁, γ₀)
@@ -114,9 +114,9 @@ function dt!(u, H::ParameterHomotopy, x, t, c::NullCache)
         γ₁, γ₀ = H.γ
         ₜγ₁, γ₀_₁₋ₜ = t * γ₁, (1 - t) * γ₀
         γ = (ₜγ₁ + γ₀_₁₋ₜ)
-        pₜ = (@fastmath ₜγ₁ / γ) * p₁(H) + (@fastmath γ₀_₁₋ₜ / γ) * p₀(H)
+        pₜ = (@fastmath ₜγ₁ / γ) * p₁ + (@fastmath γ₀_₁₋ₜ / γ) * p₀
         # quotient rule to get the derivative of p(t)
-        ∂pₜ∂t = (@fastmath γ₁ * γ₀ / (y * γ)) * (p₁ - p₀)
+        ∂pₜ∂t = (@fastmath γ₁ * γ₀ / (γ * γ)) * (p₁ - p₀)
         ∂H∂p = SP.differentiate_parameters(H.F, x, pₜ)
         u .= ∂H∂p * ∂pₜ∂t
     end
