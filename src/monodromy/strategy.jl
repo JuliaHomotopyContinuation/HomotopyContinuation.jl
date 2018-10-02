@@ -89,9 +89,3 @@ function loop(tracker, x₀::Vector, p₀::SVector, params::TriangleParameters, 
 
     return ProjectiveVectors.affine(cache.x₁), retcode
 end
-
-
-
-##########
-# Helpers
-##########
