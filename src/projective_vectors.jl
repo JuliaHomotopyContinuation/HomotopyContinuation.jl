@@ -96,6 +96,7 @@ function embed(x::Vector{T}, homvar) where T
     PVector(data, homvar)
 end
 embed(z::PVector, x::Vector) = embed(x, z.homvar)
+# TODO define inplace variant of embed
 
 
 """

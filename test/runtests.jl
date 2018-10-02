@@ -28,4 +28,5 @@ end
     include("solve_test.jl")
     include("result_test.jl")
     include("integration_tests.jl")
+    include("monodromy_test.jl")
 end

@@ -44,6 +44,7 @@ module HomotopyContinuation
     include("solving.jl")
     include("solve.jl")
     include("pathtracker.jl")
+    include("monodromy.jl")
 
     include("interface_test.jl")
 
