@@ -16,16 +16,18 @@ include("monodromy/strategy.jl")
 ##############
 
 
-struct MonodromyOptions
+struct MonodromyOptions{F<:Function}
     target_solutions_count::Int
     timeout::Float64
+    done_callback::F
 end
 
 function MonodromyOptions(;
     target_solutions_count=error("target_solutions_count not provided"),
-    timeout=float(typemax(Int)))
+    timeout=float(typemax(Int)),
+    done_callback=always_false)
 
-    MonodromyOptions(target_solutions_count, float(timeout))
+    MonodromyOptions(target_solutions_count, float(timeout), done_callback)
 end
 
 
@@ -78,7 +80,11 @@ function monodromy_solve!(
     t₀ = time_ns()
     k = 0
     while length(solutions) < options.target_solutions_count
-        track_set!(solutions, tracker, p₀, parameters, strategy_cache)
+        retcode = track_set!(solutions, tracker, p₀, parameters, strategy_cache, options)
+
+        if retcode == :done
+            break
+        end
 
         dt = (time_ns() - t₀) * 1e-9
         if dt > options.timeout
@@ -89,7 +95,7 @@ function monodromy_solve!(
     solutions
 end
 
-function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameters, strategy_cache)
+function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameters, strategy_cache, options::MonodromyOptions)
     S = copy(solutions)
     while !isempty(S)
         s₀ = pop!(S)
@@ -97,9 +103,12 @@ function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameter
         if retcode == :success && !iscontained(solutions, s₁)
             push!(solutions, s₁)
             push!(S, s₁)
+            if options.done_callback(s₁) || length(solutions) ≥ options.target_solutions_count
+                return :done
+            end
         end
     end
-    solutions
+    :incomplete
 end
 
 function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVector}
@@ -111,3 +120,5 @@ function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVe
     end
     false
 end
+
+always_false(x) = false
