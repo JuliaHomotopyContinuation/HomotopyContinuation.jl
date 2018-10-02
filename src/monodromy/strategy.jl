@@ -30,14 +30,7 @@ function cache end
 ############
 # Triangle
 ############
-
-struct Triangle <: MonodromyStrategy
-end
-# Triangle(; onlyreal=false, usegamma=onlyreal)
-# Triangle(::Type{<:Real}) = Triangle(onlyreal=true, usegamma=true)
-# Triangle(::Type{<:Complex}) = Triangle(onlyreal=false, usegamma=false)
-
-
+struct Triangle <: MonodromyStrategy end
 struct TriangleParameters{N, T} <: MonodromyStrategyParameters
     p₁::SVector{N, T}
     p₂::SVector{N, T}

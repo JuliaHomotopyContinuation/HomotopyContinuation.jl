@@ -15,6 +15,20 @@ include("monodromy/strategy.jl")
 # Statistics
 ##############
 
+
+struct MonodromyOptions
+    target_solutions_count::Int
+    timeout::Float64
+end
+
+function MonodromyOptions(;
+    target_solutions_count=error("target_solutions_count not provided"),
+    timeout=float(typemax(Int)))
+
+    MonodromyOptions(target_solutions_count, float(timeout))
+end
+
+
 struct MonodromyStatistics
     ntrackedpaths::Int
     ntrackingfailures::Int
@@ -31,8 +45,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         p₀::AbstractVector{<:Number},
         solutions::Vector{<:Vector{<:Number}};
         parameters=error("You need to provide `parameters=...` to monodromy"),
-        target_solutions_count=error("target_solutions_count not provided"),
-        strategy=Triangle()) where {T}
+        strategy=Triangle(), options...) where {T}
 
     comp_solutions = map(v -> complex.(v), solutions)
     tracker = pathtracker(F, comp_solutions, parameters=parameters, p₁=p₀, p₀=p₀)
@@ -46,7 +59,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         p₀,
         strategy_params,
         strategy_cache,
-        target_solutions_count
+        MonodromyOptions(;options...)
         )
 end
 
@@ -60,15 +73,15 @@ function monodromy_solve!(
     p₀::SVector,
     parameters::MonodromyStrategyParameters,
     strategy_cache::MonodromyStrategyCache,
-    target_solutions_count::Integer)
+    options::MonodromyOptions)
 
     t₀ = time_ns()
     k = 0
-    while length(solutions) < target_solutions_count
+    while length(solutions) < options.target_solutions_count
         track_set!(solutions, tracker, p₀, parameters, strategy_cache)
 
         dt = (time_ns() - t₀) * 1e-9
-        if dt > 10
+        if dt > options.timeout
             break
         end
         parameters = regenerate(parameters)

@@ -21,11 +21,16 @@ end
 
 @testset "Monodromy" begin
 
-    @testset "assembly" begin
+    @testset "monodromy_solve" begin
         F, p, p₀, x₀ = toric_ed([3 2 1 0; 0 1 2 3])
 
         solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21)
 
         @test length(solutions) == 21
+
+        # test that timeout works
+        Random.seed!(123)
+        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, timeout=1e-9)
+        @test length(solutions) < 21
     end
 end
