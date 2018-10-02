@@ -16,19 +16,24 @@ include("monodromy/strategy.jl")
 ##############
 
 
-struct MonodromyOptions{F<:Function}
+struct MonodromyOptions{F1<:Function, F2<:Function}
     target_solutions_count::Int
     timeout::Float64
-    done_callback::F
+    done_callback::F1
+    group_action::F2
 end
 
 function MonodromyOptions(;
     target_solutions_count=error("target_solutions_count not provided"),
     timeout=float(typemax(Int)),
-    done_callback=always_false)
+    done_callback=always_false,
+    group_action=always_empty)
 
-    MonodromyOptions(target_solutions_count, float(timeout), done_callback)
+    MonodromyOptions(target_solutions_count, float(timeout), done_callback, group_action)
 end
+
+always_false(x) = false
+always_empty(x) = ()
 
 
 struct MonodromyStatistics
@@ -106,6 +111,16 @@ function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameter
             if options.done_callback(s₁) || length(solutions) ≥ options.target_solutions_count
                 return :done
             end
+
+            for tᵢ in options.group_action(s₁)
+                if !iscontained(solutions, tᵢ)
+                    push!(solutions, tᵢ)
+                    push!(S, tᵢ)
+                    if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
+                        return :done
+                    end
+                end
+            end
         end
     end
     :incomplete
@@ -120,5 +135,3 @@ function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVe
     end
     false
 end
-
-always_false(x) = false
