@@ -1,10 +1,10 @@
-export StaticParameterHomotopy, ParameterHomotopyCache, gamma
+export ParameterHomotopy, nparameters
 
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 import StaticPolynomials
 const SP = StaticPolynomials
-import StaticArrays: MVector, SVector
+import StaticArrays: SVector
 
 import ..Utilities
 
@@ -77,11 +77,21 @@ cache(::ParameterHomotopy, x, t) = NullCache()
 
 Base.size(H::ParameterHomotopy{N, NVars}) where {N, NVars} = (N, NVars)
 
+"""
+    nparameters(H::ParameterHomotopy)
+
+Returns the number of parameters of `H`.
+"""
+function nparameters(::ParameterHomotopy{N, NVars, NParams}) where {N, NVars, NParams}
+    NParams
+end
+
 @inline function p(H::ParameterHomotopy, t)
     p₁, p₀ = H.p
     if H.γ === nothing
         return t * p₁ + (1 - t) * p₀
     else
+        # compute (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)
         γ₁, γ₀ = H.γ
         ₜγ₁, γ₀_₁₋ₜ = t * γ₁, (1 - t) * γ₀
         γ = (ₜγ₁ + γ₀_₁₋ₜ)
