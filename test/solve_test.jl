@@ -174,6 +174,11 @@
         S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], homvar=z)
         @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
         @test nfinite(S2) == 1
+
+        γ₁, γ₀ =randn(ComplexF64, 2)
+        S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], γ₁=γ₁, γ₀=γ₀, homvar=z)
+        @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
+        @test nfinite(S2) == 1
     end
 
     @testset "Overdetermined" begin
