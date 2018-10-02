@@ -1,16 +1,8 @@
-using Test
-sleep(0.1)
+using Test, LinearAlgebra, Random
 using DynamicPolynomials
-sleep(0.1)
-using LinearAlgebra
-sleep(0.1)
-using Random
-sleep(0.1)
-import TreeViews
-sleep(0.1)
 using PolynomialTestSystems
-sleep(0.1)
 using HomotopyContinuation
+import TreeViews
 
 function test_treeviews(x)
     @test TreeViews.hastreeview(x)
