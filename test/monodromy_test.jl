@@ -21,6 +21,18 @@ end
 
 @testset "Monodromy" begin
 
+    @testset "Group actions" begin
+        f1 = s -> (s * s,);
+        f2 = s-> (2s, -s, 5s);
+        f3 = s -> (s + 1,);
+        action1 = HomotopyContinuation.GroupActions(f1)
+        action2 = HomotopyContinuation.GroupActions(f1, f2)
+        action3 = HomotopyContinuation.GroupActions(f1, f2, f3)
+        @test action1(3) == (9, )
+        @test action2(3) == (9, 18, -9, 45)
+        @test action3(3) == (9, 18, -9, 45, 10, 19, -8, 46)
+    end
+
     @testset "monodromy_solve" begin
         F, p, p₀, x₀ = toric_ed([3 2 1 0; 0 1 2 3])
 
