@@ -90,7 +90,7 @@ function loop(tracker, x₀::Vector, p₀::SVector, params::TriangleParameters, 
     return ProjectiveVectors.affine(cache.x₁), retcode
 end
 
-function track!(u, tracker::PathTracking.PathTracker, x, stats::MonodromyStatistics)
+function track!(u, tracker::PathTracking.PathTracker, x, stats::Statistics)
     retcode = PathTracking.track!(u, tracker, x, 1.0, 0.0)
     pathtracked!(stats, retcode)
     retcode
