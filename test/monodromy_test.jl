@@ -25,9 +25,9 @@ end
         f1 = s -> (s * s,);
         f2 = s-> (2s, -s, 5s);
         f3 = s -> (s + 1,);
-        action1 = HomotopyContinuation.GroupActions(f1)
-        action2 = HomotopyContinuation.GroupActions(f1, f2)
-        action3 = HomotopyContinuation.GroupActions(f1, f2, f3)
+        action1 = Monodromy.GroupActions(f1)
+        action2 = Monodromy.GroupActions(f1, f2)
+        action3 = Monodromy.GroupActions(f1, f2, f3)
         @test action1(3) == (9, )
         @test action2(3) == (9, 18, -9, 45)
         @test action3(3) == (9, 18, -9, 45, 10, 19, -8, 46)
@@ -67,7 +67,7 @@ end
                 t² = t * t
                 (vcat(t * s[1], t * s[2], s[3:end]),
                  vcat(t² * s[1], t² * s[2], s[3:end]))
-            end, HomotopyContinuation.complex_conjugation))
+            end, Monodromy.complex_conjugation))
         @test length(result.solutions) == 21
     end
 end

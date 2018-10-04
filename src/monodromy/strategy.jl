@@ -1,9 +1,9 @@
 # INTERFACE
 
 # Each Strategy has it's own state and cache
-abstract type MonodromyStrategy end
-abstract type MonodromyStrategyParameters end
-abstract type MonodromyStrategyCache end
+abstract type AbstractStrategy end
+abstract type AbstractStrategyParameters end
+abstract type AbstractStrategyCache end
 
 
 """
@@ -14,14 +14,14 @@ Construct the parameters of the given `strategy`.
 function parameters end
 
 """
-    regenerate(parameters::MonodromyStrategyParameters)::MonodromyStrategyParameters
+    regenerate(parameters::AbstractStrategyParameters)::AbstractStrategyParameters
 
 Regenerate the parameters of given strategy.
 """
 function regenerate end
 
 """
-    cache(strategy::MonodromyStrategy, tracker)::MonodromyStrategyParameters
+    cache(strategy::AbstractStrategy, tracker)::AbstractStrategyParameters
 
 Regenerate the parameters of given strategy.
 """
@@ -30,8 +30,8 @@ function cache end
 ############
 # Triangle
 ############
-struct Triangle <: MonodromyStrategy end
-struct TriangleParameters{N, T} <: MonodromyStrategyParameters
+struct Triangle <: AbstractStrategy end
+struct TriangleParameters{N, T} <: AbstractStrategyParameters
     p₁::SVector{N, T}
     p₂::SVector{N, T}
 
@@ -59,7 +59,7 @@ function regenerate(params::TriangleParameters{N, T}) where {N, T}
     TriangleParameters(p₁, p₂, γ)
 end
 
-struct TriangleCache{T, H} <: MonodromyStrategyCache
+struct TriangleCache{T, H} <: AbstractStrategyCache
     x₁::ProjectiveVectors.PVector{T, H}
     x₂::ProjectiveVectors.PVector{T, H}
 end

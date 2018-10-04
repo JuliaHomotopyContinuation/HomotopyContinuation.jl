@@ -1,7 +1,12 @@
+module Monodromy
+
 export monodromy_solve
 
-import StaticArrays: SVector, @SVector
 import LinearAlgebra
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
+import StaticArrays: SVector, @SVector
+import ..Homotopies, ..PathTracking, ..ProjectiveVectors
 
 
 mutable struct MonodromyStatistics
@@ -31,65 +36,7 @@ end
 ############
 
 include("monodromy/strategy.jl")
-
-
-################
-# Group actions
-################
-"""
-    GroupActions(actions::Function...)
-
-Store a bunch of group actions `(f1, f2, f3, ...)`.
-Each action has to return a tuple.
-The actions are applied in the following sense
-1) f1 is applied on the original solution `s`
-2) f2 is applied on `s` and the results of 1
-3) f3 is applied on `s` and the results of 1) and 2)
-and so on
-
-## Example
-```julia-repl
-julia> f1(s) = (s * s,);
-
-julia> f2(s) = (2s, -s, 5s);
-
-julia> f3(s) = (s + 1,);
-
-julia> GroupActions(f1)(3)
-(9,)
-
-julia> GroupActions(f1,f2)(3)
-(9, 18, -9, 45)
-
-julia> GroupActions(f1,f2, f3)(3)
-(9, 18, -9, 45, 10, 19, -8, 46)
-```
-"""
-struct GroupActions{T<:Tuple}
-    actions::T
-end
-GroupActions(::Nothing) = GroupActions(())
-GroupActions(actions::GroupActions) = actions
-GroupActions(actions::Function...) = GroupActions(actions)
-function (group_action::GroupActions)(solution)
-    apply_group_action(group_action.actions, solution)
-end
-apply_group_action(::Tuple{}, solution) = ()
-# special case 1 function case
-function apply_group_action(actions::Tuple{<:Function}, solution)
-    (actions[1])(solution)
-end
-function apply_group_action(actions::Tuple, solution)
-    f, rest = actions[1], Base.tail(actions)
-    _apply_group_action(rest, f(solution))
-end
-function _apply_group_action(actions::Tuple, solutions::Tuple)
-    foldl((acc, f) -> begin
-        (acc..., foldl(flattentuple, map(f, acc); init=())...)
-    end, actions; init=solutions)
-end
-flattentuple(a::Tuple, b::Tuple) = tuple(a..., b...)
-
+include("monodromy/group_actions.jl")
 
 
 ##############
@@ -134,7 +81,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         strategy=Triangle(), options...) where {T}
 
     comp_solutions = map(v -> complex.(v), solutions)
-    tracker = pathtracker(F, comp_solutions, parameters=parameters, p₁=p₀, p₀=p₀)
+    tracker = PathTracking.pathtracker(F, comp_solutions, parameters=parameters, p₁=p₀, p₀=p₀)
     # assemble strategy stuff
     nparams = length(p₀)
     p₀ = SVector{nparams}(p₀)
@@ -162,8 +109,8 @@ function monodromy_solve!(
     stats::MonodromyStatistics,
     tracker::PathTracking.PathTracker,
     p₀::SVector,
-    parameters::MonodromyStrategyParameters,
-    strategy_cache::MonodromyStrategyCache,
+    parameters::AbstractStrategyParameters,
+    strategy_cache::AbstractStrategyCache,
     options::MonodromyOptions)
 
     t₀ = time_ns()
@@ -197,7 +144,7 @@ function monodromy_solve!(
     :success
 end
 
-function track_set!(solutions, stats::MonodromyStatistics, tracker, p₀, params::MonodromyStrategyParameters, strategy_cache, options::MonodromyOptions)
+function track_set!(solutions, stats::MonodromyStatistics, tracker, p₀, params::AbstractStrategyParameters, strategy_cache, options::MonodromyOptions)
     S = copy(solutions)
     while !isempty(S)
         s₀ = pop!(S)
@@ -245,4 +192,6 @@ function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVe
         end
     end
     false
+end
+
 end
