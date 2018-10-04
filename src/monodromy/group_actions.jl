@@ -36,21 +36,17 @@ end
 GroupActions(::Nothing) = GroupActions(())
 GroupActions(actions::GroupActions) = actions
 GroupActions(actions::Function...) = GroupActions(actions)
-function (group_action::GroupActions)(solution)
-    apply_group_action(group_action.actions, solution)
-end
-apply_group_action(::Tuple{}, solution) = ()
+
+(G::GroupActions)(solution) = apply_group_actions(G.actions, solution)
+
+apply_group_actions(::Tuple{}, solution) = ()
 # special case 1 function case
-function apply_group_action(actions::Tuple{<:Function}, solution)
-    (actions[1])(solution)
-end
-function apply_group_action(actions::Tuple, solution)
+apply_group_actions(fs::Tuple{<:Function}, solution) = (fs[1])(solution)
+# general case
+function apply_group_actions(actions::Tuple, solution)
     f, rest = actions[1], Base.tail(actions)
-    _apply_group_action(rest, f(solution))
+    foldl(rest; init=f(solution)) do acc, f
+        foldl(flatten, map(f, acc); init=acc)
+    end
 end
-function _apply_group_action(actions::Tuple, solutions::Tuple)
-    foldl((acc, f) -> begin
-        (acc..., foldl(flattentuple, map(f, acc); init=())...)
-    end, actions; init=solutions)
-end
-flattentuple(a::Tuple, b::Tuple) = tuple(a..., b...)
+flatten(a::Tuple, b::Tuple) = (a..., b...)

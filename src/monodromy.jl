@@ -15,8 +15,6 @@ include("monodromy/statistics.jl")
 include("monodromy/strategy.jl")
 
 
-
-
 struct MonodromyResult{T}
     returncode::Symbol
     solutions::Vector{Vector{T}}
