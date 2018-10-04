@@ -36,35 +36,38 @@ end
     @testset "monodromy_solve" begin
         F, p, p₀, x₀ = toric_ed([3 2 1 0; 0 1 2 3])
 
-        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21)
-        @test length(solutions) == 21
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21)
+        @test result.returncode == :success
+        @test length(result.solutions) == 21
+        @test result.statistics.ntrackedpaths ≥ 21
+        @test result.statistics.ninstances ≥ 1
 
         # test that timeout works
         Random.seed!(123)
-        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, timeout=1e-9)
-        @test length(solutions) < 21
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, timeout=1e-9)
+        @test length(result.solutions) < 21
 
-        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
                 done_callback=(s -> true))
-        @test length(solutions) == 2
+        @test length(result.solutions) == 2
 
-        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
             group_action=(s -> begin
                 t = cis(π*2/3)
                 t² = t * t
                 (vcat(t * s[1], t * s[2], s[3:end]),
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end))
-        @test length(solutions) == 21
+        @test length(result.solutions) == 21
 
 
-        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
             group_actions=(s -> begin
                 t = cis(π*2/3)
                 t² = t * t
                 (vcat(t * s[1], t * s[2], s[3:end]),
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end, HomotopyContinuation.complex_conjugation))
-        @test length(solutions) == 21
+        @test length(result.solutions) == 21
     end
 end

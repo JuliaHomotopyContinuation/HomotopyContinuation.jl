@@ -69,23 +69,29 @@ function cache(strategy::Triangle, tracker::PathTracking.PathTracker)
 end
 
 
-function loop(tracker, x₀::Vector, p₀::SVector, params::TriangleParameters, cache::TriangleCache)
+function loop(tracker, x₀::Vector, p₀::SVector, params::TriangleParameters, cache::TriangleCache, stats)
     H = Homotopies.basehomotopy(tracker.homotopy)::Homotopies.ParameterHomotopy
 
     Homotopies.set_parameters!(H, (p₀, params.p₁), params.γ)
-    retcode = PathTracking.track!(cache.x₁, tracker, x₀, 1.0, 0.0)
+    retcode = track!(cache.x₁, tracker, x₀, stats)
     if retcode != :success
         return x₀, retcode
     end
 
     Homotopies.set_parameters!(H, (params.p₁, params.p₂))
-    retcode = PathTracking.track!(cache.x₁, tracker, cache.x₁, 1.0, 0.0)
+    retcode = track!(cache.x₁, tracker, cache.x₁, stats)
     if retcode != :success
         return x₀, retcode
     end
 
     Homotopies.set_parameters!(H, (params.p₂, p₀))
-    retcode = PathTracking.track!(cache.x₁, tracker, cache.x₁, 1.0, 0.0)
+    retcode = track!(cache.x₁, tracker, cache.x₁, stats)
 
     return ProjectiveVectors.affine(cache.x₁), retcode
+end
+
+function track!(u, tracker::PathTracking.PathTracker, x, stats::MonodromyStatistics)
+    retcode = PathTracking.track!(u, tracker, x, 1.0, 0.0)
+    pathtracked!(stats, retcode)
+    retcode
 end

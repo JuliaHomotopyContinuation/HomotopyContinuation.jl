@@ -4,6 +4,28 @@ import StaticArrays: SVector, @SVector
 import LinearAlgebra
 
 
+mutable struct MonodromyStatistics
+    ntrackedpaths::Int
+    ntrackingfailures::Int
+    ninstances::Int
+end
+MonodromyStatistics() = MonodromyStatistics(0, 0, 0)
+
+function pathtracked!(stats::MonodromyStatistics, retcode)
+    if retcode == :success
+        stats.ntrackedpaths += 1
+    else
+        stats.ntrackingfailures += 1
+    end
+end
+
+struct MonodromyResult{T}
+    returncode::Symbol
+    solutions::Vector{Vector{T}}
+    statistics::MonodromyStatistics
+end
+
+
 ############
 # Strategy
 ############
@@ -100,13 +122,6 @@ complex_conjugation(x) = (conj.(x),)
 
 
 
-struct MonodromyStatistics
-    ntrackedpaths::Int
-    ntrackingfailures::Int
-    ntriangles::Int
-end
-MonodromyStatistics() = MonodromyStatistics(0, 0, 0)
-
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
         p₀::AbstractVector{<:Number}, solution::Vector{<:Number}; kwargs...)
 
@@ -124,14 +139,18 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     nparams = length(p₀)
     p₀ = SVector{nparams}(p₀)
     strategy_params, strategy_cache = strategy_parameters_cache(strategy, tracker, p₀)
-    monodromy_solve!(
+    statistics = MonodromyStatistics()
+    retcode = monodromy_solve!(
         comp_solutions,
+        statistics,
         tracker,
         p₀,
         strategy_params,
         strategy_cache,
         MonodromyOptions(;options...)
         )
+
+    MonodromyResult(retcode, comp_solutions, statistics)
 end
 
 function strategy_parameters_cache(strategy, tracker, p₀)
@@ -140,6 +159,7 @@ end
 
 function monodromy_solve!(
     solutions::Vector{<:Vector{<:Complex}},
+    stats::MonodromyStatistics,
     tracker::PathTracking.PathTracker,
     p₀::SVector,
     parameters::MonodromyStrategyParameters,
@@ -154,13 +174,14 @@ function monodromy_solve!(
     for i=1:n
         retcode = apply_group_actions_greedily!(nothing, solutions, solutions[i], options)
         if retcode == :done
-            return :done
+            return :success
         end
     end
 
 
     while length(solutions) < options.target_solutions_count
-        retcode = track_set!(solutions, tracker, p₀, parameters, strategy_cache, options)
+        stats.ninstances += 1
+        retcode = track_set!(solutions, stats, tracker, p₀, parameters, strategy_cache, options)
 
         if retcode == :done
             break
@@ -168,18 +189,19 @@ function monodromy_solve!(
 
         dt = (time_ns() - t₀) * 1e-9
         if dt > options.timeout
-            break
+            return :timeout
         end
         parameters = regenerate(parameters)
     end
-    solutions
+
+    :success
 end
 
-function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameters, strategy_cache, options::MonodromyOptions)
+function track_set!(solutions, stats::MonodromyStatistics, tracker, p₀, params::MonodromyStrategyParameters, strategy_cache, options::MonodromyOptions)
     S = copy(solutions)
     while !isempty(S)
         s₀ = pop!(S)
-        s₁, retcode = loop(tracker, s₀, p₀, params, strategy_cache)
+        s₁, retcode = loop(tracker, s₀, p₀, params, strategy_cache, stats)
         if retcode == :success && !iscontained(solutions, s₁)
             push!(solutions, s₁)
             push!(S, s₁)
