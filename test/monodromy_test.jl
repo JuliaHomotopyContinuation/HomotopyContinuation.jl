@@ -56,5 +56,15 @@ end
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end))
         @test length(solutions) == 21
+
+
+        solutions = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+            group_actions=(s -> begin
+                t = cis(π*2/3)
+                t² = t * t
+                (vcat(t * s[1], t * s[2], s[3:end]),
+                 vcat(t² * s[1], t² * s[2], s[3:end]))
+            end, HomotopyContinuation.complex_conjugation))
+        @test length(solutions) == 21
     end
 end

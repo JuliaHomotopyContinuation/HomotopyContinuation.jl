@@ -46,6 +46,8 @@ julia> GroupActions(f1,f2, f3)(3)
 struct GroupActions{T<:Tuple}
     actions::T
 end
+GroupActions(::Nothing) = GroupActions(())
+GroupActions(actions::GroupActions) = actions
 GroupActions(actions::Function...) = GroupActions(actions)
 function (group_action::GroupActions)(solution)
     apply_group_action(group_action.actions, solution)
@@ -75,30 +77,28 @@ flattentuple(a::Tuple, b::Tuple) = tuple(a..., b...)
 
 
 
-struct MonodromyOptions{F1<:Function, F2<:Union{Tuple, Function}}
+struct MonodromyOptions{F1<:Function, F2<:Tuple}
     target_solutions_count::Int
     timeout::Float64
     done_callback::F1
-    group_action::F2
+    group_actions::GroupActions{F2}
 end
 
 function MonodromyOptions(;
     target_solutions_count=error("target_solutions_count not provided"),
     timeout=float(typemax(Int)),
     done_callback=always_false,
-    group_action=always_empty)
+    group_action=nothing,
+    group_actions=GroupActions(group_action))
 
-    MonodromyOptions(target_solutions_count, float(timeout), done_callback, group_action)
+    MonodromyOptions(target_solutions_count, float(timeout), done_callback, GroupActions(group_actions))
 end
 
 always_false(x) = false
-always_empty(x) = ()
+complex_conjugation(x) = (conj.(x),)
 
 
-function complex_conjugation(s)
 
-
-end
 
 struct MonodromyStatistics
     ntrackedpaths::Int
@@ -148,6 +148,17 @@ function monodromy_solve!(
 
     t₀ = time_ns()
     k = 0
+
+    # We prepopulate the solutions
+    n = length(solutions)
+    for i=1:n
+        retcode = apply_group_actions_greedily!(nothing, solutions, solutions[i], options)
+        if retcode == :done
+            return :done
+        end
+    end
+
+
     while length(solutions) < options.target_solutions_count
         retcode = track_set!(solutions, tracker, p₀, parameters, strategy_cache, options)
 
@@ -176,18 +187,32 @@ function track_set!(solutions, tracker, p₀, params::MonodromyStrategyParameter
                 return :done
             end
 
-            for tᵢ in options.group_action(s₁)
-                if !iscontained(solutions, tᵢ)
-                    push!(solutions, tᵢ)
-                    push!(S, tᵢ)
-                    if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
-                        return :done
-                    end
-                end
+            retcode = apply_group_actions_greedily!(S, solutions, s₁, options)
+            if retcode == :done
+                return :done
             end
         end
     end
     :incomplete
+end
+
+function apply_group_actions_greedily!(S, solutions, s, options)
+    for tᵢ in options.group_actions(s)
+        if !iscontained(solutions, tᵢ)
+            push!(solutions, tᵢ)
+            if !(S isa Nothing)
+                push!(S, tᵢ)
+            end
+            if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
+                return :done
+            end
+            retcode = apply_group_actions_greedily!(S, solutions, tᵢ, options)
+            if retcode == :done
+                return :done
+            end
+        end
+    end
+    return :incomplete
 end
 
 function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVector}
