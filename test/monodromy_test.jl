@@ -40,7 +40,11 @@ end
         @test result.returncode == :success
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21
-        @test result.statistics.ninstances ≥ 1
+        @test result.statistics.nparametergenerations ≥ 1
+
+        # By group_actions=nothing we force that complex conjugation is not used.
+        result2 = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, group_actions=nothing)
+        @test result2.returncode == :success
 
         # test that timeout works
         Random.seed!(123)
@@ -59,7 +63,6 @@ end
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end))
         @test length(result.solutions) == 21
-
 
         result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
             group_actions=(s -> begin

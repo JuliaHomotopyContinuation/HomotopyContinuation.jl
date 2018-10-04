@@ -12,9 +12,10 @@ import ..Homotopies, ..PathTracking, ..ProjectiveVectors
 mutable struct MonodromyStatistics
     ntrackedpaths::Int
     ntrackingfailures::Int
-    ninstances::Int
+    nparametergenerations::Int
+    nsolutions_development::Vector{Int}
 end
-MonodromyStatistics() = MonodromyStatistics(0, 0, 0)
+MonodromyStatistics() = MonodromyStatistics(0, 0, 0, Int[])
 
 function pathtracked!(stats::MonodromyStatistics, retcode)
     if retcode == :success
@@ -22,6 +23,11 @@ function pathtracked!(stats::MonodromyStatistics, retcode)
     else
         stats.ntrackingfailures += 1
     end
+end
+
+function generated_parameters!(stats::MonodromyStatistics, nsolutions::Int)
+    stats.nparametergenerations += 1
+    push!(stats.nsolutions_development, nsolutions)
 end
 
 struct MonodromyResult{T}
@@ -53,20 +59,25 @@ struct MonodromyOptions{F1<:Function, F2<:Tuple}
     group_actions::GroupActions{F2}
 end
 
-function MonodromyOptions(;
+function MonodromyOptions(isrealsystem;
     target_solutions_count=error("target_solutions_count not provided"),
     timeout=float(typemax(Int)),
     done_callback=always_false,
     group_action=nothing,
     group_actions=GroupActions(group_action))
 
-    MonodromyOptions(target_solutions_count, float(timeout), done_callback, GroupActions(group_actions))
+    if isrealsystem &&
+       (group_actions isa GroupActions{Tuple{}}) # i.e. no group_actions provided
+       actions = GroupActions(complex_conjugation)
+    else
+       actions = GroupActions(group_actions)
+   end
+
+    MonodromyOptions(target_solutions_count, float(timeout), done_callback, actions)
 end
 
 always_false(x) = false
 complex_conjugation(x) = (conj.(x),)
-
-
 
 
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
@@ -80,6 +91,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=Triangle(), options...) where {T}
 
+    isrealsystem = eltype(p₀) <: Real && T <: Real
+
     comp_solutions = map(v -> complex.(v), solutions)
     tracker = PathTracking.pathtracker(F, comp_solutions, parameters=parameters, p₁=p₀, p₀=p₀)
     # assemble strategy stuff
@@ -87,6 +100,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     p₀ = SVector{nparams}(p₀)
     strategy_params, strategy_cache = strategy_parameters_cache(strategy, tracker, p₀)
     statistics = MonodromyStatistics()
+
     retcode = monodromy_solve!(
         comp_solutions,
         statistics,
@@ -94,7 +108,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         p₀,
         strategy_params,
         strategy_cache,
-        MonodromyOptions(;options...)
+        MonodromyOptions(isrealsystem;options...)
         )
 
     MonodromyResult(retcode, comp_solutions, statistics)
@@ -115,9 +129,9 @@ function monodromy_solve!(
 
     t₀ = time_ns()
     k = 0
-
-    # We prepopulate the solutions
     n = length(solutions)
+    generated_parameters!(stats, n)
+    # We prepopulate the solutions
     for i=1:n
         retcode = apply_group_actions_greedily!(nothing, solutions, solutions[i], options)
         if retcode == :done
@@ -127,7 +141,6 @@ function monodromy_solve!(
 
 
     while length(solutions) < options.target_solutions_count
-        stats.ninstances += 1
         retcode = track_set!(solutions, stats, tracker, p₀, parameters, strategy_cache, options)
 
         if retcode == :done
@@ -139,6 +152,7 @@ function monodromy_solve!(
             return :timeout
         end
         parameters = regenerate(parameters)
+        generated_parameters!(stats, length(solutions))
     end
 
     :success
