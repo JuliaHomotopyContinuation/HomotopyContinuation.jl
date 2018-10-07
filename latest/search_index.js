@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#Base.real-Tuple{Union{Result, Array{#s82,1} where #s82<:PathResult}}",
+    "location": "solving.html#Base.real-Tuple{Union{Result, Array{#s91,1} where #s91<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
