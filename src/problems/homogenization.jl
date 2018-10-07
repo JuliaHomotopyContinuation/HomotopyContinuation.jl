@@ -25,7 +25,7 @@ struct Homogenization <: AbstractHomogenization
 end
 function Homogenization(homvar::MP.AbstractVariable, variables::Vector{<:MP.AbstractVariable})
     homvaridx = findfirst(var -> var == homvar, variables)
-    if homvaridx == 0 || homvaridx === nothing # 0.6 and 0.7
+    if homvaridx === nothing
         throw(error("homvar $homvar doesn't occur in the variables!"))
     end
     Homogenization(homvaridx)
