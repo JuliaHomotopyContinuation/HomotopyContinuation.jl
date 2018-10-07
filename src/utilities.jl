@@ -69,11 +69,91 @@ and stores the result in `b`.
 function solve!(A::StridedMatrix, b::StridedVecOrMat)
     m, n = size(A)
     if m == n
-        LinearAlgebra.ldiv!(LinearAlgebra.generic_lufact!(A), b)
+        lusolve!(A, b)
     else
         LinearAlgebra.ldiv!(LinearAlgebra.qr!(A), b)
     end
     b
+end
+
+# This is an adoption of LinearAlgebra.generic_lufact!
+# with 3 changes:
+# 1) For choosing the pivot we use abs2 instead of abs
+# 2) Instead of using the robust complex division we
+#    just use the naive division. This shouldn't
+#    lead to problems since numerical diffuculties only
+#    arise for very large or small exponents
+# 3) We fold lu! and ldiv! into one routine
+#    this has the effect that we do not need to allocate
+#    the pivot vector anymore and also avoid the allocations
+#    coming from the LU wrapper
+function lusolve!(A::AbstractMatrix{T}, b::Vector{T}, ::Val{Pivot} = Val(true)) where {T,Pivot}
+    m, n = size(A)
+    minmn = min(m,n)
+    # LU Factorization
+    @inbounds begin
+        for k = 1:minmn
+            # find index max
+            kp = k
+            if Pivot
+                amax = zero(real(T))
+                for i = k:m
+                    absi = abs2(A[i,k])
+                    if absi > amax
+                        kp = i
+                        amax = absi
+                    end
+                end
+            end
+            if !iszero(A[kp,k])
+                if k != kp
+                    # Interchange
+                    for i = 1:n
+                        tmp = A[k,i]
+                        A[k,i] = A[kp,i]
+                        A[kp,i] = tmp
+                    end
+                    b[k], b[kp] = b[kp], b[k]
+                end
+                # Scale first column
+                Akkinv = @fastmath inv(A[k,k])
+                for i = k+1:m
+                    A[i,k] *= Akkinv
+                end
+            end
+            # Update the rest
+            for j = k+1:n
+                for i = k+1:m
+                    A[i,j] -= A[i,k]*A[k,j]
+                end
+            end
+        end
+    end
+    # now forward and backward substitution
+    ldiv_unit_lower!(A, b)
+    ldiv_upper!(A, b)
+    b
+end
+@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
+    n = size(A, 2)
+    for j in n:-1:1
+        @inbounds iszero(A[j,j]) && throw(SingularException(j))
+        @inbounds xj = x[j] = (@fastmath A[j,j] \ b[j])
+        for i in 1:(j-1)
+            @inbounds b[i] -= A[i,j] * xj
+        end
+    end
+    b
+end
+@inline function ldiv_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
+    n = size(A, 2)
+    @inbounds for j in 1:n
+        xj = x[j] = b[j]
+        for i in j+1:n
+            b[i] -= A[i,j] * xj
+        end
+    end
+    x
 end
 
 """
