@@ -10,13 +10,12 @@ struct SearchBlock{T}
     elements::Vector{Int32}
     children::Vector{Union{Nothing, SearchBlock{T}}}
     capacity::Int
-
-    distances_cache::Vector{Tuple{T, Int}}
+    distances_cache::Vector{Vector{Tuple{T, Int}}} # one per thread
 end
 
 function SearchBlock(::Type{T}; capacity = DEFAULT_CAPACITY[]) where T
     children = Vector{Union{Nothing, SearchBlock{T}}}(nothing, capacity)
-    distances_cache = Vector{Tuple{T, Int}}()
+    distances_cache = [Vector{Tuple{T, Int}}() for _=1:Threads.nthreads()]
     SearchBlock(Int32[], children, capacity, distances_cache)
 end
 
@@ -26,7 +25,7 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) where V
+function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}, threadid=Threads.threadid()) where V
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -35,7 +34,7 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) whe
     d = distance(points[block.elements[1]], x)
     minᵢ = 1
 
-    distances = block.distances_cache
+    distances = block.distances_cache[threadid]
     empty!(distances)
     push!(distances, (d, 1))
 
@@ -59,7 +58,7 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) whe
     for i ∈ N:-1:1
         dᵢ, minᵢ = distances[i]
         if abs(d - dᵢ) < 2*tol # What is the correct constant?
-            retidx = iscontained(block.children[minᵢ], x, tol, points)
+            retidx = iscontained(block.children[minᵢ], x, tol, points, threadid)
             if retidx ≠ NOT_FOUND
                 return retidx
             end
@@ -70,17 +69,18 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) whe
 
     return NOT_FOUND
 end
-iscontained(::Nothing, x::V, tol::Real, points::Vector{V}) where V = NOT_FOUND
+iscontained(::Nothing, x::V, tol::Real, points::Vector{V}, threadid) where V = NOT_FOUND
 
 # This assumes that distances_cache is filled
-function _insert!(block::SearchBlock{T}, index::Integer) where {T, V}
+function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
     if isempty(block.elements)
         push!(block.elements, index)
     end
-    N = length(block.distances_cache)
+    distances = block.distances_cache[threadid]
+    N = length(distances)
     @assert N != 0
 
-    dᵢ, minᵢ = block.distances_cache[end]
+    dᵢ, minᵢ = distances[end]
     # if not filled so far, just add it to the current block
     if length(block.elements) < block.capacity
         push!(block.elements, index)
@@ -88,8 +88,15 @@ function _insert!(block::SearchBlock{T}, index::Integer) where {T, V}
     elseif block.children[minᵢ] === nothing
         block.children[minᵢ] = SearchBlock(T, index; capacity=block.capacity)
     else # a block already exists, so recurse
-        _insert!(block.children[minᵢ], index)
+        _insert!(block.children[minᵢ], index, threadid)
     end
+end
+
+function Base.empty!(block::SearchBlock)
+    empty!(block.elements)
+    block.children .= nothing
+
+    nothing
 end
 
 #############
@@ -151,6 +158,11 @@ function add!(tree::SearchTree{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e
 end
 
 Base.length(tree::SearchTree) = length(tree.points)
+
+function Base.empty!(tree::SearchTree)
+    empty!(tree.root)
+    empty!(tree.points)
+end
 
 function distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
     n = length(x)

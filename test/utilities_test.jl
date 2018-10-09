@@ -23,7 +23,7 @@
         @test norm(d[1:12] - A \ b) < 1e-10
     end
 
-    @testset "SeachTree" begin
+    @testset "SearchTree" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
         indices = unique!(rand(1:2000, 100))
