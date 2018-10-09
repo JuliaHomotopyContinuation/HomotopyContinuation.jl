@@ -1,7 +1,11 @@
 export SearchTree, iscontained, add!
 
-const DEFAULT_CAPACITY = Ref(7)
+const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
+const NOT_FOUND = -1
 
+#############
+# SearchBlock
+#############
 struct SearchBlock{T}
     elements::Vector{Int32}
     children::Vector{Union{Nothing, SearchBlock{T}}}
@@ -24,7 +28,7 @@ end
 
 function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) where V
     if isempty(block.elements)
-        return false
+        return NOT_FOUND
     end
 
     n = length(block.elements)
@@ -36,14 +40,14 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) whe
     push!(distances, (d, 1))
 
     if d < tol
-        return true
+        return block.elements[1]
     end
 
     for i ∈ 2:n
         dᵢ = distance(points[block.elements[i]], x)
         if dᵢ < d
             if dᵢ < tol
-                return true
+                return block.elements[i]
             end
             d = dᵢ
             minᵢ = i
@@ -55,17 +59,18 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}) whe
     for i ∈ N:-1:1
         dᵢ, minᵢ = distances[i]
         if abs(d - dᵢ) < 2*tol # What is the correct constant?
-            if iscontained(block.children[minᵢ], x, tol, points)
-                return true
+            retidx = iscontained(block.children[minᵢ], x, tol, points)
+            if retidx ≠ NOT_FOUND
+                return retidx
             end
         else
-            return false
+            return NOT_FOUND
         end
     end
 
-    return false
+    return NOT_FOUND
 end
-iscontained(::Nothing, x::V, tol::Real, points::Vector{V}) where V = false
+iscontained(::Nothing, x::V, tol::Real, points::Vector{V}) where V = NOT_FOUND
 
 # This assumes that distances_cache is filled
 function _insert!(block::SearchBlock{T}, index::Integer) where {T, V}
@@ -87,6 +92,17 @@ function _insert!(block::SearchBlock{T}, index::Integer) where {T, V}
     end
 end
 
+#############
+# SearchTree
+#############
+
+"""
+    SearchTree{V<:AbstractVector, T}
+
+A data structure which holds all known solutions of type `V`. This data structure
+provides an efficient (poly)logarithmic check whether a solution already exists where
+two solutions are considered equal if their 2-norm is less than `tol`.
+"""
 struct SearchTree{V<:AbstractVector, T}
     root::SearchBlock{T}
     points::Vector{V}
@@ -106,19 +122,35 @@ function SearchTree(v::AbstractVector{<:AbstractVector}; kwargs...)
     tree
 end
 
-function iscontained(tree::SearchTree{V}, x::V; tol::Real=1e-5) where V
-    iscontained(tree.root, x, tol, tree.points)
-end
-
-function add!(tree::SearchTree{V}, x::V; tol::Real=1e-5) where V
-    if iscontained(tree.root, x, tol, tree.points)
-        return false
+function iscontained(tree::SearchTree{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+    if Index
+        iscontained(tree.root, x, tol, tree.points)
+    else
+        iscontained(tree.root, x, tol, tree.points) ≠ NOT_FOUND
     end
-
-    push!(tree.points, x)
-    _insert!(tree.root, length(tree.points))
-    true
 end
+
+function add!(tree::SearchTree{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+    if Index
+        idx = iscontained(tree.root, x, tol, tree.points)
+        if idx ≠ NOT_FOUND
+            return idx
+        end
+        push!(tree.points, x)
+        _insert!(tree.root, length(tree.points))
+        NOT_FOUND
+    else
+        if iscontained(tree.root, x, tol, tree.points) ≠ NOT_FOUND
+            return false
+        end
+
+        push!(tree.points, x)
+        _insert!(tree.root, length(tree.points))
+        true
+    end
+end
+
+Base.length(tree::SearchTree) = length(tree.points)
 
 function distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
     n = length(x)

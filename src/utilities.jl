@@ -25,6 +25,8 @@ export allvariables,
     check_kwargs_empty,
     start_solution_sample
 
+include("utilities/search_tree.jl")
+
 
 """
     check_kwargs_empty(kwargs, [allowed_kwargs])
