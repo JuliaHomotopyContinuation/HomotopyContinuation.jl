@@ -5,7 +5,6 @@ abstract type AbstractStrategy end
 abstract type AbstractStrategyParameters end
 abstract type AbstractStrategyCache end
 
-
 """
     parameters(strategy::MondromyStrategy, nparams::Integer)
 
@@ -69,7 +68,7 @@ function cache(strategy::Triangle, tracker::PathTracking.PathTracker)
 end
 
 
-function loop(tracker, x₀::Vector, p₀::SVector, params::TriangleParameters, cache::TriangleCache, stats)
+function loop(tracker, x₀::AbstractVector, p₀::SVector, params::TriangleParameters, cache::TriangleCache, stats)
     H = Homotopies.basehomotopy(tracker.homotopy)::Homotopies.ParameterHomotopy
 
     Homotopies.set_parameters!(H, (p₀, params.p₁), params.γ)

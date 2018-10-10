@@ -25,7 +25,7 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}, threadid=Threads.threadid()) where V
+function iscontained(block::SearchBlock, x::AbstractVector, tol::Real, points::Vector, threadid=Threads.threadid())
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -69,7 +69,7 @@ function iscontained(block::SearchBlock, x::V, tol::Real, points::Vector{V}, thr
 
     return NOT_FOUND
 end
-iscontained(::Nothing, x::V, tol::Real, points::Vector{V}, threadid) where V = NOT_FOUND
+iscontained(::Nothing, x::AbstractVector, tol::Real, points::Vector, threadid) = NOT_FOUND
 
 # This assumes that distances_cache is filled
 function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
@@ -161,7 +161,7 @@ If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned.
 """
-function iscontained(data::UniquePoints{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {Index}
     if Index
         iscontained(data.root, x, tol, data.points)
     else
@@ -180,7 +180,7 @@ If `x` is contained in `data` by using the tolerance `tol` to decide for duplica
 of the data point which already exists. If the data point is not existing add it to `x` and
 return `-1`. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {Index}
     if Index
         idx = iscontained(data.root, x, tol, data.points)
         if idx ≠ NOT_FOUND

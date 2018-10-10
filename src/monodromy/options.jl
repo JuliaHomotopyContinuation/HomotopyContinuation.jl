@@ -1,5 +1,6 @@
 struct Options{F1<:Function, F2<:Tuple}
     target_solutions_count::Int
+    tol::Float64
     timeout::Float64
     done_callback::F1
     group_actions::GroupActions{F2}
@@ -7,6 +8,7 @@ end
 
 function Options(isrealsystem;
     target_solutions_count=error("target_solutions_count not provided"),
+    tol::Float64=1e-6,
     timeout=float(typemax(Int)),
     done_callback=always_false,
     group_action=nothing,
@@ -19,7 +21,7 @@ function Options(isrealsystem;
        actions = GroupActions(group_actions)
    end
 
-    Options(target_solutions_count, float(timeout), done_callback, actions)
+    Options(target_solutions_count, tol, float(timeout), done_callback, actions)
 end
 
 always_false(x) = false

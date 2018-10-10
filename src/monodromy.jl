@@ -7,6 +7,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 import StaticArrays: SVector, @SVector
 import ..Homotopies, ..PathTracking, ..ProjectiveVectors
+using ..Utilities
 
 
 include("monodromy/group_actions.jl")
@@ -14,10 +15,9 @@ include("monodromy/options.jl")
 include("monodromy/statistics.jl")
 include("monodromy/strategy.jl")
 
-
-struct MonodromyResult{T}
+struct MonodromyResult{N, T}
     returncode::Symbol
-    solutions::Vector{Vector{T}}
+    solutions::Vector{SVector{N, T}}
     statistics::Statistics
 end
 
@@ -26,33 +26,51 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
 
         monodromy_solve(F, p₀, [solution]; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
+
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
         p₀::AbstractVector{<:Number},
-        solutions::Vector{<:Vector{<:Number}};
+        solutions::Vector{<:AbstractVector{<:Number}}; kwargs...)
+    monodromy_solve(F, SVector{length(p₀)}(p₀), static_solutions(solutions, Val(length(solutions[1]))); kwargs...)
+end
+
+function static_solutions(V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}}, ::Val{N}) where {N}
+    map(v -> SVector{N}(v), V)
+end
+function static_solutions(V::Vector{<:AbstractVector{<:Number}}, ::Val{N}) where {N}
+    map(v -> complex.(float.(SVector{N}(v))), V)
+end
+
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
+        p₀::SVector{NParams, <:Number},
+        solutions::Vector{<:SVector{NVars, <:Complex}};
         parameters=error("You need to provide `parameters=...` to monodromy"),
-        strategy=Triangle(), options...) where {T}
+        strategy=Triangle(), options...) where {T, NParams, NVars}
 
+    if length(p₀) ≠ length(parameters)
+        return error("Number of provided parameters doesn't match the length of initially provided parameter `p₀`.")
+    end
     isrealsystem = eltype(p₀) <: Real && T <: Real
+    opts = Options(isrealsystem; options...)
 
-    comp_solutions = map(v -> complex.(v), solutions)
-    tracker = PathTracking.pathtracker(F, comp_solutions, parameters=parameters, p₁=p₀, p₀=p₀)
+    uniquesolutions = UniquePoints(solutions, tol=opts.tol)
+
+
+    tracker = PathTracking.pathtracker(F, solutions, parameters=parameters, p₁=p₀, p₀=p₀; tol=opts.tol)
     # assemble strategy stuff
-    nparams = length(p₀)
-    p₀ = SVector{nparams}(p₀)
     strategy_params, strategy_cache = strategy_parameters_cache(strategy, tracker, p₀)
     statistics = Statistics()
 
     retcode = monodromy_solve!(
-        comp_solutions,
+        uniquesolutions,
         statistics,
         tracker,
         p₀,
         strategy_params,
         strategy_cache,
-        Options(isrealsystem;options...)
+        opts
         )
 
-    MonodromyResult(retcode, comp_solutions, statistics)
+    MonodromyResult(retcode, points(uniquesolutions), statistics)
 end
 
 function strategy_parameters_cache(strategy, tracker, p₀)
@@ -60,7 +78,7 @@ function strategy_parameters_cache(strategy, tracker, p₀)
 end
 
 function monodromy_solve!(
-    solutions::Vector{<:Vector{<:Complex}},
+    solutions::UniquePoints,
     stats::Statistics,
     tracker::PathTracking.PathTracker,
     p₀::SVector,
@@ -74,7 +92,7 @@ function monodromy_solve!(
     generated_parameters!(stats, n)
     # We prepopulate the solutions
     for i=1:n
-        retcode = apply_group_actions_greedily!(nothing, solutions, solutions[i], options)
+        retcode = apply_group_actions_greedily!(solutions, solutions[i], options)
         if retcode == :done
             return :success
         end
@@ -99,19 +117,18 @@ function monodromy_solve!(
     :success
 end
 
-function track_set!(solutions, stats::Statistics, tracker, p₀, params::AbstractStrategyParameters, strategy_cache, options::Options)
-    S = copy(solutions)
-    while !isempty(S)
-        s₀ = pop!(S)
+function track_set!(solutions::UniquePoints, stats::Statistics, tracker, p₀, params::AbstractStrategyParameters, strategy_cache, options::Options)
+    queue = copy(points(solutions))
+    while !isempty(queue)
+        s₀ = pop!(queue)
         s₁, retcode = loop(tracker, s₀, p₀, params, strategy_cache, stats)
-        if retcode == :success && !iscontained(solutions, s₁)
-            push!(solutions, s₁)
-            push!(S, s₁)
+        if retcode == :success && add!(solutions, s₁)
+            push!(queue, s₁)
             if options.done_callback(s₁) || length(solutions) ≥ options.target_solutions_count
                 return :done
             end
 
-            retcode = apply_group_actions_greedily!(S, solutions, s₁, options)
+            retcode = apply_group_actions_greedily!(solutions, s₁, options, queue)
             if retcode == :done
                 return :done
             end
@@ -120,33 +137,22 @@ function track_set!(solutions, stats::Statistics, tracker, p₀, params::Abstrac
     :incomplete
 end
 
-function apply_group_actions_greedily!(S, solutions, s, options)
+function apply_group_actions_greedily!(solutions::UniquePoints, s, options, queue=nothing)
     for tᵢ in options.group_actions(s)
-        if !iscontained(solutions, tᵢ)
-            push!(solutions, tᵢ)
-            if !(S isa Nothing)
-                push!(S, tᵢ)
+        if add!(solutions, tᵢ)
+            if queue !== nothing
+                push!(queue, tᵢ)
             end
             if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
                 return :done
             end
-            retcode = apply_group_actions_greedily!(S, solutions, tᵢ, options)
+            retcode = apply_group_actions_greedily!(solutions, tᵢ, options, queue)
             if retcode == :done
                 return :done
             end
         end
     end
     return :incomplete
-end
-
-function iscontained(solutions::Vector{T}, s_new; tol=1e-5) where {T<:AbstractVector}
-    for s in solutions
-        if LinearAlgebra.norm(s - s_new) < tol
-        # if Distances.evaluate(Euclidean(), s, s_new) < tol
-            return true
-        end
-    end
-    false
 end
 
 end
