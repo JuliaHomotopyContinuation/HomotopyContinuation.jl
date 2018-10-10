@@ -3,6 +3,7 @@ module ProjectiveVectors
 using LinearAlgebra
 import Base: ==
 import ..Utilities: infinity_norm, unsafe_infinity_norm
+import StaticArrays: SVector
 
 export AbstractProjectiveVector,
     PVector,
@@ -137,6 +138,20 @@ function affine(z::PVector{T}, i::Int) where T
     end
     x
 end
+
+similar_affine(::Vector, z::PVector{T, Int}) where {T} = affine(z, z.homvar)
+function similar_affine(::SVector{N}, z::PVector{T, Int}) where {N, T}
+    i::Int = z.homvar
+    normalizer = @fastmath inv(z.data[i])
+    SVector(ntuple(Val(N)) do j
+        if j < i
+            z.data[j] * normalizer
+        else
+            z.data[j + 1] * normalizer
+        end
+    end)
+end
+
 
 """
     affine!(z::PVector{T, Int})

@@ -37,7 +37,14 @@ GroupActions(::Nothing) = GroupActions(())
 GroupActions(actions::GroupActions) = actions
 GroupActions(actions::Function...) = GroupActions(actions)
 
-(G::GroupActions)(solution) = apply_group_actions(G.actions, solution)
+function (G::GroupActions)(solution::V) where V
+    convert_if_necessary(apply_group_actions(G.actions, solution), solution)
+end
+convert_if_necessary(::Tuple{}, ::Any) = ()
+convert_if_necessary(xs::NTuple{N, V}, ::V) where {N, V} = xs
+convert_if_necessary(xs, ::V) where {V} = map(x -> convert(V, x), xs)
+
+
 
 apply_group_actions(::Tuple{}, solution) = ()
 # special case 1 function case

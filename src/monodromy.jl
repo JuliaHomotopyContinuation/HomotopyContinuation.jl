@@ -13,7 +13,9 @@ using ..Utilities
 include("monodromy/group_actions.jl")
 include("monodromy/options.jl")
 include("monodromy/statistics.jl")
+include("monodromy/graph.jl")
 include("monodromy/strategy.jl")
+include("monodromy/jobs.jl")
 
 struct MonodromyResult{N, T}
     returncode::Symbol
@@ -21,28 +23,26 @@ struct MonodromyResult{N, T}
     statistics::Statistics
 end
 
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
-        p₀::AbstractVector{<:Number}, solution::Vector{<:Number}; kwargs...)
-
-        monodromy_solve(F, p₀, [solution]; kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, p₀::AbstractVector{<:Number}, solution::Vector{<:Number}; kwargs...)
+    monodromy_solve(F, p₀, [solution]; kwargs...)
 end
 
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike},
-        p₀::AbstractVector{<:Number},
-        solutions::Vector{<:AbstractVector{<:Number}}; kwargs...)
-    monodromy_solve(F, SVector{length(p₀)}(p₀), static_solutions(solutions, Val(length(solutions[1]))); kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, p₀::AbstractVector{<:Number}, solutions::Vector{<:AbstractVector{<:Number}}; kwargs...)
+    monodromy_solve(F, SVector{length(p₀)}(p₀), static_solutions(solutions); kwargs...)
 end
 
-function static_solutions(V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}}, ::Val{N}) where {N}
-    map(v -> SVector{N}(v), V)
-end
-function static_solutions(V::Vector{<:AbstractVector{<:Number}}, ::Val{N}) where {N}
+
+static_solutions(V::Vector) = static_solutions(V, Val(length(V[1])))
+function static_solutions(V::Vector, ::Val{N}) where {N}
     map(v -> complex.(float.(SVector{N}(v))), V)
+end
+function static_solutions(V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}}, ::Val{N}) where {N}
+    SVector{N}.(V)
 end
 
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
         p₀::SVector{NParams, <:Number},
-        solutions::Vector{<:SVector{NVars, <:Complex}};
+        startsolutions::Vector{<:SVector{NVars, <:Complex}};
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=Triangle(), options...) where {T, NParams, NVars}
 
@@ -52,107 +52,104 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     isrealsystem = eltype(p₀) <: Real && T <: Real
     opts = Options(isrealsystem; options...)
 
-    uniquesolutions = UniquePoints(solutions, tol=opts.tol)
-
-
-    tracker = PathTracking.pathtracker(F, solutions, parameters=parameters, p₁=p₀, p₀=p₀; tol=opts.tol)
-    # assemble strategy stuff
-    strategy_params, strategy_cache = strategy_parameters_cache(strategy, tracker, p₀)
+    #assemble
+    G = graph(strategy, p₀, first(startsolutions))
+    add_initial_solutions!(G, startsolutions; tol=opts.tol)
+    tracker = PathTracking.pathtracker(F, startsolutions, parameters=parameters, p₁=p₀, p₀=p₀; tol=opts.tol)
     statistics = Statistics()
+    # solve
+    retcode = monodromy_solve!(G, tracker, opts, statistics)
 
-    retcode = monodromy_solve!(
-        uniquesolutions,
-        statistics,
-        tracker,
-        p₀,
-        strategy_params,
-        strategy_cache,
-        opts
-        )
-
-    MonodromyResult(retcode, points(uniquesolutions), statistics)
+    MonodromyResult(retcode, points(solutions(G)), statistics)
 end
 
 function strategy_parameters_cache(strategy, tracker, p₀)
     parameters(strategy, p₀), cache(strategy, tracker)
 end
 
-function monodromy_solve!(
-    solutions::UniquePoints,
-    stats::Statistics,
-    tracker::PathTracking.PathTracker,
-    p₀::SVector,
-    parameters::AbstractStrategyParameters,
-    strategy_cache::AbstractStrategyCache,
-    options::Options)
+function monodromy_solve!(G::Graph,
+    tracker::PathTracking.PathTracker, options::Options,
+    stats::Statistics)
 
     t₀ = time_ns()
-    k = 0
-    n = length(solutions)
-    generated_parameters!(stats, n)
-    # We prepopulate the solutions
-    for i=1:n
-        retcode = apply_group_actions_greedily!(solutions, solutions[i], options)
-        if retcode == :done
-            return :success
-        end
-    end
+    # n = length(solutions)
+    # generated_parameters!(stats, n)
+    generated_parameters!(stats, length(solutions(G))) # bookkeeping
+    # # We prepopulate the solutions
+    # for i=1:n
+    #     retcode = apply_group_actions_greedily!(solutions, solutions[i], options)
+    #     if retcode == :done
+    #         return :success
+    #     end
+    # end
 
+    queue = map(x -> Job(x, G.loop[1]), solutions(G))
 
-    while length(solutions) < options.target_solutions_count
-        retcode = track_set!(solutions, stats, tracker, p₀, parameters, strategy_cache, options)
+    while length(solutions(G)) < options.target_solutions_count
+        retcode = empty_queue!(queue, G, tracker, options, t₀, stats)
 
         if retcode == :done
             break
-        end
-
-        dt = (time_ns() - t₀) * 1e-9
-        if dt > options.timeout
+        elseif retcode == :timeout
             return :timeout
         end
-        parameters = regenerate(parameters)
-        generated_parameters!(stats, length(solutions))
+
+        regenerate!(queue, G, options, stats)
     end
 
     :success
 end
 
-function track_set!(solutions::UniquePoints, stats::Statistics, tracker, p₀, params::AbstractStrategyParameters, strategy_cache, options::Options)
-    queue = copy(points(solutions))
-    while !isempty(queue)
-        s₀ = pop!(queue)
-        s₁, retcode = loop(tracker, s₀, p₀, params, strategy_cache, stats)
-        if retcode == :success && add!(solutions, s₁)
-            push!(queue, s₁)
-            if options.done_callback(s₁) || length(solutions) ≥ options.target_solutions_count
-                return :done
-            end
 
-            retcode = apply_group_actions_greedily!(solutions, s₁, options, queue)
-            if retcode == :done
-                return :done
-            end
+
+function empty_queue!(queue, G::Graph, tracker::PathTracking.PathTracker, options::Options, t₀::UInt, stats::Statistics)
+    while !isempty(queue)
+        job = pop!(queue)
+        job_result = execute(job, G, tracker, stats)
+        if process!(queue, job, job_result, G, options) == :done
+            return :done
+        end
+
+        # check timeout
+        if ns_to_s(time_ns() - t₀) > options.timeout
+            return :timeout
         end
     end
     :incomplete
 end
 
-function apply_group_actions_greedily!(solutions::UniquePoints, s, options, queue=nothing)
-    for tᵢ in options.group_actions(s)
-        if add!(solutions, tᵢ)
-            if queue !== nothing
-                push!(queue, tᵢ)
-            end
-            if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
-                return :done
-            end
-            retcode = apply_group_actions_greedily!(solutions, tᵢ, options, queue)
-            if retcode == :done
-                return :done
-            end
-        end
+ns_to_s(s) = s * 1e-9
+
+function regenerate!(queue, G::Graph, options::Options, stats::Statistics)
+    sols = solutions(G)
+
+    # create a new graph by regenerating the parameters (but don't touch our
+    # main node)
+    regenerate!(G)
+    generated_parameters!(stats, length(sols)) # bookkeeping
+
+    for x in sols
+        push!(queue, Job(x, G.loop[1]))
     end
-    return :incomplete
+    nothing
 end
+#
+# function apply_group_actions_greedily!(solutions::UniquePoints, s, options, queue=nothing)
+#     for tᵢ in options.group_actions(s)
+#         if add!(solutions, tᵢ)
+#             if queue !== nothing
+#                 push!(queue, tᵢ)
+#             end
+#             if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
+#                 return :done
+#             end
+#             retcode = apply_group_actions_greedily!(solutions, tᵢ, options, queue)
+#             if retcode == :done
+#                 return :done
+#             end
+#         end
+#     end
+#     return :incomplete
+# end
 
 end

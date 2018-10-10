@@ -75,6 +75,7 @@ iscontained(::Nothing, x::AbstractVector, tol::Real, points::Vector, threadid) =
 function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
     if isempty(block.elements)
         push!(block.elements, index)
+        return
     end
     distances = block.distances_cache[threadid]
     N = length(distances)
@@ -90,6 +91,7 @@ function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.thread
     else # a block already exists, so recurse
         _insert!(block.children[minᵢ], index, threadid)
     end
+    nothing
 end
 
 function Base.empty!(block::SearchBlock)
@@ -126,6 +128,11 @@ struct UniquePoints{V<:AbstractVector, T}
     points::Vector{V}
 end
 
+function UniquePoints(v::Type{V}) where {T<:Number, V<:AbstractVector{T}}
+    root = SearchBlock(real(T))
+    points = Vector{V}()
+    UniquePoints(root, points)
+end
 function UniquePoints(v::AbstractVector{T}) where {T<:Number}
     root = SearchBlock(real(T), 1)
     points = [v]
@@ -138,6 +145,12 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}; kwargs...)
         add!(data, v[i]; kwargs...)
     end
     data
+end
+
+function Base.similar(data::UniquePoints{V, T}) where {V, T}
+    root = SearchBlock(T)
+    points = Vector{V}()
+    UniquePoints(root, points)
 end
 
 """
@@ -200,7 +213,25 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
     end
 end
 
+"""
+    unsafe_add!(data::UniquePoints{V}, x::V)::Bool
+
+Similarly to [`add!`](@ref) but assumes that it was already checked that there is no
+duplicate with [`iscontained`](@ref). *This has to be called directly after `iscontained`
+with the same value of `x`*.
+"""
+function unsafe_add!(data::UniquePoints, x::AbstractVector) where {Index}
+    push!(data.points, x)
+    _insert!(data.root, length(data.points))
+
+end
+
 Base.length(data::UniquePoints) = length(data.points)
+
+Base.iterate(data::UniquePoints) = iterate(data.points)
+Base.iterate(data::UniquePoints, state) = iterate(data.points, state)
+Base.eltype(::Type{<:UniquePoints{V}}) where {V} = V
+Base.size(data::UniquePoints) = size(data.points)
 
 """
     empty!(data::UniquePoints)
