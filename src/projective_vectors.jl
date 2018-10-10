@@ -12,6 +12,7 @@ export AbstractProjectiveVector,
     affine,
     affine!,
     embed,
+    embed!,
     at_infinity,
     pvectors,
     infinity_norm,
@@ -82,21 +83,23 @@ Embed a vector `x` into projective space with homogenization variable `homvar`.
 
 Embed a vector `x` into projective space the same way `x` was embedded.
 """
-function embed(x::Vector{T}, homvar) where T
-    k = 1
+function embed(x::AbstractVector{T}, homvar) where T
     data = Vector{T}(undef, length(x) + 1)
-    @inbounds for k in 1:length(data)
-        if k == homvar
-            data[k] = one(T)
+    embed!(PVector(data, homvar), x)
+end
+embed(z::PVector, x::AbstractVector) = embed(x, z.homvar)
+
+function embed!(z::PVector{T}, x::AbstractVector{T}) where T
+    @inbounds for k in 1:length(z.data)
+        if k == z.homvar
+            z.data[k] = one(T)
         else
-            i = k < homvar ? k : k - 1
-            data[k] = x[i]
+            i = k < z.homvar ? k : k - 1
+            z.data[k] = x[i]
         end
     end
-    PVector(data, homvar)
+    z
 end
-embed(z::PVector, x::Vector) = embed(x, z.homvar)
-# TODO define inplace variant of embed
 
 
 """
