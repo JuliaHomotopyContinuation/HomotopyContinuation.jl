@@ -23,24 +23,25 @@
         @test norm(d[1:12] - A \ b) < 1e-10
     end
 
-    @testset "SearchTree" begin
+    @testset "UniquePoints" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
         indices = unique!(rand(1:2000, 100))
 
-        tree = Utilities.SearchTree(X)
-        @test length(tree) == 2_000
+        data = Utilities.UniquePoints(X)
+        @test length(data) == 2_000
 
         for i ∈ indices
-            @test Utilities.iscontained(tree, X[i])
-            @test Utilities.iscontained(tree, X[i], Val(true)) == i
-            @test Utilities.iscontained(tree, X[i] .+ 1e-4) == false
-            @test Utilities.iscontained(tree, X[i] .+ 1e-9, Val(true)) == i
-            @test Utilities.iscontained(tree, X[i] .+ 1e-9) == true
-            @test Utilities.add!(tree, X[i]) == false
-            @test Utilities.add!(tree, X[i], Val(true)) == i
-            @test Utilities.add!(tree, X[i] .+ 1e-4) == true
-            @test Utilities.add!(tree, X[i] .- 1e-4, Val(true)) == -1
+            @test Utilities.iscontained(data, X[i])
+            @test Utilities.iscontained(data, X[i], Val(true)) == i
+            @test Utilities.iscontained(data, X[i] .+ 1e-4) == false
+            @test Utilities.iscontained(data, X[i] .+ 1e-9, Val(true)) == i
+            @test Utilities.iscontained(data, X[i] .+ 1e-9) == true
+            @test Utilities.add!(data, X[i]) == false
+            @test Utilities.add!(data, X[i], Val(true)) == i
+            @test data[i] == X[i]
+            @test Utilities.add!(data, X[i] .+ 1e-4) == true
+            @test Utilities.add!(data, X[i] .- 1e-4, Val(true)) == -1
         end
     end
 end

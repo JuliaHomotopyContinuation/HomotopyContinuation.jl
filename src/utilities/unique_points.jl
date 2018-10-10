@@ -1,4 +1,4 @@
-export SearchTree, iscontained, add!
+export UniquePoints, iscontained, add!, points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -100,68 +100,116 @@ function Base.empty!(block::SearchBlock)
 end
 
 #############
-# SearchTree
+# UniquePoints
 #############
 
 """
-    SearchTree{V<:AbstractVector, T}
+    UniquePoints{V<:AbstractVector, T}
 
-A data structure which holds all known solutions of type `V`. This data structure
-provides an efficient (poly)logarithmic check whether a solution already exists where
-two solutions are considered equal if their 2-norm is less than `tol`.
+A data structure which holds points of type `V` where `T=real(eltype(V))`. This data structure
+provides an efficient (poly)logarithmic check whether a point already exists where
+two points are considered equal if their 2-norm is less than a provided tolerance `tol`.
+
+
+    UniquePoints(v::AbstractVector{<:Number})
+
+Initialize the data structure with just one data point `v`.
+
+
+    UniquePoints(V::Vector{<:AbstractVector{<:Number}}; tol=1e-5)
+
+Initialize the data structure with all points in `v`. These are added in order
+by [`add!`](@ref) with the given tolerance `tol`.
 """
-struct SearchTree{V<:AbstractVector, T}
+struct UniquePoints{V<:AbstractVector, T}
     root::SearchBlock{T}
     points::Vector{V}
 end
 
-function SearchTree(v::AbstractVector{T}) where {T<:Number}
+function UniquePoints(v::AbstractVector{T}) where {T<:Number}
     root = SearchBlock(real(T), 1)
     points = [v]
-    SearchTree(root, points)
+    UniquePoints(root, points)
 end
 
-function SearchTree(v::AbstractVector{<:AbstractVector}; kwargs...)
-    tree = SearchTree(v[1])
+function UniquePoints(v::AbstractVector{<:AbstractVector}; kwargs...)
+    data = UniquePoints(v[1])
     for i = 2:length(v)
-        add!(tree, v[i]; kwargs...)
+        add!(data, v[i]; kwargs...)
     end
-    tree
+    data
 end
 
-function iscontained(tree::SearchTree{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+"""
+    points(data::UniquePoints)
+
+Return the points stored in `data`.
+"""
+points(data::UniquePoints) = data.points
+
+Base.getindex(data::UniquePoints, i::Integer) = data.points[i]
+
+
+"""
+    iscontained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool
+
+Check whether `x` is contained in the `data` by using the tolerance `tol` to decide for duplicates.
+
+    iscontained(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int
+
+If `x` is contained in `data` by using the tolerance `tol` return the index
+of the data point which already exists. If the data point is not existing `-1`
+is returned.
+"""
+function iscontained(data::UniquePoints{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
     if Index
-        iscontained(tree.root, x, tol, tree.points)
+        iscontained(data.root, x, tol, data.points)
     else
-        iscontained(tree.root, x, tol, tree.points) ≠ NOT_FOUND
+        iscontained(data.root, x, tol, data.points) ≠ NOT_FOUND
     end
 end
 
-function add!(tree::SearchTree{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
+"""
+    add!(data::UniquePoints{V}, x::V; tol=1e-5)::Bool
+
+Add `x` to `data` if it doesn't already exists by using the tolerance `tol` to decide for duplicates.
+
+    add!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int
+
+If `x` is contained in `data` by using the tolerance `tol` to decide for duplicates return the index
+of the data point which already exists. If the data point is not existing add it to `x` and
+return `-1`. The element will be the last element of `points(data)`.
+"""
+function add!(data::UniquePoints{V}, x::V, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {V, Index}
     if Index
-        idx = iscontained(tree.root, x, tol, tree.points)
+        idx = iscontained(data.root, x, tol, data.points)
         if idx ≠ NOT_FOUND
             return idx
         end
-        push!(tree.points, x)
-        _insert!(tree.root, length(tree.points))
+        push!(data.points, x)
+        _insert!(data.root, length(data.points))
         NOT_FOUND
     else
-        if iscontained(tree.root, x, tol, tree.points) ≠ NOT_FOUND
+        if iscontained(data.root, x, tol, data.points) ≠ NOT_FOUND
             return false
         end
 
-        push!(tree.points, x)
-        _insert!(tree.root, length(tree.points))
+        push!(data.points, x)
+        _insert!(data.root, length(data.points))
         true
     end
 end
 
-Base.length(tree::SearchTree) = length(tree.points)
+Base.length(data::UniquePoints) = length(data.points)
 
-function Base.empty!(tree::SearchTree)
-    empty!(tree.root)
-    empty!(tree.points)
+"""
+    empty!(data::UniquePoints)
+
+Remove all points from `data`.
+"""
+function Base.empty!(data::UniquePoints)
+    empty!(data.root)
+    empty!(data.points)
 end
 
 function distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
