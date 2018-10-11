@@ -4,9 +4,9 @@ mutable struct Statistics
     nparametergenerations::Int
     nsolutions_development::Vector{Int}
 end
-Statistics() = Statistics(0, 0, 0, Int[])
+Statistics(nsolutions::Int) = Statistics(0, 0, 1, [nsolutions])
 
-function pathtracked!(stats::Statistics, retcode)
+function trackedpath!(stats::Statistics, retcode)
     if retcode == :success
         stats.ntrackedpaths += 1
     else
