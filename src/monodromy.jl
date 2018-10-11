@@ -74,17 +74,10 @@ function monodromy_solve!(G::Graph,
     stats::Statistics)
 
     t₀ = time_ns()
-
-    # # We prepopulate the solutions
-    # for i=1:n
-    #     retcode = apply_group_actions_greedily!(solutions, solutions[i], options)
-    #     if retcode == :done
-    #         return :success
-    #     end
-    # end
-
-    queue = map(x -> Job(x, G.loop[1]), solutions(G))
     iterations_without_progress = 0 # stopping heuristic
+    # intialize job queue
+    queue = map(x -> Job(x, G.loop[1]), solutions(G))
+
     n = length(solutions(G))
     while n < options.target_solutions_count
         retcode = empty_queue!(queue, G, tracker, options, t₀, stats)
@@ -95,6 +88,7 @@ function monodromy_solve!(G::Graph,
             return :timeout
         end
 
+        # Iterations heuristic
         n_new = length(solutions(G))
         if n == n_new
             iterations_without_progress += 1
@@ -105,12 +99,12 @@ function monodromy_solve!(G::Graph,
             return :heuristic_stop
         end
 
-        regenerate!(queue, G, options, stats)
+        # setup a new graph and schedule new jobs
+        regenerate_and_schedule_jobs!(queue, G, options, stats)
     end
 
     :success
 end
-
 
 
 function empty_queue!(queue, G::Graph, tracker::PathTracking.PathTracker, options::Options, t₀::UInt, stats::Statistics)
@@ -131,14 +125,11 @@ end
 
 ns_to_s(s) = s * 1e-9
 
-function regenerate!(queue, G::Graph, options::Options, stats::Statistics)
+function regenerate_and_schedule_jobs!(queue, G::Graph, options::Options, stats::Statistics)
     sols = solutions(G)
-
     # create a new graph by regenerating the parameters (but don't touch our
     # main node)
     regenerate!(G, options.parameter_sampler, stats)
-
-
     for x in sols
         push!(queue, Job(x, G.loop[1]))
     end
