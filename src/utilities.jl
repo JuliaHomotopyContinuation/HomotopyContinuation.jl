@@ -137,7 +137,7 @@ end
 @inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 2)
     for j in n:-1:1
-        @inbounds iszero(A[j,j]) && throw(SingularException(j))
+        @inbounds iszero(A[j,j]) && throw(LinearAlgebra.SingularException(j))
         @inbounds xj = x[j] = (@fastmath A[j,j] \ b[j])
         for i in 1:(j-1)
             @inbounds b[i] -= A[i,j] * xj
