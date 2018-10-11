@@ -6,8 +6,9 @@ import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 import StaticArrays: SVector, @SVector
-import ..Homotopies, ..PathTracking, ..ProjectiveVectors
-using ..Utilities
+import ..Homotopies, ..PathTracking, ..ProjectiveVectors, ..Utilities
+
+import ..Utilities: UniquePoints
 
 
 include("monodromy/group_actions.jl")
@@ -60,7 +61,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     # solve
     retcode = monodromy_solve!(G, tracker, opts, statistics)
 
-    MonodromyResult(retcode, points(solutions(G)), statistics)
+    MonodromyResult(retcode, Utilities.points(solutions(G)), statistics)
 end
 
 function strategy_parameters_cache(strategy, tracker, p₀)
@@ -125,31 +126,13 @@ function regenerate!(queue, G::Graph, options::Options, stats::Statistics)
 
     # create a new graph by regenerating the parameters (but don't touch our
     # main node)
-    regenerate!(G, options.parameter_sampler)
-    generated_parameters!(stats, length(sols)) # bookkeeping
+    regenerate!(G, options.parameter_sampler, stats)
+
 
     for x in sols
         push!(queue, Job(x, G.loop[1]))
     end
     nothing
 end
-#
-# function apply_group_actions_greedily!(solutions::UniquePoints, s, options, queue=nothing)
-#     for tᵢ in options.group_actions(s)
-#         if add!(solutions, tᵢ)
-#             if queue !== nothing
-#                 push!(queue, tᵢ)
-#             end
-#             if options.done_callback(tᵢ) || length(solutions) ≥ options.target_solutions_count
-#                 return :done
-#             end
-#             retcode = apply_group_actions_greedily!(solutions, tᵢ, options, queue)
-#             if retcode == :done
-#                 return :done
-#             end
-#         end
-#     end
-#     return :incomplete
-# end
 
 end

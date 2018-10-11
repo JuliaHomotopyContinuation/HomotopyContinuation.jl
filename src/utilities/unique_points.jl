@@ -128,7 +128,8 @@ struct UniquePoints{V<:AbstractVector, T}
     points::Vector{V}
 end
 
-function UniquePoints(v::Type{V}) where {T<:Number, V<:AbstractVector{T}}
+UniquePoints(v::Type{<:UniquePoints{V}}) where V = UniquePoints(V)
+function UniquePoints(::Type{V}) where {T<:Number, V<:AbstractVector{T}}
     root = SearchBlock(real(T))
     points = Vector{V}()
     UniquePoints(root, points)

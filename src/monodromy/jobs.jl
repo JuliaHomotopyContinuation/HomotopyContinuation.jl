@@ -19,7 +19,8 @@ function process!(queue::Vector{<:Job}, job::Job, res::JobResult, G::Graph, opti
         return :incomplete
     end
     node = nodes(G)[job.edge.target]
-    if add!(node, res.x, tol=options.tol)
+    if !iscontained(node, res.x, tol=options.tol)
+        unsafe_add!(node, res.x)
         if isdone(node, res.x, options)
             return :done
         end
@@ -27,9 +28,10 @@ function process!(queue::Vector{<:Job}, job::Job, res::JobResult, G::Graph, opti
         push!(queue, Job(res.x, next_edge))
 
         # handle group actions
-        if node.apply_group_action
+        if apply_group_action(node)
             for yᵢ in options.group_actions(res.x)
-                if add!(node, yᵢ, tol=options.tol)
+                if !iscontained(node, yᵢ, tol=options.tol)
+                    unsafe_add!(node, yᵢ)
                     if isdone(node, yᵢ, options)
                         return :done
                     end

@@ -37,11 +37,11 @@ end
 Triangle(;usegamma=true) = Triangle(usegamma)
 
 function graph(strategy::Triangle, p::SVector, x::AbstractVector, options::Options)
-    Graph(p, x, 3, options::Options, usegamma=strategy.usegamma)
+    Graph(p, x, 3, options, usegamma=strategy.usegamma)
 end
 
 struct DoubleEdge <: AbstractStrategy end
 
 function graph(strategy::DoubleEdge, p::SVector, x::AbstractVector)
-    Graph(p, x, 2, usegamma=true)
+    Graph(p, x, 2, options, usegamma=true)
 end

@@ -1,27 +1,48 @@
 """
-    Node(p₀::SVector, x₀::AbstractVector)
+    Node(p::SVector, x::AbstractVector; store_points=true, is_main_node=false)
 
-Create a node with a parameter from the same type as `p₀` and expecting
-points with tthe same type as `x₀`.
+Create a node with a parameter from the same type as `p` and expecting
+points with tthe same type as `x`. If `stores_points` is `true` a `UniquePoints`
+data structure is allocated to keep track of all known solutions of this node.
 """
 struct Node{N, T, UP<:UniquePoints}
     p::SVector{N, T} # maybe just a Vector?
     points::Union{Nothing, UP}
     # Metadata / configuration
-    apply_group_action::Bool
     main_node::Bool
 end
 
-function Node(p::SVector{NParams, T}, x₀::AbstractVector; apply_group_action=true, main_node=false) where {NParams, T}
-    Node(p, UniquePoints(typeof(x₀)), apply_group_action, main_node)
+function Node(p::SVector{N, T}, x::AbstractVector; store_points=true, is_main_node=false) where {N, T}
+    uniquepoints = UniquePoints(typeof(x))
+    if store_points == false
+        Node{N, T, typeof(uniquepoints)}(p, nothing, is_main_node)
+    else
+        Node(p, uniquepoints, is_main_node)
+    end
+end
+function Node(p::SVector{N, T}, node::Node{N,T,UP}; store_points=true, is_main_node=false) where {N, T, UP}
+    if store_points == false
+        Node{N, T, UP}(p, nothing, is_main_node)
+    else
+        Node{N, T, UP}(p, UniquePoints(UP), is_main_node)
+    end
 end
 
-function regenerate(node::Node{N, T}, p; apply_group_action=node.apply_group_action) where {N, T}
-    Node(p, similar(node.points), apply_group_action, false)
-end
-
-iscontained(node::Node, x; kwargs...) = iscontained(node.points, x; kwargs...)
+apply_group_action(node::Node) = node.points !== nothing
 add!(node::Node, x; kwargs...) = Utilities.add!(node.points, x; kwargs...)
+function iscontained(node::Node, x; kwargs...)
+    if node.points === nothing
+        false
+    else
+        Utilities.iscontained(node.points, x; kwargs...)
+    end
+end
+function unsafe_add!(node::Node, x; kwargs...)
+    if node.points !== nothing
+        Utilities.unsafe_add!(node.points, x; kwargs...)
+    end
+    nothing
+end
 
 struct Edge
     start::Int
@@ -52,19 +73,13 @@ struct Graph{N<:Node}
     loop::Vector{Edge}
 end
 
-function Graph(p₁::SVector, x₁::AbstractVector, nnodes::Int, options::Options; usegamma=true, apply_group_action_on=:main_node)
-    main_group = tail_group = false
-    if apply_group_action_on == :all_nodes
-        main_group = tail_group = true
-    elseif apply_group_action_on == :main_node
-        main_group = true
-    end
-
-    n₁ = Node(p₁, x₁, apply_group_action = main_group, main_node = true)
+function Graph(p₁::SVector, x₁::AbstractVector, nnodes::Int, options::Options; usegamma=true)
+    n₁ = Node(p₁, x₁, is_main_node = true)
     nodes = [n₁]
+    store_points = options.group_action_on_all_nodes && has_group_actions(options)
     for i = 2:nnodes
         p = options.parameter_sampler(p₁)
-        push!(nodes, Node(p, x₁, apply_group_action=tail_group))
+        push!(nodes, Node(p, x₁, store_points=store_points))
     end
 
     loop = map(i -> Edge(i - 1, i; usegamma=usegamma), 2:nnodes)
@@ -72,7 +87,6 @@ function Graph(p₁::SVector, x₁::AbstractVector, nnodes::Int, options::Option
 
     Graph(nodes, loop)
 end
-
 
 
 function add_initial_solutions!(G::Graph, solutions::Vector; kwargs...)
@@ -84,18 +98,21 @@ end
 
 solutions(G::Graph) = G.nodes[1].points
 
-
+mainnode(G::Graph) = G.nodes[1]
 nodes(G::Graph) = G.nodes
 loop(G::Graph) = G.loop
 
 nextedge(G::Graph, edge::Edge) = G.loop[edge.target]
 
-function regenerate!(G::Graph, parameter_sampler::Function)
-    # The first node is fixed
+function regenerate!(G::Graph, parameter_sampler::Function, stats::Statistics)
+    main = mainnode(G)
+
+    # The first node is the main node and doesn't get touched
     for i ∈ 2:length(G.nodes)
-        G.nodes[i] = regenerate(G.nodes[i], parameter_sampler(G.nodes[1].p))
+        G.nodes[i] = Node(parameter_sampler(main.p), G.nodes[i])
     end
     G.loop .= regenerate.(G.loop)
+    generated_parameters!(stats, length(main.points)) # bookkeeping
 end
 
 @inline function set_parameters!(tracker::PathTracking.PathTracker, e::Edge, G::Graph)
