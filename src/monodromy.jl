@@ -53,7 +53,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     opts = Options(isrealsystem; options...)
 
     #assemble
-    G = graph(strategy, p₀, first(startsolutions))
+    G = graph(strategy, p₀, first(startsolutions), opts)
     add_initial_solutions!(G, startsolutions; tol=opts.tol)
     tracker = PathTracking.pathtracker(F, startsolutions, parameters=parameters, p₁=p₀, p₀=p₀; tol=opts.tol)
     statistics = Statistics()
@@ -125,7 +125,7 @@ function regenerate!(queue, G::Graph, options::Options, stats::Statistics)
 
     # create a new graph by regenerating the parameters (but don't touch our
     # main node)
-    regenerate!(G)
+    regenerate!(G, options.parameter_sampler)
     generated_parameters!(stats, length(sols)) # bookkeeping
 
     for x in sols

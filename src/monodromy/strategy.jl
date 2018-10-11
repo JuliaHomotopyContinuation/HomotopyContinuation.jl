@@ -36,8 +36,8 @@ end
 
 Triangle(;usegamma=true) = Triangle(usegamma)
 
-function graph(strategy::Triangle, p::SVector, x::AbstractVector)
-    Graph(p, x, 3, usegamma=strategy.usegamma)
+function graph(strategy::Triangle, p::SVector, x::AbstractVector, options::Options)
+    Graph(p, x, 3, options::Options, usegamma=strategy.usegamma)
 end
 
 struct DoubleEdge <: AbstractStrategy end
