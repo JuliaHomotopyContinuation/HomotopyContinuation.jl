@@ -58,6 +58,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{T}},
     add_initial_solutions!(G, startsolutions; tol=opts.tol)
     tracker = PathTracking.pathtracker(F, startsolutions, parameters=parameters, p₁=p₀, p₀=p₀; tol=opts.tol)
     statistics = Statistics()
+    generated_parameters!(statistics, length(solutions(G)))
     # solve
     retcode = monodromy_solve!(G, tracker, opts, statistics)
 
@@ -73,9 +74,7 @@ function monodromy_solve!(G::Graph,
     stats::Statistics)
 
     t₀ = time_ns()
-    # n = length(solutions)
-    # generated_parameters!(stats, n)
-    generated_parameters!(stats, length(solutions(G))) # bookkeeping
+
     # # We prepopulate the solutions
     # for i=1:n
     #     retcode = apply_group_actions_greedily!(solutions, solutions[i], options)
@@ -85,14 +84,25 @@ function monodromy_solve!(G::Graph,
     # end
 
     queue = map(x -> Job(x, G.loop[1]), solutions(G))
-
-    while length(solutions(G)) < options.target_solutions_count
+    iterations_without_progress = 0 # stopping heuristic
+    n = length(solutions(G))
+    while n < options.target_solutions_count
         retcode = empty_queue!(queue, G, tracker, options, t₀, stats)
 
         if retcode == :done
             break
         elseif retcode == :timeout
             return :timeout
+        end
+
+        n_new = length(solutions(G))
+        if n == n_new
+            iterations_without_progress += 1
+        else
+            n = n_new
+        end
+        if iterations_without_progress == options.maximal_number_of_iterations_without_progress
+            return :heuristic_stop
         end
 
         regenerate!(queue, G, options, stats)

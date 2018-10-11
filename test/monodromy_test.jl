@@ -74,5 +74,14 @@ end
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end, Monodromy.complex_conjugation))
         @test length(result.solutions) == 21
+
+
+        # Test stop heuristic using too hight target_solutions_count
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=25)
+        @test result.returncode == :heuristic_stop
+        # Test stop heuristic using too hight target_solutions_count
+        result = monodromy_solve(F, p₀, x₀, parameters=p)
+        @test result.returncode == :heuristic_stop
+
     end
 end

@@ -42,6 +42,6 @@ end
 
 struct DoubleEdge <: AbstractStrategy end
 
-function graph(strategy::DoubleEdge, p::SVector, x::AbstractVector)
+function graph(strategy::DoubleEdge, p::SVector, x::AbstractVector, options::Options)
     Graph(p, x, 2, options, usegamma=true)
 end
