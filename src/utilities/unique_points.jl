@@ -15,8 +15,12 @@ end
 
 function SearchBlock(::Type{T}; capacity = DEFAULT_CAPACITY[]) where T
     children = Vector{Union{Nothing, SearchBlock{T}}}(nothing, capacity)
-    distances_cache = [Vector{Tuple{T, Int}}() for _=1:Threads.nthreads()]
+    distances_cache = [distance_cache(T, capacity) for _=1:Threads.nthreads()]
     SearchBlock(Int32[], children, capacity, distances_cache)
+end
+
+function distance_cache(::Type{T}, capacity) where T
+    [(typemax(T), i) for i=1:capacity]
 end
 
 function SearchBlock(::Type{T}, index::Int; kwargs...) where T
@@ -25,45 +29,103 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock, x::AbstractVector, tol::Real, points::Vector, threadid=Threads.threadid())
+function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points::Vector, threadid=Threads.threadid()) where T
     if isempty(block.elements)
         return NOT_FOUND
     end
 
     n = length(block.elements)
-    d = distance(points[block.elements[1]], x)
-    minᵢ = 1
 
+    # We compute now the distance to every other element in the block
+    # If the distance to one element is smaller than tol, we are done.
+    # Otherwise, we need to look into those child whose distance
+    # is closest (let's say with distance `d`) and all those
+    # children for whose distance `dᵢ` we have |d-dᵢ| < 2*tol
+    # This fact can be shown by using the triangle inequality.
+    # We therefore simply compute the distances to every point and sort
+    # afterwards
+
+
+    # We go through the elements and compute the distances,
+    # keeping track of the three smallest elements
+    m₁ = m₂ = m₃ = (typemax(T), 1)
+    # we have a distances cache per thread
     distances = block.distances_cache[threadid]
-    empty!(distances)
-    push!(distances, (d, 1))
-
-    if d < tol
-        return block.elements[1]
-    end
-
-    for i ∈ 2:n
+    for i ∈ 1:n
         dᵢ = distance(points[block.elements[i]], x)
-        if dᵢ < d
-            if dᵢ < tol
-                return block.elements[i]
-            end
-            d = dᵢ
-            minᵢ = i
-            push!(distances, (dᵢ, minᵢ))
+        # early exit
+        if dᵢ < tol
+             # we rely on the distances for look up, so place at the first place the smallest element
+            distances[1] = (dᵢ, i)
+            return block.elements[i]
+        end
+
+        distances[i] = (dᵢ, i)
+        # check three smallest elements and update if necessary
+        if dᵢ < m₁[1]
+            m₃ = m₂
+            m₂ = m₁
+            m₁ = (dᵢ, i)
+        elseif dᵢ < m₂[1]
+            m₃ = m₂
+            m₂ = (dᵢ, i)
+        elseif dᵢ < m₃[1]
+            m₃ = (dᵢ, i)
         end
     end
 
-    N = length(distances)
-    for i ∈ N:-1:1
-        dᵢ, minᵢ = distances[i]
-        if abs(d - dᵢ) < 2*tol # What is the correct constant?
-            retidx = iscontained(block.children[minᵢ], x, tol, points, threadid)
+    # Now we computed all distances and also kept track of the two smallest elements
+    # Now there are three cases
+    # 1) m₁[1] + 2tol < m₂[1] -- > The element can only be in one subtree
+    # 2) m₁[1] + 2tol < m₃[1] -- > The element can only be in the first or second subtree
+    # 3) else -> The element can also be in more subtrees,
+    #            we need to sort the distances vector and look through everything
+
+    # Check smallest element first
+    retidx = iscontained(block.children[m₁[2]], x, tol, points, threadid)
+    if retidx ≠ NOT_FOUND
+        distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
+        return retidx
+    end
+    # Case 1)
+    if m₂[1] - m₁[1] > 2tol
+        distances[1] = m₁
+        return NOT_FOUND # already checked first tree
+    end
+    # Case 2) We know m₂[1] - m₁[1] ≤ 2tol
+    retidx = iscontained(block.children[m₂[2]], x, tol, points, threadid)
+    if retidx ≠ NOT_FOUND
+        distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
+        return retidx
+    end
+
+    if m₃[1] - m₁[1] > 2tol
+        distances[1] = m₁
+        return NOT_FOUND # Checked first and second case
+    end
+
+    # Since we know als the third element, let's check it
+    retidx = iscontained(block.children[m₃[2]], x, tol, points, threadid)
+    if retidx ≠ NOT_FOUND
+        distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
+        return retidx
+    end
+
+    # Case 3)
+    # We need to sort distances
+    sort!(distances, Base.Sort.InsertionSort, Base.Sort.By(first))
+
+    # We can start at 4 since we already checked the smallest 3
+    d = m₃[1]
+    for k ∈ 4:n
+        dᵢ, i = distances[k]
+        if dᵢ - m₁[1] < 2tol
+            retidx = iscontained(block.children[i], x, tol, points, threadid)
             if retidx ≠ NOT_FOUND
                 return retidx
             end
         else
-            return NOT_FOUND
+            break
         end
     end
 
@@ -77,11 +139,8 @@ function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.thread
         push!(block.elements, index)
         return
     end
-    distances = block.distances_cache[threadid]
-    N = length(distances)
-    @assert N != 0
 
-    dᵢ, minᵢ = distances[end]
+    dᵢ, minᵢ = block.distances_cache[threadid][1]
     # if not filled so far, just add it to the current block
     if length(block.elements) < block.capacity
         push!(block.elements, index)

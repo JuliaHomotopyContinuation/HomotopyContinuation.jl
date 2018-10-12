@@ -26,7 +26,7 @@
     @testset "UniquePoints" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
-        indices = unique!(rand(1:2000, 100))
+        indices = unique!(rand(1:2000, 20))
 
         data = Utilities.UniquePoints(X)
         @test length(data) == 2_000
@@ -43,5 +43,10 @@
             @test Utilities.add!(data, X[i] .+ 1e-4) == true
             @test Utilities.add!(data, X[i] .- 1e-4, Val(true)) == -1
         end
+
+        # Test many points with nearly indentical distance to the inserted point
+        points = shuffle!([[cis(k/100*2π)] for k=0:99])
+        data = Utilities.UniquePoints(points)
+        @test Utilities.iscontained(data, [0.0im]) == false
     end
 end
