@@ -53,7 +53,17 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     statistics = Statistics(nsolutions(loop))
 
     # solve
-    retcode = monodromy_solve!(loop, tracker, options, statistics)
+    retcode = :not_assigned
+    try
+        retcode = monodromy_solve!(loop, tracker, options, statistics)
+    catch e
+        if (e isa InterruptException)
+            println("interrupt")
+            retcode = :interrupt
+        else
+            rethrow(e)
+        end
+    end
 
     MonodromyResult(retcode, Utilities.points(solutions(loop)), statistics)
 end
