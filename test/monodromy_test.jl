@@ -42,7 +42,7 @@ end
         @test length(result.solutions) < 21
 
 
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21)
+        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, maximal_number_of_iterations_without_progress=100)
         @test result.returncode == :success
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21
@@ -58,6 +58,7 @@ end
         @test length(result.solutions) == 2
 
         result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+            maximal_number_of_iterations_without_progress=100,
             group_action=(s -> begin
                 t = cis(π*2/3)
                 t² = t * t
@@ -67,6 +68,7 @@ end
         @test length(result.solutions) == 21
 
         result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+            maximal_number_of_iterations_without_progress=100,
             group_actions=(s -> begin
                 t = cis(π*2/3)
                 t² = t * t
