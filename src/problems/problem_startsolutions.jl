@@ -44,21 +44,12 @@ function problem_startsolutions(input::Input.Homotopy, homvar, seed; kwargs...)
 end
 
 
-# promote_startsolutions(iter) = promote_startsolutions(collect(iter))
-# promote_startsolutions(xs::Vector{Vector{ComplexF64}}) = xs
-# function promote_startsolutions(xs::Vector{<:AbstractVector{<:Number}})
-#     PT = promote_type(typeof(xs[1][1]), Complex{Float64})
-#     map(s -> convert.(PT, s), xs)
-# end
-
-
 const overdetermined_error_msg = """
 The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
 See
     https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
 for details.
 """
-
 
 ##############
 # TOTALDEGREE
@@ -67,11 +58,17 @@ for details.
 function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
     F, variables, homogenization = homogenize_if_necessary(prob.system)
     if ishomogenized(homogenization)
+		# Check overdetermined case
+		length(F) ≥ length(variables) && error(overdetermined_error_msg)
+
         proj = Projective(
             Systems.TotalDegreeSystem(prob.degrees, variables, variables[homogenization.homvaridx]),
             system(F, variables), homogenization, seed; kwargs...)
         proj, totaldegree_solutions(prob.degrees, homogenization)
     else
+		# Check overdetermined case
+		length(F) > length(variables) && error(overdetermined_error_msg)
+
         G = Systems.TotalDegreeSystem(prob.degrees, variables, variables[1])
         start = totaldegree_solutions(prob.degrees, NullHomogenization())
         Projective(G, system(F), NullHomogenization(), seed; kwargs...), start
@@ -85,6 +82,8 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}},
         error("Input system is not homogenous although `homvar=$(homvar)` was passed.")
     end
     F, variables, homogenization = homogenize_if_necessary(prob.system; homvar=homvar)
+	# Check overdetermined case
+	length(F) > length(variables) && error(overdetermined_error_msg)
 
     start = totaldegree_solutions(prob.degrees, homogenization)
     proj = Projective(
@@ -96,6 +95,8 @@ end
 function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
     G = Systems.TotalDegreeSystem(prob.degrees, collect(2:N), 1)
+	# Check overdetermined case
+	n > N && error(overdetermined_error_msg)
 
     (Projective(G, prob.system, NullHomogenization(), seed; kwargs...),
      totaldegree_solutions(prob.degrees, NullHomogenization()))
@@ -183,10 +184,6 @@ function homogenize_if_necessary(F::Vector{<:MP.AbstractPolynomialLike}; homvar=
             F, variables, Homogenization(homvar, variables)
         end
     else
-        # N = n is the only valid size configuration
-        if n > N
-            error(overdetermined_error_msg)
-        end
         if homvar !== nothing
             error("Input system is not homogenous although `homvar` was passed.")
         end
