@@ -17,7 +17,7 @@ function Options(isrealsystem;
     group_action=nothing,
     group_actions=GroupActions(group_action),
     group_action_on_all_nodes=false,
-    parameter_sampler=independent_gaussian,
+    parameter_sampler=independent_zero_gaussian,
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
