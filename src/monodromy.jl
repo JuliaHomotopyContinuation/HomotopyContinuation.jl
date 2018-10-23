@@ -139,7 +139,8 @@ function monodromy_solve!(loop::Loop,
             iterations_without_progress = 0
             n = n_new
         end
-        if iterations_without_progress == options.maximal_number_of_iterations_without_progress
+        if iterations_without_progress == options.maximal_number_of_iterations_without_progress &&
+            n_new ≥ options.minimal_number_of_solutions
             return :heuristic_stop
         end
 
