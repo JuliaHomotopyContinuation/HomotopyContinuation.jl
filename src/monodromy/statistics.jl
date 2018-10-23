@@ -18,3 +18,7 @@ function generated_parameters!(stats::Statistics, nsolutions::Int)
     stats.nparametergenerations += 1
     push!(stats.nsolutions_development, nsolutions)
 end
+
+function finished!(stats, nsolutions)
+    push!(stats.nsolutions_development, nsolutions)
+end

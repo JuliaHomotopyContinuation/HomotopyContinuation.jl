@@ -5,6 +5,7 @@ export monodromy_solve
 import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
+import ProgressMeter
 import StaticArrays: SVector, @SVector
 
 import ..Homotopies, ..PathTracking, ..ProjectiveVectors, ..Utilities
@@ -21,6 +22,14 @@ struct MonodromyResult{N, T}
     statistics::Statistics
 end
 
+Base.show(io::IO, ::MIME"application/juno+inline", x::MonodromyResult) = x
+function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
+    println(io, "MonodromyResult{$N, $T} with $(length(result.solutions)) solutions:")
+    println(io, "returncode → $(result.returncode)")
+    print(io, "statistics → $(result.statistics)")
+end
+
+
 ########
 # Setup
 ########
@@ -35,6 +44,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         startsolutions::Vector{<:SVector{NVars, <:Complex}};
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=default_strategy(TC, TP),
+        showprogress=true,
         optionskwargs...) where {TC, TP, NParams, NVars}
 
     if length(p₀) ≠ length(parameters)
@@ -54,8 +64,13 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
 
     # solve
     retcode = :not_assigned
+    if showprogress
+        progress = ProgressMeter.ProgressUnknown("Solutions found:")
+    else
+        progress = nothing
+    end
     try
-        retcode = monodromy_solve!(loop, tracker, options, statistics)
+        retcode = monodromy_solve!(loop, tracker, options, statistics, progress)
     catch e
         if (e isa InterruptException)
             println("interrupt")
@@ -64,7 +79,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
             rethrow(e)
         end
     end
-
+    finished!(statistics, nsolutions(loop))
     MonodromyResult(retcode, Utilities.points(solutions(loop)), statistics)
 end
 
@@ -98,7 +113,7 @@ end
 
 function monodromy_solve!(loop::Loop,
     tracker::PathTracking.PathTracker, options::Options,
-    stats::Statistics)
+    stats::Statistics, progress)
 
     t₀ = time_ns()
     iterations_without_progress = 0 # stopping heuristic
@@ -107,9 +122,10 @@ function monodromy_solve!(loop::Loop,
 
     n = nsolutions(loop)
     while n < options.target_solutions_count
-        retcode = empty_queue!(queue, loop, tracker, options, t₀, stats)
+        retcode = empty_queue!(queue, loop, tracker, options, t₀, stats, progress)
 
         if retcode == :done
+            update_progress!(progress, loop, stats; finish=true)
             break
         elseif retcode == :timeout
             return :timeout
@@ -117,8 +133,12 @@ function monodromy_solve!(loop::Loop,
 
         # Iterations heuristic
         n_new = nsolutions(loop)
-        n == n_new && (iterations_without_progress += 1)
-        n = n_new
+        if n == n_new
+            iterations_without_progress += 1
+        else
+            iterations_without_progress = 0
+            n = n_new
+        end
         if iterations_without_progress == options.maximal_number_of_iterations_without_progress
             return :heuristic_stop
         end
@@ -129,13 +149,14 @@ function monodromy_solve!(loop::Loop,
     :success
 end
 
-function empty_queue!(queue, loop::Loop, tracker::PathTracking.PathTracker, options::Options, t₀::UInt, stats::Statistics)
+function empty_queue!(queue, loop::Loop, tracker::PathTracking.PathTracker, options::Options,
+        t₀::UInt, stats::Statistics, progress)
     while !isempty(queue)
         job = pop!(queue)
-        if process!(queue, job, tracker, loop, options, stats) == :done
+        if process!(queue, job, tracker, loop, options, stats, progress) == :done
             return :done
         end
-
+        update_progress!(progress, loop, stats)
         # check timeout
         if (time_ns() - t₀) > options.timeout * 1e9 # convert s to ns
             return :timeout
@@ -144,7 +165,8 @@ function empty_queue!(queue, loop::Loop, tracker::PathTracking.PathTracker, opti
     :incomplete
 end
 
-function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::Options, stats::Statistics)
+function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::Options,
+                  stats::Statistics, progress)
     y, retcode = track(tracker, job.x, job.edge, loop, stats)
     if retcode ≠ :success
         return :incomplete
@@ -161,7 +183,7 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
 
         # Handle group actions
         # Things are setup up such that for nodes where we want to apply
-        # group acitons `node.points !== nothing`
+        # group actions `node.points !== nothing`
         if node.points !== nothing
             for yᵢ in options.group_actions(y)
                 if !iscontained(node, yᵢ, tol=options.tol)
@@ -176,6 +198,20 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
         end
     end
     return :incomplete
+end
+
+function update_progress!(::Nothing, loop::Loop, statistics::Statistics; finish=false)
+    nothing
+end
+function update_progress!(progress, loop::Loop, statistics::Statistics; finish=false)
+    ProgressMeter.update!(progress, length(solutions(loop)), showvalues=(
+        ("# paths tracked: ", statistics.ntrackedpaths),
+        ("# loops generated: ", statistics.nparametergenerations)
+    ))
+    if finish
+        ProgressMeter.finish!(progress)
+    end
+    nothing
 end
 
 function isdone(node::Node, x, options::Options)

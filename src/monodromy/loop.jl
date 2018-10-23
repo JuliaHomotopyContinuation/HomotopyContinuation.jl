@@ -170,7 +170,6 @@ mainnode(loop::Loop) = loop.nodes[1]
 
 nextedge(loop::Loop, edge::Edge) = loop.edges[edge.target]
 
-
 ##############
 # Loop styles
 ##############
