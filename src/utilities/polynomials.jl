@@ -1,5 +1,7 @@
 export VariableGroups, allvariables, nvariables, ishomogenous, uniquevar, homogenize, projective_dims
 
+const WeightedVariable = Tuple{<:MP.AbstractVariable, Int}
+
 """
     VariableGroups{N}
 
@@ -131,16 +133,30 @@ Returns the number of variables occuring in `polys`.
 nvariables(polys::Vector{<:MP.AbstractPolynomialLike}) = length(allvariables(polys))
 
 
+
 """
     ishomogenous(f::MP.AbstractPolynomialLike)
 
 Checks whether `f` is homogenous.
 
-    ishomogenous(polys::Vector{MP.AbstractPolynomialLike})
+    ishomogenous(f::MP.AbstractPolynomialLike, vars)
 
-Checks whether each polynomial in `polys` is homogenous.
+Checks whether `f` is homogenous in the variables `vars` with possible weights.
 """
 ishomogenous(f::MP.AbstractPolynomialLike) = MP.mindegree(f) == MP.maxdegree(f)
+function ishomogenous(f::MP.AbstractPolynomialLike, variables)
+    d_min, d_max = minmaxdegree(f, variables)
+    d_min == d_max
+end
+
+"""
+    ishomogenous(F::Vector{MP.AbstractPolynomialLike}, variables)
+
+Checks whether each polynomial in `F` is homogenous in the variables `variables`.
+"""
+function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}, variables)
+    all(f -> ishomogenous(f, variables), F)
+end
 function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}; parameters=nothing)
     if parameters !== nothing
         ishomogenous(F, setdiff(MP.variables(F), parameters))
@@ -149,36 +165,33 @@ function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}; parameters=nothing
     end
 end
 
+
 """
-    ishomogenous(f::MP.AbstractPolynomialLike, v::Vector{<:MP.AbstractVariable})
+    degree(term::MP.AbstractTermLike, vars)
 
-Checks whether `f` is homogenous in the variables `v`.
-
-    ishomogenous(polys::Vector{<:MP.AbstractPolynomialLike}, v::Vector{<:MP.AbstractVariable})
-
-Checks whether each polynomial in `polys` is homogenous in the variables `v`.
+Compute the (weighted) degree of `f` in the variables `vars`.
 """
-function ishomogenous(f::MP.AbstractPolynomialLike, variables::Vector{T}) where {T<:MP.AbstractVariable}
-    d_min, d_max = minmaxdegree(f, variables)
-    d_min == d_max
+function degree(term::MP.AbstractTermLike, variables::Vector{<:MP.AbstractVariable})
+    sum(MP.degree(term, v) for v in variables)
 end
-
-function ishomogenous(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}) where {T<:MP.AbstractVariable}
-    all(f -> ishomogenous(f, variables), F)
+function degree(term::MP.AbstractTermLike, weighted_variables::Vector{<:WeightedVariable})
+    deg = 0
+    for (v, w) in weighted_variables
+        deg += w * MP.degree(term, v)
+    end
+    deg
 end
-
 
 """
     minmaxdegree(f::MP.AbstractPolynomialLike, variables)
 
-Compute the minimum and maximum (total) degree of `f` with respect to the given variables.
+Compute the minimum and maximum (weighted total) degree of `f` with respect to the given variables.
 """
 function minmaxdegree(f::MP.AbstractPolynomialLike, variables)
     d_min, d_max = typemax(Int), 0
-    for t in f
-        d = sum(MP.degree(t, v) for v in variables)
-        d_min = min(d, d_min)
-        d_max = max(d, d_max)
+    for term in f
+        d = degree(term, variables)
+        d_min, d_max = min(d, d_min), max(d, d_max)
     end
     d_min, d_max
 end
@@ -222,13 +235,13 @@ Homogenize the variables `v` in the polynomial `f` by using the given variable `
 
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
-function homogenize(f::MP.AbstractPolynomialLike, variables::Vector{T}, var=uniquevar(f)) where {T<:MP.AbstractVariable}
+function homogenize(f::MP.AbstractPolynomialLike, variables::Vector, var::MP.AbstractVariable=uniquevar(f))
     _, d_max = minmaxdegree(f, variables)
     MP.polynomial(map(f) do t
-        d = sum(MP.degree(t, v) for v in variables)
+        d = degree(t, variables)
         var^(d_max - d)*t
     end)
 end
-function homogenize(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector{T}, var=uniquevar(F)) where {T<:MP.AbstractVariable}
+function homogenize(F::Vector{<:MP.AbstractPolynomialLike}, variables::Vector, var::MP.AbstractVariable=uniquevar(F))
     map(f -> homogenize(f, variables, var), F)
 end
