@@ -13,7 +13,9 @@ import ..SystemsBase: AbstractSystem,
     jacobian,
     jacobian!,
     evaluate_and_jacobian,
-    evaluate_and_jacobian!
+    evaluate_and_jacobian!,
+    differentiate_parameters!,
+    differentiate_parameters
 
 export NullCache
 
