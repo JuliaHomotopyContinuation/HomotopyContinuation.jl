@@ -69,7 +69,7 @@ Evaluate the system `F` at `x`.
 
 Evaluate the system `F` at `x` and parameters `p`.
 """
-evaluate(F::AbstractSystem, x, c=cache(F, x)) = evaluate(F, x, c)
+evaluate(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = evaluate(F, x, c)
 
 
 """
@@ -92,7 +92,7 @@ Evaluate the Jacobian of the system `F` at `x`.
 
 Evaluate the Jacobian of the system `F` at `x` and parameters `p`.
 """
-jacobian(F::AbstractSystem, x, c=cache(F, x)) = jacobian(F, x, c)
+jacobian(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = jacobian(F, x, c)
 
 
 """
@@ -108,7 +108,7 @@ function differentiate_parameters! end
 
 Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters
 """
-differentiate_parameters(F::AbstractSystem, x, c=cache(F, x)) = differentiate_parameters(F, x, c)
+differentiate_parameters(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = differentiate_parameters(F, x, c)
 
 # Optional
 """
@@ -141,7 +141,7 @@ end
 
 Evaluate the system `F` and its Jacobian at `x`.
 """
-function evaluate_and_jacobian(F::AbstractSystem, x, c=cache(F, x))
+function evaluate_and_jacobian(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x))
     u = evaluate(F, x, c)
     U = jacobian(F, x, c)
     u, U
@@ -151,7 +151,7 @@ end
 
 Evaluate the system `F` and its Jacobian at `x` and parameters `p`.
 """
-function evaluate_and_jacobian(F::AbstractSystem, x, p, c=cache(F, x))
+function evaluate_and_jacobian(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F, x))
     u = evaluate(F, x, p, c)
     U = jacobian(F, x, p, c)
     u, U
