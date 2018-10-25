@@ -135,6 +135,17 @@ function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, p, cache::AbstractSy
     nothing
 end
 
+
+"""
+    evaluate_and_jacobian(F::AbstractSystem, x, cache=cache(F, x))
+
+Evaluate the system `F` and its Jacobian at `x`.
+"""
+function evaluate_and_jacobian(F::AbstractSystem, x, c=cache(F, x))
+    u = evaluate(F, x, c)
+    U = jacobian(F, x, c)
+    u, U
+end
 """
     evaluate_and_jacobian(F::AbstractSystem, x, p, cache=cache(F, x))
 
