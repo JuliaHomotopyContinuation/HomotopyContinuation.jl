@@ -1,9 +1,9 @@
 <img src="https://i.imgur.com/8ycOn14.png" height="120">
 
-| **Documentation** | **Build Status** | **References to cite** |
-|:-----------------:|:----------------:|:-----------------------:|
-| [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] | [![DOI](https://zenodo.org/badge/99226144.svg)](https://zenodo.org/badge/latestdoi/99226144) |
-| [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url] | [arXiv:1711.10911](https://arxiv.org/abs/1711.10911) |
+| **Documentation** | **Build Status** |
+|:-----------------:|:----------------:|
+| [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] |
+| [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url]|
 
 
 `HomotopyContinuation.jl` is a package for solving polynomial systems with only finitely many solution using numerical homotopy continuation.
@@ -94,6 +94,22 @@ results(solution, result, onlyreal=true)
 ```
 to obtain only real solutions.
 See the documentation for more possibilities to analyze `result`.
+
+## Citing HomotopyContinuation.jl
+If you find HomotopyContinuation useful in your work, we kindly request that you cite the [following paper](https://link.springer.com/chapter/10.1007/978-3-319-96418-8_54):
+
+```latex
+@inproceedings{HomotopyContinuation.jl,
+  title={HomotopyContinuation.jl: A Package for Homotopy Continuation in Julia},
+  author={Breiding, Paul and Timme, Sascha},
+  booktitle={International Congress on Mathematical Software},
+  pages={458--465},
+  year={2018},
+  organization={Springer}
+}
+```
+
+A preprint of this paper is [freely available](https://arxiv.org/abs/1711.10911).
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
