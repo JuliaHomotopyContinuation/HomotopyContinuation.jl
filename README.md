@@ -96,7 +96,7 @@ to obtain only real solutions.
 See the documentation for more possibilities to analyze `result`.
 
 ## Citing HomotopyContinuation.jl
-If you find HomotopyContinuation useful in your work, we kindly request that you cite the [following paper](https://link.springer.com/chapter/10.1007/978-3-319-96418-8_54):
+If you find HomotopyContinuation.jl useful in your work, we kindly request that you cite the [following paper](https://link.springer.com/chapter/10.1007/978-3-319-96418-8_54):
 
 ```latex
 @inproceedings{HomotopyContinuation.jl,
