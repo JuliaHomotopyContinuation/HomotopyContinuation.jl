@@ -25,6 +25,8 @@ export allvariables,
     check_kwargs_empty,
     start_solution_sample
 
+include("utilities/unique_points.jl")
+
 
 """
     check_kwargs_empty(kwargs, [allowed_kwargs])

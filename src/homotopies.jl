@@ -10,7 +10,8 @@ import ..HomotopiesBase: AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!
+    precondition!, update!,
+    basehomotopy
 
 import ..Systems
 import ..Systems: AbstractSystem, AbstractSystemCache
@@ -26,7 +27,8 @@ export AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!
+    precondition!, update!,
+    basehomotopy
 
 # This has to be here otherwise the compiler crashes
 """

@@ -8,6 +8,7 @@ module HomotopyContinuation
         Endgaming,
         Homotopies,
         InterfaceTest,
+        Monodromy,
         PatchSwitching,
         PathTracking,
         Predictors,
@@ -43,7 +44,7 @@ module HomotopyContinuation
 
     include("solving.jl")
     include("solve.jl")
-    include("pathtracker.jl")
+    include("monodromy.jl")
 
     include("interface_test.jl")
 
@@ -72,6 +73,11 @@ module HomotopyContinuation
     import .Utilities: homogenize, uniquevar, ishomogenous
     export homogenize, uniquevar, ishomogenous
 
+    import .PathTracking: pathtracker, pathtracker_startsolutions
+    export pathtracker, pathtracker_startsolutions
+
+    import .Monodromy: monodromy_solve
+    export monodromy_solve
 
     import LinearAlgebra: issuccess
     export issuccess

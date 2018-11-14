@@ -123,3 +123,5 @@ function dt(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
     M, N = size(H)
     dt!(similar(c.b, M), H, x, t, c)
 end
+
+basehomotopy(H::PatchedHomotopy) = H.homotopy

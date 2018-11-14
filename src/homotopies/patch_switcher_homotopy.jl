@@ -138,3 +138,5 @@ function dt(H::PatchSwitcherHomotopy, x, t, c::PatchSwitcherHomotopyCache)
     M, N = size(H)
     dt!(similar(c.b, M), H, x, t, c)
 end
+
+basehomotopy(H::PatchSwitcherHomotopy) = H.homotopy

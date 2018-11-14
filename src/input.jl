@@ -71,9 +71,9 @@ Construct a `ParameterSystem`. This indicates that the system `system` has varia
 struct ParameterSystem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable} <: AbstractInput
     system::Vector{P}
     parameters::Vector{V}
-    p₁::Vector
-    p₀::Vector
-    startsolutions
+    p₁::AbstractVector
+    p₀::AbstractVector
+    startsolutions::AbstractVector
     γ₁::Union{Nothing, ComplexF64}
     γ₀::Union{Nothing, ComplexF64}
 end

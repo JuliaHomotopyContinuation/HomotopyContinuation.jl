@@ -75,7 +75,7 @@ end
 # If x₁ is not a AbstractProjectiveVector we need to embed it first. This is
 # just a convenience fallback.
 function setup!(tracker::PathTracker, x₁, t₁, t₀; kwargs...)
-    setup!(tracker, ProjectiveVectors.embed(tracker.x, x₁), t₁, t₀; kwargs...)
+    setup!(tracker, ProjectiveVectors.embed!(tracker.x, x₁), t₁, t₀; kwargs...)
 end
 
 patch(cache::Cache) = cache.homotopy.homotopy.patch # this is a little bit hacky...

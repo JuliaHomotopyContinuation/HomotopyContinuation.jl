@@ -137,7 +137,7 @@ end
 Construct a [`PathTracking.PathTracker`](@ref) from the given `problem`.
 """
 function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
-    y₁ = Problems.embed(prob, x₁)
+    y₁ = Problems.embed(prob, Vector(x₁))
     H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, y₁))
     PathTracker(H, y₁, complex(t₁), complex(t₀); kwargs...)
 end
