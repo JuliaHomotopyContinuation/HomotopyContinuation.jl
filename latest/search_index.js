@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#Base.real-Tuple{Union{Result, Array{#s91,1} where #s91<:PathResult}}",
+    "location": "solving.html#Base.real-Tuple{Union{Result, Array{#s94,1} where #s94<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -721,11 +721,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.basehomotopy",
+    "page": "Homotopies",
+    "title": "HomotopyContinuation.HomotopiesBase.basehomotopy",
+    "category": "function",
+    "text": "basehomotopy(H::AbstractHomotopy)\n\nReturns the \'proper\' homotopy describing the problem. Any wrapper homotopy recursively calls wrappedhomotopy with the wrapped homotopy as argument.\n\n\n\n\n\n"
+},
+
+{
     "location": "homotopies.html#Optional-1",
     "page": "Homotopies",
     "title": "Optional",
     "category": "section",
-    "text": "Homotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!"
+    "text": "Homotopies.evaluate_and_jacobian!\nHomotopies.evaluate_and_jacobian\nHomotopies.jacobian_and_dt!\nHomotopies.evaluate\nHomotopies.jacobian\nHomotopies.dt\nHomotopies.precondition!\nHomotopies.update!\nHomotopies.basehomotopy"
 },
 
 {
@@ -801,11 +809,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.pathtracker_startsolutions",
+    "location": "pathtracking.html#HomotopyContinuation.PathTracking.pathtracker_startsolutions",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.pathtracker_startsolutions",
+    "title": "HomotopyContinuation.PathTracking.pathtracker_startsolutions",
     "category": "function",
-    "text": "pathtracker_startsolutions(args...; kwargs...)\n\nConstruct a PathTracking.PathTracker and startsolutions in the same way solve does it. This als0 takes the same input arguments as solve. This is convenient if you want to investigate single paths.\n\n\n\n\n\n"
+    "text": "pathtracker_startsolutions(args...; kwargs...)\n\nConstruct a PathTracking.PathTracker and startsolutions in the same way solve does it. This also takes the same input arguments as solve. This is convenient if you want to investigate single paths.\n\n\n\n\n\n"
 },
 
 {
