@@ -109,9 +109,9 @@ end
 
 Update the parameters `p` and `γ` of `H`.
 """
-function set_parameters!(H::Homotopies.ParameterHomotopy{N, NVars, NParams},
+function set_parameters!(H::Homotopies.ParameterHomotopy{S, NParams, T},
     p::NTuple{2, SVector{NParams, T}},
-    γ::Union{Nothing, NTuple{2, ComplexF64}}) where {N, NVars, NParams, T}
+    γ::Union{Nothing, NTuple{2, ComplexF64}}) where {S, NParams, T}
     H.p = p
     H.γ = γ
     H
@@ -122,8 +122,8 @@ end
 
 Update the parameter `p` of `H`.
 """
-function set_parameters!(H::Homotopies.ParameterHomotopy{N, NVars, NParams},
-    p::NTuple{2, SVector{NParams, T}}) where {N, NVars, NParams, T}
+function set_parameters!(H::Homotopies.ParameterHomotopy{S, NParams, T},
+    p::NTuple{2, SVector{NParams, T}}) where {S, NParams, T}
     H.p = p
     H
 end
