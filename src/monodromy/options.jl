@@ -1,3 +1,8 @@
+const options_allowed_keywords = [:tol, :done_callback,
+    :group_action,:group_actions, :group_action_on_all_nodes,
+    :parameter_sampler, :target_solutions_count, :timeout,
+    :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
+
 struct Options{F1<:Function, F2<:Tuple, F3<:Function}
     tol::Float64
     done_callback::F1

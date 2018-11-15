@@ -45,11 +45,13 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=default_strategy(TC, TP),
         showprogress=true,
-        optionskwargs...) where {TC, TP, NParams, NVars}
+        kwargs...) where {TC, TP, NParams, NVars}
 
     if length(p₀) ≠ length(parameters)
         error("Number of provided parameters doesn't match the length of initially provided parameter `p₀`.")
     end
+
+    optionskwargs, restkwargs = Utilities.splitkwargs(kwargs, options_allowed_keywords)
     options = begin
         isrealsystem = TC <: Real && TP <: Real
         Options(isrealsystem; optionskwargs...)
@@ -58,8 +60,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     #assemble
     loop = Loop(strategy, p₀, startsolutions, options)
     tracker = PathTracking.pathtracker(
-        F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, tol=options.tol
-    )
+        F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
+        restkwargs...)
     statistics = Statistics(nsolutions(loop))
 
     # solve
