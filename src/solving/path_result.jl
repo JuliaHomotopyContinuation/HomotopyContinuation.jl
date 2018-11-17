@@ -160,13 +160,13 @@ end
 windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
 windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
 
-function Base.show(io::IO, ::MIME"text/plain", r::PathResult)
+function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
-
-    if iscompact
-        println(io, " • returncode: $(r.returncode)")
+    if iscompact || haskey(io, :typeinfo)
+        println(io, "• returncode: $(r.returncode)")
         println(io, " • solution: ", r.solution)
         println(io, " • residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " • pathnumber: ", r.pathnumber)
     else
         println(io, "PathResult")
         println(io, "==========")
@@ -179,7 +179,7 @@ function Base.show(io::IO, ::MIME"text/plain", r::PathResult)
         println(io, " • condition_number: $(@sprintf "%.3e" r.condition_number)")
         println(io, " • windingnumber: $(r.windingnumber)")
         println(io, "")
-        println(io, " • path number: ", r.pathnumber)
+        println(io, " • pathnumber: ", r.pathnumber)
         println(io, " • start_solution: ", r.start_solution)
         println(io, "")
         println(io, " • t: ", r.t)
