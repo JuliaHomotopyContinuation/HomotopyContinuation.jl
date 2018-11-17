@@ -14,28 +14,25 @@
 # We wish to find the smallest radius $r$ for which $E_1( r )\cap E_2( r )$ is not empty. Let $r^\star$ be the solution for this optimization problem. For a generic choice of $Q_1$ and $Q_2$ we have that $\vert E_1(r^\star)\cap E_2(r^\star) \vert =1$ and $E_1(r^\star)$, $E_2(r^\star)$ are tangent. In Julia we translate this into a polynomial system:
 #
 
-using HomotopyContinuation
-
+using HomotopyContinuation, LinearAlgebra
 ## generate the variables
 @polyvar Q₁[1:2, 1:2] Q₂[1:2, 1:2] p₁[1:2] p₂[1:2]
 @polyvar x[1:2] r
 z₁ = x - p₁
 z₂ = x - p₂
-
 ## initialize the equations for E₁ and E₂
 f₁ = (Q₁ * z₁) ⋅ (Q₁ * z₁) - r^2
 f₂ = (Q₂ * z₂) ⋅ (Q₂ * z₂) - r^2
-
 ## initialize the equation for E₁ and E₂ being tangent
 @polyvar λ
 g = (Q₁' * Q₁) * z₁ - λ .* (Q₂' * Q₂) * z₂
-
 ## gather everything in one system
 F = [f₁; f₂; g];
 
 
+
 # An initial solution is given by two circles, each of radius 1,  centered at $(1,0)$ and $(-1,0)$, respectively.
-#
+
 map(F) do f
     f(vec(Q₁) => [1,0,0,1], vec(Q₂) => [1,0,0,1], x => [0,0], p₁ => [1,0], p₂ => [-1,0], λ => -1, r => 1)
 end
@@ -46,13 +43,13 @@ end
 # That is, the *parameters* are $p_1, p_2, Q_1, Q_2$ and the *variables* are $x,r,λ$.
 # Now we track the starting solution towards the target system
 
-#md solve(F, [[0, 0, 1, -1]], parameters=[vec(Q₁); vec(Q₂); p₁; p₂], startparameters=[1, 0, 0, 1, 1, 0, 0, 1, 1, 0, -1, 0], targetparameters=[vec([1 2; 2 5]); vec([0 3; 3 1]); [7, 5]; [1, 2]]) #hide
-S = solve(F, [[0, 0, 1, -1]],
-      parameters=[vec(Q₁); vec(Q₂); p₁; p₂],
-      startparameters=[1, 0, 0, 1, 1, 0, 0, 1, 1, 0, -1, 0],
-      targetparameters=[vec([1 2; 2 5]); vec([0 3; 3 1]); [7, 5]; [1, 2]])
+params = [vec(Q₁); vec(Q₂); p₁; p₂]
+startparams = [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, -1, 0]
+targetparams = [vec([1 2; 2 5]); vec([0 3; 3 1]); [7, 5]; [1, 2]]
+#md solve(F, [[0, 0, 1, -1]], parameters=params, startparameters=startparams, targetparameters=targetparams) #hide
+S = solve(F, [[0, 0, 1, -1]], parameters=params, startparameters=startparams, targetparameters=targetparams)
 
-# ```
+
 # The computation reveals that $r^\star \approx 10.89$. We can plot the two ellipses:
 # ```julia
 # r = solution(S[1])[3]

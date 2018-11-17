@@ -1,5 +1,4 @@
-using Literate
-using Documenter, DocumenterMarkdown
+using Literate, Documenter, DocumenterMarkdown
 
 for f in readdir(joinpath(@__DIR__, "src"))
     if endswith(f, ".jl")
