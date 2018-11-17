@@ -10,9 +10,8 @@ export currt, currΔt,
     set_refinement_tol!,
     set_refinement_maxiters!
 
-function Base.show(io::IO, ::MIME"text/plain", tracker::PathTracker)
-    print(io, "PathTracker()")
-end
+Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker()")
+Base.show(io::IO, ::MIME"application/juno+inline", x::PathTracker) = x
 
 """
     checkstart(H, x)

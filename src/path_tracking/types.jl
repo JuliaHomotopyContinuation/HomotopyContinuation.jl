@@ -142,9 +142,6 @@ function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; patch=AffinePa
     PathTracker(H, y₁, complex(t₁), complex(t₀); kwargs...)
 end
 
-Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
-
-
 """
      PathTrackerResult(tracker)
 
@@ -170,7 +167,7 @@ function PathTrackerResult(tracker::PathTracker)
           currresidual(tracker), curriters(tracker))
 end
 
-function Base.show(io::IO, ::MIME"text/plain", result::PathTrackerResult)
+function Base.show(io::IO, result::PathTrackerResult)
     println(io, "PathTrackerResult{", typeof(result.x), ",", typeof(result.t) ,"}:")
     println(io, " • returncode → :$(result.returncode)")
     println(io, " • x → $(result.x)")
@@ -178,8 +175,8 @@ function Base.show(io::IO, ::MIME"text/plain", result::PathTrackerResult)
     println(io, " • res → $(result.res)")
     println(io, " • iters → $(result.iters)")
 end
+Base.show(io::IO, ::MIME"application/juno+inline", x::PathTrackerResult) = x
 
 TreeViews.hastreeview(::PathTrackerResult) = true
-
 TreeViews.treelabel(io::IO, x::PathTrackerResult, ::MIME"application/juno+inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathTrackerResult{$(typeof(x.x)),$( typeof(x.t))}</span>")

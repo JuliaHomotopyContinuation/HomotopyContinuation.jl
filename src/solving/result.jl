@@ -379,7 +379,7 @@ end
 
 
 ####Show functions
-function Base.show(io::IO, ::MIME"text/plain", x::AffineResult)
+function Base.show(io::IO, x::AffineResult)
     s = statistics(x)
     println(io, "AffineResult with $(length(x)) tracked paths")
     println(io, "==================================")
@@ -390,7 +390,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::AffineResult)
     println(io, "• random seed: $(seed(x))")
 end
 
-function Base.show(io::IO, ::MIME"text/plain", x::ProjectiveResult)
+function Base.show(io::IO, x::ProjectiveResult)
     s = statistics(x)
     println(io, "ProjectiveResult with $(length(x)) tracked paths")
     println(io, "==================================")
@@ -399,7 +399,6 @@ function Base.show(io::IO, ::MIME"text/plain", x::ProjectiveResult)
     println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• random seed: $(seed(x))")
 end
-Base.print(io::IO, r::Union{AffineResult, ProjectiveResult}) = show(io::IO, MIME"text/plain"(), r)
 
 TreeViews.hastreeview(::AffineResult) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
