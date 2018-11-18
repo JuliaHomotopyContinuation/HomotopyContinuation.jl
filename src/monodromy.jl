@@ -33,15 +33,35 @@ end
 ########
 # Setup
 ########
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, p₀::AbstractVector{<:Number}, solution::Vector{<:Number}; kwargs...)
-    monodromy_solve(F, p₀, [solution]; kwargs...)
+"""
+    monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)
+
+Solve a polynomial system `F(x;p)` with specified parameters and initial solutions `sols`
+by monodromy techniques. This makes loops in the parameter space of `F` to find new solutions.
+
+## Options
+* `target_solutions_count=nothing`: The computations are stopped if this number of solutions is reached.
+* `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
+* `maximal_number_of_iterations_without_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
+* `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
+* `strategy`: The strategy used to create loops. By default this will be `Trianlge` with weights if `F` is a real system.
+* `showprogress=true`: Enable a progress meter.
+* `tol::Float64=1e-6`: The tolerance with which paths are tracked and with which it is decided whether to solutions are identical.
+* `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
+* `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
+* `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
+* `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
+* `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
+"""
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{<:Number}; kwargs...)
+    monodromy_solve(F, [solution], p₀; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, p₀::AbstractVector{<:Number}, solutions::Vector{<:AbstractVector{<:Number}}; kwargs...)
-    monodromy_solve(F, SVector{length(p₀)}(p₀), static_solutions(solutions); kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{<:Number}; kwargs...)
+    monodromy_solve(F, static_solutions(solutions), SVector{length(p₀)}(p₀); kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
-        p₀::SVector{NParams, TP},
-        startsolutions::Vector{<:SVector{NVars, <:Complex}};
+        startsolutions::Vector{<:SVector{NVars, <:Complex}},
+        p₀::SVector{NParams, TP};
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=default_strategy(TC, TP),
         showprogress=true,
@@ -220,7 +240,7 @@ end
 function isdone(node::Node, x, options::Options)
     !node.main_node && return false
 
-    options.done_callback(x) ||
+    options.done_callback(x, node.points) ||
     length(node.points) ≥ options.target_solutions_count
 end
 

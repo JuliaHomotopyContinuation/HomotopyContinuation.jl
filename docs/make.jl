@@ -2,7 +2,6 @@ using Documenter, HomotopyContinuation
 import LinearAlgebra
 
 makedocs(
-    format = :html,
     sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
@@ -16,10 +15,5 @@ makedocs(
 )
 
 deploydocs(
-    repo   = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git",
-    target = "build",
-    julia = "1.0",
-    osname = "linux",
-    deps   = nothing,
-    make   = nothing
+    repo = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git"
 )

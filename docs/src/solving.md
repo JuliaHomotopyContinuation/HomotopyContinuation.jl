@@ -79,3 +79,17 @@ isatinfinity
 issingular
 isnonsingular
 ```
+
+
+## Monodromy Solve
+
+```@docs
+monodromy_solve
+GroupActions
+```
+
+### Strategies
+```@docs
+Triangle
+Pental
+```

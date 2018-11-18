@@ -38,26 +38,29 @@ end
 
         # test that timeout works
         Random.seed!(12345)
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, timeout=1e-12)
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, timeout=1e-12)
         @test length(result.solutions) < 21
 
 
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, maximal_number_of_iterations_without_progress=100)
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, maximal_number_of_iterations_without_progress=100)
         @test result.returncode == :success
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
         @test length(Utilities.UniquePoints(result.solutions).points) == 21
 
+        @test monodromy_solve(F, result.solutions, p₀, parameters=p,
+                    target_solutions_count=21).returncode == :success
+
         # By group_actions=nothing we force that complex conjugation is not used.
-        result2 = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21, group_actions=nothing)
+        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, group_actions=nothing)
         @test result2.returncode == :success
 
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
-                done_callback=(s -> true))
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
+                done_callback=((_, _) -> true))
         @test length(result.solutions) == 2
 
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
             group_action=(s -> begin
                 t = cis(π*2/3)
@@ -67,7 +70,7 @@ end
             end))
         @test length(result.solutions) == 21
 
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
             group_actions=(s -> begin
                 t = cis(π*2/3)
@@ -79,10 +82,10 @@ end
 
 
         # Test stop heuristic using too hight target_solutions_count
-        result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=25)
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
         @test result.returncode == :heuristic_stop
         # Test stop heuristic using too hight target_solutions_count
-        result = monodromy_solve(F, p₀, x₀, parameters=p)
+        result = monodromy_solve(F, x₀, p₀, parameters=p)
         @test result.returncode == :heuristic_stop
 
     end

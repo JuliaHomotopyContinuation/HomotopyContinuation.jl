@@ -1,3 +1,5 @@
+export Triangle, Petal
+
 #####################
 # Nodes of the Loop
 #####################

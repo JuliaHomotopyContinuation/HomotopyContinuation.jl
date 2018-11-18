@@ -22,7 +22,7 @@ function Options(isrealsystem;
     group_action=nothing,
     group_actions=GroupActions(group_action),
     group_action_on_all_nodes=false,
-    parameter_sampler=independent_zero_gaussian,
+    parameter_sampler=independent_normal,
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
@@ -49,7 +49,7 @@ function default_minimal_number_of_solutions(target_solutions_count::Int)
     div(target_solutions_count, 2)
 end
 
-always_false(x) = false
+always_false(x, sols) = false
 complex_conjugation(x) = (conj.(x),)
 has_group_actions(options::Options) = !(options.group_actions isa GroupActions{Tuple{}})
 
@@ -57,6 +57,6 @@ function independent_gaussian(p::SVector{N, T}) where {N, T}
     p + (@SVector randn(T, N))
 end
 
-function independent_zero_gaussian(p::SVector{N, T}) where {N, T}
+function independent_normal(p::SVector{N, T}) where {N, T}
     @SVector randn(T, N)
 end
