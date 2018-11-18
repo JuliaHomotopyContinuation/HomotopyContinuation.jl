@@ -4,7 +4,8 @@ import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
-export allvariables,
+export print_fieldnames,
+    allvariables,
     nvariables,
     ishomogenous,
     uniquevar,
@@ -26,6 +27,18 @@ export allvariables,
     start_solution_sample
 
 include("utilities/unique_points.jl")
+
+"""
+     print_fieldnames(io::IO, obj)
+
+ A better default printing for structs.
+ """
+ function print_fieldnames(io::IO, obj)
+     println(io, typeof(obj), ":")
+     for name in fieldnames(typeof(obj))
+         println(io, " • ", name, " → ", getfield(obj, name))
+     end
+ end
 
 
 """

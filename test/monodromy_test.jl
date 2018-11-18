@@ -54,7 +54,7 @@ end
         @test result2.returncode == :success
 
         result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,
-                done_callback=(s -> true))
+                done_callback=((_, _) -> true))
         @test length(result.solutions) == 2
 
         result = monodromy_solve(F, p₀, x₀, parameters=p, target_solutions_count=21,

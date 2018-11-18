@@ -3,7 +3,7 @@
 | **Documentation** | **Build Status** |
 |:-----------------:|:----------------:|
 | [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] |
-| [![][docs-latest-img]][docs-latest-url] | [![Codecov branch][codecov-img]][codecov-url]|
+| [![][docs-dev-img]][docs-dev-url] | [![Codecov branch][codecov-img]][codecov-url]|
 
 
 `HomotopyContinuation.jl` is a package for solving polynomial systems with only finitely many solution using numerical homotopy continuation.
@@ -112,9 +112,9 @@ If you find HomotopyContinuation.jl useful in your work, we kindly request that 
 A preprint of this paper is [freely available](https://arxiv.org/abs/1711.10911).
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
-[docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-stable-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/stable
-[docs-latest-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/latest
+[docs-dev-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/dev
 
 [build-img]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl.svg?branch=master
 [build-url]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl
