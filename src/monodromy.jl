@@ -60,8 +60,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vect
     monodromy_solve(F, static_solutions(solutions), SVector{length(p₀)}(p₀); kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
-        startsolutions::Vector{<:SVector{NVars, <:Complex}}
-        p₀::SVector{NParams, TP},;
+        startsolutions::Vector{<:SVector{NVars, <:Complex}},
+        p₀::SVector{NParams, TP};
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=default_strategy(TC, TP),
         showprogress=true,
