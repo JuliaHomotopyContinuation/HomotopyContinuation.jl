@@ -1,7 +1,7 @@
 var documenterSearchIndex = {"docs": [
 
 {
-    "location": "index.html#",
+    "location": "#",
     "page": "Introduction",
     "title": "Introduction",
     "category": "page",
@@ -9,7 +9,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Introduction-1",
+    "location": "#Introduction-1",
     "page": "Introduction",
     "title": "Introduction",
     "category": "section",
@@ -17,7 +17,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Contents-1",
+    "location": "#Contents-1",
     "page": "Introduction",
     "title": "Contents",
     "category": "section",
@@ -25,7 +25,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#",
+    "location": "solving/#",
     "page": "Solving Polynomial Systems",
     "title": "Solving Polynomial Systems",
     "category": "page",
@@ -33,7 +33,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#Solving-Polynomial-Systems-1",
+    "location": "solving/#Solving-Polynomial-Systems-1",
     "page": "Solving Polynomial Systems",
     "title": "Solving Polynomial Systems",
     "category": "section",
@@ -41,7 +41,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.solve",
+    "location": "solving/#HomotopyContinuation.solve",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.solve",
     "category": "function",
@@ -49,7 +49,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#The-*solve*-function-1",
+    "location": "solving/#The-*solve*-function-1",
     "page": "Solving Polynomial Systems",
     "title": "The solve function",
     "category": "section",
@@ -57,7 +57,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.AffineResult",
+    "location": "solving/#HomotopyContinuation.Solving.AffineResult",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.AffineResult",
     "category": "type",
@@ -65,7 +65,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.ProjectiveResult",
+    "location": "solving/#HomotopyContinuation.Solving.ProjectiveResult",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.ProjectiveResult",
     "category": "type",
@@ -73,7 +73,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.results",
+    "location": "solving/#HomotopyContinuation.Solving.results",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.results",
     "category": "function",
@@ -81,7 +81,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.mapresults",
+    "location": "solving/#HomotopyContinuation.Solving.mapresults",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.mapresults",
     "category": "function",
@@ -89,7 +89,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.solutions",
+    "location": "solving/#HomotopyContinuation.Solving.solutions",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solutions",
     "category": "function",
@@ -97,7 +97,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.realsolutions",
+    "location": "solving/#HomotopyContinuation.Solving.realsolutions",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.realsolutions",
     "category": "function",
@@ -105,7 +105,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.uniquesolutions",
+    "location": "solving/#HomotopyContinuation.Solving.uniquesolutions",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.uniquesolutions",
     "category": "function",
@@ -113,7 +113,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.finite",
+    "location": "solving/#HomotopyContinuation.Solving.finite",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.finite",
     "category": "function",
@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#Base.real-Tuple{Union{Result, Array{#s94,1} where #s94<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s94,1} where #s94<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -129,7 +129,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.atinfinity",
+    "location": "solving/#HomotopyContinuation.Solving.atinfinity",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.atinfinity",
     "category": "function",
@@ -137,7 +137,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.singular",
+    "location": "solving/#HomotopyContinuation.Solving.singular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.singular",
     "category": "function",
@@ -145,7 +145,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nonsingular",
+    "location": "solving/#HomotopyContinuation.Solving.nonsingular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nonsingular",
     "category": "function",
@@ -153,7 +153,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.failed",
+    "location": "solving/#HomotopyContinuation.Solving.failed",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.failed",
     "category": "function",
@@ -161,7 +161,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.multiplicities",
+    "location": "solving/#HomotopyContinuation.Solving.multiplicities",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.multiplicities",
     "category": "function",
@@ -169,7 +169,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.seed",
+    "location": "solving/#HomotopyContinuation.Solving.seed",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.seed",
     "category": "function",
@@ -177,7 +177,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nresults",
+    "location": "solving/#HomotopyContinuation.Solving.nresults",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nresults",
     "category": "function",
@@ -185,7 +185,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nfinite",
+    "location": "solving/#HomotopyContinuation.Solving.nfinite",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nfinite",
     "category": "function",
@@ -193,7 +193,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nreal",
+    "location": "solving/#HomotopyContinuation.Solving.nreal",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nreal",
     "category": "function",
@@ -201,7 +201,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nsingular",
+    "location": "solving/#HomotopyContinuation.Solving.nsingular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nsingular",
     "category": "function",
@@ -209,7 +209,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nnonsingular",
+    "location": "solving/#HomotopyContinuation.Solving.nnonsingular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nnonsingular",
     "category": "function",
@@ -217,7 +217,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.natinfinity",
+    "location": "solving/#HomotopyContinuation.Solving.natinfinity",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.natinfinity",
     "category": "function",
@@ -225,7 +225,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.nfailed",
+    "location": "solving/#HomotopyContinuation.Solving.nfailed",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.nfailed",
     "category": "function",
@@ -233,7 +233,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#The-result-of-*solve*-1",
+    "location": "solving/#The-result-of-*solve*-1",
     "page": "Solving Polynomial Systems",
     "title": "The result of solve",
     "category": "section",
@@ -241,7 +241,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.PathResult",
+    "location": "solving/#HomotopyContinuation.Solving.PathResult",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.PathResult",
     "category": "type",
@@ -249,7 +249,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.solution",
+    "location": "solving/#HomotopyContinuation.Solving.solution",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.solution",
     "category": "function",
@@ -257,7 +257,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.residual",
+    "location": "solving/#HomotopyContinuation.Solving.residual",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.residual",
     "category": "function",
@@ -265,7 +265,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.startsolution",
+    "location": "solving/#HomotopyContinuation.Solving.startsolution",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.startsolution",
     "category": "function",
@@ -273,7 +273,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#Base.isreal-Tuple{PathResult}",
+    "location": "solving/#Base.isreal-Tuple{PathResult}",
     "page": "Solving Polynomial Systems",
     "title": "Base.isreal",
     "category": "method",
@@ -281,7 +281,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#LinearAlgebra.issuccess-Tuple{PathResult}",
+    "location": "solving/#LinearAlgebra.issuccess-Tuple{PathResult}",
     "page": "Solving Polynomial Systems",
     "title": "LinearAlgebra.issuccess",
     "category": "method",
@@ -289,7 +289,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.isfailed",
+    "location": "solving/#HomotopyContinuation.Solving.isfailed",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isfailed",
     "category": "function",
@@ -297,7 +297,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.isaffine",
+    "location": "solving/#HomotopyContinuation.Solving.isaffine",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isaffine",
     "category": "function",
@@ -305,7 +305,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.isprojective",
+    "location": "solving/#HomotopyContinuation.Solving.isprojective",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isprojective",
     "category": "function",
@@ -313,7 +313,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.isatinfinity",
+    "location": "solving/#HomotopyContinuation.Solving.isatinfinity",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isatinfinity",
     "category": "function",
@@ -321,7 +321,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.issingular",
+    "location": "solving/#HomotopyContinuation.Solving.issingular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.issingular",
     "category": "function",
@@ -329,7 +329,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#HomotopyContinuation.Solving.isnonsingular",
+    "location": "solving/#HomotopyContinuation.Solving.isnonsingular",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.Solving.isnonsingular",
     "category": "function",
@@ -337,7 +337,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving.html#PathResult-1",
+    "location": "solving/#PathResult-1",
     "page": "Solving Polynomial Systems",
     "title": "PathResult",
     "category": "section",
@@ -345,7 +345,23 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#",
+    "location": "solving/#Monodromy-Solve-1",
+    "page": "Solving Polynomial Systems",
+    "title": "Monodromy Solve",
+    "category": "section",
+    "text": "monodromy_solve\nGroupActions"
+},
+
+{
+    "location": "solving/#Strategies-1",
+    "page": "Solving Polynomial Systems",
+    "title": "Strategies",
+    "category": "section",
+    "text": "Triangle\nPental"
+},
+
+{
+    "location": "systems/#",
     "page": "Systems",
     "title": "Systems",
     "category": "page",
@@ -353,7 +369,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Polynomial-systems-1",
+    "location": "systems/#Polynomial-systems-1",
     "page": "Systems",
     "title": "Polynomial systems",
     "category": "section",
@@ -361,7 +377,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.Systems.FPSystem",
+    "location": "systems/#HomotopyContinuation.Systems.FPSystem",
     "page": "Systems",
     "title": "HomotopyContinuation.Systems.FPSystem",
     "category": "type",
@@ -369,7 +385,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.Systems.SPSystem",
+    "location": "systems/#HomotopyContinuation.Systems.SPSystem",
     "page": "Systems",
     "title": "HomotopyContinuation.Systems.SPSystem",
     "category": "type",
@@ -377,7 +393,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.Systems.FixedHomotopy",
+    "location": "systems/#HomotopyContinuation.Systems.FixedHomotopy",
     "page": "Systems",
     "title": "HomotopyContinuation.Systems.FixedHomotopy",
     "category": "type",
@@ -385,7 +401,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Default-systems-1",
+    "location": "systems/#Default-systems-1",
     "page": "Systems",
     "title": "Default systems",
     "category": "section",
@@ -393,7 +409,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Interface-for-custom-systems-1",
+    "location": "systems/#Interface-for-custom-systems-1",
     "page": "Systems",
     "title": "Interface for custom systems",
     "category": "section",
@@ -401,7 +417,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.AbstractSystem",
+    "location": "systems/#HomotopyContinuation.SystemsBase.AbstractSystem",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.AbstractSystem",
     "category": "type",
@@ -409,7 +425,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.AbstractSystemCache",
+    "location": "systems/#HomotopyContinuation.SystemsBase.AbstractSystemCache",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.AbstractSystemCache",
     "category": "type",
@@ -417,7 +433,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.NullCache",
+    "location": "systems/#HomotopyContinuation.SystemsBase.NullCache",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.NullCache",
     "category": "type",
@@ -425,7 +441,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Types-1",
+    "location": "systems/#Types-1",
     "page": "Systems",
     "title": "Types",
     "category": "section",
@@ -433,7 +449,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.cache",
+    "location": "systems/#HomotopyContinuation.SystemsBase.cache",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.cache",
     "category": "function",
@@ -441,7 +457,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.evaluate!",
+    "location": "systems/#HomotopyContinuation.SystemsBase.evaluate!",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate!",
     "category": "function",
@@ -449,7 +465,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.evaluate",
+    "location": "systems/#HomotopyContinuation.SystemsBase.evaluate",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate",
     "category": "function",
@@ -457,7 +473,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.jacobian!",
+    "location": "systems/#HomotopyContinuation.SystemsBase.jacobian!",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian!",
     "category": "function",
@@ -465,7 +481,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.jacobian",
+    "location": "systems/#HomotopyContinuation.SystemsBase.jacobian",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian",
     "category": "function",
@@ -473,7 +489,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Base.size-Tuple{HomotopyContinuation.SystemsBase.AbstractSystem}",
+    "location": "systems/#Base.size-Tuple{HomotopyContinuation.SystemsBase.AbstractSystem}",
     "page": "Systems",
     "title": "Base.size",
     "category": "method",
@@ -481,7 +497,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Mandatory-1",
+    "location": "systems/#Mandatory-1",
     "page": "Systems",
     "title": "Mandatory",
     "category": "section",
@@ -489,7 +505,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.evaluate_and_jacobian!",
+    "location": "systems/#HomotopyContinuation.SystemsBase.evaluate_and_jacobian!",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian!",
     "category": "function",
@@ -497,7 +513,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#HomotopyContinuation.SystemsBase.evaluate_and_jacobian",
+    "location": "systems/#HomotopyContinuation.SystemsBase.evaluate_and_jacobian",
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian",
     "category": "function",
@@ -505,7 +521,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "systems.html#Optional-1",
+    "location": "systems/#Optional-1",
     "page": "Systems",
     "title": "Optional",
     "category": "section",
@@ -513,7 +529,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#",
+    "location": "homotopies/#",
     "page": "Homotopies",
     "title": "Homotopies",
     "category": "page",
@@ -521,7 +537,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Homotopies-1",
+    "location": "homotopies/#Homotopies-1",
     "page": "Homotopies",
     "title": "Homotopies",
     "category": "section",
@@ -529,7 +545,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.Homotopies.StraightLineHomotopy",
+    "location": "homotopies/#HomotopyContinuation.Homotopies.StraightLineHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.StraightLineHomotopy",
     "category": "type",
@@ -537,7 +553,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.Homotopies.FixedPointHomotopy",
+    "location": "homotopies/#HomotopyContinuation.Homotopies.FixedPointHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.FixedPointHomotopy",
     "category": "type",
@@ -545,7 +561,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.Homotopies.PatchedHomotopy",
+    "location": "homotopies/#HomotopyContinuation.Homotopies.PatchedHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.PatchedHomotopy",
     "category": "type",
@@ -553,7 +569,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.Homotopies.PatchSwitcherHomotopy",
+    "location": "homotopies/#HomotopyContinuation.Homotopies.PatchSwitcherHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.PatchSwitcherHomotopy",
     "category": "type",
@@ -561,7 +577,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Default-homotopies-1",
+    "location": "homotopies/#Default-homotopies-1",
     "page": "Homotopies",
     "title": "Default homotopies",
     "category": "section",
@@ -569,7 +585,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Interface-for-custom-homotopies-1",
+    "location": "homotopies/#Interface-for-custom-homotopies-1",
     "page": "Homotopies",
     "title": "Interface for custom homotopies",
     "category": "section",
@@ -577,7 +593,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.AbstractHomotopy",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.AbstractHomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.AbstractHomotopy",
     "category": "type",
@@ -585,7 +601,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.AbstractHomotopyCache",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.AbstractHomotopyCache",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.AbstractHomotopyCache",
     "category": "type",
@@ -593,7 +609,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.NullCache",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.NullCache",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.NullCache",
     "category": "type",
@@ -601,7 +617,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Types-1",
+    "location": "homotopies/#Types-1",
     "page": "Homotopies",
     "title": "Types",
     "category": "section",
@@ -609,7 +625,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.cache",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.cache",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.cache",
     "category": "function",
@@ -617,7 +633,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.evaluate!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.evaluate!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.evaluate!",
     "category": "function",
@@ -625,7 +641,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.jacobian!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.jacobian!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.jacobian!",
     "category": "function",
@@ -633,7 +649,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.dt!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.dt!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.dt!",
     "category": "function",
@@ -641,7 +657,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Base.size-Tuple{HomotopyContinuation.HomotopiesBase.AbstractHomotopy}",
+    "location": "homotopies/#Base.size-Tuple{HomotopyContinuation.HomotopiesBase.AbstractHomotopy}",
     "page": "Homotopies",
     "title": "Base.size",
     "category": "method",
@@ -649,7 +665,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Mandatory-1",
+    "location": "homotopies/#Mandatory-1",
     "page": "Homotopies",
     "title": "Mandatory",
     "category": "section",
@@ -657,7 +673,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian!",
     "category": "function",
@@ -665,7 +681,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.evaluate_and_jacobian",
     "category": "function",
@@ -673,7 +689,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.jacobian_and_dt!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.jacobian_and_dt!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.jacobian_and_dt!",
     "category": "function",
@@ -681,7 +697,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.evaluate",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.evaluate",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.evaluate",
     "category": "function",
@@ -689,7 +705,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.jacobian",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.jacobian",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.jacobian",
     "category": "function",
@@ -697,7 +713,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.dt",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.dt",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.dt",
     "category": "function",
@@ -705,7 +721,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.precondition!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.precondition!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.precondition!",
     "category": "function",
@@ -713,7 +729,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.update!",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.update!",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.update!",
     "category": "function",
@@ -721,7 +737,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#HomotopyContinuation.HomotopiesBase.basehomotopy",
+    "location": "homotopies/#HomotopyContinuation.HomotopiesBase.basehomotopy",
     "page": "Homotopies",
     "title": "HomotopyContinuation.HomotopiesBase.basehomotopy",
     "category": "function",
@@ -729,7 +745,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "homotopies.html#Optional-1",
+    "location": "homotopies/#Optional-1",
     "page": "Homotopies",
     "title": "Optional",
     "category": "section",
@@ -737,7 +753,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#",
+    "location": "predictors-correctors/#",
     "page": "Predictors and Correctors",
     "title": "Predictors and Correctors",
     "category": "page",
@@ -745,7 +761,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#Predictors-and-Correctors-1",
+    "location": "predictors-correctors/#Predictors-and-Correctors-1",
     "page": "Predictors and Correctors",
     "title": "Predictors and Correctors",
     "category": "section",
@@ -753,7 +769,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#HomotopyContinuation.Predictors.RK4",
+    "location": "predictors-correctors/#HomotopyContinuation.Predictors.RK4",
     "page": "Predictors and Correctors",
     "title": "HomotopyContinuation.Predictors.RK4",
     "category": "type",
@@ -761,7 +777,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#HomotopyContinuation.Predictors.Euler",
+    "location": "predictors-correctors/#HomotopyContinuation.Predictors.Euler",
     "page": "Predictors and Correctors",
     "title": "HomotopyContinuation.Predictors.Euler",
     "category": "type",
@@ -769,7 +785,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#HomotopyContinuation.Predictors.NullPredictor",
+    "location": "predictors-correctors/#HomotopyContinuation.Predictors.NullPredictor",
     "page": "Predictors and Correctors",
     "title": "HomotopyContinuation.Predictors.NullPredictor",
     "category": "type",
@@ -777,7 +793,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#Predictors-1",
+    "location": "predictors-correctors/#Predictors-1",
     "page": "Predictors and Correctors",
     "title": "Predictors",
     "category": "section",
@@ -785,7 +801,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#HomotopyContinuation.Correctors.Newton",
+    "location": "predictors-correctors/#HomotopyContinuation.Correctors.Newton",
     "page": "Predictors and Correctors",
     "title": "HomotopyContinuation.Correctors.Newton",
     "category": "type",
@@ -793,7 +809,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "predictors-correctors.html#Correctors-1",
+    "location": "predictors-correctors/#Correctors-1",
     "page": "Predictors and Correctors",
     "title": "Correctors",
     "category": "section",
@@ -801,7 +817,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#",
+    "location": "pathtracking/#",
     "page": "Path tracker",
     "title": "Path tracker",
     "category": "page",
@@ -809,7 +825,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.pathtracker_startsolutions",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.pathtracker_startsolutions",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.pathtracker_startsolutions",
     "category": "function",
@@ -817,7 +833,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#Path-tracking-1",
+    "location": "pathtracking/#Path-tracking-1",
     "page": "Path tracker",
     "title": "Path tracking",
     "category": "section",
@@ -825,7 +841,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.PathTracker",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.PathTracker",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.PathTracker",
     "category": "type",
@@ -833,7 +849,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.PathTrackerResult",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.PathTrackerResult",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.PathTrackerResult",
     "category": "type",
@@ -841,7 +857,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.StepLength.HeuristicStepLength",
+    "location": "pathtracking/#HomotopyContinuation.StepLength.HeuristicStepLength",
     "page": "Path tracker",
     "title": "HomotopyContinuation.StepLength.HeuristicStepLength",
     "category": "type",
@@ -849,7 +865,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#Types-1",
+    "location": "pathtracking/#Types-1",
     "page": "Path tracker",
     "title": "Types",
     "category": "section",
@@ -857,7 +873,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.track!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.track!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.track!",
     "category": "function",
@@ -865,7 +881,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.track",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.track",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.track",
     "category": "function",
@@ -873,7 +889,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.setup!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.setup!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.setup!",
     "category": "function",
@@ -881,7 +897,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currx",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.currx",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currx",
     "category": "function",
@@ -889,7 +905,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currt",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.currt",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currt",
     "category": "function",
@@ -897,7 +913,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currΔt",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.currΔt",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currΔt",
     "category": "function",
@@ -905,7 +921,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.curriters",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.curriters",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.curriters",
     "category": "function",
@@ -913,7 +929,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.currstatus",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.currstatus",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.currstatus",
     "category": "function",
@@ -921,7 +937,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.tol",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.tol",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.tol",
     "category": "function",
@@ -929,7 +945,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.corrector_maxiters",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.corrector_maxiters",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.corrector_maxiters",
     "category": "function",
@@ -937,7 +953,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.refinement_tol",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.refinement_tol",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.refinement_tol",
     "category": "function",
@@ -945,7 +961,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.refinement_maxiters",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.refinement_maxiters",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.refinement_maxiters",
     "category": "function",
@@ -953,7 +969,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_tol!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.set_tol!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.set_tol!",
     "category": "function",
@@ -961,7 +977,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_corrector_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.set_corrector_maxiters!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.set_corrector_maxiters!",
     "category": "function",
@@ -969,7 +985,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_refinement_tol!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.set_refinement_tol!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.set_refinement_tol!",
     "category": "function",
@@ -977,7 +993,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#HomotopyContinuation.PathTracking.set_refinement_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.PathTracking.set_refinement_maxiters!",
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.set_refinement_maxiters!",
     "category": "function",
@@ -985,7 +1001,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking.html#Methods-1",
+    "location": "pathtracking/#Methods-1",
     "page": "Path tracker",
     "title": "Methods",
     "category": "section",
@@ -993,7 +1009,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#",
+    "location": "reference/#",
     "page": "Reference",
     "title": "Reference",
     "category": "page",
@@ -1001,7 +1017,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#Reference-1",
+    "location": "reference/#Reference-1",
     "page": "Reference",
     "title": "Reference",
     "category": "section",
@@ -1009,7 +1025,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#Input-1",
+    "location": "reference/#Input-1",
     "page": "Reference",
     "title": "Input",
     "category": "section",
@@ -1017,7 +1033,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.Utilities.ishomogenous",
+    "location": "reference/#HomotopyContinuation.Utilities.ishomogenous",
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.ishomogenous",
     "category": "function",
@@ -1025,7 +1041,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.Utilities.uniquevar",
+    "location": "reference/#HomotopyContinuation.Utilities.uniquevar",
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.uniquevar",
     "category": "function",
@@ -1033,7 +1049,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.Utilities.homogenize",
+    "location": "reference/#HomotopyContinuation.Utilities.homogenize",
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.homogenize",
     "category": "function",
@@ -1041,7 +1057,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#Utilities-1",
+    "location": "reference/#Utilities-1",
     "page": "Reference",
     "title": "Utilities",
     "category": "section",
@@ -1049,7 +1065,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.OrthogonalPatch",
+    "location": "reference/#HomotopyContinuation.AffinePatches.OrthogonalPatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.OrthogonalPatch",
     "category": "type",
@@ -1057,7 +1073,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.EmbeddingPatch",
+    "location": "reference/#HomotopyContinuation.AffinePatches.EmbeddingPatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.EmbeddingPatch",
     "category": "type",
@@ -1065,7 +1081,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.RandomPatch",
+    "location": "reference/#HomotopyContinuation.AffinePatches.RandomPatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.RandomPatch",
     "category": "type",
@@ -1073,7 +1089,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.FixedPatch",
+    "location": "reference/#HomotopyContinuation.AffinePatches.FixedPatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.FixedPatch",
     "category": "type",
@@ -1081,7 +1097,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#AffinePatches-1",
+    "location": "reference/#AffinePatches-1",
     "page": "Reference",
     "title": "AffinePatches",
     "category": "section",
@@ -1089,7 +1105,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.AbstractAffinePatch",
+    "location": "reference/#HomotopyContinuation.AffinePatches.AbstractAffinePatch",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.AbstractAffinePatch",
     "category": "type",
@@ -1097,7 +1113,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.state",
+    "location": "reference/#HomotopyContinuation.AffinePatches.state",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.state",
     "category": "function",
@@ -1105,7 +1121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.precondition!",
+    "location": "reference/#HomotopyContinuation.AffinePatches.precondition!",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.precondition!",
     "category": "function",
@@ -1113,7 +1129,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#HomotopyContinuation.AffinePatches.update!",
+    "location": "reference/#HomotopyContinuation.AffinePatches.update!",
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.update!",
     "category": "function",
@@ -1121,7 +1137,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "reference.html#Interface-1",
+    "location": "reference/#Interface-1",
     "page": "Reference",
     "title": "Interface",
     "category": "section",
