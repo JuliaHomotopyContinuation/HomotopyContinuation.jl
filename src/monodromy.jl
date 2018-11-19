@@ -81,6 +81,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     loop = Loop(strategy, p₀, startsolutions, options)
     tracker = PathTracking.pathtracker(
         F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
+        tol=options.tol * 1e-2,
         restkwargs...)
     statistics = Statistics(nsolutions(loop))
 
