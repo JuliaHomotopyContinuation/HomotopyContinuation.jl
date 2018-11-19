@@ -48,6 +48,7 @@ end
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
         @test length(Utilities.UniquePoints(result.solutions).points) == 21
+        @test isempty(sprint(show, result)) == false
 
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,
                     target_solutions_count=21).returncode == :success

@@ -6,7 +6,7 @@ mutable struct Statistics
 end
 Statistics(nsolutions::Int) = Statistics(0, 0, 1, [nsolutions])
 
-Base.show(io::IO, S::Statistics) = print_fieldnames(io, Statistics)
+Base.show(io::IO, S::Statistics) = Utilities.print_fieldnames(io, Statistics)
 Base.show(io::IO, ::MIME"application/juno+inline", S::Statistics) = S
 
 
