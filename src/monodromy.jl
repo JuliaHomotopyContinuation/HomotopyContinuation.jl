@@ -22,7 +22,7 @@ struct MonodromyResult{N, T}
     statistics::Statistics
 end
 
-Base.show(io::IO, ::MIME"application/juno+inline", x::MonodromyResult) = x
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
     println(io, "MonodromyResult{$N, $T} with $(length(result.solutions)) solutions:")
     println(io, "returncode → $(result.returncode)")
@@ -81,6 +81,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     loop = Loop(strategy, p₀, startsolutions, options)
     tracker = PathTracking.pathtracker(
         F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
+        tol=options.tol * 1e-2,
         restkwargs...)
     statistics = Statistics(nsolutions(loop))
 

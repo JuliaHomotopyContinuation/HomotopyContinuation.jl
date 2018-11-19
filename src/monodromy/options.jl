@@ -17,7 +17,7 @@ struct Options{F1<:Function, F2<:Tuple, F3<:Function}
 end
 
 function Options(isrealsystem;
-    tol::Float64=1e-6,
+    tol::Float64=1e-5,
     done_callback=always_false,
     group_action=nothing,
     group_actions=GroupActions(group_action),
