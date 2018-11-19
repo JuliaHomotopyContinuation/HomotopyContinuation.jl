@@ -6,9 +6,9 @@ import TreeViews
 
 function test_treeviews(x)
     @test TreeViews.hastreeview(x)
-    @test_nowarn TreeViews.treelabel(devnull, x, MIME"application/prs.juno.inline"())
+    @test_nowarn TreeViews.treelabel(devnull, x, MIME"application/juno+inline"())
     for i=1:TreeViews.numberofnodes(x)
-        @test_nowarn TreeViews.nodelabel(devnull, x, i, MIME"application/prs.juno.inline"())
+        @test_nowarn TreeViews.nodelabel(devnull, x, i, MIME"application/juno+inline"())
         @test_nowarn TreeViews.treenode(x, i)
     end
 end
