@@ -6,7 +6,7 @@
 # ```julia-repl
 # pkg> add HomotopyContinuation
 # ```
-# you can enter the Julia package manager by pressing `[` in the REPL.
+# you can enter the Julia package manager by pressing `]` in the REPL.
 #
 #
 # <h3 class="section-head" id="h-basic-usage"><a href="#h-basic-usage">Basic usage</a></h3>
