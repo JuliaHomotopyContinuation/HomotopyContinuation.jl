@@ -175,8 +175,8 @@ function Base.show(io::IO, result::PathTrackerResult)
     println(io, " • res → $(result.res)")
     println(io, " • iters → $(result.iters)")
 end
-Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTrackerResult) = x
+Base.show(io::IO, ::MIME"application/juno+inline", x::PathTrackerResult) = x
 
 TreeViews.hastreeview(::PathTrackerResult) = true
-TreeViews.treelabel(io::IO, x::PathTrackerResult, ::MIME"application/prs.juno.inline") =
+TreeViews.treelabel(io::IO, x::PathTrackerResult, ::MIME"application/juno+inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathTrackerResult{$(typeof(x.x)),$( typeof(x.t))}</span>")

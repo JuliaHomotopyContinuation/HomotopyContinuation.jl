@@ -404,12 +404,12 @@ TreeViews.hastreeview(::AffineResult) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
 TreeViews.numberofnodes(::AffineResult) = 6
 TreeViews.numberofnodes(::ProjectiveResult) = 5
-TreeViews.treelabel(io::IO, x::AffineResult, ::MIME"application/prs.juno.inline") =
+TreeViews.treelabel(io::IO, x::AffineResult, ::MIME"application/juno+inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">AffineResult</span>")
-TreeViews.treelabel(io::IO, x::ProjectiveResult, ::MIME"application/prs.juno.inline") =
+TreeViews.treelabel(io::IO, x::ProjectiveResult, ::MIME"application/juno+inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">ProjectiveResult</span>")
 
-function TreeViews.nodelabel(io::IO, x::AffineResult, i::Int, ::MIME"application/prs.juno.inline")
+function TreeViews.nodelabel(io::IO, x::AffineResult, i::Int, ::MIME"application/juno+inline")
     s = statistics(x)
     if i == 1
         print(io, "Paths tracked")
@@ -444,7 +444,7 @@ function TreeViews.treenode(r::AffineResult, i::Integer)
     missing
 end
 
-function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"application/prs.juno.inline")
+function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"application/juno+inline")
     s = statistics(x)
     if i == 1
         print(io, "Paths tracked")

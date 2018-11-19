@@ -44,7 +44,7 @@
         @test R.returncode == :success
         @test R.res < 1e-7
         @test_nowarn show(devnull, R)
-        @test_nowarn TreeViews.treelabel(devnull, R, MIME"application/prs.juno.inline"())
+        @test_nowarn TreeViews.treelabel(devnull, R, MIME"application/juno+inline"())
 
         out = Problems.embed(P, first(start_sols))
         retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
