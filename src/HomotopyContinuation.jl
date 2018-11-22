@@ -16,7 +16,6 @@ module HomotopyContinuation
         Problems,
         ProjectiveVectors,
         Solving,
-        StepLength,
         Systems,
         Utilities
 
@@ -33,9 +32,6 @@ module HomotopyContinuation
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")
-    include("prediction_correction.jl")
-
-    include("step_length.jl")
 
     include("path_tracking.jl")
     include("endgaming.jl")

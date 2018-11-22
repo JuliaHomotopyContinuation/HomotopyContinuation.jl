@@ -43,14 +43,9 @@ end
 function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
     x₁= Problems.embed(prob, startsolutionsample)
 
-    slkwargs, kwargs = splitkwargs(kwargs, StepLength.allowed_keywords)
-    steplength = StepLength.HeuristicStepLength(;slkwargs...)
+    tracker = PathTracking.PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, PathTracking.allowed_keywords)...)
 
-    tracker = pathtracker(prob, x₁, t₁, t₀; steplength=steplength,
-        filterkwargs(kwargs, PathTracking.allowed_keywords)...)
-
-    endgame = Endgaming.Endgame(prob.homotopy, x₁; steplength=steplength,
-        filterkwargs(kwargs, Endgaming.allowed_keywords)...)
+    endgame = Endgaming.Endgame(prob.homotopy, x₁; filterkwargs(kwargs, Endgaming.allowed_keywords)...)
 
     check_kwargs(kwargs)
 
@@ -65,10 +60,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
-allowed_keywords() = [:patch,
-    PathTracking.allowed_keywords...,
-    StepLength.allowed_keywords...,
-    Endgaming.allowed_keywords...]
+allowed_keywords() = [:patch, PathTracking.allowed_keywords..., Endgaming.allowed_keywords...]
 
 function invalid_kwargs(kwargs)
     invalids = []
@@ -80,11 +72,6 @@ function invalid_kwargs(kwargs)
         end
     end
     invalids
-end
-
-function pathtracker(prob::Problems.Projective, x::AbstractVector, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
-    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
-    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
 end
 
 function patchswitcher(prob::Problems.Projective{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}

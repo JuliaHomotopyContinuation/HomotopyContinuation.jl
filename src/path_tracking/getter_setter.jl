@@ -30,7 +30,7 @@ end
 Current `t`.
 """
 currt(tracker::PathTracker) = currt(tracker.state)
-currt(state::State) = (1-state.t) * state.target + state.t * state.start
+currt(state::State) = state.segment[state.s]
 
 """
      currΔt(tracker::PathTracker)
@@ -38,7 +38,7 @@ currt(state::State) = (1-state.t) * state.target + state.t * state.start
 Current steplength `Δt`.
 """
 currΔt(tracker::PathTracker) = currΔt(tracker.state)
-currΔt(state::State) = state.Δt * (state.target - state.start)
+currΔt(state::State) = state.segment[state.Δs] - state.segment.start
 
 """
      curriters(tracker::PathTracker)
@@ -61,7 +61,8 @@ currstatus(state::State) = state.status
 
 Return the current value of `x`.
 """
-currx(tracker::PathTracker) = tracker.x
+currx(tracker::PathTracker) = currx(tracker.state)
+currx(state::State) = state.x
 
 """
      tol(tracker::PathTracker)

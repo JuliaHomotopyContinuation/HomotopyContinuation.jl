@@ -101,6 +101,12 @@ function embed!(z::PVector{T}, x::AbstractVector{T}) where T
     end
     z
 end
+function embed!(z::PV, x::PV) where {PV <: PVector}
+    for k in eachindex(z)
+        z[k] = x[k]
+    end
+    z
+end
 
 
 """
@@ -379,8 +385,8 @@ const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
 Base.size(z::AbstractProjectiveVector) = size(z.data)
 Base.length(z::AbstractProjectiveVector) = length(z.data)
-Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
-Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
+Base.@propagate_inbounds Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
+Base.@propagate_inbounds Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
 Base.lastindex(z::AbstractProjectiveVector) = lastindex(z.data)
 
 end

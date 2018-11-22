@@ -4,7 +4,6 @@ import ..AffinePatches
 import ..Homotopies
 import ..PathTracking
 import ..Predictors
-import ..StepLength
 import ..Systems
 
 
@@ -24,7 +23,6 @@ end
 function PatchSwitcher(H::Homotopies.AbstractHomotopy,
     p₁::AffinePatches.AbstractAffinePatchState,
     p₀::AffinePatches.AbstractAffinePatchState, x, t;
-    steplength=StepLength.HeuristicStepLength(initial=1.0),
     predictor=Predictors.Euler(),
     kwargs...)
     fixed = Systems.FixedHomotopy(H, t)
@@ -32,7 +30,7 @@ function PatchSwitcher(H::Homotopies.AbstractHomotopy,
     homotopy = Homotopies.PatchSwitcherHomotopy(fixed, p₁, p₀)
 
     tracker = PathTracking.PathTracker(homotopy, x, 1.0, 0.0;
-        steplength=steplength, predictor=predictor, kwargs...)
+        initial_steplength=1.0, predictor=predictor, kwargs...)
     PatchSwitcher(tracker, start)
 end
 

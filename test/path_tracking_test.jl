@@ -32,23 +32,23 @@
 
 
         PathTracking.setup!(t1, Problems.embed(P, first(start_sols)), 1.0, 0.4)
-        @test PathTracking.currstatus(t1) == :ok
+        @test PathTracking.currstatus(t1) == PathTracking.done
         @test PathTracking.currt(t1) == 1.0
 
         PathTracking.setup!(t1, Problems.embed(P, first(start_sols)), 0.5, 0.4)
-        @test PathTracking.currstatus(t1) == :invalid_startvalue
+        @test PathTracking.currstatus(t1) == PathTracking.terminated_invalid_startvalue
         @test PathTracking.currt(t1) == 0.5
 
         R = PathTracking.track(t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
         @test R isa PathTracking.PathTrackerResult
-        @test R.returncode == :success
+        @test R.returncode == PathTracking.done
         @test R.res < 1e-7
         @test_nowarn show(devnull, R)
         @test_nowarn TreeViews.treelabel(devnull, R, MIME"application/juno+inline"())
 
         out = Problems.embed(P, first(start_sols))
         retcode = PathTracking.track!(out, t1, Problems.embed(P, first(start_sols)), 1.0, 0.0)
-        @test retcode == :success
+        @test retcode == PathTracking.done
         @test out == R.x
     end
 
@@ -69,17 +69,17 @@
         tracker = PathTracking.PathTracker(H, s, rand(), rand())
 
         result = PathTracking.track(tracker, s, 1.0, 0.0)
-        @test result.returncode == :success
+        @test result.returncode == PathTracking.done
         @test result.t == 0.0
         x = result.x
         @test norm(affine(x) - A \ b) < 1e-6
 
         x_inter = copy(s)
         retcode = PathTracking.track!(x_inter, tracker, s, 1.0, 0.1)
-        @test retcode == :success
+        @test retcode == PathTracking.done
         x_final = zero(x_inter)
         retcode = PathTracking.track!(x_final, tracker, x_inter, 0.1, 0.0)
-        @test retcode == :success
+        @test retcode == PathTracking.done
         tracker
         @test PathTracking.curriters(tracker) < 3
         x = PathTracking.currx(tracker)

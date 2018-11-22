@@ -131,10 +131,6 @@ Pathtracking specific:
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-6`: The precision used to track a value.
 * `initial_steplength=0.1`: The initial step size for the predictor.
-* `steplength_increase_factor=2.0`: The factor with which the step size is increased after `steplength_consecutive_successes_necessary` consecutive successes.
-* `steplength_decrease_factor=inv(increase_factor)`: The factor with which the step size is decreased after a step failed.
-* `steplength_consecutive_successes_necessary=5`: The numer of consecutive successes necessary until the step size is increased by `steplength_increase_factor`.
-* `maximal_steplength=max(0.1, initial_steplength)`: The maximal step length.
 * `minimal_steplength=1e-14`: The minimal step size. If the size of step is below this the path is considered failed.
 
 Endgame specific options
