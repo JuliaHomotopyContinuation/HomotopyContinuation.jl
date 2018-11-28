@@ -9,7 +9,7 @@ include("path_tracking/tracking.jl")
 """
     pathtracker_startsolutions(args...; kwargs...)
 
-Construct a [`PathTracking.PathTracker`](@ref) and `startsolutions` in the same way [`solve`](@ref)
+Construct a [`PathTracking.PathTracker`](@ref) and `startsolutions` in the same way `solve`
 does it. This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
@@ -24,8 +24,8 @@ end
 """
     pathtracker(args...; kwargs...)
 
-Construct a [`PathTracking.PathTracker`](@ref) in the same way [`solve`](@ref)
-does it. This als0 takes the same input arguments as [`solve`](@ref). This is convenient if you want
+Construct a [`PathTracking.PathTracker`](@ref) in the same way `solve`
+does it. This als0 takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
 function pathtracker(args...; kwargs...)
