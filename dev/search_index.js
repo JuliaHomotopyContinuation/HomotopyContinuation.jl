@@ -345,11 +345,43 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "solving/#HomotopyContinuation.Monodromy.monodromy_solve",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Monodromy.monodromy_solve",
+    "category": "function",
+    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. By default this will be Trianlge with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\ntol::Float64=1e-6: The tolerance with which paths are tracked and with which it is decided whether to solutions are identical.\ngroup_actions=GroupActions(group_action): If there is more than one group action you can use this to chain the application of them.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
+},
+
+{
+    "location": "solving/#HomotopyContinuation.Monodromy.GroupActions",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Monodromy.GroupActions",
+    "category": "type",
+    "text": "GroupActions(actions::Function...)\n\nStore a bunch of group actions (f1, f2, f3, ...). Each action has to return a tuple. The actions are applied in the following sense\n\nf1 is applied on the original solution s\nf2 is applied on s and the results of 1\nf3 is applied on s and the results of 1) and 2)\n\nand so on\n\nExample\n\njulia> f1(s) = (s * s,);\n\njulia> f2(s) = (2s, -s, 5s);\n\njulia> f3(s) = (s + 1,);\n\njulia> GroupActions(f1)(3)\n(9,)\n\njulia> GroupActions(f1,f2)(3)\n(9, 18, -9, 45)\n\njulia> GroupActions(f1,f2, f3)(3)\n(9, 18, -9, 45, 10, 19, -8, 46)\n\n\n\n\n\n"
+},
+
+{
     "location": "solving/#Monodromy-Solve-1",
     "page": "Solving Polynomial Systems",
     "title": "Monodromy Solve",
     "category": "section",
-    "text": "monodromy_solve\nGroupActions"
+    "text": "monodromy_solve\nMonodromy.GroupActions"
+},
+
+{
+    "location": "solving/#HomotopyContinuation.Monodromy.Triangle",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Monodromy.Triangle",
+    "category": "type",
+    "text": "Triangle(;weights=true)\n\nA triangle is a loop consisting of the main node and two addtional nodes. If weights is true the edges are equipped with additional random weights. Note that this is usually only necessary for real parameters.\n\n\n\n\n\n"
+},
+
+{
+    "location": "solving/#HomotopyContinuation.Monodromy.Petal",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.Monodromy.Petal",
+    "category": "type",
+    "text": "Petal()\n\nA petal is a loop consisting of the main node and one other node connected by two edges with different random weights.\n\n\n\n\n\n"
 },
 
 {
@@ -357,7 +389,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "Strategies",
     "category": "section",
-    "text": "Triangle\nPental"
+    "text": "Monodromy.Triangle\nMonodromy.Petal"
 },
 
 {
