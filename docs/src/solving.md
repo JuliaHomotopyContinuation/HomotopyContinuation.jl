@@ -85,11 +85,11 @@ isnonsingular
 
 ```@docs
 monodromy_solve
-GroupActions
+Monodromy.GroupActions
 ```
 
 ### Strategies
 ```@docs
-Triangle
-Pental
+Monodromy.Triangle
+Monodromy.Petal
 ```

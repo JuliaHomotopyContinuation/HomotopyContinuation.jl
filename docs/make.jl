@@ -11,7 +11,8 @@ makedocs(
         "Predictors and Correctors" => "predictors-correctors.md",
         "Path tracker" => "pathtracking.md",
         "Reference" => "reference.md"
-        ]
+        ],
+    strict=true
 )
 
 deploydocs(
