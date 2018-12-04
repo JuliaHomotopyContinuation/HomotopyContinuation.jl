@@ -402,8 +402,8 @@ end
 
 TreeViews.hastreeview(::AffineResult) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
-TreeViews.numberofnodes(::AffineResult) = 6
-TreeViews.numberofnodes(::ProjectiveResult) = 5
+TreeViews.numberofnodes(::AffineResult) = 7
+TreeViews.numberofnodes(::ProjectiveResult) = 6
 TreeViews.treelabel(io::IO, x::AffineResult, ::MIME"application/juno+inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">AffineResult</span>")
 TreeViews.treelabel(io::IO, x::ProjectiveResult, ::MIME"application/juno+inline") =
@@ -417,15 +417,17 @@ function TreeViews.nodelabel(io::IO, x::AffineResult, i::Int, ::MIME"application
         print(io, "$(s.nonsingular) finite non-singular ($(s.real_nonsingular) real)")
     elseif i == 3 && s.singular > 0
         print(io, "$(s.singular) finite singular ($(s.real_singular) real)")
-    elseif i == 4 && s.atinfinity > 0
+    elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
+        print(io, "$(s.real_nonsingular+s.real_singular) finite real")
+    elseif i == 5 && s.atinfinity > 0
         print(io, "$(s.atinfinity) atinfinity")
-    elseif i == 5 && s.failed > 0
+    elseif i == 6 && s.failed > 0
         print(io, "$(s.failed) failed")
-    elseif i == 6
+    elseif i == 7
         print(io, "Random seed used")
     end
-
 end
+
 function TreeViews.treenode(r::AffineResult, i::Integer)
     s = statistics(r)
     if i == 1
@@ -434,11 +436,13 @@ function TreeViews.treenode(r::AffineResult, i::Integer)
         return finite(r, onlynonsingular=true)
     elseif i == 3 && s.singular > 0
         return finite(r, onlysingular=true)
-    elseif i == 4 && s.atinfinity > 0
+    elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
+        return finite(r, onlyreal = true)
+    elseif i == 5 && s.atinfinity > 0
         return atinfinity(r)
-    elseif i == 5 && s.failed > 0
+    elseif i == 6 && s.failed > 0
         return failed(r)
-    elseif i == 6
+    elseif i == 7
         return seed(r)
     end
     missing
@@ -452,13 +456,15 @@ function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"applica
         print(io, "$(s.nonsingular) non-singular ($(s.real_nonsingular) real)")
     elseif i == 3 && s.singular > 0
         print(io, "$(s.singular) singular ($(s.real_singular) real)")
-    elseif i == 4 && s.failed > 0
+    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
+        print(io, "$(s.real_nonsingular + s.real_singular) real solutions")
+    elseif i == 5 && s.failed > 0
         print(io, "$(s.failed) failed")
-    elseif i == 5
+    elseif i == 6
         print(io, "Random seed used")
     end
-
 end
+
 function TreeViews.treenode(r::ProjectiveResult, i::Integer)
     s = statistics(r)
     if i == 1
@@ -467,9 +473,11 @@ function TreeViews.treenode(r::ProjectiveResult, i::Integer)
         return finite(r, onlynonsingular=true)
     elseif i == 3 && s.singular > 0
         return finite(r, onlysingular=true)
-    elseif i == 4 && s.failed > 0
+    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
+        return finite(r, onlyreal=true)
+    elseif i == 5 && s.failed > 0
         return failed(r)
-    elseif i == 5
+    elseif i == 6
         return seed(r)
     end
     missing
