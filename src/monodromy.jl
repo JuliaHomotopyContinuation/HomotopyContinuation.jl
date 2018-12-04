@@ -44,9 +44,9 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
 * `maximal_number_of_iterations_without_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
-* `strategy`: The strategy used to create loops. By default this will be `Trianlge` with weights if `F` is a real system.
+* `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
-* `tol::Float64=1e-6`: The tolerance with which paths are tracked and with which it is decided whether to solutions are identical.
+* `tol::Float64=1e-5`: The tolerance with which it is decided whether two solutions are identical. The paths are tracked with tolerance `tol*1e-2`.
 * `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
@@ -96,7 +96,6 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         retcode = monodromy_solve!(loop, tracker, options, statistics, progress)
     catch e
         if (e isa InterruptException)
-            println("interrupt")
             retcode = :interrupt
         else
             rethrow(e)
