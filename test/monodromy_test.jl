@@ -80,6 +80,9 @@ end
                  vcat(t² * s[1], t² * s[2], s[3:end]))
             end, Monodromy.complex_conjugation))
         @test length(result.solutions) == 21
+        @test length(Monodromy.solutions(result)) == 21
+        @test length(Monodromy.realsolutions(result)) < 21
+        test_treeviews(result)
 
 
         # Test stop heuristic using too hight target_solutions_count

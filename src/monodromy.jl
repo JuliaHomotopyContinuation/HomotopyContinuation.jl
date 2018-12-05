@@ -23,11 +23,14 @@ struct MonodromyResult{N, T}
     statistics::Statistics
 end
 
+Base.iterate(R::MonodromyResult) = iterate(R.solutions)
+Base.iterate(R::MonodromyResult, state) = iterate(R.solutions, state)
+
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
     println(io, "MonodromyResult")
     println(io, "==================================")
-    println(io, "• $(length(result.solutions)) solutions ($(nreal(result)) real)")
+    println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
     println(io, "• return code → $(result.returncode)")
     println(io, "• $(result.statistics.ntrackedpaths) tracked paths")
 end
@@ -61,6 +64,21 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
     end
     missing
 end
+
+
+"""
+    solutions(result::MonodromyResult)
+
+Returns the solutions of the `result`.
+"""
+solutions(res::MonodromyResult) = res.solutions
+
+"""
+    nsolutions(result::MonodromyResult)
+
+Returns the number solutions of the `result`.
+"""
+nsolutions(res::MonodromyResult) = length(res.solutions)
 
 """
     realsolutions(res::MonodromyResult; tol = 1e-6)
