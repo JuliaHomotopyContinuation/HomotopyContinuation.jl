@@ -1,12 +1,13 @@
 module Monodromy
 
-export monodromy_solve
+export monodromy_solve, realsolutions, nreal
 
 import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 import ProgressMeter
 import StaticArrays: SVector, @SVector
+import TreeViews
 
 import ..Homotopies, ..PathTracking, ..ProjectiveVectors, ..Utilities
 import ..Utilities: UniquePoints
@@ -22,12 +23,80 @@ struct MonodromyResult{N, T}
     statistics::Statistics
 end
 
+Base.iterate(R::MonodromyResult) = iterate(R.solutions)
+Base.iterate(R::MonodromyResult, state) = iterate(R.solutions, state)
+
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
-    println(io, "MonodromyResult{$N, $T} with $(length(result.solutions)) solutions:")
-    println(io, "returncode → $(result.returncode)")
-    print(io, "statistics → $(result.statistics)")
+    println(io, "MonodromyResult")
+    println(io, "==================================")
+    println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
+    println(io, "• return code → $(result.returncode)")
+    println(io, "• $(result.statistics.ntrackedpaths) tracked paths")
 end
+
+
+TreeViews.hastreeview(::MonodromyResult) = true
+TreeViews.numberofnodes(::MonodromyResult) = 4
+TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/juno+inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
+
+function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"application/juno+inline")
+    if i == 1
+        print(io, "Solutions")
+    elseif i == 2
+            print(io, "Real solutions")
+    elseif i == 3
+        print(io, "Return Code")
+    elseif i == 4
+        print(io, "Tracked Paths")
+    end
+end
+function TreeViews.treenode(r::MonodromyResult, i::Integer)
+    if i == 1
+        return r.solutions
+    elseif i == 2
+        return realsolutions(r)
+    elseif i == 3
+        return r.returncode
+    elseif i == 4
+        return r.statistics.ntrackedpaths
+    end
+    missing
+end
+
+
+"""
+    solutions(result::MonodromyResult)
+
+Returns the solutions of the `result`.
+"""
+solutions(res::MonodromyResult) = res.solutions
+
+"""
+    nsolutions(result::MonodromyResult)
+
+Returns the number solutions of the `result`.
+"""
+nsolutions(res::MonodromyResult) = length(res.solutions)
+
+"""
+    realsolutions(res::MonodromyResult; tol = 1e-6)
+
+Returns the solutions of `res` whose imaginary part has norm < 1e-6.
+"""
+function realsolutions(res::MonodromyResult; tol=1e-6)
+    map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
+end
+"""
+    nreal(res::MonodromyResult; tol = 1e-6)
+
+Counts how many solutions of `res` have imaginary part norm < 1e-6.
+"""
+function nreal(res::MonodromyResult; tol=1e-6)
+    count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
+end
+
 
 
 ########
@@ -70,6 +139,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     if length(p₀) ≠ length(parameters)
         error("Number of provided parameters doesn't match the length of initially provided parameter `p₀`.")
     end
+
+    p₀ = convert(SVector{NParams, promote_type(Float64, TP)}, p₀)
 
     optionskwargs, restkwargs = Utilities.splitkwargs(kwargs, options_allowed_keywords)
     options = begin
