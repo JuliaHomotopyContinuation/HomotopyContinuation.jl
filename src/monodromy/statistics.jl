@@ -5,7 +5,16 @@ mutable struct Statistics
     nparametergenerations::Int
     nsolutions_development::Vector{Int}
 end
+
 Statistics(nsolutions::Int) = Statistics(0, 0, 0, 1, [nsolutions])
+function Statistics(solutions)
+    stats = Statistics(length(solutions))
+    for s in solutions
+        checkreal!(stats, s)
+    end
+    stats
+end
+
 
 Base.show(io::IO, S::Statistics) = Utilities.print_fieldnames(io, S)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", S::Statistics) = S
@@ -19,8 +28,9 @@ function trackedpath!(stats::Statistics, retcode)
     end
 end
 
+
 function checkreal!(stats::Statistics, y)
-    if LinearAlgebra.norm(imag.(y)) < 1e-6
+    if Utilities.isrealvector(y)
         stats.nreal +=1
     end
 end

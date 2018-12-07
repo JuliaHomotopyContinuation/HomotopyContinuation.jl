@@ -154,7 +154,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
         tol=options.tol * 1e-2,
         restkwargs...)
-    statistics = Statistics(nsolutions(loop))
+    statistics = Statistics(solutions(loop))
 
     # solve
     retcode = :not_assigned
