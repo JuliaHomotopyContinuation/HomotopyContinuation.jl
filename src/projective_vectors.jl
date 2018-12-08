@@ -108,10 +108,12 @@ function embed!(z::PVector{T}, x::AbstractVector) where T
     end
     z
 end
-function embed!(z::PVector, x::PVector)
-    for k in eachindex(z)
-        z[k] = x[k]
-    end
+function embed!(z::PVector{T,Nothing}, x::PVector{S,Nothing}) where {T,S}
+    copyto!(z.data, x.data)
+    z
+end
+function embed!(z::PVector{T,Int}, x::PVector{S,Int}) where {T,S}
+    copyto!(z.data, x.data)
     z
 end
 

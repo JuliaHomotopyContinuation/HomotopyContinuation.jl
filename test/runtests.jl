@@ -23,7 +23,7 @@ end
     include("correctors_test.jl")
     include("affine_patches_test.jl")
     include("path_tracking_test.jl")
-    # include("solve_test.jl")
+    include("solve_test.jl")
     # include("result_test.jl")
     # include("integration_tests.jl")
     # include("monodromy_test.jl")
