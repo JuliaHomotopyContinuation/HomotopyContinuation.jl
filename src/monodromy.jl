@@ -154,7 +154,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
         tol=options.tol * 1e-2,
         restkwargs...)
-    statistics = Statistics(nsolutions(loop))
+    statistics = Statistics(solutions(loop))
 
     # solve
     retcode = :not_assigned
@@ -268,6 +268,9 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
     node = loop.nodes[job.edge.target]
     if !iscontained(node, y, tol=options.tol)
         unsafe_add!(node, y)
+        if job.edge.target == 1
+            checkreal!(stats, y)
+        end
         # Check if we are done
         if isdone(node, y, options)
             return :done
@@ -282,6 +285,9 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
             for yᵢ in options.group_actions(y)
                 if !iscontained(node, yᵢ, tol=options.tol)
                     unsafe_add!(node, yᵢ)
+                    if job.edge.target == 1
+                        checkreal!(stats, y)
+                    end
                     # Check if we are done
                     if isdone(node, yᵢ, options)
                         return :done
@@ -299,8 +305,9 @@ function update_progress!(::Nothing, loop::Loop, statistics::Statistics; finish=
 end
 function update_progress!(progress, loop::Loop, statistics::Statistics; finish=false)
     ProgressMeter.update!(progress, length(solutions(loop)), showvalues=(
-        ("# paths tracked: ", statistics.ntrackedpaths),
-        ("# loops generated: ", statistics.nparametergenerations)
+        ("# paths tracked ", statistics.ntrackedpaths),
+        ("# loops generated ", statistics.nparametergenerations),
+        ("# real solutions ", statistics.nreal)
     ))
     if finish
         ProgressMeter.finish!(progress)

@@ -24,7 +24,8 @@ export print_fieldnames,
     get_num_BLAS_threads,
     randseed,
     check_kwargs_empty,
-    start_solution_sample
+    start_solution_sample,
+    isrealvector
 
 include("utilities/unique_points.jl")
 
@@ -66,7 +67,19 @@ function check_kwargs_empty(kwargs, allowed_kwargs=[])
     end
 end
 
+"""
+    isrealvector(v::AbstractVector, tol=1e-6)
 
+Check whether the 2-norm of the imaginary part of `v` is at most `tol`.
+."""
+isrealvector(z::AbstractVector{<:Real}, tol=1e-6) = true
+function isrealvector(z::AbstractVector{<:Complex}, tol=1e-6)
+    total = zero(real(eltype(z)))
+    for zᵢ in z
+        total += abs2(imag(zᵢ))
+    end
+    sqrt(total) < tol
+end
 
 """
     randseed(range=1_000:1_000_000)
