@@ -21,7 +21,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::Statistics) = S
 
 
 function trackedpath!(stats::Statistics, retcode)
-    if retcode == PathTracking.Status.done
+    if retcode == PathTracking.Status.success
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1

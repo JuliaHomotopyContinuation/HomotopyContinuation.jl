@@ -48,7 +48,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
 # State
 ##########
 @moduleenum Status begin
-    done
+    success
     tracking
     terminated_maximal_iterations
     terminated_invalid_startvalue
@@ -269,7 +269,7 @@ Additionally also stores the result in `x₀` if the tracking was successfull.
 function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
      track!(tracker, x₁, t₁, t₀)
      retcode = currstatus(tracker)
-     if retcode == Status.done
+     if retcode == Status.success
          x₀ .= currx(tracker)
      end
      retcode
@@ -281,7 +281,7 @@ function track!(tracker::PathTracker, x₁, t₁, t₀, args...)
         step!(tracker)
         check_terminated!(tracker)
     end
-    if tracker.state.status == Status.done
+    if tracker.state.status == Status.success
         refine!(tracker)
     end
 
@@ -467,7 +467,7 @@ end
 
 function check_terminated!(tracker)
     if abs(tracker.state.s - length(tracker.state.segment)) < 1e-15
-        tracker.state.status = Status.done
+        tracker.state.status = Status.success
     elseif curriters(tracker) ≥ tracker.options.maxiters
         tracker.state.status = Status.terminated_maximal_iterations
     end
@@ -678,7 +678,7 @@ function Base.iterate(tracker::PathTracker, state=1)
         step!(tracker)
         check_terminated!(tracker)
 
-        if tracker.state.status == Status.done
+        if tracker.state.status == Status.success
             refine!(tracker)
         end
         tracker, state + 1

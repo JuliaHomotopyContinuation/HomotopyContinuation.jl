@@ -32,13 +32,13 @@
 
         R = PathTracking.track(t1, first(start_sols), 1.0, 0.0)
         @test R isa PathTracking.PathTrackerResult
-        @test R.returncode == PathTracking.Status.done
+        @test R.returncode == PathTracking.Status.success
         @test R.accuracy < 1e-7
         @test_nowarn show(devnull, R)
 
         out = [1; first(start_sols)]
         retcode = PathTracking.track!(out, t1, first(start_sols), 1.0, 0.0)
-        @test retcode == PathTracking.Status.done
+        @test retcode == PathTracking.Status.success
         @test out == R.x
     end
 
@@ -52,17 +52,17 @@
         tracker, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.RandomPatch())
         s = first(start_sols)
         result = PathTracking.track(tracker, s, 1.0, 0.0)
-        @test result.returncode == PathTracking.Status.done
+        @test result.returncode == PathTracking.Status.success
         @test result.t == 0.0
         x = result.x
         @test norm(ProjectiveVectors.affine(x) - A \ b) < 1e-6
 
         x_inter = [1;copy(s)]
         retcode = PathTracking.track!(x_inter, tracker, s, 1.0, 0.1)
-        @test retcode == PathTracking.Status.done
+        @test retcode == PathTracking.Status.success
         x_final = zero(x_inter)
         retcode = PathTracking.track!(x_final, tracker, x_inter, 0.1, 0.0)
-        @test retcode == PathTracking.Status.done
+        @test retcode == PathTracking.Status.success
         tracker
         @test PathTracking.curriters(tracker) < 3
         x = PathTracking.currx(tracker)

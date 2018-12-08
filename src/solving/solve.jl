@@ -102,7 +102,7 @@ end
 function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
     t₁, t_endgame, t₀ = t₁_t_endgame_t₀(solver)
     x₁, r = start_solutions[k], endgame_zone_results[k]
-    if r.returncode == PathTracking.Status.done
+    if r.returncode == PathTracking.Status.success
         # Run endgame
         result = Endgaming.runendgame(solver.endgame, r.x, t_endgame)
         # If the tracker failed we are probably to late with the endgame.
@@ -110,7 +110,7 @@ function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
             # Rerun with something more away
             new_t = 0.3*(t₁ - t_endgame)
             pr = trackpath(solver::Solver, x₁, t₁, new_t)
-            if pr.returncode == PathTracking.Status.done
+            if pr.returncode == PathTracking.Status.success
                 result = Endgaming.runendgame(solver.endgame, pr.x, new_t)
             end
         end

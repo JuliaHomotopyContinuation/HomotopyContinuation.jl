@@ -91,7 +91,7 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
 function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::Union{Nothing,PatchSwitching.PatchSwitcher})
-    returncode = r.returncode
+    returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
     patchswitcher !== nothing && switch_to_affine!(r.x, returncode, windingnumber, patchswitcher)
