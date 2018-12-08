@@ -74,12 +74,12 @@ end
 
 
 """
-    solve!(A, b)
+    solve!([x,] A, b)
 
 Solve ``Ax=b`` inplace. This overwrites `A` and `b`
-and stores the result in `b`.
+and stores the result in `x`. If `x` is not provided result is stored in `b`
 """
-function solve!(A::StridedMatrix, b::StridedVecOrMat)
+function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
     m, n = size(A)
     if m == n
         # solve using an LU factorization
@@ -88,11 +88,15 @@ function solve!(A::StridedMatrix, b::StridedVecOrMat)
         ldiv_unit_lower!(A, b)
         ldiv_upper!(A, b)
         b
+        if x !== b
+            copyto!(x, b)
+        end
     else
-        LinearAlgebra.ldiv!(LinearAlgebra.qr!(A), b)
+        LinearAlgebra.ldiv!(x, LinearAlgebra.qr!(A), b)
     end
-    b
+    x
 end
+solve!(A, b) = solve!(b, A, b)
 
 """
     solve!(factorization, b)
@@ -106,7 +110,7 @@ function solve!(LU::LinearAlgebra.LU, b::AbstractVector)
      ldiv_upper!(LU.factors, b)
      b
  end
-solve!(fact, b::AbstractVector) = LinearAlgebra.ldiv!(fact, b)
+solve!(x, fact::LinearAlgebra.Factorization, b::AbstractVector) = LinearAlgebra.ldiv!(x, fact, b)
 
 """
     factorization(A::AbstractMatrix)

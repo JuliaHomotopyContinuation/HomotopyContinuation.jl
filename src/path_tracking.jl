@@ -182,7 +182,7 @@ end
 function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    predictor::Predictors.AbstractPredictor=Predictors.Euler(), kwargs...)
+    predictor::Predictors.AbstractPredictor=Predictors.RK4(), kwargs...)
 
     options = Options(;kwargs...)
 
@@ -324,12 +324,12 @@ function checkstartvalue!(tracker)
 end
 
 function compute_ẋ!(ẋ, x, t, cache)
-    @inbounds Homotopies.jacobian_and_dt!(cache.J, ẋ, cache.homotopy, x, t)
-    @inbounds for i in eachindex(ẋ)
-        ẋ[i] = -ẋ[i]
+    @inbounds Homotopies.jacobian_and_dt!(cache.J, cache.out, cache.homotopy, x, t)
+    @inbounds for i in eachindex(cache.out)
+        cache.out[i] = -cache.out[i]
     end
     cache.J_factorization = Utilities.factorize!(cache.J_factorization, cache.J)
-    Utilities.solve!(cache.J_factorization, ẋ)
+    Utilities.solve!(ẋ, cache.J_factorization, cache.out)
 end
 
 
@@ -345,13 +345,10 @@ function step!(tracker)
     H = cache.homotopy
     x, x̂, x̄, ẋ = state.x, state.x̂, state.x̄, state.ẋ
 
-    # println("--------------------")
     try
         t, Δt = currt(state), currΔt(state)
-        # println("\n\nt: ", t, "Δt: ", Δt)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
-        # @show result
         if Correctors.isconverged(result)
             AffinePatches.changepatch!(state.patch, x̄)
 
@@ -394,11 +391,6 @@ function step!(tracker)
 end
 
 g(Θ) = sqrt(1+4Θ) - 1
-function lipschitz(result::Correctors.Result)
-    N = result.iters - 1
-    2 * nthroot(result.accuracy, N) / result.norm_Δx₀^2
-end
-
 function update_stepsize!(state::State, result::Correctors.Result,
                           order::Int, options::Options)
     # we have to handle the special case that there is only 1 iteration
@@ -413,11 +405,10 @@ function update_stepsize!(state::State, result::Correctors.Result,
     end
 
     Δx₀ = result.norm_Δx₀
-    τₙ = τ(options, 0.5)
+    τN = τ(options, 0.5)
     if Correctors.isconverged(result)
         # compute η and update
         η = d_x̂_x̄ / state.Δs^order
-        # @show η
         if isnan(state.ω)
             ω′ = ω
         else
@@ -425,19 +416,18 @@ function update_stepsize!(state::State, result::Correctors.Result,
             ω′ = max(2ω - state.ω, ω)
         end
         if isnan(state.η)
-            λ = g(√(ω′/2) * τₙ) / (ω′ * d_x̂_x̄)
+            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄)
             Δs′ = nthroot(λ, order) * state.Δs
         else
             d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.25d_x̂_x̄)
             η′ = d_x̂_x̄′ / state.Δs^order
-            λ = g(√(ω′/2) * τₙ) / (ω′ * d_x̂_x̄′)
+            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄′)
             Δs′ = nthroot(λ, order) * state.Δs
         end
 
         Δs′ = max(Δs′, state.Δs)
         state.η = η
         state.ω = ω
-        # λ = g(√(ω/2) * τₙ) / (scale_η * ω * d_x̂_x̄)
     else
         ω = max(ω, state.ω)
         if √(ω / 2) * τ(options, 0.1) < ω / 2 * Δx₀

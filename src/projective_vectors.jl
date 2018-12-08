@@ -90,7 +90,14 @@ function embed(x::AbstractVector{T}, homvar) where T
 end
 embed(z::PVector, x::AbstractVector) = embed(x, z.homvar)
 
-function embed!(z::PVector{T}, x::AbstractVector{T}) where T
+function embed!(z::PVector{T, Nothing}, x::AbstractVector) where T
+    if length(z) != length(x)
+        error("Cannot embed a vector of a different length.")
+    end
+    z.data .= x
+    z
+end
+function embed!(z::PVector{T}, x::AbstractVector) where T
     @inbounds for k in 1:length(z.data)
         if k == z.homvar
             z.data[k] = one(T)
@@ -101,7 +108,7 @@ function embed!(z::PVector{T}, x::AbstractVector{T}) where T
     end
     z
 end
-function embed!(z::PV, x::PV) where {PV <: PVector}
+function embed!(z::PVector, x::PVector)
     for k in eachindex(z)
         z[k] = x[k]
     end

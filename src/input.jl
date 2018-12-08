@@ -103,7 +103,7 @@ function input(F::Vector{<:MP.AbstractPolynomial})
     check_zero_dimensional(F)
     # square system and each polynomial is non-zero
     if length(F) == MP.nvariables(F) && ishomogenous(F)
-        error("The input system is a square homogenous system. This will result in an at least 1 dimensional solution space.")
+        error("Cannot construct a total degree homotopy for a square homogenous system.")
     end
     TotalDegree(F, MP.maxdegree.(F))
 end
