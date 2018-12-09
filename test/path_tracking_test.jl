@@ -80,11 +80,11 @@
 
         r1 = PathTracking.track(fixedtracker, x1, 1.0, 0.1)
         v1 = copy(fixedpatch.v̄)
-        PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, false)
+        PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=false)
         @test v1 == fixedpatch.v̄
-        PathTracking.track!(fixedtracker, PathTracking.currx(tracker), 0.05, 0.01, false)
+        PathTracking.track!(fixedtracker, PathTracking.currx(tracker), 0.05, 0.01, setup_patch=false)
         @test v1 == fixedpatch.v̄
-        PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, true)
+        PathTracking.track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=true)
         @test v1 != fixedpatch.v̄
 
         r1 = PathTracking.track(tracker, x1, 1.0, 0.1)

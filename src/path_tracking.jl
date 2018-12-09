@@ -32,7 +32,7 @@ function Options(;tol=1e-7,
     refinement_tol=1e-8,
     corrector_maxiters::Int=3,
     refinement_maxiters=corrector_maxiters,
-    maxiters=1000,
+    maxiters=10_000,
     initial_steplength=0.1,
     minimal_steplength=1e-14)
 
@@ -144,6 +144,7 @@ The corrector used during in the predictor-corrector scheme. The default is
 [`Correctors.Newton`](@ref).
 * `corrector_maxiters=3`: The maximal number of correction steps in a single step.
 * `initial_steplength=0.1`: The step length of the first step.
+* `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_steplength=1e-14`: The minimal step length.
 * `predictor::Predictors.AbstractPredictor`:
 The predictor used during in the predictor-corrector scheme. The default is
@@ -276,7 +277,7 @@ end
 function track!(tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
     setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 
     while tracker.state.status == Status.tracking

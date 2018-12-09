@@ -143,7 +143,7 @@ Endgame specific options
 * `max_extrapolation_samples=4`: During the endgame a Richardson extrapolation is used to improve the accuracy of certain approximations. This is the maximal number of samples used for this.
 * `minradius=1e-15`: A path is declared false if the endgame didn't finished until then.
 * `sampling_factor=0.5`: During the endgame we approach ``0`` by the geometric series ``h^kR₀`` where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runendgame`.
-* `maxiters_per_step=30`: The maximal number of steps bewtween two samples.
+* `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
 """
 function solve end
 

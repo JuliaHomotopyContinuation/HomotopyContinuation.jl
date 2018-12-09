@@ -141,7 +141,7 @@ The distance between endpoints is normalized by the maximal difference between a
 * `cauchy_samples_per_loop=6` The number of samples used to predict an endpoint. A higher number of samples should result
 in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop
 and ``n`` is `cauchy_samples_per_loop`.
-* `maxiters_per_step=30`: The maximal number of steps bewtween two samples.
+* `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
 * `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
@@ -157,7 +157,7 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
     maxwindingnumber=15,
     max_extrapolation_samples=4,
     cauchy_loop_closed_tolerance=1e-3, cauchy_samples_per_loop=6,
-    maxiters_per_step=30,
+    maxiters_per_step=100,
     patch=nothing, maxiters=nothing, pathtrackerkwargs...)
 
     options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
