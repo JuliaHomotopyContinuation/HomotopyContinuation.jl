@@ -120,7 +120,7 @@ mutable struct Cache{H<:Homotopies.HomotopyWithCache, P<:Predictors.AbstractPred
 end
 function Cache(H::Homotopies.HomotopyWithCache, predictor, corrector, state::State)
     t = state.segment[state.s]
-    pcache = Predictors.cache(predictor, H, state.x, t)
+    pcache = Predictors.cache(predictor, H, state.x, state.ẋ, t)
     ccache = Correctors.cache(corrector, H, state.x, t)
     J = Homotopies.jacobian(H, state.x, t)
     J_factorization = factorization(J)
@@ -302,8 +302,10 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
         Predictors.reset!(cache.predictor, state.x, t₁)
 
         checkstartvalue && checkstartvalue!(tracker)
-        compute_ẋ && compute_ẋ!(state.ẋ, state.x, currt(state), cache)
-        Predictors.setup!(cache.predictor, state.x, state.ẋ, currt(state))
+        if compute_ẋ
+            compute_ẋ!(state.ẋ, state.x, currt(state), cache)
+            Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.J_factorization)
+        end
     catch err
         if !(err isa LinearAlgebra.SingularException)
             rethrow(err)

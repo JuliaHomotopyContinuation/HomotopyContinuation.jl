@@ -9,23 +9,23 @@ predictor of order 2.
 """
 struct Midpoint <: AbstractStatelessPredictor end
 struct MidpointCache{T} <: AbstractStatelessPredictorCache
-    A::Matrix{T}
+    J::Matrix{T}
+    dt::Vector{T}
     mk₂::Vector{T}
 end
 
-function cache(::Midpoint, H, x, t)
-    mk₂ = dt(H, x, t)
-    MidpointCache(jacobian(H, x, t), mk₂)
+function cache(::Midpoint, H, x, ẋ, t)
+    MidpointCache(jacobian(H, x, t), dt(H, x, t), copy(ẋ))
 end
 #
 function predict!(xnext, ::Midpoint, cache::MidpointCache, H::HomotopyWithCache, x, t, Δt, ẋ)
-    mk₂ = cache.mk₂
+    J, dt, mk₂ = cache.J, cache.dt, cache.mk₂
     n = length(xnext)
     @inbounds for i=1:n
         xnext[i] = x[i] + 0.5Δt * ẋ[i]
     end
 
-    minus_ẋ!(mk₂, H, xnext, t + 0.5Δt, cache.A)
+    minus_ẋ!(mk₂, H, xnext, t + 0.5Δt, J, dt)
 
     @inbounds for i=1:n
         xnext[i] = x[i] - Δt * mk₂[i]

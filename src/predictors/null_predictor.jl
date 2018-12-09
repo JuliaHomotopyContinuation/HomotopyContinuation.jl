@@ -9,7 +9,7 @@ its prediction.
 struct NullPredictor <: AbstractStatelessPredictor end
 struct NullPredictorCache <: AbstractStatelessPredictorCache end
 
-cache(::NullPredictor, H, x, t) = NullPredictorCache()
+cache(::NullPredictor, H, x, ẋ, t) = NullPredictorCache()
 
 function predict!(xnext, ::NullPredictor, ::NullPredictorCache, H, x, t, dt, ẋ)
     xnext .= x
