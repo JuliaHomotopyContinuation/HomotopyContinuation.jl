@@ -57,8 +57,8 @@ module HomotopyContinuation
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
         nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
-    import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
-    export StraightLineHomotopy, FixedPointHomotopy
+    import .Homotopies: StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
+    export StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
 
     import .Systems: FPSystem, SPSystem
     export FPSystem, SPSystem

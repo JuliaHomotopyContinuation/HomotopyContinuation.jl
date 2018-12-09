@@ -11,6 +11,7 @@ The following homotopies are available by default
 ```@docs
 StraightLineHomotopy
 FixedPointHomotopy
+ParameterHomotopy
 ```
 
 We also provide more specialised homotopies, which are mostly used internally currently

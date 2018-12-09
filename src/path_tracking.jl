@@ -32,7 +32,7 @@ function Options(;tol=1e-7,
     refinement_tol=1e-8,
     corrector_maxiters::Int=3,
     refinement_maxiters=corrector_maxiters,
-    maxiters=500,
+    maxiters=1000,
     initial_steplength=0.1,
     minimal_steplength=1e-14)
 
@@ -142,16 +142,15 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `corrector::Correctors.AbstractCorrector`:
 The corrector used during in the predictor-corrector scheme. The default is
 [`Correctors.Newton`](@ref).
-* `corrector_maxiters=2`: The maximal number of correction steps in a single step.
+* `corrector_maxiters=3`: The maximal number of correction steps in a single step.
+* `initial_steplength=0.1`: The step length of the first step.
+* `minimal_steplength=1e-14`: The minimal step length.
 * `predictor::Predictors.AbstractPredictor`:
 The predictor used during in the predictor-corrector scheme. The default is
 `[Predictors.RK4`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
-* `steplength::StepLength.AbstractStepLength`
-The step size logic used to determine changes of the step size. The default is
-[`StepLength.HeuristicStepLength`](@ref).
-* `tol=1e-6`: The precision used to track a value.
+* `tol=1e-7`: The precision used to track a value.
 """
 struct PathTracker{H<:Homotopies.AbstractHomotopy,
     Predictor<:Predictors.AbstractPredictor,
@@ -216,8 +215,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 Containing the result of a tracked path. The fields are
 * `successfull::Bool` Indicating whether tracking was successfull.
-* `returncode::Symbol` If the tracking was successfull then it is `:success`.
-Otherwise the return code gives an indication what happened.
+* `returncode::PathTracking.Status.t` If the tracking was successfull then it is `PathTracking.Status.success`.
 * `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 """
@@ -243,10 +241,11 @@ Base.show(io::IO, result::PathTrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::PathTrackerResult) = result
 
 """
-    track(tracker, x₁, t₁, t₀)::PathTrackerResult
+    track(tracker, x₁, t₁, t₀; options...)::PathTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 This returns a `PathTrackerResult`. This modifies `tracker`.
+See [`track!`](@ref) for the possible options.
 """
 function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...)
      track!(tracker, x₁, t₁, t₀; kwargs...)
@@ -254,28 +253,31 @@ function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...
 end
 
 """
-     track!(tracker, x₁, t₁, t₀; checkstartvalue=true, precondition=true)
+     track!(tracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
-Returns a `Symbol` indicating the status.
-If the tracking was successfull it is `:success`.
-If `predcondition` is `true` then [`Homotopies.precondition!`](@ref) is called at the beginning
+Returns one of the enum values of `PathTracking.Status.t` indicating the status.
+If the tracking was successfull it is `PathTracking.Status.success`.
+If `setup_patch` is `true` then [`AffinePatches.setup!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker, x₁, t₁, t₀)
+    track!(x₀, tracker, x₁, t₁, t₀; options...)
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::PathTracker, x₁, t₁, t₀)
-     track!(tracker, x₁, t₁, t₀)
+function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
      retcode = currstatus(tracker)
      if retcode == Status.success
          x₀ .= currx(tracker)
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀, args...)
-    setup!(tracker, x₁, t₁, t₀, args...)
+function track!(tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+    track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+end
+function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 
     while tracker.state.status == Status.tracking
         step!(tracker)
