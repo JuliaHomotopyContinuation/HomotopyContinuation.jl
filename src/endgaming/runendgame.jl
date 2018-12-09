@@ -65,6 +65,9 @@ function runendgame!(endgame)
         if in_endgame_zone!(state)
             predict_infinity_check!(state, tracker, options, cache)
         end
+        if checkatinfinity_norm(state, options)
+            state.status = :at_infinity
+        end
         checkterminate!(state, endgame.options)
     end
 
@@ -174,7 +177,7 @@ function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex,
     dirs = state.directions
 
     # We want the homogenization variable to be at least somewhat small
-    if state.R > 1e-5 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
+    if state.R > 1e-8 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
         return false
     end
     for i=1:length(x)
