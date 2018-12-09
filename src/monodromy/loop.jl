@@ -239,13 +239,15 @@ function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::Statis
     track(tracker, x, stats)
 end
 function track(tracker, x::AbstractVector, stats::Statistics)
-    retcode = PathTracking.track!(tracker, x, 1.0, 0.0)
+    res = PathTracking.track(tracker, x, 1.0, 0.0)
+    # @show res
+    retcode = res.returncode
     trackedpath!(stats, retcode)
     y = ProjectiveVectors.similar_affine(x, PathTracking.currx(tracker))
     y, retcode
 end
 
-"""
+"""x
     set_parameters!(tracker::PathTracking.PathTracker, e::Edge, loop::Loop)
 
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.

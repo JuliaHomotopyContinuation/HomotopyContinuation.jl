@@ -19,26 +19,31 @@ function state(::OrthogonalPatch, x::PVector)
 end
 nequations(::OrthogonalPatchState) = 1
 
-
-function precondition!(state::OrthogonalPatchState, x)
-    update!(state, x)
-end
-
-
-function normalize!(x::AbstractVector, ::OrthogonalPatchState)
-    LinearAlgebra.normalize!(x)
-end
-
-Base.@propagate_inbounds function update!(state::OrthogonalPatchState, x, isnormalized=false)
+function onpatch!(x::AbstractVector, state::OrthogonalPatchState)
     @boundscheck length(x) == length(state.v̄)
+    λ = zero(eltype(x))
+    @inbounds for i=1:length(x)
+        λ += state.v̄[i] * x[i]
+    end
+    λ⁻¹ = @fastmath inv(λ)
+    for i=1:length(x)
+        x[i] *= λ⁻¹
+    end
+    x
+end
+
+function setup!(state::OrthogonalPatchState, x::AbstractVector)
+    @boundscheck length(x) == length(state.v̄)
+    LinearAlgebra.normalize!(x)
     @inbounds for i in eachindex(state.v̄)
         state.v̄[i] = conj(x[i])
     end
-    !isnormalized && LinearAlgebra.normalize!(state.v̄)
     state
 end
 
-Base.@propagate_inbounds function evaluate!(u, state::OrthogonalPatchState, x)
+changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
+
+function evaluate!(u, state::OrthogonalPatchState, x)
     @boundscheck length(x) == length(state.v̄)
     out = -one(eltype(x))
     @inbounds for i in eachindex(state.v̄)

@@ -33,3 +33,5 @@ end
 function evaluate_and_jacobian(F::FPSystem, x, c::FPSystemCache)
     FP.evaluate_and_jacobian(F.system, x, c.config)
 end
+
+weylnorm2(F::FPSystem) = FP.weyldot(F.system.polys, F.system.polys)

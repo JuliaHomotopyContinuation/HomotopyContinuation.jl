@@ -262,7 +262,7 @@ end
 function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::Options,
                   stats::Statistics, progress)
     y, retcode = track(tracker, job.x, job.edge, loop, stats)
-    if retcode ≠ :success
+    if retcode ≠ PathTracking.Status.done
         return :incomplete
     end
     node = loop.nodes[job.edge.target]

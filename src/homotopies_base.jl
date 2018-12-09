@@ -13,7 +13,6 @@ export AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!,
     basehomotopy
 
 

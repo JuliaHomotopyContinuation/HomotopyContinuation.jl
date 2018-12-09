@@ -24,6 +24,7 @@ abstract type AbstractCorrectorCache end
 @enum ReturnCode begin
     converged
     terminated
+    terminated_no_approximate
     maximal_iterations
 end
 
@@ -39,8 +40,8 @@ struct Result{T}
     retcode::ReturnCode
     accuracy::T
     iters::Int
-    Θ₀::T
-    Θᵢ::T
+    ω₀::Float64
+    ω::Float64
     norm_Δx₀::T
 end
 

@@ -83,8 +83,8 @@ function nextsample!(tracker::PathTracking.PathTracker, state, options)
     R, λ = state.R, options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(tracker, state.x, R, λR, precondition=false)
-    if retcode != :success
+    retcode = PathTracking.track!(tracker, state.x, R, λR, false)
+    if retcode != PathTracking.Status.done
         state.status = :tracker_failed
         return nothing
     end
@@ -174,7 +174,7 @@ function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex,
     dirs = state.directions
 
     # We want the homogenization variable to be at least somewhat small
-    if state.R > 1e-8 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
+    if state.R > 1e-5 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
         return false
     end
     for i=1:length(x)

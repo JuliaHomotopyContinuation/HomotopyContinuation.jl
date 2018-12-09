@@ -47,4 +47,4 @@ function predict!(xnext, ::RK4, cache::RK4Cache, H::HomotopyWithCache, x, t, Δt
     nothing
 end
 
-order(::RK4) = 4
+order(::RK4) = 5

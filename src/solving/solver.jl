@@ -49,7 +49,7 @@ function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<
 
     check_kwargs(kwargs)
 
-    Solver(prob, tracker, endgame, patchswitcher(prob, x₁, t₀),
+    Solver(prob, tracker, endgame, nothing, #patchswitcher(prob, x₁, t₀),
         t₁, t₀, seed, options, SolverCache(prob, tracker))
 end
 

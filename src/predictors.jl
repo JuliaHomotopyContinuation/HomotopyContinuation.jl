@@ -49,11 +49,12 @@ function predict! end
 setup!(::AbstractPredictorCache, x, ẋ, t) = nothing
 
 """
-    update!(cache::AbstractStatefulPredictorCache, x, ẋ, t, Δt)
+    update!(cache::AbstractStatefulPredictorCache, x, ẋ, t, fac)
 
-Update the cache. `x` is the new path value at `t+Δt` and `ẋ` is the derivative at `t + Δt`.
+Update the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
+`fac` is a factorization of the Jacobian at `(x,t)`.
 """
-update!(::AbstractPredictorCache, x, ẋ, t) = nothing
+update!(::AbstractPredictorCache, H, x, ẋ, t, fac) = nothing
 
 """
     update_stepsize!(cache::AbstractStatefulPredictorCache, Δt_ratio)
@@ -76,16 +77,6 @@ end
 
 function order end
 
-function asymptotic_correction(alg::AbstractPredictor, ::AbstractPredictorCache,
-                               correction_factor, Δs::Real)
-    p = order(alg) + 1
-    if p == 2
-        √(correction_factor) * Δs
-    else
-        correction_factor^(1 // p) * Δs
-    end
-end
-
 # HELPERS
 
 """
@@ -102,9 +93,11 @@ end
 
 include("predictors/null_predictor.jl")
 include("predictors/euler.jl")
+include("predictors/rk3.jl")
 include("predictors/rk4.jl")
 include("predictors/heun.jl")
 include("predictors/midpoint.jl")
 include("predictors/ralston.jl")
+include("predictors/taylor.jl")
 
 end

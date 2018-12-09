@@ -4,7 +4,8 @@ function setup_prediction_test()
     xnext = copy(x)
     t = rand()
     H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
-    H, x, xnext, t
+    ẋ = Homotopies.dt(H, x, t)
+    H, x, xnext, t, ẋ
 end
 
 function setup_overdetermined_prediction_test()
@@ -14,13 +15,14 @@ function setup_overdetermined_prediction_test()
     xnext = copy(x)
     t = rand()
     H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
-    H, x, xnext, t
+    ẋ = Homotopies.dt(H, x, t)
+    H, x, xnext, t, ẋ
 end
 
 @testset "Predictors" begin
 
     @testset "NullPredictor" begin
-        H, x, xnext, t = setup_prediction_test()
+        H, x, xnext, t, ẋ = setup_prediction_test()
 
         predictor = Predictors.NullPredictor()
         @test predictor isa Predictors.NullPredictor
@@ -28,10 +30,10 @@ end
         @test predictor_cache isa Predictors.NullPredictorCache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
         @test xnext == x
 
-        H, x, xnext, t = setup_overdetermined_prediction_test()
+        H, x, xnext, t, ẋ = setup_overdetermined_prediction_test()
 
         predictor = Predictors.NullPredictor()
         @test predictor isa Predictors.NullPredictor
@@ -39,12 +41,12 @@ end
         @test predictor_cache isa Predictors.NullPredictorCache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
         @test xnext == x
     end
 
     @testset "Euler" begin
-        H, x, xnext, t = setup_prediction_test()
+        H, x, xnext, t, ẋ = setup_prediction_test()
 
         predictor = Predictors.Euler()
         @test predictor isa Predictors.Euler
@@ -52,9 +54,9 @@ end
         @test predictor_cache isa Predictors.EulerCache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
 
-        H, x, xnext, t = setup_overdetermined_prediction_test()
+        H, x, xnext, t, ẋ = setup_overdetermined_prediction_test()
 
         predictor = Predictors.Euler()
         @test predictor isa Predictors.Euler
@@ -62,12 +64,12 @@ end
         @test predictor_cache isa Predictors.EulerCache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
 
     end
 
     @testset "RK4" begin
-        H, x, xnext, t = setup_prediction_test()
+        H, x, xnext, t, ẋ = setup_prediction_test()
 
         predictor = Predictors.RK4()
         @test predictor isa Predictors.RK4
@@ -75,9 +77,9 @@ end
         @test predictor_cache isa Predictors.RK4Cache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
 
-        H, x, xnext, t = setup_overdetermined_prediction_test()
+        H, x, xnext, t, ẋ = setup_overdetermined_prediction_test()
 
         predictor = Predictors.RK4()
         @test predictor isa Predictors.RK4
@@ -85,6 +87,6 @@ end
         @test predictor_cache isa Predictors.RK4Cache
 
         # check that this doesn't throw
-        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05)
+        @test_nowarn Predictors.predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
     end
 end

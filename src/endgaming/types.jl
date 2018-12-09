@@ -160,8 +160,8 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
     options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
-    H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
-    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
+    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im;
+        patch=AffinePatches.FixedPatch(), pathtrackerkwargs...)
     state = State(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)

@@ -40,8 +40,6 @@ function cache(ph::PatchSwitcherHomotopy, x, t)
     PatchSwitcherHomotopyCache(c, A, b, patch_jac, patch_val)
 end
 
-precondition!(H::PatchSwitcherHomotopy, x, t, cache) = AffinePatches.precondition!(H.start_patch, x)
-
 function evaluate!(u, H::PatchSwitcherHomotopy, x, t, c::PatchSwitcherHomotopyCache)
     M, _ = size(H.homotopy)
     # H(x, t)

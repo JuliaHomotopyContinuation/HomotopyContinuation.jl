@@ -21,4 +21,4 @@ function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t,
     nothing
 end
 
-order(::Euler) = 1
+order(::Euler) = 2

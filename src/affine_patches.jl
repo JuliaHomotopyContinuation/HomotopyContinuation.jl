@@ -7,8 +7,9 @@ import LinearAlgebra
 export AbstractAffinePatch,
     AbstractLocalAffinePatch,
     state,
-    precondition!,
-    update!
+    onpatch!,
+    setup!,
+    changepatch!
 
 """
     AbstractAffinePatch
@@ -33,19 +34,26 @@ Construct the state of the path from `x`.
 function state end
 
 """
-    precondition!(v::AbstractAffinePatchState, x)
+    onpatch!(x::AbstractVector, ::AbstractAffinePatchState)
 
-Modify both such that `v` is properly setup and `v⋅x-1=0` holds.
+Scale a vector `x` such that it is on the affine patch.
 """
-function precondition! end
+function onpatch! end
 
 """
-    update_patch!(::AbstractAffinePatchState, x)
+    setup!(::AbstractAffinePatchState, x::AbstractVector)
 
-Update the patch depending on the local state.
+Setup the affine patch depending on `x` and modify `x` if necessary.
+This is only called once at the beginning of a tracked path.
 """
-update!(::AbstractAffinePatchState, x) = nothing
+setup!(state::AbstractAffinePatchState, x::AbstractVector) = onpatch!(x, state)
 
+"""
+    changepatch!(::AbstractAffinePatch, x::AbstractVector)
+
+The same as [`setup!`](@ref) but only called during the path tracking.
+"""
+changepatch!(::AbstractAffinePatchState, x::AbstractVector) = nothing
 
 include("affine_patches/orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")

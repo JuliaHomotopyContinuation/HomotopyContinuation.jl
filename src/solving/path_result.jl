@@ -90,11 +90,11 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::PatchSwitching.PatchSwitcher)
+function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::Union{Nothing,PatchSwitching.PatchSwitcher})
     returncode = r.returncode
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    switch_to_affine!(r.x, returncode, windingnumber, patchswitcher)
+    patchswitcher !== nothing && switch_to_affine!(r.x, returncode, windingnumber, patchswitcher)
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
@@ -113,8 +113,12 @@ function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::Pat
 
 
     PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
-        condition, windingnumber, k, x₁, intermediate_sol, r.iters, npredictions)
+        condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
 end
+
+iters(R::Endgaming.Result) = R.iters
+iters(R::PathTracking.PathTrackerResult) = R.accepted_steps + R.rejected_steps
+
 
 function makereturncode(retcode)
     if retcode != :at_infinity && retcode != :success
@@ -123,6 +127,7 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
+makereturncode(retcode::PathTracking.Status.t) = :path_failed, :none
 
 function switch_to_affine!(x::ProjectiveVectors.PVector{<:Complex, Int}, returncode, windingnumber, patchswitcher)
     if returncode == :success && windingnumber == 1 && abs2(x[x.homvar]) < 1.0
