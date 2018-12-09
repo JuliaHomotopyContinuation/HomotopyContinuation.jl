@@ -14,11 +14,10 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgaming.Endgame, PS<:Union{Nothing,PatchSwitching.PatchSwitcher}, C<:SolverCache}
+        E<:Endgaming.Endgame, C<:SolverCache}
     prob::P
     tracker::T
     endgame::E
-    patchswitcher::PS
     t₁::Float64
     t₀::Float64
     seed::Int
@@ -49,8 +48,7 @@ function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<
 
     check_kwargs(kwargs)
 
-    Solver(prob, tracker, endgame, nothing, #patchswitcher(prob, x₁, t₀),
-        t₁, t₀, seed, options, SolverCache(prob, tracker))
+    Solver(prob, tracker, endgame, t₁, t₀, seed, options, SolverCache(prob, tracker))
 end
 
 function solver_startsolutions(args...; kwargs...)
@@ -73,14 +71,3 @@ function invalid_kwargs(kwargs)
     end
     invalids
 end
-
-function patchswitcher(prob::Problems.Projective{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}
-    nothing
-end
-function patchswitcher(prob::Problems.Projective, x, t₀)
-    p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
-    p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
-    PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)
-end
-
-const Solvers = Vector{<:Solver}

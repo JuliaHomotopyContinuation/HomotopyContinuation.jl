@@ -9,7 +9,6 @@ module HomotopyContinuation
         Homotopies,
         InterfaceTest,
         Monodromy,
-        PatchSwitching,
         PathTracking,
         Predictors,
         Input,
@@ -35,8 +34,6 @@ module HomotopyContinuation
 
     include("path_tracking.jl")
     include("endgaming.jl")
-
-    include("patch_switching.jl")
 
     include("solving.jl")
     include("solve.jl")

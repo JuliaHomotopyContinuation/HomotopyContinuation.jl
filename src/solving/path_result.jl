@@ -62,10 +62,10 @@ struct PathResult{T1, T2, T3}
     npredictions::Int
 end
 
-function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher)
-    PathResult(prob.homogenization, k, x₁, x_e, t₀, r, cache, patchswitcher)
+function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
+    PathResult(prob.homogenization, k, x₁, x_e, t₀, r, cache)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, ::Nothing)
+function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = raw(align_axis!(copy(r.x)))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
@@ -90,11 +90,9 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
 end
-function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache, patchswitcher::Union{Nothing,PatchSwitching.PatchSwitcher})
+function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
-
-    patchswitcher !== nothing && switch_to_affine!(r.x, returncode, windingnumber, patchswitcher)
 
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
     res = infinity_norm(cache.v)
@@ -129,14 +127,6 @@ function makereturncode(retcode)
 end
 makereturncode(retcode::PathTracking.Status.t) = :path_failed, :none
 
-function switch_to_affine!(x::ProjectiveVectors.PVector{<:Complex, Int}, returncode, windingnumber, patchswitcher)
-    if returncode == :success && windingnumber == 1 && abs2(x[x.homvar]) < 1.0
-        PatchSwitching.switch!(x, patchswitcher)
-    elseif returncode != :at_infinity
-        ProjectiveVectors.affine!(x)
-    end
-    x
-end
 
 """
     align_axis!(x)

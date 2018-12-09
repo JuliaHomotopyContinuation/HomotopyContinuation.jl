@@ -15,7 +15,6 @@ import ..PathTracking
 import ..Parallel
 import ..Predictors
 import ..Problems
-import ..PatchSwitching
 import ..Systems
 
 using ..Utilities
