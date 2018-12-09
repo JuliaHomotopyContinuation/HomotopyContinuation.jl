@@ -74,6 +74,5 @@ function correct! end
 
 
 include("correctors/newton.jl")
-include("correctors/quasi_newton.jl")
 
 end
