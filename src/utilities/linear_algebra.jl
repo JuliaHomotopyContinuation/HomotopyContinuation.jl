@@ -1,4 +1,4 @@
-export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!, fast_factorization!, fast_ldiv!, factorization
+export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!, fast_factorization!, fast_ldiv!, factorization, factorize!
 
 """
     normalized_dot(u, v)
@@ -87,7 +87,6 @@ function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
         # now forward and backward substitution
         ldiv_unit_lower!(A, b)
         ldiv_upper!(A, b)
-        b
         if x !== b
             copyto!(x, b)
         end
@@ -104,11 +103,14 @@ solve!(A, b) = solve!(b, A, b)
 Solve ``Ax=b`` inplace where already a factorization of `A` is provided.
 This stores the result in `b`.
 """
-function solve!(LU::LinearAlgebra.LU, b::AbstractVector)
+function solve!(x, LU::LinearAlgebra.LU, b::AbstractVector)
      _ipiv!(LU, b)
      ldiv_unit_lower!(LU.factors, b)
      ldiv_upper!(LU.factors, b)
-     b
+     if x !== b
+         copyto!(x, b)
+     end
+     x
  end
 solve!(x, fact::LinearAlgebra.Factorization, b::AbstractVector) = LinearAlgebra.ldiv!(x, fact, b)
 
