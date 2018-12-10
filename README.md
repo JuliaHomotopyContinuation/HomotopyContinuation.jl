@@ -16,7 +16,9 @@ pkg> add HomotopyContinuation
 you can enter the Julia package manager by pressing `]` in the REPL.
 
 
-<h3 class="section-head" id="h-basic-usage"><a href="#h-basic-usage">Basic usage</a></h3> HomotopyContinuation.jl aims at having easy-to-understand top-level commands. For instance, suppose we want to solve the following polynomial system
+## Basic usage
+
+HomotopyContinuation.jl aims at having easy-to-understand top-level commands. For instance, suppose we want to solve the following polynomial system
 
 ```math
 f= [x^2+y, y^2-1].  
