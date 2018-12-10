@@ -853,7 +853,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Predictors and Correctors",
     "title": "HomotopyContinuation.Correctors.Newton",
     "category": "type",
-    "text": "Newton()\n\nA classical simple Newton operator for square linear systems using the LU factorization to solve the linear systems.\n\n\n\n\n\n"
+    "text": "Newton(;simplified_last_step=true)\n\nAn ordinary Newton\'s method. If simplified_last_step is true, then for the last iteration the previously Jacobian will be used. This uses an LU-factorization for square systems and a QR-factorization for overdetermined.\n\n\n\n\n\n"
 },
 
 {
