@@ -7,8 +7,12 @@ currently available.
 
 The following predictors are currently implemented.
 ```@docs
-Predictors.RK4
 Predictors.Euler
+Predictors.Heun
+Predictors.Ralston
+Predictors.RK3
+Predictors.RK4
+Predictors.Pade21
 Predictors.NullPredictor
 ```
 

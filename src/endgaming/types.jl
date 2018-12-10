@@ -2,7 +2,8 @@ export Endgame, Result, allowed_keywords
 
 const allowed_keywords = [:sampling_factor, :egtol, :minradius, :maxnorm, :minimal_maxnorm,
     :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
-    :cauchy_samples_per_loop]
+    :cauchy_samples_per_loop,
+    :maxiters_per_step]
 
 struct Options
     # See Endgame docstring for explanations
@@ -140,6 +141,7 @@ The distance between endpoints is normalized by the maximal difference between a
 * `cauchy_samples_per_loop=6` The number of samples used to predict an endpoint. A higher number of samples should result
 in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop
 and ``n`` is `cauchy_samples_per_loop`.
+* `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
 * `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
@@ -155,13 +157,14 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
     maxwindingnumber=15,
     max_extrapolation_samples=4,
     cauchy_loop_closed_tolerance=1e-3, cauchy_samples_per_loop=6,
-    patch=nothing, pathtrackerkwargs...)
+    maxiters_per_step=100,
+    patch=nothing, maxiters=nothing, pathtrackerkwargs...)
 
     options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
-    H = Homotopies.PatchedHomotopy(H, AffinePatches.state(AffinePatches.FixedPatch(), x))
-    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im; pathtrackerkwargs...)
+    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im;
+        patch=AffinePatches.FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
     state = State(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)

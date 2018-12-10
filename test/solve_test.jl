@@ -117,8 +117,7 @@
         F = equations(cyclic(6))
         P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
         x₁ = Problems.embed(P, first(start_sols))
-        H = Homotopies.PatchedHomotopy(P.homotopy, AffinePatches.OrthogonalPatch(), x₁)
-        tracker = PathTracking.PathTracker(H, x₁, 1.0, 0.1, tol=1e-3)
+        tracker = PathTracking.PathTracker(P.homotopy, x₁, 1.0, 0.1, tol=1e-3, patch=AffinePatches.OrthogonalPatch())
         tracked_paths = map(start_sols) do x
             PathTracking.track(tracker, Problems.embed(P, x), 1.0, 0.1)
         end
@@ -126,7 +125,7 @@
         crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-2)
         @test length(crossed_path_indices) > 0
 
-        tracker = PathTracking.PathTracker(H, x₁, 1.0, 0.1, tol=1e-8)
+        tracker = PathTracking.PathTracker(P.homotopy, x₁, 1.0, 0.1, tol=1e-8, patch=AffinePatches.OrthogonalPatch())
         tracked_paths = map(start_sols) do x
             PathTracking.track(tracker, x, 1.0, 0.1)
         end

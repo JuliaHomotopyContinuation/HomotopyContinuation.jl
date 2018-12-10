@@ -4,13 +4,14 @@ import LinearAlgebra
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
-export print_fieldnames,
+export @moduleenum,
+    nthroot,
+    print_fieldnames,
     allvariables,
     nvariables,
     ishomogenous,
     uniquevar,
     homogenize,
-    ldiv_lu!, blas_ldiv_lu!,
     infinity_norm,
     unsafe_infinity_norm,
     fubini_study,
@@ -19,15 +20,74 @@ export print_fieldnames,
     randomish_gamma,
     filterkwargs,
     splitkwargs,
-    solve!,
     set_num_BLAS_threads,
     get_num_BLAS_threads,
     randseed,
     check_kwargs_empty,
     start_solution_sample,
-    isrealvector
+    ComplexSegment
 
 include("utilities/unique_points.jl")
+include("utilities/linear_algebra.jl")
+
+
+"""
+    nthroot(x, n)
+
+Compute the `n`-th root of `x`.
+"""
+function nthroot(x::Real, N::Integer)
+    if N == 2
+        √(x)
+    elseif N == 4
+        √(√(x))
+    elseif N == 1
+        x
+    elseif N == 0
+        one(x)
+    else
+        x^(1/N)
+    end
+end
+
+"""
+    @modulenum(name, block)
+
+This is a modification of `@enum` and creates an intermediate enum.
+
+## Example
+
+The definition
+
+```julia
+@moduleenum Car begin
+    audi
+    volkswagen
+    bmw
+end
+```
+
+expands into
+
+```julia
+module Car
+    @enum t begin
+        audi
+        volkswagen
+        bmw
+    end
+end
+import .Car
+"""
+macro moduleenum(name, content...)
+    mname = esc(name)
+    quote
+        @eval module $name
+            @enum t $(content...)
+        end
+        import .$name
+    end
+end
 
 """
      print_fieldnames(io::IO, obj)
@@ -87,102 +147,6 @@ end
 Return a random seed in the range `range`.
 """
 randseed(range=1_000:1_000_000) = rand(range)
-
-"""
-    solve!(A, b)
-
-Solve ``Ax=b`` inplace. This overwrites `A` and `b`
-and stores the result in `b`.
-"""
-function solve!(A::StridedMatrix, b::StridedVecOrMat)
-    m, n = size(A)
-    if m == n
-        lusolve!(A, b)
-    else
-        LinearAlgebra.ldiv!(LinearAlgebra.qr!(A), b)
-    end
-    b
-end
-
-# This is an adoption of LinearAlgebra.generic_lufact!
-# with 3 changes:
-# 1) For choosing the pivot we use abs2 instead of abs
-# 2) Instead of using the robust complex division we
-#    just use the naive division. This shouldn't
-#    lead to problems since numerical diffuculties only
-#    arise for very large or small exponents
-# 3) We fold lu! and ldiv! into one routine
-#    this has the effect that we do not need to allocate
-#    the pivot vector anymore and also avoid the allocations
-#    coming from the LU wrapper
-function lusolve!(A::AbstractMatrix{T}, b::Vector{T}, ::Val{Pivot} = Val(true)) where {T,Pivot}
-    m, n = size(A)
-    minmn = min(m,n)
-    # LU Factorization
-    @inbounds begin
-        for k = 1:minmn
-            # find index max
-            kp = k
-            if Pivot
-                amax = zero(real(T))
-                for i = k:m
-                    absi = abs2(A[i,k])
-                    if absi > amax
-                        kp = i
-                        amax = absi
-                    end
-                end
-            end
-            if !iszero(A[kp,k])
-                if k != kp
-                    # Interchange
-                    for i = 1:n
-                        tmp = A[k,i]
-                        A[k,i] = A[kp,i]
-                        A[kp,i] = tmp
-                    end
-                    b[k], b[kp] = b[kp], b[k]
-                end
-                # Scale first column
-                Akkinv = @fastmath inv(A[k,k])
-                for i = k+1:m
-                    A[i,k] *= Akkinv
-                end
-            end
-            # Update the rest
-            for j = k+1:n
-                for i = k+1:m
-                    A[i,j] -= A[i,k]*A[k,j]
-                end
-            end
-        end
-    end
-    # now forward and backward substitution
-    ldiv_unit_lower!(A, b)
-    ldiv_upper!(A, b)
-    b
-end
-@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
-    n = size(A, 2)
-    for j in n:-1:1
-        @inbounds iszero(A[j,j]) && throw(LinearAlgebra.SingularException(j))
-        @inbounds xj = x[j] = (@fastmath A[j,j] \ b[j])
-        for i in 1:(j-1)
-            @inbounds b[i] -= A[i,j] * xj
-        end
-    end
-    b
-end
-@inline function ldiv_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
-    n = size(A, 2)
-    @inbounds for j in 1:n
-        xj = x[j] = b[j]
-        for i in j+1:n
-            b[i] -= A[i,j] * xj
-        end
-    end
-    x
-end
 
 """
     allvariables(polys)
@@ -345,6 +309,7 @@ logabs(z::Complex) = 0.5 * log(abs2(z))
 logabs(x) = log(abs(x))
 
 
+
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
     # Therefore we artificially constrain the choices
@@ -392,6 +357,40 @@ function promote_start_solution(x)
     x_new
 end
 
+"""
+    ComplexSegment(start, target)
+
+Represents the line segment from `start` to `finish`.
+Supports indexing of the values `t ∈ [0, length(target-start)]` in order to get the
+corresponding point on the line segment.
+"""
+struct ComplexSegment
+    start::ComplexF64
+    target::ComplexF64
+    # derived
+    Δ_target_start::ComplexF64
+    abs_target_start::Float64
+end
+function ComplexSegment(start, target)
+    Δ_target_start = convert(ComplexF64, target) - convert(ComplexF64, start)
+    abs_target_start = abs(Δ_target_start)
+
+    ComplexSegment(start, target, Δ_target_start, abs_target_start)
+end
+
+function Base.getindex(segment::ComplexSegment, t::Real)
+    Δ = t / segment.abs_target_start
+    if 1.0 - Δ < 2eps()
+        Δ = 1.0
+    end
+    segment.start + Δ * segment.Δ_target_start
+end
+Base.length(segment::ComplexSegment) = segment.abs_target_start
+
+function Base.show(io::IO, segment::ComplexSegment)
+    print(io, "ComplexSegment($(segment.start), $(segment.target))")
+end
+Base.show(io::IO, ::MIME"application/juno+inlinestate", opts::ComplexSegment) = opts
 
 # Parallelization
 

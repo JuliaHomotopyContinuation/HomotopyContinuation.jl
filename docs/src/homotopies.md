@@ -11,13 +11,13 @@ The following homotopies are available by default
 ```@docs
 StraightLineHomotopy
 FixedPointHomotopy
+ParameterHomotopy
 ```
 
 We also provide more specialised homotopies, which are mostly used internally currently
 but could be useful in conjunction with the [`PathTracking.PathTracker`](@ref) primitive.
 ```@docs
 Homotopies.PatchedHomotopy
-Homotopies.PatchSwitcherHomotopy
 ```
 
 ## Interface for custom homotopies
@@ -50,7 +50,5 @@ Homotopies.jacobian_and_dt!
 Homotopies.evaluate
 Homotopies.jacobian
 Homotopies.dt
-Homotopies.precondition!
-Homotopies.update!
 Homotopies.basehomotopy
 ```

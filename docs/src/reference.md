@@ -45,6 +45,7 @@ Each patch has to follow the following interface.
 ```@docs
 AffinePatches.AbstractAffinePatch
 AffinePatches.state
-AffinePatches.precondition!
-AffinePatches.update!
+AffinePatches.onpatch!
+AffinePatches.setup!
+AffinePatches.changepatch!
 ```

@@ -14,7 +14,6 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
     cross_tol = original_tol * 10
     # We start with a list of all indices where some crossing happened.
     crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
-
     ncrossedpaths = length(crossed_path_indices)
     # No paths crossed -> done :)
     if ncrossedpaths == 0

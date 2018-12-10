@@ -1,4 +1,7 @@
+import Random
+
 export RandomPatch
+
 
 
 """
@@ -14,16 +17,16 @@ end
 
 function state(::RandomPatch, x::AbstractProjectiveVector)
     v = copy(x)
-    for i=1:length(v)
-        v[i] = rand(eltype(v))
-    end
+    Random.randn!(v)
     LinearAlgebra.normalize!(v)
     RandomPatchState(v)
 end
 nequations(::RandomPatchState) = 1
 
-function precondition!(state::RandomPatchState, x::PVector)
-    LinearAlgebra.rmul!(raw(x), inv(LinearAlgebra.dot(state.v, x)))
+function onpatch!(x::AbstractVector, state::RandomPatchState)
+    λ = LinearAlgebra.dot(state.v, x)
+    λ⁻¹ = @fastmath inv(λ)
+    LinearAlgebra.rmul!(x.data, λ⁻¹)
 end
 
 function evaluate!(u, state::RandomPatchState, x)

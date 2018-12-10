@@ -65,6 +65,9 @@ function runendgame!(endgame)
         if in_endgame_zone!(state)
             predict_infinity_check!(state, tracker, options, cache)
         end
+        if checkatinfinity_norm(state, options)
+            state.status = :at_infinity
+        end
         checkterminate!(state, endgame.options)
     end
 
@@ -83,8 +86,8 @@ function nextsample!(tracker::PathTracking.PathTracker, state, options)
     R, λ = state.R, options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(tracker, state.x, R, λR, precondition=false)
-    if retcode != :success
+    retcode = PathTracking.track!(tracker, state.x, R, λR, setup_patch=false, compute_ẋ=false, checkstartvalue=false)
+    if retcode != PathTracking.Status.success
         state.status = :tracker_failed
         return nothing
     end

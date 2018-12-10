@@ -9,14 +9,12 @@ module HomotopyContinuation
         Homotopies,
         InterfaceTest,
         Monodromy,
-        PatchSwitching,
         PathTracking,
         Predictors,
         Input,
         Problems,
         ProjectiveVectors,
         Solving,
-        StepLength,
         Systems,
         Utilities
 
@@ -33,14 +31,9 @@ module HomotopyContinuation
     include("problems.jl")
     include("predictors.jl")
     include("correctors.jl")
-    include("prediction_correction.jl")
-
-    include("step_length.jl")
 
     include("path_tracking.jl")
     include("endgaming.jl")
-
-    include("patch_switching.jl")
 
     include("solving.jl")
     include("solve.jl")
@@ -64,8 +57,8 @@ module HomotopyContinuation
         finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
         nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
-    import .Homotopies: StraightLineHomotopy, FixedPointHomotopy
-    export StraightLineHomotopy, FixedPointHomotopy
+    import .Homotopies: StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
+    export StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
 
     import .Systems: FPSystem, SPSystem
     export FPSystem, SPSystem

@@ -17,7 +17,7 @@ function state(::EmbeddingPatch, x::PVector)
 end
 nequations(state::EmbeddingPatchState) = state.nequations
 
-function precondition!(state::EmbeddingPatchState, x::AbstractProjectiveVector)
+function onpatch!(x::AbstractVector, state::EmbeddingPatchState)
     ProjectiveVectors.affine!(x)
 end
 

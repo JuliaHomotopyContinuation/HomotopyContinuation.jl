@@ -100,3 +100,6 @@ function evaluate_and_jacobian(F::TotalDegreeSystem, x, cache::NullCache)
     evaluate_and_jacobian!(u, U, F, x, cache)
     u, U
 end
+
+
+weylnorm2(F::TotalDegreeSystem) = 2 * length(F.degrees)

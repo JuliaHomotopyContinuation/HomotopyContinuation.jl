@@ -35,9 +35,6 @@ function cache(ph::PatchedHomotopy, x, t)
     PatchedHomotopyCache(c, jacobian(H, x, t, c), evaluate(H, x, t, c))
 end
 
-precondition!(H::PatchedHomotopy, x, t, cache) = AffinePatches.precondition!(H.patch, x)
-update!(H::PatchedHomotopy, x, t, cache) = AffinePatches.update!(H.patch, x)
-
 function evaluate!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
 

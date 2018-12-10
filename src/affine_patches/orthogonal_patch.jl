@@ -1,3 +1,5 @@
+import LinearAlgebra
+
 export OrthogonalPatch
 
 """
@@ -7,7 +9,7 @@ export OrthogonalPatch
 struct OrthogonalPatch <: AbstractLocalAffinePatch end
 
 struct OrthogonalPatchState{T, H} <: AbstractAffinePatchState
-    v_conj::PVector{T, H} # this is already conjugated
+    v̄::PVector{T, H} # this is already conjugated
 end
 
 function state(::OrthogonalPatch, x::PVector)
@@ -17,28 +19,43 @@ function state(::OrthogonalPatch, x::PVector)
 end
 nequations(::OrthogonalPatchState) = 1
 
-function precondition!(state::OrthogonalPatchState, x)
-    LinearAlgebra.normalize!(x)
-    update!(state, x)
-end
-function update!(state::OrthogonalPatchState, x)
-    raw(state.v_conj) .= conj.(raw(x))
-    LinearAlgebra.normalize!(raw(state.v_conj))
-    nothing
+function onpatch!(x::AbstractVector, state::OrthogonalPatchState)
+    @boundscheck length(x) == length(state.v̄)
+    λ = zero(eltype(x))
+    @inbounds for i=1:length(x)
+        λ += state.v̄[i] * x[i]
+    end
+    λ⁻¹ = @fastmath inv(λ)
+    for i=1:length(x)
+        x[i] *= λ⁻¹
+    end
+    x
 end
 
+function setup!(state::OrthogonalPatchState, x::AbstractVector)
+    @boundscheck length(x) == length(state.v̄)
+    LinearAlgebra.normalize!(x)
+    @inbounds for i in eachindex(state.v̄)
+        state.v̄[i] = conj(x[i])
+    end
+    state
+end
+
+changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
+
 function evaluate!(u, state::OrthogonalPatchState, x)
+    @boundscheck length(x) == length(state.v̄)
     out = -one(eltype(x))
-    @inbounds for i=1:length(x)
-        out += state.v_conj[i] * x[i]
+    @inbounds for i in eachindex(state.v̄)
+        out += state.v̄[i] * x[i]
     end
     u[end] = out
-    nothing
+    u
 end
 
 function jacobian!(U, state::OrthogonalPatchState, x)
     @inbounds for j=1:size(U, 2)
-        U[end, j] = state.v_conj[j]
+        U[end, j] = state.v̄[j]
     end
     nothing
 end

@@ -13,7 +13,6 @@ pathtracker_startsolutions
 ```@docs
 PathTracking.PathTracker
 PathTracking.PathTrackerResult
-StepLength.HeuristicStepLength
 ```
 
 ## Methods

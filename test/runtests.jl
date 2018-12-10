@@ -1,7 +1,5 @@
 using Test, LinearAlgebra, Random
-using DynamicPolynomials
-using PolynomialTestSystems
-using HomotopyContinuation
+using DynamicPolynomials, PolynomialTestSystems, HomotopyContinuation
 import TreeViews
 
 function test_treeviews(x)

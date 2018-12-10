@@ -90,7 +90,14 @@ function embed(x::AbstractVector{T}, homvar) where T
 end
 embed(z::PVector, x::AbstractVector) = embed(x, z.homvar)
 
-function embed!(z::PVector{T}, x::AbstractVector{T}) where T
+function embed!(z::PVector{T, Nothing}, x::AbstractVector) where T
+    if length(z) != length(x)
+        error("Cannot embed a vector of a different length.")
+    end
+    z.data .= x
+    z
+end
+function embed!(z::PVector{T}, x::AbstractVector) where T
     @inbounds for k in 1:length(z.data)
         if k == z.homvar
             z.data[k] = one(T)
@@ -99,6 +106,14 @@ function embed!(z::PVector{T}, x::AbstractVector{T}) where T
             z.data[k] = x[i]
         end
     end
+    z
+end
+function embed!(z::PVector{T,Nothing}, x::PVector{S,Nothing}) where {T,S}
+    copyto!(z.data, x.data)
+    z
+end
+function embed!(z::PVector{T,Int}, x::PVector{S,Int}) where {T,S}
+    copyto!(z.data, x.data)
     z
 end
 
@@ -379,8 +394,8 @@ const VecView{T} = SubArray{T,1,Vector{T},Tuple{UnitRange{Int64}},true}
 
 Base.size(z::AbstractProjectiveVector) = size(z.data)
 Base.length(z::AbstractProjectiveVector) = length(z.data)
-Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
-Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
+Base.@propagate_inbounds Base.getindex(z::AbstractProjectiveVector, i::Integer) = getindex(z.data, i)
+Base.@propagate_inbounds Base.setindex!(z::AbstractProjectiveVector, zᵢ, i::Integer) = setindex!(z.data, zᵢ, i)
 Base.lastindex(z::AbstractProjectiveVector) = lastindex(z.data)
 
 end

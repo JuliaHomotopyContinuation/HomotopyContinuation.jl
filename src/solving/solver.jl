@@ -14,11 +14,10 @@ function SolverCache(prob, tracker)
 end
 
 struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgaming.Endgame, PS<:Union{Nothing,PatchSwitching.PatchSwitcher}, C<:SolverCache}
+        E<:Endgaming.Endgame, C<:SolverCache}
     prob::P
     tracker::T
     endgame::E
-    patchswitcher::PS
     t₁::Float64
     t₀::Float64
     seed::Int
@@ -43,19 +42,13 @@ end
 function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
     x₁= Problems.embed(prob, startsolutionsample)
 
-    slkwargs, kwargs = splitkwargs(kwargs, StepLength.allowed_keywords)
-    steplength = StepLength.HeuristicStepLength(;slkwargs...)
+    tracker = PathTracking.PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, PathTracking.allowed_keywords)...)
 
-    tracker = pathtracker(prob, x₁, t₁, t₀; steplength=steplength,
-        filterkwargs(kwargs, PathTracking.allowed_keywords)...)
-
-    endgame = Endgaming.Endgame(prob.homotopy, x₁; steplength=steplength,
-        filterkwargs(kwargs, Endgaming.allowed_keywords)...)
+    endgame = Endgaming.Endgame(prob.homotopy, x₁; filterkwargs(kwargs, Endgaming.allowed_keywords)...)
 
     check_kwargs(kwargs)
 
-    Solver(prob, tracker, endgame, patchswitcher(prob, x₁, t₀),
-        t₁, t₀, seed, options, SolverCache(prob, tracker))
+    Solver(prob, tracker, endgame, t₁, t₀, seed, options, SolverCache(prob, tracker))
 end
 
 function solver_startsolutions(args...; kwargs...)
@@ -65,10 +58,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
-allowed_keywords() = [:patch,
-    PathTracking.allowed_keywords...,
-    StepLength.allowed_keywords...,
-    Endgaming.allowed_keywords...]
+allowed_keywords() = [:patch, PathTracking.allowed_keywords..., Endgaming.allowed_keywords...]
 
 function invalid_kwargs(kwargs)
     invalids = []
@@ -81,19 +71,3 @@ function invalid_kwargs(kwargs)
     end
     invalids
 end
-
-function pathtracker(prob::Problems.Projective, x::AbstractVector, t₁, t₀; patch=AffinePatches.OrthogonalPatch(), kwargs...)
-    H = Homotopies.PatchedHomotopy(prob.homotopy, AffinePatches.state(patch, x))
-    PathTracking.PathTracker(H, x, complex(t₁), complex(t₀); kwargs...)
-end
-
-function patchswitcher(prob::Problems.Projective{H, Problems.NullHomogenization}, x, t₀) where {H<:Homotopies.AbstractHomotopy}
-    nothing
-end
-function patchswitcher(prob::Problems.Projective, x, t₀)
-    p₁ = AffinePatches.state(AffinePatches.FixedPatch(), x)
-    p₀ = AffinePatches.state(AffinePatches.EmbeddingPatch(), x)
-    PatchSwitching.PatchSwitcher(prob.homotopy, p₁, p₀, x, t₀)
-end
-
-const Solvers = Vector{<:Solver}

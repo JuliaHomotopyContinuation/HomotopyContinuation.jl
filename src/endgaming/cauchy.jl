@@ -42,8 +42,8 @@ function determine_windingnumber!(state, tracker, options, cache)
         k += 1
         θk = R * unitroots[(k - 1) % samples_per_loop + 1]
         # We go around the unit circle in an `n`-gon
-        retcode = PathTracking.track!(tracker, xk1, θk1, θk, precondition=false)
-        if retcode != :success
+        retcode = PathTracking.track!(tracker, xk1, θk1, θk, setup_patch=false)
+        if retcode != PathTracking.Status.success
             return :loop_failed_tracking_failed
         end
         xk = PathTracking.currx(tracker)
@@ -91,8 +91,8 @@ function predict_cif!(state, tracker, options, cache)
     for k = 2:(state.windingnumber * samples_per_loop)
         θk = R * unitroots[(k - 1) % samples_per_loop + 1]
         # We go around the unit circle in an `n`-gon
-        retcode = PathTracking.track!(tracker, xk1, θk1, θk, precondition=false)
-        if retcode != :success
+        retcode = PathTracking.track!(tracker, xk1, θk1, θk, setup_patch=false)
+        if retcode != PathTracking.Status.success
             return :tracking_failed
         end
         xk = PathTracking.currx(tracker)

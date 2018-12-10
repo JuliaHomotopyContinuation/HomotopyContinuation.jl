@@ -10,7 +10,6 @@ import ..HomotopiesBase: AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!,
     basehomotopy
 
 import ..Systems
@@ -27,7 +26,6 @@ export AbstractHomotopy,
     evaluate_and_jacobian!, evaluate_and_jacobian,
     dt!, dt,
     jacobian_and_dt!, jacobian_and_dt,
-    precondition!, update!,
     basehomotopy
 
 # This has to be here otherwise the compiler crashes
@@ -45,6 +43,5 @@ include("homotopies/straight_line.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/fixed_point.jl")
 include("homotopies/patched_homotopy.jl")
-include("homotopies/patch_switcher_homotopy.jl")
 
 end

@@ -1,3 +1,5 @@
+const Solvers = Vector{<:Solver}
+
 include("path_crossing.jl")
 
 solve(solver, start_solutions) = solve(solver, collect(start_solutions))
@@ -65,7 +67,7 @@ function track_to_endgamezone(solvers, start_solutions)
     result
 end
 
-@inline trackpath(solver::Solver, x₁, t₁, t₀) = PathTracking.track(solver.tracker, Problems.embed(solver.prob, x₁), t₁, t₀)
+trackpath(solver::Solver, x₁, t₁, t₀) = PathTracking.track(solver.tracker, Problems.embed(solver.prob, x₁), t₁, t₀)
 
 function endgame(solvers, start_solutions, endgame_zone_results)
     _, t_endgame, t₀ = t₁_t_endgame_t₀(solvers)
@@ -74,7 +76,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     if t₀ == t_endgame
         return Parallel.tmap(solvers, 1:n) do solver, tid, k
             x₁, r = start_solutions[k], endgame_zone_results[k]
-            PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
+            PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
         end
     end
 
@@ -102,7 +104,7 @@ end
 function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
     t₁, t_endgame, t₀ = t₁_t_endgame_t₀(solver)
     x₁, r = start_solutions[k], endgame_zone_results[k]
-    if r.returncode == :success
+    if r.returncode == PathTracking.Status.success
         # Run endgame
         result = Endgaming.runendgame(solver.endgame, r.x, t_endgame)
         # If the tracker failed we are probably to late with the endgame.
@@ -110,18 +112,18 @@ function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
             # Rerun with something more away
             new_t = 0.3*(t₁ - t_endgame)
             pr = trackpath(solver::Solver, x₁, t₁, new_t)
-            if pr.returncode == :success
+            if pr.returncode == PathTracking.Status.success
                 result = Endgaming.runendgame(solver.endgame, pr.x, new_t)
             end
         end
-        return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
+        return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
     else
         # If we even didn't come to the endgame zone we start earlier.
         result = Endgaming.runendgame(solver.endgame, Problems.embed(solver.prob, x₁), 1.0)
         if result.returncode == :success || result.returncode == :at_infinity
-            return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult, solver.patchswitcher)
+            return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
         else
-            return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult, solver.patchswitcher)
+            return PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
         end
     end
 end
