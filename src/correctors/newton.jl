@@ -4,27 +4,34 @@ using ..Utilities
 export Newton
 
 """
-    Newton()
+    Newton(;simplified_last_step=true)
 
-A classical simple Newton operator for square linear systems using the LU factorization
-to solve the linear systems.
+An ordinary Newton's method. If `simplified_last_step` is `true`, then for the last iteration
+the previously Jacobian will be used. This uses an LU-factorization for square systems
+and a QR-factorization for overdetermined.
 """
-struct Newton <: AbstractCorrector end
+struct Newton <: AbstractCorrector
+    simplified_last_step::Bool
+end
 
-struct NewtonCache{T} <: AbstractCorrectorCache
+Newton(;simplified_last_step=true) = Newton(simplified_last_step)
+
+struct NewtonCache{T, Fac<:LinearAlgebra.Factorization} <: AbstractCorrectorCache
     Jᵢ::Matrix{T}
+    fac::Fac
     rᵢ::Vector{T}
 end
 
 function cache(::Newton, H::HomotopyWithCache, x, t)
     Jᵢ = Homotopies.jacobian(H, x, t)
+    fac = factorization(Jᵢ)
     rᵢ = Homotopies.evaluate(H, x, t)
-    NewtonCache(Jᵢ, rᵢ)
+    NewtonCache(Jᵢ, fac, rᵢ)
 end
 
 
 function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol, maxit)
-    Jᵢ, rᵢ= cache.Jᵢ, cache.rᵢ
+    Jᵢ, rᵢ, fac = cache.Jᵢ, cache.rᵢ, cache.fac
 
     copyto!(out, x₀)
     xᵢ₊₁ = xᵢ = out # just alias to make logic easier
@@ -36,11 +43,16 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
     accuracy = T(Inf)
     ω₀ = ω = 0.0
     for i ∈ 0:(maxit-1)
-        evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
-        Δxᵢ = solve!(Jᵢ, rᵢ)
+        if i == maxit - 1 && alg.simplified_last_step
+            evaluate!(rᵢ, H, xᵢ, t)
+        else
+            evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
+            fac = factorize!(fac, Jᵢ)
+        end
+        Δxᵢ = solve!(fac, rᵢ)
         norm_Δxᵢ₋₁ = norm_Δxᵢ
-        accuracy = norm_Δxᵢ = euclidean_norm(Δxᵢ)
-        for k in eachindex(xᵢ)
+        norm_Δxᵢ = euclidean_norm(Δxᵢ)
+        @inbounds for k in eachindex(xᵢ)
             xᵢ₊₁[k] = xᵢ[k] - Δxᵢ[k]
         end
 
@@ -52,13 +64,18 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             continue
         end
 
-        ωᵢ₋₁ = 2norm_Δxᵢ / norm_Δxᵢ₋₁^2
+        Θᵢ₋₁ = norm_Δxᵢ / norm_Δxᵢ₋₁
+        ωᵢ₋₁ = 2Θᵢ₋₁ / norm_Δxᵢ₋₁
         if i == 1
             ω = ω₀ = ωᵢ₋₁
         else
             ω = @fastmath max(ω, ωᵢ₋₁)
         end
+        if Θᵢ₋₁ > 0.5
+            return Result(terminated, norm_Δx₀, i + 1, ω₀, ω, norm_Δx₀)
+        end
 
+        accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
         if accuracy ≤ tol
             return Result(converged, accuracy, i + 1, ω₀, ω, norm_Δx₀)
         end
