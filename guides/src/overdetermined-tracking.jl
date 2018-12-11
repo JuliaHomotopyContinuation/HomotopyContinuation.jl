@@ -5,7 +5,9 @@
 # <h3 class="section-head" id="Rational_normal_curve"><a href="#Rational_normal_curve">Example: the rational normal curve</a></h3>
 #
 # The [rational normal curve](https://en.wikipedia.org/wiki/Rational_normal_curve) is a 1-dimensional algebraic variety within the 3-dimensional complex space:
-# $$C = \\{(x,y,z) \in \mathbb{C}^3 \mid xz-y^2 = 0,\, y-z^2=0, \, x-yz = 0\\}.$$
+# ```math
+# C = \\{(x,y,z) \in \mathbb{C}^3 \mid xz-y^2 = 0,\, y-z^2=0, \, x-yz = 0\\}.
+# ```
 # Since $C$ is cut out by 3 equations one might expect it to be 0-dimensional, but it is not. In fact, the rational normal curve is a first example of a [non-complete intersection](https://en.wikipedia.org/wiki/Complete_intersection).
 #
 # <h3 class="section-head" id="tracking_overdetermined"><a href="#tracking_overdetermined">Intersecting the rational normal curve with a linear space</a></h3>

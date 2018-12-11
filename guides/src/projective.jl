@@ -5,7 +5,9 @@
 # <h3 class="section-head" id="h-degree"><a href="#h-degree">Example: computing the degree of a projective variety</a></h3>
 #
 # Consider the projective variety in the 2-dimensional complex projective space $\mathbb{CP}^2$.
-# $$V = \\{ x^2 + y^2 - z^2 = 0 \\}$$
+# ```math
+# V = \\{ x^2 + y^2 - z^2 = 0 \\}
+# ```
 #
 # The degree of $V$ is the number of intersection points of $V$ with a generic line.
 # Let us see what it is. First we initialize the defining equation of $V$.
