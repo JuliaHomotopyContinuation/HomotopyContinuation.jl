@@ -17,8 +17,7 @@
 # ```math
 # U(t) =
 # U
-# \begin{bmatrix}\cos(2\pi t) & -\sin(2\pi t) & 0 &\cdots & 0 \\\\ 
-# \sin(2\pi t) & \cos(2\pi t) & 0 &\cdots & 0 \\\\ 0 & 0 & 1 &\cdots & 0\\\\0 & 0 & 0 &\ddots & 0\\\\0 & 0 & 0 &\cdots & 1
+# \begin{bmatrix}\cos(2\pi t) & -\sin(2\pi t) & 0 &\cdots & 0 \\\\ \sin(2\pi t) & \cos(2\pi t) & 0 &\cdots & 0 \\\\ 0 & 0 & 1 &\cdots & 0\\\\ 0 & 0 & 0 &\ddots & 0\\\\ 0 & 0 & 0 &\cdots & 1
 # \end{bmatrix} U^T.
 # ```
 #
@@ -46,8 +45,7 @@
 # where
 # ```math
 # U'(t)= U
-# \begin{bmatrix}-2\pi\sin(2\pi t) & -2\pi\cos(2\pi t) & 0 &\cdots & 0 \\\\ 
-# 2\pi\cos(2\pi t) & -2\pi\sin(2\pi t) & 0 &\cdots & 0 \\\\ 0 & 0 & 0 &\cdots & 0\\\\0 & 0 & 0 &\ddots & 0\\\\0 & 0 & 0 &\cdots & 0
+# \begin{bmatrix}-2\pi\sin(2\pi t) & -2\pi\cos(2\pi t) & 0 &\cdots & 0 \\\\ 2\pi\cos(2\pi t) & -2\pi\sin(2\pi t) & 0 &\cdots & 0 \\\\ 0 & 0 & 0 &\cdots & 0\\\\ 0 & 0 & 0 &\ddots & 0\\\\ 0 & 0 & 0 &\cdots & 0
 # \end{bmatrix} U^T.
 # ```
 #
@@ -67,12 +65,13 @@ struct RandomUnitaryPath{Start,Target} <: Homotopies.AbstractHomotopy
 end
 function RandomUnitaryPath(start::Systems.AbstractSystem, target::Systems.AbstractSystem)
     m, n = size(start)
-    # construct a random unitary matrix
+    ## construct a random unitary matrix
     U = Matrix(qr(randn(n,n) + im * randn(n,n)).Q)
     RandomUnitaryPath(Homotopies.StraightLineHomotopy(start, target), U)
 end
-# We have to define the size
+## We have to define the size
 Base.size(H::RandomUnitaryPath) = size(H.straightline)
+#md nothing #hide
 
 
 #
@@ -87,7 +86,7 @@ struct RandomUnitaryPathCache{C, T1, T2} <: Homotopies.AbstractHomotopyCache
     straightline::C
     U_t::Matrix{ComplexF64}
     y::Vector{T1}
-    # More temporary storage necessary to avoid allocations
+    ## More temporary storage necessary to avoid allocations
     jac::Matrix{T2} # holds a jacobian
     dt::Vector{T2} # holds a derivative w.r.t. t
     U::Matrix{ComplexF64} # holds something like U
@@ -115,21 +114,21 @@ end
 
 ## U(t)x
 function Ut_mul_x!(cache, U, x, t)
-    # We start with U * (the 2x2 sin-cos block + I)
+    ## We start with U * (the 2x2 sin-cos block + I)
     cache.U .= U
     s, c = sin(2π*t), cos(2π*t)
     for i=1:size(U, 1)
         cache.U[i, 1] = U[i,2] * s + U[i,1] * c
         cache.U[i, 2] = U[i,2] * c - U[i,1] * s
     end
-    # U(t) = cache.U * U'
-    # y = cache.y = U(t) * x
+    ## U(t) = cache.U * U'
+    ## y = cache.y = U(t) * x
     mul!(cache.y, mul!(cache.U_t, cache.U, U'), x)
 end
 
 ## U'(t)x
 function U_dot_t_mul_x!(cache, U, x, t)
-    # We start with U * (the derivative of the 2x2 sin-cos block + 0)
+    ## We start with U * (the derivative of the 2x2 sin-cos block + 0)
     cache.U .= zero(eltype(U))
     s, c = 2π*sin(2π*t), 2π*cos(2π*t)
     for i=1:size(U, 1)
@@ -137,8 +136,8 @@ function U_dot_t_mul_x!(cache, U, x, t)
         cache.U[i, 2] = -U[i,2] * s - U[i,1] * c
     end
 
-    # U'(t) = cache.U * U'
-    # y' = cache.y = U'(t) * x
+    ## U'(t) = cache.U * U'
+    ## y' = cache.y = U'(t) * x
     mul!(cache.y, mul!(cache.U_t, cache.U, U'), x)
 end
 #md nothing #hide
@@ -158,7 +157,7 @@ end
 
 function Homotopies.dt!(out, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
-    # chain rule
+    ## chain rule
     Homotopies.jacobian_and_dt!(cache.jac, out, H.straightline, y, t, cache.straightline)
     y_dot = U_dot_t_mul_x!(cache, H.U, x, t) # y_dot = U'(t)x
     mul!(cache.dt, cache.jac, y_dot) # dt = J_H(y, t) * y_dot
