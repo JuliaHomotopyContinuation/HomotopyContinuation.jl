@@ -139,16 +139,12 @@ Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
 needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 
 ## Options
-* `corrector::Correctors.AbstractCorrector`:
-The corrector used during in the predictor-corrector scheme. The default is
-[`Correctors.Newton`](@ref).
+* `corrector::Correctors.AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Correctors.Newton`](@ref).
 * `corrector_maxiters=3`: The maximal number of correction steps in a single step.
 * `initial_steplength=0.1`: The step length of the first step.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_steplength=1e-14`: The minimal step length.
-* `predictor::Predictors.AbstractPredictor`:
-The predictor used during in the predictor-corrector scheme. The default is
-`[Predictors.RK4`](@ref)()`.
+* `predictor::Predictors.AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is `[Predictors.RK4`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-7`: The precision used to track a value.
