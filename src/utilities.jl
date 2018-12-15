@@ -37,7 +37,9 @@ include("utilities/linear_algebra.jl")
 Compute the `n`-th root of `x`.
 """
 function nthroot(x::Real, N::Integer)
-    if N == 2
+    if N == 3
+        cbrt(x)
+    elseif N == 2
         √(x)
     elseif N == 4
         √(√(x))

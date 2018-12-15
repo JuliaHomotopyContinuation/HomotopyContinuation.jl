@@ -178,7 +178,7 @@ end
 function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    predictor::Predictors.AbstractPredictor=Predictors.RK4(), kwargs...)
+    predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)
 
     options = Options(;kwargs...)
 
