@@ -13,6 +13,10 @@ function totaldegree_solutions(degrees::Vector{Int}, ::Homogenization)
     TotalDegreeSolutionIterator(degrees, false)
 end
 
+function totaldegree_solutions(degrees::Vector{Int}; homogenous=false)
+    TotalDegreeSolutionIterator(degrees, homogenous)
+end
+
 
 """
     TotalDegreeSolutionIterator(degrees, homogenous::Bool)

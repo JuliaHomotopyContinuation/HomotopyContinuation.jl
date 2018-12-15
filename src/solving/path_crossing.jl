@@ -1,5 +1,5 @@
 using ..Utilities
-import ..ProjectiveVectors
+import ProjectiveVectors
 
 """
     pathcrossing_check!(tracked_paths, solvers, start_solutions)

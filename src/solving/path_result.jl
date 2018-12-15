@@ -6,8 +6,8 @@ export PathResult, solution,
 using Printf
 
 import ..Homotopies
-import ..ProjectiveVectors
-import ..ProjectiveVectors: raw
+import ProjectiveVectors
+import ProjectiveVectors: raw
 using ..Utilities
 
 struct PathResultCache{Hom, T}

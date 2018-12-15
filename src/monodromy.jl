@@ -9,7 +9,7 @@ import ProgressMeter
 import StaticArrays: SVector, @SVector
 import TreeViews
 
-import ..Homotopies, ..PathTracking, ..ProjectiveVectors, ..Utilities
+import ..Homotopies, ..PathTracking, ProjectiveVectors, ..Utilities
 import ..Utilities: UniquePoints
 
 include("monodromy/group_actions.jl")

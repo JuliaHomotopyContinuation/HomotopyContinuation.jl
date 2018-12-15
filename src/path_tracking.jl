@@ -1,8 +1,9 @@
 module PathTracking
 
+import ProjectiveVectors
 import LinearAlgebra, TreeViews
 import ..AffinePatches, ..Correctors, ..Homotopies,
-       ..Predictors, ..Problems, ..ProjectiveVectors
+       ..Predictors, ..Problems
 using ..Utilities
 
 export PathTracker, allowed_keywords
@@ -56,10 +57,10 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
     terminated_singularity
 end
 
-mutable struct State{T, PV<:ProjectiveVectors.AbstractProjectiveVector{T}, PatchState <: AffinePatches.AbstractAffinePatchState}
-    x::PV # current x
-    x̂::PV # last prediction
-    x̄::PV # canidate for new x
+mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
+    x::ProjectiveVectors.PVector{T,N} # current x
+    x̂::ProjectiveVectors.PVector{T,N} # last prediction
+    x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
     ẋ::Vector{T} # derivative at current x
     η::Float64
     ω::Float64
@@ -75,7 +76,7 @@ mutable struct State{T, PV<:ProjectiveVectors.AbstractProjectiveVector{T}, Patch
     last_step_failed::Bool
 end
 
-function State(x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
+function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
     η = ω = NaN
@@ -179,7 +180,7 @@ function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; kwargs...)
     y₁ = Problems.embed(prob, x₁)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
+function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)

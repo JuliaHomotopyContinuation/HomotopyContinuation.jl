@@ -1,4 +1,4 @@
-import ..ProjectiveVectors
+import ProjectiveVectors
 import ..Homotopies
 
 function setup!(endgame, x, R)
@@ -140,14 +140,14 @@ function in_endgame_zone!(state)
 end
 
 analyze_finite_atinfinity(s, o, c) = analyze_finite_atinfinity(s.x, s, o, c)
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Int}, state, options, cache)
-    checkfinite(state) && return :finite
-    checkatinfinity(state, options) && return :at_infinity
-    :unknown
-end
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Nothing}, state, options, cache)
-    :projective
-end
+# function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Int}, state, options, cache)
+#     checkfinite(state) && return :finite
+#     checkatinfinity(state, options) && return :at_infinity
+#     :unknown
+# end
+# function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Nothing}, state, options, cache)
+#     :projective
+# end
 
 checkfinite(state) = checkfinite(state, state.x)
 function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex, Int})

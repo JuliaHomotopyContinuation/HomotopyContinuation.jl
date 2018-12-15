@@ -18,7 +18,7 @@ struct Options
     cauchy_samples_per_loop::Int
 end
 
-mutable struct State{V<:ProjectiveVectors.AbstractProjectiveVector, C, T}
+mutable struct State{V<:ProjectiveVectors.PVector, C, T}
     # Current value
     x::V
     # prediction and previous prediction
@@ -152,7 +152,7 @@ struct Endgame{P<:PathTracking.PathTracker, V}
     options::Options
 end
 
-function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
+function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.PVector;
     sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, minimal_maxnorm=min(1e3, maxnorm),
     maxwindingnumber=15,
     max_extrapolation_samples=4,

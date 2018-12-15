@@ -1,9 +1,11 @@
+import ..Utilities
+
 export TotalDegreeSystem
 
 """
     TotalDegreeSystem(polynomials, vars) <: AbstractSystem
 
-Create a system using the `StaticPolynomials` package.
+Create a tottal degree system
 """
 struct TotalDegreeSystem <: AbstractSystem
     degrees::Vector{Int}
@@ -16,22 +18,14 @@ struct TotalDegreeSystem <: AbstractSystem
         new(degrees, degree_idxs, hom_idx)
     end
 end
+function TotalDegreeSystem(F::Vector{<:MP.AbstractPolynomialLike})
+    TotalDegreeSystem(MP.maxdegree.(F))
+end
+function TotalDegreeSystem(degrees::Vector{Int})
+    TotalDegreeSystem(degrees, collect(1:length(degrees)), length(degrees) + 1)
+end
 
-function TotalDegreeSystem(F::Vector{<:MP.AbstractPolynomialLike}, vars, homvar)
-    TotalDegreeSystem(MP.maxdegree.(F), vars, homvar)
-end
-function TotalDegreeSystem(degrees::Vector{Int}, vars::Vector{<:MP.AbstractVariable}, homvar::MP.AbstractVariable)
-    degree_idxs = Int[]
-    hom_idx = 0
-    for (i, var) in enumerate(vars)
-        if var == homvar
-            hom_idx = i
-        else
-            push!(degree_idxs, i)
-        end
-    end
-    TotalDegreeSystem(degrees, degree_idxs, hom_idx)
-end
+
 
 Base.size(F::TotalDegreeSystem) = (length(F.degrees), length(F.degrees) + 1)
 

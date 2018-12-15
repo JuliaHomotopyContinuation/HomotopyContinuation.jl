@@ -13,14 +13,12 @@ module HomotopyContinuation
         Predictors,
         Input,
         Problems,
-        ProjectiveVectors,
         Solving,
         Systems,
         Utilities
 
     include("utilities.jl")
     include("parallel.jl")
-    include("projective_vectors.jl")
     include("affine_patches.jl")
 
     include("systems_base.jl")
@@ -33,29 +31,29 @@ module HomotopyContinuation
     include("correctors.jl")
 
     include("path_tracking.jl")
-    include("endgaming.jl")
+    # include("endgaming.jl")
 
-    include("solving.jl")
-    include("solve.jl")
-    include("monodromy.jl")
+    # include("solving.jl")
+    # include("solve.jl")
+    # include("monodromy.jl")
 
-    include("interface_test.jl")
+    # include("interface_test.jl")
 
-    import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, isnonsingular,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
-
-    export AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, #issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, isnonsingular,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
+    # import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
+    #     residual, startsolution, issuccess,
+    #     isfailed, isaffine, isprojective,
+    #     isatinfinity, issingular, isnonsingular,
+    #     nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
+    #     finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
+    #     nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
+    #
+    # export AffineResult, ProjectiveResult, PathResult, solution,
+    #     residual, startsolution, #issuccess,
+    #     isfailed, isaffine, isprojective,
+    #     isatinfinity, issingular, isnonsingular,
+    #     nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
+    #     finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
+    #     nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
 
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
     export StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
@@ -69,8 +67,8 @@ module HomotopyContinuation
     import .PathTracking: pathtracker, pathtracker_startsolutions
     export pathtracker, pathtracker_startsolutions
 
-    import .Monodromy: monodromy_solve
-    export monodromy_solve
+    # import .Monodromy: monodromy_solve
+    # export monodromy_solve
 
     import LinearAlgebra: issuccess
     export issuccess

@@ -2,10 +2,10 @@ export PatchedHomotopy, PatchedHomotopyCache
 
 import ..AffinePatches
 import ..AffinePatches: AbstractAffinePatch, AbstractAffinePatchState
-import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
+import ProjectiveVectors: PVector
 
 """
-    PatchedHomotopy(H::AbstractHomotopy, patch, v::AbstractProjectiveVector)
+    PatchedHomotopy(H::AbstractHomotopy, patch, v::PVector)
 
 Augment the homotopy `H` with the given patch `v`. This results in the system `[H(x,t); v ⋅ x - 1]`
 """
@@ -46,10 +46,10 @@ function evaluate!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
     AffinePatches.evaluate!(u, H.patch, x)
     u
 end
-function jacobian!(U, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::PatchedHomotopyCache)
+function jacobian!(U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     # J_H(x, t)
-    jacobian!(c.A, H.homotopy, raw(x), t, c.cache)
+    jacobian!(c.A, H.homotopy, x.data, t, c.cache)
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
     end
@@ -57,10 +57,10 @@ function jacobian!(U, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::Pat
     U
 end
 
-function dt!(u, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::PatchedHomotopyCache)
+function dt!(u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
-    dt!(c.b, H.homotopy, raw(x), t, c.cache)
+    dt!(c.b, H.homotopy, x.data, t, c.cache)
     @inbounds for i=1:M
         u[i] = c.b[i]
     end
@@ -70,9 +70,9 @@ function dt!(u, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::PatchedHo
     u
 end
 
-function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::PatchedHomotopyCache)
+function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
-    evaluate_and_jacobian!(c.b, c.A, H.homotopy, raw(x), t, c.cache)
+    evaluate_and_jacobian!(c.b, c.A, H.homotopy, x.data, t, c.cache)
 
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
@@ -87,10 +87,10 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::AbstractProjectiveV
     nothing
 end
 
-function jacobian_and_dt!(U, u, H::PatchedHomotopy, x::AbstractProjectiveVector, t, c::PatchedHomotopyCache)
+function jacobian_and_dt!(U, u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     A, b = c.A, c.b
-    jacobian_and_dt!(A, b, H.homotopy, raw(x), t, c.cache)
+    jacobian_and_dt!(A, b, H.homotopy, x.data, t, c.cache)
     # jacobian
     @inbounds for j=1:N, i=1:M
         U[i, j] = A[i, j]
