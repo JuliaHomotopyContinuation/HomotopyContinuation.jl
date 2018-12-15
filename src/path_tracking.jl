@@ -353,7 +353,6 @@ function step!(tracker)
     try
         t, Δt = currt(state), currΔt(state)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        AffinePatches.changepatch!(state.patch, x̂)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
         if Correctors.isconverged(result)
             # Step is accepted, assign values
@@ -371,7 +370,6 @@ function step!(tracker)
             Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.J_factorization)
         else
             # We have to reset the patch
-            AffinePatches.changepatch!(state.patch, x)
             state.rejected_steps += 1
 
             # Step failed, so we have to try with a new (smaller) step size
