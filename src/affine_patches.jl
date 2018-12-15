@@ -1,7 +1,7 @@
 module AffinePatches
 
-import ..ProjectiveVectors
-import ..ProjectiveVectors: AbstractProjectiveVector, PVector, raw
+import ProjectiveVectors
+import ProjectiveVectors: PVector
 import LinearAlgebra
 
 export AbstractAffinePatch,
@@ -55,6 +55,7 @@ The same as [`setup!`](@ref) but only called during the path tracking.
 """
 changepatch!(::AbstractAffinePatchState, x::AbstractVector) = nothing
 
+include("affine_patches/common.jl")
 include("affine_patches/orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")
 include("affine_patches/random_patch.jl")
