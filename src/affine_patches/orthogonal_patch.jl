@@ -41,7 +41,7 @@ function setup!(state::OrthogonalPatchState, x::AbstractVector)
     state
 end
 
-changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
+Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
 
 function evaluate!(u, state::OrthogonalPatchState, x)
     @boundscheck length(x) == length(state.v̄)

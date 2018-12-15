@@ -72,6 +72,7 @@ mutable struct State{T, PV<:ProjectiveVectors.AbstractProjectiveVector{T}, Patch
     patch::PatchState
     accepted_steps::Int
     rejected_steps::Int
+    last_step_failed::Bool
 end
 
 function State(x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
@@ -85,7 +86,9 @@ function State(x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀, pat
     accuracy = 0.0
     accepted_steps = rejected_steps = 0
     status = Status.tracking
-    State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, status, patch, accepted_steps, rejected_steps)
+    last_step_failed = false
+    State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, status, patch,
+        accepted_steps, rejected_steps, last_step_failed)
 end
 
 function reset!(state::State, x₁::AbstractVector, t₁, t₀, options::Options, setup_patch)
@@ -99,6 +102,7 @@ function reset!(state::State, x₁::AbstractVector, t₁, t₀, options::Options
     state.status = Status.tracking
     ProjectiveVectors.embed!(state.x, x₁)
     setup_patch && AffinePatches.setup!(state.patch, state.x)
+    state.last_step_failed = false
     state
 end
 
@@ -178,7 +182,7 @@ end
 function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    predictor::Predictors.AbstractPredictor=Predictors.RK4(), kwargs...)
+    predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)
 
     options = Options(;kwargs...)
 
@@ -349,26 +353,22 @@ function step!(tracker)
     try
         t, Δt = currt(state), currΔt(state)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
+        AffinePatches.changepatch!(state.patch, x̂)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
         if Correctors.isconverged(result)
-            AffinePatches.changepatch!(state.patch, x̄)
-
             # Step is accepted, assign values
             state.accepted_steps += 1
             x .= x̄
-            # state.Δs_prev = state.Δs
             state.s += state.Δs
             state.accuracy = result.accuracy
 
-            # update derivative
-            compute_ẋ!(ẋ, x̄, t + Δt, cache)
-            # tell the predictors about the new derivative if they need to update something
-            Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.J_factorization)
-
             # Step size change
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
-
-            return
+            AffinePatches.changepatch!(state.patch, x)
+            # update derivative
+            compute_ẋ!(ẋ, x, t + Δt, cache)
+            # tell the predictors about the new derivative if they need to update something
+            Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.J_factorization)
         else
             # We have to reset the patch
             AffinePatches.changepatch!(state.patch, x)
@@ -377,9 +377,9 @@ function step!(tracker)
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
             Δt = currΔt(state)
+            state.last_step_failed = true
             if state.Δs < options.minimal_steplength
                 state.status = Status.terminated_steplength_too_small
-                return
             end
         end
     catch err
@@ -402,51 +402,50 @@ function update_stepsize!(state::State, result::Correctors.Result,
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω
-        d_x̂_x̄ = euclidean_distance(state.x̂, state.x̄)
+        d_x̂_x̄ = euclidean_distance(state.x̂, state.x)
     end
 
     Δx₀ = result.norm_Δx₀
-    τN = τ(options, 0.5)
+    τN = τ(options)
     if Correctors.isconverged(result)
         # compute η and update
         η = d_x̂_x̄ / state.Δs^order
-        if isnan(state.ω)
-            ω′ = ω
-        else
-            # assume Δs′ = Δs
-            ω′ = max(2ω - state.ω, ω)
-        end
-        if isnan(state.η)
-            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄)
-            Δs′ = nthroot(λ, order) * state.Δs
-        else
-            d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.25d_x̂_x̄)
-            η′ = d_x̂_x̄′ / state.Δs^order
-            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄′)
-            Δs′ = nthroot(λ, order) * state.Δs
-        end
 
-        Δs′ = max(Δs′, state.Δs)
+        # assume Δs′ = Δs
+        ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
+        if isnan(state.η)
+            λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
+            Δs′ = nthroot(λ, order) * state.Δs
+        else
+            d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.75d_x̂_x̄)
+            if state.last_step_failed
+                d_x̂_x̄′ *= 2
+            end
+            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄′)
+            Δs′ = 0.8 * nthroot(λ, order) * state.Δs
+        end
+        if state.last_step_failed
+            Δs′ = min(Δs′, state.Δs)
+        end
         state.η = η
         state.ω = ω
+        state.last_step_failed = false
     else
         ω = max(ω, state.ω)
-        if √(ω / 2) * τ(options, 0.1) < ω / 2 * Δx₀
+        if √(ω / 2) * τN < ω / 2 * Δx₀
+            λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
+        elseif √(ω / 2) * τ(options, 0.1) < ω / 2 * Δx₀
             λ = g(√(ω / 2) * τ(options, 0.1)) / g(ω / 2 * Δx₀)
-        # require a slightly more restrictive τ
         elseif √(ω / 2) * τ(options, 0.01) < ω / 2 * Δx₀
             λ = g(√(ω / 2) * τ(options, 0.01)) / g(ω / 2 * Δx₀)
         elseif √(ω / 2) * τ(options, 0.001) < ω / 2 * Δx₀
             λ = g(√(ω / 2) * τ(options, 0.001)) / g(ω / 2 * Δx₀)
         else
-            # fallback
-            λ = 0.25
+            λ = 0.5^order
         end
-        # To avoid too minimal changes, e.g. λ=0.9999 we require that λ is at most
-        λ = min(λ, 0.95)
-        Δs′ = nthroot(λ, order) * state.Δs
+        Δs′ = 0.8 * nthroot(λ, order) * state.Δs
+        state.last_step_failed = true
     end
-
 
     state.Δs = min(Δs′, length(state.segment) - state.s)
 

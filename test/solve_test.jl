@@ -113,30 +113,21 @@
 
     @testset "Path Crossing" begin
         # This tests that we indeed detect path crossings
-        Random.seed!(2337)
         F = equations(cyclic(6))
-        P, start_sols = Problems.problem_startsolutions(Input.TotalDegree(F))
-        x₁ = Problems.embed(P, first(start_sols))
-        tracker = PathTracking.PathTracker(P.homotopy, x₁, 1.0, 0.1, tol=1e-3, patch=AffinePatches.OrthogonalPatch())
+        tracker, start_sols = pathtracker_startsolutions(F, tol=1e-3, corrector_maxiters=5, seed=123512)
         tracked_paths = map(start_sols) do x
-            PathTracking.track(tracker, Problems.embed(P, x), 1.0, 0.1)
+            PathTracking.track(tracker, x, 1.0, 0.1)
         end
 
         crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-2)
         @test length(crossed_path_indices) > 0
 
-        tracker = PathTracking.PathTracker(P.homotopy, x₁, 1.0, 0.1, tol=1e-8, patch=AffinePatches.OrthogonalPatch())
+        tracker, start_sols = pathtracker_startsolutions(F, seed=123512)
         tracked_paths = map(start_sols) do x
             PathTracking.track(tracker, x, 1.0, 0.1)
         end
-        crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-7)
+        crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-5)
         @test isempty(crossed_path_indices)
-
-        # Test that we resolve path crossings
-        F = equations(cyclic(6))
-        # this will have three crossed paths
-        @test nfinite(solve(F, tol=1e-3, seed=2337, threading=false)) < 158
-        @test nfinite(solve(F, tol=1e-3, seed=2337)) < 158
     end
 
     @testset "Affine vs projective" begin
