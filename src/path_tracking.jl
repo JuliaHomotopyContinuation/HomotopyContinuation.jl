@@ -221,10 +221,10 @@ Containing the result of a tracked path. The fields are
 * `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 """
-struct PathTrackerResult{V<:AbstractVector, T}
+struct PathTrackerResult{T, N}
      returncode::Status.t
-     x::V
-     t::T
+     x::ProjectiveVectors.PVector{T,N}
+     t::ComplexF64
      accuracy::Float64
      accepted_steps::Int
      rejected_steps::Int
