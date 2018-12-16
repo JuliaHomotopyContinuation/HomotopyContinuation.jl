@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s115,1} where #s115<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s99,1} where #s99<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -605,7 +605,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Homotopies",
     "title": "HomotopyContinuation.Homotopies.PatchedHomotopy",
     "category": "type",
-    "text": "PatchedHomotopy(H::AbstractHomotopy, patch, v::AbstractProjectiveVector)\n\nAugment the homotopy H with the given patch v. This results in the system [H(x,t); v ⋅ x - 1]\n\n\n\n\n\n"
+    "text": "PatchedHomotopy(H::AbstractHomotopy, patch, v::PVector)\n\nAugment the homotopy H with the given patch v. This results in the system [H(x,t); v ⋅ x - 1]\n\n\n\n\n\n"
 },
 
 {
@@ -1117,7 +1117,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "HomotopyContinuation.AffinePatches.EmbeddingPatch",
     "category": "type",
-    "text": "EmbeddingPatch()\n\nHolds an AbstractProjectiveVector onto its affine patch. With this the effect is basically the same as tracking in affine space.\n\n\n\n\n\n"
+    "text": "EmbeddingPatch()\n\nHolds an PVector onto its affine patch. With this the effect is basically the same as tracking in affine space.\n\n\n\n\n\n"
 },
 
 {
