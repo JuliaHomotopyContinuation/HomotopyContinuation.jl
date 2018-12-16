@@ -243,7 +243,7 @@ function track(tracker, x::AbstractVector, stats::Statistics)
     # @show res
     retcode = res.returncode
     trackedpath!(stats, retcode)
-    y = ProjectiveVectors.similar_affine(x, PathTracking.currx(tracker))
+    y = ProjectiveVectors.affine_chart!(x, PathTracking.currx(tracker))
     y, retcode
 end
 

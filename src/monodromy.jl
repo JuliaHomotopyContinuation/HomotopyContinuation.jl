@@ -38,10 +38,10 @@ end
 
 TreeViews.hastreeview(::MonodromyResult) = true
 TreeViews.numberofnodes(::MonodromyResult) = 4
-TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/juno+inline") =
+TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
 
-function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"application/juno+inline")
+function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"application/prs.juno.inline")
     if i == 1
         print(io, "Solutions")
     elseif i == 2

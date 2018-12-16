@@ -44,7 +44,8 @@ function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<
 
     tracker = PathTracking.PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, PathTracking.allowed_keywords)...)
 
-    endgame = Endgaming.Endgame(prob.homotopy, x₁; filterkwargs(kwargs, Endgaming.allowed_keywords)...)
+    check_at_infinity = Problems.homvars(prob) !== nothing
+    endgame = Endgaming.Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, Endgaming.allowed_keywords)...)
 
     check_kwargs(kwargs)
 

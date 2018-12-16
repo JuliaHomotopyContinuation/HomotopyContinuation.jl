@@ -1,4 +1,5 @@
 import LinearAlgebra
+import Random
 using ..Utilities
 
 export Newton
@@ -24,6 +25,7 @@ end
 
 function cache(::Newton, H::HomotopyWithCache, x, t)
     Jᵢ = Homotopies.jacobian(H, x, t)
+    Random.rand!(Jᵢ) # replace by random matrix to avoid singularities
     fac = factorization(Jᵢ)
     rᵢ = Homotopies.evaluate(H, x, t)
     NewtonCache(Jᵢ, fac, rᵢ)
@@ -32,7 +34,6 @@ end
 
 function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol, maxit)
     Jᵢ, rᵢ, fac = cache.Jᵢ, cache.rᵢ, cache.fac
-
     copyto!(out, x₀)
     xᵢ₊₁ = xᵢ = out # just alias to make logic easier
     rᵢ₊₁ = rᵢ

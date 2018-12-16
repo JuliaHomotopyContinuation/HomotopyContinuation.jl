@@ -40,7 +40,7 @@ function problem_startsolutions(input::AbstractInput, seed::Int;
 end
 
 function problem_startsolutions(input::Input.Homotopy, homvar, seed; kwargs...)
-    Projective(input.H, homogenization(homvar), seed), input.startsolutions
+    Projective(input.H, VariableGroups(size(input.H)[2], homvar), seed), input.startsolutions
 end
 
 
@@ -66,13 +66,13 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing,
         proj = Projective(
             Systems.TotalDegreeSystem(prob.degrees),
             system(F, variables), variable_groups, seed; kwargs...)
-        proj, totaldegree_solutions(prob.degrees, homogenous=false)
+        proj, totaldegree_solutions(prob.degrees)
     else
 		# Check overdetermined case
 		length(F) > length(variables) && error(overdetermined_error_msg)
 
         G = Systems.TotalDegreeSystem(prob.degrees)
-        start = totaldegree_solutions(prob.degrees, homogenous=true)
+        start = totaldegree_solutions(prob.degrees)
         Projective(G, system(F, variables), variable_groups, seed; kwargs...), start
     end
 end
@@ -87,7 +87,7 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}},
 	# Check overdetermined case
 	length(F) > length(variables) && error(overdetermined_error_msg)
 
-    start = totaldegree_solutions(prob.degrees, homogenous=false)
+    start = totaldegree_solutions(prob.degrees)
     proj = Projective(
         Systems.TotalDegreeSystem(prob.degrees),
         system(F, variables), variable_groups, seed; kwargs...)
@@ -145,16 +145,16 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}}, hom
         Projective(system(G′, variables), system(F′, variables), vargroups, seed; kwargs...), prob.startsolutions
     end
 end
-#
-# #####################
-# # Parameter homotopy
-# #####################
-#
-# function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
-#     F, variables, homogenization = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
-#
-#     H = ParameterHomotopy(F, prob.parameters, variables=variables,
-# 						  p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
-#
-#     Projective(H, homogenization, seed), prob.startsolutions
-# end
+
+#####################
+# Parameter homotopy
+#####################
+
+function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
+    F, variables, variable_groups = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
+
+    H = ParameterHomotopy(F, prob.parameters, variables=variables,
+						  p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+
+    Projective(H, variable_groups, seed), prob.startsolutions
+end

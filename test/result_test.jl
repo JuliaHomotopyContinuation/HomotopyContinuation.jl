@@ -82,7 +82,7 @@
         @polyvar x y z
         f = (x-1*y)*(x-1.01*y)
         g = x - y - z
-        S = solve([f,g])
+        S = solve([f,g], threading=false)
         @test length(multiplicities(S, tol=1e-1)) == 1
         @test length(multiplicities(S, tol=1e-5)) == 0
         @test length(multiplicities(S.pathresults, tol=1e-1)) == 1
@@ -91,7 +91,7 @@
         @polyvar x y z
         f = (x-1)*(x-1.01)
         g = x - 1 - z
-        S = solve([f,g])
+        S = solve([f,g], threading=false)
         @test length(multiplicities(S, tol=1e-1)) == 1
         @test length(multiplicities(S, tol=1e-5)) == 0
         @test length(multiplicities(S.pathresults, tol=1e-1)) == 1

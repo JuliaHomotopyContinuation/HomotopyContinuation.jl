@@ -49,7 +49,7 @@
 
         @polyvar w
         F = equations(cyclic(5))
-        result = solve(Utilities.homogenize(F, w), homvar=w)
+        result = solve(Utilities.homogenize(F, w), threading=false, homvar=w)
         @test result isa AffineResult
 
         @polyvar x y z
@@ -69,14 +69,14 @@
         prob, startsolutions = Problems.problem_startsolutions(Input.TotalDegree(F))
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            ProjectiveVectors.raw(Problems.embed(prob, s))
+            Problems.embed(prob, s).data
         end)
         @test result isa ProjectiveResult
         @test nnonsingular(result) == 32
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            ProjectiveVectors.raw(Problems.embed(prob, s))
-        end, homvar=prob.homogenization.homvaridx)
+            Problems.embed(prob, s).data
+        end, homvar=Problems.homvars(prob)[1])
         @test result isa AffineResult
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32

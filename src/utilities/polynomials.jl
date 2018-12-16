@@ -69,6 +69,14 @@ Returns the projective dimension of each variable group.
 projective_dims(groups::VariableGroups) = length.(groups.groups) .- 1
 
 
+
+const overdetermined_error_msg = """
+The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
+See
+    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
+for details.
+"""
+
 """
     homogenize_if_necessary(F::Vector{<:MP.AbstractPolynomialLike})
 

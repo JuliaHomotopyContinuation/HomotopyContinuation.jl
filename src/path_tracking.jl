@@ -1,6 +1,7 @@
 module PathTracking
 
 import ProjectiveVectors
+import Random
 import LinearAlgebra, TreeViews
 import ..AffinePatches, ..Correctors, ..Homotopies,
        ..Predictors, ..Problems
@@ -128,6 +129,7 @@ function Cache(H::Homotopies.HomotopyWithCache, predictor, corrector, state::Sta
     pcache = Predictors.cache(predictor, H, state.x, state.ẋ, t)
     ccache = Correctors.cache(corrector, H, state.x, t)
     J = Homotopies.jacobian(H, state.x, t)
+    Random.rand!(J) # replace by random matrix to avoid singularites
     J_factorization = factorization(J)
     out = H(state.x, t)
     Cache(H, pcache, ccache, J, J_factorization, out)
@@ -304,7 +306,6 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
     try
         reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
         Predictors.reset!(cache.predictor, state.x, t₁)
-
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
             compute_ẋ!(state.ẋ, state.x, currt(state), cache)
@@ -415,8 +416,9 @@ function update_stepsize!(state::State, result::Correctors.Result,
         # assume Δs′ = Δs
         ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
         if isnan(state.η)
-            λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
-            Δs′ = nthroot(λ, order) * state.Δs
+            # λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
+            # Δs′ = nthroot(λ, order) * state.Δs
+            Δs′ = state.Δs
         else
             d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.75d_x̂_x̄)
             if state.last_step_failed
@@ -656,7 +658,7 @@ xs = []
 for tracker in iterator!(pathtracker, x₁, 1.0, 0.25)
     x = PathTracking.currx(tracker)
      # We want to get the affine vector, this also creates a copy
-    push!(xs, ProjectiveVectors.affine(x))
+    push!(xs, ProjectiveVectors.affine_chart(x))
 end
 ```
 """

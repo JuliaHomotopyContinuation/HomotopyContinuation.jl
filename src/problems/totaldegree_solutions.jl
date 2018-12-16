@@ -3,23 +3,14 @@
 
 Returns an iterator of the solutions of the total degree startsystem of `F`.
 """
-function totaldegree_solutions(F::Vector{AP}, homogenization) where {AP<:MP.AbstractPolynomialLike}
-    totaldegree_solutions(MP.maxdegree.(F), homogenization)
+function totaldegree_solutions(F::Vector{AP}) where {AP<:MP.AbstractPolynomialLike}
+    totaldegree_solutions(MP.maxdegree.(F))
 end
-function totaldegree_solutions(degrees::Vector{Int}, ::NullHomogenization)
-    TotalDegreeSolutionIterator(degrees, true)
-end
-function totaldegree_solutions(degrees::Vector{Int}, ::Homogenization)
-    TotalDegreeSolutionIterator(degrees, false)
-end
-
-function totaldegree_solutions(degrees::Vector{Int}; homogenous=false)
-    TotalDegreeSolutionIterator(degrees, homogenous)
-end
+totaldegree_solutions(degrees::Vector{Int}) = TotalDegreeSolutionIterator(degrees)
 
 
 """
-    TotalDegreeSolutionIterator(degrees, homogenous::Bool)
+    TotalDegreeSolutionIterator(degrees)
 
 Given the `Vector`s `degrees` `TotalDegreeSolutionIterator` enumerates all solutions
 of the system
@@ -31,18 +22,18 @@ of the system
     z_n^{d_n} - 1 &= 0 \\\\
 \\end{align*}
 ```
-where ``d_i`` is `degrees[i]`. If `homogenous` is `true` then
-the solutions of the system will be embedded in projective space by the map
-`x → [1.0; x]`.
+where ``d_i`` is `degrees[i]`.
 """
 struct TotalDegreeSolutionIterator{Iter}
     degrees::Vector{Int}
-    homogenous::Bool
     iterator::Iter
 end
-function TotalDegreeSolutionIterator(degrees::Vector{Int}, homogenous::Bool)
+function TotalDegreeSolutionIterator(degrees::Vector{Int})
     iterator = Base.Iterators.product(map(d -> 0:d-1, degrees)...)
-    TotalDegreeSolutionIterator(degrees, homogenous, iterator)
+    TotalDegreeSolutionIterator(degrees, iterator)
+end
+function Base.show(io::IO, iter::TotalDegreeSolutionIterator)
+    print(io, "TotalDegreeSolutionIterator(degrees=$(iter.degrees))")
 end
 
 function Base.iterate(iter::TotalDegreeSolutionIterator)
@@ -57,9 +48,6 @@ end
 
 function _value(iter::TotalDegreeSolutionIterator, indices)
     value = Vector{Complex{Float64}}()
-    if iter.homogenous
-        push!(value, complex(1.0, 0.0))
-    end
     for (i, k) in enumerate(indices)
         push!(value, cis(2π * k / iter.degrees[i]))
     end
