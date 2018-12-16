@@ -42,7 +42,9 @@ end
         @test length(result.solutions) < 21
 
 
-        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, maximal_number_of_iterations_without_progress=100)
+        result = monodromy_solve(F, x₀, p₀, parameters=p,
+                target_solutions_count=21,
+                maximal_number_of_iterations_without_progress=100)
         @test result.returncode == :success
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21

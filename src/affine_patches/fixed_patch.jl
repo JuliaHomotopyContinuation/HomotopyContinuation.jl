@@ -5,16 +5,16 @@ export FixedPatch
 """
 struct FixedPatch <: AbstractLocalAffinePatch end
 
-struct FixedPatchState{T, H} <: AbstractAffinePatchState
-    v̄::PVector{T, H} # this is already conjugated
+struct FixedPatchState{T, N} <: AbstractAffinePatchState
+    v̄::PVector{T, N} # this is already conjugated
 end
 
 function state(::FixedPatch, x::PVector)
     v = copy(x)
-    conj!(raw(v))
+    conj!(v.data)
     FixedPatchState(v)
 end
-nequations(::FixedPatchState) = 1
+nequations(::FixedPatchState{T, N}) where {T, N}= N
 
 function setup!(state::FixedPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
@@ -25,31 +25,6 @@ function setup!(state::FixedPatchState, x::AbstractVector)
     state
 end
 
-function onpatch!(x::AbstractVector, state::FixedPatchState)
-    @boundscheck length(x) == length(state.v̄)
-    λ = zero(eltype(x))
-    @inbounds for i=1:length(x)
-        λ += state.v̄[i] * x[i]
-    end
-    λ⁻¹ = @fastmath inv(λ)
-    for i=1:length(x)
-        x[i] *= λ⁻¹
-    end
-    x
-end
-
-function evaluate!(u, state::FixedPatchState, x::PVector)
-    out = -one(eltype(x))
-    @inbounds for i=1:length(x)
-        out += state.v̄[i] * x[i]
-    end
-    @inbounds u[end] = out
-    nothing
-end
-
-function jacobian!(U, state::FixedPatchState, x::PVector)
-    @inbounds for j=1:size(U, 2)
-        U[end, j] = state.v̄[j]
-    end
-    nothing
-end
+onpatch!(x::AbstractVector, state::FixedPatchState) = onpatch!(x, state.v̄)
+evaluate!(u, state::FixedPatchState, x::PVector) = evaluate!(u, state.v̄, x)
+jacobian!(U, state::FixedPatchState, x::PVector) = jacobian!(U, state.v̄, x)

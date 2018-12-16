@@ -55,7 +55,7 @@
         @test result.returncode == PathTracking.Status.success
         @test result.t == 0.0
         x = result.x
-        @test norm(ProjectiveVectors.affine(x) - A \ b) < 1e-6
+        @test norm(ProjectiveVectors.affine_chart(x) - A \ b) < 1e-6
 
         x_inter = [1;copy(s)]
         retcode = PathTracking.track!(x_inter, tracker, s, 1.0, 0.1)
@@ -63,10 +63,9 @@
         x_final = zero(x_inter)
         retcode = PathTracking.track!(x_final, tracker, x_inter, 0.1, 0.0)
         @test retcode == PathTracking.Status.success
-        tracker
         @test PathTracking.curriters(tracker) < 3
         x = PathTracking.currx(tracker)
-        @test norm(ProjectiveVectors.affine(x) - A \ b) < 1e-6
+        @test norm(ProjectiveVectors.affine_chart(x) - A \ b) < 1e-6
     end
 
     @testset "FixedPatch continuation" begin

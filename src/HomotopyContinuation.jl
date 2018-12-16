@@ -13,14 +13,12 @@ module HomotopyContinuation
         Predictors,
         Input,
         Problems,
-        ProjectiveVectors,
         Solving,
         Systems,
         Utilities
 
     include("utilities.jl")
     include("parallel.jl")
-    include("projective_vectors.jl")
     include("affine_patches.jl")
 
     include("systems_base.jl")

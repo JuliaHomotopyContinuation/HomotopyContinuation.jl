@@ -1,7 +1,7 @@
 name = "HomotopyContinuation"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
-author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breidings@mis.mpg.de>"]
 license = "MIT"
+author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breidings@mis.mpg.de>"]
 version = "0.5.0"
 
 [deps]
@@ -11,6 +11,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariatePolynomials = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+ProjectiveVectors = "01f381cc-face-5a0a-ade9-ef63dc65d628"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StaticPolynomials = "62e018b1-6e46-5407-a5a7-97d4fbcae734"
@@ -23,6 +24,7 @@ FixedPolynomials = "^0.4.0"
 MultivariatePolynomials = "^0.2.3"
 PolynomialTestSystems = "^0.1.0"
 ProgressMeter = "^0.8.0"
+ProjectiveVectors = "^0.2.0"
 StaticArrays = "^0.8, ^0.9, ^0.10"
 StaticPolynomials = "^1.0.0"
 TreeViews = "^0.3.0"

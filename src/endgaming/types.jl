@@ -3,7 +3,7 @@ export Endgame, Result, allowed_keywords
 const allowed_keywords = [:sampling_factor, :egtol, :minradius, :maxnorm, :minimal_maxnorm,
     :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
     :cauchy_samples_per_loop,
-    :maxiters_per_step]
+    :maxiters_per_step, :check_at_infinity]
 
 struct Options
     # See Endgame docstring for explanations
@@ -16,9 +16,10 @@ struct Options
     max_extrapolation_samples::Int
     cauchy_loop_closed_tolerance::Float64
     cauchy_samples_per_loop::Int
+    check_at_infinity::Bool
 end
 
-mutable struct State{V<:ProjectiveVectors.AbstractProjectiveVector, C, T}
+mutable struct State{V<:ProjectiveVectors.PVector, C, T}
     # Current value
     x::V
     # prediction and previous prediction
@@ -152,7 +153,8 @@ struct Endgame{P<:PathTracking.PathTracker, V}
     options::Options
 end
 
-function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractProjectiveVector;
+function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.PVector;
+    check_at_infinity::Bool=true,
     sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, minimal_maxnorm=min(1e3, maxnorm),
     maxwindingnumber=15,
     max_extrapolation_samples=4,
@@ -162,7 +164,7 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.AbstractPr
 
     options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
-        cauchy_loop_closed_tolerance, cauchy_samples_per_loop)
+        cauchy_loop_closed_tolerance, cauchy_samples_per_loop, check_at_infinity)
     tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im;
         patch=AffinePatches.FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
     state = State(x, complex(1.0,0.0), options)

@@ -3,7 +3,7 @@ export EmbeddingPatch
 """
     EmbeddingPatch()
 
-Holds an `AbstractProjectiveVector` onto its affine patch. With this the effect
+Holds an `PVector` onto its affine patch. With this the effect
 is basically the same as tracking in affine space.
 """
 struct EmbeddingPatch <: AbstractAffinePatch end
@@ -12,24 +12,29 @@ struct EmbeddingPatchState <: AbstractAffinePatchState
     nequations::Int
 end
 
-function state(::EmbeddingPatch, x::PVector)
-    EmbeddingPatchState(1)
+function state(::EmbeddingPatch, x::PVector{T,N}) where {T,N}
+    EmbeddingPatchState(N)
 end
 nequations(state::EmbeddingPatchState) = state.nequations
 
-function onpatch!(x::AbstractVector, state::EmbeddingPatchState)
-    ProjectiveVectors.affine!(x)
+function onpatch!(x::PVector, state::EmbeddingPatchState)
+    ProjectiveVectors.affine_chart!(x)
 end
 
-function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, Int}) where {T}
-    u[end] = x[ProjectiveVectors.homvar(x)] - one(eltype(x))
+function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
+    homvars = ProjectiveVectors.homvars(x)
+    n = length(u) - N
+    for i in 1:N
+        u[n + i] = x[homvars[i]] - one(eltype(x))
+    end
     nothing
 end
 
-function jacobian!(U, state::EmbeddingPatchState, x::PVector{T, Int}) where {T}
-    i = ProjectiveVectors.homvar(x)
-    for j=1:size(U, 2)
-        U[end, j] = j == i ? one(eltype(x)) : zero(eltype(x))
+function jacobian!(U, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
+    homvars = ProjectiveVectors.homvars(x)
+    n = size(U,1) - N
+    for j in 1:size(U, 2), i in 1:N
+        U[n + i, j] = j == homvars[i] ? one(eltype(x)) : zero(eltype(x))
     end
     nothing
 end

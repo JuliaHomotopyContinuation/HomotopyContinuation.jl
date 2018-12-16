@@ -8,29 +8,16 @@ export OrthogonalPatch
 """
 struct OrthogonalPatch <: AbstractLocalAffinePatch end
 
-struct OrthogonalPatchState{T, H} <: AbstractAffinePatchState
-    v̄::PVector{T, H} # this is already conjugated
+struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState
+    v̄::PVector{T, N} # this is already conjugated
 end
 
 function state(::OrthogonalPatch, x::PVector)
     v = copy(x)
-    conj!(raw(v))
+    conj!(v.data)
     OrthogonalPatchState(v)
 end
-nequations(::OrthogonalPatchState) = 1
-
-function onpatch!(x::AbstractVector, state::OrthogonalPatchState)
-    @boundscheck length(x) == length(state.v̄)
-    λ = zero(eltype(x))
-    @inbounds for i=1:length(x)
-        λ += state.v̄[i] * x[i]
-    end
-    λ⁻¹ = @fastmath inv(λ)
-    for i=1:length(x)
-        x[i] *= λ⁻¹
-    end
-    x
-end
+nequations(::OrthogonalPatchState{T, N}) where {T,N} = N
 
 function setup!(state::OrthogonalPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
@@ -40,22 +27,8 @@ function setup!(state::OrthogonalPatchState, x::AbstractVector)
     end
     state
 end
-
 Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
 
-function evaluate!(u, state::OrthogonalPatchState, x)
-    @boundscheck length(x) == length(state.v̄)
-    out = -one(eltype(x))
-    @inbounds for i in eachindex(state.v̄)
-        out += state.v̄[i] * x[i]
-    end
-    u[end] = out
-    u
-end
-
-function jacobian!(U, state::OrthogonalPatchState, x)
-    @inbounds for j=1:size(U, 2)
-        U[end, j] = state.v̄[j]
-    end
-    nothing
-end
+onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
+evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate!(u, state.v̄, x)
+jacobian!(U, state::OrthogonalPatchState, x::PVector) = jacobian!(U, state.v̄, x)

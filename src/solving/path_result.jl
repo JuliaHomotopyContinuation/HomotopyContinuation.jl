@@ -6,8 +6,7 @@ export PathResult, solution,
 using Printf
 
 import ..Homotopies
-import ..ProjectiveVectors
-import ..ProjectiveVectors: raw
+import ProjectiveVectors
 using ..Utilities
 
 struct PathResultCache{Hom, T}
@@ -17,8 +16,8 @@ struct PathResultCache{Hom, T}
 end
 
 function PathResultCache(prob::Problems.AbstractProblem, x)
-    H = Homotopies.HomotopyWithCache(prob.homotopy, raw(x), rand())
-    v, J = Homotopies.evaluate_and_jacobian(H, raw(x), rand())
+    H = Homotopies.HomotopyWithCache(prob.homotopy, x, rand())
+    v, J = Homotopies.evaluate_and_jacobian(H, x, rand())
     PathResultCache(H, v, J)
 end
 
@@ -63,11 +62,11 @@ struct PathResult{T1, T2, T3}
 end
 
 function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(prob.homogenization, k, x₁, x_e, t₀, r, cache)
+    PathResult(Problems.homvars(prob), k, x₁, x_e, t₀, r, cache)
 end
-function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
-    x = raw(align_axis!(copy(r.x)))
+    x = align_axis!(copy(r.x.data))
     Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(cache.v)
 
@@ -86,26 +85,25 @@ function PathResult(::Problems.NullHomogenization, k, x₁, x_e, t₀, r, cache:
 
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
-        windingnumber, k, x₁, raw(x_e), r.iters, npredictions)
+        windingnumber, k, x₁, x_e.data, iters(r), npredictions)
 end
-function PathResult(::Problems.Homogenization, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache) where {N}
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, raw(r.x), t₀)
+    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, r.x, t₀)
     res = infinity_norm(cache.v)
 
     returncode, returncode_detail = makereturncode(returncode)
 
-    intermediate_sol = ProjectiveVectors.affine(x_e)
+    intermediate_sol = ProjectiveVectors.affine_chart(x_e)
 
     if returncode != :success
-        solution = copy(raw(r.x))
+        solution = copy(r.x.data)
         condition = Inf
     else
-        solution = ProjectiveVectors.affine(r.x)
+        solution = ProjectiveVectors.affine_chart(r.x)
         condition = LinearAlgebra.cond(@view cache.J[:,2:end])
     end
 

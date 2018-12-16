@@ -1,8 +1,10 @@
 module PathTracking
 
+import ProjectiveVectors
+import Random
 import LinearAlgebra, TreeViews
 import ..AffinePatches, ..Correctors, ..Homotopies,
-       ..Predictors, ..Problems, ..ProjectiveVectors
+       ..Predictors, ..Problems
 using ..Utilities
 
 export PathTracker, allowed_keywords
@@ -56,10 +58,10 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
     terminated_singularity
 end
 
-mutable struct State{T, PV<:ProjectiveVectors.AbstractProjectiveVector{T}, PatchState <: AffinePatches.AbstractAffinePatchState}
-    x::PV # current x
-    x̂::PV # last prediction
-    x̄::PV # canidate for new x
+mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
+    x::ProjectiveVectors.PVector{T,N} # current x
+    x̂::ProjectiveVectors.PVector{T,N} # last prediction
+    x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
     ẋ::Vector{T} # derivative at current x
     η::Float64
     ω::Float64
@@ -75,7 +77,7 @@ mutable struct State{T, PV<:ProjectiveVectors.AbstractProjectiveVector{T}, Patch
     last_step_failed::Bool
 end
 
-function State(x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
+function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
     η = ω = NaN
@@ -127,6 +129,7 @@ function Cache(H::Homotopies.HomotopyWithCache, predictor, corrector, state::Sta
     pcache = Predictors.cache(predictor, H, state.x, state.ẋ, t)
     ccache = Correctors.cache(corrector, H, state.x, t)
     J = Homotopies.jacobian(H, state.x, t)
+    Random.rand!(J) # replace by random matrix to avoid singularites
     J_factorization = factorization(J)
     out = H(state.x, t)
     Cache(H, pcache, ccache, J, J_factorization, out)
@@ -179,7 +182,7 @@ function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; kwargs...)
     y₁ = Problems.embed(prob, x₁)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.AbstractProjectiveVector, t₁, t₀;
+function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)
@@ -220,10 +223,10 @@ Containing the result of a tracked path. The fields are
 * `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 """
-struct PathTrackerResult{V<:AbstractVector, T}
+struct PathTrackerResult{T, N}
      returncode::Status.t
-     x::V
-     t::T
+     x::ProjectiveVectors.PVector{T,N}
+     t::ComplexF64
      accuracy::Float64
      accepted_steps::Int
      rejected_steps::Int
@@ -303,7 +306,6 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
     try
         reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
         Predictors.reset!(cache.predictor, state.x, t₁)
-
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
             compute_ẋ!(state.ẋ, state.x, currt(state), cache)
@@ -412,8 +414,9 @@ function update_stepsize!(state::State, result::Correctors.Result,
         # assume Δs′ = Δs
         ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
         if isnan(state.η)
-            λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
-            Δs′ = nthroot(λ, order) * state.Δs
+            # λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
+            # Δs′ = nthroot(λ, order) * state.Δs
+            Δs′ = state.Δs
         else
             d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.75d_x̂_x̄)
             if state.last_step_failed
@@ -653,7 +656,7 @@ xs = []
 for tracker in iterator!(pathtracker, x₁, 1.0, 0.25)
     x = PathTracking.currx(tracker)
      # We want to get the affine vector, this also creates a copy
-    push!(xs, ProjectiveVectors.affine(x))
+    push!(xs, ProjectiveVectors.affine_chart(x))
 end
 ```
 """

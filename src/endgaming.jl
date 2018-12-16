@@ -4,7 +4,7 @@ import ..AffinePatches
 import ..Homotopies
 import ..Problems
 import ..PathTracking
-import ..ProjectiveVectors
+import ProjectiveVectors
 using ..Utilities
 
 include("endgaming/types.jl")

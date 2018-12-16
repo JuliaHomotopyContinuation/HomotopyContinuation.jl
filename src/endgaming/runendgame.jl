@@ -1,4 +1,4 @@
-import ..ProjectiveVectors
+import ProjectiveVectors
 import ..Homotopies
 
 function setup!(endgame, x, R)
@@ -140,18 +140,16 @@ function in_endgame_zone!(state)
 end
 
 analyze_finite_atinfinity(s, o, c) = analyze_finite_atinfinity(s.x, s, o, c)
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Int}, state, options, cache)
+function analyze_finite_atinfinity(x::ProjectiveVectors.PVector, state, options, cache)
+    options.check_at_infinity || :projective
     checkfinite(state) && return :finite
     checkatinfinity(state, options) && return :at_infinity
     :unknown
 end
-function analyze_finite_atinfinity(x::ProjectiveVectors.PVector{<:Complex, Nothing}, state, options, cache)
-    :projective
-end
 
 checkfinite(state) = checkfinite(state, state.x)
-function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex, Int})
-    i₀ = ProjectiveVectors.homvar(x)
+function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex})
+    i₀, = ProjectiveVectors.homvars(x)
     d_i₀ = state.directions[i₀, state.nsamples]
     if abs(d_i₀) < 1e-3
         return true
@@ -167,17 +165,17 @@ function checkfinite(state, x::ProjectiveVectors.PVector{<:Complex, Int})
 end
 
 checkatinfinity(state, options) = checkatinfinity(state, options, state.x)
-function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex, Int})
+function checkatinfinity(state, options, x::ProjectiveVectors.PVector{<:Complex})
     LOOKBACK = 1
     TOL = 1e-3
     MIN_AT_INFINITY_RATIO = 0.032
 
-    i₀ = ProjectiveVectors.homvar(x)
+    i₀, = ProjectiveVectors.homvars(x)
     n = state.nsamples
     dirs = state.directions
 
     # We want the homogenization variable to be at least somewhat small
-    if state.R > 1e-8 && !ProjectiveVectors.at_infinity(x, options.minimal_maxnorm)
+    if state.R > 1e-8 && ProjectiveVectors.norm_affine_chart(x) < options.minimal_maxnorm
         return false
     end
     for i=1:length(x)
@@ -223,12 +221,9 @@ end
 
 function checkatinfinity_norm(state, options)
     p = state.npredictions > 0 ? state.p : state.x
-    checkatinfinity_norm(p, options)
+    options.check_at_infinity && infinity_norm(p) > options.maxnorm
 end
-checkatinfinity_norm(v::ProjectiveVectors.PVector{<:Complex, Nothing}, options) = false
-function checkatinfinity_norm(v::ProjectiveVectors.PVector{<:Complex, Int}, options)
-    infinity_norm(v) > options.maxnorm
-end
+
 
 """
     checkterminate!(endgame)
