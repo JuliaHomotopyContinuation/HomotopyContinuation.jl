@@ -25,8 +25,6 @@ function TotalDegreeSystem(degrees::Vector{Int})
     TotalDegreeSystem(degrees, collect(1:length(degrees)), length(degrees) + 1)
 end
 
-
-
 Base.size(F::TotalDegreeSystem) = (length(F.degrees), length(F.degrees) + 1)
 
 cache(::TotalDegreeSystem, x) = NullCache()

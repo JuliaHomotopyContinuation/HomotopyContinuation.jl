@@ -18,7 +18,7 @@ end
 nequations(state::EmbeddingPatchState) = state.nequations
 
 function onpatch!(x::PVector, state::EmbeddingPatchState)
-    ProjectiveVectors.affine!(x)
+    ProjectiveVectors.affine_chart!(x)
 end
 
 function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
@@ -32,7 +32,7 @@ end
 
 function jacobian!(U, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
     homvars = ProjectiveVectors.homvars(x)
-    n = length(u) - N
+    n = size(U,1) - N
     for j in 1:size(U, 2), i in 1:N
         U[n + i, j] = j == homvars[i] ? one(eltype(x)) : zero(eltype(x))
     end

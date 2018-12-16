@@ -1,4 +1,4 @@
-export AbstractProblem, Projective, homotopy, homogenization, embed
+export AbstractProblem, Projective, homotopy, homogenization, embed, homvars
 
 abstract type AbstractProblem end
 
@@ -27,11 +27,17 @@ Get the homotopy stored in the problem `prob`.
 homotopy(prob::Projective) = prob.homotopy
 
 """
-    homogenization(prob::Projective)
+    homvars(prob::Projective)
 
-Get the [`HomogenizationStrategy`](@ref) stored in the problem `prob`.
+Get the homogenization variables of the problem. Returns `nothing` if there are no.
 """
-homogenization(prob::Projective) = prob.homogenization
+function homvars(prob::Projective{H, N}) where {H,N}
+    if prob.vargroups.dedicated_homvars
+        map(last, prob.vargroups.groups)
+    else
+        nothing
+    end
+end
 
 """
     embed(prob::Projective, x)
@@ -39,7 +45,6 @@ homogenization(prob::Projective) = prob.homogenization
 Embed the solution `x` into projective space if necessary.
 """
 function embed(prob::Projective{<:AbstractHomotopy, N}, x) where {N}
-    # M, N = size(homotopy(prob))
     dims = projective_dims(prob.vargroups)
     if sum(dims) == length(x)
         ProjectiveVectors.embed(x, dims)
@@ -47,14 +52,4 @@ function embed(prob::Projective{<:AbstractHomotopy, N}, x) where {N}
         PVector(x, dims)
     end
 end
-# function embed(prob::Projective{<:AbstractHomotopy, Homogenization}, x)
-#     M, N = size(homotopy(prob))
-#     if length(x) == N
-#         return PVector(x, homogenization(prob).homvaridx)
-#     elseif length(x) == N - 1
-#         return ProjectiveVectors.embed(x, homogenization(prob).homvaridx)
-#     end
-#     throw(error("The length of the initial solution is $(length(x)) but expected length $N or $(N-1)."))
-# end
-# embed(prob::Projective{<:AbstractHomotopy, Homogenization}, x::PVector) = x
-# embed(prob::Projective{<:AbstractHomotopy, NullHomogenization}, x::PVector) = x
+embed(prob::Projective{<:AbstractHomotopy, N}, x::PVector) where {N} = x

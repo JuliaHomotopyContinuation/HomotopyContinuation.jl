@@ -25,8 +25,8 @@ vargroups.homvars == true
 ```
 """
 function VariableGroups(all_variables,
-                       variable_groups::NTuple{N, Vector{<:MP.AbstractVariable}},
-                       homvars::Union{Nothing, NTuple{N, <:MP.AbstractVariable}}=nothing) where N
+                       variable_groups::NTuple{N, <:Vector{<:Union{Int, MP.AbstractVariable}}},
+                       homvars::Union{Nothing, NTuple{N, <:Union{Int, MP.AbstractVariable}}}=nothing) where N
     groups = ntuple(N) do k
         variable_group = variable_groups[k]
         h = homvars === nothing ? 0 : homvars[k]
@@ -53,6 +53,12 @@ function VariableGroups(all_variables, homvar::MP.AbstractVariable)
 end
 function VariableGroups(all_variables, homvar::Nothing=nothing)
     VariableGroups(all_variables, (collect(all_variables),), homvar)
+end
+function VariableGroups(nvariables::Int, homvar::Nothing=nothing)
+    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), nothing)
+end
+function VariableGroups(nvariables::Int, homvar::Int)
+    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), (homvar,))
 end
 
 """

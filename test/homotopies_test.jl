@@ -67,7 +67,7 @@
     @testset "PatchedHomotopy" begin
         F = Systems.SPSystem(equations(katsura(5)))
         G = Systems.SPSystem(equations(cyclic(6)))
-        x = ProjectiveVectors.PVector(rand(Complex{Float64}, 6), 1)
+        x = ProjectiveVectors.embed(rand(Complex{Float64}, 5))
         H = Homotopies.PatchedHomotopy(Homotopies.StraightLineHomotopy(F, G),
             AffinePatches.OrthogonalPatch(),
             x)

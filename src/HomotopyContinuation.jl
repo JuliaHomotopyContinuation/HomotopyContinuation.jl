@@ -37,7 +37,7 @@ module HomotopyContinuation
     # include("solve.jl")
     # include("monodromy.jl")
 
-    # include("interface_test.jl")
+    include("interface_test.jl")
 
     # import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
     #     residual, startsolution, issuccess,
