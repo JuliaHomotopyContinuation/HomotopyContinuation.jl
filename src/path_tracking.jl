@@ -435,16 +435,16 @@ function update_stepsize!(state::State, result::Correctors.Result,
         ω = max(ω, state.ω)
         if √(ω / 2) * τN < ω / 2 * Δx₀
             λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
-        elseif √(ω / 2) * τ(options, 0.1) < ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τ(options, 0.1)) / g(ω / 2 * Δx₀)
-        elseif √(ω / 2) * τ(options, 0.01) < ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τ(options, 0.01)) / g(ω / 2 * Δx₀)
-        elseif √(ω / 2) * τ(options, 0.001) < ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τ(options, 0.001)) / g(ω / 2 * Δx₀)
+        elseif √(ω / 2) * τN < 2ω / 2 * Δx₀
+            λ = g(√(ω / 2) * τN )/ g(2ω / 2 * Δx₀)
+        elseif √(ω / 2) * τN < 4ω / 2 * Δx₀
+            λ = g(√(ω / 2) * τN) / g(4ω / 2 * Δx₀)
+        elseif √(ω / 2) * τN < 8ω / 2 * Δx₀
+            λ = g(√(ω / 2) * τN) / g(8ω / 2 * Δx₀)
         else
             λ = 0.5^order
         end
-        Δs′ = 0.8 * nthroot(λ, order) * state.Δs
+        Δs′ = 0.9 * nthroot(λ, order) * state.Δs
         state.last_step_failed = true
     end
 
