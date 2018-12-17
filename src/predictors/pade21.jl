@@ -1,5 +1,5 @@
 import LinearAlgebra
-
+import ProjectiveVectors: PVector
 export Pade21
 
 """
@@ -8,10 +8,10 @@ export Pade21
 This uses a Padé-approximation of type (2,1) for prediction.
 """
 struct Pade21 <: AbstractStatelessPredictor end
-struct Pade21Cache{T} <: AbstractStatelessPredictorCache
+struct Pade21Cache{T,N} <: AbstractStatelessPredictorCache
     x²::Vector{T}
     x³::Vector{T}
-    x_h::Vector{T}
+    x_h::PVector{T,N}
 
     u::Vector{T}
     u₁::Vector{T}
@@ -24,7 +24,7 @@ struct Pade21Cache{T} <: AbstractStatelessPredictorCache
 end
 
 function cache(::Pade21, H, x, ẋ, t)
-    x², x³, x_h = copy(ẋ), copy(ẋ), copy(ẋ)
+    x², x³, x_h = copy(ẋ), copy(ẋ), copy(x)
     u = evaluate(H, x,t)
     u₁, u₂, u₃, u₄ = copy(u), copy(u), copy(u), copy(u)
     h₂ = nthroot(eps(), 2+4) # x² is the second order derivative and has a 4th order approximation
