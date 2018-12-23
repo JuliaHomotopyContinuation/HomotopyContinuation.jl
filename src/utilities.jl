@@ -22,6 +22,7 @@ export @moduleenum,
     start_solution_sample,
     ComplexSegment
 
+include("utilities/precision.jl")
 include("utilities/unique_points.jl")
 include("utilities/linear_algebra.jl")
 include("utilities/polynomials.jl")

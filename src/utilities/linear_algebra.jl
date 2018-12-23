@@ -242,3 +242,38 @@ end
     end
     x
 end
+
+
+
+
+# # Iterative refinement
+# function condition(A, x, b)
+#     cond = 0.0
+#     for k in 1:maxiters
+#         residual!(r, A, x, b)
+#         norm_r = euclidean_norm(r)
+#         if norm_r < tol
+#             break
+#         end
+#     end
+# end
+#
+
+"""
+    residual!(u::AbstractVector{T}, A, x, b, T_res)
+
+Compute the residual `Ax-b` in precision `T_res` and store in precision `T` in `u`.
+"""
+function residual!(u::AbstractVector{Complex{T}}, A, x, b, ::Type{T_res}) where {T, T_res}
+    @boundscheck size(A, 1) == length(b) && size(A,2) == length(x)
+    S = Complex{T_res}
+    m, n = size(A)
+    @inbounds for i in 1:m
+        dot = zero(S)
+        for j in 1:n
+            dot = multiply_add(A[i,j], x[j], dot)
+        end
+        u[i] = sub(dot, b[i])
+    end
+    u
+end
