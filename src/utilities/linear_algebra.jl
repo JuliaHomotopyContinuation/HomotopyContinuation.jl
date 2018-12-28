@@ -82,14 +82,14 @@ and stores the result in `x`. If `x` is not provided result is stored in `b`
 function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
     m, n = size(A)
     if m == n
-        # solve using an LU factorization
-        lu_factorization!(A, b, nothing)
-        # now forward and backward substitution
-        ldiv_unit_lower!(A, b)
-        ldiv_upper!(A, b)
         if x !== b
             copyto!(x, b)
         end
+        # solve using an LU factorization
+        lu_factorization!(A, x, nothing)
+        # now forward and backward substitution
+        ldiv_unit_lower!(A, x)
+        ldiv_upper!(A, x)
     else
         LinearAlgebra.ldiv!(x, LinearAlgebra.qr!(A), b)
     end
@@ -97,22 +97,31 @@ function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
 end
 solve!(A, b) = solve!(b, A, b)
 
+
 """
-    solve!(factorization, b)
+    solve!([x, ] factorization, b)
 
 Solve ``Ax=b`` inplace where already a factorization of `A` is provided.
 This stores the result in `b`.
 """
+function solve!(x, Jac::Jacobian, b::AbstractVector)
+    if x !== b
+        copyto!(x, b)
+    end
+    apply_rowscaling!(x, Jac)
+    solve!(x, Jac.fac, x)
+end
 function solve!(x, LU::LinearAlgebra.LU, b::AbstractVector)
-     _ipiv!(LU, b)
-     ldiv_unit_lower!(LU.factors, b)
-     ldiv_upper!(LU.factors, b)
-     if x !== b
-         copyto!(x, b)
-     end
+    if x !== b
+        copyto!(x, b)
+    end
+     _ipiv!(LU, x)
+     ldiv_unit_lower!(LU.factors, x)
+     ldiv_upper!(LU.factors, x)
      x
  end
 solve!(x, fact::LinearAlgebra.Factorization, b::AbstractVector) = LinearAlgebra.ldiv!(x, fact, b)
+
 
 """
     factorization(A::AbstractMatrix)
