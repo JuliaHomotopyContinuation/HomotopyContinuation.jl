@@ -1,6 +1,6 @@
 export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!,
     fast_factorization!, fast_ldiv!, factorization, factorize!,
-    iterative_refinement!, IterativeRefinementResult,
+    iterative_refinement!, iterative_refinement_step!, IterativeRefinementResult,
     Jacobian
 
 
@@ -367,36 +367,79 @@ end
 end
 
 
+# Iterative refinement
+"""
+    IterativeRefinementResult
 
+The result of an application of [`iterative_refinement!`](@ref).
 
-# # Iterative refinement
-# function condition(A, x, b)
-#     cond = 0.0
-#     for k in 1:maxiters
-#         residual!(r, A, x, b)
-#         norm_r = euclidean_norm(r)
-#         if norm_r < tol
-#             break
-#         end
-#     end
-# end
-#
+## Fields
+* `iters::Int`
+* `accuracy::Float64` The relative accuarcy of the last update, i.e., `||δx|| / ||x||`.
+* `cond::Float64` An estimate of the condition number of the matrix, computed by `||δx|| / eps(||x||)`.
+"""
+struct IterativeRefinementResult
+    iters::Int
+    accuracy::Float64
+    cond::Float64
+end
 
 """
-    residual!(u::AbstractVector{T}, A, x, b, T_res)
+    solve_with_iterative_refinement!(x, jacobian::Jacobian, b, ::Type{T}, iters=1)
 
-Compute the residual `Ax-b` in precision `T_res` and store in precision `T` in `u`.
+Apply iterative refinement on the solution `x` of the equation `Ax=b`
+where `A` is the matrix stored in `jacobian`. `T` is the accuracy with which
+the residual is computed.
+Returns an [`IterativeRefinementResult`](@ref).
 """
-function residual!(u::AbstractVector{Complex{T}}, A, x, b, ::Type{T_res}) where {T, T_res}
+function solve_with_iterative_refinement!(x::AbstractVector, Jac::Jacobian,
+                b::AbstractVector, ::Type{T}; iters::Int=1) where {T}
+    # we need to apply row scaling sepearetly since we need it the b scaled
+    apply_rowscaling!(b, Jac)
+    solve!(x, Jac.fac, b)
+    cond = 0.0
+    accuracy = Inf
+    norm_x = maximum(abs, x)
+    for iter in 1:iters
+        accuracy = iterative_refinement_step!(x, Jac.J, b, Jac.fac, T_res, Jac.r)
+        if iters == 1
+            cond = norm_δx / (eps() * norm_x)
+        end
+    end
+    IterativeRefinementResult(maxiters, accuracy, cond)
+end
+
+"""
+    iterative_refinement_step!(x, A, b, fac, T, r)
+
+Apply one step of iterative refinement where the residual is computed with precision `T`.
+"""
+function iterative_refinement_step!(x, A, b, fac, T, r)
+    residual!(r, A, x, b, T)
+    δx = solve!(fac, b)
+    accuracy = maximum(abs, δx)
+    for i in eachindex(r)
+        x[i] = Complex{T}(x[i]) - Complex{T}(δx[i])
+    end
+
+    return accuracy
+end
+
+"""
+    residual!(u, A, x, b, [::Type{T}])
+
+Compute the residual `Ax-b` in precision `T` and store in `u`.
+"""
+residual!(u::AbstractVector, A, x, b) = residual!(u, A, x, b)
+function residual!(u::AbstractVector, A, x, b, ::Type{T}) where {T}
     @boundscheck size(A, 1) == length(b) && size(A,2) == length(x)
-    S = Complex{T_res}
     m, n = size(A)
     @inbounds for i in 1:m
-        dot = zero(S)
+        dot = zero(Complex{T})
         for j in 1:n
-            dot = multiply_add(A[i,j], x[j], dot)
+            dot = muladd(Complex{T}(A[i,j]), Complex{T}(x[j]), dot)
         end
-        u[i] = sub(dot, b[i])
+        u[i] = dot - Complex{T}(b[i])
     end
     u
 end
