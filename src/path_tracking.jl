@@ -123,19 +123,18 @@ mutable struct Cache{H<:Homotopies.HomotopyWithCache, P<:Predictors.AbstractPred
     homotopy::H
     predictor::P
     corrector::C
-    J::Matrix{T}
-    J_factorization::F
+    Jac::Jacobian{T, F}
     out::Vector{T}
+    r::Vector{T}
 end
 function Cache(H::Homotopies.HomotopyWithCache, predictor, corrector, state::State)
     t = state.segment[state.s]
     pcache = Predictors.cache(predictor, H, state.x, state.ẋ, t)
     ccache = Correctors.cache(corrector, H, state.x, t)
-    J = Homotopies.jacobian(H, state.x, t)
-    Random.rand!(J) # replace by random matrix to avoid singularites
-    J_factorization = factorization(J)
+    Jac = Jacobian(Homotopies.jacobian(H, state.x, t))
     out = H(state.x, t)
-    Cache(H, pcache, ccache, J, J_factorization, out)
+    r = copy(out)
+    Cache(H, pcache, ccache, Jac, out, r)
 end
 
 
@@ -312,7 +311,7 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
             compute_ẋ!(state.ẋ, state.x, currt(state), cache)
-            Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.J_factorization)
+            Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -334,20 +333,22 @@ function checkstartvalue!(tracker)
 end
 
 function compute_ẋ!(ẋ, x, t, cache)
-    @inbounds Homotopies.jacobian_and_dt!(cache.J, cache.out, cache.homotopy, x, t)
+    @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, x, t)
+    # applay row scaling to J and compute factorization
+    Utilities.updated_jacobian!(cache.Jac)
+
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    cache.J_factorization = Utilities.factorize!(cache.J_factorization, cache.J)
-    Utilities.solve!(ẋ, cache.J_factorization, cache.out)
-end
 
+    Utilities.solve!(ẋ, cache.Jac, cache.out)
+end
 
 function correct!(x̄, tracker, x=tracker.state.x, t=tracker.state.segment[tracker.state.s];
     tol=tracker.options.tol,
     maxiters=tracker.options.corrector_maxiters)
     Correctors.correct!(x̄, tracker.corrector, tracker.cache.corrector,
-                        tracker.cache.homotopy, x, t, tol, maxiters)
+                        tracker.cache.homotopy, x, t, tol=tol, maxiters=maxiters)
 end
 
 function step!(tracker)
@@ -358,7 +359,7 @@ function step!(tracker)
     try
         t, Δt = currt(state), currΔt(state)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
+        result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, tol=options.tol, maxiters=options.corrector_maxiters)
         if Correctors.isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
@@ -372,7 +373,7 @@ function step!(tracker)
             # update derivative
             compute_ẋ!(ẋ, x, t + Δt, cache)
             # tell the predictors about the new derivative if they need to update something
-            Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.J_factorization)
+            Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
         else
             # We have to reset the patch
             state.rejected_steps += 1

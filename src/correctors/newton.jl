@@ -18,22 +18,22 @@ end
 Newton(;simplified_last_step=true) = Newton(simplified_last_step)
 
 struct NewtonCache{T, Fac<:LinearAlgebra.Factorization} <: AbstractCorrectorCache
-    Jᵢ::Matrix{T}
-    fac::Fac
+    Jac::Jacobian{T, Fac}
     rᵢ::Vector{T}
+    Δxᵢ::Vector{T}
 end
 
 function cache(::Newton, H::HomotopyWithCache, x, t)
-    Jᵢ = Homotopies.jacobian(H, x, t)
-    Random.rand!(Jᵢ) # replace by random matrix to avoid singularities
-    fac = factorization(Jᵢ)
+    Jac = Jacobian(Homotopies.jacobian(H, x, t))
     rᵢ = Homotopies.evaluate(H, x, t)
-    NewtonCache(Jᵢ, fac, rᵢ)
+    Δxᵢ = copy(rᵢ)
+
+    NewtonCache(Jac, rᵢ, Δxᵢ)
 end
 
-
-function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol, maxit)
-    Jᵢ, rᵢ, fac = cache.Jᵢ, cache.rᵢ, cache.fac
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t; tol=1e-6, maxiters::Integer=3)
+    Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
+    Jᵢ = Jac.J
     copyto!(out, x₀)
     xᵢ₊₁ = xᵢ = out # just alias to make logic easier
     rᵢ₊₁ = rᵢ
@@ -48,9 +48,9 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             evaluate!(rᵢ, H, xᵢ, t)
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
-            fac = factorize!(fac, Jᵢ)
+            Utilities.updated_jacobian!(Jac)
         end
-        Δxᵢ = solve!(fac, rᵢ)
+        solve!(Δxᵢ, Jac, rᵢ)
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = euclidean_norm(Δxᵢ)
         @inbounds for k in eachindex(xᵢ)
@@ -82,5 +82,5 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
         end
     end
 
-    return Result(maximal_iterations, accuracy, maxit, ω₀, ω, norm_Δx₀)
+    return Result(maximal_iterations, accuracy, maxiters, ω₀, ω, norm_Δx₀)
 end

@@ -1,4 +1,95 @@
-export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!, fast_factorization!, fast_ldiv!, factorization, factorize!
+export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!,
+    fast_factorization!, fast_ldiv!, factorization, factorize!,
+    iterative_refinement!, IterativeRefinementResult,
+    Jacobian
+
+
+"""
+    Jacobian{T, <:Factorization}
+
+Data structure holding a Jacobian matrix `J` with it's factorization.
+Additional contains a vector `D` of scalings which row equilibarate `J`.
+
+    Jacobian(J; rowscaling=false)
+
+Setup a Jacobian with Jacobian matrices of the form `J`. Enable row scaling
+if desired.
+"""
+mutable struct Jacobian{T, F<:LinearAlgebra.Factorization}
+    J::Matrix{T} # Jacobian matrix
+    D::Vector{Float64} # Scaling factors D
+    fac::F # Factorization of D * J
+    rowscaling::Bool
+    r::Vector{T} # Vector for iterative refinement
+end
+
+function Jacobian(A::AbstractMatrix; rowscaling=false)
+    m, n = size(A)
+    if m == n
+        fac = LinearAlgebra.lu(A)
+    else
+        fac = LinearAlgebra.qr(A)
+    end
+    J = copy(A)
+    D = ones(m)
+    r = similar(J, size(J, 1))
+    Jacobian(J, D, fac, rowscaling, r)
+end
+
+"""
+    update!(jacobian, J)
+
+Update the `jacobian` struct with the new Matrix `J`.
+This applies rowscaling, if enabled, and computes a factorization of `J`.
+"""
+function update!(Jac::Jacobian, J::AbstractMatrix)
+    copyto!(Jac.J, J)
+    Jac.rowscaling && rowscaling!(Jac.D, Jac.J)
+    Jac.fac = factorize!(Jac.fac, Jac.J)
+    Jac
+end
+
+"""
+    update_jacobian!(jacobian)
+
+This applies rowscaling, if enabled, and computes a factorization of the stored Jacobian matrix.
+Call this instead of `update!` if `jacobian.J` got updated.
+"""
+function updated_jacobian!(Jac::Jacobian)
+    Jac.rowscaling && rowscaling!(Jac.D, Jac.J)
+    Jac.fac = factorize!(Jac.fac, Jac.J)
+    Jac
+end
+
+"""
+    apply_rowscaling!(x, jacobian)
+
+Apply the stored row scaling to the vector `x`.
+"""
+function apply_rowscaling!(x::AbstractVector, Jac::Jacobian)
+    if Jac.rowscaling
+        @boundscheck length(x) == size(Jac.D)
+        @inbounds for i in eachindex(x)
+            x[i] *= Jac.D[i]
+        end
+    end
+    x
+end
+
+"""
+    enable_rowscaling!(jacobian)
+
+Enable row scaling.
+"""
+enable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = true; Jac end
+
+"""
+    disable_rowscaling!(jacobian)
+
+Disable row scaling.
+"""
+disable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = true; Jac end
+
 
 """
     normalized_dot(u, v)
@@ -72,6 +163,28 @@ function rowscaling!(A::AbstractMatrix, b::Union{AbstractVector, Nothing}=nothin
     A
 end
 
+
+"""
+    rowscaling!(D::Vector, A)
+
+Apply elementwise row-scaling inplace to `A`.
+Stores the scaling factors in D.
+"""
+function rowscaling!(D::Vector, A::AbstractMatrix)
+    m, n = size(A)
+    @inbounds for i=1:m
+        s = zero(eltype(D))
+        for j=1:n
+            s += abs2(A[i, j])
+        end
+        dᵢ = inv(sqrt(s))
+        for j=1:n
+            A[i, j] *= dᵢ
+        end
+        D[i] = dᵢ
+    end
+    D
+end
 
 """
     solve!([x,] A, b)
@@ -150,6 +263,7 @@ end
 function factorize!(fact::LinearAlgebra.Factorization, A::AbstractMatrix)
     LinearAlgebra.qr!(A)
 end
+
 
 # This is an adoption of LinearAlgebra.generic_lufact!
 # with 3 changes:

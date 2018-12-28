@@ -1,4 +1,5 @@
 import DoubleFloats
+import DoubleFloats: Double64
 
 """
     multiply_add(z, w, x)
