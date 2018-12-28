@@ -204,7 +204,8 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVe
     indempotent_x = begin
         u = Vector{Any}(undef, size(H)[1])
         Homotopies.evaluate!(u, HC, x₁, t₁)
-        similar(x₁, promote_type(typeof(u[1]), ComplexF64))
+        indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
+        indem_x .= x₁
     end
     state = State(indempotent_x, t₁, t₀, patch_state, options)
     cache = Cache(HC, predictor, corrector, state)
