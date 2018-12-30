@@ -5,6 +5,7 @@ import Random
 import LinearAlgebra, TreeViews
 import ..AffinePatches, ..Correctors, ..Homotopies,
        ..Predictors, ..Problems
+import DoubleFloats: Double64
 using ..Utilities
 
 export PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
@@ -70,6 +71,7 @@ mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
     Δs::Float64 # current step size
     Δs_prev::Float64 # previous step size
     accuracy::Float64
+    cond::Float64 # estimate of the condition number
     status::Status.t
     patch::PatchState
     accepted_steps::Int
@@ -87,11 +89,12 @@ function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches
     Δs = convert(Float64, min(options.initial_steplength, length(segment)))
     Δs_prev = 0.0
     accuracy = 0.0
+    cond = 1.0
     accepted_steps = rejected_steps = 0
     status = Status.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, status, patch,
+    State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, cond, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -311,7 +314,7 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
         Predictors.reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
-            compute_ẋ!(state.ẋ, state.x, currt(state), cache)
+            compute_ẋ_and_cond_estimate!(state, cache, tracker.options)
             Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
         end
     catch err
@@ -333,17 +336,42 @@ function checkstartvalue!(tracker)
     nothing
 end
 
-function compute_ẋ!(ẋ, x, t, cache)
-    @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, x, t)
-    # applay row scaling to J and compute factorization
+function compute_ẋ_and_cond_estimate!(state, cache, options::Options)
+    @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
+    # apply row scaling to J and compute factorization
     Utilities.updated_jacobian!(cache.Jac)
 
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
 
-    Utilities.solve!(ẋ, cache.Jac, cache.out)
+    # We want to achieve accuracy tol,
+    # We make an error in the linear algebra of ≈ eps() * condition_estimate
+    # Another limiting factor is the accuracy of the evaluation which we do not know
+    # Thus, we add an additional safety factor of
+    safety_factor = 1e4
+    # In total we have that tol should be less than eps() * condition_estimate * safety_factor
+    if options.tol < eps() * state.cond * safety_factor
+        # we do iterative refinement with higher precision
+        res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Double64; iters=1)
+        state.cond = res.cond
+    else
+        res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Float64, iters=1)
+        state.cond = res.cond
+
+        # If the cond estimate is now worse than our threshold and
+        # if rowscaling is *not* enabled so far, we enable it and
+        # recompute everything
+        if options.tol < eps() * state.cond * safety_factor && !cache.Jac.rowscaling
+            Utilities.enable_rowscaling!(cache.Jac)
+            Utilities.updated_jacobian!(cache.Jac)
+            res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Float64, iters=1)
+            state.cond = res.cond
+        end
+    end
+    nothing
 end
+
 
 function correct!(x̄, tracker, x=tracker.state.x, t=tracker.state.segment[tracker.state.s];
     tol=tracker.options.tol,
@@ -359,8 +387,10 @@ function step!(tracker)
 
     try
         t, Δt = currt(state), currΔt(state)
+        println("t: ", real(t), " Δt: ", real(Δt))
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, tol=options.tol, maxiters=options.corrector_maxiters)
+        @show result
         if Correctors.isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
@@ -372,7 +402,7 @@ function step!(tracker)
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
             AffinePatches.changepatch!(state.patch, x)
             # update derivative
-            compute_ẋ!(ẋ, x, t + Δt, cache)
+            compute_ẋ_and_cond_estimate!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
             Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
         else

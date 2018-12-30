@@ -401,12 +401,14 @@ function solve_with_iterative_refinement!(x::AbstractVector, Jac::Jacobian,
     accuracy = Inf
     norm_x = maximum(abs, x)
     for iter in 1:iters
-        accuracy = iterative_refinement_step!(x, Jac.J, b, Jac.fac, T_res, Jac.r)
+        accuracy = norm_δx = iterative_refinement_step!(x, Jac.J, b, Jac.fac, T, Jac.r)
         if iters == 1
             cond = norm_δx / (eps() * norm_x)
         end
     end
-    IterativeRefinementResult(maxiters, accuracy, cond)
+    accuracy /= norm_x
+
+    IterativeRefinementResult(iters, accuracy, cond)
 end
 
 """
@@ -416,13 +418,13 @@ Apply one step of iterative refinement where the residual is computed with preci
 """
 function iterative_refinement_step!(x, A, b, fac, T, r)
     residual!(r, A, x, b, T)
-    δx = solve!(fac, b)
-    accuracy = maximum(abs, δx)
+    δx = solve!(fac, r)
+    norm_δx = maximum(abs, δx)
     for i in eachindex(r)
         x[i] = Complex{T}(x[i]) - Complex{T}(δx[i])
     end
 
-    return accuracy
+    return norm_δx
 end
 
 """
