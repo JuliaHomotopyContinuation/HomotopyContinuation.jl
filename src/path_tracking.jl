@@ -314,7 +314,7 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
         Predictors.reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
-            compute_ẋ_and_cond_estimate!(state, cache, tracker.options)
+            compute_ẋ!(state, cache, tracker.options)
             Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
         end
     catch err
@@ -336,7 +336,7 @@ function checkstartvalue!(tracker)
     nothing
 end
 
-function compute_ẋ_and_cond_estimate!(state, cache, options::Options)
+function compute_ẋ!(state, cache, options::Options)
     @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
     # apply row scaling to J and compute factorization
     Utilities.updated_jacobian!(cache.Jac)
@@ -344,31 +344,7 @@ function compute_ẋ_and_cond_estimate!(state, cache, options::Options)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-
-    # We want to achieve accuracy tol,
-    # We make an error in the linear algebra of ≈ eps() * condition_estimate
-    # Another limiting factor is the accuracy of the evaluation which we do not know
-    # Thus, we add an additional safety factor of
-    safety_factor = 1e4
-    # In total we have that tol should be less than eps() * condition_estimate * safety_factor
-    if options.tol < eps() * state.cond * safety_factor
-        # we do iterative refinement with higher precision
-        res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Double64; iters=1)
-        state.cond = res.cond
-    else
-        res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Float64, iters=1)
-        state.cond = res.cond
-
-        # If the cond estimate is now worse than our threshold and
-        # if rowscaling is *not* enabled so far, we enable it and
-        # recompute everything
-        if options.tol < eps() * state.cond * safety_factor && !cache.Jac.rowscaling
-            Utilities.enable_rowscaling!(cache.Jac)
-            Utilities.updated_jacobian!(cache.Jac)
-            res = Utilities.solve_with_iterative_refinement!(state.ẋ, cache.Jac, cache.out, Float64, iters=1)
-            state.cond = res.cond
-        end
-    end
+    Utilities.adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=option.tol, safety_factor=0.0)
     nothing
 end
 
@@ -387,28 +363,28 @@ function step!(tracker)
 
     try
         t, Δt = currt(state), currΔt(state)
-        println("t: ", real(t), " Δt: ", real(Δt))
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, tol=options.tol, maxiters=options.corrector_maxiters)
-        @show result
+        result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt,
+                tol=options.tol, maxiters=options.corrector_maxiters,
+                cond=state.cond)
         if Correctors.isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
             x .= x̄
             state.s += state.Δs
             state.accuracy = result.accuracy
-
+            state.cond = result.cond
             # Step size change
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
             AffinePatches.changepatch!(state.patch, x)
             # update derivative
-            compute_ẋ_and_cond_estimate!(state, cache, options)
+            compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
             Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
         else
             # We have to reset the patch
             state.rejected_steps += 1
-
+            state.cond = result.cond
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
             Δt = currΔt(state)
