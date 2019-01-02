@@ -498,7 +498,7 @@ function simple_step_size!(state::State, result::Correctors.Result, options::Opt
 end
 
 function check_terminated!(tracker)
-    if abs(tracker.state.s - length(tracker.state.segment)) < 1e-15
+    if abs(tracker.state.s - length(tracker.state.segment)) < 2eps(length(tracker.state.segment))
         tracker.state.status = Status.success
     elseif curriters(tracker) ≥ tracker.options.maxiters
         tracker.state.status = Status.terminated_maximal_iterations
