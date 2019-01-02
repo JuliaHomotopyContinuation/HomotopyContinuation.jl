@@ -1,8 +1,9 @@
 export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!,
     fast_factorization!, fast_ldiv!, factorization, factorize!,
     iterative_refinement!, iterative_refinement_step!, IterativeRefinementResult,
-    Jacobian
+    Jacobian, adaptive_solve!
 
+import DoubleFloats: Double64
 
 """
     Jacobian{T, <:Factorization}
@@ -88,7 +89,7 @@ enable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = true; Jac end
 
 Disable row scaling.
 """
-disable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = true; Jac end
+disable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = false; Jac end
 
 
 """
@@ -402,8 +403,8 @@ function solve_with_iterative_refinement!(x::AbstractVector, Jac::Jacobian,
     norm_x = maximum(abs, x)
     for iter in 1:iters
         accuracy = norm_δx = iterative_refinement_step!(x, Jac.J, b, Jac.fac, T, Jac.r)
-        if iters == 1
-            cond = norm_δx / (eps() * norm_x)
+        if iter == 1
+            cond = norm_δx / (eps(norm_x))
         end
     end
     accuracy /= norm_x
@@ -444,4 +445,42 @@ function residual!(u::AbstractVector, A, x, b, ::Type{T}) where {T}
         u[i] = dot - Complex{T}(b[i])
     end
     u
+end
+
+"""
+    adaptive_solve!(x, Jac::Jac, b; tol=1e-7, cond=1.0, safety_factor=1e2, compute_new_cond=false)
+
+Solve `Jac.J * x = b` by optionally using iterative refinment depending on the condition number estimate
+`cond` and the desired accuracy `tol`.
+Returns an updated estimate of `cond` if `compute_new_cond == true` or iterative refinement was used.
+Otherwise the existing `cond` is passed.
+"""
+function adaptive_solve!(x, Jac::Jacobian, b; tol=1e-7, cond=1.0, safety_factor=1e3, compute_new_cond=false)
+    # We want to achieve accuracy of tol,
+    # We make an error in the linear algebra of ≈ eps() * cond
+    # Another limiting factor is the accuracy of the evaluation which we do not know
+    # Thus, we add an additional safety factor.
+
+    # In total we have that
+    #    eps() * condition_estimate * safety_factor
+    # should be less than
+    #    tol
+    if eps(real(eltype(x))) * cond * safety_factor < tol
+        # we can solve in working precision
+        if compute_new_cond # we do iterative refinement to get a condition estimate
+            res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
+            cond = res.cond
+        else
+            # just do a normal solve
+            solve!(x, Jac, b)
+        end
+    else
+        # solve!(x, Jac, b)
+        # res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
+        # we need to do iterative refinement in higher precision
+        # TODO: iters=1 should be replaced by an adaptive termination criterion
+        res = Utilities.solve_with_iterative_refinement!(x, Jac, b, Double64; iters=3)
+        cond = res.cond
+    end
+    cond
 end
