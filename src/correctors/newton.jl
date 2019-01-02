@@ -1,5 +1,6 @@
 import LinearAlgebra
 import Random
+import DoubleFloats: Double64
 using ..Utilities
 
 export Newton
@@ -31,7 +32,7 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
     NewtonCache(Jac, rᵢ, Δxᵢ)
 end
 
-function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t; tol=1e-6, maxiters::Integer=3)
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t; tol=1e-6, maxiters::Integer=3, cond=1.0)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -50,7 +51,10 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
             Utilities.updated_jacobian!(Jac)
         end
-        solve!(Δxᵢ, Jac, rᵢ)
+        cond = Utilities.adaptive_solve!(Δxᵢ, Jac, rᵢ, tol=tol, cond=cond,
+            # We always compute an condition number estimate in the first iteration
+            compute_new_cond=iszero(i))
+
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = euclidean_norm(Δxᵢ)
         @inbounds for k in eachindex(xᵢ)
@@ -58,29 +62,30 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
         end
 
         if i == 0
-            norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
+            accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
             if norm_Δx₀ ≤ tol
-                return Result(converged, norm_Δx₀, i + 1, 0.0, 0.0, norm_Δx₀)
+                return Result(converged, norm_Δx₀, i + 1, 0.0, 0.0, norm_Δx₀, cond)
             end
-            continue
-        end
 
-        Θᵢ₋₁ = norm_Δxᵢ / norm_Δxᵢ₋₁
-        ωᵢ₋₁ = 2Θᵢ₋₁ / norm_Δxᵢ₋₁
-        if i == 1
-            ω = ω₀ = ωᵢ₋₁
         else
-            ω = @fastmath max(ω, ωᵢ₋₁)
-        end
-        if Θᵢ₋₁ > 0.5
-            return Result(terminated, norm_Δx₀, i + 1, ω₀, ω, norm_Δx₀)
-        end
+            Θᵢ₋₁ = norm_Δxᵢ / norm_Δxᵢ₋₁
+            ωᵢ₋₁ = 2Θᵢ₋₁ / norm_Δxᵢ₋₁
+            if i == 1
+                ω = ω₀ = ωᵢ₋₁
+            else
+                ω = @fastmath max(ω, ωᵢ₋₁)
+            end
 
-        accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
-        if accuracy ≤ tol
-            return Result(converged, accuracy, i + 1, ω₀, ω, norm_Δx₀)
+            if Θᵢ₋₁ > 0.5
+                return Result(terminated, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
+            end
+
+            accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
+            if accuracy ≤ tol
+                return Result(converged, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
+            end
         end
     end
 
-    return Result(maximal_iterations, accuracy, maxiters, ω₀, ω, norm_Δx₀)
+    return Result(maximal_iterations, accuracy, maxiters, ω₀, ω, norm_Δx₀, cond)
 end

@@ -43,6 +43,7 @@ struct Result{T}
     ω₀::Float64
     ω::Float64
     norm_Δx₀::T
+    cond::Float64
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::Result) = r
