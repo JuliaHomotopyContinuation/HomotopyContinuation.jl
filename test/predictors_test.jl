@@ -1,7 +1,7 @@
-import LinearAlgebra
+import LinearAlgebra, ProjectiveVectors
 function setup_prediction_test()
     F = Systems.SPSystem(equations(katsura(6)))
-    x = rand(Complex{Float64}, 7)
+    x = ProjectiveVectors.PVector(rand(Complex{Float64}, 7))
     xnext = copy(x)
     t = rand()
     H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
@@ -14,7 +14,7 @@ end
 function setup_overdetermined_prediction_test()
     @polyvar x y
     F = Systems.SPSystem([x^2+y, y^2-3x*y, y+x+3, y+2x-5])
-    x = rand(Complex{Float64}, 2)
+    x = ProjectiveVectors.PVector(rand(Complex{Float64}, 2))
     xnext = copy(x)
     t = rand()
     H = Homotopies.HomotopyWithCache(Homotopies.StraightLineHomotopy(F, F), x, t)
