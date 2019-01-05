@@ -26,9 +26,23 @@
         @test Utilities.iscontained(data, [0.0im]) == false
     end
 
-    @testset "Homogenization" begin
+    @testset "Polynomials" begin
+        @polyvar p a b c x y z
+        e = [p + 1]
+        f = [a * b * c ]
+        g = [x+y, y + z, x + z]
+        @test Utilities.expand(f ∘ g) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2]
+        @test Utilities.expand(e ∘ f ∘ g) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2 + 1]
+
+        @test Utilities.validate(f ∘ g) == true
+        @test Utilities.validate(f ∘ g, parameters=[z]) == true
+        @test Utilities.validate(f ∘ g, parameters=[c]) == false
+        @test Utilities.validate(g ∘ f) == false
+
+        @test Utilities.nvariables(f ∘ g) == 3
+        @test Utilities.nvariables(f ∘ g, parameters=[z]) == 2
+
         @polyvar x y z
-        @test Utilities.ishomogenous(x^2+y^2+x*y)
         @test Utilities.ishomogenous([x^2+y^2+x*y, x^5])
         @test Utilities.ishomogenous([x^2+y^2+x*y, x^4+1]) == false
 
@@ -39,6 +53,12 @@
         @test Utilities.ishomogenous(Utilities.homogenize([x^2+y^2+x*y, x^4+1]))
         @test Utilities.ishomogenous([x^2+z^2 + y, x^4+z^4], [x,z]) == false
         @test Utilities.ishomogenous(Utilities.homogenize([x^2+z^2*y, x^4+z^4*y], [x,z]), [x,z]) == true
+
+        @test Utilities.ishomogenous(f ∘ g) == true
+        h = [a * b * c  + p * c^3] ∘ [x+y, y + z, x + z]
+        @test Utilities.ishomogenous(h, parameters=[p]) == true
+        h2 = [a * b * c  + p] ∘ [x+y, y + z, x + z]
+        @test Utilities.ishomogenous(h2, parameters=[p]) == false
     end
 
     @testset "Misc" begin

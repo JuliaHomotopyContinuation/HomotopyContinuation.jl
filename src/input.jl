@@ -14,11 +14,11 @@ export AbstractInput,
     TotalDegree,
     ParameterSystem
 
-
 abstract type AbstractInput end
 
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
-const Inputs = Union{Systems.AbstractSystem, MPPolys}
+const Inputs = Union{<:Systems.AbstractSystem, <:MPPolys, <:Composition}
+const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
 """
     StartTargetProblem(start::Vector{<:MP.AbstractPolynomial}, target::Vector{<:MP.AbstractPolynomial})
@@ -68,8 +68,8 @@ end
 
 Construct a `ParameterSystem`. This indicates that the system `system` has variables `x` and parameters `p`.
 """
-struct ParameterSystem{P<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable} <: AbstractInput
-    system::Vector{P}
+struct ParameterSystem{P<:MPPolyInputs, V<:MP.AbstractVariable} <: AbstractInput
+    system::P
     parameters::Vector{V}
     p₁::AbstractVector
     p₀::AbstractVector
@@ -98,8 +98,8 @@ const supported_keywords = [:parameters, :startparameters, :targetparameters,
 
 Construct an `AbstractInput`.
 """
-function input(F::Vector{<:MP.AbstractPolynomial})
-    F = filter(f -> !iszero(f), F)
+function input(F::MPPolyInputs)
+    remove_zeros!(F)
     check_zero_dimensional(F)
     # square system and each polynomial is non-zero
     if length(F) == MP.nvariables(F) && ishomogenous(F)
@@ -185,19 +185,5 @@ function check_homogenous_degrees(F::Systems.AbstractSystem)
     degrees
 end
 
-"""
-    check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial})
-
-Check that the given polynomial system can have zero dimensional components.
-"""
-function check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial})
-    N = MP.nvariables(F)
-    n = length(F)
-
-    if n ≥ N || (n == N - 1 && ishomogenous(F))
-        return nothing
-    end
-    error("The input system will not result in a finite number of solutions.")
-end
 
 end
