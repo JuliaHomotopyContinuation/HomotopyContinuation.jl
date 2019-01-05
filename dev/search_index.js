@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s98,1} where #s98<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s102,1} where #s102<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -485,7 +485,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.cache",
     "category": "function",
-    "text": "cache(F::AbstractSystem, x)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x. The default implementation returns a NullCache.\n\n\n\n\n\n"
+    "text": "cache(F::AbstractSystem, x)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x.\n\ncache(F::AbstractSystem, x, p)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x and parameters p.\n\n\n\n\n\n"
 },
 
 {
@@ -493,7 +493,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate!",
     "category": "function",
-    "text": "evaluate!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the system F at x and store the result in u.\n\n\n\n\n\n"
+    "text": "evaluate!(u, F::AbstractSystem, x, cache::AbstractSystemCache)\n\nEvaluate the system F at x and store the result in u.\n\nevaluate!(u, F::AbstractSystem, x, p, cache::AbstractSystemCache)\n\nEvaluate the system F at x and parameters p and store the result in u.\n\n\n\n\n\n"
 },
 
 {
@@ -501,7 +501,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate",
     "category": "function",
-    "text": "evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))\n\nEvaluate the system F at x.\n\n\n\n\n\n"
+    "text": "evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))\n\nEvaluate the system F at x.\n\nevaluate(F::AbstractSystem, x::AbstractVector, p, cache=cache(F, x))\n\nEvaluate the system F at x and parameters p.\n\n\n\n\n\n"
 },
 
 {
@@ -509,7 +509,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian!",
     "category": "function",
-    "text": "jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and store the result in u.\n\n\n\n\n\n"
+    "text": "jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and store the result in u.\n\njacobian!(u, F::AbstractSystem, x , p, cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and parameters p and store the result in u.\n\n\n\n\n\n"
 },
 
 {
@@ -517,7 +517,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.jacobian",
     "category": "function",
-    "text": "jacobian(F::AbstractSystem, x, cache=cache(F, x))\n\nEvaluate the Jacobian of the system F at x.\n\n\n\n\n\n"
+    "text": "jacobian(F::AbstractSystem, x, cache=cache(F, x))\n\nEvaluate the Jacobian of the system F at x.\n\njacobian(F::AbstractSystem, x , p, cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and parameters p.\n\n\n\n\n\n"
 },
 
 {
@@ -541,7 +541,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian!",
     "category": "function",
-    "text": "evaluate_and_jacobian!(u, U, F, x , cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and store the results in u (evalution) and U (Jacobian).\n\n\n\n\n\n"
+    "text": "evaluate_and_jacobian!(u, U, F, x , cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and store the results in u (evalution) and U (Jacobian).\n\n\n\n\n\nevaluate_and_jacobian!(u, U, F, x, p, cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and parameters p and store the results in u (evalution) and U (Jacobian).\n\n\n\n\n\n"
 },
 
 {
@@ -549,7 +549,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Systems",
     "title": "HomotopyContinuation.SystemsBase.evaluate_and_jacobian",
     "category": "function",
-    "text": "evaluate_and_jacobian(F::AbstractSystem, x , cache=cache(F, x))\n\nEvaluate the system F and its Jacobian at x.\n\n\n\n\n\n"
+    "text": "evaluate_and_jacobian(F::AbstractSystem, x, cache=cache(F, x))\n\nEvaluate the system F and its Jacobian at x.\n\n\n\n\n\nevaluate_and_jacobian(F::AbstractSystem, x, p, cache=cache(F, x))\n\nEvaluate the system F and its Jacobian at x and parameters p.\n\n\n\n\n\n"
 },
 
 {
