@@ -13,7 +13,7 @@ function onpatch!(x::AbstractVector, v̄::PVector{T, N}) where {T,N}
     x
 end
 
-function evaluate!(u, v̄::PVector{T, N}, x::PVector{T,N}) where {T, N}
+function evaluate!(u, v̄::PVector{S, N}, x::PVector{T,N}) where {S, T, N}
     ranges = ProjectiveVectors.dimension_indices(v̄)
     n = length(u) - N
     for (k, range) in enumerate(ranges)
@@ -26,7 +26,7 @@ function evaluate!(u, v̄::PVector{T, N}, x::PVector{T,N}) where {T, N}
     nothing
 end
 
-function jacobian!(U, v̄::PVector{T, N}, x::PVector) where {T,N}
+function jacobian!(U, v̄::PVector{S, N}, x::PVector) where {S, T, N}
     ranges = ProjectiveVectors.dimension_indices(v̄)
     n = size(U, 1) - N
     for (k, range) in enumerate(ranges)
