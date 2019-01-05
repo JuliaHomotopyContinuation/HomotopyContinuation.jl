@@ -21,6 +21,7 @@ mutable struct Jacobian{T, F<:LinearAlgebra.Factorization}
     D::Vector{Float64} # Scaling factors D
     fac::F # Factorization of D * J
     rowscaling::Bool
+    b::Vector{T} # Vector for overdetermined systems
     r::Vector{T} # Vector for iterative refinement
 end
 
@@ -34,7 +35,8 @@ function Jacobian(A::AbstractMatrix; rowscaling=false)
     J = copy(A)
     D = ones(m)
     r = similar(J, size(J, 1))
-    Jacobian(J, D, fac, rowscaling, r)
+    b = copy(r)
+    Jacobian(J, D, fac, rowscaling, b, r)
 end
 
 """
@@ -220,10 +222,19 @@ This stores the result in `b`.
 """
 function solve!(x, Jac::Jacobian, b::AbstractVector)
     if x !== b
-        copyto!(x, b)
+        if length(b) == length(x)
+            rhs = x
+        else
+            # overdetermined, we need an intermediate structure
+            rhs = Jac.b
+        end
+        copyto!(rhs, b)
+    else
+        rhs = x
     end
-    apply_rowscaling!(x, Jac)
-    solve!(x, Jac.fac, x)
+
+    apply_rowscaling!(rhs, Jac)
+    solve!(x, Jac.fac, rhs)
 end
 function solve!(x, LU::LinearAlgebra.LU, b::AbstractVector)
     if x !== b
@@ -261,8 +272,9 @@ function factorize!(LU::LinearAlgebra.LU, A::AbstractMatrix)
     lu_factorization!(LU.factors, nothing, LU.ipiv)
     LU
 end
-function factorize!(fact::LinearAlgebra.Factorization, A::AbstractMatrix)
-    LinearAlgebra.qr!(A)
+function factorize!(QR::LinearAlgebra.QRCompactWY, A::AbstractMatrix)
+    copyto!(QR.factors, A)
+    LinearAlgebra.qr!(QR.factors)
 end
 
 
