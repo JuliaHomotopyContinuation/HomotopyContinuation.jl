@@ -30,6 +30,7 @@ mutable struct Options
     initial_steplength::Float64
     minimal_steplength::Float64
     simple_step_size::Bool
+    update_patch::Bool
 end
 
 function Options(;tol=1e-7,
@@ -39,10 +40,12 @@ function Options(;tol=1e-7,
     maxiters=10_000,
     initial_steplength=0.1,
     minimal_steplength=1e-14,
-    simple_step_size=false)
+    minimal_steplength=1e-14,
+    simple_step_size=false,
+    update_patch=true)
 
     Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
-            initial_steplength, minimal_steplength, simple_step_size)
+            initial_steplength, minimal_steplength, simple_step_size, update_patch)
 end
 Base.show(io::IO, opts::Options) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
@@ -275,7 +278,7 @@ of the tracking.
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
      track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
      retcode = currstatus(tracker)
      if retcode == Status.success
@@ -283,7 +286,7 @@ function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, 
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+function track!(tracker::PathTracker, x₁, t₁, t₀; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 end
 function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
@@ -301,12 +304,12 @@ function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartv
 end
 
 """
-    setup!(pathtracker, x₁, t₁, t₀, setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+    setup!(pathtracker, x₁, t₁, t₀, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
 
 Setup `pathtracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
 pathtracker as an iterator.
 """
-function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     state, cache = tracker.state, tracker.cache
 
     try
@@ -344,7 +347,7 @@ function compute_ẋ!(state, cache, options::Options)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    Utilities.adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=option.tol, safety_factor=0.0)
+    Utilities.adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol, safety_factor=0.0)
     nothing
 end
 
@@ -376,7 +379,7 @@ function step!(tracker)
             state.cond = result.cond
             # Step size change
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
-            AffinePatches.changepatch!(state.patch, x)
+            options.update_patch && AffinePatches.changepatch!(state.patch, x)
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
