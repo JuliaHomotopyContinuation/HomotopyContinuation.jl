@@ -27,14 +27,22 @@ struct SPSystem{S<:SP.PolynomialSystem} <: AbstractSystem
 end
 
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.PolynomialSystem(polys, variables=vars))
-SPSystem(polys::Vector{<:MP.AbstractPolynomial}) = SPSystem(SP.PolynomialSystem(polys))
+SPSystem(polys::Vector{<:MP.AbstractPolynomial}; kwargs...) = SPSystem(SP.PolynomialSystem(polys; kwargs...))
 
 Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))
 
-cache(F::SPSystem, x) = NullCache()
+cache(F::SPSystem, x, p=nothing) = NullCache()
 Base.@propagate_inbounds evaluate!(u, F::SPSystem, x, ::NullCache) = SP.evaluate!(u, F.system, x)
-Base.@propagate_inbounds evaluate(F::SPSystem, x, ::NullCache) = SP.evaluate(F.system, x)
+Base.@propagate_inbounds evaluate!(u, F::SPSystem, x, p, ::NullCache) = SP.evaluate!(u, F.system, x, p)
+evaluate(F::SPSystem, x, ::NullCache) = SP.evaluate(F.system, x)
+evaluate(F::SPSystem, x, p, ::NullCache) = SP.evaluate(F.system, x, p)
 Base.@propagate_inbounds jacobian!(U, F::SPSystem, x, ::NullCache) = SP.jacobian!(U, F.system, x)
-Base.@propagate_inbounds jacobian(F::SPSystem, x, ::NullCache) = SP.jacobian(F.system, x)
+Base.@propagate_inbounds jacobian!(U, F::SPSystem, x, p, ::NullCache) = SP.jacobian!(U, F.system, x, p)
+jacobian(F::SPSystem, x, ::NullCache) = SP.jacobian(F.system, x)
+jacobian(F::SPSystem, x, p, ::NullCache) = SP.jacobian(F.system, x, p)
 Base.@propagate_inbounds evaluate_and_jacobian!(u, U, F::SPSystem, x, ::NullCache) = SP.evaluate_and_jacobian!(u, U, F.system, x)
-Base.@propagate_inbounds evaluate_and_jacobian(F::SPSystem, x, ::NullCache) = SP.evaluate_and_jacobian(F.system, x)
+Base.@propagate_inbounds evaluate_and_jacobian!(u, U, F::SPSystem, x, p, ::NullCache) = SP.evaluate_and_jacobian!(u, U, F.system, x, p)
+evaluate_and_jacobian(F::SPSystem, x, ::NullCache) = SP.evaluate_and_jacobian(F.system, x)
+evaluate_and_jacobian(F::SPSystem, x, p, ::NullCache) = SP.evaluate_and_jacobian(F.system, x, p)
+Base.@propagate_inbounds differentiate_parameters!(U, F::SPSystem, x, p, ::NullCache) = SP.differentiate_parameters!(U, F.system, x, p)
+differentiate_parameters(F::SPSystem, x, p, ::NullCache) = SP.differentiate_parameters(F.system, x, p)
