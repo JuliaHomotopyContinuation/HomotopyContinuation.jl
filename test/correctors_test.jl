@@ -17,7 +17,7 @@ end
         @test corrector_cache isa Correctors.NewtonCache
 
         # check that this doesn't throw
-        out = Correctors.correct!(xnext, corrector, corrector_cache, H, x, t, 1e-7, 3)
+        out = Correctors.correct!(xnext, corrector, corrector_cache, H, x, t, tol=1e-7, maxiters=3)
         @test out isa Correctors.Result
     end
 end
