@@ -27,7 +27,7 @@
     end
 
     @testset "Polynomials" begin
-        @polyvar p a b c x y z
+        @polyvar p q a b c x y z
         e = [p + 1]
         f = [a * b * c ]
         g = [x+y, y + z, x + z]
@@ -59,6 +59,19 @@
         @test Utilities.ishomogenous(h, parameters=[p]) == true
         h2 = [a * b * c  + p] ∘ [x+y, y + z, x + z]
         @test Utilities.ishomogenous(h2, parameters=[p]) == false
+
+
+        #homogenize
+        @test Utilities.homogenize(x^2+y+1, z) == x^2+y*z + z^2
+        # This needs to be an array due to a compiler bug
+        @test Utilities.homogenize([x^2+y+p], z, parameters=[p]) == [x^2+y*z + z^2*p]
+
+        @test Utilities.homogenize([x^3+p, 1+y], z, parameters=[p]) == [x^3+p*z^3, z+y]
+
+        h2 = [a * b * c  + p] ∘ [x+y, y + z, x + q]
+        @test Utilities.validate(homogenize(h2, parameters=[p, q]), parameters=[p, q])
+        h3 = [a * b * c  + 1] ∘ [x+y, y + z, x + 1]
+        @test Utilities.validate(homogenize(h3))
     end
 
     @testset "Misc" begin

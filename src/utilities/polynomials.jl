@@ -84,6 +84,7 @@ mutable struct Composition{T<:MP.AbstractPolynomialLike} <: AbstractComposition
 end
 
 Base.length(C::Composition) = length(C.polys)
+Base.:(==)(C::Composition, D::Composition) = C.polys == D.polys
 
 compose(g::Composition, f::Composition) = Composition([g.polys..., f.polys...])
 compose(g::Composition, f::Composition, h::Composition...) = compose(Composition([g.polys..., f.polys...]), h...)
@@ -154,12 +155,16 @@ end
 
 Returns the variables occuring in `F`.
 """
-function variables(polys::MPPolys; parameters=nothing)
+function variables(polys::Union{MPPoly, MPPolys}; parameters=nothing, weights=nothing)
 	variables = MP.variables(polys)
     if parameters !== nothing
         setdiff!(variables, parameters)
     end
-	variables
+	if weights === nothing
+		variables
+	else
+		zip(variables, weights)
+	end
 end
 variables(C::Composition; kwargs...) = variables(C.polys[end]; kwargs...)
 
@@ -215,8 +220,7 @@ function homogenous_degrees_helper(C::Composition; parameters=nothing, weights=n
 	weights
 end
 function homogenous_degrees_helper(F::MPPolys; parameters=nothing, weights=nothing)
-	allvars = variables(F, parameters=parameters)
-	vars = weights === nothing ? allvars : zip(allvars, weights)
+	vars = variables(F, parameters=parameters, weights=weights)
     degrees = Int[]
     for f in F
         mindeg, maxdeg = minmaxdegree(f, vars)
@@ -279,28 +283,19 @@ Homogenize the polynomial `f` by using the given variable `variable`.
     homogenize(F::Vector{<:MP.AbstractPolynomial}, variable=uniquevar(F))
 
 Homogenize each polynomial in `F` by using the given variable `variable`.
-"""
-function homogenize(f::MP.AbstractPolynomialLike, var=uniquevar(f))
-    d = MP.maxdegree(f)
-    MP.polynomial(map(t -> var^(d - MP.degree(t)) * t, MP.terms(f)))
-end
-function homogenize(F::MPPolys, var=uniquevar(F); parameters=nothing)
-    if parameters !== nothing
-        homogenize(F, setdiff(MP.variables(F), parameters), var)
-    else
-        homogenize.(F, Ref(var))
-    end
-end
 
-"""
-    homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))
+	homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))
 
 Homogenize the variables `v` in the polynomial `f` by using the given variable `variable`.
 
-    homogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))
+	homogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))
 
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
+function homogenize(f::MP.AbstractPolynomialLike, var=uniquevar(f); parameters=nothing)
+	vars = variables(f; parameters=parameters)
+	homogenize(f, vars, var)
+end
 function homogenize(f::MP.AbstractPolynomialLike, variables::Vector, var::MP.AbstractVariable=uniquevar(f))
     _, d_max = minmaxdegree(f, variables)
     MP.polynomial(map(f) do t
@@ -308,9 +303,64 @@ function homogenize(f::MP.AbstractPolynomialLike, variables::Vector, var::MP.Abs
         var^(d_max - d)*t
     end)
 end
+function homogenize(F::MPPolys, var=uniquevar(F); parameters=nothing)
+    homogenize(F, variables(F, parameters=parameters), var)
+end
 function homogenize(F::MPPolys, variables::Vector, var::MP.AbstractVariable=uniquevar(F))
     map(f -> homogenize(f, variables, var), F)
 end
+function homogenize(C::Composition, var::MP.AbstractVariable=uniquevar(C.polys[1]); parameters=nothing, weights=nothing)
+	polys = map(length(C.polys):-1:1) do k
+		f̄, weights = homogenize_degrees(C.polys[k], var; parameters=parameters, weights=weights)
+		if k > 1
+			push!(f̄, var)
+			push!(weights, 1)
+		end
+    	f̄
+	end
+	Composition(reverse!(polys))
+end
+
+
+"""
+	homogenize_degree(f::MPPoly, variables, var)
+
+Homogenize `f` by using the variable `v`. Returns the homogenized polynomial
+and its degree.
+"""
+function homogenize_degree(f::MPPoly, variables, var::MP.AbstractVariable)
+    _, d = minmaxdegree(f, variables)
+    MP.polynomial(map(t -> t * var^(d - degree(t, variables)), f)), d
+end
+
+
+"""
+	homogenize_degrees(F::MPPolys, var; parameters=nothing, weights=nothing)
+	homogenize_degrees(F::MPPolys, variables, var)
+
+Homogenize the system `F` using the variable `var`. Returns the homogenized system
+and the degrees of each polynomial.
+"""
+function homogenize_degrees(F::MPPolys, variables, var::MP.AbstractVariable)
+    F̄ = similar(F)
+    degrees = Int[]
+    for (i,f) in enumerate(F)
+        f̄, d = homogenize_degree(f, variables, var)
+        F̄[i] = f̄
+        push!(degrees, d)
+    end
+
+    F̄, degrees
+end
+function homogenize_degrees(F::MPPolys, var::MP.AbstractVariable; parameters=nothing, weights=nothing)
+	allvars = variables(F, parameters=parameters)
+	if weights !== nothing
+		homogenize_degrees(F, zip(allvars, weights), var)
+	else
+		homogenize_degrees(F, allvars, var)
+	end
+end
+
 
 """
     remove_zeros!(F::Vector{<:MP.AbstractPolynomialLike})
@@ -356,32 +406,29 @@ Homogenizes the system `F` if necessary and returns the (new) system `F` its var
 and a subtype of [`AbstractHomogenization`] indicating whether it was homegenized.
 If it was homogenized and no then the new variable is the **first one**.
 """
-function homogenize_if_necessary(F::MPPolys; homvar=nothing, parameters=nothing)
-    variables = MP.variables(F)
-    if parameters !== nothing
-        variables = setdiff(variables, parameters)
-    end
+function homogenize_if_necessary(F::Union{MPPolys, Composition}; homvar=nothing, parameters=nothing)
+    vars = variables(F, parameters=parameters)
 
-    n, N = length(F), length(variables)
+    n, N = length(F), length(vars)
     if ishomogenous(F; parameters=parameters)
         # N = n+1 is the only valid size configuration
         if n + 1 > N
             error(overdetermined_error_msg)
         end
-		vargroups = VariableGroups(variables, homvar)
-		F, variables[vcat(vargroups.groups...)], vargroups
+		vargroups = VariableGroups(vars, homvar)
+		F, vars[vcat(vargroups.groups...)], vargroups
     else
         if homvar !== nothing
             error("Input system is not homogenous although `homvar` was passed.")
         end
         # We create a new variable to homogenize the system
         homvar = uniquevar(F)
-        push!(variables, homvar)
-        sort!(variables, rev=true)
+        push!(vars, homvar)
+        sort!(vars, rev=true)
 
         F′ = homogenize(F, homvar; parameters=parameters)
-		vargroups = VariableGroups(variables, homvar)
+		vargroups = VariableGroups(vars, homvar)
 
-		F′, variables[vcat(vargroups.groups...)], vargroups
+		F′, vars[vcat(vargroups.groups...)], vargroups
     end
 end
