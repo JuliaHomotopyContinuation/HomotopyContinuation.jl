@@ -1,5 +1,5 @@
 export VariableGroups, nvariables, variables, ishomogenous, uniquevar, homogenize, projective_dims,
-	remove_zeros!, Composition
+	remove_zeros!, Composition, maxdegrees, check_zero_dimensional
 
 const MPPoly = MP.AbstractPolynomialLike
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
@@ -249,9 +249,6 @@ function degree(term::MP.AbstractTermLike, weighted_variables)
     deg
 end
 
-
-
-
 """
     minmaxdegree(f::MP.AbstractPolynomialLike, variables)
 
@@ -264,6 +261,23 @@ function minmaxdegree(f::MP.AbstractPolynomialLike, variables)
         d_min, d_max = min(d, d_min), max(d, d_max)
     end
     d_min, d_max
+end
+
+"""
+	maxdegrees(F, parameters=nothing)
+
+Computes the degrees of the polynomials of `F`.
+"""
+function maxdegrees(F::MPPolys; parameters=nothing, weights=nothing)
+	vars = variables(F, parameters=parameters, weights=weights)
+	last.(minmaxdegree.(F, Ref(vars)))
+end
+function maxdegrees(C::Composition; parameters=nothing)
+	weights = nothing
+	for f in reverse(C.polys)
+    	weights = maxdegrees(f, parameters=parameters, weights=weights)
+	end
+	weights
 end
 
 """
@@ -372,7 +386,7 @@ function remove_zeros!(F::MPPolys)
     F
 end
 function remove_zeros!(C::Composition)
-    filter!(!iszero, c.g)
+    filter!(!iszero, C.polys[1])
     C
 end
 
@@ -381,8 +395,8 @@ end
 
 Check that the given polynomial system can have zero dimensional components.
 """
-function check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial})
-    N = MP.nvariables(F)
+function check_zero_dimensional(F::Union{MPPolys, Composition})
+    N = nvariables(F)
     n = length(F)
 
     if n ≥ N || (n == N - 1 && ishomogenous(F))

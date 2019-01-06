@@ -55,7 +55,7 @@ for details.
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
+function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...)
     F, variables, variable_groups = Utilities.homogenize_if_necessary(prob.system)
 	# Since homvar is provided we either need to homogenize or
 	# we have already a homogenous system.
@@ -77,8 +77,8 @@ function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing,
     end
 end
 
-function problem_startsolutions(prob::TotalDegree{Vector{AP}},
-    homvar::MP.AbstractVariable, seed; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
+function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs},
+    homvar::MP.AbstractVariable, seed; system=DEFAULT_SYSTEM, kwargs...)
 
     if !ishomogenous(prob.system)
         error("Input system is not homogenous although `homvar=$(homvar)` was passed.")
@@ -119,14 +119,13 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...) where
-    {AP1<:MP.AbstractPolynomialLike, AP2<:MP.AbstractPolynomialLike}
+function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.MPPolyInputs}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...)
 
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogenous.((F, G))
-	variables = MP.variables(F)
+	vars = variables(F)
     if F_ishom && G_ishom
-		vargroups = VariableGroups(variables, homvar)
+		vargroups = VariableGroups(vars, homvar)
         Projective(system(G), system(F), vargroups, seed; kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogenous and the other not!")
@@ -136,13 +135,13 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}}, hom
         end
 
 		h = uniquevar(F)
-        push!(variables, h)
-        sort!(variables, rev=true)
+        push!(vars, h)
+        sort!(vars, rev=true)
         F′ = homogenize(F, h)
 		G′ = homogenize(G, h)
 
-		vargroups = VariableGroups(variables, h)
-        Projective(system(G′, variables), system(F′, variables), vargroups, seed; kwargs...), prob.startsolutions
+		vargroups = VariableGroups(vars, h)
+        Projective(system(G′, vars), system(F′, vars), vargroups, seed; kwargs...), prob.startsolutions
     end
 end
 
