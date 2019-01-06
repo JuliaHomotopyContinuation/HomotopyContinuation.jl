@@ -1,5 +1,5 @@
-export VariableGroups, nvariables, variables, ishomogenous, uniquevar, homogenize, projective_dims,
-	remove_zeros!, Composition, maxdegrees, check_zero_dimensional
+export VariableGroups, nvariables, variables, npolynomials, ishomogenous, uniquevar, homogenize, projective_dims,
+	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system
 
 const MPPoly = MP.AbstractPolynomialLike
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
@@ -73,6 +73,8 @@ Returns the projective dimension of each variable group.
 """
 projective_dims(groups::VariableGroups) = length.(groups.groups) .- 1
 
+nvariables(G::VariableGroups) = sum(length.(G.groups))
+Base.length(::VariableGroups{N}) where N = N
 
 ##############
 # COMPOSITION
@@ -176,6 +178,14 @@ Returns the number of variables occuring in `polys`.
 function nvariables(F::Union{Composition, MPPolys}; parameters=nothing)
 	length(variables(F, parameters=parameters))
 end
+
+"""
+    npolynomials(F)
+
+Returns the number of polynomials occuring in `F`.
+"""
+npolynomials(F::MPPolys) = length(F)
+npolynomials(F::Composition) = length(F.polys[1])
 
 
 """
@@ -405,14 +415,6 @@ function check_zero_dimensional(F::Union{MPPolys, Composition})
     error("The input system will not result in a finite number of solutions.")
 end
 
-
-const overdetermined_error_msg = """
-The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
-See
-    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
-for details.
-"""
-
 """
     homogenize_if_necessary(F::MPPolys)
 
@@ -423,17 +425,13 @@ If it was homogenized and no then the new variable is the **first one**.
 function homogenize_if_necessary(F::Union{MPPolys, Composition}; homvar=nothing, parameters=nothing)
     vars = variables(F, parameters=parameters)
 
-    n, N = length(F), length(vars)
+    n, N = npolynomials(F), length(vars)
     if ishomogenous(F; parameters=parameters)
-        # N = n+1 is the only valid size configuration
-        if n + 1 > N
-            error(overdetermined_error_msg)
-        end
 		vargroups = VariableGroups(vars, homvar)
-		F, vars[vcat(vargroups.groups...)], vargroups
+		F, vars[vcat(vargroups.groups...)], vargroups, homvar
     else
         if homvar !== nothing
-            error("Input system is not homogenous although `homvar` was passed.")
+            error("Input system is not homogenous although `homvar=$(homvar)` was passed.")
         end
         # We create a new variable to homogenize the system
         homvar = uniquevar(F)
@@ -443,6 +441,45 @@ function homogenize_if_necessary(F::Union{MPPolys, Composition}; homvar=nothing,
         F′ = homogenize(F, homvar; parameters=parameters)
 		vargroups = VariableGroups(vars, homvar)
 
-		F′, vars[vcat(vargroups.groups...)], vargroups
+		F′, vars[vcat(vargroups.groups...)], vargroups, homvar
     end
+end
+
+"""
+	classify_homogenous_system(F, vargroups::VariableGroups)
+
+Returns a symbol indicating whether `F` is `:square`, `:overdetermined` or `:underdetermined`.
+"""
+function classify_homogenous_system(F, vargroups::VariableGroups)
+	n = npolynomials(F) - (nvariables(vargroups) - length(vargroups))
+
+	if n == 0
+		:square
+	elseif n > 0
+		:overdetermined
+	else
+		:underdetermined
+	end
+end
+
+const overdetermined_error_msg = """
+The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
+See
+    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
+for details.
+"""
+
+"""
+	check_square_homogenous_system(F, vargroups::VariableGroups)
+
+Checks whether `F` is a square polynomial system.
+"""
+function check_square_homogenous_system(F, vargroups::VariableGroups)
+	class = classify_homogenous_system(F, vargroups)
+	if class == :overdetermined
+		error(overdetermined_error_msg)
+	elseif class == :underdetermined
+		error("Underdetermined polynomial systems are currently not supported.")
+	end
+	nothing
 end
