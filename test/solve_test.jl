@@ -80,6 +80,17 @@
         @test result isa AffineResult
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
+
+        # Composition
+        @polyvar a b c x y z u v
+        e = [u + 1, v - 2]
+        f = [a * b - 2, a*c- 1]
+        g = [x+y, y + 3, x + 2]
+        res = solve(e ∘ f ∘ g)
+        @test nnonsingular(res) == 2
+
+        res = solve(e ∘ f ∘ g, system=SPSystem)
+        @test nnonsingular(res) == 2
     end
 
 
@@ -169,6 +180,24 @@
         S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], γ₁=γ₁, γ₀=γ₀, homvar=z)
         @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
         @test nfinite(S2) == 1
+    end
+
+    @testset "ParameterHomotopy with Composition" begin
+        @polyvar p q a b c x y z u v
+        e = [u + 1, v - 2]
+        f = [a * b - 2, a*c- 1]
+        g = [x+y, y + 3, x + 2]
+        res = solve(f ∘ g, system=SPSystem)
+
+        f2 = [a * b - q, a*c- p]
+        g = [x+y, y + 3, x + 2]
+        r = solve(f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
+
+        res = solve(e ∘ f ∘ g, system=SPSystem)
+        f2 = [a * b - q, a*c- p]
+        r = solve(e ∘ f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
     end
 
     @testset "Overdetermined" begin

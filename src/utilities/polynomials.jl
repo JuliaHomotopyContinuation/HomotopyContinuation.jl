@@ -298,6 +298,8 @@ Creates a unique variable.
 """
 uniquevar(f::MP.AbstractPolynomialLike, tag=:x0) = MP.similarvariable(f, gensym(tag))
 uniquevar(F::MPPolys, tag=:x0) = uniquevar(F[1], tag)
+uniquevar(C::Composition, tag=:x0) = uniquevar(C.polys[1][1], tag)
+
 
 """
     homogenize(f::MP.AbstractPolynomial, variable=uniquevar(f))
@@ -407,7 +409,7 @@ Check that the given polynomial system can have zero dimensional components.
 """
 function check_zero_dimensional(F::Union{MPPolys, Composition})
     N = nvariables(F)
-    n = length(F)
+    n = npolynomials(F)
 
     if n ≥ N || (n == N - 1 && ishomogenous(F))
         return nothing

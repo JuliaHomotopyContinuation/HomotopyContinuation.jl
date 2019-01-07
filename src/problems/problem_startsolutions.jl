@@ -4,8 +4,8 @@ const supported_keywords = [[:seed, :homvar, :homotopy, :system]; Input.supporte
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
-function construct_system(F::Composition, system_constructor; homvars=nothing)
-	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
+function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
+	Systems.CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
 end
 function construct_system(F::MPPolys, system_constructor; homvars=nothing, kwargs...)
 	system_constructor(F; kwargs...)
@@ -61,7 +61,7 @@ function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, homvar,
 	check_square_homogenous_system(F, variable_groups)
 
 	problem = Projective(Systems.TotalDegreeSystem(prob.degrees),
-		construct_system(F, system, variables; homvars=homvars), variable_groups, seed; kwargs...)
+		construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
 	startsolutions = totaldegree_solutions(prob.degrees)
 
 	problem, startsolutions
