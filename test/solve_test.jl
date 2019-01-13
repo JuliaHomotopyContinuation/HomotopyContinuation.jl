@@ -34,6 +34,10 @@
         @test nfinite(solve(F, system=Systems.SPSystem, threading=false)) == 32
         @test nfinite(solve(F, system=Systems.FPSystem, threading=false)) == 32
 
+        # Simple step size
+        F = equations(katsura(5))
+        @test nfinite(solve(F, simple_step_size=true, threading=false)) == 32
+
         @test nfinite(solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
         result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)
         @test nresults(result) == 32

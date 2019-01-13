@@ -11,11 +11,7 @@ export PathTracker, allowed_keywords
 
 const allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
-    :maxiters]
-
-########################
-# Constructors and show
-########################
+    :maxiters, :simple_step_size]
 
 ###########
 # Options
@@ -28,6 +24,7 @@ mutable struct Options
     maxiters::Int
     initial_steplength::Float64
     minimal_steplength::Float64
+    simple_step_size::Bool
 end
 
 function Options(;tol=1e-7,
@@ -36,10 +33,11 @@ function Options(;tol=1e-7,
     refinement_maxiters=corrector_maxiters,
     maxiters=10_000,
     initial_steplength=0.1,
-    minimal_steplength=1e-14)
+    minimal_steplength=1e-14,
+    simple_step_size=false)
 
     Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
-            initial_steplength, minimal_steplength)
+            initial_steplength, minimal_steplength, simple_step_size)
 end
 Base.show(io::IO, opts::Options) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
@@ -75,6 +73,7 @@ mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
     accepted_steps::Int
     rejected_steps::Int
     last_step_failed::Bool
+    consecutive_successfull_steps::Int
 end
 
 function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
@@ -89,8 +88,9 @@ function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches
     accepted_steps = rejected_steps = 0
     status = Status.tracking
     last_step_failed = false
+    consecutive_successfull_steps = 0
     State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, status, patch,
-        accepted_steps, rejected_steps, last_step_failed)
+        accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
 function reset!(state::State, x₁::AbstractVector, t₁, t₀, options::Options, setup_patch)
@@ -105,6 +105,7 @@ function reset!(state::State, x₁::AbstractVector, t₁, t₀, options::Options
     ProjectiveVectors.embed!(state.x, x₁)
     setup_patch && AffinePatches.setup!(state.patch, state.x)
     state.last_step_failed = false
+    state.consecutive_successfull_steps = 0
     state
 end
 
@@ -394,6 +395,12 @@ end
 g(Θ) = sqrt(1+4Θ) - 1
 function update_stepsize!(state::State, result::Correctors.Result,
                           order::Int, options::Options)
+
+    if options.simple_step_size
+        simple_step_size!(state, result, options)
+        return nothing
+    end
+
     # we have to handle the special case that there is only 1 iteration
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
@@ -453,8 +460,29 @@ function update_stepsize!(state::State, result::Correctors.Result,
     if !Correctors.isconverged(result) && state.Δs < options.minimal_steplength
         state.status = Status.terminated_steplength_too_small
     end
+    nothing
 end
 
+function simple_step_size!(state::State, result::Correctors.Result, options::Options)
+    if Correctors.isconverged(result)
+        state.consecutive_successfull_steps += 1
+        if state.consecutive_successfull_steps == 5
+            Δs′ = 2 * state.Δs
+            state.consecutive_successfull_steps = 0
+        else
+            Δs′ = state.Δs
+        end
+    else
+        state.consecutive_successfull_steps = 0
+        Δs′ = 0.5 * state.Δs
+    end
+
+    state.Δs = min(Δs′, length(state.segment) - state.s)
+
+    if !Correctors.isconverged(result) && state.Δs < options.minimal_steplength
+        state.status = Status.terminated_steplength_too_small
+    end
+end
 
 function check_terminated!(tracker)
     if abs(tracker.state.s - length(tracker.state.segment)) < 1e-15
