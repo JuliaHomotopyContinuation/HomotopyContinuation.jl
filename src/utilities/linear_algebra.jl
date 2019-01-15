@@ -429,7 +429,7 @@ end
 
 Apply one step of iterative refinement where the residual is computed with precision `T`.
 """
-function iterative_refinement_step!(x, A, b, fac, T, r)
+function iterative_refinement_step!(x, A, b, fac, ::Type{T}, r) where T
     residual!(r, A, x, b, T)
     δx = solve!(fac, r)
     norm_δx = maximum(abs, δx)
@@ -467,7 +467,7 @@ Solve `Jac.J * x = b` by optionally using iterative refinment depending on the c
 Returns an updated estimate of `cond` if `compute_new_cond == true` or iterative refinement was used.
 Otherwise the existing `cond` is passed.
 """
-function adaptive_solve!(x, Jac::Jacobian, b; tol=1e-7, cond=1.0, safety_factor=1e3, compute_new_cond=false)
+function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; tol=1e-7, cond=1.0, safety_factor=1e3, compute_new_cond=false)
     # We want to achieve accuracy of tol,
     # We make an error in the linear algebra of ≈ eps() * cond
     # Another limiting factor is the accuracy of the evaluation which we do not know

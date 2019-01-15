@@ -356,7 +356,7 @@ function correct!(x̄, tracker, x=tracker.state.x, t=tracker.state.segment[track
     tol=tracker.options.tol,
     maxiters=tracker.options.corrector_maxiters)
     Correctors.correct!(x̄, tracker.corrector, tracker.cache.corrector,
-                        tracker.cache.homotopy, x, t, tol=tol, maxiters=maxiters)
+                        tracker.cache.homotopy, x, t, tol, maxiters)
 end
 
 function step!(tracker)
@@ -368,8 +368,7 @@ function step!(tracker)
         t, Δt = currt(state), currΔt(state)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt,
-                tol=options.tol, maxiters=options.corrector_maxiters,
-                cond=state.cond)
+                options.tol, options.corrector_maxiters, state.cond)
         if Correctors.isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1

@@ -33,6 +33,10 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
 end
 
 function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t; tol=1e-6, maxiters::Integer=3, cond=1.0)
+    correct!(out, alg, cache, H, x₀, t, tol, maxiters, cond)
+end
+
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol=1e-6, maxiters::Integer=3, cond=1.0)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
