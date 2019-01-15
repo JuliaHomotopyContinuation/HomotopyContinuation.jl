@@ -239,9 +239,7 @@ function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::Statis
     track(tracker, x, stats)
 end
 function track(tracker, x::AbstractVector, stats::Statistics)
-    res = PathTracking.track(tracker, x, 1.0, 0.0)
-    # @show res
-    retcode = res.returncode
+    retcode = PathTracking.track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
     y = ProjectiveVectors.affine_chart!(x, PathTracking.currx(tracker))
     y, retcode
