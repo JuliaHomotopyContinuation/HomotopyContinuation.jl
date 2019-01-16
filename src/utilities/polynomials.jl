@@ -2,8 +2,8 @@ export VariableGroups, nvariables, variables, npolynomials, ishomogenous, unique
 	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system,
 	hasparameters
 
-const MPPoly = MP.AbstractPolynomialLike
-const MPPolys = Vector{<:MP.AbstractPolynomialLike}
+const MPPoly{T} = MP.AbstractPolynomialLike{T}
+const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
 const WeightedVariable = Tuple{<:MP.AbstractVariable, Int}
 
 """
@@ -503,4 +503,59 @@ function check_square_homogenous_system(F, vargroups::VariableGroups)
 		error("Underdetermined polynomial systems are currently not supported.")
 	end
 	nothing
+end
+
+
+"""
+    weyldot(f::Polynomial, g::Polynomial)
+Compute the [Bombieri-Weyl dot product](https://en.wikipedia.org/wiki/Bombieri_norm).
+Note that this is only properly defined if `f` and `g` are homogenous.
+    weyldot(f::Vector{Polynomial}, g::Vector{Polynomial})
+Compute the dot product for vectors of polynomials.
+"""
+function weyldot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
+	if f === g
+		return sum(f) do term
+			abs2(MP.coefficient(term)) / multinomial(exponent(term, vars))
+	    end
+	end
+    result = zero(promote_type(T,S))
+    for term_f in f
+		c_f = MP.coefficient(term_f)
+		exp_f = exponent(term_f, vars)
+        for term_g in g
+			c_g = MP.coefficient(term_g)
+			exp_g = exponent(term_g, vars)
+            if exp_f == exp_g
+                result += (c_f * conj(c_g)) / multinomial(exp_f)
+                break
+            end
+        end
+    end
+    result
+end
+function weyldot(F::MPPolys, G::MPPolys, vars=variables(F))
+	sum(fg -> weyldot(fg..., vars), zip(F, G))
+end
+
+"""
+    weylnorm(F, vars=variables(F))
+
+Compute the [Bombieri-Weyl norm](https://en.wikipedia.org/wiki/Bombieri_norm).
+Note that this is only properly defined if `f` is homogenous.
+"""
+weylnorm(F::MPPolys, vars=variables(F)) = √(sum(f -> weyldot(f, f, vars), F))
+weylnorm(f::MPPoly, vars=variables(f)) = √(weyldot(f, f, vars))
+
+exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
+
+"Computes the multinomial coefficient (|k| \\over k)"
+function multinomial(k::Vector{Int})
+    s = 0
+    result = 1
+	for i in k
+        s += i
+        result *= binomial(s, i)
+    end
+    result
 end

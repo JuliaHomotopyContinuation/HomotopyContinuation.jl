@@ -72,6 +72,16 @@
         @test Utilities.validate(homogenize(h2, parameters=[p, q]), parameters=[p, q])
         h3 = [a * b * c  + 1] ∘ [x+y, y + z, x + 1]
         @test Utilities.validate(homogenize(h3))
+
+        # Weylnorm
+        @polyvar x y z
+        f = 3.0x^2 + 2x*y - y^2
+        g = (-2.5+2im) * x^2 - 3.0*x*y + 4y^2
+        @test Utilities.weyldot(f, g) == 3.0 * conj(-2.5 + 2im) + 2.0 * (-3.0) / 2 + (-1.0) * 4.0
+        @test Utilities.weyldot(f, f) == 9.0 + 4.0  / 2 + 1.0
+        @test Utilities.weylnorm(f)^2 ≈ Utilities.weyldot(f,f)
+        @test Utilities.weyldot([f, f], [g, g]) == 2 * Utilities.weyldot(f, g)
+        @test Utilities.weylnorm([f, f]) == √Utilities.weyldot([f, f], [f, f])
     end
 
     @testset "Misc" begin
