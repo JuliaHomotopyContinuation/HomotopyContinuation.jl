@@ -184,19 +184,27 @@
 
     @testset "ParameterHomotopy with Composition" begin
         @polyvar p q a b c x y z u v
-        e = [u + 1, v - 2]
         f = [a * b - 2, a*c- 1]
-        g = [x+y, y + 3, x + 2]
+        g = [x + y, y + 3, x + 2]
         res = solve(f ∘ g, system=SPSystem)
 
+        # parameters at the end
         f2 = [a * b - q, a*c- p]
-        g = [x+y, y + 3, x + 2]
+        g = [x + y, y + 3, x + 2]
         r = solve(f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
         @test HomotopyContinuation.nnonsingular(r) == 2
 
-        res = solve(e ∘ f ∘ g, system=SPSystem)
-        f2 = [a * b - q, a*c- p]
-        r = solve(e ∘ f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
+        # parameters at the beginning
+        f = [a * b - 2, a*c- 1]
+        g2 = [x + y, y + u, x + v]
+        r = solve(f ∘ g2, solutions(res), parameters=[u, v], p₁=[3, 2], p₀=[-2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
+
+        # parameter in the middle
+        e = [u + 1, v - 2]
+        res2 = solve(e ∘ f ∘ g, system=SPSystem)
+        f2 = [a * b - q, a * c- p]
+        r = solve(e ∘ f2 ∘ g, solutions(res2), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
         @test HomotopyContinuation.nnonsingular(r) == 2
     end
 

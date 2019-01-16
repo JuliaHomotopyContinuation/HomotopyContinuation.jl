@@ -1,5 +1,6 @@
 export VariableGroups, nvariables, variables, npolynomials, ishomogenous, uniquevar, homogenize, projective_dims,
-	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system
+	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system,
+	hasparameters
 
 const MPPoly = MP.AbstractPolynomialLike
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
@@ -169,6 +170,24 @@ function variables(polys::Union{MPPoly, MPPolys}; parameters=nothing, weights=no
 	end
 end
 variables(C::Composition; kwargs...) = variables(C.polys[end]; kwargs...)
+
+
+"""
+    hasparameters(F, parameters=nothing)
+
+Returns `true` if the parameters occur in F.
+"""
+function hasparameters(polys::Union{MPPoly, MPPolys}, parameters=nothing)
+	parameters === nothing && return false
+
+	variables = MP.variables(polys)
+	for p in parameters
+		if p in variables
+			return true
+		end
+	end
+	false
+end
 
 """
     nvariables(polys; parameters=nothing)

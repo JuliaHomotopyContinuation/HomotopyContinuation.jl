@@ -11,6 +11,9 @@ struct CompositionSystem{S1<:AbstractSystem, S2<:AbstractSystem} <: AbstractSyst
     # The system is g ∘ f
     g::S2 # Never a composition system
     f::S1 # Can be a CompositionSystem again
+
+    g_has_parameters::Bool
+    f_has_parameters::Bool
 end
 
 function CompositionSystem(C::Utilities.Composition, system_constructor;
@@ -32,15 +35,21 @@ function CompositionSystem(g::Vector{<:MP.AbstractPolynomialLike},
 
     vars = Utilities.variables(g; parameters=parameters)
     homvars_to_end!(vars, homvars)
+    g_has_parameters =
     G = system_constructor(g, variables=vars, parameters=parameters)
 
     if isa(f, CompositionSystem)
-        CompositionSystem(G, f)
+        CompositionSystem(G, f,
+            Utilities.hasparameters(g, parameters), hasparameters(f))
     else
         F = system_constructor(f, variables=variables, parameters=parameters)
-        CompositionSystem(G, F)
+        CompositionSystem(G, F,
+            Utilities.hasparameters(g, parameters),
+            Utilities.hasparameters(f, parameters))
     end
 end
+
+hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
 
 homvars_to_end!(variables, ::Nothing) = variables
 homvars_to_end!(vars, homvars::MP.AbstractVariable) = homvars_to_end!(vars, (homvars,))
@@ -133,16 +142,27 @@ function differentiate_parameters!(U, C::CompositionSystem, x, p, c::Composition
 
     # d/(dp)(g(f(x, p), p)) = g_y(f(x, p), p)f_p(x, p) + g_p(f(x, p), p)
     evaluate!(c.eval_f, C.f, x, p, c.cache_f)
+    # See whether we can simplify things
+    if C.g_has_parameters && C.f_has_parameters
+        differentiate_parameters!(c.Jp_g, C.g, c.eval_f, p, c.cache_g)
+        differentiate_parameters!(c.Jp_f, C.f, x, p, c.cache_f)
+        jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
+        LinearAlgebra.mul!(U, c.J_g, c.Jp_f)
+        U .= U .+ c.Jp_g
+    elseif C.g_has_parameters # && !C.f_has_parameters
+        differentiate_parameters!(c.Jp_g, C.g, c.eval_f, p, c.cache_g)
+        U .= c.Jp_g
+    elseif C.f_has_parameters  # !C.g_has_parameters &&
+        differentiate_parameters!(c.Jp_f, C.f, x, p, c.cache_f)
+        jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
+        LinearAlgebra.mul!(U, c.J_g, c.Jp_f)
+    else
+        U .= zero(eltype(U))
+    end
 
-    differentiate_parameters!(c.Jp_f, C.f, x, p, c.cache_f)
-    jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
-
-    differentiate_parameters!(c.Jp_g, C.g, c.eval_f, p, c.cache_g)
-
-    LinearAlgebra.mul!(U, c.J_g, c.Jp_f)
-    U .= U .+ c.Jp_g
     U
 end
+
 function differentiate_parameters(F::CompositionSystem, x, p, c::CompositionSystemCache)
     U = similar(c.J_g, size(c.J_g, 1), size(c.Jp_f, 2))
     differentiate_parameters!(U, F, x, p, c)
