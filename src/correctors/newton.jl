@@ -43,8 +43,8 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
     Θ₀ = Θᵢ₋₁ = norm_Δxᵢ₋₁ = norm_Δxᵢ = norm_Δx₀ = zero(T)
     accuracy = T(Inf)
     ω₀ = ω = 0.0
-    for i ∈ 0:(maxit-1)
-        if i == maxit - 1 && alg.simplified_last_step
+    for i ∈ 0:(maxit)
+        if i == maxit && alg.simplified_last_step
             evaluate!(rᵢ, H, xᵢ, t)
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)

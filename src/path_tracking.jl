@@ -29,7 +29,7 @@ end
 
 function Options(;tol=1e-7,
     refinement_tol=1e-8,
-    corrector_maxiters::Int=3,
+    corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
     maxiters=10_000,
     initial_steplength=0.1,
@@ -393,7 +393,7 @@ end
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
 δ(opts::Options, ω) = @fastmath min(√(ω/2) * τ(opts), 0.25)
-τ(opts::Options) = nthroot(opts.tol, 2 * (opts.corrector_maxiters - 1))
+τ(opts::Options) = nthroot(opts.tol, 2 * opts.corrector_maxiters)
 
 function update_stepsize!(state::State, result::Correctors.Result,
                           order::Int, options::Options)
