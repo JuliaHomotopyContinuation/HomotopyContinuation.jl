@@ -125,7 +125,7 @@ General options:
 
 Pathtracking specific:
 * `corrector::Correctors.AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Correctors.Newton`](@ref).
-* `corrector_maxiters=3`: The maximal number of correction steps in a single step.
+* `corrector_maxiters=2`: The maximal number of correction steps in a single step.
 * `predictor::Predictors.AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Predictors.RK4`](@ref).
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.

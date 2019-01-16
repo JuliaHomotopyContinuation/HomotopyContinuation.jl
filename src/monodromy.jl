@@ -1,6 +1,6 @@
 module Monodromy
 
-export monodromy_solve, realsolutions, nreal
+export monodromy_solve, realsolutions, nreal, GroupActions, complex_conjugation
 
 import LinearAlgebra
 import MultivariatePolynomials
@@ -115,7 +115,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
-* `tol::Float64=1e-5`: The tolerance with which it is decided whether two solutions are identical. The paths are tracked with tolerance `tol*1e-2`.
+* `tol::Float64=1e-7`: The tolerance with which paths are tracked and with which it is decided whether two solutions are identical.
 * `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
@@ -152,7 +152,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     loop = Loop(strategy, p₀, startsolutions, options)
     tracker = PathTracking.pathtracker(
         F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
-        tol=options.tol * 1e-2,
+        tol=options.tol,
+        refinement_tol=options.tol / 10,
         restkwargs...)
     statistics = Statistics(solutions(loop))
 

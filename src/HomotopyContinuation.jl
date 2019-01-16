@@ -64,11 +64,19 @@ module HomotopyContinuation
     import .Utilities: homogenize, uniquevar, ishomogenous
     export homogenize, uniquevar, ishomogenous
 
-    import .PathTracking: pathtracker, pathtracker_startsolutions
-    export pathtracker, pathtracker_startsolutions
+    import .PathTracking: PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
+            allowed_keywords, track, track!, setup!, iterator!,
+            currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
+            refinement_tol, refinement_maxiters, set_tol!,
+            set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
+    export PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
+            allowed_keywords, track, track!, setup!, iterator!,
+            currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
+            refinement_tol, refinement_maxiters, set_tol!,
+            set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
 
-    import .Monodromy: monodromy_solve
-    export monodromy_solve
+    import .Monodromy: monodromy_solve, GroupActions, complex_conjugation, Triangle, Petal
+    export monodromy_solve, GroupActions, complex_conjugation, Triangle, Petal
 
     import LinearAlgebra: issuccess
     export issuccess

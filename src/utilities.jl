@@ -268,7 +268,7 @@ Base.length(segment::ComplexSegment) = segment.abs_target_start
 function Base.show(io::IO, segment::ComplexSegment)
     print(io, "ComplexSegment($(segment.start), $(segment.target))")
 end
-Base.show(io::IO, ::MIME"application/juno+inlinestate", opts::ComplexSegment) = opts
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::ComplexSegment) = opts
 
 # Parallelization
 

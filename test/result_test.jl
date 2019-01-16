@@ -44,13 +44,13 @@
         @test_nowarn show(IOContext(devnull, :compact=>true), R[end])
 
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
 
         @polyvar x y z
         R = solve([(x-3)^3,(y-2)])
         @test R isa Solving.AffineResult
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
         @test_nowarn sprint(show, R)
@@ -60,14 +60,14 @@
         @test R isa Solving.ProjectiveResult
         @test_nowarn string(R)
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 1
 
         @polyvar x y z
         R = solve([(x-3z)^3,(y-2z)])
         @test R isa Solving.ProjectiveResult
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/juno+inline"())
+        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
 
