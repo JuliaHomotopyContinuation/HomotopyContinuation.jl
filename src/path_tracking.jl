@@ -42,8 +42,6 @@ end
 Base.show(io::IO, opts::Options) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
 
-τ(opts::Options) = nthroot(opts.tol, 2 * (opts.corrector_maxiters - 1))
-τ(opts::Options, λ) = nthroot(λ * opts.tol, 2 * (opts.corrector_maxiters - 1))
 ###########
 # State
 ##########
@@ -393,6 +391,10 @@ function step!(tracker)
 end
 
 g(Θ) = sqrt(1+4Θ) - 1
+# Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
+δ(opts::Options, ω) = @fastmath min(√(ω/2) * τ(opts), 0.25)
+τ(opts::Options) = nthroot(opts.tol, 2 * (opts.corrector_maxiters - 1))
+
 function update_stepsize!(state::State, result::Correctors.Result,
                           order::Int, options::Options)
 
@@ -413,7 +415,6 @@ function update_stepsize!(state::State, result::Correctors.Result,
     end
 
     Δx₀ = result.norm_Δx₀
-    τN = τ(options)
     if Correctors.isconverged(result)
         # compute η and update
         η = d_x̂_x̄ / state.Δs^order
@@ -421,15 +422,13 @@ function update_stepsize!(state::State, result::Correctors.Result,
         # assume Δs′ = Δs
         ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
         if isnan(state.η)
-            # λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
-            # Δs′ = nthroot(λ, order) * state.Δs
             Δs′ = state.Δs
         else
             d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.75d_x̂_x̄)
             if state.last_step_failed
                 d_x̂_x̄′ *= 2
             end
-            λ = g(√(ω′/2) * τN) / (ω′ * d_x̂_x̄′)
+            λ = g(δ(options, ω′) / (ω′ * d_x̂_x̄′)
             Δs′ = 0.8 * nthroot(λ, order) * state.Δs
         end
         if state.last_step_failed
@@ -440,14 +439,16 @@ function update_stepsize!(state::State, result::Correctors.Result,
         state.last_step_failed = false
     else
         ω = max(ω, state.ω)
-        if √(ω / 2) * τN < ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τN) / g(ω / 2 * Δx₀)
-        elseif √(ω / 2) * τN < 2ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τN )/ g(2ω / 2 * Δx₀)
-        elseif √(ω / 2) * τN < 4ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τN) / g(4ω / 2 * Δx₀)
-        elseif √(ω / 2) * τN < 8ω / 2 * Δx₀
-            λ = g(√(ω / 2) * τN) / g(8ω / 2 * Δx₀)
+        δ_N_ω = δ(options, ω)
+        ω_η = ω / 2 * Δx₀
+        if δ_N_ω < ω_η
+            λ = g(δ_N_ω) / g(ω_η)
+        elseif δ_N_ω < 2ω_η
+            λ = g(δ_N_ω) / g(2ω_η)
+        elseif δ_N_ω < 4ω_η
+            λ = g(δ_N_ω) / g(4ω_η)
+        elseif δ_N_ω < 8ω_η
+            λ = g(δ_N_ω) / g(8ω_η)
         else
             λ = 0.5^order
         end
