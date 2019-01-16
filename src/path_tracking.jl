@@ -428,7 +428,7 @@ function update_stepsize!(state::State, result::Correctors.Result,
             if state.last_step_failed
                 d_x̂_x̄′ *= 2
             end
-            λ = g(δ(options, ω′) / (ω′ * d_x̂_x̄′)
+            λ = g(δ(options, ω′)) / (ω′ * d_x̂_x̄′)
             Δs′ = 0.8 * nthroot(λ, order) * state.Δs
         end
         if state.last_step_failed
