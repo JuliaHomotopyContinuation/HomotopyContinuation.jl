@@ -182,7 +182,7 @@ function Base.show(io::IO, r::PathResult)
 end
 
 TreeViews.hastreeview(::PathResult) = true
-TreeViews.treelabel(io::IO, x::PathResult, ::MIME"application/juno+inline") =
+TreeViews.treelabel(io::IO, x::PathResult, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">PathResult</span>")
 
 """
