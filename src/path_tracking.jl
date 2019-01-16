@@ -7,7 +7,11 @@ import ..AffinePatches, ..Correctors, ..Homotopies,
        ..Predictors, ..Problems
 using ..Utilities
 
-export PathTracker, allowed_keywords
+export PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
+        allowed_keywords, track, track!, setup!, iterator!,
+        currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
+        refinement_tol, refinement_maxiters, set_tol!,
+        set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
 
 const allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,

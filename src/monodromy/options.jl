@@ -50,6 +50,12 @@ function default_minimal_number_of_solutions(target_solutions_count::Int)
 end
 
 always_false(x, sols) = false
+
+"""
+    complex_conjugation(x)
+
+A group action which returns the elementwise complex conjugated solutions.
+"""
 complex_conjugation(x) = (conj.(x),)
 has_group_actions(options::Options) = !(options.group_actions isa GroupActions{Tuple{}})
 

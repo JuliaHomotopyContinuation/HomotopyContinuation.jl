@@ -1,6 +1,6 @@
 module Monodromy
 
-export monodromy_solve, realsolutions, nreal
+export monodromy_solve, realsolutions, nreal, GroupActions, complex_conjugation
 
 import LinearAlgebra
 import MultivariatePolynomials
