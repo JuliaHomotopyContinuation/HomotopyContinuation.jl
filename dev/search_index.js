@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s102,1} where #s102<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s187,1} where #s187<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -1093,7 +1093,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.ishomogenous",
     "category": "function",
-    "text": "ishomogenous(f::MP.AbstractPolynomialLike)\n\nChecks whether f is homogenous.\n\nishomogenous(polys::Vector{MP.AbstractPolynomialLike})\n\nChecks whether each polynomial in polys is homogenous.\n\n\n\n\n\nishomogenous(f::MP.AbstractPolynomialLike, v::Vector{<:MP.AbstractVariable})\n\nChecks whether f is homogenous in the variables v.\n\nishomogenous(polys::Vector{<:MP.AbstractPolynomialLike}, v::Vector{<:MP.AbstractVariable})\n\nChecks whether each polynomial in polys is homogenous in the variables v.\n\n\n\n\n\n"
+    "text": "ishomogenous(f::MP.AbstractPolynomialLike)\n\nChecks whether f is homogenous.\n\nishomogenous(f::MP.AbstractPolynomialLike, vars)\n\nChecks whether f is homogenous in the variables vars with possible weights.\n\n\n\n\n\nishomogenous(F::Vector{MP.AbstractPolynomialLike}, variables)\n\nChecks whether each polynomial in F is homogenous in the variables variables.\n\n\n\n\n\n"
 },
 
 {
@@ -1101,7 +1101,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.uniquevar",
     "category": "function",
-    "text": "uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)\nuniquevar(F::Vector{<:MP.AbstractPolynomialLike}, tag=:x0)\n\nCreates a unique variable.\n\n\n\n\n\n"
+    "text": "uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)\nuniquevar(F::MPPolys, tag=:x0)\n\nCreates a unique variable.\n\n\n\n\n\n"
 },
 
 {
@@ -1109,7 +1109,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "HomotopyContinuation.Utilities.homogenize",
     "category": "function",
-    "text": "homogenize(f::MP.AbstractPolynomial, variable=uniquevar(f))\n\nHomogenize the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, variable=uniquevar(F))\n\nHomogenize each polynomial in F by using the given variable variable.\n\n\n\n\n\nhomogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))\n\nHomogenize the variables v in the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))\n\nHomogenize the variables v in each polynomial in F by using the given variable variable.\n\n\n\n\n\n"
+    "text": "homogenize(f::MP.AbstractPolynomial, variable=uniquevar(f))\n\nHomogenize the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, variable=uniquevar(F))\n\nHomogenize each polynomial in F by using the given variable variable.\n\nhomogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))\n\nHomogenize the variables v in the polynomial f by using the given variable variable.\n\nhomogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))\n\nHomogenize the variables v in each polynomial in F by using the given variable variable.\n\n\n\n\n\n"
 },
 
 {
