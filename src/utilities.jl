@@ -147,6 +147,7 @@ Return a random seed in the range `range`.
 randseed(range=1_000:1_000_000) = rand(range)
 
 """
+
     infinity_norm(z)
 
 Compute the ∞-norm of `z`. If `z` is a complex vector this is more efficient
@@ -185,7 +186,6 @@ The log absolute map `log(abs(z))`.
 """
 logabs(z::Complex) = 0.5 * log(abs2(z))
 logabs(x) = log(abs(x))
-
 
 
 function randomish_gamma()

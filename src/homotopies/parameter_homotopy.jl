@@ -57,14 +57,23 @@ function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::Abstra
     ParameterHomotopy(F, p, γ)
 end
 
+function ParameterHomotopy(F::AbstractSystem;
+    startparameters=nothing, p₁ = startparameters,
+    targetparameters=nothing, p₀ = targetparameters,
+    kwargs...)
+    (p₁ !== nothing && p₀ !== nothing) || error("Parameters not provided for ParameterHomotopy")
+    ParameterHomotopy(F, p₁, p₀; kwargs...)
+end
+
 function ParameterHomotopy(F::Vector{T},
     parameters::AbstractVector{V};
     variables=setdiff(MP.variables(F), parameters),
-    startparameters=randn(ComplexF64, length(parameters)), p₁ = startparameters,
-    targetparameters=randn(ComplexF64, length(parameters)), p₀ = targetparameters,
+    startparameters=randn(ComplexF64, length(parameters)),
+    targetparameters=randn(ComplexF64, length(parameters)),
     kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
     G = Systems.SPSystem(F; variables=variables, parameters=parameters)
-    ParameterHomotopy(G, p₁, p₀; kwargs...)
+    ParameterHomotopy(G; startparameters=startparameters,
+        targetparameters=targetparameters, kwargs...)
 end
 
 struct ParameterHomotopyCache{C<:AbstractSystemCache, T1<:Number, T2<:Number} <: AbstractHomotopyCache

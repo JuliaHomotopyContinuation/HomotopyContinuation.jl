@@ -84,6 +84,17 @@
         @test result isa AffineResult
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
+
+        # Composition
+        @polyvar a b c x y z u v
+        e = [u + 1, v - 2]
+        f = [a * b - 2, a*c- 1]
+        g = [x+y, y + 3, x + 2]
+        res = solve(e ∘ f ∘ g)
+        @test nnonsingular(res) == 2
+
+        res = solve(e ∘ f ∘ g, system=SPSystem)
+        @test nnonsingular(res) == 2
     end
 
 
@@ -175,6 +186,32 @@
         @test nfinite(S2) == 1
     end
 
+    @testset "ParameterHomotopy with Composition" begin
+        @polyvar p q a b c x y z u v
+        f = [a * b - 2, a*c- 1]
+        g = [x + y, y + 3, x + 2]
+        res = solve(f ∘ g, system=SPSystem)
+
+        # parameters at the end
+        f2 = [a * b - q, a*c- p]
+        g = [x + y, y + 3, x + 2]
+        r = solve(f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
+
+        # parameters at the beginning
+        f = [a * b - 2, a*c- 1]
+        g2 = [x + y, y + u, x + v]
+        r = solve(f ∘ g2, solutions(res), parameters=[u, v], p₁=[3, 2], p₀=[-2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
+
+        # parameter in the middle
+        e = [u + 1, v - 2]
+        res2 = solve(e ∘ f ∘ g, system=SPSystem)
+        f2 = [a * b - q, a * c- p]
+        r = solve(e ∘ f2 ∘ g, solutions(res2), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
+        @test HomotopyContinuation.nnonsingular(r) == 2
+    end
+
     @testset "Overdetermined" begin
         @polyvar x y z w
         a = [0.713865+0.345317im, 0.705182+0.455495im, 0.9815+0.922608im, 0.337617+0.508932im]
@@ -183,15 +220,12 @@
         L₁ = [1, -1, 1, -1] ⋅ [x, y, z, w]
         L₂ = rand(ComplexF64, 4) ⋅ [x, y, z, w]
         S = solve([f; L₁], [f; L₂], [[1, 1, 1, 1]])
-
         @test nnonsingular(S) == 1
-
 
         f = [x*z-y^2, y-z^2, x-y*z]
         L₁ = [1, -1, 1, -1] ⋅ [x, y, z, 1]
         L₂ = rand(ComplexF64, 4) ⋅ [x, y, z, 1]
         S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
-
         @test nfinite(S) == 1
     end
 end

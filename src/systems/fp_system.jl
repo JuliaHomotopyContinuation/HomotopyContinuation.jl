@@ -13,7 +13,17 @@ struct FPSystem{T} <: AbstractSystem
 end
 
 FPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = FPSystem(FP.System(polys, vars))
-FPSystem(polys::Vector{<:MP.AbstractPolynomial}) = FPSystem(FP.System(polys))
+function FPSystem(polys::Vector{<:MP.AbstractPolynomial};
+    variables=nothing, parameters=nothing)
+
+    parameters === nothing || error("Parameters are not supported by FPSystem")
+
+    if variables === nothing
+        FPSystem(FP.System(polys))
+    else
+        FPSystem(FP.System(polys, variables))
+    end
+ end
 
 struct FPSystemCache{JC<:FP.JacobianConfig} <: AbstractSystemCache
     config::JC

@@ -4,6 +4,13 @@ const supported_keywords = [[:seed, :homvar, :homotopy, :system]; Input.supporte
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
+function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
+	Systems.CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
+end
+function construct_system(F::MPPolys, system_constructor; homvars=nothing, kwargs...)
+	system_constructor(F; kwargs...)
+end
+
 """
     problem_startsolutions(F; options...)
     problem_startsolutions(G, F, startsolutions; options...)
@@ -34,7 +41,7 @@ end
 function problem_startsolutions(input::AbstractInput; seed=randseed(), kwargs...)
     problem_startsolutions(input, seed; kwargs...)
 end
-function problem_startsolutions(input::AbstractInput, seed::Int;
+function problem_startsolutions(input::AbstractInput, seed;
 	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing, kwargs...)
     problem_startsolutions(input, homvar, seed; kwargs...)
 end
@@ -44,62 +51,27 @@ function problem_startsolutions(input::Input.Homotopy, homvar, seed; kwargs...)
 end
 
 
-const overdetermined_error_msg = """
-The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
-See
-    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
-for details.
-"""
-
 ##############
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegree{Vector{AP}}, _homvar::Nothing, seed::Int; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomial}
-    F, variables, variable_groups = Utilities.homogenize_if_necessary(prob.system)
-	# Since homvar is provided we either need to homogenize or
-	# we have already a homogenous system.
-    if variable_groups.dedicated_homvars # affine case
-		# Check overdetermined case
-		length(F) ≥ length(variables) && error(overdetermined_error_msg)
+function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...)
+    F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system; homvar=homvar)
 
-        proj = Projective(
-            Systems.TotalDegreeSystem(prob.degrees),
-            system(F, variables), variable_groups, seed; kwargs...)
-        proj, totaldegree_solutions(prob.degrees)
-    else
-		# Check overdetermined case
-		length(F) > length(variables) && error(overdetermined_error_msg)
+	check_square_homogenous_system(F, variable_groups)
 
-        G = Systems.TotalDegreeSystem(prob.degrees)
-        start = totaldegree_solutions(prob.degrees)
-        Projective(G, system(F, variables), variable_groups, seed; kwargs...), start
-    end
+	problem = Projective(Systems.TotalDegreeSystem(prob.degrees),
+		construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
+	startsolutions = totaldegree_solutions(prob.degrees)
+
+	problem, startsolutions
 end
-
-function problem_startsolutions(prob::TotalDegree{Vector{AP}},
-    homvar::MP.AbstractVariable, seed; system=DEFAULT_SYSTEM, kwargs...) where {AP<:MP.AbstractPolynomialLike}
-
-    if !ishomogenous(prob.system)
-        error("Input system is not homogenous although `homvar=$(homvar)` was passed.")
-    end
-    F, variables, variable_groups = Utilities.homogenize_if_necessary(prob.system; homvar=homvar)
-	# Check overdetermined case
-	length(F) > length(variables) && error(overdetermined_error_msg)
-
-    start = totaldegree_solutions(prob.degrees)
-    proj = Projective(
-        Systems.TotalDegreeSystem(prob.degrees),
-        system(F, variables), variable_groups, seed; kwargs...)
-    proj, start
-end
-
 
 function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
     G = Systems.TotalDegreeSystem(prob.degrees)
 	# Check overdetermined case
-	n > N && error(overdetermined_error_msg)
+	n > N && error(Utilities.overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
     (Projective(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(prob.degrees))
@@ -119,15 +91,15 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...) where
-    {AP1<:MP.AbstractPolynomialLike, AP2<:MP.AbstractPolynomialLike}
-
+function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.MPPolyInputs}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogenous.((F, G))
-	variables = MP.variables(F)
+	vars = variables(F)
     if F_ishom && G_ishom
-		vargroups = VariableGroups(variables, homvar)
-        Projective(system(G), system(F), vargroups, seed; kwargs...), prob.startsolutions
+		vargroups = VariableGroups(vars, homvar)
+		F̄ = construct_system(F, system; variables=vars, homvars=homvar)
+		Ḡ = construct_system(G, system; variables=vars, homvars=homvar)
+        Projective(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogenous and the other not!")
     else
@@ -136,13 +108,12 @@ function problem_startsolutions(prob::StartTarget{Vector{AP1}, Vector{AP2}}, hom
         end
 
 		h = uniquevar(F)
-        push!(variables, h)
-        sort!(variables, rev=true)
-        F′ = homogenize(F, h)
-		G′ = homogenize(G, h)
-
-		vargroups = VariableGroups(variables, h)
-        Projective(system(G′, variables), system(F′, variables), vargroups, seed; kwargs...), prob.startsolutions
+        push!(vars, h)
+        sort!(vars, rev=true)
+        F̄ = construct_system(homogenize(F, h), system, variables=vars, homvars=homvar)
+		Ḡ = construct_system(homogenize(G, h), system, variables=vars, homvars=homvar)
+		vargroups = VariableGroups(vars, h)
+        Projective(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     end
 end
 
@@ -150,11 +121,10 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=FPSystem, kwargs...)
-    F, variables, variable_groups = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
-
-    H = ParameterHomotopy(F, prob.parameters, variables=variables,
-						  p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=SPSystem, kwargs...)
+    F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
+	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
+    H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
     Projective(H, variable_groups, seed), prob.startsolutions
 end
