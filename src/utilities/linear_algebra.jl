@@ -1,4 +1,4 @@
-export normalized_dot, euclidean_distance, euclidean_norm, rowscaling, rowscaling!, solve!,
+export normalized_dot, euclidean_distance, euclidean_norm, solve!,
     fast_factorization!, fast_ldiv!, factorization, factorize!,
     iterative_refinement!, iterative_refinement_step!, IterativeRefinementResult,
     Jacobian, adaptive_solve!
@@ -11,21 +11,19 @@ import DoubleFloats: Double64
 Data structure holding a Jacobian matrix `J` with it's factorization.
 Additional contains a vector `D` of scalings which row equilibarate `J`.
 
-    Jacobian(J; rowscaling=false)
+    Jacobian(J)
 
-Setup a Jacobian with Jacobian matrices of the form `J`. Enable row scaling
-if desired.
+Setup a Jacobian with Jacobian matrices of the form `J`.
 """
 mutable struct Jacobian{T, F<:LinearAlgebra.Factorization}
     J::Matrix{T} # Jacobian matrix
     D::Vector{Float64} # Scaling factors D
     fac::F # Factorization of D * J
-    rowscaling::Bool
     b::Vector{T} # Vector for overdetermined systems
     r::Vector{T} # Vector for iterative refinement
 end
 
-function Jacobian(A::AbstractMatrix; rowscaling=false)
+function Jacobian(A::AbstractMatrix)
     m, n = size(A)
     if m == n
         fac = LinearAlgebra.lu(A)
@@ -36,18 +34,16 @@ function Jacobian(A::AbstractMatrix; rowscaling=false)
     D = ones(m)
     r = similar(J, size(J, 1))
     b = copy(r)
-    Jacobian(J, D, fac, rowscaling, b, r)
+    Jacobian(J, D, fac, b, r)
 end
 
 """
     update!(jacobian, J)
 
 Update the `jacobian` struct with the new Matrix `J`.
-This applies rowscaling, if enabled, and computes a factorization of `J`.
 """
 function update!(Jac::Jacobian, J::AbstractMatrix)
     copyto!(Jac.J, J)
-    Jac.rowscaling && rowscaling!(Jac.D, Jac.J)
     Jac.fac = factorize!(Jac.fac, Jac.J)
     Jac
 end
@@ -55,62 +51,12 @@ end
 """
     update_jacobian!(jacobian)
 
-This applies rowscaling, if enabled, and computes a factorization of the stored Jacobian matrix.
+This computes a factorization of the stored Jacobian matrix.
 Call this instead of `update!` if `jacobian.J` got updated.
 """
 function updated_jacobian!(Jac::Jacobian)
-    Jac.rowscaling && rowscaling!(Jac.D, Jac.J)
     Jac.fac = factorize!(Jac.fac, Jac.J)
     Jac
-end
-
-"""
-    apply_rowscaling!(x, jacobian)
-
-Apply the stored row scaling to the vector `x`.
-"""
-function apply_rowscaling!(x::AbstractVector, Jac::Jacobian)
-    if Jac.rowscaling
-        @boundscheck length(x) == size(Jac.D)
-        @inbounds for i in eachindex(x)
-            x[i] *= Jac.D[i]
-        end
-    end
-    x
-end
-
-"""
-    enable_rowscaling!(jacobian)
-
-Enable row scaling.
-"""
-enable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = true; Jac end
-
-"""
-    disable_rowscaling!(jacobian)
-
-Disable row scaling.
-"""
-disable_rowscaling!(Jac::Jacobian) = begin Jac.rowscaling = false; Jac end
-
-
-"""
-    normalized_dot(u, v)
-
-Compute u⋅v / (||u||*||v||).
-"""
-function normalized_dot(u::AbstractVector{T}, v::AbstractVector{T}) where T
-    @boundscheck length(u) == length(v)
-    n = length(u)
-    dot = zero(eltype(u))
-    norm_u = norm_v = zero(real(eltype(u)))
-    for i=1:n
-        dot += conj(v[i]) * u[i]
-        norm_u += abs2(u[i])
-        norm_v += abs2(v[i])
-    end
-
-    @fastmath dot / sqrt(norm_u * norm_v)
 end
 
 """
@@ -137,59 +83,6 @@ function euclidean_norm(x::AbstractVector)
 end
 
 """
-    rowscaling(A)
-
-Apply elementwise row-scaling to a copy of `A`.
-"""
-rowscaling(A) = rowscaling!(copy(A))
-
-"""
-    rowscaling(A, b=nothing)
-
-Apply elementwise row-scaling inplace to `A`.
-Also scale the i-th entry of `b` by the same value as the i-th row of `A`.
-"""
-function rowscaling!(A::AbstractMatrix, b::Union{AbstractVector, Nothing}=nothing)
-    @inbounds for i=1:size(A, 1)
-        s = zero(eltype(A))
-        for j=1:size(A, 2)
-            s += abs2(A[i, j])
-        end
-        s = sqrt(s)
-        for j=1:size(A, 2)
-            A[i, j] /= s
-        end
-        if b !== nothing
-            b[i] /= s
-        end
-    end
-    A
-end
-
-
-"""
-    rowscaling!(D::Vector, A)
-
-Apply elementwise row-scaling inplace to `A`.
-Stores the scaling factors in D.
-"""
-function rowscaling!(D::Vector, A::AbstractMatrix)
-    m, n = size(A)
-    @inbounds for i=1:m
-        s = zero(eltype(D))
-        for j=1:n
-            s += abs2(A[i, j])
-        end
-        dᵢ = inv(sqrt(s))
-        for j=1:n
-            A[i, j] *= dᵢ
-        end
-        D[i] = dᵢ
-    end
-    D
-end
-
-"""
     solve!([x,] A, b)
 
 Solve ``Ax=b`` inplace. This overwrites `A` and `b`
@@ -213,7 +106,6 @@ function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
 end
 solve!(A, b) = solve!(b, A, b)
 
-
 """
     solve!([x, ] factorization, b)
 
@@ -233,7 +125,6 @@ function solve!(x, Jac::Jacobian, b::AbstractVector)
         rhs = x
     end
 
-    apply_rowscaling!(rhs, Jac)
     solve!(x, Jac.fac, rhs)
 end
 function solve!(x, LU::LinearAlgebra.LU, b::AbstractVector)
@@ -407,8 +298,6 @@ Returns an [`IterativeRefinementResult`](@ref).
 """
 function solve_with_iterative_refinement!(x::AbstractVector, Jac::Jacobian,
                 b::AbstractVector, ::Type{T}; iters::Int=1) where {T}
-    # we need to apply row scaling sepearetly since we need it the b scaled
-    apply_rowscaling!(b, Jac)
     solve!(x, Jac.fac, b)
     cond = 0.0
     accuracy = Inf
