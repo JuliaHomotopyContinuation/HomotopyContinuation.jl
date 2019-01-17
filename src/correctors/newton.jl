@@ -36,7 +36,7 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
     correct!(out, alg, cache, H, x₀, t, tol, maxiters, cond)
 end
 
-function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol=1e-6, maxiters::Integer=3, cond=1.0)
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3, cond=1.0)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -48,8 +48,8 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
     Θ₀ = Θᵢ₋₁ = norm_Δxᵢ₋₁ = norm_Δxᵢ = norm_Δx₀ = zero(T)
     accuracy = T(Inf)
     ω₀ = ω = 0.0
-    for i ∈ 0:(maxit)
-        if i == maxit && alg.simplified_last_step
+    for i ∈ 0:(maxiters)
+        if i == maxiters && alg.simplified_last_step
             evaluate!(rᵢ, H, xᵢ, t)
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)

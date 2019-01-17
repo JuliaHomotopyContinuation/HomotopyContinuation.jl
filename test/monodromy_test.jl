@@ -37,7 +37,7 @@ end
         F, p, p₀, x₀ = toric_ed([3 2 1 0; 0 1 2 3])
 
         # test that timeout works
-        Random.seed!(12345)
+        Random.seed!(51232)
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, timeout=1e-12)
         @test length(result.solutions) < 21
 

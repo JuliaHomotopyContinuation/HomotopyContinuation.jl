@@ -40,7 +40,6 @@ function Options(;tol=1e-7,
     maxiters=10_000,
     initial_steplength=0.1,
     minimal_steplength=1e-14,
-    minimal_steplength=1e-14,
     simple_step_size=false,
     update_patch=true)
 
