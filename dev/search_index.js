@@ -949,7 +949,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracking.setup!",
     "category": "function",
-    "text": "setup!(pathtracker, x₁, t₁, t₀, setup_patch=true, checkstartvalue=true, compute_ẋ=true)\n\nSetup pathtracker to track x₁ from t₁ to t₀. Use this if you want to use the pathtracker as an iterator.\n\n\n\n\n\n"
+    "text": "setup!(pathtracker, x₁, t₁, t₀, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)\n\nSetup pathtracker to track x₁ from t₁ to t₀. Use this if you want to use the pathtracker as an iterator.\n\n\n\n\n\n"
 },
 
 {
