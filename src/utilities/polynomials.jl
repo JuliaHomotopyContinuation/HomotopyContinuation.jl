@@ -1,6 +1,6 @@
 export VariableGroups, nvariables, variables, npolynomials, ishomogenous, uniquevar, homogenize, projective_dims,
 	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system,
-	hasparameters
+	hasparameters, scale_systems
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
@@ -102,6 +102,12 @@ import Base: ∘
 ∘(g::Union{Composition, <:MPPolys}, f::MPPolys...) = compose(g, f...)
 ∘(g::Union{Composition, <:MPPolys}, f::Composition...) = compose(g, f...)
 
+"""
+	scale(C::Composition, λ)
+
+Scale a composition by λ.
+"""
+scale(C::Composition, λ) = Composition([[C.polys[1] .* λ]; C.polys[2:end]])
 
 """
 	expand(C::Composition; parameters=nothing)
@@ -505,6 +511,28 @@ function check_square_homogenous_system(F, vargroups::VariableGroups)
 	nothing
 end
 
+exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
+
+function coefficient_dot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
+	if f === g
+		return sum(t -> abs2(MP.coefficient(t)), f)
+	end
+    result = zero(promote_type(T,S))
+    for term_f in f
+		c_f = MP.coefficient(term_f)
+		exp_f = exponent(term_f, vars)
+        for term_g in g
+			c_g = MP.coefficient(term_g)
+			exp_g = exponent(term_g, vars)
+            if exp_f == exp_g
+                result += (c_f * conj(c_g))
+                break
+            end
+        end
+    end
+    result
+end
+coefficient_norm(f::MPPoly, vars=variables(f)) = √(coefficient_dot(f, f, vars))
 
 """
     weyldot(f::Polynomial, g::Polynomial)
@@ -547,8 +575,6 @@ Note that this is only properly defined if `f` is homogenous.
 weylnorm(F::MPPolys, vars=variables(F)) = √(sum(f -> weyldot(f, f, vars), F))
 weylnorm(f::MPPoly, vars=variables(f)) = √(weyldot(f, f, vars))
 
-exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
-
 "Computes the multinomial coefficient (|k| \\over k)"
 function multinomial(k::Vector{Int})
     s = 0
@@ -558,4 +584,68 @@ function multinomial(k::Vector{Int})
         result *= binomial(s, i)
     end
     result
+end
+
+"""
+	scale_systems(G, F)
+
+Scale the polynomial systems `G` and `F` such that ``||fᵢ-gᵢ||=1`` where the
+used norm is the the 2-norm on the coefficients of `G` and `F`.
+"""
+function scale_systems(G::Composition, F::MPPolys; report_scaling_factors=true, kwargs...)
+	_, f, scale_g, scale_f = scale_systems(Utilities.expand(G), F; report_scaling_factors=true, kwargs...)
+	if report_scaling_factors
+		scale(G, scale_g), f, scale_g, scale_f
+	else
+		scale(G, scale_g), f
+	end
+end
+function scale_systems(G::MPPolys, F::Composition; report_scaling_factors=true, kwargs...)
+	g, _, scale_g, scale_f = scale_systems(G, Utilities.expand(F); report_scaling_factors=true, kwargs...)
+	if report_scaling_factors
+		g, scale(F, scale_f), scale_g, scale_f
+	else
+		g, scale(F, scale_f)
+	end
+end
+function scale_systems(G::Composition, F::Composition; report_scaling_factors=true, kwargs...)
+	_, _, scale_g, scale_f = scale_systems(Utilities.expand(G), Utilities.expand(F);
+				report_scaling_factors=true, kwargs...)
+	if report_scaling_factors
+		scale(G, scale_g), scale(G, scale_f), scale_g, scale_f
+	else
+		scale(G, scale_g), scale(G, scale_f)
+	end
+end
+function scale_systems(G::MPPolys, F::MPPolys; report_scaling_factors=false, variables=Utilities.variables(F))
+	# We consider the homogenous systems F and G as elements in projective space
+	# In particular as elements on the unit sphere
+	normalizer_g = inv.(coefficient_norm.(G))
+	g = normalizer_g .* G
+	normalizer_f = inv.(coefficient_norm.(F))
+	f = normalizer_f .* F
+
+	# We scale such that ⟨fᵢ-gᵢ,fᵢ-gᵢ⟩=1
+	μλ = map(1:length(f)) do i
+		dot = abs(coefficient_dot(f[i], g[i]))
+		# <fᵢ,\gᵢ> reasonabe large to scale
+		if dot > 1e-4
+			λᵢ = 2dot
+			μᵢ = one(λᵢ)
+		else
+			λᵢ = μᵢ = sqrt(0.5)
+		end
+		μᵢ, λᵢ
+	end
+
+	g .*= first.(μλ)
+	f .*= last.(μλ)
+
+	if report_scaling_factors
+		scale_g = normalizer_g .* first.(μλ)
+		scale_f = normalizer_f .* last.(μλ)
+		g, f, scale_g, scale_f
+	else
+		g, f
+	end
 end

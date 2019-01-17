@@ -34,8 +34,8 @@ function cache(H::StraightLineHomotopy, x, t)
     start_cache = Systems.cache(H.start, x)
     target_cache = Systems.cache(H.target, x)
 
-    u = Systems.evaluate(H.start, x, start_cache)
-    U = Systems.jacobian(H.start, x, start_cache)
+    u = complex.(Systems.evaluate(H.start, x, start_cache))
+    U = complex.(Systems.jacobian(H.start, x, start_cache))
 
     StraightLineHomotopyCache(start_cache, target_cache, u, U)
 end

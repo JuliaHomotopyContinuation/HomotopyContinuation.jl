@@ -38,6 +38,10 @@
         F = equations(katsura(5))
         @test nfinite(solve(F, simple_step_size=true, threading=false)) == 32
 
+        # scaling
+        F = equations(katsura(5))
+        @test nfinite(solve(F, scale_systems=false, threading=false)) == 32
+
         @test nfinite(solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
         result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)
         @test nresults(result) == 32
@@ -92,6 +96,7 @@
         g = [x+y, y + 3, x + 2]
         res = solve(e ∘ f ∘ g)
         @test nnonsingular(res) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, scale_systems=false)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
