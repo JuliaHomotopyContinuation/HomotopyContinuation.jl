@@ -302,12 +302,3 @@ function Base.empty!(data::UniquePoints)
     empty!(data.root)
     empty!(data.points)
 end
-
-function distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
-    n = length(x)
-    @inbounds d = abs2(x[1] - y[1])
-    @inbounds for i=2:n
-        @fastmath d += abs2(x[i] - y[i])
-    end
-    sqrt(d)
-end

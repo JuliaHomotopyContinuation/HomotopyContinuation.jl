@@ -41,7 +41,6 @@ end
 
 function change_weight!(ip::EuclideanInnerProduct, x::PVector{T,1}) where {T}
     point_norm = norm(x, ip)[1]
-    @show point_norm
     w = ip.weight
     for i in 1:length(w)
         wᵢ = (abs(x[i]) + w[i]) / 2
@@ -71,7 +70,12 @@ Base.@propagate_inbounds function inner(ip::EuclideanInnerProduct, x::AbstractVe
 end
 (ip::EuclideanInnerProduct)(x::AbstractVector, y::AbstractVector) = inner(ip, x, y)
 
+"""
+    distance(u, v, inner_product=nothing)
 
+Compute the distance ||u-v|| with the norm induced by `inner_product`.
+If `inner_product === nothing` the euclidean scalar product is used.
+"""
 function distance(x::AbstractVector, y::AbstractVector, in::EuclideanInnerProduct)
     @boundscheck length(in.weight) == length(x) == length(y)
     out = zero(real(eltype(x)))
@@ -81,7 +85,15 @@ function distance(x::AbstractVector, y::AbstractVector, in::EuclideanInnerProduc
     end
     sqrt(out)
 end
-
+function distance(x::AbstractVector{T}, y::AbstractVector{T}, ::Nothing=nothing) where T
+    @boundscheck length(x) == length(y)
+    n = length(x)
+    @inbounds d = abs2(x[1] - y[1])
+    @inbounds for i=2:n
+        @fastmath d += abs2(x[i] - y[i])
+    end
+    sqrt(d)
+end
 
 
 function norm2(x::AbstractVector, in::EuclideanInnerProduct)
@@ -93,6 +105,14 @@ function norm2(x::AbstractVector, in::EuclideanInnerProduct)
     end
     out
 end
+function norm2(x::AbstractVector, ::Nothing=nothing)
+    out = zero(real(eltype(x)))
+    @inbounds for i in eachindex(x)
+        out += abs2(x[i])
+    end
+    out
+end
+
 function norm2(z::PVector{T, 1}, ip::EuclideanInnerProduct) where {T}
     (norm2(z.data, ip),)
 end
@@ -112,4 +132,6 @@ Base.@propagate_inbounds function _norm2_range(z::PVector{T}, rᵢ::UnitRange{In
 end
 
 LinearAlgebra.norm(x::AbstractVector, ip::EuclideanInnerProduct) = sqrt(norm2(x, ip))
+LinearAlgebra.norm(x::AbstractVector, ::Nothing) = sqrt(norm2(x))
 LinearAlgebra.norm(x::PVector, ip::EuclideanInnerProduct) = sqrt.(norm2(x, ip))
+LinearAlgebra.norm(x::PVector, ::Nothing) = norm(x)

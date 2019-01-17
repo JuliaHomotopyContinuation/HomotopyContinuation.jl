@@ -31,6 +31,7 @@ mutable struct Options
     minimal_steplength::Float64
     simple_step_size::Bool
     update_patch::Bool
+    scaling::Bool
 end
 
 function Options(;tol=1e-7,
@@ -41,10 +42,11 @@ function Options(;tol=1e-7,
     initial_steplength=0.1,
     minimal_steplength=1e-14,
     simple_step_size=false,
-    update_patch=true)
+    update_patch=true,
+    scaling=true)
 
     Options(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
-            initial_steplength, minimal_steplength, simple_step_size, update_patch)
+            initial_steplength, minimal_steplength, simple_step_size, update_patch, scaling)
 end
 Base.show(io::IO, opts::Options) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
@@ -61,12 +63,12 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::Options) = opts
     terminated_singularity
 end
 
-mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
+mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState, IP<:Union{Nothing, InnerProduct}}
     x::ProjectiveVectors.PVector{T,N} # current x
     x̂::ProjectiveVectors.PVector{T,N} # last prediction
     x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
     ẋ::Vector{T} # derivative at current x
-    inner_product::EuclideanInnerProduct{Float64} # weighted inner product
+    inner_product::IP
     η::Float64
     ω::Float64
     segment::ComplexSegment
@@ -86,7 +88,7 @@ end
 function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
-    inner_product = EuclideanInnerProduct(ones(length(x)))
+    inner_product = options.scaling ? EuclideanInnerProduct(ones(length(x))) : nothing
     η = ω = NaN
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
@@ -112,7 +114,9 @@ function reset!(state::State, x₁::AbstractVector, t₁, t₀, options::Options
     state.accepted_steps = state.rejected_steps = 0
     state.status = Status.tracking
     ProjectiveVectors.embed!(state.x, x₁)
-    setup_patch && AffinePatches.setup!(state.patch, state.x)
+    if setup_patch
+        AffinePatches.setup!(state.patch, state.x, inner_product(state, options))
+    end
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
     state
@@ -311,25 +315,28 @@ Setup `pathtracker` to track `x₁` from `t₁` to `t₀`. Use this if you want 
 pathtracker as an iterator.
 """
 function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
-    state, cache = tracker.state, tracker.cache
+    state, cache, options = tracker.state, tracker.cache, tracker.options
 
     try
-        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
-
+        reset!(state, x₁, t₁, t₀, options, setup_patch)
+        options.scaling && init_scaling!(state)
         Predictors.reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
-            compute_ẋ!(state, cache, tracker.options)
+            compute_ẋ!(state, cache, options)
             Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
             rethrow(err)
         end
-        tracker.state.status = Status.terminated_singularity
+        state.status = Status.terminated_singularity
     end
     tracker
 end
+
+inner_product(tracker::PathTracker) = inner_product(tracker.state, tracker.options)
+inner_product(state::State, opts::Options) = state.inner_product
 
 function init_scaling!(state::State)
     init_weight!(state.inner_product, state.x)
@@ -362,7 +369,7 @@ function correct!(x̄, tracker, x=tracker.state.x, t=tracker.state.segment[track
     tol=tracker.options.tol,
     maxiters=tracker.options.corrector_maxiters)
     Correctors.correct!(x̄, tracker.corrector, tracker.cache.corrector,
-                        tracker.cache.homotopy, x, t, tol, maxiters)
+                        tracker.cache.homotopy, x, t, inner_product(tracker), tol, maxiters)
 end
 
 function step!(tracker)
@@ -374,7 +381,7 @@ function step!(tracker)
         t, Δt = currt(state), currΔt(state)
         Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt,
-                options.tol, options.corrector_maxiters, state.cond)
+                inner_product(tracker), options.tol, options.corrector_maxiters, state.cond)
         if Correctors.isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
@@ -385,8 +392,8 @@ function step!(tracker)
             # Step size change
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
 
-            change_scaling!(state)
-            options.update_patch && AffinePatches.changepatch!(state.patch, x)
+            options.scaling && change_scaling!(state)
+            options.update_patch && AffinePatches.changepatch!(state.patch, x, inner_product(tracker))
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
@@ -412,9 +419,7 @@ function step!(tracker)
     nothing
 end
 
-function change_scaling!(state::State)
-    change_weight!(state.inner_product, state.x)
-end
+change_scaling!(state::State, x=state.x) = change_weight!(state.inner_product, x)
 
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
@@ -437,7 +442,7 @@ function update_stepsize!(state::State, result::Correctors.Result,
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω
-        d_x̂_x̄ = euclidean_distance(state.x̂, state.x)
+        d_x̂_x̄ = distance(state.x̂, state.x, inner_product(state, options))
     end
 
     Δx₀ = result.norm_Δx₀

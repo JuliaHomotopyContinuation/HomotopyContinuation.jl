@@ -47,7 +47,7 @@ function onpatch! end
 Setup the affine patch depending on `x` and modify `x` if necessary.
 This is only called once at the beginning of a tracked path.
 """
-setup!(state::AbstractAffinePatchState, x::AbstractVector) = onpatch!(x, state)
+setup!(state::AbstractAffinePatchState, x::AbstractVector, ip=nothing) = onpatch!(x, state)
 
 """
     changepatch!(::AbstractAffinePatch, x::AbstractVector)
@@ -55,6 +55,9 @@ setup!(state::AbstractAffinePatchState, x::AbstractVector) = onpatch!(x, state)
 The same as [`setup!`](@ref) but only called during the path tracking.
 """
 changepatch!(::AbstractAffinePatchState, x::AbstractVector) = nothing
+function changepatch!(state::AbstractAffinePatchState, x, ip)
+    changepatch!(state, x)
+end
 
 include("affine_patches/common.jl")
 include("affine_patches/orthogonal_patch.jl")

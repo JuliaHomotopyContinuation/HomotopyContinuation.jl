@@ -32,11 +32,11 @@ function cache(::Newton, H::HomotopyWithCache, x, t)
     NewtonCache(Jac, rᵢ, Δxᵢ)
 end
 
-function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t; tol=1e-6, maxiters::Integer=3, cond=1.0)
-    correct!(out, alg, cache, H, x₀, t, tol, maxiters, cond)
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, ip; tol=1e-6, maxiters::Integer=3, cond=1.0)
+    correct!(out, alg, cache, H, x₀, t, ip, tol, maxiters, cond)
 end
 
-function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3, cond=1.0)
+function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x₀, t, ip::Union{Nothing,InnerProduct}, tol::Float64=1e-6, maxiters::Integer=3, cond=1.0)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -60,7 +60,7 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             compute_new_cond=iszero(i))
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
-        norm_Δxᵢ = euclidean_norm(Δxᵢ)
+        norm_Δxᵢ = LinearAlgebra.norm(Δxᵢ, ip)
         @inbounds for k in eachindex(xᵢ)
             xᵢ₊₁[k] = xᵢ[k] - Δxᵢ[k]
         end
