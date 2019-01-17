@@ -24,6 +24,7 @@ export @moduleenum,
 
 include("utilities/unique_points.jl")
 include("utilities/linear_algebra.jl")
+include("utilities/inner.jl")
 include("utilities/polynomials.jl")
 
 

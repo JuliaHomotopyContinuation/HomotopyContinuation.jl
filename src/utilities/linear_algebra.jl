@@ -4,6 +4,7 @@ export normalized_dot, euclidean_distance, euclidean_norm, solve!,
     Jacobian, adaptive_solve!
 
 import DoubleFloats: Double64
+using LinearAlgebra
 
 """
     Jacobian{T, <:Factorization}

@@ -66,6 +66,7 @@ mutable struct State{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
     x̂::ProjectiveVectors.PVector{T,N} # last prediction
     x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
     ẋ::Vector{T} # derivative at current x
+    inner_product::EuclideanInnerProduct{Float64} # weighted inner product
     η::Float64
     ω::Float64
     segment::ComplexSegment
@@ -85,6 +86,7 @@ end
 function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::Options)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
+    inner_product = EuclideanInnerProduct(ones(length(x)))
     η = ω = NaN
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
@@ -96,7 +98,7 @@ function State(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches
     status = Status.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    State(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, cond, status, patch,
+    State(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy, cond, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -313,6 +315,7 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
 
     try
         reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
+
         Predictors.reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
@@ -326,6 +329,10 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
         tracker.state.status = Status.terminated_singularity
     end
     tracker
+end
+
+function init_scaling!(state::State)
+    init_weight!(state.inner_product, state.x)
 end
 
 function checkstartvalue!(tracker)
@@ -377,6 +384,8 @@ function step!(tracker)
             state.cond = result.cond
             # Step size change
             update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
+
+            change_scaling!(state)
             options.update_patch && AffinePatches.changepatch!(state.patch, x)
             # update derivative
             compute_ẋ!(state, cache, options)
@@ -401,6 +410,10 @@ function step!(tracker)
         tracker.state.status = Status.terminated_singularity
     end
     nothing
+end
+
+function change_scaling!(state::State)
+    change_weight!(state.inner_product, state.x)
 end
 
 g(Θ) = sqrt(1+4Θ) - 1
