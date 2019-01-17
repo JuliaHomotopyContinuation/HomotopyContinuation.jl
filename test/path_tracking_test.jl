@@ -42,6 +42,14 @@
         @test out == R.x
     end
 
+    @testset "Allocations" begin
+        F = equations(katsura(5))
+        tracker, start_sols = PathTracking.pathtracker_startsolutions(F)
+        s = first(start_sols)
+        PathTracking.track!(tracker, s, 1.0, 0.1)
+        @allocated PathTracking.track!(tracker, s, 1.0, 0.1) == 16
+    end
+
     @testset "LinearSystem" begin
         A = rand(3, 3)
         b = rand(3)

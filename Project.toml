@@ -5,6 +5,7 @@ author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breidings@mi
 version = "0.5.0"
 
 [deps]
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 FixedPolynomials = "3dd14ad9-0029-526e-86e9-8aa0bdd2ab0d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

@@ -49,7 +49,7 @@ x₀ = [0; 1]
 @polyvar u[1:2]
 F_u = [det([x-u ∇]); f]
 
-monodromy_solve(F_u, [x₀], u₀, parameters = u)
+monodromy_solve(F_u, [x₀], u₀, parameters = u, target_solutions_count=3)
 
 
 # We get the three solutions. The following picture shows them:
