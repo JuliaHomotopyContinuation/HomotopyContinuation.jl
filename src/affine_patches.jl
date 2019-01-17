@@ -3,6 +3,7 @@ module AffinePatches
 import ProjectiveVectors
 import ProjectiveVectors: PVector
 import LinearAlgebra
+using ..Utilities
 
 export AbstractAffinePatch,
     AbstractLocalAffinePatch,
@@ -57,6 +58,7 @@ changepatch!(::AbstractAffinePatchState, x::AbstractVector) = nothing
 
 include("affine_patches/common.jl")
 include("affine_patches/orthogonal_patch.jl")
+include("affine_patches/scaled_orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")
 include("affine_patches/random_patch.jl")
 include("affine_patches/fixed_patch.jl")
