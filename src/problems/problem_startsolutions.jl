@@ -1,6 +1,6 @@
 export problem_startsolutions
 
-const supported_keywords = [[:seed, :homvar, :homotopy, :system]; Input.supported_keywords]
+const supported_keywords = [[:seed, :homvar, :homotopy, :system, :scale_systems]; Input.supported_keywords]
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
@@ -55,16 +55,35 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
     F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system; homvar=homvar)
 
 	check_square_homogenous_system(F, variable_groups)
 
-	problem = Projective(Systems.TotalDegreeSystem(prob.degrees),
-		construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
+	# Scale systems
+	if scale_systems
+		G = homogenous_totaldegree_polysystem(prob.degrees, variables, variable_groups)
+		_, f, G_scaling_factors, _ = Utilities.scale_systems(G, F, report_scaling_factors=true)
+		g = Systems.TotalDegreeSystem(prob.degrees, G_scaling_factors)
+		problem = Projective(g,
+						construct_system(f, system; variables=variables, homvars=homvars),
+						variable_groups, seed; kwargs...)
+	else
+		problem = Projective(Systems.TotalDegreeSystem(prob.degrees),
+			construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
+
+	end
 	startsolutions = totaldegree_solutions(prob.degrees)
 
 	problem, startsolutions
+end
+
+function homogenous_totaldegree_polysystem(degrees, variables, variable_groups::VariableGroups{1})
+	vars = variables[variable_groups.groups[1]]
+	map(1:length(degrees)) do i
+		d = degrees[i]
+		vars[i]^d - vars[end]^d
+	end
 end
 
 function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
@@ -91,14 +110,19 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.MPPolyInputs}, homvar, seed; system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogenous.((F, G))
 	vars = variables(F)
     if F_ishom && G_ishom
 		vargroups = VariableGroups(vars, homvar)
-		F̄ = construct_system(F, system; variables=vars, homvars=homvar)
-		Ḡ = construct_system(G, system; variables=vars, homvars=homvar)
+		if scale_systems
+			g, f = Utilities.scale_systems(G, F)
+		else
+			g, f = G, F
+		end
+		F̄ = construct_system(f, system; variables=vars, homvars=homvar)
+		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
         Projective(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogenous and the other not!")
@@ -110,8 +134,13 @@ function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.
 		h = uniquevar(F)
         push!(vars, h)
         sort!(vars, rev=true)
-        F̄ = construct_system(homogenize(F, h), system, variables=vars, homvars=homvar)
-		Ḡ = construct_system(homogenize(G, h), system, variables=vars, homvars=homvar)
+		if scale_systems
+			g, f = Utilities.scale_systems(homogenize(G, h), homogenize(F, h))
+		else
+			g, f = homogenize(G, h), homogenize(F, h)
+		end
+        F̄ = construct_system(f, system, variables=vars, homvars=homvar)
+		Ḡ = construct_system(g, system, variables=vars, homvars=homvar)
 		vargroups = VariableGroups(vars, h)
         Projective(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     end
