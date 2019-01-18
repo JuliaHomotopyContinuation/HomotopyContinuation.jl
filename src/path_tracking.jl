@@ -16,7 +16,7 @@ export PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
 
 const allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
-    :maxiters, :simple_step_size]
+    :maxiters, :simple_step_size, :scaling]
 
 ###########
 # Options
@@ -168,6 +168,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-7`: The precision used to track a value.
+* `scaling=false`: Automatically scale variables such that the patch is tracked with an relative accuracy instead of absolute.
 """
 struct PathTracker{H<:Homotopies.AbstractHomotopy,
     Predictor<:Predictors.AbstractPredictor,
@@ -196,11 +197,12 @@ function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; kwargs...)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
 function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
-    patch=AffinePatches.OrthogonalPatch(),
+    scaling=false,
+    patch=defaultpatch(scaling),
     corrector::Correctors.AbstractCorrector=Correctors.Newton(),
     predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)
 
-    options = Options(;kwargs...)
+    options = Options(;scaling=scaling, kwargs...)
 
     if H isa Homotopies.PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
@@ -222,6 +224,14 @@ function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVe
     cache = Cache(HC, predictor, corrector, state)
 
     PathTracker(H, predictor, corrector, patch, state, options, cache)
+end
+
+function defaultpatch(scaling)
+    if scaling
+        AffinePatches.ScaledOrthogonalPatch()
+    else
+        AffinePatches.OrthogonalPatch()
+    end
 end
 
 Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
@@ -354,7 +364,6 @@ end
 
 function compute_ẋ!(state, cache, options::Options)
     @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
-    # apply row scaling to J and compute factorization
     Utilities.updated_jacobian!(cache.Jac)
 
     @inbounds for i in eachindex(cache.out)
