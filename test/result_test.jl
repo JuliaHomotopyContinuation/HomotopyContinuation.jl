@@ -1,11 +1,11 @@
 @testset "Result" begin
     @testset "Result+PathResult" begin
         R = solve(equations(heart()), seed=506435)
-        @test R isa Solving.AffineResult
+        @test R isa AffineResult
         @test natinfinity(R) ≤ 572
         @test nfinite(R) == 4
         @test length(collect(R)) == 576
-        @test finite(R) isa Vector{<:Solving.PathResult}
+        @test finite(R) isa Vector{<:PathResult}
 
         @test length(finite(R, onlynonsingular=false)) == 4
         @test length(finite(R, onlynonsingular=true)) == 4
@@ -48,7 +48,7 @@
 
         @polyvar x y z
         R = solve([(x-3)^3,(y-2)])
-        @test R isa Solving.AffineResult
+        @test R isa AffineResult
         test_treeviews(R)
         @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0
@@ -57,7 +57,7 @@
 
         @polyvar x y z
         R = solve([(x-3z),(y-2z)])
-        @test R isa Solving.ProjectiveResult
+        @test R isa ProjectiveResult
         @test_nowarn string(R)
         test_treeviews(R)
         @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
@@ -65,7 +65,7 @@
 
         @polyvar x y z
         R = solve([(x-3z)^3,(y-2z)])
-        @test R isa Solving.ProjectiveResult
+        @test R isa ProjectiveResult
         test_treeviews(R)
         @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0

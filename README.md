@@ -54,7 +54,7 @@ real(result)
 ```
 
 ```
-2-element Array{HomotopyContinuation.Solving.PathResult{Complex{Float64},Float64,Complex{Float64}},1}:
+2-element Array{HomotopyContinuation.PathResult{Complex{Float64},Float64,Complex{Float64}},1}:
  • returncode: success
  • solution: Complex{Float64}[1.68179+5.55112e-17im, -1.41421-1.38778e-17im]
  • residual: 1.130e-16

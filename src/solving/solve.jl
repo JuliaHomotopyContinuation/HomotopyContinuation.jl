@@ -2,9 +2,9 @@ const Solvers = Vector{<:Solver}
 
 include("path_crossing.jl")
 
-solve(solver, start_solutions) = solve(solver, collect(start_solutions))
+internal_solve(solver, start_solutions) = solve(solver, collect(start_solutions))
 
-function solve(solvers, start_solutions::AbstractVector)
+function internal_solve(solvers, start_solutions::AbstractVector)
     nblas_threads = single_thread_blas()
 
     endgame_zone_results = track_to_endgamezone(solvers, start_solutions)

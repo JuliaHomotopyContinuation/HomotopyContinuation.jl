@@ -36,7 +36,7 @@ solutions
 realsolutions
 uniquesolutions
 finite
-Base.real(::Solving.Results)
+Base.real(::Results)
 atinfinity
 singular
 nonsingular

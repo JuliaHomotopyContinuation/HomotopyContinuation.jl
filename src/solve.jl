@@ -5,7 +5,6 @@ import .Input
 import .Problems
 import .Systems
 import .Homotopies
-import .Solving
 
 using .Utilities
 
@@ -148,19 +147,19 @@ Endgame specific options
 function solve end
 
 function solve(args...; threading=true, kwargs...)
-    solver, startsolutions = Solving.solver_startsolutions(args...; kwargs...)
+    solver, startsolutions = solver_startsolutions(args...; kwargs...)
     solve(solver, startsolutions, threading=threading)
 end
 
 # Internal
-function solve(solver::Solving.Solver, start_solutions; threading=true)
+function solve(solver::Solver, start_solutions; threading=true)
     if threading && Threads.nthreads() > 1
         solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
         solve(solvers, start_solutions, threading=true)
     else
-        Solving.solve(solver, start_solutions)
+        internal_solve(solver, start_solutions)
     end
 end
-function solve(solvers::AbstractVector{<:Solving.Solver}, start_solutions; threading=true)
-    Solving.solve(threading ? solvers : solvers[1], start_solutions)
+function solve(solvers::AbstractVector{<:Solver}, start_solutions; threading=true)
+    internal_solve(threading ? solvers : solvers[1], start_solutions)
 end

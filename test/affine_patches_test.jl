@@ -62,7 +62,7 @@ end
         AffinePatches.setup!(patch, x)
         u = [0.0im]
         AffinePatches.evaluate!(u, patch, x)
-        @test u[1] ≈ 0.0 atol=1e-15
+        @test u[1] ≈ 0.0 atol=1e-14
 
         U = zeros(Complex{Float64}, 1, 3)
         AffinePatches.jacobian!(U, patch, x)
@@ -71,7 +71,7 @@ end
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         AffinePatches.onpatch!(y, patch)
         AffinePatches.evaluate!(u, patch, y)
-        @test u[1] ≈ 0.0  atol=1e-15
+        @test u[1] ≈ 0.0  atol=1e-14
     end
 
     @testset "FixedPatch" begin

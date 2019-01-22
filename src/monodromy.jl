@@ -1,5 +1,3 @@
-module Monodromy
-
 export monodromy_solve, realsolutions, nreal, GroupActions, complex_conjugation
 
 import LinearAlgebra
@@ -339,7 +337,4 @@ function regenerate_loop_and_schedule_jobs!(queue, loop::Loop, options::Options,
         push!(queue, Job(x, loop.edges[1]))
     end
     nothing
-end
-
-
 end

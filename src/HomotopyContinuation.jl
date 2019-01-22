@@ -8,12 +8,10 @@ module HomotopyContinuation
         Endgaming,
         Homotopies,
         InterfaceTest,
-        Monodromy,
         PathTracking,
         Predictors,
         Input,
         Problems,
-        Solving,
         Systems,
         Utilities
 
@@ -39,22 +37,6 @@ module HomotopyContinuation
 
     include("interface_test.jl")
 
-    import .Solving: AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, isnonsingular,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
-
-    export AffineResult, ProjectiveResult, PathResult, solution,
-        residual, startsolution, #issuccess,
-        isfailed, isaffine, isprojective,
-        isatinfinity, issingular, isnonsingular,
-        nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular,
-        finite, results, mapresults, solutions, realsolutions, failed, atinfinity, singular,
-        nonsingular, seed, nreal, multiplicities, uniquesolutions, statistics
-
     import .Homotopies: StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
     export StraightLineHomotopy, FixedPointHomotopy, ParameterHomotopy
 
@@ -75,10 +57,7 @@ module HomotopyContinuation
             refinement_tol, refinement_maxiters, set_tol!,
             set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
 
-    import .Monodromy: monodromy_solve, GroupActions, complex_conjugation, Triangle, Petal
-    export monodromy_solve, GroupActions, complex_conjugation, Triangle, Petal
-
     import LinearAlgebra: issuccess
     export issuccess
 
-end #
+end
