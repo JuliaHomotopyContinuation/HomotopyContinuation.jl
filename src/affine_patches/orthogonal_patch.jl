@@ -30,5 +30,5 @@ end
 Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
 
 onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
-evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate!(u, state.v̄, x)
-jacobian!(U, state::OrthogonalPatchState, x::PVector) = jacobian!(U, state.v̄, x)
+evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)
+jacobian!(U, state::OrthogonalPatchState, x::PVector) = jacobian_patch!(U, state.v̄, x)

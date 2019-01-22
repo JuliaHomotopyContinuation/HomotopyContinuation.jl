@@ -26,5 +26,5 @@ function setup!(state::FixedPatchState, x::AbstractVector)
 end
 
 onpatch!(x::AbstractVector, state::FixedPatchState) = onpatch!(x, state.v̄)
-evaluate!(u, state::FixedPatchState, x::PVector) = evaluate!(u, state.v̄, x)
-jacobian!(U, state::FixedPatchState, x::PVector) = jacobian!(U, state.v̄, x)
+evaluate!(u, state::FixedPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)
+jacobian!(U, state::FixedPatchState, x::PVector) = jacobian_patch!(U, state.v̄, x)

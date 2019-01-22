@@ -24,5 +24,5 @@ end
 nequations(::RandomPatchState{T,N}) where {T,N} = N
 
 onpatch!(x::AbstractVector, state::RandomPatchState) = onpatch!(x, state.v̄)
-evaluate!(u, state::RandomPatchState, x::PVector) = evaluate!(u, state.v̄, x)
-jacobian!(U, state::RandomPatchState, x::PVector) = jacobian!(U, state.v̄, x)
+evaluate!(u, state::RandomPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)
+jacobian!(U, state::RandomPatchState, x::PVector) = jacobian_patch!(U, state.v̄, x)
