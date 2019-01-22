@@ -239,18 +239,18 @@ function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::Statis
     track(tracker, x, stats)
 end
 function track(tracker, x::AbstractVector, stats::Statistics)
-    retcode = PathTracking.track!(tracker, x, 1.0, 0.0)
+    retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
-    y = ProjectiveVectors.affine_chart!(x, PathTracking.currx(tracker))
+    y = ProjectiveVectors.affine_chart!(x, currx(tracker))
     y, retcode
 end
 
 """x
-    set_parameters!(tracker::PathTracking.PathTracker, e::Edge, loop::Loop)
+    set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
 
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.
 """
-function set_parameters!(tracker::PathTracking.PathTracker, e::Edge, loop::Loop)
+function set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
     H = Homotopies.basehomotopy(tracker.homotopy)
     if !(H isa Homotopies.ParameterHomotopy)
         error("Base homotopy is not a ParameterHomotopy")

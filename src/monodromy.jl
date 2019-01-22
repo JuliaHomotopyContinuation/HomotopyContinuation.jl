@@ -7,7 +7,7 @@ import ProgressMeter
 import StaticArrays: SVector, @SVector
 import TreeViews
 
-import ..Homotopies, ..PathTracking, ProjectiveVectors, ..Utilities
+import ..Homotopies, ProjectiveVectors, ..Utilities
 import ..Utilities: UniquePoints
 
 include("monodromy/group_actions.jl")
@@ -150,12 +150,12 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     #assemble
     loop = Loop(strategy, p₀, startsolutions, options)
     if scale_system
-        f = F ./ Utilities.coefficient_norm.(map(fi -> MP.subs(fi, parameters=>p₀), F))
+        f = F ./ coefficient_norm.(map(fi -> MP.subs(fi, parameters=>p₀), F))
     else
         f = F
     end
 
-    tracker = PathTracking.pathtracker(
+    tracker = pathtracker(
         f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
         tol=options.tol,
         refinement_tol=options.tol / 10,
@@ -211,7 +211,7 @@ end
 
 
 function monodromy_solve!(loop::Loop,
-    tracker::PathTracking.PathTracker, options::Options,
+    tracker::PathTracker, options::Options,
     stats::Statistics, progress)
 
     t₀ = time_ns()
@@ -249,7 +249,7 @@ function monodromy_solve!(loop::Loop,
     :success
 end
 
-function empty_queue!(queue, loop::Loop, tracker::PathTracking.PathTracker, options::Options,
+function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::Options,
         t₀::UInt, stats::Statistics, progress)
     while !isempty(queue)
         job = pop!(queue)
@@ -268,7 +268,7 @@ end
 function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::Options,
                   stats::Statistics, progress)
     y, retcode = track(tracker, job.x, job.edge, loop, stats)
-    if retcode ≠ PathTracking.Status.success
+    if retcode ≠ PathTrackerStatus.success
         return :incomplete
     end
     node = loop.nodes[job.edge.target]

@@ -8,13 +8,13 @@ struct SolverCache{P<:PathResultCache}
 end
 
 function SolverCache(prob, tracker)
-    pathresult = PathResultCache(prob, PathTracking.currx(tracker))
+    pathresult = PathResultCache(prob, currx(tracker))
 
     SolverCache(pathresult)
 end
 
-struct Solver{P<:Problems.AbstractProblem, T<:PathTracking.PathTracker,
-        E<:Endgaming.Endgame, C<:SolverCache}
+struct Solver{P<:Problems.AbstractProblem, T<:PathTracker,
+        E<:Endgame, C<:SolverCache}
     prob::P
     tracker::T
     endgame::E
@@ -42,10 +42,10 @@ end
 function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
     x₁= Problems.embed(prob, startsolutionsample)
 
-    tracker = PathTracking.PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, PathTracking.allowed_keywords)...)
+    tracker = PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracking_allowed_keywords)...)
 
     check_at_infinity = Problems.homvars(prob) !== nothing
-    endgame = Endgaming.Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, Endgaming.allowed_keywords)...)
+    endgame = Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, endgame_allowed_keywords)...)
 
     check_kwargs(kwargs)
 
@@ -59,7 +59,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
-allowed_keywords() = [:patch, PathTracking.allowed_keywords..., Endgaming.allowed_keywords...]
+allowed_keywords() = [:patch, pathtracker_allowed_keywords..., endgame_allowed_keywords...]
 
 function invalid_kwargs(kwargs)
     invalids = []

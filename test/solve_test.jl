@@ -136,7 +136,7 @@
         F = equations(cyclic(6))
         tracker, start_sols = pathtracker_startsolutions(F, tol=1e-3, corrector_maxiters=5, seed=123512)
         tracked_paths = map(start_sols) do x
-            PathTracking.track(tracker, x, 1.0, 0.1)
+            track(tracker, x, 1.0, 0.1)
         end
 
         crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-2)
@@ -144,7 +144,7 @@
 
         tracker, start_sols = pathtracker_startsolutions(F, seed=123512)
         tracked_paths = map(start_sols) do x
-            PathTracking.track(tracker, x, 1.0, 0.1)
+            track(tracker, x, 1.0, 0.1)
         end
         crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-5)
         @test isempty(crossed_path_indices)

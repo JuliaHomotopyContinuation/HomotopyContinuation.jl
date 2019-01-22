@@ -112,8 +112,8 @@ function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathRe
         condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
 end
 
-iters(R::Endgaming.Result) = R.iters
-iters(R::PathTracking.PathTrackerResult) = R.accepted_steps + R.rejected_steps
+iters(R::EndgameResult) = R.iters
+iters(R::PathTrackerResult) = R.accepted_steps + R.rejected_steps
 
 
 function makereturncode(retcode)
@@ -123,7 +123,7 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
-makereturncode(retcode::PathTracking.Status.t) = :path_failed, :none
+makereturncode(retcode::PathTrackerStatus.t) = :path_failed, :none
 
 
 """
@@ -150,8 +150,8 @@ function align_axis!(x)
     x
 end
 
-windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
-windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
+windingnumber_npredictions(r::EndgameResult) = (r.windingnumber, r.npredictions)
+windingnumber_npredictions(r::PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)

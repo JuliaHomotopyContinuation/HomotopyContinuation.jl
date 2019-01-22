@@ -1,11 +1,11 @@
-export Endgame, Result, allowed_keywords
+export Endgame, EndgameResult, endgame_allowed_keywords
 
-const allowed_keywords = [:sampling_factor, :egtol, :minradius, :maxnorm, :minimal_maxnorm,
+const endgame_allowed_keywords = [:sampling_factor, :egtol, :minradius, :maxnorm, :minimal_maxnorm,
     :maxwindingnumber, :max_extrapolation_samples, :cauchy_loop_closed_tolerance,
     :cauchy_samples_per_loop,
     :maxiters_per_step, :check_at_infinity]
 
-struct Options
+struct EndgameOptions
     # See Endgame docstring for explanations
     sampling_factor::Float64
     tol::Float64
@@ -19,7 +19,7 @@ struct Options
     check_at_infinity::Bool
 end
 
-mutable struct State{V<:ProjectiveVectors.PVector, C, T}
+mutable struct EndgameState{V<:ProjectiveVectors.PVector, C, T}
     # Current value
     x::V
     # prediction and previous prediction
@@ -47,7 +47,7 @@ mutable struct State{V<:ProjectiveVectors.PVector, C, T}
     in_endgame_zone::Bool
 end
 
-function State(x, R₀, options)
+function EndgameState(x, R₀, options)
     n = maxsamples(R₀, options)
 
     R = real(R₀)
@@ -69,7 +69,7 @@ function State(x, R₀, options)
     windingnumber = 1
     in_endgame_zone = false
 
-    State(copy(x), p, pprev, pbest, pbest_delta, samples, nsamples, logabs_samples,
+    EndgameState(copy(x), p, pprev, pbest, pbest_delta, samples, nsamples, logabs_samples,
         directions,
         R, npredictions, iters, status,
         windingnumber, in_endgame_zone)
@@ -79,7 +79,7 @@ function maxsamples(R₀, options)
     ceil(Int, log(options.sampling_factor, options.minradius / real(R₀))) + 2
 end
 
-function reset!(state::State, x, R)
+function reset!(state::EndgameState, x, R)
     state.nsamples = 1
     state.x .= x
     for i = 1:length(x)
@@ -108,7 +108,7 @@ struct Cache{V}
     pbuffer::V
 end
 
-function Cache(state::State, options::Options)
+function Cache(state::EndgameState, options::EndgameOptions)
     log_sampling_factor = log(options.sampling_factor)
     windingnumbers = zeros(Int, length(state.x))
     unitroots = Vector{ComplexF64}()
@@ -125,7 +125,7 @@ end
 Construct an `Endgame` to run the endgame for paths of the type of `x` and the homotopy
 `H`.
 
-## Options
+## EndgameOptions
 * `sampling_factor=0.5` During the endgame we approach ``0`` by the geometric series ``h^kR₀``
 where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runendgame`.
 * `egtol=1e-10` This is the tolerance necessary to declare the endgame converged.
@@ -143,14 +143,14 @@ The distance between endpoints is normalized by the maximal difference between a
 in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop
 and ``n`` is `cauchy_samples_per_loop`.
 * `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
-* `pathtrackerkwargs...` During the endgame a [`PathTracking.PathTracker`](@ref) is used. These are all arguments possible
+* `pathtrackerkwargs...` During the endgame a [`PathTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
 """
-struct Endgame{P<:PathTracking.PathTracker, V}
+struct Endgame{P<:PathTracker, V}
     tracker::P
-    state::State{V}
+    state::EndgameState{V}
     cache::Cache
-    options::Options
+    options::EndgameOptions
 end
 
 function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.PVector;
@@ -162,18 +162,18 @@ function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.PVector;
     maxiters_per_step=100,
     patch=nothing, maxiters=nothing, pathtrackerkwargs...)
 
-    options = Options(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
+    options = EndgameOptions(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop, check_at_infinity)
-    tracker = PathTracking.PathTracker(H, x, complex(0.1,0.0), 0.0im;
+    tracker = PathTracker(H, x, complex(0.1,0.0), 0.0im;
         patch=AffinePatches.FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
-    state = State(x, complex(1.0,0.0), options)
+    state = EndgameState(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)
 end
 
 """
-    Result(endgame)
+    EndgameResult(endgame)
 
 ## Fields
 * `returncode::Symbol`
@@ -184,7 +184,7 @@ end
 * `npredictions`: The number of predictions.
 * `iters`: The number of iterations.
 """
-struct Result{V}
+struct EndgameResult{V}
     returncode::Symbol
     x::V
     t::Float64
@@ -194,7 +194,7 @@ struct Result{V}
     iters::Int
 end
 
-function Result(endgame::Endgame)
+function EndgameResult(endgame::Endgame)
     state = endgame.state
 
     if state.npredictions == 0 || state.status == :at_infinity
@@ -202,6 +202,6 @@ function Result(endgame::Endgame)
     else
         x = copy(state.pbest)
     end
-    Result(state.status, x, real(state.R), state.pbest_delta,
+    EndgameResult(state.status, x, real(state.R), state.pbest_delta,
         state.windingnumber, state.npredictions, state.iters)
 end

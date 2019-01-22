@@ -5,10 +5,8 @@ module HomotopyContinuation
 
     export AffinePatches,
         Correctors,
-        Endgaming,
         Homotopies,
         InterfaceTest,
-        PathTracking,
         Predictors,
         Input,
         Problems,
@@ -45,17 +43,6 @@ module HomotopyContinuation
 
     import .Utilities: homogenize, uniquevar, ishomogenous
     export homogenize, uniquevar, ishomogenous
-
-    import .PathTracking: PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
-            allowed_keywords, track, track!, setup!, iterator!,
-            currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
-            refinement_tol, refinement_maxiters, set_tol!,
-            set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
-    export PathTracker, PathTrackerResult, pathtracker, pathtracker_startsolutions,
-            allowed_keywords, track, track!, setup!, iterator!,
-            currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
-            refinement_tol, refinement_maxiters, set_tol!,
-            set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
 
     import LinearAlgebra: issuccess
     export issuccess

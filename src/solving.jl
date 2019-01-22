@@ -7,9 +7,7 @@ import ProgressMeter
 import TreeViews
 
 import ..AffinePatches
-import ..Endgaming
 import ..Homotopies
-import ..PathTracking
 import ..Parallel
 import ..Predictors
 import ..Problems
