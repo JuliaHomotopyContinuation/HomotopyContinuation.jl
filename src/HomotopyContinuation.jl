@@ -23,6 +23,7 @@ module HomotopyContinuation
     include("homotopies.jl")
     include("input.jl")
     include("problems.jl")
+    include("totaldegree.jl")
     include("predictors.jl")
     include("correctors.jl")
 

@@ -74,17 +74,17 @@
 
 
         F = equations(katsura(5))
-        prob, startsolutions = Problems.problem_startsolutions(Input.TotalDegree(F))
+        prob, startsolutions = problem_startsolutions(Input.TotalDegree(F))
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            Problems.embed(prob, s).data
+            embed(prob, s).data
         end)
         @test result isa ProjectiveResult
         @test nnonsingular(result) == 32
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            Problems.embed(prob, s).data
-        end, homvar=Problems.homvars(prob)[1])
+            embed(prob, s).data
+        end, homvar=homvars(prob)[1])
         @test result isa AffineResult
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32

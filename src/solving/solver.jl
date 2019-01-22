@@ -13,7 +13,7 @@ function SolverCache(prob, tracker)
     SolverCache(pathresult)
 end
 
-struct Solver{P<:Problems.AbstractProblem, T<:PathTracker,
+struct Solver{P<:AbstractProblem, T<:PathTracker,
         E<:Endgame, C<:SolverCache}
     prob::P
     tracker::T
@@ -25,11 +25,11 @@ struct Solver{P<:Problems.AbstractProblem, T<:PathTracker,
     cache::C
 end
 
-function Solver(prob::Problems.AbstractProblem, start_solutions, args...; kwargs...) where {T<:AbstractVector}
+function Solver(prob::AbstractProblem, start_solutions, args...; kwargs...) where {T<:AbstractVector}
     Solver(prob, Utilities.start_solution_sample(start_solutions), args...; kwargs...)
 end
 
-function Solver(prob::Problems.AbstractProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed=0;
+function Solver(prob::AbstractProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed=0;
     endgame_start=0.1,
     report_progress=true,
     kwargs...)
@@ -39,12 +39,12 @@ function Solver(prob::Problems.AbstractProblem, startsolutionsample::AbstractVec
     Solver(prob, startsolutionsample, t₁, t₀, seed, options; kwargs...)
 end
 
-function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
-    x₁= Problems.embed(prob, startsolutionsample)
+function Solver(prob::ProjectiveProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
+    x₁= embed(prob, startsolutionsample)
 
-    tracker = PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracking_allowed_keywords)...)
+    tracker = PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracker_allowed_keywords)...)
 
-    check_at_infinity = Problems.homvars(prob) !== nothing
+    check_at_infinity = homvars(prob) !== nothing
     endgame = Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, endgame_allowed_keywords)...)
 
     check_kwargs(kwargs)
@@ -53,8 +53,8 @@ function Solver(prob::Problems.Projective, startsolutionsample::AbstractVector{<
 end
 
 function solver_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs, Problems.supported_keywords)
-    prob, startsolutions = Problems.problem_startsolutions(args...; supported...)
+    supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
+    prob, startsolutions = problem_startsolutions(args...; supported...)
     Solver(prob, startsolutions, 1.0, 0.0, prob.seed; rest...), startsolutions
 end
 

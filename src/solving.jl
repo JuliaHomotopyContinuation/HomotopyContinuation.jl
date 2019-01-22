@@ -10,7 +10,6 @@ import ..AffinePatches
 import ..Homotopies
 import ..Parallel
 import ..Predictors
-import ..Problems
 import ..Systems
 
 using ..Utilities

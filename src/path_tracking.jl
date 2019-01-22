@@ -1,8 +1,7 @@
 import ProjectiveVectors
 import Random
 import LinearAlgebra, TreeViews
-import ..AffinePatches, ..Correctors, ..Homotopies,
-       ..Predictors, ..Problems
+import ..AffinePatches, ..Correctors, ..Homotopies, ..Predictors
 import DoubleFloats: Double64
 using ..Utilities
 
@@ -180,12 +179,12 @@ struct PathTracker{H<:Homotopies.AbstractHomotopy,
 end
 
 """
-    PathTracker(problem::Problems.AbstractProblem, x₁, t₁, t₀; kwargs...)
+    PathTracker(problem::AbstractProblem, x₁, t₁, t₀; kwargs...)
 
 Construct a [`PathTracker`](@ref) from the given `problem`.
 """
-function PathTracker(prob::Problems.Projective, x₁, t₁, t₀; kwargs...)
-    y₁ = Problems.embed(prob, x₁)
+function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
+    y₁ = embed(prob, x₁)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
 function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
@@ -655,8 +654,8 @@ does it. This also takes the same input arguments as `solve`. This is convenient
 to investigate single paths.
 """
 function pathtracker_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs, Problems.supported_keywords)
-    prob, startsolutions = Problems.problem_startsolutions(args...; supported...)
+    supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
+    prob, startsolutions = problem_startsolutions(args...; supported...)
     tracker = PathTracker(prob, Utilities.start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
 
     (tracker=tracker, startsolutions=startsolutions)

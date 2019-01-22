@@ -1,10 +1,10 @@
 using HomotopyContinuation
 using TestSystems
 using BenchmarkTools
-p1 = Problems.TotalDegreeProblem(equations(katsura(7)()))
-P = Problems.Projective(p1)
+p1 = TotalDegreeProblem(equations(katsura(7)()))
+P = ProjectiveProblem(p1)
 
-sols = Problems.embed.(P, Utilities.totaldegree_solutions(p1.system) |> collect)
+sols = embed.(P, Utilities.totaldegree_solutions(p1.system) |> collect)
 
 tracker = PathTracker(P.homotopy, first(sols), 1.0, 0.0)
 

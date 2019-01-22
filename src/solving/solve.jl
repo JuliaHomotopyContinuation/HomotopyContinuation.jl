@@ -67,7 +67,7 @@ function track_to_endgamezone(solvers, start_solutions)
     result
 end
 
-trackpath(solver::Solver, x₁, t₁, t₀) = track(solver.tracker, Problems.embed(solver.prob, x₁), t₁, t₀)
+trackpath(solver::Solver, x₁, t₁, t₀) = track(solver.tracker, embed(solver.prob, x₁), t₁, t₀)
 
 function endgame(solvers, start_solutions, endgame_zone_results)
     _, t_endgame, t₀ = t₁_t_endgame_t₀(solvers)
@@ -119,7 +119,7 @@ function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
     else
         # If we even didn't come to the endgame zone we start earlier.
-        result = runendgame(solver.endgame, Problems.embed(solver.prob, x₁), 1.0)
+        result = runendgame(solver.endgame, embed(solver.prob, x₁), 1.0)
         if result.returncode == :success || result.returncode == :at_infinity
             return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
         else

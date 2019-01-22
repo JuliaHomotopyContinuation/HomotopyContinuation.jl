@@ -15,7 +15,7 @@ struct PathResultCache{Hom, T}
     J::Matrix{T}
 end
 
-function PathResultCache(prob::Problems.AbstractProblem, x)
+function PathResultCache(prob::AbstractProblem, x)
     H = Homotopies.HomotopyWithCache(prob.homotopy, x, rand())
     v, J = Homotopies.evaluate_and_jacobian(H, x, rand())
     PathResultCache(H, v, J)
@@ -61,8 +61,8 @@ struct PathResult{T1, T2, T3}
     npredictions::Int
 end
 
-function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(Problems.homvars(prob), k, x₁, x_e, t₀, r, cache)
+function PathResult(prob::AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
+    PathResult(homvars(prob), k, x₁, x_e, t₀, r, cache)
 end
 function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
