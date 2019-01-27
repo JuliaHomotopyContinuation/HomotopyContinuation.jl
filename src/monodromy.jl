@@ -7,8 +7,7 @@ import ProgressMeter
 import StaticArrays: SVector, @SVector
 import TreeViews
 
-import ProjectiveVectors, ..Utilities
-import ..Utilities: UniquePoints
+import ProjectiveVectors
 
 include("monodromy/group_actions.jl")
 include("monodromy/options.jl")
@@ -141,7 +140,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
 
     p₀ = convert(SVector{NParams, promote_type(Float64, TP)}, p₀)
 
-    optionskwargs, restkwargs = Utilities.splitkwargs(kwargs, options_allowed_keywords)
+    optionskwargs, restkwargs = splitkwargs(kwargs, options_allowed_keywords)
     options = begin
         isrealsystem = TC <: Real && TP <: Real
         Options(isrealsystem; optionskwargs...)
@@ -179,7 +178,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         end
     end
     finished!(statistics, nsolutions(loop))
-    MonodromyResult(retcode, Utilities.points(solutions(loop)), statistics)
+    MonodromyResult(retcode, points(solutions(loop)), statistics)
 end
 
 default_strategy(coeff::Type{<:Number}, p::Type{<:Real}) = Triangle(useweights=true)

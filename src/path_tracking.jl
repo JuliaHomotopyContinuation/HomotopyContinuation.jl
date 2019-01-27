@@ -1,5 +1,4 @@
 import DoubleFloats: Double64
-using ..Utilities
 
 export PathTracker, PathTrackerResult, PathTrackerStatus,
         pathtracker, pathtracker_startsolutions,
@@ -335,12 +334,12 @@ end
 function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
     # apply row scaling to J and compute factorization
-    Utilities.updated_jacobian!(cache.Jac)
+    updated_jacobian!(cache.Jac)
 
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    Utilities.adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol, safety_factor=0.0)
+    adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol, safety_factor=0.0)
     nothing
 end
 
@@ -651,7 +650,7 @@ to investigate single paths.
 function pathtracker_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
-    tracker = PathTracker(prob, Utilities.start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
 
     (tracker=tracker, startsolutions=startsolutions)
 end

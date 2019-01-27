@@ -1,5 +1,3 @@
-using ..Utilities
-
 ## The structure for sorting the solutions is a k search tree.
 ## First, we cluster the points by ordering them w.r.t. the the absolute value of their entries and w.r.t. the arguments of the entries.
 ## Then, we compare the points pairwise in each cluster.

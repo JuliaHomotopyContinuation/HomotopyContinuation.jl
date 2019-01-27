@@ -1,12 +1,9 @@
-using .Utilities
-
 export AbstractInput,
     StartTargetInput,
     TotalDegreeInput,
     HomotopyInput,
     ParameterSystemInput
 
-const MPPolys = Vector{<:MP.AbstractPolynomialLike}
 const Inputs = Union{<:AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 

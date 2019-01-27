@@ -1,5 +1,3 @@
-using ..Utilities
-
 export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homvars,
 	problem_startsolutions
 
@@ -93,7 +91,7 @@ function problem_startsolutions end
 
 function problem_startsolutions(args...; seed=randseed(), kwargs...)
     Random.seed!(seed)
-    supported, rest = Utilities.splitkwargs(kwargs, input_supported_keywords)
+    supported, rest = splitkwargs(kwargs, input_supported_keywords)
     problem_startsolutions(input(args...; supported...), seed; rest...)
 end
 
@@ -115,14 +113,14 @@ end
 ##############
 
 function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
-    F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system; homvar=homvar)
+    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system; homvar=homvar)
 
 	check_square_homogenous_system(F, variable_groups)
 
 	# Scale systems
 	if scale_systems
 		G = homogenous_totaldegree_polysystem(prob.degrees, variables, variable_groups)
-		_, f, G_scaling_factors, _ = Utilities.scale_systems(G, F, report_scaling_factors=true)
+		_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
 		g = TotalDegreeSystem(prob.degrees, G_scaling_factors)
 		problem = ProjectivProblem(g,
 						construct_system(f, system; variables=variables, homvars=homvars),
@@ -149,7 +147,7 @@ function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvar
     n, N = size(prob.system)
     G = TotalDegreeSystem(prob.degrees)
 	# Check overdetermined case
-	n > N && error(Utilities.overdetermined_error_msg)
+	n > N && error(overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
     (ProjectivProblem(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(prob.degrees))
@@ -176,7 +174,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_syst
     if F_ishom && G_ishom
 		vargroups = VariableGroups(vars, homvar)
 		if scale_systems
-			g, f = Utilities.scale_systems(G, F)
+			g, f = scale_systems(G, F)
 		else
 			g, f = G, F
 		end
@@ -194,7 +192,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_syst
         push!(vars, h)
         sort!(vars, rev=true)
 		if scale_systems
-			g, f = Utilities.scale_systems(homogenize(G, h), homogenize(F, h))
+			g, f = scale_systems(homogenize(G, h), homogenize(F, h))
 		else
 			g, f = homogenize(G, h), homogenize(F, h)
 		end
@@ -210,7 +208,7 @@ end
 #####################
 
 function problem_startsolutions(prob::ParameterSystemInput, homvar, seed; system=SPSystem, kwargs...)
-    F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
+    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
 	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
     H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 

@@ -1,5 +1,3 @@
-using ..Utilities
-
 export Solver,
     solve,
     multiplicities,

@@ -49,7 +49,7 @@ end
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
-        @test length(Utilities.UniquePoints(result.solutions).points) == 21
+        @test length(HC.UniquePoints(result.solutions).points) == 21
         @test isempty(sprint(show, result)) == false
 
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,

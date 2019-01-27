@@ -1,7 +1,4 @@
-import LinearAlgebra
-import Random
 import DoubleFloats: Double64
-using ..Utilities
 
 export Newton
 
@@ -53,9 +50,9 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             evaluate!(rᵢ, H, xᵢ, t)
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
-            Utilities.updated_jacobian!(Jac)
+            updated_jacobian!(Jac)
         end
-        cond = Utilities.adaptive_solve!(Δxᵢ, Jac, rᵢ, tol=tol, cond=cond,
+        cond = adaptive_solve!(Δxᵢ, Jac, rᵢ, tol=tol, cond=cond,
             # We always compute an condition number estimate in the first iteration
             compute_new_cond=iszero(i))
 

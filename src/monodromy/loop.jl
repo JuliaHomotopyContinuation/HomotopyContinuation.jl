@@ -37,31 +37,31 @@ end
 """
     add!(node::Node, x; kwargs...)
 
-Calls [`Utilities.add!`](@ref) on the points of the Node.
+Calls [`add!`](@ref) on the points of the Node.
 """
-add!(node::Node, x; kwargs...) = Utilities.add!(node.points, x; kwargs...)
+add!(node::Node, x; kwargs...) = add!(node.points, x; kwargs...)
 
 """
     iscontained(node::Node, x; kwargs...)
 
-Calls [`Utilities.iscontained`](@ref) on the points of the Node.
+Calls [`iscontained`](@ref) on the points of the Node.
 """
 function iscontained(node::Node, x; kwargs...)
     if node.points === nothing
         false
     else
-        Utilities.iscontained(node.points, x; kwargs...)
+        iscontained(node.points, x; kwargs...)
     end
 end
 
 """
     unsafe_add!(node::Node, x)
 
-Calls [`Utilities.unsafe_add!`](@ref) on the points of the Node.
+Calls [`unsafe_add!`](@ref) on the points of the Node.
 """
 function unsafe_add!(node::Node, x)
     if node.points !== nothing
-        Utilities.unsafe_add!(node.points, x)
+        unsafe_add!(node.points, x)
     end
     nothing
 end

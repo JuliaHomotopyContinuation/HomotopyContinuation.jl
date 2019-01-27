@@ -1,5 +1,3 @@
-import ..Utilities
-
 export TotalDegreeSystem
 
 """

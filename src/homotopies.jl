@@ -1,5 +1,3 @@
-import ..Utilities: randomish_gamma
-
 export NullCache,
     nvariables,
     cache,
@@ -141,7 +139,7 @@ end
 
 Returns the number of variables of the homotopy `H`.
 """
-Utilities.nvariables(H::AbstractHomotopy) = last(size(H))
+nvariables(H::AbstractHomotopy) = last(size(H))
 
 Base.size(F::AbstractHomotopy, i::Integer) = size(F)[i]
 Base.length(F::AbstractHomotopy) = size(F, 1)

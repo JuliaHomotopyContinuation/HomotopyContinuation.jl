@@ -10,7 +10,7 @@ function internal_solve(solvers, start_solutions::AbstractVector)
     endgame_zone_results = track_to_endgamezone(solvers, start_solutions)
     results = endgame(solvers, start_solutions, endgame_zone_results)
 
-    Utilities.set_num_BLAS_threads(nblas_threads)
+    set_num_BLAS_threads(nblas_threads)
 
     if all(r -> r.solution_type == :affine, results)
         AffineResult(results, seed(solvers))
@@ -31,8 +31,8 @@ that the single threaded version is around two times faster (at least on Mac Jul
 Returns the previous number of BLAS threads.
 """
 function single_thread_blas()
-    nblas_threads = Utilities.get_num_BLAS_threads()
-    Utilities.set_num_BLAS_threads(1)
+    nblas_threads = get_num_BLAS_threads()
+    set_num_BLAS_threads(1)
     nblas_threads
 end
 

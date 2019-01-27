@@ -2,6 +2,8 @@ using Test, LinearAlgebra, Random
 using DynamicPolynomials, PolynomialTestSystems, HomotopyContinuation
 import TreeViews, ProjectiveVectors
 
+const HC = HomotopyContinuation
+
 function test_treeviews(x)
     @test TreeViews.hastreeview(x)
     @test_nowarn TreeViews.treelabel(devnull, x, MIME"application/prs.juno.inline"())

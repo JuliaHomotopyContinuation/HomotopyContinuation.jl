@@ -16,7 +16,7 @@ function Statistics(solutions)
 end
 
 
-Base.show(io::IO, S::Statistics) = Utilities.print_fieldnames(io, S)
+Base.show(io::IO, S::Statistics) = print_fieldnames(io, S)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", S::Statistics) = S
 
 
@@ -30,7 +30,7 @@ end
 
 
 function checkreal!(stats::Statistics, y)
-    if Utilities.isrealvector(y)
+    if isrealvector(y)
         stats.nreal +=1
     end
 end

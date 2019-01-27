@@ -1,15 +1,5 @@
 export ParameterHomotopy, nparameters, set_parameters!
 
-import LinearAlgebra
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-import StaticPolynomials
-const SP = StaticPolynomials
-import StaticArrays: SVector
-
-import ..Utilities
-
-
 """
     ParameterHomotopy(F, parameters;
         variables=setdiff(MP.variables(F), parameters),

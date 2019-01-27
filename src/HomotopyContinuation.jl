@@ -3,20 +3,25 @@ module HomotopyContinuation
     import DynamicPolynomials
     import LinearAlgebra
     import MultivariatePolynomials
+    import Printf
     import ProgressMeter
     import ProjectiveVectors
     import Random
+
+    import StaticArrays
+    import StaticPolynomials
     import TreeViews
+
 
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
+    import StaticArrays: SVector
     import Test: @test
 
     const MP = MultivariatePolynomials
+    const SP = StaticPolynomials
 
     export @polyvar
-    export AffinePatches,
-        Utilities
 
     include("utilities.jl")
     include("parallel.jl")
@@ -35,9 +40,6 @@ module HomotopyContinuation
     include("solving.jl")
     include("solve.jl")
     include("monodromy.jl")
-
-    import .Utilities: homogenize, uniquevar, ishomogenous
-    export homogenize, uniquevar, ishomogenous
 
     import LinearAlgebra: issuccess
     export issuccess

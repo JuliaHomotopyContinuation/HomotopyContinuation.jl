@@ -57,7 +57,7 @@
 
         @polyvar w
         F = equations(cyclic(5))
-        result = solve(Utilities.homogenize(F, w), threading=false, homvar=w)
+        result = solve(homogenize(F, w), threading=false, homvar=w)
         @test result isa AffineResult
 
         @polyvar x y z
@@ -67,7 +67,7 @@
         @test nfinite(solve(G, F, [[2, -3]])) == 1
         @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
-        F = FPSystem(Utilities.homogenize(equations(cyclic(5))))
+        F = FPSystem(homogenize(equations(cyclic(5))))
         result = solve(F, homvar=6)
         @test nfinite(result) == 70
         @test natinfinity(result) == 50

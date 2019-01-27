@@ -26,7 +26,7 @@ struct Solver{P<:AbstractProblem, T<:PathTracker,
 end
 
 function Solver(prob::AbstractProblem, start_solutions, args...; kwargs...) where {T<:AbstractVector}
-    Solver(prob, Utilities.start_solution_sample(start_solutions), args...; kwargs...)
+    Solver(prob, start_solution_sample(start_solutions), args...; kwargs...)
 end
 
 function Solver(prob::AbstractProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed=0;

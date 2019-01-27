@@ -6,7 +6,7 @@ function setup_prediction_test()
     t = rand()
     H = HomotopyWithCache(StraightLineHomotopy(F, F), x, t)
     J = jacobian(H, x, t)
-    fac = Utilities.factorization(J)
+    fac = HC.factorization(J)
     ẋ = fac \ -dt(H, x, t)
     H, x, xnext, t, ẋ, fac
 end
@@ -19,7 +19,7 @@ function setup_overdetermined_prediction_test()
     t = rand()
     H = HomotopyWithCache(StraightLineHomotopy(F, F), x, t)
     J = jacobian(H, x, t)
-    fac = Utilities.factorization(J)
+    fac = HC.factorization(J)
     ẋ = fac \ -dt(H, x, t)
     H, x, xnext, t, ẋ, fac
 end

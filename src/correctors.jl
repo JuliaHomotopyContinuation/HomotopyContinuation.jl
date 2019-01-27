@@ -1,5 +1,3 @@
-using ..Utilities
-
 export AbstractCorrector,
     AbstractCorrectorCache,
     CorrectorResult,

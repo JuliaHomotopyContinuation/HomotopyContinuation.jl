@@ -3,11 +3,6 @@ export PathResult, solution,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
-using Printf
-
-import ProjectiveVectors
-using ..Utilities
-
 struct PathResultCache{Hom, T}
     H::Hom
     v::Vector{T}
@@ -157,7 +152,7 @@ function Base.show(io::IO, r::PathResult)
     if iscompact || haskey(io, :typeinfo)
         println(io, "• returncode: $(r.returncode)")
         println(io, " • solution: ", r.solution)
-        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " • residual: $(Printf.@sprintf "%.3e" r.residual)")
         println(io, " • pathnumber: ", r.pathnumber)
     else
         println(io, "PathResult")
@@ -167,8 +162,8 @@ function Base.show(io::IO, r::PathResult)
             println(io, " • returncode_detail: $(r.returncode_detail)")
         end
         println(io, " • solution: ", r.solution)
-        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
-        println(io, " • condition_number: $(@sprintf "%.3e" r.condition_number)")
+        println(io, " • residual: $(Printf.@sprintf "%.3e" r.residual)")
+        println(io, " • condition_number: $(Printf.@sprintf "%.3e" r.condition_number)")
         println(io, " • windingnumber: $(r.windingnumber)")
         println(io, "")
         println(io, " • pathnumber: ", r.pathnumber)

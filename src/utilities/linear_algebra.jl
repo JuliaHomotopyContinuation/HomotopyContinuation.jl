@@ -1,8 +1,3 @@
-export normalized_dot, euclidean_distance, euclidean_norm, solve!,
-    fast_factorization!, fast_ldiv!, factorization, factorize!,
-    iterative_refinement!, iterative_refinement_step!, IterativeRefinementResult,
-    Jacobian, adaptive_solve!
-
 import DoubleFloats: Double64
 
 """
@@ -380,7 +375,7 @@ function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; to
         # res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
         # we need to do iterative refinement in higher precision
         # TODO: iters=1 should be replaced by an adaptive termination criterion
-        res = Utilities.solve_with_iterative_refinement!(x, Jac, b, Double64; iters=3)
+        res = solve_with_iterative_refinement!(x, Jac, b, Double64; iters=3)
         cond = res.cond
     end
     cond
