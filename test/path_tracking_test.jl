@@ -2,7 +2,7 @@
     @testset "General" begin
         F = equations(katsura(5))
         # test construction
-        t1, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.OrthogonalPatch())
+        t1, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch())
 
         @test_nowarn currΔt(t1)
 
@@ -19,7 +19,7 @@
         @test t1 isa PathTracker
         @test length(currx(t1)) == 7
 
-        t3, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.OrthogonalPatch(), predictor=Euler())
+        t3, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch(), predictor=Euler())
         @test t3.predictor isa Euler
 
         setup!(t1, first(start_sols), 1.0, 0.4)
@@ -57,7 +57,7 @@
         @polyvar x[1:3]
         F = A * x - b
 
-        tracker, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.RandomPatch())
+        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch())
         s = first(start_sols)
         result = track(tracker, s, 1.0, 0.0)
         @test result.returncode == PathTrackerStatus.success
@@ -79,9 +79,9 @@
     @testset "FixedPatch continuation" begin
         F = equations(katsura(5))
         # test construction
-        tracker, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.OrthogonalPatch())
+        tracker, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch())
         patch = tracker.state.patch
-        fixedtracker = pathtracker(F, patch=AffinePatches.FixedPatch())
+        fixedtracker = pathtracker(F, patch=FixedPatch())
         fixedpatch = fixedtracker.state.patch
         x1 = first(start_sols)
 

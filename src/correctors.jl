@@ -1,4 +1,3 @@
-import ..AffinePatches
 using ..Utilities
 
 export AbstractCorrector,

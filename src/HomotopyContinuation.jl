@@ -3,8 +3,10 @@ module HomotopyContinuation
     import DynamicPolynomials
     import LinearAlgebra
     import MultivariatePolynomials
+    import ProgressMeter
     import ProjectiveVectors
     import Random
+    import TreeViews
 
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
@@ -39,5 +41,4 @@ module HomotopyContinuation
 
     import LinearAlgebra: issuccess
     export issuccess
-
 end

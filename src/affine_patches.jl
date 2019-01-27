@@ -1,11 +1,5 @@
-module AffinePatches
-
-import ProjectiveVectors
-import ProjectiveVectors: PVector
-import LinearAlgebra
-
 export AbstractAffinePatch,
-    AbstractLocalAffinePatch,
+    nequations,
     state,
     onpatch!,
     setup!,
@@ -17,21 +11,27 @@ export AbstractAffinePatch,
 An affine patch is a hyperplane defined by ``v⋅x-1=0``.
 """
 abstract type AbstractAffinePatch end
-abstract type AbstractLocalAffinePatch <: AbstractAffinePatch end
 
 """
-    AbstractAffinePatchState
+    AbstractAffinePatchState{N}
 
-This holds the actual patch information.
+This holds the actual patch information. `N` indicates the number of products of projective spaces.
 """
-abstract type AbstractAffinePatchState end
+abstract type AbstractAffinePatchState{N} end
+
+"""
+    nequations(::AbstractAffinePatchState)
+
+Number of equations an affine patch adds.
+"""
+nequations(::AbstractAffinePatchState{N}) where N = N
 
 """
     state(::AbstractAffinePatch, x)::AbstractAffinePatchState
 
 Construct the state of the path from `x`.
 """
-function state end
+state(p::AbstractAffinePatch, x) = throw(MethodError(state, (p,x)))
 
 """
     onpatch!(x::AbstractVector, ::AbstractAffinePatchState)
@@ -60,5 +60,3 @@ include("affine_patches/orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")
 include("affine_patches/random_patch.jl")
 include("affine_patches/fixed_patch.jl")
-
-end

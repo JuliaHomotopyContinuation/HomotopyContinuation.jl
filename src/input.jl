@@ -173,7 +173,7 @@ function check_homogenous_degrees(F::AbstractSystem)
     x = rand(ComplexF64, N)
     system_cache = cache(F, x)
     y = evaluate(F, x, system_cache)
-    rmul!(x, 2)
+    LinearAlgebra.rmul!(x, 2)
     y2 = evaluate(F, x, system_cache)
 
     degrees = map(y2, y) do y2ᵢ, yᵢ

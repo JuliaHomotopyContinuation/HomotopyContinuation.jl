@@ -1,12 +1,3 @@
-using LinearAlgebra
-
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-
-import ProgressMeter
-import TreeViews
-
-import ..AffinePatches
 import ..Parallel
 
 using ..Utilities

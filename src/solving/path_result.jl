@@ -73,7 +73,7 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
     if returncode != :success
         condition = Inf
     else
-        σ = svdvals(cache.J)
+        σ = LinearAlgebra.svdvals(cache.J)
         n = size(cache.H)[2]
         if n>2
             condition = σ[1]/σ[n-1]

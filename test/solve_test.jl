@@ -51,9 +51,9 @@
         @test nfinite(result) == 32
         @test string(result) isa String
 
-        @test nfinite(solve(F, patch=AffinePatches.RandomPatch())) == 32
-        @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
-        @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
+        @test nfinite(solve(F, patch=RandomPatch())) == 32
+        @test nfinite(solve(F, patch=EmbeddingPatch())) ≤ 32
+        @test nfinite(solve(F, patch=OrthogonalPatch())) == 32
 
         @polyvar w
         F = equations(cyclic(5))

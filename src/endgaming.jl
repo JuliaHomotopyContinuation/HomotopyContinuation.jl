@@ -1,7 +1,3 @@
-import ..AffinePatches
-import ProjectiveVectors
-using ..Utilities
-
 include("endgaming/types.jl")
 include("endgaming/powerseries.jl")
 include("endgaming/cauchy.jl")

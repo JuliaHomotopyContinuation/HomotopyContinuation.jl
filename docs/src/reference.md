@@ -35,17 +35,17 @@ Affine patches are there to augment projective system such that they can be cons
 as (locally) affine system. By default the following patches are defined
 
 ```@docs
-AffinePatches.OrthogonalPatch
-AffinePatches.EmbeddingPatch
-AffinePatches.RandomPatch
-AffinePatches.FixedPatch
+OrthogonalPatch
+EmbeddingPatch
+RandomPatch
+FixedPatch
 ```
 ### Interface
 Each patch has to follow the following interface.
 ```@docs
-AffinePatches.AbstractAffinePatch
-AffinePatches.state
-AffinePatches.onpatch!
-AffinePatches.setup!
-AffinePatches.changepatch!
+AbstractAffinePatch
+state
+onpatch!
+setup!
+changepatch!
 ```

@@ -1,9 +1,5 @@
 export PatchedHomotopy, PatchedHomotopyCache
 
-import ..AffinePatches
-import ..AffinePatches: AbstractAffinePatch, AbstractAffinePatchState
-import ProjectiveVectors: PVector
-
 """
     PatchedHomotopy(H::AbstractHomotopy, patch, v::PVector)
 
@@ -15,12 +11,12 @@ struct PatchedHomotopy{H<:AbstractHomotopy, PS<:AbstractAffinePatchState} <: Abs
 end
 
 function PatchedHomotopy(H::AbstractHomotopy, p::AbstractAffinePatch, x)
-    PatchedHomotopy(H, AffinePatches.state(p, x))
+    PatchedHomotopy(H, state(p, x))
 end
 
 function Base.size(H::PatchedHomotopy)
     m, n = size(H.homotopy)
-    (m + AffinePatches.nequations(H.patch), n)
+    (m + nequations(H.patch), n)
 end
 
 struct PatchedHomotopyCache{HC, T} <: AbstractHomotopyCache
@@ -43,7 +39,7 @@ function evaluate!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
     @inbounds for i=1:M
         u[i] = c.b[i]
     end
-    AffinePatches.evaluate!(u, H.patch, x)
+    evaluate!(u, H.patch, x)
     u
 end
 function jacobian!(U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
@@ -53,7 +49,7 @@ function jacobian!(U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
     end
-    AffinePatches.jacobian!(U, H.patch, x)
+    jacobian!(U, H.patch, x)
     U
 end
 
@@ -64,7 +60,7 @@ function dt!(u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     @inbounds for i=1:M
         u[i] = c.b[i]
     end
-    for i=1:AffinePatches.nequations(H.patch)
+    for i=1:nequations(H.patch)
         u[M+i] = zero(eltype(u))
     end
     u
@@ -77,12 +73,12 @@ function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::PVector, t, c::Patc
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
     end
-    AffinePatches.jacobian!(U, H.patch, x)
+    jacobian!(U, H.patch, x)
 
     @inbounds for i=1:M
         u[i] = c.b[i]
     end
-    AffinePatches.evaluate!(u, H.patch, x)
+    evaluate!(u, H.patch, x)
 
     nothing
 end
@@ -95,13 +91,13 @@ function jacobian_and_dt!(U, u, H::PatchedHomotopy, x::PVector, t, c::PatchedHom
     @inbounds for j=1:N, i=1:M
         U[i, j] = A[i, j]
     end
-    AffinePatches.jacobian!(U, H.patch, x)
+    jacobian!(U, H.patch, x)
 
     # dt
     @inbounds for i=1:M
         u[i] = b[i]
     end
-    for i=1:AffinePatches.nequations(H.patch)
+    for i=1:nequations(H.patch)
         u[M+i] = zero(eltype(u))
     end
 

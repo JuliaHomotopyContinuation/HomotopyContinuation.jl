@@ -6,9 +6,9 @@ export OrthogonalPatch
     OrthogonalPatch()
 
 """
-struct OrthogonalPatch <: AbstractLocalAffinePatch end
+struct OrthogonalPatch <: AbstractAffinePatch end
 
-struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState
+struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState{N}
     v̄::PVector{T, N} # this is already conjugated
 end
 
@@ -17,7 +17,6 @@ function state(::OrthogonalPatch, x::PVector)
     conj!(v.data)
     OrthogonalPatchState(v)
 end
-nequations(::OrthogonalPatchState{T, N}) where {T,N} = N
 
 function setup!(state::OrthogonalPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)

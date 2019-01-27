@@ -10,7 +10,7 @@ A random patch. The vector has norm 1.
 """
 struct RandomPatch <: AbstractAffinePatch end
 
-struct RandomPatchState{T, N} <: AbstractAffinePatchState
+struct RandomPatchState{T, N} <: AbstractAffinePatchState{N}
     v̄::PVector{T, N}
 end
 
@@ -21,7 +21,6 @@ function state(::RandomPatch, x::PVector)
     conj!(v)
     RandomPatchState(v)
 end
-nequations(::RandomPatchState{T,N}) where {T,N} = N
 
 onpatch!(x::AbstractVector, state::RandomPatchState) = onpatch!(x, state.v̄)
 evaluate!(u, state::RandomPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)

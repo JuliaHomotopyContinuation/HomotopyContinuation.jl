@@ -144,7 +144,7 @@ in a better approximation. Note that the error should be roughly ``t^n`` where `
 and ``n`` is `cauchy_samples_per_loop`.
 * `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
 * `pathtrackerkwargs...` During the endgame a [`PathTracker`](@ref) is used. These are all arguments possible
-to be supplied to it (with the excemption of `patch` this is always [`AffinePatches.FixedPatch()`](@ref)).
+to be supplied to it (with the excemption of `patch` this is always [`FixedPatch()`](@ref)).
 """
 struct Endgame{P<:PathTracker, V}
     tracker::P
@@ -166,7 +166,7 @@ function Endgame(H::AbstractHomotopy, x::ProjectiveVectors.PVector;
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop, check_at_infinity)
     tracker = PathTracker(H, x, complex(0.1,0.0), 0.0im;
-        patch=AffinePatches.FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
+        patch=FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
     state = EndgameState(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)

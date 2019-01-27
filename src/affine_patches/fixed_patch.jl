@@ -3,9 +3,9 @@ export FixedPatch
 """
     FixedPatch()
 """
-struct FixedPatch <: AbstractLocalAffinePatch end
+struct FixedPatch <: AbstractAffinePatch end
 
-struct FixedPatchState{T, N} <: AbstractAffinePatchState
+struct FixedPatchState{T, N} <: AbstractAffinePatchState{N}
     v̄::PVector{T, N} # this is already conjugated
 end
 
@@ -14,7 +14,6 @@ function state(::FixedPatch, x::PVector)
     conj!(v.data)
     FixedPatchState(v)
 end
-nequations(::FixedPatchState{T, N}) where {T, N}= N
 
 function setup!(state::FixedPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)

@@ -69,7 +69,7 @@
         G = SPSystem(equations(cyclic(6)))
         x = ProjectiveVectors.embed(rand(Complex{Float64}, 5))
         H = PatchedHomotopy(StraightLineHomotopy(F, G),
-            AffinePatches.OrthogonalPatch(),
+            OrthogonalPatch(),
             x)
         @test H isa AbstractHomotopy
         @test size(H) == (7, 6)

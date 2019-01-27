@@ -1,7 +1,3 @@
-import ProjectiveVectors
-import Random
-import LinearAlgebra, TreeViews
-import ..AffinePatches
 import DoubleFloats: Double64
 using ..Utilities
 
@@ -59,7 +55,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions)
     terminated_singularity
 end
 
-mutable struct PathTrackerState{T, N, PatchState <: AffinePatches.AbstractAffinePatchState}
+mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     x::ProjectiveVectors.PVector{T,N} # current x
     x̂::ProjectiveVectors.PVector{T,N} # last prediction
     x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
@@ -80,7 +76,7 @@ mutable struct PathTrackerState{T, N, PatchState <: AffinePatches.AbstractAffine
     consecutive_successfull_steps::Int
 end
 
-function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AffinePatches.AbstractAffinePatchState, options::PathTrackerOptions)
+function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AbstractAffinePatchState, options::PathTrackerOptions)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
     η = ω = NaN
@@ -108,7 +104,7 @@ function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state.accepted_steps = state.rejected_steps = 0
     state.status = PathTrackerStatus.tracking
     ProjectiveVectors.embed!(state.x, x₁)
-    setup_patch && AffinePatches.setup!(state.patch, state.x)
+    setup_patch && setup!(state.patch, state.x)
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
     state
@@ -164,7 +160,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 struct PathTracker{H<:AbstractHomotopy,
     Predictor<:AbstractPredictor,
     Corrector<:AbstractCorrector,
-    Patch<:AffinePatches.AbstractAffinePatch,
+    Patch<:AbstractAffinePatch,
     S<:PathTrackerState,
     C<:PathTrackerCache}
     # these are fixed
@@ -188,7 +184,7 @@ function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
 function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
-    patch=AffinePatches.OrthogonalPatch(),
+    patch=OrthogonalPatch(),
     corrector::AbstractCorrector=Newton(),
     predictor::AbstractPredictor=Heun(), kwargs...)
 
@@ -198,7 +194,7 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
     end
 
-    patch_state = AffinePatches.state(patch, x₁)
+    patch_state = state(patch, x₁)
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
     HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
@@ -210,10 +206,10 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
         indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
         indem_x .= x₁
     end
-    state = PathTrackerState(indempotent_x, t₁, t₀, patch_state, options)
-    cache = PathTrackerCache(HC, predictor, corrector, state)
+    tracker_state = PathTrackerState(indempotent_x, t₁, t₀, patch_state, options)
+    cache = PathTrackerCache(HC, predictor, corrector, tracker_state)
 
-    PathTracker(H, predictor, corrector, patch, state, options, cache)
+    PathTracker(H, predictor, corrector, patch, tracker_state, options, cache)
 end
 
 Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
@@ -268,7 +264,7 @@ end
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 Returns one of the enum values of `PathTrackerStatus.t` indicating the status.
 If the tracking was successfull it is `PathTrackerStatus.success`.
-If `setup_patch` is `true` then [`AffinePatches.setup!`](@ref) is called at the beginning
+If `setup_patch` is `true` then [`setup!`](@ref) is called at the beginning
 of the tracking.
 
     track!(x₀, tracker, x₁, t₁, t₀; options...)
@@ -374,7 +370,7 @@ function step!(tracker::PathTracker)
             state.cond = result.cond
             # Step size change
             update_stepsize!(state, result, order(tracker.predictor), options)
-            options.update_patch && AffinePatches.changepatch!(state.patch, x)
+            options.update_patch && changepatch!(state.patch, x)
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
