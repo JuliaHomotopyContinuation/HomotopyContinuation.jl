@@ -1,8 +1,6 @@
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 
-import .Input
-import .Problems
 import .Systems
 import .Homotopies
 

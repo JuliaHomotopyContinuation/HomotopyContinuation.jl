@@ -1,74 +1,83 @@
-module Input
+import .Homotopies
+import .Systems
+using .Utilities
 
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-using LinearAlgebra
-
-import ..Homotopies
-import ..Systems
-using ..Utilities
-
-# STAGE 1 exports
 export AbstractInput,
-    StartTarget,
-    TotalDegree,
-    ParameterSystem
-
-abstract type AbstractInput end
+    StartTargetInput,
+    TotalDegreeInput,
+    HomotopyInput,
+    ParameterSystemInput
 
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
 const Inputs = Union{<:Systems.AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
-"""
-    StartTargetProblem(start::MPPolyInputs, target::MPPolyInputs)
+const input_supported_keywords = [:parameters, :startparameters, :targetparameters,
+                            :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
 
-Construct a `StartTargetProblem` out of two systems of polynomials.
+
+
 """
-struct StartTarget{P1<:Inputs, P2<:Inputs} <: AbstractInput
+    AbstractInput
+
+An abstract type to model different input types.
+"""
+abstract type AbstractInput end
+
+"""
+    StartTargetInput(start::MPPolyInputs, target::MPPolyInputs, startsolutions)
+
+Construct a `StartTargetInput` out of two systems of polynomials.
+"""
+struct StartTargetInput{P1<:Inputs, P2<:Inputs} <: AbstractInput
     start::P1
     target::P2
     startsolutions
 
-    function StartTarget{P1, P2}(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
+    function StartTargetInput{P1, P2}(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
         if length(start) ≠ length(target)
-            error("Cannot construct `StartTargetProblem` since the lengths of `start` and `target` don't match.")
+            error("Cannot construct `StartTargetInput` since the lengths of `start` and `target` don't match.")
         end
         new(start, target, startsolutions)
     end
 end
-function StartTarget(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
-    StartTarget{P1, P2}(start, target, startsolutions)
+function StartTargetInput(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
+    StartTargetInput{P1, P2}(start, target, startsolutions)
 end
 
 
-struct Homotopy{Hom<:Homotopies.AbstractHomotopy} <: AbstractInput
+"""
+    HomotopyInput(H::Homotopy, startsolutions)
+
+Construct a `HomotopyInput` for a homotopy `H` with given `startsolutions`.
+"""
+struct HomotopyInput{Hom<:Homotopies.AbstractHomotopy} <: AbstractInput
     H::Hom
     startsolutions
 end
 
 
 """
-    TotalDegree(system::MPPolyInputs)
+    TotalDegreeInput(system::MPPolyInputs)
 
-Construct a `TotalDegreeProblem`. This indicates that the system `system`
+Construct a `TotalDegreeInputProblem`. This indicates that the system `system`
 is the target system and a total degree system should be assembled.
 """
-struct TotalDegree{S<:Inputs} <: AbstractInput
+struct TotalDegreeInput{S<:Inputs} <: AbstractInput
     system::S
     degrees::Vector{Int}
 end
-function TotalDegree(S::Vector{<:MP.AbstractPolynomialLike})
-    TotalDegree(S, maxdegrees(S))
+function TotalDegreeInput(S::Vector{<:MP.AbstractPolynomialLike})
+    TotalDegreeInput(S, maxdegrees(S))
 end
 
 
 """
-    ParameterSystem(system::MPPolyInputs, x::Vector{<:MP.AbstractVariable}, p::Vector{<:MP.AbstractVariable})
+    ParameterSystemInput(F, parameters, p₁, p₀, startsoluions, γ₁=nothing, γ₂=nothing)
 
-Construct a `ParameterSystem`. This indicates that the system `system` has variables `x` and parameters `p`.
+Construct a `ParameterSystemInput`.
 """
-struct ParameterSystem{P<:MPPolyInputs, V<:MP.AbstractVariable} <: AbstractInput
+struct ParameterSystemInput{P<:MPPolyInputs, V<:MP.AbstractVariable} <: AbstractInput
     system::P
     parameters::Vector{V}
     p₁::AbstractVector
@@ -85,16 +94,12 @@ See
 for details.
 """
 
-
-const supported_keywords = [:parameters, :startparameters, :targetparameters,
-                            :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
-
 """
-    input(F::MPPolyInputs)::TotalDegree
-    input(F::Systems.AbstractSystem)::TotalDegree
-    input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)::StartTargetProblem
-    input(F::MPPolyInputs, parameters, startsolutions; kwargs...)::ParameterSystem
-    input(H::Homotopies.AbstractHomotopy, startsolutions)::Homotopy
+    input(F::MPPolyInputs)::TotalDegreeInput
+    input(F::Systems.AbstractSystem)::TotalDegreeInput
+    input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)::StartTargetInput
+    input(F::MPPolyInputs, parameters, startsolutions; kwargs...)::ParameterSystemInput
+    input(H::Homotopies.AbstractHomotopy, startsolutions)::HomotopyInput
 
 Construct an `AbstractInput`.
 """
@@ -105,7 +110,7 @@ function input(F::MPPolyInputs)
     if length(F) == nvariables(F) && ishomogenous(F)
         error("Cannot construct a total degree homotopy for a square homogenous system.")
     end
-    TotalDegree(F, maxdegrees(F))
+    TotalDegreeInput(F, maxdegrees(F))
 end
 
 function input(F::Systems.AbstractSystem)
@@ -117,7 +122,7 @@ function input(F::Systems.AbstractSystem)
     elseif  n + 1 ≠ N
         error("Input system is not a square homogenous system!")
     end
-    TotalDegree(F, degrees)
+    TotalDegreeInput(F, degrees)
 end
 
 function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)
@@ -125,7 +130,7 @@ function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)
         error("Start and target system don't have the same length")
     end
     check_zero_dimensional(F)
-    StartTarget(G, F, startsolutions)
+    StartTargetInput(G, F, startsolutions)
 end
 
 function input(F::MPPolyInputs, startsolutions;
@@ -145,12 +150,12 @@ function input(F::MPPolyInputs, startsolutions;
         error("Number of parameters doesn't match!")
     end
 
-    ParameterSystem(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
+    ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
 end
 
 function input(H::Homotopies.AbstractHomotopy, startsolutions)
     check_homogenous_degrees(Systems.FixedHomotopy(H, rand()))
-    Homotopy(H, startsolutions)
+    HomotopyInput(H, startsolutions)
 end
 
 
@@ -183,7 +188,4 @@ function check_homogenous_degrees(F::Systems.AbstractSystem)
         dᵢ
     end
     degrees
-end
-
-
 end

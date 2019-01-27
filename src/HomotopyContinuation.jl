@@ -2,14 +2,16 @@ module HomotopyContinuation
 
     import DynamicPolynomials: @polyvar
     export @polyvar
+    import MultivariatePolynomials
+    import LinearAlgebra
+
+    const MP = MultivariatePolynomials
 
     export AffinePatches,
         Correctors,
         Homotopies,
         InterfaceTest,
         Predictors,
-        Input,
-        Problems,
         Systems,
         Utilities
 

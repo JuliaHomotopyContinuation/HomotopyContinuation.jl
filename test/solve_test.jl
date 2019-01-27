@@ -74,7 +74,7 @@
 
 
         F = equations(katsura(5))
-        prob, startsolutions = problem_startsolutions(Input.TotalDegree(F))
+        prob, startsolutions = problem_startsolutions(TotalDegreeInput(F))
 
         result = solve(prob.homotopy, map(startsolutions) do s
             embed(prob, s).data

@@ -6,8 +6,6 @@ import ProjectiveVectors
 import ProjectiveVectors: PVector
 import Random
 
-import ..Input
-import ..Input: AbstractInput, TotalDegree, StartTarget, ParameterSystem, MPPolys
 import ..Homotopies: AbstractHomotopy, StraightLineHomotopy, ParameterHomotopy
 import ..Systems: AbstractSystem, SPSystem, FPSystem
 import ..Systems
@@ -19,7 +17,8 @@ export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homv
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homotopy, :system]; Input.supported_keywords]
+	[:seed, :homvar, :homotopy, :system]; input_supported_keywords]
+
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
@@ -106,9 +105,8 @@ function problem_startsolutions end
 
 function problem_startsolutions(args...; seed=randseed(), kwargs...)
     Random.seed!(seed)
-    supported, rest = Utilities.splitkwargs(kwargs, Input.supported_keywords)
-    input = Input.input(args...; supported...)
-    problem_startsolutions(input, seed; rest...)
+    supported, rest = Utilities.splitkwargs(kwargs, input_supported_keywords)
+    problem_startsolutions(input(args...; supported...), seed; rest...)
 end
 
 function problem_startsolutions(input::AbstractInput; seed=randseed(), kwargs...)
@@ -119,8 +117,8 @@ function problem_startsolutions(input::AbstractInput, seed;
     problem_startsolutions(input, homvar, seed; kwargs...)
 end
 
-function problem_startsolutions(input::Input.Homotopy, homvar, seed; kwargs...)
-    ProjectivProblem(input.H, VariableGroups(size(input.H)[2], homvar), seed), input.startsolutions
+function problem_startsolutions(input::HomotopyInput, homvar, seed; kwargs...)
+    ProjectiveProblem(input.H, VariableGroups(size(input.H)[2], homvar), seed), input.startsolutions
 end
 
 
@@ -128,7 +126,7 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegree{<:Input.MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
     F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system; homvar=homvar)
 
 	check_square_homogenous_system(F, variable_groups)
@@ -159,7 +157,7 @@ function homogenous_totaldegree_polysystem(degrees, variables, variable_groups::
 	end
 end
 
-function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
     G = Systems.TotalDegreeSystem(prob.degrees)
 	# Check overdetermined case
@@ -169,7 +167,7 @@ function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::
      totaldegree_solutions(prob.degrees))
 end
 
-function problem_startsolutions(prob::TotalDegree{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
 
     G = Systems.TotalDegreeSystem(prob.degrees)
@@ -183,7 +181,7 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTarget{<:Input.MPPolyInputs, <:Input.MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogenous.((F, G))
 	vars = variables(F)
@@ -223,7 +221,7 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystem, homvar, seed; system=SPSystem, kwargs...)
+function problem_startsolutions(prob::ParameterSystemInput, homvar, seed; system=SPSystem, kwargs...)
     F, variables, variable_groups, homvars = Utilities.homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
 	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
     H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
