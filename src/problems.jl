@@ -1,15 +1,3 @@
-import DynamicPolynomials
-import LinearAlgebra
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-import ProjectiveVectors
-import ProjectiveVectors: PVector
-import Random
-
-import ..Homotopies: AbstractHomotopy, StraightLineHomotopy, ParameterHomotopy
-import ..Systems: AbstractSystem, SPSystem, FPSystem
-import ..Systems
-
 using ..Utilities
 
 export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homvars,
@@ -77,7 +65,7 @@ end
 embed(prob::ProjectiveProblem{<:AbstractHomotopy, N}, x::PVector) where {N} = x
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
-	Systems.CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
+	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
 end
 function construct_system(F::MPPolys, system_constructor; homvars=nothing, kwargs...)
 	system_constructor(F; kwargs...)
@@ -95,9 +83,9 @@ end
 
     The `options` are
     * `seed::Int`: Random seed used in the construction.
-    * `system=FPSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The constructor
+    * `system=FPSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The constructor
     is called with `system(polys, variables)` where `variables` determines the variable ordering.
-    * `homotopy=StraightLineHomotopy`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref) an `Systems.AbstractSystem`. The constructor
+    * `homotopy=StraightLineHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) an `AbstractSystem`. The constructor
     is called with `homotopy(start, target)` where `start` and `target` are systems constructed
     with `system`.
 """
@@ -135,12 +123,12 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, 
 	if scale_systems
 		G = homogenous_totaldegree_polysystem(prob.degrees, variables, variable_groups)
 		_, f, G_scaling_factors, _ = Utilities.scale_systems(G, F, report_scaling_factors=true)
-		g = Systems.TotalDegreeSystem(prob.degrees, G_scaling_factors)
+		g = TotalDegreeSystem(prob.degrees, G_scaling_factors)
 		problem = ProjectivProblem(g,
 						construct_system(f, system; variables=variables, homvars=homvars),
 						variable_groups, seed; kwargs...)
 	else
-		problem = ProjectivProblem(Systems.TotalDegreeSystem(prob.degrees),
+		problem = ProjectivProblem(TotalDegreeSystem(prob.degrees),
 			construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
 
 	end
@@ -159,7 +147,7 @@ end
 
 function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
-    G = Systems.TotalDegreeSystem(prob.degrees)
+    G = TotalDegreeSystem(prob.degrees)
 	# Check overdetermined case
 	n > N && error(Utilities.overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
@@ -170,7 +158,7 @@ end
 function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
 
-    G = Systems.TotalDegreeSystem(prob.degrees)
+    G = TotalDegreeSystem(prob.degrees)
 	variable_groups = VariableGroups(N, homvaridx)
     (ProjectivProblem(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(prob.degrees))

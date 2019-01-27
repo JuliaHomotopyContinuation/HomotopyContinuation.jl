@@ -10,8 +10,8 @@
         # homogenous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
-        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
-        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
+        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3])
 
@@ -22,7 +22,7 @@
 
         # test numerical homogenous check fails
         @polyvar x y z
-        G = Systems.FPSystem([x-2z, y^2+3z])
+        G = FPSystem([x-2z, y^2+3z])
         @test_throws ErrorException solve(G, homvar=3)
     end
 
@@ -31,8 +31,8 @@
         @test nfinite(solve([x - 1])) == 1
         F = equations(katsura(5))
         @test nfinite(solve(F, threading=false)) == 32
-        @test nfinite(solve(F, system=Systems.SPSystem, threading=false)) == 32
-        @test nfinite(solve(F, system=Systems.FPSystem, threading=false)) == 32
+        @test nfinite(solve(F, system=SPSystem, threading=false)) == 32
+        @test nfinite(solve(F, system=FPSystem, threading=false)) == 32
 
         # Simple step size
         F = equations(katsura(5))
@@ -42,8 +42,8 @@
         F = equations(katsura(5))
         @test nfinite(solve(F, scale_systems=false, threading=false)) == 32
 
-        @test nfinite(solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
-        result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)
+        @test nfinite(solve(F, homotopy=StraightLineHomotopy)) == 32
+        result = solve(F, predictor=Euler(), homotopy=StraightLineHomotopy)
         @test nresults(result) == 32
         @test nfinite(solve(F, tol=1e-5)) == 32
 
@@ -67,7 +67,7 @@
         @test nfinite(solve(G, F, [[2, -3]])) == 1
         @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
-        F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(5))))
+        F = FPSystem(Utilities.homogenize(equations(cyclic(5))))
         result = solve(F, homvar=6)
         @test nfinite(result) == 70
         @test natinfinity(result) == 50

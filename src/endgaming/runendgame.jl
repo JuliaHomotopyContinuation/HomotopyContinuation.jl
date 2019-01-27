@@ -1,5 +1,4 @@
 import ProjectiveVectors
-import ..Homotopies
 
 function setup!(endgame, x, R)
     setup!(endgame.tracker, x, R, 0.0im)

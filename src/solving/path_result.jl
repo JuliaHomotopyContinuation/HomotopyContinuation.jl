@@ -5,7 +5,6 @@ export PathResult, solution,
 
 using Printf
 
-import ..Homotopies
 import ProjectiveVectors
 using ..Utilities
 
@@ -16,8 +15,8 @@ struct PathResultCache{Hom, T}
 end
 
 function PathResultCache(prob::AbstractProblem, x)
-    H = Homotopies.HomotopyWithCache(prob.homotopy, x, rand())
-    v, J = Homotopies.evaluate_and_jacobian(H, x, rand())
+    H = HomotopyWithCache(prob.homotopy, x, rand())
+    v, J = evaluate_and_jacobian(H, x, rand())
     PathResultCache(H, v, J)
 end
 
@@ -67,7 +66,7 @@ end
 function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = align_axis!(copy(r.x.data))
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
+    evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(cache.v)
 
 
@@ -92,7 +91,7 @@ function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathRe
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, r.x, t₀)
+    evaluate_and_jacobian!(cache.v, cache.J, cache.H, r.x, t₀)
     res = infinity_norm(cache.v)
 
     returncode, returncode_detail = makereturncode(returncode)

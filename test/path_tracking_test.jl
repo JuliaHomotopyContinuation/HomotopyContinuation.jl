@@ -19,8 +19,8 @@
         @test t1 isa PathTracker
         @test length(currx(t1)) == 7
 
-        t3, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.OrthogonalPatch(), predictor=Predictors.Euler())
-        @test t3.predictor isa Predictors.Euler
+        t3, start_sols = pathtracker_startsolutions(F, patch=AffinePatches.OrthogonalPatch(), predictor=Euler())
+        @test t3.predictor isa Euler
 
         setup!(t1, first(start_sols), 1.0, 0.4)
         @test currstatus(t1) == PathTrackerStatus.tracking

@@ -1,5 +1,4 @@
 import ..AffinePatches
-import ..Homotopies
 import ProjectiveVectors
 using ..Utilities
 

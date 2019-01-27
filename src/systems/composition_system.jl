@@ -49,7 +49,7 @@ function CompositionSystem(g::Vector{<:MP.AbstractPolynomialLike},
     end
 end
 
-hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
+Utilities.hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
 
 homvars_to_end!(variables, ::Nothing) = variables
 homvars_to_end!(vars, homvars::MP.AbstractVariable) = homvars_to_end!(vars, (homvars,))

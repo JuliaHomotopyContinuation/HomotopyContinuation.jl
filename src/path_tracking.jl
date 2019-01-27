@@ -1,7 +1,7 @@
 import ProjectiveVectors
 import Random
 import LinearAlgebra, TreeViews
-import ..AffinePatches, ..Correctors, ..Homotopies, ..Predictors
+import ..AffinePatches
 import DoubleFloats: Double64
 using ..Utilities
 
@@ -121,8 +121,8 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", state::PathTrackerState) 
 ###########
 # PathTrackerCache
 ##########
-mutable struct PathTrackerCache{H<:Homotopies.HomotopyWithCache, P<:Predictors.AbstractPredictorCache,
-             C<:Correctors.AbstractCorrectorCache, T, F}
+mutable struct PathTrackerCache{H<:HomotopyWithCache, P<:AbstractPredictorCache,
+             C<:AbstractCorrectorCache, T, F}
     homotopy::H
     predictor::P
     corrector::C
@@ -130,11 +130,11 @@ mutable struct PathTrackerCache{H<:Homotopies.HomotopyWithCache, P<:Predictors.A
     out::Vector{T}
     r::Vector{T}
 end
-function PathTrackerCache(H::Homotopies.HomotopyWithCache, predictor, corrector, state::PathTrackerState)
+function PathTrackerCache(H::HomotopyWithCache, predictor, corrector, state::PathTrackerState)
     t = state.segment[state.s]
-    pcache = Predictors.cache(predictor, H, state.x, state.ẋ, t)
-    ccache = Correctors.cache(corrector, H, state.x, t)
-    Jac = Jacobian(Homotopies.jacobian(H, state.x, t))
+    pcache = cache(predictor, H, state.x, state.ẋ, t)
+    ccache = cache(corrector, H, state.x, t)
+    Jac = Jacobian(jacobian(H, state.x, t))
     out = H(state.x, t)
     r = copy(out)
     PathTrackerCache(H, pcache, ccache, Jac, out, r)
@@ -145,25 +145,25 @@ end
 # PathTracker
 ##############
 """
-     PathTracker(H::Homotopies.AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker
+     PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker
 
 Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
 needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 
 ## PathTrackerOptions
-* `corrector::Correctors.AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Correctors.Newton`](@ref).
+* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Newton`](@ref).
 * `corrector_maxiters=3`: The maximal number of correction steps in a single step.
 * `initial_steplength=0.1`: The step length of the first step.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_steplength=1e-14`: The minimal step length.
-* `predictor::Predictors.AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is `[Predictors.RK4`](@ref)()`.
+* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is `[RK4`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-7`: The precision used to track a value.
 """
-struct PathTracker{H<:Homotopies.AbstractHomotopy,
-    Predictor<:Predictors.AbstractPredictor,
-    Corrector<:Correctors.AbstractCorrector,
+struct PathTracker{H<:AbstractHomotopy,
+    Predictor<:AbstractPredictor,
+    Corrector<:AbstractCorrector,
     Patch<:AffinePatches.AbstractAffinePatch,
     S<:PathTrackerState,
     C<:PathTrackerCache}
@@ -187,26 +187,26 @@ function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
     y₁ = embed(prob, x₁)
     PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
 end
-function PathTracker(H::Homotopies.AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
+function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=AffinePatches.OrthogonalPatch(),
-    corrector::Correctors.AbstractCorrector=Correctors.Newton(),
-    predictor::Predictors.AbstractPredictor=Predictors.Heun(), kwargs...)
+    corrector::AbstractCorrector=Newton(),
+    predictor::AbstractPredictor=Heun(), kwargs...)
 
     options = PathTrackerOptions(;kwargs...)
 
-    if H isa Homotopies.PatchedHomotopy
+    if H isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
     end
 
     patch_state = AffinePatches.state(patch, x₁)
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
-    HC = Homotopies.HomotopyWithCache(Homotopies.PatchedHomotopy(H, patch_state), x₁, t₁)
+    HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
 
     # We have to make sure that the element type of x is invariant under evaluation
     indempotent_x = begin
         u = Vector{Any}(undef, size(H)[1])
-        Homotopies.evaluate!(u, HC, x₁, t₁)
+        evaluate!(u, HC, x₁, t₁)
         indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
         indem_x .= x₁
     end
@@ -311,11 +311,11 @@ function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_pa
 
     try
         reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
-        Predictors.reset!(cache.predictor, state.x, t₁)
+        reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
             compute_ẋ!(state, cache, tracker.options)
-            Predictors.setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
+            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -328,7 +328,7 @@ end
 
 function checkstartvalue!(tracker::PathTracker)
     result = correct!(tracker.state.x̄, tracker)
-    if Correctors.isconverged(result)
+    if isconverged(result)
         tracker.state.x .= tracker.state.x̄
     else
         tracker.state.status = PathTrackerStatus.terminated_invalid_startvalue
@@ -337,7 +337,7 @@ function checkstartvalue!(tracker::PathTracker)
 end
 
 function compute_ẋ!(state, cache, options::Options)
-    @inbounds Homotopies.jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
+    @inbounds jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
     # apply row scaling to J and compute factorization
     Utilities.updated_jacobian!(cache.Jac)
 
@@ -352,7 +352,7 @@ end
 function correct!(x̄, tracker::PathTracker, x=tracker.state.x, t=tracker.state.segment[tracker.state.s];
     tol=tracker.options.tol,
     maxiters=tracker.options.corrector_maxiters)
-    Correctors.correct!(x̄, tracker.corrector, tracker.cache.corrector,
+    correct!(x̄, tracker.corrector, tracker.cache.corrector,
                         tracker.cache.homotopy, x, t, tol, maxiters)
 end
 
@@ -363,10 +363,9 @@ function step!(tracker::PathTracker)
 
     try
         t, Δt = currt(state), currΔt(state)
-        Predictors.predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = Correctors.correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt,
-                options.tol, options.corrector_maxiters, state.cond)
-        if Correctors.isconverged(result)
+        predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
+        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters, state.cond)
+        if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
             x .= x̄
@@ -374,18 +373,18 @@ function step!(tracker::PathTracker)
             state.accuracy = result.accuracy
             state.cond = result.cond
             # Step size change
-            update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
+            update_stepsize!(state, result, order(tracker.predictor), options)
             options.update_patch && AffinePatches.changepatch!(state.patch, x)
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
-            Predictors.update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
+            update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
         else
             # We have to reset the patch
             state.rejected_steps += 1
             state.cond = result.cond
             # Step failed, so we have to try with a new (smaller) step size
-            update_stepsize!(state, result, Predictors.order(tracker.predictor), options)
+            update_stepsize!(state, result, order(tracker.predictor), options)
             Δt = currΔt(state)
             state.last_step_failed = true
             if state.Δs < options.minimal_steplength
@@ -406,7 +405,7 @@ g(Θ) = sqrt(1+4Θ) - 1
 δ(opts::PathTrackerOptions, ω) = @fastmath min(√(ω/2) * τ(opts), 0.25)
 τ(opts::PathTrackerOptions) = nthroot(opts.tol, 2 * opts.corrector_maxiters)
 
-function update_stepsize!(state::PathTrackerState, result::Correctors.Result,
+function update_stepsize!(state::PathTrackerState, result::CorrectorResult,
                           order::Int, options::PathTrackerOptions)
 
     if options.simple_step_size
@@ -426,7 +425,7 @@ function update_stepsize!(state::PathTrackerState, result::Correctors.Result,
     end
 
     Δx₀ = result.norm_Δx₀
-    if Correctors.isconverged(result)
+    if isconverged(result)
         # compute η and update
         η = d_x̂_x̄ / state.Δs^order
 
@@ -469,14 +468,14 @@ function update_stepsize!(state::PathTrackerState, result::Correctors.Result,
 
     state.Δs = min(Δs′, length(state.segment) - state.s)
 
-    if !Correctors.isconverged(result) && state.Δs < options.minimal_steplength
+    if !isconverged(result) && state.Δs < options.minimal_steplength
         state.status = PathTrackerStatus.terminated_steplength_too_small
     end
     nothing
 end
 
-function simple_step_size!(state::PathTrackerState, result::Correctors.Result, options::PathTrackerOptions)
-    if Correctors.isconverged(result)
+function simple_step_size!(state::PathTrackerState, result::CorrectorResult, options::PathTrackerOptions)
+    if isconverged(result)
         state.consecutive_successfull_steps += 1
         if state.consecutive_successfull_steps == 5
             Δs′ = 2 * state.Δs
@@ -491,7 +490,7 @@ function simple_step_size!(state::PathTrackerState, result::Correctors.Result, o
 
     state.Δs = min(Δs′, length(state.segment) - state.s)
 
-    if !Correctors.isconverged(result) && state.Δs < options.minimal_steplength
+    if !isconverged(result) && state.Δs < options.minimal_steplength
         state.status = PathTrackerStatus.terminated_steplength_too_small
     end
 end
@@ -512,7 +511,7 @@ function refine!(tracker::PathTracker)
     result = correct!(tracker.state.x̄, tracker;
         tol=tracker.options.refinement_tol,
         maxiters=tracker.options.refinement_maxiters)
-    if Correctors.isconverged(result)
+    if isconverged(result)
         tracker.state.x .= tracker.state.x̄
         tracker.state.accuracy = result.accuracy
     end
@@ -521,7 +520,7 @@ end
 
 # TODO: REMOVE THIS
 function residual(tracker::PathTracker, x, t)
-    Homotopies.evaluate!(tracker.cache.out, tracker.cache.homotopy, x, t)
+    evaluate!(tracker.cache.out, tracker.cache.homotopy, x, t)
     infinity_norm(tracker.cache.out)
 end
 
@@ -532,7 +531,7 @@ end
 Check whether the `x` has the correct size.
 """
 function checkstart(H, x)
-    N = Homotopies.nvariables(H)
+    N = nvariables(H)
     N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
     nothing
 end

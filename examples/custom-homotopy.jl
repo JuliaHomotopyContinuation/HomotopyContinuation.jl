@@ -1,23 +1,23 @@
 using HomotopyContinuation
 using LinearAlgebra
 
-struct RandomUnitaryPath{Start<:Systems.AbstractSystem,Target<:Systems.AbstractSystem} <: Homotopies.AbstractHomotopy
+struct RandomUnitaryPath{Start<:AbstractSystem,Target<:AbstractSystem} <: HomotopyContinuation.AbstractHomotopy
     straightline::StraightLineHomotopy{Start, Target}
     U::Matrix{ComplexF64}
 end
 
-function RandomUnitaryPath(start::Systems.AbstractSystem, target::Systems.AbstractSystem)
+function RandomUnitaryPath(start::AbstractSystem, target::AbstractSystem)
     m, n = size(start)
     # construct a random unitary matrix
     U = qr(randn(n,n) + im * randn(n,n))[1]
-    RandomUnitaryPath(Homotopies.StraightLineHomotopy(start, target), U)
+    RandomUnitaryPath(HomotopyContinuation.StraightLineHomotopy(start, target), U)
 end
 
 # We have to define the size
 Base.size(H::RandomUnitaryPath) = size(H.straightline)
 
 # Cache for efficient evaluation
-struct RandomUnitaryPathCache{C, T1, T2} <: Homotopies.AbstractHomotopyCache
+struct RandomUnitaryPathCache{C, T1, T2} <: HomotopyContinuation.AbstractHomotopyCache
     straightline::C
     U_t::Matrix{ComplexF64}
     y::Vector{T1}
@@ -27,12 +27,12 @@ struct RandomUnitaryPathCache{C, T1, T2} <: Homotopies.AbstractHomotopyCache
     U::Matrix{ComplexF64} # holds something like U
 end
 
-function Homotopies.cache(H::RandomUnitaryPath, x, t)
+function HomotopyContinuation.cache(H::RandomUnitaryPath, x, t)
     U_t = copy(H.U)
     y = U_t * x
-    straightline = Homotopies.cache(H.straightline, y, t)
+    straightline = HomotopyContinuation.cache(H.straightline, y, t)
 
-    jac = Homotopies.jacobian(H.straightline, y, t, straightline)
+    jac = HomotopyContinuation.jacobian(H.straightline, y, t, straightline)
     dt = jac * y
     U = copy(U_t)
     RandomUnitaryPathCache(straightline, U_t, y, jac, dt, U)
@@ -75,35 +75,35 @@ function U_dot_t_mul_x!(cache, U, x, t)
     mul!(cache.y, mul!(cache.U_t, cache.U, adjoint(U)), x)
 end
 
-function Homotopies.evaluate!(out, H::RandomUnitaryPath, x, t, cache)
+function HomotopyContinuation.evaluate!(out, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
-    Homotopies.evaluate!(out, H.straightline, y, t, cache.straightline)
+    HomotopyContinuation.evaluate!(out, H.straightline, y, t, cache.straightline)
 end
 
-function Homotopies.jacobian!(out, H::RandomUnitaryPath, x, t, cache)
+function HomotopyContinuation.jacobian!(out, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
-    Homotopies.jacobian!(cache.jac, H.straightline, y, t, cache.straightline)
+    HomotopyContinuation.jacobian!(cache.jac, H.straightline, y, t, cache.straightline)
     mul!(out, cache.jac, cache.U_t) # out = J_H(y, t) * U(t)
 end
 
-function Homotopies.dt!(out, H::RandomUnitaryPath, x, t, cache)
+function HomotopyContinuation.dt!(out, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
     # chain rule
-    Homotopies.jacobian_and_dt!(cache.jac, out, H.straightline, y, t, cache.straightline)
+    HomotopyContinuation.jacobian_and_dt!(cache.jac, out, H.straightline, y, t, cache.straightline)
     y_dot = U_dot_t_mul_x!(cache, H.U, x, t) # y_dot = U'(t)x
     mul!(cache.dt, cache.jac, y_dot) # dt = J_H(y, t) * y_dot
     out .+= cache.dt
 end
 
-function Homotopies.evaluate_and_jacobian!(val, jac, H::RandomUnitaryPath, x, t, cache)
+function HomotopyContinuation.evaluate_and_jacobian!(val, jac, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
-    Homotopies.evaluate_and_jacobian!(val, cache.jac, H.straightline, y, t, cache.straightline)
+    HomotopyContinuation.evaluate_and_jacobian!(val, cache.jac, H.straightline, y, t, cache.straightline)
     mul!(jac, cache.jac, cache.U_t)
 end
 
-function Homotopies.jacobian_and_dt!(jac, dt, H::RandomUnitaryPath, x, t, cache)
+function HomotopyContinuation.jacobian_and_dt!(jac, dt, H::RandomUnitaryPath, x, t, cache)
     y = Ut_mul_x!(cache, H.U, x, t)
-    Homotopies.jacobian_and_dt!(cache.jac, dt, H.straightline, y, t, cache.straightline)
+    HomotopyContinuation.jacobian_and_dt!(cache.jac, dt, H.straightline, y, t, cache.straightline)
     mul!(jac, cache.jac, cache.U_t) # jac = J_H(y, t) * U(t)
     y_dot = U_dot_t_mul_x!(cache, H.U, x, t) # y_dot = U'(t)x
     mul!(cache.dt, cache.jac, y_dot) # dt = J_H(y, t) * y_dot

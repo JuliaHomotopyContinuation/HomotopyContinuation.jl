@@ -1,7 +1,3 @@
-module Predictors
-
-
-using ..Homotopies
 using ..Utilities
 
 export AbstractPredictor,
@@ -26,18 +22,14 @@ which follows from the fact ``d/dt H(x(t),t) ≡ 0 ∀ t∈[0,1]`` and the total
 of ``H`` w.r.t. ``t``.
 """
 abstract type AbstractPredictor end
-abstract type AbstractStatelessPredictor <: AbstractPredictor end
-abstract type AbstractStatefulPredictor <: AbstractPredictor end
 abstract type AbstractPredictorCache end
-abstract type AbstractStatelessPredictorCache <: AbstractPredictorCache end
-abstract type AbstractStatefulPredictorCache <: AbstractPredictorCache end
 
 """
     cache(::AbstractPredictor, ::HomotopyWithCache, x, ẋ, t)::AbstractPredictorCache
 
 Construct a cache to avoid allocations.
 """
-function cache end
+cache(p::AbstractPredictor, args...) = throw(MethodError(cache, tuple(p, args...)))
 
 
 """
@@ -92,7 +84,6 @@ function minus_ẋ!(ẋ, H, x, t, J, dt)
     solve!(ẋ, J, dt)
 end
 
-
 include("predictors/null_predictor.jl")
 include("predictors/euler.jl")
 include("predictors/rk3.jl")
@@ -101,5 +92,3 @@ include("predictors/heun.jl")
 include("predictors/midpoint.jl")
 include("predictors/ralston.jl")
 include("predictors/pade21.jl")
-
-end

@@ -7,10 +7,7 @@ import ProgressMeter
 import TreeViews
 
 import ..AffinePatches
-import ..Homotopies
 import ..Parallel
-import ..Predictors
-import ..Systems
 
 using ..Utilities
 

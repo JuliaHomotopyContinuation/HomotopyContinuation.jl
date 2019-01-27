@@ -75,7 +75,7 @@ end
 
 Create an edge between two nodes references by the index. `usegamma` refers
 to an optional weight of two random complex numbers γ=(γ₁, γ₀). These are the same
-gammas as in [`Homotopies.ParameterHomotopy`](@ref).
+gammas as in [`ParameterHomotopy`](@ref).
 
     Edge(edge::Edge)
 
@@ -251,10 +251,10 @@ end
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.
 """
 function set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
-    H = Homotopies.basehomotopy(tracker.homotopy)
-    if !(H isa Homotopies.ParameterHomotopy)
+    H = basehomotopy(tracker.homotopy)
+    if !(H isa ParameterHomotopy)
         error("Base homotopy is not a ParameterHomotopy")
     end
     p = (loop.nodes[e.start].p, loop.nodes[e.target].p)
-    Homotopies.set_parameters!(H, p, e.γ)
+    set_parameters!(H, p, e.γ)
 end

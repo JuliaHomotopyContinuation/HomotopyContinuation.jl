@@ -7,8 +7,8 @@ export Heun
 The [Heun](https://en.wikipedia.org/wiki/List_of_Runge–Kutta_methods#Heun's_method)
 predictor of order 2.
 """
-struct Heun <: AbstractStatelessPredictor end
-struct HeunCache{T} <: AbstractStatelessPredictorCache
+struct Heun <: AbstractPredictor end
+struct HeunCache{T} <: AbstractPredictorCache
     J::Matrix{T}
     dt::Vector{T}
     mk₁::Vector{T}

@@ -1,11 +1,9 @@
-module Correctors
-
 import ..AffinePatches
-using ..Homotopies, ..Utilities
+using ..Utilities
 
 export AbstractCorrector,
     AbstractCorrectorCache,
-    Result,
+    CorrectorResult,
     cache,
     correct!
 
@@ -36,7 +34,7 @@ Structure holding information about a `correct!` step. The fields are
 * `res::T` The residual of the final result.
 * `iters::Int` The number of iterations used.
 """
-struct Result{T}
+struct CorrectorResult{T}
     retcode::ReturnCode
     accuracy::T
     iters::Int
@@ -46,8 +44,8 @@ struct Result{T}
     cond::Float64
 end
 
-Base.show(io::IO, ::MIME"application/prs.juno.inline", r::Result) = r
-Base.show(io::IO, result::Result) = print_fieldnames(io, result)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", r::CorrectorResult) = r
+Base.show(io::IO, result::CorrectorResult) = print_fieldnames(io, result)
 
 
 """
@@ -55,14 +53,14 @@ Base.show(io::IO, result::Result) = print_fieldnames(io, result)
 
 Returns whether the correction was successfull.
 """
-isconverged(result::Result) = result.retcode == converged
+isconverged(result::CorrectorResult) = result.retcode == converged
 
 """
     cache(::AbstractCorrector, ::HomotopyWithCache{M, N}, x, t)::AbstractCorrectorCache
 
 Construct a cache to avoid allocations.
 """
-function cache end
+cache(c::AbstractCorrector, args...) = throw(MethodError(cache, tuple(c, args...)))
 
 
 """
@@ -73,7 +71,4 @@ Returns a [`Result`](@ref).
 """
 function correct! end
 
-
 include("correctors/newton.jl")
-
-end

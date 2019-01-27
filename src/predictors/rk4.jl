@@ -7,8 +7,8 @@ export RK4
 The classical [Runge-Kutta](https://en.wikipedia.org/wiki/Runge–Kutta_methods)
 predictor of order 4.
 """
-struct RK4 <: AbstractStatelessPredictor end
-struct RK4Cache{T} <: AbstractStatelessPredictorCache
+struct RK4 <: AbstractPredictor end
+struct RK4Cache{T} <: AbstractPredictorCache
     J::Matrix{T}
     dt::Vector{T}
     k1::Vector{T}

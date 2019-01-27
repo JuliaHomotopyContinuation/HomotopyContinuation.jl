@@ -17,38 +17,38 @@ ParameterHomotopy
 We also provide more specialised homotopies, which are mostly used internally currently
 but could be useful in conjunction with the [`PathTracker`](@ref) primitive.
 ```@docs
-Homotopies.PatchedHomotopy
+PatchedHomotopy
 ```
 
 ## Interface for custom homotopies
 
 The great thing is that you are not limited to the homotopies provided by default.
-You can define your own homotopy by defining a struct with super type [`Homotopies.AbstractHomotopy`](@ref).
+You can define your own homotopy by defining a struct with super type [`AbstractHomotopy`](@ref).
 For this the following interface has to be defined.
 
 ### Types
 ```@docs
-Homotopies.AbstractHomotopy
-Homotopies.AbstractHomotopyCache
-Homotopies.NullCache
+AbstractHomotopy
+AbstractHomotopyCache
+NullCache
 ```
 
 ### Mandatory
 The following methods are mandatory to implement.
 ```@docs
-Homotopies.cache
-Homotopies.evaluate!
-Homotopies.jacobian!
-Homotopies.dt!
-Base.size(::Homotopies.AbstractHomotopy)
+cache
+evaluate!
+jacobian!
+dt!
+Base.size(::AbstractHomotopy)
 ```
 ### Optional
 ```@docs
-Homotopies.evaluate_and_jacobian!
-Homotopies.evaluate_and_jacobian
-Homotopies.jacobian_and_dt!
-Homotopies.evaluate
-Homotopies.jacobian
-Homotopies.dt
-Homotopies.basehomotopy
+evaluate_and_jacobian!
+evaluate_and_jacobian
+jacobian_and_dt!
+evaluate
+jacobian
+dt
+basehomotopy
 ```

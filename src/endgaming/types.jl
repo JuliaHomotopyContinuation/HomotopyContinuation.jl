@@ -153,7 +153,7 @@ struct Endgame{P<:PathTracker, V}
     options::EndgameOptions
 end
 
-function Endgame(H::Homotopies.AbstractHomotopy, x::ProjectiveVectors.PVector;
+function Endgame(H::AbstractHomotopy, x::ProjectiveVectors.PVector;
     check_at_infinity::Bool=true,
     sampling_factor=0.5, egtol=1e-10, minradius=1e-15, maxnorm=1e5, minimal_maxnorm=min(1e3, maxnorm),
     maxwindingnumber=15,

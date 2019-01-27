@@ -12,7 +12,7 @@
     @test PP2 isa ProjectiveProblem
     @test length(start2) == 720
 
-    @test homotopy(PP2) isa Homotopies.AbstractHomotopy
+    @test homotopy(PP2) isa AbstractHomotopy
     @test homvars(PP2) == (7,)
 
     @polyvar x y z
@@ -35,13 +35,13 @@
     @test homvars(P) == (3,)
 
 
-    F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(6))))
+    F = FPSystem(Utilities.homogenize(equations(cyclic(6))))
     degrees = HomotopyContinuation.check_homogenous_degrees(F)
     P, startvals = problem_startsolutions(TotalDegreeInput(F, degrees))
     @test homvars(P) == nothing
     @test length(startvals) == 720
 
-    F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(6))))
+    F = FPSystem(Utilities.homogenize(equations(cyclic(6))))
     degrees = HomotopyContinuation.check_homogenous_degrees(F)
     P, startvals = problem_startsolutions(TotalDegreeInput(F, degrees), homvar=5)
     @test homvars(P) == (5,)

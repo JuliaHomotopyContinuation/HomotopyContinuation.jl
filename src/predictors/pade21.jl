@@ -7,8 +7,8 @@ export Pade21
 
 This uses a Padé-approximation of type (2,1) for prediction.
 """
-struct Pade21 <: AbstractStatelessPredictor end
-struct Pade21Cache{T,N} <: AbstractStatelessPredictorCache
+struct Pade21 <: AbstractPredictor end
+struct Pade21Cache{T,N} <: AbstractPredictorCache
     x²::Vector{T}
     x³::Vector{T}
     x_h::PVector{T,N}
@@ -36,7 +36,7 @@ end
     @inbounds for i in eachindex(x)
         x_h[i] = x[i] + h * ẋ[i]
     end
-    Homotopies.evaluate!(u, H, x_h, t + h)
+    evaluate!(u, H, x_h, t + h)
 end
 
 @inline function g₂!(u, H, x, ẋ, x², t, h, x_h)
@@ -44,7 +44,7 @@ end
     @inbounds for i in eachindex(x)
         x_h[i] = x[i] + h * ẋ[i] + h² * x²[i]
     end
-    Homotopies.evaluate!(u, H, x_h, t + h)
+    evaluate!(u, H, x_h, t + h)
 end
 
 function update!(cache::Pade21Cache, H, x, ẋ, t, fac)

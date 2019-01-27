@@ -29,9 +29,9 @@ end
 
 Base.size(F::TotalDegreeSystem) = (length(F.degrees), length(F.degrees) + 1)
 
-cache(::TotalDegreeSystem, x) = NullCache()
+cache(::TotalDegreeSystem, x) = SystemNullCache()
 
-function evaluate!(u, F::TotalDegreeSystem, x, ::NullCache)
+function evaluate!(u, F::TotalDegreeSystem, x, ::SystemNullCache)
     λ = F.scaling_factors
     @inbounds for i=1:length(F.degrees)
         d = F.degrees[i]
@@ -40,13 +40,13 @@ function evaluate!(u, F::TotalDegreeSystem, x, ::NullCache)
     end
     u
 end
-function evaluate(F::TotalDegreeSystem, x, cache::NullCache)
+function evaluate(F::TotalDegreeSystem, x, cache::SystemNullCache)
     u = similar(x, size(F, 1))
     evaluate!(u, F, x, cache)
     u
 end
 
-function jacobian!(U, F::TotalDegreeSystem, x, ::NullCache)
+function jacobian!(U, F::TotalDegreeSystem, x, ::SystemNullCache)
     U .= zero(eltype(x))
     hidx = F.hom_idx
     λ = F.scaling_factors
@@ -63,13 +63,13 @@ function jacobian!(U, F::TotalDegreeSystem, x, ::NullCache)
     end
     U
 end
-function jacobian(F::TotalDegreeSystem, x, cache::NullCache)
+function jacobian(F::TotalDegreeSystem, x, cache::SystemNullCache)
     U = similar(x, size(F))
     jacobian!(U, F, x, cache)
     U
 end
 
-function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x, ::NullCache)
+function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x, ::SystemNullCache)
     U .= zero(eltype(x))
     hidx = F.hom_idx
     λ = F.scaling_factors
@@ -91,7 +91,7 @@ function evaluate_and_jacobian!(u, U, F::TotalDegreeSystem, x, ::NullCache)
     nothing
 end
 
-function evaluate_and_jacobian(F::TotalDegreeSystem, x, cache::NullCache)
+function evaluate_and_jacobian(F::TotalDegreeSystem, x, cache::SystemNullCache)
     u = similar(x, size(F, 1))
     U = similar(x, size(F))
     evaluate_and_jacobian!(u, U, F, x, cache)

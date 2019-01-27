@@ -1,5 +1,3 @@
-import .Homotopies
-import .Systems
 using .Utilities
 
 export AbstractInput,
@@ -9,7 +7,7 @@ export AbstractInput,
     ParameterSystemInput
 
 const MPPolys = Vector{<:MP.AbstractPolynomialLike}
-const Inputs = Union{<:Systems.AbstractSystem, <:MPPolys, <:Composition}
+const Inputs = Union{<:AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
 const input_supported_keywords = [:parameters, :startparameters, :targetparameters,
@@ -51,7 +49,7 @@ end
 
 Construct a `HomotopyInput` for a homotopy `H` with given `startsolutions`.
 """
-struct HomotopyInput{Hom<:Homotopies.AbstractHomotopy} <: AbstractInput
+struct HomotopyInput{Hom<:AbstractHomotopy} <: AbstractInput
     H::Hom
     startsolutions
 end
@@ -96,10 +94,10 @@ for details.
 
 """
     input(F::MPPolyInputs)::TotalDegreeInput
-    input(F::Systems.AbstractSystem)::TotalDegreeInput
+    input(F::AbstractSystem)::TotalDegreeInput
     input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)::StartTargetInput
     input(F::MPPolyInputs, parameters, startsolutions; kwargs...)::ParameterSystemInput
-    input(H::Homotopies.AbstractHomotopy, startsolutions)::HomotopyInput
+    input(H::AbstractHomotopy, startsolutions)::HomotopyInput
 
 Construct an `AbstractInput`.
 """
@@ -113,7 +111,7 @@ function input(F::MPPolyInputs)
     TotalDegreeInput(F, maxdegrees(F))
 end
 
-function input(F::Systems.AbstractSystem)
+function input(F::AbstractSystem)
     n, N = size(F)
     degrees = check_homogenous_degrees(F)
     # system needs to be homogenous
@@ -153,8 +151,8 @@ function input(F::MPPolyInputs, startsolutions;
     ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
 end
 
-function input(H::Homotopies.AbstractHomotopy, startsolutions)
-    check_homogenous_degrees(Systems.FixedHomotopy(H, rand()))
+function input(H::AbstractHomotopy, startsolutions)
+    check_homogenous_degrees(FixedHomotopy(H, rand()))
     HomotopyInput(H, startsolutions)
 end
 
@@ -164,7 +162,7 @@ end
 
 Compute (numerically) the degrees of `F` and verify that `F` is homogenous,
 """
-function check_homogenous_degrees(F::Systems.AbstractSystem)
+function check_homogenous_degrees(F::AbstractSystem)
     n, N = size(F)
     if n < N - 1
         error("Input system is not homogenous! It has $n polynomials in $N variables according to `size`.")
@@ -173,10 +171,10 @@ function check_homogenous_degrees(F::Systems.AbstractSystem)
     # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
     x = rand(ComplexF64, N)
-    cache = Systems.cache(F, x)
-    y = Systems.evaluate(F, x, cache)
+    system_cache = cache(F, x)
+    y = evaluate(F, x, system_cache)
     rmul!(x, 2)
-    y2 = Systems.evaluate(F, x, cache)
+    y2 = evaluate(F, x, system_cache)
 
     degrees = map(y2, y) do y2ᵢ, yᵢ
         # y2ᵢ = 2^dᵢ yᵢ

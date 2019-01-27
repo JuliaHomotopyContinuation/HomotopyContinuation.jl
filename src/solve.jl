@@ -1,9 +1,3 @@
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-
-import .Systems
-import .Homotopies
-
 using .Utilities
 
 export solve
@@ -14,7 +8,7 @@ export solve
 
 Solve the system `F` using a total degree homotopy. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
-- [`Systems.AbstractSystem`](@ref) (the system has to represent a **homogenous** polynomial system.)
+- [`AbstractSystem`](@ref) (the system has to represent a **homogenous** polynomial system.)
 
 ### Example
 Assume we want to solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)``.
@@ -30,17 +24,17 @@ solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)
 ```
 This would result in the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
 
-To solve ``F`` by a custom `Systems.AbstractSystem` you can do
+To solve ``F`` by a custom `AbstractSystem` you can do
 ```julia
 @polyvar x y z
 # The system `F` has to be homgoenous system
-F = Systems.SPSystem([x^2+y^2+z^2, 2x+3y-z]) # Systems.SPSystem <: Systems.AbstractSystem
+F = SPSystem([x^2+y^2+z^2, 2x+3y-z]) # SPSystem <: AbstractSystem
 # To solve the original affine system we have to tell that the homogenization variable has index 3
 solve(F, homvar=3)
 ```
 or equivalently (in this case) by
 ```julia
-solve([x^2+y^2+z^2, 2x+3y-z], system=Systems.SPSystem)
+solve([x^2+y^2+z^2, 2x+3y-z], system=SPSystem)
 ```
 
 # Start Target Homotopy
@@ -99,7 +93,7 @@ solve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p�
 
 # Abstract Homotopy
 
-    solve(H::Homotopies.AbstractHomotopy, start_solutions; options...)
+    solve(H::AbstractHomotopy, start_solutions; options...)
 
 Solve the homotopy `H` by tracking the each solution of
 ``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
@@ -112,8 +106,8 @@ if the third variable is the homogenization variable.
 # Options
 General options:
 
-* `system::Systems.AbstractSystem`: A constructor to assemble a [`Systems.AbstractSystem`](@ref). The default is [`Systems.FPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering.
-* `homotopy::Systems.AbstractHomotopy`: A constructor to construct a [`Homotopies.AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogenous [`Systems.AbstractSystem`](@ref)s.
+* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`FPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering.
+* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogenous [`AbstractSystem`](@ref)s.
 * `seed::Int`: The random seed used during the computations.
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogenous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
 * `endgame_start=0.1`: The value of `t` for which the endgame is started.
@@ -121,9 +115,9 @@ General options:
 * `threading=true`: Enable or disable multi-threading.
 
 Pathtracking specific:
-* `corrector::Correctors.AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Correctors.Newton`](@ref).
+* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Newton`](@ref).
 * `corrector_maxiters=2`: The maximal number of correction steps in a single step.
-* `predictor::Predictors.AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Predictors.RK4`](@ref).
+* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`RK4`](@ref).
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-7`: The precision used to track a value.

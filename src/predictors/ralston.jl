@@ -7,8 +7,8 @@ export Ralston
 The [Ralston](https://en.wikipedia.org/wiki/List_of_Runge–Kutta_methods#Ralston's_method)
 predictor of order 2.
 """
-struct Ralston <: AbstractStatelessPredictor end
-struct RalstonCache{T} <: AbstractStatelessPredictorCache
+struct Ralston <: AbstractPredictor end
+struct RalstonCache{T} <: AbstractPredictorCache
     J::Matrix{T}
     dt::Vector{T}
     mk₁::Vector{T}

@@ -25,8 +25,8 @@ struct NewtonCache{T, Fac<:LinearAlgebra.Factorization} <: AbstractCorrectorCach
 end
 
 function cache(::Newton, H::HomotopyWithCache, x, t)
-    Jac = Jacobian(Homotopies.jacobian(H, x, t))
-    rᵢ = Homotopies.evaluate(H, x, t)
+    Jac = Jacobian(jacobian(H, x, t))
+    rᵢ = evaluate(H, x, t)
     Δxᵢ = copy(rᵢ)
 
     NewtonCache(Jac, rᵢ, Δxᵢ)
@@ -68,7 +68,7 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
             if norm_Δx₀ ≤ tol
-                return Result(converged, norm_Δx₀, i + 1, 0.0, 0.0, norm_Δx₀, cond)
+                return CorrectorResult(converged, norm_Δx₀, i + 1, 0.0, 0.0, norm_Δx₀, cond)
             end
 
         else
@@ -81,15 +81,15 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             end
 
             if Θᵢ₋₁ > 0.5
-                return Result(terminated, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
+                return CorrectorResult(terminated, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
             if accuracy ≤ tol
-                return Result(converged, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
+                return CorrectorResult(converged, accuracy, i + 1, ω₀, ω, norm_Δx₀, cond)
             end
         end
     end
 
-    return Result(maximal_iterations, accuracy, maxiters, ω₀, ω, norm_Δx₀, cond)
+    return CorrectorResult(maximal_iterations, accuracy, maxiters, ω₀, ω, norm_Δx₀, cond)
 end
