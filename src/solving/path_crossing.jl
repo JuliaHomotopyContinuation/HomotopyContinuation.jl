@@ -26,7 +26,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
     set_tol!(solvers, min(original_tol * 1e-2, 1e-10))
 
-    Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+    tforeach(solvers, crossed_path_indices) do solver, tid, k
         x₁ = start_solutions[k]
         tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
     end
@@ -38,7 +38,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
         set_tol!(solvers, min(original_tol * 1e-3, 1e-12))
         set_corrector_maxiters!(solvers, 1)
 
-        Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+        tforeach(solvers, crossed_path_indices) do solver, tid, k
             x₁ = start_solutions[k]
             tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
         end

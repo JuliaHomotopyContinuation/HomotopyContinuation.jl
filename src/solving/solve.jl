@@ -50,7 +50,7 @@ function track_to_endgamezone(solvers, start_solutions)
     if report_progress(solvers)
         p = ProgressMeter.Progress(n, 0.5, "Tracking $(length(start_solutions)) paths to endgame zone...") # minimum update interval: 1 second
 
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k - 1),))
             end
@@ -59,7 +59,7 @@ function track_to_endgamezone(solvers, start_solutions)
 
         ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
     else
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             trackpath(solver, start_solutions[k], t₁, t_endgame)
         end
     end
@@ -74,7 +74,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     n = length(start_solutions)
 
     if t₀ == t_endgame
-        return Parallel.tmap(solvers, 1:n) do solver, tid, k
+        return tmap(solvers, 1:n) do solver, tid, k
             x₁, r = start_solutions[k], endgame_zone_results[k]
             PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
         end
@@ -85,7 +85,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     if report_progress(solvers)
         p = ProgressMeter.Progress(n, 0.5, "Running endgame for $(length(endgame_zone_results)) paths...")
 
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:completed, k-1),))
             end
@@ -93,7 +93,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
         end
         ProgressMeter.update!(p, n, showvalues=((:completed, n),))
     else
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         end
     end

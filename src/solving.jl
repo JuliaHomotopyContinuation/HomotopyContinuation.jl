@@ -1,5 +1,3 @@
-import ..Parallel
-
 using ..Utilities
 
 export Solver,
