@@ -124,7 +124,7 @@ function jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c=cache(H, x, t))
 end
 
 """
-    evaluate_and_dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
+    jacobian_and_dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)`.
 """

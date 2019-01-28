@@ -12,7 +12,6 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
-
     import DoubleFloats: Double64
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
