@@ -81,7 +81,7 @@
         @test HC.weyldot(f, f) == 9.0 + 4.0  / 2 + 1.0
         @test HC.weylnorm(f)^2 ≈ HC.weyldot(f,f)
         @test HC.weyldot([f, f], [g, g]) == 2 * HC.weyldot(f, g)
-        @test HC.weylnorm([f, f]) == HC.weyldot([f, f], [f, f])
+        @test HC.weylnorm([f, f]) == √HC.weyldot([f, f], [f, f])
     end
 
     @testset "Misc" begin

@@ -40,7 +40,7 @@
 
         # scaling
         F = equations(katsura(5))
-        @test nfinite(solve(F, scale_systems=false, threading=false)) == 32
+        @test nfinite(solve(F, system_scaling=false, threading=false)) == 32
 
         @test nfinite(solve(F, homotopy=StraightLineHomotopy)) == 32
         result = solve(F, predictor=Euler(), homotopy=StraightLineHomotopy)
@@ -96,7 +96,7 @@
         g = [x+y, y + 3, x + 2]
         res = solve(e ∘ f ∘ g)
         @test nnonsingular(res) == 2
-        @test nnonsingular(solve(e ∘ f ∘ g, scale_systems=false)) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=false)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
