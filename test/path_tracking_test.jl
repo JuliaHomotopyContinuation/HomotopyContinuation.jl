@@ -44,10 +44,10 @@
 
     @testset "Allocations" begin
         F = equations(katsura(5))
-        tracker, start_sols = PathTracking.pathtracker_startsolutions(F)
+        tracker, start_sols = pathtracker_startsolutions(F)
         s = first(start_sols)
-        PathTracking.track!(tracker, s, 1.0, 0.1)
-        @allocated PathTracking.track!(tracker, s, 1.0, 0.1) == 16
+        track!(tracker, s, 1.0, 0.1)
+        @allocated track!(tracker, s, 1.0, 0.1) == 16
     end
 
     @testset "LinearSystem" begin

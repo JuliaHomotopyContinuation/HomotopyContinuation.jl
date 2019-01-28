@@ -336,7 +336,7 @@ function checkstartvalue!(tracker::PathTracker)
     nothing
 end
 
-function compute_ẋ!(state, cache, options::Options)
+function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
     # apply row scaling to J and compute factorization
     Utilities.updated_jacobian!(cache.Jac)
