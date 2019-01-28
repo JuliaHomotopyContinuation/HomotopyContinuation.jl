@@ -1,6 +1,3 @@
-import FixedPolynomials
-const FP = FixedPolynomials
-
 export FPSystem, differentiate
 
 """

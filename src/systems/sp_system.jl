@@ -1,6 +1,3 @@
-import StaticPolynomials
-const SP = StaticPolynomials
-
 export SPSystem
 
 """

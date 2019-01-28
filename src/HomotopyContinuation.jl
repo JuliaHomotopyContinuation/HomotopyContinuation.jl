@@ -1,23 +1,25 @@
 module HomotopyContinuation
 
     import DynamicPolynomials
+    import FixedPolynomials
     import LinearAlgebra
     import MultivariatePolynomials
     import Printf
     import ProgressMeter
     import ProjectiveVectors
     import Random
-
     import StaticArrays
     import StaticPolynomials
     import TreeViews
 
 
+    import DoubleFloats: Double64
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
-    import StaticArrays: SVector
+    import StaticArrays: SVector, @SVector
     import Test: @test
 
+    const FP = FixedPolynomials
     const MP = MultivariatePolynomials
     const SP = StaticPolynomials
 

@@ -1,5 +1,3 @@
-import DoubleFloats: Double64
-
 """
     Jacobian{T, <:Factorization}
 

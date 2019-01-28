@@ -1,7 +1,5 @@
 export CompositionSystem
 
-import LinearAlgebra
-
 """
     CompositionSystem(composition::Composition, systems_constructor) <: AbstractSystem
 

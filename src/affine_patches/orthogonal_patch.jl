@@ -1,5 +1,3 @@
-import LinearAlgebra
-
 export OrthogonalPatch
 
 """

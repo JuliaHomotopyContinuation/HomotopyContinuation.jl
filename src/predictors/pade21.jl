@@ -1,5 +1,3 @@
-import LinearAlgebra
-import ProjectiveVectors: PVector
 export Pade21
 
 """

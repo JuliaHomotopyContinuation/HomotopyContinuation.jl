@@ -1,7 +1,4 @@
-import Random
-
 export RandomPatch
-
 
 """
     RandomPatch()

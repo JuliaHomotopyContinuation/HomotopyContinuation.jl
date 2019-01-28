@@ -1,14 +1,5 @@
 export monodromy_solve, realsolutions, nreal, GroupActions, complex_conjugation
 
-import LinearAlgebra
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-import ProgressMeter
-import StaticArrays: SVector, @SVector
-import TreeViews
-
-import ProjectiveVectors
-
 include("monodromy/group_actions.jl")
 include("monodromy/options.jl")
 include("monodromy/statistics.jl")

@@ -1,5 +1,3 @@
-import ProjectiveVectors
-
 function setup!(endgame, x, R)
     setup!(endgame.tracker, x, R, 0.0im)
     reset!(endgame.state, x, R)

@@ -1,5 +1,3 @@
-import DoubleFloats: Double64
-
 export Newton
 
 """

@@ -1,5 +1,3 @@
-import DoubleFloats: Double64
-
 export PathTracker, PathTrackerResult, PathTrackerStatus,
         pathtracker, pathtracker_startsolutions,
         track, track!, setup!, iterator!,
