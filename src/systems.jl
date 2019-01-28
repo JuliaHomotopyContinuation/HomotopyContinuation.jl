@@ -1,6 +1,6 @@
 export AbstractSystem,
     AbstractSystemCache,
-    NullCache,
+    SystemNullCache,
     cache,
     evaluate,
     evaluate!,
@@ -13,7 +13,7 @@ export AbstractSystem,
 
 
 """
-    NullCache
+    SystemNullCache
 
 An empty cache if no cache is necessary.
 """

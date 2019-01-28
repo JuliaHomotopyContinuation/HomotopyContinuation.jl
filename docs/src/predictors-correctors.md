@@ -17,6 +17,8 @@ NullPredictor
 ```
 
 ## Correctors
+
+The following correctors are currently implemented.
 ```@docs
 Newton
 ```

@@ -1,4 +1,4 @@
-export NullCache,
+export HomotopyNullCache,
     nvariables,
     cache,
     evaluate!,
@@ -13,7 +13,7 @@ export NullCache,
 
 
 """
-    NullCache
+    HomotopyNullCache
 
 The default `AbstractHomotopyCache` containing nothing.
 """

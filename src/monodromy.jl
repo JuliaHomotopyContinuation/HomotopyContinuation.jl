@@ -76,6 +76,7 @@ Returns the solutions of `res` whose imaginary part has norm < 1e-6.
 function realsolutions(res::MonodromyResult; tol=1e-6)
     map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
 end
+
 """
     nreal(res::MonodromyResult; tol = 1e-6)
 

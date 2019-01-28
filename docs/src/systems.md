@@ -27,18 +27,24 @@ For this the following interface has to be defined.
 ```@docs
 AbstractSystem
 AbstractSystemCache
-NullCache
+SystemNullCache
 ```
 
 ### Mandatory
 The following methods are mandatory to implement.
 ```@docs
-cache
-evaluate!
-evaluate
-jacobian!
-jacobian
+cache(F::AbstractSystem, args...)
+evaluate!(u, F::AbstractSystem, args...)
+evaluate(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x))
+jacobian!(u, F::AbstractSystem, args...)
+jacobian(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x))
 Base.size(::AbstractSystem)
+```
+
+Additionally if the system should support parameter homotopies it needs to support
+```@docs
+differentiate_parameters!
+differentiate_parameters
 ```
 
 ### Optional
@@ -46,6 +52,6 @@ The following methods are mandatory to implement.
 The following are optional to implement but usually you want to define at least
 [`cache`](@ref).
 ```@docs
-evaluate_and_jacobian!
-evaluate_and_jacobian
+evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache::AbstractSystemCache)
+evaluate_and_jacobian!(u, U, F::AbstractSystem, x, p, cache::AbstractSystemCache)
 ```

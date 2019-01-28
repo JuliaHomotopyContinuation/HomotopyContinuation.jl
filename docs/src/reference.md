@@ -40,12 +40,3 @@ EmbeddingPatch
 RandomPatch
 FixedPatch
 ```
-### Interface
-Each patch has to follow the following interface.
-```@docs
-AbstractAffinePatch
-state
-onpatch!
-setup!
-changepatch!
-```

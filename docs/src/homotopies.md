@@ -30,25 +30,26 @@ For this the following interface has to be defined.
 ```@docs
 AbstractHomotopy
 AbstractHomotopyCache
-NullCache
+HomotopyNullCache
 ```
 
 ### Mandatory
 The following methods are mandatory to implement.
 ```@docs
-cache
-evaluate!
-jacobian!
+cache(H::AbstractHomotopy, x, t)
+evaluate!(u, F::AbstractHomotopy, args...)
+jacobian!(u, H::AbstractHomotopy, args...)
 dt!
 Base.size(::AbstractHomotopy)
 ```
 ### Optional
 ```@docs
-evaluate_and_jacobian!
-evaluate_and_jacobian
-jacobian_and_dt!
-evaluate
-jacobian
-dt
+evaluate_and_jacobian!(u, U, H::AbstractHomotopy, x, t, c=cache(H, x, t))
+evaluate_and_jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t))
+jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c=cache(H, x, t))
+jacobian_and_dt(H::AbstractHomotopy, x, t, c=cache(H, x, t))
+evaluate(H::AbstractHomotopy, x, t)
+jacobian(H::AbstractHomotopy, x, t)
+dt(H::AbstractHomotopy, x, t)
 basehomotopy
 ```

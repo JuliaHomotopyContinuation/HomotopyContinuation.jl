@@ -9,13 +9,13 @@ export ParameterHomotopy, nparameters, set_parameters!
 
 Construct the homotopy
 ```math
-H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀))
-```,
+H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
+```
 where `p₁` and `p₀` are a vector of parameter values for ``F`` and
 `γ₁` and `γ₀` are complex numbers. If `γ₁` or `γ₀` is `nothing`, it is assumed
 that `γ₁` and `γ₀` are ``1``.
 The input ``parameters`` specifies the parameter variables of ``F``.
-Neccessarily, ``length(parameters) == length(p₁) == length(p₀)``.
+Neccessarily, `length(parameters) == length(p₁) == length(p₀)`.
 
 Note that `p₁` and `p₀` are stored as a tuple `p` of `SVectors` and `γ₁` and `γ₀`
 are stored as a tuple `γ` or as `γ=nothing`
