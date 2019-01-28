@@ -6,7 +6,7 @@ mutable struct MonodromyStatistics
     nsolutions_development::Vector{Int}
 end
 
-MonodromyStatistics(nsolutions::Int) = Statistics(0, 0, 0, 1, [nsolutions])
+MonodromyStatistics(nsolutions::Int) = MonodromyStatistics(0, 0, 0, 1, [nsolutions])
 function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
