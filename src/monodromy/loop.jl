@@ -107,17 +107,17 @@ end
 # Loop data structure
 #######################
 """
-    Loop(p::SVector, x::AbstractVector{<:Number}, nnodes::Int, options::Options; usegamma=true)
+    Loop(p::SVector, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct a loop using `nnodes` nodes with parameters of the type of `p` and solutions
 of the type of `x`. `usegamma` refers to the use weights on the edges. See also
 [`Edge`](@ref).
 
-    Loop(p::SVector, x::AbstractVector, nnodes::Int, options::Options; usegamma=true)
+    Loop(p::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct the loop and add all points in `x` to it.
 
-    Loop(style::LoopStyle, p::SVector, x::AbstractVector, options::Options)
+    Loop(style::LoopStyle, p::SVector, x::AbstractVector, options::MonodromyOptions)
 
 Construct a loop using the defined style `style` with parameters of the type of `p` and solutions
 of the type of `x`.
@@ -127,7 +127,7 @@ struct Loop{N<:Node}
     edges::Vector{Edge}
 end
 
-function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, options::Options; usegamma=true)
+function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
     n₁ = Node(p₁, x₁, is_main_node = true)
     nodes = [n₁]
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
@@ -141,7 +141,7 @@ function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, option
 
     Loop(nodes, loop)
 end
-function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::Options; kwargs...)
+function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
     loop = Loop(p₁, first(x), nnodes, options; kwargs...)
     for xᵢ ∈ x
         add!(loop.nodes[1], xᵢ; tol=options.tol)
@@ -195,7 +195,7 @@ struct Triangle <: LoopStyle
 end
 Triangle(;useweights=true) = Triangle(useweights)
 
-function Loop(strategy::Triangle, p::SVector, x::AbstractVector, options::Options)
+function Loop(strategy::Triangle, p::SVector, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 3, options, usegamma=strategy.useweights)
 end
 
@@ -206,17 +206,17 @@ A petal is a loop consisting of the main node and one other node connected
 by two edges with different random weights.
 """
 struct Petal <: LoopStyle end
-function Loop(strategy::Petal, p::SVector, x::AbstractVector, options::Options)
+function Loop(strategy::Petal, p::SVector, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 2, options, usegamma=true)
 end
 
 
 """
-    regenerate!(loop::Loop, options::Options, stats::Statistics)
+    regenerate!(loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics)
 
 Regenerate all random parameters in the loop in order to introduce a new monodromy action.
 """
-function regenerate!(loop::Loop, options::Options, stats::Statistics)
+function regenerate!(loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics)
     main = mainnode(loop)
 
     # The first node is the main node and doesn't get touched
@@ -229,16 +229,16 @@ end
 
 
 """
-    track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::Statistics)
+    track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
 
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::Statistics)
+function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
     set_parameters!(tracker, edge, loop)
     track(tracker, x, stats)
 end
-function track(tracker, x::AbstractVector, stats::Statistics)
+function track(tracker, x::AbstractVector, stats::MonodromyStatistics)
     retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
     y = ProjectiveVectors.affine_chart!(x, currx(tracker))

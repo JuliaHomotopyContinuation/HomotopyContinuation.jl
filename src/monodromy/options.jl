@@ -3,7 +3,7 @@ const options_allowed_keywords = [:tol, :done_callback,
     :parameter_sampler, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
-struct Options{F1<:Function, F2<:Tuple, F3<:Function}
+struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
     tol::Float64
     done_callback::F1
     group_actions::GroupActions{F2}
@@ -16,7 +16,7 @@ struct Options{F1<:Function, F2<:Tuple, F3<:Function}
     maximal_number_of_iterations_without_progress::Int
 end
 
-function Options(isrealsystem;
+function MonodromyOptions(isrealsystem;
     tol::Float64=1e-5,
     done_callback=always_false,
     group_action=nothing,
@@ -36,7 +36,7 @@ function Options(isrealsystem;
        actions = GroupActions(group_actions)
    end
 
-    Options(tol, done_callback, actions,
+    MonodromyOptions(tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler,
         target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
@@ -57,7 +57,7 @@ always_false(x, sols) = false
 A group action which returns the elementwise complex conjugated solutions.
 """
 complex_conjugation(x) = (conj.(x),)
-has_group_actions(options::Options) = !(options.group_actions isa GroupActions{Tuple{}})
+has_group_actions(options::MonodromyOptions) = !(options.group_actions isa GroupActions{Tuple{}})
 
 function independent_gaussian(p::SVector{N, T}) where {N, T}
     p + (@SVector randn(T, N))

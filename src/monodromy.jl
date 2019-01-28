@@ -8,7 +8,7 @@ include("monodromy/loop.jl")
 struct MonodromyResult{N, T}
     returncode::Symbol
     solutions::Vector{SVector{N, T}}
-    statistics::Statistics
+    statistics::MonodromyStatistics
 end
 
 Base.iterate(R::MonodromyResult) = iterate(R.solutions)
@@ -135,7 +135,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     optionskwargs, restkwargs = splitkwargs(kwargs, options_allowed_keywords)
     options = begin
         isrealsystem = TC <: Real && TP <: Real
-        Options(isrealsystem; optionskwargs...)
+        MonodromyOptions(isrealsystem; optionskwargs...)
     end
 
     #assemble
@@ -151,7 +151,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         tol=options.tol,
         refinement_tol=options.tol / 10,
         restkwargs...)
-    statistics = Statistics(solutions(loop))
+    statistics = MonodromyStatistics(solutions(loop))
 
     # solve
     retcode = :not_assigned
@@ -202,8 +202,8 @@ end
 
 
 function monodromy_solve!(loop::Loop,
-    tracker::PathTracker, options::Options,
-    stats::Statistics, progress)
+    tracker::PathTracker, options::MonodromyOptions,
+    stats::MonodromyStatistics, progress)
 
     t₀ = time_ns()
     iterations_without_progress = 0 # stopping heuristic
@@ -240,8 +240,8 @@ function monodromy_solve!(loop::Loop,
     :success
 end
 
-function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::Options,
-        t₀::UInt, stats::Statistics, progress)
+function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::MonodromyOptions,
+        t₀::UInt, stats::MonodromyStatistics, progress)
     while !isempty(queue)
         job = pop!(queue)
         if process!(queue, job, tracker, loop, options, stats, progress) == :done
@@ -256,8 +256,8 @@ function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::Options,
     :incomplete
 end
 
-function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::Options,
-                  stats::Statistics, progress)
+function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::MonodromyOptions,
+                  stats::MonodromyStatistics, progress)
     y, retcode = track(tracker, job.x, job.edge, loop, stats)
     if retcode ≠ PathTrackerStatus.success
         return :incomplete
@@ -297,10 +297,10 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
     return :incomplete
 end
 
-function update_progress!(::Nothing, loop::Loop, statistics::Statistics; finish=false)
+function update_progress!(::Nothing, loop::Loop, statistics::MonodromyStatistics; finish=false)
     nothing
 end
-function update_progress!(progress, loop::Loop, statistics::Statistics; finish=false)
+function update_progress!(progress, loop::Loop, statistics::MonodromyStatistics; finish=false)
     ProgressMeter.update!(progress, length(solutions(loop)), showvalues=(
         ("# paths tracked ", statistics.ntrackedpaths),
         ("# loops generated ", statistics.nparametergenerations),
@@ -312,14 +312,14 @@ function update_progress!(progress, loop::Loop, statistics::Statistics; finish=f
     nothing
 end
 
-function isdone(node::Node, x, options::Options)
+function isdone(node::Node, x, options::MonodromyOptions)
     !node.main_node && return false
 
     options.done_callback(x, node.points) ||
     length(node.points) ≥ options.target_solutions_count
 end
 
-function regenerate_loop_and_schedule_jobs!(queue, loop::Loop, options::Options, stats::Statistics)
+function regenerate_loop_and_schedule_jobs!(queue, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics)
     sols = solutions(loop)
     # create a new loop by regenerating the parameters (but don't touch our
     # main node)
