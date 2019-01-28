@@ -3,7 +3,8 @@ export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homv
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homotopy, :system]; input_supported_keywords]
+	[:seed, :homvar, :homotopy, :system, :system_scaling];
+	input_supported_keywords]
 
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
@@ -112,21 +113,21 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
     F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system; homvar=homvar)
 
 	check_square_homogenous_system(F, variable_groups)
 
 	# Scale systems
-	if scale_systems
+	if system_scaling
 		G = homogenous_totaldegree_polysystem(prob.degrees, variables, variable_groups)
 		_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
 		g = TotalDegreeSystem(prob.degrees, G_scaling_factors)
-		problem = ProjectivProblem(g,
+		problem = ProjectiveProblem(g,
 						construct_system(f, system; variables=variables, homvars=homvars),
 						variable_groups, seed; kwargs...)
 	else
-		problem = ProjectivProblem(TotalDegreeSystem(prob.degrees),
+		problem = ProjectiveProblem(TotalDegreeSystem(prob.degrees),
 			construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
 
 	end
@@ -149,7 +150,7 @@ function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvar
 	# Check overdetermined case
 	n > N && error(overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
-    (ProjectivProblem(G, prob.system, variable_groups, seed; kwargs...),
+    (ProjectiveProblem(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(prob.degrees))
 end
 
@@ -158,7 +159,7 @@ function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvar
 
     G = TotalDegreeSystem(prob.degrees)
 	variable_groups = VariableGroups(N, homvaridx)
-    (ProjectivProblem(G, prob.system, variable_groups, seed; kwargs...),
+    (ProjectiveProblem(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(prob.degrees))
 end
 
@@ -167,20 +168,20 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_systems=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogenous.((F, G))
 	vars = variables(F)
     if F_ishom && G_ishom
 		vargroups = VariableGroups(vars, homvar)
-		if scale_systems
+		if system_scaling
 			g, f = scale_systems(G, F)
 		else
 			g, f = G, F
 		end
 		F̄ = construct_system(f, system; variables=vars, homvars=homvar)
 		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
-        ProjectivProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
+        ProjectiveProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogenous and the other not!")
     else
@@ -191,7 +192,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_syst
 		h = uniquevar(F)
         push!(vars, h)
         sort!(vars, rev=true)
-		if scale_systems
+		if system_scaling
 			g, f = scale_systems(homogenize(G, h), homogenize(F, h))
 		else
 			g, f = homogenize(G, h), homogenize(F, h)
@@ -199,7 +200,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; scale_syst
         F̄ = construct_system(f, system, variables=vars, homvars=homvar)
 		Ḡ = construct_system(g, system, variables=vars, homvars=homvar)
 		vargroups = VariableGroups(vars, h)
-        ProjectivProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
+        ProjectiveProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
     end
 end
 
@@ -212,5 +213,5 @@ function problem_startsolutions(prob::ParameterSystemInput, homvar, seed; system
 	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
     H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
-    ProjectivProblem(H, variable_groups, seed), prob.startsolutions
+    ProjectiveProblem(H, variable_groups, seed), prob.startsolutions
 end
