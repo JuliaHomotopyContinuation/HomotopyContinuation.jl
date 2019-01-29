@@ -99,7 +99,7 @@ function PathResult(homvars::NTuple{1,Int}, k, x₁, x_e, t₀, r, cache::PathRe
     else
         solution = ProjectiveVectors.affine_chart(r.x)
 
-        # Before we compute the condition number we row equilibrated the Jacobian matrix
+        # Before we compute the condition number we row-equilibrate the Jacobian matrix
         for i=1:size(cache.J, 1)
             rᵢ = abs(cache.J[i, 1])
             for j=2:size(cache.J, 2)-1
@@ -254,25 +254,25 @@ Checks whether the path result is finite.
 Base.isfinite(r::PathResult) = r.returncode == :success # we don't check isaffine to make other code easier
 
 """
-    issingular(pathresult; tol=1e10)
+    issingular(pathresult; tol=1e12)
     issingular(pathresult, tol)
 
 Checks whether the path result is singular. This is true if
 the winding number > 1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-issingular(r::PathResult; tol=1e10) = issingular(r, tol)
+issingular(r::PathResult; tol=1e12) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
     (r.windingnumber > 1 || r.condition_number > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
-    isnonsingular(pathresult; tol=1e10)
+    isnonsingular(pathresult; tol=1e12)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
+isnonsingular(r::PathResult; tol=1e12) = isnonsingular(r, tol)
 isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
