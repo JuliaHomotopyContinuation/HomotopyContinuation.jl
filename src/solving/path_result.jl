@@ -25,7 +25,7 @@ Its fields are
 * `solution::Vector{T}`: The solution vector. If the algorithm computed in projective space and the solution is at infinity then the projective solution is given. Otherwise an affine solution is given if the startvalue was affine and a projective solution is given if the startvalue was projective.
 * `residual::Float64`: The value of the infinity norm of `H(solution, 0)`.
 * `newton_residual`: The value of the 2-norm of ``J_H(\\text{solution})^{-1}H(\\text{solution}, 0)``
-* `condition_number`: This is the condition number of the Jacobian at the solution. A high condition number indicates a singularity.
+* `condition_number`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
 * `windingnumber`: The estimated winding number
 * `angle_to_infinity`: The angle to infinity is the angle of the solution to the hyperplane where the homogenizing coordinate is ``0``.
 * `real_solution`: Indicates whether the solution is real given the defined tolerance `at_infinity_tol` (from the solver options).
@@ -68,6 +68,17 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
     if returncode != :success
         condition = Inf
     else
+        # Before we compute the condition number we row-equilibrate the Jacobian matrix
+        for i=1:size(cache.J, 1)
+            rᵢ = abs2(cache.J[i, 1])
+            for j=2:size(cache.J, 2)
+                rᵢ += abs2(cache.J[i, j])
+            end
+            rᵢ = inv(√rᵢ)
+            for j=1:size(cache.J, 2)
+                cache.J[i, j] *= rᵢ
+            end
+        end
         σ = LinearAlgebra.svdvals(cache.J)
         n = size(cache.H)[2]
         if n>2
@@ -82,7 +93,7 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, x_e.data, iters(r), npredictions)
 end
-function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache) where {N}
+function PathResult(homvars::NTuple{1,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
@@ -98,9 +109,20 @@ function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathRe
         condition = Inf
     else
         solution = ProjectiveVectors.affine_chart(r.x)
-        condition = LinearAlgebra.cond(@view cache.J[:,2:end])
-    end
 
+        # Before we compute the condition number we row-equilibrate the Jacobian matrix
+        for i=1:size(cache.J, 1)
+            rᵢ = abs2(cache.J[i, 1])
+            for j=2:size(cache.J, 2)-1
+                rᵢ += abs2(cache.J[i, j])
+            end
+            rᵢ = inv(√rᵢ)
+            for j=1:size(cache.J, 2)-1
+                cache.J[i, j] *= rᵢ
+            end
+        end
+        condition = LinearAlgebra.cond(@view cache.J[:,1:end-1])
+    end
 
     PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
         condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
@@ -244,25 +266,25 @@ Checks whether the path result is finite.
 Base.isfinite(r::PathResult) = r.returncode == :success # we don't check isaffine to make other code easier
 
 """
-    issingular(pathresult; tol=1e10)
+    issingular(pathresult;tol=1e14)
     issingular(pathresult, tol)
 
 Checks whether the path result is singular. This is true if
 the winding number > 1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-issingular(r::PathResult; tol=1e10) = issingular(r, tol)
+issingular(r::PathResult;tol=1e14) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
     (r.windingnumber > 1 || r.condition_number > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
-    isnonsingular(pathresult; tol=1e10)
+    isnonsingular(pathresult;tol=1e14)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; tol=1e10) = isnonsingular(r, tol)
+isnonsingular(r::PathResult;tol=1e14) = isnonsingular(r, tol)
 isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
