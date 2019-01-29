@@ -68,6 +68,17 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
     if returncode != :success
         condition = Inf
     else
+        # Before we compute the condition number we row-equilibrate the Jacobian matrix
+        for i=1:size(cache.J, 1)
+            rᵢ = abs2(cache.J[i, 1])
+            for j=2:size(cache.J, 2)
+                rᵢ += abs2(cache.J[i, j])
+            end
+            rᵢ = inv(√rᵢ)
+            for j=1:size(cache.J, 2)
+                cache.J[i, j] *= rᵢ
+            end
+        end
         σ = LinearAlgebra.svdvals(cache.J)
         n = size(cache.H)[2]
         if n>2
