@@ -101,12 +101,13 @@ function PathResult(homvars::NTuple{1,Int}, k, x₁, x_e, t₀, r, cache::PathRe
 
         # Before we compute the condition number we row-equilibrate the Jacobian matrix
         for i=1:size(cache.J, 1)
-            rᵢ = abs(cache.J[i, 1])
+            rᵢ = abs2(cache.J[i, 1])
             for j=2:size(cache.J, 2)-1
-                rᵢ = max(rᵢ, abs(cache.J[i, j]))
+                rᵢ += abs2(cache.J[i, j])
             end
+            rᵢ = inv(√rᵢ)
             for j=1:size(cache.J, 2)-1
-                cache.J[i, j] /= rᵢ
+                cache.J[i, j] *= rᵢ
             end
         end
         condition = LinearAlgebra.cond(@view cache.J[:,1:end-1])
