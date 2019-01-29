@@ -102,7 +102,7 @@
     @testset "uniquesolutions" begin
         @polyvar x
         f = (x-3)^3*(x-2)
-        R = solve([f])
+        R = solve([f], seed=171090)
         @test length(uniquesolutions(R)) == 2
         @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2
@@ -111,7 +111,7 @@
 
         @polyvar x y
         f = (x-3y)^3*(x-2y)
-        R = solve([f])
+        R = solve([f], seed=171090)
         @test length(uniquesolutions(R)) == 2
         @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2
