@@ -2,7 +2,7 @@ const Solvers = Vector{<:Solver}
 
 include("path_crossing.jl")
 
-internal_solve(solver, start_solutions) = solve(solver, collect(start_solutions))
+internal_solve(solver, start_solutions) = internal_solve(solver, collect(start_solutions))
 
 function internal_solve(solvers, start_solutions::AbstractVector)
     nblas_threads = single_thread_blas()
