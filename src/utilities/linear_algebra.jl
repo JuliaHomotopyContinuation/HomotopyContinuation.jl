@@ -373,7 +373,7 @@ function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; to
         # res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
         # we need to do iterative refinement in higher precision
         # TODO: iters=1 should be replaced by an adaptive termination criterion
-        res = solve_with_iterative_refinement!(x, Jac, b, Double64; iters=3)
+        res = solve_with_iterative_refinement!(x, Jac, b, Double64; iters=1)
         cond = res.cond
     end
     cond
