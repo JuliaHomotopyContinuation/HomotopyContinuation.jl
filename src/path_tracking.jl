@@ -337,7 +337,7 @@ function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol, safety_factor=0.0)
+    adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol)
     nothing
 end
 
