@@ -2,7 +2,7 @@
 
 We also export a path tracking primitive to make the core path tracking routine
 available for other applications.
-At the heart is a [`PathTracking.PathTracker`](@ref) object which holds
+At the heart is a [`PathTracker`](@ref) object which holds
 all the state. The easiest way to construct a `PathTracker` is to use the [`pathtracker_startsolutions`](@ref) routine.
 
 ```@docs
@@ -20,9 +20,9 @@ PathTrackerResult
 To track from a start to an endpoint with the `PathTracker` we provide the following
 routines.
 ```@docs
-PathTracking.track
-PathTracking.track!
-PathTracking.setup!
+track
+track!
+setup!
 ```
 
 It is also possible to use a `PathTracker` as an iterator:

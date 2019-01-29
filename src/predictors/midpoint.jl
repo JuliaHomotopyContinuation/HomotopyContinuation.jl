@@ -7,8 +7,8 @@ export Midpoint
 The (explicit) [Midpoint](https://en.wikipedia.org/wiki/List_of_Runge–Kutta_methods#Explicit_midpoint_method)
 predictor of order 2.
 """
-struct Midpoint <: AbstractStatelessPredictor end
-struct MidpointCache{T} <: AbstractStatelessPredictorCache
+struct Midpoint <: AbstractPredictor end
+struct MidpointCache{T} <: AbstractPredictorCache
     J::Matrix{T}
     dt::Vector{T}
     mk₂::Vector{T}

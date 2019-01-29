@@ -25,9 +25,9 @@ end
         f1 = s -> (s * s,);
         f2 = s-> (2s, -s, 5s);
         f3 = s -> (s + 1,);
-        action1 = Monodromy.GroupActions(f1)
-        action2 = Monodromy.GroupActions(f1, f2)
-        action3 = Monodromy.GroupActions(f1, f2, f3)
+        action1 = GroupActions(f1)
+        action2 = GroupActions(f1, f2)
+        action3 = GroupActions(f1, f2, f3)
         @test action1(3) == (9, )
         @test action2(3) == (9, 18, -9, 45)
         @test action3(3) == (9, 18, -9, 45, 10, 19, -8, 46)
@@ -49,7 +49,7 @@ end
         @test length(result.solutions) == 21
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
-        @test length(Utilities.UniquePoints(result.solutions).points) == 21
+        @test length(HC.UniquePoints(result.solutions).points) == 21
         @test isempty(sprint(show, result)) == false
 
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,
@@ -80,10 +80,10 @@ end
                 t² = t * t
                 (vcat(t * s[1], t * s[2], s[3:end]),
                  vcat(t² * s[1], t² * s[2], s[3:end]))
-            end, Monodromy.complex_conjugation))
+            end, complex_conjugation))
         @test length(result.solutions) == 21
-        @test length(Monodromy.solutions(result)) == 21
-        @test length(Monodromy.realsolutions(result)) < 21
+        @test length(solutions(result)) == 21
+        @test length(realsolutions(result)) < 21
         test_treeviews(result)
 
 

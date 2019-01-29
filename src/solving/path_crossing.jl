@@ -1,6 +1,3 @@
-using ..Utilities
-import ProjectiveVectors
-
 """
     pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
@@ -26,7 +23,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
 
     set_tol!(solvers, min(original_tol * 1e-2, 1e-10))
 
-    Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+    tforeach(solvers, crossed_path_indices) do solver, tid, k
         x₁ = start_solutions[k]
         tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
     end
@@ -38,7 +35,7 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
         set_tol!(solvers, min(original_tol * 1e-3, 1e-12))
         set_corrector_maxiters!(solvers, 1)
 
-        Parallel.tforeach(solvers, crossed_path_indices) do solver, tid, k
+        tforeach(solvers, crossed_path_indices) do solver, tid, k
             x₁ = start_solutions[k]
             tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
         end
@@ -52,18 +49,18 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
     return (ncrossedpaths, crossed_path_indices)
 end
 
-tol(solver::Solver) = PathTracking.tol(solver.tracker)
+tol(solver::Solver) = tol(solver.tracker)
 tol(solvers::Solvers) = tol(solvers[1])
-corrector_maxiters(solver::Solver) = PathTracking.corrector_maxiters(solver.tracker)
+corrector_maxiters(solver::Solver) = corrector_maxiters(solver.tracker)
 corrector_maxiters(solvers::Solvers) = corrector_maxiters(solvers[1])
 
-set_tol!(solver::Solver, tol) = PathTracking.set_tol!(solver.tracker, tol)
+set_tol!(solver::Solver, tol) = set_tol!(solver.tracker, tol)
 function set_tol!(solvers::Solvers, tol)
     for solver in solvers
         set_tol!(solver, tol)
     end
 end
-set_corrector_maxiters!(solver::Solver, n) = PathTracking.set_corrector_maxiters!(solver.tracker, n)
+set_corrector_maxiters!(solver::Solver, n) = set_corrector_maxiters!(solver.tracker, n)
 function set_corrector_maxiters!(solvers::Solvers, n)
     for solver in solvers
         set_corrector_maxiters!(solver, n)
@@ -78,7 +75,7 @@ Check whether two solutions are closer than the given tolerance since this
 indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
-function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTracking.PathTrackerResult}
+function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTrackerResult}
     V = map(p -> LinearAlgebra.normalize(p.x.data), paths)
     vcat(multiplicities(V, tol, fubini_study)...)
 end

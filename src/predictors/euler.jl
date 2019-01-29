@@ -6,8 +6,8 @@ export Euler
 This uses the explicit Euler method for prediction, also known as the
 tangent predictor.
 """
-struct Euler <: AbstractStatelessPredictor end
-struct EulerCache{T} <: AbstractStatelessPredictorCache
+struct Euler <: AbstractPredictor end
+struct EulerCache{T} <: AbstractPredictorCache
     A::Matrix{T}
     b::Vector{T}
 end

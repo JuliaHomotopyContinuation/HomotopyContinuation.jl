@@ -26,7 +26,7 @@ struct FixedPointHomotopyCache{SC} <: AbstractHomotopyCache
 end
 
 function cache(H::FixedPointHomotopy, x, t)
-    F_cache = Systems.cache(H.F, x)
+    F_cache = cache(H.F, x)
     FixedPointHomotopyCache(F_cache)
 end
 
@@ -47,7 +47,7 @@ Obtain the gamma used in the FixedPointHomotopy.
 γ(H::FixedPointHomotopy) = gamma(H)
 
 function evaluate!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    Systems.evaluate!(u, H.F, x, c.F)
+    evaluate!(u, H.F, x, c.F)
 
     u .= (γ(H) * t) .* (x .- H.x₀) .+ (1 - t) .* u
 
@@ -56,13 +56,13 @@ end
 (H::FixedPointHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
 function dt!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    Systems.evaluate!(u, H.F, x, c.F)
+    evaluate!(u, H.F, x, c.F)
     u .= γ(H) .* (x .- H.x₀) .- u
     u
 end
 
 function jacobian!(U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    Systems.jacobian!(U, H.F, x, c.F)
+    jacobian!(U, H.F, x, c.F)
 
     U .= (1 - t) .* U
     γt = γ(H) * t
@@ -73,7 +73,7 @@ function jacobian!(U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
 end
 
 function evaluate_and_jacobian!(u, U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    Systems.evaluate_and_jacobian!(u, U, H.F, x, c.F)
+    evaluate_and_jacobian!(u, U, H.F, x, c.F)
 
     u .= (γ(H) * t) .* (x .- H.x₀) .+ (1 - t) .* u
     U .= (1 - t) .* U
@@ -87,7 +87,7 @@ function evaluate_and_jacobian!(u, U, H::FixedPointHomotopy, x, t, c::FixedPoint
 end
 
 function jacobian_and_dt!(U, u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
-    Systems.evaluate_and_jacobian!(u, U, H.F, x, c.F)
+    evaluate_and_jacobian!(u, U, H.F, x, c.F)
 
     U .= (1 - t) .* U
     γt = γ(H) * t

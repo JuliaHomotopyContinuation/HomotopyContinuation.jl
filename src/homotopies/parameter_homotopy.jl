@@ -1,15 +1,5 @@
 export ParameterHomotopy, nparameters, set_parameters!
 
-import LinearAlgebra
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-import StaticPolynomials
-const SP = StaticPolynomials
-import StaticArrays: SVector
-
-import ..Utilities
-
-
 """
     ParameterHomotopy(F, parameters;
         variables=setdiff(MP.variables(F), parameters),
@@ -19,13 +9,13 @@ import ..Utilities
 
 Construct the homotopy
 ```math
-H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀))
-```,
+H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
+```
 where `p₁` and `p₀` are a vector of parameter values for ``F`` and
 `γ₁` and `γ₀` are complex numbers. If `γ₁` or `γ₀` is `nothing`, it is assumed
 that `γ₁` and `γ₀` are ``1``.
 The input ``parameters`` specifies the parameter variables of ``F``.
-Neccessarily, ``length(parameters) == length(p₁) == length(p₀)``.
+Neccessarily, `length(parameters) == length(p₁) == length(p₀)`.
 
 Note that `p₁` and `p₀` are stored as a tuple `p` of `SVectors` and `γ₁` and `γ₀`
 are stored as a tuple `γ` or as `γ=nothing`
@@ -71,7 +61,7 @@ function ParameterHomotopy(F::Vector{T},
     startparameters=randn(ComplexF64, length(parameters)),
     targetparameters=randn(ComplexF64, length(parameters)),
     kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
-    G = Systems.SPSystem(F; variables=variables, parameters=parameters)
+    G = SPSystem(F; variables=variables, parameters=parameters)
     ParameterHomotopy(G; startparameters=startparameters,
         targetparameters=targetparameters, kwargs...)
 end
@@ -92,9 +82,9 @@ function cache(H::ParameterHomotopy, x, t)
         pt = Vector{typeof(H.γ[1] * t * H.p[1][1])}(undef, length(H.p[1]))
     end
     p!(pt, H, t)
-    F_cache = Systems.cache(H.F, x, pt)
+    F_cache = cache(H.F, x, pt)
     ∂p∂t = Vector{eltype(pt)}(undef, length(pt))
-    J_p = Matrix(Systems.differentiate_parameters(H.F, x, pt, F_cache))
+    J_p = Matrix(differentiate_parameters(H.F, x, pt, F_cache))
 
     ParameterHomotopyCache(F_cache, pt, ∂p∂t, J_p)
 end
@@ -114,7 +104,7 @@ nparameters(H::ParameterHomotopy) = length(H.p[1])
 
 Update the parameters `p` and `γ` of `H`.
 """
-function set_parameters!(H::Homotopies.ParameterHomotopy, p::Tuple, γ=nothing)
+function set_parameters!(H::ParameterHomotopy, p::Tuple, γ=nothing)
     H.p[1] .= p[1]
     H.p[2] .= p[2]
     H.γ = γ
@@ -126,7 +116,7 @@ end
 
 Update the parameters `p` and `γ` of `H`.
 """
-function set_parameters!(H::Homotopies.ParameterHomotopy, p₁::AbstractVector, p₀::AbstractVector, γ=nothing)
+function set_parameters!(H::ParameterHomotopy, p₁::AbstractVector, p₀::AbstractVector, γ=nothing)
     set_parameters!(H, (p₁, p₀), γ)
 end
 
@@ -170,27 +160,27 @@ end
 
 
 function evaluate!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    Systems.evaluate!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
+    evaluate!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function evaluate(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    Systems.evaluate(H.F, x, p!(c.pt, H, t), c.F_cache)
+    evaluate(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
 function jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    Systems.jacobian!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
+    jacobian!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function jacobian(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    Systems.jacobian(H.F, x, p!(c.pt, H, t), c.F_cache)
+    jacobian(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
 function evaluate_and_jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    Systems.evaluate_and_jacobian!(u, H.F, x, p(H, t), c.F_cache)
+    evaluate_and_jacobian!(u, H.F, x, p(H, t), c.F_cache)
 end
 
 function dt!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     # apply chain rule to H(x, p(t))
     p!(c.pt, H, t)
     ∂p∂t!(c.∂p∂t, H, t, c)
-    Systems.differentiate_parameters!(c.J_p, H.F, x, c.pt, c.F_cache)
+    differentiate_parameters!(c.J_p, H.F, x, c.pt, c.F_cache)
     LinearAlgebra.mul!(u, c.J_p, c.∂p∂t)
 end

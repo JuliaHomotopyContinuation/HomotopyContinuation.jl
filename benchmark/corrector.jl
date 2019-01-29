@@ -1,18 +1,18 @@
 using HomotopyContinuation
 using TestSystems
 using BenchmarkTools
-p1 = Problems.TotalDegreeProblem(equations(katsura(7)()))
-P = Problems.Projective(p1)
+p1 = TotalDegreeProblem(equations(katsura(7)()))
+P = ProjectiveProblem(p1)
 
-sols = Problems.embed.(P, Utilities.totaldegree_solutions(p1.system) |> collect)
+sols = embed.(P, totaldegree_solutions(p1.system) |> collect)
 
-tracker = PathTracking.PathTracker(P.homotopy, first(sols), 1.0, 0.0)
+tracker = PathTracker(P.homotopy, first(sols), 1.0, 0.0)
 
-PathTracking.track(tracker, sols, 1.0, 0.0)
+track(tracker, sols, 1.0, 0.0)
 
 Profile.clear_malloc_data()
 
-@btime PathTracking.track($tracker, $sols, 1.0, 0.0)
+@btime track($tracker, $sols, 1.0, 0.0)
 
 
 H, x, t = tracker.cache.homotopy, tracker.state.x, HomotopyContinuation.PathTrackers.current_t(tracker.state)

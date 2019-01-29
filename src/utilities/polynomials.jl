@@ -1,6 +1,4 @@
-export VariableGroups, nvariables, variables, npolynomials, ishomogenous, uniquevar, homogenize, projective_dims,
-	remove_zeros!, Composition, maxdegrees, check_zero_dimensional, classify_homogenous_system, check_square_homogenous_system,
-	hasparameters, scale_systems
+export ishomogenous, homogenize, uniquevar, Composition, expand, compose, validate
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
@@ -82,6 +80,12 @@ Base.length(::VariableGroups{N}) where N = N
 ##############
 
 abstract type AbstractComposition end
+
+"""
+	Composition
+
+A `Composition` is a composition of polynomial systems. This is the result of [`compose`](@ref).
+"""
 mutable struct Composition{T<:MP.AbstractPolynomialLike} <: AbstractComposition
     polys::Vector{Vector{T}} # polys = [f1, f2, f3] -> f1 ∘ f2 ∘ f3
 end
@@ -89,6 +93,21 @@ end
 Base.length(C::Composition) = length(C.polys)
 Base.:(==)(C::Composition, D::Composition) = C.polys == D.polys
 
+"""
+	compose(g, f)::Composition
+
+Compose the polynomial systems `g` and `f`.
+You can also use the infix operator `∘` (written by \\circ).
+
+```julia-repl
+julia> @polyvar a b c x y z;
+julia> g = [a * b * c];
+julia> f = [x+y, y + z, x + z];
+julia> expand(compose(g, f))
+1-element Array{DynamicPolynomials.Polynomial{true,Int64},1}:
+ x²y + x²z + xy² + 2xyz + xz² + y²z + yz²
+```
+"""
 compose(g::Composition, f::Composition) = Composition([g.polys..., f.polys...])
 compose(g::Composition, f::Composition, h::Composition...) = compose(Composition([g.polys..., f.polys...]), h...)
 compose(g::Composition, fs::MPPolys...) = Composition([g.polys..., fs...])
@@ -119,7 +138,7 @@ Expand the composition to the polynomial system is originally represents.
 julia> @polyvar a b c x y z;
 julia> f = [a * b * c];
 julia> g = [x+y, y + z, x + z];
-julia> Utilities.expand(f ∘ g)
+julia> expand(f ∘ g)
 1-element Array{DynamicPolynomials.Polynomial{true,Int64},1}:
  x²y + x²z + xy² + 2xyz + xz² + y²z + yz²
 ```
@@ -593,7 +612,7 @@ Scale the polynomial systems `G` and `F` such that ``||fᵢ-gᵢ||=1`` where the
 used norm is the the 2-norm on the coefficients of `G` and `F`.
 """
 function scale_systems(G::Composition, F::MPPolys; report_scaling_factors=true, kwargs...)
-	_, f, scale_g, scale_f = scale_systems(Utilities.expand(G), F; report_scaling_factors=true, kwargs...)
+	_, f, scale_g, scale_f = scale_systems(expand(G), F; report_scaling_factors=true, kwargs...)
 	if report_scaling_factors
 		scale(G, scale_g), f, scale_g, scale_f
 	else
@@ -601,7 +620,7 @@ function scale_systems(G::Composition, F::MPPolys; report_scaling_factors=true, 
 	end
 end
 function scale_systems(G::MPPolys, F::Composition; report_scaling_factors=true, kwargs...)
-	g, _, scale_g, scale_f = scale_systems(G, Utilities.expand(F); report_scaling_factors=true, kwargs...)
+	g, _, scale_g, scale_f = scale_systems(G, expand(F); report_scaling_factors=true, kwargs...)
 	if report_scaling_factors
 		g, scale(F, scale_f), scale_g, scale_f
 	else
@@ -609,7 +628,7 @@ function scale_systems(G::MPPolys, F::Composition; report_scaling_factors=true, 
 	end
 end
 function scale_systems(G::Composition, F::Composition; report_scaling_factors=true, kwargs...)
-	_, _, scale_g, scale_f = scale_systems(Utilities.expand(G), Utilities.expand(F);
+	_, _, scale_g, scale_f = scale_systems(expand(G), expand(F);
 				report_scaling_factors=true, kwargs...)
 	if report_scaling_factors
 		scale(G, scale_g), scale(G, scale_f), scale_g, scale_f
@@ -617,7 +636,7 @@ function scale_systems(G::Composition, F::Composition; report_scaling_factors=tr
 		scale(G, scale_g), scale(G, scale_f)
 	end
 end
-function scale_systems(G::MPPolys, F::MPPolys; report_scaling_factors=false, variables=Utilities.variables(F))
+function scale_systems(G::MPPolys, F::MPPolys; report_scaling_factors=false, variables=variables(F))
 	# We consider the homogenous systems F and G as elements in projective space
 	# In particular as elements on the unit sphere
 	normalizer_g = inv.(coefficient_norm.(G))

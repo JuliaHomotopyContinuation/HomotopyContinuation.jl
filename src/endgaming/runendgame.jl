@@ -1,12 +1,9 @@
-import ProjectiveVectors
-import ..Homotopies
-
 function setup!(endgame, x, R)
-    PathTracking.setup!(endgame.tracker, x, R, 0.0im)
+    setup!(endgame.tracker, x, R, 0.0im)
     reset!(endgame.state, x, R)
 
     # The endgame fails if we already have a solution. Hence we check it now.
-    r = PathTracking.residual(endgame.tracker, x, 0.0)
+    r = residual(endgame.tracker, x, 0.0)
     if abs(r) < endgame.options.tol
         endgame.state.pbest .= x
         endgame.state.pbest_delta = r
@@ -54,7 +51,7 @@ per loop. See [^2] for some more details.
 function runendgame(endgame, x, R)
     setup!(endgame, x, R)
     runendgame!(endgame)
-    Result(endgame)
+    EndgameResult(endgame)
 end
 
 function runendgame!(endgame)
@@ -80,20 +77,20 @@ end
 
 Obtain a new sample on the geometric series and add it to `endgame`.
 """
-function nextsample!(tracker::PathTracking.PathTracker, state, options)
+function nextsample!(tracker::PathTracker, state, options)
     state.iters += 1
 
     R, λ = state.R, options.sampling_factor
     λR = λ * R
 
-    retcode = PathTracking.track!(tracker, state.x, R, λR, setup_patch=false, compute_ẋ=false, checkstartvalue=false)
-    if retcode != PathTracking.Status.success
+    retcode = track!(tracker, state.x, R, λR, setup_patch=false, compute_ẋ=false, checkstartvalue=false)
+    if retcode != PathTrackerStatus.success
         state.status = :tracker_failed
         return nothing
     end
 
     state.R = λR
-    state.x .= PathTracking.currx(tracker)
+    state.x .= currx(tracker)
     state.nsamples += 1
     for i=1:length(state.x)
         state.samples[i, state.nsamples] = state.x[i]

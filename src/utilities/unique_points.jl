@@ -1,5 +1,3 @@
-export UniquePoints, iscontained, add!, points
-
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
 

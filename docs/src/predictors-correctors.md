@@ -7,16 +7,18 @@ currently available.
 
 The following predictors are currently implemented.
 ```@docs
-Predictors.Euler
-Predictors.Heun
-Predictors.Ralston
-Predictors.RK3
-Predictors.RK4
-Predictors.Pade21
-Predictors.NullPredictor
+Euler
+Heun
+Ralston
+RK3
+RK4
+Pade21
+NullPredictor
 ```
 
 ## Correctors
+
+The following correctors are currently implemented.
 ```@docs
-Correctors.Newton
+Newton
 ```

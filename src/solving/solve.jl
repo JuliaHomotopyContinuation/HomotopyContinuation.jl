@@ -2,15 +2,15 @@ const Solvers = Vector{<:Solver}
 
 include("path_crossing.jl")
 
-solve(solver, start_solutions) = solve(solver, collect(start_solutions))
+internal_solve(solver, start_solutions) = solve(solver, collect(start_solutions))
 
-function solve(solvers, start_solutions::AbstractVector)
+function internal_solve(solvers, start_solutions::AbstractVector)
     nblas_threads = single_thread_blas()
 
     endgame_zone_results = track_to_endgamezone(solvers, start_solutions)
     results = endgame(solvers, start_solutions, endgame_zone_results)
 
-    Utilities.set_num_BLAS_threads(nblas_threads)
+    set_num_BLAS_threads(nblas_threads)
 
     if all(r -> r.solution_type == :affine, results)
         AffineResult(results, seed(solvers))
@@ -31,8 +31,8 @@ that the single threaded version is around two times faster (at least on Mac Jul
 Returns the previous number of BLAS threads.
 """
 function single_thread_blas()
-    nblas_threads = Utilities.get_num_BLAS_threads()
-    Utilities.set_num_BLAS_threads(1)
+    nblas_threads = get_num_BLAS_threads()
+    set_num_BLAS_threads(1)
     nblas_threads
 end
 
@@ -50,7 +50,7 @@ function track_to_endgamezone(solvers, start_solutions)
     if report_progress(solvers)
         p = ProgressMeter.Progress(n, 0.5, "Tracking $(length(start_solutions)) paths to endgame zone...") # minimum update interval: 1 second
 
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:tracked, k - 1),))
             end
@@ -59,7 +59,7 @@ function track_to_endgamezone(solvers, start_solutions)
 
         ProgressMeter.update!(p, n, showvalues=((:tracked, n),))
     else
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             trackpath(solver, start_solutions[k], t₁, t_endgame)
         end
     end
@@ -67,14 +67,14 @@ function track_to_endgamezone(solvers, start_solutions)
     result
 end
 
-trackpath(solver::Solver, x₁, t₁, t₀) = PathTracking.track(solver.tracker, Problems.embed(solver.prob, x₁), t₁, t₀)
+trackpath(solver::Solver, x₁, t₁, t₀) = track(solver.tracker, embed(solver.prob, x₁), t₁, t₀)
 
 function endgame(solvers, start_solutions, endgame_zone_results)
     _, t_endgame, t₀ = t₁_t_endgame_t₀(solvers)
     n = length(start_solutions)
 
     if t₀ == t_endgame
-        return Parallel.tmap(solvers, 1:n) do solver, tid, k
+        return tmap(solvers, 1:n) do solver, tid, k
             x₁, r = start_solutions[k], endgame_zone_results[k]
             PathResult(solver.prob, k, x₁, r.x, t₀, r, solver.cache.pathresult)
         end
@@ -85,7 +85,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
     if report_progress(solvers)
         p = ProgressMeter.Progress(n, 0.5, "Running endgame for $(length(endgame_zone_results)) paths...")
 
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             if tid == 1
                 ProgressMeter.update!(p, max(1, k-1), showvalues=((:completed, k-1),))
             end
@@ -93,7 +93,7 @@ function endgame(solvers, start_solutions, endgame_zone_results)
         end
         ProgressMeter.update!(p, n, showvalues=((:completed, n),))
     else
-        result = Parallel.tmap(solvers, 1:n) do solver, tid, k
+        result = tmap(solvers, 1:n) do solver, tid, k
             runendgame(solver, tid, k, start_solutions, endgame_zone_results)
         end
     end
@@ -104,22 +104,22 @@ end
 function runendgame(solver, tid, k, start_solutions, endgame_zone_results)
     t₁, t_endgame, t₀ = t₁_t_endgame_t₀(solver)
     x₁, r = start_solutions[k], endgame_zone_results[k]
-    if r.returncode == PathTracking.Status.success
+    if r.returncode == PathTrackerStatus.success
         # Run endgame
-        result = Endgaming.runendgame(solver.endgame, r.x, t_endgame)
+        result = runendgame(solver.endgame, r.x, t_endgame)
         # If the tracker failed we are probably to late with the endgame.
         if result.returncode == :tracker_failed
             # Rerun with something more away
             new_t = 0.3*(t₁ - t_endgame)
             pr = trackpath(solver::Solver, x₁, t₁, new_t)
-            if pr.returncode == PathTracking.Status.success
-                result = Endgaming.runendgame(solver.endgame, pr.x, new_t)
+            if pr.returncode == PathTrackerStatus.success
+                result = runendgame(solver.endgame, pr.x, new_t)
             end
         end
         return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
     else
         # If we even didn't come to the endgame zone we start earlier.
-        result = Endgaming.runendgame(solver.endgame, Problems.embed(solver.prob, x₁), 1.0)
+        result = runendgame(solver.endgame, embed(solver.prob, x₁), 1.0)
         if result.returncode == :success || result.returncode == :at_infinity
             return PathResult(solver.prob, k, x₁, r.x, t₀, result, solver.cache.pathresult)
         else

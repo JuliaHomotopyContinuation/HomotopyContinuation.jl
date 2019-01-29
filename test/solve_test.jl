@@ -10,8 +10,8 @@
         # homogenous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
-        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
-        @test_throws ErrorException solve(Systems.FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
+        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3])
 
@@ -22,7 +22,7 @@
 
         # test numerical homogenous check fails
         @polyvar x y z
-        G = Systems.FPSystem([x-2z, y^2+3z])
+        G = FPSystem([x-2z, y^2+3z])
         @test_throws ErrorException solve(G, homvar=3)
     end
 
@@ -31,8 +31,8 @@
         @test nfinite(solve([x - 1])) == 1
         F = equations(katsura(5))
         @test nfinite(solve(F, threading=false)) == 32
-        @test nfinite(solve(F, system=Systems.SPSystem, threading=false)) == 32
-        @test nfinite(solve(F, system=Systems.FPSystem, threading=false)) == 32
+        @test nfinite(solve(F, system=SPSystem, threading=false)) == 32
+        @test nfinite(solve(F, system=FPSystem, threading=false)) == 32
 
         # Simple step size
         F = equations(katsura(5))
@@ -40,10 +40,10 @@
 
         # scaling
         F = equations(katsura(5))
-        @test nfinite(solve(F, scale_systems=false, threading=false)) == 32
+        @test nfinite(solve(F, system_scaling=false, threading=false)) == 32
 
-        @test nfinite(solve(F, homotopy=Homotopies.StraightLineHomotopy)) == 32
-        result = solve(F, predictor=Predictors.Euler(), homotopy=Homotopies.StraightLineHomotopy)
+        @test nfinite(solve(F, homotopy=StraightLineHomotopy)) == 32
+        result = solve(F, predictor=Euler(), homotopy=StraightLineHomotopy)
         @test nresults(result) == 32
         @test nfinite(solve(F, tol=1e-5)) == 32
 
@@ -51,13 +51,13 @@
         @test nfinite(result) == 32
         @test string(result) isa String
 
-        @test nfinite(solve(F, patch=AffinePatches.RandomPatch())) == 32
-        @test nfinite(solve(F, patch=AffinePatches.EmbeddingPatch())) ≤ 32
-        @test nfinite(solve(F, patch=AffinePatches.OrthogonalPatch())) == 32
+        @test nfinite(solve(F, patch=RandomPatch())) == 32
+        @test nfinite(solve(F, patch=EmbeddingPatch())) ≤ 32
+        @test nfinite(solve(F, patch=OrthogonalPatch())) == 32
 
         @polyvar w
         F = equations(cyclic(5))
-        result = solve(Utilities.homogenize(F, w), threading=false, homvar=w)
+        result = solve(homogenize(F, w), threading=false, homvar=w)
         @test result isa AffineResult
 
         @polyvar x y z
@@ -67,24 +67,24 @@
         @test nfinite(solve(G, F, [[2, -3]])) == 1
         @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
-        F = Systems.FPSystem(Utilities.homogenize(equations(cyclic(5))))
+        F = FPSystem(homogenize(equations(cyclic(5))))
         result = solve(F, homvar=6)
         @test nfinite(result) == 70
         @test natinfinity(result) == 50
 
 
         F = equations(katsura(5))
-        prob, startsolutions = Problems.problem_startsolutions(Input.TotalDegree(F))
+        prob, startsolutions = problem_startsolutions(TotalDegreeInput(F))
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            Problems.embed(prob, s).data
+            embed(prob, s).data
         end)
         @test result isa ProjectiveResult
         @test nnonsingular(result) == 32
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            Problems.embed(prob, s).data
-        end, homvar=Problems.homvars(prob)[1])
+            embed(prob, s).data
+        end, homvar=homvars(prob)[1])
         @test result isa AffineResult
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
@@ -96,7 +96,7 @@
         g = [x+y, y + 3, x + 2]
         res = solve(e ∘ f ∘ g)
         @test nnonsingular(res) == 2
-        @test nnonsingular(solve(e ∘ f ∘ g, scale_systems=false)) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=false)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
@@ -136,17 +136,17 @@
         F = equations(cyclic(6))
         tracker, start_sols = pathtracker_startsolutions(F, tol=1e-3, corrector_maxiters=5, seed=123512)
         tracked_paths = map(start_sols) do x
-            PathTracking.track(tracker, x, 1.0, 0.1)
+            track(tracker, x, 1.0, 0.1)
         end
 
-        crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-2)
+        crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-2)
         @test length(crossed_path_indices) > 0
 
         tracker, start_sols = pathtracker_startsolutions(F, seed=123512)
         tracked_paths = map(start_sols) do x
-            PathTracking.track(tracker, x, 1.0, 0.1)
+            track(tracker, x, 1.0, 0.1)
         end
-        crossed_path_indices = Solving.check_crossed_paths(tracked_paths, 1e-5)
+        crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-5)
         @test isempty(crossed_path_indices)
     end
 
@@ -177,7 +177,7 @@
         @polyvar x a y b z
         F = [x^2-a*z^2, x*y-(a-b)*z^2]
         S = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], startparameters=[1, 0], targetparameters=[2, 4])
-        @test S isa Solving.ProjectiveResult
+        @test S isa ProjectiveResult
         @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
         @test nnonsingular(S) == 1
 

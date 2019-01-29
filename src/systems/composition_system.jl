@@ -1,7 +1,5 @@
 export CompositionSystem
 
-import LinearAlgebra
-
 """
     CompositionSystem(composition::Composition, systems_constructor) <: AbstractSystem
 
@@ -16,11 +14,11 @@ struct CompositionSystem{S1<:AbstractSystem, S2<:AbstractSystem} <: AbstractSyst
     f_has_parameters::Bool
 end
 
-function CompositionSystem(C::Utilities.Composition, system_constructor;
+function CompositionSystem(C::Composition, system_constructor;
     variables=nothing, parameters=nothing, homvars=nothing)
     n = length(C.polys)
     f = CompositionSystem(C.polys[n-1], C.polys[n], system_constructor;
-                    variables=variables, parameters=parameters, homvars=homvars)
+                    input_variables=variables, parameters=parameters, homvars=homvars)
     for k in (n-2):-1:1
         f = CompositionSystem(C.polys[k], f, system_constructor;
                         parameters=parameters, homvars=homvars)
@@ -31,23 +29,23 @@ end
 function CompositionSystem(g::Vector{<:MP.AbstractPolynomialLike},
         f::Union{CompositionSystem, Vector{<:MP.AbstractPolynomialLike}},
         system_constructor;
-        variables=nothing, parameters=nothing, homvars=nothing)
+        input_variables=nothing, parameters=nothing, homvars=nothing)
 
-    vars = Utilities.variables(g; parameters=parameters)
+    vars = variables(g; parameters=parameters)
     homvars_to_end!(vars, homvars)
-    g_has_parameters =
     G = system_constructor(g, variables=vars, parameters=parameters)
 
     if isa(f, CompositionSystem)
         CompositionSystem(G, f,
-            Utilities.hasparameters(g, parameters), hasparameters(f))
+            hasparameters(g, parameters), hasparameters(f))
     else
-        F = system_constructor(f, variables=variables, parameters=parameters)
+        F = system_constructor(f, variables=input_variables, parameters=parameters)
         CompositionSystem(G, F,
-            Utilities.hasparameters(g, parameters),
-            Utilities.hasparameters(f, parameters))
+            hasparameters(g, parameters),
+            hasparameters(f, parameters))
     end
 end
+
 
 hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
 

@@ -1,31 +1,6 @@
-module Utilities
-
-import LinearAlgebra
-import MultivariatePolynomials
-const MP = MultivariatePolynomials
-
-export @moduleenum,
-    nthroot,
-    print_fieldnames,
-    infinity_norm,
-    unsafe_infinity_norm,
-    fubini_study,
-    logabs,
-    batches,
-    randomish_gamma,
-    filterkwargs,
-    splitkwargs,
-    set_num_BLAS_threads,
-    get_num_BLAS_threads,
-    randseed,
-    check_kwargs_empty,
-    start_solution_sample,
-    ComplexSegment
-
 include("utilities/unique_points.jl")
 include("utilities/linear_algebra.jl")
 include("utilities/polynomials.jl")
-
 
 """
     nthroot(x, n)
@@ -295,6 +270,4 @@ const _get_num_BLAS_threads = function() # anonymous so it will be serialized wh
     end
 
     return nothing
-end
-
 end

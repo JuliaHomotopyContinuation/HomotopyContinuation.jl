@@ -8,20 +8,17 @@ is basically the same as tracking in affine space.
 """
 struct EmbeddingPatch <: AbstractAffinePatch end
 
-struct EmbeddingPatchState <: AbstractAffinePatchState
-    nequations::Int
-end
+struct EmbeddingPatchState{N} <: AbstractAffinePatchState{N} end
 
 function state(::EmbeddingPatch, x::PVector{T,N}) where {T,N}
-    EmbeddingPatchState(N)
+    EmbeddingPatchState{N}()
 end
-nequations(state::EmbeddingPatchState) = state.nequations
 
 function onpatch!(x::PVector, state::EmbeddingPatchState)
     ProjectiveVectors.affine_chart!(x)
 end
 
-function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
+function evaluate!(u, state::EmbeddingPatchState{N}, x::PVector{T, N}) where {T, N}
     homvars = ProjectiveVectors.homvars(x)
     n = length(u) - N
     for i in 1:N
@@ -30,7 +27,7 @@ function evaluate!(u, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
     nothing
 end
 
-function jacobian!(U, state::EmbeddingPatchState, x::PVector{T, N}) where {T, N}
+function jacobian!(U, state::EmbeddingPatchState{N}, x::PVector{T, N}) where {T, N}
     homvars = ProjectiveVectors.homvars(x)
     n = size(U,1) - N
     for j in 1:size(U, 2), i in 1:N

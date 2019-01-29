@@ -347,7 +347,7 @@ function uniquesolutions(R::Results, ::Type{Val{B}}; tol=1e-6, conditions...) wh
     if R isa AffineResult
         M = multiplicities(sols, tol, infinity_norm)
     elseif R isa ProjectiveResult
-        M = multiplicities(normalize.(sols), tol, fubini_study)
+        M = multiplicities(LinearAlgebra.normalize.(sols), tol, fubini_study)
     end
     _uniquesolutions(sols, M, Val{B})
 end

@@ -3,21 +3,15 @@ export PathResult, solution,
     isfailed, isaffine, isprojective,
     isatinfinity, issingular, isnonsingular
 
-using Printf
-
-import ..Homotopies
-import ProjectiveVectors
-using ..Utilities
-
 struct PathResultCache{Hom, T}
     H::Hom
     v::Vector{T}
     J::Matrix{T}
 end
 
-function PathResultCache(prob::Problems.AbstractProblem, x)
-    H = Homotopies.HomotopyWithCache(prob.homotopy, x, rand())
-    v, J = Homotopies.evaluate_and_jacobian(H, x, rand())
+function PathResultCache(prob::AbstractProblem, x)
+    H = HomotopyWithCache(prob.homotopy, x, rand())
+    v, J = evaluate_and_jacobian(H, x, rand())
     PathResultCache(H, v, J)
 end
 
@@ -61,20 +55,20 @@ struct PathResult{T1, T2, T3}
     npredictions::Int
 end
 
-function PathResult(prob::Problems.AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(Problems.homvars(prob), k, x₁, x_e, t₀, r, cache)
+function PathResult(prob::AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
+    PathResult(homvars(prob), k, x₁, x_e, t₀, r, cache)
 end
 function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = align_axis!(copy(r.x.data))
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
+    evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
     res = infinity_norm(cache.v)
 
 
     if returncode != :success
         condition = Inf
     else
-        σ = svdvals(cache.J)
+        σ = LinearAlgebra.svdvals(cache.J)
         n = size(cache.H)[2]
         if n>2
             condition = σ[1]/σ[n-1]
@@ -92,7 +86,7 @@ function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathRe
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
-    Homotopies.evaluate_and_jacobian!(cache.v, cache.J, cache.H, r.x, t₀)
+    evaluate_and_jacobian!(cache.v, cache.J, cache.H, r.x, t₀)
     res = infinity_norm(cache.v)
 
     returncode, returncode_detail = makereturncode(returncode)
@@ -112,8 +106,8 @@ function PathResult(homvars::NTuple{N,Int}, k, x₁, x_e, t₀, r, cache::PathRe
         condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
 end
 
-iters(R::Endgaming.Result) = R.iters
-iters(R::PathTracking.PathTrackerResult) = R.accepted_steps + R.rejected_steps
+iters(R::EndgameResult) = R.iters
+iters(R::PathTrackerResult) = R.accepted_steps + R.rejected_steps
 
 
 function makereturncode(retcode)
@@ -123,7 +117,7 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
-makereturncode(retcode::PathTracking.Status.t) = :path_failed, :none
+makereturncode(retcode::PathTrackerStatus.t) = :path_failed, :none
 
 
 """
@@ -150,15 +144,15 @@ function align_axis!(x)
     x
 end
 
-windingnumber_npredictions(r::Endgaming.Result) = (r.windingnumber, r.npredictions)
-windingnumber_npredictions(r::PathTracking.PathTrackerResult) = (0, 0)
+windingnumber_npredictions(r::EndgameResult) = (r.windingnumber, r.npredictions)
+windingnumber_npredictions(r::PathTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
     if iscompact || haskey(io, :typeinfo)
         println(io, "• returncode: $(r.returncode)")
         println(io, " • solution: ", r.solution)
-        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
+        println(io, " • residual: $(Printf.@sprintf "%.3e" r.residual)")
         println(io, " • pathnumber: ", r.pathnumber)
     else
         println(io, "PathResult")
@@ -168,8 +162,8 @@ function Base.show(io::IO, r::PathResult)
             println(io, " • returncode_detail: $(r.returncode_detail)")
         end
         println(io, " • solution: ", r.solution)
-        println(io, " • residual: $(@sprintf "%.3e" r.residual)")
-        println(io, " • condition_number: $(@sprintf "%.3e" r.condition_number)")
+        println(io, " • residual: $(Printf.@sprintf "%.3e" r.residual)")
+        println(io, " • condition_number: $(Printf.@sprintf "%.3e" r.condition_number)")
         println(io, " • windingnumber: $(r.windingnumber)")
         println(io, "")
         println(io, " • pathnumber: ", r.pathnumber)

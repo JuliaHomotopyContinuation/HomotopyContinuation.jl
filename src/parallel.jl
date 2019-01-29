@@ -1,5 +1,3 @@
-module Parallel
-
 @inline function tmap(f::F, solver::S, src; blocksize=20) where {F<:Function, S}
     n = length(src)
     dst₁ = f(solver, 1, src[1])
@@ -22,7 +20,7 @@ end
     function threads_fun()
         tid = Threads.threadid()
         solver = solvers[tid]
-        loop!(i, n, blocksize) do k
+        thread_loop!(i, n, blocksize) do k
             dst[k] = f(solver, tid, src[k])
         end
     end
@@ -43,7 +41,7 @@ function tforeach(f::F, solvers::AbstractVector, src; blocksize=20) where {F<:Fu
         tid = Threads.threadid()
         solver = solvers[tid]
         n = length(src)
-        loop!(i, n, blocksize) do k
+        thread_loop!(i, n, blocksize) do k
             f(solver, tid, src[k])
         end
     end
@@ -53,7 +51,7 @@ function tforeach(f::F, solvers::AbstractVector, src; blocksize=20) where {F<:Fu
     nothing
 end
 
-function loop!(f::F, i, n, blocksize) where {F<:Function}
+function thread_loop!(f::F, i, n, blocksize) where {F<:Function}
     while true
         k = Threads.atomic_add!(i, blocksize)
         if k > n
@@ -65,8 +63,4 @@ function loop!(f::F, i, n, blocksize) where {F<:Function}
             k += 1
         end
     end
-end
-
-
-
 end

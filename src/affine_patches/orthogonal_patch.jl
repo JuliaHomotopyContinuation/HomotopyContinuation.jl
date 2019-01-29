@@ -1,14 +1,12 @@
-import LinearAlgebra
-
 export OrthogonalPatch
 
 """
     OrthogonalPatch()
 
 """
-struct OrthogonalPatch <: AbstractLocalAffinePatch end
+struct OrthogonalPatch <: AbstractAffinePatch end
 
-struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState
+struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState{N}
     v̄::PVector{T, N} # this is already conjugated
 end
 
@@ -17,7 +15,6 @@ function state(::OrthogonalPatch, x::PVector)
     conj!(v.data)
     OrthogonalPatchState(v)
 end
-nequations(::OrthogonalPatchState{T, N}) where {T,N} = N
 
 function setup!(state::OrthogonalPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
@@ -30,5 +27,5 @@ end
 Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
 
 onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
-evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate!(u, state.v̄, x)
-jacobian!(U, state::OrthogonalPatchState, x::PVector) = jacobian!(U, state.v̄, x)
+evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)
+jacobian!(U, state::OrthogonalPatchState, x::PVector) = jacobian_patch!(U, state.v̄, x)
