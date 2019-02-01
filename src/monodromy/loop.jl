@@ -234,11 +234,11 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
+function track(tracker::PathTracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
     set_parameters!(tracker, edge, loop)
     track(tracker, x, stats)
 end
-function track(tracker, x::AbstractVector, stats::MonodromyStatistics)
+function track(tracker::PathTracker, x::AbstractVector, stats::MonodromyStatistics)
     retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
     y = ProjectiveVectors.affine_chart!(x, currx(tracker))
