@@ -14,6 +14,7 @@ pathtracker
 ```@docs
 PathTracker
 PathTrackerResult
+PathTrackerStatus.states
 ```
 
 ## Methods
@@ -25,18 +26,26 @@ track!
 setup!
 ```
 
-It is also possible to use a `PathTracker` as an iterator:
-```
-iterator!
+It is also possible to use a `PathTracker` as an iterator. This can either
+be done by the high level `iterator` method or by directly using a `PathTracker`
+as an iterator. The recommend approach is simply using `iterator`.
+```@docs
+iterator
 ```
 
-To introspect the current state and change settings we provide the following routines.
+## Introspecting the current state
+To introspect the current state we provide the following routines.
 ```@docs
 currx
 currt
 currΔt
 curriters
 currstatus
+```
+
+## Changing options
+To change settings
+```@docs
 tol
 corrector_maxiters
 refinement_tol

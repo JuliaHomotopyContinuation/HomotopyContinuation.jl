@@ -1,10 +1,9 @@
 export PathTracker, PathTrackerResult, PathTrackerStatus,
         pathtracker, pathtracker_startsolutions,
-        track, track!, setup!, iterator!,
+        track, track!, setup!, iterator,
         currx, currt, currΔt, curriters, currstatus, tol, corrector_maxiters,
         refinement_tol, refinement_maxiters, set_tol!,
         set_corrector_maxiters!, set_refinement_tol!, set_refinement_maxiters!
-
 const pathtracker_allowed_keywords = [:corrector, :predictor, :steplength,
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
     :maxiters, :simple_step_size]
@@ -43,13 +42,27 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions)
 ###########
 # PathTrackerState
 ##########
-@moduleenum PathTrackerStatus begin
-    success
-    tracking
-    terminated_maximal_iterations
-    terminated_invalid_startvalue
-    terminated_steplength_too_small
-    terminated_singularity
+module PathTrackerStatus
+    """
+        PathTrackerStatus.states
+
+    The possible states the pathtracker can achieve are
+
+    * `PathTrackerStatus.success`
+    * `PathTrackerStatus.tracking`
+    * `PathTrackerStatus.terminated_maximal_iterations`
+    * `PathTrackerStatus.terminated_invalid_startvalue`
+    * `PathTrackerStatus.terminated_steplength_too_small`
+    * `PathTrackerStatus.terminated_singularity`
+    """
+    @enum states begin
+        success
+        tracking
+        terminated_maximal_iterations
+        terminated_invalid_startvalue
+        terminated_steplength_too_small
+        terminated_singularity
+    end
 end
 
 mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
@@ -65,7 +78,7 @@ mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     Δs_prev::Float64 # previous step size
     accuracy::Float64
     cond::Float64 # estimate of the condition number
-    status::PathTrackerStatus.t
+    status::PathTrackerStatus.states
     patch::PatchState
     accepted_steps::Int
     rejected_steps::Int
@@ -218,12 +231,12 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 Containing the result of a tracked path. The fields are
 * `successfull::Bool` Indicating whether tracking was successfull.
-* `returncode::PathTrackerStatus.t` If the tracking was successfull then it is `PathTrackerStatus.success`.
+* `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
 * `x::V` The result.
 * `t::Float64` The `t` when the path tracker stopped.
 """
 struct PathTrackerResult{T, N}
-     returncode::PathTrackerStatus.t
+     returncode::PathTrackerStatus.states
      x::ProjectiveVectors.PVector{T,N}
      t::ComplexF64
      accuracy::Float64
@@ -244,31 +257,31 @@ Base.show(io::IO, result::PathTrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::PathTrackerResult) = result
 
 """
-    track(tracker, x₁, t₁, t₀; options...)::PathTrackerResult
+    track(tracker, x₁, t₁=1.0, t₀=0.0; options...)::PathTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
 This returns a `PathTrackerResult`. This modifies `tracker`.
 See [`track!`](@ref) for the possible options.
 """
-function track(tracker::PathTracker, x₁::AbstractVector, t₁, t₀; kwargs...)
+function track(tracker::PathTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; kwargs...)
      track!(tracker, x₁, t₁, t₀; kwargs...)
      PathTrackerResult(tracker)
 end
 
 """
-     track!(tracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
 
 Track a value `x₁` from `t₁` to `t₀` using the given `PathTracker` `tracker`.
-Returns one of the enum values of `PathTrackerStatus.t` indicating the status.
+Returns one of the enum values of `PathTrackerStatus.states` indicating the status.
 If the tracking was successfull it is `PathTrackerStatus.success`.
 If `setup_patch` is `true` then [`setup!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker, x₁, t₁, t₀; options...)
+    track!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function track!(x₀, tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
      track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
      retcode = currstatus(tracker)
      if retcode == PathTrackerStatus.success
@@ -276,7 +289,7 @@ function track!(x₀, tracker::PathTracker, x₁, t₁, t₀; setup_patch=tracke
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁, t₀; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function track!(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 end
 function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
@@ -294,12 +307,12 @@ function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartv
 end
 
 """
-    setup!(pathtracker, x₁, t₁, t₀, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+    setup!(pathtracker, x₁, t₁=1.0, t₀=0.0, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
 
 Setup `pathtracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
 pathtracker as an iterator.
 """
-function setup!(tracker::PathTracker, x₁::AbstractVector, t₁, t₀, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function setup!(tracker::PathTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     state, cache = tracker.state, tracker.cache
 
     try
@@ -657,53 +670,112 @@ end
     pathtracker(args...; kwargs...)
 
 Construct a [`PathTracker`](@ref) in the same way `solve`
-does it. This als0 takes the same input arguments as `solve`. This is convenient if you want
-to investigate single paths.
+does it. This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
+This is convenient if you want to investigate single paths.
+
+## Examples
+
+### Obtain single solution
+We want to construct a path tracker to track a parameterized system `f` with parameters `p`
+from the parameters `a` to `b`.
+```julia
+tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
+```
+You then can obtain a single solution at `b` by using
+```julia
+x_b = track(tracker, x_a).x
+```
+
+### Trace a path
+To trace a path you can use the [`iterator`](@ref) method.
+
+```julia
+tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
+for (x, t) in iterator(tracker, x₁)
+    @show (x,t)
+end
+```
 """
 function pathtracker(args...; kwargs...)
     tracker, _ = pathtracker_startsolutions(args...; kwargs...)
     tracker
 end
 
-"""
-    iterator!(tracker::PathTracker, x₁, t₁, t₀)
 
-Prepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect
-the state of the pathtracker at each iteration. In each iteration the PathTracker is returned
-from the iterator.
+struct PathIterator{Tracker<:PathTracker}
+    tracker::Tracker
+    x_affine::Bool
+    t_real::Bool
+end
+Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()
+Base.IteratorEltype(::Type{<:PathIterator}) = Base.HasEltype()
+
+"""
+    iterator(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; affine=true)
+
+Prepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect a specific
+path. In each iteration the tuple `(x,t)` is returned.
+If `affine == true` then `x` is the affine solution (internally we compute in projective space).
 
 ## Example
 
-Assume you have `PathTracker` `pathtracker` and you wan to track `x₁` from 1.0 to 0.25:
+Assume you have `PathTracker` `tracker` and you wan to track `x₁` from 1.0 to 0.25:
 ```julia
-for tracker in iterator!(pathtracker, x₁, 1.0, 0.25)
-    println("Current t: \$(real(currt(tracker)))") # The time `t` is always a complex number
+for (x,t) in iterator(tracker, x₁, 1.0, 0.25)
+    println("x at t=\$t:")
+    println(x)
 end
 ```
 
-Note that if you want to store the current value of `x` you have to create a **copy**.
-`x` will also be a projective vector.
+Note that this is a stateful iterator. You can still introspect the state of the tracker.
+For example to check whether the tracker was successfull
+(and did not terminate early due to some problem) you can do
 ```julia
-xs = []
-for tracker in iterator!(pathtracker, x₁, 1.0, 0.25)
-    x = currx(tracker)
-     # We want to get the affine vector, this also creates a copy
-    push!(xs, ProjectiveVectors.affine_chart(x))
-end
+println("Success: ", currstatus(tracker) == PathTrackerStatus.success)
 ```
 """
-iterator!(tracker::PathTracker, x₁, t₁, t₀; kwargs...) = setup!(tracker, x₁, t₁, t₀; kwargs...)
+function iterator(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; affine=true, kwargs...)
+    setup!(tracker, x₁, t₁, t₀; kwargs...)
+    PathIterator(tracker, affine, typeof(t₁ - t₀) <: Real)
+end
 
-function Base.iterate(tracker::PathTracker, state=1)
+function current_x_t(iter::PathIterator)
+    x = currx(iter.tracker)
+    t = currt(iter.tracker)
+    (iter.x_affine ? ProjectiveVectors.affine_chart(x) : x,
+     iter.t_real ? real(t) : t)
+end
+
+function Base.iterate(iter::PathIterator, state=nothing)
+    state === nothing && return current_x_t(iter), 1
+    iter.tracker.state.status != PathTrackerStatus.tracking && return nothing
+
+    step_done = false
+    while !step_done && (iter.tracker.state.status == PathTrackerStatus.tracking)
+
+        step!(iter.tracker)
+        check_terminated!(iter.tracker)
+
+        if iter.tracker.state.status == PathTrackerStatus.success
+            refine!(iter.tracker)
+        end
+
+        step_done = !iter.tracker.state.last_step_failed
+    end
+    current_x_t(iter), state + 1
+end
+
+function Base.iterate(tracker::PathTracker, state=nothing)
+    state === nothing && return tracker, 1
+
     if tracker.state.status == PathTrackerStatus.tracking
-        # return initial tracker once
-        state == 1 && return tracker, state + 1
         step!(tracker)
         check_terminated!(tracker)
 
         if tracker.state.status == PathTrackerStatus.success
             refine!(tracker)
         end
+
         tracker, state + 1
     else
         nothing
