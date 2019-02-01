@@ -98,7 +98,15 @@ for details.
 
 Construct an `AbstractInput`.
 """
-function input(F::MPPolyInputs)
+function input(F::MPPolyInputs; parameters=nothing, kwargs...)
+    # if parameters === nothing this is actually the
+    # input constructor for a parameter homotopy, but no startsolutions
+    # are provided
+    if parameters !== nothing
+        startsolutions = [randn(ComplexF64, nvariables(F, parameters=parameters))]
+        return input(F, startsolutions; parameters=parameters, kwargs...)
+    end
+
     remove_zeros!(F)
     check_zero_dimensional(F)
     # square system and each polynomial is non-zero
@@ -120,11 +128,14 @@ function input(F::AbstractSystem)
     TotalDegreeInput(F, degrees)
 end
 
-function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)
+function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     if length(G) ≠ length(F)
         error("Start and target system don't have the same length")
     end
     check_zero_dimensional(F)
+    if startsolutions === nothing
+        startsolutions = [randn(ComplexF64, nvariables(F))]
+    end
     StartTargetInput(G, F, startsolutions)
 end
 
@@ -144,7 +155,9 @@ function input(F::MPPolyInputs, startsolutions;
     if !(length(parameters) == length(p₁) == length(p₀))
         error("Number of parameters doesn't match!")
     end
-
+    if startsolutions === nothing
+        startsolutions = [randn(ComplexF64, nvariables(F, parameters=parameters))]
+    end
     ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
 end
 

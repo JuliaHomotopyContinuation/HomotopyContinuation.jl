@@ -139,7 +139,7 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
-makereturncode(retcode::PathTrackerStatus.t) = :path_failed, :none
+makereturncode(retcode::PathTrackerStatus.states) = :path_failed, :none
 
 
 """
