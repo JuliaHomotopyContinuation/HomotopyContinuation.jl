@@ -925,7 +925,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.pathtracker",
     "category": "function",
-    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This als0 takes the same input arguments as solve. This is convenient if you want to investigate single paths.\n\n\n\n\n\n"
+    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This also takes the same input arguments as solve with the exception that you do not need to specify startsolutions. This is convenient if you want to investigate single paths.\n\nExamples\n\nObtain single solution\n\nWe want to construct a path tracker to track a parameterized system f with parameters p from the parameters a to b.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\n\nYou then can obtain a single solution at b by using\n\nx_b = track(tracker, x_a).x\n\nTrace a path\n\nTo trace a path you can use the iterator method.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\n\n\n\n\n"
 },
 
 {
@@ -949,7 +949,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTrackerResult",
     "category": "type",
-    "text": " PathTrackerResult(tracker)\n\nContaining the result of a tracked path. The fields are\n\nsuccessfull::Bool Indicating whether tracking was successfull.\nreturncode::PathTrackerStatus.t If the tracking was successfull then it is PathTrackerStatus.success.\nx::V The result.\nt::Float64 The t when the path tracker stopped.\n\n\n\n\n\n"
+    "text": " PathTrackerResult(tracker)\n\nContaining the result of a tracked path. The fields are\n\nsuccessfull::Bool Indicating whether tracking was successfull.\nreturncode::PathTrackerStatus.states If the tracking was successfull then it is PathTrackerStatus.success.\nx::V The result.\nt::Float64 The t when the path tracker stopped.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#HomotopyContinuation.PathTrackerStatus.states",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.PathTrackerStatus.states",
+    "category": "type",
+    "text": "PathTrackerStatus.states\n\nThe possible states the pathtracker can achieve are\n\nPathTrackerStatus.success\nPathTrackerStatus.tracking\nPathTrackerStatus.terminated_maximal_iterations\nPathTrackerStatus.terminated_invalid_startvalue\nPathTrackerStatus.terminated_steplength_too_small\nPathTrackerStatus.terminated_singularity\n\n\n\n\n\n"
 },
 
 {
@@ -957,7 +965,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "Types",
     "category": "section",
-    "text": "PathTracker\nPathTrackerResult"
+    "text": "PathTracker\nPathTrackerResult\nPathTrackerStatus.states"
 },
 
 {
@@ -965,7 +973,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.track",
     "category": "function",
-    "text": "track(tracker, x₁, t₁, t₀; options...)::PathTrackerResult\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. This returns a PathTrackerResult. This modifies tracker. See track! for the possible options.\n\n\n\n\n\ntrack(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)\n\nTrack x along the edge edge in the loop loop using tracker. Record statistics in stats.\n\n\n\n\n\n"
+    "text": "track(tracker, x₁, t₁=1.0, t₀=0.0; options...)::PathTrackerResult\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. This returns a PathTrackerResult. This modifies tracker. See track! for the possible options.\n\n\n\n\n\ntrack(tracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)\n\nTrack x along the edge edge in the loop loop using tracker. Record statistics in stats.\n\n\n\n\n\n"
 },
 
 {
@@ -973,7 +981,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.track!",
     "category": "function",
-    "text": " track!(tracker, x₁, t₁, t₀; setup_patch=true, checkstartvalue=true, compute_ẋ=true)\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. Returns one of the enum values of PathTrackerStatus.t indicating the status. If the tracking was successfull it is PathTrackerStatus.success. If setup_patch is true then setup! is called at the beginning of the tracking.\n\ntrack!(x₀, tracker, x₁, t₁, t₀; options...)\n\nAdditionally also stores the result in x₀ if the tracking was successfull.\n\n\n\n\n\n"
+    "text": " track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, compute_ẋ=true)\n\nTrack a value x₁ from t₁ to t₀ using the given PathTracker tracker. Returns one of the enum values of PathTrackerStatus.states indicating the status. If the tracking was successfull it is PathTrackerStatus.success. If setup_patch is true then setup! is called at the beginning of the tracking.\n\ntrack!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)\n\nAdditionally also stores the result in x₀ if the tracking was successfull.\n\n\n\n\n\n"
 },
 
 {
@@ -981,7 +989,23 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.setup!",
     "category": "function",
-    "text": "setup!(::AbstractAffinePatchState, x::AbstractVector)\n\nSetup the affine patch depending on x and modify x if necessary. This is only called once at the beginning of a tracked path.\n\n\n\n\n\nsetup!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac)\n\nSetup the cache. x is the new path value at t and ẋ is the derivative at t. fac is a factorization of the Jacobian at (x,t). This falls back to calling update.\n\n\n\n\n\nsetup!(pathtracker, x₁, t₁, t₀, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)\n\nSetup pathtracker to track x₁ from t₁ to t₀. Use this if you want to use the pathtracker as an iterator.\n\n\n\n\n\n"
+    "text": "setup!(::AbstractAffinePatchState, x::AbstractVector)\n\nSetup the affine patch depending on x and modify x if necessary. This is only called once at the beginning of a tracked path.\n\n\n\n\n\nsetup!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac)\n\nSetup the cache. x is the new path value at t and ẋ is the derivative at t. fac is a factorization of the Jacobian at (x,t). This falls back to calling update.\n\n\n\n\n\nsetup!(pathtracker, x₁, t₁=1.0, t₀=0.0, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)\n\nSetup pathtracker to track x₁ from t₁ to t₀. Use this if you want to use the pathtracker as an iterator.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#HomotopyContinuation.iterator",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.iterator",
+    "category": "function",
+    "text": "iterator(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; affine=true)\n\nPrepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect a specific path. In each iteration the tuple (x,t) is returned. If affine == true then x is the affine solution (internally we compute in projective space).\n\nExample\n\nAssume you have PathTracker tracker and you wan to track x₁ from 1.0 to 0.25:\n\nfor (x,t) in iterator(tracker, x₁, 1.0, 0.25)\n    println(\"x at t=$t:\")\n    println(x)\nend\n\nNote that this is a stateful iterator. You can still introspect the state of the tracker. For example to check whether the tracker was successfull (and did not terminate early due to some problem) you can do\n\nprintln(\"Success: \", currstatus(tracker) == PathTrackerStatus.success)\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#Methods-1",
+    "page": "Path tracker",
+    "title": "Methods",
+    "category": "section",
+    "text": "To track from a start to an endpoint with the PathTracker we provide the following routines.track\ntrack!\nsetup!It is also possible to use a PathTracker as an iterator. This can either be done by the high level iterator method or by directly using a PathTracker as an iterator. The recommend approach is simply using iterator.iterator"
 },
 
 {
@@ -1022,6 +1046,14 @@ var documenterSearchIndex = {"docs": [
     "title": "HomotopyContinuation.currstatus",
     "category": "function",
     "text": " currstatus(tracker::PathTracker)\n\nCurrent status.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#Introspecting-the-current-state-1",
+    "page": "Path tracker",
+    "title": "Introspecting the current state",
+    "category": "section",
+    "text": "To introspect the current state we provide the following routines.currx\ncurrt\ncurrΔt\ncurriters\ncurrstatus"
 },
 
 {
@@ -1089,11 +1121,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#Methods-1",
+    "location": "pathtracking/#Changing-options-1",
     "page": "Path tracker",
-    "title": "Methods",
+    "title": "Changing options",
     "category": "section",
-    "text": "To track from a start to an endpoint with the PathTracker we provide the following routines.track\ntrack!\nsetup!It is also possible to use a PathTracker as an iterator:iterator!To introspect the current state and change settings we provide the following routines.currx\ncurrt\ncurrΔt\ncurriters\ncurrstatus\ntol\ncorrector_maxiters\nrefinement_tol\nrefinement_maxiters\nset_tol!\nset_corrector_maxiters!\nset_refinement_tol!\nset_refinement_maxiters!"
+    "text": "To change settingstol\ncorrector_maxiters\nrefinement_tol\nrefinement_maxiters\nset_tol!\nset_corrector_maxiters!\nset_refinement_tol!\nset_refinement_maxiters!"
 },
 
 {
