@@ -118,20 +118,21 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, 
 
 	check_square_homogenous_system(F, variable_groups)
 
+	degrees = maxdegrees(F)
 	# Scale systems
 	if system_scaling
-		G = homogenous_totaldegree_polysystem(prob.degrees, variables, variable_groups)
+		G = homogenous_totaldegree_polysystem(degrees, variables, variable_groups)
 		_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
-		g = TotalDegreeSystem(prob.degrees, G_scaling_factors)
+		g = TotalDegreeSystem(degrees, G_scaling_factors)
 		problem = ProjectiveProblem(g,
 						construct_system(f, system; variables=variables, homvars=homvars),
 						variable_groups, seed; kwargs...)
 	else
-		problem = ProjectiveProblem(TotalDegreeSystem(prob.degrees),
+		problem = ProjectiveProblem(TotalDegreeSystem(degrees),
 			construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
 
 	end
-	startsolutions = totaldegree_solutions(prob.degrees)
+	startsolutions = totaldegree_solutions(degrees)
 
 	problem, startsolutions
 end
@@ -146,23 +147,35 @@ end
 
 function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
-    G = TotalDegreeSystem(prob.degrees)
+	degrees = abstract_system_degrees(prob.system)
+    G = TotalDegreeSystem(degrees)
 	# Check overdetermined case
 	n > N && error(overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
     (ProjectiveProblem(G, prob.system, variable_groups, seed; kwargs...),
-     totaldegree_solutions(prob.degrees))
+     totaldegree_solutions(degrees))
 end
 
 function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
-
-    G = TotalDegreeSystem(prob.degrees)
+	degrees = abstract_system_degrees(prob.system)
+    G = TotalDegreeSystem(degrees)
 	variable_groups = VariableGroups(N, homvaridx)
     (ProjectiveProblem(G, prob.system, variable_groups, seed; kwargs...),
-     totaldegree_solutions(prob.degrees))
+     totaldegree_solutions(degrees))
 end
 
+function abstract_system_degrees(F)
+	n, N = size(F)
+	degrees = check_homogenous_degrees(F)
+	# system needs to be homogenous
+	if n + 1 > N
+		error(overdetermined_error_msg)
+	elseif  n + 1 ≠ N
+		error("Input system is not a square homogenous system!")
+	end
+	degrees
+end
 
 ###############
 # START TARGET

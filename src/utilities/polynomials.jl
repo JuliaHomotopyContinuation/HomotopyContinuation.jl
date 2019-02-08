@@ -335,6 +335,37 @@ function maxdegrees(C::Composition; parameters=nothing)
 end
 
 """
+    check_homogenous_degrees(F::AbstractSystem)
+
+Compute (numerically) the degrees of `F` and verify that `F` is homogenous,
+"""
+function check_homogenous_degrees(F)
+    n, N = size(F)
+    if n < N - 1
+        error("Input system is not homogenous! It has $n polynomials in $N variables according to `size`.")
+    end
+    # The number of variables match, but it still cannot be homogenous.
+    # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
+    # scales accordingly to the degrees which we can obtain by taking logarithms.
+    x = rand(ComplexF64, N)
+    system_cache = cache(F, x)
+    y = evaluate(F, x, system_cache)
+    LinearAlgebra.rmul!(x, 2)
+    y2 = evaluate(F, x, system_cache)
+
+    degrees = map(y2, y) do y2ᵢ, yᵢ
+        # y2ᵢ = 2^dᵢ yᵢ
+        float_dᵢ = log2(abs(y2ᵢ / yᵢ))
+        dᵢ = round(Int, float_dᵢ)
+        if abs(dᵢ - float_dᵢ) > 1e-10
+            error("Input system is not homogenous by our numerical check.")
+        end
+        dᵢ
+    end
+    degrees
+end
+
+"""
     uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)
     uniquevar(F::MPPolys, tag=:x0)
 
