@@ -100,8 +100,9 @@ function problem_startsolutions(input::AbstractInput; seed=randseed(), kwargs...
     problem_startsolutions(input, seed; kwargs...)
 end
 function problem_startsolutions(input::AbstractInput, seed;
-	homvar::Union{Nothing, Int, MP.AbstractVariable}=nothing, kwargs...)
-    problem_startsolutions(input, homvar, seed; kwargs...)
+	homvar=nothing, homvars=nothing, variable_groups=nothing, kwargs...)
+	homvar_info = HomogenizationInformation(;homvar=homvar, homvars=homvars, variable_groups=variable_groups)
+    problem_startsolutions(input, homvar_info, seed; kwargs...)
 end
 
 function problem_startsolutions(input::HomotopyInput, homvar, seed; kwargs...)
@@ -109,12 +110,13 @@ function problem_startsolutions(input::HomotopyInput, homvar, seed; kwargs...)
 end
 
 
+
 ##############
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
-    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system; homvar=homvar)
+function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_info, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, homvar_info)
 
 	check_square_homogenous_system(F, variable_groups)
 
@@ -156,11 +158,11 @@ function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvar
      totaldegree_solutions(degrees))
 end
 
-function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, homvaridx::Int, seed; system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, kwargs...)
     n, N = size(prob.system)
 	degrees = abstract_system_degrees(prob.system)
     G = TotalDegreeSystem(degrees)
-	variable_groups = VariableGroups(N, homvaridx)
+	variable_groups = VariableGroups(N, hominfo)
     (ProjectiveProblem(G, prob.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
 end
@@ -221,8 +223,8 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystemInput, homvar, seed; system=SPSystem, kwargs...)
-    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, homvar=homvar, parameters=prob.parameters)
+function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; system=SPSystem, kwargs...)
+    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
 	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
     H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
