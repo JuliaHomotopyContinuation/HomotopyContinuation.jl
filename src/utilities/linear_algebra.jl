@@ -174,7 +174,7 @@ end
 #    the pivot vector anymore and also avoid the allocations
 #    coming from the LU wrapper
 @inline function lu_factorization!(A::AbstractMatrix{T},
-                           b::Union{AbstractVector{T}, Nothing}=nothing,
+                           b::Union{AbstractVector, Nothing}=nothing,
                            ipiv::Union{Vector{I}, Nothing}=nothing,
                            ::Val{Pivot} = Val(true)) where {T,I,Pivot}
     m, n = size(A)
@@ -187,7 +187,11 @@ end
             if Pivot
                 amax = zero(real(T))
                 for i = k:m
-                    absi = abs2(A[i,k])
+                    if T <: Complex
+                        absi = abs2(A[i,k])
+                    else
+                        absi = abs(A[i,k])
+                    end
                     if absi > amax
                         kp = i
                         amax = absi
