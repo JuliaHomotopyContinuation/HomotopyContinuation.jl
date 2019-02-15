@@ -142,8 +142,6 @@ function HomogenizationInformation(;homvar=nothing, homvars=nothing, variable_gr
 		error("Currently we cannot find variable groups just from given `homvars`. Please provide explicit variable groups using `variable_groups=...`.")
 	elseif variable_groups === nothing
 		HomogenizationInformation(homvars, nothing)
-	elseif length(variable_groups) !== homvars
-		error("Number of provided variables to `homvars` doesn't match the number of `variable_groups`.")
 	else
 		HomogenizationInformation(homvars, tuple(collect.(variable_groups)...))
 	end
@@ -251,6 +249,12 @@ projective_dims(groups::VariableGroups) = length.(groups.groups) .- 1
 nvariables(G::VariableGroups) = sum(length.(G.groups))
 Base.length(::VariableGroups{N}) where N = N
 
+"""
+	groups(VG::VariableGroups, variables)
+
+Group the given variables in their corresponding groups.
+"""
+groups(VG::VariableGroups, variables) = map(g -> variables[g], VG.groups)
 
 ##############
 # POLYNOMIALS
@@ -340,13 +344,22 @@ function ishomogenous(F::MPPolys, ::Nothing=nothing; parameters=nothing)
     end
 end
 function ishomogenous(F::MPPolys, hominfo::HomogenizationInformation; parameters=nothing)
-    if parameters !== nothing
+	if hominfo.vargroups !== nothing
+		all(vars -> ishomogenous(F, vars), hominfo.vargroups)
+	elseif parameters !== nothing
         ishomogenous(F, variables(F, parameters=parameters))
     else
         all(ishomogenous, F)
     end
 end
 function ishomogenous(C::Composition, hominfo=nothing; kwargs...)
+    homogenous_degrees_helper(C; kwargs...) !== nothing
+end
+function ishomogenous(C::Composition, hominfo::HomogenizationInformation; kwargs...)
+	if hominfo.vargroups && length(hominfo.vargroups) > 1
+		error("`variable_groups` and compositions are currently not supported.")
+	end
+
     homogenous_degrees_helper(C; kwargs...) !== nothing
 end
 
@@ -419,6 +432,26 @@ function maxdegrees(C::Composition; parameters=nothing)
 end
 
 """
+	multidegrees(F, variable_groups)
+
+Computes the multi-degrees of the polynomials of `F` with respect to the given
+variable groups. Returns an integer matrix, each column is the degree with respect
+to the corresponding variable group and each row is one of the polynomials in the system.
+
+## Example
+```
+julia> @polyvar x y;
+julia> multidegrees([x*y-2, x^2-4], ([x], [y]))
+2×2 Array{Int64,2}:
+ 1  1
+ 2  0
+ ```
+"""
+multidegrees(F, vargroups) = [minmaxdegree(f, vars)[2] for f in F, vars in vargroups]
+multidegrees(F, VG::VariableGroups, vars) = multidegrees(F, groups(VG, vars))
+
+
+"""
     check_homogenous_degrees(F::AbstractSystem)
 
 Compute (numerically) the degrees of `F` and verify that `F` is homogenous,
@@ -488,11 +521,22 @@ function homogenize(f::MP.AbstractPolynomialLike, variables::Vector, var::MP.Abs
         var^(d_max - d)*t
     end)
 end
+function homogenize(f::MP.AbstractPolynomialLike, hominfo::HomogenizationInformation)
+	g = f
+	for (vargroup, homvar) in zip(hominfo.vargroups, hominfo.homvars)
+		g = homogenize(g, vargroup, homvar)
+	end
+	g
+end
+
 function homogenize(F::MPPolys, var=uniquevar(F); parameters=nothing)
     homogenize(F, variables(F, parameters=parameters), var)
 end
 function homogenize(F::MPPolys, variables::Vector, var::MP.AbstractVariable=uniquevar(F))
     map(f -> homogenize(f, variables, var), F)
+end
+function homogenize(F::MPPolys, hominfo::HomogenizationInformation)
+	homogenize.(F, Ref(hominfo))
 end
 function homogenize(C::Composition, var::MP.AbstractVariable=uniquevar(C.polys[1]); parameters=nothing, weights=nothing)
     polys = map(length(C.polys):-1:1) do k
@@ -586,9 +630,9 @@ If it was homogenized and no then the new variable is the **first one**.
 function homogenize_if_necessary(F::Union{MPPolys, Composition}, hominfo::Union{Nothing, HomogenizationInformation}; parameters=nothing)
     vars = variables(F, parameters=parameters)
 
+	# This fills in the simple variable group (allvars,)
 	hominfo = add_variable_groups(hominfo, F; parameters=parameters)
 
-    n, N = npolynomials(F), length(vars)
     if ishomogenous(F, hominfo; parameters=parameters)
 		vargroups = VariableGroups(vars, hominfo)
 		F, vars[vcat(vargroups.groups...)], vargroups, homvars(hominfo)
