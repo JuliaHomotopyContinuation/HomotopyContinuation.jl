@@ -46,12 +46,14 @@ currstatus
 ## Changing options
 To change settings
 ```@docs
-tol
 corrector_maxiters
-refinement_tol
-refinement_maxiters
-set_tol!
 set_corrector_maxiters!
-set_refinement_tol!
+maximal_step_size
+set_maximal_step_size!
+refinement_maxiters
 set_refinement_maxiters!
+refinement_tol
+set_refinement_tol!
+tol
+set_tol!
 ```

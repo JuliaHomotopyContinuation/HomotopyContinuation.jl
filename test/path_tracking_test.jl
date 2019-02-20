@@ -99,4 +99,35 @@
         track!(tracker, r1.x, 0.1, 0.0)
         @test v1 != patch.v̄
     end
+
+    @testset "pathtracker_startsolutions" begin
+        @polyvar  x y
+
+        tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
+        result = track(tracker, first(S), 1.0, 0.0)
+        @test result.returncode == :success
+
+        # test type promotion of startsolutions
+        tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
+        result = track(tracker, [1, 1], 1.0, 0.0)
+        @test result.returncode == :success
+    end
+
+    @testset "iterator" begin
+        @polyvar x a y b
+        F = [x^2-a, x*y-a+b]
+        p = [a, b]
+        s = [1.0, 1.0 + 0.0*im]
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
+        typeof(first(iterator(tracker, s, 1.0, 0.0))) ==
+            Tuple{Vector{ComplexF64}, Float64}
+        typeof(first(iterator(tracker, s, 1.0, 0.0; affine=false))) ==
+            Tuple{ProjectiveVectors.PVector{ComplexF64, 1}, Float64}
+
+        @test maximal_step_size(tracker) == Inf
+        set_maximal_step_size!(tracker, 0.01)
+        @test maximal_step_size(tracker) == 0.01
+
+        length(collect(iterator(tracker, s, 1.0, 0.0))) == 101
+    end
 end
