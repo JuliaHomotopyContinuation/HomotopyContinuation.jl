@@ -105,12 +105,12 @@
 
         tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
         result = track(tracker, first(S), 1.0, 0.0)
-        @test result.returncode == :success
+        @test result.returncode == PathTrackerStatus.success
 
         # test type promotion of startsolutions
         tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
         result = track(tracker, [1, 1], 1.0, 0.0)
-        @test result.returncode == :success
+        @test result.returncode == PathTrackerStatus.success
     end
 
     @testset "iterator" begin
