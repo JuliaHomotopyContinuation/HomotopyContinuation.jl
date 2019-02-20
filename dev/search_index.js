@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s126,1} where #s126<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s124,1} where #s124<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -925,7 +925,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.pathtracker",
     "category": "function",
-    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This also takes the same input arguments as solve with the exception that you do not need to specify startsolutions. This is convenient if you want to investigate single paths.\n\nExamples\n\nObtain single solution\n\nWe want to construct a path tracker to track a parameterized system f with parameters p from the parameters a to b.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\n\nYou then can obtain a single solution at b by using\n\nx_b = track(tracker, x_a).x\n\nTrace a path\n\nTo trace a path you can use the iterator method.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\n\n\n\n\n"
+    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This also takes the same input arguments as solve with the exception that you do not need to specify startsolutions. This is convenient if you want to investigate single paths.\n\nExamples\n\nObtain single solution\n\nWe want to construct a path tracker to track a parameterized system f with parameters p from the parameters a to b.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\n\nYou then can obtain a single solution at b by using\n\nx_b = track(tracker, x_a).x\n\nTrace a path\n\nTo trace a path you can use the iterator method.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\nIf we want to guarantee smooth traces we can limit the maximal step size.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\n\n\n\n\n"
 },
 
 {
@@ -941,7 +941,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracker",
     "category": "type",
-    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is Newton.\ncorrector_maxiters=3: The maximal number of correction steps in a single step.\ninitial_steplength=0.1: The step length of the first step.\nmaxiters=10_000: The maximal number of iterations the path tracker has available.\nminimal_steplength=1e-14: The minimal step length.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is [RK4](@ref)()`.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\n\n\n\n\n\n"
+    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is Newton.\ncorrector_maxiters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmaxiters=10_000: The maximal number of iterations the path tracker has available.\nminimal_step_size=1e-14: The minimal step size.\nmaximal_step_size=Inf: The maximal step size.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is [RK4](@ref)()`.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\n\n\n\n\n\n"
 },
 
 {
@@ -957,7 +957,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTrackerStatus.states",
     "category": "type",
-    "text": "PathTrackerStatus.states\n\nThe possible states the pathtracker can achieve are\n\nPathTrackerStatus.success\nPathTrackerStatus.tracking\nPathTrackerStatus.terminated_maximal_iterations\nPathTrackerStatus.terminated_invalid_startvalue\nPathTrackerStatus.terminated_steplength_too_small\nPathTrackerStatus.terminated_singularity\n\n\n\n\n\n"
+    "text": "PathTrackerStatus.states\n\nThe possible states the pathtracker can achieve are\n\nPathTrackerStatus.success\nPathTrackerStatus.tracking\nPathTrackerStatus.terminated_maximal_iterations\nPathTrackerStatus.terminated_invalid_startvalue\nPathTrackerStatus.terminated_step_size_too_small\nPathTrackerStatus.terminated_singularity\n\n\n\n\n\n"
 },
 
 {
@@ -1029,7 +1029,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.currΔt",
     "category": "function",
-    "text": " currΔt(tracker::PathTracker)\n\nCurrent steplength Δt.\n\n\n\n\n\n"
+    "text": " currΔt(tracker::PathTracker)\n\nCurrent step_size Δt.\n\n\n\n\n\n"
 },
 
 {
@@ -1057,14 +1057,6 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.tol",
-    "page": "Path tracker",
-    "title": "HomotopyContinuation.tol",
-    "category": "function",
-    "text": " tol(tracker::PathTracker)\n\nCurrent tolerance.\n\n\n\n\n\n"
-},
-
-{
     "location": "pathtracking/#HomotopyContinuation.corrector_maxiters",
     "page": "Path tracker",
     "title": "HomotopyContinuation.corrector_maxiters",
@@ -1073,11 +1065,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.refinement_tol",
+    "location": "pathtracking/#HomotopyContinuation.set_corrector_maxiters!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.refinement_tol",
+    "title": "HomotopyContinuation.set_corrector_maxiters!",
     "category": "function",
-    "text": " refinement_tol(tracker::PathTracker)\n\nCurrent refinement tolerance.\n\n\n\n\n\n"
+    "text": " set_corrector_maxiters!(tracker::PathTracker, n)\n\nSet the correction maxiters to n.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#HomotopyContinuation.maximal_step_size",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.maximal_step_size",
+    "category": "function",
+    "text": " maximal_step_size(tracker::PathTracker)\n\nCurrent maximal step size.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#HomotopyContinuation.set_maximal_step_size!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.set_maximal_step_size!",
+    "category": "function",
+    "text": " set_corrector_maxiters!(tracker::PathTracker, Δs)\n\nSet the maximal step size to Δs.\n\n\n\n\n\n"
 },
 
 {
@@ -1089,19 +1097,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_tol!",
+    "location": "pathtracking/#HomotopyContinuation.set_refinement_maxiters!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_tol!",
+    "title": "HomotopyContinuation.set_refinement_maxiters!",
     "category": "function",
-    "text": " set_tol!(tracker::PathTracker, tol)\n\nSet the current tolerance to tol.\n\n\n\n\n\n"
+    "text": " set_refinement_maxiters!(tracker::PathTracker, n)\n\nSet the current refinement maxiters to n.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_corrector_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.refinement_tol",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_corrector_maxiters!",
+    "title": "HomotopyContinuation.refinement_tol",
     "category": "function",
-    "text": " set_corrector_maxiters!(tracker::PathTracker, n)\n\nSet the current correction maxiters to n.\n\n\n\n\n\n"
+    "text": " refinement_tol(tracker::PathTracker)\n\nCurrent refinement tolerance.\n\n\n\n\n\n"
 },
 
 {
@@ -1113,11 +1121,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_refinement_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.tol",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_refinement_maxiters!",
+    "title": "HomotopyContinuation.tol",
     "category": "function",
-    "text": " set_refinement_maxiters!(tracker::PathTracker, n)\n\nSet the current refinement maxiters to n.\n\n\n\n\n\n"
+    "text": " tol(tracker::PathTracker)\n\nCurrent tolerance.\n\n\n\n\n\n"
+},
+
+{
+    "location": "pathtracking/#HomotopyContinuation.set_tol!",
+    "page": "Path tracker",
+    "title": "HomotopyContinuation.set_tol!",
+    "category": "function",
+    "text": " set_tol!(tracker::PathTracker, tol)\n\nSet the current tolerance to tol.\n\n\n\n\n\n"
 },
 
 {
@@ -1125,7 +1141,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "Changing options",
     "category": "section",
-    "text": "To change settingstol\ncorrector_maxiters\nrefinement_tol\nrefinement_maxiters\nset_tol!\nset_corrector_maxiters!\nset_refinement_tol!\nset_refinement_maxiters!"
+    "text": "To change settingscorrector_maxiters\nset_corrector_maxiters!\nmaximal_step_size\nset_maximal_step_size!\nrefinement_maxiters\nset_refinement_maxiters!\nrefinement_tol\nset_refinement_tol!\ntol\nset_tol!"
 },
 
 {
