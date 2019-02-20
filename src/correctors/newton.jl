@@ -50,9 +50,9 @@ function correct!(out, alg::Newton, cache::NewtonCache, H::HomotopyWithCache, x�
             evaluate_and_jacobian!(rᵢ, Jᵢ, H, xᵢ, t)
             updated_jacobian!(Jac)
         end
-        cond = adaptive_solve!(Δxᵢ, Jac, rᵢ, tol=tol, cond=cond,
+        cond = adaptive_solve!(Δxᵢ, Jac, rᵢ, tol, cond,
             # We always compute an condition number estimate in the first iteration
-            compute_new_cond=iszero(i))
+            iszero(i))
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = euclidean_norm(Δxᵢ)

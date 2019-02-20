@@ -46,8 +46,8 @@
         F = equations(katsura(5))
         tracker, start_sols = pathtracker_startsolutions(F)
         s = first(start_sols)
-        track!(tracker, s, 1.0, 0.1)
-        @allocated track!(tracker, s, 1.0, 0.1) == 16
+        @allocated track!(tracker, s, 1.0, 0.1)
+        @test (@allocated track!(tracker, s, 1.0, 0.1)) == 0
     end
 
     @testset "LinearSystem" begin

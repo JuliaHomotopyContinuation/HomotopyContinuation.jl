@@ -299,7 +299,7 @@ function track!(x₀, tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; setup_patc
      end
      retcode
 end
-function track!(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+@inline function track!(tracker::PathTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
 end
 function track!(tracker::PathTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
@@ -360,7 +360,7 @@ function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    adaptive_solve!(state.ẋ, cache.Jac, cache.out, cond=state.cond, tol=options.tol)
+    adaptive_solve!(state.ẋ, cache.Jac, cache.out, options.tol, state.cond)
     nothing
 end
 

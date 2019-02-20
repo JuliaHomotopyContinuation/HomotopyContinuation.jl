@@ -290,7 +290,7 @@ the residual is computed.
 Returns an [`IterativeRefinementResult`](@ref).
 """
 function solve_with_iterative_refinement!(x::AbstractVector, Jac::Jacobian,
-                b::AbstractVector, ::Type{T}; iters::Int=1) where {T}
+                b::AbstractVector, ::Type{T}, iters::Int=1) where {T}
     solve!(x, Jac.fac, b)
     cond = 0.0
     accuracy = Inf
@@ -342,14 +342,18 @@ function residual!(u::AbstractVector, A, x, b, ::Type{T}) where {T}
 end
 
 """
-    adaptive_solve!(x, Jac::Jac, b; tol=1e-7, cond=1.0, safety_factor=1e2, compute_new_cond=false)
+    adaptive_solve!(x, Jac::Jac, b; tol=1e-7, cond=1.0, compute_new_cond=false, safety_factor=1e3)
+    adaptive_solve!(x, Jac::Jac, b, tol, cond=1.0, compute_new_cond=false, safety_factor=1e3)
 
 Solve `Jac.J * x = b` by optionally using iterative refinment depending on the condition number estimate
 `cond` and the desired accuracy `tol`.
 Returns an updated estimate of `cond` if `compute_new_cond == true` or iterative refinement was used.
 Otherwise the existing `cond` is passed.
 """
-function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; tol=1e-7, cond=1.0, safety_factor=1e3, compute_new_cond=false)
+function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; tol=1e-7, cond=1.0, compute_new_cond=false, safety_factor=1e3)
+    adaptive_solve!(x, Jac, b, tol, cond, compute_new_cond, safety_factor)
+end
+function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector, tol, cond=1.0, compute_new_cond=false, safety_factor=1e3)
     # We want to achieve accuracy of tol,
     # We make an error in the linear algebra of ≈ eps() * cond
     # Another limiting factor is the accuracy of the evaluation which we do not know
@@ -362,18 +366,18 @@ function adaptive_solve!(x::AbstractVector, Jac::Jacobian, b::AbstractVector; to
     if eps(real(eltype(x))) * cond * safety_factor < tol
         # we can solve in working precision
         if compute_new_cond # we do iterative refinement to get a condition estimate
-            res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
+            iters = 1
+            res = solve_with_iterative_refinement!(x, Jac, b, Float64, iters)
             cond = res.cond
         else
             # just do a normal solve
             solve!(x, Jac, b)
         end
     else
-        # solve!(x, Jac, b)
-        # res = solve_with_iterative_refinement!(x, Jac, b, Float64; iters=1)
         # we need to do iterative refinement in higher precision
         # TODO: iters=1 should be replaced by an adaptive termination criterion
-        res = solve_with_iterative_refinement!(x, Jac, b, Double64; iters=1)
+        iters = 1
+        res = solve_with_iterative_refinement!(x, Jac, b, Double64, iters)
         cond = res.cond
     end
     cond
