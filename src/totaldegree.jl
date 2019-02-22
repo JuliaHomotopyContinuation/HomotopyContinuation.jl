@@ -64,7 +64,12 @@ Base.eltype(iter::Type{<:TotalDegreeSolutionIterator}) = Vector{Complex{Float64}
 
 struct MultiBezoutIndicesIterator{N}
     D::Matrix{Int} # Degree matrix
-    k::NTuple{N, Int} # size of (affine) variable groups
+    k::NTuple{N, Int} # (projective) dimensions
+
+    function MultiBezoutIndicesIterator(D::Matrix{Int}, k::NTuple{M, Int}) where {M}
+        @assert size(D, 1) == M
+        new{M}(D, k)
+    end
 end
 MultiBezoutIndicesIterator(D::Matrix, k) = MultiBezoutIndicesIterator(D, tuple(k...))
 MultiBezoutIndicesIterator(D::Matrix, groups::VariableGroups) = MultiBezoutIndicesIterator(D, projective_dims(groups))
@@ -73,13 +78,13 @@ Base.IteratorSize(::Type{MultiBezoutIndicesIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{MultiBezoutIndicesIterator}) = Tuple{Int, Vector{Int}}
 function Base.iterate(iter::MultiBezoutIndicesIterator, state=[i for i=1:length(iter.k) for j=1:iter.k[i]])
     d = 0
-    n, m = size(iter.D)
+    m, n = size(iter.D)
     p = state
     while d == 0
         state[1] > n && return nothing
         p, state = nextpermutation(1:m, state)
         let p=p, D=iter.D
-            d = prod(i -> D[i, p[i]], 1:n)::Int
+            d = prod(i -> D[p[i], i], 1:n)::Int
         end
     end
 
@@ -117,6 +122,39 @@ Compute the multi-homogenous bezout number associated to the given multidegrees 
 bezout_number(D::Matrix, groups::VariableGroups) = bezout_number(D, projective_dims(groups))
 bezout_number(D::Matrix, k) = sum(first, MultiBezoutIndicesIterator(D, k))
 
+"""
+    multi_bezout_coefficients(D, projective_dims)
+
+Compute coefficients for a multi-bezout start system.
+`projective_dims` is the projective dimensions of the projective spaces.
+"""
+function multi_bezout_coefficients(D::Matrix, k::NTuple{M, Int}) where M
+    @assert size(D, 1) == M
+    @assert size(D, 2) == sum(k)
+
+    n = size(D, 2)
+    C = zeros(n+M, n)
+    for i in 1:n
+        j = 1
+        for kⱼ in k
+            for l in 1:kⱼ
+                C[j, i] = begin
+                    if (i == l && i ≤ kⱼ)
+                        1.0
+                    elseif i ≠ l && i ≤ kⱼ
+                        0.0
+                    else
+                        randn()
+                    end
+                end
+                j += 1
+            end
+            C[j, i] = 1.0
+            j += 1
+        end
+    end
+    C
+end
 
 """
     totaldegree_polysystem(multidegrees::Matrix, variables, variable_groups::VariableGroups)
@@ -126,30 +164,25 @@ and the coefficients``c_{i,j,l}`` described in [Wampler, 93] as a `Matrix{Vector
 
 [Wampler, 93]: An efficient start system for multi-homogeneous polynomial continuation (https://link.springer.com/article/10.1007/BF01385710).
 """
-function totaldegree_polysystem(multidegrees::Matrix, variables, variable_groups::VariableGroups)
-    n, m = size(multidegrees)
+function totaldegree_polysystem(multidegrees::Matrix, variables, vargroups::VariableGroups)
+    C = multi_bezout_coefficients(multidegrees, length.(vargroups.groups) .- 1)
+    totaldegree_polysystem(multidegrees, variables, vargroups, C)
+end
+function totaldegree_polysystem(D::Matrix, variables, variable_groups::VariableGroups, C::Matrix)
     Z = groups(variable_groups, variables)
-    c(i, j) = begin
-        kⱼ = length(Z[j]) - 1
-        map(1:kⱼ) do l
-            if (i == l && i ≤ kⱼ)
-                1.0
-            elseif i ≠ l && i ≤ kⱼ
-                0.0
-            else
-                randn()
-            end
-        end
-    end
-    C = [c(i,j) for i ∈ 1:n, j ∈ 1:m]
+    m, n = size(D)
     G = map(1:n) do i
+        s = Ref(1)
         prod(1:m) do j
-            dᵢⱼ = multidegrees[i,j]
+            dᵢⱼ = D[j,i]
             dᵢⱼ == 0 && return 1
             kⱼ = length(Z[j]) - 1
             bᵢⱼ = sum(1:kⱼ) do l
-                C[i,j][l] * Z[j][l]
+                cz = C[s[], i] * Z[j][l]
+                s[] += 1
+                cz
             end
+            s[] += 1
             bᵢⱼ^dᵢⱼ - Z[j][end]^dᵢⱼ
         end
     end
@@ -159,22 +192,29 @@ end
 
 struct MultiBezoutSolutionsIterator{N}
     indices::MultiBezoutIndicesIterator{N}
-    coeffs::Matrix{Vector{Float64}}
+    coeffs::Matrix{Float64}
     # precomputed stuff and cache
     roots_of_unity::Matrix{ComplexF64} # Lower Triangular matrix storing the precomputed roots
     A::NTuple{N, Matrix{Float64}}
     b::NTuple{N, Vector{ComplexF64}}
+    ranges::NTuple{N, UnitRange{Int}}
 end
 
 function MultiBezoutSolutionsIterator(indices::MultiBezoutIndicesIterator, coeffs::Matrix)
     d_max = maximum(indices.D)
     roots_of_unity = zeros(ComplexF64, d_max, d_max)
-    for i in 1:maximum(indices.D), j in 0:i-1
+    for i in 1:d_max, j in 0:i-1
         roots_of_unity[i, j+1] = cis(2π * j / i)
     end
     A = map(kⱼ -> zeros(kⱼ, kⱼ), indices.k)
     b = map(kⱼ -> zeros(ComplexF64, kⱼ), indices.k)
-    MultiBezoutSolutionsIterator(indices, coeffs, roots_of_unity, A, b)
+    r_stop = Ref(1)
+    ranges = map(indices.k) do kⱼ
+        range = r_stop[]:(kⱼ + r_stop[] - 1)
+        r_stop[] += kⱼ + 1
+        range
+    end
+    MultiBezoutSolutionsIterator(indices, coeffs, roots_of_unity, A, b, ranges)
 end
 
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
@@ -182,7 +222,7 @@ Base.eltype(::Type{MultiBezoutSolutionsIterator{N}}) where N = ProjectiveVectors
 
 function Base.iterate(iter::MultiBezoutSolutionsIterator)
     (_, perm), indices_state = iterate(iter.indices)
-    dᵢ = ntuple(i -> iter.indices.D[i, perm[i]], length(perm))
+    dᵢ = ntuple(i -> iter.indices.D[perm[i],i], length(perm))
     d_iter = Iterators.product(map(dᵢ -> 1:dᵢ, dᵢ)...)
     q, d_state = iterate(d_iter)
 
@@ -208,7 +248,7 @@ function Base.iterate(iter::MultiBezoutSolutionsIterator, state)
     (_, perm), indices_state = indices_newstate
     # Create new d_iter
     new_dᵢ::typeof(dᵢ) = let D=iter.indices.D, perm=perm
-        ntuple(i -> D[i, perm[i]], length(perm))
+        ntuple(i -> D[perm[i],i], length(perm))
     end
     new_d_iter::typeof(d_iter) = Iterators.product(map(dᵢⱼ -> 1:dᵢⱼ, new_dᵢ)...)
     q, d_state = iterate(new_d_iter)
@@ -218,7 +258,7 @@ end
 
 
 function compute_solution(iter::MultiBezoutSolutionsIterator, perm, q, dᵢ)
-    n, m = size(iter.indices.D)
+    m, n = size(iter.indices.D)
     # for each variable group we have to solve a linear system
     t = 1
     data = zeros(ComplexF64, n + m)
@@ -229,13 +269,15 @@ function compute_solution(iter::MultiBezoutSolutionsIterator, perm, q, dᵢ)
         s = 1
         for i=1:n
             perm[i] == j || continue
-            Aⱼ[s, :] = iter.coeffs[i, j]
+            range = iter.ranges[j]
+            for (t, l)  in enumerate(range)
+                Aⱼ[s, t] = iter.coeffs[l, i]
+            end
             bⱼ[s] = iter.roots_of_unity[dᵢ[i], q[i]]
             s += 1
         end
         solve!(Aⱼ, bⱼ)
         data[t:(t+kⱼ-1)] .= bⱼ
-        # [] = LinearAlgebra.lu!(Aⱼ) \ bⱼ
         data[t+kⱼ] = 1
         t += kⱼ + 1
     end

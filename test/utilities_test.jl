@@ -100,7 +100,7 @@
         @test HC.ishomogenous(g, hominfo) == true
 
         @test HC.homogenize(f, hominfo) == g
-        HC.multidegrees(f, ([x], [y])) == [1 1; 2 0]
+        HC.multidegrees(f, ([x], [y])) == [1 2; 1 0]
     end
 
     @testset "Misc" begin

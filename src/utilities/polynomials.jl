@@ -443,11 +443,11 @@ to the corresponding variable group and each row is one of the polynomials in th
 julia> @polyvar x y;
 julia> multidegrees([x*y-2, x^2-4], ([x], [y]))
 2×2 Array{Int64,2}:
- 1  1
- 2  0
+ 1  2
+ 1  0
  ```
 """
-multidegrees(F, vargroups) = [minmaxdegree(f, vars)[2] for f in F, vars in vargroups]
+multidegrees(F, vargroups) = [minmaxdegree(f, vars)[2] for vars in vargroups, f in F]
 multidegrees(F, VG::VariableGroups, vars) = multidegrees(F, groups(VG, vars))
 
 
