@@ -3,7 +3,7 @@ export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homv
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homotopy, :system, :system_scaling];
+	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling];
 	input_supported_keywords]
 
 const DEFAULT_SYSTEM = FPSystem
@@ -116,25 +116,33 @@ end
 ##############
 
 function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_info, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
-    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, homvar_info)
-
-	check_square_homogenous_system(F, variable_groups)
-
-	degrees = maxdegrees(F)
-	# Scale systems
-	if system_scaling
-		G = homogenous_totaldegree_polysystem(degrees, variables, variable_groups)
-		_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
-		g = TotalDegreeSystem(degrees, G_scaling_factors)
-		problem = ProjectiveProblem(g,
-						construct_system(f, system; variables=variables, homvars=homvars),
-						variable_groups, seed; kwargs...)
-	else
-		problem = ProjectiveProblem(TotalDegreeSystem(degrees),
-			construct_system(F, system; variables=variables, homvars=homvars), variable_groups, seed; kwargs...)
-
+    F, vargroups, homvars = homogenize_if_necessary(prob.system, homvar_info)
+	variables = flattened_variable_groups(vargroups)
+	target_constructor = f -> begin
+		construct_system(f, system; variables=variables, homvars=homvars)
 	end
-	startsolutions = totaldegree_solutions(degrees)
+
+	check_square_homogenous_system(F, vargroups)
+
+	if ngroups(vargroups) == 1
+		degrees = maxdegrees(F)
+		# Scale systems
+		if system_scaling
+			G = homogenous_totaldegree_polysystem(degrees, variables, vargroups)
+			_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
+			g = TotalDegreeSystem(degrees, G_scaling_factors)
+			problem = ProjectiveProblem(g, target_constructor(f), vargroups, seed; kwargs...)
+		else
+			g = TotalDegreeSystem(degrees)
+			problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
+		end
+	# Multihomogenous
+	else
+		D = multidegrees(F, vargroups)
+		g = MultiHomTotalDegreeSystem(D, projective_dims(vargroups))
+		problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
+	end
+	startsolutions = totaldegree_solutions(g, vargroups)
 
 	problem, startsolutions
 end
@@ -224,7 +232,8 @@ end
 #####################
 
 function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; system=SPSystem, kwargs...)
-    F, variables, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
+    F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
+	variables = flattened_variable_groups(variable_groups)
 	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
     H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 

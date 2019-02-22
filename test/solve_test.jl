@@ -233,4 +233,17 @@
         S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
         @test nfinite(S) == 1
     end
+
+    @testset "MultiHomogenous" begin
+        @polyvar x y u v
+
+        f = [x*y - 6, x^2 - 5]
+        S = solve(f, variable_groups=[(x,), (y,)])
+        @test nnonsingular(S) == 2
+        S = solve(f, variable_groups=[(x,), (y,)])
+        @test nnonsingular(S) == 2
+        g = [x*y - 6u*v, x^2 - u^2]
+        S = solve(g, variable_groups=[(x,u), (y,v)], homvars=(u,v))
+        @test nnonsingular(S) == 2
+    end
 end

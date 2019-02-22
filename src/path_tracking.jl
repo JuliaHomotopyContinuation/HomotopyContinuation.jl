@@ -206,7 +206,7 @@ end
 function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=OrthogonalPatch(),
     corrector::AbstractCorrector=Newton(),
-    predictor::AbstractPredictor=Heun(), kwargs...)
+    predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
     options = PathTrackerOptions(;kwargs...)
 
@@ -231,6 +231,10 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
 
     PathTracker(H, predictor, corrector, patch, tracker_state, options, cache)
 end
+
+# Do not really understand this but Heun doesn't work that great
+default_predictor(x::ProjectiveVectors.PVector{T,1}) where {T} = Heun()
+default_predictor(x::ProjectiveVectors.PVector) = Euler()
 
 Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x

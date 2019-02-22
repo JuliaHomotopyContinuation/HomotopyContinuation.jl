@@ -10,6 +10,10 @@ struct MultiHomTotalDegreeSystem <: AbstractSystem
     C::Matrix{Float64}
 end
 
+function MultiHomTotalDegreeSystem(D::Matrix, k::NTuple{M, Int}) where M
+    MultiHomTotalDegreeSystem(D, multi_bezout_coefficients(D, k))
+end
+
 struct MultiHomTotalDegreeSystemCache{M,T} <: AbstractSystemCache
     B::Matrix{T}
     Ĝ::Matrix{T}

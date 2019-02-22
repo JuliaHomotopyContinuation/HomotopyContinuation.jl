@@ -103,7 +103,7 @@ function input(F::MPPolyInputs; parameters=nothing, kwargs...)
     end
 
     remove_zeros!(F)
-    check_zero_dimensional(F)
+    # check_zero_dimensional(F)
     # square system and each polynomial is non-zero
     if length(F) == nvariables(F) && ishomogenous(F)
         error("Cannot construct a total degree homotopy for a square homogenous system.")

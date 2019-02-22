@@ -4,9 +4,13 @@
 Returns an iterator of the solutions of the total degree startsystem of `F`.
 """
 function totaldegree_solutions(F::Vector{AP}) where {AP<:MP.AbstractPolynomialLike}
-    totaldegree_solutions(MP.maxdegree.(F))
+    TotalDegreeSolutionIterator(MP.maxdegree.(F))
 end
 totaldegree_solutions(degrees::Vector{Int}) = TotalDegreeSolutionIterator(degrees)
+totaldegree_solutions(F::TotalDegreeSystem, _) = TotalDegreeSolutionIterator(F.degrees)
+function totaldegree_solutions(F::MultiHomTotalDegreeSystem, vargroups)
+    MultiBezoutSolutionsIterator(F.D, F.C, vargroups)
+end
 
 
 """
@@ -215,6 +219,9 @@ function MultiBezoutSolutionsIterator(indices::MultiBezoutIndicesIterator, coeff
         range
     end
     MultiBezoutSolutionsIterator(indices, coeffs, roots_of_unity, A, b, ranges)
+end
+function MultiBezoutSolutionsIterator(D::Matrix, C::Matrix, vargroups::VariableGroups)
+    MultiBezoutSolutionsIterator(MultiBezoutIndicesIterator(D, vargroups), C)
 end
 
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
