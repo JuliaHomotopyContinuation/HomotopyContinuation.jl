@@ -1,7 +1,8 @@
 using Test, LinearAlgebra, Random
-using DynamicPolynomials, PolynomialTestSystems, HomotopyContinuation
-import TreeViews, ProjectiveVectors
+using DynamicPolynomials, HomotopyContinuation
+import TreeViews, ProjectiveVectors, PolynomialTestSystems
 
+import PolynomialTestSystems: cyclic, katsura, equations, ipp2, heart
 const HC = HomotopyContinuation
 
 function test_treeviews(x)

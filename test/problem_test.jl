@@ -36,14 +36,12 @@
 
 
     F = FPSystem(homogenize(equations(cyclic(6))))
-    degrees = HomotopyContinuation.check_homogenous_degrees(F)
-    P, startvals = problem_startsolutions(TotalDegreeInput(F, degrees))
+    P, startvals = problem_startsolutions(TotalDegreeInput(F))
     @test homvars(P) == nothing
     @test length(startvals) == 720
 
     F = FPSystem(homogenize(equations(cyclic(6))))
-    degrees = HomotopyContinuation.check_homogenous_degrees(F)
-    P, startvals = problem_startsolutions(TotalDegreeInput(F, degrees), homvar=5)
+    P, startvals = problem_startsolutions(TotalDegreeInput(F), homvar=5)
     @test homvars(P) == (5,)
     @test length(startvals) == 720
 end

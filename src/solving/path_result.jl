@@ -35,7 +35,7 @@ Its fields are
 * `npredictions`: The number of predictions the endgamer did.
 * `predictions`: The predictions of the endgamer.
 """
-struct PathResult{T1, T2, T3}
+struct PathResult{T1, T2, V<:AbstractVector}
     returncode::Symbol
     returncode_detail::Symbol
 
@@ -48,17 +48,17 @@ struct PathResult{T1, T2, T3}
     windingnumber::Int
 
     pathnumber::Int
-    start_solution::Vector{T3}
+    start_solution::V
     endgame_start_solution::Vector{T1}
 
     iterations::Int
     npredictions::Int
 end
 
-function PathResult(prob::AbstractProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
-    PathResult(homvars(prob), k, x₁, x_e, t₀, r, cache)
+function PathResult(prob::ProjectiveProblem, k, x₁, x_e, t₀, r, cache::PathResultCache)
+    PathResult(homvars(prob), prob.vargroups, k, x₁, x_e, t₀, r, cache)
 end
-function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(homvars::Nothing, vargroups, k, x₁, x_e, t₀, r, cache::PathResultCache)
     returncode, returncode_detail = makereturncode(r.returncode)
     x = align_axis!(copy(r.x.data))
     evaluate_and_jacobian!(cache.v, cache.J, cache.H, x, t₀)
@@ -80,9 +80,8 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
             end
         end
         σ = LinearAlgebra.svdvals(cache.J)
-        n = size(cache.H)[2]
-        if n>2
-            condition = σ[1]/σ[n-1]
+        if size(cache.J, 1) > ngroups(vargroups) + 1
+            condition = σ[1]/σ[end-ngroups(vargroups)]
         else
             condition = inv(σ[1])
         end
@@ -93,7 +92,7 @@ function PathResult(homvars::Nothing, k, x₁, x_e, t₀, r, cache::PathResultCa
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, x_e.data, iters(r), npredictions)
 end
-function PathResult(homvars::NTuple{1,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache)
+function PathResult(homvars::NTuple{M,Int}, vargroups, k, x₁, x_e, t₀, r, cache::PathResultCache) where {M}
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
@@ -121,11 +120,17 @@ function PathResult(homvars::NTuple{1,Int}, k, x₁, x_e, t₀, r, cache::PathRe
                 cache.J[i, j] *= rᵢ
             end
         end
-        condition = LinearAlgebra.cond(@view cache.J[:,1:end-1])
+        condition = LinearAlgebra.cond(cache.J)
+    end
+
+    if x₁ isa ProjectiveVectors.PVector
+        start = ProjectiveVectors.affine_chart(x₁)
+    else
+        start = x₁
     end
 
     PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
-        condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
+        condition, windingnumber, k, start, intermediate_sol, iters(r), npredictions)
 end
 
 iters(R::EndgameResult) = R.iters

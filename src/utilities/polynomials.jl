@@ -4,77 +4,6 @@ const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
 const WeightedVariable = Tuple{<:MP.AbstractVariable, Int}
 
-"""
-    VariableGroups{N}
-
-A `VariableGroups` stores an `NTuple` of indices mapping to the indices of the original variables.
-"""
-struct VariableGroups{N}
-    groups::NTuple{N, Vector{Int}}
-    dedicated_homvars::Bool
-end
-
-"""
-    VariableGroups(all_variables, variable_groups, homvars)
-
-# Example
-```julia
-all_vars = @polyvar a b c x y z
-variable_groups = ([c, b, a], [x, y, z])
-homvars = (b, y)
-
-vargroups = VariableGroups(all_vars, variable_groups, homvars)
-vargroups.groups == ([3, 1, 2], [4, 6, 5])
-vargroups.homvars == true
-```
-"""
-function VariableGroups(all_variables,
-                       variable_groups::NTuple{N, <:Vector{<:Union{Int, MP.AbstractVariable}}},
-                       homvars::Union{Nothing, NTuple{N, <:Union{Int, MP.AbstractVariable}}}=nothing) where N
-    groups = ntuple(N) do k
-        variable_group = variable_groups[k]
-        h = homvars === nothing ? 0 : homvars[k]
-        group = Int[]
-        homvar = 0
-        for v in variable_group
-            i = findfirst(w -> w == v, all_variables)
-            if v == h
-                homvar = i
-            else
-                push!(group, i)
-            end
-         end
-         if homvar != 0
-             push!(group, homvar)
-         end
-         group
-      end
-      VariableGroups(groups, homvars !== nothing)
-end
-
-function VariableGroups(all_variables, homvar::MP.AbstractVariable)
-    VariableGroups(all_variables, (collect(all_variables),), (homvar,))
-end
-function VariableGroups(all_variables, homvar::Nothing=nothing)
-    VariableGroups(all_variables, (collect(all_variables),), homvar)
-end
-function VariableGroups(nvariables::Int, homvar::Nothing=nothing)
-    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), nothing)
-end
-function VariableGroups(nvariables::Int, homvar::Int)
-    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), (homvar,))
-end
-
-"""
-    projective_dims(variable_groups)
-
-Returns the projective dimension of each variable group.
-"""
-projective_dims(groups::VariableGroups) = length.(groups.groups) .- 1
-
-nvariables(G::VariableGroups) = sum(length.(G.groups))
-Base.length(::VariableGroups{N}) where N = N
-
 ##############
 # COMPOSITION
 ##############
@@ -178,6 +107,182 @@ function validate(C::Composition; parameters=nothing)
 end
 
 
+#############################
+# HomogenizationInformation
+#############################
+
+"""
+	HomogenizationInformation(;homvar=nothing, homvars=nothing, variable_groups=nothing)
+
+This captures the information about the desired homogenization of the problem.
+`homvar(s) = nothing` indicates that the problem should be homogenized.
+`variable_groups` indicate the desired variable grouping for multi-homogenous homotopies.
+
+## Fields
+* `homvars`
+* `vargroups`
+"""
+struct HomogenizationInformation{N, T}
+	# one of the two fields is always not Nothing
+	homvars::Union{Nothing, NTuple{N, T}}
+	vargroups::Union{Nothing, NTuple{N, Vector{T}}}
+end
+
+function HomogenizationInformation(;homvar=nothing, homvars=nothing, variable_groups=nothing)
+	if homvars === nothing && homvar !== nothing
+		homvars = (homvar,)
+		if variable_groups !== nothing && length(variable_groups) > 1
+			error("You provided more than 1 variables group but only declared `homvar=$homvar`. Use instead `homvars=...`.")
+		end
+	end
+
+	if variable_groups === nothing && homvars === nothing
+		return nothing
+	elseif variable_groups === nothing && length(homvars) > 1
+		error("Currently we cannot find variable groups just from given `homvars`. Please provide explicit variable groups using `variable_groups=...`.")
+	elseif variable_groups === nothing
+		HomogenizationInformation(homvars, nothing)
+	else
+		HomogenizationInformation(homvars, tuple(collect.(variable_groups)...))
+	end
+end
+
+function add_variable_groups(HI::HomogenizationInformation, F::MPPolys; parameters=nothing)
+	if HI.vargroups === nothing
+		if length(HI.homvars) == 1
+			vargroups = (variables(F; parameters=parameters),)
+			return HomogenizationInformation(HI.homvars, vargroups)
+		else
+			error("Cannot add variable groups")
+		end
+	end
+	HI
+end
+add_variable_groups(::Nothing, F; parameters=nothing) = nothing
+
+homvars(H::HomogenizationInformation) = H.homvars
+homvars(::Nothing) = nothing
+
+"""
+    VariableGroups{N}
+
+A `VariableGroups` stores an `NTuple` of indices mapping to the indices of the original variables.
+"""
+struct VariableGroups{N, V<:Union{MP.AbstractVariable, Int}}
+	variables::Vector{V}
+    groups::NTuple{N, Vector{Int}}
+    dedicated_homvars::Bool
+end
+
+"""
+    VariableGroups(all_variables, variable_groups, homvars)
+
+# Example
+```julia
+all_vars = @polyvar a b c x y z
+variable_groups = ([c, b, a], [x, y, z])
+homvars = (b, y)
+
+vargroups = VariableGroups(all_vars, variable_groups, homvars)
+vargroups.groups == ([3, 1, 2], [4, 6, 5])
+vargroups.homvars == true
+```
+"""
+function VariableGroups(all_variables,
+                       variable_groups::NTuple{N, <:Vector{<:Union{Int, MP.AbstractVariable}}},
+                       homvars::Union{Nothing, NTuple{N, <:Union{Int, MP.AbstractVariable}}}=nothing) where N
+    groups = ntuple(N) do k
+        variable_group = variable_groups[k]
+        h = homvars === nothing ? 0 : homvars[k]
+        group = Int[]
+        homvar = 0
+        for v in variable_group
+            i = findfirst(w -> w == v, all_variables)
+            if v == h
+                homvar = i
+            else
+                push!(group, i)
+            end
+         end
+         if homvar != 0
+             push!(group, homvar)
+         end
+         group
+      end
+      VariableGroups(all_variables, groups, homvars !== nothing)
+end
+function VariableGroups(all_variables, homvar_info::HomogenizationInformation)
+	if homvar_info.vargroups === nothing
+		VariableGroups(all_variables, (collect(all_variables),), homvar_info.homvars)
+	else
+		VariableGroups(all_variables, homvar_info.vargroups, homvar_info.homvars)
+	end
+end
+
+function VariableGroups(all_variables, homvar::MP.AbstractVariable)
+    VariableGroups(all_variables, (collect(all_variables),), (homvar,))
+end
+function VariableGroups(all_variables, homvar::Nothing=nothing)
+    VariableGroups(all_variables, (collect(all_variables),), homvar)
+end
+function VariableGroups(nvariables::Int, homvar::Nothing=nothing)
+    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), nothing)
+end
+function VariableGroups(nvariables::Int, homvar::Int)
+    VariableGroups(collect(1:nvariables), (collect(1:nvariables),), (homvar,))
+end
+function VariableGroups(nvariables::Int, hominfo::HomogenizationInformation)
+	if hominfo.vargroups === nothing
+		VariableGroups(collect(1:nvariables), (collect(1:nvariables),), hominfo.homvars)
+	else
+		VariableGroups(collect(1:nvariables), hominfo.vargroups, hominfo.homvars)
+	end
+end
+
+
+"""
+	projective_dims(variable_groups)
+
+Returns the projective dimension of each variable group.
+"""
+function projective_dims(groups::VariableGroups)
+	length.(groups.groups) .- 1
+end
+
+nvariables(G::VariableGroups) = sum(length.(G.groups))
+Base.length(::VariableGroups{N}) where N = N
+
+"""
+	variable_groups(VG::VariableGroups)
+
+Returns the variable groups.
+"""
+variable_groups(VG::VariableGroups) = map(g -> VG.variables[g], VG.groups)
+
+"""
+	flattened_groups(VG::VariableGroups)
+
+Returns the variable groups.
+"""
+flattened_variable_groups(VG::VariableGroups) = vcat(variable_groups(VG)...)
+
+"""
+	variables(VG::VariableGroups)
+
+Returns all variables in their original order.
+"""
+variables(VG::VariableGroups) = VG.variables
+
+"""
+	ngroups(VG::VariableGroups)
+
+Group the given variables in their corresponding groups.
+"""
+ngroups(VG::VariableGroups{M}) where M = M
+
+##############
+# POLYNOMIALS
+#############
 """
     variables(F; parameters=nothing)
 
@@ -255,14 +360,30 @@ Checks whether each polynomial in `F` is homogenous in the variables `variables`
 function ishomogenous(F::MPPolys, variables)
     all(f -> ishomogenous(f, variables), F)
 end
-function ishomogenous(F::MPPolys; parameters=nothing)
+function ishomogenous(F::MPPolys, ::Nothing=nothing; parameters=nothing)
     if parameters !== nothing
         ishomogenous(F, variables(F, parameters=parameters))
     else
         all(ishomogenous, F)
     end
 end
-function ishomogenous(C::Composition; kwargs...)
+function ishomogenous(F::MPPolys, hominfo::HomogenizationInformation; parameters=nothing)
+	if hominfo.vargroups !== nothing
+		all(vars -> ishomogenous(F, vars), hominfo.vargroups)
+	elseif parameters !== nothing
+        ishomogenous(F, variables(F, parameters=parameters))
+    else
+        all(ishomogenous, F)
+    end
+end
+function ishomogenous(C::Composition, hominfo=nothing; kwargs...)
+    homogenous_degrees_helper(C; kwargs...) !== nothing
+end
+function ishomogenous(C::Composition, hominfo::HomogenizationInformation; kwargs...)
+	if hominfo.vargroups && length(hominfo.vargroups) > 1
+		error("`variable_groups` and compositions are currently not supported.")
+	end
+
     homogenous_degrees_helper(C; kwargs...) !== nothing
 end
 
@@ -335,6 +456,57 @@ function maxdegrees(C::Composition; parameters=nothing)
 end
 
 """
+	multidegrees(F, variable_groups)
+
+Computes the multi-degrees of the polynomials of `F` with respect to the given
+variable groups. Returns an integer matrix, each column is the degree with respect
+to the corresponding variable group and each row is one of the polynomials in the system.
+
+## Example
+```
+julia> @polyvar x y;
+julia> multidegrees([x*y-2, x^2-4], ([x], [y]))
+2×2 Array{Int64,2}:
+ 1  2
+ 1  0
+ ```
+"""
+multidegrees(F, vargroups) = [minmaxdegree(f, vars)[2] for vars in vargroups, f in F]
+multidegrees(F, VG::VariableGroups) = multidegrees(F, variable_groups(VG))
+
+
+"""
+    check_homogenous_degrees(F::AbstractSystem)
+
+Compute (numerically) the degrees of `F` and verify that `F` is homogenous,
+"""
+function check_homogenous_degrees(F)
+    n, N = size(F)
+    if n < N - 1
+        error("Input system is not homogenous! It has $n polynomials in $N variables according to `size`.")
+    end
+    # The number of variables match, but it still cannot be homogenous.
+    # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
+    # scales accordingly to the degrees which we can obtain by taking logarithms.
+    x = rand(ComplexF64, N)
+    system_cache = cache(F, x)
+    y = evaluate(F, x, system_cache)
+    LinearAlgebra.rmul!(x, 2)
+    y2 = evaluate(F, x, system_cache)
+
+    degrees = map(y2, y) do y2ᵢ, yᵢ
+        # y2ᵢ = 2^dᵢ yᵢ
+        float_dᵢ = log2(abs(y2ᵢ / yᵢ))
+        dᵢ = round(Int, float_dᵢ)
+        if abs(dᵢ - float_dᵢ) > 1e-10
+            error("Input system is not homogenous by our numerical check.")
+        end
+        dᵢ
+    end
+    degrees
+end
+
+"""
     uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)
     uniquevar(F::MPPolys, tag=:x0)
 
@@ -373,11 +545,22 @@ function homogenize(f::MP.AbstractPolynomialLike, variables::Vector, var::MP.Abs
         var^(d_max - d)*t
     end)
 end
+function homogenize(f::MP.AbstractPolynomialLike, hominfo::HomogenizationInformation)
+	g = f
+	for (vargroup, homvar) in zip(hominfo.vargroups, hominfo.homvars)
+		g = homogenize(g, vargroup, homvar)
+	end
+	g
+end
+
 function homogenize(F::MPPolys, var=uniquevar(F); parameters=nothing)
     homogenize(F, variables(F, parameters=parameters), var)
 end
 function homogenize(F::MPPolys, variables::Vector, var::MP.AbstractVariable=uniquevar(F))
     map(f -> homogenize(f, variables, var), F)
+end
+function homogenize(F::MPPolys, hominfo::HomogenizationInformation)
+	homogenize.(F, Ref(hominfo))
 end
 function homogenize(C::Composition, var::MP.AbstractVariable=uniquevar(C.polys[1]); parameters=nothing, weights=nothing)
     polys = map(length(C.polys):-1:1) do k
@@ -468,26 +651,40 @@ Homogenizes the system `F` if necessary and returns the (new) system `F` its var
 and a subtype of [`AbstractHomogenization`] indicating whether it was homegenized.
 If it was homogenized and no then the new variable is the **first one**.
 """
-function homogenize_if_necessary(F::Union{MPPolys, Composition}; homvar=nothing, parameters=nothing)
+function homogenize_if_necessary(F::Union{MPPolys, Composition}, hominfo::Union{Nothing, HomogenizationInformation}; parameters=nothing)
     vars = variables(F, parameters=parameters)
 
-    n, N = npolynomials(F), length(vars)
-    if ishomogenous(F; parameters=parameters)
-        vargroups = VariableGroups(vars, homvar)
-        F, vars[vcat(vargroups.groups...)], vargroups, homvar
-    else
-        if homvar !== nothing
-            error("Input system is not homogenous although `homvar=$(homvar)` was passed.")
-        end
-        # We create a new variable to homogenize the system
-        homvar = uniquevar(F)
+	# This fills in the simple variable group (allvars,)
+	hominfo = add_variable_groups(hominfo, F; parameters=parameters)
+
+    if ishomogenous(F, hominfo; parameters=parameters)
+		vargroups = VariableGroups(vars, hominfo)
+		F, vargroups, homvars(hominfo)
+    elseif hominfo === nothing
+		homvar = uniquevar(F)
         push!(vars, homvar)
-        sort!(vars, rev=true)
 
         F′ = homogenize(F, homvar; parameters=parameters)
         vargroups = VariableGroups(vars, homvar)
 
-        F′, vars[vcat(vargroups.groups...)], vargroups, homvar
+		F′, vargroups, (homvar,)
+	else
+        if hominfo.homvars !== nothing
+            error("Input system is not homogenous although `homvars=$(hominfo.homvars)` was passed.")
+        end
+
+		# We create a new variable for each variable group to homogenize the system
+		new_homvars = map(_ -> uniquevar(F), hominfo.vargroups)
+		push!(vars, new_homvars...)
+		new_vargroups = map(hominfo.vargroups, new_homvars) do group, v
+			vcat(group, v)
+		end
+		hominfo = HomogenizationInformation(new_homvars, new_vargroups)
+
+        F′ = homogenize(F, hominfo)
+		vargroups = VariableGroups(vars, hominfo)
+
+		F′, vargroups, new_homvars
     end
 end
 
@@ -497,7 +694,7 @@ end
 Returns a symbol indicating whether `F` is `:square`, `:overdetermined` or `:underdetermined`.
 """
 function classify_homogenous_system(F, vargroups::VariableGroups)
-    n = npolynomials(F) - (nvariables(vargroups) - length(vargroups))
+	n = npolynomials(F) - (nvariables(vargroups) - ngroups(vargroups))
 
     if n == 0
         :square

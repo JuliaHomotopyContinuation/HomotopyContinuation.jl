@@ -60,12 +60,7 @@ is the target system and a total degree system should be assembled.
 """
 struct TotalDegreeInput{S<:Inputs} <: AbstractInput
     system::S
-    degrees::Vector{Int}
 end
-function TotalDegreeInput(S::Vector{<:MP.AbstractPolynomialLike})
-    TotalDegreeInput(S, maxdegrees(S))
-end
-
 
 """
     ParameterSystemInput(F, parameters, p₁, p₀, startsoluions, γ₁=nothing, γ₂=nothing)
@@ -108,24 +103,16 @@ function input(F::MPPolyInputs; parameters=nothing, kwargs...)
     end
 
     remove_zeros!(F)
-    check_zero_dimensional(F)
+    # check_zero_dimensional(F)
     # square system and each polynomial is non-zero
     if length(F) == nvariables(F) && ishomogenous(F)
         error("Cannot construct a total degree homotopy for a square homogenous system.")
     end
-    TotalDegreeInput(F, maxdegrees(F))
+    TotalDegreeInput(F)
 end
 
 function input(F::AbstractSystem)
-    n, N = size(F)
-    degrees = check_homogenous_degrees(F)
-    # system needs to be homogenous
-    if n + 1 > N
-        error(overdetermined_error_msg)
-    elseif  n + 1 ≠ N
-        error("Input system is not a square homogenous system!")
-    end
-    TotalDegreeInput(F, degrees)
+    TotalDegreeInput(F)
 end
 
 function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
@@ -164,36 +151,4 @@ end
 function input(H::AbstractHomotopy, startsolutions)
     check_homogenous_degrees(FixedHomotopy(H, rand()))
     HomotopyInput(H, startsolutions)
-end
-
-
-"""
-    check_homogenous_degrees(F::AbstractSystem)
-
-Compute (numerically) the degrees of `F` and verify that `F` is homogenous,
-"""
-function check_homogenous_degrees(F::AbstractSystem)
-    n, N = size(F)
-    if n < N - 1
-        error("Input system is not homogenous! It has $n polynomials in $N variables according to `size`.")
-    end
-    # The number of variables match, but it still cannot be homogenous.
-    # We evaluate the system with y:=rand(N) and 2y. If homogenous then the output
-    # scales accordingly to the degrees which we can obtain by taking logarithms.
-    x = rand(ComplexF64, N)
-    system_cache = cache(F, x)
-    y = evaluate(F, x, system_cache)
-    LinearAlgebra.rmul!(x, 2)
-    y2 = evaluate(F, x, system_cache)
-
-    degrees = map(y2, y) do y2ᵢ, yᵢ
-        # y2ᵢ = 2^dᵢ yᵢ
-        float_dᵢ = log2(abs(y2ᵢ / yᵢ))
-        dᵢ = round(Int, float_dᵢ)
-        if abs(dᵢ - float_dᵢ) > 1e-10
-            error("Input system is not homogenous by our numerical check.")
-        end
-        dᵢ
-    end
-    degrees
 end

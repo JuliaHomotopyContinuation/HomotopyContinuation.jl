@@ -84,6 +84,25 @@
         @test HC.weylnorm([f, f]) == √HC.weyldot([f, f], [f, f])
     end
 
+    @testset "Multihomogenous" begin
+        @polyvar x y
+        f = [x*y-2, x^2-4]
+
+        affine_hominfo = HC.HomogenizationInformation(variable_groups = ((x,), (y,)))
+        @test HC.ishomogenous(f, affine_hominfo) == false
+
+        @polyvar v w
+        g = [x * y - 2v * w, x^2-4v^2]
+        hominfo = HC.HomogenizationInformation(variable_groups = ((x,v), (y,w)))
+        @test HC.ishomogenous(g, hominfo) == true
+
+        hominfo = HC.HomogenizationInformation(homvars=(v,w), variable_groups = ((x,v), (y,w)))
+        @test HC.ishomogenous(g, hominfo) == true
+
+        @test HC.homogenize(f, hominfo) == g
+        HC.multidegrees(f, ([x], [y])) == [1 2; 1 0]
+    end
+
     @testset "Misc" begin
         A = rand(Complex{Float64}, 12, 12)
         b = rand(Complex{Float64}, 12)

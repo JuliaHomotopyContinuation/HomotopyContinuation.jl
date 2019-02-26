@@ -25,6 +25,7 @@ f = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2
 ## Utilities
 
 ```@docs
+bezout_number
 ishomogenous
 uniquevar
 homogenize

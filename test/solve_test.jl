@@ -233,4 +233,45 @@
         S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
         @test nfinite(S) == 1
     end
+
+    @testset "MultiHomogenous" begin
+        @polyvar x y u v
+
+        f = [x*y - 6, x^2 - 5]
+        S = solve(f, variable_groups=[(x,), (y,)])
+        @test nnonsingular(S) == 2
+        S = solve(f, variable_groups=[(x,), (y,)])
+        @test nnonsingular(S) == 2
+        g = [x*y - 6u*v, x^2 - u^2]
+        S = solve(g, variable_groups=[(x,u), (y,v)], homvars=(u,v))
+        @test nnonsingular(S) == 2
+
+
+        # The 6-R inverse problem
+
+        ## initialize the variables
+        @polyvar z[1:6,1:3]
+        p = [1, 1, 0]
+        α = randn(5)
+        a = randn(9)
+        ## define the system of polynomials
+        f = [z[i,:] ⋅ z[i,:] for i=2:5]
+        g = [z[i,:] ⋅ z[i+1,:] for i=1:5]
+        h = sum(a[i] .* (z[i,:] × z[i+1,:]) for i=1:3) +
+            sum(a[i+4] .* z[i,:] for i=2:5)
+        F′ = [f .- 1; g .- cos.(α); h .- p]
+        ## assign values to z₁ and z₆
+        F = [subs(f, z[1,:] => [1, 0, 0], z[6,:] => [1,0,0]) for f in F′]
+
+        group1 = [[z[2,:]; z[4,:]], [z[3,:]; z[5,:]]]
+        group2 = [z[2,:], z[4,:], z[3,:], z[5,:]]
+
+        @test bezout_number(F) == 1024
+        @test bezout_number(F, variable_groups=group1) == 320
+        @test bezout_number(F, variable_groups=group2) == 576
+
+        @test nnonsingular(solve(F)) == 16
+        @test nnonsingular(solve(F; variable_groups=group1)) == 16
+        @test nnonsingular(solve(F; variable_groups=group2)) == 64
+    end
 end

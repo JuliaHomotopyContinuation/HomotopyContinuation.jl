@@ -45,7 +45,7 @@ end
 function jacobian!(U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     # J_H(x, t)
-    jacobian!(c.A, H.homotopy, x.data, t, c.cache)
+    jacobian!(c.A, H.homotopy, x, t, c.cache)
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
     end
@@ -56,7 +56,7 @@ end
 function dt!(u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
-    dt!(c.b, H.homotopy, x.data, t, c.cache)
+    dt!(c.b, H.homotopy, x, t, c.cache)
     @inbounds for i=1:M
         u[i] = c.b[i]
     end
@@ -68,7 +68,7 @@ end
 
 function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
-    evaluate_and_jacobian!(c.b, c.A, H.homotopy, x.data, t, c.cache)
+    evaluate_and_jacobian!(c.b, c.A, H.homotopy, x, t, c.cache)
 
     @inbounds for j=1:N, i=1:M
         U[i, j] = c.A[i, j]
@@ -86,7 +86,7 @@ end
 function jacobian_and_dt!(U, u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     A, b = c.A, c.b
-    jacobian_and_dt!(A, b, H.homotopy, x.data, t, c.cache)
+    jacobian_and_dt!(A, b, H.homotopy, x, t, c.cache)
     # jacobian
     @inbounds for j=1:N, i=1:M
         U[i, j] = A[i, j]
