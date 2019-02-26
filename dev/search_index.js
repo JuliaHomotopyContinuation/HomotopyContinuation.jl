@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s124,1} where #s124<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s141,1} where #s141<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -1169,6 +1169,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "reference/#HomotopyContinuation.bezout_number",
+    "page": "Reference",
+    "title": "HomotopyContinuation.bezout_number",
+    "category": "function",
+    "text": "bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)\nbezout_number(multidegrees, groups::VariableGroups)\n\nCompute the multi-homogenous bezout number associated to the given system and variable groups.\n\n\n\n\n\n"
+},
+
+{
     "location": "reference/#HomotopyContinuation.ishomogenous",
     "page": "Reference",
     "title": "HomotopyContinuation.ishomogenous",
@@ -1197,7 +1205,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Reference",
     "title": "Utilities",
     "category": "section",
-    "text": "ishomogenous\nuniquevar\nhomogenize"
+    "text": "bezout_number\nishomogenous\nuniquevar\nhomogenize"
 },
 
 {
