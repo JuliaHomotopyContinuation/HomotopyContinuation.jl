@@ -92,7 +92,7 @@ function PathResult(homvars::Nothing, vargroups, k, x₁, x_e, t₀, r, cache::P
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, x_e.data, iters(r), npredictions)
 end
-function PathResult(homvars::NTuple{M,Int}, vargroups, k, x₁, x_e, t₀, r, cache::PathResultCache) where {M}
+function PathResult(homvars::NTuple{M,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache) where {M}
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
@@ -123,8 +123,14 @@ function PathResult(homvars::NTuple{M,Int}, vargroups, k, x₁, x_e, t₀, r, ca
         condition = LinearAlgebra.cond(cache.J)
     end
 
+    if x₁ isa ProjectiveVectors.PVector
+        start = ProjectiveVectors.affine_chart(x₁)
+    else
+        start = x₁
+    end
+
     PathResult(returncode, returncode_detail, solution, :affine, real(r.t), res,
-        condition, windingnumber, k, x₁, intermediate_sol, iters(r), npredictions)
+        condition, windingnumber, k, start, intermediate_sol, iters(r), npredictions)
 end
 
 iters(R::EndgameResult) = R.iters

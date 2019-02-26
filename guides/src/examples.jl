@@ -107,3 +107,17 @@ F = [subs(f, z[1,:] => [1, 0, 0], z[6,:] => [1,0,0]) for f in F′]
 solve(F)
 
 # We find 16 solutions, which is the correct number of solutions for these type of systems.
+
+# But studying the problem we can see that the system has a multi-homogenous structure.
+# By considering the two variable groups {z₂, z₄} and {z₃, z₅} we can reduce the number
+# of paths to track.
+# There is the small helper function `bezout_number` to compute the maximal number of solutions
+# with respect to a variable grouping. Let's check this
+
+bezout_number(F, variable_groups=[[z[2,:]; z[4,:]], [z[3,:]; z[5,:]]])
+
+# We see that we only have to track 320 paths using this variable grouping!
+# So let's do that
+
+#md solve(F; variable_groups=[[z[2,:]; z[4,:]], [z[3,:]; z[5,:]]], report_progress=false) #hide
+solve(F, variable_groups=[[z[2,:]; z[4,:]], [z[3,:]; z[5,:]]])

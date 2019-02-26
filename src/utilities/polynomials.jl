@@ -245,7 +245,9 @@ end
 
 Returns the projective dimension of each variable group.
 """
-projective_dims(groups::VariableGroups) = length.(groups.groups) .- 1
+function projective_dims(groups::VariableGroups)
+	length.(groups.groups) .- 1
+end
 
 nvariables(G::VariableGroups) = sum(length.(G.groups))
 Base.length(::VariableGroups{N}) where N = N

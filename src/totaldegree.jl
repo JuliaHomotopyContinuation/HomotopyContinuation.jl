@@ -1,3 +1,5 @@
+export bezout_number
+
 """
     totaldegree_solutions(F::Vector{<:MP.AbstractPolynomialLike})
 
@@ -119,12 +121,27 @@ function nextpermutation(m, state)
 end
 
 """
+    bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)
     bezout_number(multidegrees, groups::VariableGroups)
 
-Compute the multi-homogenous bezout number associated to the given multidegrees and variable groups.
+Compute the multi-homogenous bezout number associated to the given system and variable groups.
 """
 bezout_number(D::Matrix, groups::VariableGroups) = bezout_number(D, projective_dims(groups))
 bezout_number(D::Matrix, k) = sum(first, MultiBezoutIndicesIterator(D, k))
+function bezout_number(F::MPPolys; parameters=nothing, variable_groups=nothing, homvars=nothing)
+    if variable_groups == nothing
+        return prod(maxdegrees(F; parameters=parameters))
+    end
+
+    vars = variables(F; parameters=parameters)
+    hominfo = HomogenizationInformation(variable_groups=variable_groups, homvars=homvars)
+    D = multidegrees(F, variable_groups)
+    if ishomogenous(F, hominfo; parameters=parameters)
+        bezout_number(D, length.(variable_groups) .- 1)
+    else
+        bezout_number(D, length.(variable_groups))
+    end
+end
 
 """
     multi_bezout_coefficients(D, projective_dims)
@@ -161,26 +178,25 @@ function multi_bezout_coefficients(D::Matrix, k::NTuple{M, Int}) where M
 end
 
 """
-    totaldegree_polysystem(multidegrees::Matrix, variables, variable_groups::VariableGroups)
+    totaldegree_polysystem(multidegrees::Matrix, variable_groups::VariableGroups, coeffs)
 
 The multi-homogenous totaldegree start system described in [Wampler, 93]. Returns a tuple, the system
 and the coefficients``c_{i,j,l}`` described in [Wampler, 93] as a `Matrix{Vector{Float64}}`.
 
 [Wampler, 93]: An efficient start system for multi-homogeneous polynomial continuation (https://link.springer.com/article/10.1007/BF01385710).
 """
-function totaldegree_polysystem(multidegrees::Matrix, variables, vargroups::VariableGroups)
-    C = multi_bezout_coefficients(multidegrees, length.(vargroups.groups) .- 1)
-    totaldegree_polysystem(multidegrees, variables, vargroups, C)
-end
-function totaldegree_polysystem(D::Matrix, variables, variable_groups::VariableGroups, C::Matrix)
-    Z = groups(variable_groups, variables)
+function totaldegree_polysystem(D::Matrix, vargroups::VariableGroups, C::Matrix)
+    Z = variable_groups(vargroups)
     m, n = size(D)
     G = map(1:n) do i
         s = Ref(1)
         prod(1:m) do j
             dᵢⱼ = D[j,i]
-            dᵢⱼ == 0 && return 1
             kⱼ = length(Z[j]) - 1
+            if dᵢⱼ == 0
+                s[] += kⱼ + 1
+                return 1
+            end
             bᵢⱼ = sum(1:kⱼ) do l
                 cz = C[s[], i] * Z[j][l]
                 s[] += 1
@@ -190,7 +206,7 @@ function totaldegree_polysystem(D::Matrix, variables, variable_groups::VariableG
             bᵢⱼ^dᵢⱼ - Z[j][end]^dᵢⱼ
         end
     end
-    G, C
+    G
 end
 
 
@@ -223,6 +239,11 @@ end
 function MultiBezoutSolutionsIterator(D::Matrix, C::Matrix, vargroups::VariableGroups)
     MultiBezoutSolutionsIterator(MultiBezoutIndicesIterator(D, vargroups), C)
 end
+
+function Base.show(io::IO, iter::MultiBezoutSolutionsIterator)
+    print(io, "Solutions iterator for a multi-homogenous start system")
+end
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MultiBezoutSolutionsIterator) = x
 
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{MultiBezoutSolutionsIterator{N}}) where N = ProjectiveVectors.PVector{ComplexF64, N}
@@ -283,7 +304,9 @@ function compute_solution(iter::MultiBezoutSolutionsIterator, perm, q, dᵢ)
             bⱼ[s] = iter.roots_of_unity[dᵢ[i], q[i]]
             s += 1
         end
+
         solve!(Aⱼ, bⱼ)
+
         data[t:(t+kⱼ-1)] .= bⱼ
         data[t+kⱼ] = 1
         t += kⱼ + 1

@@ -3,15 +3,15 @@ export MultiHomTotalDegreeSystem
 """
     MultiHomogenousTotalDegreeSystem(polynomials, vars) <: AbstractSystem
 
-Create a tottal degree system
+Create a multi-homogenous total degree system as described in
+
+An efficient start system for multi-homogeneous polynomial continuation,
+Wampler, C.W. Numer. Math. (1993) 66: 517. https://doi.org/10.1007/BF01385710
 """
-struct MultiHomTotalDegreeSystem <: AbstractSystem
+struct MultiHomTotalDegreeSystem{T} <: AbstractSystem
     D::Matrix{Int}
     C::Matrix{Float64}
-end
-
-function MultiHomTotalDegreeSystem(D::Matrix, k::NTuple{M, Int}) where M
-    MultiHomTotalDegreeSystem(D, multi_bezout_coefficients(D, k))
+    scaling_factors::Vector{T}
 end
 
 struct MultiHomTotalDegreeSystemCache{M,T} <: AbstractSystemCache
@@ -42,9 +42,12 @@ function evaluate!(u, F::MultiHomTotalDegreeSystem, z::ProjectiveVectors.PVector
     B, ranges, homvars = cache.B, cache.ranges, cache.homvars
 
     n = size(B, 2)
+
+    @boundscheck checkbounds(u, 1:n)
+
     # Compute all bᵢⱼ and store in B
     # Since B is column major we store bᵢⱼ in B[j, i]
-    for i=1:n
+    @inbounds for i=1:n
         for j=1:M
             if D[j, i] != 0
                 bᵢⱼ = -zero(B[j, i])
@@ -56,7 +59,7 @@ function evaluate!(u, F::MultiHomTotalDegreeSystem, z::ProjectiveVectors.PVector
         end
     end
 
-    for i=1:n
+    @inbounds for i=1:n
         gᵢ = one(eltype(u))
         for j=1:M
             dᵢⱼ, bᵢⱼ = D[j, i], B[j, i]
@@ -64,15 +67,13 @@ function evaluate!(u, F::MultiHomTotalDegreeSystem, z::ProjectiveVectors.PVector
                 gᵢ *= bᵢⱼ^dᵢⱼ - z[homvars[j]]^dᵢⱼ
             end
         end
-        u[i] = gᵢ
+        u[i] = gᵢ * F.scaling_factors[i]
     end
 
     u
 end
 function evaluate(F::MultiHomTotalDegreeSystem, x, cache::MultiHomTotalDegreeSystemCache)
-    u = similar(x, size(F, 1))
-    evaluate!(u, F, x, cache)
-    u
+    evaluate!(similar(x, size(F, 1)), F, x, cache)
 end
 
 function jacobian!(U, F::MultiHomTotalDegreeSystem, z, cache::MultiHomTotalDegreeSystemCache{M}) where M
@@ -80,19 +81,23 @@ function jacobian!(U, F::MultiHomTotalDegreeSystem, z, cache::MultiHomTotalDegre
     U
 end
 function jacobian(F::MultiHomTotalDegreeSystem, x, cache::MultiHomTotalDegreeSystemCache)
-    U = similar(x, size(F))
-    jacobian!(U, F, x, cache)
-    U
+    jacobian!(similar(x, size(F)), F, x, cache)
 end
 
 function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::MultiHomTotalDegreeSystemCache{M}) where M
+    n, N = size(F)
+
+    @boundscheck checkbounds(U, 1:n, 1:N)
+    if u !== nothing
+        @boundscheck checkbounds(u, 1:n)
+    end
 
     D, C = F.D, F.C
     B, Ĝ, R, S, ranges, homvars = cache.B, cache.Ĝ, cache.R, cache.S, cache.ranges, cache.homvars
 
     n = size(B, 2)
 
-    for i=1:n
+    @inbounds for i=1:n
         # Compute all bᵢⱼ and store in B
         # Since B is column major we store bᵢⱼ in B[j, i]
         for j=1:M
@@ -121,9 +126,11 @@ function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::Mu
         for j=2:M
             if D[j, i] != 0 # otherwise Ĝ[j, i] = 1
                 R[j, i] = rᵢⱼ_prev = rᵢⱼ_prev * Ĝ[j, i]
+            else
+                R[j, i] = rᵢⱼ_prev
             end
             if u !== nothing
-                u[i] = rᵢⱼ_prev
+                u[i] = rᵢⱼ_prev * F.scaling_factors[i]
             end
         end
 
@@ -132,6 +139,8 @@ function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::Mu
         for j=M-1:-1:1
             if D[j, i] != 0 # otherwise Ĝ[j, i] = 1
                 S[j, i] = sᵢⱼ_prev = sᵢⱼ_prev * Ĝ[j, i]
+            else
+                S[j, i] = sᵢⱼ_prev
             end
         end
 
@@ -144,7 +153,7 @@ function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::Mu
                     U[i, k] = zero(eltype(U))
                 else
                     if dᵢⱼ == 1
-                        u_ik = dᵢⱼ * c
+                        u_ik = c
                     else
                         u_ik = dᵢⱼ * B[j,i]^(dᵢⱼ - 1) * c
                     end
@@ -154,9 +163,10 @@ function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::Mu
                     if j < M
                         u_ik *= S[j+1, i]
                     end
-                    U[i, k] = u_ik
+                    U[i, k] = u_ik * F.scaling_factors[i]
                 end
             end
+
             k = homvars[j]
             if iszero(dᵢⱼ)
                 U[i, k] = zero(eltype(U))
@@ -172,10 +182,9 @@ function evaluate_and_jacobian!(u, U, F::MultiHomTotalDegreeSystem, z, cache::Mu
                 if j < M
                     u_ik *= S[j+1, i]
                 end
-                U[i, k] = u_ik
+                U[i, k] = u_ik * F.scaling_factors[i]
             end
         end
-
     end
     nothing
 end

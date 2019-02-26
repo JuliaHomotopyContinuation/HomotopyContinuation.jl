@@ -139,7 +139,17 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_i
 	# Multihomogenous
 	else
 		D = multidegrees(F, vargroups)
-		g = MultiHomTotalDegreeSystem(D, projective_dims(vargroups))
+		C = multi_bezout_coefficients(D, projective_dims(vargroups))
+		if system_scaling
+			G = totaldegree_polysystem(D, vargroups, C)
+			_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
+			g = MultiHomTotalDegreeSystem(D, C, G_scaling_factors)
+			problem = ProjectiveProblem(g, target_constructor(f), vargroups, seed; kwargs...)
+		else
+			g = MultiHomTotalDegreeSystem(D, C)
+			problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
+		end
+
 		problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
 	end
 	startsolutions = totaldegree_solutions(g, vargroups)

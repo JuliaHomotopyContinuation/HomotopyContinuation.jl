@@ -29,6 +29,9 @@ end
 function jacobian_patch!(U, v̄::PVector{S, N}, x::PVector) where {S, T, N}
     ranges = ProjectiveVectors.dimension_indices(v̄)
     n = size(U, 1) - N
+    for j in 1:size(U, 2), i in (n+1):size(U, 1)
+        U[i, j] = zero(eltype(U))
+    end
     for (k, range) in enumerate(ranges)
         for j in range
             U[n + k, j] = v̄[j]
