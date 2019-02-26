@@ -272,6 +272,6 @@
 
         @test nnonsingular(solve(F)) == 16
         @test nnonsingular(solve(F; variable_groups=group1)) == 16
-        @test nnonsingular(solve(F; variable_groups=group2)) == 16
+        @test nnonsingular(solve(F; variable_groups=group2)) == 64
     end
 end

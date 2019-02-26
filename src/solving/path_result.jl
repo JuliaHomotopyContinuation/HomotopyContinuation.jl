@@ -92,7 +92,7 @@ function PathResult(homvars::Nothing, vargroups, k, x₁, x_e, t₀, r, cache::P
     PathResult(returncode, returncode_detail, x, :projective, real(r.t), res, condition,
         windingnumber, k, x₁, x_e.data, iters(r), npredictions)
 end
-function PathResult(homvars::NTuple{M,Int}, k, x₁, x_e, t₀, r, cache::PathResultCache) where {M}
+function PathResult(homvars::NTuple{M,Int}, vargroups, k, x₁, x_e, t₀, r, cache::PathResultCache) where {M}
     returncode = Symbol(r.returncode)
     windingnumber, npredictions = windingnumber_npredictions(r)
 
