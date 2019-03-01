@@ -11,6 +11,40 @@ struct MonodromyResult{N, T}
     statistics::MonodromyStatistics
 end
 
+
+"""
+    mapresults(f::Function, result::MonodromyResult; conditions...)
+
+Apply the function `f` to all entries of `MonodromyResult` for which the given conditions apply.
+
+## Example
+```julia
+# This gives us all solutions considered real (but still as a complex vector).
+realsolutions = mapresults(solution, R, onlyreal=true)
+```
+"""
+function mapresults(f::Function, R::MonodromyResult;
+    onlyreal=false, realtol=1e-6)
+    [f(r) for r in R.solutions if
+        (!onlyreal || isrealvector(r, realtol))]
+end
+
+"""
+    solutions(result::MonodromyResult; conditions...)
+
+Return all solution (as `Vector`s) for which the given conditions apply.
+
+## Example
+```julia
+realsolutions = solutions(R, onlyreal=true)
+```
+"""
+function solutions(R::MonodromyResult; kwargs...)
+    mapresults(identity, R; kwargs...)
+end
+
+
+
 Base.iterate(R::MonodromyResult) = iterate(R.solutions)
 Base.iterate(R::MonodromyResult, state) = iterate(R.solutions, state)
 
