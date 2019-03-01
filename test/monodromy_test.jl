@@ -41,12 +41,12 @@ end
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, timeout=1e-12)
         @test length(result.solutions) < 21
 
-
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                 target_solutions_count=21,
                 maximal_number_of_iterations_without_progress=100)
         @test result.returncode == :success
-        @test length(result.solutions) == 21
+        @test length(solutions(result)) == 21
+        @test length(solutions(result, onlyreal = true)) >= 1
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
         @test length(HC.UniquePoints(result.solutions).points) == 21

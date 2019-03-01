@@ -1,10 +1,10 @@
-const options_allowed_keywords = [:tol, :done_callback,
+const options_allowed_keywords = [:accuracy, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
 struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
-    tol::Float64
+    accuracy::Float64
     done_callback::F1
     group_actions::GroupActions{F2}
     group_action_on_all_nodes::Bool
@@ -17,7 +17,7 @@ struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
 end
 
 function MonodromyOptions(isrealsystem;
-    tol::Float64=1e-5,
+    accuracy::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
     group_actions=GroupActions(group_action),
@@ -36,7 +36,7 @@ function MonodromyOptions(isrealsystem;
        actions = GroupActions(group_actions)
    end
 
-    MonodromyOptions(tol, done_callback, actions,
+    MonodromyOptions(accuracy, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler,
         target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
         float(timeout),

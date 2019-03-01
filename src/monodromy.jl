@@ -11,6 +11,40 @@ struct MonodromyResult{N, T}
     statistics::MonodromyStatistics
 end
 
+
+"""
+    mapresults(f::Function, result::MonodromyResult; conditions...)
+
+Apply the function `f` to all entries of `MonodromyResult` for which the given conditions apply.
+
+## Example
+```julia
+# This gives us all solutions considered real (but still as a complex vector).
+realsolutions = mapresults(solution, R, onlyreal=true)
+```
+"""
+function mapresults(f::Function, R::MonodromyResult;
+    onlyreal=false, realtol=1e-6)
+    [f(r) for r in R.solutions if
+        (!onlyreal || isrealvector(r, realtol))]
+end
+
+"""
+    solutions(result::MonodromyResult; conditions...)
+
+Return all solution (as `Vector`s) for which the given conditions apply.
+
+## Example
+```julia
+realsolutions = solutions(R, onlyreal=true)
+```
+"""
+function solutions(R::MonodromyResult; kwargs...)
+    mapresults(identity, R; kwargs...)
+end
+
+
+
 Base.iterate(R::MonodromyResult) = iterate(R.solutions)
 Base.iterate(R::MonodromyResult, state) = iterate(R.solutions, state)
 
@@ -86,6 +120,17 @@ function nreal(res::MonodromyResult; tol=1e-6)
     count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
 end
 
+"""
+MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache}
+
+Cache for monodromy loops.
+"""
+struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, T<:Number, N}
+    F::FT
+    tracker::Tracker
+    newton_cache::NC
+    out::ProjectiveVectors.PVector{T,N}
+end
 
 
 ########
@@ -104,7 +149,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
-* `tol::Float64=1e-7`: The tolerance with which paths are tracked and with which it is decided whether two solutions are identical.
+* `accuracy::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
 * `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
@@ -147,11 +192,18 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     end
 
     tracker = pathtracker(
-        f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
-        tol=options.tol,
-        refinement_tol=options.tol / 10,
-        restkwargs...)
+        f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     statistics = MonodromyStatistics(solutions(loop))
+
+    # affine newton methods
+    patch_state = state(EmbeddingPatch(), tracker.state.x)
+    HC = HomotopyWithCache(PatchedHomotopy(tracker.homotopy, patch_state), tracker.state.x, 1.0)
+    F₀ = FixedHomotopy(HC, 0.0)
+    newton_cache = NewtonCache(F₀, tracker.state.x)
+
+    # construct cache
+    C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
+
 
     # solve
     retcode = :not_assigned
@@ -161,7 +213,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         progress = nothing
     end
     try
-        retcode = monodromy_solve!(loop, tracker, options, statistics, progress)
+        retcode = monodromy_solve!(loop, C, options, statistics, progress)
     catch e
         if (e isa InterruptException)
             retcode = :interrupt
@@ -201,8 +253,7 @@ struct Job{N, T}
 end
 
 
-function monodromy_solve!(loop::Loop,
-    tracker::PathTracker, options::MonodromyOptions,
+function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptions,
     stats::MonodromyStatistics, progress)
 
     t₀ = time_ns()
@@ -212,7 +263,7 @@ function monodromy_solve!(loop::Loop,
 
     n = nsolutions(loop)
     while n < options.target_solutions_count
-        retcode = empty_queue!(queue, loop, tracker, options, t₀, stats, progress)
+        retcode = empty_queue!(queue, loop, C, options, t₀, stats, progress)
 
         if retcode == :done
             update_progress!(progress, loop, stats; finish=true)
@@ -240,11 +291,11 @@ function monodromy_solve!(loop::Loop,
     :success
 end
 
-function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::MonodromyOptions,
+function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOptions,
         t₀::UInt, stats::MonodromyStatistics, progress)
     while !isempty(queue)
         job = pop!(queue)
-        if process!(queue, job, tracker, loop, options, stats, progress) == :done
+        if process!(queue, job, C, loop, options, stats, progress) == :done
             return :done
         end
         update_progress!(progress, loop, stats)
@@ -256,18 +307,41 @@ function empty_queue!(queue, loop::Loop, tracker::PathTracker, options::Monodrom
     :incomplete
 end
 
-function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::MonodromyOptions,
-                  stats::MonodromyStatistics, progress)
-    y, retcode = track(tracker, job.x, job.edge, loop, stats)
+function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
+    result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, 1.0, C.newton_cache)
+
+    if result.retcode == converged
+        return ProjectiveVectors.affine_chart!(x, C.out)
+    else
+        return nothing
+    end
+end
+
+function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics, progress)
+    retcode = track(C.tracker, job.x, job.edge, loop, stats)
     if retcode ≠ PathTrackerStatus.success
         return :incomplete
     end
-    node = loop.nodes[job.edge.target]
-    if !iscontained(node, y, tol=options.tol)
-        unsafe_add!(node, y)
-        if job.edge.target == 1
-            checkreal!(stats, y)
+
+    if job.edge.target == 1
+        y = verified_affine_vector(C, currx(C.tracker), job.x, options)
+        #is the solution at infinity?
+        if y === nothing
+            return :incomplete
         end
+    else
+        y = ProjectiveVectors.affine_chart!(job.x, currx(C.tracker))
+    end
+
+    if job.edge.target == 1
+        #is the solution real?
+        checkreal!(stats, y)
+    end
+
+    node = loop.nodes[job.edge.target]
+    if !iscontained(node, y, tol=options.accuracy)
+        unsafe_add!(node, y)
+
         # Check if we are done
         if isdone(node, y, options)
             return :done
@@ -280,7 +354,7 @@ function process!(queue::Vector{<:Job}, job::Job, tracker, loop::Loop, options::
         # group actions `node.points !== nothing`
         if node.points !== nothing
             for yᵢ in options.group_actions(y)
-                if !iscontained(node, yᵢ, tol=options.tol)
+                if !iscontained(node, yᵢ, tol=options.accuracy)
                     unsafe_add!(node, yᵢ)
                     if job.edge.target == 1
                         checkreal!(stats, y)
