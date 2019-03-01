@@ -2,7 +2,9 @@ export AbstractCorrector,
     AbstractCorrectorCache,
     CorrectorResult,
     cache,
-    correct!
+    correct!,
+    ReturnCode,
+    NewtonCorrector
 
 # Interface
 """
@@ -16,15 +18,9 @@ to be a subtype of `AbstractCorrectorCache`.
 """
 abstract type AbstractCorrectorCache end
 
-@enum ReturnCode begin
-    converged
-    terminated
-    terminated_no_approximate
-    maximal_iterations
-end
 
 """
-    Result{T, Corrector}
+    CorrectorResult{T}
 
 Structure holding information about a `correct!` step. The fields are
 * `converged::Bool` Indicating whether the correction was successfull
@@ -68,4 +64,47 @@ Returns a [`Result`](@ref).
 """
 function correct! end
 
-include("correctors/newton.jl")
+# Newton Corrector
+"""
+    NewtonCorrector(;simplified_last_step=true)
+
+An ordinary Newton's method. If `simplified_last_step` is `true`, then for the last iteration
+the previously Jacobian will be used. This uses an LU-factorization for square systems
+and a QR-factorization for overdetermined.
+"""
+struct NewtonCorrector <: AbstractCorrector
+    simplified_last_step::Bool
+end
+
+NewtonCorrector(;simplified_last_step=true) = NewtonCorrector(simplified_last_step)
+
+
+struct NewtonCorrectorCache{FH<:FixedHomotopy, T, Fac<:LinearAlgebra.Factorization} <: AbstractCorrectorCache
+    F::FH
+    C::NewtonCache{T, Fac}
+end
+
+function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
+    F = FixedHomotopy(H, t)
+    C = NewtonCache(F, x)
+
+    NewtonCorrectorCache(F, C)
+end
+
+
+function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3, newton_update_error=1.0)
+    cache.F.t = t
+    result = newton!(out, cache.F, x₀, tol, maxiters, alg.simplified_last_step, newton_update_error, cache.C)
+    CorrectorResult(result)
+end
+
+function CorrectorResult(R::NewtonResult)
+    CorrectorResult(R.retcode,
+                    R.accuracy,
+                    R.iters,
+                    R.ω₀,
+                    R.ω,
+                    R.norm_Δx₀,
+                    R.newton_update_error
+                    )
+end

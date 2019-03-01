@@ -205,7 +205,7 @@ function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
 end
 function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=OrthogonalPatch(),
-    corrector::AbstractCorrector=Newton(),
+    corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
     options = PathTrackerOptions(;kwargs...)
@@ -385,6 +385,7 @@ function step!(tracker::PathTracker)
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters, state.cond)
+        @show result
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1

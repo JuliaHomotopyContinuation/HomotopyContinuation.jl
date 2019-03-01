@@ -11,13 +11,13 @@ end
     @testset "Newton" begin
         H, x, xnext, t = setup_square_corrector_test()
 
-        corrector = Newton()
-        @test corrector isa Newton
+        corrector = NewtonCorrector()
+        @test corrector isa NewtonCorrector
         corrector_cache = cache(corrector, H, x, t)
-        @test corrector_cache isa HomotopyContinuation.NewtonCache
+        @test corrector_cache isa HomotopyContinuation.NewtonCorrectorCache
 
         # check that this doesn't throw
-        out = correct!(xnext, corrector, corrector_cache, H, x, t, tol=1e-7, maxiters=3)
+        out = correct!(xnext, corrector, corrector_cache, H, x, t, 1e-7, 3)
         @test out isa CorrectorResult
     end
 end
