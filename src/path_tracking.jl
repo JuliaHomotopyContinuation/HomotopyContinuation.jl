@@ -166,13 +166,13 @@ Create a `PathTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
 needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 
 ## PathTrackerOptions
-* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Newton`](@ref).
+* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
 * `corrector_maxiters=3`: The maximal number of correction steps in a single step.
 * `initial_step_size=0.1`: The step size of the first step.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_step_size=1e-14`: The minimal step size.
 * `maximal_step_size=Inf`: The maximal step size.
-* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is `[RK4`](@ref)()`.
+* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
 * `tol=1e-7`: The precision used to track a value.
@@ -205,7 +205,7 @@ function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
 end
 function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=OrthogonalPatch(),
-    corrector::AbstractCorrector=Newton(),
+    corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
     options = PathTrackerOptions(;kwargs...)
@@ -385,6 +385,7 @@ function step!(tracker::PathTracker)
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
         result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters, state.cond)
+
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1

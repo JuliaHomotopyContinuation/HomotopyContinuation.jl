@@ -32,6 +32,9 @@ module HomotopyContinuation
     include("input.jl")
     include("problems.jl")
     include("totaldegree.jl")
+
+    include("returncodes.jl")
+    include("newton.jl")
     include("predictors.jl")
     include("correctors.jl")
 

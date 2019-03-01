@@ -113,7 +113,7 @@ General options:
 * `threading=true`: Enable or disable multi-threading.
 
 Pathtracking specific:
-* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`Newton`](@ref).
+* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
 * `corrector_maxiters=2`: The maximal number of correction steps in a single step.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref).
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.

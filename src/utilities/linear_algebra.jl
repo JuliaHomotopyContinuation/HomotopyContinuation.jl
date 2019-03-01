@@ -319,7 +319,7 @@ function iterative_refinement_step!(x, A, b, fac, ::Type{T}, r) where T
     residual!(r, A, x, b, T)
     δx = solve!(fac, r)
     norm_δx = maximum(abs, δx)
-    for i in eachindex(r)
+    for i in eachindex(x)
         x[i] = Complex{T}(x[i]) - Complex{T}(δx[i])
     end
 

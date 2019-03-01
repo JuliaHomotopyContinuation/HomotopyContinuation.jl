@@ -57,7 +57,7 @@
         @polyvar x[1:3]
         F = A * x - b
 
-        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch())
+        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch(), maxiters=10)
         s = first(start_sols)
         result = track(tracker, s, 1.0, 0.0)
         @test result.returncode == PathTrackerStatus.success

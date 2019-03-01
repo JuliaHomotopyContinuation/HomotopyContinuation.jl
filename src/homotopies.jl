@@ -195,28 +195,28 @@ function homotopy_interface_test(H::AbstractHomotopy, x=rand(Complex{Float64}, s
     homotopy_cache = cache(H, x, t)
 
     evaluate!(u, H, x, t, homotopy_cache)
-    @test evaluate(H, x, t, homotopy_cache) ≈ u atol=1e-15
-    @test evaluate(H, x, t) ≈ u atol=1e-15
+    @test evaluate(H, x, t, homotopy_cache) ≈ u atol=1e-14
+    @test evaluate(H, x, t) ≈ u atol=1e-14
 
     dt!(u, H, x, t, homotopy_cache)
-    @test dt(H, x, t, homotopy_cache) ≈ u atol=1e-15
-    @test dt(H, x, t) ≈ u atol=1e-15
+    @test dt(H, x, t, homotopy_cache) ≈ u atol=1e-14
+    @test dt(H, x, t) ≈ u atol=1e-14
 
     jacobian!(U, H, x, t, homotopy_cache)
-    @test jacobian(H, x, t, homotopy_cache) ≈ U atol=1e-15
-    @test jacobian(H, x, t) ≈ U atol=1e-15
+    @test jacobian(H, x, t, homotopy_cache) ≈ U atol=1e-14
+    @test jacobian(H, x, t) ≈ U atol=1e-14
 
     evaluate_and_jacobian!(u, U, H, x, t, homotopy_cache)
     (v, V) = evaluate_and_jacobian(H, x, t, homotopy_cache)
     @test v ≈ u
     @test V ≈ U
-    @test evaluate(H, x, t) ≈ u atol=1e-15
-    @test jacobian(H, x, t) ≈ U atol=1e-15
+    @test evaluate(H, x, t) ≈ u atol=1e-14
+    @test jacobian(H, x, t) ≈ U atol=1e-14
 
     jacobian_and_dt!(U, u, H, x, t, homotopy_cache)
     (V, v) = jacobian_and_dt(H, x, t, homotopy_cache)
-    @test V ≈ U atol=1e-15
-    @test v ≈ u atol=1e-15
-    @test jacobian(H, x, t) ≈ U atol=1e-15
-    @test dt(H, x, t) ≈ u atol=1e-15
+    @test V ≈ U atol=1e-14
+    @test v ≈ u atol=1e-14
+    @test jacobian(H, x, t) ≈ U atol=1e-14
+    @test dt(H, x, t) ≈ u atol=1e-14
 end

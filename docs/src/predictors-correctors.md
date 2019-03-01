@@ -20,5 +20,5 @@ NullPredictor
 
 The following correctors are currently implemented.
 ```@docs
-Newton
+NewtonCorrector
 ```
