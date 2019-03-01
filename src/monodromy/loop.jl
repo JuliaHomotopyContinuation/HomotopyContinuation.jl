@@ -241,8 +241,7 @@ end
 function track(tracker::PathTracker, x::AbstractVector, stats::MonodromyStatistics)
     retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
-    y = ProjectiveVectors.affine_chart!(x, currx(tracker))
-    y, retcode
+    retcode
 end
 
 """x
