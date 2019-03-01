@@ -270,8 +270,7 @@
         @test bezout_number(F, variable_groups=group1) == 320
         @test bezout_number(F, variable_groups=group2) == 576
 
-        @test nnonsingular(solve(F)) == 16
-        @test nnonsingular(solve(F; variable_groups=group1)) == 16
-        @test nnonsingular(solve(F; variable_groups=group2)) == 64
+        @test nnonsingular(solve(F, seed=1234)) == 16
+        @test nnonsingular(solve(F; variable_groups=group1, seed=1234)) == 16
     end
 end
