@@ -95,7 +95,6 @@ struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, 
     F::FT
     tracker::Tracker
     newton_cache::NC
-    accuracy::Float64
     out::ProjectiveVectors.PVector{T,N}
 end
 
@@ -116,7 +115,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
-* `tol::Float64=1e-7`: The tolerance with which paths are tracked and with which it is decided whether two solutions are identical.
+* `accuracy::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
 * `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
@@ -136,7 +135,6 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         strategy=default_strategy(TC, TP),
         scale_system=true,
         showprogress=true,
-        accuracy=1e-6,
         kwargs...) where {TC, TP, NParams, NVars}
 
     if length(p₀) ≠ length(parameters)
@@ -160,10 +158,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     end
 
     tracker = pathtracker(
-        f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀,
-        tol=options.tol,
-        refinement_tol=options.tol / 10,
-        restkwargs...)
+        f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     statistics = MonodromyStatistics(solutions(loop))
 
     # affine newton methods
@@ -173,7 +168,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     newton_cache = NewtonCache(F₀, tracker.state.x)
 
     # construct cache
-    C =  MonodromyCache(F₀, tracker, newton_cache, accuracy, copy(tracker.state.x))
+    C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
 
 
     # solve
@@ -278,8 +273,8 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
     :incomplete
 end
 
-function verified_affine_vector(C::MonodromyCache, ŷ, x)
-    result = newton!(C.out, C.F, ŷ, C.accuracy, 3, true, 1.0, C.newton_cache)
+function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
+    result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, 1.0, C.newton_cache)
 
     if result.retcode == converged
         return ProjectiveVectors.affine_chart!(x, C.out)
@@ -295,7 +290,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     end
 
     if job.edge.target == 1
-        y = verified_affine_vector(C, currx(C.tracker), job.x)
+        y = verified_affine_vector(C, currx(C.tracker), job.x, options)
         #is the solution at infinity?
         if y === nothing
             return :incomplete
@@ -310,7 +305,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     end
 
     node = loop.nodes[job.edge.target]
-    if !iscontained(node, y, tol=options.tol)
+    if !iscontained(node, y, tol=options.accuracy)
         unsafe_add!(node, y)
 
         # Check if we are done
@@ -325,7 +320,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         # group actions `node.points !== nothing`
         if node.points !== nothing
             for yᵢ in options.group_actions(y)
-                if !iscontained(node, yᵢ, tol=options.tol)
+                if !iscontained(node, yᵢ, tol=options.accuracy)
                     unsafe_add!(node, yᵢ)
                     if job.edge.target == 1
                         checkreal!(stats, y)

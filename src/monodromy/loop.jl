@@ -144,7 +144,7 @@ end
 function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
     loop = Loop(p₁, first(x), nnodes, options; kwargs...)
     for xᵢ ∈ x
-        add!(loop.nodes[1], xᵢ; tol=options.tol)
+        add!(loop.nodes[1], xᵢ; tol=options.accuracy)
     end
     loop
 end
