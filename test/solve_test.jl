@@ -272,6 +272,5 @@
 
         @test nnonsingular(solve(F, seed=1234)) == 16
         @test nnonsingular(solve(F; variable_groups=group1, seed=1234)) == 16
-        @test nnonsingular(solve(F; variable_groups=group2, seed=1234)) == 64
     end
 end
