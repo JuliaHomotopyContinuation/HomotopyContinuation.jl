@@ -10,6 +10,7 @@ makedocs(
         "Homotopies" => "homotopies.md",
         "Predictors and Correctors" => "predictors-correctors.md",
         "Path tracker" => "pathtracking.md",
+        "Newton's method" => "newton.md",
         "Reference" => "reference.md"
         ],
     strict=true
