@@ -8,13 +8,13 @@ Structure holding information about the outcome of the `newton` function. The fi
 * `retcode` The return code of the compuation. `converged` means that `accuracy ≤ tol`.
 * `accuracy::T` |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.
 * `iters::Int` The number of iterations used.
-* `newton_update_error::Float64` δx/(|x| ⋅ ϵ), where x is the first Newton update, δx is an estimate for the error |x-x̂| between x and the exact Newton update x̂ and ϵ is the machine precision.
+* `digits_lost::Float64` Estimate of the (relative) lost digits in the linear algebra.
 """
 struct NewtonResult{T}
     retcode::ReturnCode
     accuracy::T
     iters::Int
-    newton_update_error::Float64
+    digits_lost::Float64
     ω₀::Float64
     ω::Float64
     norm_Δx₀::T
@@ -59,16 +59,16 @@ An ordinary Newton's method. If `simplified_last_step` is `true`, then for the l
 the previously Jacobian will be used. This uses an LU-factorization for square systems
 and a QR-factorization for overdetermined.
 """
-function newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true, newton_update_error = 1.0)
-    newton!(copy(x₀), F::AbstractSystem, x₀, tol, maxiters, simplified_last_step, newton_update_error, NewtonCache(F::AbstractSystem, x₀))
+function newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton!(copy(x₀), F::AbstractSystem, x₀, tol, maxiters, simplified_last_step, NewtonCache(F::AbstractSystem, x₀))
 end
 
 """
-    newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool,  cache::NewtonCache, newton_update_error = 1.0)
+    newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
 
 In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) as input.
 """
-function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, newton_update_error, cache::NewtonCache)
+function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -79,6 +79,7 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
     T = real(eltype(xᵢ))
     Θ₀ = Θᵢ₋₁ = norm_Δxᵢ₋₁ = norm_Δxᵢ = norm_Δx₀ = zero(T)
     accuracy = T(Inf)
+    digits_lost = 0.0
     ω₀ = ω = 0.0
     for i ∈ 0:(maxiters)
         if i == maxiters && simplified_last_step
@@ -87,9 +88,11 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
             evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ)
             updated_jacobian!(Jac)
         end
-        newton_update_error = adaptive_solve!(Δxᵢ, Jac, rᵢ, tol, newton_update_error,
-            # We always compute an the error estimate in the first iteration
-            iszero(i))
+        if i == 0
+            digits_lost = solve_with_digits_lost!(Δxᵢ, Jac, rᵢ)
+        else
+            solve!(Δxᵢ, Jac, rᵢ)
+        end
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = euclidean_norm(Δxᵢ)
@@ -100,7 +103,7 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
             if norm_Δx₀ ≤ tol
-                return NewtonResult(converged, norm_Δx₀, i + 1, newton_update_error, 0.0, 0.0, norm_Δx₀)
+                return NewtonResult(converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
         else
@@ -113,15 +116,15 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
             end
 
             if Θᵢ₋₁ > 0.5
-                return NewtonResult(terminated, accuracy, i + 1, newton_update_error, ω₀, ω, norm_Δx₀)
+                return NewtonResult(terminated, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
             if accuracy ≤ tol
-                return NewtonResult(converged, accuracy, i + 1, newton_update_error, ω₀, ω, norm_Δx₀)
+                return NewtonResult(converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
         end
     end
 
-    return NewtonResult(maximal_iterations, accuracy, maxiters, newton_update_error, ω₀, ω, norm_Δx₀)
+    return NewtonResult(maximal_iterations, accuracy, maxiters, digits_lost, ω₀, ω, norm_Δx₀)
 end

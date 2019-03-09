@@ -86,7 +86,10 @@ mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     Δs::Float64 # current step size
     Δs_prev::Float64 # previous step size
     accuracy::Float64
-    cond::Float64 # estimate of the condition number
+    # The relative number of digits lost during the solution of the linear systems
+    # in Newton's method. See `solve_with_digits_lost!` in utilities/linear_algebra.jl
+    # for how this is computed.
+    digits_lost::Float64
     status::PathTrackerStatus.states
     patch::PatchState
     accepted_steps::Int
@@ -104,12 +107,12 @@ function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::Ab
     Δs = convert(Float64, min(options.initial_step_size, length(segment), options.maximal_step_size))
     Δs_prev = 0.0
     accuracy = 0.0
-    cond = 1.0
+    digits_lost = 0.0
     accepted_steps = rejected_steps = 0
     status = PathTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    PathTrackerState(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, cond, status, patch,
+    PathTrackerState(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, digits_lost, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -364,7 +367,7 @@ function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    adaptive_solve!(state.ẋ, cache.Jac, cache.out, options.tol, state.cond)
+    solve!(state.ẋ, cache.Jac, cache.out)
     nothing
 end
 
@@ -384,7 +387,7 @@ function step!(tracker::PathTracker)
     try
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters, state.cond)
+        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
 
         if isconverged(result)
             # Step is accepted, assign values
@@ -392,7 +395,7 @@ function step!(tracker::PathTracker)
             x .= x̄
             state.s += state.Δs
             state.accuracy = result.accuracy
-            state.cond = result.cond
+            state.digits_lost = result.digits_lost
             # Step size change
             update_stepsize!(state, result, order(tracker.predictor), options)
             options.update_patch && changepatch!(state.patch, x)
@@ -403,7 +406,7 @@ function step!(tracker::PathTracker)
         else
             # We have to reset the patch
             state.rejected_steps += 1
-            state.cond = result.cond
+            state.digits_lost = result.digits_lost
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(state, result, order(tracker.predictor), options)
             Δt = currΔt(state)

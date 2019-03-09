@@ -34,7 +34,7 @@ struct CorrectorResult{T}
     ω₀::Float64
     ω::Float64
     norm_Δx₀::T
-    cond::Float64
+    digits_lost::Float64
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::CorrectorResult) = r
@@ -92,9 +92,9 @@ function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
 end
 
 
-function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3, newton_update_error=1.0)
+function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3)
     cache.F.t = t
-    result = newton!(out, cache.F, x₀, tol, maxiters, alg.simplified_last_step, newton_update_error, cache.C)
+    result = newton!(out, cache.F, x₀, tol, maxiters, alg.simplified_last_step, cache.C)
     CorrectorResult(result)
 end
 
@@ -105,6 +105,6 @@ function CorrectorResult(R::NewtonResult)
                     R.ω₀,
                     R.ω,
                     R.norm_Δx₀,
-                    R.newton_update_error
+                    R.digits_lost
                     )
 end
