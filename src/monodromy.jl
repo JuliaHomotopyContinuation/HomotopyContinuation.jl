@@ -323,7 +323,9 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         return :incomplete
     end
 
-    if job.edge.target == 1
+    node = loop.nodes[job.edge.target]
+
+    if node.main_node
         y = verified_affine_vector(C, currx(C.tracker), job.x, options)
         #is the solution at infinity?
         if y === nothing
@@ -333,12 +335,12 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         y = ProjectiveVectors.affine_chart!(job.x, currx(C.tracker))
     end
 
-    if job.edge.target == 1
+    if node.main_node
         #is the solution real?
         checkreal!(stats, y)
     end
 
-    node = loop.nodes[job.edge.target]
+
     if !iscontained(node, y, tol=options.accuracy)
         unsafe_add!(node, y)
 
@@ -356,8 +358,8 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
             for yᵢ in options.group_actions(y)
                 if !iscontained(node, yᵢ, tol=options.accuracy)
                     unsafe_add!(node, yᵢ)
-                    if job.edge.target == 1
                         checkreal!(stats, y)
+                    if node.main_node
                     end
                     # Check if we are done
                     if isdone(node, yᵢ, options)
