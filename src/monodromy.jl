@@ -335,19 +335,16 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         y = ProjectiveVectors.affine_chart!(job.x, currx(C.tracker))
     end
 
-    if node.main_node
-        #is the solution real?
-        checkreal!(stats, y)
-    end
-
 
     if !iscontained(node, y, tol=options.accuracy)
         unsafe_add!(node, y)
 
+        # If we are on the main node check whether we have a real root.
+        node.main_node && checkreal!(stats, y)
+
         # Check if we are done
-        if isdone(node, y, options)
-            return :done
-        end
+        isdone(node, y, options) && return :done
+
         next_edge = nextedge(loop, job.edge)
         push!(queue, Job(y, next_edge))
 
@@ -358,13 +355,12 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
             for yᵢ in options.group_actions(y)
                 if !iscontained(node, yᵢ, tol=options.accuracy)
                     unsafe_add!(node, yᵢ)
-                    if node.main_node
-                        checkreal!(stats, yᵢ)
-                    end
+
+                    node.main_node && checkreal!(stats, yᵢ)
+
                     # Check if we are done
-                    if isdone(node, yᵢ, options)
-                        return :done
-                    end
+                    isdone(node, yᵢ, options) && :done
+
                     push!(queue, Job(yᵢ, next_edge))
                 end
             end
