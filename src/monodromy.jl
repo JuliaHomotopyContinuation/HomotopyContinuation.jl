@@ -358,8 +358,8 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
             for yᵢ in options.group_actions(y)
                 if !iscontained(node, yᵢ, tol=options.accuracy)
                     unsafe_add!(node, yᵢ)
-                        checkreal!(stats, y)
                     if node.main_node
+                        checkreal!(stats, yᵢ)
                     end
                     # Check if we are done
                     if isdone(node, yᵢ, options)
