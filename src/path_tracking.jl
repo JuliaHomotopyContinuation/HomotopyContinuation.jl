@@ -434,6 +434,8 @@ function update_stepsize!(state::PathTrackerState, result::CorrectorResult,
         return nothing
     end
 
+    # The step size control is described in https://arxiv.org/abs/1902.02968
+
     # we have to handle the special case that there is only 1 iteration
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
