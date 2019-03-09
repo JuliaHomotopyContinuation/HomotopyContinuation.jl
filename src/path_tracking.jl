@@ -241,13 +241,13 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 
 """
-     PathTrackerResult(tracker)
+     PathTrackerResult{T,N}
 
 Containing the result of a tracked path. The fields are
-* `successfull::Bool` Indicating whether tracking was successfull.
 * `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
-* `x::V` The result.
-* `t::Float64` The `t` when the path tracker stopped.
+* `x::ProjectiveVectors.PVector{T,N}` The result.
+* `t::ComplexF64` The `t` when the path tracker stopped.
+* `accuracy::Float64`: The estimated accuracy of `x`.
 """
 struct PathTrackerResult{T, N}
      returncode::PathTrackerStatus.states
