@@ -26,6 +26,7 @@ mutable struct PathTrackerOptions
     maximal_step_size::Float64
     simple_step_size::Bool
     update_patch::Bool
+    maximal_lost_digits::Float64
 end
 
 function PathTrackerOptions(;tol=1e-7,
@@ -40,10 +41,12 @@ function PathTrackerOptions(;tol=1e-7,
     maximal_steplength=Inf,
     maximal_step_size=maximal_steplength,
     simple_step_size=false,
-    update_patch=true)
+    update_patch=true,
+    maximal_lost_digits=13.0)
 
     PathTrackerOptions(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
-            initial_step_size, minimal_step_size, maximal_step_size, simple_step_size, update_patch)
+            initial_step_size, minimal_step_size, maximal_step_size, simple_step_size, update_patch,
+            float(maximal_lost_digits))
 end
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
@@ -63,6 +66,7 @@ module PathTrackerStatus
     * `PathTrackerStatus.terminated_invalid_startvalue`
     * `PathTrackerStatus.terminated_step_size_too_small`
     * `PathTrackerStatus.terminated_singularity`
+    * `PathTrackerStatus.terminated_ill_conditioned`
     """
     @enum states begin
         success
@@ -71,6 +75,7 @@ module PathTrackerStatus
         terminated_invalid_startvalue
         terminated_step_size_too_small
         terminated_singularity
+        terminated_ill_conditioned
     end
 end
 
@@ -175,6 +180,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_step_size=1e-14`: The minimal step size.
 * `maximal_step_size=Inf`: The maximal step size.
+* `maximal_lost_digits::Real=13.0`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
@@ -411,8 +417,14 @@ function step!(tracker::PathTracker)
             update_stepsize!(state, result, order(tracker.predictor), options)
             Δt = currΔt(state)
             state.last_step_failed = true
+            # Check termination criteria
+            # 1) Step size get's too small:
             if state.Δs < options.minimal_step_size
                 state.status = PathTrackerStatus.terminated_step_size_too_small
+            end
+            # 2) We became too ill-conditioned
+            if state.digits_lost > options.maximal_lost_digits
+                state.status = PathTrackerStatus.terminated_ill_conditioned
             end
         end
     catch err
