@@ -63,28 +63,31 @@ end
                 done_callback=((_, _) -> true))
         @test length(result.solutions) == 2
 
+        roots_of_unity(s) = begin
+            t = cis(π*2/3)
+            t² = t * t
+            (vcat(t * s[1], t * s[2], s[3:end]),
+             vcat(t² * s[1], t² * s[2], s[3:end]))
+        end
+
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
-            group_action=(s -> begin
-                t = cis(π*2/3)
-                t² = t * t
-                (vcat(t * s[1], t * s[2], s[3:end]),
-                 vcat(t² * s[1], t² * s[2], s[3:end]))
-            end))
+            group_action=roots_of_unity)
         @test length(result.solutions) == 21
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
-            group_actions=(s -> begin
-                t = cis(π*2/3)
-                t² = t * t
-                (vcat(t * s[1], t * s[2], s[3:end]),
-                 vcat(t² * s[1], t² * s[2], s[3:end]))
-            end, complex_conjugation))
+            group_actions=(roots_of_unity, complex_conjugation))
         @test length(result.solutions) == 21
         @test length(solutions(result)) == 21
         @test length(realsolutions(result)) < 21
         test_treeviews(result)
+
+        # group_actions as a vector
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
+            maximal_number_of_iterations_without_progress=100,
+            group_actions=[roots_of_unity, complex_conjugation])
+        @test length(result.solutions) == 21
 
 
         # Test stop heuristic using too hight target_solutions_count

@@ -38,6 +38,7 @@ end
 GroupActions(::Nothing) = GroupActions(())
 GroupActions(actions::GroupActions) = actions
 GroupActions(actions::Function...) = GroupActions(actions)
+GroupActions(actions) = GroupActions(actions...)
 
 function (G::GroupActions)(solution::V) where V
     convert_if_necessary(apply_group_actions(G.actions, solution), solution)
@@ -83,7 +84,7 @@ function MonodromyOptions(isrealsystem;
     accuracy::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
-    group_actions=GroupActions(group_action),
+    group_actions= group_action === nothing ? nothing : GroupActions(group_action),
     group_action_on_all_nodes=false,
     parameter_sampler=independent_normal,
     # stopping heuristic
@@ -92,12 +93,13 @@ function MonodromyOptions(isrealsystem;
     minimal_number_of_solutions::Int=default_minimal_number_of_solutions(target_solutions_count),
     maximal_number_of_iterations_without_progress::Int=10)
 
-    if isrealsystem &&
-       (group_actions isa GroupActions{Tuple{}}) # i.e. no group_actions provided
+    if group_actions === nothing && isrealsystem
        actions = GroupActions(complex_conjugation)
+    elseif group_actions isa GroupActions
+       actions = group_actions
     else
        actions = GroupActions(group_actions)
-   end
+    end
 
     MonodromyOptions(accuracy, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler,
@@ -583,9 +585,9 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
 * `accuracy::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
-* `group_actions=GroupActions(group_action)`: If there is more than one group action you can use this to chain the application of them.
+* `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
-* `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.
+* `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
