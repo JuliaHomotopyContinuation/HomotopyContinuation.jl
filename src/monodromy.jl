@@ -574,7 +574,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
 * `maximal_number_of_iterations_without_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
-* `strategy`: The strategy used to create loops. By default this will be `Triangle` with weights if `F` is a real system.
+* `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
 * `accuracy::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
 * `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
@@ -593,13 +593,13 @@ end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         startsolutions::Vector{<:SVector{NVars, <:Complex}},
         p₀::SVector{NParams, TP};
-        parameters=error("You need to provide `parameters=...` to monodromy"),
-        strategy=default_strategy(TC, TP),
+        parameters=throw(ArgumentError("You need to provide `parameters=...` to monodromy")),
+        strategy=default_strategy(F, parameters, p₀),
         showprogress=true,
         kwargs...) where {TC, TP, NParams, NVars}
 
     if length(p₀) ≠ length(parameters)
-        error("Number of provided parameters doesn't match the length of initially provided parameter `p₀`.")
+        throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
     p₀ = convert(SVector{NParams, promote_type(Float64, TP)}, p₀)
@@ -646,8 +646,17 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     MonodromyResult(retcode, points(solutions(loop)), statistics)
 end
 
-default_strategy(coeff::Type{<:Number}, p::Type{<:Real}) = Triangle(useweights=true)
-default_strategy(coeff::Type{<:Number}, p::Type{<:Number}) = Triangle(useweights=false)
+function default_strategy(F::Vector{<:MP.AbstractPolynomialLike{TC}}, parameters, p₀::AbstractVector{TP}) where {TC,TP}
+    # If F depends only linearly on the parameters a petal is sufficient
+    if all(f -> last(minmaxdegree(f, parameters)) ≤ 1, F)
+        Petal()
+    # For a real system we should introduce some weights to avoid the discriminant
+    elseif TP <: Real && TC <: Real
+        Triangle(useweights=true)
+    else
+        Triangle(useweights=false)
+    end
+end
 
 # convert vector of vectors to vector of svectors
 static_solutions(V::Vector) = static_solutions(V, Val(length(V[1])))

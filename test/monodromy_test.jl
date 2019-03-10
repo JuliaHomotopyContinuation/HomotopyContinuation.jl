@@ -58,8 +58,11 @@ end
         # Test stop heuristic using too hight target_solutions_count
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
         @test result.returncode == :heuristic_stop
-        # Test stop heuristic with not target solutions count
+        # Test stop heuristic with no target solutions count
         result = monodromy_solve(F, x₀, p₀, parameters=p)
+        @test result.returncode == :heuristic_stop
+        # Test stop heuristic with no target solutions count
+        result = monodromy_solve(F, x₀, p₀, parameters=p, strategy=Triangle(useweights=true))
         @test result.returncode == :heuristic_stop
 
 
