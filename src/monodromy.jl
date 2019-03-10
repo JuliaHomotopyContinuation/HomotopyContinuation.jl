@@ -189,6 +189,9 @@ function n_loops_without_change(stats, nsolutions)
     return k
 end
 
+function n_solutions_current_loop(statistics, nsolutions)
+    nsolutions - statistics.nsolutions_development[end]
+end
 
 #############################
 # Loops and Data Structures #
@@ -843,6 +846,7 @@ function update_progress!(progress, loop::Loop, statistics::MonodromyStatistics;
         ("# paths tracked", statistics.ntrackedpaths),
         ("# loops generated", statistics.nparametergenerations),
         ("# loops without change", n_loops_without_change(statistics, nsolutions)),
+        ("# solutions in current loop", n_solutions_current_loop(statistics, nsolutions)),
         ("# real solutions", statistics.nreal),
     ))
     if finish
