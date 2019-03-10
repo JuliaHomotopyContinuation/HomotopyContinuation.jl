@@ -55,8 +55,16 @@ end
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,
                     target_solutions_count=21).returncode == :success
 
+        # Test stop heuristic using too hight target_solutions_count
+        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
+        @test result.returncode == :heuristic_stop
+        # Test stop heuristic with not target solutions count
+        result = monodromy_solve(F, x₀, p₀, parameters=p)
+        @test result.returncode == :heuristic_stop
+
+
         # By group_actions=nothing we force that complex conjugation is not used.
-        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, group_actions=nothing)
+        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, complex_conjugation=false)
         @test result2.returncode == :success
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
@@ -72,12 +80,15 @@ end
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
+            equivalence_classes=false,
             group_action=roots_of_unity)
         @test length(result.solutions) == 21
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
-            group_actions=(roots_of_unity, complex_conjugation))
+            complex_conjugation=false, # disable complex conjugation to test it as a group action.
+            equivalence_classes=false,
+            group_actions=(roots_of_unity, s -> (conj.(s),)))
         @test length(result.solutions) == 21
         @test length(solutions(result)) == 21
         @test length(realsolutions(result)) < 21
@@ -86,16 +97,19 @@ end
         # group_actions as a vector
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
             maximal_number_of_iterations_without_progress=100,
-            group_actions=[roots_of_unity, complex_conjugation])
+            complex_conjugation=false,
+            equivalence_classes=false,
+            group_actions=[roots_of_unity, s -> (conj.(s),)])
         @test length(result.solutions) == 21
 
 
-        # Test stop heuristic using too hight target_solutions_count
-        result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
-        @test result.returncode == :heuristic_stop
-        # Test stop heuristic using too hight target_solutions_count
-        result = monodromy_solve(F, x₀, p₀, parameters=p)
-        @test result.returncode == :heuristic_stop
-
+        # equivalence classes
+        result = monodromy_solve(F, x₀, p₀, parameters=p,
+            equivalence_classes=true,
+            group_action=roots_of_unity)
+        @test length(result.solutions) == 7
+        # Test that equivalence classes are on by default if we supply a group action
+        result = monodromy_solve(F, x₀, p₀, parameters=p, group_action=roots_of_unity)
+        @test length(result.solutions) == 7
     end
 end

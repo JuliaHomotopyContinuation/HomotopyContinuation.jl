@@ -85,18 +85,18 @@ isnonsingular
 ```@docs
 monodromy_solve
 ```
-### GroupActions
-
-If there is a group acting on the solution set of the polynomial system this can provided with the `group_action` keyword for single group actions or with the `group_actions` keyword for compositions
-of group actions.
-
-```@docs
-GroupActions
-complex_conjugation
-```
 
 ### Strategies
 ```@docs
 Triangle
 Petal
+```
+
+### GroupActions
+
+If there is a group acting on the solution set of the polynomial system this can provided with the `group_action` keyword for single group actions or with the `group_actions` keyword for compositions
+of group actions. These will be internally transformed into `GroupActions`.
+
+```@docs
+GroupActions
 ```

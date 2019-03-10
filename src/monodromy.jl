@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, GroupActions, complex_conjugation
+export monodromy_solve, realsolutions, nreal, GroupActions
 
 ################
 # Group actions
@@ -64,7 +64,7 @@ flatten(a::Tuple, b::Tuple) = (a..., b...)
 #####################
 const monodromy_options_allowed_keywords = [:accuracy, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
-    :parameter_sampler, :target_solutions_count, :timeout,
+    :parameter_sampler, :equivalence_classes, :complex_conjugation, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
 struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
@@ -73,6 +73,8 @@ struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
     group_actions::GroupActions{F2}
     group_action_on_all_nodes::Bool
     parameter_sampler::F3
+    equivalence_classes::Bool
+    complex_conjugation::Bool
     # stopping heuristic
     target_solutions_count::Int
     timeout::Float64
@@ -87,22 +89,22 @@ function MonodromyOptions(isrealsystem;
     group_actions= group_action === nothing ? nothing : GroupActions(group_action),
     group_action_on_all_nodes=false,
     parameter_sampler=independent_normal,
+    equivalence_classes=true,
+    complex_conjugation=isrealsystem,
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
     minimal_number_of_solutions::Int=default_minimal_number_of_solutions(target_solutions_count),
     maximal_number_of_iterations_without_progress::Int=10)
 
-    if group_actions === nothing && isrealsystem
-       actions = GroupActions(complex_conjugation)
-    elseif group_actions isa GroupActions
+    if group_actions isa GroupActions
        actions = group_actions
     else
        actions = GroupActions(group_actions)
     end
 
     MonodromyOptions(accuracy, done_callback, actions,
-        group_action_on_all_nodes, parameter_sampler,
+        group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
         target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         minimal_number_of_solutions,
@@ -116,18 +118,14 @@ end
 
 always_false(x, sols) = false
 
-"""
-    complex_conjugation(x)
-
-A group action which returns the elementwise complex conjugated solutions.
-"""
-complex_conjugation(x) = (conj.(x),)
 has_group_actions(options::MonodromyOptions) = !(options.group_actions isa GroupActions{Tuple{}})
 
-function independent_gaussian(p::SVector{N, T}) where {N, T}
-    p + (@SVector randn(T, N))
-end
 
+"""
+    independent_normal(p::SVector{N, T}) where {N, T}
+
+Sample a `SVector{N, T}` where each entries is drawn independently from the univariate normal distribution.
+"""
 function independent_normal(p::SVector{N, T}) where {N, T}
     @SVector randn(T, N)
 end
@@ -582,6 +580,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.
+* `equivalence_classes=true`: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
@@ -758,7 +757,14 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     end
 
 
-    if add!(node, y; tol=options.accuracy)
+    if !iscontained(node, y; tol=options.accuracy)
+        if options.equivalence_classes
+            if equivalence_class_contained(node, y, options)
+                return :incomplete
+            end
+        end
+
+        add!(node, y; tol=options.accuracy)
         # If we are on the main node check whether we have a real root.
         node.main_node && checkreal!(stats, y)
         # Check if we are done
@@ -767,10 +773,23 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         next_edge = nextedge(loop, job.edge)
         push!(queue, Job(y, next_edge))
 
+        # Check for complex conjugate solution
+        if options.complex_conjugation && node.main_node
+            ȳ = conj.(y)
+            if !equivalence_class_contained(node, ȳ, options)
+                add!(node, ȳ; tol=options.accuracy)
+                # Check if we are done
+                isdone(node, ȳ, options) && return :done
+                # Schedule new job
+                push!(queue, Job(ȳ, next_edge))
+            end
+        end
+
         # Handle group actions
-        # Things are setup up such that for nodes where we want to apply
-        # group actions `node.points !== nothing`
-        if node.points !== nothing
+        # 1) We only need to go through group actions if we do not compute in equivalence classes
+        # 2) Things are setup up such that for nodes where we want to apply
+        #    group actions `node.points !== nothing`
+        if !options.equivalence_classes && node.points !== nothing
             for yᵢ in options.group_actions(y)
                 if add!(node, yᵢ; tol=options.accuracy)
                     node.main_node && checkreal!(stats, yᵢ)
@@ -785,14 +804,24 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     return :incomplete
 end
 
+function equivalence_class_contained(node, y, options)
+    for yᵢ in options.group_actions(y)
+        if iscontained(node, yᵢ, tol=options.accuracy)
+            # equivalence class already existing
+            return true
+        end
+    end
+    false
+end
+
 function update_progress!(::Nothing, loop::Loop, statistics::MonodromyStatistics; finish=false)
     nothing
 end
 function update_progress!(progress, loop::Loop, statistics::MonodromyStatistics; finish=false)
     ProgressMeter.update!(progress, length(solutions(loop)), showvalues=(
-        ("# paths tracked ", statistics.ntrackedpaths),
-        ("# loops generated ", statistics.nparametergenerations),
-        ("# real solutions ", statistics.nreal)
+        ("# paths tracked", statistics.ntrackedpaths),
+        ("# loops generated", statistics.nparametergenerations),
+        ("# real solutions", statistics.nreal)
     ))
     if finish
         ProgressMeter.finish!(progress)
