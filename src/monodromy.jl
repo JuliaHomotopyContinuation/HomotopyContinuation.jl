@@ -226,7 +226,13 @@ end
 
 Calls [`add!`](@ref) on the points of the Node.
 """
-add!(node::Node, x; kwargs...) = add!(node.points, x; kwargs...)
+function add!(node::Node, x; kwargs...)
+    if node.points === nothing
+        false
+    else
+        add!(node.points, x; kwargs...)
+    end
+end
 
 """
     iscontained(node::Node, x; kwargs...)
@@ -239,18 +245,6 @@ function iscontained(node::Node, x; kwargs...)
     else
         iscontained(node.points, x; kwargs...)
     end
-end
-
-"""
-    unsafe_add!(node::Node, x)
-
-Calls [`unsafe_add!`](@ref) on the points of the Node.
-"""
-function unsafe_add!(node::Node, x)
-    if node.points !== nothing
-        unsafe_add!(node.points, x)
-    end
-    nothing
 end
 
 
@@ -764,12 +758,9 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     end
 
 
-    if !iscontained(node, y, tol=options.accuracy)
-        unsafe_add!(node, y)
-
+    if add!(node, y; tol=options.accuracy)
         # If we are on the main node check whether we have a real root.
         node.main_node && checkreal!(stats, y)
-
         # Check if we are done
         isdone(node, y, options) && return :done
 
@@ -781,11 +772,8 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         # group actions `node.points !== nothing`
         if node.points !== nothing
             for yᵢ in options.group_actions(y)
-                if !iscontained(node, yᵢ, tol=options.accuracy)
-                    unsafe_add!(node, yᵢ)
-
+                if add!(node, yᵢ; tol=options.accuracy)
                     node.main_node && checkreal!(stats, yᵢ)
-
                     # Check if we are done
                     isdone(node, yᵢ, options) && return :done
 

@@ -232,7 +232,7 @@ If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned.
 """
-function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {Index}
+function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
         iscontained(data.root, x, tol, data.points)
     else
@@ -251,22 +251,19 @@ If `x` is contained in `data` by using the tolerance `tol` to decide for duplica
 of the data point which already exists. If the data point is not existing add it to `x` and
 return `-1`. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Real=1e-5) where {Index}
+function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
         idx = iscontained(data.root, x, tol, data.points)
         if idx ≠ NOT_FOUND
             return idx
         end
-        push!(data.points, x)
-        _insert!(data.root, length(data.points))
+        unsafe_add!(data, x)
         NOT_FOUND
     else
         if iscontained(data.root, x, tol, data.points) ≠ NOT_FOUND
             return false
         end
-
-        push!(data.points, x)
-        _insert!(data.root, length(data.points))
+        unsafe_add!(data, x)
         true
     end
 end
