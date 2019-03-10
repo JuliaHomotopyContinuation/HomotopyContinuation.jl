@@ -602,7 +602,6 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         p₀::SVector{NParams, TP};
         parameters=error("You need to provide `parameters=...` to monodromy"),
         strategy=default_strategy(TC, TP),
-        scale_system=true,
         showprogress=true,
         kwargs...) where {TC, TP, NParams, NVars}
 
@@ -620,14 +619,9 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
 
     #assemble
     loop = Loop(strategy, p₀, startsolutions, options)
-    if scale_system
-        f = F ./ coefficient_norm.(map(fi -> MP.subs(fi, parameters=>p₀), F))
-    else
-        f = F
-    end
 
     tracker = pathtracker(
-        f, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
+        F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     statistics = MonodromyStatistics(solutions(loop))
 
     # affine newton methods
