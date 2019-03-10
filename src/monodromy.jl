@@ -178,6 +178,17 @@ function finished!(stats, nsolutions)
     push!(stats.nsolutions_development, nsolutions)
 end
 
+function n_loops_without_change(stats, nsolutions)
+    k = 0
+    for n in stats.nsolutions_development
+        if n != nsolutions
+            return k
+        end
+        k += 0
+    end
+    return k
+end
+
 
 #############################
 # Loops and Data Structures #
@@ -827,10 +838,12 @@ function update_progress!(::Nothing, loop::Loop, statistics::MonodromyStatistics
     nothing
 end
 function update_progress!(progress, loop::Loop, statistics::MonodromyStatistics; finish=false)
-    ProgressMeter.update!(progress, length(solutions(loop)), showvalues=(
+    nsolutions = length(solutions(loop))
+    ProgressMeter.update!(progress, nsolutions, showvalues=(
         ("# paths tracked", statistics.ntrackedpaths),
         ("# loops generated", statistics.nparametergenerations),
-        ("# real solutions", statistics.nreal)
+        ("# loops without change", n_loops_without_change(statistics, nsolutions)),
+        ("# real solutions", statistics.nreal),
     ))
     if finish
         ProgressMeter.finish!(progress)
