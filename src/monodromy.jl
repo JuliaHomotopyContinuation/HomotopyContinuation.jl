@@ -791,7 +791,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
                     node.main_node && checkreal!(stats, yᵢ)
 
                     # Check if we are done
-                    isdone(node, yᵢ, options) && :done
+                    isdone(node, yᵢ, options) && return :done
 
                     push!(queue, Job(yᵢ, next_edge))
                 end
