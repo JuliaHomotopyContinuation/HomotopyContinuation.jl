@@ -180,11 +180,11 @@ end
 
 function n_loops_without_change(stats, nsolutions)
     k = 0
-    for n in stats.nsolutions_development
-        if n != nsolutions
+    for i in length(stats.nsolutions_development):-1:1
+        if stats.nsolutions_development[i] != nsolutions
             return k
         end
-        k += 0
+        k += 1
     end
     return k
 end
