@@ -91,4 +91,31 @@
         # @test u ≈ evaluate(F, w)
         # @test U ≈ jacobian(F, w)
     end
+
+    @testset "FixedParameterSystem" begin
+        @polyvar x y a b
+        f = SPSystem([x^2+y-a, b*x+y*a^2]; parameters=[a, b])
+        F = FixedParameterSystem(f, [2.0, 3.0])
+
+        @test size(F) == (2, 2)
+        @test length(F) == 2
+        x = rand(Complex{Float64}, 2)
+        system_cache = cache(F, x)
+        @test system_cache isa HomotopyContinuation.FixedParameterSystemCache
+        u = zeros(Complex{Float64}, 2)
+        evaluate!(u, F, x, system_cache)
+        @test evaluate(F, x, system_cache) ≈ u
+        @test evaluate(F, x) ≈ u
+
+        U = zeros(Complex{Float64}, 2, 2)
+        jacobian!(U, F, x, system_cache)
+        @test jacobian(F, x, system_cache) ≈ U
+        @test jacobian(F, x) ≈ U
+
+        evaluate_and_jacobian!(u, U, F, x, system_cache)
+        @test all(evaluate_and_jacobian(F, x, system_cache) .≈ (u, U))
+
+        set_parameters!(F, (4.0, 2.3))
+        @test F.p == [4.0, 2.3]
+    end
 end
