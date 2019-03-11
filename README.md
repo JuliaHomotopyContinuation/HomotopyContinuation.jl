@@ -1,4 +1,4 @@
-<img src="https://i.imgur.com/8ycOn14.png" height="120">
+<img src="https://i.imgur.com/8ycOn14.png" width="320px">
 
 | **Documentation** | **Build Status** |
 |:-----------------:|:----------------:|
