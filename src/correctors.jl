@@ -79,9 +79,9 @@ end
 NewtonCorrector(;simplified_last_step=true) = NewtonCorrector(simplified_last_step)
 
 
-struct NewtonCorrectorCache{FH<:FixedHomotopy, T, Fac<:LinearAlgebra.Factorization} <: AbstractCorrectorCache
+struct NewtonCorrectorCache{FH<:FixedHomotopy, T, Fac, SC} <: AbstractCorrectorCache
     F::FH
-    C::NewtonCache{T, Fac}
+    C::NewtonCache{T, Fac, SC}
 end
 
 function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)

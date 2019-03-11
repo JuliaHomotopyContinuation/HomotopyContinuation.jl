@@ -37,18 +37,20 @@ isconverged(result::NewtonResult) = result.retcode == converged
 
 Cache for the [`newton`](@ref) function.
 """
-struct NewtonCache{T, Fac<:LinearAlgebra.Factorization}
+struct NewtonCache{T, Fac<:LinearAlgebra.Factorization, SC<:AbstractSystemCache}
     Jac::Jacobian{T, Fac}
     rᵢ::Vector{T}
     Δxᵢ::Vector{T}
+    system_cache::SC
 end
 
 function NewtonCache(F::AbstractSystem, x)
-    Jac = Jacobian(jacobian(F, x))
-    rᵢ = evaluate(F, x)
+    system_cache = cache(F, x)
+    Jac = Jacobian(jacobian(F, x, system_cache))
+    rᵢ = evaluate(F, x, system_cache)
     Δxᵢ = copy(rᵢ)
 
-    NewtonCache(Jac, rᵢ, Δxᵢ)
+    NewtonCache(Jac, rᵢ, Δxᵢ, system_cache)
 end
 
 
@@ -88,9 +90,9 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, ma
     ω₀ = ω = 0.0
     for i ∈ 0:maxiters
         if i == maxiters && simplified_last_step
-            evaluate!(rᵢ, F, xᵢ)
+            evaluate!(rᵢ, F, xᵢ, cache.system_cache)
         else
-            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ)
+            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
             updated_jacobian!(Jac)
         end
         if i == 0
