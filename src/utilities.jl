@@ -23,44 +23,6 @@ function nthroot(x::Real, N::Integer)
     end
 end
 
-"""
-    @modulenum(name, block)
-
-This is a modification of `@enum` and creates an intermediate enum.
-
-## Example
-
-The definition
-
-```julia
-@moduleenum Car begin
-    audi
-    volkswagen
-    bmw
-end
-```
-
-expands into
-
-```julia
-module Car
-    @enum t begin
-        audi
-        volkswagen
-        bmw
-    end
-end
-import .Car
-"""
-macro moduleenum(name, content...)
-    mname = esc(name)
-    quote
-        @eval module $name
-            @enum t $(content...)
-        end
-        import .$name
-    end
-end
 
 """
      print_fieldnames(io::IO, obj)
