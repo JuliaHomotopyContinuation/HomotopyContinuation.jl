@@ -1,3 +1,5 @@
+export UniquePoints, multiplicities, iscontained, add!, points
+
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
 
@@ -27,7 +29,7 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points::Vector, threadid=Threads.threadid()) where T
+function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, F<:Function}
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -80,7 +82,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points
     #            we need to sort the distances vector and look through everything
 
     # Check smallest element first
-    retidx = iscontained(block.children[m₁[2]], x, tol, points, threadid)
+    retidx = iscontained(block.children[m₁[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -91,7 +93,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points
         return NOT_FOUND # already checked first tree
     end
     # Case 2) We know m₂[1] - m₁[1] ≤ 2tol
-    retidx = iscontained(block.children[m₂[2]], x, tol, points, threadid)
+    retidx = iscontained(block.children[m₂[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -103,7 +105,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points
     end
 
     # Since we know als the third element, let's check it
-    retidx = iscontained(block.children[m₃[2]], x, tol, points, threadid)
+    retidx = iscontained(block.children[m₃[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -118,7 +120,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points
     for k ∈ 4:n
         dᵢ, i = distances[k]
         if dᵢ - m₁[1] < 2tol
-            retidx = iscontained(block.children[i], x, tol, points, threadid)
+            retidx = iscontained(block.children[i], x, tol, points, distance, threadid)
             if retidx ≠ NOT_FOUND
                 return retidx
             end
@@ -129,7 +131,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points
 
     return NOT_FOUND
 end
-iscontained(::Nothing, x::AbstractVector, tol::Real, points::Vector, threadid) = NOT_FOUND
+iscontained(::Nothing, x::AbstractVector, tol::Real, points::Vector, distance, threadid) = NOT_FOUND
 
 # This assumes that distances_cache is filled
 function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
@@ -180,35 +182,39 @@ Initialize the data structure with just one data point `v`.
 Initialize the data structure with all points in `v`. These are added in order
 by [`add!`](@ref) with the given tolerance `tol`.
 """
-struct UniquePoints{V<:AbstractVector, T}
+struct UniquePoints{V<:AbstractVector, T, F<:Function}
     root::SearchBlock{T}
     points::Vector{V}
+    distance_function::F
 end
 
-UniquePoints(v::Type{<:UniquePoints{V}}) where V = UniquePoints(V)
-function UniquePoints(::Type{V}) where {T<:Number, V<:AbstractVector{T}}
+UniquePoints(v::Type{<:UniquePoints{V}}, distance::F) where {V, F<:Function} = UniquePoints(V, distance)
+function UniquePoints(::Type{V}, distance::F) where {T<:Number, V<:AbstractVector{T}, F<:Function}
     root = SearchBlock(real(T))
     points = Vector{V}()
-    UniquePoints(root, points)
+    UniquePoints(root, points, distance)
 end
-function UniquePoints(v::AbstractVector{T}) where {T<:Number}
+function UniquePoints(v::AbstractVector{T}, distance::F) where {T<:Number, F<:Function}
     root = SearchBlock(real(T), 1)
     points = [v]
-    UniquePoints(root, points)
+    UniquePoints(root, points, distance)
 end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}; kwargs...)
-    data = UniquePoints(v[1])
+function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; kwargs...) where {F<:Function}
+    data = UniquePoints(v[1], distance)
     for i = 2:length(v)
         add!(data, v[i]; kwargs...)
     end
     data
 end
 
+UniquePoints(v) = UniquePoints(v, euclidean_distance)
+UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance, kwargs...)
+
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
     root = SearchBlock(T)
     points = Vector{V}()
-    UniquePoints(root, points)
+    UniquePoints(root, points, data.distance_function)
 end
 
 """
@@ -218,6 +224,7 @@ Return the points stored in `data`.
 """
 points(data::UniquePoints) = data.points
 
+Base.show(data::UniquePoints) = show(points(data))
 Base.getindex(data::UniquePoints, i::Integer) = data.points[i]
 
 
@@ -234,9 +241,9 @@ is returned.
 """
 function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        iscontained(data.root, x, tol, data.points)
+        iscontained(data.root, x, tol, data.points, data.distance_function)
     else
-        iscontained(data.root, x, tol, data.points) ≠ NOT_FOUND
+        iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
     end
 end
 
@@ -253,14 +260,14 @@ return `-1`. The element will be the last element of `points(data)`.
 """
 function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        idx = iscontained(data.root, x, tol, data.points)
+        idx = iscontained(data.root, x, tol, data.points, data.distance_function)
         if idx ≠ NOT_FOUND
             return idx
         end
         unsafe_add!(data, x)
         NOT_FOUND
     else
-        if iscontained(data.root, x, tol, data.points) ≠ NOT_FOUND
+        if iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
             return false
         end
         unsafe_add!(data, x)
@@ -298,11 +305,23 @@ function Base.empty!(data::UniquePoints)
     empty!(data.points)
 end
 
-function distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
-    n = length(x)
-    @inbounds d = abs2(x[1] - y[1])
-    @inbounds for i=2:n
-        @fastmath d += abs2(x[i] - y[i])
+
+
+"""
+    multiplicities(vectors, tol, distance)
+
+Returns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.
+"""
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F; tol::Real = 1e-5) where {T<:Number, F<:Function}
+    mults = [[i] for i in 1:length(v)]
+    k = -1
+    data = UniquePoints(v[1], distance)
+    for i = 2:length(v)
+            k = add!(data, v[i], Val{true}(), tol = tol)
+            if k != -1
+                push!(mults[k], i)
+            end
     end
-    sqrt(d)
+    [m for m in mults if length(m) > 1]
 end
+multiplicities(v::Vector{<:AbstractVector{T}}; tol::Real = 1e-5) where T = multiplicities(v, euclidean_distance, tol = tol)

@@ -88,7 +88,7 @@
         @test length(multiplicities(S.pathresults, tol=1e-1)) == 1
         @test length(multiplicities(S.pathresults, tol=1e-5)) == 0
 
-        @polyvar x y z
+        @polyvar x z
         f = (x-1)*(x-1.01)
         g = x - 1 - z
         S = solve([f,g], threading=false)
