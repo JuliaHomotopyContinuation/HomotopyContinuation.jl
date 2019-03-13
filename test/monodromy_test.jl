@@ -67,7 +67,7 @@ end
 
 
         # By group_actions=nothing we force that complex conjugation is not used.
-        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, complex_conjugation=false)
+        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, complex_conjugation=false, maximal_number_of_iterations_without_progress=100)
         @test result2.returncode == :success
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
