@@ -85,7 +85,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.mapresults",
     "category": "function",
-    "text": "mapresults(f::Function, result; conditions...)\n\nApply the function f to all PathResults for which the given conditions apply. For the possible conditions see results.\n\nExample\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n\n\nmapresults(f::Function, result::MonodromyResult; conditions...)\n\nApply the function f to all entries of MonodromyResult for which the given conditions apply.\n\nExample\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = mapresults(solution, R, onlyreal=true)\n\n\n\n\n\n"
+    "text": "mapresults(f::Function, result; conditions...)\n\nApply the function f to all PathResults for which the given conditions apply. For the possible conditions see results.\n\nExample\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = results(solution, R, onlyreal=true)\n\n\n\n\n\nmapresults(f, result::MonodromyResult; onlyreal=false, realtol=1e-6)\n\nApply the function f to all entries of MonodromyResult for which the given conditions apply.\n\nExample\n\n# This gives us all solutions considered real (but still as a complex vector).\nrealsolutions = mapresults(solution, R, onlyreal=true)\n\n\n\n\n\n"
 },
 
 {
@@ -93,7 +93,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.solutions",
     "category": "function",
-    "text": "solutions(result; conditions...)\n\nReturn all solution (as Vectors) for which the given conditions apply. For the possible conditions see results.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n\n\nsolutions(loop::Loop)\n\nGet the solutions of the loop.\n\n\n\n\n\nsolutions(result::MonodromyResult)\n\nReturns the solutions of the result.\n\n\n\n\n\n"
+    "text": "solutions(result; conditions...)\n\nReturn all solution (as Vectors) for which the given conditions apply. For the possible conditions see results.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> solutions(result)\n[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]\n\n\n\n\n\nsolutions(loop::Loop)\n\nGet the solutions of the loop.\n\n\n\n\n\nsolutions(result::MonodromyResult; onlyreal=false, realtol=1e-6)\n\nReturn all solutions (as SVectors) for which the given conditions apply.\n\nExample\n\nrealsolutions = solutions(R, onlyreal=true)\n\n\n\n\n\n"
 },
 
 {
@@ -101,7 +101,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.realsolutions",
     "category": "function",
-    "text": "realsolutions(result; tol=1e-6, conditions...)\n\nReturn all real solution (as Vectors of reals) for which the given conditions apply. For the possible conditions see results. Note that onlyreal is always true and realtol is now tol.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> realsolutions(result)\n[[2.0, -5.0], [-3.0, 0.0]]\n\n\n\n\n\nrealsolutions(res::MonodromyResult; tol = 1e-6)\n\nReturns the solutions of res whose imaginary part has norm < 1e-6.\n\n\n\n\n\n"
+    "text": "realsolutions(result; tol=1e-6, conditions...)\n\nReturn all real solution (as Vectors of reals) for which the given conditions apply. For the possible conditions see results. Note that onlyreal is always true and realtol is now tol.\n\nExample\n\njulia> @polyvar x y\njulia> result = solve([(x-2)y, y+x+3]);\njulia> realsolutions(result)\n[[2.0, -5.0], [-3.0, 0.0]]\n\n\n\n\n\nrealsolutions(res::MonodromyResult; tol=1e-6)\n\nReturns the solutions of res whose imaginary part has norm less than 1e-6.\n\n\n\n\n\n"
 },
 
 {
@@ -197,7 +197,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.nreal",
     "category": "function",
-    "text": "nreal(result; tol=1e-6)\n\nThe number of real solutions where all imaginary parts of each solution are smaller than tol.\n\n\n\n\n\nnreal(res::MonodromyResult; tol = 1e-6)\n\nCounts how many solutions of res have imaginary part norm < 1e-6.\n\n\n\n\n\n"
+    "text": "nreal(result; tol=1e-6)\n\nThe number of real solutions where all imaginary parts of each solution are smaller than tol.\n\n\n\n\n\nnreal(res::MonodromyResult; tol=1e-6)\n\nCounts how many solutions of res have imaginary part norm less than 1e-6.\n\n\n\n\n\n"
 },
 
 {
@@ -349,7 +349,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.monodromy_solve",
     "category": "function",
-    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. By default this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\naccuracy::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=GroupActions(group_action): If there is more than one group action you can use this to chain the application of them.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the unviraite normal distribution.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
+    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. If F only depends linearly on p this will be Petal. Otherwise this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\naccuracy::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=nothing: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions foo and bar you can set group_actions=[foo, bar]. See GroupActions for details regarding the application rules.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.\nequivalence_classes=true: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
 },
 
 {
@@ -358,30 +358,6 @@ var documenterSearchIndex = {"docs": [
     "title": "Monodromy Solve",
     "category": "section",
     "text": "monodromy_solve"
-},
-
-{
-    "location": "solving/#HomotopyContinuation.GroupActions",
-    "page": "Solving Polynomial Systems",
-    "title": "HomotopyContinuation.GroupActions",
-    "category": "type",
-    "text": "GroupActions(actions::Function...)\n\nStore a bunch of group actions (f1, f2, f3, ...). Each action has to return a tuple. The actions are applied in the following sense\n\nf1 is applied on the original solution s\nf2 is applied on s and the results of 1\nf3 is applied on s and the results of 1) and 2)\n\nand so on\n\nExample\n\njulia> f1(s) = (s * s,);\n\njulia> f2(s) = (2s, -s, 5s);\n\njulia> f3(s) = (s + 1,);\n\njulia> GroupActions(f1)(3)\n(9,)\n\njulia> GroupActions(f1,f2)(3)\n(9, 18, -9, 45)\n\njulia> GroupActions(f1,f2, f3)(3)\n(9, 18, -9, 45, 10, 19, -8, 46)\n\n\n\n\n\n"
-},
-
-{
-    "location": "solving/#HomotopyContinuation.complex_conjugation",
-    "page": "Solving Polynomial Systems",
-    "title": "HomotopyContinuation.complex_conjugation",
-    "category": "function",
-    "text": "complex_conjugation(x)\n\nA group action which returns the elementwise complex conjugated solutions.\n\n\n\n\n\n"
-},
-
-{
-    "location": "solving/#GroupActions-1",
-    "page": "Solving Polynomial Systems",
-    "title": "GroupActions",
-    "category": "section",
-    "text": "If there is a group acting on the solution set of the polynomial system this can provided with the group_action keyword for single group actions or with the group_actions keyword for compositions of group actions.GroupActions\ncomplex_conjugation"
 },
 
 {
@@ -406,6 +382,22 @@ var documenterSearchIndex = {"docs": [
     "title": "Strategies",
     "category": "section",
     "text": "Triangle\nPetal"
+},
+
+{
+    "location": "solving/#HomotopyContinuation.GroupActions",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.GroupActions",
+    "category": "type",
+    "text": "GroupActions(actions::Function...)\n\nStore a bunch of group actions (f1, f2, f3, ...). Each action has to return a tuple. The actions are applied in the following sense\n\nf1 is applied on the original solution s\nf2 is applied on s and the results of 1\nf3 is applied on s and the results of 1) and 2)\n\nand so on\n\nExample\n\njulia> f1(s) = (s * s,);\n\njulia> f2(s) = (2s, -s, 5s);\n\njulia> f3(s) = (s + 1,);\n\njulia> GroupActions(f1)(3)\n(9,)\n\njulia> GroupActions(f1,f2)(3)\n(9, 18, -9, 45)\n\njulia> GroupActions(f1,f2, f3)(3)\n(9, 18, -9, 45, 10, 19, -8, 46)\n\n\n\n\n\n"
+},
+
+{
+    "location": "solving/#GroupActions-1",
+    "page": "Solving Polynomial Systems",
+    "title": "GroupActions",
+    "category": "section",
+    "text": "If there is a group acting on the solution set of the polynomial system this can provided with the group_action keyword for single group actions or with the group_actions keyword for compositions of group actions. These will be internally transformed into GroupActions.GroupActions"
 },
 
 {
