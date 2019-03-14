@@ -186,7 +186,7 @@ unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 """
     fubini_study(x, y)
 
-Computes the Fubini-Study norm of `x` and `y`.
+Computes the Fubini-Study distance between `x` and `y`.
 """
 fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
 

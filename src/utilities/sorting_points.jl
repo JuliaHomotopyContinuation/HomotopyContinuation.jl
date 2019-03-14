@@ -1,4 +1,4 @@
-export UniquePoints, multiplicities, iscontained, add!, points
+export UniquePoints, multiplicities, iscontained, add!, unsafe_add!, empty!, points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -165,22 +165,36 @@ end
 #############
 
 """
-    UniquePoints{V<:AbstractVector, T}
+    UniquePoints{V<:AbstractVector, T, F<:Function}
 
 A data structure which holds points of type `V` where `T=real(eltype(V))`. This data structure
 provides an efficient (poly)logarithmic check whether a point already exists where
-two points are considered equal if their 2-norm is less than a provided tolerance `tol`.
+two points `u,v` are considered equal if `F(u,v)<tol`, where `tol` is a tolerance provided through the [`add!`](@ref) function.
 
 
-    UniquePoints(v::AbstractVector{<:Number})
+    UniquePoints(v::AbstractVector{<:Number}, distance::F)
 
 Initialize the data structure with just one data point `v`.
 
 
-    UniquePoints(V::Vector{<:AbstractVector{<:Number}}; tol=1e-5)
+    UniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5)
 
 Initialize the data structure with all points in `v`. These are added in order
-by [`add!`](@ref) with the given tolerance `tol`.
+by [`add!`](@ref) with the given tolerance `tol`. In particular, 'UniquePoints' structure will contain only points for which the pairwise distance given by `F` is less than `tol`.
+
+    UniquePoints(v) = UniquePoints(v, euclidean_distance)
+
+If `F` is not specialized, [`euclidean_distance`](@ref) is used.
+
+## Example
+```julia-repl
+julia> UniquePoints([[1,0.5]; [1,0.5]; [1,1]])
+[[1,0.5], [1,1]]
+```
+This is the same as
+```julia
+UniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
+```
 """
 struct UniquePoints{V<:AbstractVector, T, F<:Function}
     root::SearchBlock{T}
@@ -233,7 +247,7 @@ Base.getindex(data::UniquePoints, i::Integer) = data.points[i]
 
 Check whether `x` is contained in the `data` by using the tolerance `tol` to decide for duplicates.
 
-    iscontained(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int
+    iscontained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int
 
 If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
@@ -308,9 +322,22 @@ end
 
 
 """
-    multiplicities(vectors, tol, distance)
+    multiplicities(v::Vector{<:AbstractVector{T}}, distance; tol::Real = 1e-5)
 
-Returns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.
+Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol.
+
+    multiplicities(v; tol::Real = 1e-5) = multiplicities(v, euclidean_distance, tol = tol)
+If `distance` is not specified, [`euclidean_distance`](@ref) is used.
+
+
+```julia-repl
+julia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])
+[[1,2]]
+```
+This is the same as
+```julia
+multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
+```
 """
 function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F; tol::Real = 1e-5) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
