@@ -306,12 +306,12 @@ Two solutions are regarded as equal, when their pairwise distance is less than '
 function multiplicities(V::Results; tol=1e-6)
     output = Vector{Vector{PathResult}}()
     if all(v -> v.solution_type == :affine, V)
-        M = multiplicities(map(solution, V), tol, infinity_norm)
+        M = multiplicities(solutions(V), infinity_norm, tol = tol)
         for m in M
             push!(output, V[m])
         end
     elseif all(v -> v.solution_type == :projective, V)
-        M = multiplicities(map(v -> LinearAlgebra.normalize(solution(v)), V), tol, fubini_study)
+        M = multiplicities(LinearAlgebra.normalize.(solutions(V)), fubini_study, tol = tol)
         for m in M
             push!(output, V[m])
         end
@@ -345,9 +345,9 @@ end
 function uniquesolutions(R::Results, ::Type{Val{B}}; tol=1e-6, conditions...) where B
     sols = solutions(R; conditions...)
     if R isa AffineResult
-        M = multiplicities(sols, tol, infinity_norm)
+        M = multiplicities(sols, infinity_norm, tol = tol)
     elseif R isa ProjectiveResult
-        M = multiplicities(LinearAlgebra.normalize.(sols), tol, fubini_study)
+        M = multiplicities(LinearAlgebra.normalize.(sols), fubini_study, tol = tol)
     end
     _uniquesolutions(sols, M, Val{B})
 end

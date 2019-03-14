@@ -41,7 +41,7 @@ atinfinity
 singular
 nonsingular
 failed
-multiplicities
+multiplicities(::HomotopyContinuation.Results)
 seed
 ```
 

@@ -77,5 +77,5 @@ This assumes that the paths were not tracked until t=0.
 """
 function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTrackerResult}
     V = map(p -> LinearAlgebra.normalize(p.x.data), paths)
-    vcat(multiplicities(V, tol, fubini_study)...)
+    vcat(multiplicities(V, fubini_study, tol = tol)...)
 end

@@ -24,7 +24,6 @@ end
     include("predictors_test.jl")
     include("correctors_test.jl")
     include("path_tracking_test.jl")
-    include("multiplicities_test.jl")
     include("solve_test.jl")
     include("result_test.jl")
     include("integration_tests.jl")
