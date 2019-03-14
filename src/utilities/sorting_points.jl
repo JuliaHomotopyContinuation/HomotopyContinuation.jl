@@ -322,7 +322,7 @@ end
 
 
 """
-    multiplicities(v::Vector{<:AbstractVector{T}}, distance; tol::Real = 1e-5)
+    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5)
 
 Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol.
 
@@ -339,7 +339,7 @@ This is the same as
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F; tol::Real = 1e-5) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Real = 1e-5) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     k = -1
     data = UniquePoints(v[1], distance)
