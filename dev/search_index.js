@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s141,1} where #s141<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s139,1} where #s139<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -161,11 +161,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#HomotopyContinuation.multiplicities",
+    "location": "solving/#HomotopyContinuation.multiplicities-Tuple{Union{Result, Array{#s139,1} where #s139<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.multiplicities",
-    "category": "function",
-    "text": "multiplicities(vectors, tol, distance)\n\nReturns an array of arrays of integers. Each vector v in vectors contains all indices i,j such that V[i] and V[j] have distance at most tol.\n\n\n\n\n\nmultiplicities(V::Results; tol=1e-6)\n\nReturns a Vector of Vector{PathResult}s grouping the PathResults whose solutions appear with multiplicities greater 1 in \'V\'. Two solutions are regarded as equal, when their pairwise distance is less than \'tol\'.\n\n\n\n\n\n"
+    "category": "method",
+    "text": "multiplicities(V::Results; tol=1e-6)\n\nReturns a Vector of Vector{PathResult}s grouping the PathResults whose solutions appear with multiplicities greater 1 in \'V\'. Two solutions are regarded as equal, when their pairwise distance is less than \'tol\'.\n\n\n\n\n\n"
 },
 
 {
@@ -237,7 +237,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "The result of solve",
     "category": "section",
-    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nmapresults\nsolutions\nrealsolutions\nuniquesolutions\nfinite\nBase.real(::HomotopyContinuation.Results)\natinfinity\nsingular\nnonsingular\nfailed\nmultiplicities\nseedIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnreal\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
+    "text": "Depending on the input solve returns one of the following typesAffineResult\nProjectiveResultA Result is a wrapper around the results of each single path (PathResult) and it contains some additional informations like the used random seed for the computation.In order to analyze a Result we provide the following helper functionsresults\nmapresults\nsolutions\nrealsolutions\nuniquesolutions\nfinite\nBase.real(::HomotopyContinuation.Results)\natinfinity\nsingular\nnonsingular\nfailed\nmultiplicities(::HomotopyContinuation.Results)\nseedIf you are interested in the number of solutions of a certain kind we also provide the following helper functions.nresults\nnfinite\nnreal\nnsingular\nnnonsingular\nnatinfinity\nnfailed"
 },
 
 {
