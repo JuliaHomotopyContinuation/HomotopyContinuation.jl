@@ -13,6 +13,8 @@ We provide the following systems by default.
 FPSystem
 SPSystem
 FixedHomotopy
+FixedParameterSystem
+CompositionSystem
 ```
 
 ## Interface for custom systems

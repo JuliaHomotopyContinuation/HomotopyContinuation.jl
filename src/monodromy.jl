@@ -756,7 +756,13 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
 end
 
 function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
-    result = newton!(C.out, C.F, ŷ, options.identical_tol, 3, true, C.newton_cache)
+    # We distinguish solutions which have a distance larger than identical_tol
+    # But due to the numerical error in the evaluation of the distance, we need to be a little bit
+    # carfule. Therefore, we require that the solutions should be one magnitude closer to
+    # the true solutions as necessary
+    tol = 0.1 * options.identical_tol
+    result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache,
+                tol=tol, miniters=1, maxiters=3, simplified_last_step=false)
 
     if result.retcode == converged
         return affine_chart(x, C.out)
@@ -776,12 +782,9 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
 
     node = loop.nodes[job.edge.target]
 
-    if node.main_node && (
-        !affine_tracking(C.tracker) ||
-        (affine_tracking(C.tracker) && accuracy(C.tracker) > options.identical_tol)
-       )
+    if node.main_node
         y = verified_affine_vector(C, currx(C.tracker), job.x, options)
-        #is the solution at infinity?
+        # is the solution at infinity?
         if y === nothing
             return :incomplete
         end

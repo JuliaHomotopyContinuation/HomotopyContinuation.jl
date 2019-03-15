@@ -17,7 +17,7 @@ end
         @test corrector_cache isa HomotopyContinuation.NewtonCorrectorCache
 
         # check that this doesn't throw
-        out = correct!(xnext, corrector, corrector_cache, H, x, t, 1e-7, 3)
+        out = correct!(xnext, corrector, corrector_cache, H, x, t, euclidean_norm, 1e-7, 3)
         @test out isa CorrectorResult
     end
 end

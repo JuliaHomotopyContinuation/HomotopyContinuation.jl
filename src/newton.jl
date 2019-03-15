@@ -37,38 +37,45 @@ isconverged(result::NewtonResult) = result.retcode == converged
 
 Cache for the [`newton`](@ref) function.
 """
-struct NewtonCache{T, Fac<:LinearAlgebra.Factorization}
+struct NewtonCache{T, Fac<:LinearAlgebra.Factorization, SC<:AbstractSystemCache}
     Jac::Jacobian{T, Fac}
     rᵢ::Vector{T}
     Δxᵢ::Vector{T}
+    system_cache::SC
 end
 
 function NewtonCache(F::AbstractSystem, x)
-    Jac = Jacobian(jacobian(F, x))
-    rᵢ = evaluate(F, x)
+    system_cache = cache(F, x)
+    Jac = Jacobian(jacobian(F, x, system_cache))
+    rᵢ = evaluate(F, x, system_cache)
     Δxᵢ = copy(rᵢ)
 
-    NewtonCache(Jac, rᵢ, Δxᵢ)
+    NewtonCache(Jac, rᵢ, Δxᵢ, system_cache)
 end
 
-
 """
-    newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
 
 An ordinary Newton's method. If `simplified_last_step` is `true`, then for the last iteration
 the previously Jacobian will be used. This uses an LU-factorization for square systems
 and a QR-factorization for overdetermined.
 """
-function newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)
-    newton!(copy(x₀), F::AbstractSystem, x₀, tol, maxiters, simplified_last_step, NewtonCache(F::AbstractSystem, x₀))
+function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀);
+                tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
+    x = copy(x₀)
+    x, newton!(x, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
 end
 
 """
-    newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
+    newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
 
-In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) as input.
+In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
-function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache;
+                 tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3, simplified_last_step::Bool=true)
+    newton!(out, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
+end
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, miniters::Int, maxiters::Int, simplified_last_step::Bool)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -81,28 +88,28 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
     accuracy = T(Inf)
     digits_lost = 0.0
     ω₀ = ω = 0.0
-    for i ∈ 0:(maxiters)
+    for i ∈ 0:maxiters
         if i == maxiters && simplified_last_step
-            evaluate!(rᵢ, F, xᵢ)
+            evaluate!(rᵢ, F, xᵢ, cache.system_cache)
         else
-            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ)
+            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
             updated_jacobian!(Jac)
         end
         if i == 0
-            digits_lost = solve_with_digits_lost!(Δxᵢ, Jac, rᵢ)
+            digits_lost = Float64(solve_with_digits_lost!(Δxᵢ, Jac, rᵢ))
         else
             solve!(Δxᵢ, Jac, rᵢ)
         end
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
-        norm_Δxᵢ = euclidean_norm(Δxᵢ)
+        norm_Δxᵢ = Float64(norm(Δxᵢ))
         @inbounds for k in eachindex(xᵢ)
             xᵢ₊₁[k] = xᵢ[k] - Δxᵢ[k]
         end
 
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
-            if norm_Δx₀ ≤ tol
+            if norm_Δx₀ ≤ tol && i + 1 ≥ miniters
                 return NewtonResult(converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
@@ -120,7 +127,7 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
-            if accuracy ≤ tol
+            if accuracy ≤ tol && i + 1 ≥ miniters
                 return NewtonResult(converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
         end

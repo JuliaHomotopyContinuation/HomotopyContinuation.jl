@@ -18,6 +18,7 @@ export HomotopyNullCache,
 The default `AbstractHomotopyCache` containing nothing.
 """
 struct HomotopyNullCache <: AbstractHomotopyCache end
+const HNC = HomotopyNullCache
 
 """
     cache(H::AbstractHomotopy, x, t)::AbstractHomotopyCache

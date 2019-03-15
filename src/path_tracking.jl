@@ -18,7 +18,8 @@ const pathtracker_allowed_keywords = [:corrector, :predictor, :initial_steplengt
 ####################
 
 module PathTrackerStatus
-    """
+
+    @doc """
         PathTrackerStatus.states
 
     The possible states the pathtracker can achieve are
@@ -82,6 +83,24 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", result::PathTrackerResult
 ## PATH TRACKER ##
 ##################
 
+"""
+    AutoScalingOptions(;scale_min=0.01,
+                     scale_abs_min=min(scale_min^2, 200 * sqrt(eps()),
+                     scale_max=1.0 / eps() / sqrt(2)
+
+Parameters for the auto scaling of the variables.
+"""
+struct AutoScalingOptions
+    scale_min::Float64
+    scale_abs_min::Float64
+    scale_max::Float64
+end
+function AutoScalingOptions(;scale_min=0.01,
+                             scale_abs_min=min(scale_min^2, 200 * sqrt(eps())),
+                             scale_max=1.0 / eps() / sqrt(2))
+    AutoScalingOptions(scale_min, scale_abs_min, scale_max)
+end
+
 
 ######################
 # PathTrackerOptions #
@@ -98,9 +117,11 @@ mutable struct PathTrackerOptions
     simple_step_size_alg::Bool
     update_patch::Bool
     maximal_lost_digits::Float64
+    auto_scaling::Bool
+    auto_scaling_options::AutoScalingOptions
 end
 
-function PathTrackerOptions(::Type{Precision};accuracy=1e-7,
+function PathTrackerOptions(::Type{Precision}; accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
     refinement_max_iters=max_corrector_iters,
@@ -110,11 +131,14 @@ function PathTrackerOptions(::Type{Precision};accuracy=1e-7,
     max_step_size=Inf,
     simple_step_size_alg=false,
     update_patch=true,
-    maximal_lost_digits=default_maximal_lost_digits(Precision)) where {Precision<:Real}
+    maximal_lost_digits=default_maximal_lost_digits(Precision),
+    auto_scaling=true,
+    auto_scaling_options=AutoScalingOptions()) where {Precision<:Real}
 
     PathTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             refinement_max_iters, max_steps, initial_step_size, min_step_size,
-            max_step_size, simple_step_size_alg, update_patch, float(maximal_lost_digits))
+            max_step_size, simple_step_size_alg, update_patch, float(maximal_lost_digits),
+            auto_scaling, auto_scaling_options)
 end
 
 default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 3
@@ -127,11 +151,12 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions)
 # PathTrackerState #
 ####################
 
-mutable struct PathTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Union{AbstractAffinePatchState, Nothing}}
+mutable struct PathTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Union{AbstractAffinePatchState, Nothing}, IP}
     x::AV # current x
     x̂::AV # last prediction
     x̄::AV # canidate for new x
     ẋ::Vector{T} # derivative at current x
+    inner_product::IP
     η::Float64
     ω::Float64
     segment::ComplexSegment
@@ -151,7 +176,9 @@ mutable struct PathTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
     consecutive_successfull_steps::Int
 end
 
-function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, patch::Union{Nothing, AbstractAffinePatchState}=nothing)
+function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions,
+                           patch::Union{Nothing, AbstractAffinePatchState}=nothing,
+                           inner_product::AbstractInnerProduct=EuclideanIP())
     if isa(x₁, SVector)
         x = Vector(x₁)
     else
@@ -170,7 +197,7 @@ function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTracker
     status = PathTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    PathTrackerState(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, digits_lost, status, patch,
+    PathTrackerState(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy, digits_lost, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -179,7 +206,6 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", state::PathTrackerState) 
 
 function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, setup_patch)
     state.segment = ComplexSegment(promote(t₁, t₀)...)
-    state.η = state.ω = NaN
     state.s = 0.0
     state.Δs = min(options.initial_step_size, length(state.segment), options.max_step_size )
     state.Δs_prev = 0.0
@@ -188,6 +214,10 @@ function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state.status = PathTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
+    state.η = state.ω = NaN
+    if options.auto_scaling
+        init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
+    end
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
     state
@@ -195,6 +225,22 @@ end
 
 embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
 embed!(x::AbstractVector, y) = x .= y
+
+function init_auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptions)
+    point_norm = euclidean_norm(x)
+    w = ip.weight
+    for i in 1:length(w)
+        wᵢ = abs(x[i])
+        if wᵢ < opts.scale_min * point_norm
+            wᵢ = max(opts.scale_min * point_norm, opts.scale_abs_min)
+        elseif wᵢ > opts.scale_max * point_norm
+            wᵢ = opts.scale_max * point_norm
+        end
+        w[i] = wᵢ
+    end
+    nothing
+end
+init_auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = nothing
 
 ####################
 # PathTrackerCache #
@@ -240,6 +286,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `refinement_max_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `accuracy=1e-7`: The precision used to track a value.
+* `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
 """
 struct PathTracker{H<:AbstractHomotopy,
     Predictor<:AbstractPredictor,
@@ -274,6 +321,8 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
     options = PathTrackerOptions(real(eltype(x₁)); kwargs...)
+    # disable auto scaling always in projective space
+    options.auto_scaling = false
 
     if H isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
@@ -301,13 +350,13 @@ function PathTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
     # to be able to pass things around more easily
     HC = HomotopyWithCache(H, x₁, t₁)
 
+    inner_product = options.auto_scaling ? WeightedIP(x₁) : EuclideanIP()
     # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = PathTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options)
+    tracker_state = PathTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options, nothing, inner_product)
     cache = PathTrackerCache(HC, predictor, corrector, tracker_state)
 
     PathTracker(H, predictor, corrector, nothing, tracker_state, options, cache)
 end
-
 
 default_predictor(x::AbstractVector) = Heun()
 # Do not really understand this but Heun doesn't work that great for multi-homogenous tracking
@@ -437,11 +486,15 @@ function compute_ẋ!(state, cache, options::PathTrackerOptions)
 end
 
 
-function correct!(x̄, tracker::PathTracker, x=tracker.state.x, t=tracker.state.segment[tracker.state.s];
-    accuracy=tracker.options.accuracy,
-    max_steps=tracker.options.max_corrector_iters)
+function correct!(x̄, tracker::PathTracker,
+        x=tracker.state.x,
+        t=tracker.state.segment[tracker.state.s],
+        norm=tracker.state.inner_product;
+        accuracy=tracker.options.accuracy,
+        max_iters=tracker.options.max_corrector_iters)
+
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
-                        tracker.cache.homotopy, x, t, accuracy, max_steps)
+             tracker.cache.homotopy, x, t, norm, accuracy, max_iters)
 end
 
 function step!(tracker::PathTracker)
@@ -452,8 +505,7 @@ function step!(tracker::PathTracker)
     try
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.accuracy, options.max_corrector_iters)
-
+        result = correct!(x̄, tracker, x̂, t + Δt)
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
@@ -466,6 +518,7 @@ function step!(tracker::PathTracker)
             if state.patch !== nothing && options.update_patch
                 changepatch!(state.patch, x)
             end
+            options.auto_scaling && auto_scaling!(state, options)
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
@@ -520,7 +573,7 @@ function update_stepsize!(state::PathTrackerState, result::CorrectorResult,
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω
-        d_x̂_x̄ = euclidean_distance(state.x̂, state.x)
+        d_x̂_x̄ = distance(state.x̂, state.x, state.inner_product)
     end
 
     Δx₀ = result.norm_Δx₀
@@ -594,6 +647,24 @@ function simple_step_size_alg!(state::PathTrackerState, result::CorrectorResult,
     end
 end
 
+function auto_scaling!(state::PathTrackerState, options::PathTrackerOptions)
+    auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
+end
+function auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptions)
+    norm_x = ip(x)
+    for i in 1:length(x)
+        wᵢ = (abs(x[i]) + ip.weight[i]) / 2
+        if wᵢ < opts.scale_min * norm_x
+            wᵢ = max(opts.scale_min * norm_x, opts.scale_abs_min)
+        elseif wᵢ > opts.scale_max * norm_x
+            wᵢ = opts.scale_max * norm_x
+        end
+        ip.weight[i] = wᵢ
+    end
+    nothing
+end
+auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = nothing
+
 function check_terminated!(tracker::PathTracker)
     if abs(tracker.state.s - length(tracker.state.segment)) < 2eps(length(tracker.state.segment))
         tracker.state.status = PathTrackerStatus.success
@@ -609,7 +680,7 @@ function refine!(tracker::PathTracker)
     end
     result = correct!(tracker.state.x̄, tracker;
         accuracy=tracker.options.refinement_accuracy,
-        max_steps=tracker.options.refinement_max_iters)
+        max_iters=tracker.options.refinement_max_iters)
     if isconverged(result)
         tracker.state.x .= tracker.state.x̄
         tracker.state.accuracy = result.accuracy
