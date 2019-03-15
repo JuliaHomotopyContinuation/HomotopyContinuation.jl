@@ -55,7 +55,7 @@ end
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,
                     target_solutions_count=21).returncode == :success
 
-        # Test stop heuristic using too hight target_solutions_count
+        # Test stop heuristic using too high target_solutions_count
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
         @test result.returncode == :heuristic_stop
         # Test stop heuristic with no target solutions count
@@ -109,10 +109,15 @@ end
         # equivalence classes
         result = monodromy_solve(F, x₀, p₀, parameters=p,
             equivalence_classes=true,
+            maximal_number_of_iterations_without_progress=100,
             group_action=roots_of_unity)
         @test length(result.solutions) == 7
         # Test that equivalence classes are on by default if we supply a group action
-        result = monodromy_solve(F, x₀, p₀, parameters=p, group_action=roots_of_unity)
+        result = monodromy_solve(F, x₀, p₀, parameters=p, group_action=roots_of_unity, maximal_number_of_iterations_without_progress=100)
+        @test length(result.solutions) == 7
+
+        # Test affine tracking
+        result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true, group_action=roots_of_unity, maximal_number_of_iterations_without_progress=100)
         @test length(result.solutions) == 7
     end
 end

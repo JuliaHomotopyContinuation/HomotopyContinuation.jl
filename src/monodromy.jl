@@ -627,17 +627,21 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     #assemble
     loop = Loop(strategy, p₀, startsolutions, options)
 
-    tracker = pathtracker(
-        F, startsolutions; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
+    tracker = pathtracker(F, startsolutions;
+                          parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     statistics = MonodromyStatistics(solutions(loop))
 
-    # affine newton methods
-    patch_state = state(EmbeddingPatch(), tracker.state.x)
-    HC = HomotopyWithCache(PatchedHomotopy(tracker.homotopy, patch_state), tracker.state.x, 1.0)
-    F₀ = FixedHomotopy(HC, 0.0)
-    newton_cache = NewtonCache(F₀, tracker.state.x)
-
+    if affine_tracking(tracker)
+        HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
+        F₀ = FixedHomotopy(HC, 0.0)
+    else
+        # Force affine newton method
+        patch_state = state(EmbeddingPatch(), tracker.state.x)
+        HC = HomotopyWithCache(PatchedHomotopy(tracker.homotopy, patch_state), tracker.state.x, 1.0)
+        F₀ = FixedHomotopy(HC, 0.0)
+    end
     # construct cache
+    newton_cache = NewtonCache(F₀, tracker.state.x)
     C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
 
     # solve
@@ -755,11 +759,14 @@ function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
     result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, C.newton_cache)
 
     if result.retcode == converged
-        return ProjectiveVectors.affine_chart!(x, C.out)
+        return affine_chart(x, C.out)
     else
         return nothing
     end
 end
+
+affine_chart(x::SVector, y::PVector) = ProjectiveVectors.affine_chart!(x, y)
+affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
 
 function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics, progress)
     retcode = track(C.tracker, job.x, job.edge, loop, stats)
@@ -769,14 +776,14 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
 
     node = loop.nodes[job.edge.target]
 
-    if node.main_node
+    if node.main_node && !affine_tracking(C.tracker)
         y = verified_affine_vector(C, currx(C.tracker), job.x, options)
         #is the solution at infinity?
         if y === nothing
             return :incomplete
         end
     else
-        y = ProjectiveVectors.affine_chart!(job.x, currx(C.tracker))
+        y = affine_chart(job.x, currx(C.tracker))
     end
 
 
@@ -791,7 +798,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         # If we are on the main node check whether we have a real root.
         node.main_node && checkreal!(stats, y)
         # Check if we are done
-        isdone(node, y, options) && return :done
+        node.main_node && isdone(node, y, options) && return :done
 
         next_edge = nextedge(loop, job.edge)
         push!(queue, Job(y, next_edge))
@@ -817,7 +824,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
                 if add!(node, yᵢ; tol=options.accuracy)
                     node.main_node && checkreal!(stats, yᵢ)
                     # Check if we are done
-                    isdone(node, yᵢ, options) && return :done
+                    node.main_node && isdone(node, yᵢ, options) && return :done
 
                     push!(queue, Job(yᵢ, next_edge))
                 end
