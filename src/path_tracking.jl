@@ -29,7 +29,7 @@ mutable struct PathTrackerOptions
     maximal_lost_digits::Float64
 end
 
-function PathTrackerOptions(;tol=1e-7,
+function PathTrackerOptions(::Type{Precision};tol=1e-7,
     refinement_tol=1e-8,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
@@ -42,12 +42,15 @@ function PathTrackerOptions(;tol=1e-7,
     maximal_step_size=maximal_steplength,
     simple_step_size=false,
     update_patch=true,
-    maximal_lost_digits=13.0)
+    maximal_lost_digits=default_maximal_lost_digits(Precision)) where {Precision<:Real}
 
     PathTrackerOptions(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
             initial_step_size, minimal_step_size, maximal_step_size, simple_step_size, update_patch,
             float(maximal_lost_digits))
 end
+
+default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 3
+
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
@@ -180,7 +183,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_step_size=1e-14`: The minimal step size.
 * `maximal_step_size=Inf`: The maximal step size.
-* `maximal_lost_digits::Real=13.0`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
+* `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
@@ -217,7 +220,7 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
     corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
-    options = PathTrackerOptions(;kwargs...)
+    options = PathTrackerOptions(real(eltype(x₁)); kwargs...)
 
     if H isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
