@@ -1,5 +1,5 @@
 using Test, LinearAlgebra, Random
-using DynamicPolynomials, HomotopyContinuation
+using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
 
 import PolynomialTestSystems: cyclic, katsura, equations, ipp2, heart

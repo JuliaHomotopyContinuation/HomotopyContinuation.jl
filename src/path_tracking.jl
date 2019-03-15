@@ -152,12 +152,13 @@ mutable struct PathTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
 end
 
 function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, patch::Union{Nothing, AbstractAffinePatchState}=nothing)
-    x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
-    if x₁ isa PVector
-        ẋ = copy(x₁.data)
+    if isa(x₁, SVector)
+        x = Vector(x₁)
     else
-        ẋ = copy(x₁)
+        x = copy(x₁)
     end
+    x̂, x̄ = copy(x), copy(x)
+    ẋ = Vector(x)
     η = ω = NaN
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
@@ -296,7 +297,6 @@ function PathTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
     options = PathTrackerOptions(real(eltype(x₁)); kwargs...)
-
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
     HC = HomotopyWithCache(H, x₁, t₁)
@@ -322,7 +322,12 @@ This returns a vector similar to `x₁` but with an element type which is invari
 function indempotent_x(H, x₁, t₁)
     u = Vector{Any}(undef, size(H)[1])
     evaluate!(u, H, x₁, t₁)
-    indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
+
+    if isa(x₁, SVector)
+        indem_x = Vector{promote_type(typeof(u[1]), ComplexF64)}(undef, length(x₁))
+    else
+        indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
+    end
     indem_x .= x₁
 end
 

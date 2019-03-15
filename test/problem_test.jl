@@ -30,6 +30,10 @@
         [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(ComplexF64, 3)]))
     @test homvars(P) == nothing
 
+    _, starts = problem_startsolutions(HC.input(
+        [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], rand(ComplexF64, 3)))
+    @test length(starts) == 1
+
     P, _ = problem_startsolutions(StartTargetInput(
         [x^2+y^2+z^2, x^4+y^4+z^4], [x^3+z^3,y^3-z^3], [rand(ComplexF64, 3)]), homvar=z)
     @test homvars(P) == (3,)

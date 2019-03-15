@@ -244,10 +244,10 @@ function splitkwargs(kwargs, supported_keywords)
 end
 
 
-start_solution_sample(xs) = first(xs) |> promote_start_solution
-start_solution_sample(x::AbstractVector{<:Number}) = promote_start_solution(x )
-
+start_solution_sample(xs) = promote_start_solution(first(xs))
+start_solution_sample(x::AbstractVector{<:Number}) = promote_start_solution(x)
 promote_start_solution(x::AbstractVector{ComplexF64}) = x
+promote_start_solution(x::SVector) = map(xᵢ -> first(promote(xᵢ, 0.0im)), x)
 function promote_start_solution(x)
     x_new =similar(x, promote_type(eltype(x), ComplexF64), length(x))
     copyto!(x_new, x)
