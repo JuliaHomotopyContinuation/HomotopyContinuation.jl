@@ -1,5 +1,5 @@
 export PathTracker, PathTrackerResult, PathTrackerStatus,
-        pathtracker, pathtracker_startsolutions,
+        pathtracker, pathtracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, refinement_max_iters,
@@ -652,6 +652,14 @@ function Base.iterate(tracker::PathTracker, state=nothing)
         nothing
     end
 end
+
+"""
+    affine_tracking(tracker)
+
+Returns `true` if the path tracker tracks in affine space. If `false` then then the path tracker
+tracks in some affine chart of the projective space.
+"""
+affine_tracking(tracker::PathTracker) = tracker.affine_patch === nothing
 
 #################
 ## Query State ##

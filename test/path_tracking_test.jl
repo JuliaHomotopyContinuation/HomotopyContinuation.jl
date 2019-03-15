@@ -49,6 +49,7 @@
 
         tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
                     affine=true)
+        @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
         @test res.returncode == PathTrackerStatus.success
         @test isa(res.x, Vector{ComplexF64})
