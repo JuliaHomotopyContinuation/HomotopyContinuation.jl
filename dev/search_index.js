@@ -45,7 +45,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.solve",
     "category": "function",
-    "text": "solve(F; options...)\n\nSolve the system F using a total degree homotopy. F can be\n\nVector{<:MultivariatePolynomials.AbstractPolynomial} (e.g. constructed by @polyvar)\nAbstractSystem (the system has to represent a homogenous polynomial system.)\n\nExample\n\nAssume we want to solve the system F(xy) = (x^2+y^2+1 2x+3y-1).\n\n@polyvar x y\nsolve([x^2+y^2+1, 2x+3y-1])\n\nIf you polynomial system is already homogenous, but you would like to consider it as an affine system you can do\n\n@polyvar x y z\nsolve([x^2+y^2+z^2, 2x+3y-z], homvar=z)\n\nThis would result in the same result as solve([x^2+y^2+1, 2x+3y-1]).\n\nTo solve F by a custom AbstractSystem you can do\n\n@polyvar x y z\n# The system `F` has to be homgoenous system\nF = SPSystem([x^2+y^2+z^2, 2x+3y-z]) # SPSystem <: AbstractSystem\n# To solve the original affine system we have to tell that the homogenization variable has index 3\nsolve(F, homvar=3)\n\nor equivalently (in this case) by\n\nsolve([x^2+y^2+z^2, 2x+3y-z], system=SPSystem)\n\nStart Target Homotopy\n\nsolve(G, F, start_solutions; options...)\n\nSolve the system F by tracking the each provided solution of G (as provided by start_solutions).\n\nExample\n\n@polyvar x y\nG = [x^2-1,y-1]\nF = [x^2+y^2+z^2, 2x+3y-z]\nsolve(G, F, [[1, 1], [-1, 1]])\n\nParameter Homotopy\n\nsolve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},\n    startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=nothing, γ₀=nothing)\n\nSolve the parameter homotopy\n\nH(x t) = F(x (tγ₁p₁+(1-t)γ₀p₀)  (tγ₁+(1-t)γ₀))\n\n, where p₁ and p₀ are a vector of parameter values for F and γ₁ and γ₀ are complex numbers. If γ₁ or γ₀ is nothing, it is assumed that γ₁ and γ₀ are 1. The input parameters specifies the parameter variables of F which should be considered as parameters. Neccessarily, length(parameters) == length(p₁) == length(p₀).\n\nsolve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},\n        startsolutions; parameters::Vector{<:MP.AbstractVariable},\n        startparameters, targetparameters,\n        startgamma=randn(ComplexF64), targetgamma=randn(ComplexF64))\n\nThis is a non-unicode variant where γ₁=start_parameters, γ₀=target_parameters,     γ₁=start_gamma, γ₀=target_gamma.\n\nExample\n\nWe want to solve a parameter homotopy H(xt) = F(x t1 0+(1-t)2 4) where\n\nF(x a) = (x₁^2-a₁ x₁x₂-a₁+a₂)\n\nand let\'s say we are only intersted in tracking of 11. This can be accomplished as follows\n\n@polyvar x[1:2] a[1:2]\nF = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]\nstartsolutions = [[1, 1]]\nsolve(F, startsolutions, parameters=a, p₁=p₁, p₀=p₀)\n# If you don\'t like unicode this is also possible\nsolve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p₀)\n\nAbstract Homotopy\n\nsolve(H::AbstractHomotopy, start_solutions; options...)\n\nSolve the homotopy H by tracking the each solution of H( t) (as provided by start_solutions) from t=1 to t=0. Note that H has to be a homotopy between homogenous polynomial systems. If it should be considered as an affine system indicate which is the index of the homogenization variable, e.g. solve(H, startsolutions, homvar=3) if the third variable is the homogenization variable.\n\nOptions\n\nGeneral options:\n\nsystem::AbstractSystem: A constructor to assemble a AbstractSystem. The default is FPSystem. This constructor is only applied to the input of solve. The constructor is called with system(polynomials, variables) where polynomials is a vector of MultivariatePolynomials.AbstractPolynomials and variables determines the variable ordering.\nhomotopy::AbstractHomotopy: A constructor to construct a AbstractHomotopy. The default is StraightLineHomotopy. The constructor is called with homotopy(start, target) where start and target are homogenous AbstractSystems.\nseed::Int: The random seed used during the computations.\nhomvar::Union{Int,MultivariatePolynomials.AbstractVariable}: This considers the homogenous system F as an affine system which was homogenized by homvar. If F is an AbstractSystem homvar is the index (i.e. Int) of the homogenization variable. If F is an AbstractVariables (e.g. created by @polyvar x) homvar is the actual variable used in the system F.\nendgame_start=0.1: The value of t for which the endgame is started.\nreport_progress=true: Whether a progress bar should be printed to STDOUT.\nthreading=true: Enable or disable multi-threading.\n\nPathtracking specific:\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\ncorrector_maxiters=2: The maximal number of correction steps in a single step.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\ninitial_steplength=0.1: The initial step size for the predictor.\nminimal_steplength=1e-14: The minimal step size. If the size of step is below this the path is considered failed.\nmaxiters=1000: The maximal number of steps per path.\n\nEndgame specific options\n\ncauchy_loop_closed_tolerance=1e-3: The tolerance for which is used to determine whether a loop is closed. The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.\ncauchy_samples_per_loop=6: The number of samples used to predict an endpoint. A higher number of samples should result in a better approximation. Note that the error should be roughly t^n where t is the current time of the loop and n is cauchy_samples_per_loop.\negtol=1e-10: This is the tolerance necessary to declare the endgame converged.\nmaxnorm=1e5: If our original problem is affine we declare a path at infinity if the infinity norm with respect to the standard patch is larger than maxnorm.\nmaxwindingnumber=15: The maximal windingnumber we try to find using Cauchys integral formula.\nmax_extrapolation_samples=4: During the endgame a Richardson extrapolation is used to improve the accuracy of certain approximations. This is the maximal number of samples used for this.\nminradius=1e-15: A path is declared false if the endgame didn\'t finished until then.\nsampling_factor=0.5: During the endgame we approach 0 by the geometric series h^kR₀ where h is sampling_factor and R₀ the endgame start provided in runendgame.\nmaxiters_per_step=100: The maximal number of steps bewtween two samples.\n\n\n\n\n\n"
+    "text": "solve(F; options...)\n\nSolve the system F using a total degree homotopy. F can be\n\nVector{<:MultivariatePolynomials.AbstractPolynomial} (e.g. constructed by @polyvar)\nAbstractSystem (the system has to represent a homogenous polynomial system.)\n\nExample\n\nAssume we want to solve the system F(xy) = (x^2+y^2+1 2x+3y-1).\n\n@polyvar x y\nsolve([x^2+y^2+1, 2x+3y-1])\n\nIf you polynomial system is already homogenous, but you would like to consider it as an affine system you can do\n\n@polyvar x y z\nsolve([x^2+y^2+z^2, 2x+3y-z], homvar=z)\n\nThis would result in the same result as solve([x^2+y^2+1, 2x+3y-1]).\n\nTo solve F by a custom AbstractSystem you can do\n\n@polyvar x y z\n# The system `F` has to be homgoenous system\nF = SPSystem([x^2+y^2+z^2, 2x+3y-z]) # SPSystem <: AbstractSystem\n# To solve the original affine system we have to tell that the homogenization variable has index 3\nsolve(F, homvar=3)\n\nor equivalently (in this case) by\n\nsolve([x^2+y^2+z^2, 2x+3y-z], system=SPSystem)\n\nStart Target Homotopy\n\nsolve(G, F, start_solutions; options...)\n\nSolve the system F by tracking the each provided solution of G (as provided by start_solutions).\n\nExample\n\n@polyvar x y\nG = [x^2-1,y-1]\nF = [x^2+y^2+z^2, 2x+3y-z]\nsolve(G, F, [[1, 1], [-1, 1]])\n\nParameter Homotopy\n\nsolve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},\n    startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=nothing, γ₀=nothing)\n\nSolve the parameter homotopy\n\nH(x t) = F(x (tγ₁p₁+(1-t)γ₀p₀)  (tγ₁+(1-t)γ₀))\n\n, where p₁ and p₀ are a vector of parameter values for F and γ₁ and γ₀ are complex numbers. If γ₁ or γ₀ is nothing, it is assumed that γ₁ and γ₀ are 1. The input parameters specifies the parameter variables of F which should be considered as parameters. Neccessarily, length(parameters) == length(p₁) == length(p₀).\n\nsolve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},\n        startsolutions; parameters::Vector{<:MP.AbstractVariable},\n        startparameters, targetparameters,\n        startgamma=randn(ComplexF64), targetgamma=randn(ComplexF64))\n\nThis is a non-unicode variant where γ₁=start_parameters, γ₀=target_parameters,     γ₁=start_gamma, γ₀=target_gamma.\n\nExample\n\nWe want to solve a parameter homotopy H(xt) = F(x t1 0+(1-t)2 4) where\n\nF(x a) = (x₁^2-a₁ x₁x₂-a₁+a₂)\n\nand let\'s say we are only intersted in tracking of 11. This can be accomplished as follows\n\n@polyvar x[1:2] a[1:2]\nF = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]\nstartsolutions = [[1, 1]]\nsolve(F, startsolutions, parameters=a, p₁=p₁, p₀=p₀)\n# If you don\'t like unicode this is also possible\nsolve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p₀)\n\nAbstract Homotopy\n\nsolve(H::AbstractHomotopy, start_solutions; options...)\n\nSolve the homotopy H by tracking the each solution of H( t) (as provided by start_solutions) from t=1 to t=0. Note that H has to be a homotopy between homogenous polynomial systems. If it should be considered as an affine system indicate which is the index of the homogenization variable, e.g. solve(H, startsolutions, homvar=3) if the third variable is the homogenization variable.\n\nOptions\n\nGeneral options:\n\nsystem::AbstractSystem: A constructor to assemble a AbstractSystem. The default is FPSystem. This constructor is only applied to the input of solve. The constructor is called with system(polynomials, variables) where polynomials is a vector of MultivariatePolynomials.AbstractPolynomials and variables determines the variable ordering.\nhomotopy::AbstractHomotopy: A constructor to construct a AbstractHomotopy. The default is StraightLineHomotopy. The constructor is called with homotopy(start, target) where start and target are homogenous AbstractSystems.\nseed::Int: The random seed used during the computations.\nhomvar::Union{Int,MultivariatePolynomials.AbstractVariable}: This considers the homogenous system F as an affine system which was homogenized by homvar. If F is an AbstractSystem homvar is the index (i.e. Int) of the homogenization variable. If F is an AbstractVariables (e.g. created by @polyvar x) homvar is the actual variable used in the system F.\nendgame_start=0.1: The value of t for which the endgame is started.\nreport_progress=true: Whether a progress bar should be printed to STDOUT.\nthreading=true: Enable or disable multi-threading.\n\nPathtracking specific:\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\nmax_corrector_iters=2: The maximal number of correction steps in a single step.\naccuracy=1e-7: The accuracy used to track a value.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun.\nrefinement_max_iters=max_corrector_iters: The maximal number of correction steps used to refine the final value.\nrefinement_accuracy=1e-8: The precision used to refine the final value.\ninitial_step_size=0.1: The initial step size for the predictor.\nmin_step_size=1e-14: The minimal step size. If the size of step is below this the path is considered failed.\nmax_steps=1000: The maximal number of steps per path.\n\nEndgame specific options\n\ncauchy_loop_closed_tolerance=1e-3: The tolerance for which is used to determine whether a loop is closed. The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.\ncauchy_samples_per_loop=6: The number of samples used to predict an endpoint. A higher number of samples should result in a better approximation. Note that the error should be roughly t^n where t is the current time of the loop and n is cauchy_samples_per_loop.\negtol=1e-10: This is the tolerance necessary to declare the endgame converged.\nmaxnorm=1e5: If our original problem is affine we declare a path at infinity if the infinity norm with respect to the standard patch is larger than maxnorm.\nmaxwindingnumber=15: The maximal windingnumber we try to find using Cauchys integral formula.\nmax_extrapolation_samples=4: During the endgame a Richardson extrapolation is used to improve the accuracy of certain approximations. This is the maximal number of samples used for this.\nminradius=1e-15: A path is declared false if the endgame didn\'t finished until then.\nsampling_factor=0.5: During the endgame we approach 0 by the geometric series h^kR₀ where h is sampling_factor and R₀ the endgame start provided in runendgame.\nmaxiters_per_step=100: The maximal number of steps bewtween two samples.\n\n\n\n\n\n"
 },
 
 {
@@ -349,7 +349,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.monodromy_solve",
     "category": "function",
-    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. If F only depends linearly on p this will be Petal. Otherwise this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\naccuracy::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=nothing: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions foo and bar you can set group_actions=[foo, bar]. See GroupActions for details regarding the application rules.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.\nequivalence_classes=true: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
+    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. If F only depends linearly on p this will be Petal. Otherwise this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\nidentical_tol::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=nothing: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions foo and bar you can set group_actions=[foo, bar]. See GroupActions for details regarding the application rules.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.\nequivalence_classes=true: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
 },
 
 {
@@ -917,7 +917,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.pathtracker",
     "category": "function",
-    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This also takes the same input arguments as solve with the exception that you do not need to specify startsolutions. This is convenient if you want to investigate single paths.\n\nExamples\n\nObtain single solution\n\nWe want to construct a path tracker to track a parameterized system f with parameters p from the parameters a to b.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\n\nYou then can obtain a single solution at b by using\n\nx_b = track(tracker, x_a).x\n\nTrace a path\n\nTo trace a path you can use the iterator method.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\nIf we want to guarantee smooth traces we can limit the maximal step size.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\n\n\n\n\n"
+    "text": "pathtracker(args...; kwargs...)\n\nConstruct a PathTracker in the same way solve does it. This also takes the same input arguments as solve with the exception that you do not need to specify startsolutions. This is convenient if you want to investigate single paths.\n\nExamples\n\nObtain single solution\n\nWe want to construct a path tracker to track a parameterized system f with parameters p from the parameters a to b.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b)\n\nYou then can obtain a single solution at b by using\n\nx_b = track(tracker, x_a).x\n\nTrace a path\n\nTo trace a path you can use the iterator method.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\nIf we want to guarantee smooth traces we can limit the maximal step size.\n\ntracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)\nfor (x, t) in iterator(tracker, x₁)\n    @show (x,t)\nend\n\n\n\n\n\n"
 },
 
 {
@@ -933,7 +933,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracker",
     "category": "type",
-    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\ncorrector_maxiters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmaxiters=10_000: The maximal number of iterations the path tracker has available.\nminimal_step_size=1e-14: The minimal step size.\nmaximal_step_size=Inf: The maximal step size.\nmaximal_lost_digits::Real=-(log₁₀(eps) + 3): The tracking is terminated if we estimate that we loose more than maximal_lost_digits in the linear algebra steps.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\n\n\n\n\n\n"
+    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\nmax_corrector_iters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmax_steps=10_000: The maximal number of iterations the path tracker has available.\nmin_step_size =1e-14: The minimal step size.\nmax_step_size =Inf: The maximal step size.\nmaximal_lost_digits::Real=-(log₁₀(eps) + 3): The tracking is terminated if we estimate that we loose more than maximal_lost_digits in the linear algebra steps.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_max_iters=max_corrector_iters: The maximal number of correction steps used to refine the final value.\nrefinement_accuracy=1e-8: The precision used to refine the final value.\naccuracy=1e-7: The precision used to track a value.\n\n\n\n\n\n"
 },
 
 {
@@ -941,7 +941,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTrackerResult",
     "category": "type",
-    "text": " PathTrackerResult{T,N}\n\nContaining the result of a tracked path. The fields are\n\nreturncode::PathTrackerStatus.states If the tracking was successfull then it is PathTrackerStatus.success.\nx::ProjectiveVectors.PVector{T,N} The result.\nt::ComplexF64 The t when the path tracker stopped.\naccuracy::Float64: The estimated accuracy of x.\n\n\n\n\n\n"
+    "text": " PathTrackerResult{V<:AbstractVector}\n\nContaining the result of a tracked path. The fields are\n\nreturncode::PathTrackerStatus.states If the tracking was successfull then it is PathTrackerStatus.success.\nx::V The result.\nt::ComplexF64 The t when the path tracker stopped.\naccuracy::Float64: The estimated accuracy of x.\n\n\n\n\n\n"
 },
 
 {
@@ -1049,83 +1049,83 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.corrector_maxiters",
+    "location": "pathtracking/#HomotopyContinuation.accuracy",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.corrector_maxiters",
+    "title": "HomotopyContinuation.accuracy",
     "category": "function",
-    "text": " corrector_maxiters(tracker::PathTracker)\n\nCurrent correction maxiters.\n\n\n\n\n\n"
+    "text": " accuracy(tracker::PathTracker)\n\nCurrent accuracy.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_corrector_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.set_accuracy!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_corrector_maxiters!",
+    "title": "HomotopyContinuation.set_accuracy!",
     "category": "function",
-    "text": " set_corrector_maxiters!(tracker::PathTracker, n)\n\nSet the correction maxiters to n.\n\n\n\n\n\n"
+    "text": " set_accuracy!(tracker::PathTracker, accuracy)\n\nSet the current accuracy to accuracy.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.maximal_step_size",
+    "location": "pathtracking/#HomotopyContinuation.max_corrector_iters",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.maximal_step_size",
+    "title": "HomotopyContinuation.max_corrector_iters",
     "category": "function",
-    "text": " maximal_step_size(tracker::PathTracker)\n\nCurrent maximal step size.\n\n\n\n\n\n"
+    "text": " max_corrector_iters(tracker::PathTracker)\n\nCurrent correction max_steps.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_maximal_step_size!",
+    "location": "pathtracking/#HomotopyContinuation.set_max_corrector_iters!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_maximal_step_size!",
+    "title": "HomotopyContinuation.set_max_corrector_iters!",
     "category": "function",
-    "text": " set_corrector_maxiters!(tracker::PathTracker, Δs)\n\nSet the maximal step size to Δs.\n\n\n\n\n\n"
+    "text": " set_max_corrector_iters!(tracker::PathTracker, n)\n\nSet the correction max_steps to n.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.refinement_maxiters",
+    "location": "pathtracking/#HomotopyContinuation.max_step_size",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.refinement_maxiters",
+    "title": "HomotopyContinuation.max_step_size",
     "category": "function",
-    "text": " refinement_maxiters(tracker::PathTracker)\n\nCurrent refinement maxiters.\n\n\n\n\n\n"
+    "text": " max_step_size (tracker::PathTracker)\n\nCurrent maximal step size.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_refinement_maxiters!",
+    "location": "pathtracking/#HomotopyContinuation.set_max_step_size!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_refinement_maxiters!",
+    "title": "HomotopyContinuation.set_max_step_size!",
     "category": "function",
-    "text": " set_refinement_maxiters!(tracker::PathTracker, n)\n\nSet the current refinement maxiters to n.\n\n\n\n\n\n"
+    "text": " set_max_corrector_iters!(tracker::PathTracker, Δs)\n\nSet the maximal step size to Δs.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.refinement_tol",
+    "location": "pathtracking/#HomotopyContinuation.refinement_max_iters",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.refinement_tol",
+    "title": "HomotopyContinuation.refinement_max_iters",
     "category": "function",
-    "text": " refinement_tol(tracker::PathTracker)\n\nCurrent refinement tolerance.\n\n\n\n\n\n"
+    "text": " refinement_max_iters(tracker::PathTracker)\n\nCurrent refinement max_steps.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_refinement_tol!",
+    "location": "pathtracking/#HomotopyContinuation.set_refinement_max_iters!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_refinement_tol!",
+    "title": "HomotopyContinuation.set_refinement_max_iters!",
     "category": "function",
-    "text": " set_refinement_maxiters!(tracker::PathTracker, tol)\n\nSet the current refinement tolerance to tol.\n\n\n\n\n\n"
+    "text": " set_refinement_max_iters!(tracker::PathTracker, n)\n\nSet the current refinement max_steps to n.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.tol",
+    "location": "pathtracking/#HomotopyContinuation.refinement_accuracy",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.tol",
+    "title": "HomotopyContinuation.refinement_accuracy",
     "category": "function",
-    "text": " tol(tracker::PathTracker)\n\nCurrent tolerance.\n\n\n\n\n\n"
+    "text": " refinement_accuracy(tracker::PathTracker)\n\nCurrent refinement accuracy.\n\n\n\n\n\n"
 },
 
 {
-    "location": "pathtracking/#HomotopyContinuation.set_tol!",
+    "location": "pathtracking/#HomotopyContinuation.set_refinement_accuracy!",
     "page": "Path tracker",
-    "title": "HomotopyContinuation.set_tol!",
+    "title": "HomotopyContinuation.set_refinement_accuracy!",
     "category": "function",
-    "text": " set_tol!(tracker::PathTracker, tol)\n\nSet the current tolerance to tol.\n\n\n\n\n\n"
+    "text": " set_refinement_max_iters!(tracker::PathTracker, accuracy)\n\nSet the current refinement accuracy to accuracy.\n\n\n\n\n\n"
 },
 
 {
@@ -1133,7 +1133,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "Changing options",
     "category": "section",
-    "text": "To change settingscorrector_maxiters\nset_corrector_maxiters!\nmaximal_step_size\nset_maximal_step_size!\nrefinement_maxiters\nset_refinement_maxiters!\nrefinement_tol\nset_refinement_tol!\ntol\nset_tol!"
+    "text": "To change settingsaccuracy\nset_accuracy!\nmax_corrector_iters\nset_max_corrector_iters!\nmax_step_size\nset_max_step_size!\nrefinement_max_iters\nset_refinement_max_iters!\nrefinement_accuracy\nset_refinement_accuracy!"
 },
 
 {
