@@ -95,13 +95,13 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
             updated_jacobian!(Jac)
         end
         if i == 0
-            digits_lost = solve_with_digits_lost!(Δxᵢ, Jac, rᵢ)
+            digits_lost = Float64(solve_with_digits_lost!(Δxᵢ, Jac, rᵢ))
         else
             solve!(Δxᵢ, Jac, rᵢ)
         end
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
-        norm_Δxᵢ = norm(Δxᵢ)
+        norm_Δxᵢ = Float64(norm(Δxᵢ))
         @inbounds for k in eachindex(xᵢ)
             xᵢ₊₁[k] = xᵢ[k] - Δxᵢ[k]
         end
