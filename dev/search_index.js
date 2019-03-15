@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s139,1} where #s139<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s142,1} where #s142<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -161,7 +161,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#HomotopyContinuation.multiplicities-Tuple{Union{Result, Array{#s139,1} where #s139<:PathResult}}",
+    "location": "solving/#HomotopyContinuation.multiplicities-Tuple{Union{Result, Array{#s142,1} where #s142<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.multiplicities",
     "category": "method",
@@ -441,11 +441,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "systems/#HomotopyContinuation.FixedParameterSystem",
+    "page": "Systems",
+    "title": "HomotopyContinuation.FixedParameterSystem",
+    "category": "type",
+    "text": "FixedParameterSystem(F, p) <: AbstractSystem\n\nFix a parameterized system F(x; p) at p, i.e., it is treated as a system without parameters.\n\n\n\n\n\n"
+},
+
+{
+    "location": "systems/#HomotopyContinuation.CompositionSystem",
+    "page": "Systems",
+    "title": "HomotopyContinuation.CompositionSystem",
+    "category": "type",
+    "text": "CompositionSystem(composition::Composition, systems_constructor) <: AbstractSystem\n\nA system representing the composition of polynomial maps.\n\n\n\n\n\n"
+},
+
+{
     "location": "systems/#Default-systems-1",
     "page": "Systems",
     "title": "Default systems",
     "category": "section",
-    "text": "We provide the following systems by default.FPSystem\nSPSystem\nFixedHomotopy"
+    "text": "We provide the following systems by default.FPSystem\nSPSystem\nFixedHomotopy\nFixedParameterSystem\nCompositionSystem"
 },
 
 {
@@ -933,7 +949,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracker",
     "category": "type",
-    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\nmax_corrector_iters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmax_steps=10_000: The maximal number of iterations the path tracker has available.\nmin_step_size =1e-14: The minimal step size.\nmax_step_size =Inf: The maximal step size.\nmaximal_lost_digits::Real=-(log₁₀(eps) + 3): The tracking is terminated if we estimate that we loose more than maximal_lost_digits in the linear algebra steps.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_max_iters=max_corrector_iters: The maximal number of correction steps used to refine the final value.\nrefinement_accuracy=1e-8: The precision used to refine the final value.\naccuracy=1e-7: The precision used to track a value.\n\n\n\n\n\n"
+    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\nmax_corrector_iters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmax_steps=10_000: The maximal number of iterations the path tracker has available.\nmin_step_size =1e-14: The minimal step size.\nmax_step_size =Inf: The maximal step size.\nmaximal_lost_digits::Real=-(log₁₀(eps) + 3): The tracking is terminated if we estimate that we loose more than maximal_lost_digits in the linear algebra steps.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_max_iters=max_corrector_iters: The maximal number of correction steps used to refine the final value.\nrefinement_accuracy=1e-8: The precision used to refine the final value.\naccuracy=1e-7: The precision used to track a value.\nauto_scaling=true: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.\n\n\n\n\n\n"
 },
 
 {
@@ -1149,7 +1165,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Newton\'s method",
     "title": "HomotopyContinuation.newton",
     "category": "function",
-    "text": "newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)\n\nAn ordinary Newton\'s method. If simplified_last_step is true, then for the last iteration the previously Jacobian will be used. This uses an LU-factorization for square systems and a QR-factorization for overdetermined.\n\n\n\n\n\n"
+    "text": "newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nAn ordinary Newton\'s method. If simplified_last_step is true, then for the last iteration the previously Jacobian will be used. This uses an LU-factorization for square systems and a QR-factorization for overdetermined.\n\n\n\n\n\n"
 },
 
 {
@@ -1165,7 +1181,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Newton\'s method",
     "title": "HomotopyContinuation.newton!",
     "category": "function",
-    "text": "newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)\n\nIn-place version of newton. Needs a NewtonCache as input.\n\n\n\n\n\n"
+    "text": "newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nIn-place version of newton. Needs a NewtonCache and norm as input.\n\n\n\n\n\n"
 },
 
 {
