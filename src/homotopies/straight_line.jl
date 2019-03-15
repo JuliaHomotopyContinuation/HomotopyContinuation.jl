@@ -130,12 +130,3 @@ function dt(H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
     M, N = size(H)
     dt!(similar(c.u, M), H, x, t, c)
 end
-
-
-function weylnorm(H::StraightLineHomotopy, t)
-    λ_1 = weylnorm2(H.target)
-    λ_3 = weylnorm2(H.start)
-
-        # + 2 * real((one(T) - t) * conj(t * gamma(H)) * λ_2)
-    sqrt(abs2(1 - t) * λ_1  + abs2(t) * λ_3)
-end
