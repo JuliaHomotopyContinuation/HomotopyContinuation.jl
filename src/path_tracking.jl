@@ -26,9 +26,10 @@ mutable struct PathTrackerOptions
     maximal_step_size::Float64
     simple_step_size::Bool
     update_patch::Bool
+    maximal_lost_digits::Float64
 end
 
-function PathTrackerOptions(;tol=1e-7,
+function PathTrackerOptions(::Type{Precision};tol=1e-7,
     refinement_tol=1e-8,
     corrector_maxiters::Int=2,
     refinement_maxiters=corrector_maxiters,
@@ -40,11 +41,16 @@ function PathTrackerOptions(;tol=1e-7,
     maximal_steplength=Inf,
     maximal_step_size=maximal_steplength,
     simple_step_size=false,
-    update_patch=true)
+    update_patch=true,
+    maximal_lost_digits=default_maximal_lost_digits(Precision)) where {Precision<:Real}
 
     PathTrackerOptions(tol, corrector_maxiters, refinement_tol, refinement_maxiters, maxiters,
-            initial_step_size, minimal_step_size, maximal_step_size, simple_step_size, update_patch)
+            initial_step_size, minimal_step_size, maximal_step_size, simple_step_size, update_patch,
+            float(maximal_lost_digits))
 end
+
+default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 3
+
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
@@ -63,6 +69,7 @@ module PathTrackerStatus
     * `PathTrackerStatus.terminated_invalid_startvalue`
     * `PathTrackerStatus.terminated_step_size_too_small`
     * `PathTrackerStatus.terminated_singularity`
+    * `PathTrackerStatus.terminated_ill_conditioned`
     """
     @enum states begin
         success
@@ -71,6 +78,7 @@ module PathTrackerStatus
         terminated_invalid_startvalue
         terminated_step_size_too_small
         terminated_singularity
+        terminated_ill_conditioned
     end
 end
 
@@ -86,7 +94,10 @@ mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     Δs::Float64 # current step size
     Δs_prev::Float64 # previous step size
     accuracy::Float64
-    cond::Float64 # estimate of the condition number
+    # The relative number of digits lost during the solution of the linear systems
+    # in Newton's method. See `solve_with_digits_lost!` in utilities/linear_algebra.jl
+    # for how this is computed.
+    digits_lost::Float64
     status::PathTrackerStatus.states
     patch::PatchState
     accepted_steps::Int
@@ -104,12 +115,12 @@ function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::Ab
     Δs = convert(Float64, min(options.initial_step_size, length(segment), options.maximal_step_size))
     Δs_prev = 0.0
     accuracy = 0.0
-    cond = 1.0
+    digits_lost = 0.0
     accepted_steps = rejected_steps = 0
     status = PathTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    PathTrackerState(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, cond, status, patch,
+    PathTrackerState(x, x̂, x̄, ẋ, η, ω, segment, s, Δs, Δs_prev, accuracy, digits_lost, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -172,6 +183,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `maxiters=10_000`: The maximal number of iterations the path tracker has available.
 * `minimal_step_size=1e-14`: The minimal step size.
 * `maximal_step_size=Inf`: The maximal step size.
+* `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
 * `refinement_tol=1e-8`: The precision used to refine the final value.
@@ -208,7 +220,7 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
     corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
 
-    options = PathTrackerOptions(;kwargs...)
+    options = PathTrackerOptions(real(eltype(x₁)); kwargs...)
 
     if H isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to PathTracker. Instead pass the homotopy and patch separate.")
@@ -241,13 +253,13 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 
 """
-     PathTrackerResult(tracker)
+     PathTrackerResult{T,N}
 
 Containing the result of a tracked path. The fields are
-* `successfull::Bool` Indicating whether tracking was successfull.
 * `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
-* `x::V` The result.
-* `t::Float64` The `t` when the path tracker stopped.
+* `x::ProjectiveVectors.PVector{T,N}` The result.
+* `t::ComplexF64` The `t` when the path tracker stopped.
+* `accuracy::Float64`: The estimated accuracy of `x`.
 """
 struct PathTrackerResult{T, N}
      returncode::PathTrackerStatus.states
@@ -364,7 +376,7 @@ function compute_ẋ!(state, cache, options::PathTrackerOptions)
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    adaptive_solve!(state.ẋ, cache.Jac, cache.out, options.tol, state.cond)
+    solve!(state.ẋ, cache.Jac, cache.out)
     nothing
 end
 
@@ -384,7 +396,7 @@ function step!(tracker::PathTracker)
     try
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters, state.cond)
+        result = correct!(x̄, tracker.corrector, cache.corrector, H, x̂, t + Δt, options.tol, options.corrector_maxiters)
 
         if isconverged(result)
             # Step is accepted, assign values
@@ -392,7 +404,7 @@ function step!(tracker::PathTracker)
             x .= x̄
             state.s += state.Δs
             state.accuracy = result.accuracy
-            state.cond = result.cond
+            state.digits_lost = result.digits_lost
             # Step size change
             update_stepsize!(state, result, order(tracker.predictor), options)
             options.update_patch && changepatch!(state.patch, x)
@@ -403,13 +415,19 @@ function step!(tracker::PathTracker)
         else
             # We have to reset the patch
             state.rejected_steps += 1
-            state.cond = result.cond
+            state.digits_lost = result.digits_lost
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(state, result, order(tracker.predictor), options)
             Δt = currΔt(state)
             state.last_step_failed = true
+            # Check termination criteria
+            # 1) Step size get's too small:
             if state.Δs < options.minimal_step_size
                 state.status = PathTrackerStatus.terminated_step_size_too_small
+            end
+            # 2) We became too ill-conditioned
+            if state.digits_lost > options.maximal_lost_digits
+                state.status = PathTrackerStatus.terminated_ill_conditioned
             end
         end
     catch err
@@ -433,6 +451,8 @@ function update_stepsize!(state::PathTrackerState, result::CorrectorResult,
         simple_step_size!(state, result, options)
         return nothing
     end
+
+    # The step size control is described in https://arxiv.org/abs/1902.02968
 
     # we have to handle the special case that there is only 1 iteration
     # in this case we cannot estimate ω and therefore just assume ω = 2

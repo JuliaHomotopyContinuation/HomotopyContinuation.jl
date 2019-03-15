@@ -752,7 +752,7 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
 end
 
 function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
-    result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, 1.0, C.newton_cache)
+    result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, C.newton_cache)
 
     if result.retcode == converged
         return ProjectiveVectors.affine_chart!(x, C.out)

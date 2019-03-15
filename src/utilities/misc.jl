@@ -23,6 +23,14 @@ function nthroot(x::Real, N::Integer)
 end
 
 """
+    log₁₀(x)
+
+Same as `log10` but faster.
+"""
+log₁₀(x) = log(x) / 2.302585092994046
+
+
+"""
     @modulenum(name, block)
 
 This is a modification of `@enum` and creates an intermediate enum.
