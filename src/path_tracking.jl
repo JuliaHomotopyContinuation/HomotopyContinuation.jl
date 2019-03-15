@@ -659,7 +659,7 @@ end
 Returns `true` if the path tracker tracks in affine space. If `false` then then the path tracker
 tracks in some affine chart of the projective space.
 """
-affine_tracking(tracker::PathTracker) = tracker.affine_patch === nothing
+affine_tracking(tracker::PathTracker) = !isa(tracker.state.x, ProjectiveVectors.PVector)
 
 #################
 ## Query State ##
