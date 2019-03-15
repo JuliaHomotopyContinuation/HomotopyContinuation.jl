@@ -1274,15 +1274,15 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#",
-    "page": "Norms and Distances arrays of solutions",
-    "title": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
+    "title": "Norms and Distances",
     "category": "page",
     "text": ""
 },
 
 {
     "location": "norms_distances/#HomotopyContinuation.euclidean_distance",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "HomotopyContinuation.euclidean_distance",
     "category": "function",
     "text": "euclidean_distance(u, v)\n\nCompute ||u-v||₂.\n\n\n\n\n\n"
@@ -1290,7 +1290,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#HomotopyContinuation.euclidean_norm",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "HomotopyContinuation.euclidean_norm",
     "category": "function",
     "text": "euclidean_norm(u)\n\nCompute ||u||₂.\n\n\n\n\n\n"
@@ -1298,7 +1298,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#HomotopyContinuation.infinity_distance",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "HomotopyContinuation.infinity_distance",
     "category": "function",
     "text": "infinity_distance(u, v)\n\nCompute the ∞-norm of u-v.\n\n\n\n\n\n"
@@ -1306,7 +1306,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#HomotopyContinuation.infinity_norm",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "HomotopyContinuation.infinity_norm",
     "category": "function",
     "text": "infinity_norm(z)\n\nCompute the ∞-norm of z. If z is a complex vector this is more efficient than norm(z, Inf).\n\ninfinity_norm(z₁, z₂)\n\nCompute the ∞-norm of z₁-z₂.\n\n\n\n\n\n"
@@ -1314,7 +1314,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#HomotopyContinuation.fubini_study",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "HomotopyContinuation.fubini_study",
     "category": "function",
     "text": "fubini_study(x, y)\n\nComputes the Fubini-Study distance between x and y.\n\n\n\n\n\n"
@@ -1322,7 +1322,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "norms_distances/#Distances-and-norms-1",
-    "page": "Norms and Distances arrays of solutions",
+    "page": "Norms and Distances",
     "title": "Distances and norms",
     "category": "section",
     "text": "We provide functions for computing norms and distances.euclidean_distance\neuclidean_norminfinity_distance\ninfinity_normfubini_study"
