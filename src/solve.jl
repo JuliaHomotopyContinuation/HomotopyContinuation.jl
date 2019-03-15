@@ -114,14 +114,14 @@ General options:
 
 Pathtracking specific:
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
-* `corrector_maxiters=2`: The maximal number of correction steps in a single step.
+* `max_corrector_iters=2`: The maximal number of correction steps in a single step.
+* `accuracy=1e-7`: The accuracy used to track a value.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref).
-* `refinement_maxiters=corrector_maxiters`: The maximal number of correction steps used to refine the final value.
-* `refinement_tol=1e-8`: The precision used to refine the final value.
-* `tol=1e-7`: The precision used to track a value.
-* `initial_steplength=0.1`: The initial step size for the predictor.
-* `minimal_steplength=1e-14`: The minimal step size. If the size of step is below this the path is considered failed.
-* `maxiters=1000`: The maximal number of steps per path.
+* `refinement_max_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
+* `refinement_accuracy=1e-8`: The precision used to refine the final value.
+* `initial_step_size=0.1`: The initial step size for the predictor.
+* `min_step_size=1e-14`: The minimal step size. If the size of step is below this the path is considered failed.
+* `max_steps=1000`: The maximal number of steps per path.
 
 Endgame specific options
 * `cauchy_loop_closed_tolerance=1e-3`: The tolerance for which is used to determine whether a loop is closed. The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.

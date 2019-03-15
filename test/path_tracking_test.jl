@@ -6,15 +6,15 @@
 
         @test_nowarn currΔt(t1)
 
-        rtol = refinement_tol(t1)
-        @test_nowarn set_refinement_tol!(t1, 5e-5)
-        @test refinement_tol(t1) == 5e-5
-        set_refinement_tol!(t1, rtol)
+        raccuracy = refinement_accuracy(t1)
+        @test_nowarn set_refinement_accuracy!(t1, 5e-5)
+        @test refinement_accuracy(t1) == 5e-5
+        set_refinement_accuracy!(t1, raccuracy)
 
-        rmaxiter = refinement_maxiters(t1)
-        @test_nowarn set_refinement_maxiters!(t1, 11)
-        @test refinement_maxiters(t1) == 11
-        set_refinement_maxiters!(t1, rmaxiter)
+        rmaxiter = refinement_max_iters(t1)
+        @test_nowarn set_refinement_max_iters!(t1, 11)
+        @test refinement_max_iters(t1) == 11
+        set_refinement_max_iters!(t1, rmaxiter)
 
         @test t1 isa PathTracker
         @test length(currx(t1)) == 7
@@ -42,6 +42,27 @@
         @test out == R.x
     end
 
+    @testset "Affine tracking" begin
+        @polyvar x a y b
+        F = [x^2-a, x*y-a+b]
+        p = [a, b]
+
+        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
+                    affine=true)
+        @test affine_tracking(tracker) == true
+        res = track(tracker, starts[1], 1.0, 0.0)
+        @test res.returncode == PathTrackerStatus.success
+        @test isa(res.x, Vector{ComplexF64})
+        @test length(res.x) == 2
+
+        x = @SVector [1.0, 1.0 + 0.0*im]
+        tracker, starts = pathtracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
+        @test length(starts) == 1
+        res = track(tracker, starts[1], 1.0, 0.0)
+        @test isa(res.x, Vector{ComplexF64})
+        @test length(res.x) == 2
+    end
+
     @testset "Allocations" begin
         F = equations(katsura(5))
         tracker, start_sols = pathtracker_startsolutions(F)
@@ -57,7 +78,7 @@
         @polyvar x[1:3]
         F = A * x - b
 
-        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch(), maxiters=10)
+        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch(), max_steps=10)
         s = first(start_sols)
         result = track(tracker, s, 1.0, 0.0)
         @test result.returncode == PathTrackerStatus.success
@@ -124,9 +145,9 @@
         typeof(first(iterator(tracker, s, 1.0, 0.0; affine=false))) ==
             Tuple{ProjectiveVectors.PVector{ComplexF64, 1}, Float64}
 
-        @test maximal_step_size(tracker) == Inf
-        set_maximal_step_size!(tracker, 0.01)
-        @test maximal_step_size(tracker) == 0.01
+        @test max_step_size(tracker) == Inf
+        set_max_step_size!(tracker, 0.01)
+        @test max_step_size(tracker) == 0.01
 
         length(collect(iterator(tracker, s, 1.0, 0.0))) == 101
     end

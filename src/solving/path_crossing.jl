@@ -7,10 +7,10 @@ and `indices` are the indices which could not be resolved.
 """
 function pathcrossing_check!(tracked_paths, solvers, start_solutions)
     t₁, t_endgame, _ = t₁_t_endgame_t₀(solvers)
-    original_tol = tol(solvers)
-    cross_tol = original_tol * 10
+    original_accuracy = accuracy(solvers)
+    cross_accuracy = original_accuracy * 10
     # We start with a list of all indices where some crossing happened.
-    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_accuracy)
     ncrossedpaths = length(crossed_path_indices)
     # No paths crossed -> done :)
     if ncrossedpaths == 0
@@ -18,52 +18,52 @@ function pathcrossing_check!(tracked_paths, solvers, start_solutions)
     end
 
     # Now we are trying it with tighter precision to avoid the jumping
-    original_tol = tol(solvers)
-    original_corrector_maxiters = corrector_maxiters(solvers)
+    original_accuracy = accuracy(solvers)
+    original_corrector_maxiters = max_corrector_iters(solvers)
 
-    set_tol!(solvers, min(original_tol * 1e-2, 1e-10))
+    set_accuracy!(solvers, min(original_accuracy * 1e-2, 1e-10))
 
     tforeach(solvers, crossed_path_indices) do solver, tid, k
         x₁ = start_solutions[k]
         tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
     end
 
-    crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
+    crossed_path_indices = check_crossed_paths(tracked_paths, cross_accuracy)
 
     if !isempty(crossed_path_indices)
-        # Now we are trying it with less corrector steps and even smaller tol
-        set_tol!(solvers, min(original_tol * 1e-3, 1e-12))
-        set_corrector_maxiters!(solvers, 1)
+        # Now we are trying it with less corrector steps and even smaller accuracy
+        set_accuracy!(solvers, min(original_accuracy * 1e-3, 1e-12))
+        set_max_corrector_iters!(solvers, 1)
 
         tforeach(solvers, crossed_path_indices) do solver, tid, k
             x₁ = start_solutions[k]
             tracked_paths[k] = trackpath(solver, x₁, t₁, t_endgame)
         end
-        crossed_path_indices = check_crossed_paths(tracked_paths, cross_tol)
+        crossed_path_indices = check_crossed_paths(tracked_paths, cross_accuracy)
     end
 
     # No we reset the options
-    set_tol!(solvers, original_tol)
-    set_corrector_maxiters!(solvers, original_corrector_maxiters)
+    set_accuracy!(solvers, original_accuracy)
+    set_max_corrector_iters!(solvers, original_corrector_maxiters)
 
     return (ncrossedpaths, crossed_path_indices)
 end
 
-tol(solver::Solver) = tol(solver.tracker)
-tol(solvers::Solvers) = tol(solvers[1])
-corrector_maxiters(solver::Solver) = corrector_maxiters(solver.tracker)
-corrector_maxiters(solvers::Solvers) = corrector_maxiters(solvers[1])
+accuracy(solver::Solver) = accuracy(solver.tracker)
+accuracy(solvers::Solvers) = accuracy(solvers[1])
+max_corrector_iters(solver::Solver) = max_corrector_iters(solver.tracker)
+max_corrector_iters(solvers::Solvers) = max_corrector_iters(solvers[1])
 
-set_tol!(solver::Solver, tol) = set_tol!(solver.tracker, tol)
-function set_tol!(solvers::Solvers, tol)
+set_accuracy!(solver::Solver, accuracy) = set_accuracy!(solver.tracker, accuracy)
+function set_accuracy!(solvers::Solvers, accuracy)
     for solver in solvers
-        set_tol!(solver, tol)
+        set_accuracy!(solver, accuracy)
     end
 end
-set_corrector_maxiters!(solver::Solver, n) = set_corrector_maxiters!(solver.tracker, n)
-function set_corrector_maxiters!(solvers::Solvers, n)
+set_max_corrector_iters!(solver::Solver, n) = set_max_corrector_iters!(solver.tracker, n)
+function set_max_corrector_iters!(solvers::Solvers, n)
     for solver in solvers
-        set_corrector_maxiters!(solver, n)
+        set_max_corrector_iters!(solver, n)
     end
 end
 

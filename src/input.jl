@@ -122,6 +122,8 @@ function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     check_zero_dimensional(F)
     if startsolutions === nothing
         startsolutions = [randn(ComplexF64, nvariables(F))]
+    elseif isa(startsolutions, AbstractVector{<:Number})
+        startsolutions = [startsolutions]
     end
     StartTargetInput(G, F, startsolutions)
 end
@@ -144,11 +146,16 @@ function input(F::MPPolyInputs, startsolutions;
     end
     if startsolutions === nothing
         startsolutions = [randn(ComplexF64, nvariables(F, parameters=parameters))]
+    elseif isa(startsolutions, AbstractVector{<:Number})
+        startsolutions = [startsolutions]
     end
     ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
 end
 
 function input(H::AbstractHomotopy, startsolutions)
     check_homogenous_degrees(FixedHomotopy(H, rand()))
+    if isa(startsolutions, AbstractVector{<:Number})
+        startsolutions = [startsolutions]
+    end
     HomotopyInput(H, startsolutions)
 end

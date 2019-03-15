@@ -6,10 +6,10 @@ export Pade21
 This uses a Padé-approximation of type (2,1) for prediction.
 """
 struct Pade21 <: AbstractPredictor end
-struct Pade21Cache{T,N} <: AbstractPredictorCache
+struct Pade21Cache{T, AV<:AbstractVector{T}} <: AbstractPredictorCache
     x²::Vector{T}
     x³::Vector{T}
-    x_h::PVector{T,N}
+    x_h::AV
 
     u::Vector{T}
     u₁::Vector{T}
