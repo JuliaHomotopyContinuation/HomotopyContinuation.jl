@@ -623,19 +623,6 @@ function residual(tracker::PathTracker, x, t)
     infinity_norm(tracker.cache.out)
 end
 
-
-"""
-    checkstart(H, x)
-
-Check whether the `x` has the correct size.
-"""
-function checkstart(H, x)
-    N = nvariables(H)
-    N != length(x) && throw(error("Expected `x` to have length $(N) but `x` has length $(length(x))"))
-    nothing
-end
-
-
 function Base.iterate(tracker::PathTracker, state=nothing)
     state === nothing && return tracker, 1
 
