@@ -16,15 +16,6 @@ struct WeightedIP{T<:Real} <: AbstractInnerProduct
 end
 WeightedIP(x::AbstractVector) = WeightedIP(zeros(real(eltype(x)), length(x)))
 
-function LinearAlgebra.dot(x::AbstractVector, y::AbstractVector, ip::WeightedIP)
-    @boundscheck length(ip.weight) == length(x) == length(y)
-    @inbounds out = x[1] * y[1]
-    for i in 1:length(x)
-        out += x[i] * conj(y[i]) / (w[i]^2)
-    end
-    out
-end
-
 """
     distance(u, v, inner_product=EuclideanIP)
 
