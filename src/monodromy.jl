@@ -776,7 +776,10 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
 
     node = loop.nodes[job.edge.target]
 
-    if node.main_node && !affine_tracking(C.tracker)
+    if node.main_node && (
+        !affine_tracking(C.tracker) ||
+        (affine_tracking(C.tracker) && accuracy(C.tracker) > options.identical_tol)
+       )
         y = verified_affine_vector(C, currx(C.tracker), job.x, options)
         #is the solution at infinity?
         if y === nothing
