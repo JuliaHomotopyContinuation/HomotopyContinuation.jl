@@ -53,29 +53,28 @@ function NewtonCache(F::AbstractSystem, x)
     NewtonCache(Jac, rᵢ, Δxᵢ, system_cache)
 end
 
-
 """
-    newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
 
 An ordinary Newton's method. If `simplified_last_step` is `true`, then for the last iteration
 the previously Jacobian will be used. This uses an LU-factorization for square systems
 and a QR-factorization for overdetermined.
 """
 function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀);
-                tol=1e-6, maxiters=3, simplified_last_step=true)
-    newton!(copy(x₀), F, x₀, norm, cache, tol, maxiters, simplified_last_step)
+                tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
+    newton!(copy(x₀), F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
 end
 
 """
-    newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
 
 In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
 function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache;
-                 tol::Float64=1e-6, maxiters::Int=3, simplified_last_step::Bool=true)
-    newton!(out, F, x₀, norm, cache, tol, maxiters, simplified_last_step)
+                 tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3, simplified_last_step::Bool=true)
+    newton!(out, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
 end
-function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, maxiters::Integer, simplified_last_step::Bool)
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, miniters::Int, maxiters::Int, simplified_last_step::Bool)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -109,7 +108,7 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, ma
 
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
-            if norm_Δx₀ ≤ tol
+            if norm_Δx₀ ≤ tol && i + 1 ≥ miniters
                 return NewtonResult(converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
@@ -127,7 +126,7 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, ma
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
-            if accuracy ≤ tol
+            if accuracy ≤ tol && i + 1 ≥ miniters
                 return NewtonResult(converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
         end
