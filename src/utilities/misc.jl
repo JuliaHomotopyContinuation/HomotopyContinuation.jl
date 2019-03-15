@@ -1,4 +1,4 @@
-export infinity_norm, infinity_distance, euclidean_distance, euclidean_norm, fubini_study
+export infinity_norm, infinity_distance, fubini_study
 
 
 """
@@ -127,35 +127,6 @@ end
 Return a random seed in the range `range`.
 """
 randseed(range=1_000:1_000_000) = rand(range)
-
-
-"""
-    euclidean_distance(u, v)
-
-Compute ||u-v||₂.
-"""
-function euclidean_distance(x::AbstractVector{T}, y::AbstractVector{T}) where T
-    @boundscheck length(x) == length(y)
-    n = length(x)
-    @inbounds d = abs2(x[1] - y[1])
-    @inbounds for i=2:n
-        @fastmath d += abs2(x[i] - y[i])
-    end
-    sqrt(d)
-end
-
-"""
-    euclidean_norm(u)
-
-Compute ||u||₂.
-"""
-function euclidean_norm(x::AbstractVector)
-    out = zero(real(eltype(x)))
-    @inbounds for i in eachindex(x)
-        out += abs2(x[i])
-    end
-    sqrt(out)
-end
 
 """
 
