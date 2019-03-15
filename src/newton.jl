@@ -53,22 +53,27 @@ end
 
 
 """
-    newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, maxiters=3, simplified_last_step=true)
 
 An ordinary Newton's method. If `simplified_last_step` is `true`, then for the last iteration
 the previously Jacobian will be used. This uses an LU-factorization for square systems
 and a QR-factorization for overdetermined.
 """
-function newton(F::AbstractSystem, x₀; tol=1e-6, maxiters=3, simplified_last_step=true)
-    newton!(copy(x₀), F::AbstractSystem, x₀, tol, maxiters, simplified_last_step, NewtonCache(F::AbstractSystem, x₀))
+function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀);
+                tol=1e-6, maxiters=3, simplified_last_step=true)
+    newton!(copy(x₀), F, x₀, norm, cache, tol, maxiters, simplified_last_step)
 end
 
 """
-    newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
+    newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, maxiters=3, simplified_last_step=true)
 
-In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) as input.
+In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
-function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache;
+                 tol::Float64=1e-6, maxiters::Int=3, simplified_last_step::Bool=true)
+    newton!(out, F, x₀, norm, cache, tol, maxiters, simplified_last_step)
+end
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, maxiters::Integer, simplified_last_step::Bool)
     Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -81,7 +86,7 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
     accuracy = T(Inf)
     digits_lost = 0.0
     ω₀ = ω = 0.0
-    for i ∈ 0:(maxiters)
+    for i ∈ 0:maxiters
         if i == maxiters && simplified_last_step
             evaluate!(rᵢ, F, xᵢ)
         else
@@ -95,7 +100,7 @@ function newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplifie
         end
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
-        norm_Δxᵢ = euclidean_norm(Δxᵢ)
+        norm_Δxᵢ = norm(Δxᵢ)
         @inbounds for k in eachindex(xᵢ)
             xᵢ₊₁[k] = xᵢ[k] - Δxᵢ[k]
         end

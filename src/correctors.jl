@@ -92,9 +92,9 @@ function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
 end
 
 
-function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, tol, maxiters::Integer=3)
+function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, norm, tol, maxiters::Integer)
     cache.F.t = t
-    result = newton!(out, cache.F, x₀, tol, maxiters, alg.simplified_last_step, cache.C)
+    result = newton!(out, cache.F, x₀, norm, cache.C, tol, maxiters, alg.simplified_last_step)
     CorrectorResult(result)
 end
 

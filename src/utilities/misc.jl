@@ -77,7 +77,9 @@ end
  function print_fieldnames(io::IO, obj)
      println(io, typeof(obj), ":")
      for name in fieldnames(typeof(obj))
-         println(io, " • ", name, " → ", getfield(obj, name))
+         if getfield(obj, name) !== nothing
+             println(io, " • ", name, " → ", getfield(obj, name))
+         end
      end
  end
 

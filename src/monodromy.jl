@@ -756,7 +756,7 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
 end
 
 function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
-    result = newton!(C.out, C.F, ŷ, options.identical_tol, 3, true, C.newton_cache)
+    result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache, options.identical_tol, 3, true)
 
     if result.retcode == converged
         return affine_chart(x, C.out)
@@ -778,6 +778,11 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
 
     if node.main_node && (
         !affine_tracking(C.tracker) ||
+        # Note, if auto scaling is enabled, and a solution component x_i is larg-ish
+        # then ||x_i - x^*_i|| is lower than the path tracking accuracy
+        # But if the path tracking accuracy is smaller than options.identical_tol
+        # The check would let the solution get through.
+        # TODO: Is that bad? Maybe if two solutions are very close?
         (affine_tracking(C.tracker) && accuracy(C.tracker) > options.identical_tol)
        )
         y = verified_affine_vector(C, currx(C.tracker), job.x, options)
