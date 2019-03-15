@@ -221,8 +221,6 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; kwargs..
     end
     data
 end
-
-UniquePoints(v) = UniquePoints(v, euclidean_distance)
 UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance, kwargs...)
 
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
@@ -339,7 +337,7 @@ This is the same as
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Real = 1e-5) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     k = -1
     data = UniquePoints(v[1], distance)
@@ -351,4 +349,3 @@ function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_di
     end
     [m for m in mults if length(m) > 1]
 end
-multiplicities(v::Vector{<:AbstractVector{T}}; tol::Real = 1e-5) where T = multiplicities(v, euclidean_distance, tol = tol)
