@@ -67,6 +67,8 @@
         @test nfinite(solve(G, F, [[2, -3]])) == 1
         @test nfinite(solve(G, F, [[2+0.0im, -3.0+0im]])) == 1
 
+        @test nfinite(solve(G, F, [@SVector [2, -3]])) == 1
+
         F = FPSystem(homogenize(equations(cyclic(5))))
         result = solve(F, homvar=6)
         @test nfinite(result) == 70
@@ -187,6 +189,12 @@
 
         γ₁, γ₀ =randn(ComplexF64, 2)
         S2 = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], γ₁=γ₁, γ₀=γ₀, homvar=z)
+        @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
+        @test nfinite(S2) == 1
+
+
+        γ₁, γ₀ =randn(ComplexF64, 2)
+        S2 = solve(F, [@SVector [1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], p₁=[1, 0], p₀=[2, 4], γ₁=γ₁, γ₀=γ₀, homvar=z)
         @test solution(S2[1]) ≈ [complex(√2), -complex(√2)]
         @test nfinite(S2) == 1
     end
