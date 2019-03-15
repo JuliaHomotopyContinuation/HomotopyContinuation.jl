@@ -933,7 +933,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTracker",
     "category": "type",
-    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\ncorrector_maxiters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmaxiters=10_000: The maximal number of iterations the path tracker has available.\nminimal_step_size=1e-14: The minimal step size.\nmaximal_step_size=Inf: The maximal step size.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\n\n\n\n\n\n"
+    "text": " PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker\n\nCreate a PathTracker to track x₁ from t₁ to t₀. The homotopy H needs to be homogenous. Note that a PathTracker is also a (mutable) iterator.\n\nPathTrackerOptions\n\ncorrector::AbstractCorrector: The corrector used during in the predictor-corrector scheme. The default is NewtonCorrector.\ncorrector_maxiters=3: The maximal number of correction steps in a single step.\ninitial_step_size=0.1: The step size of the first step.\nmaxiters=10_000: The maximal number of iterations the path tracker has available.\nminimal_step_size=1e-14: The minimal step size.\nmaximal_step_size=Inf: The maximal step size.\nmaximal_lost_digits::Real=-(log₁₀(eps) + 3): The tracking is terminated if we estimate that we loose more than maximal_lost_digits in the linear algebra steps.\npredictor::AbstractPredictor: The predictor used during in the predictor-corrector scheme. The default is Heun()`.\nrefinement_maxiters=corrector_maxiters: The maximal number of correction steps used to refine the final value.\nrefinement_tol=1e-8: The precision used to refine the final value.\ntol=1e-7: The precision used to track a value.\n\n\n\n\n\n"
 },
 
 {
@@ -941,7 +941,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTrackerResult",
     "category": "type",
-    "text": " PathTrackerResult(tracker)\n\nContaining the result of a tracked path. The fields are\n\nsuccessfull::Bool Indicating whether tracking was successfull.\nreturncode::PathTrackerStatus.states If the tracking was successfull then it is PathTrackerStatus.success.\nx::V The result.\nt::Float64 The t when the path tracker stopped.\n\n\n\n\n\n"
+    "text": " PathTrackerResult{T,N}\n\nContaining the result of a tracked path. The fields are\n\nreturncode::PathTrackerStatus.states If the tracking was successfull then it is PathTrackerStatus.success.\nx::ProjectiveVectors.PVector{T,N} The result.\nt::ComplexF64 The t when the path tracker stopped.\naccuracy::Float64: The estimated accuracy of x.\n\n\n\n\n\n"
 },
 
 {
@@ -949,7 +949,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Path tracker",
     "title": "HomotopyContinuation.PathTrackerStatus.states",
     "category": "type",
-    "text": "PathTrackerStatus.states\n\nThe possible states the pathtracker can achieve are\n\nPathTrackerStatus.success\nPathTrackerStatus.tracking\nPathTrackerStatus.terminated_maximal_iterations\nPathTrackerStatus.terminated_invalid_startvalue\nPathTrackerStatus.terminated_step_size_too_small\nPathTrackerStatus.terminated_singularity\n\n\n\n\n\n"
+    "text": "PathTrackerStatus.states\n\nThe possible states the pathtracker can achieve are\n\nPathTrackerStatus.success\nPathTrackerStatus.tracking\nPathTrackerStatus.terminated_maximal_iterations\nPathTrackerStatus.terminated_invalid_startvalue\nPathTrackerStatus.terminated_step_size_too_small\nPathTrackerStatus.terminated_singularity\nPathTrackerStatus.terminated_ill_conditioned\n\n\n\n\n\n"
 },
 
 {
@@ -1157,7 +1157,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Newton\'s method",
     "title": "HomotopyContinuation.NewtonResult",
     "category": "type",
-    "text": "NewtonResult{T}\n\nStructure holding information about the outcome of the newton function. The fields are.\n\nretcode The return code of the compuation. converged means that accuracy ≤ tol.\naccuracy::T |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.\niters::Int The number of iterations used.\nnewton_update_error::Float64 δx/(|x| ⋅ ϵ), where x is the first Newton update, δx is an estimate for the error |x-x̂| between x and the exact Newton update x̂ and ϵ is the machine precision.\n\n\n\n\n\n"
+    "text": "NewtonResult{T}\n\nStructure holding information about the outcome of the newton function. The fields are.\n\nretcode The return code of the compuation. converged means that accuracy ≤ tol.\naccuracy::T |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.\niters::Int The number of iterations used.\ndigits_lost::Float64 Estimate of the (relative) lost digits in the linear algebra.\n\n\n\n\n\n"
 },
 
 {
@@ -1165,7 +1165,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Newton\'s method",
     "title": "HomotopyContinuation.newton!",
     "category": "function",
-    "text": "newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool,  cache::NewtonCache, newton_update_error = 1.0)\n\nIn-place version of newton. Needs a NewtonCache as input.\n\n\n\n\n\n"
+    "text": "newton!(out, F::AbstractSystem, x₀, tol, maxiters::Integer, simplified_last_step::Bool, cache::NewtonCache)\n\nIn-place version of newton. Needs a NewtonCache as input.\n\n\n\n\n\n"
 },
 
 {
