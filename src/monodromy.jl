@@ -62,13 +62,13 @@ flatten(a::Tuple, b::Tuple) = (a..., b...)
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_allowed_keywords = [:accuracy, :done_callback,
+const monodromy_options_allowed_keywords = [:identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
 struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
-    accuracy::Float64
+    identical_tol::Float64
     done_callback::F1
     group_actions::GroupActions{F2}
     group_action_on_all_nodes::Bool
@@ -83,7 +83,7 @@ struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
 end
 
 function MonodromyOptions(isrealsystem;
-    accuracy::Float64=1e-6,
+    identical_tol::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
     group_actions= group_action === nothing ? nothing : GroupActions(group_action),
@@ -103,7 +103,7 @@ function MonodromyOptions(isrealsystem;
        actions = GroupActions(group_actions)
     end
 
-    MonodromyOptions(accuracy, done_callback, actions,
+    MonodromyOptions(identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
         target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
@@ -337,7 +337,7 @@ end
 function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
     loop = Loop(p₁, first(x), nnodes, options; kwargs...)
     for xᵢ ∈ x
-        add!(loop.nodes[1], xᵢ; tol=options.accuracy)
+        add!(loop.nodes[1], xᵢ; tol=options.identical_tol)
     end
     loop
 end
@@ -590,7 +590,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
-* `accuracy::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
+* `identical_tol::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
 * `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
 * `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.
@@ -756,7 +756,7 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
 end
 
 function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
-    result = newton!(C.out, C.F, ŷ, options.accuracy, 3, true, C.newton_cache)
+    result = newton!(C.out, C.F, ŷ, options.identical_tol, 3, true, C.newton_cache)
 
     if result.retcode == converged
         return affine_chart(x, C.out)
@@ -787,14 +787,14 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     end
 
 
-    if !iscontained(node, y; tol=options.accuracy)
+    if !iscontained(node, y; tol=options.identical_tol)
         if options.equivalence_classes
             if equivalence_class_contained(node, y, options)
                 return :incomplete
             end
         end
 
-        add!(node, y; tol=options.accuracy)
+        add!(node, y; tol=options.identical_tol)
         # If we are on the main node check whether we have a real root.
         node.main_node && checkreal!(stats, y)
         # Check if we are done
@@ -807,7 +807,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         if options.complex_conjugation && node.main_node
             ȳ = conj.(y)
             if !equivalence_class_contained(node, ȳ, options)
-                add!(node, ȳ; tol=options.accuracy)
+                add!(node, ȳ; tol=options.identical_tol)
                 # Check if we are done
                 isdone(node, ȳ, options) && return :done
                 # Schedule new job
@@ -821,7 +821,7 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         #    group actions `node.points !== nothing`
         if !options.equivalence_classes && node.points !== nothing
             for yᵢ in options.group_actions(y)
-                if add!(node, yᵢ; tol=options.accuracy)
+                if add!(node, yᵢ; tol=options.identical_tol)
                     node.main_node && checkreal!(stats, yᵢ)
                     # Check if we are done
                     node.main_node && isdone(node, yᵢ, options) && return :done
@@ -836,7 +836,7 @@ end
 
 function equivalence_class_contained(node, y, options)
     for yᵢ in options.group_actions(y)
-        if iscontained(node, yᵢ, tol=options.accuracy)
+        if iscontained(node, yᵢ, tol=options.identical_tol)
             # equivalence class already existing
             return true
         end
