@@ -36,7 +36,7 @@
 
         # Simple step size
         F = equations(katsura(5))
-        @test nfinite(solve(F, simple_step_size=true, threading=false)) == 32
+        @test nfinite(solve(F, simple_step_size_alg=true, threading=false)) == 32
 
         # scaling
         F = equations(katsura(5))
@@ -45,7 +45,7 @@
         @test nfinite(solve(F, homotopy=StraightLineHomotopy)) == 32
         result = solve(F, predictor=Euler(), homotopy=StraightLineHomotopy)
         @test nresults(result) == 32
-        @test nfinite(solve(F, tol=1e-5)) == 32
+        @test nfinite(solve(F, accuracy=1e-5)) == 32
 
         result = solve(F)
         @test nfinite(result) == 32
@@ -134,7 +134,7 @@
     @testset "Path Crossing" begin
         # This tests that we indeed detect path crossings
         F = equations(cyclic(6))
-        tracker, start_sols = pathtracker_startsolutions(F, tol=1e-3, corrector_maxiters=5, seed=123512)
+        tracker, start_sols = pathtracker_startsolutions(F, accuracy=1e-3, max_corrector_iters=5, seed=123512)
         tracked_paths = map(start_sols) do x
             track(tracker, x, 1.0, 0.1)
         end

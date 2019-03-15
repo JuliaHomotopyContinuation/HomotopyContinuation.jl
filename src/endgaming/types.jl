@@ -166,7 +166,7 @@ function Endgame(H::AbstractHomotopy, x::ProjectiveVectors.PVector;
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop, check_at_infinity)
     tracker = PathTracker(H, x, complex(0.1,0.0), 0.0im;
-        patch=FixedPatch(), maxiters=maxiters_per_step, pathtrackerkwargs...)
+        patch=FixedPatch(), max_steps=maxiters_per_step, pathtrackerkwargs...)
     state = EndgameState(x, complex(1.0,0.0), options)
 
     Endgame(tracker, state, Cache(state, options), options)
