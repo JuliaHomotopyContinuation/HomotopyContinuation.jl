@@ -12,7 +12,7 @@ makedocs(
         "Path tracker" => "pathtracking.md",
         "Newton's method" => "newton.md",
         "Sorting arrays of solutions" => "sorting.md",
-        "Norms and Distances arrays of solutions" => "norms_distances.md",
+        "Norms and Distances" => "norms_distances.md",
         "Reference" => "reference.md"
         ],
     strict=true
