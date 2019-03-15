@@ -21,7 +21,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Contents",
     "category": "section",
-    "text": "Pages = [\"solving.md\", \"systems.md\", \"homotopies.md\", \"predictors-correctors.md\", \"pathtracking.md\", \"newton.md\", \"reference.md\"]"
+    "text": "Pages = [\n  \"solving.md\",\n  \"systems.md\",\n  \"homotopies.md\",\n  \"predictors-correctors.md\",\n  \"pathtracking.md\",\n  \"newton.md\",\n  \"sorting.md\",\n  \"norms_distances.md\",\n  \"reference.md\"]"
 },
 
 {
@@ -1182,6 +1182,150 @@ var documenterSearchIndex = {"docs": [
     "title": "Newton\'s method",
     "category": "section",
     "text": "Sometimes it is necessary to refine obtained solutions. For this we provide an interface to Newton\'s method.newton\nNewtonResultFor high performance applications we also provide an in-place version of Newton\'s method which avoids any temporary allocations.newton!\nNewtonCache"
+},
+
+{
+    "location": "sorting/#",
+    "page": "Sorting arrays of solutions",
+    "title": "Sorting arrays of solutions",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "sorting/#Sorting-arrays-of-solutions-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Sorting arrays of solutions",
+    "category": "section",
+    "text": "We provide functions for sorting analyzing arrays of vectors."
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.UniquePoints",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.UniquePoints",
+    "category": "type",
+    "text": "UniquePoints{V<:AbstractVector, T, F<:Function}\n\nA data structure which holds points of type V where T=real(eltype(V)). This data structure provides an efficient (poly)logarithmic check whether a point already exists where two points u,v are considered equal if F(u,v)<tol, where tol is a tolerance provided through the add! function.\n\nUniquePoints(v::AbstractVector{<:Number}, distance::F)\n\nInitialize the data structure with just one data point v.\n\nUniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5)\n\nInitialize the data structure with all points in v. These are added in order by add! with the given tolerance tol. In particular, \'UniquePoints\' structure will contain only points for which the pairwise distance given by F is less than tol.\n\nUniquePoints(v) = UniquePoints(v, euclidean_distance)\n\nIf F is not specialized, euclidean_distance is used.\n\nExample\n\njulia> UniquePoints([[1,0.5]; [1,0.5]; [1,1]])\n[[1,0.5], [1,1]]\n\nThis is the same as\n\nUniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.points",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.points",
+    "category": "function",
+    "text": "points(data::UniquePoints)\n\nReturn the points stored in data.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.iscontained",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.iscontained",
+    "category": "function",
+    "text": "iscontained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nCheck whether x is contained in the data by using the tolerance tol to decide for duplicates.\n\niscontained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol return the index of the data point which already exists. If the data point is not existing -1 is returned.\n\n\n\n\n\niscontained(node::Node, x; kwargs...)\n\nCalls iscontained on the points of the Node.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.add!",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.add!",
+    "category": "function",
+    "text": "add!(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nAdd x to data if it doesn\'t already exists by using the tolerance tol to decide for duplicates.\n\nadd!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol to decide for duplicates return the index of the data point which already exists. If the data point is not existing add it to x and return -1. The element will be the last element of points(data).\n\n\n\n\n\nadd!(node::Node, x; kwargs...)\n\nCalls add! on the points of the Node.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.unsafe_add!",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.unsafe_add!",
+    "category": "function",
+    "text": "unsafe_add!(data::UniquePoints{V}, x::V)::Bool\n\nSimilarly to add! but assumes that it was already checked that there is no duplicate with iscontained. This has to be called directly after iscontained with the same value of x.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Base.empty!",
+    "page": "Sorting arrays of solutions",
+    "title": "Base.empty!",
+    "category": "function",
+    "text": "empty!(collection) -> collection\n\nRemove all elements from a collection.\n\nExamples\n\njulia> A = Dict(\"a\" => 1, \"b\" => 2)\nDict{String,Int64} with 2 entries:\n  \"b\" => 2\n  \"a\" => 1\n\njulia> empty!(A);\n\njulia> A\nDict{String,Int64} with 0 entries\n\n\n\n\n\nempty!(data::UniquePoints)\n\nRemove all points from data.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Computing-unique-points-in-an-array-of-vectors-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Computing unique points in an array of vectors",
+    "category": "section",
+    "text": "UniquePointsWe provide several helper functions for UniquePoints.points\niscontained\nadd!\nunsafe_add!\nempty!"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.multiplicities",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.multiplicities",
+    "category": "function",
+    "text": "multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5)\n\nReturns an array of arrays of integers. Each vector w in \'v\' contains all indices i,j such that w[i] and w[j] have distance at most tol.\n\nmultiplicities(v; tol::Real = 1e-5) = multiplicities(v, euclidean_distance, tol = tol)\n\nIf distance is not specified, euclidean_distance is used.\n\njulia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])\n[[1,2]]\n\nThis is the same as\n\nmultiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))\n\n\n\n\n\nmultiplicities(V::Results; tol=1e-6)\n\nReturns a Vector of Vector{PathResult}s grouping the PathResults whose solutions appear with multiplicities greater 1 in \'V\'. Two solutions are regarded as equal, when their pairwise distance is less than \'tol\'.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Computing-points-in-an-array-of-vectors-which-appear-multiple-times-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Computing points in an array of vectors which appear multiple times",
+    "category": "section",
+    "text": "If instead of unique points, the user wants to have the information which points in an array of points appear with multiplicity, they should use the next function.multiplicitiesThe multiplicities functions may also be applied to AffineResult and ProjectiveResult structures; see here: multiplicities(::HomotopyContinuation.Results)."
+},
+
+{
+    "location": "norms_distances/#",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "Norms and Distances arrays of solutions",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.euclidean_distance",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "HomotopyContinuation.euclidean_distance",
+    "category": "function",
+    "text": "euclidean_distance(u, v)\n\nCompute ||u-v||₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.euclidean_norm",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "HomotopyContinuation.euclidean_norm",
+    "category": "function",
+    "text": "euclidean_norm(u)\n\nCompute ||u||₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.infinity_distance",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "HomotopyContinuation.infinity_distance",
+    "category": "function",
+    "text": "infinity_distance(u, v)\n\nCompute the ∞-norm of u-v.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.infinity_norm",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "HomotopyContinuation.infinity_norm",
+    "category": "function",
+    "text": "infinity_norm(z)\n\nCompute the ∞-norm of z. If z is a complex vector this is more efficient than norm(z, Inf).\n\ninfinity_norm(z₁, z₂)\n\nCompute the ∞-norm of z₁-z₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.fubini_study",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "HomotopyContinuation.fubini_study",
+    "category": "function",
+    "text": "fubini_study(x, y)\n\nComputes the Fubini-Study distance between x and y.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#Distances-and-norms-1",
+    "page": "Norms and Distances arrays of solutions",
+    "title": "Distances and norms",
+    "category": "section",
+    "text": "We provide functions for computing norms and distances.euclidean_distance\neuclidean_norminfinity_distance\ninfinity_normfubini_study"
 },
 
 {
