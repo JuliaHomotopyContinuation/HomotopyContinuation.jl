@@ -569,11 +569,11 @@ MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache}
 
 Cache for monodromy loops.
 """
-struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, T<:Number, N}
+struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, AV<:AbstractVector}
     F::FT
     tracker::Tracker
     newton_cache::NC
-    out::ProjectiveVectors.PVector{T,N}
+    out::AV
 end
 
 

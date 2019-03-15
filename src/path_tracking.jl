@@ -48,17 +48,17 @@ end
 ####################
 
 """
-     PathTrackerResult{T,N}
+     PathTrackerResult{V<:AbstractVector}
 
 Containing the result of a tracked path. The fields are
 * `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
-* `x::ProjectiveVectors.PVector{T,N}` The result.
+* `x::V` The result.
 * `t::ComplexF64` The `t` when the path tracker stopped.
 * `accuracy::Float64`: The estimated accuracy of `x`.
 """
-struct PathTrackerResult{T, N}
+struct PathTrackerResult{V <: AbstractVector}
      returncode::PathTrackerStatus.states
-     x::ProjectiveVectors.PVector{T,N}
+     x::V
      t::ComplexF64
      accuracy::Float64
      accepted_steps::Int
@@ -130,10 +130,10 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions)
 # PathTrackerState #
 ####################
 
-mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
-    x::ProjectiveVectors.PVector{T,N} # current x
-    x̂::ProjectiveVectors.PVector{T,N} # last prediction
-    x̄::ProjectiveVectors.PVector{T,N} # canidate for new x
+mutable struct PathTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Union{AbstractAffinePatchState, Nothing}}
+    x::AV # current x
+    x̂::AV # last prediction
+    x̄::AV # canidate for new x
     ẋ::Vector{T} # derivative at current x
     η::Float64
     ω::Float64
@@ -147,14 +147,14 @@ mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     # for how this is computed.
     digits_lost::Float64
     status::PathTrackerStatus.states
-    patch::PatchState
+    patch::MaybePatchState
     accepted_steps::Int
     rejected_steps::Int
     last_step_failed::Bool
     consecutive_successfull_steps::Int
 end
 
-function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::AbstractAffinePatchState, options::PathTrackerOptions)
+function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, patch::Union{Nothing, AbstractAffinePatchState}=nothing)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
     ẋ = copy(x₁.data)
     η = ω = NaN
@@ -184,12 +184,15 @@ function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state.accuracy = 0.0
     state.accepted_steps = state.rejected_steps = 0
     state.status = PathTrackerStatus.tracking
-    ProjectiveVectors.embed!(state.x, x₁)
-    setup_patch && setup!(state.patch, state.x)
+    embed!(state.x, x₁)
+    setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
     state
 end
+
+embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
+embed!(x::AbstractVector, y) = x .= y
 
 ####################
 # PathTrackerCache #
@@ -239,14 +242,14 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 struct PathTracker{H<:AbstractHomotopy,
     Predictor<:AbstractPredictor,
     Corrector<:AbstractCorrector,
-    Patch<:AbstractAffinePatch,
+    MaybePatch<:Union{Nothing, AbstractAffinePatch},
     S<:PathTrackerState,
     C<:PathTrackerCache}
     # these are fixed
     homotopy::H
     predictor::Predictor
     corrector::Corrector
-    affine_patch::Patch
+    affine_patch::MaybePatch
     # these are mutable
     state::S
     options::PathTrackerOptions
@@ -260,8 +263,10 @@ Construct a [`PathTracker`](@ref) from the given `problem`.
 """
 function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
     y₁ = embed(prob, x₁)
-    PathTracker(prob.homotopy, y₁, complex(t₁), complex(t₀); kwargs...)
+    PathTracker(prob.homotopy, y₁, t₁, t₀; kwargs...)
 end
+
+# Tracking in Projective Space
 function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=OrthogonalPatch(),
     corrector::AbstractCorrector=NewtonCorrector(),
@@ -279,21 +284,47 @@ function PathTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
     HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
 
     # We have to make sure that the element type of x is invariant under evaluation
-    indempotent_x = begin
-        u = Vector{Any}(undef, size(H)[1])
-        evaluate!(u, HC, x₁, t₁)
-        indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
-        indem_x .= x₁
-    end
-    tracker_state = PathTrackerState(indempotent_x, t₁, t₀, patch_state, options)
+    tracker_state = PathTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state)
     cache = PathTrackerCache(HC, predictor, corrector, tracker_state)
 
     PathTracker(H, predictor, corrector, patch, tracker_state, options, cache)
 end
 
-# Do not really understand this but Heun doesn't work that great
+# Tracking in affine space
+function PathTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
+    corrector::AbstractCorrector=NewtonCorrector(),
+    predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
+
+    options = PathTrackerOptions(real(eltype(x₁)); kwargs...)
+
+    # We close over the patch state, the homotopy and its cache
+    # to be able to pass things around more easily
+    HC = HomotopyWithCache(H, x₁, t₁)
+
+    # We have to make sure that the element type of x is invariant under evaluation
+    tracker_state = PathTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options)
+    cache = PathTrackerCache(HC, predictor, corrector, tracker_state)
+
+    PathTracker(H, predictor, corrector, nothing, tracker_state, options, cache)
+end
+
+
+default_predictor(x::AbstractVector) = Heun()
+# Do not really understand this but Heun doesn't work that great for multi-homogenous tracking
 default_predictor(x::ProjectiveVectors.PVector{T,1}) where {T} = Heun()
-default_predictor(x::ProjectiveVectors.PVector) = Euler()
+default_predictor(x::ProjectiveVectors.PVector{T,N}) where {T, N} = Euler()
+
+"""
+    indempotent_x(H, x₁, t₁)
+
+This returns a vector similar to `x₁` but with an element type which is invariant under evaluation.
+"""
+function indempotent_x(H, x₁, t₁)
+    u = Vector{Any}(undef, size(H)[1])
+    evaluate!(u, H, x₁, t₁)
+    indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
+    indem_x .= x₁
+end
 
 Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
@@ -427,7 +458,9 @@ function step!(tracker::PathTracker)
             state.digits_lost = result.digits_lost
             # Step size change
             update_stepsize!(state, result, order(tracker.predictor), options)
-            options.update_patch && changepatch!(state.patch, x)
+            if state.patch !== nothing && options.update_patch
+                changepatch!(state.patch, x)
+            end
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
