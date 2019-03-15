@@ -7,5 +7,14 @@ If this is your first time reading this documentation, we recommend you start wi
 
 ## Contents
 ```@contents
-Pages = ["solving.md", "systems.md", "homotopies.md", "predictors-correctors.md", "pathtracking.md", "newton.md", "reference.md"]
+Pages = [
+  "solving.md",
+  "systems.md",
+  "homotopies.md",
+  "predictors-correctors.md",
+  "pathtracking.md",
+  "newton.md",
+  "sorting.md",
+  "norms_distances.md",
+  "reference.md"]
 ```
