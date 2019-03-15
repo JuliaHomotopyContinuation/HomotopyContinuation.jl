@@ -3,22 +3,29 @@ export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homv
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling];
+	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine];
 	input_supported_keywords]
 
 const DEFAULT_SYSTEM = FPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
 abstract type AbstractProblem end
+Base.broadcastable(P::AbstractProblem) = Ref(P)
+"""
+    homotopy(prob::AbstractProblem)
+
+Get the homotopy stored in the problem `prob`.
+"""
+homotopy(prob::AbstractProblem) = prob.homotopy
 
 """
     ProjectiveProblem(H::AbstractHomotopy, homogenization::AbstractHomogenization, seed::Int)
 
 Construct a `ProjectiveProblemProblem`. The homotopy `H` needs to be homogenous.
 """
-struct ProjectiveProblem{H<:AbstractHomotopy, N} <: AbstractProblem
-    homotopy::H
-    vargroups::VariableGroups{N}
+struct ProjectiveProblem <: AbstractProblem
+    homotopy::AbstractHomotopy
+    vargroups::VariableGroups
     seed::Int
 end
 function ProjectiveProblem(G::AbstractSystem, F::AbstractSystem,
@@ -26,21 +33,12 @@ function ProjectiveProblem(G::AbstractSystem, F::AbstractSystem,
     ProjectiveProblem(homotopy(G, F), vargroups, seed)
 end
 
-Base.broadcastable(P::AbstractProblem) = Ref(P)
-
-"""
-    homotopy(prob::ProjectiveProblem)
-
-Get the homotopy stored in the problem `prob`.
-"""
-homotopy(prob::ProjectiveProblem) = prob.homotopy
-
 """
     homvars(prob::ProjectiveProblem)
 
 Get the homogenization variables of the problem. Returns `nothing` if there are no.
 """
-function homvars(prob::ProjectiveProblem{H, N}) where {H,N}
+function homvars(prob::ProjectiveProblem) where {H,N}
     if prob.vargroups.dedicated_homvars
         map(last, prob.vargroups.groups)
     else
@@ -48,12 +46,29 @@ function homvars(prob::ProjectiveProblem{H, N}) where {H,N}
     end
 end
 
+
+"""
+    AffineProblem(H::AbstractHomotopy, seed::Int)
+
+Construct a `AffineProblem`.
+"""
+struct AffineProblem <: AbstractProblem
+    homotopy::AbstractHomotopy
+    vargroups::VariableGroups{1}
+    seed::Int
+end
+function AffineProblem(G::AbstractSystem, F::AbstractSystem,
+        vargroups::VariableGroups{1}, seed::Int; homotopy=DEFAULT_HOMOTOPY)
+    AffineProblem(homotopy(G, F), vargroups, seed)
+end
+
+
 """
     embed(prob::ProjectiveProblem, x)
 
 Embed the solution `x` into projective space if necessary.
 """
-function embed(prob::ProjectiveProblem{<:AbstractHomotopy, N}, x) where {N}
+function embed(prob::ProjectiveProblem, x)
     dims = projective_dims(prob.vargroups)
     if sum(dims) == length(x)
         ProjectiveVectors.embed(x, dims)
@@ -61,7 +76,8 @@ function embed(prob::ProjectiveProblem{<:AbstractHomotopy, N}, x) where {N}
         PVector(x, dims)
     end
 end
-embed(prob::ProjectiveProblem{<:AbstractHomotopy, N}, x::PVector) where {N} = x
+embed(prob::ProjectiveProblem, x::PVector) = x
+embed(prob::AffineProblem, x::AbstractVector) = x
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
 	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
@@ -241,11 +257,20 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; system=SPSystem, kwargs...)
-    F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
-	variables = flattened_variable_groups(variable_groups)
-	F̄ = construct_system(F, system; homvars=homvars, variables=variables, parameters=prob.parameters)
-    H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affine=false, system=SPSystem, kwargs...)
+	if affine
+		vars = variables(prob.system; parameters=prob.parameters)
+		variable_groups = VariableGroups(vars)
+		F = construct_system(prob.system, system; variables=vars, parameters=prob.parameters)
+	    H = ParameterHomotopy(F, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
-    ProjectiveProblem(H, variable_groups, seed), prob.startsolutions
+	    AffineProblem(H, variable_groups, seed), prob.startsolutions
+	else
+	    F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
+		vars = flattened_variable_groups(variable_groups)
+		F̄ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
+	    H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+
+	    ProjectiveProblem(H, variable_groups, seed), prob.startsolutions
+	end
 end

@@ -42,6 +42,20 @@
         @test out == R.x
     end
 
+    @testset "Affine tracking" begin
+        @polyvar x a y b
+        F = [x^2-a, x*y-a+b]
+        p = [a, b]
+
+        tracker, starts = pathtracker_startsolutions(F, [[1.0, 1.0 + 0.0*im]], parameters=p, p₁=[1, 0], p₀=[2, 4],
+                    affine=true)
+
+        res = track(tracker, starts[1], 1.0, 0.0)
+        @test res.returncode == PathTrackerStatus.success
+        @test isa(res.x, Vector{ComplexF64})
+        @test length(res.x) == 2
+    end
+
     @testset "Allocations" begin
         F = equations(katsura(5))
         tracker, start_sols = pathtracker_startsolutions(F)

@@ -156,7 +156,11 @@ end
 
 function PathTrackerState(x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, patch::Union{Nothing, AbstractAffinePatchState}=nothing)
     x, x̂, x̄ = copy(x₁), copy(x₁), copy(x₁)
-    ẋ = copy(x₁.data)
+    if x₁ isa PVector
+        ẋ = copy(x₁.data)
+    else
+        ẋ = copy(x₁)
+    end
     η = ω = NaN
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
@@ -261,9 +265,8 @@ end
 
 Construct a [`PathTracker`](@ref) from the given `problem`.
 """
-function PathTracker(prob::ProjectiveProblem, x₁, t₁, t₀; kwargs...)
-    y₁ = embed(prob, x₁)
-    PathTracker(prob.homotopy, y₁, t₁, t₀; kwargs...)
+function PathTracker(prob::AbstractProblem, x₁, t₁, t₀; kwargs...)
+    PathTracker(prob.homotopy, embed(prob, x₁), t₁, t₀; kwargs...)
 end
 
 # Tracking in Projective Space
