@@ -286,6 +286,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `refinement_max_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `accuracy=1e-7`: The precision used to track a value.
+* `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
 """
 struct PathTracker{H<:AbstractHomotopy,
     Predictor<:AbstractPredictor,
