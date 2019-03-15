@@ -12,9 +12,80 @@ const pathtracker_allowed_keywords = [:corrector, :predictor, :initial_steplengt
     :tol, :refinement_tol, :corrector_maxiters,  :refinement_maxiters,
     :maxiters, :simple_step_size]
 
-###########
-# PathTrackerOptions
-##########
+
+####################
+# PathTrackerState #
+####################
+
+module PathTrackerStatus
+    """
+        PathTrackerStatus.states
+
+    The possible states the pathtracker can achieve are
+
+    * `PathTrackerStatus.success`
+    * `PathTrackerStatus.tracking`
+    * `PathTrackerStatus.terminated_maximal_iterations`
+    * `PathTrackerStatus.terminated_invalid_startvalue`
+    * `PathTrackerStatus.terminated_step_size_too_small`
+    * `PathTrackerStatus.terminated_singularity`
+    * `PathTrackerStatus.terminated_ill_conditioned`
+    """
+    @enum states begin
+        success
+        tracking
+        terminated_maximal_iterations
+        terminated_invalid_startvalue
+        terminated_step_size_too_small
+        terminated_singularity
+        terminated_ill_conditioned
+    end
+end
+
+
+####################
+# PathTrackerResult #
+####################
+
+"""
+     PathTrackerResult{T,N}
+
+Containing the result of a tracked path. The fields are
+* `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
+* `x::ProjectiveVectors.PVector{T,N}` The result.
+* `t::ComplexF64` The `t` when the path tracker stopped.
+* `accuracy::Float64`: The estimated accuracy of `x`.
+"""
+struct PathTrackerResult{T, N}
+     returncode::PathTrackerStatus.states
+     x::ProjectiveVectors.PVector{T,N}
+     t::ComplexF64
+     accuracy::Float64
+     accepted_steps::Int
+     rejected_steps::Int
+end
+
+function PathTrackerResult(tracker)
+    state = tracker.state
+     PathTrackerResult(state.status,
+          copy(state.x), state.segment[state.s],
+          state.accuracy,
+          state.accepted_steps,
+          state.rejected_steps)
+end
+
+Base.show(io::IO, result::PathTrackerResult) = print_fieldnames(io, result)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", result::PathTrackerResult) = result
+
+
+##################
+## PATH TRACKER ##
+##################
+
+
+######################
+# PathTrackerOptions #
+######################
 mutable struct PathTrackerOptions
     tol::Float64
     corrector_maxiters::Int
@@ -54,33 +125,10 @@ default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 3
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
-###########
-# PathTrackerState
-##########
-module PathTrackerStatus
-    """
-        PathTrackerStatus.states
 
-    The possible states the pathtracker can achieve are
-
-    * `PathTrackerStatus.success`
-    * `PathTrackerStatus.tracking`
-    * `PathTrackerStatus.terminated_maximal_iterations`
-    * `PathTrackerStatus.terminated_invalid_startvalue`
-    * `PathTrackerStatus.terminated_step_size_too_small`
-    * `PathTrackerStatus.terminated_singularity`
-    * `PathTrackerStatus.terminated_ill_conditioned`
-    """
-    @enum states begin
-        success
-        tracking
-        terminated_maximal_iterations
-        terminated_invalid_startvalue
-        terminated_step_size_too_small
-        terminated_singularity
-        terminated_ill_conditioned
-    end
-end
+####################
+# PathTrackerState #
+####################
 
 mutable struct PathTrackerState{T, N, PatchState <: AbstractAffinePatchState}
     x::ProjectiveVectors.PVector{T,N} # current x
@@ -124,6 +172,9 @@ function PathTrackerState(x₁::ProjectiveVectors.PVector, t₁, t₀, patch::Ab
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
+Base.show(io::IO, state::PathTrackerState) = print_fieldnames(io, state)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", state::PathTrackerState) = state
+
 function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, options::PathTrackerOptions, setup_patch)
     state.segment = ComplexSegment(promote(t₁, t₀)...)
     state.η = state.ω = NaN
@@ -140,13 +191,9 @@ function reset!(state::PathTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state
 end
 
-Base.show(io::IO, state::PathTrackerState) = print_fieldnames(io, state)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", state::PathTrackerState) = state
-
-
-###########
-# PathTrackerCache
-##########
+####################
+# PathTrackerCache #
+####################
 mutable struct PathTrackerCache{H<:HomotopyWithCache, P<:AbstractPredictorCache,
              C<:AbstractCorrectorCache, T, F}
     homotopy::H
@@ -167,9 +214,9 @@ function PathTrackerCache(H::HomotopyWithCache, predictor, corrector, state::Pat
 end
 
 
-##############
-# PathTracker
-##############
+###############
+# PathTracker #
+###############
 """
      PathTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::PathTracker
 
@@ -251,36 +298,9 @@ default_predictor(x::ProjectiveVectors.PVector) = Euler()
 Base.show(io::IO, ::PathTracker) = print(io, "PathTracker()")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
-
-"""
-     PathTrackerResult{T,N}
-
-Containing the result of a tracked path. The fields are
-* `returncode::PathTrackerStatus.states` If the tracking was successfull then it is `PathTrackerStatus.success`.
-* `x::ProjectiveVectors.PVector{T,N}` The result.
-* `t::ComplexF64` The `t` when the path tracker stopped.
-* `accuracy::Float64`: The estimated accuracy of `x`.
-"""
-struct PathTrackerResult{T, N}
-     returncode::PathTrackerStatus.states
-     x::ProjectiveVectors.PVector{T,N}
-     t::ComplexF64
-     accuracy::Float64
-     accepted_steps::Int
-     rejected_steps::Int
-end
-
-function PathTrackerResult(tracker::PathTracker)
-    state = tracker.state
-     PathTrackerResult(state.status,
-          copy(state.x), state.segment[state.s],
-          state.accuracy,
-          state.accepted_steps,
-          state.rejected_steps)
-end
-
-Base.show(io::IO, result::PathTrackerResult) = print_fieldnames(io, result)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", result::PathTrackerResult) = result
+##############
+## TRACKING ##
+##############
 
 """
     track(tracker, x₁, t₁=1.0, t₀=0.0; options...)::PathTrackerResult
@@ -577,6 +597,27 @@ function checkstart(H, x)
     nothing
 end
 
+
+function Base.iterate(tracker::PathTracker, state=nothing)
+    state === nothing && return tracker, 1
+
+    if tracker.state.status == PathTrackerStatus.tracking
+        step!(tracker)
+        check_terminated!(tracker)
+
+        if tracker.state.status == PathTrackerStatus.success
+            refine!(tracker)
+        end
+
+        tracker, state + 1
+    else
+        nothing
+    end
+end
+
+#################
+## Query State ##
+#################
 """
      currt(tracker::PathTracker)
 
@@ -617,6 +658,10 @@ Return the current value of `x`.
 currx(tracker::PathTracker) = currx(tracker.state)
 currx(state::PathTrackerState) = state.x
 
+
+##################
+# Modify options #
+##################
 """
      tol(tracker::PathTracker)
 
@@ -687,66 +732,9 @@ Set the maximal step size to `Δs`.
 """
 set_maximal_step_size!(T::PathTracker, Δs) = T.options.maximal_step_size = Δs
 
-
-"""
-    pathtracker_startsolutions(args...; kwargs...)
-
-Construct a [`PathTracker`](@ref) and `startsolutions` in the same way `solve`
-does it. This also takes the same input arguments as `solve`. This is convenient if you want
-to investigate single paths.
-"""
-function pathtracker_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
-    prob, startsolutions = problem_startsolutions(args...; supported...)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
-
-    (tracker=tracker, startsolutions=startsolutions)
-end
-
-"""
-    pathtracker(args...; kwargs...)
-
-Construct a [`PathTracker`](@ref) in the same way `solve`
-does it. This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
-This is convenient if you want to investigate single paths.
-
-## Examples
-
-### Obtain single solution
-We want to construct a path tracker to track a parameterized system `f` with parameters `p`
-from the parameters `a` to `b`.
-```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
-```
-You then can obtain a single solution at `b` by using
-```julia
-x_b = track(tracker, x_a).x
-```
-
-### Trace a path
-To trace a path you can use the [`iterator`](@ref) method.
-
-```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)
-for (x, t) in iterator(tracker, x₁)
-    @show (x,t)
-end
-```
-
-If we want to guarantee smooth traces we can limit the maximal step size.
-```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)
-for (x, t) in iterator(tracker, x₁)
-    @show (x,t)
-end
-```
-"""
-function pathtracker(args...; kwargs...)
-    tracker, _ = pathtracker_startsolutions(args...; kwargs...)
-    tracker
-end
-
-
+################
+# PathIterator #
+################
 struct PathIterator{Tracker<:PathTracker}
     tracker::Tracker
     x_affine::Bool
@@ -810,19 +798,64 @@ function Base.iterate(iter::PathIterator, state=nothing)
     current_x_t(iter), state + 1
 end
 
-function Base.iterate(tracker::PathTracker, state=nothing)
-    state === nothing && return tracker, 1
 
-    if tracker.state.status == PathTrackerStatus.tracking
-        step!(tracker)
-        check_terminated!(tracker)
+#############################
+# Convencience constructors #
+#############################
+"""
+    pathtracker_startsolutions(args...; kwargs...)
 
-        if tracker.state.status == PathTrackerStatus.success
-            refine!(tracker)
-        end
+Construct a [`PathTracker`](@ref) and `startsolutions` in the same way `solve`
+does it. This also takes the same input arguments as `solve`. This is convenient if you want
+to investigate single paths.
+"""
+function pathtracker_startsolutions(args...; kwargs...)
+    supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
+    prob, startsolutions = problem_startsolutions(args...; supported...)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
 
-        tracker, state + 1
-    else
-        nothing
-    end
+    (tracker=tracker, startsolutions=startsolutions)
+end
+
+"""
+    pathtracker(args...; kwargs...)
+
+Construct a [`PathTracker`](@ref) in the same way `solve`
+does it. This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
+This is convenient if you want to investigate single paths.
+
+## Examples
+
+### Obtain single solution
+We want to construct a path tracker to track a parameterized system `f` with parameters `p`
+from the parameters `a` to `b`.
+```julia
+tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
+```
+You then can obtain a single solution at `b` by using
+```julia
+x_b = track(tracker, x_a).x
+```
+
+### Trace a path
+To trace a path you can use the [`iterator`](@ref) method.
+
+```julia
+tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)
+for (x, t) in iterator(tracker, x₁)
+    @show (x,t)
+end
+```
+
+If we want to guarantee smooth traces we can limit the maximal step size.
+```julia
+tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, maximal_step_size=0.01)
+for (x, t) in iterator(tracker, x₁)
+    @show (x,t)
+end
+```
+"""
+function pathtracker(args...; kwargs...)
+    tracker, _ = pathtracker_startsolutions(args...; kwargs...)
+    tracker
 end
