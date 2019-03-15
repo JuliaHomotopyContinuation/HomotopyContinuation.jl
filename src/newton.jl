@@ -62,7 +62,8 @@ and a QR-factorization for overdetermined.
 """
 function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀);
                 tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
-    newton!(copy(x₀), F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
+    x = copy(x₀)
+    x, newton!(x, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
 end
 
 """
