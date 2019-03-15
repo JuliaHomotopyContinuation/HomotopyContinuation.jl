@@ -150,5 +150,14 @@
         @test max_step_size(tracker) == 0.01
 
         length(collect(iterator(tracker, s, 1.0, 0.0))) == 101
+
+
+        # Test iteration protocol
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
+        setup!(tracker, s, 1.0, 0.0)
+        for tr in tracker
+            # nothing
+        end
+        @test tracker.state.status == PathTrackerStatus.success
     end
 end
