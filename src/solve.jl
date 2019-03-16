@@ -104,7 +104,7 @@ if the third variable is the homogenization variable.
 # Options
 General options:
 
-* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`FPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering.
+* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering. If you experience significant compilation times, consider to change system to `FPSystem`.
 * `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogenous [`AbstractSystem`](@ref)s.
 * `seed::Int`: The random seed used during the computations.
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogenous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.

@@ -6,7 +6,8 @@ const problem_startsolutions_supported_keywords = [
 	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine];
 	input_supported_keywords]
 
-const DEFAULT_SYSTEM = FPSystem
+
+const DEFAULT_SYSTEM = @static VERSION < v"1.1" ? FPSystem : SPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
 
 abstract type AbstractProblem end
@@ -98,7 +99,7 @@ end
 
     The `options` are
     * `seed::Int`: Random seed used in the construction.
-    * `system=FPSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The constructor
+    * `system=SPSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The constructor
     is called with `system(polys, variables)` where `variables` determines the variable ordering.
     * `homotopy=StraightLineHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) an `AbstractSystem`. The constructor
     is called with `homotopy(start, target)` where `start` and `target` are systems constructed
