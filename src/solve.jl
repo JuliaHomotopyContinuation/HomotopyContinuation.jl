@@ -117,7 +117,7 @@ Pathtracking specific:
 * `max_corrector_iters=2`: The maximal number of correction steps in a single step.
 * `accuracy=1e-7`: The accuracy used to track a value.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref).
-* `refinement_max_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
+* `max_refinement_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `initial_step_size=0.1`: The initial step size for the predictor.
 * `min_step_size=1e-14`: The minimal step size. If the size of step is below this the path is considered failed.

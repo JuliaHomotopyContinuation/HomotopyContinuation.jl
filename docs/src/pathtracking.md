@@ -52,8 +52,8 @@ max_corrector_iters
 set_max_corrector_iters!
 max_step_size
 set_max_step_size!
-refinement_max_iters
-set_refinement_max_iters!
+max_refinement_iters
+set_max_refinement_iters!
 refinement_accuracy
 set_refinement_accuracy!
 ```

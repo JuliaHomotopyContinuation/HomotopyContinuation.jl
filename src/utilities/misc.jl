@@ -1,5 +1,20 @@
 export infinity_norm, infinity_distance, fubini_study
 
+"""
+    deprecatekwarg(oldkw, newkw)
+
+Logs a deprecation warning and assigns `oldkw` to `newkw` if `oldkw` is not `nothing`.
+"""
+macro deprecatekwarg(oldkw, newkw)
+    quote
+        if $(esc(oldkw)) !== nothing
+            old = $(Expr(:quote, oldkw))
+            new = $(Expr(:quote, newkw))
+            @warn("`$(old)=$($(esc(oldkw)))` is deprecated, use `$(new)=$($(esc(oldkw)))` instead.")
+            $(esc(newkw)) = $(esc(oldkw))
+        end
+    end
+end
 
 """
     nthroot(x, n)

@@ -11,10 +11,10 @@
         @test refinement_accuracy(t1) == 5e-5
         set_refinement_accuracy!(t1, raccuracy)
 
-        rmaxiter = refinement_max_iters(t1)
-        @test_nowarn set_refinement_max_iters!(t1, 11)
-        @test refinement_max_iters(t1) == 11
-        set_refinement_max_iters!(t1, rmaxiter)
+        rmaxiter = max_refinement_iters(t1)
+        @test_nowarn set_max_refinement_iters!(t1, 11)
+        @test max_refinement_iters(t1) == 11
+        set_max_refinement_iters!(t1, rmaxiter)
 
         @test t1 isa PathTracker
         @test length(currx(t1)) == 7
@@ -159,5 +159,12 @@
             # nothing
         end
         @test tracker.state.status == PathTrackerStatus.success
+    end
+
+    @testset "Deprecation warnings" begin
+        F = equations(katsura(5))
+        # test deprecation mechanism
+        tracker = pathtracker(F, tol=1e-8)
+        @test accuracy(tracker) == 1e-8
     end
 end
