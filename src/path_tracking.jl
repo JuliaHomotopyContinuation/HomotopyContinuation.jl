@@ -2,15 +2,19 @@ export PathTracker, PathTrackerResult, PathTrackerStatus,
         pathtracker, pathtracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
-        max_step_size , refinement_accuracy, refinement_max_iters,
+        max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
-        set_refinement_max_iters!, set_max_step_size!
+        set_max_refinement_iters!, set_max_step_size!
 
-const pathtracker_allowed_keywords = [:corrector, :predictor, :initial_steplength,
-    :minimal_steplength, :maximal_steplength,
-    :initial_step_size, :min_step_size , :max_step_size ,
-    :accuracy, :refinement_accuracy, :max_corrector_iters,  :refinement_max_iters,
-    :max_steps, :simple_step_size_alg]
+const pathtracker_allowed_keywords = [:corrector, :predictor,
+    :initial_step_size, :min_step_size , :max_step_size,
+    :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
+    :max_steps, :simple_step_size_alg,
+    # deprecated
+    :initial_steplength, :minimal_steplength, :maximal_steplength,
+    :initial_step_size, :minimal_step_size, :maximal_step_size,
+    :tol, :refinement_tol, :corrector_maxiters, :refinement_maxiters,
+    :maxiters, :simple_step_size]
 
 
 ####################
@@ -109,7 +113,7 @@ mutable struct PathTrackerOptions
     accuracy::Float64
     max_corrector_iters::Int
     refinement_accuracy::Float64
-    refinement_max_iters::Int
+    max_refinement_iters::Int
     max_steps::Int
     initial_step_size::Float64
     min_step_size ::Float64
@@ -121,10 +125,12 @@ mutable struct PathTrackerOptions
     auto_scaling_options::AutoScalingOptions
 end
 
+
+
 function PathTrackerOptions(::Type{Precision}; accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
-    refinement_max_iters=max_corrector_iters,
+    max_refinement_iters=max_corrector_iters,
     max_steps=1_000,
     initial_step_size=0.1,
     min_step_size=1e-14,
@@ -133,10 +139,31 @@ function PathTrackerOptions(::Type{Precision}; accuracy=1e-7,
     update_patch=true,
     maximal_lost_digits=default_maximal_lost_digits(Precision),
     auto_scaling=true,
-    auto_scaling_options=AutoScalingOptions()) where {Precision<:Real}
+    auto_scaling_options=AutoScalingOptions(),
+    # deprecated in 0.6
+    tol=nothing,
+    refinement_tol=nothing,
+    corrector_maxiters=nothing,
+    refinement_maxiters=nothing,
+    maxiters=nothing,
+    initial_steplength=nothing,
+    minimal_steplength=nothing,
+    maximal_steplength=nothing,
+    simple_step_size=nothing
+    ) where {Precision<:Real}
+
+    @deprecatekwarg tol accuracy
+    @deprecatekwarg refinement_tol refinement_accuracy
+    @deprecatekwarg corrector_maxiters max_corrector_iters
+    @deprecatekwarg refinement_maxiters max_refinement_iters
+    @deprecatekwarg maxiters max_steps
+    @deprecatekwarg initial_steplength initial_step_size
+    @deprecatekwarg minimal_steplength min_step_size
+    @deprecatekwarg maximal_steplength max_step_size
+    @deprecatekwarg simple_step_size simple_step_size_alg
 
     PathTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
-            refinement_max_iters, max_steps, initial_step_size, min_step_size,
+            max_refinement_iters, max_steps, initial_step_size, min_step_size,
             max_step_size, simple_step_size_alg, update_patch, float(maximal_lost_digits),
             auto_scaling, auto_scaling_options)
 end
@@ -283,7 +310,7 @@ needs to be homogenous. Note that a `PathTracker` is also a (mutable) iterator.
 * `max_step_size =Inf`: The maximal step size.
 * `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `refinement_max_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
+* `max_refinement_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `accuracy=1e-7`: The precision used to track a value.
 * `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
@@ -680,7 +707,7 @@ function refine!(tracker::PathTracker)
     end
     result = correct!(tracker.state.x̄, tracker;
         accuracy=tracker.options.refinement_accuracy,
-        max_iters=tracker.options.refinement_max_iters)
+        max_iters=tracker.options.max_refinement_iters)
     if isconverged(result)
         tracker.state.x .= tracker.state.x̄
         tracker.state.accuracy = result.accuracy
@@ -788,25 +815,25 @@ Current refinement accuracy.
 refinement_accuracy(tracker::PathTracker) = tracker.options.refinement_accuracy
 
 """
-     set_refinement_max_iters!(tracker::PathTracker, accuracy)
+     set_max_refinement_iters!(tracker::PathTracker, accuracy)
 
 Set the current refinement accuracy to `accuracy`.
 """
 set_refinement_accuracy!(T::PathTracker, accuracy) = T.options.refinement_accuracy = accuracy
 
 """
-     refinement_max_iters(tracker::PathTracker)
+     max_refinement_iters(tracker::PathTracker)
 
 Current refinement max_steps.
 """
-refinement_max_iters(T::PathTracker) = T.options.refinement_max_iters
+max_refinement_iters(T::PathTracker) = T.options.max_refinement_iters
 
 """
-     set_refinement_max_iters!(tracker::PathTracker, n)
+     set_max_refinement_iters!(tracker::PathTracker, n)
 
 Set the current refinement max_steps to `n`.
 """
-set_refinement_max_iters!(T::PathTracker, n) = T.options.refinement_max_iters = n
+set_max_refinement_iters!(T::PathTracker, n) = T.options.max_refinement_iters = n
 
 """
      max_corrector_iters(tracker::PathTracker)
