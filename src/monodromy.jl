@@ -718,6 +718,8 @@ function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptio
             break
         elseif retcode == :timeout
             return :timeout
+        elseif retcode == :invalid_startvalue
+            return :invalid_startvalue
         end
 
         # Iterations heuristic
@@ -743,8 +745,11 @@ function empty_queue!(queue, loop::Loop, C::MonodromyCache, options::MonodromyOp
         t₀::UInt, stats::MonodromyStatistics, progress)
     while !isempty(queue)
         job = pop!(queue)
-        if process!(queue, job, C, loop, options, stats, progress) == :done
+        status = process!(queue, job, C, loop, options, stats, progress)
+        if status == :done
             return :done
+        elseif status == :invalid_startvalue
+            return :invalid_startvalue
         end
         update_progress!(progress, loop, stats)
         # check timeout
@@ -777,6 +782,9 @@ affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
 function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics, progress)
     retcode = track(C.tracker, job.x, job.edge, loop, stats)
     if retcode ≠ PathTrackerStatus.success
+        if retcode == PathTrackerStatus.terminated_invalid_startvalue && stats.ntrackedpaths == 0
+            return :invalid_startvalue
+        end
         return :incomplete
     end
 
