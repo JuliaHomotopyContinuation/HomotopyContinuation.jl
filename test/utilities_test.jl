@@ -24,6 +24,20 @@
         points = shuffle!([[cis(k/100*2π)] for k=0:99])
         data = HC.UniquePoints(points)
         @test HC.iscontained(data, [0.0im]) == false
+
+        # Test with group action
+        x = randn(ComplexF64, 4)
+        permutation1(x) = (x, [x[2]; x[1]; x[3]; x[4]])
+        permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
+        X = [v for v in GroupActions(permutation1, permutation2)(x)]
+
+        # One group action
+        data = UniquePoints(X, group_action = permutation1)
+        @test length(data) == 2
+
+        # Two group actions
+        data = HC.UniquePoints(X, group_actions = GroupActions(permutation1, permutation2))
+        @test length(data) == 1
     end
 
     @testset "Multiplicities" begin

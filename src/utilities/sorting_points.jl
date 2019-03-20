@@ -196,37 +196,59 @@ This is the same as
 UniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 """
-struct UniquePoints{V<:AbstractVector, T, F<:Function}
+struct UniquePoints{V<:AbstractVector, T, F<:Function, F2<:Tuple}
     root::SearchBlock{T}
     points::Vector{V}
     distance_function::F
+    group_actions::GroupActions{F2}
 end
 
-UniquePoints(v::Type{<:UniquePoints{V}}, distance::F) where {V, F<:Function} = UniquePoints(V, distance)
-function UniquePoints(::Type{V}, distance::F) where {T<:Number, V<:AbstractVector{T}, F<:Function}
-    root = SearchBlock(real(T))
-    points = Vector{V}()
-    UniquePoints(root, points, distance)
-end
-function UniquePoints(v::AbstractVector{T}, distance::F) where {T<:Number, F<:Function}
+function UniquePoints(v::AbstractVector{T}, distance::F;
+    group_action=nothing,
+    group_actions= group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, F<:Function}
+
+    if group_actions isa GroupActions
+       actions = group_actions
+    else
+       actions = GroupActions(group_actions)
+    end
+
     root = SearchBlock(real(T), 1)
     points = [v]
-    UniquePoints(root, points, distance)
+    UniquePoints(root, points, distance, actions)
 end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; kwargs...) where {F<:Function}
-    data = UniquePoints(v[1], distance)
+
+function UniquePoints(::Type{V}, distance::F;
+    group_action=nothing,
+    group_actions= group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+
+    if group_actions isa GroupActions
+       actions = group_actions
+    else
+       actions = GroupActions(group_actions)
+    end
+
+    root = SearchBlock(real(T))
+    points = Vector{V}()
+    UniquePoints(root, points, distance, actions)
+end
+
+
+function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Float64 = 1e-5, kwargs...) where {F<:Function}
+    data = UniquePoints(v[1], distance; kwargs...)
     for i = 2:length(v)
-        add!(data, v[i]; kwargs...)
+        add!(data, v[i]; tol=tol)
     end
     data
 end
-UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance, kwargs...)
+UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance, kwargs...)
+UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
 
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
     root = SearchBlock(T)
     points = Vector{V}()
-    UniquePoints(root, points, data.distance_function)
+    UniquePoints(root, points, data.distance_function, group_actions = data.group_actions)
 end
 
 """
@@ -253,9 +275,37 @@ is returned.
 """
 function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        iscontained(data.root, x, tol, data.points, data.distance_function)
+        k = iscontained(data.root, x, tol, data.points, data.distance_function)
+        if k ≠ NOT_FOUND
+            return k
+        end
+        if data.group_actions.actions != nothing
+            for y in data.group_actions(x)
+                k = iscontained(data.root, y, tol, data.points, data.distance_function)
+                if k ≠ NOT_FOUND
+                    return k
+                end
+            end
+            return k
+        else
+            return k
+        end
     else
-        iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
+        k = iscontained(data.root, x, tol, data.points, data.distance_function)
+        if k ≠ NOT_FOUND
+            return true
+        end
+        if data.group_actions.actions != nothing
+            for y in data.group_actions(x)
+                k = iscontained(data.root, y, tol, data.points, data.distance_function)
+                if k ≠ NOT_FOUND
+                    return true
+                end
+            end
+            return false
+        else
+            return false
+        end
     end
 end
 
@@ -272,14 +322,14 @@ return `-1`. The element will be the last element of `points(data)`.
 """
 function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        idx = iscontained(data.root, x, tol, data.points, data.distance_function)
+        idx = iscontained(data, x, Val{true}(), tol = tol)
         if idx ≠ NOT_FOUND
             return idx
         end
         unsafe_add!(data, x)
         NOT_FOUND
     else
-        if iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
+        if iscontained(data, x, Val{true}(), tol = tol) ≠ NOT_FOUND
             return false
         end
         unsafe_add!(data, x)
@@ -337,10 +387,10 @@ This is the same as
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     k = -1
-    data = UniquePoints(v[1], distance)
+    data = UniquePoints(v[1], distance; kwargs...)
     for i = 2:length(v)
             k = add!(data, v[i], Val{true}(), tol = tol)
             if k != -1
