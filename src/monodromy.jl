@@ -203,7 +203,7 @@ export Triangle, Petal
 #####################
 
 """
-    Node(p::SVector, x::AbstractVector; store_points=true, is_main_node=false)
+    Node(p, x::AbstractVector; store_points=true, is_main_node=false)
 
 Create a node with a parameter from the same type as `p` and expecting
 points with tthe same type as `x`. If `stores_points` is `true` a `UniquePoints`
@@ -299,17 +299,17 @@ end
 # Loop data structure
 #######################
 """
-    Loop(p::SVector, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(p, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct a loop using `nnodes` nodes with parameters of the type of `p` and solutions
 of the type of `x`. `usegamma` refers to the use weights on the edges. See also
 [`Edge`](@ref).
 
-    Loop(p::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(p, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct the loop and add all points in `x` to it.
 
-    Loop(style::LoopStyle, p::SVector, x::AbstractVector, options::MonodromyOptions)
+    Loop(style::LoopStyle, p, x::AbstractVector, options::MonodromyOptions)
 
 Construct a loop using the defined style `style` with parameters of the type of `p` and solutions
 of the type of `x`.
@@ -319,7 +319,7 @@ struct Loop{N<:Node}
     edges::Vector{Edge}
 end
 
-function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+function Loop(p₁, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
     n₁ = Node(p₁, x₁, is_main_node = true)
     nodes = [n₁]
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
@@ -333,7 +333,7 @@ function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, option
 
     Loop(nodes, loop)
 end
-function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
+function Loop(p₁, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
     loop = Loop(p₁, first(x), nnodes, options; kwargs...)
     for xᵢ ∈ x
         add!(loop.nodes[1], xᵢ; tol=options.identical_tol)
@@ -387,7 +387,7 @@ struct Triangle <: LoopStyle
 end
 Triangle(;useweights=true) = Triangle(useweights)
 
-function Loop(strategy::Triangle, p::SVector, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Triangle, p, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 3, options, usegamma=strategy.useweights)
 end
 
@@ -398,7 +398,7 @@ A petal is a loop consisting of the main node and one other node connected
 by two edges with different random weights.
 """
 struct Petal <: LoopStyle end
-function Loop(strategy::Petal, p::SVector, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Petal, p, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 2, options, usegamma=true)
 end
 
@@ -608,10 +608,10 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{<:Number}; kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, [solution], p₀; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{<:Number}; kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, static_solutions(solutions), p₀; kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
@@ -622,7 +622,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         showprogress=true,
         kwargs...) where {TC, TP, NVars}
 
-    if length(p₀) ≠ length(parameters)
+    if length(p) ≠ length(parameters)
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 

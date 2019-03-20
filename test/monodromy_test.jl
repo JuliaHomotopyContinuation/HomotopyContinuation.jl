@@ -67,7 +67,9 @@ end
 
 
         # By group_actions=nothing we force that complex conjugation is not used.
-        result2 = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21, complex_conjugation=false, maximal_number_of_iterations_without_progress=100)
+        result2 = monodromy_solve(F, x₀, p₀, parameters=p,
+                        target_solutions_count=21, complex_conjugation=false,
+                        maximal_number_of_iterations_without_progress=100)
         @test result2.returncode == :success
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
@@ -113,11 +115,15 @@ end
             group_action=roots_of_unity)
         @test length(result.solutions) == 7
         # Test that equivalence classes are on by default if we supply a group action
-        result = monodromy_solve(F, x₀, p₀, parameters=p, group_action=roots_of_unity, maximal_number_of_iterations_without_progress=100)
+        result = monodromy_solve(F, x₀, p₀, parameters=p,
+                            group_action=roots_of_unity,
+                            maximal_number_of_iterations_without_progress=200)
         @test length(result.solutions) == 7
 
         # Test affine tracking
-        result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true, group_action=roots_of_unity, maximal_number_of_iterations_without_progress=100)
+        result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true,
+                        group_action=roots_of_unity,
+                        maximal_number_of_iterations_without_progress=200)
         @test length(result.solutions) == 7
     end
 
