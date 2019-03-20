@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, GroupActions
+export monodromy_solve, realsolutions, nreal, parameters, GroupActions
 
 ################
 # Group actions
@@ -454,9 +454,10 @@ end
 #############
 ## Results ##
 #############
-struct MonodromyResult{N, T}
+struct MonodromyResult{N, T1, T2}
     returncode::Symbol
-    solutions::Vector{SVector{N, T}}
+    solutions::Vector{SVector{N, T1}}
+    parameters::Vector{T2}
     statistics::MonodromyStatistics
 end
 
@@ -474,7 +475,7 @@ end
 
 
 TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 4
+TreeViews.numberofnodes(::MonodromyResult) = 5
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
 
@@ -482,11 +483,13 @@ function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"applicat
     if i == 1
         print(io, "Solutions")
     elseif i == 2
-            print(io, "Real solutions")
+        print(io, "Real solutions")
     elseif i == 3
         print(io, "Return Code")
     elseif i == 4
         print(io, "Tracked Paths")
+    elseif i == 5
+        print(io, "Paramters")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
@@ -498,6 +501,8 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
         return r.returncode
     elseif i == 4
         return r.statistics.ntrackedpaths
+    elseif i == 5
+        return r.parameters
     end
     missing
 end
@@ -559,6 +564,12 @@ function nreal(res::MonodromyResult; tol=1e-6)
     count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
 end
 
+"""
+    parameters(r::MonodromyResult)
+
+Return the parameters corresponding to the given result `r`.
+"""
+parameters(r::MonodromyResult) = r.parameters
 
 #####################
 ## monodromy solve ##
@@ -601,21 +612,21 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vecto
     monodromy_solve(F, [solution], p₀; kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{<:Number}; kwargs...)
-    monodromy_solve(F, static_solutions(solutions), SVector{length(p₀)}(p₀); kwargs...)
+    monodromy_solve(F, static_solutions(solutions), p₀; kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         startsolutions::Vector{<:SVector{NVars, <:Complex}},
-        p₀::SVector{NParams, TP};
+        p::AbstractVector{TP};
         parameters=throw(ArgumentError("You need to provide `parameters=...` to monodromy")),
-        strategy=default_strategy(F, parameters, p₀),
+        strategy=default_strategy(F, parameters, p),
         showprogress=true,
-        kwargs...) where {TC, TP, NParams, NVars}
+        kwargs...) where {TC, TP, NVars}
 
     if length(p₀) ≠ length(parameters)
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
-    p₀ = convert(SVector{NParams, promote_type(Float64, TP)}, p₀)
+    p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_allowed_keywords)
     options = begin
@@ -660,7 +671,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         end
     end
     finished!(statistics, nsolutions(loop))
-    MonodromyResult(retcode, points(solutions(loop)), statistics)
+    MonodromyResult(retcode, points(solutions(loop)), p₀, statistics)
 end
 
 function default_strategy(F::Vector{<:MP.AbstractPolynomialLike{TC}}, parameters, p₀::AbstractVector{TP}) where {TC,TP}
