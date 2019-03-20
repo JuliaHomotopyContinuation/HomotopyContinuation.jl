@@ -122,13 +122,12 @@ has_group_actions(options::MonodromyOptions) = !(options.group_actions isa Group
 
 
 """
-    independent_normal(p::SVector{N, T}) where {N, T}
+    independent_normal(p::AbstractVector{T}) where {T}
 
-Sample a `SVector{N, T}` where each entries is drawn independently from the univariate normal distribution.
+Sample a vector where each entries is drawn independently from the univariate normal distribution.
 """
-function independent_normal(p::SVector{N, T}) where {N, T}
-    @SVector randn(T, N)
-end
+independent_normal(p::SVector{N, T}) where {N, T} = @SVector randn(T, N)
+independent_normal(p::AbstractVector{T}) where {T} = randn(T, length(p))
 
 ##########################
 ## Monodromy Statistics ##
@@ -210,26 +209,26 @@ Create a node with a parameter from the same type as `p` and expecting
 points with tthe same type as `x`. If `stores_points` is `true` a `UniquePoints`
 data structure is allocated to keep track of all known solutions of this node.
 """
-struct Node{N, T, UP<:UniquePoints}
-    p::SVector{N, T} # maybe just a Vector?
+struct Node{T, UP<:UniquePoints}
+    p::Vector{T}
     points::Union{Nothing, UP}
     # Metadata / configuration
     main_node::Bool
 end
 
-function Node(p::SVector{N, T}, x::AbstractVector; store_points=true, is_main_node=false) where {N, T}
+function Node(p::AbstractVector{T}, x::AbstractVector; store_points=true, is_main_node=false) where {T}
     uniquepoints = UniquePoints(typeof(x))
     if store_points == false
-        Node{N, T, typeof(uniquepoints)}(p, nothing, is_main_node)
+        Node{T, typeof(uniquepoints)}(Vector(p), nothing, is_main_node)
     else
-        Node(p, uniquepoints, is_main_node)
+        Node(Vector(p), uniquepoints, is_main_node)
     end
 end
-function Node(p::SVector{N, T}, node::Node{N,T,UP}; store_points=true, is_main_node=false) where {N, T, UP}
+function Node(p::AbstractVector{T}, node::Node{T,UP}; store_points=true, is_main_node=false) where {T, UP}
     if store_points == false
-        Node{N, T, UP}(p, nothing, is_main_node)
+        Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{N, T, UP}(p, UniquePoints(UP), is_main_node)
+        Node{T, UP}(Vector(p), UniquePoints(UP), is_main_node)
     end
 end
 
