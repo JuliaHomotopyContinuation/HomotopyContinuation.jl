@@ -489,7 +489,7 @@ function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"applicat
     elseif i == 4
         print(io, "Tracked Paths")
     elseif i == 5
-        print(io, "Paramters")
+        print(io, "Parameters")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
