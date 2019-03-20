@@ -120,4 +120,54 @@ end
         result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true, group_action=roots_of_unity, maximal_number_of_iterations_without_progress=100)
         @test length(result.solutions) == 7
     end
+
+    @testset "Method of Moments" begin
+        @polyvar a[1:3] x[1:3] s[1:3]
+
+        f0 = a[1]+a[2]+a[3];
+        f1 = a[1]*x[1]+a[2]*x[2]+a[3]*x[3];
+        f2 = a[1]*(x[1]^2+s[1])+a[2]*(x[2]^2+s[2])+a[3]*(x[3]^2+s[3]);
+        f3 = a[1]*(x[1]^3+3*s[1]*x[1])+a[2]*(x[2]^3+3*s[2]*x[2])+a[3]*(x[3]^3+3*s[3]*x[3]);
+        f4 = a[1]*(x[1]^4+6*s[1]*x[1]^2+3*s[1]^2)+a[2]*(x[2]^4+6*s[2]*x[2]^2+3*s[2]^2)+
+        	a[3]*(x[3]^4+6*s[3]*x[3]^2+3*s[3]^2);
+        f5= a[1]*(x[1]^5+10*s[1]*x[1]^3+15*x[1]*s[1]^2)+a[2]*(x[2]^5+10*s[2]*x[2]^3+15*x[2]*s[2]^2)+a[3]*(x[3]^5+10*s[3]*x[3]^3+15*x[3]*s[3]^2);
+        f6= a[1]*(x[1]^6+15*s[1]*x[1]^4+45*x[1]^2*s[1]^2+15*s[1]^3)+
+        	a[2]*(x[2]^6+15*s[2]*x[2]^4+45*x[2]^2*s[2]^2+15*s[2]^3)+
+        	a[3]*(x[3]^6+15*s[3]*x[3]^4+45*x[3]^2*s[3]^2+15*s[3]^3);
+        f7= a[1]*(x[1]^7+21*s[1]*x[1]^5+105*x[1]^3*s[1]^2+105*x[1]*s[1]^3)+
+        	a[2]*(x[2]^7+21*s[2]*x[2]^5+105*x[2]^3*s[2]^2+105*x[2]*s[2]^3)+
+        	a[3]*(x[3]^7+21*s[3]*x[3]^5+105*x[3]^3*s[3]^2+105*x[3]*s[3]^3);
+        f8= a[1]*(x[1]^8+28*s[1]*x[1]^6+210*x[1]^4*s[1]^2+420*x[1]^2*s[1]^3+105*s[1]^4)+
+        	a[2]*(x[2]^8+28*s[2]*x[2]^6+210*x[2]^4*s[2]^2+420*x[2]^2*s[2]^3+105*s[2]^4)+
+        	a[3]*(x[3]^8+28*s[3]*x[3]^6+210*x[3]^4*s[3]^2+420*x[3]^2*s[3]^3+105*s[3]^4)
+
+        f = [f0, f1, f2, f3, f4, f5, f6, f7, f8]
+
+
+        S₃ = SymmetricGroup(3)
+        relabeling(v) = map(p -> (v[1:3][p]..., v[4:6][p]..., v[7:9][p]...), S₃)
+
+        @polyvar p[1:9]
+
+        function sample_moments(_=nothing)
+        	a₀ = rand(3)
+        	a₀ ./= sum(a₀)
+        	x₀ = randn(3)
+        	s₀ = rand(3) .* 2
+
+        	y₀ = [a₀; x₀; s₀]
+        	p₀ = [fᵢ(a => a₀, x => x₀, s => s₀) for fᵢ in f]
+        	y₀, p₀
+        end
+
+        y₀, p₀ = sample_moments()
+
+        R = monodromy_solve(f - p, y₀, p₀;
+        			parameters=p, group_action=relabeling,
+        			maximal_number_of_iterations_without_progress=100,
+        			target_solutions_count=225,
+        			parameter_sampler=last ∘ sample_moments)
+
+        @test length(solutions(R)) == 225
+    end
 end

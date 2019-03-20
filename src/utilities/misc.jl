@@ -1,4 +1,43 @@
-export infinity_norm, infinity_distance, fubini_study
+export SymmetricGroup, infinity_norm, infinity_distance, fubini_study
+
+"""
+    SymmetricGroup(n)
+
+Group action of the symmetric group S(n). This does not contain the identity element.
+"""
+struct SymmetricGroup{N,M}
+    permutations::NTuple{M, SVector{N,Int}} # We should get rid of the necessary of a tuple
+end
+SymmetricGroup(N::Int) = SymmetricGroup(permutations(Val(N)))
+function permutations(::Val{N}) where {N}
+    s = StaticArrays.MVector{N}(1:N)
+    perms = Vector{SVector{N, Int}}()
+    while true
+        i = N - 1
+        while i>=1 && s[i] >= s[i+1]
+            i -= 1
+        end
+        if i > 0
+            j = N
+            while j > i && s[i] >= s[j]
+                j -= 1
+            end
+            s[i], s[j] = s[j], s[i]
+            reverse!(s, i+1)
+        else
+            s[1] = N+1
+        end
+
+        s[1] > N && break
+        push!(perms, SVector(s))
+    end
+    tuple(perms...)
+end
+
+Base.eltype(::Type{SymmetricGroup{N}}) where {N} = SVector{N, Int}
+Base.length(p::SymmetricGroup{N}) where {N} = length(p.permutations)
+Base.iterate(p::SymmetricGroup) = iterate(p.permutations)
+Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
 
 """
     deprecatekwarg(oldkw, newkw)
