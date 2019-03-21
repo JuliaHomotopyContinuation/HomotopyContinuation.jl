@@ -177,14 +177,16 @@ two points `u,v` are considered equal if `F(u,v)<tol`, where `tol` is a toleranc
 Initialize the data structure with just one data point `v`.
 
 
-    UniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5)
+    UniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5, kwargs...)
 
 Initialize the data structure with all points in `v`. These are added in order
 by [`add!`](@ref) with the given tolerance `tol`. In particular, 'UniquePoints' structure will contain only points for which the pairwise distance given by `F` is less than `tol`.
 
-    UniquePoints(v) = UniquePoints(v, euclidean_distance)
+    UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
 
 If `F` is not specialized, [`euclidean_distance`](@ref) is used.
+
+As optional keyword the user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
 
 ## Example
 ```julia-repl
@@ -367,11 +369,14 @@ end
 
 
 """
-    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5)
+    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5, kwargs...)
 
-Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol.
+Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol. As an optional keyword the user can pass [`GroupActions`](@ref), so that points in the same orbit of the group action are considered equal. Use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`.
 
-    multiplicities(v; tol::Real = 1e-5) = multiplicities(v, euclidean_distance, tol = tol)
+
+
+    multiplicities(v; tol::Real = 1e-5, kwargs...) = multiplicities(v, euclidean_distance; tol = tol, kwargs...)
+
 If `distance` is not specified, [`euclidean_distance`](@ref) is used.
 
 

@@ -24,13 +24,13 @@ julia> f2(s) = (2s, -s, 5s);
 julia> f3(s) = (s + 1,);
 
 julia> GroupActions(f1)(3)
-(9,)
+(3, 9)
 
 julia> GroupActions(f1,f2)(3)
-(9, 18, -9, 45)
+(3, 9, 6, -3, 15, 18, -9, 45)
 
 julia> GroupActions(f1,f2, f3)(3)
-(9, 18, -9, 45, 10, 19, -8, 46)
+(3, 9, 6, -3, 15, 18, -9, 45, 4, 10, 7, -2, 16, 19, -8, 46)
 ```
 """
 struct GroupActions{T<:Tuple}
