@@ -162,6 +162,7 @@ end
         			maximal_number_of_iterations_without_progress=150,
         			target_solutions_count=225,
         			parameter_sampler=last ∘ sample_moments,
+                    maximal_number_of_iterations_without_progress=50,
                     showprogress=false)
 
         @test length(solutions(R)) == 225
