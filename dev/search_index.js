@@ -393,11 +393,35 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "solving/#HomotopyContinuation.SymmetricGroup",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.SymmetricGroup",
+    "category": "type",
+    "text": "SymmetricGroup(n)\n\nGroup action of the symmetric group S(n). This does not contain the identity element.\n\n\n\n\n\n"
+},
+
+{
     "location": "solving/#GroupActions-1",
     "page": "Solving Polynomial Systems",
     "title": "GroupActions",
     "category": "section",
-    "text": "If there is a group acting on the solution set of the polynomial system this can provided with the group_action keyword for single group actions or with the group_actions keyword for compositions of group actions. These will be internally transformed into GroupActions.GroupActions"
+    "text": "If there is a group acting on the solution set of the polynomial system this can provided with the group_action keyword for single group actions or with the group_actions keyword for compositions of group actions. These will be internally transformed into GroupActions.GroupActionsTo help with the more common group actions we provide some helper functions:SymmetricGroup"
+},
+
+{
+    "location": "solving/#HomotopyContinuation.parameters",
+    "page": "Solving Polynomial Systems",
+    "title": "HomotopyContinuation.parameters",
+    "category": "function",
+    "text": "parameters(r::MonodromyResult)\n\nReturn the parameters corresponding to the given result r.\n\n\n\n\n\n"
+},
+
+{
+    "location": "solving/#Helper-functions-1",
+    "page": "Solving Polynomial Systems",
+    "title": "Helper functions",
+    "category": "section",
+    "text": "parameters"
 },
 
 {
