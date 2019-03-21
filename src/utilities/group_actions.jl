@@ -26,7 +26,7 @@ julia> f3(s) = (s + 1,);
 julia> GroupActions(f1)(3)
 (3, 9)
 
-julia> GroupActions(f1,f2)(3)
+julia> GroupActions(f1, f2)(3)
 (3, 9, 6, -3, 15, 18, -9, 45)
 
 julia> GroupActions(f1,f2, f3)(3)
@@ -41,21 +41,24 @@ GroupActions(actions::GroupActions) = actions
 GroupActions(actions::Function...) = GroupActions(actions)
 GroupActions(actions) = GroupActions(actions...)
 
-function (G::GroupActions)(solution::V) where V
-    convert_if_necessary(apply_group_actions(G.actions, solution), solution)
-end
-convert_if_necessary(::Tuple{}, ::Any) = ()
-convert_if_necessary(xs::NTuple{N, V}, ::V) where {N, V} = xs
-convert_if_necessary(xs, ::V) where {V} = map(x -> convert(V, x), xs)
-
-apply_group_actions(::Tuple{}, solution) = ()
-# special case 1 function case
-apply_group_actions(fs::Tuple{<:Function}, solution) = (solution, (fs[1])(solution)...)
-# general case
-function apply_group_actions(actions::Tuple, solution)
-    f, rest = actions[1], Base.tail(actions)
-    foldl(rest; init=(solution, f(solution)...)) do acc, f
-        foldl(flatten, map(f, acc); init=acc)
+function (actions::GroupActions)(s)
+    S = [s]
+    apply_actions(actions, s) do sᵢ
+        push!(S, sᵢ)
+        false
     end
+    S
 end
-flatten(a::Tuple, b::Tuple) = (a..., b...)
+
+apply_actions(cb, action::GroupActions, s) = apply_actions(action.actions, s, cb)
+function apply_actions(actions::Tuple, x, cb)
+    f, rest = actions[1], Base.tail(actions)
+    for yᵢ in f(x)
+        cb(yᵢ) && return true
+        if apply_actions(rest, yᵢ, cb)
+            return true
+        end
+    end
+    apply_actions(rest, x, cb)
+end
+apply_actions(::Tuple{}, s, cb) = false

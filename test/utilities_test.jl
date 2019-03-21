@@ -7,17 +7,66 @@
         action1 = GroupActions(f1)
         action2 = GroupActions(f1, f2)
         action3 = GroupActions(f1, f2, f3)
-        @test action1(3) == (3, 9)
-        @test action2(3) == (3, 9, 6, -3, 15, 18, -9, 45)
-        @test action3(3) == (3, 9, 6, -3, 15, 18, -9, 45, 4, 10, 7, -2, 16, 19, -8, 46)
+        r1 = Int[]
+        HC.apply_actions(action1, 3) do s
+            push!(r1, s)
+            false
+        end
+        @test r1 == [9]
+
+        r2 = Int[]
+        HC.apply_actions(action2, 3) do s
+            push!(r2, s)
+            false
+        end
+        r2
+        @test r2 == [9, 18, -9, 45, 6, -3, 15]
+
+        r3 = Int[]
+        HC.apply_actions(action3, 3) do s
+            push!(r3, s)
+            false
+        end
+        r3
+        @test r3 == [9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
+        @test action3(3) == [3, 9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
+
+        # also test with arrays
+        g1 = s -> [s * s];
+        g2 = s-> [2s, -s, 5s];
+        g3 = s -> [s + 1];
+        action1 = GroupActions(g1)
+        action2 = GroupActions(g1, g2)
+        action3 = GroupActions(g1, g2, g3)
+        r1 = Int[]
+        HC.apply_actions(action1, 3) do s
+            push!(r1, s)
+            false
+        end
+        @test r1 == [9]
+
+        r2 = Int[]
+        HC.apply_actions(action2, 3) do s
+            push!(r2, s)
+            false
+        end
+        @test r2 == [9, 18, -9, 45, 6, -3, 15]
+
+        r3 = Int[]
+        HC.apply_actions(action3, 3) do s
+            push!(r3, s)
+            false
+        end
+        r3
+        @test r3 == [9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
     end
 
     @testset "UniquePoints" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
         indices = HC.unique!(rand(1:2000, 20))
-
         data = HC.UniquePoints(X)
+
         @test length(data) == 2_000
 
         for i ∈ indices
@@ -78,7 +127,7 @@
         x = randn(ComplexF64, 4)
         permutation1(x) = ([x[2]; x[1]; x[3]; x[4]],)
         permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
-        X = [v for v in GroupActions(permutation1, permutation2)(x)]
+        X = GroupActions(permutation1, permutation2)(x)
 
         # One group action
         m = multiplicities(X, group_action = permutation1)

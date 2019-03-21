@@ -105,12 +105,13 @@ end
         # Test that equivalence classes are on by default if we supply a group action
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                             group_action=roots_of_unity,
-                            maximal_number_of_iterations_without_progress=200)
+                            maximal_number_of_iterations_without_progress=20)
         @test length(result.solutions) == 7
 
         # Test affine tracking
         result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true,
                         group_action=roots_of_unity,
+                        target_solutions_count=7,
                         maximal_number_of_iterations_without_progress=200)
         @test length(result.solutions) == 7
     end

@@ -652,7 +652,6 @@ struct Job{N, T}
     edge::Edge
 end
 
-
 function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptions,
     stats::MonodromyStatistics, progress)
 
@@ -759,25 +758,13 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
                 return :incomplete
             end
         end
-
-        add!(node, y; tol=options.identical_tol)
-        # If we are on the main node check whether we have a real root.
-        node.main_node && checkreal!(stats, y)
-        # Check if we are done
-        node.main_node && isdone(node, y, options) && return :done
-
         next_edge = nextedge(loop, job.edge)
-        push!(queue, Job(y, next_edge))
-
+        add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done
         # Check for complex conjugate solution
         if options.complex_conjugation && node.main_node
             ȳ = conj.(y)
             if !equivalence_class_contained(node, ȳ, options)
-                add!(node, ȳ; tol=options.identical_tol)
-                # Check if we are done
-                isdone(node, ȳ, options) && return :done
-                # Schedule new job
-                push!(queue, Job(ȳ, next_edge))
+                add_and_schedule!(node, queue, ȳ, options, stats, next_edge) && return :done
             end
         end
 
@@ -786,28 +773,36 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         # 2) Things are setup up such that for nodes where we want to apply
         #    group actions `node.points !== nothing`
         if !options.equivalence_classes && node.points !== nothing
-            for yᵢ in options.group_actions(y)
-                if add!(node, yᵢ; tol=options.identical_tol)
-                    node.main_node && checkreal!(stats, yᵢ)
-                    # Check if we are done
-                    node.main_node && isdone(node, yᵢ, options) && return :done
-
-                    push!(queue, Job(yᵢ, next_edge))
-                end
+            apply_actions(options.group_actions, y) do yᵢ
+                add_and_schedule!(node, queue, yᵢ, options, stats, next_edge)
+                false
             end
         end
     end
     return :incomplete
 end
 
-function equivalence_class_contained(node, y, options)
-    for yᵢ in options.group_actions(y)
-        if iscontained(node, yᵢ, tol=options.identical_tol)
-            # equivalence class already existing
-            return true
-        end
+"""
+    add_and_schedule!(node, y, options, stats, nextedge)
+
+Add `y` to the current `node` (if it not already exists).
+Returns `true` if we are done. Otherwise `false`.
+"""
+function add_and_schedule!(node, queue::Vector{Job{N,T}}, y, options, stats, next_edge) where {N,T}
+    if add!(node, y; tol=options.identical_tol)
+        # If we are on the main node check whether we have a real root.
+        node.main_node && checkreal!(stats, y)
+        # Check if we are done
+        node.main_node && isdone(node, y, options) && return true
+        push!(queue, Job(SVector{N,T}(y), next_edge))
     end
     false
+end
+
+function equivalence_class_contained(node, y, options)
+    apply_actions(options.group_actions, y) do yᵢ
+        iscontained(node, yᵢ, tol=options.identical_tol)
+    end
 end
 
 function update_progress!(::Nothing, loop::Loop, statistics::MonodromyStatistics; finish=false)

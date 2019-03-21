@@ -198,11 +198,11 @@ This is the same as
 UniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 """
-struct UniquePoints{V<:AbstractVector, T, F<:Function, F2<:Tuple}
+struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, GroupActions}}
     root::SearchBlock{T}
     points::Vector{V}
     distance_function::F
-    group_actions::GroupActions{F2}
+    group_actions::MaybeGA
 end
 
 function UniquePoints(v::AbstractVector{T}, distance::F;
@@ -211,6 +211,8 @@ function UniquePoints(v::AbstractVector{T}, distance::F;
 
     if group_actions isa GroupActions
        actions = group_actions
+    elseif group_actions === nothing
+       actions = nothing
     else
        actions = GroupActions(group_actions)
     end
@@ -227,6 +229,8 @@ function UniquePoints(::Type{V}, distance::F;
 
     if group_actions isa GroupActions
        actions = group_actions
+    elseif group_actions === nothing
+       actions = nothing
     else
        actions = GroupActions(group_actions)
     end
@@ -275,19 +279,23 @@ If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned.
 """
-function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
-    iscontained(data, x, Val{Index}(), tol)
+function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Float64=1e-5)
+    iscontained(data, x, val, tol)
 end
-function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(), tol::Float64) where {Index}
-    if data.group_actions.actions == nothing
-        index = iscontained(data.root, x, tol, data.points, data.distance_function)
-    else
-        index = NOT_FOUND
-        for y in data.group_actions(x)
-            k = iscontained(data.root, y, tol, data.points, data.distance_function)
-            if k ≠ NOT_FOUND
-                index = k
-                break
+function iscontained(data::UniquePoints, x::NTuple{N,T}, val, tol::Float64) where {N, T}
+    iscontained(data, SVector{N,T}(x), val, tol)
+end
+function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}, tol::Float64) where {Index}
+    index = iscontained(data.root, x, tol, data.points, data.distance_function)
+    if index == NOT_FOUND
+        if data.group_actions !== nothing # extra if statement since inference cannot look through &&
+            apply_actions(data.group_actions, x) do y
+                k = iscontained(data.root, y, tol, data.points, data.distance_function)
+                if k ≠ NOT_FOUND
+                    index = k
+                    return true
+                end
+                false
             end
         end
     end
@@ -319,7 +327,7 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
         unsafe_add!(data, x)
         NOT_FOUND
     else
-        if !iscontained(data, x, Val{false}(), tol)
+        if iscontained(data, x, Val{false}(), tol)
             return false
         end
         unsafe_add!(data, x)
@@ -381,8 +389,8 @@ multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
 Here is an example for using group actions.
 ```julia-repl
-julia> X = [[1;2;3;4]; [2;1;3;4]; [1;2;4;3]; [2;1;4;3]]
-julia> permutation(x) = ([x[2]; x[1]; x[3]; x[4]],)
+julia> X = [[1, 2, 3, 4]; [2,1,3,4]; [1,2,4,3]; [2,1,4,3]]
+julia> permutation(x) = ([x[2], x[1], x[3], x[4]],)
 julia> m = multiplicities(X, group_action = permutation)
 [[1,2], [3,4]]
 ```
@@ -390,17 +398,17 @@ julia> m = multiplicities(X, group_action = permutation)
 function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     positions = Vector{Int64}()
-    k = -1
+    k = NOT_FOUND
     j = 1
     data = UniquePoints(v[1], distance; kwargs...)
     push!(positions, 1)
     for i = 2:length(v)
-            k = add!(data, v[i], Val{true}(), tol = tol)
-            if k != -1
-                push!(mults[positions[k]], i)
-            else
-                push!(positions, i)
-            end
+        k = add!(data, v[i], Val{true}(), tol = tol)
+        if k != NOT_FOUND
+            push!(mults[positions[k]], i)
+        else
+            push!(positions, i)
+        end
     end
     [m for m in mults if length(m) > 1]
 end
