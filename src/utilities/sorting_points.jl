@@ -379,15 +379,27 @@ This is the same as
 ```julia
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
+Here is an example for involving group actions.
+```julia-repl
+julia> X = [[1;2;3;4]; [2;1;3;4]; [1;2;4;3]; [2;1;4;3]]
+julia> permutation(x) = ([x[2]; x[1]; x[3]; x[4]],)
+julia> m = multiplicities(X, group_action = permutation)
+[[1,2], [3,4]]
+```
 """
 function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
+    positions = Vector{Int64}()
     k = -1
+    j = 1
     data = UniquePoints(v[1], distance; kwargs...)
+    push!(positions, 1)
     for i = 2:length(v)
             k = add!(data, v[i], Val{true}(), tol = tol)
             if k != -1
-                push!(mults[k], i)
+                push!(mults[positions[k]], i)
+            else
+                push!(positions, i)
             end
     end
     [m for m in mults if length(m) > 1]

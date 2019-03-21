@@ -73,6 +73,20 @@
 
         P = HC.multiplicities(X, (x,y) -> 1-abs(LinearAlgebra.dot(x,y)))
         @test length(P) == 3
+
+        # Test with group action
+        x = randn(ComplexF64, 4)
+        permutation1(x) = ([x[2]; x[1]; x[3]; x[4]],)
+        permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
+        X = [v for v in GroupActions(permutation1, permutation2)(x)]
+
+        # One group action
+        m = multiplicities(X, group_action = permutation1)
+        @test m == [[1;2], [3;4]]
+
+        # Two group actions
+        m = multiplicities(X, group_actions = GroupActions(permutation1, permutation2))
+        @test m == [[1;2;3;4]]
     end
 
     @testset "Polynomials" begin
