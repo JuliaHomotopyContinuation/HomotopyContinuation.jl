@@ -100,6 +100,18 @@
         # Two group actions
         data = HC.UniquePoints(X, group_actions = GroupActions(permutation1, permutation2))
         @test length(data) == 1
+
+        # Group action and reality check
+        x = randn(4)
+        X = [im.*x, x, randn(ComplexF64, 4)]
+
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x))
+        @test HC.isrealvector(points(data)[1]) == false
+        @test length(points(data)) == 2
+
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), add_real_if_possible = true)
+        @test HC.isrealvector(points(data)[1]) == true
+        @test length(points(data)) == 2
     end
 
     @testset "Multiplicities" begin

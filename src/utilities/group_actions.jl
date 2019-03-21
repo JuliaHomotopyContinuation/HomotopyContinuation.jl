@@ -1,4 +1,4 @@
-export GroupActions
+export GroupActions, apply_actions
 
 
 ################

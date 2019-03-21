@@ -2,6 +2,7 @@ export UniquePoints, multiplicities, iscontained, add!, unsafe_add!, empty!, poi
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
+const NOT_FOUND_AND_REAL = -2
 
 #############
 # SearchBlock
@@ -203,34 +204,39 @@ struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, G
     points::Vector{V}
     distance_function::F
     group_actions::MaybeGA
+    add_real_if_possible::Bool
 end
 
 function UniquePoints(v::AbstractVector{T}, distance::F;
     group_action=nothing,
-    group_actions=group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, F<:Function}
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
+    add_real_if_possible::Bool=false) where {T<:Number, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
     elseif group_actions === nothing
        actions = nothing
+       add_real_if_possible = false
     else
        actions = GroupActions(group_actions)
     end
 
     root = SearchBlock(real(T), 1)
     points = [v]
-    UniquePoints(root, points, distance, actions)
+    UniquePoints(root, points, distance, actions, add_real_if_possible)
 end
 
 
 function UniquePoints(::Type{V}, distance::F;
     group_action=nothing,
-    group_actions=group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
+    add_real_if_possible::Bool=false) where {T<:Number, V<:AbstractVector{T}, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
     elseif group_actions === nothing
        actions = nothing
+       add_real_if_possible = false
     else
        actions = GroupActions(group_actions)
     end
@@ -242,7 +248,21 @@ end
 
 
 function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Float64 = 1e-5, kwargs...) where {F<:Function}
+
     data = UniquePoints(v[1], distance; kwargs...)
+
+    if data.add_real_if_possible
+        for y in data.group_actions(v[1])
+            if isrealvector(y)
+                empty!(data)
+                unsafe_add!(data, y)
+                for i = 2:length(v)
+                    add!(data, v[i]; tol=tol)
+                end
+                return data
+            end
+        end
+    end
     for i = 2:length(v)
         add!(data, v[i]; tol=tol)
     end
@@ -324,14 +344,36 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
         if idx ≠ NOT_FOUND
             return idx
         end
-        unsafe_add!(data, x)
-        NOT_FOUND
+        if !data.add_real_if_possible
+            unsafe_add!(data, x)
+            return NOT_FOUND
+        else
+            for y in data.group_actions(x)
+                if isrealvector(y)
+                    unsafe_add!(data, y)
+                    return NOT_FOUND_AND_REAL
+                end
+            end
+            unsafe_add!(data, x)
+            return NOT_FOUND
+        end
     else
         if iscontained(data, x, Val{false}(), tol)
             return false
         end
-        unsafe_add!(data, x)
-        true
+        if !data.add_real_if_possible
+            unsafe_add!(data, x)
+            return true
+        else
+            for y in data.group_actions(x)
+                if isrealvector(y)
+                    unsafe_add!(data, y)
+                    return true
+                end
+            end
+            unsafe_add!(data, x)
+            return true
+        end
     end
 end
 
