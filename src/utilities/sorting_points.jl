@@ -275,11 +275,9 @@ is returned.
 """
 function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        k = iscontained(data.root, x, tol, data.points, data.distance_function)
-        if k ≠ NOT_FOUND
-            return k
-        end
-        if data.group_actions.actions != nothing
+        if data.group_actions.actions == nothing
+            return iscontained(data.root, x, tol, data.points, data.distance_function)
+        else
             for y in data.group_actions(x)
                 k = iscontained(data.root, y, tol, data.points, data.distance_function)
                 if k ≠ NOT_FOUND
@@ -287,23 +285,22 @@ function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{fal
                 end
             end
             return k
-        else
-            return k
         end
     else
-        k = iscontained(data.root, x, tol, data.points, data.distance_function)
-        if k ≠ NOT_FOUND
-            return true
-        end
-        if data.group_actions.actions != nothing
+        if data.group_actions.actions == nothing
+            k = iscontained(data.root, x, tol, data.points, data.distance_function)
+            if k ≠ NOT_FOUND
+                return true
+            else
+                reutnr false
+            end
+        else
             for y in data.group_actions(x)
                 k = iscontained(data.root, y, tol, data.points, data.distance_function)
                 if k ≠ NOT_FOUND
                     return true
                 end
             end
-            return false
-        else
             return false
         end
     end

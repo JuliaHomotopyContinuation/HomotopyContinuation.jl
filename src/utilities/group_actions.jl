@@ -50,11 +50,11 @@ convert_if_necessary(xs, ::V) where {V} = map(x -> convert(V, x), xs)
 
 apply_group_actions(::Tuple{}, solution) = ()
 # special case 1 function case
-apply_group_actions(fs::Tuple{<:Function}, solution) = (fs[1])(solution)
+apply_group_actions(fs::Tuple{<:Function}, solution) = (solution, (fs[1])(solution)...)
 # general case
 function apply_group_actions(actions::Tuple, solution)
     f, rest = actions[1], Base.tail(actions)
-    foldl(rest; init=f(solution)) do acc, f
+    foldl(rest; init=(solution, f(solution)...)) do acc, f
         foldl(flatten, map(f, acc); init=acc)
     end
 end

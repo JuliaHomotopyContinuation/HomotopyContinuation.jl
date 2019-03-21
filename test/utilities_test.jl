@@ -1,4 +1,17 @@
 @testset "Utilities" begin
+
+    @testset "Group actions" begin
+        f1 = s -> (s * s,);
+        f2 = s-> (2s, -s, 5s);
+        f3 = s -> (s + 1,);
+        action1 = GroupActions(f1)
+        action2 = GroupActions(f1, f2)
+        action3 = GroupActions(f1, f2, f3)
+        @test action1(3) == (3, 9)
+        @test action2(3) == (3, 9, 6, -3, 15, 18, -9, 45)
+        @test action3(3) == (3, 9, 6, -3, 15, 18, -9, 45, 4, 10, 7, -2, 16, 19, -8, 46)
+    end
+
     @testset "UniquePoints" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
@@ -27,7 +40,7 @@
 
         # Test with group action
         x = randn(ComplexF64, 4)
-        permutation1(x) = (x, [x[2]; x[1]; x[3]; x[4]])
+        permutation1(x) = ([x[2]; x[1]; x[3]; x[4]],)
         permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
         X = [v for v in GroupActions(permutation1, permutation2)(x)]
 
