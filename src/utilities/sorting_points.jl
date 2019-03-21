@@ -379,7 +379,7 @@ This is the same as
 ```julia
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
-Here is an example for involving group actions.
+Here is an example for using group actions.
 ```julia-repl
 julia> X = [[1;2;3;4]; [2;1;3;4]; [1;2;4;3]; [2;1;4;3]]
 julia> permutation(x) = ([x[2]; x[1]; x[3]; x[4]],)
