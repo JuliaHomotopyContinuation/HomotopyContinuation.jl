@@ -100,3 +100,15 @@ of group actions. These will be internally transformed into `GroupActions`.
 ```@docs
 GroupActions
 ```
+
+To help with the more common group actions we provide some helper functions:
+
+```@docs
+SymmetricGroup
+```
+
+
+### Helper functions
+```@docs
+parameters
+```

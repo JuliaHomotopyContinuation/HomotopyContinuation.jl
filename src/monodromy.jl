@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, GroupActions
+export monodromy_solve, realsolutions, nreal, parameters, GroupActions
 
 ################
 # Group actions
@@ -122,13 +122,12 @@ has_group_actions(options::MonodromyOptions) = !(options.group_actions isa Group
 
 
 """
-    independent_normal(p::SVector{N, T}) where {N, T}
+    independent_normal(p::AbstractVector{T}) where {T}
 
-Sample a `SVector{N, T}` where each entries is drawn independently from the univariate normal distribution.
+Sample a vector where each entries is drawn independently from the univariate normal distribution.
 """
-function independent_normal(p::SVector{N, T}) where {N, T}
-    @SVector randn(T, N)
-end
+independent_normal(p::SVector{N, T}) where {N, T} = @SVector randn(T, N)
+independent_normal(p::AbstractVector{T}) where {T} = randn(T, length(p))
 
 ##########################
 ## Monodromy Statistics ##
@@ -204,32 +203,32 @@ export Triangle, Petal
 #####################
 
 """
-    Node(p::SVector, x::AbstractVector; store_points=true, is_main_node=false)
+    Node(p, x::AbstractVector; store_points=true, is_main_node=false)
 
 Create a node with a parameter from the same type as `p` and expecting
 points with tthe same type as `x`. If `stores_points` is `true` a `UniquePoints`
 data structure is allocated to keep track of all known solutions of this node.
 """
-struct Node{N, T, UP<:UniquePoints}
-    p::SVector{N, T} # maybe just a Vector?
+struct Node{T, UP<:UniquePoints}
+    p::Vector{T}
     points::Union{Nothing, UP}
     # Metadata / configuration
     main_node::Bool
 end
 
-function Node(p::SVector{N, T}, x::AbstractVector; store_points=true, is_main_node=false) where {N, T}
+function Node(p::AbstractVector{T}, x::AbstractVector; store_points=true, is_main_node=false) where {T}
     uniquepoints = UniquePoints(typeof(x))
     if store_points == false
-        Node{N, T, typeof(uniquepoints)}(p, nothing, is_main_node)
+        Node{T, typeof(uniquepoints)}(Vector(p), nothing, is_main_node)
     else
-        Node(p, uniquepoints, is_main_node)
+        Node(Vector(p), uniquepoints, is_main_node)
     end
 end
-function Node(p::SVector{N, T}, node::Node{N,T,UP}; store_points=true, is_main_node=false) where {N, T, UP}
+function Node(p::AbstractVector{T}, node::Node{T,UP}; store_points=true, is_main_node=false) where {T, UP}
     if store_points == false
-        Node{N, T, UP}(p, nothing, is_main_node)
+        Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{N, T, UP}(p, UniquePoints(UP), is_main_node)
+        Node{T, UP}(Vector(p), UniquePoints(UP), is_main_node)
     end
 end
 
@@ -300,17 +299,17 @@ end
 # Loop data structure
 #######################
 """
-    Loop(p::SVector, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(p, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct a loop using `nnodes` nodes with parameters of the type of `p` and solutions
 of the type of `x`. `usegamma` refers to the use weights on the edges. See also
 [`Edge`](@ref).
 
-    Loop(p::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(p, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
 Construct the loop and add all points in `x` to it.
 
-    Loop(style::LoopStyle, p::SVector, x::AbstractVector, options::MonodromyOptions)
+    Loop(style::LoopStyle, p, x::AbstractVector, options::MonodromyOptions)
 
 Construct a loop using the defined style `style` with parameters of the type of `p` and solutions
 of the type of `x`.
@@ -320,7 +319,7 @@ struct Loop{N<:Node}
     edges::Vector{Edge}
 end
 
-function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+function Loop(p₁, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
     n₁ = Node(p₁, x₁, is_main_node = true)
     nodes = [n₁]
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
@@ -334,7 +333,7 @@ function Loop(p₁::SVector, x₁::AbstractVector{<:Number}, nnodes::Int, option
 
     Loop(nodes, loop)
 end
-function Loop(p₁::SVector, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
+function Loop(p₁, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
     loop = Loop(p₁, first(x), nnodes, options; kwargs...)
     for xᵢ ∈ x
         add!(loop.nodes[1], xᵢ; tol=options.identical_tol)
@@ -388,7 +387,7 @@ struct Triangle <: LoopStyle
 end
 Triangle(;useweights=true) = Triangle(useweights)
 
-function Loop(strategy::Triangle, p::SVector, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Triangle, p, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 3, options, usegamma=strategy.useweights)
 end
 
@@ -399,7 +398,7 @@ A petal is a loop consisting of the main node and one other node connected
 by two edges with different random weights.
 """
 struct Petal <: LoopStyle end
-function Loop(strategy::Petal, p::SVector, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Petal, p, x::AbstractVector, options::MonodromyOptions)
     Loop(p, x, 2, options, usegamma=true)
 end
 
@@ -455,9 +454,10 @@ end
 #############
 ## Results ##
 #############
-struct MonodromyResult{N, T}
+struct MonodromyResult{N, T1, T2}
     returncode::Symbol
-    solutions::Vector{SVector{N, T}}
+    solutions::Vector{SVector{N, T1}}
+    parameters::Vector{T2}
     statistics::MonodromyStatistics
 end
 
@@ -475,7 +475,7 @@ end
 
 
 TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 4
+TreeViews.numberofnodes(::MonodromyResult) = 5
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
 
@@ -483,11 +483,13 @@ function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"applicat
     if i == 1
         print(io, "Solutions")
     elseif i == 2
-            print(io, "Real solutions")
+        print(io, "Real solutions")
     elseif i == 3
         print(io, "Return Code")
     elseif i == 4
         print(io, "Tracked Paths")
+    elseif i == 5
+        print(io, "Parameters")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
@@ -499,6 +501,8 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
         return r.returncode
     elseif i == 4
         return r.statistics.ntrackedpaths
+    elseif i == 5
+        return r.parameters
     end
     missing
 end
@@ -560,6 +564,12 @@ function nreal(res::MonodromyResult; tol=1e-6)
     count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
 end
 
+"""
+    parameters(r::MonodromyResult)
+
+Return the parameters corresponding to the given result `r`.
+"""
+parameters(r::MonodromyResult) = r.parameters
 
 #####################
 ## monodromy solve ##
@@ -598,25 +608,25 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{<:Number}; kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, [solution], p₀; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{<:Number}; kwargs...)
-    monodromy_solve(F, static_solutions(solutions), SVector{length(p₀)}(p₀); kwargs...)
+function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{TP}; kwargs...) where {TP}
+    monodromy_solve(F, static_solutions(solutions), p₀; kwargs...)
 end
 function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         startsolutions::Vector{<:SVector{NVars, <:Complex}},
-        p₀::SVector{NParams, TP};
+        p::AbstractVector{TP};
         parameters=throw(ArgumentError("You need to provide `parameters=...` to monodromy")),
-        strategy=default_strategy(F, parameters, p₀),
+        strategy=default_strategy(F, parameters, p),
         showprogress=true,
-        kwargs...) where {TC, TP, NParams, NVars}
+        kwargs...) where {TC, TP, NVars}
 
-    if length(p₀) ≠ length(parameters)
+    if length(p) ≠ length(parameters)
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
-    p₀ = convert(SVector{NParams, promote_type(Float64, TP)}, p₀)
+    p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_allowed_keywords)
     options = begin
@@ -661,7 +671,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         end
     end
     finished!(statistics, nsolutions(loop))
-    MonodromyResult(retcode, points(solutions(loop)), statistics)
+    MonodromyResult(retcode, points(solutions(loop)), p₀, statistics)
 end
 
 function default_strategy(F::Vector{<:MP.AbstractPolynomialLike{TC}}, parameters, p₀::AbstractVector{TP}) where {TC,TP}
