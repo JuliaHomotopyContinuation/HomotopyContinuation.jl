@@ -207,7 +207,7 @@ end
 
 function UniquePoints(v::AbstractVector{T}, distance::F;
     group_action=nothing,
-    group_actions= group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, F<:Function}
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -223,7 +223,7 @@ end
 
 function UniquePoints(::Type{V}, distance::F;
     group_action=nothing,
-    group_actions= group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action)) where {T<:Number, V<:AbstractVector{T}, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -276,35 +276,26 @@ of the data point which already exists. If the data point is not existing `-1`
 is returned.
 """
 function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
-    if Index
-        if data.group_actions.actions == nothing
-            return iscontained(data.root, x, tol, data.points, data.distance_function)
-        else
-            for y in data.group_actions(x)
-                k = iscontained(data.root, y, tol, data.points, data.distance_function)
-                if k ≠ NOT_FOUND
-                    return k
-                end
-            end
-            return k
-        end
+    iscontained(data, x, Val{Index}(), tol)
+end
+function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(), tol::Float64) where {Index}
+    if data.group_actions.actions == nothing
+        index = iscontained(data.root, x, tol, data.points, data.distance_function)
     else
-        if data.group_actions.actions == nothing
-            k = iscontained(data.root, x, tol, data.points, data.distance_function)
+        index = NOT_FOUND
+        for y in data.group_actions(x)
+            k = iscontained(data.root, y, tol, data.points, data.distance_function)
             if k ≠ NOT_FOUND
-                return true
-            else
-                reutnr false
+                index = k
+                break
             end
-        else
-            for y in data.group_actions(x)
-                k = iscontained(data.root, y, tol, data.points, data.distance_function)
-                if k ≠ NOT_FOUND
-                    return true
-                end
-            end
-            return false
         end
+    end
+
+    if Index
+        return index
+    else
+        return index ≠ NOT_FOUND
     end
 end
 
@@ -321,14 +312,14 @@ return `-1`. The element will be the last element of `points(data)`.
 """
 function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
-        idx = iscontained(data, x, Val{true}(), tol = tol)
+        idx = iscontained(data, x, Val{true}(), tol)
         if idx ≠ NOT_FOUND
             return idx
         end
         unsafe_add!(data, x)
         NOT_FOUND
     else
-        if iscontained(data, x, Val{true}(), tol = tol) ≠ NOT_FOUND
+        if !iscontained(data, x, Val{false}(), tol)
             return false
         end
         unsafe_add!(data, x)
