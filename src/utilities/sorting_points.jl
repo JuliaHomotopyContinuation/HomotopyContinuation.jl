@@ -204,39 +204,37 @@ struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, G
     points::Vector{V}
     distance_function::F
     group_actions::MaybeGA
-    add_real_if_possible::Bool
+    check_real::Bool
 end
 
 function UniquePoints(v::AbstractVector{T}, distance::F;
     group_action=nothing,
     group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    add_real_if_possible::Bool=false) where {T<:Number, F<:Function}
+    check_real::Bool=false) where {T<:Number, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
     elseif group_actions === nothing
        actions = nothing
-       add_real_if_possible = false
     else
        actions = GroupActions(group_actions)
     end
 
     root = SearchBlock(real(T), 1)
     points = [v]
-    UniquePoints(root, points, distance, actions, add_real_if_possible)
+    UniquePoints(root, points, distance, actions, check_real)
 end
 
 
 function UniquePoints(::Type{V}, distance::F;
     group_action=nothing,
     group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    add_real_if_possible::Bool=false) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+    check_real::Bool=false) where {T<:Number, V<:AbstractVector{T}, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
     elseif group_actions === nothing
        actions = nothing
-       add_real_if_possible = false
     else
        actions = GroupActions(group_actions)
     end
@@ -251,7 +249,7 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Flo
 
     data = UniquePoints(v[1], distance; kwargs...)
 
-    if data.add_real_if_possible
+    if data.check_real
         for y in data.group_actions(v[1])
             if isrealvector(y)
                 empty!(data)
@@ -344,35 +342,45 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
         if idx ≠ NOT_FOUND
             return idx
         end
-        if !data.add_real_if_possible
+        if !data.check_real
             unsafe_add!(data, x)
             return NOT_FOUND
         else
-            for y in data.group_actions(x)
-                if isrealvector(y)
-                    unsafe_add!(data, y)
+            if data.group_actions !== nothing
+                for y in data.group_actions(x)
+                    if isrealvector(y)
+                        unsafe_add!(data, y)
+                        return NOT_FOUND_AND_REAL
+                    end
+                end
+            else
+                if isrealvector(x)
+                    unsafe_add!(data, x)
                     return NOT_FOUND_AND_REAL
                 end
+                unsafe_add!(data, x)
+                return NOT_FOUND
             end
-            unsafe_add!(data, x)
-            return NOT_FOUND
         end
     else
         if iscontained(data, x, Val{false}(), tol)
             return false
         end
-        if !data.add_real_if_possible
+        if !data.check_real
             unsafe_add!(data, x)
             return true
         else
-            for y in data.group_actions(x)
-                if isrealvector(y)
-                    unsafe_add!(data, y)
-                    return true
+            if data.group_actions !== nothing
+                for y in data.group_actions(x)
+                    if isrealvector(y)
+                        unsafe_add!(data, y)
+                        return true
+                    end
                 end
+            else
+                unsafe_add!(data, x)
+                return true
             end
-            unsafe_add!(data, x)
-            return true
         end
     end
 end

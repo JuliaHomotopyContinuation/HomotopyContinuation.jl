@@ -112,6 +112,12 @@
         data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), add_real_if_possible = true)
         @test HC.isrealvector(points(data)[1]) == true
         @test length(points(data)) == 2
+
+        data = HC.UniquePoints(randn(ComplexF64, 4), check_real = true)
+        k = add!(data, randn(4), Val{true}())
+        @test k == -2
+        k = add!(data, randn(ComplexF64, 4), Val{true}())
+        @test k == -1
     end
 
     @testset "Multiplicities" begin
