@@ -2,8 +2,8 @@
 
 We also export a path tracking primitive to make the core path tracking routine
 available for other applications.
-At the heart is a [`PathTracker`](@ref) object which holds
-all the state. The easiest way to construct a `PathTracker` is to use the [`pathtracker_startsolutions`](@ref) routine.
+At the heart is a [`CoreTracker`](@ref) object which holds
+all the state. The easiest way to construct a `CoreTracker` is to use the [`pathtracker_startsolutions`](@ref) routine.
 
 ```@docs
 pathtracker_startsolutions
@@ -12,13 +12,13 @@ pathtracker
 
 ## Types
 ```@docs
-PathTracker
-PathTrackerResult
-PathTrackerStatus.states
+CoreTracker
+CoreTrackerResult
+CoreTrackerStatus.states
 ```
 
 ## Methods
-To track from a start to an endpoint with the `PathTracker` we provide the following
+To track from a start to an endpoint with the `CoreTracker` we provide the following
 routines.
 ```@docs
 track
@@ -26,8 +26,8 @@ track!
 setup!
 ```
 
-It is also possible to use a `PathTracker` as an iterator. This can either
-be done by the high level `iterator` method or by directly using a `PathTracker`
+It is also possible to use a `CoreTracker` as an iterator. This can either
+be done by the high level `iterator` method or by directly using a `CoreTracker`
 as an iterator. The recommend approach is simply using `iterator`.
 ```@docs
 iterator

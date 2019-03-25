@@ -75,7 +75,7 @@ Check whether two solutions are closer than the given tolerance since this
 indicates that path crossing happened.
 This assumes that the paths were not tracked until t=0.
 """
-function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:PathTrackerResult}
+function check_crossed_paths(paths::Vector{PR}, tol) where {PR<:CoreTrackerResult}
     V = map(p -> LinearAlgebra.normalize(p.x.data), paths)
     vcat(multiplicities(V, fubini_study, tol = tol)...)
 end

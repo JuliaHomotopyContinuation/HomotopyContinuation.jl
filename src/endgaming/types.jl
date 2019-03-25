@@ -143,10 +143,10 @@ The distance between endpoints is normalized by the maximal difference between a
 in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop
 and ``n`` is `cauchy_samples_per_loop`.
 * `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
-* `pathtrackerkwargs...` During the endgame a [`PathTracker`](@ref) is used. These are all arguments possible
+* `pathtrackerkwargs...` During the endgame a [`CoreTracker`](@ref) is used. These are all arguments possible
 to be supplied to it (with the excemption of `patch` this is always [`FixedPatch()`](@ref)).
 """
-struct Endgame{P<:PathTracker, V}
+struct Endgame{P<:CoreTracker, V}
     tracker::P
     state::EndgameState{V}
     cache::Cache
@@ -165,7 +165,7 @@ function Endgame(H::AbstractHomotopy, x::ProjectiveVectors.PVector;
     options = EndgameOptions(sampling_factor, egtol, minradius, maxnorm, minimal_maxnorm,
         maxwindingnumber, max_extrapolation_samples,
         cauchy_loop_closed_tolerance, cauchy_samples_per_loop, check_at_infinity)
-    tracker = PathTracker(H, x, complex(0.1,0.0), 0.0im;
+    tracker = CoreTracker(H, x, complex(0.1,0.0), 0.0im;
         patch=FixedPatch(), max_steps=maxiters_per_step, pathtrackerkwargs...)
     state = EndgameState(x, complex(1.0,0.0), options)
 

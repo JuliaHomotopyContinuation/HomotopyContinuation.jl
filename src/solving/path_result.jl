@@ -134,7 +134,7 @@ function PathResult(homvars::NTuple{M,Int}, vargroups, k, x₁, x_e, t₀, r, ca
 end
 
 iters(R::EndgameResult) = R.iters
-iters(R::PathTrackerResult) = R.accepted_steps + R.rejected_steps
+iters(R::CoreTrackerResult) = R.accepted_steps + R.rejected_steps
 
 
 function makereturncode(retcode)
@@ -144,7 +144,7 @@ function makereturncode(retcode)
         retcode, :none
     end
 end
-makereturncode(retcode::PathTrackerStatus.states) = :path_failed, :none
+makereturncode(retcode::CoreTrackerStatus.states) = :path_failed, :none
 
 
 """
@@ -172,7 +172,7 @@ function align_axis!(x)
 end
 
 windingnumber_npredictions(r::EndgameResult) = (r.windingnumber, r.npredictions)
-windingnumber_npredictions(r::PathTrackerResult) = (0, 0)
+windingnumber_npredictions(r::CoreTrackerResult) = (0, 0)
 
 function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)

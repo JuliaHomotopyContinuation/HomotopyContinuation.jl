@@ -77,14 +77,14 @@ end
 
 Obtain a new sample on the geometric series and add it to `endgame`.
 """
-function nextsample!(tracker::PathTracker, state, options)
+function nextsample!(tracker::CoreTracker, state, options)
     state.iters += 1
 
     R, λ = state.R, options.sampling_factor
     λR = λ * R
 
     retcode = track!(tracker, state.x, R, λR, setup_patch=false, compute_ẋ=false, checkstartvalue=false)
-    if retcode != PathTrackerStatus.success
+    if retcode != CoreTrackerStatus.success
         state.status = :tracker_failed
         return nothing
     end

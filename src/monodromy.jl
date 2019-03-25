@@ -108,7 +108,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) =
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
-    if retcode == PathTrackerStatus.success
+    if retcode == CoreTrackerStatus.success
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
@@ -349,22 +349,22 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker::PathTracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
+function track(tracker::CoreTracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
     set_parameters!(tracker, edge, loop)
     track(tracker, x, stats)
 end
-function track(tracker::PathTracker, x::AbstractVector, stats::MonodromyStatistics)
+function track(tracker::CoreTracker, x::AbstractVector, stats::MonodromyStatistics)
     retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
     retcode
 end
 
 """x
-    set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
+    set_parameters!(tracker::CoreTracker, e::Edge, loop::Loop)
 
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.
 """
-function set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
+function set_parameters!(tracker::CoreTracker, e::Edge, loop::Loop)
     H = basehomotopy(tracker.homotopy)
     if !(H isa ParameterHomotopy)
         error("Base homotopy is not a ParameterHomotopy")
@@ -498,11 +498,11 @@ parameters(r::MonodromyResult) = r.parameters
 ## monodromy solve ##
 #####################
 """
-MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache}
+MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache}
 
 Cache for monodromy loops.
 """
-struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, AV<:AbstractVector}
+struct MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache, AV<:AbstractVector}
     F::FT
     tracker::Tracker
     newton_cache::NC
@@ -740,8 +740,8 @@ affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
 
 function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics, progress)
     retcode = track(C.tracker, job.x, job.edge, loop, stats)
-    if retcode ≠ PathTrackerStatus.success
-        if retcode == PathTrackerStatus.terminated_invalid_startvalue && stats.ntrackedpaths == 0
+    if retcode ≠ CoreTrackerStatus.success
+        if retcode == CoreTrackerStatus.terminated_invalid_startvalue && stats.ntrackedpaths == 0
             return :invalid_startvalue
         end
         return :incomplete

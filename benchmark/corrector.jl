@@ -6,7 +6,7 @@ P = ProjectiveProblem(p1)
 
 sols = embed.(P, totaldegree_solutions(p1.system) |> collect)
 
-tracker = PathTracker(P.homotopy, first(sols), 1.0, 0.0)
+tracker = CoreTracker(P.homotopy, first(sols), 1.0, 0.0)
 
 track(tracker, sols, 1.0, 0.0)
 
@@ -15,7 +15,7 @@ Profile.clear_malloc_data()
 @btime track($tracker, $sols, 1.0, 0.0)
 
 
-H, x, t = tracker.cache.homotopy, tracker.state.x, HomotopyContinuation.PathTrackers.current_t(tracker.state)
+H, x, t = tracker.cache.homotopy, tracker.state.x, HomotopyContinuation.CoreTrackers.current_t(tracker.state)
 y = (randn(9).*0.1 .- 0.1)
 z = x + y
 

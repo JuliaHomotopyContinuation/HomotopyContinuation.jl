@@ -37,7 +37,7 @@ module HomotopyContinuation
     include("predictors.jl")
     include("correctors.jl")
 
-    include("path_tracking.jl")
+    include("core_tracker.jl")
     include("endgaming.jl")
 
     include("solving.jl")

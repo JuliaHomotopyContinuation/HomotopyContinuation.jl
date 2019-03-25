@@ -13,7 +13,7 @@ function SolverCache(prob, tracker)
     SolverCache(pathresult)
 end
 
-struct Solver{P<:AbstractProblem, T<:PathTracker,
+struct Solver{P<:AbstractProblem, T<:CoreTracker,
         E<:Endgame, C<:SolverCache}
     prob::P
     tracker::T
@@ -42,7 +42,7 @@ end
 function Solver(prob::ProjectiveProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
     x₁= embed(prob, startsolutionsample)
 
-    tracker = PathTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracker_allowed_keywords)...)
+    tracker = CoreTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracker_allowed_keywords)...)
 
     check_at_infinity = homvars(prob) !== nothing
     endgame = Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, endgame_allowed_keywords)...)
