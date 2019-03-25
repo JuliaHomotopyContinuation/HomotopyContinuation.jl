@@ -1,4 +1,4 @@
-export FPSystem, differentiate
+export FPSystem
 
 """
     FPSystem(polynomials, vars) <: AbstractSystem
