@@ -12,6 +12,7 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
+    import Parameters: @pack!, @unpack
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
@@ -38,6 +39,7 @@ module HomotopyContinuation
     include("correctors.jl")
 
     include("core_tracker.jl")
+    include("path_tracker.jl")
     include("endgaming.jl")
 
     include("solving.jl")
