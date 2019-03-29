@@ -1,5 +1,4 @@
-export solve
-
+export solve, Result
 
 """
     solve(F; options...)
@@ -136,20 +135,514 @@ Endgame specific options
 """
 function solve end
 
-function solve(args...; threading=true, kwargs...)
-    solver, startsolutions = solver_startsolutions(args...; kwargs...)
-    solve(solver, startsolutions, threading=threading)
+function solve(args...; threading=true, report_progress=true, kwargs...)
+    tracker, start_solutions = pathtracker_startsolutions(args...; kwargs...)
+    solve(tracker, start_solutions; threading=threading, report_progress=report_progress)
 end
 
-# Internal
-function solve(solver::Solver, start_solutions; threading=true)
-    if threading && Threads.nthreads() > 1
-        solvers = append!([solver], [deepcopy(solver) for _=2:Threads.nthreads()])
-        solve(solvers, start_solutions, threading=true)
+function solve(tracker::PathTracker, start_solutions; kwargs...)
+    results = Vector{result_type(tracker)}(undef, length(start_solutions))
+    track_paths!(results, tracker, start_solutions; kwargs...)
+    Result(results, tracker.problem.seed)
+end
+
+function track_paths!(results, tracker, start_solutions; threading=true, report_progress=true, details_level=1)
+    track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
+end
+function track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
+    n = length(results)
+
+    if report_progress
+        progress = ProgressMeter.Progress(n, 0.1, "Tracking $n paths... ")
     else
-        internal_solve(solver, start_solutions)
+        progress = nothing
+    end
+
+    nthreads = Threads.nthreads()
+    if threading && nthreads > 1
+        # TODO: We can probably also do this better, but for now we have to collect
+        # to support indexing
+        S = collect(start_solutions)
+
+        batch_size = 32 * nthreads
+        ranges = partition_work(1:min(batch_size, n), nthreads)
+        trackers = Threads.resize_nthreads!([tracker])
+        batch_tracker = BatchTracker(results, trackers, ranges, S, details_level)
+
+        k = 1
+        while k ≤ n
+            partition_work!(batch_tracker.ranges, k:min(k+batch_size-1, n), nthreads)
+            ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
+            k += batch_size
+            update_progress!(progress, results, min(k - 1, n))
+        end
+    else
+        for (k, s) in enumerate(start_solutions)
+            results[k] = track(tracker, s, 1.0; path_number=k, details_level=details_level)
+            k % 16 == 0 && update_progress!(progress, results, k)
+        end
+    end
+    results
+end
+
+function update_progress!(progress, results, N)
+    ProgressMeter.update!(progress, N, showvalues=((:tracked, N),))
+    nothing
+end
+update_progress!(::Nothing, results, N) = nothing
+
+mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
+    results::Vector{R}
+    trackers::Vector{Tracker}
+    ranges::Vector{UnitRange{Int}}
+    start_solutions::V
+    details_level::Int
+end
+
+function (batch::BatchTracker)()
+    tid = Threads.threadid()
+    track_batch!(batch.results, batch.trackers[tid],
+                 batch.ranges[tid], batch.start_solutions, batch.details_level)
+end
+function track_batch!(results, pathtracker, range, starts, details_level)
+    for k in range
+        results[k] = track(pathtracker, starts[k], 1.0; path_number=k, details_level=details_level)
+    end
+    results
+end
+
+
+export AffineResult, ProjectiveResult,
+    nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
+    finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
+    solutions, realsolutions, multiplicities, uniquesolutions, statistics
+
+
+"""
+    Result{V<:AbstractVector}
+
+The result of `solve`.
+"""
+struct Result{V}
+    pathresults::Vector{PathResult{V}}
+    seed::Int
+end
+
+Base.length(r::Result) = length(r.pathresults)
+Base.getindex(r::Result, I) = getindex(r.pathresults, I)
+
+Base.iterate(r::Result) = iterate(r.pathresults)
+Base.iterate(r::Result, state) = iterate(r.pathresults, state)
+Base.lastindex(r::Result) = lastindex(r.pathresults)
+Base.eltype(r::Type{Result{V}}) where {V} = PathResult{V}
+
+const Results = Union{Result, Vector{<:PathResult}}
+const ProjectiveResult = Result{<:PVector}
+"""
+    nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e14, onlyfinite=true)
+
+The number of solutions which satisfy the corresponding predicates.
+
+## Example
+```julia
+result = solve(F)
+# Get all non-singular results where all imaginary parts are smaller than 1e-8
+nresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)
+```
+"""
+function nresults(R::Results; onlyreal=false, realtol=1e-6,
+    onlynonsingular=false, onlysingular=false, singulartol=1e14, onlyfinite=true)
+    count(R) do r
+        (!onlyreal || isreal(r, realtol)) &&
+        (!onlynonsingular || isnonsingular(r, singulartol)) &&
+        (!onlysingular || issingular(r, singulartol)) &&
+        (!onlyfinite || isfinite(r) || isprojective(r))
     end
 end
-function solve(solvers::AbstractVector{<:Solver}, start_solutions; threading=true)
-    internal_solve(threading ? solvers : solvers[1], start_solutions)
+
+"""
+    statistics(R::Result; onlyreal=false, realtol=1e-6,
+        onlynonsingular=false, onlysingular=false, singulartol=1e14)
+
+Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
+
+## Example
+```julia
+julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
+(nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
+"""
+function statistics(R::Results, onlyreal=false, realtol=1e-6,
+    onlynonsingular=false, onlysingular=false, singulartol=1e14)
+
+    failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
+
+    for r in R
+        if isfailed(r)
+            failed += 1
+        elseif issingular(r, singulartol)
+            if isreal(r, realtol)
+                real_singular += 1
+            end
+            singular += 1
+        elseif !isprojective(r) && !isfinite(r)
+            atinfinity += 1
+        else # finite, nonsingular
+            if isreal(r, realtol)
+                real_nonsingular += 1
+            end
+            nonsingular += 1
+        end
+    end
+    (nonsingular = nonsingular,
+    singular = singular,
+    real_nonsingular = real_nonsingular,
+    real_singular = real_singular,
+    real = real_nonsingular + real_singular,
+    atinfinity = atinfinity,
+    failed = failed,
+    total = length(R))
 end
+
+"""
+    nfinite(affineresult)
+
+The number of finite solutions.
+"""
+nfinite(R::Results) = count(isfinite, R)
+
+"""
+    nsingular(result; tol=1e10)
+
+The number of singular solutions. A solution is considered singular
+if its windingnumber is larger than 1 or the condition number is larger than `tol`.
+"""
+nsingular(R::Results; tol=1e10) = count(r -> issingular(r, tol), R)
+
+"""
+    natinfinity(result)
+
+The number of solutions at infinity.
+"""
+natinfinity(R::Results) = count(isatinfinity, R)
+
+"""
+    nafailed(result)
+
+The number of failed paths.
+"""
+nfailed(R::Results) = count(isfailed, R)
+
+"""
+    nnonsingular(result; tol=1e-10)
+
+The number of non-singular solutions.
+"""
+nnonsingular(R::Result; tol = 1e10) = count(r -> isnonsingular(r, tol), R)
+
+"""
+    nreal(result; tol=1e-6)
+
+The number of real solutions where all imaginary parts of each solution
+are smaller than `tol`.
+"""
+nreal(R::Results; tol = 1e-6) = count(r -> isreal(r, tol), R)
+
+
+"""
+    seed(result)
+
+The random seed used in the computation.
+"""
+seed(result::Result) = result.seed
+
+
+
+# Filtering
+"""
+    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e14, onlyfinite=true)
+
+Return all `PathResult`s for which the given conditions apply.
+
+## Example
+
+```julia
+R = solve(F)
+
+# This gives us all PathResults considered non-singular and real (but still as a complex vector).
+realsolutions = results(R, onlyreal=true, onlynonsingular=true)
+```
+"""
+results(R::Results; kwargs...) = mapresults(identity, R; kwargs...)
+results(f::Function, R::Results; kwargs...) = mapresults(f, R; kwargs...)
+
+"""
+    mapresults(f::Function, result; conditions...)
+
+Apply the function `f` to all `PathResult`s for which the given conditions apply. For the possible
+conditions see [`results`](@ref).
+
+## Example
+```julia
+# This gives us all solutions considered real (but still as a complex vector).
+realsolutions = mapresults(solution, R, onlyreal=true)
+```
+"""
+function mapresults(f::Function, R::Results;
+    onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysingular=false, singulartol=1e14,
+    onlyfinite=true)
+    [f(r) for r in R if
+        (!onlyreal || isreal(r, realtol)) &&
+        (!onlynonsingular || isnonsingular(r, singulartol)) &&
+        (!onlysingular || issingular(r, singulartol)) &&
+        (!onlyfinite || isfinite(r) || isprojective(r))]
+end
+
+"""
+    solutions(result; conditions...)
+
+Return all solution (as `Vector`s) for which the given conditions apply.
+For the possible `conditions` see [`results`](@ref).
+
+## Example
+```julia
+julia> @polyvar x y
+julia> result = solve([(x-2)y, y+x+3]);
+julia> solutions(result)
+[[2.0+0.0im, -5.0+0.0im], [-3.0+0.0im, 0.0+0.0im]]
+```
+"""
+function solutions(result::Results; kwargs...)
+    mapresults(solution, result; kwargs...)
+end
+
+"""
+    realsolutions(result; tol=1e-6, conditions...)
+
+Return all real solution (as `Vector`s of reals) for which the given conditions apply.
+For the possible `conditions` see [`results`](@ref). Note that `onlyreal` is always `true`
+and `realtol` is now `tol`.
+
+## Example
+```julia
+julia> @polyvar x y
+julia> result = solve([(x-2)y, y+x+3]);
+julia> realsolutions(result)
+[[2.0, -5.0], [-3.0, 0.0]]
+```
+"""
+function realsolutions(result::Results; onlyreal=true, tol=1e-6, kwargs...)
+    mapresults(r -> real.(solution(r)), result; onlyreal=true, realtol=tol, kwargs...)
+end
+
+"""
+    nonsingular(result::Results; conditions...)
+
+Return all `PathResult`s for which the solution is non-singular. This is just a shorthand
+for `results(R; onlynonsingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+"""
+nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
+
+"""
+    singular(result::Results; conditions...)
+
+Return all `PathResult`s for which the solution is singular. This is just a shorthand
+for `results(R; onlysingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+"""
+function singular(R::Results; singulartol=1e14, tol=singulartol, kwargs...)
+    results(R; onlysingular=true, singulartol=tol, kwargs...)
+end
+
+
+"""
+    finite(result::AffineResults; conditions...)
+
+Return all `PathResult`s for which the solution is finite. This is just a shorthand
+for `results(R; onlyfinite=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+"""
+finite(R::Results; kwargs...) = results(R; onlyfinite=true, kwargs...)
+
+"""
+    real(result, tol=1e-6)
+
+Get all results where the solutions are real with the given tolerance `tol`.
+See [`isreal`](@ref) for details regarding the determination of 'realness'.
+"""
+Base.real(R::Results; tol=1e-6) = [r for r in R if isreal(r, tol)]
+
+"""
+    failed(result)
+
+Get all results where the path tracking failed.
+"""
+failed(R::Results) = [r for r in R if isfailed(r)]
+
+"""
+    atinfinity(result::AffineResult)
+
+Get all results where the solutions is at infinity.
+"""
+atinfinity(R::Results) = [r for r in R if isatinfinity(r)]
+
+"""
+    multiplicities(V::Results; tol=1e-6)
+
+Returns a `Vector` of `Vector{PathResult}`s grouping the `PathResult`s whose solutions appear with multiplicities *greater* 1 in 'V'.
+Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
+"""
+function multiplicities(results::Results; tol=1e-6)
+    map(i -> results[i], multiplicities(solutions(results); tol = tol))
+end
+
+"""
+    uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)
+
+Return all *unique* solutions. If `multiplicities` is `true`, then
+all *unique* solutions with their correspnding multiplicities as pairs `(s, m)`
+where `s` is the solution and `m` the multiplicity are returned.
+For the possible `conditions` see [`results`](@ref).
+
+## Example
+```julia-repl
+julia> @polyvar x;
+julia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)
+[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]
+julia> uniquesolutions([(x-3)^3*(x+2)])
+[[3.0+0.0im], [-2.0+0.0im]]
+```
+"""
+function uniquesolutions(R::Results; tol=1e-6, multiplicities=false, conditions...)
+    uniquesolutions(R, Val(multiplicities); tol=tol, conditions...)
+end
+
+function uniquesolutions(R::Results, ::Val{Multiplicities}; tol=1e-6, conditions...)  where {Multiplicities}
+    sols = solutions(R; conditions...)
+    M = multiplicities(sols; tol=tol)
+    indicator = trues(length(sols))
+    uniques = map(M) do m
+        for k in m
+            indicator[k] = false
+        end
+        if Multiplicities
+            (sols[m[1]], length(m))
+        else
+            sols[m[1]]
+        end
+    end
+    for (k, s) in enumerate(sols)
+        if indicator[k]
+            if Multiplicities
+                push!(uniques, (s, 1))
+            else
+                push!(uniques, s)
+            end
+        end
+    end
+    uniques
+end
+
+
+####Show function
+
+function Base.show(io::IO, x::Result)
+    s = statistics(x)
+    println(io, "Result with $(length(x)) tracked paths")
+    println(io, "==================================")
+    println(io, "• $(s.nonsingular) non-singular finite $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
+    println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.atinfinity) $(plural("solution", s.atinfinity)) at infinity")
+    println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    println(io, "• random seed: $(seed(x))")
+end
+
+function Base.show(io::IO, x::ProjectiveResult)
+    s = statistics(x)
+    println(io, "Result with $(length(x)) tracked paths")
+    println(io, "==================================")
+    println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
+    println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    println(io, "• random seed: $(seed(x))")
+end
+
+TreeViews.hastreeview(::Result) = true
+TreeViews.hastreeview(::ProjectiveResult) = true
+TreeViews.numberofnodes(::Result) = 7
+TreeViews.numberofnodes(::ProjectiveResult) = 6
+TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") =
+    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">Result</span>")
+
+function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
+    s = statistics(x)
+    if i == 1
+        print(io, "Paths tracked")
+    elseif i == 2 && s.nonsingular > 0
+        print(io, "$(s.nonsingular) finite non-singular ($(s.real_nonsingular) real)")
+    elseif i == 3 && s.singular > 0
+        print(io, "$(s.singular) finite singular ($(s.real_singular) real)")
+    elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
+        print(io, "$(s.real_nonsingular+s.real_singular) finite real")
+    elseif i == 5 && s.atinfinity > 0
+        print(io, "$(s.atinfinity) atinfinity")
+    elseif i == 6 && s.failed > 0
+        print(io, "$(s.failed) failed")
+    elseif i == 7
+        print(io, "Random seed used")
+    end
+end
+
+function TreeViews.treenode(r::Result, i::Integer)
+    s = statistics(r)
+    if i == 1
+        return length(r)
+    elseif i == 2 && s.nonsingular > 0
+        return finite(r, onlynonsingular=true)
+    elseif i == 3 && s.singular > 0
+        return finite(r, onlysingular=true)
+    elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
+        return finite(r, onlyreal = true)
+    elseif i == 5 && s.atinfinity > 0
+        return atinfinity(r)
+    elseif i == 6 && s.failed > 0
+        return failed(r)
+    elseif i == 7
+        return seed(r)
+    end
+    missing
+end
+
+function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"application/prs.juno.inline")
+    s = statistics(x)
+    if i == 1
+        print(io, "Paths tracked")
+    elseif i == 2 && s.nonsingular > 0
+        print(io, "$(s.nonsingular) non-singular ($(s.real_nonsingular) real)")
+    elseif i == 3 && s.singular > 0
+        print(io, "$(s.singular) singular ($(s.real_singular) real)")
+    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
+        print(io, "$(s.real_nonsingular + s.real_singular) real solutions")
+    elseif i == 5 && s.failed > 0
+        print(io, "$(s.failed) failed")
+    elseif i == 6
+        print(io, "Random seed used")
+    end
+end
+
+function TreeViews.treenode(r::ProjectiveResult, i::Integer)
+    s = statistics(r)
+    if i == 1
+        return length(r)
+    elseif i == 2 && s.nonsingular > 0
+        return finite(r, onlynonsingular=true)
+    elseif i == 3 && s.singular > 0
+        return finite(r, onlysingular=true)
+    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
+        return finite(r, onlyreal=true)
+    elseif i == 5 && s.failed > 0
+        return failed(r)
+    elseif i == 6
+        return seed(r)
+    end
+    missing
+end
+
+plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"

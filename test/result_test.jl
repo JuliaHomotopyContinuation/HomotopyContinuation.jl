@@ -1,7 +1,7 @@
 @testset "Result" begin
     @testset "Result+PathResult" begin
         R = solve(equations(heart()), seed=506435)
-        @test R isa AffineResult
+        @test R isa Result
         @test natinfinity(R) ≤ 572
         @test nfinite(R) == 4
         @test length(collect(R)) == 576
@@ -26,7 +26,7 @@
         @test length(singular(real(R))) == 0
 
         @test_nowarn mapresults(solution, R)
-        @test_nowarn mapresults(startsolution, R)
+        @test_nowarn mapresults(start_solution, R)
         @test_nowarn mapresults(residual, R)
         @test_nowarn mapresults(issingular, R)
         @test count(mapresults(isreal, R)) == 2
@@ -44,30 +44,26 @@
         @test_nowarn show(IOContext(devnull, :compact=>true), R[end])
 
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
 
         @polyvar x y z
         R = solve([(x-3)^3,(y-2)])
-        @test R isa AffineResult
+        @test R isa Result
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
         @test_nowarn sprint(show, R)
 
         @polyvar x y z
         R = solve([(x-3z),(y-2z)])
-        @test R isa ProjectiveResult
+        @test R isa Result{<:ProjectiveVectors.PVector}
         @test_nowarn string(R)
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 1
 
         @polyvar x y z
         R = solve([(x-3z)^3,(y-2z)])
-        @test R isa ProjectiveResult
+        @test R isa Result{<:ProjectiveVectors.PVector}
         test_treeviews(R)
-        @test_nowarn TreeViews.treelabel(devnull, R[1], MIME"application/prs.juno.inline"())
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
 
@@ -113,7 +109,7 @@
         f = (x-3y)^3*(x-2y)
         R = solve([f], seed=171090)
         @test length(uniquesolutions(R)) == 2
-        @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
+        @test uniquesolutions(R) isa Vector{ProjectiveVectors.PVector{Complex{Float64}, 1}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2
         a, b = uniquesolutions(R, multiplicities=true)
         @test (a[2] == 3 && b[2] == 1) || (b[2] == 3 && a[2] == 1)

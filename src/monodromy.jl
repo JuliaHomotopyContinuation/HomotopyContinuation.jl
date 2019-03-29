@@ -4,7 +4,7 @@ export monodromy_solve, realsolutions, nreal, parameters
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_allowed_keywords = [:distance, :identical_tol, :done_callback,
+const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
@@ -553,7 +553,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
 
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
-    optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_allowed_keywords)
+    optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
     options = begin
         isrealsystem = TC <: Real && TP <: Real
         MonodromyOptions(isrealsystem; optionskwargs...)

@@ -172,10 +172,26 @@ of type `V`. `Homvars` is true if there have been homogenization variables decla
 struct VariableGroups{N, Homvars, V<:Union{MP.AbstractVariable, Int}}
 	variables::Vector{V}
     groups::NTuple{N, Vector{Int}}
+	pull_back_mapping::Vector{Tuple{Int,Int}}
 end
 
-function VariableGroups(variables, groups::NTuple{N, Vector{Int}}, dedicated_homvars) where {N}
-	VariableGroups{N, dedicated_homvars, eltype(variables)}(variables, groups)
+function VariableGroups(variables, groups::NTuple{N, Vector{Int}}, dedicated_homvars::Bool) where {N}
+	hom_vars = last.(groups)
+	elements = vcat(groups...)
+	pull_back_mapping = Tuple{Int,Int}[]
+	proj_homvar_indices = cumsum([length(g) for g in groups])
+	for i in 1:sum(length, groups)
+		i ∉ hom_vars || continue
+		l = 0
+		for (gᵢ, group) in enumerate(groups), k in group
+			l += 1
+			if i == k
+				push!(pull_back_mapping, (l, proj_homvar_indices[gᵢ]))
+				break
+			end
+		end
+	end
+	VariableGroups{N, dedicated_homvars, eltype(variables)}(variables, groups, pull_back_mapping)
 end
 
 """
@@ -325,19 +341,9 @@ function embed_projective!(x::PVector{<:Number, M}, VG::VariableGroups{M}, v::Ab
 end
 
 pull_back(VG::VariableGroups{1, false}, v::Vector) = copy(v)
-pull_back(VG::VariableGroups{M, false}, v::PVector{<:Number, M}) where {M} = copy(v)
+pull_back(VG::VariableGroups{M, false}, v::PVector{<:Number, M}) where {M} = LinearAlgebra.normalize(v)
 function pull_back(VG::VariableGroups{M, true}, x::PVector{<:Number, M}) where {M}
-	n = sum(projective_dims(VG))
-	v = Vector{eltype(x)}(undef, n)
-	k = 1
-	for group in VG.groups
-		for i in 1:(length(group)-1)
-			v[group[i]] = x[k] / x[group[end]]
-			k += 1
-		end
-		k += 1
-	end
-	v
+	map(ki -> x[ki[1]] / x[ki[2]], VG.pull_back_mapping)
 end
 
 ##############

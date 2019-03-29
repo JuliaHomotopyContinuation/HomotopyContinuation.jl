@@ -65,6 +65,23 @@ macro deprecatekwarg(oldkw, newkw)
 end
 
 """
+    invalid_keywords(kwargs, allowed)
+
+Look for invalid keywords in the `kwargs`.
+"""
+function invalid_kwargs(kwargs, allowed)
+    invalids = []
+    for kwarg in kwargs
+        kw = first(kwarg)
+        if !any(isequal(kw), allowed)
+            push!(invalids, kwarg)
+        end
+    end
+    invalids
+end
+
+
+"""
     nthroot(x, n)
 
 Compute the `n`-th root of `x`.
@@ -234,6 +251,9 @@ unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 Computes the Fubini-Study distance between `x` and `y`.
 """
 fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
+function fubini_study(x::PVector{<:Number, 1}, y::PVector{<:Number, 1})
+    acos(min(1.0, abs(first(LinearAlgebra.dot(x,y)))))
+end
 
 """
     logabs(z)

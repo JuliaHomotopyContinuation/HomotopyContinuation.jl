@@ -1,9 +1,10 @@
-export PathTrackerResult, ExtendedPathTrackerResult,
-       PathTrackerStatus, PathTracker,
-       pathtracker, pathtracker_startsolutions
+export PathResult, PathTrackerStatus, PathTracker,
+       pathtracker, pathtracker_startsolutions, solution,
+       accuracy, residual, start_solution, isfailed, isatinfinity,
+       issingular, isnonsingular, isprojective
 
 
-const pathtracker_allowed_keywords = [
+const pathtracker_supported_keywords = [
     :at_infinity_check, :max_step_size_endgame_start,
     :min_val_accuracy, :samples_per_loop,
     :max_winding_number, :max_affine_norm]
@@ -276,13 +277,13 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0)
     state.status
 end
 
-function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details_level::Int=1) where {Extended}
+function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details_level::Int=1)
     track(tracker, x₁, t₁, path_number, details_level)
 end
 
-function track(tracker::PathTracker, x₁, t₁::Float64, path_number::Int, details_level::Int) where {Extended}
+function track(tracker::PathTracker, x₁, t₁::Float64, path_number::Int, details_level::Int)
     track!(tracker, x₁, t₁)
-    PathTrackerResult(tracker, x₁, path_number; details_level=details_level)
+    PathResult(tracker, x₁, path_number; details_level=details_level)
 end
 
 
@@ -497,6 +498,12 @@ type_of_x(tracker::PathTracker) = typeof(tracker.core_tracker.state.x)
 #############################
 # Convencience constructors #
 #############################
+
+const pathtracker_startsolutions_supported_keywords = [
+    problem_startsolutions_supported_keywords;
+    coretracker_supported_keywords;
+    pathtracker_supported_keywords]
+
 """
     pathtracker_startsolutions(args...; kwargs...)
 
@@ -505,9 +512,12 @@ This also takes the same input arguments as `solve`. This is convenient if you w
 to investigate single paths.
 """
 function pathtracker_startsolutions(args...; kwargs...)
+    invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
+    check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
+
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
-    core_tracker_supported, pathtracker_kwargs = splitkwargs(rest, coretracker_allowed_keywords)
+    core_tracker_supported, pathtracker_kwargs = splitkwargs(rest, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
     tracker = PathTracker(prob, core_tracker; pathtracker_kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
@@ -574,11 +584,11 @@ function winding_number(tracker::PathTracker)
 end
 
 """
-     PathTrackerResult(tracker::PathTracker, start_solution=nothing, path_number::Union{Nothing,Int}=nothing; details_level=1)
+     PathResult(tracker::PathTracker, start_solution=nothing, path_number::Union{Nothing,Int}=nothing; details_level=1)
 
 Possible `details_levels` values are `0` (minimal details), `1` (default) and `2` (all information possible).
 """
-struct PathTrackerResult{V<:AbstractVector}
+struct PathResult{V<:AbstractVector}
     return_code::Symbol
     solution::V
     t::Float64
@@ -596,7 +606,7 @@ struct PathTrackerResult{V<:AbstractVector}
     valuation_accuracy::Union{Nothing, Vector{Float64}} # level 2+
 end
 
-function PathTrackerResult(tracker::PathTracker, start_solution, path_number::Union{Nothing,Int}=nothing; details_level::Int=1)
+function PathResult(tracker::PathTracker, start_solution, path_number::Union{Nothing,Int}=nothing; details_level::Int=1)
     @unpack state, core_tracker, cache = tracker
 
     return_code = Symbol(state.status)
@@ -649,7 +659,7 @@ function PathTrackerResult(tracker::PathTracker, start_solution, path_number::Un
         valuation_accuracy = nothing
     end
 
-    PathTrackerResult(return_code, x, t, accuracy, res, condition_jac,
+    PathResult(return_code, x, t, accuracy, res, condition_jac,
                       windingnumber, endgame_zone_start,
                       path_number,
                       startsolution,
@@ -675,9 +685,9 @@ end
 
 Returns the type of result `track` will return.
 """
-result_type(tracker::PathTracker) = PathTrackerResult{typeof(solution(tracker))}
+result_type(tracker::PathTracker) = PathResult{typeof(solution(tracker))}
 
-function Base.show(io::IO, r::PathTrackerResult)
+function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
     if iscompact || haskey(io, :typeinfo)
         println(io, " • return_code: $(r.return_code)")
@@ -689,7 +699,7 @@ function Base.show(io::IO, r::PathTrackerResult)
         r.path_number !== nothing &&
             println(io, " • path_number: ", r.path_number)
     else
-        println(io, "PathTrackerResult")
+        println(io, "PathResult")
         println(io, "=================")
         println(io, " • return_code: $(r.return_code)")
         println(io, " • solution: ", r.solution)
@@ -700,47 +710,56 @@ function Base.show(io::IO, r::PathTrackerResult)
         r.winding_number !== nothing &&
             println(io, " • winding_number: $(r.winding_number)")
         r.condition_jacobian !== nothing &&
-            println(io, " • condition_number: $(Printf.@sprintf "%.3e" r.condition_jacobian)")
+            println(io, " • condition_jacobian: $(Printf.@sprintf "%.3e" r.condition_jacobian)")
         r.path_number !== nothing &&
             println(io, " • path_number: ", r.path_number)
     end
 end
-Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTrackerResult) = x
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathResult) = x
 
 """
     solution(pathresult)
 
 Get the solution of the path.
 """
-solution(r::PathTrackerResult) = r.solution
+solution(r::PathResult) = r.solution
+
+
+"""
+    accuracy(pathresult)
+
+Get the accuracy of the solution ``x`` of the path, i.e., ``||H(x, 0)||_2``.
+"""
+accuracy(r::PathResult) = r.accuracy
+
 
 """
     residual(pathresult)
 
 Get the residual of the solution ``x`` of the path, i.e., ``||H(x, 0)||_2``.
 """
-residual(r::PathTrackerResult) = r.residual
+residual(r::PathResult) = r.residual
 
 """
     start_solution(pathresult)
 
 Get the start solution of the solution ``x`` of the path.
 """
-start_solution(r::PathTrackerResult) = r.start_solution
+start_solution(r::PathResult) = r.start_solution
 
 """
     issuccess(pathresult)
 
 Checks whether the path is successfull.
 """
-LinearAlgebra.issuccess(r::PathTrackerResult) = r.retur_ncode == :success
+LinearAlgebra.issuccess(r::PathResult) = r.return_code == :success
 
 """
     isfailed(pathresult)
 
 Checks whether the path failed.
 """
-isfailed(r::PathTrackerResult) =!(r.return_code == :at_infinity || r.return_code == :success)
+isfailed(r::PathResult) =!(r.return_code == :at_infinity || r.return_code == :success)
 
 
 """
@@ -748,14 +767,14 @@ isfailed(r::PathTrackerResult) =!(r.return_code == :at_infinity || r.return_cod
 
 Checks whether the path goes to infinity.
 """
-isatinfinity(r::PathTrackerResult) = r.return_code == :at_infinity
+isatinfinity(r::PathResult) = r.return_code == :at_infinity
 
 """
     isfinite(pathresult)
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathTrackerResult) = r.returncode == :success # we don't check isaffine to make other code easier
+Base.isfinite(r::PathResult) = r.return_code == :success # we don't check isaffine to make other code easier
 
 """
     issingular(pathresult; tol=1e14)
@@ -764,9 +783,9 @@ Checks whether the path result is singular. This is true if
 the winding number is larger than  1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-issingular(r::PathTrackerResult; tol=1e14) = issingular(r, tol)
-function issingular(r::PathTrackerResult, tol::Real)
-    (unpack(r.windingnumber, 0) > 1 || r.condition_number > tol) && LinearAlgebra.issuccess(r)
+issingular(r::PathResult; tol=1e14) = issingular(r, tol)
+function issingular(r::PathResult, tol::Real)
+    (unpack(r.winding_number, 0) > 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
@@ -775,8 +794,8 @@ end
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathTrackerResult; tol=1e14) = isnonsingular(r, tol)
-isnonsingular(r::PathTrackerResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
+isnonsingular(r::PathResult; tol=1e14) = isnonsingular(r, tol)
+isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
 """
@@ -784,5 +803,8 @@ isnonsingular(r::PathTrackerResult, tol::Real) = !issingular(r, tol) && LinearAl
 
 We consider a result as `real` if the 2-norm of the imaginary part of the solution is at most `tol`.
 """
-Base.isreal(r::PathTrackerResult; tol=1e-6) = isreal(r, tol)
-Base.isreal(r::PathTrackerResult, tol::Real) = isrealvector(r.solution, tol)
+Base.isreal(r::PathResult; tol=1e-6) = isreal(r, tol)
+Base.isreal(r::PathResult, tol::Real) = isrealvector(r.solution, tol)
+
+isprojective(r::PathResult{<:PVector}) = true
+isprojective(r::PathResult) = false

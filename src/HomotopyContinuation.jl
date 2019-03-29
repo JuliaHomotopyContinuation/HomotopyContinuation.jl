@@ -25,7 +25,6 @@ module HomotopyContinuation
     export @polyvar
 
     include("utilities.jl")
-    include("parallel.jl")
     include("affine_patches.jl")
 
     include("systems_and_homotopies.jl")
@@ -39,11 +38,7 @@ module HomotopyContinuation
 
     include("core_tracker.jl")
     include("path_tracker.jl")
-    include("endgaming.jl")
-
-    include("solving.jl")
     include("solve.jl")
-    include("new_solve.jl")
     include("monodromy.jl")
 
     import LinearAlgebra: issuccess

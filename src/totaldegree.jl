@@ -245,6 +245,7 @@ function Base.show(io::IO, iter::MultiBezoutSolutionsIterator)
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MultiBezoutSolutionsIterator) = x
 
+Base.length(iter::MultiBezoutSolutionsIterator) = bezout_number(iter.indices.D, iter.indices.k)
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{MultiBezoutSolutionsIterator{N}}) where N = ProjectiveVectors.PVector{ComplexF64, N}
 

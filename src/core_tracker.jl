@@ -6,7 +6,7 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!
 
-const coretracker_allowed_keywords = [:corrector, :predictor,
+const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
     :max_steps, :simple_step_size_alg,

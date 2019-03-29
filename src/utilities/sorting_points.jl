@@ -435,3 +435,5 @@ function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_di
     end
     [m for m in mults if length(m) > 1]
 end
+# TODO: Do we need different functions depending on the number of products of projective spaces?
+multiplicities(v::Vector{<:PVector}; kwargs...) = multiplicities(v, fubini_study; kwargs...)
