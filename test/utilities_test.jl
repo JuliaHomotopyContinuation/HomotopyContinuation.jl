@@ -83,8 +83,8 @@
         end
 
         # Test many points with nearly indentical distance to the inserted point
-        points = shuffle!([[cis(k/100*2π)] for k=0:99])
-        data = HC.UniquePoints(points)
+        p = shuffle!([[cis(k/100*2π)] for k=0:99])
+        data = HC.UniquePoints(p)
         @test HC.iscontained(data, [0.0im]) == false
 
         # Test with group action
@@ -109,7 +109,7 @@
         @test HC.isrealvector(points(data)[1]) == false
         @test length(points(data)) == 2
 
-        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), add_real_if_possible = true)
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real = true)
         @test HC.isrealvector(points(data)[1]) == true
         @test length(points(data)) == 2
 

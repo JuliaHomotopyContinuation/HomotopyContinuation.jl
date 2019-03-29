@@ -255,14 +255,14 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Flo
                 empty!(data)
                 unsafe_add!(data, y)
                 for i = 2:length(v)
-                    add!(data, v[i]; tol=tol)
+                    k = add!(data, v[i]; tol=tol)
                 end
                 return data
             end
         end
     end
     for i = 2:length(v)
-        add!(data, v[i]; tol=tol)
+        k = add!(data, v[i]; tol=tol)
     end
     data
 end
@@ -353,14 +353,12 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
                         return NOT_FOUND_AND_REAL
                     end
                 end
-            else
-                if isrealvector(x)
-                    unsafe_add!(data, x)
-                    return NOT_FOUND_AND_REAL
-                end
+            elseif isrealvector(x)
                 unsafe_add!(data, x)
-                return NOT_FOUND
+                return NOT_FOUND_AND_REAL
             end
+            unsafe_add!(data, x)
+            return NOT_FOUND
         end
     else
         if iscontained(data, x, Val{false}(), tol)
@@ -377,10 +375,12 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); 
                         return true
                     end
                 end
-            else
+            elseif isrealvector(x)
                 unsafe_add!(data, x)
                 return true
             end
+            unsafe_add!(data, x)
+            return true
         end
     end
 end
