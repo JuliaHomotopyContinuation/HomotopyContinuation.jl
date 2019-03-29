@@ -187,7 +187,10 @@ by [`add!`](@ref) with the given tolerance `tol`. In particular, 'UniquePoints' 
 
 If `F` is not specialized, [`euclidean_distance`](@ref) is used.
 
-As optional keyword the user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
+Optional keywords:
+
+* The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
+* `check_real=true` adds real from points from group orbits (if they exists). The default is `check_real=false`.
 
 ## Example
 ```julia-repl
@@ -295,7 +298,7 @@ Check whether `x` is contained in the `data` by using the tolerance `tol` to dec
 
 If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
-is returned.
+is returned. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added.
 """
 function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Float64=1e-5)
     iscontained(data, x, val, tol)
@@ -334,7 +337,7 @@ Add `x` to `data` if it doesn't already exists by using the tolerance `tol` to d
 
 If `x` is contained in `data` by using the tolerance `tol` to decide for duplicates return the index
 of the data point which already exists. If the data point is not existing add it to `x` and
-return `-1`. The element will be the last element of `points(data)`.
+return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
 function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
     if Index
