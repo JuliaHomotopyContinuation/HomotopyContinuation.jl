@@ -100,7 +100,7 @@ end
         result = monodromy_solve(F, x₀, p₀, parameters=p,
             equivalence_classes=true,
             maximal_number_of_iterations_without_progress=100,
-            group_action=roots_of_unity)
+            group_actions=roots_of_unity)
         @test length(result.solutions) == 7
         # Test that equivalence classes are on by default if we supply a group action
         result = monodromy_solve(F, x₀, p₀, parameters=p,

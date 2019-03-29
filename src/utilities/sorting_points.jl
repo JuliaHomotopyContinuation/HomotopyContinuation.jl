@@ -190,7 +190,7 @@ If `F` is not specialized, [`euclidean_distance`](@ref) is used.
 Optional keywords:
 
 * The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
-* `check_real=true` adds real from points from group orbits (if they exists). The default is `check_real=false`.
+* `check_real=true` adds real from points from group orbits (if they exist). The default is `check_real=true`.
 
 ## Example
 ```julia-repl
@@ -213,18 +213,16 @@ end
 function UniquePoints(v::AbstractVector{T}, distance::F;
     group_action=nothing,
     group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    check_real::Bool=false) where {T<:Number, F<:Function}
+    check_real::Bool=true) where {T<:Number, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
-    elseif group_actions === nothing
-       actions = nothing
     else
        actions = GroupActions(group_actions)
     end
 
     root = SearchBlock(real(T), 1)
-    points = [v]
+    points = [deepcopy(v)]
     UniquePoints(root, points, distance, actions, check_real)
 end
 
@@ -236,15 +234,13 @@ function UniquePoints(::Type{V}, distance::F;
 
     if group_actions isa GroupActions
        actions = group_actions
-    elseif group_actions === nothing
-       actions = nothing
     else
        actions = GroupActions(group_actions)
     end
 
     root = SearchBlock(real(T))
     points = Vector{V}()
-    UniquePoints(root, points, distance, actions)
+    UniquePoints(root, points, distance, actions, check_real)
 end
 
 
@@ -269,13 +265,13 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Flo
     end
     data
 end
-UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance, kwargs...)
+UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
 UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
 
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
     root = SearchBlock(T)
     points = Vector{V}()
-    UniquePoints(root, points, data.distance_function, group_actions = data.group_actions)
+    UniquePoints(root, points, data.distance_function, data.group_actions, data.check_real)
 end
 
 """

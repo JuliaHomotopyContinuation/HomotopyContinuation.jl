@@ -45,6 +45,10 @@ function MonodromyOptions(isrealsystem;
        actions = GroupActions(group_actions)
     end
 
+    if actions.actions === nothing
+        equivalence_classes = false
+    end
+
     MonodromyOptions(identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
         target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
@@ -87,7 +91,9 @@ MonodromyStatistics(nsolutions::Int) = MonodromyStatistics(0, 0, 0, 1, [nsolutio
 function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
-        checkreal!(stats, s)
+        if isrealvector(s)
+            stats.nreal +=1
+        end
     end
     stats
 end
@@ -101,12 +107,6 @@ function trackedpath!(stats::MonodromyStatistics, retcode)
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
-    end
-end
-
-function checkreal!(stats::MonodromyStatistics, y)
-    if isrealvector(y)
-        stats.nreal +=1
     end
 end
 
@@ -158,21 +158,25 @@ struct Node{T, UP<:UniquePoints}
     main_node::Bool
 end
 
-function Node(p::AbstractVector{T}, x::AbstractVector; store_points=true, is_main_node=false) where {T}
-    uniquepoints = UniquePoints(typeof(x))
+function Node(p::AbstractVector{T}, x::UP; store_points=true, is_main_node=false) where {T, UP<:UniquePoints}
     if store_points == false
-        Node{T, typeof(uniquepoints)}(Vector(p), nothing, is_main_node)
+        Node{T, typeof(x)}(Vector(p), nothing, is_main_node)
     else
-        Node(Vector(p), uniquepoints, is_main_node)
+        Node(Vector(p), x, is_main_node)
     end
 end
 function Node(p::AbstractVector{T}, node::Node{T,UP}; store_points=true, is_main_node=false) where {T, UP}
     if store_points == false
         Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{T, UP}(Vector(p), UniquePoints(UP), is_main_node)
+        if node.points == nothing
+            Node{T, UP}(Vector(p), UniquePoints(UP; check_real = true), is_main_node)
+        else
+            Node{T, UP}(Vector(p), UniquePoints(UP; group_actions = node.points.group_actions, check_real = true), is_main_node)
+        end
     end
 end
+
 
 """
     add!(node::Node, x; kwargs...)
@@ -183,20 +187,7 @@ function add!(node::Node, x; kwargs...)
     if node.points === nothing
         false
     else
-        add!(node.points, x; kwargs...)
-    end
-end
-
-"""
-    iscontained(node::Node, x; kwargs...)
-
-Calls [`iscontained`](@ref) on the points of the Node.
-"""
-function iscontained(node::Node, x; kwargs...)
-    if node.points === nothing
-        false
-    else
-        iscontained(node.points, x; kwargs...)
+        add!(node.points, x, Val{true}(); kwargs...)
     end
 end
 
@@ -261,26 +252,19 @@ struct Loop{N<:Node}
     edges::Vector{Edge}
 end
 
-function Loop(p₁, x₁::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+function Loop(p₁, x₁::UP, nnodes::Int, options::MonodromyOptions; usegamma=true) where {UP<:UniquePoints}
     n₁ = Node(p₁, x₁, is_main_node = true)
     nodes = [n₁]
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
     for i = 2:nnodes
         p = options.parameter_sampler(p₁)
-        push!(nodes, Node(p, x₁, store_points=store_points))
+        push!(nodes, Node(p, n₁; store_points=store_points, is_main_node=false))
     end
 
     loop = map(i -> Edge(i - 1, i; usegamma=usegamma), 2:nnodes)
     push!(loop, Edge(nnodes, 1; usegamma=usegamma))
 
     Loop(nodes, loop)
-end
-function Loop(p₁, x::AbstractVector, nnodes::Int, options::MonodromyOptions; kwargs...)
-    loop = Loop(p₁, first(x), nnodes, options; kwargs...)
-    for xᵢ ∈ x
-        add!(loop.nodes[1], xᵢ; tol=options.identical_tol)
-    end
-    loop
 end
 
 """
@@ -329,7 +313,7 @@ struct Triangle <: LoopStyle
 end
 Triangle(;useweights=true) = Triangle(useweights)
 
-function Loop(strategy::Triangle, p, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Triangle, p, x::UP, options::MonodromyOptions) where {UP<:UniquePoints}
     Loop(p, x, 3, options, usegamma=strategy.useweights)
 end
 
@@ -340,7 +324,7 @@ A petal is a loop consisting of the main node and one other node connected
 by two edges with different random weights.
 """
 struct Petal <: LoopStyle end
-function Loop(strategy::Petal, p, x::AbstractVector, options::MonodromyOptions)
+function Loop(strategy::Petal, p, x::UP, options::MonodromyOptions) where {UP<:UniquePoints}
     Loop(p, x, 2, options, usegamma=true)
 end
 
@@ -577,9 +561,15 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     end
 
     #assemble
-    loop = Loop(strategy, p₀, startsolutions, options)
-
-    tracker = pathtracker(F, startsolutions;
+    if options.equivalence_classes
+        uniquepoints = UniquePoints(startsolutions;
+                                    group_actions = options.group_actions,
+                                    check_real = true)
+    else
+        uniquepoints = UniquePoints(startsolutions)
+    end
+    loop = Loop(strategy, p₀, uniquepoints, options)
+    tracker = pathtracker(F, points(uniquepoints);
                           parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     statistics = MonodromyStatistics(solutions(loop))
 
@@ -599,7 +589,11 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     # solve
     retcode = :not_assigned
     if showprogress
-        progress = ProgressMeter.ProgressUnknown("Solutions found:")
+        if !options.equivalence_classes
+            progress = ProgressMeter.ProgressUnknown("Solutions found:")
+        else
+            progress = ProgressMeter.ProgressUnknown("Counting solutions modulo group action. \n Solutions found:")
+        end
     else
         progress = nothing
     end
@@ -751,32 +745,17 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
         y = affine_chart(job.x, currx(C.tracker))
     end
 
+    next_edge = nextedge(loop, job.edge)
+    add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done
 
-    if !iscontained(node, y; tol=options.identical_tol)
-        if options.equivalence_classes
-            if equivalence_class_contained(node, y, options)
-                return :incomplete
-            end
-        end
-        next_edge = nextedge(loop, job.edge)
-        add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done
-        # Check for complex conjugate solution
-        if options.complex_conjugation && node.main_node
-            ȳ = conj.(y)
-            if !equivalence_class_contained(node, ȳ, options)
-                add_and_schedule!(node, queue, ȳ, options, stats, next_edge) && return :done
-            end
-        end
+    if options.complex_conjugation
+        add_and_schedule!(node, queue, conj.(y), options, stats, next_edge) && return :done
+    end
 
-        # Handle group actions
-        # 1) We only need to go through group actions if we do not compute in equivalence classes
-        # 2) Things are setup up such that for nodes where we want to apply
-        #    group actions `node.points !== nothing`
-        if !options.equivalence_classes && node.points !== nothing
-            apply_actions(options.group_actions, y) do yᵢ
-                add_and_schedule!(node, queue, yᵢ, options, stats, next_edge)
-                false
-            end
+    if !options.equivalence_classes && node.points !== nothing
+        apply_actions(options.group_actions, y) do yᵢ
+            add_and_schedule!(node, queue, yᵢ, options, stats, next_edge)
+            false
         end
     end
     return :incomplete
@@ -789,20 +768,23 @@ Add `y` to the current `node` (if it not already exists).
 Returns `true` if we are done. Otherwise `false`.
 """
 function add_and_schedule!(node, queue::Vector{Job{N,T}}, y, options, stats, next_edge) where {N,T}
-    if add!(node, y; tol=options.identical_tol)
-        # If we are on the main node check whether we have a real root.
-        node.main_node && checkreal!(stats, y)
+    k = add!(node, y; tol=options.identical_tol)
+    if k == NOT_FOUND
         # Check if we are done
         node.main_node && isdone(node, y, options) && return true
         push!(queue, Job(SVector{N,T}(y), next_edge))
+    elseif k == NOT_FOUND_AND_REAL
+        # If we are on the main node check whether we have a real root.
+        if node.main_node
+            stats.nreal +=1
+        end
+        # Check if we are done
+        node.main_node && isdone(node, y, options) && return true
+        push!(queue, Job(SVector{N,T}(y), next_edge))
+    elseif k == nothing
+        push!(queue, Job(SVector{N,T}(y), next_edge))
     end
     false
-end
-
-function equivalence_class_contained(node, y, options)
-    apply_actions(options.group_actions, y) do yᵢ
-        iscontained(node, yᵢ, tol=options.identical_tol)
-    end
 end
 
 function update_progress!(::Nothing, loop::Loop, statistics::MonodromyStatistics; finish=false)
