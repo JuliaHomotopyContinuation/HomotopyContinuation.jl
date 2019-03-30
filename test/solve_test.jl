@@ -240,6 +240,19 @@
         L₂ = rand(ComplexF64, 4) ⋅ [x, y, z, 1]
         S = solve([f; L₁], [f; L₂], [[1, 1, 1]])
         @test nfinite(S) == 1
+
+
+        @polyvar x y z
+        p₁ = (y - x^2) * (x^2+y^2+z^2 - 1) * (x - 0.5)
+        p₂ = (z - x^3) * (x^2+y^2+z^2 - 1) * (y - 0.5)
+        p₃ = (y - x^2) * (z - x^3) * (x^2+y^2+z^2 - 1) * (z - 0.5)
+        L₁ = [rand(ComplexF64, 4) ⋅ [x, y, z, 1], rand(ComplexF64, 4) ⋅ [x, y, z, 1]]
+        L₂ = [rand(ComplexF64, 4) ⋅ [x, y, z, 1], rand(ComplexF64, 4) ⋅ [x, y, z, 1]]
+
+        s = first(solutions(solve([x^2+y^2+z^2 - 1; L₁])))
+        tracker, starts = pathtracker_startsolutions([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s)
+
+        @test track(tracker, s).returncode == PathTrackerStatus.success
     end
 
     @testset "MultiHomogenous" begin
