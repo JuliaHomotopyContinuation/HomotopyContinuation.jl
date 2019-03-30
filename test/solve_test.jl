@@ -120,14 +120,6 @@
         @test seed(solve(G, F, [[2, -3]], seed=222)) == 222
     end
 
-    # @testset "No Endgame" begin
-    #     F = equations(katsura(5))
-    #     # no endgame
-    #     @test nfinite(solve(F, endgame_start=0.0)) == 32
-    #
-    #     @test nfinite(solve(F, endgame_start=0.0, threading=false)) == 32
-    # end
-
     @testset "Singular solutions" begin
         @polyvar x y z
         z = 1
@@ -137,24 +129,10 @@
         @test all(r -> r.winding_number == 3, singular(result))
     end
 
-    # @testset "Path Crossing" begin
-    #     # This tests that we indeed detect path crossings
-    #     F = equations(cyclic(6))
-    #     tracker, start_sols = coretracker_startsolutions(F, accuracy=1e-3, max_corrector_iters=5, seed=123512)
-    #     tracked_paths = map(start_sols) do x
-    #         track(tracker, x, 1.0, 0.1)
-    #     end
-    #
-    #     crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-2)
-    #     @test length(crossed_path_indices) > 0
-    #
-    #     tracker, start_sols = coretracker_startsolutions(F, seed=123512)
-    #     tracked_paths = map(start_sols) do x
-    #         track(tracker, x, 1.0, 0.1)
-    #     end
-    #     crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-5)
-    #     @test isempty(crossed_path_indices)
-    # end
+    @testset "Path jumping" begin
+        result = solve(equations(katsura(5)); accuracy=1e-1, refinement_accuracy=1e-8, seed=39813)
+        @test nreal(result) == 16
+    end
 
     @testset "Affine vs projective" begin
         @polyvar x y z

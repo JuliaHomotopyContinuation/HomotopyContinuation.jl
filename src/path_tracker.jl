@@ -182,8 +182,9 @@ function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_inf
 end
 
 
-function track!(tracker::PathTracker, x₁, t₁::Float64=1.0)
+function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
     @unpack core_tracker, state, options, cache = tracker
+    prev_options = set_options!(core_tracker; kwargs...)
 
     # For performance reasons we single thread blas
     n_blas_threads = single_thread_blas()
@@ -271,20 +272,33 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0)
         end
     end
 
+    if state.status == PathTrackerStatus.success && state.winding_number ≤ 1
+        refine!(core_tracker)
+    end
+
     # We have to set the number of blas threads to the previous value
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
 
+    set_options!(core_tracker; prev_options...)
     state.status
 end
 
-function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details_level::Int=1)
-    track(tracker, x₁, t₁, path_number, details_level)
-end
-
-function track(tracker::PathTracker, x₁, t₁::Float64, path_number::Int, details_level::Int)
-    track!(tracker, x₁, t₁)
+function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details_level::Int=1, kwargs...)
+    track!(tracker, x₁, t₁; kwargs...)
     PathResult(tracker, x₁, path_number; details_level=details_level)
 end
+
+
+function set_options!(core_tracker::CoreTracker;
+                      accuracy::Float64=core_tracker.options.accuracy,
+                      max_corrector_iters::Int=core_tracker.options.max_corrector_iters,
+                      max_steps::Int=core_tracker.options.max_steps)
+    core_tracker.options.accuracy = accuracy
+    core_tracker.options.max_corrector_iters = max_corrector_iters
+    core_tracker.options.max_steps = max_steps
+    (accuracy=accuracy, max_corrector_iters=max_corrector_iters, max_steps=max_steps)
+end
+
 
 
 ################

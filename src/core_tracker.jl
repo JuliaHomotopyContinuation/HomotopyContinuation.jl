@@ -128,7 +128,7 @@ end
 function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
-    max_refinement_iters=max_corrector_iters,
+    max_refinement_iters=10,
     max_steps=1_000,
     initial_step_size=0.1,
     min_step_size=1e-14,
@@ -308,7 +308,7 @@ needs to be homogenous. Note that a `CoreTracker` is also a (mutable) iterator.
 * `max_step_size =Inf`: The maximal step size.
 * `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `max_refinement_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
+* `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `accuracy=1e-7`: The precision used to track a value.
 * `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.

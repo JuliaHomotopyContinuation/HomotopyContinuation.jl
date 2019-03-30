@@ -1,4 +1,6 @@
-export solve, Result
+export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
+    finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
+    solutions, realsolutions, multiplicities, uniquesolutions, statistics
 
 """
     solve(F; options...)
@@ -140,15 +142,13 @@ function solve(args...; threading=true, report_progress=true, kwargs...)
     solve(tracker, start_solutions; threading=threading, report_progress=report_progress)
 end
 
-function solve(tracker::PathTracker, start_solutions; kwargs...)
+function solve(tracker::PathTracker, start_solutions; threading=true, report_progress=true, details_level=1)
     results = Vector{result_type(tracker)}(undef, length(start_solutions))
-    track_paths!(results, tracker, start_solutions; kwargs...)
+    track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
+    path_jumping_check!(results, tracker, details_level)
     Result(results, tracker.problem.seed)
 end
 
-function track_paths!(results, tracker, start_solutions; threading=true, report_progress=true, details_level=1)
-    track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
-end
 function track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
     n = length(results)
 
@@ -211,11 +211,55 @@ function track_batch!(results, pathtracker, range, starts, details_level)
     results
 end
 
+"""
+    path_jumping_check!(results, tracker, details_level)
 
-export AffineResult, ProjectiveResult,
-    nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
-    finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
-    solutions, realsolutions, multiplicities, uniquesolutions, statistics
+Try to detect path jumping by comparing the winding numbers of finite results.
+"""
+function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details_level::Int)
+    finite_results_indices = Int[]
+    finite_results = Vector{eltype(results)}()
+    for (i, r) in enumerate(results)
+        if isfinite(r)
+            push!(finite_results, r)
+            push!(finite_results_indices, i)
+        end
+    end
+    tol = tracker.core_tracker.options.refinement_accuracy
+    clusters = multiplicities(solution, finite_results; tol=tol)
+    while true
+        for cluster in clusters
+            m = length(cluster)
+            all_same_winding_number = true
+            for i in m
+                if unpack(finite_results[i].winding_number, 1) ≠ m
+                    all_same_winding_number = false
+                    break
+                end
+            end
+            if !all_same_winding_number
+                # rerun
+                for i in cluster
+                    rᵢ = finite_results[i]
+                    new_rᵢ = track(tracker, start_solution(rᵢ), 1.0; path_number=rᵢ.path_number,
+                                            details_level=details_level,
+                                            accuracy=min(1e-8, accuracy(tracker.core_tracker)),
+                                            max_corrector_iters=1)
+                    finite_results[i] = new_rᵢ
+                    results[finite_results_indices[i]] = new_rᵢ
+
+                end
+            end
+        end
+        prev_clusters = clusters
+        clusters = multiplicities(solution, finite_results; tol=tol)
+        if clusters == prev_clusters
+            break
+        end
+    end
+
+    results
+end
 
 
 """
