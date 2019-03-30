@@ -246,13 +246,15 @@ unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 
 """
-    fubini_study(x, y)
+    fubini_study(x::PVector, y::PVector)
 
 Computes the Fubini-Study distance between `x` and `y`.
 """
-fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
 function fubini_study(x::PVector{<:Number, 1}, y::PVector{<:Number, 1})
     acos(min(1.0, abs(first(LinearAlgebra.dot(x,y)))))
+end
+function fubini_study(x::PVector{<:Number, M}, y::PVector{<:Number, M}) where {M}
+    sqrt(sum(abs2.(acos.(min.(1.0, abs.(LinearAlgebra.dot(x,y)))))))
 end
 
 """
