@@ -42,7 +42,7 @@ end
 function Solver(prob::ProjectiveProblem, startsolutionsample::AbstractVector{<:Complex}, t₁, t₀, seed, options::SolverOptions;kwargs...)
     x₁= embed(prob, startsolutionsample)
 
-    tracker = CoreTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, pathtracker_allowed_keywords)...)
+    tracker = CoreTracker(prob, x₁, t₁, t₀; filterkwargs(kwargs, coretracker_allowed_keywords)...)
 
     check_at_infinity = homvars(prob) !== nothing
     endgame = Endgame(prob.homotopy, x₁; check_at_infinity=check_at_infinity, filterkwargs(kwargs, endgame_allowed_keywords)...)
@@ -59,7 +59,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 check_kwargs(kwargs) = check_kwargs_empty(invalid_kwargs(kwargs), allowed_keywords())
-allowed_keywords() = [:patch, pathtracker_allowed_keywords..., endgame_allowed_keywords...]
+allowed_keywords() = [:patch, coretracker_allowed_keywords..., endgame_allowed_keywords...]
 
 function invalid_kwargs(kwargs)
     invalids = []

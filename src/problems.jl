@@ -24,14 +24,19 @@ homotopy(prob::AbstractProblem) = prob.homotopy
 
 Construct a `ProjectiveProblemProblem`. The homotopy `H` needs to be homogenous.
 """
-struct ProjectiveProblem <: AbstractProblem
-    homotopy::AbstractHomotopy
-    vargroups::VariableGroups
+struct ProjectiveProblem{H<:AbstractHomotopy, VG<:VariableGroups} <: AbstractProblem
+    homotopy::H
+    vargroups::VG
     seed::Int
+	startsolutions_need_reordering::Bool
+end
+function ProjectiveProblem(H::AbstractHomotopy, vargroups::VariableGroups, seed::Int; startsolutions_need_reordering=false)
+	ProjectiveProblem(H, vargroups, seed, startsolutions_need_reordering)
 end
 function ProjectiveProblem(G::AbstractSystem, F::AbstractSystem,
-        vargroups::VariableGroups, seed::Int; homotopy=DEFAULT_HOMOTOPY)
-    ProjectiveProblem(homotopy(G, F), vargroups, seed)
+        vargroups::VariableGroups, seed::Int;
+		homotopy=DEFAULT_HOMOTOPY, kwargs...)
+    ProjectiveProblem(homotopy(G, F), vargroups, seed; kwargs...)
 end
 
 """
@@ -39,8 +44,8 @@ end
 
 Get the homogenization variables of the problem. Returns `nothing` if there are no.
 """
-function homvars(prob::ProjectiveProblem) where {H,N}
-    if prob.vargroups.dedicated_homvars
+function homvars(prob::ProjectiveProblem)
+    if has_dedicated_homvars(prob.vargroups)
         map(last, prob.vargroups.groups)
     else
         nothing
@@ -53,32 +58,49 @@ end
 
 Construct a `AffineProblem`.
 """
-struct AffineProblem <: AbstractProblem
-    homotopy::AbstractHomotopy
-    vargroups::VariableGroups{1}
+struct AffineProblem{H<:AbstractHomotopy, T} <: AbstractProblem
+    homotopy::H
+    vargroups::VariableGroups{1, false, T}
     seed::Int
 end
 function AffineProblem(G::AbstractSystem, F::AbstractSystem,
-        vargroups::VariableGroups{1}, seed::Int; homotopy=DEFAULT_HOMOTOPY)
+        vargroups::VariableGroups{1, false}, seed::Int; homotopy=DEFAULT_HOMOTOPY)
     AffineProblem(homotopy(G, F), vargroups, seed)
 end
 
 
 """
-    embed(prob::ProjectiveProblem, x)
+    embed(prob::ProjectiveProblem, v)
 
-Embed the solution `x` into projective space if necessary.
+Embed the vector `v` into projective space if necessary.
 """
-function embed(prob::ProjectiveProblem, x)
-    dims = projective_dims(prob.vargroups)
-    if sum(dims) == length(x)
-        ProjectiveVectors.embed(x, dims)
-    else
-        PVector(x, dims)
-    end
+function embed!(x, prob::ProjectiveProblem, v)
+	if prob.startsolutions_need_reordering
+		embed_projective!(x, prob.vargroups, v)
+	else
+		ProjectiveVectors.embed!(x, v)
+	end
 end
-embed(prob::ProjectiveProblem, x::PVector) = x
-embed(prob::AffineProblem, x::AbstractVector) = x
+embed!(x, prob::ProjectiveProblem, v::PVector) = ProjectiveVectors.embed!(x, v)
+embed!(x, prob::AffineProblem, v::AbstractVector) = begin x .= v; x end
+
+function embed(prob::ProjectiveProblem, v)
+	if prob.startsolutions_need_reordering
+		embed_projective(prob.vargroups, v)
+	else
+		ProjectiveVectors.embed(v, projective_dims(prob.vargroups))
+	end
+end
+embed(prob::ProjectiveProblem, v::PVector) = v
+embed(prob::AffineProblem, v::AbstractVector) = v
+
+"""
+    pull_back(prob::ProjectiveProblem, x)
+
+Pull the solution `x` into affine space if necessary. Creates a copy.
+"""
+pull_back(prob::ProjectiveProblem, x::PVector) = pull_back(prob.vargroups, x)
+pull_back(prob::AffineProblem, x::AbstractVector) = copy(x)
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
 	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
@@ -231,7 +253,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_sca
 		end
 		F̄ = construct_system(f, system; variables=vars, homvars=homvar)
 		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
-        ProjectiveProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
+        ProjectiveProblem(Ḡ, F̄, vargroups, seed; startsolutions_need_reordering=true, kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogenous and the other not!")
     else
@@ -250,7 +272,7 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_sca
         F̄ = construct_system(f, system, variables=vars, homvars=homvar)
 		Ḡ = construct_system(g, system, variables=vars, homvars=homvar)
 		vargroups = VariableGroups(vars, h)
-        ProjectiveProblem(Ḡ, F̄, vargroups, seed; kwargs...), prob.startsolutions
+        ProjectiveProblem(Ḡ, F̄, vargroups, seed; startsolutions_need_reordering=true, kwargs...), prob.startsolutions
     end
 end
 
@@ -272,6 +294,6 @@ function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affin
 		F̄ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
 	    H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 
-	    ProjectiveProblem(H, variable_groups, seed), prob.startsolutions
+	    ProjectiveProblem(H, variable_groups, seed; startsolutions_need_reordering=true), prob.startsolutions
 	end
 end

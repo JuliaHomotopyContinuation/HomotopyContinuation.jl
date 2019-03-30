@@ -22,20 +22,6 @@ function internal_solve(solvers, start_solutions::AbstractVector)
     end
 end
 
-"""
-    single_thread_blas()
-
-We set the number of BLAS threads to 1 since we multithread by ourself.
-But even if we would not, the overhead of the threading is so large
-that the single threaded version is around two times faster (at least on Mac Julia v0.6.2).
-Returns the previous number of BLAS threads.
-"""
-function single_thread_blas()
-    nblas_threads = get_num_BLAS_threads()
-    set_num_BLAS_threads(1)
-    nblas_threads
-end
-
 seed(solver::Solver) = solver.seed
 seed(solvers::Solvers) = seed(solvers[1])
 t₁_t_endgame_t₀(solver::Solver) = solver.t₁, solver.options.endgame_start, solver.t₀

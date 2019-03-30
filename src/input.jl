@@ -77,13 +77,6 @@ struct ParameterSystemInput{P<:MPPolyInputs, V<:MP.AbstractVariable} <: Abstract
     γ₀::Union{Nothing, ComplexF64}
 end
 
-const overdetermined_error_msg = """
-The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
-See
-    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
-for details.
-"""
-
 """
     input(F::MPPolyInputs)::TotalDegreeInput
     input(F::AbstractSystem)::TotalDegreeInput

@@ -33,7 +33,6 @@ module HomotopyContinuation
     include("problems.jl")
     include("totaldegree.jl")
 
-    include("returncodes.jl")
     include("newton.jl")
     include("predictors.jl")
     include("correctors.jl")
@@ -44,6 +43,7 @@ module HomotopyContinuation
 
     include("solving.jl")
     include("solve.jl")
+    include("new_solve.jl")
     include("monodromy.jl")
 
     import LinearAlgebra: issuccess

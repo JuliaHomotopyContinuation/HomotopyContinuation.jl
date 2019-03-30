@@ -2,7 +2,7 @@ using Test, LinearAlgebra, Random
 using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
 
-import PolynomialTestSystems: cyclic, katsura, equations, ipp2, heart
+import PolynomialTestSystems: cyclic, katsura, equations, ipp2, heart, griewank_osborne
 const HC = HomotopyContinuation
 
 function test_treeviews(x)
@@ -23,7 +23,8 @@ end
     include("homotopies_test.jl")
     include("predictors_test.jl")
     include("correctors_test.jl")
-    include("path_tracking_test.jl")
+    include("core_tracker_test.jl")
+    include("path_tracker_test.jl")
     include("solve_test.jl")
     include("result_test.jl")
     include("integration_tests.jl")

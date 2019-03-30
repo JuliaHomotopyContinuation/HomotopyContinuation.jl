@@ -164,14 +164,18 @@ homvars(H::HomogenizationInformation) = H.homvars
 homvars(::Nothing) = nothing
 
 """
-    VariableGroups{N}
+    VariableGroups{N, Homvars, V}
 
-A `VariableGroups` stores an `NTuple` of indices mapping to the indices of the original variables.
+A `VariableGroups` stores an `NTuple` of indices mapping to the indices of the original variables
+of type `V`. `Homvars` is true if there have been homogenization variables declared.
 """
-struct VariableGroups{N, V<:Union{MP.AbstractVariable, Int}}
+struct VariableGroups{N, Homvars, V<:Union{MP.AbstractVariable, Int}}
 	variables::Vector{V}
     groups::NTuple{N, Vector{Int}}
-    dedicated_homvars::Bool
+end
+
+function VariableGroups(variables, groups::NTuple{N, Vector{Int}}, dedicated_homvars) where {N}
+	VariableGroups{N, dedicated_homvars, eltype(variables)}(variables, groups)
 end
 
 """
@@ -239,6 +243,12 @@ function VariableGroups(nvariables::Int, hominfo::HomogenizationInformation)
 	end
 end
 
+"""
+	has_dedicated_homvars(variable_groups)
+
+Returns `true` if there have been homogenization variables declared.
+"""
+has_dedicated_homvars(groups::VariableGroups{N, Homvars}) where {N, Homvars} = Homvars
 
 """
 	projective_dims(variable_groups)
@@ -279,6 +289,56 @@ variables(VG::VariableGroups) = VG.variables
 Group the given variables in their corresponding groups.
 """
 ngroups(VG::VariableGroups{M}) where M = M
+
+
+function embed_projective(VG::VariableGroups{M}, v::AbstractVector) where {M}
+	dims = projective_dims(VG)
+	x = PVector(zeros(eltype(v), sum(dims) + M), dims)
+	embed_projective!(x, VG, v)
+end
+
+function embed_projective!(x::PVector{<:Number, M}, VG::VariableGroups{M}, v::PVector{<:Number, M}) where {M}
+	x.data .= v.data
+	x
+end
+function embed_projective!(x::PVector{<:Number, M}, VG::VariableGroups{M}, v::AbstractVector) where {M}
+	if sum(projective_dims(VG)) == length(v)
+		k = 1
+		for group in VG.groups
+			for i in 1:(length(group)-1)
+				x[k] = v[group[i]]
+				k += 1
+			end
+			x[k] = one(eltype(x))
+			k += 1
+		end
+	else
+		k = 1
+		for group in VG.groups
+			for i in group
+				x[k] = v[i]
+				k += 1
+			end
+		end
+	end
+	x
+end
+
+pull_back(VG::VariableGroups{1, false}, v::Vector) = copy(v)
+pull_back(VG::VariableGroups{M, false}, v::PVector{<:Number, M}) where {M} = copy(v)
+function pull_back(VG::VariableGroups{M, true}, x::PVector{<:Number, M}) where {M}
+	n = sum(projective_dims(VG))
+	v = Vector{eltype(x)}(undef, n)
+	k = 1
+	for group in VG.groups
+		for i in 1:(length(group)-1)
+			v[group[i]] = x[k] / x[group[end]]
+			k += 1
+		end
+		k += 1
+	end
+	v
+end
 
 ##############
 # POLYNOMIALS

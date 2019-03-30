@@ -299,3 +299,22 @@ function solve_with_digits_lost!(x::AbstractVector, Jac::Jacobian, b::AbstractVe
     norm_δx = iterative_refinement_step!(x, Jac.J, b, Jac.fac, Jac.r)
     log₁₀(norm_δx / eps(norm_x))
 end
+
+"""
+    row_scaling!(A)
+
+Divide each row of `A` by its 2-norm.
+"""
+function row_scaling!(A)
+    @inbounds for i=1:size(A, 1)
+        rᵢ = abs2(A[i, 1])
+        for j=2:size(A, 2)
+            rᵢ += abs2(A[i, j])
+        end
+        rᵢ = inv(√rᵢ)
+        for j=1:size(A, 2)
+            A[i, j] *= rᵢ
+        end
+    end
+    A
+end

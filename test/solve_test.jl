@@ -136,7 +136,7 @@
     @testset "Path Crossing" begin
         # This tests that we indeed detect path crossings
         F = equations(cyclic(6))
-        tracker, start_sols = pathtracker_startsolutions(F, accuracy=1e-3, max_corrector_iters=5, seed=123512)
+        tracker, start_sols = coretracker_startsolutions(F, accuracy=1e-3, max_corrector_iters=5, seed=123512)
         tracked_paths = map(start_sols) do x
             track(tracker, x, 1.0, 0.1)
         end
@@ -144,7 +144,7 @@
         crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-2)
         @test length(crossed_path_indices) > 0
 
-        tracker, start_sols = pathtracker_startsolutions(F, seed=123512)
+        tracker, start_sols = coretracker_startsolutions(F, seed=123512)
         tracked_paths = map(start_sols) do x
             track(tracker, x, 1.0, 0.1)
         end
@@ -252,7 +252,7 @@
         s = first(solutions(solve([x^2+y^2+z^2 - 1; L₁])))
         tracker, starts = pathtracker_startsolutions([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s)
 
-        @test track(tracker, s).returncode == PathTrackerStatus.success
+        @test track(tracker, s).return_code == :success
     end
 
     @testset "MultiHomogenous" begin

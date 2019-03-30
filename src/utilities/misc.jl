@@ -1,5 +1,14 @@
 export SymmetricGroup, infinity_norm, infinity_distance, fubini_study
 
+
+"""
+    unpack(a::Union{Nothing, T}, b::T)
+
+Returns `a` if it is not `nothing`, otherwise `b`.
+"""
+unpack(a::Union{Nothing, T}, b::T) where {T} = a === nothing ? b : a
+
+
 """
     SymmetricGroup(n)
 
@@ -167,7 +176,7 @@ end
     isrealvector(v::AbstractVector, tol=1e-6)
 
 Check whether the 2-norm of the imaginary part of `v` is at most `tol`.
-."""
+"""
 isrealvector(z::AbstractVector{<:Real}, tol=1e-6) = true
 function isrealvector(z::AbstractVector{<:Complex}, tol=1e-6)
     total = zero(real(eltype(z)))
@@ -319,6 +328,20 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::ComplexSegment) = o
 
 # Parallelization
 
+"""
+    single_thread_blas()
+
+We set the number of BLAS threads to 1 since we multithread by ourself.
+But even if we would not, the overhead of the threading is so large
+that the single threaded version is around two times faster (at least on Mac Julia v0.6.2).
+Returns the previous number of BLAS threads.
+"""
+function single_thread_blas()
+    nblas_threads = get_num_BLAS_threads()
+    set_num_BLAS_threads(1)
+    nblas_threads
+end
+
 set_num_BLAS_threads(n) = LinearAlgebra.BLAS.set_num_threads(n)
 get_num_BLAS_threads() = convert(Int, _get_num_BLAS_threads())
 # This is into 0.7 but we need it for 0.6 as well
@@ -342,4 +365,28 @@ const _get_num_BLAS_threads = function() # anonymous so it will be serialized wh
     end
 
     return nothing
+end
+
+"""
+
+    partition_work(unit_range, n_chunks)
+
+Partition a unit_range in `n_chunks` equally sized chunks.
+
+    partition_work(N, n_chunks)
+
+Partition a workload of `N` elements into equal chunks.
+"""
+partition_work(arg, n_chunks) = partition_work!(Vector{UnitRange{Int}}(undef, n_chunks), arg, n_chunks)
+partition_work!(dst, N::Int, n_chunks) = partition_work!(dst, 1:N, n_chunks)
+function partition_work!(dst, R::UnitRange, n_chunks)
+    ls = range(R.start, stop=R.stop, length=n_chunks+1)
+    map!(dst, 1:n_chunks) do i
+        a = round(Int, ls[i])
+        if i > 1
+            a += 1
+        end
+        b = round(Int, ls[i+1])
+        a:b
+    end
 end

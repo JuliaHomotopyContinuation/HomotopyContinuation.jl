@@ -1,12 +1,12 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
-        pathtracker, pathtracker_startsolutions, affine_tracking,
+        coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!
 
-const pathtracker_allowed_keywords = [:corrector, :predictor,
+const coretracker_allowed_keywords = [:corrector, :predictor,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
     :max_steps, :simple_step_size_alg,
@@ -26,7 +26,7 @@ module CoreTrackerStatus
     @doc """
         CoreTrackerStatus.states
 
-    The possible states the pathtracker can achieve are
+    The possible states the coretracker can achieve are
 
     * `CoreTrackerStatus.success`
     * `CoreTrackerStatus.tracking`
@@ -463,10 +463,10 @@ function track!(tracker::CoreTracker, x₁, t₁, t₀, setup_patch, checkstartv
 end
 
 """
-    setup!(pathtracker, x₁, t₁=1.0, t₀=0.0, setup_patch=pathtracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+    setup!(coretracker, x₁, t₁=1.0, t₀=0.0, setup_patch=coretracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
 
-Setup `pathtracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
-pathtracker as an iterator.
+Setup `coretracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
+coretracker as an iterator.
 """
 function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
     state, cache = tracker.state, tracker.cache
@@ -539,6 +539,7 @@ function step!(tracker::CoreTracker)
             state.accuracy = result.accuracy
             state.digits_lost = result.digits_lost
             # Step size change
+            state.Δs_prev = state.Δs
             update_stepsize!(state, result, order(tracker.predictor), options)
             if state.patch !== nothing && options.update_patch
                 changepatch!(state.patch, x)
@@ -548,6 +549,7 @@ function step!(tracker::CoreTracker)
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
             update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
+            state.last_step_failed = false
         else
             # We have to reset the patch
             state.rejected_steps += 1
@@ -600,7 +602,7 @@ function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
     if result.iters == 1
-        ω = 2.0
+        ω = isnan(state.ω) ? 2.0 : state.ω
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω
@@ -629,7 +631,6 @@ function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
         end
         state.η = η
         state.ω = ω
-        state.last_step_failed = false
     else
         ω = max(ω, state.ω)
         δ_N_ω = δ(options, ω)
@@ -646,7 +647,6 @@ function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
             λ = 0.5^order
         end
         Δs′ = 0.9 * nthroot(λ, order) * state.Δs
-        state.last_step_failed = true
     end
 
     state.Δs = min(Δs′, length(state.segment) - state.s, options.max_step_size )
@@ -938,22 +938,21 @@ end
 # Convencience constructors #
 #############################
 """
-    pathtracker_startsolutions(args...; kwargs...)
+    coretracker_startsolutions(args...; kwargs...)
 
 Construct a [`CoreTracker`](@ref) and `startsolutions` in the same way `solve`
 does it. This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
-function pathtracker_startsolutions(args...; kwargs...)
+function coretracker_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
     tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
-
     (tracker=tracker, startsolutions=startsolutions)
 end
 
 """
-    pathtracker(args...; kwargs...)
+    coretracker(args...; kwargs...)
 
 Construct a [`CoreTracker`](@ref) in the same way `solve`
 does it. This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
@@ -965,7 +964,7 @@ This is convenient if you want to investigate single paths.
 We want to construct a path tracker to track a parameterized system `f` with parameters `p`
 from the parameters `a` to `b`.
 ```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
+tracker = coretracker(f, parameters=p, p₁=a, p₀=b)
 ```
 You then can obtain a single solution at `b` by using
 ```julia
@@ -976,7 +975,7 @@ x_b = track(tracker, x_a).x
 To trace a path you can use the [`iterator`](@ref) method.
 
 ```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
 for (x, t) in iterator(tracker, x₁)
     @show (x,t)
 end
@@ -984,13 +983,13 @@ end
 
 If we want to guarantee smooth traces we can limit the maximal step size.
 ```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
 for (x, t) in iterator(tracker, x₁)
     @show (x,t)
 end
 ```
 """
-function pathtracker(args...; kwargs...)
-    tracker, _ = pathtracker_startsolutions(args...; kwargs...)
+function coretracker(args...; kwargs...)
+    tracker, _ = coretracker_startsolutions(args...; kwargs...)
     tracker
 end

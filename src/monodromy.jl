@@ -560,7 +560,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     end
 
     # construct tracker
-    tracker = pathtracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
+    tracker = coretracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     if affine_tracking(tracker)
         HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
         F₀ = FixedHomotopy(HC, 0.0)
