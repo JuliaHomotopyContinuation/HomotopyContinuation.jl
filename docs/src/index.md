@@ -10,12 +10,13 @@ If this is your first time reading this documentation, we recommend you start wi
 Pages = [
   "solving.md",
   "monodromy.md",
+  "path_tracker.md",
   "newton.md",
   "sorting.md",
   "norms_distances.md",
   "systems.md",
   "homotopies.md",
   "predictors-correctors.md",
-  "pathtracking.md",
+  "core_tracker.md",
   "reference.md"]
 ```

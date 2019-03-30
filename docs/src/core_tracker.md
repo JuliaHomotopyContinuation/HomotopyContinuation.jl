@@ -1,13 +1,13 @@
-# Path tracking
+# Core Tracker
 
-We also export a path tracking primitive to make the core path tracking routine
+We also export the path tracking primitive to make the core path tracking routine
 available for other applications.
 At the heart is a [`CoreTracker`](@ref) object which holds
-all the state. The easiest way to construct a `CoreTracker` is to use the [`pathtracker_startsolutions`](@ref) routine.
+all the state. The easiest way to construct a `CoreTracker` is to use the [`coretracker_startsolutions`](@ref) routine.
 
 ```@docs
-pathtracker_startsolutions
-pathtracker
+coretracker_startsolutions
+coretracker
 ```
 
 ## Types
@@ -21,8 +21,8 @@ CoreTrackerStatus.states
 To track from a start to an endpoint with the `CoreTracker` we provide the following
 routines.
 ```@docs
-track
-track!
+track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; kwargs...)
+track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
 setup!
 ```
 

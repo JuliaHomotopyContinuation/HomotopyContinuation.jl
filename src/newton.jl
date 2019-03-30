@@ -2,6 +2,16 @@ export NewtonResult, newton, newton!, NewtonCache, NewtonReturnCode
 
 
 module NewtonReturnCode
+    @doc """
+        NewtonReturnCode.codes
+
+    The possible return codes of Newton's method
+
+    * `NewtonReturnCode.converged`
+    * `NewtonReturnCode.terminated`
+    * `NewtonReturnCode.terminated_no_approximate`
+    * `NewtonReturnCode.maximal_iterations`
+    """
     @enum codes begin
         converged
         terminated
@@ -15,9 +25,9 @@ end
     NewtonResult{T}
 
 Structure holding information about the outcome of the `newton` function. The fields are.
-* `return_code` The return code of the compuation. `converged` means that `accuracy ≤ tol`.
-* `accuracy::T` |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.
-* `iters::Int` The number of iterations used.
+* `return_code::NewtonReturnCode.codes`: The return code of computation. `NewtonReturnCode.converged` means that `accuracy ≤ tol`.
+* `accuracy::T`: |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.
+* `iters::Int`: The number of iterations used.
 * `digits_lost::Float64` Estimate of the (relative) lost digits in the linear algebra.
 """
 struct NewtonResult{T}

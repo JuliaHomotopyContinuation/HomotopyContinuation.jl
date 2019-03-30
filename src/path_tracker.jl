@@ -1,7 +1,7 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, isfailed, isatinfinity,
-       issingular, isnonsingular, isprojective
+       issingular, isnonsingular, isprojective, isaffine
 
 
 const pathtracker_supported_keywords = [
@@ -158,13 +158,22 @@ end
 """
      PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
 
+`PathTracker` the way to track single paths. It combines the core path tracking routine
+with an endgame, i.e., it can also deal with singular solutions as well as paths going to infinity.
+`PathTracker` is a wrapper around [`CoreTracker`](@ref)
+and thus has all configuration possibilities [`CoreTracker`](@ref) has.
 
-The path tracker is *the* way to trace single paths. It combines the core path tracking routine
-with an endgame. Thus, it decides whether a path is going to infinity, has a regular solution
-or a singular solution.
+There are the following `PathTracker` specific options (with their defaults in parens):
 
-It also handles any input transformations (e.g. affine -> projective -> affine)
-such that the user gets out what he puts in.
+* `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
+* `max_step_size_endgame_start::Float64=1e-6`: The endgame only starts if the step size becomes smaller that the provided value.
+* `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
+* `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
+* `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
+* `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
+
+In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
+[`pathtracker_startsolutions`](@ref) helper functions.
 """
 struct PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
     problem::Prob
@@ -181,7 +190,16 @@ function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_inf
     PathTracker(problem, core_tracker, state, options, cache)
 end
 
+"""
+    track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states
 
+Track the path with start solution `x₁` from `t₁` towards `t=0`.
+
+Possible values for the options are
+* `accuracy::Float64`
+* `max_corrector_iters::Int`
+* `max_steps::Int`
+"""
 function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
     @unpack core_tracker, state, options, cache = tracker
     prev_options = set_options!(core_tracker; kwargs...)
@@ -283,9 +301,20 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
     state.status
 end
 
-function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details_level::Int=1, kwargs...)
+"""
+    track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, options...)::PathResult
+
+Track the path with start solution `x₁` from `t₁` towards `t=0`. The `details` options controls
+the level of details of the informations available in `PathResult`.
+
+Possible values for the options are
+* `accuracy::Float64`
+* `max_corrector_iters::Int`
+* `max_steps::Int`
+"""
+function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, kwargs...)
     track!(tracker, x₁, t₁; kwargs...)
-    PathResult(tracker, x₁, path_number; details_level=details_level)
+    PathResult(tracker, x₁, path_number; details=details)
 end
 
 
@@ -521,7 +550,7 @@ const pathtracker_startsolutions_supported_keywords = [
 """
     pathtracker_startsolutions(args...; kwargs...)
 
-Construct a [`PathTracker`](@ref) and `startsolutions` in the same way `solve` does it.
+Construct a [`PathTracker`](@ref) and start solutions in the same way [`solve`](@ref) does it.
 This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
@@ -540,9 +569,8 @@ end
 """
     pathtracker(args...; kwargs...)
 
-Construct a [`PathTracker`](@ref) in the same way `solve` does it.
+Construct a [`PathTracker`](@ref) in the same way [`solve`](@ref) does it.
 This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
-This is convenient if you want to investigate single paths.
 
 ## Examples
 
@@ -554,31 +582,10 @@ tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
 ```
 You then can obtain a single solution at `b` by using
 ```julia
-x_b = track(tracker, x_a).x
-```
-
-### Trace a path
-To trace a path you can use the [`iterator`](@ref) method.
-
-```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
-for (x, t) in iterator(tracker, x₁)
-    @show (x,t)
-end
-```
-
-If we want to guarantee smooth traces we can limit the maximal step size.
-```julia
-tracker = pathtracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
-for (x, t) in iterator(tracker, x₁)
-    @show (x,t)
-end
+x_b = solution(track(tracker, x_a))
 ```
 """
-function pathtracker(args...; kwargs...)
-    tracker, _ = pathtracker_startsolutions(args...; kwargs...)
-    tracker
-end
+pathtracker(args...; kwargs...) = first(pathtracker_startsolutions(args...; kwargs...))
 
 
 ############
@@ -598,9 +605,28 @@ function winding_number(tracker::PathTracker)
 end
 
 """
-     PathResult(tracker::PathTracker, start_solution=nothing, path_number::Union{Nothing,Int}=nothing; details_level=1)
+    PathResult{V<:AbstractVector}
 
-Possible `details_levels` values are `0` (minimal details), `1` (default) and `2` (all information possible).
+A `PathResult` is the result of tracking of a path using [`PathTracker`](@ref).
+Its fields are
+
+* `return_code`: One of `:success`, `:at_infinity` or any error code in [`PathTrackerStatus.states`](@ref) converted to a `Symbol`.
+* `solution::V`: The solution vector.
+* `t::Float64`: The value of `t` at which `solution` was computed. Note that if `return_code` is `:at_infinity`, then `t` is the value when this was decided.
+* `accuracy::Union{Nothing, Float64}`: An approximation of ``||x-x^*||₂`` where ``x`` is the computed solution and ``x^*`` is the true solution.
+* `residual::Union{Nothing, Float64}`: The value of the 2-norm of `H(solution, 0)`.
+* `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
+* `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound on the multiplicity of the solution.
+* `endgame_zone_start::Union{Nothing, Float64}`: The value of `t` at which we entered the endgame zone, i.e., where the path `x(t)` has an expansion a convergent Puiseux series near `t=0`.
+* `start_solution::Union{Nothing, Int}`: The start solution of the path.
+* `accepted_steps::Int`: The number of accepted steps during the path tracking.
+* `rejected_steps::Int`: The number of rejected steps during the path tracking.
+* `valuation::Union{Nothing, Vector{Float64}}`: An approximation of the valuation of the Puiseux series expansion of `x(t)`.
+* `valuation_accuracy::Union{Nothing, Vector{Float64}}`: An estimate of the accuracy of the valuation of the Puiseux series expansion of `x(t)`.
+
+     PathResult(tracker::PathTracker, start_solution=nothing, path_number::Union{Nothing,Int}=nothing; details=:default)
+
+Possible `details` values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
 """
 struct PathResult{V<:AbstractVector}
     return_code::Symbol
@@ -620,9 +646,9 @@ struct PathResult{V<:AbstractVector}
     valuation_accuracy::Union{Nothing, Vector{Float64}} # level 2+
 end
 
-function PathResult(tracker::PathTracker, start_solution, path_number::Union{Nothing,Int}=nothing; details_level::Int=1)
+function PathResult(tracker::PathTracker, start_solution, path_number::Union{Nothing,Int}=nothing; details::Symbol=:default)
     @unpack state, core_tracker, cache = tracker
-
+    details_level = detailslevel(details)
     return_code = Symbol(state.status)
     windingnumber = winding_number(tracker)
     x = solution(tracker)
@@ -681,6 +707,16 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
                       valuation, valuation_accuracy)
 end
 
+function detailslevel(details::Symbol)
+    if details == :minimal
+        return 0
+    elseif details == :extensive
+        return 2
+    else
+        return 1
+    end
+end
+
 function residual(tracker::PathTracker, x, t)
     evaluate!(tracker.cache.residual, tracker.cache.homotopy, x, t)
     euclidean_norm(tracker.cache.residual)
@@ -692,8 +728,6 @@ function condition_jacobian(tracker, x, t)
     LinearAlgebra.cond(tracker.cache.jacobian)
 end
 
-
-
 """
     result_type(tracker::PathTracker)
 
@@ -704,7 +738,7 @@ result_type(tracker::PathTracker) = PathResult{typeof(solution(tracker))}
 function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
     if iscompact || haskey(io, :typeinfo)
-        println(io, " • return_code: $(r.return_code)")
+        println(io, "• return_code: $(r.return_code)")
         println(io, " • solution: ", r.solution)
         r.accuracy !== nothing &&
             println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
@@ -742,7 +776,7 @@ solution(r::PathResult) = r.solution
 """
     accuracy(pathresult)
 
-Get the accuracy of the solution ``x`` of the path, i.e., ``||H(x, 0)||_2``.
+Get the accuracy of the solution ``x`` of the path, i.e., ``||H(x, 0)||₂``.
 """
 accuracy(r::PathResult) = r.accuracy
 
@@ -750,7 +784,7 @@ accuracy(r::PathResult) = r.accuracy
 """
     residual(pathresult)
 
-Get the residual of the solution ``x`` of the path, i.e., ``||H(x, 0)||_2``.
+Get the residual of the solution ``x`` of the path, i.e., ``||H(x, 0)||₂``.
 """
 residual(r::PathResult) = r.residual
 
@@ -820,5 +854,17 @@ We consider a result as `real` if the 2-norm of the imaginary part of the soluti
 Base.isreal(r::PathResult; tol=1e-6) = isreal(r, tol)
 Base.isreal(r::PathResult, tol::Real) = isrealvector(r.solution, tol)
 
+"""
+    isprojective(pathresult)
+
+Return`s true if the solution is a projective vector.
+"""
 isprojective(r::PathResult{<:PVector}) = true
 isprojective(r::PathResult) = false
+
+"""
+    isaffine(pathresult)
+
+Return`s true if the solution is an affine vector.
+"""
+isaffine(r::PathResult) = !isprojective(r)

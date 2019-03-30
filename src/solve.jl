@@ -3,45 +3,64 @@ export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsi
     solutions, realsolutions, multiplicities, uniquesolutions, statistics
 
 """
+    solve(args...; options...)::Result
+
+The solve function takes many different arguments and options depending on your specific situation,
+but in the it always returns a [`Result`](@ref) containing the result of the computations.
+In the following we show the different inputs `solve` takes.
+
+# Total Degree Homotopy
+
     solve(F; options...)
 
 Solve the system `F` using a total degree homotopy. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
+- A composition of polynomial systems constructed by [`compose`](@ref).
 - [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
 
-### Example
-Assume we want to solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)``.
+Additionally if `F` has a multi-homogenous structure you can provide variable groups
+to use a multi-homogenous totaldegree homotopy.
+
+### Examples
+We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
 ```julia
-@polyvar x y
-solve([x^2+y^2+1, 2x+3y-1])
+julia> @polyvar x y;
+julia> solve([x^2+y^2+1, 2x+3y-1])
+Result with 2 tracked paths
+==================================
+• 2 non-singular finite solutions (0 real)
+• 0 singular finite solutions (0 real)
+• 0 solutions at infinity
+• 0 failed paths
+• random seed: 448703
 ```
-If you polynomial system is already homogeneous, but you would like to consider it as an affine system
+
+If your polynomial system is already homogeneous, but you would like to consider it as an affine system
 you can do
 ```julia
 @polyvar x y z
 solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)
 ```
-This would result in the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
+This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
 
-To solve ``F`` by a custom `AbstractSystem` you can do
+By exploiting the multi-homogenous structure of a polynomial system it is possible
+to decrease the number of paths necessary to track.
 ```julia
-@polyvar x y z
-# The system `F` has to be homgoenous system
-F = SPSystem([x^2+y^2+z^2, 2x+3y-z]) # SPSystem <: AbstractSystem
-# To solve the original affine system we have to tell that the homogenization variable has index 3
-solve(F, homvar=3)
+@polyvar x y
+# Use variable groups to only track 2 paths instead of 4
+solve([x*y - 6, x^2 - 5], variable_groups=[(x,), (y,)])
 ```
-or equivalently (in this case) by
-```julia
-solve([x^2+y^2+z^2, 2x+3y-z], system=SPSystem)
-```
+To check whether a certain variable grouping is beneficial you can use the [`bezout_number`](@ref)
+function.
+
 
 # Start Target Homotopy
 
     solve(G, F, start_solutions; options...)
 
-Solve the system `F` by tracking the each provided solution of
-`G` (as provided by `start_solutions`).
+This constructs the homotopy ``H(x,t) = tG(x)+(1-t)F(x)`` to compute solutions of the
+system `F`. `start_solutions` is a list of solutions of `G` which are tracked to solutions
+of `F`.
 
 ### Example
 ```julia
@@ -52,29 +71,25 @@ solve(G, F, [[1, 1], [-1, 1]])
 ```
 
 # Parameter Homotopy
-    solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
-        startsolutions; parameters::Vector{<:MP.AbstractVariable}, p₁, p₀, γ₁=nothing, γ₀=nothing)
+    solve(F, startsolutions; parameters, p₁, p₀, γ₁=nothing, γ₀=nothing)
 
 Solve the parameter homotopy
 ```math
-H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀))
-```,
+H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
+```
 where `p₁` and `p₀` are a vector of parameter values for ``F`` and
 `γ₁` and `γ₀` are complex numbers. If `γ₁` or `γ₀` is `nothing`, it is assumed
 that `γ₁` and `γ₀` are ``1``.
 The input `parameters` specifies the parameter variables of `F`
 which should be considered as parameters.
-Neccessarily, ``length(parameters) == length(p₁) == length(p₀)``.
+Necessarily we have `length(parameters) == length(p₁) == length(p₀)`.
 
-    solve(F::Vector{<:MultivariatePolynomials.AbstractPolynomial},
-            startsolutions; parameters::Vector{<:MP.AbstractVariable},
-            startparameters, targetparameters,
-            startgamma=randn(ComplexF64), targetgamma=randn(ComplexF64))
+    solve(F, startsolutions; parameters, startparameters, targetparameters, startgamma=nothing, targetgamma=nothing)
 
-This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
-    `γ₁=start_gamma`, γ₀=`target_gamma`.
+This is a non-unicode variant where `γ₁=startparameters`, `γ₀=targetparameters`,
+    `γ₁=startgamma`, γ₀=`targetgamma`.
 
-## Example
+### Example
 We want to solve a parameter homotopy ``H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])`` where
 ```math
 F(x; a) := (x₁^2-a₁, x₁x₂-a₁+a₂)
@@ -85,7 +100,7 @@ This can be accomplished as follows
 @polyvar x[1:2] a[1:2]
 F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
 startsolutions = [[1, 1]]
-solve(F, startsolutions, parameters=a, p₁=p₁, p₀=p₀)
+solve(F, startsolutions; parameters=a, p₁=p₁, p₀=p₀)
 # If you don't like unicode this is also possible
 solve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p₀)
 ```
@@ -105,35 +120,38 @@ if the third variable is the homogenization variable.
 # Options
 General options:
 
-* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering. If you experience significant compilation times, consider to change system to `FPSystem`.
-* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogeneous [`AbstractSystem`](@ref)s.
 * `seed::Int`: The random seed used during the computations.
-* `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogeneous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
-* `endgame_start=0.1`: The value of `t` for which the endgame is started.
-* `report_progress=true`: Whether a progress bar should be printed to `STDOUT`.
+* `report_progress=true`: Whether a progress bar should be printed to standard out.
 * `threading=true`: Enable or disable multi-threading.
+* `path_result_details=:default`: The amount of information computed in each path result. Possible values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
+* `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogeneous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
+* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering. If you experience significant compilation times, consider to change system to `FPSystem`.
+* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) for the totaldegree and start target homotopy. The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogeneous [`AbstractSystem`](@ref)s.
+* `affine::Bool=false`: Indicate whether path tracking should happen in affine space rather than projective space. Currently this is only supported for parameter homotopies.
 
-Pathtracking specific:
+Path tracking specific options:
+
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
-* `max_corrector_iters=2`: The maximal number of correction steps in a single step.
-* `accuracy=1e-7`: The accuracy used to track a value.
-* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref).
-* `max_refinement_iters=max_corrector_iters`: The maximal number of correction steps used to refine the final value.
+* `max_corrector_iters=3`: The maximal number of correction steps in a single step.
+* `initial_step_size=0.1`: The step size of the first step.
+* `max_steps=10_000`: The maximal number of iterations the path tracker has available.
+* `min_step_size =1e-14`: The minimal step size.
+* `max_step_size =Inf`: The maximal step size.
+* `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
+* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
+* `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
-* `initial_step_size=0.1`: The initial step size for the predictor.
-* `min_step_size=1e-14`: The minimal step size. If the size of step is below this the path is considered failed.
-* `max_steps=1000`: The maximal number of steps per path.
+* `accuracy=1e-7`: The precision used to track a value.
+* `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
 
-Endgame specific options
-* `cauchy_loop_closed_tolerance=1e-3`: The tolerance for which is used to determine whether a loop is closed. The distance between endpoints is normalized by the maximal difference between any point in the loop and the starting point.
-* `cauchy_samples_per_loop=6`: The number of samples used to predict an endpoint. A higher number of samples should result in a better approximation. Note that the error should be roughly ``t^n`` where ``t`` is the current time of the loop and ``n`` is `cauchy_samples_per_loop`.
-* `egtol=1e-10`: This is the tolerance necessary to declare the endgame converged.
-* `maxnorm=1e5`: If our original problem is affine we declare a path at infinity if the infinity norm with respect to the standard patch is larger than `maxnorm`.
-* `maxwindingnumber=15`: The maximal windingnumber we try to find using Cauchys integral formula.
-* `max_extrapolation_samples=4`: During the endgame a Richardson extrapolation is used to improve the accuracy of certain approximations. This is the maximal number of samples used for this.
-* `minradius=1e-15`: A path is declared false if the endgame didn't finished until then.
-* `sampling_factor=0.5`: During the endgame we approach ``0`` by the geometric series ``h^kR₀`` where ``h`` is `sampling_factor` and `R₀` the endgame start provided in `runendgame`.
-* `maxiters_per_step=100`: The maximal number of steps bewtween two samples.
+Endgame specific options:
+
+* `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
+* `max_step_size_endgame_start::Float64=1e-6`: The endgame only starts if the step size becomes smaller that the provided value.
+* `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
+* `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
+* `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
+* `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
 """
 function solve end
 
@@ -142,14 +160,14 @@ function solve(args...; threading=true, report_progress=true, kwargs...)
     solve(tracker, start_solutions; threading=threading, report_progress=report_progress)
 end
 
-function solve(tracker::PathTracker, start_solutions; threading=true, report_progress=true, details_level=1)
+function solve(tracker::PathTracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default)
     results = Vector{result_type(tracker)}(undef, length(start_solutions))
-    track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
-    path_jumping_check!(results, tracker, details_level)
+    track_paths!(results, tracker, start_solutions, threading, report_progress, path_result_details)
+    path_jumping_check!(results, tracker, path_result_details)
     Result(results, tracker.problem.seed)
 end
 
-function track_paths!(results, tracker, start_solutions, threading, report_progress, details_level)
+function track_paths!(results, tracker, start_solutions, threading, report_progress, path_result_details)
     n = length(results)
 
     if report_progress
@@ -167,7 +185,7 @@ function track_paths!(results, tracker, start_solutions, threading, report_progr
         batch_size = 32 * nthreads
         ranges = partition_work(1:min(batch_size, n), nthreads)
         trackers = Threads.resize_nthreads!([tracker])
-        batch_tracker = BatchTracker(results, trackers, ranges, S, details_level)
+        batch_tracker = BatchTracker(results, trackers, ranges, S, path_result_details)
 
         k = 1
         while k ≤ n
@@ -178,7 +196,7 @@ function track_paths!(results, tracker, start_solutions, threading, report_progr
         end
     else
         for (k, s) in enumerate(start_solutions)
-            results[k] = track(tracker, s, 1.0; path_number=k, details_level=details_level)
+            results[k] = track(tracker, s, 1.0; path_number=k, details=path_result_details)
             k % 16 == 0 && update_progress!(progress, results, k)
         end
     end
@@ -196,27 +214,27 @@ mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
     trackers::Vector{Tracker}
     ranges::Vector{UnitRange{Int}}
     start_solutions::V
-    details_level::Int
+    details::Symbol
 end
 
 function (batch::BatchTracker)()
     tid = Threads.threadid()
     track_batch!(batch.results, batch.trackers[tid],
-                 batch.ranges[tid], batch.start_solutions, batch.details_level)
+                 batch.ranges[tid], batch.start_solutions, batch.details)
 end
-function track_batch!(results, pathtracker, range, starts, details_level)
+function track_batch!(results, pathtracker, range, starts, details)
     for k in range
-        results[k] = track(pathtracker, starts[k], 1.0; path_number=k, details_level=details_level)
+        results[k] = track(pathtracker, starts[k], 1.0; path_number=k, details=details)
     end
     results
 end
 
 """
-    path_jumping_check!(results, tracker, details_level)
+    path_jumping_check!(results, tracker, details)
 
 Try to detect path jumping by comparing the winding numbers of finite results.
 """
-function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details_level::Int)
+function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details::Symbol)
     finite_results_indices = Int[]
     finite_results = Vector{eltype(results)}()
     for (i, r) in enumerate(results)
@@ -242,7 +260,7 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
                 for i in cluster
                     rᵢ = finite_results[i]
                     new_rᵢ = track(tracker, start_solution(rᵢ), 1.0; path_number=rᵢ.path_number,
-                                            details_level=details_level,
+                                            details=details,
                                             accuracy=min(1e-8, accuracy(tracker.core_tracker)),
                                             max_corrector_iters=1)
                     finite_results[i] = new_rᵢ
@@ -265,7 +283,8 @@ end
 """
     Result{V<:AbstractVector}
 
-The result of `solve`.
+The result of `solve`. This is a wrapper around the results of each single path ([`PathResult`](@ref)) and it contains some additional informations like
+a random seed to replicate the result.
 """
 struct Result{V}
     pathresults::Vector{PathResult{V}}
