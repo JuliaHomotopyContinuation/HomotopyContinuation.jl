@@ -98,8 +98,8 @@ function input(F::MPPolyInputs; parameters=nothing, kwargs...)
     remove_zeros!(F)
     # check_zero_dimensional(F)
     # square system and each polynomial is non-zero
-    if length(F) == nvariables(F) && ishomogenous(F)
-        error("Cannot construct a total degree homotopy for a square homogenous system.")
+    if length(F) == nvariables(F) && ishomogeneous(F)
+        error("Cannot construct a total degree homotopy for a square homogeneous system.")
     end
     TotalDegreeInput(F)
 end
@@ -146,7 +146,7 @@ function input(F::MPPolyInputs, startsolutions;
 end
 
 function input(H::AbstractHomotopy, startsolutions)
-    check_homogenous_degrees(FixedHomotopy(H, rand()))
+    check_homogeneous_degrees(FixedHomotopy(H, rand()))
     if isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end

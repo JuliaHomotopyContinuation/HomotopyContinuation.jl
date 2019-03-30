@@ -22,7 +22,7 @@ homotopy(prob::AbstractProblem) = prob.homotopy
 """
     ProjectiveProblem(H::AbstractHomotopy, homogenization::AbstractHomogenization, seed::Int)
 
-Construct a `ProjectiveProblemProblem`. The homotopy `H` needs to be homogenous.
+Construct a `ProjectiveProblemProblem`. The homotopy `H` needs to be homogeneous.
 """
 struct ProjectiveProblem{H<:AbstractHomotopy, VG<:VariableGroups} <: AbstractProblem
     homotopy::H
@@ -161,13 +161,13 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_i
 		construct_system(f, system; variables=variables, homvars=homvars)
 	end
 
-	check_square_homogenous_system(F, vargroups)
+	check_square_homogeneous_system(F, vargroups)
 
 	if ngroups(vargroups) == 1
 		degrees = maxdegrees(F)
 		# Scale systems
 		if system_scaling
-			G = homogenous_totaldegree_polysystem(degrees, variables, vargroups)
+			G = homogeneous_totaldegree_polysystem(degrees, variables, vargroups)
 			_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
 			g = TotalDegreeSystem(degrees, G_scaling_factors)
 			problem = ProjectiveProblem(g, target_constructor(f), vargroups, seed; kwargs...)
@@ -175,7 +175,7 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_i
 			g = TotalDegreeSystem(degrees)
 			problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
 		end
-	# Multihomogenous
+	# Multihomogeneous
 	else
 		D = multidegrees(F, vargroups)
 		C = multi_bezout_coefficients(D, projective_dims(vargroups))
@@ -196,7 +196,7 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_i
 	problem, startsolutions
 end
 
-function homogenous_totaldegree_polysystem(degrees, variables, variable_groups::VariableGroups{1})
+function homogeneous_totaldegree_polysystem(degrees, variables, variable_groups::VariableGroups{1})
 	vars = variables[variable_groups.groups[1]]
 	map(1:length(degrees)) do i
 		d = degrees[i]
@@ -226,12 +226,12 @@ end
 
 function abstract_system_degrees(F)
 	n, N = size(F)
-	degrees = check_homogenous_degrees(F)
-	# system needs to be homogenous
+	degrees = check_homogeneous_degrees(F)
+	# system needs to be homogeneous
 	if n + 1 > N
 		error(overdetermined_error_msg)
 	elseif  n + 1 ≠ N
-		error("Input system is not a square homogenous system!")
+		error("Input system is not a square homogeneous system!")
 	end
 	degrees
 end
@@ -242,7 +242,7 @@ end
 
 function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
-    F_ishom, G_ishom = ishomogenous.((F, G))
+    F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
     if F_ishom && G_ishom
 		vargroups = VariableGroups(vars, homvar)
@@ -255,10 +255,10 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_sca
 		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
         ProjectiveProblem(Ḡ, F̄, vargroups, seed; startsolutions_need_reordering=true, kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
-        error("One of the input polynomials is homogenous and the other not!")
+        error("One of the input polynomials is homogeneous and the other not!")
     else
         if homvar !== nothing
-            error("Input system is not homogenous although `homvar` was passed.")
+            error("Input system is not homogeneous although `homvar` was passed.")
         end
 
 		h = uniquevar(F)

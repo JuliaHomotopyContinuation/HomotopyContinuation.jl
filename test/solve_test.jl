@@ -4,10 +4,10 @@
         @test_throws ErrorException solve([x-2y+2, 0])
         @test_throws ErrorException solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 
-        # non homogenous overdetermiend
+        # non homogeneous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
         @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x, z+x])
-        # homogenous overdetermiend
+        # homogeneous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
         @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
@@ -20,7 +20,7 @@
         # invalid kwargs
         @test_throws ErrorException solve(equations(cyclic(5)), def=0.4, abc=23)
 
-        # test numerical homogenous check fails
+        # test numerical homogeneous check fails
         @polyvar x y z
         G = FPSystem([x-2z, y^2+3z])
         @test_throws ErrorException solve(G, homvar=3)
@@ -238,7 +238,7 @@
         @test track(tracker, s).return_code == :success
     end
 
-    @testset "MultiHomogenous" begin
+    @testset "MultiHomogeneous" begin
         @polyvar x y u v
 
         f = [x*y - 6, x^2 - 5]

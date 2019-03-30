@@ -7,7 +7,7 @@ export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsi
 
 Solve the system `F` using a total degree homotopy. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
-- [`AbstractSystem`](@ref) (the system has to represent a **homogenous** polynomial system.)
+- [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
 
 ### Example
 Assume we want to solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)``.
@@ -15,7 +15,7 @@ Assume we want to solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)``.
 @polyvar x y
 solve([x^2+y^2+1, 2x+3y-1])
 ```
-If you polynomial system is already homogenous, but you would like to consider it as an affine system
+If you polynomial system is already homogeneous, but you would like to consider it as an affine system
 you can do
 ```julia
 @polyvar x y z
@@ -96,7 +96,7 @@ solve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p�
 
 Solve the homotopy `H` by tracking the each solution of
 ``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
-Note that `H` has to be a homotopy between *homogenous* polynomial systems.
+Note that `H` has to be a homotopy between *homogeneous* polynomial systems.
 If it should be considered as an affine system indicate which is the index
 of the homogenization variable, e.g. `solve(H, startsolutions, homvar=3)`
 if the third variable is the homogenization variable.
@@ -106,9 +106,9 @@ if the third variable is the homogenization variable.
 General options:
 
 * `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering. If you experience significant compilation times, consider to change system to `FPSystem`.
-* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogenous [`AbstractSystem`](@ref)s.
+* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref). The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogeneous [`AbstractSystem`](@ref)s.
 * `seed::Int`: The random seed used during the computations.
-* `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogenous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
+* `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogeneous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
 * `endgame_start=0.1`: The value of `t` for which the endgame is started.
 * `report_progress=true`: Whether a progress bar should be printed to `STDOUT`.
 * `threading=true`: Enable or disable multi-threading.

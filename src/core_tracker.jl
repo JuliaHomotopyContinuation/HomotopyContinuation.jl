@@ -297,7 +297,7 @@ end
      CoreTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::CoreTracker
 
 Create a `CoreTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
-needs to be homogenous. Note that a `CoreTracker` is also a (mutable) iterator.
+needs to be homogeneous. Note that a `CoreTracker` is also a (mutable) iterator.
 
 ## CoreTrackerOptions
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
@@ -384,7 +384,7 @@ function CoreTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
 end
 
 default_predictor(x::AbstractVector) = Heun()
-# Do not really understand this but Heun doesn't work that great for multi-homogenous tracking
+# Do not really understand this but Heun doesn't work that great for multi-homogeneous tracking
 default_predictor(x::ProjectiveVectors.PVector{T,1}) where {T} = Heun()
 default_predictor(x::ProjectiveVectors.PVector{T,N}) where {T, N} = Euler()
 

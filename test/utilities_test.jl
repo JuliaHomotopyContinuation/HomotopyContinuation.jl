@@ -173,22 +173,22 @@
         @test HC.nvariables(f ∘ g, parameters=[z]) == 2
 
         @polyvar x y z
-        @test ishomogenous([x^2+y^2+x*y, x^5])
-        @test ishomogenous([x^2+y^2+x*y, x^4+1]) == false
+        @test ishomogeneous([x^2+y^2+x*y, x^5])
+        @test ishomogeneous([x^2+y^2+x*y, x^4+1]) == false
 
         #test weighted degree
-        @test ishomogenous(x^3+x*y, [(x, 2), (y, 4)])
+        @test ishomogeneous(x^3+x*y, [(x, 2), (y, 4)])
         @test homogenize(x+x*y, [(x, 2), (y, 4)], z) == x*z^4+x*y
 
-        @test ishomogenous(homogenize([x^2+y^2+x*y, x^4+1]))
-        @test ishomogenous([x^2+z^2 + y, x^4+z^4], [x,z]) == false
-        @test ishomogenous(homogenize([x^2+z^2*y, x^4+z^4*y], [x,z]), [x,z]) == true
+        @test ishomogeneous(homogenize([x^2+y^2+x*y, x^4+1]))
+        @test ishomogeneous([x^2+z^2 + y, x^4+z^4], [x,z]) == false
+        @test ishomogeneous(homogenize([x^2+z^2*y, x^4+z^4*y], [x,z]), [x,z]) == true
 
-        @test ishomogenous(f ∘ g) == true
+        @test ishomogeneous(f ∘ g) == true
         h = [a * b * c  + p * c^3] ∘ [x+y, y + z, x + z]
-        @test ishomogenous(h, parameters=[p]) == true
+        @test ishomogeneous(h, parameters=[p]) == true
         h2 = [a * b * c  + p] ∘ [x+y, y + z, x + z]
-        @test ishomogenous(h2, parameters=[p]) == false
+        @test ishomogeneous(h2, parameters=[p]) == false
 
 
         #homogenize
@@ -214,20 +214,20 @@
         @test HC.weylnorm([f, f]) == √HC.weyldot([f, f], [f, f])
     end
 
-    @testset "Multihomogenous" begin
+    @testset "Multihomogeneous" begin
         @polyvar x y
         f = [x*y-2, x^2-4]
 
         affine_hominfo = HC.HomogenizationInformation(variable_groups = ((x,), (y,)))
-        @test HC.ishomogenous(f, affine_hominfo) == false
+        @test HC.ishomogeneous(f, affine_hominfo) == false
 
         @polyvar v w
         g = [x * y - 2v * w, x^2-4v^2]
         hominfo = HC.HomogenizationInformation(variable_groups = ((x,v), (y,w)))
-        @test HC.ishomogenous(g, hominfo) == true
+        @test HC.ishomogeneous(g, hominfo) == true
 
         hominfo = HC.HomogenizationInformation(homvars=(v,w), variable_groups = ((x,v), (y,w)))
-        @test HC.ishomogenous(g, hominfo) == true
+        @test HC.ishomogeneous(g, hominfo) == true
 
         @test HC.homogenize(f, hominfo) == g
         HC.multidegrees(f, ([x], [y])) == [1 2; 1 0]
