@@ -161,7 +161,7 @@
         @polyvar x a y b z
         F = [x^2-a*z^2, x*y-(a-b)*z^2]
         S = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], startparameters=[1, 0], targetparameters=[2, 4])
-        @test S isa ProjectiveResult
+        @test S isa Result{<:ProjectiveVectors.PVector}
         @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
         @test nnonsingular(S) == 1
 

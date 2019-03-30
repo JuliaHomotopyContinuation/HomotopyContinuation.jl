@@ -112,6 +112,7 @@ end
         # equivalence classes
         result = monodromy_solve(F, x₀, p₀, parameters=p,
             equivalence_classes=true,
+            target_solutions_count=7,
             maximal_number_of_iterations_without_progress=100,
             group_actions=roots_of_unity)
         @test length(result.solutions) == 7
@@ -130,6 +131,7 @@ end
     end
 
     @testset "Method of Moments" begin
+        Random.seed!(130793)
         @polyvar a[1:3] x[1:3] s[1:3]
 
         f0 = a[1]+a[2]+a[3];
