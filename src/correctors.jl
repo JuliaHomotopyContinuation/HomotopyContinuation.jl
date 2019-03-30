@@ -3,7 +3,6 @@ export AbstractCorrector,
     CorrectorResult,
     cache,
     correct!,
-    ReturnCode,
     NewtonCorrector
 
 # Interface
@@ -18,6 +17,29 @@ to be a subtype of `AbstractCorrectorCache`.
 """
 abstract type AbstractCorrectorCache end
 
+module CorrectorReturnCode
+    import ..NewtonReturnCode
+
+    @enum codes begin
+        converged
+        terminated
+        terminated_no_approximate
+        maximal_iterations
+    end
+
+    function code(c::NewtonReturnCode.codes)
+        if c == NewtonReturnCode.converged
+            converged
+        elseif c == NewtonReturnCode.terminated
+            terminated
+        elseif c == NewtonReturnCode.terminated_no_approximate
+            terminated_no_approximate
+        else # maximal_iterations
+            maximal_iterations
+        end
+    end
+end
+
 
 """
     CorrectorResult{T}
@@ -28,7 +50,7 @@ Structure holding information about a `correct!` step. The fields are
 * `iters::Int` The number of iterations used.
 """
 struct CorrectorResult{T}
-    retcode::ReturnCode
+    return_code::CorrectorReturnCode.codes
     accuracy::T
     iters::Int
     ω₀::Float64
@@ -46,7 +68,7 @@ Base.show(io::IO, result::CorrectorResult) = print_fieldnames(io, result)
 
 Returns whether the correction was successfull.
 """
-isconverged(result::CorrectorResult) = result.retcode == converged
+isconverged(result::CorrectorResult) = result.return_code == CorrectorReturnCode.converged
 
 """
     cache(::AbstractCorrector, ::HomotopyWithCache{M, N}, x, t)::AbstractCorrectorCache
@@ -99,7 +121,7 @@ function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::Hom
 end
 
 function CorrectorResult(R::NewtonResult)
-    CorrectorResult(R.retcode,
+    CorrectorResult(CorrectorReturnCode.code(R.return_code),
                     R.accuracy,
                     R.iters,
                     R.ω₀,

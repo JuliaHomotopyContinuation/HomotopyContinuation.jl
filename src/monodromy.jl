@@ -728,7 +728,7 @@ function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
     result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache,
                 tol=tol, miniters=1, maxiters=3, simplified_last_step=false)
 
-    if result.retcode == converged
+    if isconverged(result)
         return affine_chart(x, C.out)
     else
         return nothing
