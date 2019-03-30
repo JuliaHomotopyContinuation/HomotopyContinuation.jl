@@ -490,7 +490,7 @@ Returns a `Vector` of `Vector{PathResult}`s grouping the `PathResult`s whose sol
 Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
 """
 function multiplicities(results::Results; tol=1e-6)
-    map(i -> results[i], multiplicities(solutions(results); tol = tol))
+    map(i -> results[i], multiplicities(solution, results; tol = tol))
 end
 
 """

@@ -388,7 +388,7 @@ end
 
 
 """
-    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5, kwargs...)
+    multiplicities(vectors; distance=euclidean_distance, tol::Real = 1e-5, kwargs...)
 
 Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol.
 
@@ -397,10 +397,6 @@ Optional keywords:
 * `check_real=true` adds real from points from group orbits (if they exist) to the [`UniquePoints`](@ref) data structure used internally. The default is `check_real=false`.
 * The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
 
-    multiplicities(v; tol::Real = 1e-5, kwargs...) = multiplicities(v, euclidean_distance; tol = tol, kwargs...)
-
-If `distance` is not specified, [`euclidean_distance`](@ref) is used.
-
 
 ```julia-repl
 julia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])
@@ -408,7 +404,7 @@ julia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])
 ```
 This is the same as
 ```julia
-multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
+multiplicities([[1,0.5]; [1,0.5]; [1,1]]; distance=(x,y) -> LinearAlgebra.norm(x-y))
 ```
 Here is an example for using group actions.
 ```julia-repl
@@ -418,21 +414,24 @@ julia> m = multiplicities(X, group_action = permutation)
 [[1,2], [3,4]]
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Real=1e-5, check_real=false, kwargs...) where {T<:Number, F<:Function}
-    mults = [[i] for i in 1:length(v)]
-    positions = Vector{Int64}()
-    k = NOT_FOUND
-    j = 1
-    data = UniquePoints(v[1], distance; check_real=check_real, kwargs...)
-    push!(positions, 1)
-    for i = 2:length(v)
-        k = add!(data, v[i], Val(true), tol = tol)
-        if k > 0
-            push!(mults[positions[k]], i)
-        else
-            push!(positions, i)
+
+multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
+function multiplicities(f, v; distance=default_distance(f,v), kwargs...) where {F<:Function}
+    _multiplicities(f, v, distance; kwargs...)
+end
+default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_distance
+function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
+    mults = Dict{Int, Vector{Int}}()
+    data = UniquePoints(typeof(f(first(v))), distance; check_real=check_real, kwargs...)
+    for (i, vᵢ) in enumerate(v)
+        k = add!(data, f(vᵢ), Val(true); tol = tol)
+        if k ≠ NOT_FOUND
+            if haskey(mults, k)
+                push!(mults[k], i)
+            else
+                mults[k] = [k, i]
+            end
         end
     end
-    [m for m in mults if length(m) > 1]
+    collect(values(mults))
 end
-multiplicities(v::Vector{<:PVector}; kwargs...) = multiplicities(v, fubini_study; kwargs...)
