@@ -564,7 +564,8 @@ function step!(tracker::PathTracker)
                 state.status = PathTrackerStatus.terminated_step_size_too_small
             end
             # 2) We became too ill-conditioned
-            if state.digits_lost > options.maximal_lost_digits
+            if !is_overdetermined_tracking(tracker) &&
+               state.digits_lost > options.maximal_lost_digits
                 state.status = PathTrackerStatus.terminated_ill_conditioned
             end
         end
@@ -575,6 +576,11 @@ function step!(tracker::PathTracker)
         tracker.state.status = PathTrackerStatus.terminated_singularity
     end
     nothing
+end
+
+function is_overdetermined_tracking(tracker)
+    m, n = size(tracker.cache.homotopy)
+    m > n
 end
 
 g(Θ) = sqrt(1+4Θ) - 1
