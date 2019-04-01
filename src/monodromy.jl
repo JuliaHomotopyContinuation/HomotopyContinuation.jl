@@ -4,7 +4,7 @@ export monodromy_solve, realsolutions, nreal, parameters
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_allowed_keywords = [:distance_function, :identical_tol, :done_callback,
+const monodromy_options_allowed_keywords = [:distance, :identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
@@ -26,7 +26,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
 end
 
 function MonodromyOptions(isrealsystem;
-    distance_function=euclidean_distance,
+    distance=euclidean_distance,
     identical_tol::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
@@ -51,7 +51,7 @@ function MonodromyOptions(isrealsystem;
     end
 
 
-    MonodromyOptions(distance_function,identical_tol, done_callback, actions,
+    MonodromyOptions(distance,identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
