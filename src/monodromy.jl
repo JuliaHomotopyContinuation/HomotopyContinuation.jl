@@ -148,7 +148,7 @@ export Triangle, Petal
     Node(p, x::AbstractVector; store_points=true, is_main_node=false)
 
 Create a node with a parameter from the same type as `p` and expecting
-points with tthe same type as `x`. If `stores_points` is `true` a `UniquePoints`
+points with the same type as `x`. If `stores_points` is `true` a `UniquePoints`
 data structure is allocated to keep track of all known solutions of this node.
 """
 struct Node{T, UP<:UniquePoints}
@@ -334,8 +334,10 @@ function regenerate!(loop::Loop, options::MonodromyOptions, stats::MonodromyStat
     main = mainnode(loop)
 
     # The first node is the main node and doesn't get touched
+    store_points = options.group_action_on_all_nodes && has_group_actions(options)
     for i ∈ 2:length(loop.nodes)
-        loop.nodes[i] = Node(options.parameter_sampler(main.p), loop.nodes[i], options)
+        loop.nodes[i] = Node(options.parameter_sampler(main.p), loop.nodes[i], options;
+                                        store_points=store_points, is_main_node=false)
     end
     loop.edges .= Edge.(loop.edges)
     generated_parameters!(stats, length(main.points)) # bookkeeping
