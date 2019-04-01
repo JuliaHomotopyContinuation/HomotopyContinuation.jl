@@ -399,16 +399,16 @@ julia> m = multiplicities(X, group_action = permutation)
 [[1,2], [3,4]]
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, kwargs...) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, check_real=false, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     positions = Vector{Int64}()
     k = NOT_FOUND
     j = 1
-    data = UniquePoints(v[1], distance; kwargs...)
+    data = UniquePoints(v[1], distance; check_real=check_real, kwargs...)
     push!(positions, 1)
     for i = 2:length(v)
-        k = add!(data, v[i], Val{true}(), tol = tol)
-        if k != NOT_FOUND
+        k = add!(data, v[i], Val(true), tol = tol)
+        if k > 0
             push!(mults[positions[k]], i)
         else
             push!(positions, i)
