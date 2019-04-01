@@ -1,4 +1,4 @@
-export UniquePoints, multiplicities, iscontained, add!, unsafe_add!, empty!, points
+export UniquePoints, multiplicities, iscontained, add!, simple_add!, empty!, points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -222,6 +222,8 @@ function UniquePoints(::Type{V}, distance::F;
 
     if group_actions isa GroupActions
        actions = group_actions
+   elseif group_actions === nothing
+       actions = nothing
     else
        actions = GroupActions(group_actions)
     end
@@ -239,10 +241,7 @@ end
 
 function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Real=1e-5, kwargs...) where {F<:Function}
     data = UniquePoints(eltype(v), distance; kwargs...)
-    for vᵢ in v
-        add!(data, vᵢ; tol=tol)
-    end
-    data
+    add!(data, v; tol=tol)
 end
 UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
 UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
@@ -311,49 +310,62 @@ Add `x` to `data` if it doesn't already exists by using the tolerance `tol` to d
     add!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int
 
 If `x` is contained in `data` by using the tolerance `tol` to decide for duplicates return the index
-of the data point which already exists. If the data point is not existing add it to `x` and
+of the data point which already exists. If the data point is not existing add it to `data` and
 return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Real=1e-5) where {Index}
-    idx = iscontained(data, x, Val{true}(), tol)
-    if idx ≠ NOT_FOUND
-        return idx
-    end
+function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol::Real=1e-5)
+    idx = iscontained(data, x, Val(true), tol)
+    idx == NOT_FOUND || return idx
+
     if !data.check_real
-        unsafe_add!(data, x)
+        simple_add!(data, x, tol)
         return NOT_FOUND
     else
         if isrealvector(x)
-            unsafe_add!(data, x)
+            simple_add!(data, x, tol)
             return NOT_FOUND_AND_REAL
         elseif data.group_actions !== nothing
-            for y in data.group_actions(x)
+            not_found_and_real = false
+            apply_actions(data.group_actions, x) do y
                 if isrealvector(y)
-                    unsafe_add!(data, y)
-                    return NOT_FOUND_AND_REAL
+                    simple_add!(data, y, tol)
+                    not_found_and_real = true
+                    return true
                 end
+                false
             end
+            not_found_and_real && return NOT_FOUND_AND_REAL
         end
-        unsafe_add!(data, x)
+        simple_add!(data, x, tol)
         return NOT_FOUND
     end
 end
-function add!(data::UniquePoints, x::AbstractVector, ::Val{false}=Val(false); tol::Real=1e-5) where {Index}
+function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{false}=Val(false); tol::Real=1e-5)
     idx = add!(data, x, Val(true); tol=tol)
     idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
 end
+function add!(data::UniquePoints, v::AbstractVector{<:AbstractVector}, val::Val=Val(false); tol::Real=1e-5)
+    for vᵢ in v
+        add!(data, vᵢ; tol=tol)
+    end
+    data
+end
 
 """
-    unsafe_add!(data::UniquePoints{V}, x::V)::Bool
+    simple_add!(data::UniquePoints{V}, x::V, tol::Real)::Bool
 
-Similarly to [`add!`](@ref) but assumes that it was already checked that there is no
-duplicate with [`iscontained`](@ref). *This has to be called directly after `iscontained`
-with the same value of `x`*.
+Similarly to [`add!`](@ref) but does not apply any group actions.
+If the data point is not existing add it to `data` and return `-1`. Otherwise
+the index of `x` in `data.points` is returned.
 """
-function unsafe_add!(data::UniquePoints, x::AbstractVector) where {Index}
+function simple_add!(data::UniquePoints, x::AbstractVector, tol::Real)
+    idx = iscontained(data.root, x, tol, data.points, data.distance_function)
+    if idx ≠ NOT_FOUND
+        return idx
+    end
     push!(data.points, x)
     _insert!(data.root, length(data.points))
-
+    NOT_FOUND
 end
 
 Base.length(data::UniquePoints) = length(data.points)

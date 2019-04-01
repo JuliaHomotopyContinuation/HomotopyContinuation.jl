@@ -11,7 +11,7 @@ We provide several helper functions for `UniquePoints`.
 points
 iscontained
 add!
-unsafe_add!
+simple_add!
 empty!
 ```
 

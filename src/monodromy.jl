@@ -30,7 +30,7 @@ function MonodromyOptions(isrealsystem;
     identical_tol::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
-    group_actions= group_action === nothing ? nothing : GroupActions(group_action),
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
     group_action_on_all_nodes=false,
     parameter_sampler=independent_normal,
     equivalence_classes=true,
