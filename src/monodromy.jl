@@ -572,15 +572,13 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
                                     group_actions = options.group_actions,
                                     check_real = true)
     else
-        uniquepoints = UniquePoints(eltype(startsolutions))
+        uniquepoints = UniquePoints(eltype(startsolutions); check_real = true)
     end
     # add only unique points that are true solutions
     for s in startsolutions
-        if !iscontained(uniquepoints, s)
-            y = verified_affine_vector(C, s, s, options)
-            if y !== nothing
-                unsafe_add!(uniquepoints, y)
-            end
+        y = verified_affine_vector(C, s, s, options)
+        if y !== nothing
+            add!(uniquepoints, y; tol=options.identical_tol)
         end
     end
     statistics = MonodromyStatistics(uniquepoints)
