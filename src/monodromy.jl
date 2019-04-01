@@ -51,7 +51,7 @@ function MonodromyOptions(isrealsystem;
 
     MonodromyOptions(identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
-        target_solutions_count == nothing ? typemax(Int) : target_solutions_count,
+        target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         minimal_number_of_solutions,
         maximal_number_of_iterations_without_progress)
@@ -776,7 +776,7 @@ function add_and_schedule!(node, queue::Vector{Job{N,T}}, y, options, stats, nex
         # Check if we are done
         node.main_node && isdone(node, y, options) && return true
         push!(queue, Job(SVector{N,T}(y), next_edge))
-    elseif k == nothing
+    elseif k === nothing
         push!(queue, Job(SVector{N,T}(y), next_edge))
     end
     false

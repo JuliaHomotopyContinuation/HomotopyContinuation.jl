@@ -129,7 +129,7 @@ Compute the multi-homogenous bezout number associated to the given system and va
 bezout_number(D::Matrix, groups::VariableGroups) = bezout_number(D, projective_dims(groups))
 bezout_number(D::Matrix, k) = sum(first, MultiBezoutIndicesIterator(D, k))
 function bezout_number(F::MPPolys; parameters=nothing, variable_groups=nothing, homvars=nothing)
-    if variable_groups == nothing
+    if variable_groups === nothing
         return prod(maxdegrees(F; parameters=parameters))
     end
 
