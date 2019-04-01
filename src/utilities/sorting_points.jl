@@ -310,53 +310,33 @@ If `x` is contained in `data` by using the tolerance `tol` to decide for duplica
 of the data point which already exists. If the data point is not existing add it to `x` and
 return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
-    if Index
-        idx = iscontained(data, x, Val{true}(), tol)
-        if idx ≠ NOT_FOUND
-            return idx
-        end
-        if !data.check_real
-            unsafe_add!(data, x)
-            return NOT_FOUND
-        else
-            if data.group_actions !== nothing
-                for y in data.group_actions(x)
-                    if isrealvector(y)
-                        unsafe_add!(data, y)
-                        return NOT_FOUND_AND_REAL
-                    end
-                end
-            elseif isrealvector(x)
-                unsafe_add!(data, x)
-                return NOT_FOUND_AND_REAL
-            end
-            unsafe_add!(data, x)
-            return NOT_FOUND
-        end
-    else
-        if iscontained(data, x, Val{false}(), tol)
-            return false
-        end
-        if !data.check_real
-            unsafe_add!(data, x)
-            return true
-        else
-            if data.group_actions !== nothing
-                for y in data.group_actions(x)
-                    if isrealvector(y)
-                        unsafe_add!(data, y)
-                        return true
-                    end
-                end
-            elseif isrealvector(x)
-                unsafe_add!(data, x)
-                return true
-            end
-            unsafe_add!(data, x)
-            return true
-        end
+function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Float64=1e-5) where {Index}
+    idx = iscontained(data, x, Val{true}(), tol)
+    if idx ≠ NOT_FOUND
+        return idx
     end
+    if !data.check_real
+        unsafe_add!(data, x)
+        return NOT_FOUND
+    else
+        if data.group_actions !== nothing
+            for y in data.group_actions(x)
+                if isrealvector(y)
+                    unsafe_add!(data, y)
+                    return NOT_FOUND_AND_REAL
+                end
+            end
+        elseif isrealvector(x)
+            unsafe_add!(data, x)
+            return NOT_FOUND_AND_REAL
+        end
+        unsafe_add!(data, x)
+        return NOT_FOUND
+    end
+end
+function add!(data::UniquePoints, x::AbstractVector, ::Val{false}=Val(false); tol::Float64=1e-5) where {Index}
+    idx = add!(data, x, Val(true); tol=tol)
+    idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
 end
 
 """
