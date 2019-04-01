@@ -4,12 +4,13 @@ export monodromy_solve, realsolutions, nreal, parameters
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_allowed_keywords = [:identical_tol, :done_callback,
+const monodromy_options_allowed_keywords = [:distance_function, :identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
-struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
+struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
+    distance_function::F
     identical_tol::Float64
     done_callback::F1
     group_actions::GroupActions{F2}
@@ -25,6 +26,7 @@ struct MonodromyOptions{F1<:Function, F2<:Tuple, F3<:Function}
 end
 
 function MonodromyOptions(isrealsystem;
+    distance_function=euclidean_distance,
     identical_tol::Float64=1e-6,
     done_callback=always_false,
     group_action=nothing,
@@ -49,7 +51,7 @@ function MonodromyOptions(isrealsystem;
     end
 
 
-    MonodromyOptions(identical_tol, done_callback, actions,
+    MonodromyOptions(distance_function,identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
@@ -169,7 +171,7 @@ function Node(p::AbstractVector{T}, node::Node{T,UP}, options::MonodromyOptions;
     if store_points == false
         Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{T, UP}(Vector(p), UniquePoints(UP, euclidean_distance; group_actions = options.group_actions, check_real = true), is_main_node)
+        Node{T, UP}(Vector(p), UniquePoints(UP, options.distance_function; group_actions = options.group_actions, check_real = true), is_main_node)
     end
 end
 
@@ -518,6 +520,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
 * `showprogress=true`: Enable a progress meter.
+* `distance_function=euclidean_distance`: The distance function used for [`UniquePoints`](@ref).
 * `identical_tol::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
 * `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
 * `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
@@ -568,11 +571,11 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
     # construct UniquePoints
     if options.equivalence_classes
-        uniquepoints = UniquePoints(eltype(startsolutions);
+        uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function;
                                     group_actions = options.group_actions,
                                     check_real = true)
     else
-        uniquepoints = UniquePoints(eltype(startsolutions); check_real = true)
+        uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function; check_real = true)
     end
     # add only unique points that are true solutions
     for s in startsolutions

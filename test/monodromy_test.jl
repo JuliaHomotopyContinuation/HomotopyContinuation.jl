@@ -50,7 +50,9 @@ end
         result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p)
         @test length(solutions(result)) == 21
 
-
+        # different distance function
+        result = monodromy_solve(F, x₀, p₀, parameters=p, distance_function = (x,y)->0.0, timeout=10)
+        @test length(solutions(result)) == 1
 
         # Test stop heuristic using too high target_solutions_count
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
