@@ -181,9 +181,9 @@ Calls [`add!`](@ref) on the points of the Node.
 """
 function add!(node::Node, x; kwargs...)
     if node.points === nothing
-        false
+        nothing
     else
-        add!(node.points, x, Val{true}(); kwargs...)
+        add!(node.points, x, Val(true); kwargs...)
     end
 end
 
