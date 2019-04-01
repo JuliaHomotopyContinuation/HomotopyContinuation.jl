@@ -319,16 +319,16 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Float64=1
         unsafe_add!(data, x)
         return NOT_FOUND
     else
-        if data.group_actions !== nothing
+        if isrealvector(x)
+            unsafe_add!(data, x)
+            return NOT_FOUND_AND_REAL
+        elseif data.group_actions !== nothing
             for y in data.group_actions(x)
                 if isrealvector(y)
                     unsafe_add!(data, y)
                     return NOT_FOUND_AND_REAL
                 end
             end
-        elseif isrealvector(x)
-            unsafe_add!(data, x)
-            return NOT_FOUND_AND_REAL
         end
         unsafe_add!(data, x)
         return NOT_FOUND
