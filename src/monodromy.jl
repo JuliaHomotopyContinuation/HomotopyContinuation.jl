@@ -584,7 +584,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         if !options.equivalence_classes
             progress = ProgressMeter.ProgressUnknown("Solutions found:")
         else
-            progress = ProgressMeter.ProgressUnknown("Counting classes of solutions (modulo group action). \n Solutions found:")
+            progress = ProgressMeter.ProgressUnknown("Classes of solutions (modulo group action) found:")
         end
     else
         progress = nothing
