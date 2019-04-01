@@ -41,11 +41,16 @@ end
         @test isempty(sprint(show, result)) == false
 
         # test input of length > 1
-        result = monodromy_solve(F, [x₀,x₀], p₀, parameters=p)
+        result = monodromy_solve(F, [x₀ for _ in 1:30], p₀, parameters=p)
         @test length(solutions(result)) == 21
 
-        @test monodromy_solve(F, result.solutions, p₀, parameters=p,
-                    target_solutions_count=21).returncode == :success
+        # test with false input
+        result = monodromy_solve(F, [rand(6) for _ in 1:10], p₀, parameters=p)
+        @test result.returncode == :invalid_startvalue
+        result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p)
+        @test length(solutions(result)) == 21
+
+
 
         # Test stop heuristic using too high target_solutions_count
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)

@@ -552,19 +552,8 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         MonodromyOptions(isrealsystem; optionskwargs...)
     end
 
-    #assemble
-    if options.equivalence_classes
-        uniquepoints = UniquePoints(startsolutions;
-                                    group_actions = options.group_actions,
-                                    check_real = true)
-    else
-        uniquepoints = UniquePoints(startsolutions)
-    end
-    loop = Loop(strategy, p₀, uniquepoints, options)
-    tracker = pathtracker(F, points(uniquepoints);
-                          parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
-    statistics = MonodromyStatistics(solutions(loop))
-
+    # construct tracker
+    tracker = pathtracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     if affine_tracking(tracker)
         HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
         F₀ = FixedHomotopy(HC, 0.0)
@@ -577,6 +566,30 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     # construct cache
     newton_cache = NewtonCache(F₀, tracker.state.x)
     C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
+    # construct UniquePoints
+    if options.equivalence_classes
+        uniquepoints = UniquePoints(eltype(startsolutions);
+                                    group_actions = options.group_actions,
+                                    check_real = true)
+    else
+        uniquepoints = UniquePoints(eltype(startsolutions))
+    end
+    # add only unique points that are true solutions
+    for s in startsolutions
+        if !iscontained(uniquepoints, s)
+            y = verified_affine_vector(C, s, s, options)
+            if y !== nothing
+                unsafe_add!(uniquepoints, y)
+            end
+        end
+    end
+    statistics = MonodromyStatistics(uniquepoints)
+    if  length(points(uniquepoints)) == 0
+        println("None of the provided solutions is a valid start solution.")
+        return MonodromyResult(:invalid_startvalue, Vector{SVector{length(startsolutions[1]),ComplexF64}}(), p₀, statistics)
+    end
+    # construct Loop
+    loop = Loop(strategy, p₀, uniquepoints, options)
 
     # solve
     retcode = :not_assigned
@@ -700,7 +713,7 @@ end
 function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
     # We distinguish solutions which have a distance larger than identical_tol
     # But due to the numerical error in the evaluation of the distance, we need to be a little bit
-    # carfule. Therefore, we require that the solutions should be one magnitude closer to
+    # careful. Therefore, we require that the solutions should be one magnitude closer to
     # the true solutions as necessary
     tol = 0.1 * options.identical_tol
     result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache,
