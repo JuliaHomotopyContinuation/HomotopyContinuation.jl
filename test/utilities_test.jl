@@ -105,7 +105,7 @@
         x = randn(4)
         X = [im.*x, x, randn(ComplexF64, 4)]
 
-        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x))
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real=false)
         @test HC.isrealvector(points(data)[1]) == false
         @test length(points(data)) == 2
 

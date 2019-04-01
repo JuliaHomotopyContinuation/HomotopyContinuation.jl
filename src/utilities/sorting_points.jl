@@ -173,12 +173,12 @@ provides an efficient (poly)logarithmic check whether a point already exists whe
 two points `u,v` are considered equal if `F(u,v)<tol`, where `tol` is a tolerance provided through the [`add!`](@ref) function.
 
 
-    UniquePoints(v::AbstractVector{<:Number}, distance::F)
+    UniquePoints(v::AbstractVector{<:Number}, distance::F; group_action(s)=nothing, check_real=true)
 
 Initialize the data structure with just one data point `v`.
 
 
-    UniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5, kwargs...)
+    UniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5, group_action(s)=nothing, check_real=true)
 
 Initialize the data structure with all points in `v`. These are added in order
 by [`add!`](@ref) with the given tolerance `tol`. In particular, 'UniquePoints' structure will contain only points for which the pairwise distance given by `F` is less than `tol`.
@@ -189,8 +189,9 @@ If `F` is not specialized, [`euclidean_distance`](@ref) is used.
 
 Optional keywords:
 
-* The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
 * `check_real=true` adds real from points from group orbits (if they exist). The default is `check_real=true`.
+* The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
+
 
 ## Example
 ```julia-repl
@@ -210,27 +211,10 @@ struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, G
     check_real::Bool
 end
 
-function UniquePoints(v::AbstractVector{T}, distance::F;
-    group_action=nothing,
-    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    check_real::Bool=true) where {T<:Number, F<:Function}
-
-    if group_actions isa GroupActions
-       actions = group_actions
-    else
-       actions = GroupActions(group_actions)
-    end
-
-    root = SearchBlock(real(T), 1)
-    points = [v]
-    UniquePoints(root, points, distance, actions, check_real)
-end
-
-
 function UniquePoints(::Type{V}, distance::F;
     group_action=nothing,
     group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    check_real::Bool=false) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+    check_real::Bool=true) where {T<:Number, V<:AbstractVector{T}, F<:Function}
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -243,25 +227,16 @@ function UniquePoints(::Type{V}, distance::F;
     UniquePoints(root, points, distance, actions, check_real)
 end
 
+function UniquePoints(v::AbstractVector{<:Number}, distance::Function; kwargs...)
+    data = UniquePoints(typeof(v), distance; kwargs...)
+    add!(data, v)
+    data
+end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Float64 = 1e-5, kwargs...) where {F<:Function}
-
-    data = UniquePoints(v[1], distance; kwargs...)
-
-    if data.check_real
-        for y in data.group_actions(v[1])
-            if isrealvector(y)
-                empty!(data)
-                unsafe_add!(data, y)
-                for i = 2:length(v)
-                    k = add!(data, v[i]; tol=tol)
-                end
-                return data
-            end
-        end
-    end
-    for i = 2:length(v)
-        k = add!(data, v[i]; tol=tol)
+function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Float64=1e-5, kwargs...) where {F<:Function}
+    data = UniquePoints(eltype(v), distance; kwargs...)
+    for vᵢ in v
+        add!(data, vᵢ; tol=tol)
     end
     data
 end
