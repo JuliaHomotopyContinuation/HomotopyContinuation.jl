@@ -30,7 +30,11 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, F<:Function}
+function iscontained(block::SearchBlock{T}, x::NTuple{N,S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, N, S, F<:Function}
+    iscontained(block, SVector{N,S}(x), tol, points, distance)
+end
+
+function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, S, F<:Function}
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -233,7 +237,7 @@ function UniquePoints(v::AbstractVector{<:Number}, distance::Function; kwargs...
     data
 end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Float64=1e-5, kwargs...) where {F<:Function}
+function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Real=1e-5, kwargs...) where {F<:Function}
     data = UniquePoints(eltype(v), distance; kwargs...)
     for vᵢ in v
         add!(data, vᵢ; tol=tol)
@@ -271,13 +275,13 @@ If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added.
 """
-function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Float64=1e-5)
+function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Real=1e-5)
     iscontained(data, x, val, tol)
 end
-function iscontained(data::UniquePoints, x::NTuple{N,T}, val, tol::Float64) where {N, T}
+function iscontained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N, T}
     iscontained(data, SVector{N,T}(x), val, tol)
 end
-function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}, tol::Float64) where {Index}
+function iscontained(data::UniquePoints{T}, x::AbstractVector{S}, ::Val{Index}, tol::Real) where {T,S,Index}
     index = iscontained(data.root, x, tol, data.points, data.distance_function)
     if index == NOT_FOUND
         if data.group_actions !== nothing # extra if statement since inference cannot look through &&
@@ -310,7 +314,7 @@ If `x` is contained in `data` by using the tolerance `tol` to decide for duplica
 of the data point which already exists. If the data point is not existing add it to `x` and
 return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Float64=1e-5) where {Index}
+function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Real=1e-5) where {Index}
     idx = iscontained(data, x, Val{true}(), tol)
     if idx ≠ NOT_FOUND
         return idx
@@ -334,7 +338,7 @@ function add!(data::UniquePoints, x::AbstractVector, ::Val{true}; tol::Float64=1
         return NOT_FOUND
     end
 end
-function add!(data::UniquePoints, x::AbstractVector, ::Val{false}=Val(false); tol::Float64=1e-5) where {Index}
+function add!(data::UniquePoints, x::AbstractVector, ::Val{false}=Val(false); tol::Real=1e-5) where {Index}
     idx = add!(data, x, Val(true); tol=tol)
     idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
 end
@@ -399,7 +403,7 @@ julia> m = multiplicities(X, group_action = permutation)
 [[1,2], [3,4]]
 ```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5, check_real=false, kwargs...) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Real=1e-5, check_real=false, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
     positions = Vector{Int64}()
     k = NOT_FOUND
