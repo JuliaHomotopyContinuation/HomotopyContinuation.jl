@@ -40,6 +40,10 @@ end
         @test length(HC.UniquePoints(result.solutions).points) == 21
         @test isempty(sprint(show, result)) == false
 
+        # test input of length > 1
+        result = monodromy_solve(F, [x₀,x₀], p₀, parameters=p)
+        @test length(solutions(result)) == 21
+
         @test monodromy_solve(F, result.solutions, p₀, parameters=p,
                     target_solutions_count=21).returncode == :success
 
