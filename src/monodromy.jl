@@ -750,7 +750,6 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     if !options.equivalence_classes && node.points !== nothing
         apply_actions(options.group_actions, y) do yᵢ
             add_and_schedule!(node, queue, yᵢ, options, stats, next_edge)
-            false
         end
     end
     return :incomplete
