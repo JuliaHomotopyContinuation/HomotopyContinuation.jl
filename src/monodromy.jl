@@ -145,10 +145,10 @@ export Triangle, Petal
 #####################
 
 """
-    Node(p, x::AbstractVector; store_points=true, is_main_node=false)
+    Node(p, x::UniquePoints; store_points=true, is_main_node=false)
 
-Create a node with a parameter from the same type as `p` and expecting
-points with the same type as `x`. If `stores_points` is `true` a `UniquePoints`
+Create a node with a parameter from the same type as `p` and
+points from `x`. If `stores_points` is `true` a `UniquePoints`
 data structure is allocated to keep track of all known solutions of this node.
 """
 struct Node{T, UP<:UniquePoints}
@@ -177,7 +177,7 @@ end
 """
     add!(node::Node, x; kwargs...)
 
-Calls [`add!`](@ref) on the points of the Node.
+Calls [`add!`](@ref) on the points of the Node with option `Val(true)`.
 """
 function add!(node::Node, x; kwargs...)
     if node.points === nothing
@@ -228,20 +228,14 @@ end
 # Loop data structure
 #######################
 """
-    Loop(p, x::AbstractVector{<:Number}, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(p, x::UniquePoints, nnodes::Int, options::MonodromyOptions; usegamma=true)
 
-Construct a loop using `nnodes` nodes with parameters of the type of `p` and solutions
-of the type of `x`. `usegamma` refers to the use weights on the edges. See also
+Construct a loop using `nnodes` nodes with parameters of the type of `p` and solutions `x`. `usegamma` refers to the use weights on the edges. See also
 [`Edge`](@ref).
 
-    Loop(p, x::AbstractVector, nnodes::Int, options::MonodromyOptions; usegamma=true)
+    Loop(style::LoopStyle, p, x::UniquePoints, options::MonodromyOptions)
 
-Construct the loop and add all points in `x` to it.
-
-    Loop(style::LoopStyle, p, x::AbstractVector, options::MonodromyOptions)
-
-Construct a loop using the defined style `style` with parameters of the type of `p` and solutions
-of the type of `x`.
+Construct a loop using the defined style `style` with parameters of the type of `p` and solutions `x`.
 """
 struct Loop{N<:Node}
     nodes::Vector{N}
@@ -758,9 +752,9 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
 end
 
 """
-    add_and_schedule!(node, y, options, stats, nextedge)
+    add_and_schedule!(node, queue::Vector{Job{N,T}}, y, options, stats, nextedge)
 
-Add `y` to the current `node` (if it not already exists).
+Add `y` to the current `node` (if it not already exists) and schedule a new job to the `queue`.
 Returns `true` if we are done. Otherwise `false`.
 """
 function add_and_schedule!(node, queue::Vector{Job{N,T}}, y, options, stats, next_edge) where {N,T}
