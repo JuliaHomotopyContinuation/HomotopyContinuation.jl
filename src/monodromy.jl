@@ -42,12 +42,12 @@ function MonodromyOptions(isrealsystem;
     if group_actions isa GroupActions
        actions = group_actions
     else
+       if group_actions === nothing
+           equivalence_classes = false
+       end
        actions = GroupActions(group_actions)
     end
 
-    if actions.actions === nothing
-        equivalence_classes = false
-    end
 
     MonodromyOptions(identical_tol, done_callback, actions,
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
@@ -165,15 +165,11 @@ function Node(p::AbstractVector{T}, x::UP; store_points=true, is_main_node=false
         Node(Vector(p), x, is_main_node)
     end
 end
-function Node(p::AbstractVector{T}, node::Node{T,UP}; store_points=true, is_main_node=false) where {T, UP}
+function Node(p::AbstractVector{T}, node::Node{T,UP}, options::MonodromyOptions; store_points=true, is_main_node=false) where {T, UP}
     if store_points == false
         Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        if node.points == nothing
-            Node{T, UP}(Vector(p), UniquePoints(UP; check_real = true), is_main_node)
-        else
-            Node{T, UP}(Vector(p), UniquePoints(UP; group_actions = node.points.group_actions, check_real = true), is_main_node)
-        end
+        Node{T, UP}(Vector(p), UniquePoints(UP, euclidean_distance; group_actions = options.group_actions, check_real = true), is_main_node)
     end
 end
 
@@ -258,7 +254,7 @@ function Loop(p₁, x₁::UP, nnodes::Int, options::MonodromyOptions; usegamma=t
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
     for i = 2:nnodes
         p = options.parameter_sampler(p₁)
-        push!(nodes, Node(p, n₁; store_points=store_points, is_main_node=false))
+        push!(nodes, Node(p, n₁, options; store_points=store_points, is_main_node=false))
     end
 
     loop = map(i -> Edge(i - 1, i; usegamma=usegamma), 2:nnodes)
@@ -339,7 +335,7 @@ function regenerate!(loop::Loop, options::MonodromyOptions, stats::MonodromyStat
 
     # The first node is the main node and doesn't get touched
     for i ∈ 2:length(loop.nodes)
-        loop.nodes[i] = Node(options.parameter_sampler(main.p), loop.nodes[i])
+        loop.nodes[i] = Node(options.parameter_sampler(main.p), loop.nodes[i], options)
     end
     loop.edges .= Edge.(loop.edges)
     generated_parameters!(stats, length(main.points)) # bookkeeping
@@ -592,7 +588,7 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         if !options.equivalence_classes
             progress = ProgressMeter.ProgressUnknown("Solutions found:")
         else
-            progress = ProgressMeter.ProgressUnknown("Counting solutions modulo group action. \n Solutions found:")
+            progress = ProgressMeter.ProgressUnknown("Counting classes of solutions (modulo group action). \n Solutions found:")
         end
     else
         progress = nothing
@@ -744,7 +740,6 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     else
         y = affine_chart(job.x, currx(C.tracker))
     end
-
     next_edge = nextedge(loop, job.edge)
     add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done
 

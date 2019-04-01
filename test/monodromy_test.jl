@@ -30,7 +30,7 @@ end
         @test length(result.solutions) < 21
 
         result = monodromy_solve(F, x₀, p₀, parameters=p,
-                target_solutions_count=21,
+                target_solutions_count=22,
                 maximal_number_of_iterations_without_progress=100)
         @test result.returncode == :success
         @test length(solutions(result)) == 21
@@ -159,7 +159,6 @@ end
 
         R = monodromy_solve(f - p, y₀, p₀;
         			parameters=p, group_action=relabeling,
-        			maximal_number_of_iterations_without_progress=2000,
         			target_solutions_count=225,
         			parameter_sampler=last ∘ sample_moments,
                     maximal_number_of_iterations_without_progress=50,

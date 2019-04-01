@@ -222,7 +222,7 @@ function UniquePoints(v::AbstractVector{T}, distance::F;
     end
 
     root = SearchBlock(real(T), 1)
-    points = [deepcopy(v)]
+    points = [v]
     UniquePoints(root, points, distance, actions, check_real)
 end
 
