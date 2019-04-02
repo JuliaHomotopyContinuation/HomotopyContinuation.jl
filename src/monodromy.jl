@@ -297,7 +297,7 @@ abstract type LoopStyle end
 
 
 """
-    Triangle(;weights=true)
+    Triangle(;useweights=true)
 
 A triangle is a loop consisting of the main node and two addtional nodes.
 If `weights` is true the edges are equipped with additional random weights.
