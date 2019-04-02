@@ -13,7 +13,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Introduction",
     "category": "section",
-    "text": "Homotopy.Continuation.jl is a package for solving systems of polynomials equations with only finitely many solutions using numerical homotopy continuation. If this is your first time reading this documentation, we recommend you start with the getting started guide."
+    "text": "HomotopyContinuation.jl is a package for solving systems of polynomials equations with only finitely many solutions using numerical homotopy continuation. If this is your first time reading this documentation, we recommend you start with the getting started guide."
 },
 
 {
@@ -21,7 +21,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Contents",
     "category": "section",
-    "text": "Pages = [\n  \"solving.md\",\n  \"systems.md\",\n  \"homotopies.md\",\n  \"predictors-correctors.md\",\n  \"pathtracking.md\",\n  \"newton.md\",\n  \"sorting.md\",\n  \"norms_distances.md\",\n  \"reference.md\"]"
+    "text": "Pages = [\n  \"solving.md\",\n  \"monodromy.md\",\n  \"newton.md\",\n  \"sorting.md\",\n  \"norms_distances.md\",\n  \"systems.md\",\n  \"homotopies.md\",\n  \"predictors-correctors.md\",\n  \"pathtracking.md\",\n  \"reference.md\"]"
 },
 
 {
@@ -121,7 +121,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s363,1} where #s363<:PathResult}}",
+    "location": "solving/#Base.real-Tuple{Union{Result, Array{#s367,1} where #s367<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "Base.real",
     "category": "method",
@@ -161,7 +161,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#HomotopyContinuation.multiplicities-Tuple{Union{Result, Array{#s363,1} where #s363<:PathResult}}",
+    "location": "solving/#HomotopyContinuation.multiplicities-Tuple{Union{Result, Array{#s367,1} where #s367<:PathResult}}",
     "page": "Solving Polynomial Systems",
     "title": "HomotopyContinuation.multiplicities",
     "category": "method",
@@ -345,104 +345,304 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "solving/#HomotopyContinuation.monodromy_solve",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#",
+    "page": "Solving Systems with Monodromy",
+    "title": "Solving Systems with Monodromy",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "monodromy/#HomotopyContinuation.monodromy_solve",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.monodromy_solve",
     "category": "function",
-    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. If F only depends linearly on p this will be Petal. Otherwise this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\nidentical_tol::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=nothing: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions foo and bar you can set group_actions=[foo, bar]. See GroupActions for details regarding the application rules.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.\nequivalence_classes=true: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
+    "text": "monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)\n\nSolve a polynomial system F(x;p) with specified parameters and initial solutions sols by monodromy techniques. This makes loops in the parameter space of F to find new solutions.\n\nOptions\n\ntarget_solutions_count=nothing: The computations are stopped if this number of solutions is reached.\ndone_callback=always_false: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution x and the second one are all current solutions (including x). Return true if the compuation is done.\nmaximal_number_of_iterations_without_progress::Int=10: The maximal number of iterations (i.e. loops generated) without any progress.\ngroup_action=nothing: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.\nstrategy: The strategy used to create loops. If F only depends linearly on p this will be Petal. Otherwise this will be Triangle with weights if F is a real system.\nshowprogress=true: Enable a progress meter.\ndistance_function=euclidean_distance: The distance function used for UniquePoints.\nidentical_tol::Float64=1e-6: The tolerance with which it is decided whether two solutions are identical.\ngroup_actions=nothing: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions foo and bar you can set group_actions=[foo, bar]. See GroupActions for details regarding the application rules.\ngroup_action_on_all_nodes=false: By default the group_action(s) are only applied on the solutions with the main parameter p. If this is enabled then it is applied for every parameter q.\nparameter_sampler=independent_normal: A function taking the parameter p and returning a new random parameter q. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.\nequivalence_classes=true: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.\ncheck_startsolutions=true: If true, we do a Newton step for each entry of solsfor checking if it is a valid startsolutions. Solutions which are not valid are sorted out.\ntimeout=float(typemax(Int)): The maximal number of seconds the computation is allowed to run.\nminimal_number_of_solutions: The minimal number of solutions before a stopping heuristic is applied. By default this is half of target_solutions_count if applicable otherwise 2.\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#Monodromy-Solve-1",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#Monodromy-Solve-1",
+    "page": "Solving Systems with Monodromy",
     "title": "Monodromy Solve",
     "category": "section",
-    "text": "monodromy_solve"
+    "text": "Next to solve, HomotopyContinuation.jl provides the function monodromy_solve. Instead of taking a two systems f and g and tracking an array of start solutions from f to g, monodromy_solve takes as input a single system with parameters p and together with a start solution s. Then by tracking s around loops in the parameters p, monodromy_solve duplicates the solution until a stopping criterion is reached.monodromy_solve"
 },
 
 {
-    "location": "solving/#HomotopyContinuation.Triangle",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#HomotopyContinuation.Triangle",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.Triangle",
     "category": "type",
-    "text": "Triangle(;weights=true)\n\nA triangle is a loop consisting of the main node and two addtional nodes. If weights is true the edges are equipped with additional random weights. Note that this is usually only necessary for real parameters.\n\n\n\n\n\n"
+    "text": "Triangle(;useweights=true)\n\nA triangle is a loop consisting of the main node and two addtional nodes. If weights is true the edges are equipped with additional random weights. Note that this is usually only necessary for real parameters.\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#HomotopyContinuation.Petal",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#HomotopyContinuation.Petal",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.Petal",
     "category": "type",
     "text": "Petal()\n\nA petal is a loop consisting of the main node and one other node connected by two edges with different random weights.\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#Strategies-1",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#Strategies-1",
+    "page": "Solving Systems with Monodromy",
     "title": "Strategies",
     "category": "section",
     "text": "Triangle\nPetal"
 },
 
 {
-    "location": "solving/#HomotopyContinuation.GroupActions",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#HomotopyContinuation.GroupActions",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.GroupActions",
     "category": "type",
-    "text": "GroupActions(actions::Function...)\n\nStore a bunch of group actions (f1, f2, f3, ...). Each action has to return a tuple. The actions are applied in the following sense\n\nf1 is applied on the original solution s\nf2 is applied on s and the results of 1\nf3 is applied on s and the results of 1) and 2)\n\nand so on\n\nExample\n\njulia> f1(s) = (s * s,);\n\njulia> f2(s) = (2s, -s, 5s);\n\njulia> f3(s) = (s + 1,);\n\njulia> GroupActions(f1)(3)\n(9,)\n\njulia> GroupActions(f1,f2)(3)\n(9, 18, -9, 45)\n\njulia> GroupActions(f1,f2, f3)(3)\n(9, 18, -9, 45, 10, 19, -8, 46)\n\n\n\n\n\n"
+    "text": "GroupActions(actions::Function...)\n\nStore a bunch of group actions (f1, f2, f3, ...). Each action has to return a tuple. The actions are applied in the following sense\n\nf1 is applied on the original solution s\nf2 is applied on s and the results of 1\nf3 is applied on s and the results of 1) and 2)\n\nand so on\n\nExample\n\njulia> f1(s) = (s * s,);\n\njulia> f2(s) = (2s, -s, 5s);\n\njulia> f3(s) = (s + 1,);\n\njulia> GroupActions(f1)(3)\n(3, 9)\n\njulia> GroupActions(f1, f2)(3)\n(3, 9, 6, -3, 15, 18, -9, 45)\n\njulia> GroupActions(f1,f2, f3)(3)\n(3, 9, 6, -3, 15, 18, -9, 45, 4, 10, 7, -2, 16, 19, -8, 46)\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#HomotopyContinuation.SymmetricGroup",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#HomotopyContinuation.SymmetricGroup",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.SymmetricGroup",
     "category": "type",
     "text": "SymmetricGroup(n)\n\nGroup action of the symmetric group S(n). This does not contain the identity element.\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#GroupActions-1",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#GroupActions-1",
+    "page": "Solving Systems with Monodromy",
     "title": "GroupActions",
     "category": "section",
     "text": "If there is a group acting on the solution set of the polynomial system this can provided with the group_action keyword for single group actions or with the group_actions keyword for compositions of group actions. These will be internally transformed into GroupActions.GroupActionsTo help with the more common group actions we provide some helper functions:SymmetricGroup"
 },
 
 {
-    "location": "solving/#HomotopyContinuation.parameters",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#HomotopyContinuation.parameters",
+    "page": "Solving Systems with Monodromy",
     "title": "HomotopyContinuation.parameters",
     "category": "function",
     "text": "parameters(r::MonodromyResult)\n\nReturn the parameters corresponding to the given result r.\n\n\n\n\n\n"
 },
 
 {
-    "location": "solving/#Helper-functions-1",
-    "page": "Solving Polynomial Systems",
+    "location": "monodromy/#Helper-functions-1",
+    "page": "Solving Systems with Monodromy",
     "title": "Helper functions",
     "category": "section",
     "text": "parameters"
 },
 
 {
-    "location": "systems/#",
-    "page": "Systems",
-    "title": "Systems",
+    "location": "newton/#",
+    "page": "Newton\'s method",
+    "title": "Newton\'s method",
     "category": "page",
     "text": ""
 },
 
 {
-    "location": "systems/#Polynomial-systems-1",
-    "page": "Systems",
-    "title": "Polynomial systems",
+    "location": "newton/#HomotopyContinuation.newton",
+    "page": "Newton\'s method",
+    "title": "HomotopyContinuation.newton",
+    "category": "function",
+    "text": "newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nAn ordinary Newton\'s method. If simplified_last_step is true, then for the last iteration the previously Jacobian will be used. This uses an LU-factorization for square systems and a QR-factorization for overdetermined.\n\n\n\n\n\n"
+},
+
+{
+    "location": "newton/#HomotopyContinuation.NewtonResult",
+    "page": "Newton\'s method",
+    "title": "HomotopyContinuation.NewtonResult",
+    "category": "type",
+    "text": "NewtonResult{T}\n\nStructure holding information about the outcome of the newton function. The fields are.\n\nretcode The return code of the compuation. converged means that accuracy ≤ tol.\naccuracy::T |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.\niters::Int The number of iterations used.\ndigits_lost::Float64 Estimate of the (relative) lost digits in the linear algebra.\n\n\n\n\n\n"
+},
+
+{
+    "location": "newton/#HomotopyContinuation.newton!",
+    "page": "Newton\'s method",
+    "title": "HomotopyContinuation.newton!",
+    "category": "function",
+    "text": "newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nIn-place version of newton. Needs a NewtonCache and norm as input.\n\n\n\n\n\n"
+},
+
+{
+    "location": "newton/#HomotopyContinuation.NewtonCache",
+    "page": "Newton\'s method",
+    "title": "HomotopyContinuation.NewtonCache",
+    "category": "type",
+    "text": "NewtonCache(F::AbstractSystem, x)\n\nCache for the newton function.\n\n\n\n\n\n"
+},
+
+{
+    "location": "newton/#Newton\'s-method-1",
+    "page": "Newton\'s method",
+    "title": "Newton\'s method",
+    "category": "section",
+    "text": "Sometimes it is necessary to refine obtained solutions. For this we provide an interface to Newton\'s method.newton\nNewtonResultFor high performance applications we also provide an in-place version of Newton\'s method which avoids any temporary allocations.newton!\nNewtonCache"
+},
+
+{
+    "location": "sorting/#",
+    "page": "Sorting arrays of solutions",
+    "title": "Sorting arrays of solutions",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "sorting/#Sorting-arrays-of-solutions-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Sorting arrays of solutions",
+    "category": "section",
+    "text": "We provide functions for sorting analyzing arrays of vectors."
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.UniquePoints",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.UniquePoints",
+    "category": "type",
+    "text": "UniquePoints{V<:AbstractVector, T, F<:Function}\n\nA data structure which holds points of type V where T=real(eltype(V)). This data structure provides an efficient (poly)logarithmic check whether a point already exists where two points u,v are considered equal if F(u,v)<tol, where tol is a tolerance provided through the add! function.\n\nUniquePoints(v::AbstractVector{<:Number}, distance::F)\n\nInitialize the data structure with just one data point v.\n\nUniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5)\n\nInitialize the data structure with all points in v. These are added in order by add! with the given tolerance tol. In particular, \'UniquePoints\' structure will contain only points for which the pairwise distance given by F is less than tol.\n\nUniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)\n\nIf F is not specialized, euclidean_distance is used.\n\nOptional keywords:\n\ncheck_real=true adds real from points from group orbits (if they exist). The default is check_real=true.\nThe user can use group_action=foo or, if there is more than one group acting, group_actions=[foo, bar]. Then, points that are in the same group orbit are considered equal. See GroupActions for details regarding the application rules.\n\nExample\n\njulia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]])\n[1.0, 0.5]\n[0.5, 1.0]\n\njulia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -> ([x[2];x[1]],))\n[1.0, 0.5]\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.points",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.points",
+    "category": "function",
+    "text": "points(data::UniquePoints)\n\nReturn the points stored in data.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.iscontained",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.iscontained",
+    "category": "function",
+    "text": "iscontained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nCheck whether x is contained in the data by using the tolerance tol to decide for duplicates.\n\niscontained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol return the index of the data point which already exists. If the data point is not existing -1 is returned. If data has the option check_real enabled, a -2 will be returned once a real vector was added.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.add!",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.add!",
+    "category": "function",
+    "text": "add!(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nAdd x to data if it doesn\'t already exists by using the tolerance tol to decide for duplicates.\n\nadd!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol to decide for duplicates return the index of the data point which already exists. If the data point is not existing add it to data and return -1. If data has the option check_real enabled, a -2 will be returned once a real vector was added. The element will be the last element of points(data).\n\n\n\n\n\nadd!(node::Node, x; kwargs...)\n\nCalls add! on the points of the Node with option Val(true).\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.simple_add!",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.simple_add!",
+    "category": "function",
+    "text": "simple_add!(data::UniquePoints{V}, x::V, tol::Real)::Bool\n\nSimilarly to add! but does not apply any group actions. If the data point is not existing add it to data and return -1. Otherwise the index of x in data.points is returned.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Base.empty!",
+    "page": "Sorting arrays of solutions",
+    "title": "Base.empty!",
+    "category": "function",
+    "text": "empty!(collection) -> collection\n\nRemove all elements from a collection.\n\nExamples\n\njulia> A = Dict(\"a\" => 1, \"b\" => 2)\nDict{String,Int64} with 2 entries:\n  \"b\" => 2\n  \"a\" => 1\n\njulia> empty!(A);\n\njulia> A\nDict{String,Int64} with 0 entries\n\n\n\n\n\nempty!(data::UniquePoints)\n\nRemove all points from data.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Computing-unique-points-in-an-array-of-vectors-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Computing unique points in an array of vectors",
+    "category": "section",
+    "text": "UniquePointsWe provide several helper functions for UniquePoints.points\niscontained\nadd!\nsimple_add!\nempty!"
+},
+
+{
+    "location": "sorting/#HomotopyContinuation.multiplicities",
+    "page": "Sorting arrays of solutions",
+    "title": "HomotopyContinuation.multiplicities",
+    "category": "function",
+    "text": "multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5, kwargs...)\n\nReturns an array of arrays of integers. Each vector w in \'v\' contains all indices i,j such that w[i] and w[j] have distance at most tol.\n\nOptional keywords:\n\ncheck_real=true adds real from points from group orbits (if they exist) to the UniquePoints data structure used internally. The default is check_real=false.\nThe user can use group_action=foo or, if there is more than one group acting, group_actions=[foo, bar]. Then, points that are in the same group orbit are considered equal. See GroupActions for details regarding the application rules.\nmultiplicities(v; tol::Real = 1e-5, kwargs...) = multiplicities(v, euclidean_distance; tol = tol, kwargs...)\n\nIf distance is not specified, euclidean_distance is used.\n\njulia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])\n[[1,2]]\n\nThis is the same as\n\nmultiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))\n\nHere is an example for using group actions.\n\njulia> X = [[1, 2, 3, 4]; [2,1,3,4]; [1,2,4,3]; [2,1,4,3]]\njulia> permutation(x) = ([x[2], x[1], x[3], x[4]],)\njulia> m = multiplicities(X, group_action = permutation)\n[[1,2], [3,4]]\n\n\n\n\n\nmultiplicities(V::Results; tol=1e-6)\n\nReturns a Vector of Vector{PathResult}s grouping the PathResults whose solutions appear with multiplicities greater 1 in \'V\'. Two solutions are regarded as equal, when their pairwise distance is less than \'tol\'.\n\n\n\n\n\n"
+},
+
+{
+    "location": "sorting/#Computing-points-in-an-array-of-vectors-which-appear-multiple-times-1",
+    "page": "Sorting arrays of solutions",
+    "title": "Computing points in an array of vectors which appear multiple times",
+    "category": "section",
+    "text": "If instead of unique points, the user wants to have the information which points in an array of points appear with multiplicity, they should use the next function.multiplicitiesThe multiplicities functions may also be applied to AffineResult and ProjectiveResult structures; see here: multiplicities(::HomotopyContinuation.Results)."
+},
+
+{
+    "location": "norms_distances/#",
+    "page": "Norms and Distances",
+    "title": "Norms and Distances",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.euclidean_distance",
+    "page": "Norms and Distances",
+    "title": "HomotopyContinuation.euclidean_distance",
+    "category": "function",
+    "text": "euclidean_distance(u, v)\n\nCompute ||u-v||₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.euclidean_norm",
+    "page": "Norms and Distances",
+    "title": "HomotopyContinuation.euclidean_norm",
+    "category": "function",
+    "text": "euclidean_norm(u)\n\nCompute ||u||₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.infinity_distance",
+    "page": "Norms and Distances",
+    "title": "HomotopyContinuation.infinity_distance",
+    "category": "function",
+    "text": "infinity_distance(u, v)\n\nCompute the ∞-norm of u-v.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.infinity_norm",
+    "page": "Norms and Distances",
+    "title": "HomotopyContinuation.infinity_norm",
+    "category": "function",
+    "text": "infinity_norm(z)\n\nCompute the ∞-norm of z. If z is a complex vector this is more efficient than norm(z, Inf).\n\ninfinity_norm(z₁, z₂)\n\nCompute the ∞-norm of z₁-z₂.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#HomotopyContinuation.fubini_study",
+    "page": "Norms and Distances",
+    "title": "HomotopyContinuation.fubini_study",
+    "category": "function",
+    "text": "fubini_study(x, y)\n\nComputes the Fubini-Study distance between x and y.\n\n\n\n\n\n"
+},
+
+{
+    "location": "norms_distances/#Distances-and-norms-1",
+    "page": "Norms and Distances",
+    "title": "Distances and norms",
+    "category": "section",
+    "text": "We provide functions for computing norms and distances.euclidean_distance\neuclidean_norminfinity_distance\ninfinity_normfubini_study"
+},
+
+{
+    "location": "systems/#",
+    "page": "Data structures for polynomial systems",
+    "title": "Data structures for polynomial systems",
+    "category": "page",
+    "text": ""
+},
+
+{
+    "location": "systems/#Data-structures-for-polynomial-systems-1",
+    "page": "Data structures for polynomial systems",
+    "title": "Data structures for polynomial systems",
     "category": "section",
     "text": "Polynomial systems can be represented in numerous ways in a computer and each representation has certain tradeoffs. For our purposes the most important thing is that it is fast to evaluate the system. Therefore we automatically convert an input given by DynamicPolynomials to another representation more suitable for numerically evaluations. The default is currently FPSystem."
 },
 
 {
     "location": "systems/#HomotopyContinuation.FPSystem",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.FPSystem",
     "category": "type",
     "text": "FPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a polynomial system using the FixedPolynomials package.\n\n\n\n\n\n"
@@ -450,7 +650,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.SPSystem",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.SPSystem",
     "category": "type",
     "text": "SPSystem(polynomials, vars) <: AbstractSystem\n\nCreate a system using the StaticPolynomials package. Note that StaticPolynomials leverages Julias metaprogramming capabilities to automatically generate functions to evaluate the system and its Jacobian. These generated functions are very fast but at the cost of possibly large compile times. The compile time depends on the size of the support of the polynomial system. If you intend to solve a large system or you need to solve a system with the same support but different coefficients even large compile times can be worthwile. As a general rule of thumb this usually is twice as fast as solving the same system using FPSystem.\n\nExample\n\nYou can use SPSystem as follows with solve\n\n@polyvar x y\nF = [x^2+3y^4-2, 2y^2+3x*y+4]\nsolve(F, system=SPSystem)\n\n\n\n\n\n"
@@ -458,7 +658,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.FixedHomotopy",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.FixedHomotopy",
     "category": "type",
     "text": "FixedHomotopy(H, t) <: AbstractSystem\n\nFix a homotopy H(x,t) at t\n\n\n\n\n\n"
@@ -466,7 +666,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.FixedParameterSystem",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.FixedParameterSystem",
     "category": "type",
     "text": "FixedParameterSystem(F, p) <: AbstractSystem\n\nFix a parameterized system F(x; p) at p, i.e., it is treated as a system without parameters.\n\n\n\n\n\n"
@@ -474,7 +674,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.CompositionSystem",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.CompositionSystem",
     "category": "type",
     "text": "CompositionSystem(composition::Composition, systems_constructor) <: AbstractSystem\n\nA system representing the composition of polynomial maps.\n\n\n\n\n\n"
@@ -482,7 +682,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Default-systems-1",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Default systems",
     "category": "section",
     "text": "We provide the following systems by default.FPSystem\nSPSystem\nFixedHomotopy\nFixedParameterSystem\nCompositionSystem"
@@ -490,7 +690,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Interface-for-custom-systems-1",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Interface for custom systems",
     "category": "section",
     "text": "The great thing is that you are not limited to the systems provided by default. Maybe your polynomial system has a particular structure which you want to use to efficiently evaluate it. For this you can define your own homotopy by defining a struct with super type AbstractSystem. For this the following interface has to be defined."
@@ -498,7 +698,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.AbstractSystem",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.AbstractSystem",
     "category": "type",
     "text": "AbstractSystem\n\nRepresenting a system of polynomials.\n\n\n\n\n\n"
@@ -506,7 +706,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.AbstractSystemCache",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.AbstractSystemCache",
     "category": "type",
     "text": "AbstractSystemCache\n\nA cache to avoid allocations for the evaluation of an AbstractSystem.\n\n\n\n\n\n"
@@ -514,7 +714,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.SystemNullCache",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.SystemNullCache",
     "category": "type",
     "text": "SystemNullCache\n\nAn empty cache if no cache is necessary.\n\n\n\n\n\n"
@@ -522,7 +722,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Types-1",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Types",
     "category": "section",
     "text": "AbstractSystem\nAbstractSystemCache\nSystemNullCache"
@@ -530,7 +730,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.cache-Tuple{AbstractSystem,Vararg{Any,N} where N}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.cache",
     "category": "method",
     "text": "cache(F::AbstractSystem, x)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x.\n\ncache(F::AbstractSystem, x, p)::AbstractSystemCache\n\nCreate a cache for the evaluation (incl. Jacobian) of F with elements of the type of x and parameters p.\n\n\n\n\n\n"
@@ -538,7 +738,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.evaluate!-Tuple{Any,AbstractSystem,Vararg{Any,N} where N}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.evaluate!",
     "category": "method",
     "text": "evaluate!(u, F::AbstractSystem, x, cache::AbstractSystemCache)\n\nEvaluate the system F at x and store the result in u.\n\nevaluate!(u, F::AbstractSystem, x, p, cache::AbstractSystemCache)\n\nEvaluate the system F at x and parameters p and store the result in u.\n\n\n\n\n\n"
@@ -546,7 +746,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.evaluate",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.evaluate",
     "category": "function",
     "text": "evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))\n\nEvaluate the system F at x.\n\nevaluate(F::AbstractSystem, x::AbstractVector, p, cache=cache(F, x))\n\nEvaluate the system F at x and parameters p.\n\n\n\n\n\n"
@@ -554,7 +754,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.jacobian!-Tuple{Any,AbstractSystem,Vararg{Any,N} where N}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.jacobian!",
     "category": "method",
     "text": "jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and store the result in u.\n\njacobian!(u, F::AbstractSystem, x , p, cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and parameters p and store the result in u.\n\n\n\n\n\n"
@@ -562,7 +762,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.jacobian",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.jacobian",
     "category": "function",
     "text": "jacobian(F::AbstractSystem, x, cache=cache(F, x))\n\nEvaluate the Jacobian of the system F at x.\n\njacobian(F::AbstractSystem, x , p, cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and parameters p.\n\n\n\n\n\n"
@@ -570,7 +770,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Base.size-Tuple{AbstractSystem}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Base.size",
     "category": "method",
     "text": "Base.size(F::AbstractSystem)\n\nReturns a tuple (m, n) indicating that F is a system of m polynomials m in n variables.\n\n\n\n\n\n"
@@ -578,7 +778,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.differentiate_parameters!",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.differentiate_parameters!",
     "category": "function",
     "text": "differentiate_parameters!(u, F::AbstractSystem, x, p, cache::AbstractSystemCache)\n\nEvaluate the Jacobian of the system F at x and parameters p w.r.t. the parameters and store the result in u.\n\n\n\n\n\n"
@@ -586,7 +786,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.differentiate_parameters",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.differentiate_parameters",
     "category": "function",
     "text": "differentiate_parameters(F::AbstractSystem, x, p, cache=cache(F, x))\n\nEvaluate the Jacobian of the system F at x and parameters p w.r.t. the parameters\n\n\n\n\n\n"
@@ -594,7 +794,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Mandatory-1",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Mandatory",
     "category": "section",
     "text": "The following methods are mandatory to implement.cache(F::AbstractSystem, args...)\nevaluate!(u, F::AbstractSystem, args...)\nevaluate(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x))\njacobian!(u, F::AbstractSystem, args...)\njacobian(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x))\nBase.size(::AbstractSystem)Additionally if the system should support parameter homotopies it needs to supportdifferentiate_parameters!\ndifferentiate_parameters"
@@ -602,7 +802,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.evaluate_and_jacobian!-Tuple{Any,Any,AbstractSystem,Any,AbstractSystemCache}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.evaluate_and_jacobian!",
     "category": "method",
     "text": "evaluate_and_jacobian!(u, U, F, x , cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and store the results in u (evalution) and U (Jacobian).\n\n\n\n\n\n"
@@ -610,7 +810,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#HomotopyContinuation.evaluate_and_jacobian!-Tuple{Any,Any,AbstractSystem,Any,Any,AbstractSystemCache}",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "HomotopyContinuation.evaluate_and_jacobian!",
     "category": "method",
     "text": "evaluate_and_jacobian!(u, U, F, x, p, cache::AbstractSystemCache)\n\nEvaluate the system F and its Jacobian at x and parameters p and store the results in u (evalution) and U (Jacobian).\n\n\n\n\n\n"
@@ -618,7 +818,7 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "systems/#Optional-1",
-    "page": "Systems",
+    "page": "Data structures for polynomial systems",
     "title": "Optional",
     "category": "section",
     "text": "The following methods are mandatory to implement. The following are optional to implement but usually you want to define at least cache.evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache::AbstractSystemCache)\nevaluate_and_jacobian!(u, U, F::AbstractSystem, x, p, cache::AbstractSystemCache)"
@@ -1174,198 +1374,6 @@ var documenterSearchIndex = {"docs": [
     "title": "Changing options",
     "category": "section",
     "text": "To change settingsaccuracy\nset_accuracy!\nmax_corrector_iters\nset_max_corrector_iters!\nmax_step_size\nset_max_step_size!\nmax_refinement_iters\nset_max_refinement_iters!\nrefinement_accuracy\nset_refinement_accuracy!"
-},
-
-{
-    "location": "newton/#",
-    "page": "Newton\'s method",
-    "title": "Newton\'s method",
-    "category": "page",
-    "text": ""
-},
-
-{
-    "location": "newton/#HomotopyContinuation.newton",
-    "page": "Newton\'s method",
-    "title": "HomotopyContinuation.newton",
-    "category": "function",
-    "text": "newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nAn ordinary Newton\'s method. If simplified_last_step is true, then for the last iteration the previously Jacobian will be used. This uses an LU-factorization for square systems and a QR-factorization for overdetermined.\n\n\n\n\n\n"
-},
-
-{
-    "location": "newton/#HomotopyContinuation.NewtonResult",
-    "page": "Newton\'s method",
-    "title": "HomotopyContinuation.NewtonResult",
-    "category": "type",
-    "text": "NewtonResult{T}\n\nStructure holding information about the outcome of the newton function. The fields are.\n\nretcode The return code of the compuation. converged means that accuracy ≤ tol.\naccuracy::T |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.\niters::Int The number of iterations used.\ndigits_lost::Float64 Estimate of the (relative) lost digits in the linear algebra.\n\n\n\n\n\n"
-},
-
-{
-    "location": "newton/#HomotopyContinuation.newton!",
-    "page": "Newton\'s method",
-    "title": "HomotopyContinuation.newton!",
-    "category": "function",
-    "text": "newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)\n\nIn-place version of newton. Needs a NewtonCache and norm as input.\n\n\n\n\n\n"
-},
-
-{
-    "location": "newton/#HomotopyContinuation.NewtonCache",
-    "page": "Newton\'s method",
-    "title": "HomotopyContinuation.NewtonCache",
-    "category": "type",
-    "text": "NewtonCache(F::AbstractSystem, x)\n\nCache for the newton function.\n\n\n\n\n\n"
-},
-
-{
-    "location": "newton/#Newton\'s-method-1",
-    "page": "Newton\'s method",
-    "title": "Newton\'s method",
-    "category": "section",
-    "text": "Sometimes it is necessary to refine obtained solutions. For this we provide an interface to Newton\'s method.newton\nNewtonResultFor high performance applications we also provide an in-place version of Newton\'s method which avoids any temporary allocations.newton!\nNewtonCache"
-},
-
-{
-    "location": "sorting/#",
-    "page": "Sorting arrays of solutions",
-    "title": "Sorting arrays of solutions",
-    "category": "page",
-    "text": ""
-},
-
-{
-    "location": "sorting/#Sorting-arrays-of-solutions-1",
-    "page": "Sorting arrays of solutions",
-    "title": "Sorting arrays of solutions",
-    "category": "section",
-    "text": "We provide functions for sorting analyzing arrays of vectors."
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.UniquePoints",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.UniquePoints",
-    "category": "type",
-    "text": "UniquePoints{V<:AbstractVector, T, F<:Function}\n\nA data structure which holds points of type V where T=real(eltype(V)). This data structure provides an efficient (poly)logarithmic check whether a point already exists where two points u,v are considered equal if F(u,v)<tol, where tol is a tolerance provided through the add! function.\n\nUniquePoints(v::AbstractVector{<:Number}, distance::F)\n\nInitialize the data structure with just one data point v.\n\nUniquePoints(V::Vector{<:AbstractVector{<:Number}}, distance::F; tol=1e-5)\n\nInitialize the data structure with all points in v. These are added in order by add! with the given tolerance tol. In particular, \'UniquePoints\' structure will contain only points for which the pairwise distance given by F is less than tol.\n\nUniquePoints(v) = UniquePoints(v, euclidean_distance)\n\nIf F is not specialized, euclidean_distance is used.\n\nExample\n\njulia> UniquePoints([[1,0.5]; [1,0.5]; [1,1]])\n[[1,0.5], [1,1]]\n\nThis is the same as\n\nUniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.points",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.points",
-    "category": "function",
-    "text": "points(data::UniquePoints)\n\nReturn the points stored in data.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.iscontained",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.iscontained",
-    "category": "function",
-    "text": "iscontained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nCheck whether x is contained in the data by using the tolerance tol to decide for duplicates.\n\niscontained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol return the index of the data point which already exists. If the data point is not existing -1 is returned.\n\n\n\n\n\niscontained(node::Node, x; kwargs...)\n\nCalls iscontained on the points of the Node.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.add!",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.add!",
-    "category": "function",
-    "text": "add!(data::UniquePoints{V}, x::V; tol=1e-5)::Bool\n\nAdd x to data if it doesn\'t already exists by using the tolerance tol to decide for duplicates.\n\nadd!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int\n\nIf x is contained in data by using the tolerance tol to decide for duplicates return the index of the data point which already exists. If the data point is not existing add it to x and return -1. The element will be the last element of points(data).\n\n\n\n\n\nadd!(node::Node, x; kwargs...)\n\nCalls add! on the points of the Node.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.unsafe_add!",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.unsafe_add!",
-    "category": "function",
-    "text": "unsafe_add!(data::UniquePoints{V}, x::V)::Bool\n\nSimilarly to add! but assumes that it was already checked that there is no duplicate with iscontained. This has to be called directly after iscontained with the same value of x.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#Base.empty!",
-    "page": "Sorting arrays of solutions",
-    "title": "Base.empty!",
-    "category": "function",
-    "text": "empty!(collection) -> collection\n\nRemove all elements from a collection.\n\nExamples\n\njulia> A = Dict(\"a\" => 1, \"b\" => 2)\nDict{String,Int64} with 2 entries:\n  \"b\" => 2\n  \"a\" => 1\n\njulia> empty!(A);\n\njulia> A\nDict{String,Int64} with 0 entries\n\n\n\n\n\nempty!(data::UniquePoints)\n\nRemove all points from data.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#Computing-unique-points-in-an-array-of-vectors-1",
-    "page": "Sorting arrays of solutions",
-    "title": "Computing unique points in an array of vectors",
-    "category": "section",
-    "text": "UniquePointsWe provide several helper functions for UniquePoints.points\niscontained\nadd!\nunsafe_add!\nempty!"
-},
-
-{
-    "location": "sorting/#HomotopyContinuation.multiplicities",
-    "page": "Sorting arrays of solutions",
-    "title": "HomotopyContinuation.multiplicities",
-    "category": "function",
-    "text": "multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5)\n\nReturns an array of arrays of integers. Each vector w in \'v\' contains all indices i,j such that w[i] and w[j] have distance at most tol.\n\nmultiplicities(v; tol::Real = 1e-5) = multiplicities(v, euclidean_distance, tol = tol)\n\nIf distance is not specified, euclidean_distance is used.\n\njulia> multiplicities([[1,0.5]; [1,0.5]; [1,1]])\n[[1,2]]\n\nThis is the same as\n\nmultiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))\n\n\n\n\n\nmultiplicities(V::Results; tol=1e-6)\n\nReturns a Vector of Vector{PathResult}s grouping the PathResults whose solutions appear with multiplicities greater 1 in \'V\'. Two solutions are regarded as equal, when their pairwise distance is less than \'tol\'.\n\n\n\n\n\n"
-},
-
-{
-    "location": "sorting/#Computing-points-in-an-array-of-vectors-which-appear-multiple-times-1",
-    "page": "Sorting arrays of solutions",
-    "title": "Computing points in an array of vectors which appear multiple times",
-    "category": "section",
-    "text": "If instead of unique points, the user wants to have the information which points in an array of points appear with multiplicity, they should use the next function.multiplicitiesThe multiplicities functions may also be applied to AffineResult and ProjectiveResult structures; see here: multiplicities(::HomotopyContinuation.Results)."
-},
-
-{
-    "location": "norms_distances/#",
-    "page": "Norms and Distances",
-    "title": "Norms and Distances",
-    "category": "page",
-    "text": ""
-},
-
-{
-    "location": "norms_distances/#HomotopyContinuation.euclidean_distance",
-    "page": "Norms and Distances",
-    "title": "HomotopyContinuation.euclidean_distance",
-    "category": "function",
-    "text": "euclidean_distance(u, v)\n\nCompute ||u-v||₂.\n\n\n\n\n\n"
-},
-
-{
-    "location": "norms_distances/#HomotopyContinuation.euclidean_norm",
-    "page": "Norms and Distances",
-    "title": "HomotopyContinuation.euclidean_norm",
-    "category": "function",
-    "text": "euclidean_norm(u)\n\nCompute ||u||₂.\n\n\n\n\n\n"
-},
-
-{
-    "location": "norms_distances/#HomotopyContinuation.infinity_distance",
-    "page": "Norms and Distances",
-    "title": "HomotopyContinuation.infinity_distance",
-    "category": "function",
-    "text": "infinity_distance(u, v)\n\nCompute the ∞-norm of u-v.\n\n\n\n\n\n"
-},
-
-{
-    "location": "norms_distances/#HomotopyContinuation.infinity_norm",
-    "page": "Norms and Distances",
-    "title": "HomotopyContinuation.infinity_norm",
-    "category": "function",
-    "text": "infinity_norm(z)\n\nCompute the ∞-norm of z. If z is a complex vector this is more efficient than norm(z, Inf).\n\ninfinity_norm(z₁, z₂)\n\nCompute the ∞-norm of z₁-z₂.\n\n\n\n\n\n"
-},
-
-{
-    "location": "norms_distances/#HomotopyContinuation.fubini_study",
-    "page": "Norms and Distances",
-    "title": "HomotopyContinuation.fubini_study",
-    "category": "function",
-    "text": "fubini_study(x, y)\n\nComputes the Fubini-Study distance between x and y.\n\n\n\n\n\n"
-},
-
-{
-    "location": "norms_distances/#Distances-and-norms-1",
-    "page": "Norms and Distances",
-    "title": "Distances and norms",
-    "category": "section",
-    "text": "We provide functions for computing norms and distances.euclidean_distance\neuclidean_norminfinity_distance\ninfinity_normfubini_study"
 },
 
 {
