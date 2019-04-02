@@ -59,7 +59,7 @@ function MonodromyOptions(isrealsystem;
         maximal_number_of_iterations_without_progress)
 end
 
-default_minimal_number_of_solutions(::Nothing) = 2
+default_minimal_number_of_solutions(::Nothing) = 1
 function default_minimal_number_of_solutions(target_solutions_count::Int)
     div(target_solutions_count, 2)
 end
