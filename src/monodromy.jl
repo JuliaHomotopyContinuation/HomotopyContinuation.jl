@@ -174,7 +174,7 @@ function Node(p::AbstractVector{T}, node::Node{T,UP}, options::MonodromyOptions;
     if store_points == false
         Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{T, UP}(Vector(p), UniquePoints(UP, options.distance_function; group_actions = options.group_actions, check_real = true), is_main_node)
+        Node{T, UP}(Vector(p), similar(UP), is_main_node)
     end
 end
 
