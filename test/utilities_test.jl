@@ -85,6 +85,9 @@
             @test HC.add!(data, X[i] .- 1e-4, Val(true)) == -1
         end
 
+        empty!(data)
+        @test length(points(data)) == 0
+
         # Test many points with nearly indentical distance to the inserted point
         p = shuffle!([[cis(k/100*2π)] for k=0:99])
         data = HC.UniquePoints(p)
