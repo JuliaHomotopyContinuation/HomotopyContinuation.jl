@@ -173,14 +173,16 @@ end
         R = monodromy_solve(f - p, y₀, p₀;
         			parameters=p, group_action=relabeling,
         			parameter_sampler=last ∘ sample_moments,
-                    maximal_number_of_iterations_without_progress=50)
+                    showprogress=false,
+                    maximal_number_of_iterations_without_progress=5)
         @test length(solutions(R)) ≤ 225
 
         R = monodromy_solve(f - p, y₀, p₀;
         			parameters=p, group_action=relabeling,
         			target_solutions_count=225,
         			parameter_sampler=last ∘ sample_moments,
-                    maximal_number_of_iterations_without_progress=50)
+                    showprogress=false,
+                    maximal_number_of_iterations_without_progress=10)
         @test length(solutions(R)) == 225
     end
 end
