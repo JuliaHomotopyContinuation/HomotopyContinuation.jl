@@ -6,7 +6,8 @@ export monodromy_solve, realsolutions, nreal, parameters
 #####################
 const monodromy_options_allowed_keywords = [:distance, :identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
-    :parameter_sampler, :equivalence_classes, :complex_conjugation, :target_solutions_count, :timeout,
+    :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
+    :target_solutions_count, :timeout,
     :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
 
 struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
@@ -18,6 +19,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     parameter_sampler::F3
     equivalence_classes::Bool
     complex_conjugation::Bool
+    check_startsolutions::Bool
     # stopping heuristic
     target_solutions_count::Int
     timeout::Float64
@@ -35,6 +37,7 @@ function MonodromyOptions(isrealsystem;
     parameter_sampler=independent_normal,
     equivalence_classes=true,
     complex_conjugation=isrealsystem,
+    check_startsolutions=true,
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
@@ -52,7 +55,7 @@ function MonodromyOptions(isrealsystem;
 
 
     MonodromyOptions(distance,identical_tol, done_callback, actions,
-        group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation,
+        group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation, check_startsolutions,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         minimal_number_of_solutions,
@@ -578,11 +581,15 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function; check_real = true)
     end
     # add only unique points that are true solutions
-    for s in startsolutions
-        y = verified_affine_vector(C, s, s, options)
-        if y !== nothing
-            add!(uniquepoints, y; tol=options.identical_tol)
+    if options.check_startsolutions
+        for s in startsolutions
+            y = verified_affine_vector(C, s, s, options)
+            if y !== nothing
+                add!(uniquepoints, y; tol=options.identical_tol)
+            end
         end
+    else
+        add!(uniquepoints, startsolutions; tol=options.identical_tol)
     end
     statistics = MonodromyStatistics(uniquepoints)
     if  length(points(uniquepoints)) == 0

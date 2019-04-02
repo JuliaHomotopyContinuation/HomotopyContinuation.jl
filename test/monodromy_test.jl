@@ -49,6 +49,8 @@ end
         @test result.returncode == :invalid_startvalue
         result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p)
         @test length(solutions(result)) == 21
+        result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p, check_startsolutions = false)
+        @test result.returncode == :invalid_startvalue
 
         # different distance function
         result = monodromy_solve(F, x₀, p₀, parameters=p, distance = (x,y) -> 0.0)
