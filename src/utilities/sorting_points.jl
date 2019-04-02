@@ -252,6 +252,11 @@ function Base.similar(data::UniquePoints{V, T}) where {V, T}
     UniquePoints(root, points, data.distance_function, data.group_actions, data.check_real)
 end
 
+function Base.show(io::IO, data::UniquePoints)
+    print(io, typeof(data), " with ", length(points(data)), " points")
+end
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::UniquePoints) = x
+
 """
     points(data::UniquePoints)
 
@@ -259,7 +264,7 @@ Return the points stored in `data`.
 """
 points(data::UniquePoints) = data.points
 
-Base.show(data::UniquePoints) = show(points(data))
+
 Base.getindex(data::UniquePoints, i::Integer) = data.points[i]
 
 

@@ -67,6 +67,9 @@
         indices = HC.unique!(rand(1:2000, 20))
         data = HC.UniquePoints(X)
 
+        test_show_juno(data)
+        @test string(data) == "UniquePoints{Array{Complex{Float64},1},Float64,typeof(euclidean_distance),Nothing} with 2000 points"
+
         @test length(data) == 2_000
 
         for i ∈ indices
