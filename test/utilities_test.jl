@@ -148,12 +148,12 @@
         X = GroupActions(permutation1, permutation2)(x)
 
         # One group action
-        m = multiplicities(X, group_action = permutation1)
-        @test m == [[1;2], [3;4]]
+        m = multiplicities(X, group_action = permutation1) |> sort
+        @test m == [[1, 2], [3, 4]]
 
         # Two group actions
         m = multiplicities(X, group_actions = GroupActions(permutation1, permutation2))
-        @test m == [[1;2;3;4]]
+        @test m == [[1, 2, 3, 4]]
     end
 
     @testset "Polynomials" begin

@@ -422,15 +422,18 @@ end
 default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_distance
 function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
     mults = Dict{Int, Vector{Int}}()
+    positions = Vector{Int32}()
     data = UniquePoints(typeof(f(first(v))), distance; check_real=check_real, kwargs...)
     for (i, vᵢ) in enumerate(v)
         k = add!(data, f(vᵢ), Val(true); tol = tol)
-        if k ≠ NOT_FOUND
-            if haskey(mults, k)
-                push!(mults[k], i)
+        if k > 0
+            if haskey(mults, positions[k])
+                push!(mults[positions[k]], i)
             else
-                mults[k] = [k, i]
+                mults[positions[k]] = [positions[k], i]
             end
+        else
+            push!(positions, i)
         end
     end
     collect(values(mults))
