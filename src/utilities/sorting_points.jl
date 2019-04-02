@@ -1,7 +1,8 @@
-export UniquePoints, multiplicities, iscontained, add!, unsafe_add!, empty!, points
+export UniquePoints, multiplicities, iscontained, add!, simple_add!, empty!, points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
+const NOT_FOUND_AND_REAL = -2
 
 #############
 # SearchBlock
@@ -29,7 +30,11 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock{T}, x::AbstractVector, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, F<:Function}
+function iscontained(block::SearchBlock{T}, x::NTuple{N,S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, N, S, F<:Function}
+    iscontained(block, SVector{N,S}(x), tol, points, distance)
+end
+
+function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, S, F<:Function}
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -182,51 +187,69 @@ Initialize the data structure with just one data point `v`.
 Initialize the data structure with all points in `v`. These are added in order
 by [`add!`](@ref) with the given tolerance `tol`. In particular, 'UniquePoints' structure will contain only points for which the pairwise distance given by `F` is less than `tol`.
 
-    UniquePoints(v) = UniquePoints(v, euclidean_distance)
+    UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
 
 If `F` is not specialized, [`euclidean_distance`](@ref) is used.
 
+Optional keywords:
+
+* `check_real=true` adds real from points from group orbits (if they exist). The default is `check_real=true`.
+* The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
+
+
 ## Example
 ```julia-repl
-julia> UniquePoints([[1,0.5]; [1,0.5]; [1,1]])
-[[1,0.5], [1,1]]
-```
-This is the same as
-```julia
-UniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
+julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]])
+[1.0, 0.5]
+[0.5, 1.0]
+
+julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -> ([x[2];x[1]],))
+[1.0, 0.5]
 ```
 """
-struct UniquePoints{V<:AbstractVector, T, F<:Function}
+struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, GroupActions}}
     root::SearchBlock{T}
     points::Vector{V}
     distance_function::F
+    group_actions::MaybeGA
+    check_real::Bool
 end
 
-UniquePoints(v::Type{<:UniquePoints{V}}, distance::F) where {V, F<:Function} = UniquePoints(V, distance)
-function UniquePoints(::Type{V}, distance::F) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+function UniquePoints(::Type{V}, distance::F;
+    group_action=nothing,
+    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
+    check_real::Bool=true) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+
+    if group_actions isa GroupActions
+       actions = group_actions
+   elseif group_actions === nothing
+       actions = nothing
+    else
+       actions = GroupActions(group_actions)
+    end
+
     root = SearchBlock(real(T))
     points = Vector{V}()
-    UniquePoints(root, points, distance)
-end
-function UniquePoints(v::AbstractVector{T}, distance::F) where {T<:Number, F<:Function}
-    root = SearchBlock(real(T), 1)
-    points = [v]
-    UniquePoints(root, points, distance)
+    UniquePoints(root, points, distance, actions, check_real)
 end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; kwargs...) where {F<:Function}
-    data = UniquePoints(v[1], distance)
-    for i = 2:length(v)
-        add!(data, v[i]; kwargs...)
-    end
+function UniquePoints(v::AbstractVector{<:Number}, distance::Function; kwargs...)
+    data = UniquePoints(typeof(v), distance; kwargs...)
+    add!(data, v)
     data
 end
-UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance, kwargs...)
+
+function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Real=1e-5, kwargs...) where {F<:Function}
+    data = UniquePoints(eltype(v), distance; kwargs...)
+    add!(data, v; tol=tol)
+end
+UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
+UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
 
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
     root = SearchBlock(T)
     points = Vector{V}()
-    UniquePoints(root, points, data.distance_function)
+    UniquePoints(root, points, data.distance_function, data.group_actions, data.check_real)
 end
 
 """
@@ -249,13 +272,33 @@ Check whether `x` is contained in the `data` by using the tolerance `tol` to dec
 
 If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
-is returned.
+is returned. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added.
 """
-function iscontained(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
+function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Real=1e-5)
+    iscontained(data, x, val, tol)
+end
+function iscontained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N, T}
+    iscontained(data, SVector{N,T}(x), val, tol)
+end
+function iscontained(data::UniquePoints{T}, x::AbstractVector{S}, ::Val{Index}, tol::Real) where {T,S,Index}
+    index = iscontained(data.root, x, tol, data.points, data.distance_function)
+    if index == NOT_FOUND
+        if data.group_actions !== nothing # extra if statement since inference cannot look through &&
+            apply_actions(data.group_actions, x) do y
+                k = iscontained(data.root, y, tol, data.points, data.distance_function)
+                if k ≠ NOT_FOUND
+                    index = k
+                    return true
+                end
+                false
+            end
+        end
+    end
+
     if Index
-        iscontained(data.root, x, tol, data.points, data.distance_function)
+        return index
     else
-        iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
+        return index ≠ NOT_FOUND
     end
 end
 
@@ -267,37 +310,62 @@ Add `x` to `data` if it doesn't already exists by using the tolerance `tol` to d
     add!(data::UniquePoints{V}, x::V, Val(true); tol=1e-5)::Int
 
 If `x` is contained in `data` by using the tolerance `tol` to decide for duplicates return the index
-of the data point which already exists. If the data point is not existing add it to `x` and
-return `-1`. The element will be the last element of `points(data)`.
+of the data point which already exists. If the data point is not existing add it to `data` and
+return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector, ::Val{Index}=Val{false}(); tol::Float64=1e-5) where {Index}
-    if Index
-        idx = iscontained(data.root, x, tol, data.points, data.distance_function)
-        if idx ≠ NOT_FOUND
-            return idx
-        end
-        unsafe_add!(data, x)
-        NOT_FOUND
+function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol::Real=1e-5)
+    idx = iscontained(data, x, Val(true), tol)
+    idx == NOT_FOUND || return idx
+
+    if !data.check_real
+        simple_add!(data, x, tol)
+        return NOT_FOUND
     else
-        if iscontained(data.root, x, tol, data.points, data.distance_function) ≠ NOT_FOUND
-            return false
+        if isrealvector(x)
+            simple_add!(data, x, tol)
+            return NOT_FOUND_AND_REAL
+        elseif data.group_actions !== nothing
+            not_found_and_real = false
+            apply_actions(data.group_actions, x) do y
+                if isrealvector(y)
+                    simple_add!(data, y, tol)
+                    not_found_and_real = true
+                    return true
+                end
+                false
+            end
+            not_found_and_real && return NOT_FOUND_AND_REAL
         end
-        unsafe_add!(data, x)
-        true
+        simple_add!(data, x, tol)
+        return NOT_FOUND
     end
+end
+function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{false}=Val(false); tol::Real=1e-5)
+    idx = add!(data, x, Val(true); tol=tol)
+    idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
+end
+function add!(data::UniquePoints, v::AbstractVector{<:AbstractVector}, val::Val=Val(false); tol::Real=1e-5)
+    for vᵢ in v
+        add!(data, vᵢ; tol=tol)
+    end
+    data
 end
 
 """
-    unsafe_add!(data::UniquePoints{V}, x::V)::Bool
+    simple_add!(data::UniquePoints{V}, x::V, tol::Real)::Bool
 
-Similarly to [`add!`](@ref) but assumes that it was already checked that there is no
-duplicate with [`iscontained`](@ref). *This has to be called directly after `iscontained`
-with the same value of `x`*.
+Similarly to [`add!`](@ref) but does not apply any group actions.
+If the data point is not existing add it to `data` and return `-1`. Otherwise
+the index of `x` in `data.points` is returned.
 """
-function unsafe_add!(data::UniquePoints, x::AbstractVector) where {Index}
+function simple_add!(data::UniquePoints, x::AbstractVector, tol::Real)
+    idx = iscontained(data.root, x, tol, data.points, data.distance_function)
+    if idx ≠ NOT_FOUND
+        return idx
+    end
     push!(data.points, x)
     _insert!(data.root, length(data.points))
-
+    NOT_FOUND
 end
 
 Base.length(data::UniquePoints) = length(data.points)
@@ -320,11 +388,17 @@ end
 
 
 """
-    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5)
+    multiplicities(vectors, distance=euclidean_distance; tol::Real = 1e-5, kwargs...)
 
 Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i,j` such that `w[i]` and `w[j]` have `distance` at most tol.
 
-    multiplicities(v; tol::Real = 1e-5) = multiplicities(v, euclidean_distance, tol = tol)
+Optional keywords:
+
+* `check_real=true` adds real from points from group orbits (if they exist) to the [`UniquePoints`](@ref) data structure used internally. The default is `check_real=false`.
+* The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
+
+    multiplicities(v; tol::Real = 1e-5, kwargs...) = multiplicities(v, euclidean_distance; tol = tol, kwargs...)
+
 If `distance` is not specified, [`euclidean_distance`](@ref) is used.
 
 
@@ -336,16 +410,28 @@ This is the same as
 ```julia
 multiplicities([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
 ```
+Here is an example for using group actions.
+```julia-repl
+julia> X = [[1, 2, 3, 4]; [2,1,3,4]; [1,2,4,3]; [2,1,4,3]]
+julia> permutation(x) = ([x[2], x[1], x[3], x[4]],)
+julia> m = multiplicities(X, group_action = permutation)
+[[1,2], [3,4]]
+```
 """
-function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Float64=1e-5) where {T<:Number, F<:Function}
+function multiplicities(v::Vector{<:AbstractVector{T}}, distance::F=euclidean_distance; tol::Real=1e-5, check_real=false, kwargs...) where {T<:Number, F<:Function}
     mults = [[i] for i in 1:length(v)]
-    k = -1
-    data = UniquePoints(v[1], distance)
+    positions = Vector{Int64}()
+    k = NOT_FOUND
+    j = 1
+    data = UniquePoints(v[1], distance; check_real=check_real, kwargs...)
+    push!(positions, 1)
     for i = 2:length(v)
-            k = add!(data, v[i], Val{true}(), tol = tol)
-            if k != -1
-                push!(mults[k], i)
-            end
+        k = add!(data, v[i], Val(true), tol = tol)
+        if k > 0
+            push!(mults[positions[k]], i)
+        else
+            push!(positions, i)
+        end
     end
     [m for m in mults if length(m) > 1]
 end

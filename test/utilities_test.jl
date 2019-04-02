@@ -1,10 +1,72 @@
 @testset "Utilities" begin
+
+    @testset "Group actions" begin
+        f1 = s -> (s * s,);
+        f2 = s-> (2s, -s, 5s);
+        f3 = s -> (s + 1,);
+        action1 = GroupActions(f1)
+        action2 = GroupActions(f1, f2)
+        action3 = GroupActions(f1, f2, f3)
+        r1 = Int[]
+        HC.apply_actions(action1, 3) do s
+            push!(r1, s)
+            false
+        end
+        @test r1 == [9]
+
+        r2 = Int[]
+        HC.apply_actions(action2, 3) do s
+            push!(r2, s)
+            false
+        end
+        r2
+        @test r2 == [9, 18, -9, 45, 6, -3, 15]
+
+        r3 = Int[]
+        HC.apply_actions(action3, 3) do s
+            push!(r3, s)
+            false
+        end
+        r3
+        @test r3 == [9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
+        @test action3(3) == [3, 9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
+
+        # also test with arrays
+        g1 = s -> [s * s];
+        g2 = s-> [2s, -s, 5s];
+        g3 = s -> [s + 1];
+        action1 = GroupActions(g1)
+        action2 = GroupActions(g1, g2)
+        action3 = GroupActions(g1, g2, g3)
+        r1 = Int[]
+        HC.apply_actions(action1, 3) do s
+            push!(r1, s)
+            false
+        end
+        @test r1 == [9]
+
+        r2 = Int[]
+        HC.apply_actions(action2, 3) do s
+            push!(r2, s)
+            false
+        end
+        @test r2 == [9, 18, -9, 45, 6, -3, 15]
+
+        r3 = Int[]
+        HC.apply_actions(action3, 3) do s
+            push!(r3, s)
+            false
+        end
+        r3
+        @test r3 == [9, 18, 19, -9, -8, 45, 46, 10, 6, 7, -3, -2, 15, 16, 4]
+    end
+
     @testset "UniquePoints" begin
         Random.seed!(1234)
         X = [randn(ComplexF64, 10) for _ = 1:2_000]
         indices = HC.unique!(rand(1:2000, 20))
-
         data = HC.UniquePoints(X)
+
         @test length(data) == 2_000
 
         for i ∈ indices
@@ -21,9 +83,41 @@
         end
 
         # Test many points with nearly indentical distance to the inserted point
-        points = shuffle!([[cis(k/100*2π)] for k=0:99])
-        data = HC.UniquePoints(points)
+        p = shuffle!([[cis(k/100*2π)] for k=0:99])
+        data = HC.UniquePoints(p)
         @test HC.iscontained(data, [0.0im]) == false
+
+        # Test with group action
+        x = randn(ComplexF64, 4)
+        permutation1(x) = ([x[2]; x[1]; x[3]; x[4]],)
+        permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
+        X = [v for v in GroupActions(permutation1, permutation2)(x)]
+
+        # One group action
+        data = UniquePoints(X, group_action = permutation1)
+        @test length(data) == 2
+
+        # Two group actions
+        data = HC.UniquePoints(X, group_actions = GroupActions(permutation1, permutation2))
+        @test length(data) == 1
+
+        # Group action and reality check
+        x = randn(4)
+        X = [im.*x, x, randn(ComplexF64, 4)]
+
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real=false)
+        @test HC.isrealvector(points(data)[1]) == false
+        @test length(points(data)) == 2
+
+        data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real = true)
+        @test HC.isrealvector(points(data)[1]) == true
+        @test length(points(data)) == 2
+
+        data = HC.UniquePoints(randn(ComplexF64, 4), check_real = true)
+        k = add!(data, randn(4), Val{true}())
+        @test k == -2
+        k = add!(data, randn(ComplexF64, 4), Val{true}())
+        @test k == -1
     end
 
     @testset "Multiplicities" begin
@@ -46,6 +140,20 @@
 
         P = HC.multiplicities(X, (x,y) -> 1-abs(LinearAlgebra.dot(x,y)))
         @test length(P) == 3
+
+        # Test with group action
+        x = randn(ComplexF64, 4)
+        permutation1(x) = ([x[2]; x[1]; x[3]; x[4]],)
+        permutation2(x) = ([x[1]; x[2]; x[4]; x[3]],)
+        X = GroupActions(permutation1, permutation2)(x)
+
+        # One group action
+        m = multiplicities(X, group_action = permutation1)
+        @test m == [[1;2], [3;4]]
+
+        # Two group actions
+        m = multiplicities(X, group_actions = GroupActions(permutation1, permutation2))
+        @test m == [[1;2;3;4]]
     end
 
     @testset "Polynomials" begin

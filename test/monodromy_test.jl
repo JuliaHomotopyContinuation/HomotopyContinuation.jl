@@ -21,18 +21,6 @@ end
 
 @testset "Monodromy" begin
 
-    @testset "Group actions" begin
-        f1 = s -> (s * s,);
-        f2 = s-> (2s, -s, 5s);
-        f3 = s -> (s + 1,);
-        action1 = GroupActions(f1)
-        action2 = GroupActions(f1, f2)
-        action3 = GroupActions(f1, f2, f3)
-        @test action1(3) == (9, )
-        @test action2(3) == (9, 18, -9, 45)
-        @test action3(3) == (9, 18, -9, 45, 10, 19, -8, 46)
-    end
-
     @testset "monodromy_solve" begin
         F, p, p₀, x₀ = toric_ed([3 2 1 0; 0 1 2 3])
 
@@ -43,7 +31,7 @@ end
 
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                 target_solutions_count=21,
-                maximal_number_of_iterations_without_progress=100)
+                maximal_number_of_iterations_without_progress=20)
         @test result.returncode == :success
         @test length(solutions(result)) == 21
         @test length(solutions(result, onlyreal = true)) >= 1
@@ -52,8 +40,21 @@ end
         @test length(HC.UniquePoints(result.solutions).points) == 21
         @test isempty(sprint(show, result)) == false
 
-        @test monodromy_solve(F, result.solutions, p₀, parameters=p,
-                    target_solutions_count=21).returncode == :success
+        # test input of length > 1
+        result = monodromy_solve(F, [x₀ for _ in 1:30], p₀, parameters=p)
+        @test length(solutions(result)) == 21
+
+        # test with false input
+        result = monodromy_solve(F, [rand(6) for _ in 1:10], p₀, parameters=p)
+        @test result.returncode == :invalid_startvalue
+        result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p)
+        @test length(solutions(result)) == 21
+        result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters=p, check_startsolutions = false)
+        @test result.returncode == :invalid_startvalue
+
+        # different distance function
+        result = monodromy_solve(F, x₀, p₀, parameters=p, distance = (x,y) -> 0.0)
+        @test length(solutions(result)) == 1
 
         # Test stop heuristic using too high target_solutions_count
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=25)
@@ -112,17 +113,18 @@ end
         result = monodromy_solve(F, x₀, p₀, parameters=p,
             equivalence_classes=true,
             maximal_number_of_iterations_without_progress=100,
-            group_action=roots_of_unity)
+            group_actions=roots_of_unity)
         @test length(result.solutions) == 7
         # Test that equivalence classes are on by default if we supply a group action
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                             group_action=roots_of_unity,
-                            maximal_number_of_iterations_without_progress=200)
+                            maximal_number_of_iterations_without_progress=20)
         @test length(result.solutions) == 7
 
         # Test affine tracking
         result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true,
                         group_action=roots_of_unity,
+                        target_solutions_count=7,
                         maximal_number_of_iterations_without_progress=200)
         @test length(result.solutions) == 7
     end
@@ -170,11 +172,17 @@ end
 
         R = monodromy_solve(f - p, y₀, p₀;
         			parameters=p, group_action=relabeling,
-        			maximal_number_of_iterations_without_progress=150,
+        			parameter_sampler=last ∘ sample_moments,
+                    showprogress=false,
+                    maximal_number_of_iterations_without_progress=5)
+        @test length(solutions(R)) ≤ 225
+
+        R = monodromy_solve(f - p, y₀, p₀;
+        			parameters=p, group_action=relabeling,
         			target_solutions_count=225,
         			parameter_sampler=last ∘ sample_moments,
-                    showprogress=false)
-
+                    showprogress=false,
+                    maximal_number_of_iterations_without_progress=10)
         @test length(solutions(R)) == 225
     end
 end

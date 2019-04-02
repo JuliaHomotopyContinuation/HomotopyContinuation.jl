@@ -176,6 +176,7 @@ function isrealvector(z::AbstractVector{<:Complex}, tol=1e-6)
     end
     sqrt(total) < tol
 end
+isrealvector(z::NTuple{N, T}, tol=1e-6) where {N,T} = isrealvector(SVector{N}(z), tol)
 
 """
     randseed(range=1_000:1_000_000)

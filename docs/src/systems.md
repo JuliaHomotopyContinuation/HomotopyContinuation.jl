@@ -1,4 +1,4 @@
-# Polynomial systems
+# Data structures for polynomial systems
 
 Polynomial systems can be represented in numerous ways in a computer and each
 representation has certain tradeoffs. For our purposes the most important thing

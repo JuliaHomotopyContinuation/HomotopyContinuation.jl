@@ -9,12 +9,13 @@ If this is your first time reading this documentation, we recommend you start wi
 ```@contents
 Pages = [
   "solving.md",
+  "monodromy.md",
+  "newton.md",
+  "sorting.md",
+  "norms_distances.md",
   "systems.md",
   "homotopies.md",
   "predictors-correctors.md",
   "pathtracking.md",
-  "newton.md",
-  "sorting.md",
-  "norms_distances.md",
   "reference.md"]
 ```
