@@ -199,12 +199,12 @@ Optional keywords:
 
 ## Example
 ```julia-repl
-julia> UniquePoints([[1,0.5]; [1,0.5]; [1,1]])
-[[1,0.5], [1,1]]
-```
-This is the same as
-```julia
-UniquePoints([[1,0.5]; [1,0.5]; [1,1]], (x,y) -> LinearAlgebra.norm(x-y))
+julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]])
+[1.0, 0.5]
+[0.5, 1.0]
+
+julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -> ([x[2];x[1]],))
+[1.0, 0.5]
 ```
 """
 struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, GroupActions}}
