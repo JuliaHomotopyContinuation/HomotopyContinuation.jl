@@ -14,6 +14,10 @@ function test_treeviews(x)
     end
 end
 
+function test_show_juno(x)
+    @test show(stdout, MIME("application/prs.juno.inline"), x) === x
+end
+
 # We order the tests such that isolated things are tested first
 @testset "HomotopyContinuation" begin
     include("utilities_test.jl")

@@ -244,5 +244,25 @@
         C, d = copy(A), copy(b)
         HC.solve!(C, d)
         @test norm(d[1:12] - A \ b) < 1e-10
+
+        @test HC.unpack(5, 2) == 5
+        @test HC.unpack(nothing, 2) == 2
+
+        x = rand()
+        @test HC.nthroot(x, 1) == x
+        @test HC.nthroot(x, 0) == one(x)
+
+        x = rand(6)
+        @test HC.isrealvector(x)
+
+        y = x + [0, 0, 2, 0, 0, 0]
+        @test infinity_distance(x, y) ≈ 2
+        @test infinity_distance(complex.(x), complex.(y)) ≈ 2
+
+
+        segment = HC.ComplexSegment(2, 4)
+        @test length(segment) ≈ 2
+        test_show_juno(segment)
+        @test string(segment) == "ComplexSegment(2.0 + 0.0im, 4.0 + 0.0im)"
     end
 end

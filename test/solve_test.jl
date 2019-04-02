@@ -78,6 +78,7 @@
         F = equations(katsura(5))
         result = solve(homogenize(F))
         @test result isa Result{<:ProjectiveVectors.PVector}
+        @test isprojective(first(result))
         @test nnonsingular(result) == 32
 
 

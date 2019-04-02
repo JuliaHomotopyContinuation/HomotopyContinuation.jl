@@ -39,18 +39,6 @@ function ProjectiveProblem(G::AbstractSystem, F::AbstractSystem,
     ProjectiveProblem(homotopy(G, F), vargroups, seed; kwargs...)
 end
 
-"""
-    homvars(prob::ProjectiveProblem)
-
-Get the homogenization variables of the problem. Returns `nothing` if there are no.
-"""
-function homvars(prob::ProjectiveProblem)
-    if has_dedicated_homvars(prob.vargroups)
-        map(last, prob.vargroups.groups)
-    else
-        nothing
-    end
-end
 
 
 """
@@ -68,6 +56,19 @@ function AffineProblem(G::AbstractSystem, F::AbstractSystem,
     AffineProblem(homotopy(G, F), vargroups, seed)
 end
 
+"""
+    homvars(prob::AbstractProblem)
+
+Get the homogenization variables of the problem. Returns `nothing` if there are no.
+"""
+function homvars(prob::ProjectiveProblem)
+    if has_dedicated_homvars(prob.vargroups)
+        map(last, prob.vargroups.groups)
+    else
+        nothing
+    end
+end
+homvars(prob::AffineProblem) = nothing
 
 """
     embed(prob::ProjectiveProblem, v)

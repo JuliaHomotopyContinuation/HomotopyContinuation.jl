@@ -664,7 +664,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     if return_code == :success && details_level ≥ 1
         if affine_tracking(tracker.core_tracker)
             res = residual(tracker, currx(core_tracker), t)
-            condition_jac = condition_jacobian(tracker, currx(core_Tracker), t)
+            condition_jac = condition_jacobian(tracker, currx(core_tracker), t)
         else
             # we simulate the affine vector
             # We cannot use `x` from above since pull_back also takes care of possible

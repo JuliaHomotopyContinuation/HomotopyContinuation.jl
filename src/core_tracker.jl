@@ -719,12 +719,6 @@ function refine!(tracker::CoreTracker)
     nothing
 end
 
-# TODO: REMOVE THIS
-function residual(tracker::CoreTracker, x, t)
-    evaluate!(tracker.cache.out, tracker.cache.homotopy, x, t)
-    infinity_norm(tracker.cache.out)
-end
-
 function Base.iterate(tracker::CoreTracker, state=nothing)
     state === nothing && return tracker, 1
 

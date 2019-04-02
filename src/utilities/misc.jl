@@ -217,7 +217,28 @@ randseed(range=1_000:1_000_000) = rand(range)
 
 Compute the ∞-norm of `u-v`.
 """
-infinity_distance(u, v) = infinity_norm(u, v)
+function infinity_distance(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:Complex})
+    m = abs2(z₁[1] - z₂[1])
+    n₁, n₂ = length(z₁), length(z₂)
+    if n₁ ≠ n₂
+        return convert(typeof(m), Inf)
+    end
+    @inbounds for k=2:n₁
+        @fastmath m = max(m, abs2(z₁[k] - z₂[k]))
+    end
+    sqrt(m)
+end
+function infinity_distance(z₁::AbstractVector, z₂::AbstractVector)
+    m = abs(z₁[1] - z₂[1])
+    n₁, n₂ = length(z₁), length(z₂)
+    if n₁ ≠ n₂
+        return convert(typeof(m), Inf)
+    end
+    @inbounds for k=2:n₁
+        @fastmath m = max(m, abs(z₁[k] - z₂[k]))
+    end
+    m
+end
 
 """
 
@@ -238,11 +259,10 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
         return convert(typeof(m), Inf)
     end
     @inbounds for k=2:n₁
-        m = max(m, abs2(z₁[k] - z₂[k]))
+        @fastmath m = max(m, abs2(z₁[k] - z₂[k]))
     end
     sqrt(m)
 end
-unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 
 """
@@ -257,30 +277,11 @@ function fubini_study(x::PVector{<:Number, M}, y::PVector{<:Number, M}) where {M
     sqrt(sum(abs2.(acos.(min.(1.0, abs.(LinearAlgebra.dot(x,y)))))))
 end
 
-"""
-    logabs(z)
-
-The log absolute map `log(abs(z))`.
-"""
-logabs(z::Complex) = 0.5 * log(abs2(z))
-logabs(x) = log(abs(x))
-
-
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
     # Therefore we artificially constrain the choices
     theta = rand() * 0.30 + 0.075 + (rand(Bool) ? 0.0 : 0.5)
     cis(2π * theta)
-end
-
-"""
-    filterkwargs(kwargs, allowed_kwargs)
-
-Remove all keyword arguments out of `kwargs` where the keyword is not contained
-in `allowed_kwargs`.
-"""
-function filterkwargs(kwargs, allowed_kwargs)
-    [kwarg for kwarg in kwargs if any(kw -> kw == first(kwarg), allowed_kwargs)]
 end
 
 """
@@ -394,13 +395,8 @@ end
     partition_work(unit_range, n_chunks)
 
 Partition a unit_range in `n_chunks` equally sized chunks.
-
-    partition_work(N, n_chunks)
-
-Partition a workload of `N` elements into equal chunks.
 """
 partition_work(arg, n_chunks) = partition_work!(Vector{UnitRange{Int}}(undef, n_chunks), arg, n_chunks)
-partition_work!(dst, N::Int, n_chunks) = partition_work!(dst, 1:N, n_chunks)
 function partition_work!(dst, R::UnitRange, n_chunks)
     ls = range(R.start, stop=R.stop, length=n_chunks+1)
     map!(dst, 1:n_chunks) do i

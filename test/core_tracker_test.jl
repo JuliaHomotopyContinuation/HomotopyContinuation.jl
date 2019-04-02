@@ -4,12 +4,29 @@
         # test construction
         t1, start_sols = coretracker_startsolutions(F, patch=OrthogonalPatch())
 
+        test_show_juno(t1)
+        @test !isempty(string(t1))
+        test_show_juno(t1.options)
+        @test !isempty(string(t1.options))
+        test_show_juno(t1.state)
+        @test !isempty(string(t1.state))
+
         @test_nowarn currΔt(t1)
 
         raccuracy = refinement_accuracy(t1)
         @test_nowarn set_refinement_accuracy!(t1, 5e-5)
         @test refinement_accuracy(t1) == 5e-5
         set_refinement_accuracy!(t1, raccuracy)
+
+        caccuracy = accuracy(t1)
+        @test_nowarn set_accuracy!(t1, 5e-5)
+        @test accuracy(t1) == 5e-5
+        set_accuracy!(t1, caccuracy)
+
+        cmaxiter = max_corrector_iters(t1)
+        @test_nowarn set_max_corrector_iters!(t1, 11)
+        @test max_corrector_iters(t1) == 11
+        set_max_corrector_iters!(t1, cmaxiter)
 
         rmaxiter = max_refinement_iters(t1)
         @test_nowarn set_max_refinement_iters!(t1, 11)
@@ -49,6 +66,14 @@
 
         tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
                     affine=true)
+        @test affine_tracking(tracker) == true
+        res = track(tracker, starts[1], 1.0, 0.0)
+        @test res.returncode == CoreTrackerStatus.success
+        @test isa(res.x, Vector{ComplexF64})
+        @test length(res.x) == 2
+
+        tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
+                    affine=true, auto_scaling=false)
         @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
         @test res.returncode == CoreTrackerStatus.success
