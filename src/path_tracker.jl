@@ -283,7 +283,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
     # It can happen that we jump too fast to a non-singular solution at infinity
     # For example, this happens with the Griewank & Osborne system (seed 130793) for path 3.
     # This only happens if we couldn't agrre on a valuation
-    if state.status == PathTrackerStatus.success
+    if options.at_infinity_check && state.status == PathTrackerStatus.success
         # If the path is at infinity, then one of the homogenization variables is ≈ 0
         if vector_at_infinity(currx(core_tracker), options.max_affine_norm)
             state.status = PathTrackerStatus.at_infinity
