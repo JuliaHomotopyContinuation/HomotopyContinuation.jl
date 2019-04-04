@@ -70,7 +70,7 @@
         @test nfinite(solve(G, F, [@SVector [2, -3]])) == 1
 
         F = FPSystem(homogenize(equations(cyclic(5))))
-        result = solve(F, homvar=6)
+        result = solve(F, homvar=6, save_all_paths=true)
         @test nfinite(result) == 70
         @test natinfinity(result) == 50
 

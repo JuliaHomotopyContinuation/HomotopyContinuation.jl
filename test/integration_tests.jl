@@ -4,4 +4,5 @@
     @test nfinite(solve(equations(cyclic(6)))) == 156
     R = solve(equations(cyclic(7)), seed=14113)
     @test nfinite(R) == 924
+    @test ntracked(R) == 5040
 end
