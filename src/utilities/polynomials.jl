@@ -554,7 +554,7 @@ function check_homogeneous_degrees(F)
     # The number of variables match, but it still cannot be homogeneous.
     # We evaluate the system with y:=rand(N) and 2y. If homogeneous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
-    x = rand(ComplexF64, N)
+    x = PVector(rand(ComplexF64, N))
     system_cache = cache(F, x)
     y = evaluate(F, x, system_cache)
     LinearAlgebra.rmul!(x, 2)
@@ -755,12 +755,15 @@ function homogenize_if_necessary(F::Union{MPPolys, Composition}, hominfo::Union{
 end
 
 """
-    classify_homogeneous_system(F, vargroups::VariableGroups)
+    classify_system(F, vargroups::VariableGroups; affine_tracking=false)
 
 Returns a symbol indicating whether `F` is `:square`, `:overdetermined` or `:underdetermined`.
 """
-function classify_homogeneous_system(F, vargroups::VariableGroups)
-	n = npolynomials(F) - (nvariables(vargroups) - ngroups(vargroups))
+function classify_system(F, vargroups::VariableGroups; affine_tracking=false)
+	n = npolynomials(F) - nvariables(vargroups)
+	if !affine_tracking
+		n += ngroups(vargroups)
+	end
 
     if n == 0
         :square
@@ -779,12 +782,12 @@ for details.
 """
 
 """
-    check_square_homogeneous_system(F, vargroups::VariableGroups)
+    check_square_homogeneous_system(F, vargroups::VariableGroups; affine_tracking=false)
 
 Checks whether `F` is a square polynomial system.
 """
-function check_square_homogeneous_system(F, vargroups::VariableGroups)
-    class = classify_homogeneous_system(F, vargroups)
+function check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
+    class = classify_system(F, vargroups; affine_tracking=affine_tracking)
     if class == :overdetermined
         error(overdetermined_error_msg)
     elseif class == :underdetermined

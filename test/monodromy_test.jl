@@ -123,7 +123,7 @@ end
         @test length(result.solutions) == 7
 
         # Test affine tracking
-        result = monodromy_solve(F, x₀, p₀, parameters=p, affine=true,
+        result = monodromy_solve(F, x₀, p₀, parameters=p, affine_tracking=true,
                         group_action=roots_of_unity,
                         target_solutions_count=7,
                         maximal_number_of_iterations_without_progress=200)

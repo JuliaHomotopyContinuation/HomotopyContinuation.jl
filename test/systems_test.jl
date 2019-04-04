@@ -72,24 +72,29 @@
         @polyvar x y z
 
         F = SPSystem([x^4-z^4, y^3-z^3])
-        w = rand(ComplexF64, 3)
+        w = ProjectiveVectors.PVector(rand(ComplexF64, 3))
 
         G = TotalDegreeSystem([x^4-z^4, y^3-z^3])
+        @test size(G) == (2, 3)
         @test evaluate(F, w) ≈ evaluate(G, w)
         @test jacobian(F, w) ≈ jacobian(G, w)
         u, U = evaluate_and_jacobian(F, w)
         @test u ≈ evaluate(F, w)
         @test U ≈ jacobian(G, w)
 
-        # @polyvar x y z t
-        # F = SPSystem([x^4-z^4, y^3-z^3, t-z])
-        # G = TotalDegreeSystem([x^4-z^4, y^3-z^3, t-z], [x, y, z, t], z)
-        # w = rand(ComplexF64, 4)
-        # @test evaluate(F, w) ≈ evaluate(G, w)
-        # @test jacobian(F, w) ≈ jacobian(G, w)
-        # u, U = evaluate_and_jacobian(G, w)
-        # @test u ≈ evaluate(F, w)
-        # @test U ≈ jacobian(F, w)
+        @polyvar x y z
+
+        F_affine = SPSystem([x^4-1, y^3-1])
+        w = rand(ComplexF64, 3)
+
+        G_affine = TotalDegreeSystem([x^4-1, y^3-1]; affine=true)
+        @test size(G_affine) == (2, 2)
+        @test evaluate(F_affine, w) ≈ evaluate(G_affine, w)
+        @test jacobian(F_affine, w) ≈ jacobian(G_affine, w)
+
+        u, U = evaluate_and_jacobian(F_affine, w)
+        @test u ≈ evaluate(F_affine, w)
+        @test U ≈ jacobian(G_affine, w)
     end
 
     @testset "FixedParameterSystem" begin

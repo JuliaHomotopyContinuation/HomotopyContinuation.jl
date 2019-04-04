@@ -65,7 +65,7 @@
         p = [a, b]
 
         tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
-                    affine=true)
+                    affine_tracking=true)
         @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
         @test res.returncode == CoreTrackerStatus.success
@@ -73,7 +73,7 @@
         @test length(res.x) == 2
 
         tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
-                    affine=true, auto_scaling=false)
+                    affine_tracking=true, auto_scaling=false)
         @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
         @test res.returncode == CoreTrackerStatus.success
@@ -81,7 +81,7 @@
         @test length(res.x) == 2
 
         x = @SVector [1.0, 1.0 + 0.0*im]
-        tracker, starts = coretracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
+        tracker, starts = coretracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
         @test length(starts) == 1
         res = track(tracker, starts[1], 1.0, 0.0)
         @test isa(res.x, Vector{ComplexF64})
