@@ -1,6 +1,6 @@
 @testset "Result" begin
     @testset "Result+PathResult" begin
-        R = solve(equations(heart()), seed=506435)
+        R = solve(equations(heart()), seed=506435, save_all_paths=true)
         @test R isa Result
         @test natinfinity(R) ≤ 572
         @test nfinite(R) == 4
