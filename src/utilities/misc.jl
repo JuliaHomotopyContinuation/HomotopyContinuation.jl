@@ -398,13 +398,16 @@ Partition a unit_range in `n_chunks` equally sized chunks.
 """
 partition_work(arg, n_chunks) = partition_work!(Vector{UnitRange{Int}}(undef, n_chunks), arg, n_chunks)
 function partition_work!(dst, R::UnitRange, n_chunks)
-    ls = range(R.start, stop=R.stop, length=n_chunks+1)
-    map!(dst, 1:n_chunks) do i
-        a = round(Int, ls[i])
-        if i > 1
-            a += 1
+    max_elems_per_chunk = ceil(Int, length(R) / n_chunks)
+    a = R.start
+    for i in 1:n_chunks
+        if i == 1
+            a = R.start
+        else
+            a = dst[i - 1].stop + 1
         end
-        b = round(Int, ls[i+1])
-        a:b
+        b = min(a + max_elems_per_chunk - 1, R.stop)
+        dst[i] = a:b
     end
+    dst
 end
