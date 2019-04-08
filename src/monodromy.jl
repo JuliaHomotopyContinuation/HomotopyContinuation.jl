@@ -4,7 +4,7 @@ export monodromy_solve, realsolutions, nreal, parameters
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_allowed_keywords = [:distance, :identical_tol, :done_callback,
+const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_callback,
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
@@ -108,7 +108,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) =
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
-    if retcode == PathTrackerStatus.success
+    if retcode == CoreTrackerStatus.success
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
@@ -174,7 +174,7 @@ function Node(p::AbstractVector{T}, node::Node{T,UP}, options::MonodromyOptions;
     if store_points == false
         Node{T, UP}(Vector(p), nothing, is_main_node)
     else
-        Node{T, UP}(Vector(p), UniquePoints(UP, options.distance_function; group_actions = options.group_actions, check_real = true), is_main_node)
+        Node{T, UP}(Vector(p), similar(UP), is_main_node)
     end
 end
 
@@ -349,22 +349,22 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker::PathTracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
+function track(tracker::CoreTracker, x::AbstractVector, edge::Edge, loop::Loop, stats::MonodromyStatistics)
     set_parameters!(tracker, edge, loop)
     track(tracker, x, stats)
 end
-function track(tracker::PathTracker, x::AbstractVector, stats::MonodromyStatistics)
+function track(tracker::CoreTracker, x::AbstractVector, stats::MonodromyStatistics)
     retcode = track!(tracker, x, 1.0, 0.0)
     trackedpath!(stats, retcode)
     retcode
 end
 
 """x
-    set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
+    set_parameters!(tracker::CoreTracker, e::Edge, loop::Loop)
 
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.
 """
-function set_parameters!(tracker::PathTracker, e::Edge, loop::Loop)
+function set_parameters!(tracker::CoreTracker, e::Edge, loop::Loop)
     H = basehomotopy(tracker.homotopy)
     if !(H isa ParameterHomotopy)
         error("Base homotopy is not a ParameterHomotopy")
@@ -498,11 +498,11 @@ parameters(r::MonodromyResult) = r.parameters
 ## monodromy solve ##
 #####################
 """
-MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache}
+MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache}
 
 Cache for monodromy loops.
 """
-struct MonodromyCache{FT<:FixedHomotopy, Tracker<:PathTracker, NC<:NewtonCache, AV<:AbstractVector}
+struct MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache, AV<:AbstractVector}
     F::FT
     tracker::Tracker
     newton_cache::NC
@@ -553,14 +553,14 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
 
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
-    optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_allowed_keywords)
+    optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
     options = begin
         isrealsystem = TC <: Real && TP <: Real
         MonodromyOptions(isrealsystem; optionskwargs...)
     end
 
     # construct tracker
-    tracker = pathtracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
+    tracker = coretracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
     if affine_tracking(tracker)
         HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
         F₀ = FixedHomotopy(HC, 0.0)
@@ -728,7 +728,7 @@ function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
     result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache,
                 tol=tol, miniters=1, maxiters=3, simplified_last_step=false)
 
-    if result.retcode == converged
+    if isconverged(result)
         return affine_chart(x, C.out)
     else
         return nothing
@@ -740,8 +740,8 @@ affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
 
 function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop, options::MonodromyOptions, stats::MonodromyStatistics, progress)
     retcode = track(C.tracker, job.x, job.edge, loop, stats)
-    if retcode ≠ PathTrackerStatus.success
-        if retcode == PathTrackerStatus.terminated_invalid_startvalue && stats.ntrackedpaths == 0
+    if retcode ≠ CoreTrackerStatus.success
+        if retcode == CoreTrackerStatus.terminated_invalid_startvalue && stats.ntrackedpaths == 0
             return :invalid_startvalue
         end
         return :incomplete

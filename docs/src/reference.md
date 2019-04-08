@@ -22,11 +22,16 @@ f = dot(x, x) # = x[1]^2+x[2]^2+x[3]^2
 @polyvar x[1:2, 1:2]
 ```
 
+We also provide methods construct compositions of polynomial systems:
+```@docs
+compose
+```
+
 ## Utilities
 
 ```@docs
 bezout_number
-ishomogenous
+ishomogeneous
 uniquevar
 homogenize
 ```

@@ -211,4 +211,4 @@ HomotopyContinuation.homotopy_interface_test(RandomUnitaryPath(G, F))
 solve([x^2 - y, y^3*x-x], homotopy=RandomUnitaryPath)
 
 # Alternatively we could also construct the homotopy directly and give it to `solve` together with start solutions.
-# Note that in this case we have to ensure that our homotopy is already homogenous.
+# Note that in this case we have to ensure that our homotopy is already homogeneous.

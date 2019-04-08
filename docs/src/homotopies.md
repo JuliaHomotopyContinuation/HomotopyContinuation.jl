@@ -15,7 +15,7 @@ ParameterHomotopy
 ```
 
 We also provide more specialised homotopies, which are mostly used internally currently
-but could be useful in conjunction with the [`PathTracker`](@ref) primitive.
+but could be useful in conjunction with the [`CoreTracker`](@ref) primitive.
 ```@docs
 PatchedHomotopy
 ```

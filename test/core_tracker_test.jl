@@ -1,8 +1,15 @@
-@testset "PathTracking" begin
+@testset "CoreTracker" begin
     @testset "General" begin
         F = equations(katsura(5))
         # test construction
-        t1, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch())
+        t1, start_sols = coretracker_startsolutions(F, patch=OrthogonalPatch())
+
+        test_show_juno(t1)
+        @test !isempty(string(t1))
+        test_show_juno(t1.options)
+        @test !isempty(string(t1.options))
+        test_show_juno(t1.state)
+        @test !isempty(string(t1.state))
 
         @test_nowarn currΔt(t1)
 
@@ -11,34 +18,44 @@
         @test refinement_accuracy(t1) == 5e-5
         set_refinement_accuracy!(t1, raccuracy)
 
+        caccuracy = accuracy(t1)
+        @test_nowarn set_accuracy!(t1, 5e-5)
+        @test accuracy(t1) == 5e-5
+        set_accuracy!(t1, caccuracy)
+
+        cmaxiter = max_corrector_iters(t1)
+        @test_nowarn set_max_corrector_iters!(t1, 11)
+        @test max_corrector_iters(t1) == 11
+        set_max_corrector_iters!(t1, cmaxiter)
+
         rmaxiter = max_refinement_iters(t1)
         @test_nowarn set_max_refinement_iters!(t1, 11)
         @test max_refinement_iters(t1) == 11
         set_max_refinement_iters!(t1, rmaxiter)
 
-        @test t1 isa PathTracker
+        @test t1 isa CoreTracker
         @test length(currx(t1)) == 7
 
-        t3, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch(), predictor=Euler())
+        t3, start_sols = coretracker_startsolutions(F, patch=OrthogonalPatch(), predictor=Euler())
         @test t3.predictor isa Euler
 
         setup!(t1, first(start_sols), 1.0, 0.4)
-        @test currstatus(t1) == PathTrackerStatus.tracking
+        @test currstatus(t1) == CoreTrackerStatus.tracking
         @test currt(t1) == 1.0
 
         setup!(t1, first(start_sols), 0.5, 0.4)
-        @test currstatus(t1) == PathTrackerStatus.terminated_invalid_startvalue
+        @test currstatus(t1) == CoreTrackerStatus.terminated_invalid_startvalue
         @test currt(t1) == 0.5
 
         R = track(t1, first(start_sols), 1.0, 0.0)
-        @test R isa PathTrackerResult
-        @test R.returncode == PathTrackerStatus.success
+        @test R isa CoreTrackerResult
+        @test R.returncode == CoreTrackerStatus.success
         @test R.accuracy < 1e-7
         @test_nowarn show(devnull, R)
 
         out = [1; first(start_sols)]
         retcode = track!(out, t1, first(start_sols), 1.0, 0.0)
-        @test retcode == PathTrackerStatus.success
+        @test retcode == CoreTrackerStatus.success
         @test out == R.x
     end
 
@@ -47,16 +64,24 @@
         F = [x^2-a, x*y-a+b]
         p = [a, b]
 
-        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
+        tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
                     affine=true)
         @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
-        @test res.returncode == PathTrackerStatus.success
+        @test res.returncode == CoreTrackerStatus.success
+        @test isa(res.x, Vector{ComplexF64})
+        @test length(res.x) == 2
+
+        tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
+                    affine=true, auto_scaling=false)
+        @test affine_tracking(tracker) == true
+        res = track(tracker, starts[1], 1.0, 0.0)
+        @test res.returncode == CoreTrackerStatus.success
         @test isa(res.x, Vector{ComplexF64})
         @test length(res.x) == 2
 
         x = @SVector [1.0, 1.0 + 0.0*im]
-        tracker, starts = pathtracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
+        tracker, starts = coretracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
         @test length(starts) == 1
         res = track(tracker, starts[1], 1.0, 0.0)
         @test isa(res.x, Vector{ComplexF64})
@@ -65,7 +90,7 @@
 
     @testset "Allocations" begin
         F = equations(katsura(5))
-        tracker, start_sols = pathtracker_startsolutions(F)
+        tracker, start_sols = coretracker_startsolutions(F)
         s = first(start_sols)
         @allocated track!(tracker, s, 1.0, 0.1)
         @test (@allocated track!(tracker, s, 1.0, 0.1)) == 0
@@ -78,20 +103,20 @@
         @polyvar x[1:3]
         F = A * x - b
 
-        tracker, start_sols = pathtracker_startsolutions(F, patch=RandomPatch(), max_steps=10)
+        tracker, start_sols = coretracker_startsolutions(F, patch=RandomPatch(), max_steps=10)
         s = first(start_sols)
         result = track(tracker, s, 1.0, 0.0)
-        @test result.returncode == PathTrackerStatus.success
+        @test result.returncode == CoreTrackerStatus.success
         @test result.t == 0.0
         x = result.x
         @test norm(ProjectiveVectors.affine_chart(x) - A \ b) < 1e-6
 
         x_inter = [1;copy(s)]
         retcode = track!(x_inter, tracker, s, 1.0, 0.1)
-        @test retcode == PathTrackerStatus.success
+        @test retcode == CoreTrackerStatus.success
         x_final = zero(x_inter)
         retcode = track!(x_final, tracker, x_inter, 0.1, 0.0)
-        @test retcode == PathTrackerStatus.success
+        @test retcode == CoreTrackerStatus.success
         @test curriters(tracker) < 3
         x = currx(tracker)
         @test norm(ProjectiveVectors.affine_chart(x) - A \ b) < 1e-6
@@ -100,9 +125,9 @@
     @testset "FixedPatch continuation" begin
         F = equations(katsura(5))
         # test construction
-        tracker, start_sols = pathtracker_startsolutions(F, patch=OrthogonalPatch())
+        tracker, start_sols = coretracker_startsolutions(F, patch=OrthogonalPatch())
         patch = tracker.state.patch
-        fixedtracker = pathtracker(F, patch=FixedPatch())
+        fixedtracker = coretracker(F, patch=FixedPatch())
         fixedpatch = fixedtracker.state.patch
         x1 = first(start_sols)
 
@@ -121,17 +146,17 @@
         @test v1 != patch.v̄
     end
 
-    @testset "pathtracker_startsolutions" begin
+    @testset "coretracker_startsolutions" begin
         @polyvar  x y
 
-        tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
+        tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3])
         result = track(tracker, first(S), 1.0, 0.0)
-        @test result.returncode == PathTrackerStatus.success
+        @test result.returncode == CoreTrackerStatus.success
 
         # test type promotion of startsolutions
-        tracker, S = pathtracker_startsolutions([x^2-y^2+4, x + y - 3])
+        tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3])
         result = track(tracker, [1, 1], 1.0, 0.0)
-        @test result.returncode == PathTrackerStatus.success
+        @test result.returncode == CoreTrackerStatus.success
     end
 
     @testset "iterator" begin
@@ -139,7 +164,7 @@
         F = [x^2-a, x*y-a+b]
         p = [a, b]
         s = [1.0, 1.0 + 0.0*im]
-        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
+        tracker = coretracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
         typeof(first(iterator(tracker, s, 1.0, 0.0))) ==
             Tuple{Vector{ComplexF64}, Float64}
         typeof(first(iterator(tracker, s, 1.0, 0.0; affine=false))) ==
@@ -153,18 +178,18 @@
 
 
         # Test iteration protocol
-        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
+        tracker = coretracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
         setup!(tracker, s, 1.0, 0.0)
         for tr in tracker
             # nothing
         end
-        @test tracker.state.status == PathTrackerStatus.success
+        @test tracker.state.status == CoreTrackerStatus.success
     end
 
     @testset "Deprecation warnings" begin
         F = equations(katsura(5))
         # test deprecation mechanism
-        tracker = pathtracker(F, tol=1e-8)
+        tracker = coretracker(F, tol=1e-8)
         @test accuracy(tracker) == 1e-8
     end
 end

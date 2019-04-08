@@ -65,7 +65,7 @@ Base.eltype(iter::Type{<:TotalDegreeSolutionIterator}) = Vector{Complex{Float64}
 
 
 ##################
-# Multihomogenous
+# Multihomogeneous
 ##################
 
 struct MultiBezoutIndicesIterator{N}
@@ -124,7 +124,7 @@ end
     bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)
     bezout_number(multidegrees, groups::VariableGroups)
 
-Compute the multi-homogenous bezout number associated to the given system and variable groups.
+Compute the multi-homogeneous bezout number associated to the given system and variable groups.
 """
 bezout_number(D::Matrix, groups::VariableGroups) = bezout_number(D, projective_dims(groups))
 bezout_number(D::Matrix, k) = sum(first, MultiBezoutIndicesIterator(D, k))
@@ -136,7 +136,7 @@ function bezout_number(F::MPPolys; parameters=nothing, variable_groups=nothing, 
     vars = variables(F; parameters=parameters)
     hominfo = HomogenizationInformation(variable_groups=variable_groups, homvars=homvars)
     D = multidegrees(F, variable_groups)
-    if ishomogenous(F, hominfo; parameters=parameters)
+    if ishomogeneous(F, hominfo; parameters=parameters)
         bezout_number(D, length.(variable_groups) .- 1)
     else
         bezout_number(D, length.(variable_groups))
@@ -180,7 +180,7 @@ end
 """
     totaldegree_polysystem(multidegrees::Matrix, variable_groups::VariableGroups, coeffs)
 
-The multi-homogenous totaldegree start system described in [Wampler, 93]. Returns a tuple, the system
+The multi-homogeneous totaldegree start system described in [Wampler, 93]. Returns a tuple, the system
 and the coefficients``c_{i,j,l}`` described in [Wampler, 93] as a `Matrix{Vector{Float64}}`.
 
 [Wampler, 93]: An efficient start system for multi-homogeneous polynomial continuation (https://link.springer.com/article/10.1007/BF01385710).
@@ -241,10 +241,11 @@ function MultiBezoutSolutionsIterator(D::Matrix, C::Matrix, vargroups::VariableG
 end
 
 function Base.show(io::IO, iter::MultiBezoutSolutionsIterator)
-    print(io, "Solutions iterator for a multi-homogenous start system")
+    print(io, "Solutions iterator for a multi-homogeneous start system")
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MultiBezoutSolutionsIterator) = x
 
+Base.length(iter::MultiBezoutSolutionsIterator) = bezout_number(iter.indices.D, iter.indices.k)
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{MultiBezoutSolutionsIterator{N}}) where N = ProjectiveVectors.PVector{ComplexF64, N}
 

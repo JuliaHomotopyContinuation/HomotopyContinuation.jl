@@ -1,9 +1,9 @@
 export MultiHomTotalDegreeSystem
 
 """
-    MultiHomogenousTotalDegreeSystem(polynomials, vars) <: AbstractSystem
+    MultiHomogeneousTotalDegreeSystem(polynomials, vars) <: AbstractSystem
 
-Create a multi-homogenous total degree system as described in
+Create a multi-homogeneous total degree system as described in
 
 An efficient start system for multi-homogeneous polynomial continuation,
 Wampler, C.W. Numer. Math. (1993) 66: 517. https://doi.org/10.1007/BF01385710

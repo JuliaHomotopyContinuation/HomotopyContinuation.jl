@@ -4,10 +4,10 @@
         @test_throws ErrorException solve([x-2y+2, 0])
         @test_throws ErrorException solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
 
-        # non homogenous overdetermiend
+        # non homogeneous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
         @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x, z+x])
-        # homogenous overdetermiend
+        # homogeneous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
         @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
         @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
@@ -20,7 +20,7 @@
         # invalid kwargs
         @test_throws ErrorException solve(equations(cyclic(5)), def=0.4, abc=23)
 
-        # test numerical homogenous check fails
+        # test numerical homogeneous check fails
         @polyvar x y z
         G = FPSystem([x-2z, y^2+3z])
         @test_throws ErrorException solve(G, homvar=3)
@@ -58,7 +58,7 @@
         @polyvar w
         F = equations(cyclic(5))
         result = solve(homogenize(F, w), threading=false, homvar=w)
-        @test result isa AffineResult
+        @test result isa Result
 
         @polyvar x y z
 
@@ -76,18 +76,23 @@
 
 
         F = equations(katsura(5))
-        prob, startsolutions = problem_startsolutions(TotalDegreeInput(F))
+        result = solve(homogenize(F))
+        @test result isa Result{<:ProjectiveVectors.PVector}
+        @test isprojective(first(result))
+        @test nnonsingular(result) == 32
 
+
+        prob, startsolutions = problem_startsolutions(TotalDegreeInput(F))
         result = solve(prob.homotopy, map(startsolutions) do s
-            embed(prob, s).data
+            HC.embed(prob, s)
         end)
-        @test result isa ProjectiveResult
+        @test result isa Result{<:ProjectiveVectors.PVector}
         @test nnonsingular(result) == 32
 
         result = solve(prob.homotopy, map(startsolutions) do s
-            embed(prob, s).data
+            HC.embed(prob, s)
         end, homvar=homvars(prob)[1])
-        @test result isa AffineResult
+        @test result isa Result{<:Vector}
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
 
@@ -116,40 +121,18 @@
         @test seed(solve(G, F, [[2, -3]], seed=222)) == 222
     end
 
-    @testset "No Endgame" begin
-        F = equations(katsura(5))
-        # no endgame
-        @test nfinite(solve(F, endgame_start=0.0)) == 32
-
-        @test nfinite(solve(F, endgame_start=0.0, threading=false)) == 32
-    end
-
     @testset "Singular solutions" begin
         @polyvar x y z
         z = 1
         F = [x^2 + 2*y^2 + 2*im*y*z, (18 + 3*im)*x*y + 7*im*y^2 - (3 - 18*im)*x*z - 14*y*z - 7*im*z^2]
         result = solve(F)
         @test nsingular(result) == 3
-        @test all(r -> r.windingnumber == 3, singular(result))
+        @test all(r -> r.winding_number == 3, singular(result))
     end
 
-    @testset "Path Crossing" begin
-        # This tests that we indeed detect path crossings
-        F = equations(cyclic(6))
-        tracker, start_sols = pathtracker_startsolutions(F, accuracy=1e-3, max_corrector_iters=5, seed=123512)
-        tracked_paths = map(start_sols) do x
-            track(tracker, x, 1.0, 0.1)
-        end
-
-        crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-2)
-        @test length(crossed_path_indices) > 0
-
-        tracker, start_sols = pathtracker_startsolutions(F, seed=123512)
-        tracked_paths = map(start_sols) do x
-            track(tracker, x, 1.0, 0.1)
-        end
-        crossed_path_indices = HomotopyContinuation.check_crossed_paths(tracked_paths, 1e-5)
-        @test isempty(crossed_path_indices)
+    @testset "Path jumping" begin
+        result = solve(equations(katsura(5)); accuracy=1e-1, refinement_accuracy=1e-8, seed=39813)
+        @test nreal(result) == 16
     end
 
     @testset "Affine vs projective" begin
@@ -162,8 +145,8 @@
 
         @test length(F[1].solution) == 3
         @test length(G[1].solution) == 2
-        @test F[1].solution_type == :projective
-        @test G[1].solution_type == :affine
+        @test F[1].solution isa ProjectiveVectors.PVector
+        @test G[1].solution isa Vector
     end
 
     @testset "Parameter Homotopies" begin
@@ -179,7 +162,7 @@
         @polyvar x a y b z
         F = [x^2-a*z^2, x*y-(a-b)*z^2]
         S = solve(F, [[1.0, 1.0 + 0.0*im, 1.0]], parameters=[a, b], startparameters=[1, 0], targetparameters=[2, 4])
-        @test S isa ProjectiveResult
+        @test S isa Result{<:ProjectiveVectors.PVector}
         @test solution(S[1])[1:2] / solution(S[1])[3] ≈ [complex(√2), -complex(√2)]
         @test nnonsingular(S) == 1
 
@@ -226,6 +209,7 @@
     end
 
     @testset "Overdetermined" begin
+        Random.seed!(1234567)
         @polyvar x y z w
         a = [0.713865+0.345317im, 0.705182+0.455495im, 0.9815+0.922608im, 0.337617+0.508932im]
 
@@ -252,10 +236,10 @@
         s = first(solutions(solve([x^2+y^2+z^2 - 1; L₁])))
         tracker, starts = pathtracker_startsolutions([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s)
 
-        @test track(tracker, s).returncode == PathTrackerStatus.success
+        @test track(tracker, s).return_code == :success
     end
 
-    @testset "MultiHomogenous" begin
+    @testset "MultiHomogeneous" begin
         @polyvar x y u v
 
         f = [x*y - 6, x^2 - 5]

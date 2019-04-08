@@ -12,6 +12,7 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
+    import Parameters: @pack!, @unpack
     import DynamicPolynomials: @polyvar
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
@@ -24,7 +25,6 @@ module HomotopyContinuation
     export @polyvar
 
     include("utilities.jl")
-    include("parallel.jl")
     include("affine_patches.jl")
 
     include("systems_and_homotopies.jl")
@@ -32,15 +32,12 @@ module HomotopyContinuation
     include("problems.jl")
     include("totaldegree.jl")
 
-    include("returncodes.jl")
     include("newton.jl")
     include("predictors.jl")
     include("correctors.jl")
 
-    include("path_tracking.jl")
-    include("endgaming.jl")
-
-    include("solving.jl")
+    include("core_tracker.jl")
+    include("path_tracker.jl")
     include("solve.jl")
     include("monodromy.jl")
 

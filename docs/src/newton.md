@@ -6,6 +6,7 @@ For this we provide an interface to Newton's method.
 ```@docs
 newton
 NewtonResult
+NewtonReturnCode.codes
 ```
 
 For high performance applications we also provide an in-place version of Newton's method

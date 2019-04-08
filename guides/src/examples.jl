@@ -108,7 +108,7 @@ solve(F)
 
 # We find 16 solutions, which is the correct number of solutions for these type of systems.
 
-# But studying the problem we can see that the system has a multi-homogenous structure.
+# But studying the problem we can see that the system has a multi-homogeneous structure.
 # By considering the two variable groups {z₂, z₄} and {z₃, z₅} we can reduce the number
 # of paths to track.
 # There is the small helper function `bezout_number` to compute the maximal number of solutions

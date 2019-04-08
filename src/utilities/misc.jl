@@ -1,5 +1,14 @@
 export SymmetricGroup, infinity_norm, infinity_distance, fubini_study
 
+
+"""
+    unpack(a::Union{Nothing, T}, b::T)
+
+Returns `a` if it is not `nothing`, otherwise `b`.
+"""
+unpack(a::Union{Nothing, T}, b::T) where {T} = a === nothing ? b : a
+
+
 """
     SymmetricGroup(n)
 
@@ -54,6 +63,23 @@ macro deprecatekwarg(oldkw, newkw)
         end
     end
 end
+
+"""
+    invalid_keywords(kwargs, allowed)
+
+Look for invalid keywords in the `kwargs`.
+"""
+function invalid_kwargs(kwargs, allowed)
+    invalids = []
+    for kwarg in kwargs
+        kw = first(kwarg)
+        if !any(isequal(kw), allowed)
+            push!(invalids, kwarg)
+        end
+    end
+    invalids
+end
+
 
 """
     nthroot(x, n)
@@ -167,7 +193,7 @@ end
     isrealvector(v::AbstractVector, tol=1e-6)
 
 Check whether the 2-norm of the imaginary part of `v` is at most `tol`.
-."""
+"""
 isrealvector(z::AbstractVector{<:Real}, tol=1e-6) = true
 function isrealvector(z::AbstractVector{<:Complex}, tol=1e-6)
     total = zero(real(eltype(z)))
@@ -191,7 +217,28 @@ randseed(range=1_000:1_000_000) = rand(range)
 
 Compute the ∞-norm of `u-v`.
 """
-infinity_distance(u, v) = infinity_norm(u, v)
+function infinity_distance(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:Complex})
+    m = abs2(z₁[1] - z₂[1])
+    n₁, n₂ = length(z₁), length(z₂)
+    if n₁ ≠ n₂
+        return convert(typeof(m), Inf)
+    end
+    @inbounds for k=2:n₁
+        @fastmath m = max(m, abs2(z₁[k] - z₂[k]))
+    end
+    sqrt(m)
+end
+function infinity_distance(z₁::AbstractVector, z₂::AbstractVector)
+    m = abs(z₁[1] - z₂[1])
+    n₁, n₂ = length(z₁), length(z₂)
+    if n₁ ≠ n₂
+        return convert(typeof(m), Inf)
+    end
+    @inbounds for k=2:n₁
+        @fastmath m = max(m, abs(z₁[k] - z₂[k]))
+    end
+    m
+end
 
 """
 
@@ -212,44 +259,29 @@ function infinity_norm(z₁::AbstractVector{<:Complex}, z₂::AbstractVector{<:C
         return convert(typeof(m), Inf)
     end
     @inbounds for k=2:n₁
-        m = max(m, abs2(z₁[k] - z₂[k]))
+        @fastmath m = max(m, abs2(z₁[k] - z₂[k]))
     end
     sqrt(m)
 end
-unsafe_infinity_norm(v, w) = infinity_norm(v, w)
 
 
 """
-    fubini_study(x, y)
+    fubini_study(x::PVector, y::PVector)
 
 Computes the Fubini-Study distance between `x` and `y`.
 """
-fubini_study(x,y) = acos(min(1.0, abs(LinearAlgebra.dot(x,y))))
-
-"""
-    logabs(z)
-
-The log absolute map `log(abs(z))`.
-"""
-logabs(z::Complex) = 0.5 * log(abs2(z))
-logabs(x) = log(abs(x))
-
+function fubini_study(x::PVector{<:Number, 1}, y::PVector{<:Number, 1})
+    acos(min(1.0, abs(first(LinearAlgebra.dot(x,y)))))
+end
+function fubini_study(x::PVector{<:Number, M}, y::PVector{<:Number, M}) where {M}
+    sqrt(sum(abs2.(acos.(min.(1.0, abs.(LinearAlgebra.dot(x,y)))))))
+end
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
     # Therefore we artificially constrain the choices
     theta = rand() * 0.30 + 0.075 + (rand(Bool) ? 0.0 : 0.5)
     cis(2π * theta)
-end
-
-"""
-    filterkwargs(kwargs, allowed_kwargs)
-
-Remove all keyword arguments out of `kwargs` where the keyword is not contained
-in `allowed_kwargs`.
-"""
-function filterkwargs(kwargs, allowed_kwargs)
-    [kwarg for kwarg in kwargs if any(kw -> kw == first(kwarg), allowed_kwargs)]
 end
 
 """
@@ -319,6 +351,20 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::ComplexSegment) = o
 
 # Parallelization
 
+"""
+    single_thread_blas()
+
+We set the number of BLAS threads to 1 since we multithread by ourself.
+But even if we would not, the overhead of the threading is so large
+that the single threaded version is around two times faster (at least on Mac Julia v0.6.2).
+Returns the previous number of BLAS threads.
+"""
+function single_thread_blas()
+    nblas_threads = get_num_BLAS_threads()
+    set_num_BLAS_threads(1)
+    nblas_threads
+end
+
 set_num_BLAS_threads(n) = LinearAlgebra.BLAS.set_num_threads(n)
 get_num_BLAS_threads() = convert(Int, _get_num_BLAS_threads())
 # This is into 0.7 but we need it for 0.6 as well
@@ -342,4 +388,26 @@ const _get_num_BLAS_threads = function() # anonymous so it will be serialized wh
     end
 
     return nothing
+end
+
+"""
+
+    partition_work(unit_range, n_chunks)
+
+Partition a unit_range in `n_chunks` equally sized chunks.
+"""
+partition_work(arg, n_chunks) = partition_work!(Vector{UnitRange{Int}}(undef, n_chunks), arg, n_chunks)
+function partition_work!(dst, R::UnitRange, n_chunks)
+    max_elems_per_chunk = ceil(Int, length(R) / n_chunks)
+    a = R.start
+    for i in 1:n_chunks
+        if i == 1
+            a = R.start
+        else
+            a = dst[i - 1].stop + 1
+        end
+        b = min(a + max_elems_per_chunk - 1, R.stop)
+        dst[i] = a:b
+    end
+    dst
 end

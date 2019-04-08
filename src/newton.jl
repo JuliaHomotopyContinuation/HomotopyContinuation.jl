@@ -1,17 +1,37 @@
-export NewtonResult, newton, newton!, NewtonCache
+export NewtonResult, newton, newton!, NewtonCache, NewtonReturnCode
+
+
+module NewtonReturnCode
+    @doc """
+        NewtonReturnCode.codes
+
+    The possible return codes of Newton's method
+
+    * `NewtonReturnCode.converged`
+    * `NewtonReturnCode.terminated`
+    * `NewtonReturnCode.terminated_no_approximate`
+    * `NewtonReturnCode.maximal_iterations`
+    """
+    @enum codes begin
+        converged
+        terminated
+        terminated_no_approximate
+        maximal_iterations
+    end
+end
 
 
 """
     NewtonResult{T}
 
 Structure holding information about the outcome of the `newton` function. The fields are.
-* `retcode` The return code of the compuation. `converged` means that `accuracy ≤ tol`.
-* `accuracy::T` |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.
-* `iters::Int` The number of iterations used.
+* `return_code::NewtonReturnCode.codes`: The return code of computation. `NewtonReturnCode.converged` means that `accuracy ≤ tol`.
+* `accuracy::T`: |xᵢ-xᵢ₋₁| for i = iters and x₀,x₁,…,xᵢ₋₁,xᵢ are the Newton iterates.
+* `iters::Int`: The number of iterations used.
 * `digits_lost::Float64` Estimate of the (relative) lost digits in the linear algebra.
 """
 struct NewtonResult{T}
-    retcode::ReturnCode
+    return_code::NewtonReturnCode.codes
     accuracy::T
     iters::Int
     digits_lost::Float64
@@ -29,7 +49,7 @@ Base.show(io::IO, result::NewtonResult) = print_fieldnames(io, result)
 
 Returns whether the correction was successfull.
 """
-isconverged(result::NewtonResult) = result.retcode == converged
+isconverged(result::NewtonResult) = result.return_code == NewtonReturnCode.converged
 
 
 """
@@ -110,7 +130,7 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
             if norm_Δx₀ ≤ tol && i + 1 ≥ miniters
-                return NewtonResult(converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
         else
@@ -123,15 +143,15 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
             end
 
             if Θᵢ₋₁ > 0.5
-                return NewtonResult(terminated, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.terminated, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
             if accuracy ≤ tol && i + 1 ≥ miniters
-                return NewtonResult(converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
             end
         end
     end
 
-    return NewtonResult(maximal_iterations, accuracy, maxiters, digits_lost, ω₀, ω, norm_Δx₀)
+    return NewtonResult(NewtonReturnCode.maximal_iterations, accuracy, maxiters, digits_lost, ω₀, ω, norm_Δx₀)
 end

@@ -20,5 +20,5 @@ If instead of unique points, the user wants to have the information which points
 ```@docs
 multiplicities
 ```
-The `multiplicities` functions may also be applied to [`AffineResult`](@ref) and [`ProjectiveResult`](@ref) structures; see here:
+The `multiplicities` functions may also be applied to [`Result`](@ref); see here:
 [`multiplicities(::HomotopyContinuation.Results)`](@ref).
