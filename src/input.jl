@@ -7,7 +7,7 @@ export AbstractInput,
 const Inputs = Union{<:AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
-const input_supported_keywords = [:parameters, :startparameters, :targetparameters,
+const input_supported_keywords = [:parameters, :generic_parameters, :startparameters, :targetparameters,
                             :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
 
 
@@ -87,7 +87,7 @@ end
 Construct an `AbstractInput`.
 """
 function input(F::MPPolyInputs; parameters=nothing, kwargs...)
-    # if parameters === nothing this is actually the
+    # if parameters !== nothing this is actually the
     # input constructor for a parameter homotopy, but no startsolutions
     # are provided
     if parameters !== nothing
@@ -121,17 +121,23 @@ function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     StartTargetInput(G, F, startsolutions)
 end
 
-function input(F::Inputs, startsolutions;
+
+# need
+input(F::MPPolyInputs, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
+input(F::AbstractSystem, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
+
+function parameter_homotopy(F::Inputs, startsolutions;
     parameters=(isa(F, AbstractSystem) ? nothing : error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))),
-    startparameters=nothing, p₁ = startparameters,
-    targetparameters=nothing, p₀ = targetparameters,
+    generic_parameters=nothing,
+    startparameters=generic_parameters, p₁ = startparameters,
+    targetparameters=generic_parameters, p₀ = targetparameters,
     startgamma=nothing, γ₁ = startgamma,
     targetgamma=nothing, γ₀ = targetgamma)
 
     if p₁ === nothing
-        error("!`startparameters=` or `p₁=` need to be passed as argument")
+        error("You need to pass `generic_parameters=`, `startparameters=` or `p₁=` as a keyword argument")
     elseif p₀ === nothing
-        error("!`targetparameters=` or `p₀=` need to be passed as argument")
+        error("`targetparameters=` or `p₀=` need to be passed as a keyword argument.")
     end
 
     if length(p₁) != length(p₀) || (parameters !== nothing && length(parameters) != length(p₀))

@@ -128,6 +128,14 @@ end
                         target_solutions_count=7,
                         maximal_number_of_iterations_without_progress=200)
         @test length(result.solutions) == 7
+
+        # AbstractSystem as input
+        F_p = SPSystem(F; parameters=p)
+        result = monodromy_solve(F_p, x₀, p₀, affine_tracking=true,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        maximal_number_of_iterations_without_progress=200)
+        @test length(result.solutions) == 7
     end
 
     @testset "Method of Moments" begin
