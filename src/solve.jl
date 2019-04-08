@@ -1,4 +1,4 @@
-export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal,
+export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal, ntracked,
     finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
     solutions, realsolutions, multiplicities, uniquesolutions, statistics
 
@@ -155,20 +155,24 @@ Endgame specific options:
 """
 function solve end
 
-function solve(args...; threading=true, report_progress=true, kwargs...)
-    tracker, start_solutions = pathtracker_startsolutions(args...; kwargs...)
-    solve(tracker, start_solutions; threading=threading, report_progress=report_progress)
+const solve_supported_keywords = [:threading, :report_progress, :path_result_details, :save_all_paths]
+
+function solve(args...; kwargs...)
+    solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
+    tracker, start_solutions = pathtracker_startsolutions(args...; rest...)
+    solve(tracker, start_solutions; solve_kwargs...)
 end
 
-function solve(tracker::PathTracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default)
-    results = Vector{result_type(tracker)}(undef, length(start_solutions))
-    track_paths!(results, tracker, start_solutions, threading, report_progress, path_result_details)
-    path_jumping_check!(results, tracker, path_result_details)
-    Result(results, tracker.problem.seed)
+function solve(tracker::PathTracker, start_solutions; path_result_details=:default, save_all_paths=false, kwargs...)
+    results = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
+    path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
+    Result(results, length(start_solutions), tracker.problem.seed)
 end
 
-function track_paths!(results, tracker, start_solutions, threading, report_progress, path_result_details)
-    n = length(results)
+
+function track_paths(tracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default, save_all_paths=false)
+    results = Vector{result_type(tracker)}()
+    n = length(start_solutions)
 
     if report_progress
         progress = ProgressMeter.Progress(n, 0.1, "Tracking $n paths... ")
@@ -182,22 +186,28 @@ function track_paths!(results, tracker, start_solutions, threading, report_progr
         # to support indexing
         S = collect(start_solutions)
 
-        batch_size = 32 * nthreads
-        ranges = partition_work(1:min(batch_size, n), nthreads)
-        trackers = Threads.resize_nthreads!([tracker])
-        batch_tracker = BatchTracker(results, trackers, ranges, S, path_result_details)
-
+        chunk_size = 32
+        batch_tracker = BatchTracker(tracker, S, chunk_size, path_result_details, save_all_paths)
         k = 1
         while k ≤ n
-            partition_work!(batch_tracker.ranges, k:min(k+batch_size-1, n), nthreads)
+            prepare_batch!(batch_tracker, k)
             ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
-            k += batch_size
+
+            for R in batch_tracker.results, i in 1:chunk_size
+                R[i] !== nothing && push!(results, R[i])
+                R[i] = nothing
+            end
+            k += batch_tracker.batch_size
+
             update_progress!(progress, results, min(k - 1, n))
         end
     else
         for (k, s) in enumerate(start_solutions)
-            results[k] = track(tracker, s, 1.0; path_number=k, details=path_result_details)
-            k % 16 == 0 && update_progress!(progress, results, k)
+            return_code = track!(tracker, s, 1.0)
+            if save_all_paths || return_code == PathTrackerStatus.success
+                push!(results, PathResult(tracker, s, k; details=path_result_details))
+            end
+            k % 32 == 0 && update_progress!(progress, results, k)
         end
     end
     results
@@ -210,23 +220,49 @@ end
 update_progress!(::Nothing, results, N) = nothing
 
 mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
-    results::Vector{R}
+    results::Vector{Vector{Union{Nothing, R}}}
     trackers::Vector{Tracker}
     ranges::Vector{UnitRange{Int}}
     start_solutions::V
     details::Symbol
+    all_paths::Bool
+    batch_size::Int
+end
+
+function BatchTracker(tracker::PathTracker, start_solutions, chunk_size::Int, path_result_details::Symbol, save_all_paths::Bool)
+    n = length(start_solutions)
+    batch_size = chunk_size * Threads.nthreads()
+    batch_results = Threads.resize_nthreads!([Vector{Union{Nothing, result_type(tracker)}}(undef, chunk_size)])
+    for R in batch_results
+        R .= nothing
+    end
+
+    trackers = Threads.resize_nthreads!([tracker])
+    ranges = partition_work(1:min(batch_size, n), Threads.nthreads())
+    BatchTracker(batch_results, trackers, ranges, start_solutions, path_result_details, save_all_paths, batch_size)
+end
+
+function prepare_batch!(batch_tracker::BatchTracker, k::Int)
+    n = length(batch_tracker.start_solutions)
+    nthreads = length(batch_tracker.trackers)
+    partition_work!(batch_tracker.ranges, k:min(k+batch_tracker.batch_size-1, n), nthreads)
 end
 
 function (batch::BatchTracker)()
     tid = Threads.threadid()
-    track_batch!(batch.results, batch.trackers[tid],
-                 batch.ranges[tid], batch.start_solutions, batch.details)
+    track_batch!(batch.results[tid], batch.trackers[tid],
+                 batch.ranges[tid], batch.start_solutions, batch.details, batch.all_paths)
 end
-function track_batch!(results, pathtracker, range, starts, details)
-    for k in range
-        results[k] = track(pathtracker, starts[k], 1.0; path_number=k, details=details)
+function track_batch!(results, pathtracker, range, starts, details, all_paths)
+    for (i, k) in enumerate(range)
+        return_code = track!(pathtracker, starts[k], 1.0)
+        if all_paths || return_code == PathTrackerStatus.success
+            results[i] = PathResult(pathtracker, starts[k], k; details=details)
+        else
+            results[i] = nothing
+        end
     end
-    results
+    nothing
 end
 
 """
@@ -234,13 +270,18 @@ end
 
 Try to detect path jumping by comparing the winding numbers of finite results.
 """
-function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details::Symbol)
-    finite_results_indices = Int[]
-    finite_results = Vector{eltype(results)}()
-    for (i, r) in enumerate(results)
-        if isfinite(r)
-            push!(finite_results, r)
-            push!(finite_results_indices, i)
+function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details::Symbol; finite_results_only=false)
+    if finite_results_only
+        finite_results_indices = collect(1:length(results))
+        finite_results = results
+    else
+        finite_results_indices = Int[]
+        finite_results = Vector{eltype(results)}()
+        for (i, r) in enumerate(results)
+            if isfinite(r)
+                push!(finite_results, r)
+                push!(finite_results_indices, i)
+            end
         end
     end
     tol = tracker.core_tracker.options.refinement_accuracy
@@ -288,6 +329,7 @@ a random seed to replicate the result.
 """
 struct Result{V}
     pathresults::Vector{PathResult{V}}
+    tracked_paths::Int
     seed::Int
 end
 
@@ -363,7 +405,7 @@ function statistics(R::Results, onlyreal=false, realtol=1e-6,
     real = real_nonsingular + real_singular,
     atinfinity = atinfinity,
     failed = failed,
-    total = length(R))
+    total = R.tracked_paths)
 end
 
 """
@@ -410,6 +452,13 @@ are smaller than `tol`.
 """
 nreal(R::Results; tol = 1e-6) = count(r -> isreal(r, tol), R)
 
+
+"""
+    ntracked(R::Result)
+
+Returns the total number of paths tracked.
+"""
+ntracked(R::Result) = R.tracked_paths
 
 """
     seed(result)
@@ -608,22 +657,27 @@ end
 
 function Base.show(io::IO, x::Result)
     s = statistics(x)
-    println(io, "Result with $(length(x)) tracked paths")
+    println(io, "Result with $(s.nonsingular + s.singular) solutions")
     println(io, "==================================")
     println(io, "• $(s.nonsingular) non-singular finite $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
     println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
-    println(io, "• $(s.atinfinity) $(plural("solution", s.atinfinity)) at infinity")
-    println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    s.atinfinity > 0 &&
+        println(io, "• $(s.atinfinity) $(plural("solution", s.atinfinity)) at infinity")
+    s.failed > 0 &&
+        println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
 end
 
 function Base.show(io::IO, x::ProjectiveResult)
     s = statistics(x)
-    println(io, "Result with $(length(x)) tracked paths")
+    println(io, "Result with $(s.nonsingular + s.singular) solutions")
     println(io, "==================================")
     println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
     println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
-    println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    s.failed > 0 &&
+        println(io, "• $(s.failed) failed $(plural("path", s.failed))")
+    println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
 end
 
@@ -656,7 +710,7 @@ end
 function TreeViews.treenode(r::Result, i::Integer)
     s = statistics(r)
     if i == 1
-        return length(r)
+        return ntracked(r)
     elseif i == 2 && s.nonsingular > 0
         return finite(r, onlynonsingular=true)
     elseif i == 3 && s.singular > 0
