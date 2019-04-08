@@ -131,7 +131,7 @@
     end
 
     @testset "Path jumping" begin
-        result = solve(equations(katsura(5)); accuracy=1e-1, refinement_accuracy=1e-8, seed=39813)
+        result = solve(equations(katsura(5)); accuracy=1e-2, refinement_accuracy=1e-8, seed=39813, threading=false)
         @test nreal(result) == 16
     end
 
@@ -277,5 +277,11 @@
 
         @test nnonsingular(solve(F, seed=1234)) == 16
         @test nnonsingular(solve(F; variable_groups=group1, seed=1234)) == 16
+    end
+
+    @testset "Affine TotalDegree" begin
+        result = solve(equations(cyclic(5)), affine_tracking=true, seed=12314)
+        @test nnonsingular(result) == 70
+        @test nsingular(result) == 0
     end
 end

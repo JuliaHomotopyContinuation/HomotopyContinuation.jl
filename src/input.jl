@@ -146,7 +146,6 @@ function input(F::MPPolyInputs, startsolutions;
 end
 
 function input(H::AbstractHomotopy, startsolutions)
-    check_homogeneous_degrees(FixedHomotopy(H, rand()))
     if isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end

@@ -183,12 +183,15 @@ struct PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTrack
     cache::PathTrackerCache{T, V}
 end
 
-function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_infinity_check=homvars(problem) !== nothing, optionskwargs...)
+function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_infinity_check=default_at_infinity_check(problem), optionskwargs...)
     state = PathTrackerState(core_tracker.state.x)
     options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
     cache = PathTrackerCache(core_tracker)
     PathTracker(problem, core_tracker, state, options, cache)
 end
+
+default_at_infinity_check(prob::AffineProblem) = true
+default_at_infinity_check(prob::ProjectiveProblem) = homvars(prob) !== nothing
 
 """
     track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states

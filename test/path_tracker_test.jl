@@ -17,25 +17,47 @@
         F = [x^2-a, x*y-a+b]
         p = [a, b]
 
-        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
-
+        # parameter homotopy
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
+        @test tracker.problem isa AffineProblem
         @test affine_tracking(tracker.core_tracker) == true
         @test HC.type_of_x(tracker) == Vector{ComplexF64}
         res = track(tracker, [1, 1])
         @test res.return_code == :success
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
-        @test isprojective(res) == false
+        @test !isprojective(res)
         @test isaffine(res)
 
         x = @SVector [1.0, 1.0 + 0.0*im]
         tracker, starts = pathtracker_startsolutions(F, x;
-                                parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
+                                parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
+        @test tracker.problem isa AffineProblem
         @test length(starts) == 1
         res = track(tracker, starts[1])
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
 
+        # start target homotopy
+        F₁ = subs.(F, Ref([a, b] => [1, 0]))
+        F₀ = subs.(F, Ref([a, b] => [2, 4]))
+        tracker = pathtracker(F₁, F₀, affine_tracking=true)
+        @test tracker.problem isa AffineProblem
+        res = track(tracker, [1, 1])
+        @test res.return_code == :success
+        @test isa(solution(res), Vector{ComplexF64})
+        @test length(solution(res)) == 2
+        @test !isprojective(res)
+        @test isaffine(res)
+
+        # total degree
+        tracker, starts = pathtracker_startsolutions(equations(katsura(5)), affine_tracking=true)
+        res = track(tracker, first(starts))
+        @test res.return_code == :success
+        @test isa(solution(res), Vector{ComplexF64})
+        @test length(solution(res)) == 6
+        @test !isprojective(res)
+        @test isaffine(res)
     end
 
     @testset "Details Level" begin
@@ -43,7 +65,7 @@
         F = [x^2-a, x*y-a+b]
         p = [a, b]
 
-        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine=true)
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
 
         res = track(tracker, [1, 1]; details=:minimal)
         test_show_juno(res)

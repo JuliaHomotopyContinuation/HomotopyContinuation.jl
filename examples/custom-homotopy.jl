@@ -1,4 +1,4 @@
-using HomotopyContinuation
+using HomotopyContinuation, ProjectiveVectors
 using LinearAlgebra
 
 struct RandomUnitaryPath{Start<:AbstractSystem,Target<:AbstractSystem} <: HomotopyContinuation.AbstractHomotopy
@@ -9,7 +9,7 @@ end
 function RandomUnitaryPath(start::AbstractSystem, target::AbstractSystem)
     m, n = size(start)
     # construct a random unitary matrix
-    U = qr(randn(n,n) + im * randn(n,n))[1]
+    U = copy(qr(randn(n,n) + im * randn(n,n)).Q)
     RandomUnitaryPath(HomotopyContinuation.StraightLineHomotopy(start, target), U)
 end
 
@@ -17,19 +17,21 @@ end
 Base.size(H::RandomUnitaryPath) = size(H.straightline)
 
 # Cache for efficient evaluation
-struct RandomUnitaryPathCache{C, T1, T2} <: HomotopyContinuation.AbstractHomotopyCache
+struct RandomUnitaryPathCache{C, T2} <: HomotopyContinuation.AbstractHomotopyCache
     straightline::C
     U_t::Matrix{ComplexF64}
-    y::Vector{T1}
+    y::PVector{ComplexF64,1}
     # More temporary storage necessary to avoid allocations
     jac::Matrix{T2} # holds a jacobian
     dt::Vector{T2} # holds a derivative w.r.t. t
     U::Matrix{ComplexF64} # holds something like U
 end
 
-function HomotopyContinuation.cache(H::RandomUnitaryPath, x, t)
+function HomotopyContinuation.cache(H::RandomUnitaryPath, x, t) where T
     U_t = copy(H.U)
-    y = U_t * x
+    # y = U_t * x
+    y = PVector(zeros(ComplexF64, size(U_t, 1)))
+
     straightline = HomotopyContinuation.cache(H.straightline, y, t)
 
     jac = HomotopyContinuation.jacobian(H.straightline, y, t, straightline)
@@ -119,8 +121,8 @@ end
 
 F = SPSystem([x^2*y-3x*z, z^2*x+3y^2])
 G = SPSystem([z*x^2-3x*y^2, z^3*x-2x*y*z^2])
-InterfaceTest.homotopy(RandomUnitaryPath(G, F))
-
+HomotopyContinuation.homotopy_interface_test(RandomUnitaryPath(G, F))
 
 # And now we can solve systems with our custom homotopy
-solve([x^2 - y, y^3*x-x], homotopy=RandomUnitaryPath)
+
+solve([x^2 - y, y^3*x-x], homotopy=RandomUnitaryPath, save_all_paths=true, threading=false)

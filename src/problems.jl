@@ -1,9 +1,9 @@
-export AbstractProblem, ProjectiveProblem, homotopy, homogenization, embed, homvars,
+export AbstractProblem, AffineProblem, ProjectiveProblem, homotopy, homogenization, embed, homvars,
 	problem_startsolutions
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine];
+	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine_tracking];
 	input_supported_keywords]
 
 
@@ -50,10 +50,18 @@ struct AffineProblem{H<:AbstractHomotopy, T} <: AbstractProblem
     homotopy::H
     vargroups::VariableGroups{1, false, T}
     seed::Int
+
+	function AffineProblem(homotopy::H,
+				vargroups::VariableGroups{1, false, T}, seed::Int;
+				startsolutions_need_reordering=false) where {H<:AbstractHomotopy, T}
+		!startsolutions_need_reordering || error("Affine problem doesn't support reodering.")
+		new{H,T}(homotopy, vargroups, seed)
+	end
 end
 function AffineProblem(G::AbstractSystem, F::AbstractSystem,
-        vargroups::VariableGroups{1, false}, seed::Int; homotopy=DEFAULT_HOMOTOPY)
-    AffineProblem(homotopy(G, F), vargroups, seed)
+        vargroups::VariableGroups{1, false}, seed::Int;
+		homotopy=DEFAULT_HOMOTOPY, kwargs...)
+    AffineProblem(homotopy(G, F), vargroups, seed; kwargs...)
 end
 
 """
@@ -98,7 +106,7 @@ embed(prob::AffineProblem, v::AbstractVector) = v
 """
     pull_back(prob::ProjectiveProblem, x)
 
-Pull the solution `x` into affine space if necessary. Creates a copy.
+Pull the solution `x` into affine_tracking space if necessary. Creates a copy.
 """
 pull_back(prob::ProjectiveProblem, x::PVector) = pull_back(prob.vargroups, x)
 pull_back(prob::AffineProblem, x::AbstractVector) = copy(x)
@@ -145,8 +153,13 @@ function problem_startsolutions(input::AbstractInput, seed;
     problem_startsolutions(input, homvar_info, seed; kwargs...)
 end
 
-function problem_startsolutions(input::HomotopyInput, homvar, seed; kwargs...)
-    ProjectiveProblem(input.H, VariableGroups(size(input.H)[2], homvar), seed), input.startsolutions
+function problem_startsolutions(input::HomotopyInput, homvar, seed; affine_tracking=false, kwargs...)
+	if !affine_tracking
+		check_homogeneous_degrees(FixedHomotopy(input.H, rand()))
+    	ProjectiveProblem(input.H, VariableGroups(size(input.H)[2], homvar), seed), input.startsolutions
+	else
+		AffineProblem(input.H, VariableGroups(size(input.H)[2]), seed), input.startsolutions
+	end
 end
 
 
@@ -155,29 +168,36 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_info, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
-    F, vargroups, homvars = homogenize_if_necessary(prob.system, homvar_info)
-	variables = flattened_variable_groups(vargroups)
-	target_constructor = f -> begin
-		construct_system(f, system; variables=variables, homvars=homvars)
+function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_info, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+	if affine_tracking
+		vargroups = VariableGroups(variables(prob.system))
+		homvars = nothing
+		F = prob.system
+	else
+		F, vargroups, homvars = homogenize_if_necessary(prob.system, homvar_info)
 	end
+	vars = flattened_variable_groups(vargroups)
+	target_constructor(f) = construct_system(f, system; variables=vars, homvars=homvars)
 
-	check_square_homogeneous_system(F, vargroups)
+	check_square_system(F, vargroups; affine_tracking=affine_tracking)
 
 	if ngroups(vargroups) == 1
 		degrees = maxdegrees(F)
+
 		# Scale systems
 		if system_scaling
-			G = homogeneous_totaldegree_polysystem(degrees, variables, vargroups)
+			G = totaldegree_polysystem(degrees, vars, vargroups; affine_tracking=affine_tracking)
 			_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
-			g = TotalDegreeSystem(degrees, G_scaling_factors)
-			problem = ProjectiveProblem(g, target_constructor(f), vargroups, seed; kwargs...)
+			g = TotalDegreeSystem(degrees, G_scaling_factors; affine=affine_tracking)
 		else
-			g = TotalDegreeSystem(degrees)
-			problem = ProjectiveProblem(g, target_constructor(F), vargroups, seed; kwargs...)
+			g, f = TotalDegreeSystem(degrees; affine=affine_tracking), F
 		end
+		Prob = affine_tracking ? AffineProblem : ProjectiveProblem
+		problem = Prob(g, target_constructor(f), vargroups, seed; kwargs...)
 	# Multihomogeneous
 	else
+		affine_tracking && error("Affine tracking is currently not supported for variable groups.")
+
 		D = multidegrees(F, vargroups)
 		C = multi_bezout_coefficients(D, projective_dims(vargroups))
 		if system_scaling
@@ -197,11 +217,11 @@ function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, homvar_i
 	problem, startsolutions
 end
 
-function homogeneous_totaldegree_polysystem(degrees, variables, variable_groups::VariableGroups{1})
+function totaldegree_polysystem(degrees, variables, variable_groups::VariableGroups{1}; affine_tracking=false)
 	vars = variables[variable_groups.groups[1]]
 	map(1:length(degrees)) do i
 		d = degrees[i]
-		vars[i]^d - vars[end]^d
+		affine_tracking ? vars[i]^d - 1 : vars[i]^d - vars[end]^d
 	end
 end
 
@@ -241,11 +261,11 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(prob::StartTargetInput, homvar, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
     F, G = prob.target, prob.start
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
-    if F_ishom && G_ishom
+    if !affine_tracking && F_ishom && G_ishom
 		vargroups = VariableGroups(vars, homvar)
 		if system_scaling
 			g, f = scale_systems(G, F)
@@ -257,10 +277,10 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_sca
         ProjectiveProblem(Ḡ, F̄, vargroups, seed; startsolutions_need_reordering=true, kwargs...), prob.startsolutions
     elseif F_ishom || G_ishom
         error("One of the input polynomials is homogeneous and the other not!")
-    else
-        if homvar !== nothing
-            error("Input system is not homogeneous although `homvar` was passed.")
-        end
+	elseif affine_tracking && F_ishom && G_ishom
+		error("Both of the input systems are homogenous but `affine_tracking=true` was passed.")
+    elseif !affine_tracking
+        homvar === nothing || error("Input system is not homogeneous although `homvar` was passed.")
 
 		h = uniquevar(F)
         push!(vars, h)
@@ -270,10 +290,14 @@ function problem_startsolutions(prob::StartTargetInput, homvar, seed; system_sca
 		else
 			g, f = homogenize(G, h), homogenize(F, h)
 		end
-        F̄ = construct_system(f, system, variables=vars, homvars=homvar)
-		Ḡ = construct_system(g, system, variables=vars, homvars=homvar)
+        F̄ = construct_system(f, system; variables=vars, homvars=homvar)
+		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
 		vargroups = VariableGroups(vars, h)
         ProjectiveProblem(Ḡ, F̄, vargroups, seed; startsolutions_need_reordering=true, kwargs...), prob.startsolutions
+	else # affine_tracking
+		F̂ = construct_system(F, system; variables=vars)
+		Ĝ = construct_system(G, system; variables=vars)
+		AffineProblem(Ĝ, F̂, VariableGroups(vars), seed; kwargs...), prob.startsolutions
     end
 end
 
@@ -281,20 +305,17 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affine=false, system=SPSystem, kwargs...)
-	if affine
-		vars = variables(prob.system; parameters=prob.parameters)
-		variable_groups = VariableGroups(vars)
-		F = construct_system(prob.system, system; variables=vars, parameters=prob.parameters)
-	    H = ParameterHomotopy(F, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
-
-	    AffineProblem(H, variable_groups, seed), prob.startsolutions
+function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
+	Prob = affine_tracking ? AffineProblem : ProjectiveProblem
+	if affine_tracking
+		variable_groups = VariableGroups(variables(prob.system; parameters=prob.parameters))
+		homvars = nothing
+		F = prob.system
 	else
-	    F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
-		vars = flattened_variable_groups(variable_groups)
-		F̄ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
-	    H = ParameterHomotopy(F̄, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
-
-	    ProjectiveProblem(H, variable_groups, seed; startsolutions_need_reordering=true), prob.startsolutions
+		F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
 	end
+	vars = flattened_variable_groups(variable_groups)
+	F̂ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
+	H = ParameterHomotopy(F̂, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+	Prob(H, variable_groups, seed; startsolutions_need_reordering=!affine_tracking), prob.startsolutions
 end

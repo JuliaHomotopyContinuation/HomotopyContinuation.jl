@@ -26,7 +26,7 @@ const HNC = HomotopyNullCache
 Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
 of `x`. The default implementation returns [`HomotopyNullCache`](@ref).
 """
-cache(H::AbstractHomotopy, x, t) = NullCache()
+cache(H::AbstractHomotopy, x, t) = HomotopyNullCache()
 
 
 # Homotopy API
