@@ -90,6 +90,11 @@
         res = track(tracker, starts[1])
         @test res.return_code == :success
 
+        # affine without explicit flag (numerical degree check fails)
+        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im], p₁=[1, 0], p₀=[2, 4])
+        res = track(tracker, starts[1])
+        @test res.return_code == :success
+
         # projective
         @polyvar x y z a b
         F = SPSystem([x^2-a*z^2, x*y-a*z^2+b*z^2]; parameters=[a, b])

@@ -320,10 +320,17 @@ function problem_startsolutions(prob::ParameterSystemInput{<:MPPolyInputs}, homi
 	Prob(H, variable_groups, seed; startsolutions_need_reordering=!affine_tracking), prob.startsolutions
 end
 
-function problem_startsolutions(prob::ParameterSystemInput{<:AbstractSystem}, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
+function problem_startsolutions(prob::ParameterSystemInput{<:AbstractSystem}, hominfo, seed; affine_tracking=nothing, system=SPSystem, kwargs...)
 	n, N = size(prob.system)
 	H = ParameterHomotopy(prob.system, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 	variable_groups = VariableGroups(N, hominfo)
+
+	# We do not set affine tracking here, to handle the case that the input system
+	# is not homogenous.
+	if affine_tracking === nothing
+	   affine_tracking = compute_numerically_degrees(FixedHomotopy(H, rand())) === nothing
+   end
+
 	if affine_tracking
 		AffineProblem(H, variable_groups, seed; startsolutions_need_reordering=false), prob.startsolutions
 	else
