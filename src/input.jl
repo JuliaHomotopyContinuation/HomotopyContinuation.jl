@@ -67,12 +67,12 @@ end
 
 Construct a `ParameterSystemInput`.
 """
-struct ParameterSystemInput{P<:MPPolyInputs, V<:MP.AbstractVariable} <: AbstractInput
-    system::P
-    parameters::Vector{V}
+struct ParameterSystemInput{S<:Inputs} <: AbstractInput
+    system::S
+    parameters::Union{Nothing, Vector{<:MP.AbstractVariable}}
     p₁::AbstractVector
     p₀::AbstractVector
-    startsolutions::AbstractVector
+    startsolutions
     γ₁::Union{Nothing, ComplexF64}
     γ₀::Union{Nothing, ComplexF64}
 end
@@ -121,8 +121,8 @@ function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     StartTargetInput(G, F, startsolutions)
 end
 
-function input(F::MPPolyInputs, startsolutions;
-    parameters::Vector{<:MP.AbstractVariable}=error("parameters not defined"),
+function input(F::Inputs, startsolutions;
+    parameters=(isa(F, AbstractSystem) ? nothing : error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))),
     startparameters=nothing, p₁ = startparameters,
     targetparameters=nothing, p₀ = targetparameters,
     startgamma=nothing, γ₁ = startgamma,
@@ -134,10 +134,10 @@ function input(F::MPPolyInputs, startsolutions;
         error("!`targetparameters=` or `p₀=` need to be passed as argument")
     end
 
-    if !(length(parameters) == length(p₁) == length(p₀))
+    if length(p₁) != length(p₀) || (parameters !== nothing && length(parameters) != length(p₀))
         error("Number of parameters doesn't match!")
     end
-    if startsolutions === nothing
+    if startsolutions === nothing && parameters !== nothing
         startsolutions = [randn(ComplexF64, nvariables(F, parameters=parameters))]
     elseif isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]

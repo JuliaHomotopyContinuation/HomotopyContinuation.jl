@@ -305,7 +305,7 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
+function problem_startsolutions(prob::ParameterSystemInput{<:MPPolyInputs}, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
 	Prob = affine_tracking ? AffineProblem : ProjectiveProblem
 	if affine_tracking
 		variable_groups = VariableGroups(variables(prob.system; parameters=prob.parameters))
@@ -318,4 +318,15 @@ function problem_startsolutions(prob::ParameterSystemInput, hominfo, seed; affin
 	F̂ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
 	H = ParameterHomotopy(F̂, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
 	Prob(H, variable_groups, seed; startsolutions_need_reordering=!affine_tracking), prob.startsolutions
+end
+
+function problem_startsolutions(prob::ParameterSystemInput{<:AbstractSystem}, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
+	n, N = size(prob.system)
+	H = ParameterHomotopy(prob.system, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+	variable_groups = VariableGroups(N, hominfo)
+	if affine_tracking
+		AffineProblem(H, variable_groups, seed; startsolutions_need_reordering=false), prob.startsolutions
+	else
+    	ProjectiveProblem(H, variable_groups, seed; startsolutions_need_reordering=false), prob.startsolutions
+	end
 end

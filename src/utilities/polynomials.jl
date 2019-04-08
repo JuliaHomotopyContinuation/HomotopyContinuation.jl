@@ -542,15 +542,13 @@ multidegrees(F, VG::VariableGroups) = multidegrees(F, variable_groups(VG))
 
 
 """
-    check_homogeneous_degrees(F::AbstractSystem)
+    compute_numerically_degrees(F::AbstractSystem)
 
-Compute (numerically) the degrees of `F` and verify that `F` is homogeneous,
+This tries to compute numerically the degrees of `F`. If successfull
+this returns a vector containing the degrees. If not `nothign` is returned.
 """
-function check_homogeneous_degrees(F)
+function compute_numerically_degrees(F)
     n, N = size(F)
-    if n < N - 1
-        error("Input system is not homogeneous! It has $n polynomials in $N variables according to `size`.")
-    end
     # The number of variables match, but it still cannot be homogeneous.
     # We evaluate the system with y:=rand(N) and 2y. If homogeneous then the output
     # scales accordingly to the degrees which we can obtain by taking logarithms.
@@ -560,16 +558,30 @@ function check_homogeneous_degrees(F)
     LinearAlgebra.rmul!(x, 2)
     y2 = evaluate(F, x, system_cache)
 
-    degrees = map(y2, y) do y2ᵢ, yᵢ
+    degrees = Int[]
+	for (y2ᵢ, yᵢ) in zip(y2, y)
         # y2ᵢ = 2^dᵢ yᵢ
         float_dᵢ = log2(abs(y2ᵢ / yᵢ))
         dᵢ = round(Int, float_dᵢ)
         if abs(dᵢ - float_dᵢ) > 1e-10
-            error("Input system is not homogeneous by our numerical check.")
+			return nothing
         end
-        dᵢ
+        push!(degrees, dᵢ)
     end
     degrees
+end
+
+"""
+	check_homogeneous_degrees(F::AbstractSystem)
+
+Compute (numerically) the degrees of `F` and verify that `F` is homogeneous.
+"""
+function check_homogeneous_degrees(F)
+	degs = compute_numerically_degrees(F)
+	if degs === nothing
+		error("Input system is not homogeneous by our numerical check.")
+	end
+	degs
 end
 
 """
