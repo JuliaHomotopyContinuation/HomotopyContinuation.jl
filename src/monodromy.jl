@@ -533,34 +533,30 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
+function monodromy_solve(F::Inputs, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, [solution], p₀; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike}, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{TP}; kwargs...) where {TP}
+function monodromy_solve(F::Inputs, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, static_solutions(solutions), p₀; kwargs...)
 end
-function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
+function monodromy_solve(F::Inputs,
         startsolutions::Vector{<:SVector{NVars, <:Complex}},
         p::AbstractVector{TP};
-        parameters=throw(ArgumentError("You need to provide `parameters=...` to monodromy")),
-        strategy=default_strategy(F, parameters, p),
+        parameters=nothing,
+        strategy=nothing,
         showprogress=true,
-        kwargs...) where {TC, TP, NVars}
+        kwargs...) where {TP, NVars}
 
-    if length(p) ≠ length(parameters)
+    if parameters !== nothing && length(p) ≠ length(parameters)
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
-    options = begin
-        isrealsystem = TC <: Real && TP <: Real
-        MonodromyOptions(isrealsystem; optionskwargs...)
-    end
 
     # construct tracker
-    tracker = coretracker(F; parameters=parameters, p₁=p₀, p₀=p₀, restkwargs...)
+    tracker = coretracker(F, startsolutions; parameters=parameters, generic_parameters=p₀, restkwargs...)
     if affine_tracking(tracker)
         HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
         F₀ = FixedHomotopy(HC, 0.0)
@@ -570,6 +566,11 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         HC = HomotopyWithCache(PatchedHomotopy(tracker.homotopy, patch_state), tracker.state.x, 1.0)
         F₀ = FixedHomotopy(HC, 0.0)
     end
+
+    # Check whether homotopy is real
+    isrealsystem = numerically_check_real(tracker.homotopy, tracker.state.x)
+
+    options = MonodromyOptions(isrealsystem; optionskwargs...)
     # construct cache
     newton_cache = NewtonCache(F₀, tracker.state.x)
     C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
@@ -597,6 +598,11 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
         println("None of the provided solutions is a valid start solution.")
         return MonodromyResult(:invalid_startvalue, Vector{SVector{length(startsolutions[1]),ComplexF64}}(), p₀, statistics)
     end
+
+    if strategy === nothing
+        strategy = default_strategy(F, parameters, p; isrealsystem=isrealsystem)
+    end
+
     # construct Loop
     loop = Loop(strategy, p₀, uniquepoints, options)
 
@@ -624,12 +630,20 @@ function monodromy_solve(F::Vector{<:MP.AbstractPolynomialLike{TC}},
     MonodromyResult(retcode, points(solutions(loop)), p₀, statistics)
 end
 
-function default_strategy(F::Vector{<:MP.AbstractPolynomialLike{TC}}, parameters, p₀::AbstractVector{TP}) where {TC,TP}
+function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; isrealsystem=false) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
     if all(f -> last(minmaxdegree(f, parameters)) ≤ 1, F)
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
-    elseif TP <: Real && TC <: Real
+    elseif isrealsystem
+        Triangle(useweights=true)
+    else
+        Triangle(useweights=false)
+    end
+end
+function default_strategy(F::AbstractSystem, parameters, p₀; isrealsystem=false)
+    # For a real system we should introduce some weights to avoid the discriminant
+    if isrealsystem
         Triangle(useweights=true)
     else
         Triangle(useweights=false)
@@ -645,6 +659,17 @@ function static_solutions(V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}
     SVector{N}.(V)
 end
 
+
+function numerically_check_real(H::AbstractHomotopy, x)
+    y = copy(x)
+    Random.randn!(y)
+    for i in eachindex(y)
+        y[i] = real(y[i]) + 0.0im
+    end
+    t = rand()
+    r = evaluate(H, y, t)
+    isapprox(LinearAlgebra.norm(imag.(r), Inf), 0.0, atol=1e-14)
+end
 
 #################
 ## Actual work ##
