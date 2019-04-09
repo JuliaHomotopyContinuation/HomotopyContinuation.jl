@@ -288,7 +288,8 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
     # This only happens if we couldn't agrre on a valuation
     if options.at_infinity_check && state.status == PathTrackerStatus.success
         # If the path is at infinity, then one of the homogenization variables is ≈ 0
-        if vector_at_infinity(currx(core_tracker), options.max_affine_norm)
+        if (maximum(state.val_accuracy) < options.min_val_accuracy && minimum(state.val) < -0.05) ||
+            vector_at_infinity(currx(core_tracker), options.max_affine_norm)
             state.status = PathTrackerStatus.at_infinity
         end
     end
