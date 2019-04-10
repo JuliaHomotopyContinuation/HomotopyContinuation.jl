@@ -173,8 +173,8 @@ function jacobian(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     jacobian(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-function evaluate_and_jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
-    evaluate_and_jacobian!(u, H.F, x, p(H, t), c.F_cache)
+function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+    evaluate_and_jacobian!(u, U, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
 function dt!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
