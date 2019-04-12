@@ -74,7 +74,7 @@ function PathTrackerOptions(;
             at_infinity_check=true,
             max_step_size_endgame_start::Float64=1e-8,
             min_val_accuracy::Float64=0.001,
-            samples_per_loop::Int=5,
+            samples_per_loop::Int=8,
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6)
     PathTrackerOptions(at_infinity_check, max_step_size_endgame_start, min_val_accuracy,
