@@ -125,6 +125,7 @@
     end
 
     @testset "SquaredUpSystem" begin
+        # affine
         @polyvar x y z
 
         F = SPSystem([x^4-1, y^3-1, z^2+x, x+y+z-1, x^2+z^2-3])
@@ -140,5 +141,28 @@
         u, U = evaluate_and_jacobian(S, w, system_cache)
         @test u ≈ evaluate(S, w)
         @test U ≈ jacobian(S, w)
+
+
+        # projective
+        @polyvar x y z w
+
+        A = randn(ComplexF64, 3, 2)
+        F = [x^4-1, y^3-1, z^2+x, x^2+z^2-3, x+y+z-1]
+        G = SPSystem(homogenize([LinearAlgebra.I A] * F, w))
+        F = SPSystem(homogenize(F, w))
+        v = ProjectiveVectors.PVector(rand(ComplexF64, 4))
+
+        S = SquaredUpSystem(F, A, [4, 3, 2, 2, 1])
+        system_cache = cache(S, v)
+        @test system_cache isa AbstractSystemCache
+
+        @test size(S) == (3, 4)
+        @test evaluate(S, v, system_cache) ≈ evaluate(G, v) atol=1e-14
+        @test jacobian(S, v, system_cache) ≈ jacobian(G, v) atol=1e-14
+        u, U = evaluate_and_jacobian(S, v, system_cache)
+        @test u ≈ evaluate(S, v)
+        @test U ≈ jacobian(S, v)
+
+        @test HC.check_homogeneous_degrees(S) == [4, 3, 2]
     end
 end
