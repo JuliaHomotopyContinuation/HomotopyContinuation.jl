@@ -829,24 +829,24 @@ Checks whether the path result is finite.
 Base.isfinite(r::PathResult) = r.return_code == :success # we don't check isaffine to make other code easier
 
 """
-    issingular(pathresult; tol=1e14)
+    issingular(pathresult; tol=1e10)
 
 Checks whether the path result is singular. This is true if
 the winding number is larger than  1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-issingular(r::PathResult; tol=1e14) = issingular(r, tol)
+issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    (unpack(r.winding_number, 0) > 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
+    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
-    isnonsingular(pathresult; tol=1e14)
+    isnonsingular(pathresult; tol=1e10)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; tol=1e14) = isnonsingular(r, tol)
+isnonsingular(r::PathResult; kwargs...) = !issingular(r; kwargs...) && LinearAlgebra.issuccess(r)
 isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 

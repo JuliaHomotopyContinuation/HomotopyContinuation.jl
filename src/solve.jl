@@ -1,5 +1,6 @@
-export solve, Result, nresults, nfinite, nsingular, natinfinity, nfailed, nnonsingular, nreal, ntracked,
-    finite, results, mapresults, failed, atinfinity, singular, nonsingular, seed,
+export solve, Result, nresults, nsolutions, nfinite, nsingular, natinfinity,
+    nfailed, nnonsingular, nreal, ntracked, finite, results, mapresults,
+    failed, atinfinity, singular, nonsingular, seed,
     solutions, realsolutions, multiplicities, uniquesolutions, statistics
 
 """
@@ -346,7 +347,7 @@ Base.eltype(r::Type{Result{V}}) where {V} = PathResult{V}
 const Results = Union{Result, Vector{<:PathResult}}
 const ProjectiveResult = Result{<:PVector}
 """
-    nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e14, onlyfinite=true)
+    nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
 The number of solutions which satisfy the corresponding predicates.
 
@@ -358,7 +359,7 @@ nresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)
 ```
 """
 function nresults(R::Results; onlyreal=false, realtol=1e-6,
-    onlynonsingular=false, onlysingular=false, singulartol=1e14, onlyfinite=true)
+    onlynonsingular=false, onlysingular=false, singulartol=1e10, onlyfinite=true)
     count(R) do r
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
@@ -369,7 +370,7 @@ end
 
 """
     statistics(R::Result; onlyreal=false, realtol=1e-6,
-        onlynonsingular=false, onlysingular=false, singulartol=1e14)
+        onlynonsingular=false, onlysingular=false, singulartol=1e10)
 
 Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
 
@@ -379,7 +380,7 @@ julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
 (nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
 """
 function statistics(R::Results, onlyreal=false, realtol=1e-6,
-    onlynonsingular=false, onlysingular=false, singulartol=1e14)
+    onlynonsingular=false, onlysingular=false, singulartol=1e10)
 
     failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
 
@@ -411,11 +412,18 @@ function statistics(R::Results, onlyreal=false, realtol=1e-6,
 end
 
 """
-    nfinite(affineresult)
+    nfinite(result)
 
 The number of finite solutions.
 """
 nfinite(R::Results) = count(isfinite, R)
+
+"""
+    nsolutions(result)
+
+The number of solutions.
+"""
+nsolutions(R::Results) = count(issuccess, R)
 
 """
     nsingular(result; tol=1e10)
@@ -473,7 +481,7 @@ seed(result::Result) = result.seed
 
 # Filtering
 """
-    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e14, onlyfinite=true)
+    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e10, onlyfinite=true)
 
 Return all `PathResult`s for which the given conditions apply.
 
@@ -502,7 +510,7 @@ realsolutions = mapresults(solution, R, onlyreal=true)
 ```
 """
 function mapresults(f::Function, R::Results;
-    onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysingular=false, singulartol=1e14,
+    onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysingular=false, singulartol=1e10,
     onlyfinite=true)
     [f(r) for r in R if
         (!onlyreal || isreal(r, realtol)) &&
@@ -562,7 +570,7 @@ nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 Return all `PathResult`s for which the solution is singular. This is just a shorthand
 for `results(R; onlysingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
 """
-function singular(R::Results; singulartol=1e14, tol=singulartol, kwargs...)
+function singular(R::Results; singulartol=1e10, tol=singulartol, kwargs...)
     results(R; onlysingular=true, singulartol=tol, kwargs...)
 end
 
@@ -661,8 +669,8 @@ function Base.show(io::IO, x::Result)
     s = statistics(x)
     println(io, "Result with $(s.nonsingular + s.singular) solutions")
     println(io, "==================================")
-    println(io, "• $(s.nonsingular) non-singular finite $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
-    println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
+    println(io, "• $(s.singular) singular $(plural("solution", s.singular)) ($(s.real_singular) real)")
     s.atinfinity > 0 &&
         println(io, "• $(s.atinfinity) $(plural("solution", s.atinfinity)) at infinity")
     s.failed > 0 &&
@@ -676,7 +684,7 @@ function Base.show(io::IO, x::ProjectiveResult)
     println(io, "Result with $(s.nonsingular + s.singular) solutions")
     println(io, "==================================")
     println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
-    println(io, "• $(s.singular) singular finite $(plural("solution", s.singular)) ($(s.real_singular) real)")
+    println(io, "• $(s.singular) singular $(plural("solution", s.singular)) ($(s.real_singular) real)")
     s.failed > 0 &&
         println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• $(ntracked(x)) paths tracked")
@@ -695,11 +703,11 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
     if i == 1
         print(io, "Paths tracked")
     elseif i == 2 && s.nonsingular > 0
-        print(io, "$(s.nonsingular) finite non-singular ($(s.real_nonsingular) real)")
+        print(io, "$(s.nonsingular) non-singular ($(s.real_nonsingular) real)")
     elseif i == 3 && s.singular > 0
-        print(io, "$(s.singular) finite singular ($(s.real_singular) real)")
+        print(io, "$(s.singular) singular ($(s.real_singular) real)")
     elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
-        print(io, "$(s.real_nonsingular+s.real_singular) finite real")
+        print(io, "$(s.real_nonsingular+s.real_singular) real")
     elseif i == 5 && s.atinfinity > 0
         print(io, "$(s.atinfinity) atinfinity")
     elseif i == 6 && s.failed > 0
