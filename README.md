@@ -22,7 +22,7 @@ using HomotopyContinuation
 @polyvar x y; # declare the variables x and y
 result = solve([x^2+2y, y^2-2])
 ```
-
+https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl
 ```
 Result with 4 solutions
 ==================================
@@ -32,7 +32,7 @@ Result with 4 solutions
 • random seed: 902575
 ```
 
-For more see [our user guides](https://www.http://juliahomotopycontinuation.org/guides/).
+For more see [our user guides](https://www.juliahomotopycontinuation.org/guides/).
 
 
 ## Citing HomotopyContinuation.jl
