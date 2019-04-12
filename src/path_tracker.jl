@@ -269,7 +269,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
             state.endgame_zone_start = t
         end
         # Check singular
-        if check_singular_canidate(tracker)
+        if check_singular_candidate(tracker)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
 
             if retcode == :success
@@ -418,7 +418,7 @@ function check_at_infinity(tracker::PathTracker)
     false
 end
 
-function check_singular_canidate(tracker::PathTracker)
+function check_singular_candidate(tracker::PathTracker)
     # this assumes that valuation is accurate and all valuations are > 0
 
     # We have a singular solution if one of the components
