@@ -244,7 +244,7 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Rea
     add!(data, v; tol=tol)
 end
 UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
-UniquePoints(v; kwargs...) = UniquePoints(v, euclidean_distance; kwargs...)
+UniquePoints(v; distance=euclidean_distance, kwargs...) = UniquePoints(v, distance; kwargs...)
 
 function Base.similar(data::UniquePoints{V, T}) where {V, T}
     root = SearchBlock(T)
