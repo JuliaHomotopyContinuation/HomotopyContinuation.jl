@@ -33,5 +33,4 @@ end
     include("result_test.jl")
     include("integration_tests.jl")
     include("monodromy_test.jl")
-    include("guides_tests.jl")
 end
