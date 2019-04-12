@@ -74,7 +74,7 @@ function PathTrackerOptions(;
             at_infinity_check=true,
             max_step_size_endgame_start::Float64=1e-8,
             min_val_accuracy::Float64=0.001,
-            samples_per_loop::Int=5,
+            samples_per_loop::Int=8,
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6)
     PathTrackerOptions(at_infinity_check, max_step_size_endgame_start, min_val_accuracy,
@@ -190,6 +190,14 @@ function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_inf
     PathTracker(problem, core_tracker, state, options, cache)
 end
 
+function Base.show(io::IO, tracker::PathTracker)
+    print(io, "PathTracker")
+end
+
+Base.show(io::IO, ::MIME"application/juno.prs.inline", x::PathTracker) = x
+
+
+
 default_at_infinity_check(prob::AffineProblem) = true
 default_at_infinity_check(prob::ProjectiveProblem) = homvars(prob) !== nothing
 
@@ -269,7 +277,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
             state.endgame_zone_start = t
         end
         # Check singular
-        if check_singular_canidate(tracker)
+        if check_singular_candidate(tracker)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
 
             if retcode == :success
@@ -418,7 +426,7 @@ function check_at_infinity(tracker::PathTracker)
     false
 end
 
-function check_singular_canidate(tracker::PathTracker)
+function check_singular_candidate(tracker::PathTracker)
     # this assumes that valuation is accurate and all valuations are > 0
 
     # We have a singular solution if one of the components
@@ -829,24 +837,24 @@ Checks whether the path result is finite.
 Base.isfinite(r::PathResult) = r.return_code == :success # we don't check isaffine to make other code easier
 
 """
-    issingular(pathresult; tol=1e14)
+    issingular(pathresult; tol=1e10)
 
 Checks whether the path result is singular. This is true if
 the winding number is larger than  1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-issingular(r::PathResult; tol=1e14) = issingular(r, tol)
+issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    (unpack(r.winding_number, 0) > 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
+    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
 end
 
 """
-    isnonsingular(pathresult; tol=1e14)
+    isnonsingular(pathresult; tol=1e10)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; tol=1e14) = isnonsingular(r, tol)
+isnonsingular(r::PathResult; kwargs...) = !issingular(r; kwargs...) && LinearAlgebra.issuccess(r)
 isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
 
 
