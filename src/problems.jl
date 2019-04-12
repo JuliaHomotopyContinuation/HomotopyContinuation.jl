@@ -45,9 +45,9 @@ homotopy(prob::AbstractProblem) = prob.homotopy
 
 Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs to be homogeneous.
 """
-struct Problem{T<:TrackingType, H<:AbstractHomotopy, VG<:VariableGroups} <: AbstractProblem
+struct Problem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem
 	tracking_type::T
-    homotopy::H
+    homotopy::AbstractHomotopy
     vargroups::VG
     seed::Int
 	startsolutions_need_reordering::Bool
