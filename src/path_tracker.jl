@@ -197,9 +197,8 @@ end
 Base.show(io::IO, ::MIME"application/juno.prs.inline", x::PathTracker) = x
 
 
-
-default_at_infinity_check(prob::AffineProblem) = true
-default_at_infinity_check(prob::ProjectiveProblem) = homvars(prob) !== nothing
+default_at_infinity_check(prob::Problem{AffineTracking}) = true
+default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
 
 """
     track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states

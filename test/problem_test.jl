@@ -4,12 +4,12 @@
 
     P1 = StartTargetInput(G, F)
     (PP1, start1) = problem_startsolutions(P1, [rand(ComplexF64, 6), rand(ComplexF64, 6)])
-    @test PP1 isa ProjectiveProblem
+    @test PP1 isa Problem{ProjectiveTracking}
     @test length(start1) == 2
 
     P2 = TotalDegreeInput(G)
     (PP2, start2) = problem_startsolutions(P2)
-    @test PP2 isa ProjectiveProblem
+    @test PP2 isa Problem{ProjectiveTracking}
     @test length(start2) == 720
 
     @test homotopy(PP2) isa AbstractHomotopy
