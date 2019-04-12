@@ -190,6 +190,14 @@ function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_inf
     PathTracker(problem, core_tracker, state, options, cache)
 end
 
+function Base.show(io::IO, tracker::PathTracker)
+    print(io, "PathTracker")
+end
+
+Base.show(io::IO, ::MIME"application/juno.prs.inline", x::PathTracker) = x
+
+
+
 default_at_infinity_check(prob::AffineProblem) = true
 default_at_infinity_check(prob::ProjectiveProblem) = homvars(prob) !== nothing
 
