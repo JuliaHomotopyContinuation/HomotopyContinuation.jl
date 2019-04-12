@@ -123,4 +123,22 @@
         set_parameters!(F, (4.0, 2.3))
         @test F.p == [4.0, 2.3]
     end
+
+    @testset "SquaredUpSystem" begin
+        @polyvar x y z
+
+        F = SPSystem([x^4-1, y^3-1, z^2+x, x+y+z-1, x^2+z^2-3])
+        w = rand(ComplexF64, 3)
+        A = randn(ComplexF64, 3, 2)
+        S = SquaredUpSystem(F, A)
+        system_cache = cache(S, w)
+        @test system_cache isa AbstractSystemCache
+
+        @test size(S) == (3, 3)
+        @test evaluate(S, w, system_cache) ≈ [LinearAlgebra.I A] * evaluate(F, w) atol=1e-14
+        @test jacobian(S, w, system_cache) ≈ [LinearAlgebra.I A] * jacobian(F, w) atol=1e-14
+        u, U = evaluate_and_jacobian(S, w, system_cache)
+        @test u ≈ evaluate(S, w)
+        @test U ≈ jacobian(S, w)
+    end
 end
