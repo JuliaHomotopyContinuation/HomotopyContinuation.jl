@@ -27,17 +27,16 @@ Construct a `StartTargetInput` out of two systems of polynomials.
 struct StartTargetInput{P1<:Inputs, P2<:Inputs} <: AbstractInput
     start::P1
     target::P2
-    startsolutions
 
-    function StartTargetInput{P1, P2}(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
+    function StartTargetInput{P1, P2}(start::P1, target::P2) where {P1<:Inputs, P2<:Inputs}
         if length(start) ≠ length(target)
             error("Cannot construct `StartTargetInput` since the lengths of `start` and `target` don't match.")
         end
-        new(start, target, startsolutions)
+        new(start, target)
     end
 end
-function StartTargetInput(start::P1, target::P2, startsolutions) where {P1<:Inputs, P2<:Inputs}
-    StartTargetInput{P1, P2}(start, target, startsolutions)
+function StartTargetInput(start::P1, target::P2) where {P1<:Inputs, P2<:Inputs}
+    StartTargetInput{P1, P2}(start, target)
 end
 
 
@@ -48,7 +47,6 @@ Construct a `HomotopyInput` for a homotopy `H` with given `startsolutions`.
 """
 struct HomotopyInput{Hom<:AbstractHomotopy} <: AbstractInput
     H::Hom
-    startsolutions
 end
 
 
@@ -72,27 +70,27 @@ struct ParameterSystemInput{S<:Inputs} <: AbstractInput
     parameters::Union{Nothing, Vector{<:MP.AbstractVariable}}
     p₁::AbstractVector
     p₀::AbstractVector
-    startsolutions
     γ₁::Union{Nothing, ComplexF64}
     γ₀::Union{Nothing, ComplexF64}
 end
 
 """
-    input(F::MPPolyInputs)::TotalDegreeInput
-    input(F::AbstractSystem)::TotalDegreeInput
-    input(G::MPPolyInputs, F::MPPolyInputs, startsolutions)::StartTargetInput
-    input(F::MPPolyInputs, parameters, startsolutions; kwargs...)::ParameterSystemInput
-    input(H::AbstractHomotopy, startsolutions)::HomotopyInput
+    input_startsolutions(F::MPPolyInputs)
+    input_startsolutions(F::AbstractSystem)
+    input_startsolutions(G::MPPolyInputs, F::MPPolyInputs, startsolutions)
+    input_startsolutions(F::MPPolyInputs, parameters, startsolutions; kwargs...)
+    input_startsolutions(H::AbstractHomotopy, startsolutions)
 
-Construct an `AbstractInput`.
+Construct an `AbstractInput` and pass through startsolutions if provided.
+Returns a named tuple `(input=..., startsolutions=...)`.
 """
-function input(F::MPPolyInputs; parameters=nothing, kwargs...)
+function input_startsolutions(F::MPPolyInputs; parameters=nothing, kwargs...)
     # if parameters !== nothing this is actually the
     # input constructor for a parameter homotopy, but no startsolutions
     # are provided
     if parameters !== nothing
         startsolutions = [randn(ComplexF64, nvariables(F, parameters=parameters))]
-        return input(F, startsolutions; parameters=parameters, kwargs...)
+        return input_startsolutions(F, startsolutions; parameters=parameters, kwargs...)
     end
 
     remove_zeros!(F)
@@ -101,14 +99,14 @@ function input(F::MPPolyInputs; parameters=nothing, kwargs...)
     if length(F) == nvariables(F) && ishomogeneous(F)
         error("Cannot construct a total degree homotopy for a square homogeneous system.")
     end
-    TotalDegreeInput(F)
+    (input=TotalDegreeInput(F), startsoluions=nothing)
 end
 
-function input(F::AbstractSystem)
-    TotalDegreeInput(F)
+function input_startsolutions(F::AbstractSystem)
+    (input=TotalDegreeInput(F), startsolutions=nothing)
 end
 
-function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
+function input_startsolutions(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     if length(G) ≠ length(F)
         error("Start and target system don't have the same length")
     end
@@ -118,13 +116,13 @@ function input(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     elseif isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
-    StartTargetInput(G, F, startsolutions)
+    (input=StartTargetInput(G, F), startsolutions=startsolutions)
 end
 
 
 # need
-input(F::MPPolyInputs, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
-input(F::AbstractSystem, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
+input_startsolutions(F::MPPolyInputs, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
+input_startsolutions(F::AbstractSystem, starts; kwargs...) = parameter_homotopy(F, starts; kwargs...)
 
 function parameter_homotopy(F::Inputs, startsolutions;
     parameters=(isa(F, AbstractSystem) ? nothing : error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))),
@@ -148,12 +146,12 @@ function parameter_homotopy(F::Inputs, startsolutions;
     elseif isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
-    ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁, γ₀)
+    (input=ParameterSystemInput(F, parameters, p₁, p₀, γ₁, γ₀), startsolutions=startsolutions)
 end
 
-function input(H::AbstractHomotopy, startsolutions)
+function input_startsolutions(H::AbstractHomotopy, startsolutions)
     if isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
-    HomotopyInput(H, startsolutions)
+    (input=HomotopyInput(H), startsolutions=startsolutions)
 end
