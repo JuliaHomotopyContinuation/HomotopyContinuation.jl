@@ -66,7 +66,7 @@ end
 
 function NewtonCache(F::AbstractSystem, x)
     system_cache = cache(F, x)
-    Jac = Jacobian(jacobian(F, x, system_cache))
+    Jac = Jacobian(Random.randn!(jacobian(F, x, system_cache)))
     rᵢ = evaluate(F, x, system_cache)
     Δxᵢ = copy(rᵢ)
 

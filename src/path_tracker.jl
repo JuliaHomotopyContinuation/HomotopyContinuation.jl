@@ -85,6 +85,8 @@ mutable struct PathTrackerState{V<:AbstractVector}
     status::PathTrackerStatus.states
     t::Float64
     prediction::V
+    solution::V
+    solution_accuracy::Float64
     endgame_zone_start::Union{Nothing, Float64}
     winding_number::Int
     # Affine valuation
@@ -98,6 +100,8 @@ function PathTrackerState(x)
     status = PathTrackerStatus.tracking
     t = 1.0
     prediction = copy(x)
+    solution = copy(x)
+    solution_accuracy = NaN
     endgame_zone_start = nothing
     winding_number = 0
     n = length(x)
@@ -109,7 +113,7 @@ function PathTrackerState(x)
     prev_val = copy(val)
     prev_val_accuracy = copy(val)
 
-    PathTrackerState(status, t, prediction, endgame_zone_start, winding_number,
+    PathTrackerState(status, t, prediction, solution, solution_accuracy, endgame_zone_start, winding_number,
                      val, val_accuracy, prev_val, prev_val_accuracy)
 end
 
@@ -118,6 +122,8 @@ function reset!(state::PathTrackerState)
     state.status = PathTrackerStatus.tracking
     state.t = 1.0
     state.prediction .= zero(eltype(state.prediction))
+    state.solution .= zero(eltype(state.prediction))
+    state.solution_accuracy = NaN
     state.endgame_zone_start = nothing
     state.winding_number = 0
     state.val .= 0.0
@@ -129,29 +135,34 @@ function reset!(state::PathTrackerState)
 end
 
 
-struct PathTrackerCache{T, V<:AbstractVector{T}, H<:HomotopyWithCache}
+struct PathTrackerCache{T, V<:AbstractVector{T}, S<:AbstractSystem, NC<:NewtonCache}
     unit_roots::Vector{ComplexF64}
     base_point::V
-    residual::Vector{T}
-    jacobian::Matrix{T}
-    homotopy::H
+    target_system::S
+    target_residual::Vector{T}
+    target_jacobian::Matrix{T}
+    target_newton_cache::NC
 end
 
-function PathTrackerCache(core_tracker::CoreTracker)
+function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     unit_roots = ComplexF64[]
     base_point = copy(core_tracker.state.x)
 
-    x, t = currx(core_tracker), currt(core_tracker)
+    x = currx(core_tracker)
+    F = FixedHomotopy(core_tracker.homotopy, 0.0)
     if affine_tracking(core_tracker)
-        homotopy = HomotopyWithCache(core_tracker.homotopy, x, t)
-    else
-        patched_homotopy = PatchedHomotopy(core_tracker.homotopy, state(EmbeddingPatch(), x))
-        homotopy = HomotopyWithCache(patched_homotopy, x, t)
+        target_system = F
+    elseif pull_back_is_to_affine(prob, x)
+        target_system = PatchedSystem(F, state(EmbeddingPatch(), x))
+    else # result is projective
+        target_system = PatchedSystem(F, state(OrthogonalPatch(), x))
     end
-    res = evaluate(homotopy, currx(core_tracker), currt(core_tracker))
-    jac = jacobian(homotopy, currx(core_tracker), currt(core_tracker))
+    target_newton_cache = NewtonCache(target_system, x)
 
-    PathTrackerCache(unit_roots, base_point, res, jac, homotopy)
+    res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
+    jac = jacobian(target_system, currx(core_tracker), target_newton_cache.system_cache)
+
+    PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache)
 end
 
 
@@ -186,15 +197,12 @@ end
 function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_infinity_check=default_at_infinity_check(problem), optionskwargs...)
     state = PathTrackerState(core_tracker.state.x)
     options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
-    cache = PathTrackerCache(core_tracker)
+    cache = PathTrackerCache(problem, core_tracker)
     PathTracker(problem, core_tracker, state, options, cache)
 end
 
-function Base.show(io::IO, tracker::PathTracker)
-    print(io, "PathTracker")
-end
-
-Base.show(io::IO, ::MIME"application/juno.prs.inline", x::PathTracker) = x
+Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker")
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
@@ -301,9 +309,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
         end
     end
 
-    if state.status == PathTrackerStatus.success && state.winding_number ≤ 1
-        refine!(core_tracker)
-    end
+    refine_solution!(tracker)
 
     # We have to set the number of blas threads to the previous value
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
@@ -549,6 +555,58 @@ Returns the type of `x`.
 """
 type_of_x(tracker::PathTracker) = typeof(tracker.core_tracker.state.x)
 
+"""
+    refine_solution!(pathtracker)
+
+In the case of success, we store the solution in `state.solution`
+and try to refine the solution to the desired accuracy.
+This also makes sure that our accuracy is correct after a possible pull back.
+"""
+function refine_solution!(tracker::PathTracker)
+    @unpack core_tracker, state, options, cache = tracker
+
+    if state.status == PathTrackerStatus.success
+        # state.winding_number > 0 only if during tracking we had the need to
+        # use the cauchy endgame
+        if state.winding_number > 0
+            state.solution .= state.prediction
+        else
+            state.solution .= currx(core_tracker)
+        end
+
+        # Bring vector onto "standard form"
+        if !affine_tracking(core_tracker)
+            if pull_back_is_to_affine(tracker.problem, state.solution)
+                ProjectiveVectors.affine_chart!(state.solution)
+            else # projective result -> bring on (product of) sphere(s)
+                LinearAlgebra.normalize!(state.solution)
+                changepatch!(cache.target_system.patch, state.solution)
+            end
+        end
+
+        # If winding_number == 0 the path tracker simply ran through
+        if tracker.state.winding_number == 0
+            # We need to reach the requested refinement_accuracy
+            x̂ = cache.base_point
+            tol = core_tracker.options.refinement_accuracy
+            result = newton!(x̂, cache.target_system, state.solution,
+                            euclidean_norm, cache.target_newton_cache;
+                            tol=tol, miniters=1, maxiters=3)
+            if isconverged(result)
+                state.solution .= x̂
+                if !pull_back_is_to_affine(tracker.problem, state.solution)
+                    LinearAlgebra.normalize!(state.solution)
+                    changepatch!(cache.target_system.patch, state.solution)
+                end
+                state.solution_accuracy = result.accuracy
+            else
+                state.status = PathTrackerStatus.post_check_failed
+            end
+        end
+    end
+    nothing
+end
+
 #############################
 # Convencience constructors #
 #############################
@@ -603,13 +661,7 @@ pathtracker(args...; kwargs...) = first(pathtracker_startsolutions(args...; kwar
 ## Result ##
 ############
 
-function solution(tracker::PathTracker)
-    if tracker.state.winding_number == 0
-        pull_back(tracker.problem, currx(tracker.core_tracker))
-    else
-        pull_back(tracker.problem, tracker.state.prediction)
-    end
-end
+solution(tracker::PathTracker) = pull_back(tracker.problem, tracker.state.solution)
 
 function winding_number(tracker::PathTracker)
     tracker.state.winding_number == 0 ? nothing : tracker.state.winding_number
@@ -664,8 +716,8 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     windingnumber = winding_number(tracker)
     x = solution(tracker)
     # accuracy
-    if windingnumber === nothing && return_code == :success
-        accuracy = core_tracker.state.accuracy
+    if windingnumber === nothing && return_code == :success && !isnan(state.solution_accuracy)
+        accuracy = state.solution_accuracy
     else
         accuracy = nothing
     end
@@ -673,19 +725,8 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     t = state.t
     # residual
     if return_code == :success && details_level ≥ 1
-        if affine_tracking(tracker.core_tracker)
-            res = residual(tracker, currx(core_tracker), t)
-            condition_jac = condition_jacobian(tracker, currx(core_tracker), t)
-        else
-            # we simulate the affine vector
-            # We cannot use `x` from above since pull_back also takes care of possible
-            # permutations of the variables.
-            cache.base_point .= currx(core_tracker)
-            y = ProjectiveVectors.affine_chart!(cache.base_point)
-
-            res = residual(tracker, y, t)
-            condition_jac = condition_jacobian(tracker, y, t)
-        end
+        res = residual(tracker)
+        condition_jac = condition_jacobian(tracker)
     else
         res = nothing
         condition_jac = nothing
@@ -694,7 +735,8 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     endgame_zone_start = tracker.state.endgame_zone_start
     if details_level ≥ 1
         # mimic the behaviour in track! to get a start solution of the same type as x
-        startsolution = pull_back(tracker.problem, embed!(cache.base_point, tracker.problem, start_solution))
+        embed!(cache.base_point, tracker.problem, start_solution)
+        startsolution = pull_back(tracker.problem, cache.base_point)
     else
         startsolution = nothing
     end
@@ -711,11 +753,9 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
 
     PathResult(return_code, x, t, accuracy, res, condition_jac,
-                      windingnumber, endgame_zone_start,
-                      path_number,
-                      startsolution,
-                      accepted_steps, rejected_steps,
-                      valuation, valuation_accuracy)
+               windingnumber, endgame_zone_start, path_number,
+               startsolution, accepted_steps, rejected_steps,
+               valuation, valuation_accuracy)
 end
 
 function detailslevel(details::Symbol)
@@ -728,15 +768,17 @@ function detailslevel(details::Symbol)
     end
 end
 
-function residual(tracker::PathTracker, x, t)
-    evaluate!(tracker.cache.residual, tracker.cache.homotopy, x, t)
-    euclidean_norm(tracker.cache.residual)
+function residual(tracker::PathTracker, x=tracker.state.solution)
+    evaluate!(tracker.cache.target_residual, tracker.cache.target_system, x,
+              tracker.cache.target_newton_cache.system_cache)
+    euclidean_norm(tracker.cache.target_residual)
 end
 
-function condition_jacobian(tracker, x, t)
-    jacobian!(tracker.cache.jacobian, tracker.cache.homotopy, x, t)
-    row_scaling!(tracker.cache.jacobian)
-    LinearAlgebra.cond(tracker.cache.jacobian)
+function condition_jacobian(tracker::PathTracker, x=tracker.state.solution)
+    jacobian!(tracker.cache.target_jacobian, tracker.cache.target_system, x,
+              tracker.cache.target_newton_cache.system_cache)
+    row_scaling!(tracker.cache.target_jacobian)
+    LinearAlgebra.cond(tracker.cache.target_jacobian)
 end
 
 """

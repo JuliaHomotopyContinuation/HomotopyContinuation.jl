@@ -340,11 +340,6 @@ function embed_projective!(x::PVector{<:Number, M}, VG::VariableGroups{M}, v::Ab
 	x
 end
 
-pull_back(VG::VariableGroups{1, false}, v::Vector) = copy(v)
-pull_back(VG::VariableGroups{M, false}, v::PVector{<:Number, M}) where {M} = LinearAlgebra.normalize(v)
-function pull_back(VG::VariableGroups{M, true}, x::PVector{<:Number, M}) where {M}
-	map(ki -> x[ki[1]] / x[ki[2]], VG.pull_back_mapping)
-end
 
 ##############
 # POLYNOMIALS

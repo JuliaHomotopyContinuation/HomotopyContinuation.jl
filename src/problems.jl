@@ -106,12 +106,31 @@ embed(prob::Problem{ProjectiveTracking}, v::PVector) = v
 embed(prob::Problem{AffineTracking}, v::AbstractVector) = v
 
 """
-    pull_back(prob::Problem{ProjectiveTracking}, x)
+    pull_back(prob::Problem, x)
 
-Pull the solution `x` into affine_tracking space if necessary. Creates a copy.
+Pull the solution `x` into affine space if necessary. Creates a copy.
 """
-pull_back(prob::Problem{ProjectiveTracking}, x::PVector) = pull_back(prob.vargroups, x)
 pull_back(prob::Problem{AffineTracking}, x::AbstractVector) = copy(x)
+pull_back(prob::Problem{ProjectiveTracking}, x::PVector) = pull_back(prob.vargroups, x)
+function pull_back(VG::VariableGroups{M, false}, v::PVector{<:Number, M}) where {M}
+	LinearAlgebra.normalize(v)
+end
+function pull_back(VG::VariableGroups{M, true}, x::PVector{<:Number, M}) where {M}
+	map(ki -> x[ki[1]] / x[ki[2]], VG.pull_back_mapping)
+end
+
+"""
+    pull_back_is_to_affine(prob::ProjectiveProblem, x)
+
+Returns `true` if [`pull_back`](@ref) would pull the solution `x` into affine space.
+"""
+pull_back_is_to_affine(prob::Problem{AffineTracking}, x::AbstractVector) = true
+function pull_back_is_to_affine(prob::Problem{ProjectiveTracking}, x::PVector)
+	pull_back_is_to_affine(prob.vargroups, x)
+end
+pull_back_is_to_affine(::VariableGroups{M,true}, ::PVector{<:Number, M}) where {M} = true
+pull_back_is_to_affine(::VariableGroups{M,false},::PVector{<:Number, M}) where {M} = false
+
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
 	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
