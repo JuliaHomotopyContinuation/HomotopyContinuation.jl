@@ -195,27 +195,54 @@ function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothi
 		vargroups = VariableGroups(variables(input.system))
 		homvars = nothing
 		F = input.system
+		Prob = Problem{AffineTracking}
 	else
 		F, vargroups, homvars = homogenize_if_necessary(input.system, homvar_info)
+		Prob = Problem{ProjectiveTracking}
 	end
+
+	classifcation = classify_system(F, vargroups; affine_tracking=affine_tracking)
+	if classifcation == :underdetermined
+        error("Underdetermined polynomial systems are currently not supported.")
+	# The following case is too annoying right now
+	elseif classifcation == :overdetermined && ngroups(vargroups) > 1
+		error("Overdetermined polynomial systems with a multi-homogenous structure are currently not supported.")
+    end
+
 	vars = flattened_variable_groups(vargroups)
 	target_constructor(f) = construct_system(f, system; variables=vars, homvars=homvars)
 
-	check_square_system(F, vargroups; affine_tracking=affine_tracking)
-
 	if ngroups(vargroups) == 1
+		n = affine_tracking ? length(vars) : length(vars) - 1
 		degrees = maxdegrees(F)
 
+		if classifcation == :overdetermined
+			perm = sortperm(degrees; rev=true)
+			# reorder polynomials by minimal degree
+			F = F[perm]
+			degrees = degrees[perm]
+		end
+
 		# Scale systems
-		if system_scaling
+		if system_scaling && classifcation == :square
 			G = totaldegree_polysystem(degrees, vars, vargroups; affine_tracking=affine_tracking)
 			_, f, G_scaling_factors, _ = scale_systems(G, F, report_scaling_factors=true)
 			g = TotalDegreeSystem(degrees, G_scaling_factors; affine=affine_tracking)
+		elseif classifcation == :overdetermined
+			g, f = TotalDegreeSystem(degrees[1:n]; affine=affine_tracking), F
 		else
 			g, f = TotalDegreeSystem(degrees; affine=affine_tracking), F
 		end
 		Prob = affine_tracking ? Problem{AffineTracking} : Problem{ProjectiveTracking}
-		problem = Prob(g, target_constructor(f), vargroups, seed; kwargs...)
+
+		if classifcation == :overdetermined
+			A = randn(ComplexF64, n, length(F) - n)
+			f̂ = SquaredUpSystem(target_constructor(f), A, degrees)
+		else # square case
+			f̂ = target_constructor(f)
+		end
+
+		problem = Prob(g, f̂, vargroups, seed; kwargs...)
 	# Multihomogeneous
 	else
 		affine_tracking && error("Affine tracking is currently not supported for variable groups.")
