@@ -190,13 +190,13 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(prob::TotalDegreeInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
 	if affine_tracking
-		vargroups = VariableGroups(variables(prob.system))
+		vargroups = VariableGroups(variables(input.system))
 		homvars = nothing
-		F = prob.system
+		F = input.system
 	else
-		F, vargroups, homvars = homogenize_if_necessary(prob.system, homvar_info)
+		F, vargroups, homvars = homogenize_if_necessary(input.system, homvar_info)
 	end
 	vars = flattened_variable_groups(vargroups)
 	target_constructor(f) = construct_system(f, system; variables=vars, homvars=homvars)
@@ -247,23 +247,23 @@ function totaldegree_polysystem(degrees, variables, variable_groups::VariableGro
 	end
 end
 
-function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, ::Nothing, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
-    n, N = size(prob.system)
-	degrees = abstract_system_degrees(prob.system)
+function problem_startsolutions(input::TotalDegreeInput{<:AbstractSystem}, ::Nothing, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, kwargs...)
+    n, N = size(input.system)
+	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
 	# Check overdetermined case
 	n > N && error(overdetermined_error_msg)
 	variable_groups = VariableGroups(N, homvaridx)
-    (Problem{ProjectiveTracking}(G, prob.system, variable_groups, seed; kwargs...),
+    (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
 end
 
-function problem_startsolutions(prob::TotalDegreeInput{<:AbstractSystem}, ::Nothing, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, kwargs...)
-    n, N = size(prob.system)
-	degrees = abstract_system_degrees(prob.system)
+function problem_startsolutions(input::TotalDegreeInput{<:AbstractSystem}, ::Nothing, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, kwargs...)
+    n, N = size(input.system)
+	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
 	variable_groups = VariableGroups(N, hominfo)
-    (Problem{ProjectiveTracking}(G, prob.system, variable_groups, seed; kwargs...),
+    (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
 end
 
@@ -283,8 +283,8 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(prob::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
-    F, G = prob.target, prob.start
+function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+    F, G = input.target, input.start
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
     if !affine_tracking && F_ishom && G_ishom
@@ -327,24 +327,24 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(prob::ParameterSystemInput{<:MPPolyInputs}, startsolutions, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
+function problem_startsolutions(input::ParameterSystemInput{<:MPPolyInputs}, startsolutions, hominfo, seed; affine_tracking=false, system=SPSystem, kwargs...)
 	Prob = affine_tracking ? Problem{AffineTracking} : Problem{ProjectiveTracking}
 	if affine_tracking
-		variable_groups = VariableGroups(variables(prob.system; parameters=prob.parameters))
+		variable_groups = VariableGroups(variables(input.system; parameters=input.parameters))
 		homvars = nothing
-		F = prob.system
+		F = input.system
 	else
-		F, variable_groups, homvars = homogenize_if_necessary(prob.system, hominfo; parameters=prob.parameters)
+		F, variable_groups, homvars = homogenize_if_necessary(input.system, hominfo; parameters=input.parameters)
 	end
 	vars = flattened_variable_groups(variable_groups)
-	F̂ = construct_system(F, system; homvars=homvars, variables=vars, parameters=prob.parameters)
-	H = ParameterHomotopy(F̂, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+	F̂ = construct_system(F, system; homvars=homvars, variables=vars, parameters=input.parameters)
+	H = ParameterHomotopy(F̂, p₁=input.p₁, p₀=input.p₀, γ₁=input.γ₁, γ₀=input.γ₀)
 	Prob(H, variable_groups, seed; startsolutions_need_reordering=!affine_tracking), startsolutions
 end
 
-function problem_startsolutions(prob::ParameterSystemInput{<:AbstractSystem}, startsolutions, hominfo, seed; affine_tracking=nothing, system=SPSystem, kwargs...)
-	n, N = size(prob.system)
-	H = ParameterHomotopy(prob.system, p₁=prob.p₁, p₀=prob.p₀, γ₁=prob.γ₁, γ₀=prob.γ₀)
+function problem_startsolutions(input::ParameterSystemInput{<:AbstractSystem}, startsolutions, hominfo, seed; affine_tracking=nothing, system=SPSystem, kwargs...)
+	n, N = size(input.system)
+	H = ParameterHomotopy(input.system, p₁=input.p₁, p₀=input.p₀, γ₁=input.γ₁, γ₀=input.γ₀)
 	variable_groups = VariableGroups(N, hominfo)
 
 	# We do not set affine tracking here, to handle the case that the input system
