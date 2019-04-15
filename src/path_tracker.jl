@@ -69,6 +69,9 @@ mutable struct PathTrackerOptions
     # Fallback tolerance only used if we track a path to the end without agreeing
     # on a valuation
     max_affine_norm::Float64
+    # The minimal residual a solution needs to have to be considered
+    # a solution of the original system (only applied for singular solutions)
+    overdetermined_minimal_residual::Float64
 end
 
 function PathTrackerOptions(;
@@ -77,9 +80,11 @@ function PathTrackerOptions(;
             min_val_accuracy::Float64=0.001,
             samples_per_loop::Int=8,
             max_winding_number::Int=12,
-            max_affine_norm::Float64=1e6)
+            max_affine_norm::Float64=1e6,
+            overdetermined_minimal_residual::Float64=1e-3)
     PathTrackerOptions(at_infinity_check, max_step_size_endgame_start, min_val_accuracy,
-                       samples_per_loop, max_winding_number, max_affine_norm)
+                       samples_per_loop, max_winding_number, max_affine_norm,
+                       overdetermined_minimal_residual)
 end
 
 mutable struct PathTrackerState{V<:AbstractVector}
@@ -150,7 +155,12 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     base_point = copy(core_tracker.state.x)
 
     x = currx(core_tracker)
-    F = FixedHomotopy(core_tracker.homotopy, 0.0)
+    if is_squared_up_system(core_tracker.homotopy)
+        # core_tracker.homotopy.target is a SquaredUpSystem
+        F = core_tracker.homotopy.target.F
+    else
+        F = FixedHomotopy(core_tracker.homotopy, 0.0)
+    end
     if affine_tracking(core_tracker)
         target_system = F
     elseif pull_back_is_to_affine(prob, x)
@@ -166,6 +176,11 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache)
 end
 
+is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
+is_squared_up_system(::AbstractHomotopy) = false
+is_squared_up_system(F::PatchedSystem) = is_squared_up_system(F.system)
+is_squared_up_system(::SquaredUpSystem) = true
+is_squared_up_system(::AbstractSystem) = false
 
 """
      PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
@@ -183,6 +198,7 @@ There are the following `PathTracker` specific options (with their defaults in p
 * `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
 * `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
 * `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
+* `overdetermined_minimal_residual=1e-3`: The minimal residual a solution needs to have to be considered a solution of the original system (only applied for singular solutions).
 
 In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
 [`pathtracker_startsolutions`](@ref) helper functions.
@@ -310,7 +326,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
         end
     end
 
-    refine_solution!(tracker)
+    check_and_refine_solution!(tracker)
 
     # We have to set the number of blas threads to the previous value
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
@@ -557,13 +573,13 @@ Returns the type of `x`.
 type_of_x(tracker::PathTracker) = typeof(tracker.core_tracker.state.x)
 
 """
-    refine_solution!(pathtracker)
+    check_and_refine_solution!(pathtracker)
 
 In the case of success, we store the solution in `state.solution`
 and try to refine the solution to the desired accuracy.
 This also makes sure that our accuracy is correct after a possible pull back.
 """
-function refine_solution!(tracker::PathTracker)
+function check_and_refine_solution!(tracker::PathTracker)
     @unpack core_tracker, state, options, cache = tracker
 
     if state.status == PathTrackerStatus.success
@@ -572,6 +588,7 @@ function refine_solution!(tracker::PathTracker)
         if state.winding_number > 0
             state.solution .= state.prediction
         else
+            refine!(core_tracker)
             state.solution .= currx(core_tracker)
         end
 
@@ -585,8 +602,9 @@ function refine_solution!(tracker::PathTracker)
             end
         end
 
+
         # If winding_number == 0 the path tracker simply ran through
-        if tracker.state.winding_number == 0
+        if (tracker.state.winding_number == 0)
             # We need to reach the requested refinement_accuracy
             x̂ = cache.base_point
             tol = core_tracker.options.refinement_accuracy
@@ -601,8 +619,13 @@ function refine_solution!(tracker::PathTracker)
                 end
                 state.solution_accuracy = result.accuracy
             else
+                state.solution_accuracy = result.accuracy
                 state.status = PathTrackerStatus.post_check_failed
             end
+        # For singular solutions check
+        elseif is_squared_up_system(cache.target_system) &&
+               residual(tracker) > options.overdetermined_minimal_residual
+                state.status = PathTrackerStatus.post_check_failed
         end
     end
     nothing
@@ -717,7 +740,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     windingnumber = winding_number(tracker)
     x = solution(tracker)
     # accuracy
-    if windingnumber === nothing && return_code == :success && !isnan(state.solution_accuracy)
+    if !isnan(state.solution_accuracy)
         accuracy = state.solution_accuracy
     else
         accuracy = nothing
