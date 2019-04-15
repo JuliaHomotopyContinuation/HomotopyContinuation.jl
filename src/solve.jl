@@ -182,42 +182,53 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
 
     nsols = nreal_sols = 0
 
-    nthreads = Threads.nthreads()
-    if threading && nthreads > 1
-        batch_size = 32 * nthreads
-        batches = BatchIterator(start_solutions, batch_size)
-        batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
-        k = 0
-        for batch in batches
-            prepare_batch!(batch_tracker, batch)
-            ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
+    try
+        nthreads = Threads.nthreads()
+        if threading && nthreads > 1
+            batch_size = 32 * nthreads
+            batches = BatchIterator(start_solutions, batch_size)
+            batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
+            k = 0
+            for batch in batches
+                prepare_batch!(batch_tracker, batch)
+                ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
 
-            for R in batch_tracker.results
-                if R !== nothing
+                for R in batch_tracker.results
+                    if R !== nothing
+                        push!(results, R)
+                        nreal_sols += isreal(R)
+                        nsols += 1
+                    end
+                end
+                k += length(batch)
+                if batch_tracker.interrupted
+                    return results
+                end
+
+                update_progress!(progress, k, nsols, nreal_sols)
+            end
+        else
+            for (k, s) in enumerate(start_solutions)
+                return_code = track!(tracker, s, 1.0)
+                if save_all_paths || return_code == PathTrackerStatus.success
+                    R = PathResult(tracker, s, k; details=path_result_details)
                     push!(results, R)
-                    nreal_sols += isreal(R)
-                    nsols += 1
-                end
-            end
-            k += length(batch)
 
-            update_progress!(progress, k, nsols, nreal_sols)
-        end
-    else
-        for (k, s) in enumerate(start_solutions)
-            return_code = track!(tracker, s, 1.0)
-            if save_all_paths || return_code == PathTrackerStatus.success
-                R = PathResult(tracker, s, k; details=path_result_details)
-                push!(results, R)
-
-                if return_code == PathTrackerStatus.success
-                    nreal_sols += isreal(R)
-                    nsols += 1
+                    if return_code == PathTrackerStatus.success
+                        nreal_sols += isreal(R)
+                        nsols += 1
+                    end
                 end
+                k % 32 == 0 && update_progress!(progress, k, nsols, nreal_sols)
             end
-            k % 32 == 0 && update_progress!(progress, k, nsols, nreal_sols)
+            update_progress!(progress, n, nsols, nreal_sols)
         end
-        update_progress!(progress, n, nsols, nreal_sols)
+    catch e
+        if isa(e, InterruptException)
+            return results
+        else
+            rethrow(e)
+        end
     end
     results
 end
@@ -239,6 +250,7 @@ mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
     batch::Vector{V}
     details::Symbol
     all_paths::Bool
+    interrupted::Bool
 end
 
 function BatchTracker(tracker::PathTracker, batches::BatchIterator, path_result_details::Symbol, save_all_paths::Bool)
@@ -248,7 +260,7 @@ function BatchTracker(tracker::PathTracker, batches::BatchIterator, path_result_
     batch_results .= nothing
     ranges = partition_work(1:batch_size, length(trackers))
     BatchTracker(trackers, batch_results, ranges, batches.batch,
-                 path_result_details, save_all_paths)
+                 path_result_details, save_all_paths, false)
 end
 
 function prepare_batch!(batch_tracker::BatchTracker, batch)
@@ -263,8 +275,16 @@ end
 
 function (batch::BatchTracker)()
     tid = Threads.threadid()
-    track_batch!(batch.results, batch.trackers[tid], batch.ranges[tid],
+    try
+        track_batch!(batch.results, batch.trackers[tid], batch.ranges[tid],
                  batch.batch, batch.details, batch.all_paths)
+     catch e
+         if isa(e, InterruptException)
+             batch.interrupted = true
+         else
+             rethrow(e)
+         end
+     end
 end
 function track_batch!(results, pathtracker, range, starts, details, all_paths)
     for k in range
