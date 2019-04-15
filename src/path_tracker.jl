@@ -37,6 +37,7 @@ module PathTrackerStatus
         terminated_singularity
         terminated_ill_conditioned
         tracker_failed
+        post_check_failed
     end
 
     function status(code::CoreTrackerStatus.states)
