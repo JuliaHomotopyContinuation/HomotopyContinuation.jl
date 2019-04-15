@@ -411,3 +411,45 @@ function partition_work!(dst, R::UnitRange, n_chunks)
     end
     dst
 end
+
+
+"""
+    BatchIterator(iter, batch_size)
+
+An iterator which returns the elements of `iter` in batches of at most `batch_size`.
+"""
+struct BatchIterator{Iter, T}
+    iter::Iter
+    batch_size::Int
+	batch::Vector{T}
+end
+
+function BatchIterator(iter, size::Int)
+	batch = Vector{eltype(iter)}(undef, size)
+	BatchIterator(iter, size, batch)
+end
+
+Base.length(iter::BatchIterator) = ceil(Int, length(iter.iter) / iter.batch_size)
+Base.eltype(iter::BatchIterator) = Vector{eltype(iter.iter)}
+
+function Base.iterate(iter::BatchIterator, state=nothing)
+    next = state === nothing ? iterate(iter.iter) : iterate(iter.iter, state)
+    if next === nothing
+        return nothing
+    end
+    el, state = next
+	k = 1
+    iter.batch[k] = el
+    while k < iter.batch_size
+        next = iterate(iter.iter, state)
+		if next === nothing
+			resize!(iter.batch, k)
+			break
+		end
+        el, state = next
+		k += 1
+        iter.batch[k] = el
+    end
+
+    iter.batch, state
+end

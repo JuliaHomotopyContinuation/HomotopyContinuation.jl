@@ -183,24 +183,20 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
 
     nthreads = Threads.nthreads()
     if threading && nthreads > 1
-        # TODO: We can probably also do this better, but for now we have to collect
-        # to support indexing
-        S = collect(start_solutions)
-
-        chunk_size = 32
-        batch_tracker = BatchTracker(tracker, S, chunk_size, path_result_details, save_all_paths)
-        k = 1
-        while k ≤ n
-            prepare_batch!(batch_tracker, k)
+        batch_size = 32 * nthreads
+        batches = BatchIterator(start_solutions, batch_size)
+        batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
+        k = 0
+        for batch in batches
+            prepare_batch!(batch_tracker, batch)
             ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
 
-            for R in batch_tracker.results, i in 1:chunk_size
-                R[i] !== nothing && push!(results, R[i])
-                R[i] = nothing
+            for R in batch_tracker.results
+                R !== nothing && push!(results, R)
             end
-            k += batch_tracker.batch_size
+            k += length(batch)
 
-            update_progress!(progress, results, min(k - 1, n))
+            update_progress!(progress, results, k)
         end
     else
         for (k, s) in enumerate(start_solutions)
@@ -221,46 +217,46 @@ end
 update_progress!(::Nothing, results, N) = nothing
 
 mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
-    results::Vector{Vector{Union{Nothing, R}}}
     trackers::Vector{Tracker}
+    results::Vector{Union{Nothing, R}}
     ranges::Vector{UnitRange{Int}}
-    start_solutions::V
+    batch::Vector{V}
     details::Symbol
     all_paths::Bool
-    batch_size::Int
 end
 
-function BatchTracker(tracker::PathTracker, start_solutions, chunk_size::Int, path_result_details::Symbol, save_all_paths::Bool)
-    n = length(start_solutions)
-    batch_size = chunk_size * Threads.nthreads()
-    batch_results = Threads.resize_nthreads!([Vector{Union{Nothing, result_type(tracker)}}(undef, chunk_size)])
-    for R in batch_results
-        R .= nothing
-    end
-
+function BatchTracker(tracker::PathTracker, batches::BatchIterator, path_result_details::Symbol, save_all_paths::Bool)
     trackers = Threads.resize_nthreads!([tracker])
-    ranges = partition_work(1:min(batch_size, n), Threads.nthreads())
-    BatchTracker(batch_results, trackers, ranges, start_solutions, path_result_details, save_all_paths, batch_size)
+    batch_size = length(batches.batch)
+    batch_results = Vector{Union{Nothing, result_type(tracker)}}(undef, batch_size)
+    batch_results .= nothing
+    ranges = partition_work(1:batch_size, length(trackers))
+    BatchTracker(trackers, batch_results, ranges, batches.batch,
+                 path_result_details, save_all_paths)
 end
 
-function prepare_batch!(batch_tracker::BatchTracker, k::Int)
-    n = length(batch_tracker.start_solutions)
-    nthreads = length(batch_tracker.trackers)
-    partition_work!(batch_tracker.ranges, k:min(k+batch_tracker.batch_size-1, n), nthreads)
+function prepare_batch!(batch_tracker::BatchTracker, batch)
+    n = length(batch)
+    if length(batch_tracker.results) ≠ n
+        resize!(batch_tracker.results, n)
+    end
+    batch_tracker.results .= nothing
+
+    partition_work!(batch_tracker.ranges, 1:n, length(batch_tracker.trackers))
 end
 
 function (batch::BatchTracker)()
     tid = Threads.threadid()
-    track_batch!(batch.results[tid], batch.trackers[tid],
-                 batch.ranges[tid], batch.start_solutions, batch.details, batch.all_paths)
+    track_batch!(batch.results, batch.trackers[tid], batch.ranges[tid],
+                 batch.batch, batch.details, batch.all_paths)
 end
 function track_batch!(results, pathtracker, range, starts, details, all_paths)
-    for (i, k) in enumerate(range)
+    for k in range
         return_code = track!(pathtracker, starts[k], 1.0)
         if all_paths || return_code == PathTrackerStatus.success
-            results[i] = PathResult(pathtracker, starts[k], k; details=details)
+            results[k] = PathResult(pathtracker, starts[k], k; details=details)
         else
-            results[i] = nothing
+            results[k] = nothing
         end
     end
     nothing
