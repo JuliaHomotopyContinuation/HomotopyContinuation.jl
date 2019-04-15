@@ -170,7 +170,6 @@ function solve(tracker::PathTracker, start_solutions; path_result_details=:defau
     Result(results, length(start_solutions), tracker.problem.seed)
 end
 
-
 function track_paths(tracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default, save_all_paths=false)
     results = Vector{result_type(tracker)}()
     n = length(start_solutions)
@@ -180,6 +179,8 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
     else
         progress = nothing
     end
+
+    nsols = nreal_sols = 0
 
     nthreads = Threads.nthreads()
     if threading && nthreads > 1
@@ -192,29 +193,44 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
             ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
 
             for R in batch_tracker.results
-                R !== nothing && push!(results, R)
+                if R !== nothing
+                    push!(results, R)
+                    nreal_sols += isreal(R)
+                    nsols += 1
+                end
             end
             k += length(batch)
 
-            update_progress!(progress, results, k)
+            update_progress!(progress, k, nsols, nreal_sols)
         end
     else
         for (k, s) in enumerate(start_solutions)
             return_code = track!(tracker, s, 1.0)
             if save_all_paths || return_code == PathTrackerStatus.success
-                push!(results, PathResult(tracker, s, k; details=path_result_details))
+                R = PathResult(tracker, s, k; details=path_result_details)
+                push!(results, R)
+
+                if return_code == PathTrackerStatus.success
+                    nreal_sols += isreal(R)
+                    nsols += 1
+                end
             end
-            k % 32 == 0 && update_progress!(progress, results, k)
+            k % 32 == 0 && update_progress!(progress, k, nsols, nreal_sols)
         end
+        update_progress!(progress, n, nsols, nreal_sols)
     end
     results
 end
 
-function update_progress!(progress, results, N)
-    ProgressMeter.update!(progress, N, showvalues=((:tracked, N),))
+function update_progress!(progress, ntracked, nsols, nreal)
+    progress === nothing && return nothing
+
+    ProgressMeter.update!(progress, ntracked, showvalues=(
+        ("# paths tracked", ntracked),
+        ("# solutions (real)", "$nsols ($nreal)")
+    ))
     nothing
 end
-update_progress!(::Nothing, results, N) = nothing
 
 mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
     trackers::Vector{Tracker}
