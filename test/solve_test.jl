@@ -3,13 +3,8 @@
         @polyvar x y z
         @test_throws ErrorException solve([x-2y+2, 0])
         @test_throws ErrorException solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
-
-        # non homogeneous overdetermiend
         @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
-        @test_throws ErrorException solve([x-2z, y^2+3z, z^3+x, z+x])
-        # homogeneous overdetermiend
-        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x])
-        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3, z+x], homvar=z)
+        # overdetermined and abstract system
         @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
         @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
