@@ -789,7 +789,7 @@ for details.
 """
 
 """
-    check_square_homogeneous_system(F, vargroups::VariableGroups; affine_tracking=false)
+    check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
 
 Checks whether `F` is a square polynomial system.
 """

@@ -7,8 +7,9 @@ export AbstractInput,
 const Inputs = Union{<:AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
-const input_supported_keywords = [:parameters, :generic_parameters, :startparameters, :targetparameters,
-                            :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
+const input_supported_keywords = [
+    :parameters, :generic_parameters, :startparameters, :targetparameters,
+    :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
 
 
 
