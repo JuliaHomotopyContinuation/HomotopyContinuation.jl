@@ -602,25 +602,37 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
         end
 
+        # Catch the case that he tracker ran through but we still got a singular solution
+        if tracker.state.winding_number == 0 && condition_jacobian(tracker) > 1e13
+            tracker.state.winding_number = 1
+        end
 
         # If winding_number == 0 the path tracker simply ran through
         if (tracker.state.winding_number == 0)
-            # We need to reach the requested refinement_accuracy
-            x̂ = cache.base_point
-            tol = core_tracker.options.refinement_accuracy
-            result = newton!(x̂, cache.target_system, state.solution,
-                            euclidean_norm, cache.target_newton_cache;
-                            tol=tol, miniters=1, maxiters=3)
-            if isconverged(result)
-                state.solution .= x̂
-                if !pull_back_is_to_affine(tracker.problem, state.solution)
-                    LinearAlgebra.normalize!(state.solution)
-                    changepatch!(cache.target_system.patch, state.solution)
+            try
+                # We need to reach the requested refinement_accuracy
+                x̂ = cache.base_point
+                tol = core_tracker.options.refinement_accuracy
+                # try
+                result = newton!(x̂, cache.target_system, state.solution,
+                                euclidean_norm, cache.target_newton_cache;
+                                tol=tol, miniters=1, maxiters=3)
+                if isconverged(result)
+                    state.solution .= x̂
+                    if !pull_back_is_to_affine(tracker.problem, state.solution)
+                        LinearAlgebra.normalize!(state.solution)
+                        changepatch!(cache.target_system.patch, state.solution)
+                    end
+                    state.solution_accuracy = result.accuracy
+                else
+                    state.solution_accuracy = result.accuracy
+                    state.status = PathTrackerStatus.post_check_failed
                 end
-                state.solution_accuracy = result.accuracy
-            else
-                state.solution_accuracy = result.accuracy
-                state.status = PathTrackerStatus.post_check_failed
+            catch e
+                # okay we had a singular solution after all
+                if isa(e, LinearAlgebra.SingularException)
+                    tracker.state.winding_number = 1
+                end
             end
         # For singular solutions check
         elseif is_squared_up_system(cache.target_system) &&

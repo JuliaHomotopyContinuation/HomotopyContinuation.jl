@@ -157,7 +157,7 @@ Endgame specific options:
 """
 function solve end
 
-const solve_supported_keywords = [:threading, :report_progress, :path_result_details, :save_all_paths]
+const solve_supported_keywords = [:threading, :report_progress, :path_result_details, :save_all_paths, :path_jumping_check]
 
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
@@ -323,31 +323,57 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
     !isempty(finite_results) || return results
 
     tol = tracker.core_tracker.options.refinement_accuracy
+    # find cluster of multiple solutions
     clusters = multiplicities(solution, finite_results; tol=tol)
+
     while true
+        rerun_paths = false
         for cluster in clusters
             m = length(cluster)
-            all_same_winding_number = true
-            for i in m
-                if unpack(finite_results[i].winding_number, 1) ≠ m
-                    all_same_winding_number = false
+            # We have to consider a couple of cases
+            # 1) All m solutions in the cluster also have winding number m
+            #    -> Everything OK
+            # 2) We find two non-singular solutions (winding_number === nothing)
+            #    in the same cluster
+            #    -> Path jumping happened
+            # 3) There can be multiple paths going to the same solution, i.e.,
+            #    winding number | m
+            #    -> OK
+            # 4) It can happen that paths going to a positive dimensional component
+            #    have the same endpoint and still winding number = 1.
+            #
+            # This is quite complicated to tear apart. Therefore we focus for
+            # now only on case 2)
+
+            jumping = false
+            for i in cluster
+                cond = unpack(finite_results[i].condition_jacobian, 1.0)
+                w = unpack(finite_results[i].winding_number, 0)
+                if w == 0 && cond < 1e12
+                    jumping = true
                     break
                 end
             end
-            if !all_same_winding_number
+
+
+            if jumping
+                rerun_paths = true
                 # rerun
                 for i in cluster
                     rᵢ = finite_results[i]
-                    new_rᵢ = track(tracker, start_solution(rᵢ), 1.0; path_number=rᵢ.path_number,
+                    new_rᵢ = track(tracker, start_solution(rᵢ);
+                                            path_number=rᵢ.path_number,
                                             details=details,
-                                            accuracy=min(1e-8, accuracy(tracker.core_tracker)),
+                                            accuracy=min(1e-7, accuracy(tracker.core_tracker)),
                                             max_corrector_iters=1)
                     finite_results[i] = new_rᵢ
                     results[finite_results_indices[i]] = new_rᵢ
-
                 end
             end
         end
+
+        rerun_paths || break
+
         prev_clusters = clusters
         clusters = multiplicities(solution, finite_results; tol=tol)
         if clusters == prev_clusters
