@@ -5,7 +5,7 @@ export PathResult, PathTrackerStatus, PathTracker,
 
 
 const pathtracker_supported_keywords = [
-    :at_infinity_check, :max_step_size_endgame_start,
+    :at_infinity_check, :min_step_size_endgame_start,
     :min_val_accuracy, :samples_per_loop,
     :max_winding_number, :max_affine_norm]
 
@@ -62,7 +62,7 @@ end
 
 mutable struct PathTrackerOptions
     at_infinity_check::Bool
-    max_step_size_endgame_start::Float64
+    min_step_size_endgame_start::Float64
     min_val_accuracy::Float64
     samples_per_loop::Int
     max_winding_number::Int
@@ -71,23 +71,23 @@ mutable struct PathTrackerOptions
     max_affine_norm::Float64
     # The minimal residual a solution needs to have to be considered
     # a solution of the original system (only applied for singular solutions)
-    overdetermined_minimal_residual::Float64
-    overdetermined_minimal_accuracy::Float64
+    overdetermined_min_residual::Float64
+    overdetermined_min_accuracy::Float64
 end
 
 function PathTrackerOptions(;
             at_infinity_check=true,
-            max_step_size_endgame_start::Float64=1e-8,
+            min_step_size_endgame_start::Float64=1e-8,
             min_val_accuracy::Float64=0.001,
             samples_per_loop::Int=8,
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6,
-            overdetermined_minimal_residual::Float64=1e-3,
-            overdetermined_minimal_accuracy::Float64=1e-5)
-    PathTrackerOptions(at_infinity_check, max_step_size_endgame_start, min_val_accuracy,
+            overdetermined_min_residual::Float64=1e-3,
+            overdetermined_min_accuracy::Float64=1e-5)
+    PathTrackerOptions(at_infinity_check, min_step_size_endgame_start, min_val_accuracy,
                        samples_per_loop, max_winding_number, max_affine_norm,
-                       overdetermined_minimal_residual,
-                       overdetermined_minimal_accuracy)
+                       overdetermined_min_residual,
+                       overdetermined_min_accuracy)
 end
 
 mutable struct PathTrackerState{V<:AbstractVector}
@@ -193,13 +193,13 @@ and thus has all configuration possibilities [`CoreTracker`](@ref) has.
 There are the following `PathTracker` specific options (with their defaults in parens):
 
 * `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
-* `max_step_size_endgame_start::Float64=1e-6`: The endgame only starts if the step size becomes smaller that the provided value.
+* `min_step_size_endgame_start::Float64=1e-6`: The endgame only starts if the step size becomes smaller that the provided value.
 * `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
 * `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
 * `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
 * `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
-* `overdetermined_minimal_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
-* `overdetermined_minimal_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
+* `overdetermined_min_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
+* `overdetermined_min_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
 
 In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
 [`pathtracker_startsolutions`](@ref) helper functions.
@@ -285,7 +285,7 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
         update_val!(state, core_tracker)
 
         # We want don't want to start the endgame too early
-        core_tracker.state.Δs < options.max_step_size_endgame_start || continue
+        core_tracker.state.Δs < options.min_step_size_endgame_start || continue
 
         # Check at infinity
         if tracker.options.at_infinity_check && check_at_infinity(tracker)
@@ -628,7 +628,7 @@ function check_and_refine_solution!(tracker::PathTracker)
                                 euclidean_norm, cache.target_newton_cache;
                                 tol=tol, miniters=1, maxiters=3)
                 if isconverged(result) ||
-                    (is_squared_up_system(core_tracker.homotopy) && result.accuracy < options.overdetermined_minimal_accuracy)
+                    (is_squared_up_system(core_tracker.homotopy) && result.accuracy < options.overdetermined_min_accuracy)
                     state.solution .= x̂
                     if !pull_back_is_to_affine(tracker.problem, state.solution)
                         LinearAlgebra.normalize!(state.solution)
@@ -649,7 +649,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
         # For singular solutions check
         elseif is_squared_up_system(core_tracker.homotopy) &&
-               residual(tracker) > options.overdetermined_minimal_residual
+               residual(tracker) > options.overdetermined_min_residual
                 state.status = PathTrackerStatus.post_check_failed
         end
     end

@@ -8,8 +8,11 @@ const Inputs = Union{<:AbstractSystem, <:MPPolys, <:Composition}
 const MPPolyInputs = Union{<:MPPolys, <:Composition}
 
 const input_supported_keywords = [
-    :parameters, :generic_parameters, :startparameters, :targetparameters,
-    :targetgamma, :startgamma, :p₁, :p₀, :γ₁, :γ₀]
+    :parameters, :generic_parameters, :start_parameters, :target_parameters,
+    :target_gamma, :start_gamma, :p₁, :p₀, :γ₁, :γ₀,
+    # deprecated
+    :startparameters, :targetparameters,
+    :targetgamma, :startgamma,]
 
 
 
@@ -128,15 +131,41 @@ input_startsolutions(F::AbstractSystem, starts; kwargs...) = parameter_homotopy(
 function parameter_homotopy(F::Inputs, startsolutions;
     parameters=(isa(F, AbstractSystem) ? nothing : error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))),
     generic_parameters=nothing,
-    startparameters=generic_parameters, p₁ = startparameters,
-    targetparameters=generic_parameters, p₀ = targetparameters,
-    startgamma=nothing, γ₁ = startgamma,
-    targetgamma=nothing, γ₀ = targetgamma)
+    start_parameters=generic_parameters, p₁ = start_parameters,
+    target_parameters=generic_parameters, p₀ = target_parameters,
+    start_gamma=nothing, γ₁ = start_gamma,
+    target_gamma=nothing, γ₀ = target_gamma,
+    # deprecated in 0.7
+    startparameters=nothing,
+    targetparameters=nothing,
+    startgamma=nothing,
+    targetgamma=nothing
+    )
+
+    # deprecation handling
+    @deprecatekwarg startparameters start_parameters
+    @deprecatekwarg targetparameters target_parameters
+    @deprecatekwarg startgamma start_gamma
+    @deprecatekwarg targetgamma target_gamma
+
+    if γ₁ === nothing
+        γ₁ = start_gamma
+    end
+    if γ₀ === nothing
+        γ₀ = target_gamma
+    end
+    if p₁ === nothing
+        p₁ = start_parameters
+    end
+    if p₀ === nothing
+        p₀ = target_parameters
+    end
+
 
     if p₁ === nothing
-        error("You need to pass `generic_parameters=`, `startparameters=` or `p₁=` as a keyword argument")
+        error("You need to pass `generic_parameters=`, `start_parameters=` or `p₁=` as a keyword argument")
     elseif p₀ === nothing
-        error("`targetparameters=` or `p₀=` need to be passed as a keyword argument.")
+        error("`target_parameters=` or `p₀=` need to be passed as a keyword argument.")
     end
 
     if length(p₁) != length(p₀) || (parameters !== nothing && length(parameters) != length(p₀))

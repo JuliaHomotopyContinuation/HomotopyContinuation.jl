@@ -85,10 +85,10 @@ The input `parameters` specifies the parameter variables of `F`
 which should be considered as parameters.
 Necessarily we have `length(parameters) == length(p₁) == length(p₀)`.
 
-    solve(F, startsolutions; parameters, startparameters, targetparameters, startgamma=nothing, targetgamma=nothing)
+    solve(F, startsolutions; parameters, start_parameters, target_parameters, start_gamma=nothing, target_gamma=nothing)
 
-This is a non-unicode variant where `γ₁=startparameters`, `γ₀=targetparameters`,
-    `γ₁=startgamma`, γ₀=`targetgamma`.
+This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
+    `γ₁=start_gamma`, γ₀=`target_gamma`.
 
 ### Example
 We want to solve a parameter homotopy ``H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])`` where
@@ -103,7 +103,7 @@ F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
 startsolutions = [[1, 1]]
 solve(F, startsolutions; parameters=a, p₁=p₁, p₀=p₀)
 # If you don't like unicode this is also possible
-solve(F, startsolutions, parameters=a, startparameters=p₁, targetparameters=p₀)
+solve(F, startsolutions, parameters=a, start_parameters=p₁, target_parameters=p₀)
 ```
 
 # Abstract Homotopy
@@ -122,7 +122,7 @@ if the third variable is the homogenization variable.
 General options:
 
 * `seed::Int`: The random seed used during the computations.
-* `report_progress=true`: Whether a progress bar should be printed to standard out.
+* `show_progress=true`: Whether a progress bar should be printed to standard out.
 * `threading=true`: Enable or disable multi-threading.
 * `path_result_details=:default`: The amount of information computed in each path result. Possible values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogeneous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
@@ -136,7 +136,7 @@ Path tracking specific options:
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
 * `max_corrector_iters=3`: The maximal number of correction steps in a single step.
 * `initial_step_size=0.1`: The step size of the first step.
-* `max_steps=10_000`: The maximal number of iterations the path tracker has available.
+* `max_steps=1_000`: The maximal number of iterations the path tracker has available.
 * `min_step_size =1e-14`: The minimal step size.
 * `max_step_size =Inf`: The maximal step size.
 * `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
@@ -157,7 +157,10 @@ Endgame specific options:
 """
 function solve end
 
-const solve_supported_keywords = [:threading, :report_progress, :path_result_details, :save_all_paths, :path_jumping_check]
+const solve_supported_keywords = [:threading, :show_progress,
+            :path_result_details, :save_all_paths, :path_jumping_check,
+            # deprecated
+            :report_progress]
 
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
@@ -165,7 +168,9 @@ function solve(args...; kwargs...)
     solve(tracker, start_solutions; solve_kwargs...)
 end
 
-function solve(tracker::PathTracker, start_solutions; path_result_details=:default, save_all_paths=false, path_jumping_check=true, kwargs...)
+function solve(tracker::PathTracker, start_solutions;
+        path_result_details=:default, save_all_paths=false,
+        path_jumping_check=true, kwargs...)
     results = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
     if path_jumping_check
         path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
@@ -181,11 +186,17 @@ mutable struct SolveStats
 end
 SolveStats() = SolveStats(0,0,0,0)
 
-function track_paths(tracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default, save_all_paths=false)
+function track_paths(tracker, start_solutions;
+                threading=true, show_progress=true,
+                path_result_details::Symbol=:default, save_all_paths=false,
+                # deprecated
+                report_progress=nothing)
     results = Vector{result_type(tracker)}()
     n = length(start_solutions)
 
-    if report_progress
+    @deprecatekwarg report_progress show_progress
+
+    if show_progress
         progress = ProgressMeter.Progress(n, 0.1, "Tracking $n paths... ")
     else
         progress = nothing
