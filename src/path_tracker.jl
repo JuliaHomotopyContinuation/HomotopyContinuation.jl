@@ -72,6 +72,7 @@ mutable struct PathTrackerOptions
     # The minimal residual a solution needs to have to be considered
     # a solution of the original system (only applied for singular solutions)
     overdetermined_minimal_residual::Float64
+    overdetermined_minimal_accuracy::Float64
 end
 
 function PathTrackerOptions(;
@@ -81,10 +82,12 @@ function PathTrackerOptions(;
             samples_per_loop::Int=8,
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6,
-            overdetermined_minimal_residual::Float64=1e-3)
+            overdetermined_minimal_residual::Float64=1e-3,
+            overdetermined_minimal_accuracy::Float64=1e-5)
     PathTrackerOptions(at_infinity_check, max_step_size_endgame_start, min_val_accuracy,
                        samples_per_loop, max_winding_number, max_affine_norm,
-                       overdetermined_minimal_residual)
+                       overdetermined_minimal_residual,
+                       overdetermined_minimal_accuracy)
 end
 
 mutable struct PathTrackerState{V<:AbstractVector}
@@ -178,9 +181,6 @@ end
 
 is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
 is_squared_up_system(::AbstractHomotopy) = false
-is_squared_up_system(F::PatchedSystem) = is_squared_up_system(F.system)
-is_squared_up_system(::SquaredUpSystem) = true
-is_squared_up_system(::AbstractSystem) = false
 
 """
      PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
@@ -198,7 +198,8 @@ There are the following `PathTracker` specific options (with their defaults in p
 * `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
 * `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
 * `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
-* `overdetermined_minimal_residual=1e-3`: The minimal residual a solution needs to have to be considered a solution of the original system (only applied for singular solutions).
+* `overdetermined_minimal_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
+* `overdetermined_minimal_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
 
 In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
 [`pathtracker_startsolutions`](@ref) helper functions.
@@ -626,7 +627,8 @@ function check_and_refine_solution!(tracker::PathTracker)
                 result = newton!(x̂, cache.target_system, state.solution,
                                 euclidean_norm, cache.target_newton_cache;
                                 tol=tol, miniters=1, maxiters=3)
-                if isconverged(result)
+                if isconverged(result) ||
+                    (is_squared_up_system(core_tracker.homotopy) && result.accuracy < options.overdetermined_minimal_accuracy)
                     state.solution .= x̂
                     if !pull_back_is_to_affine(tracker.problem, state.solution)
                         LinearAlgebra.normalize!(state.solution)
@@ -646,7 +648,7 @@ function check_and_refine_solution!(tracker::PathTracker)
                 end
             end
         # For singular solutions check
-        elseif is_squared_up_system(cache.target_system) &&
+        elseif is_squared_up_system(core_tracker.homotopy) &&
                residual(tracker) > options.overdetermined_minimal_residual
                 state.status = PathTrackerStatus.post_check_failed
         end
