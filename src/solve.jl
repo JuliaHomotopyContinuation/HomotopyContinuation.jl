@@ -173,6 +173,14 @@ function solve(tracker::PathTracker, start_solutions; path_result_details=:defau
     Result(results, length(start_solutions), tracker.problem.seed)
 end
 
+mutable struct SolveStats
+    regular::Int
+    regular_real::Int
+    singular::Int
+    singular_real::Int
+end
+SolveStats() = SolveStats(0,0,0,0)
+
 function track_paths(tracker, start_solutions; threading=true, report_progress=true, path_result_details::Symbol=:default, save_all_paths=false)
     results = Vector{result_type(tracker)}()
     n = length(start_solutions)
@@ -183,7 +191,7 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
         progress = nothing
     end
 
-    nsols = nreal_sols = 0
+    stats = SolveStats()
 
     try
         nthreads = Threads.nthreads()
@@ -199,8 +207,7 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
                 for R in batch_tracker.results
                     if R !== nothing
                         push!(results, R)
-                        nreal_sols += isreal(R)
-                        nsols += 1
+                        update!(stats, R)
                     end
                 end
                 k += length(batch)
@@ -208,7 +215,7 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
                     return results
                 end
 
-                update_progress!(progress, k, nsols, nreal_sols)
+                update_progress!(progress, k, stats)
             end
         else
             for (k, s) in enumerate(start_solutions)
@@ -218,13 +225,12 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
                     push!(results, R)
 
                     if return_code == PathTrackerStatus.success
-                        nreal_sols += isreal(R)
-                        nsols += 1
+                        update!(stats, R)
                     end
                 end
-                k % 32 == 0 && update_progress!(progress, k, nsols, nreal_sols)
+                k % 32 == 0 && update_progress!(progress, k, stats)
             end
-            update_progress!(progress, n, nsols, nreal_sols)
+            update_progress!(progress, n, stats)
         end
     catch e
         if isa(e, InterruptException)
@@ -236,12 +242,27 @@ function track_paths(tracker, start_solutions; threading=true, report_progress=t
     results
 end
 
-function update_progress!(progress, ntracked, nsols, nreal)
+function update!(stats::SolveStats, R::PathResult)
+    if issingular(R)
+        stats.singular_real += isreal(R)
+        stats.singular += 1
+    else
+        stats.regular_real += isreal(R)
+        stats.regular += 1
+    end
+end
+
+function update_progress!(progress, ntracked, stats::SolveStats)
     progress === nothing && return nothing
+
+    nsols = stats.regular + stats.singular
+    nreal = stats.regular_real + stats.singular_real
 
     ProgressMeter.update!(progress, ntracked, showvalues=(
         ("# paths tracked", ntracked),
-        ("# solutions (real)", "$nsols ($nreal)")
+        ("# non-singular solutions (real)", "$(stats.regular) ($(stats.regular_real))"),
+        ("# singular solutions (real)", "$(stats.singular) ($(stats.singular_real))"),
+        ("# total solutions (real)", "$nsols ($nreal)")
     ))
     nothing
 end
