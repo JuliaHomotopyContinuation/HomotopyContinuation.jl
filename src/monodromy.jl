@@ -548,7 +548,7 @@ function monodromy_solve(F::Inputs,
         showprogress=nothing, #deprecated
         kwargs...) where {TP, NVars}
 
-    @deprecatekwarg show_progress showprogress
+    @deprecatekwarg showprogress show_progress
 
     if parameters !== nothing && length(p) ≠ length(parameters)
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
