@@ -1,7 +1,7 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, isfailed, isatinfinity,
-       issingular, isnonsingular, isprojective, isaffine
+       issingular, isnonsingular, isprojective, isaffine, set_parameters!
 
 
 const pathtracker_supported_keywords = [
@@ -235,10 +235,23 @@ Possible values for the options are
 * `accuracy::Float64`
 * `max_corrector_iters::Int`
 * `max_steps::Int`
+* `start_parameters::AbstractVector`
+* `target_parameters::AbstractVector`
 """
-function track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
+function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
+        start_parameters::Union{Nothing,<:AbstractVector}=nothing,
+        target_parameters::Union{Nothing,<:AbstractVector}=nothing,
+        kwargs...)
+
     @unpack core_tracker, state, options, cache = tracker
     prev_options = set_options!(core_tracker; kwargs...)
+
+    if start_parameters !== nothing
+        set_start_parameters!(core_tracker.homotopy, start_parameters)
+    end
+    if target_parameters !== nothing
+        set_target_parameters!(core_tracker.homotopy, target_parameters)
+    end
 
     # For performance reasons we single thread blas
     n_blas_threads = single_thread_blas()
@@ -346,6 +359,8 @@ Possible values for the options are
 * `accuracy::Float64`
 * `max_corrector_iters::Int`
 * `max_steps::Int`
+* `start_parameters::AbstractVector`
+* `target_parameters::AbstractVector`
 """
 function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, kwargs...)
     track!(tracker, x₁, t₁; kwargs...)
@@ -364,6 +379,20 @@ function set_options!(core_tracker::CoreTracker;
 end
 
 
+"""
+    set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
+
+Set the parameters of a parameter homotopy.
+"""
+function set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
+    if start_parameters !== nothing
+        set_start_parameters!(tracker.core_tracker.homotopy, start_parameters)
+    end
+    if target_parameters !== nothing
+        set_target_parameters!(tracker.core_tracker.homotopy, target_parameters)
+    end
+    nothing
+end
 
 ################
 ## VALUATIONS ##

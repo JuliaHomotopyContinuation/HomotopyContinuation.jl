@@ -112,6 +112,26 @@ function set_parameters!(H::ParameterHomotopy, p::Tuple, γ=nothing)
 end
 
 """
+    set_start_parameters!(H::ParameterHomotopy, p)
+
+Update the start parameters of `H`.
+"""
+function set_start_parameters!(H::ParameterHomotopy, p)
+    H.p[1] .= p
+    H
+end
+
+"""
+    set_target_parameters!(H::ParameterHomotopy, p)
+
+Update the target parameters of `H`.
+"""
+function set_target_parameters!(H::ParameterHomotopy, p)
+    H.p[2] .= p
+    H
+end
+
+"""
     set_parameters!(H::ParameterHomotopy, p₁, p₀, γ)
 
 Update the parameters `p` and `γ` of `H`.

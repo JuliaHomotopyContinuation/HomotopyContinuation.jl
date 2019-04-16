@@ -27,6 +27,12 @@ The return type of [`track!`](@ref) is
 PathTrackerStatus.states
 ```
 
+In the case that you track paths of parameter homotopy you can also change
+the parameters using
+```@docs
+set_parameters!(::PathTracker)
+```
+
 ## PathResult
 For each path we return a [`PathResult`](@ref) containing the detailed information about
 the single path.
