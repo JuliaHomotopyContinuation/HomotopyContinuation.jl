@@ -26,8 +26,8 @@ https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl
 ```
 Result with 4 solutions
 ==================================
-• 4 non-singular finite solutions (2 real)
-• 0 singular finite solutions (0 real)
+• 4 non-singular solutions (2 real)
+• 0 singular solutions (0 real)
 • 4 paths tracked
 • random seed: 902575
 ```
