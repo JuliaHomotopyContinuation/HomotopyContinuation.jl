@@ -303,9 +303,9 @@ needs to be homogeneous. Note that a `CoreTracker` is also a (mutable) iterator.
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
 * `max_corrector_iters=3`: The maximal number of correction steps in a single step.
 * `initial_step_size=0.1`: The step size of the first step.
-* `max_steps=10_000`: The maximal number of iterations the path tracker has available.
-* `min_step_size =1e-14`: The minimal step size.
-* `max_step_size =Inf`: The maximal step size.
+* `max_steps=1_000`: The maximal number of iterations the path tracker has available.
+* `min_step_size=1e-14`: The minimal step size.
+* `max_step_size=Inf`: The maximal step size.
 * `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.

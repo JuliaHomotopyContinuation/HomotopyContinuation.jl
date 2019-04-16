@@ -103,4 +103,38 @@
         res = track(tracker, starts[1])
         @test res.return_code == :success
     end
+
+    @testset "Parameter homotopy, change parameters" begin
+        @polyvar x y z p[1:3]
+
+        F = [
+            x + 3 + 2y + 2y^2 - p[1],
+            (x - 2 + 5y)*z + 4 - p[2] * z,
+            (x + 2 + 4y)*z + 5 - p[3] * z
+        ]
+        # Generate generic parameters by sampling complex numbers from the normal distribution
+        p₀ = randn(ComplexF64, 3)
+        # Substitute p₀ for p
+        F_p₀ = subs(F, p => p₀)
+        # Compute all solutions for F_p₀
+        result_p₀ = solve(F_p₀)
+
+        # Let's store the generic solutions
+        S_p₀ = solutions(result_p₀)
+        # Construct the PathTracker
+        tracker = pathtracker(F; parameters=p, generic_parameters=p₀)
+
+        q = randn(3)
+        result = track(tracker, first(S_p₀); target_parameters=q)
+        @test issuccess(result)
+
+        result = track(tracker, first(S_p₀); start_parameters=p₀, target_parameters=q)
+        @test issuccess(result)
+
+        # Construct the PathTracker
+        tracker = pathtracker(F; parameters=p, generic_parameters=p₀)
+        set_parameters!(tracker; target_parameters=q)
+        result2 = track(tracker, first(S_p₀))
+        @test result.solution ≈ result2.solution atol=1e-7
+    end
 end

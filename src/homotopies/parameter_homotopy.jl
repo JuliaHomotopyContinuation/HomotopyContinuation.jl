@@ -22,12 +22,12 @@ are stored as a tuple `γ` or as `γ=nothing`
 
     ParameterHomotopy(F, parameters;
         variables=setdiff(MP.variables(F), parameters),
-        startparameters=randn(ComplexF64, length(parameters)),
-        targetparameters=randn(ComplexF64, length(parameters)),
-        startgamma=nothing, targetgamma=nothing)
+        start_parameters=randn(ComplexF64, length(parameters)),
+        target_parameters=randn(ComplexF64, length(parameters)),
+        start_gamma=nothing, target_gamma=nothing)
 
-This is a non-unicode variant where `γ₁=startparameters`, `γ₀=targetparameters`,
-`γ₁=startgamma`, `γ₀=targetgamma`.
+This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
+`γ₁=start_gamma`, `γ₀=target_gamma`.
 """
 mutable struct ParameterHomotopy{Sys<:AbstractSystem, T<:Number} <: AbstractHomotopy
     F::Sys
@@ -36,8 +36,8 @@ mutable struct ParameterHomotopy{Sys<:AbstractSystem, T<:Number} <: AbstractHomo
 end
 
 function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::AbstractVector;
-    startgamma=nothing, γ₀ = startgamma,
-    targetgamma=nothing, γ₁ = targetgamma)
+    start_gamma=nothing, γ₀ = start_gamma,
+    target_gamma=nothing, γ₁ = target_gamma)
 
     length(p₁) == length(p₀) || error("Length of parameters provided doesn't match.")
 
@@ -48,8 +48,8 @@ function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::Abstra
 end
 
 function ParameterHomotopy(F::AbstractSystem;
-    startparameters=nothing, p₁ = startparameters,
-    targetparameters=nothing, p₀ = targetparameters,
+    start_parameters=nothing, p₁ = start_parameters,
+    target_parameters=nothing, p₀ = target_parameters,
     kwargs...)
     (p₁ !== nothing && p₀ !== nothing) || error("Parameters not provided for ParameterHomotopy")
     ParameterHomotopy(F, p₁, p₀; kwargs...)
@@ -58,12 +58,12 @@ end
 function ParameterHomotopy(F::Vector{T},
     parameters::AbstractVector{V};
     variables=setdiff(MP.variables(F), parameters),
-    startparameters=randn(ComplexF64, length(parameters)),
-    targetparameters=randn(ComplexF64, length(parameters)),
+    start_parameters=randn(ComplexF64, length(parameters)),
+    target_parameters=randn(ComplexF64, length(parameters)),
     kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
     G = SPSystem(F; variables=variables, parameters=parameters)
-    ParameterHomotopy(G; startparameters=startparameters,
-        targetparameters=targetparameters, kwargs...)
+    ParameterHomotopy(G; start_parameters=start_parameters,
+        target_parameters=target_parameters, kwargs...)
 end
 
 struct ParameterHomotopyCache{C<:AbstractSystemCache, T1<:Number, T2<:Number} <: AbstractHomotopyCache
@@ -108,6 +108,26 @@ function set_parameters!(H::ParameterHomotopy, p::Tuple, γ=nothing)
     H.p[1] .= p[1]
     H.p[2] .= p[2]
     H.γ = γ
+    H
+end
+
+"""
+    set_start_parameters!(H::ParameterHomotopy, p)
+
+Update the start parameters of `H`.
+"""
+function set_start_parameters!(H::ParameterHomotopy, p)
+    H.p[1] .= p
+    H
+end
+
+"""
+    set_target_parameters!(H::ParameterHomotopy, p)
+
+Update the target parameters of `H`.
+"""
+function set_target_parameters!(H::ParameterHomotopy, p)
+    H.p[2] .= p
     H
 end
 
