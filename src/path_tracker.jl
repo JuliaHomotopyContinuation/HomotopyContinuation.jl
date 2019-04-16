@@ -588,8 +588,18 @@ function check_and_refine_solution!(tracker::PathTracker)
         if state.winding_number > 0
             state.solution .= state.prediction
         else
-            refine!(core_tracker)
-            state.solution .= currx(core_tracker)
+            try
+                refine!(core_tracker)
+                state.solution .= currx(core_tracker)
+            catch e
+                # okay we had a singular solution after all
+                if isa(e, LinearAlgebra.SingularException)
+                    tracker.state.winding_number = 1
+                    state.solution .= currx(core_tracker)
+                else
+                    rethrow(e)
+                end
+            end
         end
 
         # Bring vector onto "standard form"
@@ -613,7 +623,6 @@ function check_and_refine_solution!(tracker::PathTracker)
                 # We need to reach the requested refinement_accuracy
                 x̂ = cache.base_point
                 tol = core_tracker.options.refinement_accuracy
-                # try
                 result = newton!(x̂, cache.target_system, state.solution,
                                 euclidean_norm, cache.target_newton_cache;
                                 tol=tol, miniters=1, maxiters=3)
@@ -632,6 +641,8 @@ function check_and_refine_solution!(tracker::PathTracker)
                 # okay we had a singular solution after all
                 if isa(e, LinearAlgebra.SingularException)
                     tracker.state.winding_number = 1
+                else
+                    rethrow(e)
                 end
             end
         # For singular solutions check
