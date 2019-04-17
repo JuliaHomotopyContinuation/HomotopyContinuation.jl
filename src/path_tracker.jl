@@ -614,88 +614,92 @@ This also makes sure that our accuracy is correct after a possible pull back.
 function check_and_refine_solution!(tracker::PathTracker)
     @unpack core_tracker, state, options, cache = tracker
 
-    if state.status == PathTrackerStatus.success
-        # state.winding_number > 0 only if during tracking we had the need to
-        # use the cauchy endgame
-        if state.winding_number > 0
-            state.solution .= state.prediction
-        else
-            try
-                refine!(core_tracker)
+    if state.status ≠ PathTrackerStatus.success
+        state.solution .= currx(core_tracker)
+        return nothing
+    end
+
+    # state.winding_number > 0 only if during tracking we had the need to
+    # use the cauchy endgame
+    if state.winding_number > 0
+        state.solution .= state.prediction
+    else
+        try
+            refine!(core_tracker)
+            state.solution .= currx(core_tracker)
+        catch e
+            # okay we had a singular solution after all
+            if isa(e, LinearAlgebra.SingularException)
+                tracker.state.winding_number = 1
                 state.solution .= currx(core_tracker)
-            catch e
-                # okay we had a singular solution after all
-                if isa(e, LinearAlgebra.SingularException)
-                    tracker.state.winding_number = 1
-                    state.solution .= currx(core_tracker)
-                else
-                    rethrow(e)
-                end
+            else
+                rethrow(e)
             end
-        end
-
-        projective_refinement = false
-        # Bring vector onto "standard form"
-        if !affine_tracking(core_tracker)
-            if pull_back_is_to_affine(tracker.problem, state.solution)
-                ProjectiveVectors.affine_chart!(state.solution)
-            else # projective result -> bring on (product of) sphere(s)
-                LinearAlgebra.normalize!(state.solution)
-                changepatch!(cache.target_system.patch, state.solution)
-                projective_refinement = true
-            end
-        end
-
-        # Catch the case that he tracker ran through but we still got a singular solution
-        if tracker.state.winding_number == 0 && condition_jacobian(tracker) > 1e13
-            tracker.state.winding_number = 1
-        end
-
-        # If winding_number == 0 the path tracker simply ran through
-        if (tracker.state.winding_number == 0)
-            try
-                # We need to reach the requested refinement_accuracy
-                x̂ = cache.base_point
-                if is_squared_up_system(core_tracker.homotopy)
-                    tol = options.overdetermined_min_accuracy
-                else
-                    tol = core_tracker.options.refinement_accuracy
-                end
-                if projective_refinement
-                    result = newton!(x̂, cache.target_system, state.solution,
-                                    euclidean_norm, cache.target_newton_cache;
-                                    tol=tol, miniters=1, maxiters=2)
-                else
-                    init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
-                    result = newton!(x̂, cache.target_system, state.solution,
-                                    cache.weighted_ip, cache.target_newton_cache;
-                                    tol=tol, miniters=1, maxiters=2)
-                end
-                if isconverged(result)
-                    state.solution .= x̂
-                    if !pull_back_is_to_affine(tracker.problem, state.solution)
-                        LinearAlgebra.normalize!(state.solution)
-                        changepatch!(cache.target_system.patch, state.solution)
-                    end
-                    state.solution_accuracy = result.accuracy
-                else
-                    state.solution_accuracy = result.accuracy
-                    state.status = PathTrackerStatus.post_check_failed
-                end
-            catch e
-                # okay we had a singular solution after all
-                if isa(e, LinearAlgebra.SingularException)
-                    tracker.state.winding_number = 1
-                else
-                    rethrow(e)
-                end
-            end
-        # For singular solutions check
-        elseif is_squared_up_system(core_tracker.homotopy) &&
-               residual(tracker) > options.overdetermined_min_residual
-                state.status = PathTrackerStatus.post_check_failed
         end
     end
+
+    projective_refinement = false
+    # Bring vector onto "standard form"
+    if !affine_tracking(core_tracker)
+        if pull_back_is_to_affine(tracker.problem, state.solution)
+            ProjectiveVectors.affine_chart!(state.solution)
+        else # projective result -> bring on (product of) sphere(s)
+            LinearAlgebra.normalize!(state.solution)
+            changepatch!(cache.target_system.patch, state.solution)
+            projective_refinement = true
+        end
+    end
+
+    # Catch the case that he tracker ran through but we still got a singular solution
+    if tracker.state.winding_number == 0 && condition_jacobian(tracker) > 1e13
+        tracker.state.winding_number = 1
+    end
+
+    # If winding_number == 0 the path tracker simply ran through
+    if (tracker.state.winding_number == 0)
+        try
+            # We need to reach the requested refinement_accuracy
+            x̂ = cache.base_point
+            if is_squared_up_system(core_tracker.homotopy)
+                tol = options.overdetermined_min_accuracy
+            else
+                tol = core_tracker.options.refinement_accuracy
+            end
+            if projective_refinement
+                result = newton!(x̂, cache.target_system, state.solution,
+                                euclidean_norm, cache.target_newton_cache;
+                                tol=tol, miniters=1, maxiters=2)
+            else
+                init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
+                result = newton!(x̂, cache.target_system, state.solution,
+                                cache.weighted_ip, cache.target_newton_cache;
+                                tol=tol, miniters=1, maxiters=2)
+            end
+            if isconverged(result)
+                state.solution .= x̂
+                if !pull_back_is_to_affine(tracker.problem, state.solution)
+                    LinearAlgebra.normalize!(state.solution)
+                    changepatch!(cache.target_system.patch, state.solution)
+                end
+                state.solution_accuracy = result.accuracy
+            else
+                state.solution_accuracy = result.accuracy
+                state.status = PathTrackerStatus.post_check_failed
+            end
+        catch e
+            # okay we had a singular solution after all
+            if isa(e, LinearAlgebra.SingularException)
+                tracker.state.winding_number = 1
+            else
+                rethrow(e)
+            end
+        end
+    # For singular solutions check
+    elseif is_squared_up_system(core_tracker.homotopy) &&
+           residual(tracker) > options.overdetermined_min_residual
+            state.status = PathTrackerStatus.post_check_failed
+    end
+
     nothing
 end
 
