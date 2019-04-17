@@ -21,7 +21,7 @@ function Jacobian(A::AbstractMatrix)
     if m == n
         fac = LinearAlgebra.lu(A)
     else
-        fac = LinearAlgebra.qr(A)
+        fac = LinearAlgebra.qr(A, Val(true))
     end
     J = copy(A)
     D = ones(m)
@@ -72,7 +72,7 @@ function solve!(x, A::StridedMatrix, b::StridedVecOrMat)
         ldiv_unit_lower!(A, x)
         ldiv_upper!(A, x)
     else
-        LinearAlgebra.ldiv!(x, LinearAlgebra.qr!(A), b)
+        LinearAlgebra.ldiv!(x, LinearAlgebra.qr!(A, Val(true)), b)
     end
     x
 end
@@ -121,7 +121,7 @@ function factorization(A::AbstractMatrix)
     if m == n
         LinearAlgebra.lu(A)
     else
-        LinearAlgebra.qr(A)
+        LinearAlgebra.qr(A, Val(true))
     end
 end
 
@@ -138,6 +138,10 @@ end
 function factorize!(QR::LinearAlgebra.QRCompactWY, A::AbstractMatrix)
     copyto!(QR.factors, A)
     LinearAlgebra.qr!(QR.factors)
+end
+function factorize!(QR::LinearAlgebra.QRPivoted, A::AbstractMatrix)
+    copyto!(QR.factors, A)
+    LinearAlgebra.qr!(QR.factors, Val(true))
 end
 
 

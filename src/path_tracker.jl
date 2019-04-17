@@ -7,7 +7,8 @@ export PathResult, PathTrackerStatus, PathTracker,
 const pathtracker_supported_keywords = [
     :at_infinity_check, :min_step_size_endgame_start,
     :min_val_accuracy, :samples_per_loop,
-    :max_winding_number, :max_affine_norm]
+    :max_winding_number, :max_affine_norm,
+    :overdetermined_min_accuracy, :overdetermined_min_residual]
 
 module PathTrackerStatus
 
@@ -83,7 +84,7 @@ function PathTrackerOptions(;
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6,
             overdetermined_min_residual::Float64=1e-3,
-            overdetermined_min_accuracy::Float64=1e-5)
+            overdetermined_min_accuracy::Float64=1e-4)
     PathTrackerOptions(at_infinity_check, min_step_size_endgame_start, min_val_accuracy,
                        samples_per_loop, max_winding_number, max_affine_norm,
                        overdetermined_min_residual,
@@ -144,13 +145,14 @@ function reset!(state::PathTrackerState)
 end
 
 
-struct PathTrackerCache{T, V<:AbstractVector{T}, S<:AbstractSystem, NC<:NewtonCache}
+struct PathTrackerCache{T, V<:AbstractVector{Complex{T}}, S<:AbstractSystem, NC<:NewtonCache}
     unit_roots::Vector{ComplexF64}
     base_point::V
     target_system::S
-    target_residual::Vector{T}
-    target_jacobian::Matrix{T}
+    target_residual::Vector{Complex{T}}
+    target_jacobian::Matrix{Complex{T}}
     target_newton_cache::NC
+    weighted_ip::WeightedIP{T}
 end
 
 function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
@@ -176,7 +178,8 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
     jac = jacobian(target_system, currx(core_tracker), target_newton_cache.system_cache)
 
-    PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache)
+    weighted_ip = WeightedIP(x)
+    PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache, weighted_ip)
 end
 
 is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
@@ -204,12 +207,12 @@ There are the following `PathTracker` specific options (with their defaults in p
 In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
 [`pathtracker_startsolutions`](@ref) helper functions.
 """
-struct PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
+struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCache, CT<:CoreTracker}
     problem::Prob
     core_tracker::CT
     state::PathTrackerState{V}
     options::PathTrackerOptions
-    cache::PathTrackerCache{T, V}
+    cache::PTC
 end
 
 function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_infinity_check=default_at_infinity_check(problem), optionskwargs...)
@@ -309,7 +312,6 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
         # Check that all valuations are accurate
         check_valuation_accurate(tracker) || continue
 
-        # @show state.val state.val_accuracy
         # We store when we entered the endgame zone
         if state.endgame_zone_start === nothing
             state.endgame_zone_start = t
@@ -632,6 +634,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
         end
 
+        projective_refinement = false
         # Bring vector onto "standard form"
         if !affine_tracking(core_tracker)
             if pull_back_is_to_affine(tracker.problem, state.solution)
@@ -639,6 +642,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             else # projective result -> bring on (product of) sphere(s)
                 LinearAlgebra.normalize!(state.solution)
                 changepatch!(cache.target_system.patch, state.solution)
+                projective_refinement = true
             end
         end
 
@@ -652,12 +656,22 @@ function check_and_refine_solution!(tracker::PathTracker)
             try
                 # We need to reach the requested refinement_accuracy
                 x̂ = cache.base_point
-                tol = core_tracker.options.refinement_accuracy
-                result = newton!(x̂, cache.target_system, state.solution,
-                                euclidean_norm, cache.target_newton_cache;
-                                tol=tol, miniters=1, maxiters=3)
-                if isconverged(result) ||
-                    (is_squared_up_system(core_tracker.homotopy) && result.accuracy < options.overdetermined_min_accuracy)
+                if is_squared_up_system(core_tracker.homotopy)
+                    tol = options.overdetermined_min_accuracy
+                else
+                    tol = core_tracker.options.refinement_accuracy
+                end
+                if projective_refinement
+                    result = newton!(x̂, cache.target_system, state.solution,
+                                    euclidean_norm, cache.target_newton_cache;
+                                    tol=tol, miniters=1, maxiters=2)
+                else
+                    init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
+                    result = newton!(x̂, cache.target_system, state.solution,
+                                    cache.weighted_ip, cache.target_newton_cache;
+                                    tol=tol, miniters=1, maxiters=2)
+                end
+                if isconverged(result)
                     state.solution .= x̂
                     if !pull_back_is_to_affine(tracker.problem, state.solution)
                         LinearAlgebra.normalize!(state.solution)
@@ -708,7 +722,7 @@ function pathtracker_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
     core_tracker_supported, pathtracker_kwargs = splitkwargs(rest, coretracker_supported_keywords)
-    core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
+    core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); core_tracker_supported...)
     tracker = PathTracker(prob, core_tracker; pathtracker_kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
 end
