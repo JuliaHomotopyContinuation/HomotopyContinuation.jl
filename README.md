@@ -9,7 +9,7 @@
 
 ---
 
-### **For installation instructions, full content overview and detailed documentation, see [juliahomotopycontinuation.org](https://www.juliahomotopycontinuation.org).**
+### **See [juliahomotopycontinuation.org](https://www.juliahomotopycontinuation.org) for installation instructions, full content overview and detailed documentation.**
 
 ---
 
