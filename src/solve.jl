@@ -137,19 +137,21 @@ Path tracking specific options:
 * `max_corrector_iters=3`: The maximal number of correction steps in a single step.
 * `initial_step_size=0.1`: The step size of the first step.
 * `max_steps=1_000`: The maximal number of iterations the path tracker has available.
-* `min_step_size =1e-14`: The minimal step size.
-* `max_step_size =Inf`: The maximal step size.
+* `min_step_size=1e-14`: The minimal step size.
+* `max_step_size=Inf`: The maximal step size.
 * `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
 * `accuracy=1e-7`: The precision used to track a value.
 * `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
+* `overdetermined_min_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
+* `overdetermined_min_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
 
 Endgame specific options:
 
 * `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
-* `max_step_size_endgame_start::Float64=1e-6`: The endgame only starts if the step size becomes smaller that the provided value.
+* `min_step_size_endgame_start=1e-8`: The endgame only starts if the step size becomes smaller that the provided value.
 * `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
 * `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
 * `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
