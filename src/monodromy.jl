@@ -382,6 +382,7 @@ struct MonodromyResult{N, T1, T2}
     solutions::Vector{SVector{N, T1}}
     parameters::Vector{T2}
     statistics::MonodromyStatistics
+    equivalence_classes::Bool
 end
 
 Base.iterate(R::MonodromyResult) = iterate(R.solutions)
@@ -391,7 +392,11 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
     println(io, "MonodromyResult")
     println(io, "==================================")
-    println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
+    if result.equivalence_classes
+        println(io, "• $(nsolutions(result)) classes of solutions (modulo group action) ($(nreal(result)) real)")
+    else
+        println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
+    end
     println(io, "• return code → $(result.returncode)")
     println(io, "• $(result.statistics.ntrackedpaths) tracked paths")
 end
@@ -404,13 +409,21 @@ TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inli
 
 function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"application/prs.juno.inline")
     if i == 1
-        print(io, "Solutions")
+        if x.equivalence_classes
+            print(io, "$(nsolutions(x)) classes of solutions (modulo group action)")
+        else
+            print(io, "$(nsolutions(x)) solutions")
+        end
     elseif i == 2
-        print(io, "Real solutions")
+        if x.equivalence_classes
+            print(io, "$(nreal(x)) classes of real solutions")
+        else
+            print(io, "$(nreal(x)) real solutions")
+        end
     elseif i == 3
-        print(io, "Return Code")
+        print(io, "Return code")
     elseif i == 4
-        print(io, "Tracked Paths")
+        print(io, "Tracked paths")
     elseif i == 5
         print(io, "Parameters")
     end
@@ -598,8 +611,10 @@ function monodromy_solve(F::Inputs,
     end
     statistics = MonodromyStatistics(uniquepoints)
     if  length(points(uniquepoints)) == 0
-        println("None of the provided solutions is a valid start solution.")
-        return MonodromyResult(:invalid_startvalue, Vector{SVector{length(startsolutions[1]),ComplexF64}}(), p₀, statistics)
+        @warn "None of the provided solutions is a valid start solution."
+        return MonodromyResult(:invalid_startvalue,
+                Vector{SVector{length(startsolutions[1]),ComplexF64}}(), p₀, statistics,
+                options.equivalence_classes)
     end
 
     if strategy === nothing
@@ -630,7 +645,7 @@ function monodromy_solve(F::Inputs,
         end
     end
     finished!(statistics, nsolutions(loop))
-    MonodromyResult(retcode, points(solutions(loop)), p₀, statistics)
+    MonodromyResult(retcode, points(solutions(loop)), p₀, statistics, options.equivalence_classes)
 end
 
 function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; isrealsystem=false) where {TC,TP}
