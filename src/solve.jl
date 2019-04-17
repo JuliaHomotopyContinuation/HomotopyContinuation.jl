@@ -151,7 +151,7 @@ Path tracking specific options:
 Endgame specific options:
 
 * `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
-* `min_step_size_endgame_start=1e-8`: The endgame only starts if the step size becomes smaller that the provided value.
+* `min_step_size_endgame_start=1e-10`: The endgame only starts if the step size becomes smaller that the provided value.
 * `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
 * `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
 * `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
