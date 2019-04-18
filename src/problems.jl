@@ -219,7 +219,7 @@ function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothi
 		if classifcation == :overdetermined
 			perm = sortperm(degrees; rev=true)
 			# reorder polynomials by minimal degree
-			F = F[perm]
+			F = permute(F, perm)
 			degrees = degrees[perm]
 		end
 
@@ -236,7 +236,7 @@ function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothi
 		Prob = affine_tracking ? Problem{AffineTracking} : Problem{ProjectiveTracking}
 
 		if classifcation == :overdetermined
-			A = randn(ComplexF64, n, length(F) - n)
+			A = randn(ComplexF64, n, npolynomials(F) - n)
 			f̂ = SquaredUpSystem(target_constructor(f), A, degrees)
 		else # square case
 			f̂ = target_constructor(f)
