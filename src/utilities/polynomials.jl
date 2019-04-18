@@ -702,6 +702,9 @@ function remove_zeros!(C::Composition)
     C
 end
 
+permute(F::MPPolys, perm) = F[perm]
+permute(C::Composition, perm) = Composition([[C.polys[1][perm]]; C.polys[2:end]])
+
 """
     check_zero_dimensional(F::Vector{<:MP.AbstractPolynomial})
 
