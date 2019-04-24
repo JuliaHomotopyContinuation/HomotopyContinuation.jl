@@ -305,19 +305,21 @@ function solve_with_digits_lost!(x::AbstractVector, Jac::Jacobian, b::AbstractVe
 end
 
 """
-    row_scaling!(A)
+    row_scaling!(A; tol=maximum(size(A))^2 * eps(real(eltype(A))))
 
-Divide each row of `A` by its 2-norm.
+Divide each row of `A` by its ∞-norm. This minimizes the ∞ condition number
+for all possible scalings. In order to avoid scaling near zero rows back to
+1 we only scale a row if its ∞-norm is larger than `tol`.
 """
-function row_scaling!(A)
+function row_scaling!(A::AbstractMatrix{T}; tol=maximum(size(A))^2 * eps(real(T))) where {T}
     @inbounds for i=1:size(A, 1)
-        rᵢ = abs2(A[i, 1])
+        rᵢ = abs(A[i, 1])
         for j=2:size(A, 2)
-            rᵢ += abs2(A[i, j])
+            rᵢ = max(rᵢ, abs(A[i, j]))
         end
-        rᵢ = inv(√rᵢ)
+        rᵢ > tol || continue
         for j=1:size(A, 2)
-            A[i, j] *= rᵢ
+            A[i, j] /= rᵢ
         end
     end
     A
