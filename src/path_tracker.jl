@@ -97,6 +97,7 @@ mutable struct PathTrackerState{V<:AbstractVector}
     prediction::V
     solution::V
     solution_accuracy::Float64
+    solution_cond::Float64
     endgame_zone_start::Union{Nothing, Float64}
     winding_number::Int
     # Affine valuation
@@ -111,7 +112,7 @@ function PathTrackerState(x)
     t = 1.0
     prediction = copy(x)
     solution = copy(x)
-    solution_accuracy = NaN
+    solution_accuracy = solution_cond = NaN
     endgame_zone_start = nothing
     winding_number = 0
     n = length(x)
@@ -123,7 +124,8 @@ function PathTrackerState(x)
     prev_val = copy(val)
     prev_val_accuracy = copy(val)
 
-    PathTrackerState(status, t, prediction, solution, solution_accuracy, endgame_zone_start, winding_number,
+    PathTrackerState(status, t, prediction, solution, solution_accuracy, solution_cond,
+                     endgame_zone_start, winding_number,
                      val, val_accuracy, prev_val, prev_val_accuracy)
 end
 
@@ -133,7 +135,7 @@ function reset!(state::PathTrackerState)
     state.t = 1.0
     state.prediction .= zero(eltype(state.prediction))
     state.solution .= zero(eltype(state.prediction))
-    state.solution_accuracy = NaN
+    state.solution_accuracy = state.solution_cond = NaN
     state.endgame_zone_start = nothing
     state.winding_number = 0
     state.val .= 0.0
@@ -300,26 +302,28 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
         # update valuation and associated data
         update_val!(state, core_tracker)
 
-        # We want don't want to start the endgame too early
-        core_tracker.state.Δs < options.min_step_size_endgame_start || continue
 
         # Check at infinity
-        if tracker.options.at_infinity_check && check_at_infinity(tracker)
+        if tracker.options.at_infinity_check &&
+           core_tracker.state.Δs < options.min_step_size_endgame_start &&
+           check_at_infinity(tracker)
+            # We store when we entered the endgame zone
+            if state.endgame_zone_start === nothing
+                state.endgame_zone_start = t
+            end
+
             state.status = PathTrackerStatus.at_infinity
             break
         end
 
-        # Check that all valuations are accurate
-        check_valuation_accurate(tracker) || continue
+        # Check that all valuations are accurate and solution is possibly singular
+        if check_finite_singular_candidate(tracker; at_infinity_check=tracker.options.at_infinity_check)
+            # We store when we entered the endgame zone
+            if state.endgame_zone_start === nothing
+                state.endgame_zone_start = t
+            end
 
-        # We store when we entered the endgame zone
-        if state.endgame_zone_start === nothing
-            state.endgame_zone_start = t
-        end
-        # Check singular
-        if check_singular_candidate(tracker)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
-
             if retcode == :success
                 state.status = PathTrackerStatus.success
             elseif retcode == :max_winding_number
@@ -343,7 +347,6 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
     end
 
     check_and_refine_solution!(tracker)
-
     # We have to set the number of blas threads to the previous value
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
 
@@ -448,13 +451,6 @@ re_dot(z, ż) = begin x, y = reim(z); ẋ, ẏ = reim(ż); x * ẋ + y * ẏ e
 ## CHECKS ##
 ############
 
-function check_valuation_accurate(tracker::PathTracker)
-    for (i, ωᵢ) in enumerate(tracker.state.val)
-        is_val_accurate(tracker.state, i, tracker.options) || return false
-    end
-    true
-end
-
 """
     is_val_accurate(state, i, options)
 
@@ -480,21 +476,26 @@ function check_at_infinity(tracker::PathTracker)
     false
 end
 
-function check_singular_candidate(tracker::PathTracker)
-    # this assumes that valuation is accurate and all valuations are > 0
-
+function check_finite_singular_candidate(tracker::PathTracker; at_infinity_check=true)
     # We have a singular solution if one of the components
     # has a fractional valuation
+    fractional_valuation = false
     for (i, ωᵢ) in enumerate(tracker.state.val)
-        if abs(round(ωᵢ) - ωᵢ) > 0.1 # This should be sufficient for the most common cases
-            return true
+        if !is_val_accurate(tracker.state, i, tracker.options) ||
+            (at_infinity_check && ωᵢ ≤ -tracker.options.min_val_accuracy)
+            return false
+        end
+        if abs(round(ωᵢ) - ωᵢ) > 0.1
+            fractional_valuation = true
         end
     end
+
+    fractional_valuation && return true
 
     # 3) We actually want some bad conditioning to not waste resources
     if tracker.core_tracker.state.digits_lost > 4 ||
         tracker.core_tracker.state.ω > 100 ||
-        tracker.core_tracker.state.Δs < 1e-6
+        tracker.core_tracker.state.Δs < 1e-4
         return true
     end
 
@@ -570,7 +571,6 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     if m > max_winding_number
         return :max_winding_number
     end
-
     state.winding_number = m
     prediction ./= m * samples_per_loop
     :success
@@ -651,9 +651,13 @@ function check_and_refine_solution!(tracker::PathTracker)
     end
 
     # Catch the case that he tracker ran through but we still got a singular solution
-    if tracker.state.winding_number == 0 && condition_jacobian(tracker) > 1e13
+    cond = condition_jacobian(tracker)
+    if tracker.state.winding_number == 0 && cond > 1e13
         tracker.state.winding_number = 1
+    elseif tracker.state.winding_number == 1 && cond < 1e5
+        tracker.state.winding_number = 0
     end
+    state.solution_cond = cond
 
     # If winding_number == 0 the path tracker simply ran through
     if (tracker.state.winding_number == 0)
@@ -719,12 +723,12 @@ Construct a [`PathTracker`](@ref) and start solutions in the same way [`solve`](
 This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
-function pathtracker_startsolutions(args...; kwargs...)
+function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
     invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
 
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
-    prob, startsolutions = problem_startsolutions(args...; supported...)
+    prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
     core_tracker_supported, pathtracker_kwargs = splitkwargs(rest, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); core_tracker_supported...)
     tracker = PathTracker(prob, core_tracker; pathtracker_kwargs...)
@@ -793,7 +797,7 @@ struct PathResult{V<:AbstractVector}
     t::Float64
     accuracy::Union{Nothing, Float64}
     residual::Union{Nothing, Float64} # level 1+
-    condition_jacobian::Union{Nothing, Float64} # level 1+
+    condition_jacobian::Union{Nothing, Float64}
     winding_number::Union{Nothing, Int}
     endgame_zone_start::Union{Nothing, Float64}
     path_number::Union{Nothing, Int}
@@ -819,20 +823,24 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
 
     t = state.t
+    # condition
+    if isnan(state.solution_cond)
+        condition_jac = nothing
+    else
+        condition_jac = state.solution_cond
+    end
     # residual
     if return_code == :success && details_level ≥ 1
         res = residual(tracker)
-        condition_jac = condition_jacobian(tracker)
     else
         res = nothing
-        condition_jac = nothing
     end
 
     endgame_zone_start = tracker.state.endgame_zone_start
     if details_level ≥ 1
         # mimic the behaviour in track! to get a start solution of the same type as x
         embed!(cache.base_point, tracker.problem, start_solution)
-        startsolution = pull_back(tracker.problem, cache.base_point)
+        startsolution = pull_back(tracker.problem, cache.base_point; regauge=false)
     else
         startsolution = nothing
     end

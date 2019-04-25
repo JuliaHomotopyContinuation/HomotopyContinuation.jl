@@ -232,7 +232,7 @@ function track_paths(tracker, start_solutions;
             end
         else
             for (k, s) in enumerate(start_solutions)
-                return_code = track!(tracker, s, 1.0)
+                return_code = track!(tracker, s)
                 if save_all_paths || return_code == PathTrackerStatus.success
                     R = PathResult(tracker, s, k; details=path_result_details)
                     push!(results, R)

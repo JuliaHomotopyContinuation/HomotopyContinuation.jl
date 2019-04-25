@@ -14,6 +14,10 @@ struct MultiHomTotalDegreeSystem{T} <: AbstractSystem
     scaling_factors::Vector{T}
 end
 
+function MultiHomTotalDegreeSystem(D, C)
+    MultiHomTotalDegreeSystem(D, C, ones(size(D, 2)))
+end
+
 struct MultiHomTotalDegreeSystemCache{M,T} <: AbstractSystemCache
     B::Matrix{T}
     Ĝ::Matrix{T}

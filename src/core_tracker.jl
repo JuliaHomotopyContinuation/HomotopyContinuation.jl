@@ -938,9 +938,9 @@ Construct a [`CoreTracker`](@ref) and `startsolutions` in the same way `solve`
 does it. This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
-function coretracker_startsolutions(args...; kwargs...)
+function coretracker_startsolutions(args...; system_scaling=false, kwargs...)
     supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
-    prob, startsolutions = problem_startsolutions(args...; supported...)
+    prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
     tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
     (tracker=tracker, startsolutions=startsolutions)
 end
