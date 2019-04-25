@@ -20,6 +20,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
+julia = "^1.1"
 DynamicPolynomials = "^0.1.2"
 FixedPolynomials = "^0.4.0"
 MultivariatePolynomials = "^0.2.3"
