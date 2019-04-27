@@ -367,4 +367,10 @@
         test_show_juno(segment)
         @test string(segment) == "ComplexSegment(2.0 + 0.0im, 4.0 + 0.0im)"
     end
+
+    @testset "Linear Algebra" begin
+        A = [0 3 1 0; -2 2 -1 2; 1 -1 2 3; -3 3 3 2]
+        H, U = HC.hnf(A)
+        @test A * U == H
+    end
 end

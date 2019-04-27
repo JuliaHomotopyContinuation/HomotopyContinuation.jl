@@ -522,3 +522,88 @@ function ormqr!(side::AbstractChar, trans::AbstractChar, A::Matrix{ComplexF64},
     end
     C
 end
+
+"""
+    hnf(A)
+
+    Compute the hermite normal form `H` of `A` by overwriting `A` and the correspondong transformation
+    matrix `U`. This is `A*U == H` and `H` is a lower triangular matrix.
+
+    The implementation follows the algorithm described in [1].
+
+    [1] Kannan, Ravindran, and Achim Bachem. "Polynomial algorithms for computing the Smith and Hermite normal forms of an integer matrix." SIAM Journal on Computing 8.4 (1979): 499-507.
+"""
+function hnf(A)
+    H = copy(A)
+    U = Matrix{eltype(A)}(LinearAlgebra.I, size(A))
+    hnf!(H, U)
+    H, U
+end
+
+# use checked arithmethic
+⊡(x,y) = Base.checked_mul(x, y)
+⊞(x,y) = Base.checked_add(x, y)
+
+"""
+    hnf!(H, U, A)
+
+Inplace version of [hnf](@ref).
+
+    hnf!(A, U)
+
+Inplace version of [hnf](@ref) overwriting `A` with `H`.
+"""
+hnf!(H, U, A) = hnf!(copyto!(H, A), U)
+function hnf!(A, U)
+    n = size(A, 1)
+    @inbounds for i in 1:(n-1)
+        ii = i ⊞ 1
+        for j in 1:i
+            if !iszero(A[j, j]) || !iszero(A[j, ii])
+                # 4.1
+                r, p, q = gcdx(A[j, j], A[j, ii])
+                # @show r, p, q, A[j, j], A[j, ii]
+                # 4.2
+                d_j = -A[j, ii] ÷ r
+                d_ii = A[j, j] ÷ r
+                for k = 1:n
+                    a_kj, a_kii = A[k,j], A[k,ii]
+                    A[k, j] = a_kj ⊡ p ⊞ a_kii ⊡ q
+                    A[k, ii] = a_kj ⊡ d_j ⊞ a_kii ⊡ d_ii
+
+                    u_kj, u_kii = U[k,j], U[k,ii]
+                    U[k, j] = u_kj ⊡ p ⊞ u_kii ⊡ q
+                    U[k, ii] = u_kj ⊡ d_j ⊞ u_kii ⊡ d_ii
+                end
+            end
+            # 4.3
+            if j > 1
+                reduce_off_diagonal!(A, U, j)
+            end
+        end
+        #5
+        reduce_off_diagonal!(A, U, ii)
+    end
+
+    nothing
+end
+
+function reduce_off_diagonal!(A, U, k)
+    n = size(A, 1)
+    if A[k,k] < 0
+        for i in 1:n
+            A[i, k] = -A[i, k]
+            U[i, k] = -U[i, k]
+        end
+    end
+    for z in 1:(k-1)
+        if !iszero(A[z,z])
+            r = -ceil(eltype(A), A[k,z] / A[z,z])
+            for i in 1:n
+                U[i,z] = U[i,z] ⊞ r ⊡ U[i,k]
+                A[i,z] = A[i,z] ⊞ r ⊡ A[i,k]
+            end
+        end
+    end
+    nothing
+end
