@@ -526,7 +526,7 @@ end
 """
     hnf(A)
 
-    Compute the hermite normal form `H` of `A` by overwriting `A` and the correspondong transformation
+    Compute the hermite normal form `H` of `A` by overwriting `A` and the corresponding transformation
     matrix `U`. This is `A*U == H` and `H` is a lower triangular matrix.
 
     The implementation follows the algorithm described in [1].
@@ -535,7 +535,7 @@ end
 """
 function hnf(A)
     H = copy(A)
-    U = Matrix{eltype(A)}(LinearAlgebra.I, size(A))
+    U = similar(A)
     hnf!(H, U)
     H, U
 end
@@ -556,6 +556,10 @@ Inplace version of [hnf](@ref) overwriting `A` with `H`.
 hnf!(H, U, A) = hnf!(copyto!(H, A), U)
 function hnf!(A, U)
     n = size(A, 1)
+    U .= 0
+    @inbounds for i in 1:n
+        U[i,i] = one(eltype(U))
+    end
     @inbounds for i in 1:(n-1)
         ii = i ⊞ 1
         for j in 1:i
@@ -590,13 +594,13 @@ end
 
 function reduce_off_diagonal!(A, U, k)
     n = size(A, 1)
-    if A[k,k] < 0
+    @inbounds if A[k,k] < 0
         for i in 1:n
             A[i, k] = -A[i, k]
             U[i, k] = -U[i, k]
         end
     end
-    for z in 1:(k-1)
+    @inbounds for z in 1:(k-1)
         if !iszero(A[z,z])
             r = -ceil(eltype(A), A[k,z] / A[z,z])
             for i in 1:n

@@ -29,6 +29,7 @@ end
     include("correctors_test.jl")
     include("core_tracker_test.jl")
     include("path_tracker_test.jl")
+    include("polyhedral.jl")
     include("solve_test.jl")
     include("result_test.jl")
     include("integration_tests.jl")
