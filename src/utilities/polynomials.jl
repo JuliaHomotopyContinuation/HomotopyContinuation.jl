@@ -477,6 +477,9 @@ Compute the (weighted) degree of `f` in the variables `vars`.
 function degree(term::MP.AbstractTermLike, variables::Vector{<:MP.AbstractVariable})
     sum(MP.degree(term, v) for v in variables)
 end
+function degree(term::MP.AbstractTermLike, variables::NTuple{N,<:MP.AbstractVariable}) where {N}
+    sum(MP.degree(term, v) for v in variables)
+end
 function degree(term::MP.AbstractTermLike, weighted_variables)
     deg = 0
     for (v, w) in weighted_variables

@@ -238,6 +238,9 @@
         @polyvar x y u v
 
         f = [x*y - 6, x^2 - 5]
+        @test bezout_number(f, variable_groups=[(x,), (y,)]) == 2
+        @test bezout_number(f, variable_groups=((x,), (y,))) == 2
+        @test bezout_number(f, variable_groups=[[x], [y]]) == 2
         S = solve(f, variable_groups=[(x,), (y,)])
         @test nnonsingular(S) == 2
         S = solve(f, variable_groups=[(x,), (y,)])
@@ -245,7 +248,6 @@
         g = [x*y - 6u*v, x^2 - u^2]
         S = solve(g, variable_groups=[(x,u), (y,v)], homvars=(u,v))
         @test nnonsingular(S) == 2
-
 
         # The 6-R inverse problem
 
