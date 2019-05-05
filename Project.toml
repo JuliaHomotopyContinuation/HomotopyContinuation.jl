@@ -2,7 +2,7 @@ name = "HomotopyContinuation"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
 license = "MIT"
 author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breidings@mis.mpg.de>"]
-version = "0.7.0"
+version = "0.8.0-dev"
 
 [deps]
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
@@ -20,6 +20,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
+julia = "^1.1"
 DynamicPolynomials = "^0.1.2"
 FixedPolynomials = "^0.4.0"
 MultivariatePolynomials = "^0.2.3"

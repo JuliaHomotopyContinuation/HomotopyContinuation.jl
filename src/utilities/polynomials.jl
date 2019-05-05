@@ -57,6 +57,11 @@ Scale a composition by λ.
 """
 scale(C::Composition, λ) = Composition([[C.polys[1] .* λ]; C.polys[2:end]])
 
+function subs_into_composition(C::Composition, args...)
+	p = map(pᵢ -> MP.subs(pᵢ, args...), C.polys[end])
+	Composition([C.polys[1:end-1]; [p]])
+end
+
 """
     expand(C::Composition; parameters=nothing)
 
@@ -885,65 +890,64 @@ function multinomial(k::Vector{Int})
 end
 
 """
-    scale_systems(G, F)
+	precondition(f::Union{MPPolys,Composition}, variables=MP.variables(f))
 
-Scale the polynomial systems `G` and `F` such that ``||fᵢ-gᵢ||=1`` where the
-used norm is the the 2-norm on the coefficients of `G` and `F`.
+Rescale the equations and variables of `f` following the heuristic described in [1].
+Returns the scaled system and a vector of scaling factors of the variables.
+
+[1]: HOM4PS-2.0: a software package for solving polynomial systems by the polyhedral homotopy continuation method,
+	Lee, T.L., Li, T.Y. & Tsai, C.H. Computing (2008) 83: 109.
+	https://doi.org/10.1007/s00607-008-0015-6
+
 """
-function scale_systems(G::Composition, F::MPPolys; report_scaling_factors=true, kwargs...)
-    _, f, scale_g, scale_f = scale_systems(expand(G), F; report_scaling_factors=true, kwargs...)
-    if report_scaling_factors
-        scale(G, scale_g), f, scale_g, scale_f
-    else
-        scale(G, scale_g), f
-    end
+function precondition(f::Composition, variables=MP.variables(f))
+	vars, equations = preconditioning_factors(expand(f), variables)
+	y = vars .* variables
+	scale(subs_into_composition(f, variables => y), equations), vars
 end
-function scale_systems(G::MPPolys, F::Composition; report_scaling_factors=true, kwargs...)
-    g, _, scale_g, scale_f = scale_systems(G, expand(F); report_scaling_factors=true, kwargs...)
-    if report_scaling_factors
-        g, scale(F, scale_f), scale_g, scale_f
-    else
-        g, scale(F, scale_f)
-    end
+
+function precondition(f::MPPolys, variables=MP.variables(f))
+	vars, equations = preconditioning_factors(f, variables)
+	y = vars .* variables
+	map(equations, f) do c, fᵢ
+		c * MP.subs(fᵢ, variables => y)
+	end, vars
 end
-function scale_systems(G::Composition, F::Composition; report_scaling_factors=true, kwargs...)
-    _, _, scale_g, scale_f = scale_systems(expand(G), expand(F);
-                report_scaling_factors=true, kwargs...)
-    if report_scaling_factors
-        scale(G, scale_g), scale(G, scale_f), scale_g, scale_f
-    else
-        scale(G, scale_g), scale(G, scale_f)
-    end
-end
-function scale_systems(G::MPPolys, F::MPPolys; report_scaling_factors=false, variables=variables(F))
-    # We consider the homogeneous systems F and G as elements in projective space
-    # In particular as elements on the unit sphere
-    normalizer_g = inv.(coefficient_norm.(G))
-    g = normalizer_g .* G
-    normalizer_f = inv.(coefficient_norm.(F))
-    f = normalizer_f .* F
+function preconditioning_factors(f::MPPolys, vars)
+	nvars = length(vars)
+	m = sum(nᵢ -> nᵢ + div(nᵢ * (nᵢ - 1), 2), MP.nterms.(f))
+	n = nvars + length(f)
+	A, b = zeros(Int, m, n), zeros(Float64, m)
 
-    # We scale such that ⟨fᵢ-gᵢ,fᵢ-gᵢ⟩=1
-    μλ = map(1:length(f)) do i
-        dot = abs(coefficient_dot(f[i], g[i]))
-        # <fᵢ,\gᵢ> reasonabe large to scale
-        if dot > 1e-4
-            λᵢ = 2dot
-            μᵢ = one(λᵢ)
-        else
-            λᵢ = μᵢ = sqrt(0.5)
-        end
-        μᵢ, λᵢ
-    end
+	row = 1
+	for (i, fᵢ) in enumerate(f)
+		termsᵢ = MP.terms(fᵢ)
+		ntermsᵢ = length(termsᵢ)
+		blockᵢ_start = row - 1
+		for t in termsᵢ
+			for (j, vⱼ) in enumerate(vars)
+				A[row, j] = MP.degree(t, vⱼ)
+			end
+			A[row, nvars + i] = 1
+			b[row] = -log10(convert(Float64, abs(MP.coefficient(t))))
+			row += 1
+		end
 
-    g .*= first.(μλ)
-    f .*= last.(μλ)
-
-    if report_scaling_factors
-        scale_g = normalizer_g .* first.(μλ)
-        scale_f = normalizer_f .* last.(μλ)
-        g, f, scale_g, scale_f
-    else
-        g, f
-    end
+		for k in 1:ntermsᵢ, l in (k+1):ntermsᵢ
+			for j in 1:nvars
+				A[row, j] = A[blockᵢ_start+k, j] - A[blockᵢ_start+l, j]
+			end
+			b[row] = b[blockᵢ_start+k] - b[blockᵢ_start+l]
+			row += 1
+		end
+	end
+	c = ones(n)
+	try
+		c = LinearAlgebra.qr(A, Val(true)) \ b
+	catch e
+		if !isa(e, LinearAlgebra.LAPACKException)
+			rethrow(e)
+		end
+	end
+	(variables = exp10.(c[1:nvars]), equations = exp10.(c[nvars+1:end]))
 end

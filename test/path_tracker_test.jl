@@ -1,5 +1,25 @@
 @testset "PathTracker" begin
 
+    @testset "Regauging" begin
+        A = rand(3, 3)
+        b = rand(3)
+
+        @polyvar x[1:3]
+        F = A * x - b
+
+        tracker, start_sols = pathtracker_startsolutions(F, max_steps=10)
+        s = first(start_sols)
+        result = track(tracker, s)
+        @test result.return_code == :success
+        @test result.solution ≈ A \ b atol=1e-6
+
+        @polyvar x y
+        result = solve([x^2+y^2-1, 3x+2y-1], threading=false)
+        u, v = solutions(result)
+        @test norm(u) ≈ 1.0 atol=1e-7
+        @test norm(v) ≈ 1.0 atol=1e-7
+    end
+
     @testset "EarlyAtInfinity" begin
         f = equations(griewank_osborne())
 
@@ -10,6 +30,7 @@
         result = track(tracker, S[3])
         @test result.return_code == :at_infinity
     end
+
 
 
     @testset "Affine tracking" begin
@@ -69,10 +90,10 @@
 
         res = track(tracker, [1, 1]; details=:minimal)
         test_show_juno(res)
-        @test res.condition_jacobian === nothing
+        @test res.residual === nothing
 
         res = track(tracker, [1, 1]; details=:default)
-        @test res.condition_jacobian !== nothing
+        @test res.residual !== nothing
 
         res = track(tracker, [1, 1]; details=:extensive)
         @test res.valuation !== nothing

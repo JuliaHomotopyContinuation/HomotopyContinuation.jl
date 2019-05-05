@@ -108,6 +108,7 @@
         @polyvar x y
         f = (x-3y)^3*(x-2y)
         R = solve([f], seed=171090)
+
         @test length(uniquesolutions(R)) == 2
         @test uniquesolutions(R) isa Vector{ProjectiveVectors.PVector{Complex{Float64}, 1}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2
