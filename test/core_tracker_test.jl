@@ -185,11 +185,4 @@
         end
         @test tracker.state.status == CoreTrackerStatus.success
     end
-
-    @testset "Deprecation warnings" begin
-        F = equations(katsura(5))
-        # test deprecation mechanism
-        tracker = coretracker(F, tol=1e-8)
-        @test accuracy(tracker) == 1e-8
-    end
 end

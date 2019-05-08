@@ -9,12 +9,7 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
-    :max_steps, :simple_step_size_alg,
-    # deprecated
-    :initial_steplength, :minimal_steplength, :maximal_steplength,
-    :initial_step_size, :minimal_step_size, :maximal_step_size,
-    :tol, :refinement_tol, :corrector_maxiters, :refinement_maxiters,
-    :maxiters, :simple_step_size]
+    :max_steps, :simple_step_size_alg]
 
 
 ####################
@@ -137,28 +132,7 @@ function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
     update_patch=true,
     maximal_lost_digits=default_maximal_lost_digits(Precision),
     auto_scaling=true,
-    auto_scaling_options=AutoScalingOptions(),
-    # deprecated in 0.6
-    tol=nothing,
-    refinement_tol=nothing,
-    corrector_maxiters=nothing,
-    refinement_maxiters=nothing,
-    maxiters=nothing,
-    initial_steplength=nothing,
-    minimal_steplength=nothing,
-    maximal_steplength=nothing,
-    simple_step_size=nothing
-    ) where {Precision<:Real}
-
-    @deprecatekwarg tol accuracy
-    @deprecatekwarg refinement_tol refinement_accuracy
-    @deprecatekwarg corrector_maxiters max_corrector_iters
-    @deprecatekwarg refinement_maxiters max_refinement_iters
-    @deprecatekwarg maxiters max_steps
-    @deprecatekwarg initial_steplength initial_step_size
-    @deprecatekwarg minimal_steplength min_step_size
-    @deprecatekwarg maximal_steplength max_step_size
-    @deprecatekwarg simple_step_size simple_step_size_alg
+    auto_scaling_options=AutoScalingOptions()) where {Precision<:Real}
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
