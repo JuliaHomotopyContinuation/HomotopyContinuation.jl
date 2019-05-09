@@ -12,15 +12,15 @@ unpack(a::Union{Nothing, T}, b::T) where {T} = a === nothing ? b : a
 """
     SymmetricGroup(n)
 
-Group action of the symmetric group S(n). This does not contain the identity element.
+Group action of the symmetric group S(n).
 """
-struct SymmetricGroup{N,M}
-    permutations::NTuple{M, SVector{N,Int}} # We should get rid of the necessary of a tuple
+struct SymmetricGroup{N}
+    permutations::Vector{SVector{N,Int}}
 end
 SymmetricGroup(N::Int) = SymmetricGroup(permutations(Val(N)))
 function permutations(::Val{N}) where {N}
     s = StaticArrays.MVector{N}(1:N)
-    perms = Vector{SVector{N, Int}}()
+    perms = [SVector(s)]
     while true
         i = N - 1
         while i>=1 && s[i] >= s[i+1]
@@ -40,7 +40,7 @@ function permutations(::Val{N}) where {N}
         s[1] > N && break
         push!(perms, SVector(s))
     end
-    tuple(perms...)
+    perms
 end
 
 Base.eltype(::Type{SymmetricGroup{N}}) where {N} = SVector{N, Int}
