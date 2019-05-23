@@ -45,6 +45,7 @@ struct CoefficientHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCa
     system::C
     coeffs::Vector{Vector{T}}
     diffs::Vector{Vector{T}}
+    t::ComplexF64
 end
 
 function cache(H::CoefficientHomotopy{S,T}, x, t) where {S,T}
@@ -54,13 +55,15 @@ function cache(H::CoefficientHomotopy{S,T}, x, t) where {S,T}
     diffs = map(H.start_coeffs, H.target_coeffs) do start, target
         convert(Vector{U}, start - target)
     end
-    CoefficientHomotopyCache(system, coeffs, diffs)
+    CoefficientHomotopyCache(system, coeffs, diffs, complex(1.0))
 end
 
 Base.size(H::CoefficientHomotopy) = size(H.system)
 
 function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy, t)
-    @inbounds for k in 1:length(cache.coeffs)
+    t == cache.t && return nothing
+
+    for k in 1:length(cache.coeffs)
         c = cache.coeffs[k]
         start = H.start_coeffs[k]
         target = H.target_coeffs[k]
@@ -69,6 +72,7 @@ function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy,
         end
     end
     set_coefficients!(H.system, cache.coeffs)
+    nothing
 end
 
 function evaluate!(u, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
