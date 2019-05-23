@@ -187,6 +187,7 @@ include("homotopies/parameter_homotopy.jl")
 include("homotopies/fixed_point.jl")
 include("homotopies/patched_homotopy.jl")
 include("homotopies/log_homotopy.jl")
+include("homotopies/coefficient_homotopy.jl")
 
 function homotopy_interface_test(H::AbstractHomotopy, x=rand(Complex{Float64}, size(H, 2)) )
     m, n = size(H)

@@ -216,6 +216,16 @@
         @test nnonsingular(r) == 2
     end
 
+    @testset "Coefficient Homotopy" begin
+        @polyvar x a y b
+        E = [[2 1 0; 0 0 0], [1 0; 1 0]]
+        start = [[1.0+0im, -3.0, 2.0], [2.0+0im, -2.0]]
+        target = [randn(ComplexF64, 3), randn(ComplexF64, 2)]
+        H = CoefficientHomotopy(E, start, target)
+        result = solve(H, [[1, 1]], affine_tracking=true, save_all_paths=true)
+        @test issuccess(result[1])
+    end
+
     @testset "Overdetermined" begin
         Random.seed!(1234567)
         @polyvar x y z w
