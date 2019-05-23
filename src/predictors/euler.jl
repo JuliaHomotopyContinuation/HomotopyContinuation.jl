@@ -14,7 +14,7 @@ end
 
 cache(::Euler, H, x, ẋ, t) = EulerCache(jacobian(H, x, t), dt(H, x, t))
 
-function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t, Δt, ẋ)
+function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac)
     @inbounds for i=1:length(x)
         xnext[i] = x[i] + Δt * ẋ[i]
     end

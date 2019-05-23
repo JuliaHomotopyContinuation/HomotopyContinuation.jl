@@ -6,9 +6,9 @@ function setup_prediction_test()
     t = rand()
     H = HomotopyWithCache(StraightLineHomotopy(F, F), x, t)
     J = jacobian(H, x, t)
-    fac = HC.factorization(J)
-    ẋ = fac \ -dt(H, x, t)
-    H, x, xnext, t, ẋ, fac
+    Jac = HC.Jacobian(J)
+    ẋ = Vector{ComplexF64}(undef, 7)
+    H, x, xnext, t, ẋ, Jac
 end
 
 function setup_overdetermined_prediction_test()
@@ -18,34 +18,33 @@ function setup_overdetermined_prediction_test()
     xnext = copy(x)
     t = rand()
     H = HomotopyWithCache(StraightLineHomotopy(F, F), x, t)
-    J = jacobian(H, x, t)
-    fac = HC.factorization(J)
-    ẋ = fac \ -dt(H, x, t)
-    H, x, xnext, t, ẋ, fac
+    Jac = HC.Jacobian(HC.jacobian(H, x, t))
+    ẋ = Vector{ComplexF64}(undef, 2)
+    H, x, xnext, t, ẋ, Jac
 end
 
 function test_predictor(PREDICTOR, CACHE)
-    H, x, xnext, t, ẋ, fac = setup_prediction_test()
+    H, x, xnext, t, ẋ, Jac = setup_prediction_test()
 
     predictor = PREDICTOR()
     @test predictor isa PREDICTOR
     predictor_cache = cache(predictor, H, x, ẋ, t)
-    setup!(predictor_cache, H, x, ẋ, t, fac)
+    setup!(predictor_cache, H, x, ẋ, t, Jac)
     @test predictor_cache isa CACHE
     # check that this doesn't throw
-    update!(predictor_cache, H, x, ẋ, t, fac)
-    @test_nowarn predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
+    update!(predictor_cache, H, x, ẋ, t, Jac)
+    @test_nowarn predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ, Jac)
 
 
-    H, x, xnext, t, ẋ, fac = setup_overdetermined_prediction_test()
+    H, x, xnext, t, ẋ, Jac = setup_overdetermined_prediction_test()
     predictor = PREDICTOR()
     @test predictor isa PREDICTOR
     predictor_cache = cache(predictor, H, x, ẋ, t)
-    setup!(predictor_cache, H, x, ẋ, t, fac)
+    setup!(predictor_cache, H, x, ẋ, t, Jac)
     @test predictor_cache isa CACHE
     # check that this doesn't throw
-    update!(predictor_cache, H, x, ẋ, t, fac)
-    @test_nowarn predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ)
+    update!(predictor_cache, H, x, ẋ, t, Jac)
+    @test_nowarn predict!(xnext, predictor, predictor_cache, H, x, t, 0.05, ẋ, Jac)
 end
 
 

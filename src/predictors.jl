@@ -46,12 +46,12 @@ Update the cache. `x` is the new path value at `t` and `ẋ` is the derivative a
 update!(::AbstractPredictorCache, H, x, ẋ, t, fac) = nothing
 
 """
-    setup!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac)
+    setup!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, Jac)
 
 Setup the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
 `fac` is a factorization of the Jacobian at `(x,t)`. This falls back to calling `update`.
 """
-setup!(C::AbstractPredictorCache, H, x, ẋ, t, fac) = update!(C, H, x, ẋ, t, fac)
+setup!(C::AbstractPredictorCache, H, x, ẋ, t, Jac) = update!(C, H, x, ẋ, t, Jac)
 
 """
     reset!(cache, x, t)
@@ -77,9 +77,10 @@ function order end
 Evaluate `Hₓ(x(t), t)⁻¹∂H∂t(x(t), t)` and store the result in `out`. `A` needs
 to be able to store the Jacobian of `H`.
 """
-function minus_ẋ!(ẋ, H, x, t, J, dt)
-    jacobian_and_dt!(J, dt, H, x, t)
-    solve!(ẋ, J, dt)
+function minus_ẋ!(ẋ, H, x, t, Jac::Jacobian, dt)
+    jacobian_and_dt!(Jac.J, dt, H, x, t)
+    updated_jacobian!(Jac)
+    solve!(ẋ, Jac, dt)
 end
 
 include("predictors/null_predictor.jl")

@@ -23,7 +23,7 @@
 
     @testset "solve" begin
         @polyvar x
-        @test nfinite(solve([x - 1])) == 1
+        @test nfinite(solve([x - 1], threading=false)) == 1
         F = equations(katsura(5))
         @test nfinite(solve(F, threading=false)) == 32
         @test nfinite(solve(F, system=SPSystem, threading=false)) == 32

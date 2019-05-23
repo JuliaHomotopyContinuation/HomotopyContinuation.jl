@@ -493,7 +493,7 @@ function check_finite_singular_candidate(tracker::PathTracker; at_infinity_check
     fractional_valuation && return true
 
     # 3) We actually want some bad conditioning to not waste resources
-    if tracker.core_tracker.state.digits_lost > 4 ||
+    if unpack(tracker.core_tracker.state.jacobian.digits_lost, 0.0) > 4.0 ||
         tracker.core_tracker.state.ω > 100 ||
         tracker.core_tracker.state.Δs < 1e-4
         return true

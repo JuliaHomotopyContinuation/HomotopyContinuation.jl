@@ -306,7 +306,7 @@ function compute_solution(iter::MultiBezoutSolutionsIterator, perm, q, dᵢ)
             s += 1
         end
 
-        solve!(Aⱼ, bⱼ)
+        LinearAlgebra.ldiv!(LinearAlgebra.lu!(Aⱼ), bⱼ)
 
         data[t:(t+kⱼ-1)] .= bⱼ
         data[t+kⱼ] = 1
