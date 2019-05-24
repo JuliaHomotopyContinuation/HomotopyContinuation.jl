@@ -40,7 +40,7 @@ function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}})
     n = size(first(support), 1)
     # Our random lifting strategy is to pick random integers
     # in the range of 0:nterms where nterms is the total number of terms in the support
-    lifting_range = Int32(0):Int32(sum(A -> size(A, 2), support))
+    lifting_range = Int32(0):Int32(2_000) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
     lifting = map(A -> rand(lifting_range, size(A,2)), support)
     # As coefficients do we sample random gaussian numbers with norm one.
     # start_coefficients = map(A -> map(_ -> cis(2π * rand()), 1:size(A,2)), support)
@@ -169,4 +169,40 @@ function construct_binomial_system!(D, b, support, coeffs, indices)
     end
     nothing
 
+end
+
+# This is just a prototype
+export polyhedral_solve
+
+function polyhedral_solve(f)
+    support, coeffs = HC.support_coefficients(f)
+
+    cell_iter = HC.PolyhedralStartSolutionsIterator(support)
+
+    polyhedral_homotopy = HC.PolyhedralHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
+    generic_homotopy = HC.CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
+
+    polyhedral_tracker = let
+        x = randn(ComplexF64, size(support[1], 1))
+        first(coretracker_startsolutions(polyhedral_homotopy, [x], affine_tracking=true, predictor=Pade21()))
+    end
+
+    generic_target_tracker = let
+        x = randn(ComplexF64, size(support[1], 1))
+        pathtracker(generic_homotopy, x, affine_tracking=true)
+    end
+
+    path_results = PathResult{Vector{ComplexF64}}[]
+    for (cell, X) in cell_iter
+        HC.update_cell!(polyhedral_homotopy, cell)
+        for k in 1:size(X,2)
+            x∞ = @view X[:,k]
+            retcode = track!(polyhedral_tracker, x∞, -20, 0.0)
+            if retcode == CoreTrackerStatus.success
+                result = track(generic_target_tracker, HC.currx(polyhedral_tracker))
+                push!(path_results, result)
+            end
+        end
+    end
+    path_results
 end
