@@ -56,7 +56,6 @@ struct CorrectorResult{T}
     ω₀::Float64
     ω::Float64
     norm_Δx₀::T
-    digits_lost::Float64
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::CorrectorResult) = r
@@ -101,9 +100,9 @@ end
 NewtonCorrector(;simplified_last_step=true) = NewtonCorrector(simplified_last_step)
 
 
-struct NewtonCorrectorCache{FH<:FixedHomotopy, T, Fac, SC} <: AbstractCorrectorCache
+struct NewtonCorrectorCache{FH<:FixedHomotopy, T, SC} <: AbstractCorrectorCache
     F::FH
-    C::NewtonCache{T, Fac, SC}
+    C::NewtonCache{T, SC}
 end
 
 function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
@@ -114,19 +113,16 @@ function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
 end
 
 
-function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache, H::HomotopyWithCache, x₀, t, norm, tol, maxiters::Integer)
+@inline function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache,
+                  H::HomotopyWithCache, x, t, norm, jacobian::Jacobian, tol::Float64,
+                  maxiters::Int; update_jacobian_infos::Bool=false)
     cache.F.t = t
-    result = newton!(out, cache.F, x₀, norm, cache.C, tol, 1, maxiters, alg.simplified_last_step)
+    result = newton!(out, cache.F, x, norm, cache.C, jacobian, tol, 1, maxiters,
+        alg.simplified_last_step, update_jacobian_infos)
     CorrectorResult(result)
 end
 
 function CorrectorResult(R::NewtonResult)
     CorrectorResult(CorrectorReturnCode.code(R.return_code),
-                    R.accuracy,
-                    R.iters,
-                    R.ω₀,
-                    R.ω,
-                    R.norm_Δx₀,
-                    R.digits_lost
-                    )
+                    R.accuracy, R.iters, R.ω₀, R.ω, R.norm_Δx₀,)
 end

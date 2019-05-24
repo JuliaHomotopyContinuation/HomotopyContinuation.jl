@@ -493,7 +493,7 @@ function check_finite_singular_candidate(tracker::PathTracker; at_infinity_check
     fractional_valuation && return true
 
     # 3) We actually want some bad conditioning to not waste resources
-    if tracker.core_tracker.state.digits_lost > 4 ||
+    if unpack(tracker.core_tracker.state.jacobian.digits_lost, 0.0) > 4.0 ||
         tracker.core_tracker.state.ω > 100 ||
         tracker.core_tracker.state.Δs < 1e-4
         return true
@@ -625,13 +625,22 @@ function check_and_refine_solution!(tracker::PathTracker)
         state.solution .= state.prediction
     else
         try
-            refine!(core_tracker)
+            res = refine!(core_tracker)
             state.solution .= currx(core_tracker)
         catch e
             # okay we had a singular solution after all
             if isa(e, LinearAlgebra.SingularException)
                 tracker.state.winding_number = 1
                 state.solution .= currx(core_tracker)
+                for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
+                    if ωᵢ < -0.1 &&  acc < 0.05
+                        state.status = PathTrackerStatus.at_infinity
+                    end
+                end
+                if state.status != PathTrackerStatus.at_infinity &&
+                   residual(tracker) > 0
+                    state.status = PathTrackerStatus.at_infinity
+                end
             else
                 rethrow(e)
             end
@@ -653,6 +662,16 @@ function check_and_refine_solution!(tracker::PathTracker)
     # Catch the case that he tracker ran through but we still got a singular solution
     cond = condition_jacobian(tracker)
     if tracker.state.winding_number == 0 && cond > 1e13
+        # make sure that we don't have a solution at infinity accidentaly
+        for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
+            if ωᵢ < -0.1 &&  acc < 0.05
+                state.status = PathTrackerStatus.at_infinity
+            end
+        end
+        if state.status != PathTrackerStatus.at_infinity &&
+           residual(tracker) > 0
+            state.status = PathTrackerStatus.at_infinity
+        end
         tracker.state.winding_number = 1
     elseif tracker.state.winding_number == 1 && cond < 1e5
         tracker.state.winding_number = 0

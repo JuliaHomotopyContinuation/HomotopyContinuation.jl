@@ -11,7 +11,7 @@ struct NullPredictorCache <: AbstractPredictorCache end
 
 cache(::NullPredictor, H, x, ẋ, t) = NullPredictorCache()
 
-function predict!(xnext, ::NullPredictor, ::NullPredictorCache, H, x, t, dt, ẋ)
+function predict!(xnext, ::NullPredictor, ::NullPredictorCache, H, x, t, dt, ẋ, Jac)
     xnext .= x
     nothing
 end

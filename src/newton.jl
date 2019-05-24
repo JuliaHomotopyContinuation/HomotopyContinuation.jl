@@ -34,7 +34,6 @@ struct NewtonResult{T}
     return_code::NewtonReturnCode.codes
     accuracy::T
     iters::Int
-    digits_lost::Float64
     ω₀::Float64
     ω::Float64
     norm_Δx₀::T
@@ -57,8 +56,8 @@ isconverged(result::NewtonResult) = result.return_code == NewtonReturnCode.conve
 
 Cache for the [`newton`](@ref) function.
 """
-struct NewtonCache{T, Fac<:LinearAlgebra.Factorization, SC<:AbstractSystemCache}
-    Jac::Jacobian{T, Fac}
+struct NewtonCache{T, SC<:AbstractSystemCache}
+    Jac::Jacobian{T}
     rᵢ::Vector{T}
     Δxᵢ::Vector{T}
     system_cache::SC
@@ -92,11 +91,16 @@ end
 In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
 function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache;
-                 tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3, simplified_last_step::Bool=true)
-    newton!(out, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
+                 tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3,
+                 simplified_last_step::Bool=true)
+    newton!(out, F, x₀, norm, cache, cache.Jac, tol,
+            miniters, maxiters, simplified_last_step, false)
 end
-function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, miniters::Int, maxiters::Int, simplified_last_step::Bool)
-    Jac, rᵢ, Δxᵢ = cache.Jac, cache.rᵢ, cache.Δxᵢ
+
+function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, Jac::Jacobian,
+                 tol::Float64, miniters::Int, maxiters::Int, simplified_last_step::Bool,
+                 update_jacobian_infos::Bool)
+    rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
     xᵢ₊₁ = xᵢ = out # just alias to make logic easier
@@ -106,20 +110,16 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
     T = real(eltype(xᵢ))
     Θ₀ = Θᵢ₋₁ = norm_Δxᵢ₋₁ = norm_Δxᵢ = norm_Δx₀ = zero(T)
     accuracy = T(Inf)
-    digits_lost = 0.0
     ω₀ = ω = 0.0
     for i ∈ 0:maxiters
+        update_infos = update_jacobian_infos && i == 0
         if i == maxiters && simplified_last_step
             evaluate!(rᵢ, F, xᵢ, cache.system_cache)
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
-            updated_jacobian!(Jac)
+            updated_jacobian!(Jac, update_infos=update_infos)
         end
-        if i == 0
-            digits_lost = Float64(solve_with_digits_lost!(Δxᵢ, Jac, rᵢ))
-        else
-            solve!(Δxᵢ, Jac, rᵢ)
-        end
+        solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δxᵢ))
@@ -130,7 +130,7 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
         if i == 0
             accuracy = norm_Δx₀ = norm_Δxᵢ₋₁ = norm_Δxᵢ
             if norm_Δx₀ ≤ tol && i + 1 ≥ miniters
-                return NewtonResult(NewtonReturnCode.converged, norm_Δx₀, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.converged, norm_Δx₀, i + 1, ω₀, ω, norm_Δx₀)
             end
 
         else
@@ -143,15 +143,15 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, tol, mi
             end
 
             if Θᵢ₋₁ > 0.5
-                return NewtonResult(NewtonReturnCode.terminated, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.terminated, accuracy, i + 1, ω₀, ω, norm_Δx₀)
             end
 
             accuracy = norm_Δxᵢ / (1 - 2Θᵢ₋₁^2)
             if accuracy ≤ tol && i + 1 ≥ miniters
-                return NewtonResult(NewtonReturnCode.converged, accuracy, i + 1, digits_lost, ω₀, ω, norm_Δx₀)
+                return NewtonResult(NewtonReturnCode.converged, accuracy, i + 1, ω₀, ω, norm_Δx₀)
             end
         end
     end
 
-    return NewtonResult(NewtonReturnCode.maximal_iterations, accuracy, maxiters, digits_lost, ω₀, ω, norm_Δx₀)
+    return NewtonResult(NewtonReturnCode.maximal_iterations, accuracy, maxiters+1, ω₀, ω, norm_Δx₀)
 end

@@ -45,7 +45,7 @@ end
     evaluate!(u, H, x_h, t + h)
 end
 
-function update!(cache::Pade21Cache, H, x, ẋ, t, fac)
+function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
     # unpack stuff to make the rest easier to read
     u, u₁, u₂, u₃, u₄ = cache.u, cache.u₁, cache.u₂, cache.u₃, cache.u₄
     x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
@@ -61,7 +61,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, fac)
     @inbounds for i in eachindex(u₁)
         u[i] = (-4/3 * (u₁[i] + u₂[i]) + (u₃[i] + u₄[i]) / 12) / h²
     end
-    solve!(x², fac, u)
+    solve!(x², Jac, u)
 
     g₂!(u₁, H, x, ẋ, x², t, h₃, x_h)
     g₂!(u₂, H, x, ẋ, x², t, -h₃, x_h)
@@ -70,12 +70,12 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, fac)
     @inbounds for i in eachindex(u₁)
         u[i] = -3(u₁[i] - u₂[i]) / h³
     end
-    solve!(x³, fac, u)
+    solve!(x³, Jac, u)
 
     cache
 end
 
-function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ)
+function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
     x², x³ = cache.x², cache.x³
     δ = cache.x_h
     @inbounds for i in eachindex(x)

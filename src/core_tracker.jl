@@ -9,12 +9,7 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
-    :max_steps, :simple_step_size_alg,
-    # deprecated
-    :initial_steplength, :minimal_steplength, :maximal_steplength,
-    :initial_step_size, :minimal_step_size, :maximal_step_size,
-    :tol, :refinement_tol, :corrector_maxiters, :refinement_maxiters,
-    :maxiters, :simple_step_size]
+    :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned]
 
 
 ####################
@@ -123,6 +118,7 @@ mutable struct CoreTrackerOptions
     maximal_lost_digits::Float64
     auto_scaling::Bool
     auto_scaling_options::AutoScalingOptions
+    terminate_ill_conditioned::Bool
 end
 
 function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
@@ -138,32 +134,12 @@ function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
     maximal_lost_digits=default_maximal_lost_digits(Precision),
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
-    # deprecated in 0.6
-    tol=nothing,
-    refinement_tol=nothing,
-    corrector_maxiters=nothing,
-    refinement_maxiters=nothing,
-    maxiters=nothing,
-    initial_steplength=nothing,
-    minimal_steplength=nothing,
-    maximal_steplength=nothing,
-    simple_step_size=nothing
-    ) where {Precision<:Real}
-
-    @deprecatekwarg tol accuracy
-    @deprecatekwarg refinement_tol refinement_accuracy
-    @deprecatekwarg corrector_maxiters max_corrector_iters
-    @deprecatekwarg refinement_maxiters max_refinement_iters
-    @deprecatekwarg maxiters max_steps
-    @deprecatekwarg initial_steplength initial_step_size
-    @deprecatekwarg minimal_steplength min_step_size
-    @deprecatekwarg maximal_steplength max_step_size
-    @deprecatekwarg simple_step_size simple_step_size_alg
+    terminate_ill_conditioned::Bool=true) where {Precision<:Real}
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
             max_step_size, simple_step_size_alg, update_patch, float(maximal_lost_digits),
-            auto_scaling, auto_scaling_options)
+            auto_scaling, auto_scaling_options, terminate_ill_conditioned)
 end
 
 default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 3
@@ -189,10 +165,8 @@ mutable struct CoreTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
     Δs::Float64 # current step size
     Δs_prev::Float64 # previous step size
     accuracy::Float64
-    # The relative number of digits lost during the solution of the linear systems
-    # in Newton's method. See `solve_with_digits_lost!` in utilities/linear_algebra.jl
-    # for how this is computed.
-    digits_lost::Float64
+    jacobian::Jacobian{T}
+    steps_jacobian_info_update::Int
     status::CoreTrackerStatus.states
     patch::MaybePatchState
     accepted_steps::Int
@@ -201,7 +175,7 @@ mutable struct CoreTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
     consecutive_successfull_steps::Int
 end
 
-function CoreTrackerState(x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions,
+function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions,
                            patch::Union{Nothing, AbstractAffinePatchState}=nothing,
                            inner_product::AbstractInnerProduct=EuclideanIP())
     if isa(x₁, SVector)
@@ -217,12 +191,14 @@ function CoreTrackerState(x₁::AbstractVector, t₁, t₀, options::CoreTracker
     Δs = convert(Float64, min(options.initial_step_size, length(segment), options.max_step_size ))
     Δs_prev = 0.0
     accuracy = 0.0
-    digits_lost = 0.0
+    Jac = Jacobian(jacobian(H, x, t₁))
+    steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CoreTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy, digits_lost, status, patch,
+    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy,
+        Jac, steps_jacobian_info_update, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
 
@@ -243,6 +219,10 @@ function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, optio
     if options.auto_scaling
         init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
     end
+    state.jacobian.cond = 1.0
+    state.jacobian.corank = 0
+    state.jacobian.digits_lost = nothing
+    state.steps_jacobian_info_update = 0
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
     state
@@ -271,11 +251,10 @@ init_auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions)
 # CoreTrackerCache #
 ####################
 mutable struct CoreTrackerCache{H<:HomotopyWithCache, P<:AbstractPredictorCache,
-             C<:AbstractCorrectorCache, T, F}
+             C<:AbstractCorrectorCache, T}
     homotopy::H
     predictor::P
     corrector::C
-    Jac::Jacobian{T, F}
     out::Vector{T}
     r::Vector{T}
 end
@@ -283,10 +262,9 @@ function CoreTrackerCache(H::HomotopyWithCache, predictor, corrector, state::Cor
     t = state.segment[state.s]
     pcache = cache(predictor, H, state.x, state.ẋ, t)
     ccache = cache(corrector, H, state.x, t)
-    Jac = Jacobian(jacobian(H, state.x, t))
     out = H(state.x, t)
     r = copy(out)
-    CoreTrackerCache(H, pcache, ccache, Jac, out, r)
+    CoreTrackerCache(H, pcache, ccache, out, r)
 end
 
 
@@ -359,7 +337,7 @@ function CoreTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
     HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
 
     # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = CoreTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state)
+    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state)
     cache = CoreTrackerCache(HC, predictor, corrector, tracker_state)
 
     CoreTracker(H, predictor, corrector, patch, tracker_state, options, cache)
@@ -377,7 +355,7 @@ function CoreTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
 
     inner_product = options.auto_scaling ? WeightedIP(x₁) : EuclideanIP()
     # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = CoreTrackerState(indempotent_x(HC, x₁, t₁), t₁, t₀, options, nothing, inner_product)
+    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, nothing, inner_product)
     cache = CoreTrackerCache(HC, predictor, corrector, tracker_state)
 
     CoreTracker(H, predictor, corrector, nothing, tracker_state, options, cache)
@@ -437,7 +415,7 @@ of the tracking.
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch, checkstartvalue::Bool=true, compute_ẋ::Bool=true)
      track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
      retcode = currstatus(tracker)
      if retcode == CoreTrackerStatus.success
@@ -477,7 +455,7 @@ function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, 
         checkstartvalue && checkstartvalue!(tracker)
         if compute_ẋ
             compute_ẋ!(state, cache, tracker.options)
-            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), cache.Jac)
+            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), state.jacobian)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -499,27 +477,29 @@ function checkstartvalue!(tracker::CoreTracker)
 end
 
 function compute_ẋ!(state, cache, options::CoreTrackerOptions)
-    @inbounds jacobian_and_dt!(cache.Jac.J, cache.out, cache.homotopy, state.x, currt(state))
+    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, currt(state))
     # apply row scaling to J and compute factorization
-    updated_jacobian!(cache.Jac)
+    updated_jacobian!(state.jacobian)
 
     @inbounds for i in eachindex(cache.out)
         cache.out[i] = -cache.out[i]
     end
-    solve!(state.ẋ, cache.Jac, cache.out)
+    solve!(state.ẋ, state.jacobian, cache.out)
     nothing
 end
 
 
-function correct!(x̄, tracker::CoreTracker,
+@inline function correct!(x̄, tracker::CoreTracker,
         x=tracker.state.x,
         t=tracker.state.segment[tracker.state.s],
         norm=tracker.state.inner_product;
-        accuracy=tracker.options.accuracy,
-        max_iters=tracker.options.max_corrector_iters)
+        accuracy::Float64=tracker.options.accuracy,
+        max_iters::Int=tracker.options.max_corrector_iters,
+        update_jacobian_infos::Bool=false)
 
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
-             tracker.cache.homotopy, x, t, norm, accuracy, max_iters)
+             tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
+             accuracy, max_iters; update_jacobian_infos=update_jacobian_infos)
 end
 
 function step!(tracker::CoreTracker)
@@ -529,15 +509,19 @@ function step!(tracker::CoreTracker)
 
     try
         t, Δt = currt(state), currΔt(state)
-        predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ)
-        result = correct!(x̄, tracker, x̂, t + Δt)
+        predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
+        # update_corank
+        update_jacobian_infos = state.last_step_failed || state.steps_jacobian_info_update ≥ 5
+        result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
+        if update_jacobian_infos
+            state.steps_jacobian_info_update = 0
+        end
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
             x .= x̄
             state.s += state.Δs
             state.accuracy = result.accuracy
-            state.digits_lost = result.digits_lost
             # Step size change
             state.Δs_prev = state.Δs
             update_stepsize!(state, result, order(tracker.predictor), options)
@@ -548,12 +532,12 @@ function step!(tracker::CoreTracker)
             # update derivative
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
-            update!(cache.predictor, H, x, ẋ, t + Δt, cache.Jac)
+            update!(cache.predictor, H, x, ẋ, t + Δt, state.jacobian)
             state.last_step_failed = false
+            state.steps_jacobian_info_update += 1
         else
             # We have to reset the patch
             state.rejected_steps += 1
-            state.digits_lost = result.digits_lost
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(state, result, order(tracker.predictor), options)
             Δt = currΔt(state)
@@ -564,8 +548,10 @@ function step!(tracker::CoreTracker)
                 state.status = CoreTrackerStatus.terminated_step_size_too_small
             end
             # 2) We became too ill-conditioned
-            if !is_overdetermined_tracking(tracker) &&
-               state.digits_lost > options.maximal_lost_digits
+            if options.terminate_ill_conditioned && (
+                unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
+                state.jacobian.corank > 0
+                )
                 state.status = CoreTrackerStatus.terminated_ill_conditioned
             end
         end
