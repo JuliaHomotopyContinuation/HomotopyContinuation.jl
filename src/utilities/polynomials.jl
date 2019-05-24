@@ -545,6 +545,28 @@ multidegrees(F, VG::VariableGroups) = multidegrees(F, variable_groups(VG))
 
 
 """
+	support_coefficients(F::MPPolys, vars=variables(F))
+
+Returns a tuple `(A, c)` where `A` is the vector of supports of `F` and `c` is the vector
+of corresponding coefficients.
+"""
+function support_coefficients(F::MPPolys, vars=variables(F))
+	terms₁ = MP.terms(F[1])
+    c₁ = float.(MP.coefficient.(terms₁))
+    A₁ = [Int32(MP.degree(term, var)) for var in vars, term in terms₁]
+	A = [A₁]
+	c = [c₁]
+	for i in 2:length(F)
+		termsᵢ = MP.terms(F[i])
+		cᵢ = float.(MP.coefficient.(termsᵢ))
+	   	Aᵢ = [Int32(MP.degree(term, var)) for var in vars, term in termsᵢ]
+		push!(A, Aᵢ)
+		push!(c, cᵢ)
+	end
+	A, c
+end
+
+"""
     compute_numerically_degrees(F::AbstractSystem)
 
 This tries to compute numerically the degrees of `F`. If successfull
