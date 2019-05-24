@@ -124,7 +124,7 @@ function finished!(stats, nsolutions)
     push!(stats.nsolutions_development, nsolutions)
 end
 
-function n_loops_without_change(stats, nsolutions)
+function n_completed_loops_without_change(stats, nsolutions)
     k = 0
     for i in length(stats.nsolutions_development):-1:1
         if stats.nsolutions_development[i] != nsolutions
@@ -132,7 +132,7 @@ function n_loops_without_change(stats, nsolutions)
         end
         k += 1
     end
-    return k
+    return max(k - 1, 0)
 end
 
 function n_solutions_current_loop(statistics, nsolutions)
@@ -850,7 +850,7 @@ function update_progress!(progress, loop::Loop, statistics::MonodromyStatistics;
     ProgressMeter.update!(progress, nsolutions, showvalues=(
         ("# paths tracked", statistics.ntrackedpaths),
         ("# loops generated", statistics.nparametergenerations),
-        ("# loops without change", n_loops_without_change(statistics, nsolutions)),
+        ("# completed loops without change", n_completed_loops_without_change(statistics, nsolutions)),
         ("# solutions in current loop", n_solutions_current_loop(statistics, nsolutions)),
         ("# real solutions", statistics.nreal),
     ))
