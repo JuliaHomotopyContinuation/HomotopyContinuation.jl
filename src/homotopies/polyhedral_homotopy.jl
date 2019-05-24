@@ -56,13 +56,6 @@ function update_cell!(H::PolyhedralHomotopy, cell::MixedSubdivisions.MixedCell)
     H
 end
 
-
-@enum ActiveCoeffs begin
-    COEFFS_EVAL
-    COEFFS_DT
-    COEFFS_UNKNOWN
-end
-
 """
     PolyhedralHomotopyCache
 
@@ -98,7 +91,7 @@ function update_coeffs!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy, s
     end
 
     cache.s = s
-    for k in 1:length(cache.coeffs)
+    @inbounds for k in 1:length(cache.coeffs)
         e = cache.coeffs[k]
         for i in eachindex(e)
             e[i] = exp(H.s_weights[k][i] * s) * H.coeffs[k][i]
@@ -120,7 +113,7 @@ function update_coeffs_dt!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy
 
     if s == cache.s
         cache.ds = s
-        for k in 1:length(cache.coeffs_dt)
+        @inbounds for k in 1:length(cache.coeffs_dt)
             e = cache.coeffs_dt[k]
             for i in eachindex(e)
                 e[i] = H.s_weights[k][i] * cache.coeffs[k][i]
@@ -128,7 +121,7 @@ function update_coeffs_dt!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy
         end
     else
         cache.ds = s
-        for k in 1:length(cache.coeffs_dt)
+        @inbounds for k in 1:length(cache.coeffs_dt)
             e = cache.coeffs_dt[k]
             for i in eachindex(e)
                 e[i] = H.s_weights[k][i] * exp(H.s_weights[k][i] * s) * H.coeffs[k][i]

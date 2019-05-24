@@ -5,13 +5,13 @@ export CoefficientHomotopy, CoefficientHomotopyCache, gamma
 
 Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
 """
-struct CoefficientHomotopy{S<:AbstractSystem, T} <: AbstractHomotopy
+struct CoefficientHomotopy{S<:AbstractSystem, T1, T2} <: AbstractHomotopy
     system::S
-    start_coeffs::Vector{Vector{T}}
-    target_coeffs::Vector{Vector{T}}
+    start_coeffs::Vector{Vector{T1}}
+    target_coeffs::Vector{Vector{T2}}
 end
 
-function CoefficientHomotopy(exponents_polys::Union{<:Vector{<:Matrix}, <:MPPolys}, start::Vector{Vector{T}}, target::Vector{Vector{T}}) where T
+function CoefficientHomotopy(exponents_polys::Union{<:Vector{<:Matrix}, <:MPPolys}, start::Vector{<:Vector}, target::Vector{<:Vector})
     @assert all(length.(start) .== length.(target) .== _nterms.(exponents_polys))
 
     system = SPSystem(exponents_polys, start)
@@ -35,6 +35,7 @@ _nterms(f::MPPoly) = MP.nterms(f)
 
 (H::CoefficientHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
 
+
 """
     CoefficientHomotopyCache
 
@@ -46,24 +47,32 @@ struct CoefficientHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCa
     coeffs::Vector{Vector{T}}
     diffs::Vector{Vector{T}}
     t::ComplexF64
+    active_coeffs::ActiveCoeffs
 end
 
-function cache(H::CoefficientHomotopy{S,T}, x, t) where {S,T}
+function cache(H::CoefficientHomotopy{S,T1,T2}, x, t) where {S,T1,T2}
     system = cache(H.system, x, t)
-    U = promote_type(T, typeof(t))
+    U = promote_type(T1, T2, typeof(t))
     coeffs = map(c -> convert.(U, c), H.start_coeffs)
     diffs = map(H.start_coeffs, H.target_coeffs) do start, target
         convert(Vector{U}, start - target)
     end
-    CoefficientHomotopyCache(system, coeffs, diffs, complex(1.0))
+    active_coeffs = COEFFS_UNKNOWN
+    CoefficientHomotopyCache(system, coeffs, diffs, complex(NaN), active_coeffs)
 end
 
 Base.size(H::CoefficientHomotopy) = size(H.system)
 
 function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy, t)
-    t == cache.t && return nothing
+    if t == cache.t
+        if cache.active_coeffs != COEFFS_EVAL
+            set_coefficients!(H.system, cache.coeffs)
+            cache.active_coeffs == COEFFS_EVAL
+        end
+        return nothing
+    end
 
-    for k in 1:length(cache.coeffs)
+    @inbounds for k in 1:length(cache.coeffs)
         c = cache.coeffs[k]
         start = H.start_coeffs[k]
         target = H.target_coeffs[k]
@@ -75,6 +84,14 @@ function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy,
     nothing
 end
 
+function update_coeffs_dt!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy, t)
+    if cache.active_coeffs != COEFFS_DT
+        set_coefficients!(H.system, cache.diffs)
+        cache.active_coeffs == COEFFS_DT
+    end
+    nothing
+end
+
 function evaluate!(u, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
     update_coeffs!(c, H, t)
     @inbounds evaluate!(u, H.system, x, c.system)
@@ -82,7 +99,7 @@ function evaluate!(u, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
 end
 
 function dt!(u, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
-    set_coefficients!(H.system, c.diffs)
+    update_coeffs_dt!(c, H, t)
     @inbounds evaluate!(u, H.system, x, c.system)
     u
 end
@@ -104,7 +121,7 @@ function evaluate(H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
 end
 
 function dt(H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
-    set_coefficients!(H.system, c.diffs)
+    update_coeffs_dt!(c, H, t)
     evaluate(H.system, x, c.system)
 end
 

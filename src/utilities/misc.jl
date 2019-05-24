@@ -7,6 +7,13 @@ function to_ComplexDF64(z::ComplexF64)
 end
 to_ComplexDF64!(u, Z::Vector{ComplexF64}) = map!(to_ComplexDF64, u, Z)
 
+@enum ActiveCoeffs begin
+    COEFFS_EVAL
+    COEFFS_DT
+    COEFFS_UNKNOWN
+end
+
+
 """
     unpack(a::Union{Nothing, T}, b::T)
 
