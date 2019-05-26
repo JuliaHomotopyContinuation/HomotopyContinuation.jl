@@ -175,12 +175,12 @@ end
 export polyhedral_solve
 
 function polyhedral_solve(f)
-    support, coeffs = HC.support_coefficients(f)
+    support, coeffs = support_coefficients(f)
 
-    cell_iter = HC.PolyhedralStartSolutionsIterator(support)
+    cell_iter = PolyhedralStartSolutionsIterator(support)
 
-    polyhedral_homotopy = HC.PolyhedralHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
-    generic_homotopy = HC.CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
+    polyhedral_homotopy = PolyhedralHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
+    generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
 
     polyhedral_tracker = let
         x = randn(ComplexF64, size(support[1], 1))
@@ -194,12 +194,12 @@ function polyhedral_solve(f)
 
     path_results = PathResult{Vector{ComplexF64}}[]
     for (cell, X) in cell_iter
-        HC.update_cell!(polyhedral_homotopy, cell)
+        update_cell!(polyhedral_homotopy, cell)
         for k in 1:size(X,2)
             x∞ = @view X[:,k]
             retcode = track!(polyhedral_tracker, x∞, -20, 0.0)
             if retcode == CoreTrackerStatus.success
-                result = track(generic_target_tracker, HC.currx(polyhedral_tracker))
+                result = track(generic_target_tracker, currx(polyhedral_tracker))
                 push!(path_results, result)
             end
         end
