@@ -47,20 +47,36 @@ end
 
 function update_cell!(H::PolyhedralHomotopy, cell::MixedSubdivisions.MixedCell)
     n = length(H.nterms)
-    γ = cell.normal
     k = 1
+    s_max = 1.0
+    s_min = Inf
     @inbounds for (i, m) in enumerate(H.nterms)
         βᵢ = cell.β[i]
         for _ in 1:m
             s_k = Float64(H.lifting[k]) - βᵢ
             for l in 1:n
-                s_k += H.support[l,k] * γ[l]
+                s_k += H.support[l,k] * cell.normal[l]
             end
             H.s_weights[k] = s_k
+
+            s_max = max(s_max, s_k)
+            # avoid zeroish values
+            if s_k > 1e-8
+                s_min = min(s_min, s_k)
+            end
+
             k += 1
         end
     end
-    H
+    # We normalize such that 3 is the highest power
+    s_max /= 3
+    for k in eachindex(H.s_weights)
+        H.s_weights[k] /= s_max
+    end
+
+    s_min /= s_max
+
+    s_min
 end
 
 """

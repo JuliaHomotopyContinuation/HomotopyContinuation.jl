@@ -40,7 +40,7 @@ function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}})
     n = size(first(support), 1)
     # Our random lifting strategy is to pick random integers
     # in the range of 0:nterms where nterms is the total number of terms in the support
-    lifting_range = Int32(0):Int32(2_000) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
+    lifting_range = Int32(-2^11):Int32(2^11) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
     lifting = map(A -> rand(lifting_range, size(A,2)), support)
     # As coefficients do we sample random gaussian numbers with norm one.
     # start_coefficients = map(A -> map(_ -> cis(2π * rand()), 1:size(A,2)), support)
@@ -184,20 +184,26 @@ function polyhedral_solve(f)
 
     polyhedral_tracker = let
         x = randn(ComplexF64, size(support[1], 1))
-        first(coretracker_startsolutions(polyhedral_homotopy, [x], affine_tracking=true, predictor=Pade21()))
+        first(coretracker_startsolutions(polyhedral_homotopy, [x], affine_tracking=true,
+                predictor=Pade21()))
     end
 
     generic_target_tracker = let
         x = randn(ComplexF64, size(support[1], 1))
-        pathtracker(generic_homotopy, x, affine_tracking=true)
+        pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun())
     end
 
     path_results = PathResult{Vector{ComplexF64}}[]
     for (cell, X) in cell_iter
-        update_cell!(polyhedral_homotopy, cell)
+        min_weight = update_cell!(polyhedral_homotopy, cell)
+        # We construct s₀ such that
+        #   min_{1 ≤ i ≤ n} min_{aᵢ ∈ Aᵢ} exp(s₀ * w(aᵢ)+aᵢ⋅γ-βᵢ) = 10^-8
+        # From this follows:
+        s₀ = -8*log(10) / min_weight
         for k in 1:size(X,2)
             x∞ = @view X[:,k]
-            retcode = track!(polyhedral_tracker, x∞, -20, 0.0)
+            retcode = track!(polyhedral_tracker, x∞, s₀, 0.0)
+            # println("+: $(polyhedral_tracker.state.accepted_steps) -: $(polyhedral_tracker.state.rejected_steps)")
             if retcode == CoreTrackerStatus.success
                 result = track(generic_target_tracker, currx(polyhedral_tracker))
                 push!(path_results, result)
