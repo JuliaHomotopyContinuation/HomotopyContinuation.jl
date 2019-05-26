@@ -56,13 +56,13 @@ differentiate_parameters(F::SPSystem, x, p, ::SystemNullCache) = SP.differentiat
 
 Set the coefficients of `F` to the provided coefficients
 """
-@generated function set_coefficients!(G::SP.PolynomialSystem{N}, coefficients::Vector{<:Vector}) where {N}
+@generated function set_coefficients!(G::SP.PolynomialSystem{N}, coefficients::AbstractVector{<:AbstractVector}) where {N}
     quote
         $((:(copyto!(G.polys[$i].coefficients, coefficients[$i])) for i=1:N)...)
         G
     end
 end
-function set_coefficients!(G::SPSystem, coefficients::Vector{<:Vector})
+function set_coefficients!(G::SPSystem, coefficients::AbstractVector{<:AbstractVector})
     set_coefficients!(G.system, coefficients)
     G
 end
