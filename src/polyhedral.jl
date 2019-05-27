@@ -39,9 +39,7 @@ function PolyhedralStartSolutionsIterator(f::MPPolys)
 end
 function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}})
     n = size(first(support), 1)
-    # Our random lifting strategy is to pick random integers
-    # in the range of 0:nterms where nterms is the total number of terms in the support
-    lifting_range = Int32(-2^12):Int32(2^12) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
+    lifting_range = Int32(-2^15):Int32(2^15)
     lifting = map(A -> rand(lifting_range, size(A,2)), support)
     # As coefficients do we sample random gaussian numbers with norm one.
     # start_coefficients = map(A -> map(_ -> cis(2π * rand()), 1:size(A,2)), support)
