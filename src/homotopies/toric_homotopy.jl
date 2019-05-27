@@ -1,11 +1,11 @@
-export PolyhedralHomotopy, PolyhedralHomotopyCache, gamma
+export ToricHomotopy, ToricHomotopyCache
 
 """
-    PolyhedralHomotopy(G, F; gamma=exp(i * 2π*rand()))
+    ToricHomotopy(support, lifting, coefficients)
 
 Construct the homotopy ``H(x, s) = Σ_α c_α e^{(α̂⋅γ̂) s} x^α``.
 """
-mutable struct PolyhedralHomotopy{S<:SPSystem, T} <: AbstractHomotopy
+mutable struct ToricHomotopy{S<:SPSystem, T} <: AbstractHomotopy
     system::S
     nterms::Vector{Int}
     support::Matrix{Int32}
@@ -14,7 +14,7 @@ mutable struct PolyhedralHomotopy{S<:SPSystem, T} <: AbstractHomotopy
     s_weights::Vector{Float64}
 end
 
-function PolyhedralHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32}}, coefficients::Vector{Vector{T}}) where T
+function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32}}, coefficients::Vector{Vector{T}}) where T
     @assert all(length.(coefficients) .== size.(supports,2))
     @assert length(liftings) == length(supports)
 
@@ -42,10 +42,10 @@ function PolyhedralHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{
     end
     s_weights = zeros(sum(nterms))
 
-    PolyhedralHomotopy(system, nterms, support, lifting, coeffs, s_weights)
+    ToricHomotopy(system, nterms, support, lifting, coeffs, s_weights)
 end
 
-function update_cell!(H::PolyhedralHomotopy, cell::MixedSubdivisions.MixedCell)
+function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
     n = length(H.nterms)
     k = 1
     s_max = 1.0
@@ -80,11 +80,11 @@ function update_cell!(H::PolyhedralHomotopy, cell::MixedSubdivisions.MixedCell)
 end
 
 """
-    PolyhedralHomotopyCache
+    ToricHomotopyCache
 
-An simple cache for `PolyhedralHomotopyCache`.
+An simple cache for `ToricHomotopyCache`.
 """
-mutable struct PolyhedralHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCache
+mutable struct ToricHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCache
     system::C
     coeffs::Vector{T}
     coeffs_dt::Vector{T}
@@ -95,7 +95,7 @@ mutable struct PolyhedralHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHom
     active_coeffs::ActiveCoeffs
 end
 
-function cache(H::PolyhedralHomotopy{S,T}, x, s) where {S,T}
+function cache(H::ToricHomotopy{S,T}, x, s) where {S,T}
     system = cache(H.system, x, s)
     U = promote_type(T, typeof(s))
     coeffs = convert.(U, H.coeffs)
@@ -110,12 +110,12 @@ function cache(H::PolyhedralHomotopy{S,T}, x, s) where {S,T}
     end
     s = ds = NaN
     active_coeffs = COEFFS_UNKNOWN
-    PolyhedralHomotopyCache(system, coeffs, coeffs_dt, views_coeffs, views_coeffs_dt, s, ds, active_coeffs)
+    ToricHomotopyCache(system, coeffs, coeffs_dt, views_coeffs, views_coeffs_dt, s, ds, active_coeffs)
 end
 
-Base.size(H::PolyhedralHomotopy) = size(H.system)
+Base.size(H::ToricHomotopy) = size(H.system)
 
-function update_coeffs!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy, s)
+function update_coeffs!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
     if s == cache.s
         if cache.active_coeffs != COEFFS_EVAL
             set_coefficients!(H.system, cache.views_coeffs)
@@ -133,7 +133,7 @@ function update_coeffs!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy, s
     nothing
 end
 
-function update_coeffs_dt!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy, s)
+function update_coeffs_dt!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
     if s == cache.ds
         if cache.active_coeffs != COEFFS_DT
             set_coefficients!(H.system, cache.views_coeffs_dt)
@@ -159,42 +159,42 @@ function update_coeffs_dt!(cache::PolyhedralHomotopyCache, H::PolyhedralHomotopy
 end
 
 
-function evaluate!(u, H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function evaluate!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs!(c, H, real(s))
     @inbounds evaluate!(u, H.system, x, c.system)
     u
 end
 
-function dt!(u, H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function dt!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs_dt!(c, H, real(s))
     @inbounds evaluate!(u, H.system, x, c.system)
     u
 end
 
-function jacobian!(U, H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function jacobian!(U, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs!(c, H, real(s))
     @inbounds jacobian!(U, H.system, x, c.system)
 end
 
-function evaluate_and_jacobian!(u, U, H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs!(c, H, real(s))
     @inbounds evaluate_and_jacobian!(u, U, H.system, x, c.system)
     nothing
 end
 
-function evaluate(H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function evaluate(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs!(c, H, real(s))
     evaluate(H.system, x, c.system)
 end
 
-function dt(H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function dt(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs_dt!(c, H, real(s))
     evaluate(H.system, x, c.system)
 end
 
-function jacobian(H::PolyhedralHomotopy, x, s, c::PolyhedralHomotopyCache)
+function jacobian(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     update_coeffs!(c, H, real(s))
     jacobian(H.system, x, c.system)
 end
 
-(H::PolyhedralHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::ToricHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
