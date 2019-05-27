@@ -77,7 +77,7 @@
         @test nnonsingular(result) == 32
 
 
-        prob, startsolutions = problem_startsolutions(TotalDegreeInput(F))
+        prob, startsolutions = problem_startsolutions(TargetSystemInput(F))
         result = solve(prob.homotopy, map(startsolutions) do s
             HC.embed(prob, s)
         end)

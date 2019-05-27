@@ -1,6 +1,6 @@
 export AbstractInput,
     StartTargetInput,
-    TotalDegreeInput,
+    TargetSystemInput,
     HomotopyInput,
     ParameterSystemInput
 
@@ -55,17 +55,17 @@ end
 
 
 """
-    TotalDegreeInput(system::MPPolyInputs)
+    TargetSystemInput(system::Inputs)
 
-Construct a `TotalDegreeInputProblem`. This indicates that the system `system`
-is the target system and a total degree system should be assembled.
+Construct a `TargetSystemInput`. This indicates that the system `system`
+is the target system and a start system should be assembled.
 """
-struct TotalDegreeInput{S<:Inputs} <: AbstractInput
+struct TargetSystemInput{S<:Inputs} <: AbstractInput
     system::S
 end
 
 """
-    ParameterSystemInput(F, parameters, p₁, p₀, startsoluions, γ₁=nothing, γ₂=nothing)
+    ParameterSystemInput(F, parameters, p₁, p₀, startsolutions, γ₁=nothing, γ₂=nothing)
 
 Construct a `ParameterSystemInput`.
 """
@@ -98,16 +98,16 @@ function input_startsolutions(F::MPPolyInputs; parameters=nothing, kwargs...)
     end
 
     remove_zeros!(F)
-    # check_zero_dimensional(F)
     # square system and each polynomial is non-zero
     if length(F) == nvariables(F) && ishomogeneous(F)
-        error("Cannot construct a total degree homotopy for a square homogeneous system.")
+        error("Cannot construct a start system for a square homogeneous system.")
     end
-    (input=TotalDegreeInput(F), startsoluions=nothing)
+
+    (input=TargetSystemInput(F), startsolutions=nothing)
 end
 
 function input_startsolutions(F::AbstractSystem)
-    (input=TotalDegreeInput(F), startsolutions=nothing)
+    (input=TargetSystemInput(F), startsolutions=nothing)
 end
 
 function input_startsolutions(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)

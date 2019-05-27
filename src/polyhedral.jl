@@ -1,3 +1,4 @@
+export PolyhedralTracker, update_cell!
 import MixedSubdivisions: MixedCell, MixedCellIterator, RegenerationTraverser
 import ElasticArrays: ElasticArray
 
@@ -40,7 +41,7 @@ function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}})
     n = size(first(support), 1)
     # Our random lifting strategy is to pick random integers
     # in the range of 0:nterms where nterms is the total number of terms in the support
-    lifting_range = Int32(-2^11):Int32(2^11) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
+    lifting_range = Int32(-2^12):Int32(2^12) # ??????????????? #Int32(10 * sum(A -> size(A, 2), support))
     lifting = map(A -> rand(lifting_range, size(A,2)), support)
     # As coefficients do we sample random gaussian numbers with norm one.
     # start_coefficients = map(A -> map(_ -> cis(2π * rand()), 1:size(A,2)), support)
@@ -171,44 +172,147 @@ function construct_binomial_system!(D, b, support, coeffs, indices)
 
 end
 
-# This is just a prototype
-export polyhedral_solve
 
-function polyhedral_solve(f)
-    support, coeffs = support_coefficients(f)
+struct PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
+    toric_homotopy::H
+    toric_tracker::CT
+    generic_tracker::PT
+    # state
+    s₀::Base.RefValue{Float64}
+end
 
-    cell_iter = PolyhedralStartSolutionsIterator(support)
-
-    polyhedral_homotopy = PolyhedralHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
+function PolyhedralTracker(support, coeffs, cell_iter::PolyhedralStartSolutionsIterator; kwargs...)
+    toric_homotopy = ToricHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
     generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
 
-    polyhedral_tracker = let
-        x = randn(ComplexF64, size(support[1], 1))
-        first(coretracker_startsolutions(polyhedral_homotopy, [x], affine_tracking=true,
-                predictor=Pade21()))
+    x = randn(ComplexF64, size(support[1], 1))
+    toric_tracker =
+        coretracker(toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
+    generic_tracker =
+        pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun(), kwargs...)
+
+    PolyhedralTracker(toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
+end
+
+seed(PT::PolyhedralTracker) = PT.generic_tracker.problem.seed
+
+function track!(PT::PolyhedralTracker, x∞)
+    retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
+    if retcode == CoreTrackerStatus.terminated_invalid_startvalue
+        PT.s₀[] *= 2
+        retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
+    end
+    if retcode != CoreTrackerStatus.success
+
+        return PathTrackerStatus.status(retcode)
+    end
+    track!(PT.generic_tracker, currx(PT.toric_tracker))
+end
+
+@inline function PathResult(PT::PolyhedralTracker, args...; kwargs...)
+    PathResult(PT.generic_tracker, args...; kwargs...)
+end
+
+function track(tracker::PolyhedralTracker, x₁; path_number::Int=1, details::Symbol=:default, kwargs...)
+    track!(tracker, x₁; kwargs...)
+    PathResult(tracker, x₁, path_number; details=details)
+end
+
+"""
+    update_cell!(PT::PolyhedralTracker, cell::MixedCell)
+
+Update the polyhedral tracker `PT` to track paths coming from the mixed cell `cell`.
+"""
+function update_cell!(PT::PolyhedralTracker, cell::MixedCell)
+    min_weight = update_cell!(PT.toric_homotopy, cell)
+    # We construct s₀ such that
+    #   min_{1 ≤ i ≤ n} min_{aᵢ ∈ Aᵢ} exp(s₀ * w(aᵢ)+aᵢ⋅γ-βᵢ) = 10^-8
+    # From this follows:
+    PT.s₀[] = -8.0*log(10) / min_weight
+    PT
+end
+
+function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolutionsIterator;
+                threading=false, show_progress=true,
+                path_result_details::Symbol=:default, save_all_paths=false)
+    results = Vector{result_type(PT.generic_tracker)}()
+
+    if show_progress
+        progress = ProgressMeter.ProgressUnknown("Tracking paths... ")
+    else
+        progress = nothing
     end
 
-    generic_target_tracker = let
-        x = randn(ComplexF64, size(support[1], 1))
-        pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun())
-    end
+    stats = SolveStats()
+    ntracked = 1
+    try
+        nthreads = Threads.nthreads()
+        if threading && nthreads > 1
+            error("TODO")
+            # batch_size = 32 * nthreads
+            # batches = BatchIterator(start_solutions, batch_size)
+            # batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
+            # k = 0
+            # for batch in batches
+            #     prepare_batch!(batch_tracker, batch)
+            #     ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
+            #
+            #     for R in batch_tracker.results
+            #         if R !== nothing
+            #             push!(results, R)
+            #             issuccess(R) && update!(stats, R)
+            #         end
+            #     end
+            #     k += length(batch)
+            #     if batch_tracker.interrupted
+            #         return results
+            #     end
+            #
+            #     update_progress!(progress, k, stats)
+            # end
+        else
+            for (cell, X) in start_solutions
+                update_cell!(PT, cell)
+                for i in 1:size(X, 2)
+                    x∞ = @view X[:,i]
 
-    path_results = PathResult{Vector{ComplexF64}}[]
-    for (cell, X) in cell_iter
-        min_weight = update_cell!(polyhedral_homotopy, cell)
-        # We construct s₀ such that
-        #   min_{1 ≤ i ≤ n} min_{aᵢ ∈ Aᵢ} exp(s₀ * w(aᵢ)+aᵢ⋅γ-βᵢ) = 10^-8
-        # From this follows:
-        s₀ = -8*log(10) / min_weight
-        for k in 1:size(X,2)
-            x∞ = @view X[:,k]
-            retcode = track!(polyhedral_tracker, x∞, s₀, 0.0)
-            # println("+: $(polyhedral_tracker.state.accepted_steps) -: $(polyhedral_tracker.state.rejected_steps)")
-            if retcode == CoreTrackerStatus.success
-                result = track(generic_target_tracker, currx(polyhedral_tracker))
-                push!(path_results, result)
+                    return_code = track!(PT, x∞)
+                    if save_all_paths || return_code == PathTrackerStatus.success
+                        R = PathResult(PT, x∞, ntracked; details=path_result_details)
+                        push!(results, R)
+
+                        if return_code == PathTrackerStatus.success
+                            update!(stats, R)
+                        end
+                    end
+                    ntracked += 1
+                end
+                if ntracked % 32 == 0
+                    if progress !== nothing
+                        update_progress!(progress, ntracked, stats)
+                    end
+                end
+            end
+            if progress !== nothing
+                update_progress!(progress, ntracked - 1, stats; finished=true)
             end
         end
+    catch e
+        if isa(e, InterruptException)
+            return results
+        else
+            rethrow(e)
+        end
     end
-    path_results
+    results, ntracked - 1
+end
+
+function tracker_startsolutions(prob::PolyhedralProblem, startsolutions::PolyhedralStartSolutionsIterator; kwargs...)
+    x = randn(ComplexF64, size(prob.toric_homotopy)[2])
+    toric_tracker =
+        coretracker(prob.toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
+    generic_tracker =
+        pathtracker(prob.generic_homotopy, x, affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
+    tracker = PolyhedralTracker(prob.toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
+    (tracker=tracker, startsolutions=startsolutions)
 end

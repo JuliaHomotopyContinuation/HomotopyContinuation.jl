@@ -402,6 +402,7 @@ Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 
+seed(PT::PathTracker) = PT.problem.seed
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
 
@@ -809,10 +810,15 @@ to investigate single paths.
 function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
     invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
-
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); rest...)
+    tracker_startsolutions(prob, startsolutions; rest...)
+end
+
+function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
+    core_tracker_supported, pathtracker_kwargs = splitkwargs(kwargs, coretracker_supported_keywords)
+    core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); core_tracker_supported...)
+    tracker = PathTracker(prob, core_tracker; pathtracker_kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 

@@ -166,20 +166,21 @@ const solve_supported_keywords = [:threading, :show_progress,
             # deprecated
             :report_progress]
 
+
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
     tracker, start_solutions = pathtracker_startsolutions(args...; rest...)
     solve(tracker, start_solutions; solve_kwargs...)
 end
 
-function solve(tracker::PathTracker, start_solutions;
+function solve(tracker::Union{<:PathTracker,<:PolyhedralTracker}, start_solutions;
         path_result_details=:default, save_all_paths=false,
         path_jumping_check=true, kwargs...)
-    results = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
+    results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
     if path_jumping_check
         path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
     end
-    Result(results, length(start_solutions), tracker.problem.seed)
+    Result(results, ntracked, seed(tracker))
 end
 
 mutable struct SolveStats
@@ -257,7 +258,7 @@ function track_paths(tracker, start_solutions;
             rethrow(e)
         end
     end
-    results
+    results, n
 end
 
 function update!(stats::SolveStats, R::PathResult)
@@ -270,18 +271,24 @@ function update!(stats::SolveStats, R::PathResult)
     end
 end
 
-function update_progress!(progress, ntracked, stats::SolveStats)
+function update_progress!(progress, ntracked, stats::SolveStats; finished::Bool=false)
     progress === nothing && return nothing
 
     nsols = stats.regular + stats.singular
     nreal = stats.regular_real + stats.singular_real
 
-    ProgressMeter.update!(progress, ntracked, showvalues=(
+    showvalues = (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular) ($(stats.regular_real))"),
         ("# singular solutions (real)", "$(stats.singular) ($(stats.singular_real))"),
         ("# total solutions (real)", "$nsols ($nreal)")
-    ))
+    )
+
+    ProgressMeter.update!(progress, ntracked; showvalues=showvalues)
+    if finished
+        ProgressMeter.finish!(progress; showvalues=showvalues)
+    end
+
     nothing
 end
 
@@ -423,6 +430,9 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
     end
 
     results
+end
+function path_jumping_check!(results::Vector{<:PathResult}, tracker::PolyhedralTracker, details::Symbol; kwargs...)
+    path_jumping_check!(results, tracker.generic_tracker, details; kwargs...)
 end
 
 

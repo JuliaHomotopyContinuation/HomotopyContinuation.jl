@@ -7,7 +7,7 @@
     @test PP1 isa Problem{ProjectiveTracking}
     @test length(start1) == 2
 
-    P2 = TotalDegreeInput(G)
+    P2 = TargetSystemInput(G)
     (PP2, start2) = problem_startsolutions(P2)
     @test PP2 isa Problem{ProjectiveTracking}
     @test length(start2) == 720
@@ -17,10 +17,10 @@
 
     @polyvar x y z
     F = [x^2+y^2+2z^2, x+y+3z]
-    P, _ = problem_startsolutions(TotalDegreeInput(F), nothing, homvar=y)
+    P, _ = problem_startsolutions(TargetSystemInput(F), nothing, homvar=y)
     @test homvars(P) == (2,)
 
-    P, _ = problem_startsolutions(TotalDegreeInput(F), nothing)
+    P, _ = problem_startsolutions(TargetSystemInput(F), nothing)
     @test homvars(P) === nothing
 
     @test_throws ErrorException problem_startsolutions(StartTargetInput(
@@ -40,12 +40,12 @@
 
 
     F = FPSystem(homogenize(equations(cyclic(6))))
-    P, startvals = problem_startsolutions(TotalDegreeInput(F))
+    P, startvals = problem_startsolutions(TargetSystemInput(F))
     @test homvars(P) == nothing
     @test length(startvals) == 720
 
     F = FPSystem(homogenize(equations(cyclic(6))))
-    P, startvals = problem_startsolutions(TotalDegreeInput(F), homvar=5)
+    P, startvals = problem_startsolutions(TargetSystemInput(F), homvar=5)
     @test homvars(P) == (5,)
     @test length(startvals) == 720
 end
