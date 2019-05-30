@@ -9,7 +9,8 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
-    :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned]
+    :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned,
+    :log_transform]
 
 
 ####################
@@ -318,18 +319,21 @@ function CoreTracker(prob::AbstractProblem, x₁, t₁, t₀; kwargs...)
 end
 
 # Tracking in Projective Space
-function CoreTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
+function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
     patch=OrthogonalPatch(),
     corrector::AbstractCorrector=NewtonCorrector(),
-    predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
+    predictor::AbstractPredictor=default_predictor(x₁),
+    log_transform=false, kwargs...)
 
     options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
     # disable auto scaling always in projective space
     options.auto_scaling = false
 
-    if H isa PatchedHomotopy
+    if homotopy isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to CoreTracker. Instead pass the homotopy and patch separate.")
     end
+
+    H = log_transform ? LogHomotopy(H) : homotopy
 
     patch_state = state(patch, x₁)
     # We close over the patch state, the homotopy and its cache
@@ -344,11 +348,14 @@ function CoreTracker(H::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁,
 end
 
 # Tracking in affine space
-function CoreTracker(H::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
+function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
     corrector::AbstractCorrector=NewtonCorrector(),
-    predictor::AbstractPredictor=default_predictor(x₁), kwargs...)
+    predictor::AbstractPredictor=default_predictor(x₁),
+    log_transform=false, kwargs...)
 
     options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
+
+    H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
     HC = HomotopyWithCache(H, x₁, t₁)
@@ -524,7 +531,7 @@ function step!(tracker::CoreTracker)
             state.accuracy = result.accuracy
             # Step size change
             state.Δs_prev = state.Δs
-            update_stepsize!(state, result, order(tracker.predictor), options)
+            update_stepsize!(tracker, result)
             if state.patch !== nothing && options.update_patch
                 changepatch!(state.patch, x)
             end
@@ -539,14 +546,10 @@ function step!(tracker::CoreTracker)
             # We have to reset the patch
             state.rejected_steps += 1
             # Step failed, so we have to try with a new (smaller) step size
-            update_stepsize!(state, result, order(tracker.predictor), options)
+            update_stepsize!(tracker, result)
             Δt = currΔt(state)
             state.last_step_failed = true
-            # Check termination criteria
-            # 1) Step size get's too small:
-            if state.Δs < options.min_step_size
-                state.status = CoreTrackerStatus.terminated_step_size_too_small
-            end
+            # Check termination criterion
             # 2) We became too ill-conditioned
             if options.terminate_ill_conditioned && (
                 unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
@@ -569,16 +572,29 @@ function is_overdetermined_tracking(tracker)
     m > n
 end
 
+function check_min_step_size!(tracker::CoreTracker{<:LogHomotopy})
+    if abs((exp(-state.Δs) - 1) * exp(-state.s)) < options.min_step_size
+        state.status = CoreTrackerStatus.terminated_step_size_too_small
+    end
+end
+function check_min_step_size!(tracker::CoreTracker)
+    @unpack state, options = tracker
+    if state.Δs < options.min_step_size
+        state.status = CoreTrackerStatus.terminated_step_size_too_small
+    end
+end
+
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
 δ(opts::CoreTrackerOptions, ω) = @fastmath min(√(ω/2) * τ(opts), 0.25)
 τ(opts::CoreTrackerOptions) = nthroot(opts.accuracy, 2 * opts.max_corrector_iters)
 
-function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
-                          order::Int, options::CoreTrackerOptions)
+function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
+    @unpack state, options = tracker
+    ord = order(tracker.predictor)
 
     if options.simple_step_size_alg
-        simple_step_size_alg!(state, result, options)
+        simple_step_size_alg!(tracker, result)
         return nothing
     end
 
@@ -598,19 +614,19 @@ function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
     Δx₀ = result.norm_Δx₀
     if isconverged(result)
         # compute η and update
-        η = d_x̂_x̄ / state.Δs^order
+        η = d_x̂_x̄ / state.Δs^ord
 
         # assume Δs′ = Δs
         ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
         if isnan(state.η)
             Δs′ = state.Δs
         else
-            d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(order), 0.75d_x̂_x̄)
+            d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(ord), 0.75d_x̂_x̄)
             if state.last_step_failed
                 d_x̂_x̄′ *= 2
             end
             λ = g(δ(options, ω′)) / (ω′ * d_x̂_x̄′)
-            Δs′ = 0.8 * nthroot(λ, order) * state.Δs
+            Δs′ = 0.8 * nthroot(λ, ord) * state.Δs
         end
         if state.last_step_failed
             Δs′ = min(Δs′, state.Δs)
@@ -630,20 +646,24 @@ function update_stepsize!(state::CoreTrackerState, result::CorrectorResult,
         elseif δ_N_ω < 8ω_η
             λ = g(δ_N_ω) / g(8ω_η)
         else
-            λ = 0.5^order
+            λ = 0.5^ord
         end
-        Δs′ = 0.9 * nthroot(λ, order) * state.Δs
+        Δs′ = 0.9 * nthroot(λ, ord) * state.Δs
     end
 
-    state.Δs = min(Δs′, length(state.segment) - state.s, options.max_step_size )
-
-    if !isconverged(result) && state.Δs < options.min_step_size
-        state.status = CoreTrackerStatus.terminated_step_size_too_small
+    Δs′ = min(Δs′, options.max_step_size)
+    if (length(state.segment) - state.s) < Δs′
+        state.Δs = length(state.segment) - state.s
+    else
+        state.Δs = Δs′
+        check_min_step_size!(tracker)
     end
+
     nothing
 end
 
-function simple_step_size_alg!(state::CoreTrackerState, result::CorrectorResult, options::CoreTrackerOptions)
+function simple_step_size_alg!(tracker::CoreTracker, result::CorrectorResult)
+    @unpack state, options = tracker
     if isconverged(result)
         state.consecutive_successfull_steps += 1
         if state.consecutive_successfull_steps == 5
@@ -659,8 +679,8 @@ function simple_step_size_alg!(state::CoreTrackerState, result::CorrectorResult,
 
     state.Δs = min(Δs′, length(state.segment) - state.s)
 
-    if !isconverged(result) && state.Δs < options.min_step_size
-        state.status = CoreTrackerStatus.terminated_step_size_too_small
+    if !isconverged(result)
+        check_min_step_size!(tracker)
     end
 end
 
