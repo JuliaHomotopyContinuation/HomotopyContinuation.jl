@@ -37,15 +37,22 @@ end
 function PolyhedralStartSolutionsIterator(f::MPPolys)
     PolyhedralStartSolutionsIterator(MixedSubdivisions.support(f))
 end
-function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}})
+function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, ::Nothing)
+    PolyhedralStartSolutionsIterator(support, gaussian_lifting_sampler)
+end
+function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, lifting_sampler::Function)
     n = size(first(support), 1)
-    lifting_range = Int32(-2^15):Int32(2^15)
-    lifting = map(A -> rand(lifting_range, size(A,2)), support)
-    # As coefficients do we sample random gaussian numbers with norm one.
-    # start_coefficients = map(A -> map(_ -> cis(2π * rand()), 1:size(A,2)), support)
+    lifting = map(A -> lifting_sampler(size(A,2))::Vector{Int32}, support)
     start_coefficients = map(A -> randn(ComplexF64, size(A,2)), support)
     PolyhedralStartSolutionsIterator(support, lifting, start_coefficients)
 end
+
+uniform_lifting_sampler(nterms) = rand(Int32(-2^17):Int32(2^17), nterms)
+function gaussian_lifting_sampler(nterms)
+    N = 2^19
+    round.(Int32, randn(nterms) * N)
+end
+
 function PolyhedralStartSolutionsIterator(
             support::Vector{Matrix{Int32}},
             lifting::Vector{Vector{Int32}},
@@ -179,25 +186,6 @@ struct PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
     s₀::Base.RefValue{Float64}
 end
 
-# function PolyhedralTracker(support, coeffs, cell_iter::PolyhedralStartSolutionsIterator; kwargs...)
-#     toric_homotopy = ToricHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
-#     #generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
-#
-#     start = SPSystem(support, cell_iter.start_coefficients)
-#     target = SPSystem(support, coeffs)
-#     generic_homotopy = StraightLineHomotopy(start, target; gamma = 1.0)
-#
-#     @show generic_homotopy
-#
-#     x = randn(ComplexF64, size(support[1], 1))
-#     toric_tracker =
-#         coretracker(toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
-#     generic_tracker =
-#         pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun(), kwargs...)
-#
-#     PolyhedralTracker(toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
-# end
-
 seed(PT::PolyhedralTracker) = PT.generic_tracker.problem.seed
 
 function track!(PT::PolyhedralTracker, x∞)
@@ -207,7 +195,6 @@ function track!(PT::PolyhedralTracker, x∞)
         retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
     end
     if retcode != CoreTrackerStatus.success
-
         return PathTrackerStatus.status(retcode)
     end
     track!(PT.generic_tracker, currx(PT.toric_tracker))
@@ -314,9 +301,10 @@ end
 function tracker_startsolutions(prob::PolyhedralProblem, startsolutions::PolyhedralStartSolutionsIterator; kwargs...)
     x = randn(ComplexF64, size(prob.toric_homotopy)[2])
     toric_tracker =
-        coretracker(prob.toric_homotopy, [x]; affine_tracking=true, predictor=Pade21())
+        coretracker(prob.toric_homotopy, [x]; seed=prob.seed, affine_tracking=true,#isa(prob.tracking_type, AffineTracking)
+                    predictor=Pade21())
     generic_tracker =
-        pathtracker(prob.generic_homotopy, x; affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
+        pathtracker(prob.generic_homotopy, x; seed=prob.seed, affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
     tracker = PolyhedralTracker(prob.toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
     (tracker=tracker, startsolutions=startsolutions)
 end

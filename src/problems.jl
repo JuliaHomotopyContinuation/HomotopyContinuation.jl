@@ -3,7 +3,8 @@ export AbstractProblem, Problem, TrackingType, AffineTracking, ProjectiveTrackin
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine_tracking, :start_system];
+	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine_tracking, :start_system,
+	:lifting_sampler];
 	input_supported_keywords]
 
 
@@ -225,10 +226,20 @@ function problem_startsolutions(input::AbstractInput, startsolutions, seed::Int;
     problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
 end
 
-function problem_startsolutions(input::HomotopyInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=false, system_scaling=nothing, kwargs...)
 	if !affine_tracking
 		check_homogeneous_degrees(FixedHomotopy(input.H, rand()))
-    	Problem{ProjectiveTracking}(input.H, VariableGroups(size(input.H)[2], homvar), seed), startsolutions
+		if homvar_info === nothing
+			N = size(input.H)[2]
+			if start_solution_sample(startsolutions) isa PVector
+				vargroups = VariableGroups(N)
+			else
+				vargroups = VariableGroups(N,N)
+			end
+    		Problem{ProjectiveTracking}(input.H, vargroups, seed), startsolutions
+		else
+			Problem{ProjectiveTracking}(input.H, homvar_info.vargroups, seed), startsolutions
+		end
 	else
 		Problem{AffineTracking}(input.H, VariableGroups(size(input.H)[2]), seed), startsolutions
 	end
@@ -240,7 +251,9 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed; start_system=:total_degree, affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed;
+				start_system=:total_degree, affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM,
+				lifting_sampler=nothing, kwargs...)
 	if affine_tracking
 		vargroups = VariableGroups(variables(input.system))
 		homvars = nothing
@@ -314,8 +327,8 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 			affine_support = support
 		end
 
-		cell_iter = PolyhedralStartSolutionsIterator(affine_support)
-		toric_homotopy = ToricHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
+		cell_iter = PolyhedralStartSolutionsIterator(affine_support, lifting_sampler)
+		toric_homotopy = ToricHomotopy(affine_support, cell_iter.lifting, cell_iter.start_coefficients)
 	    generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
 
 		problem = PolyhedralProblem(tracking_type, toric_homotopy, generic_homotopy, vargroups, seed;

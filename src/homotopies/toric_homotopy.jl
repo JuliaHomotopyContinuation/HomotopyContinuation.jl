@@ -68,8 +68,8 @@ function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
             k += 1
         end
     end
-    # We normalize such that 3 is the highest power
-    s_max /= 3
+    # We normalize such that 5 is the highest power
+    s_max /= 5
     for k in eachindex(H.s_weights)
         H.s_weights[k] /= s_max
     end
