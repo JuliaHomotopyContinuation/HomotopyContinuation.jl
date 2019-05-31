@@ -650,7 +650,8 @@ end
 
 function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; isrealsystem=false) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
-    if all(d -> d ≤ 1, maxdegrees(F; parameters=parameters))
+    vars = variables(F; parameters=parameters)
+    if all(d -> d ≤ 1, maxdegrees(F; parameters=vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
     elseif isrealsystem
