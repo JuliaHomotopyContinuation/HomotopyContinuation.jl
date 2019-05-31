@@ -308,9 +308,9 @@ end
 function tracker_startsolutions(prob::PolyhedralProblem, startsolutions::PolyhedralStartSolutionsIterator; kwargs...)
     x = randn(ComplexF64, size(prob.toric_homotopy)[2])
     toric_tracker =
-        coretracker(prob.toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
+        coretracker(prob.toric_homotopy, [x]; affine_tracking=true, predictor=Pade21())
     generic_tracker =
-        pathtracker(prob.generic_homotopy, x, affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
+        pathtracker(prob.generic_homotopy, x; affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
     tracker = PolyhedralTracker(prob.toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
     (tracker=tracker, startsolutions=startsolutions)
 end

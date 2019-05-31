@@ -322,7 +322,7 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 					regauging_factors=regauging_factors, kwargs...)
 		startsolutions = cell_iter
 	else
-		throw(ArgumentError("Unsupported argument `algorithm=$algorithm`. " *
+		throw(ArgumentError("Unsupported argument `start_system=$start_system`. " *
             "Possible values are `:totaldegree` and `:polyhedral`"))
 	end
 
