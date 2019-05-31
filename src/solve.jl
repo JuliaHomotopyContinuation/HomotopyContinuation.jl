@@ -14,26 +14,61 @@ In the following we show the different inputs `solve` takes.
 
     solve(F; options...)
 
-Solve the system `F` using a total degree homotopy. `F` can be
+Solve the system `F` using a start system computed from the degrees of the entries of `F`. The number of paths to track is equal to the total degree `d1⋯dn`, where `di` is the degree of the `i`th entry of `F`. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
 - A composition of polynomial systems constructed by [`compose`](@ref).
 - [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
 
-Additionally if `F` has a multi-homogenous structure you can provide variable groups
-to use a multi-homogenous totaldegree homotopy.
 
-### Examples
+### Example
 We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
 ```julia
 julia> @polyvar x y;
 julia> solve([x^2+y^2+1, 2x+3y-1])
-Result with 2 tracked paths
+Result with 2 solutions
 ==================================
-• 2 non-singular finite solutions (0 real)
-• 0 singular finite solutions (0 real)
-• 0 solutions at infinity
-• 0 failed paths
-• random seed: 448703
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 661766
+
+
+# Polyhedral Homotopy
+
+    solve(F; start_system = :polyhedral, options...)
+
+Solve the system `F` using a start system computed from the Newton Polytopes of the entries `F`. The number of paths to track is equal to the mixed volume of the Newton Polytopes of the entries of `F`. The mixed volume is at most the total degree of `F`. `F` can be
+- `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
+- A composition of polynomial systems constructed by [`compose`](@ref).
+- [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
+solve(f; start_system = :polyhedral, affine_tracking=true, seed = 141691, save_all_paths = true)
+
+### Example
+We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
+```julia
+julia> @polyvar x y;
+julia> solve([x^2+y^2+1, 2x+3y-1]; start_system = :polyhedral)
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 222880
+
+# Homogeneous Systems
+
+If `F` has is homogeneous, we return results in projective space
+
+### Examples
+```julia
+julia> @polyvar x y z;
+julia> solve([x^2+y^2+z^2, 2x+3y-z])
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 291729
 ```
 
 If your polynomial system is already homogeneous, but you would like to consider it as an affine system
@@ -43,6 +78,8 @@ you can do
 solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)
 ```
 This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
+
+# Multihomogeneous Systems
 
 By exploiting the multi-homogenous structure of a polynomial system it is possible
 to decrease the number of paths necessary to track.
