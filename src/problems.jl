@@ -336,7 +336,7 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 		startsolutions = cell_iter
 	else
 		throw(ArgumentError("Unsupported argument `start_system=$start_system`. " *
-            "Possible values are `:totaldegree` and `:polyhedral`"))
+            "Possible values are `:total_degree` and `:polyhedral`"))
 	end
 
 	problem, startsolutions
