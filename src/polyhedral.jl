@@ -179,18 +179,24 @@ struct PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
     s₀::Base.RefValue{Float64}
 end
 
-function PolyhedralTracker(support, coeffs, cell_iter::PolyhedralStartSolutionsIterator; kwargs...)
-    toric_homotopy = ToricHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
-    generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
-
-    x = randn(ComplexF64, size(support[1], 1))
-    toric_tracker =
-        coretracker(toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
-    generic_tracker =
-        pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun(), kwargs...)
-
-    PolyhedralTracker(toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
-end
+# function PolyhedralTracker(support, coeffs, cell_iter::PolyhedralStartSolutionsIterator; kwargs...)
+#     toric_homotopy = ToricHomotopy(cell_iter.support, cell_iter.lifting, cell_iter.start_coefficients)
+#     #generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
+#
+#     start = SPSystem(support, cell_iter.start_coefficients)
+#     target = SPSystem(support, coeffs)
+#     generic_homotopy = StraightLineHomotopy(start, target; gamma = 1.0)
+#
+#     @show generic_homotopy
+#
+#     x = randn(ComplexF64, size(support[1], 1))
+#     toric_tracker =
+#         coretracker(toric_homotopy, [x], affine_tracking=true, predictor=Pade21())
+#     generic_tracker =
+#         pathtracker(generic_homotopy, x, affine_tracking=true, predictor=Heun(), kwargs...)
+#
+#     PolyhedralTracker(toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
+# end
 
 seed(PT::PolyhedralTracker) = PT.generic_tracker.problem.seed
 

@@ -74,8 +74,8 @@ Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs 
 """
 struct PolyhedralProblem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T}
 	tracking_type::T
-    toric_homotopy::ToricHomotopy
-	generic_homotopy::CoefficientHomotopy
+    toric_homotopy::AbstractHomotopy
+	generic_homotopy::AbstractHomotopy
     vargroups::VG
     seed::Int
 	startsolutions_need_reordering::Bool
@@ -83,7 +83,7 @@ struct PolyhedralProblem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem
 end
 function PolyhedralProblem(T::TrackingType,
 			toric_homotopy::ToricHomotopy,
-			generic_homotopy::CoefficientHomotopy,
+			generic_homotopy::AbstractHomotopy,
 			vargroups::VariableGroups, seed::Int;
 		startsolutions_need_reordering=false, regauging_factors=nothing)
 	if isa(T, AffineTracking) && startsolutions_need_reordering

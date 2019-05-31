@@ -988,6 +988,9 @@ function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
     if iscompact || haskey(io, :typeinfo)
         println(io, "• return_code: $(r.return_code)")
+        if r.return_code != PathTrackerStatus.success
+            println(io, " • t: $(r.t)")
+        end
         println(io, " • solution: ", r.solution)
         r.accuracy !== nothing &&
             println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
@@ -999,6 +1002,9 @@ function Base.show(io::IO, r::PathResult)
         println(io, "PathResult")
         println(io, "=================")
         println(io, " • return_code: $(r.return_code)")
+        if r.return_code != PathTrackerStatus.success
+            println(io, " • t: $(r.t)")
+        end
         println(io, " • solution: ", r.solution)
         r.accuracy !== nothing &&
             println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
