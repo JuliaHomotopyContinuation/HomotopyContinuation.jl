@@ -573,6 +573,7 @@ function is_overdetermined_tracking(tracker)
 end
 
 function check_min_step_size!(tracker::CoreTracker{<:LogHomotopy})
+    @unpack state, options = tracker
     if abs((exp(-state.Δs) - 1) * exp(-state.s)) < options.min_step_size
         state.status = CoreTrackerStatus.terminated_step_size_too_small
     end

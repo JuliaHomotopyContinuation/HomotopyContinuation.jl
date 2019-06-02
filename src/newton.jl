@@ -51,25 +51,48 @@ Returns whether the correction was successfull.
 isconverged(result::NewtonResult) = result.return_code == NewtonReturnCode.converged
 
 
+abstract type AbstractNewtonCache end
 """
     NewtonCache(F::AbstractSystem, x)
 
 Cache for the [`newton`](@ref) function.
 """
-struct NewtonCache{T, SC<:AbstractSystemCache}
+struct NewtonCache{T, SC<:AbstractSystemCache} <: AbstractNewtonCache
     Jac::Jacobian{T}
     rᵢ::Vector{T}
     Δxᵢ::Vector{T}
     system_cache::SC
 end
 
-function NewtonCache(F::AbstractSystem, x)
+struct NewtonCacheF64{SC<:AbstractSystemCache, SC2<:AbstractSystemCache} <: AbstractNewtonCache
+    Jac::Jacobian{ComplexF64}
+    xᵢ_D64::Vector{Complex{Double64}}
+    rᵢ::Vector{ComplexF64}
+    rᵢ_D64::Vector{Complex{Double64}}
+    Δxᵢ::Vector{ComplexF64}
+    system_cache::SC
+    system_cache_D64::SC2
+end
+
+function newton_cache(F::AbstractSystem, x)
     system_cache = cache(F, x)
     Jac = Jacobian(Random.randn!(jacobian(F, x, system_cache)))
     rᵢ = evaluate(F, x, system_cache)
     Δxᵢ = zeros(eltype(x), length(x))
 
     NewtonCache(Jac, rᵢ, Δxᵢ, system_cache)
+end
+
+function newton_cache(F::AbstractSystem, x::AbstractVector{ComplexF64})
+    system_cache = cache(F, x)
+    Jac = Jacobian(Random.randn!(jacobian(F, x, system_cache)))
+    rᵢ = evaluate(F, x, system_cache)
+    xD64 = Complex{Double64}.(x)
+    system_cache_D64 = cache(F, xD64)
+    rᵢ_D64 = similar(rᵢ, Complex{Double64})
+    Δxᵢ = zeros(eltype(x), length(x))
+
+    NewtonCacheF64(Jac, xD64, rᵢ, rᵢ_D64, Δxᵢ, system_cache, system_cache_D64)
 end
 
 """
@@ -86,18 +109,18 @@ function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(
 end
 
 """
-    newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
+    newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache; tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
 
 In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
-function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache;
+function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache;
                  tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3,
                  simplified_last_step::Bool=true)
     newton!(out, F, x₀, norm, cache, cache.Jac, tol,
             miniters, maxiters, simplified_last_step, false)
 end
 
-function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, Jac::Jacobian,
+function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache, Jac::Jacobian,
                  tol::Float64, miniters::Int, maxiters::Int, simplified_last_step::Bool,
                  update_jacobian_infos::Bool)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
@@ -112,15 +135,10 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, Jac::Ja
     accuracy = T(Inf)
     ω₀ = ω = 0.0
     for i ∈ 0:maxiters
-        update_infos = update_jacobian_infos && i == 0
-        if i == maxiters && simplified_last_step
-            evaluate!(rᵢ, F, xᵢ, cache.system_cache)
-        else
-            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
-            updated_jacobian!(Jac, update_infos=update_infos)
-        end
-        solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
-
+        newton_step!(cache, Jac, F, xᵢ;
+                        accuracy=tol,
+                        simple_step=(i == maxiters && simplified_last_step),
+                        update_infos=(update_jacobian_infos && i == 0))
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δxᵢ))
         @inbounds for k in eachindex(xᵢ)
@@ -154,4 +172,41 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::NewtonCache, Jac::Ja
     end
 
     return NewtonResult(NewtonReturnCode.maximal_iterations, accuracy, maxiters+1, ω₀, ω, norm_Δx₀)
+end
+
+@inline function newton_step!(cache::NewtonCache, Jac::Jacobian, F, xᵢ; accuracy::Float64=1e-7, simple_step::Bool=false, update_infos::Bool=true)
+    rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
+    if simple_step
+        evaluate!(rᵢ, F, xᵢ, cache.system_cache)
+    else
+        evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
+        updated_jacobian!(Jac, update_infos=update_infos)
+    end
+    solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
+end
+
+@inline function newton_step!(cache::NewtonCacheF64, Jac::Jacobian, F, xᵢ;
+                accuracy::Float64=1e-7, simple_step::Bool=false, update_infos::Bool=true)
+    Jᵢ = Jac.J
+    @unpack rᵢ, rᵢ_D64, Δxᵢ, xᵢ_D64 = cache
+    if simple_step
+        if unpack(Jac.digits_lost, 0.0) < 14 + log₁₀(accuracy)
+            evaluate!(rᵢ, F, xᵢ, cache.system_cache)
+        else
+            xᵢ_D64 .= xᵢ
+            evaluate!(rᵢ_D64, F, xᵢ_D64, cache.system_cache_D64)
+            rᵢ .= rᵢ_D64
+        end
+    else
+        if unpack(Jac.digits_lost, 0.0) < 14 + log₁₀(accuracy)
+            evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
+        else
+            xᵢ_D64 .= xᵢ
+            evaluate!(rᵢ_D64, F, xᵢ_D64, cache.system_cache_D64)
+            rᵢ .= rᵢ_D64
+            jacobian!(Jᵢ, F, xᵢ, cache.system_cache)
+        end
+        updated_jacobian!(Jac, update_infos=update_infos)
+    end
+    solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
 end

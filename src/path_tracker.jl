@@ -147,7 +147,7 @@ function reset!(state::PathTrackerState)
 end
 
 
-struct PathTrackerCache{T, V<:AbstractVector{Complex{T}}, S<:AbstractSystem, NC<:NewtonCache}
+struct PathTrackerCache{T, V<:AbstractVector{Complex{T}}, S<:AbstractSystem, NC<:AbstractNewtonCache}
     unit_roots::Vector{ComplexF64}
     base_point::V
     target_system::S
@@ -175,7 +175,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     else # result is projective
         target_system = PatchedSystem(F, state(OrthogonalPatch(), x))
     end
-    target_newton_cache = NewtonCache(target_system, x)
+    target_newton_cache = newton_cache(target_system, x)
 
     res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
     jac = similar(res, size(target_system))

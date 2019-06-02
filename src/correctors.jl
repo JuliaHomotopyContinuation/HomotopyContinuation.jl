@@ -100,14 +100,14 @@ end
 NewtonCorrector(;simplified_last_step=true) = NewtonCorrector(simplified_last_step)
 
 
-struct NewtonCorrectorCache{FH<:FixedHomotopy, T, SC} <: AbstractCorrectorCache
+struct NewtonCorrectorCache{FH<:FixedHomotopy, NC<:AbstractNewtonCache} <: AbstractCorrectorCache
     F::FH
-    C::NewtonCache{T, SC}
+    C::NC
 end
 
 function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
     F = FixedHomotopy(H, t)
-    C = NewtonCache(F, x)
+    C = newton_cache(F, x)
 
     NewtonCorrectorCache(F, C)
 end

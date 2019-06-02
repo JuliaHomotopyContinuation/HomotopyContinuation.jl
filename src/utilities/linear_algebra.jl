@@ -1,3 +1,6 @@
+import DoubleFloats: Double64
+
+
 issquare(A::AbstractMatrix) = isequal(size(A)...)
 
 """
@@ -164,7 +167,7 @@ end
 Solve `Jac.J * x = b` inplace. Assumes `Jac` contains already the correct factorization.
 This stores the result in `x`.
 """
-function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost=false)
+function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost::Bool=false, refinement_step::Bool=false)
     if Jac.active_factorization == LU_FACTORIZATION
         lu = Jac.lu
         if lu !== nothing
@@ -182,7 +185,7 @@ function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost=false)
             custom_ldiv!(x, Jac.qr, Jac.b, Jac.corank, Jac.perm, Jac.ormqr_work )
         end
     end
-    if issquare(Jac.J) && Jac.corank == 0 && update_digits_lost
+    if issquare(Jac.J) && Jac.corank == 0 && update_digits_lost && !refinement_step
         norm_x = euclidean_norm(x)
         norm_δx = iterative_refinement_step!(x, Jac, b)
         Jac.digits_lost = log₁₀(norm_δx / eps(norm_x))
@@ -256,7 +259,7 @@ Returns the euclidean norm of the update.
 """
 function iterative_refinement_step!(x, Jac::Jacobian, b, ::Type{T}=eltype(x)) where T
     residual!(Jac.r, Jac.J, x, b, T)
-    δx = solve!(Jac, Jac.r)
+    δx = solve!(Jac.r, Jac, Jac.r; refinement_step=true)
     norm_δx = euclidean_norm(δx)
     @inbounds for i in eachindex(x)
         x[i] = convert(T, x[i]) - convert(T, δx[i])

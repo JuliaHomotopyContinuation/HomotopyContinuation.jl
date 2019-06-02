@@ -511,11 +511,11 @@ parameters(r::MonodromyResult) = r.parameters
 ## monodromy solve ##
 #####################
 """
-MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache}
+MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:AbstractNewtonCache}
 
 Cache for monodromy loops.
 """
-struct MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:NewtonCache, AV<:AbstractVector}
+struct MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:AbstractNewtonCache, AV<:AbstractVector}
     F::FT
     tracker::Tracker
     newton_cache::NC

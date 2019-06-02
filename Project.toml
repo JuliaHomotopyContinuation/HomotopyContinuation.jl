@@ -5,6 +5,7 @@ author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breiding@mis
 version = "0.8.0"
 
 [deps]
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 FixedPolynomials = "3dd14ad9-0029-526e-86e9-8aa0bdd2ab0d"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -20,7 +21,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-julia = "^1.1"
 DynamicPolynomials = "^0.1.2"
 FixedPolynomials = "^0.4.0"
 MultivariatePolynomials = "^0.2.3"
@@ -30,6 +30,7 @@ ProjectiveVectors = "^0.2.0"
 StaticArrays = "^0.8, ^0.9, ^0.10, ^0.11"
 StaticPolynomials = "^1.0.0"
 TreeViews = "^0.3.0"
+julia = "^1.1"
 
 [extras]
 PolynomialTestSystems = "4c526841-e1e8-562c-bfa9-9f39d642e243"
