@@ -588,8 +588,8 @@ end
 
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
-δ(opts::CoreTrackerOptions, ω) = @fastmath min(√(ω/2) * τ(opts), 0.25)
-τ(opts::CoreTrackerOptions) = nthroot(opts.accuracy, 2 * opts.max_corrector_iters)
+δ(opts::CoreTrackerOptions, ω, μ) = @fastmath min(√(0.5ω) * τ(opts, μ), 0.25)
+τ(opts::CoreTrackerOptions, μ) = opts.accuracy^(1/(2 * opts.max_corrector_iters - μ))
 
 function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     @unpack state, options = tracker
@@ -615,49 +615,48 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
 
     Δx₀ = result.norm_Δx₀
     if isconverged(result)
-        # compute η and update
-        η = d_x̂_x̄ / state.Δs^ord
+        # # compute η and update
+        # η = d_x̂_x̄ / state.Δs^ord
 
         # assume Δs′ = Δs
-        ω′ = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
-        if isnan(state.η)
-            Δs′ = state.Δs
-        else
-            d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(ord), 0.75d_x̂_x̄)
-            if state.last_step_failed
-                d_x̂_x̄′ *= 2
-            end
-            λ = g(δ(options, ω′)) / (ω′ * d_x̂_x̄′)
-            Δs′ = 0.8 * nthroot(λ, ord) * state.Δs
-        end
+        # ω = isnan(state.ω) ? ω : max(2ω - state.ω, ω)
+        # if isnan(state.η)
+        #     Δs′ = state.Δs
+        # else
+            # d_x̂_x̄′ = max(2d_x̂_x̄ - state.η * state.Δs^(ord), 0.75d_x̂_x̄)
+        λ = g(δ(options, ω, 0.25)) / (ω * d_x̂_x̄)
+        Δs = nthroot(λ, ord) * state.Δs
+        # end
         if state.last_step_failed
-            Δs′ = min(Δs′, state.Δs)
+            Δs = min(Δs, state.Δs)
         end
-        state.η = η
+        # state.η = η
         state.ω = ω
     else
         ω = max(ω, state.ω)
-        δ_N_ω = δ(options, ω)
-        ω_η = ω / 2 * Δx₀
+        δ_N_ω = δ(options, ω, 0.25)
+        ω_η = 0.5ω * Δx₀
         if δ_N_ω < ω_η
             λ = g(δ_N_ω) / g(ω_η)
-        elseif δ_N_ω < 2ω_η
-            λ = g(δ_N_ω) / g(2ω_η)
-        elseif δ_N_ω < 4ω_η
-            λ = g(δ_N_ω) / g(4ω_η)
-        elseif δ_N_ω < 8ω_η
-            λ = g(δ_N_ω) / g(8ω_η)
+            Δs = nthroot(λ, ord) * state.Δs
+        # elseif δ_N_ω < 2ω_η
+        #     λ = g(δ_N_ω) / g(2ω_η)
+        # elseif δ_N_ω < 4ω_η
+        #     λ = g(δ_N_ω) / g(4ω_η)
+        # elseif δ_N_ω < 8ω_η
+        #     λ = g(δ_N_ω) / g(8ω_η)
         else
-            λ = 0.5^ord
+            # λ = 0.5^ord
+            Δs = 0.5 * state.Δs
         end
-        Δs′ = 0.9 * nthroot(λ, ord) * state.Δs
+        # Δs′ = 0.9 * nthroot(λ, ord) * state.Δs
     end
 
-    Δs′ = min(Δs′, options.max_step_size)
-    if (length(state.segment) - state.s) < Δs′
+    Δs = min(Δs, options.max_step_size)
+    if (length(state.segment) - state.s) < Δs
         state.Δs = length(state.segment) - state.s
     else
-        state.Δs = Δs′
+        state.Δs = Δs
         check_min_step_size!(tracker)
     end
 
