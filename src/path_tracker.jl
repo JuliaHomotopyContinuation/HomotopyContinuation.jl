@@ -10,6 +10,174 @@ const pathtracker_supported_keywords = [
     :max_winding_number, :max_affine_norm,
     :overdetermined_min_accuracy, :overdetermined_min_residual]
 
+############
+# VALUTION #
+############
+struct Valuation
+    v::Vector{Float64}
+    v̇::Vector{Float64}
+    v̈::Vector{Float64}
+    # 0.5 |ẋ_i(s)|^2
+    abs_ẋ::Vector{Float64}
+    # d/ds(0.5 |ẋ_i(s)|^2)
+    abs_ẋ_dot::Vector{Float64}
+end
+
+@enum ValuationVerdict begin
+    VALUATION_INDECISIVE
+    VALUATION_FINITE
+    VALUATION_AT_INFINIY
+end
+
+Valuation(x::ProjectiveVectors.PVector) = Valuation(length(x) - length(ProjectiveVectors.dims(x)))
+Valuation(x::Vector) = Valuation(length(x))
+function Valuation(n::Integer)
+    v = zeros(n)
+    v̇ = zeros(n)
+    v̈ = zeros(n)
+    abs_ẋ = zeros(n)
+    abs_ẋ_dot = zeros(n)
+    Valuation(v, v̇, v̈, abs_ẋ, abs_ẋ_dot)
+end
+
+Base.show(io::IO, val::Valuation) = print_fieldnames(io, val)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
+
+function reset!(val::Valuation)
+    val.v .= 0.0
+    val.v̇ .= 0.0
+    val.v̈ .= 0.0
+    val.abs_ẋ .= 0.0
+    val.abs_ẋ_dot .= 0.0
+    val
+end
+
+
+function update!(val::Valuation, z::Vector, ż, Δs::Float64)
+    v, v̇, v̈ = val.v, val.v̇, val.v̈
+    for i in eachindex(z)
+        x, y = reim(z[i])
+        ẋ, ẏ = reiml(ż[i])
+        x²_plus_y² = abs2(z[i])
+        vᵢ, v̇ᵢ = v[i], v̇[i]
+        v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
+        v̇[i] = (v[i] - vᵢ) / Δs
+        v̈[i] = (v̇[i] - v̇ᵢ) / Δs
+
+        abs_ẋᵢ = val.abs_ẋ[i]
+        val.abs_ẋ[i] = 0.5 * abs2(ż[i])
+        val.abs_ẋ_dot[i] = (val.abs_ẋ[i] - abs_ẋᵢ) / Δs
+    end
+
+    val
+end
+function update!(val::Valuation, z::PVector, ż, Δs::Float64)
+    i = 1
+    v, v̇, v̈ = val.v, val.v̇, val.v̈
+    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(x)
+        w = inv(z[homⱼ])
+        for k in rᵢ
+            x, y = reim(z[k] * w)
+            ẋ, ẏ = reiml(ż[k] * w)
+            x²_plus_y² = x^2 + y^2
+            vᵢ, v̇ᵢ = v[i], v̇[i]
+            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
+            v̇[i] = (v[i] - vᵢ) / Δs
+            v̈[i] = (v̇[i] - v̇ᵢ) / Δs
+
+            abs_ẋᵢ = val.abs_ẋ[i]
+            val.abs_ẋ[i] = 0.5 * abs2(ż[i])
+            val.abs_ẋ_dot[i] = (val.abs_ẋ[i] - abs_ẋᵢ) / Δs
+            i += 1
+        end
+    end
+    val
+end
+
+function update!(val::Valuation, z::Vector, ż, z̈, z³, Δs::Float64)
+    for i in eachindex(z)
+        vᵢ, v̇ᵢ, v̈ᵢ, abs_ẋᵢ, abs_ẋ_dotᵢ =
+                        val_values(z[i], ż[i], z̈[i], z³[i])
+        val.v[i] = vᵢ
+        val.v̇[i] = v̇ᵢ
+        val.v̈[i] = v̈ᵢ
+        val.abs_ẋ[i] = abs_ẋᵢ
+        val.abs_ẋ_dot[i] = abs_ẋ_dotᵢ
+        i += 1
+    end
+    val
+end
+function update!(val::Valuation, z::PVector, ż, z̈, z³, Δs::Float64)
+    i = 1
+    v, v̇, v̈ = val.v, val.v̇, val.v̈
+    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(x)
+        w = inv(z[homⱼ])
+        for k in rᵢ
+            vᵢ, v̇ᵢ, v̈ᵢ, abs_ẋᵢ, abs_ẋ_dotᵢ =
+                            val_values(z[i] * w, ż[i] * w, z̈[i] * w, z³[i] * w)
+            v[i] = vᵢ
+            v̇[i] = v̇ᵢ
+            v̈[i] = v̈ᵢ
+            val.abs_ẋ[i] = abs_ẋᵢ
+            val.abs_ẋ_dot[i] = abs_ẋ_dotᵢ
+            i += 1
+        end
+    end
+    val
+end
+function val_values(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
+    x, y = reim(z)
+    ẋ, ẏ = reim(ż)
+    ẍ, ÿ = reim(z̈)
+    x³, y³ = reim(z)
+
+    v = -(x*ẋ + y*ẏ) / abs
+    v̇ = 2v[i]^2 - (x*ẍ + ẋ^2 + y*ÿ + ẏ^2) / abs
+    v̈ = 4v̇[i]*v[i] - (x*x³ + 3ẋ*ẍ + y*y³ + 3ẏ*ÿ) / abs -
+           2v[i]*(x*ẍ + ẋ^2 + y*ÿ + ẏ^2) / abs
+
+    abs_ẋ = 0.5 * (ẋ^2 + ẏ^2)
+    abs_ẋ_dot = (ẋ * ẍ + ẏ * ÿ)
+
+    v, v̇, v̈, abs_ẋ, abs_ẋ_dot
+end
+
+"""
+    judge(val::Valuation; s_max::Float64=-log(eps()))::ValuationVerdict
+
+Judge the current valuation.
+"""
+function judge(val::Valuation, s, s_max::Float64=-log(eps()))
+    @unpack v, v̇, v̈, abs_ẋ, abs_ẋ_dot = val
+    Δs = s_max - s
+    status = VALUATION_INDECISIVE
+    all_positive = true
+    for i in eachindex(v)
+        Δv̂ᵢ = abs(Δs * v̇[i] / (1.0 - 0.5Δs * v̈[i] / v̇[i]))
+        if Δv̂ᵢ > 0.01
+            return VALUATION_INDECISIVE
+        end
+        if status != VALUATION_AT_INFINIY &&
+            v[i] < -0.05 &&
+            Δv̂ᵢ < 0.001 &&
+            abs_ẋ[i] > 20.0 &&
+            abs_ẋ_dot[i] > 5.0
+
+            status = VALUATION_AT_INFINIY
+        end
+
+        if v[i] < -0.05
+            all_positive = false
+        end
+    end
+
+    status == VALUATION_AT_INFINIY && return VALUATION_AT_INFINIY
+    all_positive && return VALUATION_FINITE
+
+    VALUATION_INDECISIVE
+end
+
+
 module PathTrackerStatus
 
     import ..CoreTrackerStatus
