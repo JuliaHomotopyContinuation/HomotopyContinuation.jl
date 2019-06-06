@@ -10,17 +10,23 @@ const pathtracker_supported_keywords = [
     :max_winding_number, :max_affine_norm,
     :overdetermined_min_accuracy, :overdetermined_min_residual]
 
-############
-# VALUTION #
-############
+
+##############
+## VALUATION ##
+##############
+
 struct Valuation
     v::Vector{Float64}
     v̇::Vector{Float64}
     v̈::Vector{Float64}
-    # 0.5 |ẋ_i(s)|^2
-    abs_ẋ::Vector{Float64}
-    # d/ds(0.5 |ẋ_i(s)|^2)
-    abs_ẋ_dot::Vector{Float64}
+    #  0.5|x(s)|^2
+    abs_x_sq::Vector{Float64}
+    # d/ds 0.5|x(s)|^2
+    abs_x_sq_dot::Vector{Float64}
+    # d^2/ds^2 0.5|x(s)|^2
+    abs_x_sq_ddot::Vector{Float64}
+    # d^3/ds^3 0.5|x(s)|^2
+    abs_x_sq_dddot::Vector{Float64}
 end
 
 @enum ValuationVerdict begin
@@ -35,9 +41,11 @@ function Valuation(n::Integer)
     v = zeros(n)
     v̇ = zeros(n)
     v̈ = zeros(n)
-    abs_ẋ = zeros(n)
-    abs_ẋ_dot = zeros(n)
-    Valuation(v, v̇, v̈, abs_ẋ, abs_ẋ_dot)
+    abs_x_sq = zeros(n)
+    abs_x_sq_dot = zeros(n)
+    abs_x_sq_ddot = zeros(n)
+    abs_x_sq_dddot = zeros(n)
+    Valuation(v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot)
 end
 
 Base.show(io::IO, val::Valuation) = print_fieldnames(io, val)
@@ -47,9 +55,31 @@ function reset!(val::Valuation)
     val.v .= 0.0
     val.v̇ .= 0.0
     val.v̈ .= 0.0
-    val.abs_ẋ .= 0.0
-    val.abs_ẋ_dot .= 0.0
+    val.abs_x_sq .= 0.0
+    val.abs_x_sq_dot .= 0.0
+    val.abs_x_sq_ddot .= 0.0
+    val.abs_x_sq_dddot .= 0.0
     val
+end
+
+
+function val_values(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
+    x, y = reim(z)
+    ẋ, ẏ = reim(ż)
+    ẍ, ÿ = reim(z̈)
+    x³, y³ = reim(z)
+
+    x²_plus_y² = abs2(z)
+    abs_x_sq = 0.5x²_plus_y²
+    abs_x_sq_dot = x*ẋ + y*ẏ
+    abs_x_sq_ddot = x*ẍ + ẋ^2 + y*ÿ + ẏ^2
+    abs_x_sq_dddot = x*x³ + 3ẋ*ẍ + y*y³ + 3ẏ*ÿ
+
+    v = -(abs_x_sq_dot) / x²_plus_y²
+    v̇ = 2v^2 - abs_x_sq_ddot / x²_plus_y²
+    v̈ = 4v̇*v - abs_x_sq_dddot / x²_plus_y² - 2v*abs_x_sq_ddot / x²_plus_y²
+
+    v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot
 end
 
 
@@ -57,36 +87,58 @@ function update!(val::Valuation, z::Vector, ż, Δs::Float64)
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for i in eachindex(z)
         x, y = reim(z[i])
-        ẋ, ẏ = reiml(ż[i])
+        ẋ, ẏ = reim(ż[i])
         x²_plus_y² = abs2(z[i])
         vᵢ, v̇ᵢ = v[i], v̇[i]
         v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
         v̇[i] = (v[i] - vᵢ) / Δs
         v̈[i] = (v̇[i] - v̇ᵢ) / Δs
 
-        abs_ẋᵢ = val.abs_ẋ[i]
-        val.abs_ẋ[i] = 0.5 * abs2(ż[i])
-        val.abs_ẋ_dot[i] = (val.abs_ẋ[i] - abs_ẋᵢ) / Δs
+        abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ = val.abs_x_sq_dot[i], val.abs_x_sq_ddot[i]
+
+        val.abs_x_sq[i] = 0.5x²_plus_y²
+        val.abs_x_sq_dot[i] = x*ẋ + y*ẏ
+        val.abs_x_sq_ddot[i] = (val.abs_x_sq_dot[i] - abs_x_sq_dotᵢ) / Δs
+        val.abs_x_sq_dddot[i] = (val.abs_x_sq_ddot[i] - abs_x_sq_ddotᵢ) / Δs
     end
 
+    val
+end
+
+function update!(val::Valuation, z::Vector, ż, z̈, z³, Δs::Float64)
+    for i in eachindex(z)
+        vᵢ, v̇ᵢ, v̈ᵢ, abs_x_sqᵢ, abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ, abs_x_sq_dddotᵢ =
+                        val_values(z[i], ż[i], z̈[i], z³[i])
+        val.v[i] = vᵢ
+        val.v̇[i] = v̇ᵢ
+        val.v̈[i] = v̈ᵢ
+        val.abs_x_sq[i] = abs_x_sqᵢ
+        val.abs_x_sq_dot[i] = abs_x_sq_dotᵢ
+        val.abs_x_sq_ddot[i] = abs_x_sq_ddotᵢ
+        val.abs_x_sq_dddot[i] =abs_x_sq_dddotᵢ
+        i += 1
+    end
     val
 end
 function update!(val::Valuation, z::PVector, ż, Δs::Float64)
     i = 1
     v, v̇, v̈ = val.v, val.v̇, val.v̈
-    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(x)
-        w = inv(z[homⱼ])
-        for k in rᵢ
-            x, y = reim(z[k] * w)
-            ẋ, ẏ = reiml(ż[k] * w)
+    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
+        xⱼ, yⱼ = reim(z[homⱼ])
+        ẋⱼ, ẏⱼ = reim(ż[homⱼ])
+        abs_ẋⱼ = ẋⱼ^2 + ẏⱼ^2
+        w = -(xⱼ*ẋⱼ + yⱼ*ẏⱼ) / abs_ẋⱼ
+        for k in rⱼ
+            x, y = reim(z[k])
+            ẋ, ẏ = reim(ż[k])
             x²_plus_y² = x^2 + y^2
             vᵢ, v̇ᵢ = v[i], v̇[i]
-            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
+            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y² - w
             v̇[i] = (v[i] - vᵢ) / Δs
             v̈[i] = (v̇[i] - v̇ᵢ) / Δs
 
             abs_ẋᵢ = val.abs_ẋ[i]
-            val.abs_ẋ[i] = 0.5 * abs2(ż[i])
+            val.abs_ẋ[i] = 0.5 * (ẋ^2 + ẏ^2) / abs_ẋⱼ
             val.abs_ẋ_dot[i] = (val.abs_ẋ[i] - abs_ẋᵢ) / Δs
             i += 1
         end
@@ -94,27 +146,15 @@ function update!(val::Valuation, z::PVector, ż, Δs::Float64)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, z̈, z³, Δs::Float64)
-    for i in eachindex(z)
-        vᵢ, v̇ᵢ, v̈ᵢ, abs_ẋᵢ, abs_ẋ_dotᵢ =
-                        val_values(z[i], ż[i], z̈[i], z³[i])
-        val.v[i] = vᵢ
-        val.v̇[i] = v̇ᵢ
-        val.v̈[i] = v̈ᵢ
-        val.abs_ẋ[i] = abs_ẋᵢ
-        val.abs_ẋ_dot[i] = abs_ẋ_dotᵢ
-        i += 1
-    end
-    val
-end
+
 function update!(val::Valuation, z::PVector, ż, z̈, z³, Δs::Float64)
     i = 1
     v, v̇, v̈ = val.v, val.v̇, val.v̈
-    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(x)
-        w = inv(z[homⱼ])
-        for k in rᵢ
+    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
+        w, ẇ, ẅ, w³ = inv(z[homⱼ]), inv(ż[homⱼ]), inv(z̈[homⱼ]), inv(z³[homⱼ])
+        for k in rⱼ
             vᵢ, v̇ᵢ, v̈ᵢ, abs_ẋᵢ, abs_ẋ_dotᵢ =
-                            val_values(z[i] * w, ż[i] * w, z̈[i] * w, z³[i] * w)
+                            val_values(z[i] * w, ż[i] * ẇ, z̈[i] * ẅ, z³[i] * w³)
             v[i] = vᵢ
             v̇[i] = v̇ᵢ
             v̈[i] = v̈ᵢ
@@ -125,43 +165,30 @@ function update!(val::Valuation, z::PVector, ż, z̈, z³, Δs::Float64)
     end
     val
 end
-function val_values(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
-    x, y = reim(z)
-    ẋ, ẏ = reim(ż)
-    ẍ, ÿ = reim(z̈)
-    x³, y³ = reim(z)
-
-    v = -(x*ẋ + y*ẏ) / abs
-    v̇ = 2v[i]^2 - (x*ẍ + ẋ^2 + y*ÿ + ẏ^2) / abs
-    v̈ = 4v̇[i]*v[i] - (x*x³ + 3ẋ*ẍ + y*y³ + 3ẏ*ÿ) / abs -
-           2v[i]*(x*ẍ + ẋ^2 + y*ÿ + ẏ^2) / abs
-
-    abs_ẋ = 0.5 * (ẋ^2 + ẏ^2)
-    abs_ẋ_dot = (ẋ * ẍ + ẏ * ÿ)
-
-    v, v̇, v̈, abs_ẋ, abs_ẋ_dot
-end
 
 """
     judge(val::Valuation; s_max::Float64=-log(eps()))::ValuationVerdict
 
 Judge the current valuation.
 """
-function judge(val::Valuation, s, s_max::Float64=-log(eps()))
-    @unpack v, v̇, v̈, abs_ẋ, abs_ẋ_dot = val
-    Δs = s_max - s
+function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
+    @unpack v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot = val
+    Δs = abs(s_max - s)
     status = VALUATION_INDECISIVE
     all_positive = true
+    indecisive = false
     for i in eachindex(v)
-        Δv̂ᵢ = abs(Δs * v̇[i] / (1.0 - 0.5Δs * v̈[i] / v̇[i]))
-        if Δv̂ᵢ > 0.01
-            return VALUATION_INDECISIVE
+        # Δv̂ᵢ = abs(Δs * v̇[i]) * max((1.0 - 0.5Δs * v̈[i] / v̇[i]), 1.0)
+        Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
+        if Δv̂ᵢ > 1e-2
+            indecisive = true
         end
         if status != VALUATION_AT_INFINIY &&
-            v[i] < -0.05 &&
-            Δv̂ᵢ < 0.001 &&
-            abs_ẋ[i] > 20.0 &&
-            abs_ẋ_dot[i] > 5.0
+            v[i] < -1/20 &&
+            Δv̂ᵢ < 1e-5 &&
+            abs_x_sq[i] > -2v[i] * abs_x_sq_dot[i] > 0 &&
+            abs_x_sq_dot[i] > -2v[i] * abs_x_sq_ddot[i] > 0.1 &&
+            abs_x_sq_ddot[i] > -2v[i] * abs_x_sq_dddot[i] > 0.1
 
             status = VALUATION_AT_INFINIY
         end
@@ -170,13 +197,39 @@ function judge(val::Valuation, s, s_max::Float64=-log(eps()))
             all_positive = false
         end
     end
-
     status == VALUATION_AT_INFINIY && return VALUATION_AT_INFINIY
+    indecisive && return VALUATION_INDECISIVE
     all_positive && return VALUATION_FINITE
 
     VALUATION_INDECISIVE
 end
 
+function update!(val::Valuation, core_tracker::CoreTracker)
+    z = core_tracker.state.x
+    ż = core_tracker.state.ẋ
+    Δs = core_tracker.state.Δs_prev
+    # Don't use possible derivatives if the linear algebra becomes too ill-conditioned
+    if unpack(core_tracker.state.jacobian.digits_lost, 0.0) < 4.0
+        update!(val, z, ż, Δs, core_tracker.cache.predictor)
+    else
+        update!(val, z, ż, Δs)
+    end
+end
+
+function update!(val::Valuation, z::Vector, ż, Δs, predictor_cache::Pade21Cache)
+    z̈ = predictor_cache.x²
+    z³ = predictor_cache.x³
+    update!(val, z, ż, z̈, z³, Δs)
+end
+
+function update!(val::Valuation, z, ż, Δs, predictor_cache::AbstractPredictorCache)
+    update!(val, z, ż, Δs)
+end
+
+
+#################
+## PATHTRACKER ##
+#################
 
 module PathTrackerStatus
 
@@ -248,7 +301,7 @@ function PathTrackerOptions(;
             at_infinity_check=true,
             min_step_size_endgame_start::Float64=1e-10,
             min_val_accuracy::Float64=0.001,
-            samples_per_loop::Int=8,
+            samples_per_loop::Int=12,
             max_winding_number::Int=12,
             max_affine_norm::Float64=1e6,
             overdetermined_min_residual::Float64=1e-3,
@@ -261,55 +314,41 @@ end
 
 mutable struct PathTrackerState{V<:AbstractVector}
     status::PathTrackerStatus.states
-    t::Float64
+    s::Float64
     prediction::V
     solution::V
     solution_accuracy::Float64
     solution_cond::Float64
     endgame_zone_start::Union{Nothing, Float64}
     winding_number::Int
-    # Affine valuation
-    val::Vector{Float64}
-    val_accuracy::Vector{Float64}
-    prev_val::Vector{Float64}
-    prev_val_accuracy::Vector{Float64}
+    val::Valuation
 end
 
 function PathTrackerState(x)
     status = PathTrackerStatus.tracking
-    t = 1.0
+    s = 0.0
     prediction = copy(x)
     solution = copy(x)
     solution_accuracy = solution_cond = NaN
     endgame_zone_start = nothing
     winding_number = 0
-    n = length(x)
-    if x isa ProjectiveVectors.PVector
-        n -= length(ProjectiveVectors.dims(x))
-    end
-    val = zeros(n)
-    val_accuracy = copy(val)
-    prev_val = copy(val)
-    prev_val_accuracy = copy(val)
+    val = Valuation(x)
 
-    PathTrackerState(status, t, prediction, solution, solution_accuracy, solution_cond,
-                     endgame_zone_start, winding_number,
-                     val, val_accuracy, prev_val, prev_val_accuracy)
+    PathTrackerState(status, s, prediction, solution,
+                    solution_accuracy, solution_cond,
+                     endgame_zone_start, winding_number, val)
 end
 
 
 function reset!(state::PathTrackerState)
     state.status = PathTrackerStatus.tracking
-    state.t = 1.0
+    state.s = 0.0
     state.prediction .= zero(eltype(state.prediction))
     state.solution .= zero(eltype(state.prediction))
     state.solution_accuracy = state.solution_cond = NaN
     state.endgame_zone_start = nothing
     state.winding_number = 0
-    state.val .= 0.0
-    state.val_accuracy .= Inf
-    state.prev_val .= 0.0
-    state.prev_val_accuracy .= Inf
+    reset!(state.val)
 
     state
 end
@@ -320,7 +359,7 @@ struct PathTrackerCache{T, V<:AbstractVector{Complex{T}}, S<:AbstractSystem, NC<
     base_point::V
     target_system::S
     target_residual::Vector{Complex{T}}
-    target_jacobian::Matrix{Complex{T}}
+    target_jacobian::Jacobian{Complex{T}}
     target_newton_cache::NC
     weighted_ip::WeightedIP{T}
 end
@@ -334,7 +373,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
         # core_tracker.homotopy.target is a SquaredUpSystem
         F = core_tracker.homotopy.target.F
     else
-        F = FixedHomotopy(core_tracker.homotopy, 0.0)
+        F = FixedHomotopy(core_tracker.homotopy, Inf)
     end
     if affine_tracking(core_tracker)
         target_system = F
@@ -347,9 +386,8 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
 
     res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
     jac = similar(res, size(target_system))
-
     weighted_ip = WeightedIP(x)
-    PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache, weighted_ip)
+    PathTrackerCache(unit_roots, base_point, target_system, res, Jacobian(Random.rand!(jac)), target_newton_cache, weighted_ip)
 end
 
 is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
@@ -385,11 +423,15 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(problem::AbstractProblem, core_tracker::CoreTracker; at_infinity_check=default_at_infinity_check(problem), optionskwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), kwargs...)
+    core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
+    core_tracker = CoreTracker(prob, x, complex(0.0), complex(-log(eps()));
+                        log_transform=true, predictor=Pade21(),
+                        core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x)
     options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
-    cache = PathTrackerCache(problem, core_tracker)
-    PathTracker(problem, core_tracker, state, options, cache)
+    cache = PathTrackerCache(prob, core_tracker)
+    PathTracker(prob, core_tracker, state, options, cache)
 end
 
 Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker")
@@ -411,7 +453,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
+function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(eps());
         start_parameters::Union{Nothing,<:AbstractVector}=nothing,
         target_parameters::Union{Nothing,<:AbstractVector}=nothing,
         kwargs...)
@@ -426,40 +468,52 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
         set_target_parameters!(core_tracker.homotopy, target_parameters)
     end
 
+    _track!(tracker, x₁, s₁, s₀)
+
+    set_options!(core_tracker; prev_options...)
+    state.status
+end
+
+function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
+    @unpack core_tracker, state, options, cache = tracker
     # For performance reasons we single thread blas
     n_blas_threads = single_thread_blas()
 
     embed!(core_tracker.state.x, tracker.problem, x₁)
-    setup!(core_tracker, core_tracker.state.x, t₁, 0.0)
+    setup!(core_tracker, core_tracker.state.x, s₁, s₀)
     reset!(state)
 
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
-        t = state.t = real(currt(core_tracker))
+        state.s = real(currt(core_tracker))
         check_terminated!(core_tracker)
-
-        if core_tracker.state.status ≠ CoreTrackerStatus.tracking
+        if core_tracker.state.status != CoreTrackerStatus.tracking &&
+           core_tracker.state.status != CoreTrackerStatus.success
             state.status = PathTrackerStatus.status(core_tracker.state.status)
+            break
+        end
+
+        if core_tracker.state.jacobian.corank > 0
+            # if tracker.options.at_infinity_check  #&& check_at_infinity_fallback(state, state.s, s₀)
+            #     state.status = PathTrackerStatus.at_infinity
+            # else
+            state.status = PathTrackerStatus.terminated_ill_conditioned
+            # end
             break
         end
 
         # We only care if we moved forward
         core_tracker.state.last_step_failed && continue
 
+
         # Our endgame strategy is split in different stages
         # 1) During the path tracking we update an approximation
         #    of the valuation of x(t) since this has for t ≈ 0
         #    an expansion as a Puiseux series.
-        #    The problem is that we do not a-priori know what t ≈ 0
-        #    means. Thus, we have to find a criterion to check when
-        #    an approximation is accurate.
-        #    For this we require that:
-        #         |val(xᵢ(t_k)) - val(xᵢ(t_{k-1}))| / (log(t_k) - log(t_{k-1}))
-        #    is smaller than a given tolerance (`min_val_accuracy`)
         #
         # 2) If one of the valuation coordinates is sufficiently accurate
         #    we can decide whether this coordinate goes to infinity or not
-        #    This happens in `check_at_infinity`
+        #    This happens in `judge`
         #
         # 3) Now assume that val(xᵢ(t_k)) ≥ 0 for all i. Then we know
         #    that this converges to a finite solution. Now we have to distinguish
@@ -468,29 +522,15 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
         #    solutions we simply can track towards 0.
 
         # update valuation and associated data
-        update_val!(state, core_tracker)
+        update!(state.val, core_tracker)
 
-
-        # Check at infinity
-        if tracker.options.at_infinity_check &&
-           core_tracker.state.Δs < options.min_step_size_endgame_start &&
-           check_at_infinity(tracker)
-            # We store when we entered the endgame zone
-            if state.endgame_zone_start === nothing
-                state.endgame_zone_start = t
-            end
-
+        verdict = judge(state.val, core_tracker.state.jacobian, state.s, max(36.0, s₀))
+        if tracker.options.at_infinity_check && verdict == VALUATION_AT_INFINIY
             state.status = PathTrackerStatus.at_infinity
             break
         end
 
-        # Check that all valuations are accurate and solution is possibly singular
-        if check_finite_singular_candidate(tracker; at_infinity_check=tracker.options.at_infinity_check)
-            # We store when we entered the endgame zone
-            if state.endgame_zone_start === nothing
-                state.endgame_zone_start = t
-            end
-
+        if verdict == VALUATION_FINITE && is_singularish(state.val, core_tracker)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
             if retcode == :success
                 state.status = PathTrackerStatus.success
@@ -501,25 +541,29 @@ function track!(tracker::PathTracker, x₁, t₁::Float64=1.0;
             end
         end
 
-    end
-
-    # It can happen that we jump too fast to a non-singular solution at infinity
-    # For example, this happens with the Griewank & Osborne system (seed 130793) for path 3.
-    # This only happens if we couldn't agrre on a valuation
-    if options.at_infinity_check && state.status == PathTrackerStatus.success
-        # If the path is at infinity, then one of the homogenization variables is ≈ 0
-        if (maximum(state.val_accuracy) < options.min_val_accuracy && minimum(state.val) < -0.05) ||
-            vector_at_infinity(currx(core_tracker), options.max_affine_norm)
-            state.status = PathTrackerStatus.at_infinity
+        if core_tracker.state.status == CoreTrackerStatus.success
+            state.status = PathTrackerStatus.success
+            break
         end
     end
 
     check_and_refine_solution!(tracker)
     # We have to set the number of blas threads to the previous value
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
-
-    set_options!(core_tracker; prev_options...)
     state.status
+end
+
+
+function is_singularish(val::Valuation, core_tracker::CoreTracker)
+    # 1) check if val is rational for some i, then the solution is singular
+    for v in val.v
+        v < -0.05 && return false # this function shouldn't be called in the first
+        abs(round(v) - v) > 0.1 && return true
+    end
+
+    # 2) use condition number / digits_lost to decide
+    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e8 ||
+    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 6.0
 end
 
 """
@@ -535,8 +579,8 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, kwargs...)
-    track!(tracker, x₁, t₁; kwargs...)
+function track(tracker::PathTracker, x₁, t₁=0.0, t₀=-log(eps()); path_number::Int=1, details::Symbol=:default, kwargs...)
+    track!(tracker, x₁, t₁, t₀; kwargs...)
     PathResult(tracker, x₁, path_number; details=details)
 end
 
@@ -567,108 +611,6 @@ function set_parameters!(tracker::PathTracker; start_parameters=nothing, target_
     nothing
 end
 
-################
-## VALUATIONS ##
-################
-"""
-    update_val!(state::PathTrackerState, core_tracker::CoreTracker)
-
-Update the valuation estimate of ``x(t)`` and assess it's accuracy.
-"""
-function update_val!(state::PathTrackerState, core_tracker::CoreTracker)
-    @unpack x, ẋ = core_tracker.state
-    t_k = abs(currt(core_tracker))
-    compute_val!(state, x, ẋ, t_k)
-
-    # Compute accuracy
-    Δt = core_tracker.state.Δs_prev
-    log_Δt_k = log1p(Δt / t_k)
-    for i in eachindex(state.val)
-        state.prev_val_accuracy[i] = state.val_accuracy[i]
-        state.val_accuracy[i] = abs((state.prev_val[i] - state.val[i]) / log_Δt_k)
-    end
-    state
-end
-function compute_val!(state::PathTrackerState, x::AbstractVector, ẋ, t)
-    for i in eachindex(state.val)
-        state.prev_val[i] = state.val[i]
-        state.val[i] = val(x, ẋ, t, i)
-    end
-    state
-end
-function compute_val!(state::PathTrackerState, x::PVector, ẋ, t)
-    j = 1
-    for (rᵢ, homᵢ) in ProjectiveVectors.dimension_indices_homvars(x)
-        val_homᵢ = val(x, ẋ, t, homᵢ)
-        for k in rᵢ
-            state.prev_val[j] = state.val[j]
-            state.val[j] = val(x, ẋ, t, k) - val_homᵢ
-            j += 1
-        end
-    end
-    state
-end
-
-val(x, ẋ, t, k) = t * re_dot(x[k], ẋ[k]) / abs2(x[k])
-
-"Computes `real(z * conj(ż))`."
-re_dot(z, ż) = begin x, y = reim(z); ẋ, ẏ = reim(ż); x * ẋ + y * ẏ end
-
-
-############
-## CHECKS ##
-############
-
-"""
-    is_val_accurate(state, i, options)
-
-Checks whether ``val(xᵢ(t))`` is accurate (as specified by the tolerance in `options`).
-"""
-function is_val_accurate(state::PathTrackerState, i::Int, options::PathTrackerOptions)
-    # 1) require that the previous valuation accuracy is already enough
-    state.prev_val_accuracy[i] < options.min_val_accuracy &&
-    # We also want that the accuracy increase
-    # or it should be much much more accurate
-    (state.val_accuracy[i] < state.prev_val_accuracy[i]) ||
-     state.val_accuracy[i] < options.min_val_accuracy^2
-end
-
-function check_at_infinity(tracker::PathTracker)
-    for (i, ωᵢ) in enumerate(tracker.state.val)
-        # Case 1 ωᵢ < 0 => |xⱼ(t)| -> ∞ for t -> 0
-        if is_val_accurate(tracker.state, i, tracker.options) && ωᵢ < -0.05
-            return true
-        end
-    end
-
-    false
-end
-
-function check_finite_singular_candidate(tracker::PathTracker; at_infinity_check=true)
-    # We have a singular solution if one of the components
-    # has a fractional valuation
-    fractional_valuation = false
-    for (i, ωᵢ) in enumerate(tracker.state.val)
-        if !is_val_accurate(tracker.state, i, tracker.options) ||
-            (at_infinity_check && ωᵢ ≤ -tracker.options.min_val_accuracy)
-            return false
-        end
-        if abs(round(ωᵢ) - ωᵢ) > 0.1
-            fractional_valuation = true
-        end
-    end
-
-    fractional_valuation && return true
-
-    # 3) We actually want some bad conditioning to not waste resources
-    if unpack(tracker.core_tracker.state.jacobian.digits_lost, 0.0) > 4.0 ||
-        tracker.core_tracker.state.ω > 100 ||
-        tracker.core_tracker.state.Δs < 1e-4
-        return true
-    end
-
-    false
-end
 
 vector_at_infinity(x::AbstractVector, tol) = false
 vector_at_infinity(x::PVector, tol) = ProjectiveVectors.norm_affine_chart(x) > tol
@@ -692,9 +634,9 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     @unpack unit_roots, base_point = cache
     @unpack samples_per_loop, max_winding_number = options
 
-    compute_unit_roots!(unit_roots, samples_per_loop)
-
-    t = real(currt(core_tracker))
+    # compute_unit_roots!(unit_roots, samples_per_loop)
+    initial_step_size = core_tracker.options.initial_step_size
+    s = real(currt(core_tracker))
 
     base_point .= currx(core_tracker)
     prediction .= zero(eltype(state.prediction))
@@ -704,34 +646,37 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     fix_patch!(core_tracker)
 
     m = k = 1
+    ∂θ = 2π / samples_per_loop
+    core_tracker.options.initial_step_size = ∂θ #0.5∂θ
     while m ≤ max_winding_number
-        θⱼ = t
+        θⱼ = 0.0
         for j=1:samples_per_loop
             θⱼ₋₁ = θⱼ
-            θⱼ = t * unit_roots[j]
+            θⱼ += ∂θ
 
-            retcode = track!(core_tracker, currx(core_tracker), θⱼ₋₁, θⱼ)
-
+            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; checkstartvalue=false)
             accepted_steps += core_tracker.state.accepted_steps
             rejected_steps += core_tracker.state.rejected_steps
 
             if retcode != CoreTrackerStatus.success
                 # during the loop we fixed the affine patch
                 unfix_patch!(core_tracker)
+                core_tracker.options.initial_step_size = initial_step_size
                 @pack! core_tracker.state = accepted_steps, rejected_steps
+
                 return Symbol(retcode)
             end
 
             prediction .+= currx(core_tracker)
         end
 
-        if euclidean_distance(base_point, currx(core_tracker)) < 4 * core_tracker.options.accuracy
+        if euclidean_distance(base_point, currx(core_tracker)) < 4core_tracker.options.accuracy
             break
         end
 
         m += 1
     end
-
+    core_tracker.options.initial_step_size = initial_step_size
     # we have to undo the fixing of the patch
     unfix_patch!(core_tracker)
     @pack! core_tracker.state = accepted_steps, rejected_steps
@@ -746,24 +691,6 @@ end
 
 fix_patch!(tracker::CoreTracker) = tracker.options.update_patch = false
 unfix_patch!(tracker::CoreTracker) = tracker.options.update_patch = true
-
-"""
-    compute_unit_roots!(unit_roots, n)
-
-Fill `unit_roots` with the unit roots ``exp(2πi/n)`` for ``i=1,...,n``.
-"""
-function compute_unit_roots!(unit_roots, n)
-    if length(unit_roots) ≠ n
-        resize!(unit_roots, n)
-        unit_roots[1] = primitive_root = cis(2π/n)
-        unit_roots[n] = complex(1.0)
-        for k=2:(n-1)
-            unit_roots[k] = unit_roots[k-1] * primitive_root
-        end
-    end
-    unit_roots
-end
-
 
 """
     type_of_x(pathtracker)
@@ -800,11 +727,11 @@ function check_and_refine_solution!(tracker::PathTracker)
             if isa(e, LinearAlgebra.SingularException)
                 tracker.state.winding_number = 1
                 state.solution .= currx(core_tracker)
-                for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
-                    if ωᵢ < -0.1 &&  acc < 0.05
-                        state.status = PathTrackerStatus.at_infinity
-                    end
-                end
+                # for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
+                #     if ωᵢ < -0.1 &&  acc < 0.05
+                #         state.status = PathTrackerStatus.at_infinity
+                #     end
+                # end
                 if state.status != PathTrackerStatus.at_infinity &&
                    residual(tracker) > 0
                     state.status = PathTrackerStatus.at_infinity
@@ -831,11 +758,11 @@ function check_and_refine_solution!(tracker::PathTracker)
     cond = condition_jacobian(tracker)
     if tracker.state.winding_number == 0 && cond > 1e13
         # make sure that we don't have a solution at infinity accidentaly
-        for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
-            if ωᵢ < -0.1 &&  acc < 0.05
-                state.status = PathTrackerStatus.at_infinity
-            end
-        end
+        # for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
+        #     if ωᵢ < -0.1 &&  acc < 0.05
+        #         state.status = PathTrackerStatus.at_infinity
+        #     end
+        # end
         if state.status != PathTrackerStatus.at_infinity &&
            residual(tracker) > 0
             state.status = PathTrackerStatus.at_infinity
@@ -916,9 +843,7 @@ function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
 
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
-    core_tracker_supported, pathtracker_kwargs = splitkwargs(rest, coretracker_supported_keywords)
-    core_tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); core_tracker_supported...)
-    tracker = PathTracker(prob, core_tracker; pathtracker_kwargs...)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions); rest...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 
@@ -1009,7 +934,11 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
         accuracy = nothing
     end
 
-    t = state.t
+    if return_code == :success
+        t = 0.0
+    else
+        t = exp(-state.s)
+    end
     # condition
     if isnan(state.solution_cond)
         condition_jac = nothing
@@ -1036,8 +965,8 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     rejected_steps = core_tracker.state.rejected_steps
 
     if details_level == 2
-        valuation = copy(tracker.state.val)
-        valuation_accuracy = copy(tracker.state.val_accuracy)
+        valuation = copy(tracker.state.val.v)
+        valuation_accuracy = abs.(tracker.state.val.v̇)
     else
         valuation = nothing
         valuation_accuracy = nothing
@@ -1066,10 +995,11 @@ function residual(tracker::PathTracker, x=tracker.state.solution)
 end
 
 function condition_jacobian(tracker::PathTracker, x=tracker.state.solution)
-    jacobian!(tracker.cache.target_jacobian, tracker.cache.target_system, x,
+    jac = tracker.cache.target_jacobian
+    jacobian!(jac.J, tracker.cache.target_system, x,
               tracker.cache.target_newton_cache.system_cache)
-    row_scaling!(tracker.cache.target_jacobian)
-    LinearAlgebra.cond(tracker.cache.target_jacobian)
+    updated_jacobian!(jac; update_infos=true)
+    jac.cond
 end
 
 """

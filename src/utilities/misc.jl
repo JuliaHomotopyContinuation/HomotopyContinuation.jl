@@ -1,5 +1,11 @@
 export SymmetricGroup, infinity_norm, infinity_distance, fubini_study
 
+# The versions in DoubleFloats allocate :shrug:
+function to_ComplexDF64(z::ComplexF64)
+    x, y = reim(z)
+    Complex(Double64(x), Double64(y))
+end
+to_ComplexDF64!(u, Z::Vector{ComplexF64}) = map!(to_ComplexDF64, u, Z)
 
 """
     unpack(a::Union{Nothing, T}, b::T)

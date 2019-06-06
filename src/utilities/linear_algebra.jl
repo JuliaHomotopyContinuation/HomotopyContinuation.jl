@@ -73,6 +73,7 @@ mutable struct Jacobian{T}
     ormqr_work::Vector{ComplexF64}
     # Numerical Informations
     corank::Int # The numerical corank
+    corank_proposal::Int
     cond::Float64 # Estimate of the Jacobian
     # The relative number of digits lost during the solution of the linear systems
     # in Newton's method. See `solve_with_digits_lost!` in utilities/linear_algebra.jl
@@ -100,7 +101,20 @@ function Jacobian(A::AbstractMatrix, corank::Int=0)
     cond = 1.0
     digits_lost = nothing
     Jacobian(J, D, lu, qr, active_factorization, b, r, perm, work, rwork, ormqr_work,
-        corank, cond, digits_lost)
+        corank, 0, cond, digits_lost)
+end
+
+function update_rank!(Jac::Jacobian)
+    # if Jac.corank_proposal < Jac.corank
+    #     Jac.corank = Jac.corank_proposal
+    # elseif Jac.corank_proposal > Jac.corank == 0 && issquare(Jac.J)
+    #     if unpack(Jac.digits_lost, 0.0) > maximal_lost_digits
+    #         Jac.corank = Jac.corank_proposal
+    #     end
+    # else
+    Jac.corank = Jac.corank_proposal
+    # end
+    Jac
 end
 
 """
@@ -120,7 +134,7 @@ end
 This computes a factorization of the stored Jacobian matrix.
 Call this instead of `update!` if `jacobian.J` got updated.
 """
-function updated_jacobian!(Jac::Jacobian{T}; update_infos::Bool=false) where {T}
+function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) where {T}
     if !update_infos && issquare(Jac.J) && Jac.corank == 0
         Jac.lu !== nothing || return Jac
         copyto!(Jac.lu.factors, Jac.J)
@@ -139,21 +153,23 @@ function updated_jacobian!(Jac::Jacobian{T}; update_infos::Bool=false) where {T}
         # qr!(Jac.qr.factors, Val(true)) but without allocating new memory
         geqp3!(Jac.qr.factors, Jac.qr.jpvt, Jac.qr.τ, Jac.qr_work, Jac.qr_rwork)
 
-        ε = max(n,m) * eps(real(T)) * 100
+        ε = max(n,m) * eps()
         # check rank 0
         rnm = min(n,m)
         r₁ = abs(real(Jac.qr.factors[1,1]))
+        corank = 0
         if r₁ < ε
-            Jac.corank = rnm
+            corank = rnm
         else
             for i in 2:rnm
                 rᵢ = abs(real(Jac.qr.factors[i,i]))
                 if ε * r₁ > rᵢ
-                    Jac.corank = rnm - i + 1
+                    corank = rnm - i + 1
                     break
                 end
             end
         end
+        Jac.corank_proposal = corank
         # compute subcondition number
         Jac.cond = r₁ / abs(real(Jac.qr.factors[rnm, rnm]))
         Jac.active_factorization = QR_FACTORIZATION
@@ -168,6 +184,7 @@ Solve `Jac.J * x = b` inplace. Assumes `Jac` contains already the correct factor
 This stores the result in `x`.
 """
 function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost::Bool=false, refinement_step::Bool=false)
+    # @show Jac.active_factorization
     if Jac.active_factorization == LU_FACTORIZATION
         lu = Jac.lu
         if lu !== nothing
