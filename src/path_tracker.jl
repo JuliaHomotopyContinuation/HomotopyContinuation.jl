@@ -178,7 +178,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     target_newton_cache = NewtonCache(target_system, x)
 
     res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
-    jac = jacobian(target_system, currx(core_tracker), target_newton_cache.system_cache)
+    jac = similar(res, size(target_system))
 
     weighted_ip = WeightedIP(x)
     PathTrackerCache(unit_roots, base_point, target_system, res, jac, target_newton_cache, weighted_ip)

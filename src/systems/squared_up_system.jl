@@ -25,7 +25,8 @@ end
 
 function cache(F::SquaredUpSystem, x)
     c = cache(F.F, x)
-    u, U = evaluate_and_jacobian(F.F, x, c)
+    u = evaluate(F.F, x, c)
+    U = similar(u, size(F.F))
     n = size(F.A, 1)
     degree_diffs = [F.degrees[i] - F.degrees[n+j] for i=1:n, j=1:size(F.A, 2)]
     SquaredUpSystemCache(u, U, c, degree_diffs)

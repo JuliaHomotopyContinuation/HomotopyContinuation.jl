@@ -158,4 +158,10 @@
         result2 = track(tracker, first(S_p₀))
         @test result.solution ≈ result2.solution atol=1e-7
     end
+
+    @testset "Real Jacobian" begin
+        @polyvar v w
+        @test nfinite(solve([v - 2w , -v + 2w, v + w - 3], affine_tracking=true)) == 1
+        @test nfinite(solve([v - 2w , -v + 2w, v + w - 3], affine_tracking=false)) == 1
+    end
 end
