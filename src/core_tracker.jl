@@ -454,7 +454,7 @@ Setup `coretracker` to track `x₁` from `t₁` to `t₀`. Use this if you want 
 coretracker as an iterator.
 """
 function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
-    state, cache = tracker.state, tracker.cache
+    @unpack state, cache = tracker
 
     try
         reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
@@ -510,9 +510,10 @@ end
 end
 
 function step!(tracker::CoreTracker)
-    state, cache, options = tracker.state, tracker.cache, tracker.options
+    @unpack state, cache, options = tracker
+    @unpack x, x̂, x̄, ẋ = state
     H = cache.homotopy
-    x, x̂, x̄, ẋ = state.x, state.x̂, state.x̄, state.ẋ
+
 
     try
         t, Δt = currt(state), currΔt(state)
