@@ -143,7 +143,8 @@ function updated_jacobian!(Jac::Jacobian{T}; update_infos::Bool=false) where {T}
             Jac.corank = rnm
         else
             for i in 2:rnm
-                if ε * r₁ > abs(real(Jac.qr.factors[i,i]))
+                rᵢ = abs(real(Jac.qr.factors[i,i]))
+                if ε * r₁ > rᵢ
                     Jac.corank = rnm - i + 1
                     break
                 end
@@ -433,6 +434,7 @@ function geqp3!(A::AbstractMatrix{ComplexF64},
 	if lda == 0
 		return return A, tau, jpvt
 	end # Early exit
+    jpvt .= BlasInt(0)
 	lwork = BlasInt(-1)
 	info = Ref{BlasInt}()
 	for i = 1:2
