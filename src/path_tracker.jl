@@ -11,9 +11,9 @@ const pathtracker_supported_keywords = [
     :overdetermined_min_accuracy, :overdetermined_min_residual]
 
 
-##############
+###############
 ## VALUATION ##
-##############
+###############
 
 struct Valuation
     v::Vector{Float64}
@@ -62,27 +62,6 @@ function reset!(val::Valuation)
     val
 end
 
-
-function val_values(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
-    x, y = reim(z)
-    ẋ, ẏ = reim(ż)
-    ẍ, ÿ = reim(z̈)
-    x³, y³ = reim(z)
-
-    x²_plus_y² = abs2(z)
-    abs_x_sq = 0.5x²_plus_y²
-    abs_x_sq_dot = x*ẋ + y*ẏ
-    abs_x_sq_ddot = x*ẍ + ẋ^2 + y*ÿ + ẏ^2
-    abs_x_sq_dddot = x*x³ + 3ẋ*ẍ + y*y³ + 3ẏ*ÿ
-
-    v = -(abs_x_sq_dot) / x²_plus_y²
-    v̇ = 2v^2 - abs_x_sq_ddot / x²_plus_y²
-    v̈ = 4v̇*v - abs_x_sq_dddot / x²_plus_y² - 2v*abs_x_sq_ddot / x²_plus_y²
-
-    v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot
-end
-
-
 function update!(val::Valuation, z::Vector, ż, Δs::Float64)
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for i in eachindex(z)
@@ -105,61 +84,29 @@ function update!(val::Valuation, z::Vector, ż, Δs::Float64)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, z̈, z³, Δs::Float64)
-    for i in eachindex(z)
-        vᵢ, v̇ᵢ, v̈ᵢ, abs_x_sqᵢ, abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ, abs_x_sq_dddotᵢ =
-                        val_values(z[i], ż[i], z̈[i], z³[i])
-        val.v[i] = vᵢ
-        val.v̇[i] = v̇ᵢ
-        val.v̈[i] = v̈ᵢ
-        val.abs_x_sq[i] = abs_x_sqᵢ
-        val.abs_x_sq_dot[i] = abs_x_sq_dotᵢ
-        val.abs_x_sq_ddot[i] = abs_x_sq_ddotᵢ
-        val.abs_x_sq_dddot[i] =abs_x_sq_dddotᵢ
-        i += 1
-    end
-    val
-end
 function update!(val::Valuation, z::PVector, ż, Δs::Float64)
     i = 1
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
         xⱼ, yⱼ = reim(z[homⱼ])
         ẋⱼ, ẏⱼ = reim(ż[homⱼ])
-        abs_ẋⱼ = ẋⱼ^2 + ẏⱼ^2
-        w = -(xⱼ*ẋⱼ + yⱼ*ẏⱼ) / abs_ẋⱼ
+        xⱼ²_plus_yⱼ² = xⱼ^2 + xⱼ^2
+        vⱼ = -(xⱼ*ẋⱼ + yⱼ*ẏⱼ) / xⱼ²_plus_yⱼ²
         for k in rⱼ
             x, y = reim(z[k])
             ẋ, ẏ = reim(ż[k])
             x²_plus_y² = x^2 + y^2
             vᵢ, v̇ᵢ = v[i], v̇[i]
-            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y² - w
+            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y² - vⱼ
             v̇[i] = (v[i] - vᵢ) / Δs
             v̈[i] = (v̇[i] - v̇ᵢ) / Δs
 
-            abs_ẋᵢ = val.abs_ẋ[i]
-            val.abs_ẋ[i] = 0.5 * (ẋ^2 + ẏ^2) / abs_ẋⱼ
-            val.abs_ẋ_dot[i] = (val.abs_ẋ[i] - abs_ẋᵢ) / Δs
-            i += 1
-        end
-    end
-    val
-end
-
-
-function update!(val::Valuation, z::PVector, ż, z̈, z³, Δs::Float64)
-    i = 1
-    v, v̇, v̈ = val.v, val.v̇, val.v̈
-    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
-        w, ẇ, ẅ, w³ = inv(z[homⱼ]), inv(ż[homⱼ]), inv(z̈[homⱼ]), inv(z³[homⱼ])
-        for k in rⱼ
-            vᵢ, v̇ᵢ, v̈ᵢ, abs_ẋᵢ, abs_ẋ_dotᵢ =
-                            val_values(z[i] * w, ż[i] * ẇ, z̈[i] * ẅ, z³[i] * w³)
-            v[i] = vᵢ
-            v̇[i] = v̇ᵢ
-            v̈[i] = v̈ᵢ
-            val.abs_ẋ[i] = abs_ẋᵢ
-            val.abs_ẋ_dot[i] = abs_ẋ_dotᵢ
+            abs_x_sqᵢ, abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ =
+                                val.abs_x_sq[i], val.abs_x_sq_dot[i], val.abs_x_sq_ddot[i]
+            val.abs_x_sq[i] = 0.5 * x²_plus_y² / xⱼ²_plus_yⱼ²
+            val.abs_x_sq_dot[i] =  (val.abs_x_sq[i] - abs_x_sqᵢ) / Δs
+            val.abs_x_sq_ddot[i] = (val.abs_x_sq_dot[i] - abs_x_sq_dotᵢ) / Δs
+            val.abs_x_sq_dddot[i] = (val.abs_x_sq_ddot[i] - abs_x_sq_ddotᵢ) / Δs
             i += 1
         end
     end
@@ -209,7 +156,7 @@ function update!(val::Valuation, core_tracker::CoreTracker)
     ż = core_tracker.state.ẋ
     Δs = core_tracker.state.Δs_prev
     # Don't use possible derivatives if the linear algebra becomes too ill-conditioned
-    if unpack(core_tracker.state.jacobian.digits_lost, 0.0) < 4.0
+    if unpack(core_tracker.state.jacobian.cond, 0.0) > 4.0
         update!(val, z, ż, Δs, core_tracker.cache.predictor)
     else
         update!(val, z, ż, Δs)
@@ -219,7 +166,7 @@ end
 function update!(val::Valuation, z::Vector, ż, Δs, predictor_cache::Pade21Cache)
     z̈ = predictor_cache.x²
     z³ = predictor_cache.x³
-    update!(val, z, ż, z̈, z³, Δs)
+    update!(val, z, ż, Δs)
 end
 
 function update!(val::Valuation, z, ż, Δs, predictor_cache::AbstractPredictorCache)
@@ -227,6 +174,14 @@ function update!(val::Valuation, z, ż, Δs, predictor_cache::AbstractPredictor
 end
 
 
+function at_infinity_post_check(val::Valuation)
+    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
+        if vᵢ < -1/20 && abs(v̇ᵢ) < 1e-3
+            return true
+        end
+    end
+    false
+end
 #################
 ## PATHTRACKER ##
 #################
@@ -248,6 +203,8 @@ module PathTrackerStatus
     * `PathTrackerStatus.terminated_singularity`
     * `PathTrackerStatus.terminated_ill_conditioned`
     * `PathTrackerStatus.terminated`
+    * `PathTrackerStatus.post_check_failed`
+    * `PathTrackerStatus.excess_solution`
     """
     @enum states begin
         tracking
@@ -260,6 +217,7 @@ module PathTrackerStatus
         terminated_ill_conditioned
         tracker_failed
         post_check_failed
+        excess_solution
     end
 
     function status(code::CoreTrackerStatus.states)
@@ -370,8 +328,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
 
     x = currx(core_tracker)
     if is_squared_up_system(core_tracker.homotopy)
-        # core_tracker.homotopy.target is a SquaredUpSystem
-        F = core_tracker.homotopy.target.F
+        F = squared_up_system(core_tracker.homotopy).F
     else
         F = FixedHomotopy(core_tracker.homotopy, Inf)
     end
@@ -391,7 +348,11 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
 end
 
 is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
+is_squared_up_system(H::LogHomotopy) = is_squared_up_system(H.homotopy)
 is_squared_up_system(::AbstractHomotopy) = false
+
+squared_up_system(H::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = H.target
+squared_up_system(H::LogHomotopy) = squared_up_system(H.homotopy)
 
 """
      PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
@@ -494,17 +455,12 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         end
 
         if core_tracker.state.jacobian.corank > 0
-            # if tracker.options.at_infinity_check  #&& check_at_infinity_fallback(state, state.s, s₀)
-            #     state.status = PathTrackerStatus.at_infinity
-            # else
             state.status = PathTrackerStatus.terminated_ill_conditioned
-            # end
             break
         end
 
         # We only care if we moved forward
         core_tracker.state.last_step_failed && continue
-
 
         # Our endgame strategy is split in different stages
         # 1) During the path tracking we update an approximation
@@ -513,13 +469,13 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         #
         # 2) If one of the valuation coordinates is sufficiently accurate
         #    we can decide whether this coordinate goes to infinity or not
-        #    This happens in `judge`
+        #    This happens in `judge`.
         #
         # 3) Now assume that val(xᵢ(t_k)) ≥ 0 for all i. Then we know
         #    that this converges to a finite solution. Now we have to distinguish
         #    between singular and regular solutions.
         #    We can handle singular by the Cauchy Endgame whereas for regular
-        #    solutions we simply can track towards 0.
+        #    solutions we simply can track towards ∞.
 
         # update valuation and associated data
         update!(state.val, core_tracker)
@@ -709,117 +665,117 @@ This also makes sure that our accuracy is correct after a possible pull back.
 function check_and_refine_solution!(tracker::PathTracker)
     @unpack core_tracker, state, options, cache = tracker
 
+    # The tracking failed. Let's look at the last valuation and see whether we can
+    # resonably classify this as going to infinity
+    if (state.status == PathTrackerStatus.terminated_ill_conditioned ||
+        state.status == PathTrackerStatus.terminated_step_size_too_small ||
+        state.status == PathTrackerStatus.terminated_singularity) &&
+        at_infinity_post_check(state.val)
+
+       state.status = PathTrackerStatus.at_infinity
+   end
+
     if state.status ≠ PathTrackerStatus.success
         state.solution .= currx(core_tracker)
         return nothing
     end
 
-    # state.winding_number > 0 only if during tracking we had the need to
-    # use the cauchy endgame
-    if state.winding_number > 0
-        state.solution .= state.prediction
-    else
-        try
-            res = refine!(core_tracker)
+    # We have to differentiate
+
+    # 1.a) Non-singular solution of regular system
+    # 1.b) Singular solution of regular system (Cauchy engame used)
+    # 2.a) Non-singular solution of squared up system
+    # 2.b) Singular solution of squared up system (Cauchy engame used)
+
+    # 1.a) + 2.a)
+    if state.winding_number == 0
+        # First we refine the obtained solution if possible
+
+        result = correct!(core_tracker.state.x̄, core_tracker, currx(core_tracker), Inf;
+            use_qr=true, max_iters=3,
+            accuracy=core_tracker.options.refinement_accuracy)
+
+        state.solution_cond = core_tracker.state.jacobian.cond
+
+        if isconverged(result)
+            state.solution .= core_tracker.state.x̄
+        elseif at_infinity_post_check(state.val)
             state.solution .= currx(core_tracker)
-        catch e
-            # okay we had a singular solution after all
-            if isa(e, LinearAlgebra.SingularException)
-                tracker.state.winding_number = 1
-                state.solution .= currx(core_tracker)
-                # for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
-                #     if ωᵢ < -0.1 &&  acc < 0.05
-                #         state.status = PathTrackerStatus.at_infinity
-                #     end
-                # end
-                if state.status != PathTrackerStatus.at_infinity &&
-                   residual(tracker) > 0
-                    state.status = PathTrackerStatus.at_infinity
-                end
-            else
-                rethrow(e)
-            end
-        end
-    end
-
-    projective_refinement = false
-    # Bring vector onto "standard form"
-    if !affine_tracking(core_tracker)
-        if pull_back_is_to_affine(tracker.problem, state.solution)
-            ProjectiveVectors.affine_chart!(state.solution)
-        else # projective result -> bring on (product of) sphere(s)
-            LinearAlgebra.normalize!(state.solution)
-            changepatch!(cache.target_system.patch, state.solution)
-            projective_refinement = true
-        end
-    end
-
-    # Catch the case that he tracker ran through but we still got a singular solution
-    cond = condition_jacobian(tracker)
-    if tracker.state.winding_number == 0 && cond > 1e13
-        # make sure that we don't have a solution at infinity accidentaly
-        # for (ωᵢ, acc) in zip(state.prev_val, state.prev_val_accuracy)
-        #     if ωᵢ < -0.1 &&  acc < 0.05
-        #         state.status = PathTrackerStatus.at_infinity
-        #     end
-        # end
-        if state.status != PathTrackerStatus.at_infinity &&
-           residual(tracker) > 0
             state.status = PathTrackerStatus.at_infinity
+            return nothing
+        else
+            state.status = PathTrackerStatus.post_check_failed
+            return nothing
         end
-        tracker.state.winding_number = 1
-    elseif tracker.state.winding_number == 1 && cond < 1e5
-        tracker.state.winding_number = 0
-    end
-    state.solution_cond = cond
 
-    # If winding_number == 0 the path tracker simply ran through
-    if (tracker.state.winding_number == 0)
-        try
-            # We need to reach the requested refinement_accuracy
-            x̂ = cache.base_point
-            if is_squared_up_system(core_tracker.homotopy)
-                tol = options.overdetermined_min_accuracy
-            else
-                tol = core_tracker.options.refinement_accuracy
+        # We want to check that if we present an affine solution to a user
+        # that this is still in a convergent region of the affine target system
+        # This covers that we have a squared up system and when we tracked in projective space
+        if pull_back_is_to_affine(tracker.problem, state.solution) &&
+            (is_squared_up_system(core_tracker.homotopy) ||
+             !affine_tracking(core_tracker))
+
+            # We start with bringing it on the affine patch
+            if !affine_tracking(core_tracker)
+                ProjectiveVectors.affine_chart!(state.solution)
             end
-            if projective_refinement
-                result = newton!(x̂, cache.target_system, state.solution,
-                                euclidean_norm, cache.target_newton_cache;
-                                tol=tol, miniters=1, maxiters=2)
+            init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
+            target_result = newton!(cache.base_point, cache.target_system, state.solution,
+                            cache.weighted_ip, cache.target_newton_cache;
+                            tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
+            if isconverged(target_result)
+                state.solution .= cache.base_point
+            elseif is_squared_up_system(core_tracker.homotopy)
+                state.status = PathTrackerStatus.excess_solution
             else
-                init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
-                result = newton!(x̂, cache.target_system, state.solution,
-                                cache.weighted_ip, cache.target_newton_cache;
-                                tol=tol, miniters=1, maxiters=2)
-            end
-            if isconverged(result)
-                state.solution .= x̂
-                if !pull_back_is_to_affine(tracker.problem, state.solution)
-                    LinearAlgebra.normalize!(state.solution)
-                    changepatch!(cache.target_system.patch, state.solution)
-                end
-                state.solution_accuracy = result.accuracy
-            else
-                state.solution_accuracy = result.accuracy
                 state.status = PathTrackerStatus.post_check_failed
             end
-        catch e
-            # okay we had a singular solution after all
-            if isa(e, LinearAlgebra.SingularException)
-                tracker.state.winding_number = 1
-            else
-                rethrow(e)
-            end
-        end
-    # For singular solutions check
-    elseif is_squared_up_system(core_tracker.homotopy) &&
-           residual(tracker) > options.overdetermined_min_residual
-            state.status = PathTrackerStatus.post_check_failed
-    end
+            state.solution_accuracy = target_result.accuracy
 
-    nothing
+            if !pull_back_is_to_affine(tracker.problem, state.solution)
+                LinearAlgebra.normalize!(state.solution)
+                changepatch!(cache.target_system.patch, state.solution)
+                state.solution_accuracy = result.accuracy
+            else
+                state.solution_accuracy = result.accuracy
+            end
+        # We have a purely projective solution. Here we only have to handle the case
+        # of overdetermined systems.
+        elseif !pull_back_is_to_affine(tracker.problem, state.solution) &&
+                is_squared_up_system(core_tracker.homotopy)
+
+            LinearAlgebra.normalize!(state.solution)
+            changepatch!(cache.target_system.patch, state.solution)
+            target_proj_result = newton!(cache.base_point, cache.target_system, state.solution,
+                            euclidean_norm, cache.target_newton_cache;
+                            tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
+            if isconverged(target_proj_result)
+                state.solution .= cache.base_point
+                state.solution_accuracy = result.accuracy
+                LinearAlgebra.normalize!(state.solution)
+            else
+                state.status = PathTrackerStatus.excess_solution
+            end
+
+        end
+    # 1.b) + 2.b)
+    else
+        state.solution .= state.prediction
+        if !pull_back_is_to_affine(tracker.problem, state.solution)
+            LinearAlgebra.normalize!(state.solution)
+        end
+        # In the case of a squared up system we now have to get rid of the
+        # excess solutions, but since we don't have Newton's method at hand
+        # we simply rely non the residual.
+        if is_squared_up_system(core_tracker.homotopy) &&
+           residual(tracker) > options.overdetermined_min_residual
+             state.status = PathTrackerStatus.excess_solution
+        else
+            state.solution_cond = condition_jacobian(tracker)
+        end
+    end
 end
+
 
 #############################
 # Convencience constructors #

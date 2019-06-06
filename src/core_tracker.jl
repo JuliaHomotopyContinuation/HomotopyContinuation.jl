@@ -503,11 +503,12 @@ end
         norm=tracker.state.inner_product;
         accuracy::Float64=tracker.options.accuracy,
         max_iters::Int=tracker.options.max_corrector_iters,
-        update_jacobian_infos::Bool=false)
+        update_jacobian_infos::Bool=false,
+        use_qr::Bool=false)
 
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
              tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
-             accuracy, max_iters; update_jacobian_infos=update_jacobian_infos)
+             accuracy, max_iters; update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
 end
 
 function step!(tracker::CoreTracker)
@@ -550,6 +551,7 @@ function step!(tracker::CoreTracker)
             state.rejected_steps += 1
             update_rank!(state.jacobian)
 
+            # Check termination criterion: we became too ill-conditioned
             if options.terminate_ill_conditioned && (
                 unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
                 state.jacobian.corank > 0
@@ -561,9 +563,6 @@ function step!(tracker::CoreTracker)
             update_stepsize!(tracker, result)
             Δt = currΔt(state)
             state.last_step_failed = true
-            # Check termination criterion
-            # 2) We became too ill-conditioned
-
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -700,12 +699,12 @@ function check_terminated!(tracker::CoreTracker)
     nothing
 end
 
-function refine!(tracker::CoreTracker)
-    if tracker.state.accuracy < tracker.options.refinement_accuracy
+function refine!(tracker::CoreTracker, accuracy=tracker.options.refinement_accuracy)
+    if tracker.state.accuracy < accuracy
         return
     end
     result = correct!(tracker.state.x̄, tracker;
-        accuracy=tracker.options.refinement_accuracy,
+        accuracy=accuracy,
         max_iters=tracker.options.max_refinement_iters)
     if isconverged(result)
         tracker.state.x .= tracker.state.x̄

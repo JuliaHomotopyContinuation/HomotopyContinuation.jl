@@ -115,14 +115,14 @@ In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` a
 """
 function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache;
                  tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3,
-                 simplified_last_step::Bool=true)
+                 simplified_last_step::Bool=true, use_qr::Bool=false)
     newton!(out, F, x₀, norm, cache, cache.Jac, tol,
-            miniters, maxiters, simplified_last_step, false)
+            miniters, maxiters, simplified_last_step, false, use_qr)
 end
 
 function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache, Jac::Jacobian,
                  tol::Float64, miniters::Int, maxiters::Int, simplified_last_step::Bool,
-                 update_jacobian_infos::Bool)
+                 update_jacobian_infos::Bool, use_qr::Bool)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -140,6 +140,7 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache,
                         curr_accuracy=accuracy,
                         ω = ω,
                         simple_step=(i == maxiters && simplified_last_step),
+                        use_qr=use_qr,
                         update_infos=(update_jacobian_infos && i == 0))
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δxᵢ))
@@ -178,20 +179,22 @@ end
 
 @inline function newton_step!(cache::NewtonCache, Jac::Jacobian, F, xᵢ;
                             tol::Float64=1e-7, ω::Float64=NaN, curr_accuracy::Float64=NaN,
-                            simple_step::Bool=false, update_infos::Bool=true)
+                            simple_step::Bool=false, update_infos::Bool=true,
+                            use_qr::Bool=false)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     if simple_step
         evaluate!(rᵢ, F, xᵢ, cache.system_cache)
     else
         evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
-        updated_jacobian!(Jac, update_infos=update_infos)
+        updated_jacobian!(Jac, update_infos=(update_infos || use_qr))
     end
     solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
 end
 
 @inline function newton_step!(cache::NewtonCacheF64, Jac::Jacobian, F, xᵢ;
                     tol::Float64=1e-7, ω::Float64=NaN, curr_accuracy::Float64=NaN,
-                    simple_step::Bool=false, update_infos::Bool=true)
+                    simple_step::Bool=false, update_infos::Bool=true,
+                    use_qr::Bool=false)
     Jᵢ = Jac.J
     @unpack rᵢ, rᵢ_D64, Δxᵢ, xᵢ_D64 = cache
     if simple_step
@@ -209,7 +212,7 @@ end
         else
             evaluate_and_jacobian!(rᵢ, Jᵢ, F, xᵢ, cache.system_cache)
         end
-        updated_jacobian!(Jac, update_infos=update_infos)
+        updated_jacobian!(Jac, update_infos=(update_infos || use_qr))
     end
     solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
 end

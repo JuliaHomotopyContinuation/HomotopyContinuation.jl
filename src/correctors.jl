@@ -115,10 +115,10 @@ end
 
 @inline function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache,
                   H::HomotopyWithCache, x, t, norm, jacobian::Jacobian, tol::Float64,
-                  maxiters::Int; update_jacobian_infos::Bool=false)
+                  maxiters::Int; update_jacobian_infos::Bool=false, use_qr::Bool=false)
     cache.F.t = t
     result = newton!(out, cache.F, x, norm, cache.C, jacobian, tol, 1, maxiters,
-        alg.simplified_last_step, update_jacobian_infos)
+        alg.simplified_last_step, update_jacobian_infos, use_qr)
     CorrectorResult(result)
 end
 
