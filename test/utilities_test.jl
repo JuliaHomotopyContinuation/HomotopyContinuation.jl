@@ -272,6 +272,8 @@
         s[end] = 1e-16
         Â = U * diagm(0 => s) * V'
         HC.update!(jac, Â; update_infos=true)
+        @test jac.corank_proposal == 1
+        HC.update_rank!(jac)
         @test jac.corank == 1
         @test jac.cond > 1e14
         HC.solve!(x, jac, copy(b); update_digits_lost=false)
@@ -284,9 +286,11 @@
 
         # make a corank 1 matrix with not super clear rank
         U, s, V = svd(A)
-        s[end] = 1e-14
+        s[end] = 1e-15
         Â = U * diagm(0 => s) * V'
         HC.update!(jac, Â; update_infos=true)
+        @test jac.corank_proposal == 1
+        HC.update_rank!(jac)
         @test jac.corank == 1
         @test jac.cond > 1e13
         HC.solve!(x, jac, copy(b); update_digits_lost=false)
@@ -297,6 +301,8 @@
         s[end-1:end] .= 1e-16
         Â = U * diagm(0 => s) * V'
         HC.update!(jac, Â; update_infos=true)
+        @test jac.corank_proposal == 2
+        HC.update_rank!(jac)
         @test jac.corank == 2
         @test jac.cond > 1e14
         HC.solve!(x, jac, copy(b); update_digits_lost=false)
@@ -327,6 +333,8 @@
         s[end] = 1e-15
         Â = U * diagm(0 => s) * V'
         HC.update!(jac, Â; update_infos=true)
+        @test jac.corank_proposal == 1
+        HC.update_rank!(jac)
         @test jac.corank == 1
         @test jac.cond > 1e14
         HC.solve!(x, jac, copy(b); update_digits_lost=false)

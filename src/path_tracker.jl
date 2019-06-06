@@ -97,7 +97,9 @@ function update!(val::Valuation, z::PVector, ż, Δs::Float64)
             ẋ, ẏ = reim(ż[k])
             x²_plus_y² = x^2 + y^2
             vᵢ, v̇ᵢ = v[i], v̇[i]
-            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y² - vⱼ
+            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
+
+            v[i] -= vⱼ
             v̇[i] = (v[i] - vᵢ) / Δs
             v̈[i] = (v̇[i] - v̇ᵢ) / Δs
 
@@ -125,7 +127,6 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     all_positive = true
     indecisive = false
     for i in eachindex(v)
-        # Δv̂ᵢ = abs(Δs * v̇[i]) * max((1.0 - 0.5Δs * v̈[i] / v̇[i]), 1.0)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
         if Δv̂ᵢ > 1e-2
             indecisive = true
@@ -146,7 +147,8 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     end
     status == VALUATION_AT_INFINIY && return VALUATION_AT_INFINIY
     indecisive && return VALUATION_INDECISIVE
-    all_positive && return VALUATION_FINITE
+    # require s > 0 otherwise we can get false singular solutions
+    all_positive && Δs > 0 && return VALUATION_FINITE
 
     VALUATION_INDECISIVE
 end
@@ -384,10 +386,11 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), kwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=eps(), kwargs...)
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
-    core_tracker = CoreTracker(prob, x, complex(0.0), complex(-log(eps()));
+    core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
                         log_transform=true, predictor=Pade21(),
+                        min_step_size=min_step_size,
                         core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x)
     options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
@@ -414,20 +417,14 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(eps());
+function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=36.0;
         start_parameters::Union{Nothing,<:AbstractVector}=nothing,
         target_parameters::Union{Nothing,<:AbstractVector}=nothing,
         kwargs...)
 
     @unpack core_tracker, state, options, cache = tracker
     prev_options = set_options!(core_tracker; kwargs...)
-
-    if start_parameters !== nothing
-        set_start_parameters!(core_tracker.homotopy, start_parameters)
-    end
-    if target_parameters !== nothing
-        set_target_parameters!(core_tracker.homotopy, target_parameters)
-    end
+    set_parameters!(tracker; start_parameters=start_parameters, target_parameters=target_parameters)
 
     _track!(tracker, x₁, s₁, s₀)
 
@@ -535,7 +532,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track(tracker::PathTracker, x₁, t₁=0.0, t₀=-log(eps()); path_number::Int=1, details::Symbol=:default, kwargs...)
+function track(tracker::PathTracker, x₁, t₁=0.0, t₀=36.0; path_number::Int=1, details::Symbol=:default, kwargs...)
     track!(tracker, x₁, t₁, t₀; kwargs...)
     PathResult(tracker, x₁, path_number; details=details)
 end
@@ -557,12 +554,12 @@ end
 
 Set the parameters of a parameter homotopy.
 """
-function set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
+@inline function set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
     if start_parameters !== nothing
-        set_start_parameters!(tracker.core_tracker.homotopy, start_parameters)
+        set_start_parameters!(basehomotopy(tracker.core_tracker.homotopy), start_parameters)
     end
     if target_parameters !== nothing
-        set_target_parameters!(tracker.core_tracker.homotopy, target_parameters)
+        set_target_parameters!(basehomotopy(tracker.core_tracker.homotopy), target_parameters)
     end
     nothing
 end
@@ -687,19 +684,48 @@ function check_and_refine_solution!(tracker::PathTracker)
     # 2.a) Non-singular solution of squared up system
     # 2.b) Singular solution of squared up system (Cauchy engame used)
 
-    # 1.a) + 2.a)
-    if state.winding_number == 0
-        # First we refine the obtained solution if possible
+    is_singular = state.winding_number > 0
+    if is_singular
+        state.solution .= state.prediction
+        # check that solution is indeed singular
+        if !pull_back_is_to_affine(tracker.problem, state.solution)
+            LinearAlgebra.normalize!(state.solution)
+        end
 
+        state.solution_cond = condition_jacobian(tracker)
+        # If cond is not so high, maybe we don't have a singular solution in the end?
+        if state.solution_cond < 1e12
+            result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
+                use_qr=true, max_iters=3,
+                accuracy=core_tracker.options.refinement_accuracy)
+            if isconverged(result)
+                state.winding_number = 0
+                @goto non_singular_case
+            end
+        end
+
+        # In the case of a squared up system we now have to get rid of the
+        # excess solutions, but since we don't have Newton's method at hand
+        # we simply rely non the residual.
+        if is_squared_up_system(core_tracker.homotopy) &&
+           residual(tracker) > options.overdetermined_min_residual
+             state.status = PathTrackerStatus.excess_solution
+        end
+    # 1.a) + 2.a)
+    else
+        # First we refine the obtained solution if possible
         result = correct!(core_tracker.state.x̄, core_tracker, currx(core_tracker), Inf;
             use_qr=true, max_iters=3,
             accuracy=core_tracker.options.refinement_accuracy)
+        @label non_singular_case
 
         state.solution_cond = core_tracker.state.jacobian.cond
 
-        if isconverged(result)
+        if isconverged(result) && core_tracker.state.jacobian.corank_proposal == 0
             state.solution .= core_tracker.state.x̄
-        elseif at_infinity_post_check(state.val)
+        elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
+               at_infinity_post_check(state.val)
+
             state.solution .= currx(core_tracker)
             state.status = PathTrackerStatus.at_infinity
             return nothing
@@ -722,6 +748,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
             target_result = newton!(cache.base_point, cache.target_system, state.solution,
                             cache.weighted_ip, cache.target_newton_cache;
+                            use_qr=true,
                             tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
             if isconverged(target_result)
                 state.solution .= cache.base_point
@@ -748,6 +775,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             changepatch!(cache.target_system.patch, state.solution)
             target_proj_result = newton!(cache.base_point, cache.target_system, state.solution,
                             euclidean_norm, cache.target_newton_cache;
+                            use_qr=true,
                             tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
             if isconverged(target_proj_result)
                 state.solution .= cache.base_point
@@ -757,21 +785,6 @@ function check_and_refine_solution!(tracker::PathTracker)
                 state.status = PathTrackerStatus.excess_solution
             end
 
-        end
-    # 1.b) + 2.b)
-    else
-        state.solution .= state.prediction
-        if !pull_back_is_to_affine(tracker.problem, state.solution)
-            LinearAlgebra.normalize!(state.solution)
-        end
-        # In the case of a squared up system we now have to get rid of the
-        # excess solutions, but since we don't have Newton's method at hand
-        # we simply rely non the residual.
-        if is_squared_up_system(core_tracker.homotopy) &&
-           residual(tracker) > options.overdetermined_min_residual
-             state.status = PathTrackerStatus.excess_solution
-        else
-            state.solution_cond = condition_jacobian(tracker)
         end
     end
 end

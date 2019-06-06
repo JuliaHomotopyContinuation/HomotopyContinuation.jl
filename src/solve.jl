@@ -367,7 +367,6 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
     tol = tracker.core_tracker.options.refinement_accuracy
     # find cluster of multiple solutions
     clusters = multiplicities(solution, finite_results; tol=tol)
-
     while true
         rerun_paths = false
         for cluster in clusters

@@ -588,8 +588,8 @@ function monodromy_solve(F::Inputs,
 
     options = MonodromyOptions(isrealsystem; optionskwargs...)
     # construct cache
-    newton_cache = NewtonCache(F₀, tracker.state.x)
-    C =  MonodromyCache(F₀, tracker, newton_cache, copy(tracker.state.x))
+    newt_cache = newton_cache(F₀, tracker.state.x)
+    C =  MonodromyCache(F₀, tracker, newt_cache, copy(tracker.state.x))
     # construct UniquePoints
     if options.equivalence_classes
         uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function;

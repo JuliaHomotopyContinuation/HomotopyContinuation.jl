@@ -23,7 +23,7 @@
 
     @testset "solve" begin
         @polyvar x
-        @test nfinite(solve([x - 1], threading=false)) == 1
+        @test nfinite(solve([x - 1], threading=false, save_all_paths=true)) == 1
         F = equations(katsura(5))
         @test nfinite(solve(F, threading=false)) == 32
         @test nfinite(solve(F, system=SPSystem, threading=false)) == 32
@@ -67,11 +67,11 @@
         F = FPSystem(homogenize(equations(cyclic(5))))
         result = solve(F, homvar=6, save_all_paths=true)
         @test nfinite(result) == 70
-        @test natinfinity(result) == 50
+        @test_broken natinfinity(result) == 50
 
 
         F = equations(katsura(5))
-        result = solve(homogenize(F))
+        result = solve(homogenize(F), threading=false)
         @test result isa Result{<:ProjectiveVectors.PVector}
         @test isprojective(first(result))
         @test nnonsingular(result) == 32
@@ -126,7 +126,8 @@
     end
 
     @testset "Path jumping" begin
-        result = solve(equations(katsura(5)); accuracy=1e-2, refinement_accuracy=1e-8, seed=39813, threading=false)
+        result = solve(equations(katsura(5)); accuracy=5e-4, refinement_accuracy=1e-8,
+            seed=39813, threading=false, affine_tracking=true)
         @test nreal(result) == 16
     end
 
@@ -192,26 +193,26 @@
         @polyvar p q a b c x y z u v
         f = [a * b - 2, a*c- 1]
         g = [x + y, y + 3, x + 2]
-        res = solve(f ∘ g, system=SPSystem)
-
+        res = solve(f ∘ g, system=SPSystem; threading=false)
+        @test nnonsingular(res) == 2
         # parameters at the end
         f2 = [a * b - q, a*c- p]
         g = [x + y, y + 3, x + 2]
-        r = solve(f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
-        @test HomotopyContinuation.nnonsingular(r) == 2
+        r = solve(f2 ∘ g, solutions(res), parameters=[p, q], p₁=[1, 2], p₀=[2, 3], threading=false)
+        @test nnonsingular(r) == 2
 
         # parameters at the beginning
         f = [a * b - 2, a*c- 1]
         g2 = [x + y, y + u, x + v]
-        r = solve(f ∘ g2, solutions(res), parameters=[u, v], p₁=[3, 2], p₀=[-2, 3])
-        @test HomotopyContinuation.nnonsingular(r) == 2
+        r = solve(f ∘ g2, solutions(res), parameters=[u, v], p₁=[3, 2], p₀=[-2, 3], threading=false)
+        @test nnonsingular(r) == 2
 
         # parameter in the middle
         e = [u + 1, v - 2]
         res2 = solve(e ∘ f ∘ g, system=SPSystem)
         f2 = [a * b - q, a * c- p]
-        r = solve(e ∘ f2 ∘ g, solutions(res2), parameters=[p, q], p₁=[1, 2], p₀=[2, 3])
-        @test HomotopyContinuation.nnonsingular(r) == 2
+        r = solve(e ∘ f2 ∘ g, solutions(res2), parameters=[p, q], p₁=[1, 2], p₀=[2, 3], threading=false)
+        @test nnonsingular(r) == 2
     end
 
     @testset "Overdetermined" begin

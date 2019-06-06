@@ -516,10 +516,8 @@ function step!(tracker::CoreTracker)
     @unpack x, x̂, x̄, ẋ = state
     H = cache.homotopy
 
-
     try
         t, Δt = currt(state), currΔt(state)
-        # println("t: ", real(t), " Δt: ", real(Δt))
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # update_corank
         update_jacobian_infos = state.last_step_failed || state.steps_jacobian_info_update ≥ 5
@@ -611,7 +609,7 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
     if result.iters == 1
-        ω = isnan(state.ω) ? 2.0 : state.ω
+        ω = isnan(state.ω) ? 2.0 : 0.5state.ω
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω₀
@@ -622,7 +620,6 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     if isconverged(result)
         λ = g(δ(options, ω, 0.25)) / (ω * d_x̂_x̄)
         Δs = nthroot(λ, ord) * state.Δs
-        # end
         if state.last_step_failed
             Δs = min(Δs, state.Δs)
         end
@@ -636,6 +633,10 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
             Δs = min(nthroot(λ, ord), 0.9) * state.Δs
         else
             Δs = 0.5 * state.Δs
+        end
+        # If we fail consecutively reduce step size more aggressively.
+        if state.last_step_failed
+            Δs = min(Δs, 0.25 * state.Δs)
         end
     end
 

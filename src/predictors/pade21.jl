@@ -75,8 +75,12 @@ end
 function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
     x², x³ = cache.x², cache.x³
     @inbounds for i in eachindex(x)
-        δ = -x³[i] / (3 * x²[i])
-        xnext[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / (1 + δ*Δt)
+        δ = 1 - Δt * x³[i] / (3 * x²[i])
+        if isnan(δ) || iszero(δ)
+            xnext[i] = x[i] + Δt * ẋ[i] + 0.5 * Δt^2 * x²[i]
+        else
+            xnext[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / δ
+        end
     end
     nothing
 end
