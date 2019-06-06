@@ -28,7 +28,9 @@ end
 function cache(ph::PatchedSystem, x)
     F = ph.system
     c = cache(F, x)
-    PatchedSystemCache(c, jacobian(F, x, c), evaluate(F, x, c))
+    b = evaluate(F, x, c)
+    A = similar(b, size(F))
+    PatchedSystemCache(c, A, b)
 end
 
 function evaluate!(u, F::PatchedSystem, x, c::PatchedSystemCache)
