@@ -72,22 +72,22 @@ solve(G, F, [[1, 1], [-1, 1]])
 ```
 
 # Parameter Homotopy
-    solve(F, startsolutions; parameters, p₁, p₀, γ₁=nothing, γ₀=nothing)
+
+    solve(F, startsolutions; parameters, start_parameters, target_parameters, start_gamma=nothing, target_gamma=nothing)
 
 Solve the parameter homotopy
 ```math
 H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
 ```
-where `p₁` and `p₀` are a vector of parameter values for ``F`` and
-`γ₁` and `γ₀` are complex numbers. If `γ₁` or `γ₀` is `nothing`, it is assumed
-that `γ₁` and `γ₀` are ``1``.
-The input `parameters` specifies the parameter variables of `F`
-which should be considered as parameters.
+where ``p₁`` (=`start_parameters`) and ``p₀`` (=`target_parameters`) are vectors of parameter values for ``F`` and
+``γ₁`` (=`start_gamma`) and ``γ₀`` (=`target_gamma`) are complex numbers.
+If `start_parameters` or `target_parameters` is `nothing`, it is assumed that `γ₁` and `γ₀` are ``1``.
+The input `parameters` specifies the variables of `F` which should be considered as parameters.
 Necessarily we have `length(parameters) == length(p₁) == length(p₀)`.
 
-    solve(F, startsolutions; parameters, start_parameters, target_parameters, start_gamma=nothing, target_gamma=nothing)
+    solve(F, startsolutions; parameters, p₁, p₀, γ₁=nothing, γ₀=nothing)
 
-This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
+This is a unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
     `γ₁=start_gamma`, γ₀=`target_gamma`.
 
 ### Example
@@ -101,9 +101,11 @@ This can be accomplished as follows
 @polyvar x[1:2] a[1:2]
 F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
 startsolutions = [[1, 1]]
+p₁ = [1, 0]
+p₀ = [3im, 0.5+2im]
+solve(F, startsolutions; parameters=a, start_parameters=p₁, target_parameters=p₀)
+# If you like unicode this is also possible
 solve(F, startsolutions; parameters=a, p₁=p₁, p₀=p₀)
-# If you don't like unicode this is also possible
-solve(F, startsolutions, parameters=a, start_parameters=p₁, target_parameters=p₀)
 ```
 
 # Abstract Homotopy
@@ -233,7 +235,10 @@ function track_paths(tracker, start_solutions;
         else
             for (k, s) in enumerate(start_solutions)
                 return_code = track!(tracker, s)
-                if save_all_paths || return_code == PathTrackerStatus.success
+                if save_all_paths ||
+                   return_code == PathTrackerStatus.success ||
+                   return_code == PathTrackerStatus.terminated_invalid_startvalue
+
                     R = PathResult(tracker, s, k; details=path_result_details)
                     push!(results, R)
 
@@ -326,7 +331,10 @@ end
 function track_batch!(results, pathtracker, range, starts, details, all_paths)
     for k in range
         return_code = track!(pathtracker, starts[k], 1.0)
-        if all_paths || return_code == PathTrackerStatus.success
+        if all_paths ||
+           return_code == PathTrackerStatus.success ||
+           return_code == PathTrackerStatus.terminated_invalid_startvalue
+
             results[k] = PathResult(pathtracker, starts[k], k; details=details)
         else
             results[k] = nothing
