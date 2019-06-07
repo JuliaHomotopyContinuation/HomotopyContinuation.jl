@@ -177,6 +177,17 @@
         @test nfinite(S2) == 1
     end
 
+    @testset "Keep invalid start values" begin
+        @polyvar x[1:2] a[1:2]
+        F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
+        startsolutions = [[1, 1]]
+        p₁ = [1, 1]
+        p₀ = [3im, 0.5+2im]
+        res = solve(F, startsolutions; parameters=a, start_parameters=p₁, target_parameters=p₀)
+        @test nfailed(res) == 1
+        @test res[1].return_code == :terminated_invalid_startvalue
+    end
+
     @testset "ParameterHomotopy with Composition" begin
         @polyvar p q a b c x y z u v
         f = [a * b - 2, a*c- 1]
