@@ -1,8 +1,8 @@
 name = "HomotopyContinuation"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
 license = "MIT"
-author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breidings@mis.mpg.de>"]
-version = "0.8.0-dev"
+author = ["Sascha Timme <timme@math.tu-berlin.de>", "Paul Breiding <breiding@mis.mpg.de>"]
+version = "0.8.0"
 
 [deps]
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
@@ -27,7 +27,7 @@ MultivariatePolynomials = "^0.2.3"
 Parameters = "^0.10.3"
 ProgressMeter = "^0.8.0, ^0.9.0, ^1.0"
 ProjectiveVectors = "^0.2.0"
-StaticArrays = "^0.8, ^0.9, ^0.10"
+StaticArrays = "^0.8, ^0.9, ^0.10, ^0.11"
 StaticPolynomials = "^1.0.0"
 TreeViews = "^0.3.0"
 
