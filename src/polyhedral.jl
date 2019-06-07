@@ -47,7 +47,7 @@ function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, liftin
     PolyhedralStartSolutionsIterator(support, lifting, start_coefficients)
 end
 
-uniform_lifting_sampler(nterms) = rand(Int32(-2^17):Int32(2^17), nterms)
+uniform_lifting_sampler(nterms) = rand(Int32(-2^19):Int32(2^19), nterms)
 function gaussian_lifting_sampler(nterms)
     N = 2^19
     round.(Int32, randn(nterms) * N)
@@ -239,54 +239,33 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
     try
         nthreads = Threads.nthreads()
         if threading && nthreads > 1
-            error("TODO")
-            # batch_size = 32 * nthreads
-            # batches = BatchIterator(start_solutions, batch_size)
-            # batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
-            # k = 0
-            # for batch in batches
-            #     prepare_batch!(batch_tracker, batch)
-            #     ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
-            #
-            #     for R in batch_tracker.results
-            #         if R !== nothing
-            #             push!(results, R)
-            #             issuccess(R) && update!(stats, R)
-            #         end
-            #     end
-            #     k += length(batch)
-            #     if batch_tracker.interrupted
-            #         return results
-            #     end
-            #
-            #     update_progress!(progress, k, stats)
-            # end
-        else
-            for (cell, X) in start_solutions
-                update_cell!(PT, cell)
-                for i in 1:size(X, 2)
-                    x∞ = @view X[:,i]
+            @warn "Multithreading is currently not supported with polyhedral homotopy"
+        end
+        for (cell, X) in start_solutions
+            update_cell!(PT, cell)
+            for i in 1:size(X, 2)
+                x∞ = @view X[:,i]
 
-                    return_code = track!(PT, x∞)
-                    if save_all_paths || return_code == PathTrackerStatus.success
-                        R = PathResult(PT, x∞, ntracked; details=path_result_details)
-                        push!(results, R)
+                return_code = track!(PT, x∞)
+                if save_all_paths || return_code == PathTrackerStatus.success
+                    R = PathResult(PT, x∞, ntracked; details=path_result_details)
+                    push!(results, R)
 
-                        if return_code == PathTrackerStatus.success
-                            update!(stats, R)
-                        end
+                    if return_code == PathTrackerStatus.success
+                        update!(stats, R)
                     end
-                    ntracked += 1
                 end
+                ntracked += 1
                 if ntracked % 32 == 0
                     if progress !== nothing
                         update_progress!(progress, ntracked, stats)
                     end
                 end
             end
-            if progress !== nothing
-                update_progress!(progress, ntracked - 1, stats; finished=true)
-            end
+
+        end
+        if progress !== nothing
+            update_progress!(progress, ntracked - 1, stats; finished=true)
         end
     catch e
         if isa(e, InterruptException)
@@ -301,8 +280,7 @@ end
 function tracker_startsolutions(prob::PolyhedralProblem, startsolutions::PolyhedralStartSolutionsIterator; kwargs...)
     x = randn(ComplexF64, size(prob.toric_homotopy)[2])
     toric_tracker =
-        coretracker(prob.toric_homotopy, [x]; seed=prob.seed, affine_tracking=true,#isa(prob.tracking_type, AffineTracking)
-                    predictor=Pade21())
+        coretracker(prob.toric_homotopy, [x]; seed=prob.seed, affine_tracking=true, predictor=Pade21())
     generic_tracker =
         pathtracker(prob.generic_homotopy, x; seed=prob.seed, affine_tracking=isa(prob.tracking_type, AffineTracking), kwargs...)
     tracker = PolyhedralTracker(prob.toric_homotopy, toric_tracker, generic_tracker, Ref(NaN))
