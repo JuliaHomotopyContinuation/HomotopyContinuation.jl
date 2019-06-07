@@ -37,7 +37,7 @@ end
 function PolyhedralStartSolutionsIterator(f::MPPolys)
     PolyhedralStartSolutionsIterator(MixedSubdivisions.support(f))
 end
-function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, ::Nothing)
+function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, ::Nothing=nothing)
     PolyhedralStartSolutionsIterator(support, gaussian_lifting_sampler)
 end
 function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, lifting_sampler::Function)
@@ -101,48 +101,49 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, cellstate)
 end
 
 function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell)
-    @unpack support, start_coefficients, D, b, H, U, γ, μ, X, S, αs, DT = iter
+    @unpack support, start_coefficients, D, b, H, U = iter
     n = length(iter.support)
 
     # setup system and compute hermite normal form
     construct_binomial_system!(D, b, support, start_coefficients, cell.indices)
-    hnf!(H, U, D)
 
+    # This beauty tries first to compute the hnf using Int64,
+    # then falls back to Int128 and finally gives up and just uses
+    # BigInt
+    try
+        hnf!(H, U, D)
+        cell_solutions!(iter, cell, H, U)
+    catch e
+        isa(e, OverflowError) || rethrow(e)
+        try
+            H128, U128 = hnf(D, Int128)
+            cell_solutions!(iter, cell, H128, U128)
+        catch e128
+            isa(e128, OverflowError) || rethrow(e128)
+
+            H_big, U_big = hnf(D, BigInt)
+            cell_solutions!(iter, cell, H_big, U_big)
+        end
+    end
+
+    nothing
+end
+
+function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H, U)
+    @unpack D, b, γ, μ, X, S, DT = iter
+    n = size(H, 1)
     # resize memory
     d̂ = cell.volume
     resize!(S, n, d̂)
     resize!(X, n, d̂)
 
     # setup a table of all combinations of the types of roots of unity we need
-    d, e = d̂, 1
-    @inbounds for I in 1:n
-        dᵢ = H[I,I]
-        d = d ÷ dᵢ
-        k = 1
-        for _ in 1:e, j in 0:(dᵢ-1), _ in 1:d
-            S[I, k] = j
-            k += 1
-        end
-        e *= dᵢ
-    end
-
+    fill_unit_roots_combinations!(S, H, d̂)
     # We split the computation of the solution in 2 stages
-    # 1) Compute solutions for the angular part -> d̂ many solutions
-    # 2) Solve for the absolute value
 
-    # 1)
-    γ .= angle.(b) ./ (2π)
-    apply_trafo_angles!(μ, γ, U)
-    @inbounds for i in 1:d̂, j in n:-1:1
-        α = μ[j] + S[j, i]
-        for k in n:-1:(j+1)
-            α -= αs[k] * H[k, j]
-        end
-        α /= H[j,j]
-        X[j, i] = cis(2π * α)
-        αs[j] = α
-    end
-    # 2)
+    # 1) Compute solutions for the angular part -> d̂ many solutions
+    compute_angular_part!(iter, cell, H, U)
+    # 2) Solve for the absolute value
     μ .= log.(abs.(b))
     LinearAlgebra.transpose!(DT, D)
     LinearAlgebra.ldiv!(LinearAlgebra.lu!(DT), μ)
@@ -155,7 +156,59 @@ function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell
 end
 
 
-function apply_trafo_angles!(μ, γ, U)
+function fill_unit_roots_combinations!(S, H, d̂)
+    n = size(H, 1)
+    d, e = d̂, 1
+    @inbounds for I in 1:n
+        dᵢ = convert(Int64, H[I,I])
+        d = d ÷ dᵢ
+        k = 1
+        for _ in 1:e, j in 0:(dᵢ-1), _ in 1:d
+            S[I, k] = j
+            k += 1
+        end
+        e *= dᵢ
+    end
+end
+
+function compute_angular_part!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H::Matrix{I}, U::Matrix{I}) where {I<:Union{Int64,Int128}}
+    @unpack γ, b, μ, X, S, αs = iter
+    n = length(iter.support)
+    γ .= angle.(b) ./ (2π)
+    apply_trafo_angles!(μ, γ, U)
+    @inbounds for i in 1:cell.volume, j in n:-1:1
+        α = μ[j] + S[j, i]
+        for k in n:-1:(j+1)
+            α -= αs[k] * H[k, j]
+        end
+        α /= H[j,j]
+        X[j, i] = cis(2π * α)
+        αs[j] = α
+    end
+end
+
+
+function compute_angular_part!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H::Matrix{BigInt}, U::Matrix{BigInt})
+    @unpack b, γ, X, S = iter
+    n = length(iter.support)
+    μ = Vector{BigFloat}(undef, n)
+    αs = Vector{BigFloat}(undef, n)
+    γ .= angle.(b) ./ (2π)
+    apply_trafo_angles!(μ, γ, U)
+    @inbounds for i in 1:cell.volume, j in n:-1:1
+        # This is always small in our applications
+        α = μ[j] + S[j, i]
+        for k in n:-1:(j+1)
+            α -= αs[k] * H[k, j]
+        end
+        α /= H[j,j]
+        X[j, i] = cis(2π * convert(Float64, mod(α, 1.0)))
+        αs[j] = α
+    end
+end
+
+
+function apply_trafo_angles!(μ, γ, U::Matrix{<:Integer})
     n = length(γ)
     μ .= zero(eltype(μ))
     @inbounds for j in 1:n, i in 1:n

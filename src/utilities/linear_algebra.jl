@@ -524,18 +524,19 @@ function ormqr!(side::AbstractChar, trans::AbstractChar, A::Matrix{ComplexF64},
 end
 
 """
-    hnf(A)
+    hnf(A, T=elytpe(A))
 
     Compute the hermite normal form `H` of `A` by overwriting `A` and the corresponding transformation
-    matrix `U`. This is `A*U == H` and `H` is a lower triangular matrix.
+    matrix `U` using precision T. This is `A*U == H` and `H` is a lower triangular matrix.
 
     The implementation follows the algorithm described in [1].
 
     [1] Kannan, Ravindran, and Achim Bachem. "Polynomial algorithms for computing the Smith and Hermite normal forms of an integer matrix." SIAM Journal on Computing 8.4 (1979): 499-507.
 """
-function hnf(A)
-    H = copy(A)
-    U = similar(A)
+function hnf(A, T=eltype(A))
+    H = similar(A, T)
+    H .= A
+    U = similar(A, T)
     hnf!(H, U)
     H, U
 end
@@ -592,7 +593,7 @@ function hnf!(A, U)
     nothing
 end
 
-function reduce_off_diagonal!(A, U, k)
+@inline function reduce_off_diagonal!(A, U, k)
     n = size(A, 1)
     @inbounds if A[k,k] < 0
         for i in 1:n
