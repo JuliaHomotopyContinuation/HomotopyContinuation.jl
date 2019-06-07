@@ -2,6 +2,11 @@ export PolyhedralTracker, update_cell!
 import MixedSubdivisions: MixedCell, MixedCellIterator, RegenerationTraverser
 import ElasticArrays: ElasticArray
 
+
+#####################
+## START SOLUTIONS ##
+#####################
+
 """
     PolyhedralStartSolutionsIterator(support, lifting, start_coefficients)
 
@@ -18,9 +23,9 @@ and random start coefficients.
 """
 mutable struct PolyhedralStartSolutionsIterator
     support::Vector{Matrix{Int32}}
-    lifting::Vector{Vector{Int32}}
     start_coefficients::Vector{Vector{ComplexF64}}
-    mixed_cell_iter::MixedCellIterator{Int32, Int64, RegenerationTraverser{Int32, Int64}}
+    lifting::Union{Nothing,Vector{Vector{Int32}}}
+    mixed_cells::Union{Nothing, Vector{MixedCell}} # all mixed_cells
     X::ElasticArray{ComplexF64, 2, 1} # solutions
     # Cache
     D::Matrix{Int} # binomial system lhs
@@ -37,30 +42,16 @@ end
 function PolyhedralStartSolutionsIterator(f::MPPolys)
     PolyhedralStartSolutionsIterator(MixedSubdivisions.support(f))
 end
-function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, ::Nothing=nothing)
-    PolyhedralStartSolutionsIterator(support, gaussian_lifting_sampler)
-end
-function PolyhedralStartSolutionsIterator(support::Vector{Matrix{Int32}}, lifting_sampler::Function)
-    n = size(first(support), 1)
-    lifting = map(A -> lifting_sampler(size(A,2))::Vector{Int32}, support)
+function PolyhedralStartSolutionsIterator(support::Vector{<:Matrix{<:Integer}})
     start_coefficients = map(A -> randn(ComplexF64, size(A,2)), support)
-    PolyhedralStartSolutionsIterator(support, lifting, start_coefficients)
-end
-
-uniform_lifting_sampler(nterms) = rand(Int32(-2^19):Int32(2^19), nterms)
-function gaussian_lifting_sampler(nterms)
-    N = 2^19
-    round.(Int32, randn(nterms) * N)
+    PolyhedralStartSolutionsIterator(convert(Vector{Matrix{Int32}}, support), start_coefficients)
 end
 
 function PolyhedralStartSolutionsIterator(
             support::Vector{Matrix{Int32}},
-            lifting::Vector{Vector{Int32}},
             start_coefficients::Vector{Vector{ComplexF64}})
 
     n = size(first(support), 1)
-    mixed_cell_iter = MixedCellIterator(support, lifting)
-
     D = zeros(Int, n, n)
     b = zeros(ComplexF64, n)
     H = zeros(Int, n, n)
@@ -72,32 +63,44 @@ function PolyhedralStartSolutionsIterator(
     αs = zeros(Float64, n)
     DT = zeros(Float64, n, n)
 
-    PolyhedralStartSolutionsIterator(support, lifting, start_coefficients,
-        mixed_cell_iter, X, D, b, H, U, γ, μ, S, αs, DT)
+    PolyhedralStartSolutionsIterator(support, start_coefficients, nothing, nothing,
+            X, D, b, H, U, γ, μ, S, αs, DT)
 end
 
 Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell, typeof(iter.X)}
-
-function Base.iterate(iter::PolyhedralStartSolutionsIterator)
-    cell_cellstate = iterate(iter.mixed_cell_iter)
-    cell_cellstate !== nothing || return nothing
-
-    cell, cellstate = cell_cellstate
-    cell_solutions!(iter, cell)
-
-    return (cell, iter.X), cellstate
+function Base.length(iter::PolyhedralStartSolutionsIterator)
+    compute_mixed_cells!(iter)
+    sum(MixedSubdivisions.volume, iter.mixed_cells)
 end
 
-function Base.iterate(iter::PolyhedralStartSolutionsIterator, cellstate)
-    cell_cellstate = iterate(iter.mixed_cell_iter, cellstate)
-    cell_cellstate !== nothing || return nothing
+function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
+    if isnothing(iter.mixed_cells) || isnothing(iter.lifting)
+        mixed_cells, lifting = MixedSubdivisions.fine_mixed_cells(iter.support)
+        iter.mixed_cells = mixed_cells
+        iter.lifting = lifting
+    end
+    iter
+end
+function Base.iterate(iter::PolyhedralStartSolutionsIterator)
+    compute_mixed_cells!(iter)
 
-    cell, cellstate = cell_cellstate
+    isempty(iter.mixed_cells) && return nothing
+
+    cell = iter.mixed_cells[1]
     cell_solutions!(iter, cell)
 
-    return (cell, iter.X), cellstate
+    return (cell, iter.X), 1
+end
+
+function Base.iterate(iter::PolyhedralStartSolutionsIterator, cell_number::Int)
+    cell_number ≥ length(iter.mixed_cells) && return nothing
+
+    cell = iter.mixed_cells[cell_number + 1]
+    cell_solutions!(iter, cell)
+
+    return (cell, iter.X), cell_number + 1
 end
 
 function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell)
@@ -207,8 +210,7 @@ function compute_angular_part!(iter::PolyhedralStartSolutionsIterator, cell::Mix
     end
 end
 
-
-function apply_trafo_angles!(μ, γ, U::Matrix{<:Integer})
+function apply_trafo_angles!(μ, γ, U)
     n = length(γ)
     μ .= zero(eltype(μ))
     @inbounds for j in 1:n, i in 1:n
@@ -231,6 +233,16 @@ function construct_binomial_system!(D, b, support, coeffs, indices)
 end
 
 
+#######################
+# POLYHEDRAL TRACKER ##
+#######################
+
+"""
+    PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
+
+The polyhedral tracker combines the tracking from toric infinity toward the target system
+by a two-stage approach.
+"""
 struct PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
     toric_homotopy::H
     toric_tracker::CT
@@ -281,8 +293,12 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
                 path_result_details::Symbol=:default, save_all_paths=false)
     results = Vector{result_type(PT.generic_tracker)}()
 
+    compute_mixed_cells!(start_solutions)
+    update_lifting!(PT.toric_homotopy, start_solutions.lifting)
+
+    n = length(start_solutions)
     if show_progress
-        progress = ProgressMeter.ProgressUnknown("Tracking paths... ")
+        progress = ProgressMeter.Progress(n, 0.25, "Tracking $n paths... ")
     else
         progress = nothing
     end

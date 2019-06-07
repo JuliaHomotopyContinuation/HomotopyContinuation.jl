@@ -239,7 +239,7 @@ function track_paths(tracker, start_solutions;
     @deprecatekwarg report_progress show_progress
 
     if show_progress
-        progress = ProgressMeter.Progress(n, 0.1, "Tracking $n paths... ")
+        progress = ProgressMeter.Progress(n, 0.25, "Tracking $n paths... ")
     else
         progress = nothing
     end

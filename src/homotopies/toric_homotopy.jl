@@ -12,8 +12,13 @@ mutable struct ToricHomotopy{S<:SPSystem, T} <: AbstractHomotopy
     lifting::Vector{Int32}
     coeffs::Vector{T}
     s_weights::Vector{Float64}
+    perms::Vector{Vector{Int}}
 end
 
+function ToricHomotopy(supports::Vector{<:Matrix}, coefficients::Vector{Vector{T}}) where T
+    dummy_lifting = Vector{Int32}[collect(Int32(1):Int32(size(A, 2))) for A in supports]
+    ToricHomotopy(supports, dummy_lifting, coefficients)
+end
 function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32}}, coefficients::Vector{Vector{T}}) where T
     @assert all(length.(coefficients) .== size.(supports,2))
     @assert length(liftings) == length(supports)
@@ -30,6 +35,7 @@ function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32
     support = Matrix{Int32}(undef, n, M)
     lifting = Vector{Int32}(undef, M)
     coeffs = Vector{T}(undef, M)
+    perms = Vector{Vector{Int}}()
     k = 1
     for (i, f) in enumerate(system.system.polys)
         p = SP.permutation(f)
@@ -39,10 +45,11 @@ function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32
             coeffs[k] = coefficients[i][j]
             k += 1
         end
+        push!(perms, p)
     end
     s_weights = zeros(sum(nterms))
 
-    ToricHomotopy(system, nterms, support, lifting, coeffs, s_weights)
+    ToricHomotopy(system, nterms, support, lifting, coeffs, s_weights, perms)
 end
 
 function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
@@ -77,6 +84,15 @@ function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
     s_min /= s_max
 
     s_min
+end
+
+function update_lifting!(H::ToricHomotopy, lifting::Vector{<:Vector{<:Integer}})
+    k = 1
+    for (i, p) in enumerate(H.perms), j in p
+        H.lifting[k] = lifting[i][j]
+        k += 1
+    end
+    H
 end
 
 """
