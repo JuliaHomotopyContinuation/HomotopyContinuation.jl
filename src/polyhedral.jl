@@ -21,7 +21,7 @@ system corresponding to the mixed cell.
 Construct a polyhedral start solutions iterator by picking a random lifting
 and random start coefficients.
 """
-mutable struct PolyhedralStartSolutionsIterator
+mutable struct PolyhedralStartSolutionsIterator{CT<:CoreTracker}
     support::Vector{Matrix{Int32}}
     start_coefficients::Vector{Vector{ComplexF64}}
     lifting::Union{Nothing,Vector{Vector{Int32}}}
@@ -37,6 +37,11 @@ mutable struct PolyhedralStartSolutionsIterator
     S::ElasticArray{Int, 2, 1}
     αs::Vector{Float64} # partial angles in the triangular solve
     DT::Matrix{Float64} # transposed of D to solve coords
+    # binomial homotopy fallback solution
+    γU::Vector{Int}
+    x::Vector{ComplexF64}
+    αs_rational::Vector{Rational{Int}}
+    binomial_tracker::CT
 end
 
 function PolyhedralStartSolutionsIterator(f::MPPolys)
@@ -53,18 +58,26 @@ function PolyhedralStartSolutionsIterator(
 
     n = size(first(support), 1)
     D = zeros(Int, n, n)
-    b = zeros(ComplexF64, n)
+    b = ones(ComplexF64, n)
     H = zeros(Int, n, n)
     U = zeros(Int, n, n)
-    γ = zeros(Float64, n)
+    γ = ones(Float64, n)
     μ = zeros(Float64, n)
     X = ElasticArray{ComplexF64}(undef, n, 0)
     S = ElasticArray{Int}(undef, n, 0)
     αs = zeros(Float64, n)
     DT = zeros(Float64, n, n)
 
+    γU = zeros(Int, n)
+    x = randn(ComplexF64, n)
+    αs_rational = Vector{Rational{Int64}}(undef, n)
+    binomial_tracker = coretracker(BinomialHomotopy(D, b, γ), x;
+                        affine_tracking=true,
+                        initial_step_size=0.2,
+                        predictor=Pade21())
+
     PolyhedralStartSolutionsIterator(support, start_coefficients, nothing, nothing,
-            X, D, b, H, U, γ, μ, S, αs, DT)
+            X, D, b, H, U, γ, μ, S, αs, DT, γU, x, αs_rational, binomial_tracker)
 end
 
 Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
@@ -142,8 +155,34 @@ function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell
 
     # setup a table of all combinations of the types of roots of unity we need
     fill_unit_roots_combinations!(S, H, d̂)
-    # We split the computation of the solution in 2 stages
 
+    cell_solutions_direct!(iter, cell, H, U)
+    if !verify_solutions(iter)
+        cell_solutions_homotopy!(iter, cell, H, U)
+    end
+end
+
+function verify_solutions(iter)
+    @unpack D, b, X = iter
+    n = size(D,1)
+    for k in 1:size(X,2)
+        for i in 1:n
+            yᵢ = one(X[1,k])
+            for j in 1:n
+                if D[j, i] != 0
+                    yᵢ *= X[j,k]^D[j, i]
+                end
+            end
+            abs(yᵢ - b[i]) < 1e-10 || return false
+        end
+    end
+    true
+end
+
+function cell_solutions_direct!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H, U)
+    @unpack D, b, μ, X, DT = iter
+    n = size(D,1)
+    # We split the computation of the solution in 2 stages
     # 1) Compute solutions for the angular part -> d̂ many solutions
     compute_angular_part!(iter, cell, H, U)
     # 2) Solve for the absolute value
@@ -151,13 +190,12 @@ function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell
     LinearAlgebra.transpose!(DT, D)
     LinearAlgebra.ldiv!(LinearAlgebra.lu!(DT), μ)
     μ .= exp.(μ)
-    for j in 1:d̂, i in 1:n
+    for j in 1:cell.volume, i in 1:n
         X[i, j] *= μ[i]
     end
 
     nothing
 end
-
 
 function fill_unit_roots_combinations!(S, H, d̂)
     n = size(H, 1)
@@ -229,7 +267,55 @@ function construct_binomial_system!(D, b, support, coeffs, indices)
         b[i] = -coeffs[i][bᵢ] / coeffs[i][aᵢ]
     end
     nothing
+end
 
+
+function cell_solutions_homotopy!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H, U)
+    @unpack D, b, γ, μ, X, γU, x, S, αs_rational, binomial_tracker = iter
+
+    γ .= sign.(real.(b))
+    apply_trafo!(γU, γ, U)
+
+    n = size(D,1)
+    for i in 1:cell.volume
+        αs_denom = 1
+        for j in n:-1:1
+            α = S[j, i]
+            denom = lcm(αs_denom, convert(Int, H[j,j]))
+            if γU[j] == -1
+                α += 1//2
+                denom *= 2
+            end
+            for k in n:-1:(j+1)
+                α -= αs_rational[k] * convert(Int, H[k, j] % denom)
+            end
+            α //= H[j,j]
+            αs_denom = lcm(αs_denom, denominator(α))
+            αs_rational[j] = (numerator(α) % denominator(α)) // denominator(α)
+            x[j] = cis(2π * αs_rational[j])
+        end
+
+        ret = track!(binomial_tracker, x, 1.0, 0.0)
+        x̄ = currx(binomial_tracker)
+        for j in 1:n
+            X[j,i] = x̄[j]
+        end
+    end
+
+    nothing
+end
+
+function apply_trafo!(γU, γ, U)
+    for i in 1:length(γ)
+        γUᵢ = 1
+        for j in 1:size(U,2)
+            if γ[j] == -1 && isodd(U[j, i])
+                γUᵢ = -γUᵢ
+            end
+        end
+        γU[i] = γUᵢ
+    end
+    γU
 end
 
 
