@@ -19,4 +19,10 @@
         end
         @test mv == 70
     end
+
+    @testset "Polyhedral solve" begin
+        f = equations(cyclic(5))
+        result = solve(f; start_system=:polyhedral)
+        nfinite(result) == 70
+    end
 end
