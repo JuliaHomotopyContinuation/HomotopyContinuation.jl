@@ -46,9 +46,9 @@
         @test nfinite(result) == 32
         @test string(result) isa String
 
-        @test nfinite(solve(F, patch=RandomPatch())) == 32
-        @test nfinite(solve(F, patch=EmbeddingPatch())) ≤ 32
-        @test nfinite(solve(F, patch=OrthogonalPatch())) == 32
+        @test nfinite(solve(F, threading=false, patch=RandomPatch())) == 32
+        @test nfinite(solve(F, threading=false, patch=EmbeddingPatch())) ≤ 32
+        @test nfinite(solve(F, threading=false, patch=OrthogonalPatch())) == 32
 
         @polyvar w
         F = equations(cyclic(5))
@@ -97,6 +97,7 @@
         f = [a * b - 2, a*c- 1]
         g = [x+y, y + 3, x + 2]
         res = solve(e ∘ f ∘ g)
+        nnonsingular(solve(e ∘ f ∘ g, system_scaling=false, threading=false))
         @test nnonsingular(res) == 2
         @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=false)) == 2
 
@@ -281,11 +282,11 @@
         group2 = [z[2,:], z[4,:], z[3,:], z[5,:]]
 
         @test bezout_number(F) == 1024
-        @test bezout_number(F, variable_groups=group1) == 320
-        @test bezout_number(F, variable_groups=group2) == 576
+        @test bezout_number(F; variable_groups=group1) == 320
+        @test bezout_number(F; variable_groups=group2) == 576
 
-        @test nnonsingular(solve(F, seed=1234)) == 16
-        @test nnonsingular(solve(F; variable_groups=group1, seed=1234)) == 16
+        @test nnonsingular(solve(F, seed=1234, show_progress=false)) == 16
+        @test nnonsingular(solve(F; variable_groups=group1, seed=1234, show_progress=false)) == 16
     end
 
     @testset "Affine TotalDegree" begin
