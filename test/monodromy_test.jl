@@ -190,9 +190,10 @@ end
         R = monodromy_solve(f - p, y₀, p₀;
         			parameters=p, group_action=relabeling,
         			target_solutions_count=225,
+                    affine_tracking=true,
         			parameter_sampler=last ∘ sample_moments,
                     show_progress=false,
-                    maximal_number_of_iterations_without_progress=10)
+                    maximal_number_of_iterations_without_progress=20)
         @test length(solutions(R)) == 225
     end
 end
