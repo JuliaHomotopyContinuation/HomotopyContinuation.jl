@@ -238,7 +238,8 @@ function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_inf
 			end
     		Problem{ProjectiveTracking}(input.H, vargroups, seed), startsolutions
 		else
-			Problem{ProjectiveTracking}(input.H, homvar_info.vargroups, seed), startsolutions
+			vargroups = VariableGroups(size(input.H)[2], homvar_info)
+			Problem{ProjectiveTracking}(input.H, vargroups, seed), startsolutions
 		end
 	else
 		Problem{AffineTracking}(input.H, VariableGroups(size(input.H)[2]), seed), startsolutions
