@@ -245,7 +245,7 @@ function track_paths(tracker, start_solutions;
     end
 
     stats = SolveStats()
-
+    ntracked = 0
     try
         nthreads = Threads.nthreads()
         if threading && nthreads > 1
@@ -264,6 +264,7 @@ function track_paths(tracker, start_solutions;
                     end
                 end
                 k += length(batch)
+                ntracked = k
                 if batch_tracker.interrupted
                     return results
                 end
@@ -283,6 +284,7 @@ function track_paths(tracker, start_solutions;
                     if return_code == PathTrackerStatus.success
                         update!(stats, R)
                     end
+                    ntracked = k
                 end
                 k % 32 == 0 && update_progress!(progress, k, stats)
             end
@@ -290,7 +292,7 @@ function track_paths(tracker, start_solutions;
         end
     catch e
         if isa(e, InterruptException)
-            return results
+            return results, ntracked
         else
             rethrow(e)
         end
@@ -392,7 +394,7 @@ end
 
 Try to detect path jumping by comparing the winding numbers of finite results.
 """
-function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details::Symbol; finite_results_only=false)
+function path_jumping_check!(results::Vector{<:PathResult}, tracker, details::Symbol; finite_results_only=false)
     if finite_results_only
         finite_results_indices = collect(1:length(results))
         finite_results = results

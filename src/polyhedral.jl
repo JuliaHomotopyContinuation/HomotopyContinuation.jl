@@ -48,9 +48,22 @@ function PolyhedralStartSolutionsIterator(f::MPPolys)
     PolyhedralStartSolutionsIterator(MixedSubdivisions.support(f))
 end
 function PolyhedralStartSolutionsIterator(support::Vector{<:Matrix{<:Integer}})
-    start_coefficients = map(A -> randn(ComplexF64, size(A,2)), support)
+    # Intuitively we want to sample the coefficients from the normal distribution
+    # because we like this one very much.
+    # But this yields to a bad surpise for the start solutions in the case that
+    # the ratios of the coefficients in the binomial system is very different in between
+    # the equations
+    start_coefficients = map(A -> rand_approx_unit(size(A,2)), support)
     PolyhedralStartSolutionsIterator(convert(Vector{Matrix{Int32}}, support), start_coefficients)
 end
+
+"""
+    rand_approx_unit(n::Integer)::Vector{ComplexF64}
+
+This samples uniformly from the rectangle ``[0.9,1.1] × [0,2π]`` and transforms the sampled
+values with the map ``(r, φ) ↦ r * e^{i φ}``.
+"""
+rand_approx_unit(n) = map(_ -> (0.9 + 0.2 * rand()) * cis(2π * rand()), 1:n)
 
 function PolyhedralStartSolutionsIterator(
             support::Vector{Matrix{Int32}},
@@ -394,7 +407,7 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
     try
         nthreads = Threads.nthreads()
         if threading && nthreads > 1
-            @warn "Multithreading is currently not supported with polyhedral homotopy"
+            @warn "Multithreading is currently not supported with polyhedral homotopy, the computation runs only with a single thread."
         end
         for (cell, X) in start_solutions
             update_cell!(PT, cell)
@@ -417,14 +430,13 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
                     end
                 end
             end
-
         end
         if progress !== nothing
             update_progress!(progress, ntracked - 1, stats; finished=true)
         end
     catch e
         if isa(e, InterruptException)
-            return results
+            return results, ntracked
         else
             rethrow(e)
         end
