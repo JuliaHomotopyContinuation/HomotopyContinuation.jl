@@ -330,7 +330,7 @@ function (batch::BatchTracker)()
 end
 function track_batch!(results, pathtracker, range, starts, details, all_paths)
     for k in range
-        return_code = track!(pathtracker, starts[k], 1.0)
+        return_code = track!(pathtracker, starts[k])
         if all_paths ||
            return_code == PathTrackerStatus.success ||
            return_code == PathTrackerStatus.terminated_invalid_startvalue
