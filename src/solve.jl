@@ -330,7 +330,7 @@ function (batch::BatchTracker)()
 end
 function track_batch!(results, pathtracker, range, starts, details, all_paths)
     for k in range
-        return_code = track!(pathtracker, starts[k], 1.0)
+        return_code = track!(pathtracker, starts[k])
         if all_paths ||
            return_code == PathTrackerStatus.success ||
            return_code == PathTrackerStatus.terminated_invalid_startvalue
@@ -367,7 +367,6 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
     tol = tracker.core_tracker.options.refinement_accuracy
     # find cluster of multiple solutions
     clusters = multiplicities(solution, finite_results; tol=tol)
-
     while true
         rerun_paths = false
         for cluster in clusters

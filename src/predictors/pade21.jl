@@ -48,6 +48,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
     x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
     x², x³ = cache.x², cache.x³
 
+    h₂ *= max(abs(t), 1.0)
     # compute the second derivative at (x,t)
     g!(u₁, H, x, ẋ, t, h₂, x_h)
     g!(u₂, H, x, ẋ, t, -h₂, x_h)
@@ -58,10 +59,11 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
     end
     solve!(x², Jac, u)
 
+    h₃ *= max(abs(t), 1.0)
     g!(u₁, H, x, ẋ, x², t, h₃, x_h)
     g!(u₂, H, x, ẋ, x², t, -h₃, x_h)
 
-    h³ = h₃ * h₃ * h₃
+    h³ = h₃^3
     @inbounds for i in eachindex(u₁)
         u[i] = -3(u₁[i] - u₂[i]) / h³
     end
@@ -73,8 +75,12 @@ end
 function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
     x², x³ = cache.x², cache.x³
     @inbounds for i in eachindex(x)
-        δ = -x³[i] / (3 * x²[i])
-        xnext[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / (1 + δ*Δt)
+        δ = 1 - Δt * x³[i] / (3 * x²[i])
+        if isnan(δ) || iszero(δ)
+            xnext[i] = x[i] + Δt * ẋ[i] + 0.5 * Δt^2 * x²[i]
+        else
+            xnext[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / δ
+        end
     end
     nothing
 end

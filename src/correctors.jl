@@ -100,14 +100,14 @@ end
 NewtonCorrector(;simplified_last_step=true) = NewtonCorrector(simplified_last_step)
 
 
-struct NewtonCorrectorCache{FH<:FixedHomotopy, T, SC} <: AbstractCorrectorCache
+struct NewtonCorrectorCache{FH<:FixedHomotopy, NC<:AbstractNewtonCache} <: AbstractCorrectorCache
     F::FH
-    C::NewtonCache{T, SC}
+    C::NC
 end
 
 function cache(::NewtonCorrector, H::HomotopyWithCache, x, t)
     F = FixedHomotopy(H, t)
-    C = NewtonCache(F, x)
+    C = newton_cache(F, x)
 
     NewtonCorrectorCache(F, C)
 end
@@ -115,10 +115,10 @@ end
 
 @inline function correct!(out, alg::NewtonCorrector, cache::NewtonCorrectorCache,
                   H::HomotopyWithCache, x, t, norm, jacobian::Jacobian, tol::Float64,
-                  maxiters::Int; update_jacobian_infos::Bool=false)
+                  maxiters::Int; update_jacobian_infos::Bool=false, use_qr::Bool=false)
     cache.F.t = t
     result = newton!(out, cache.F, x, norm, cache.C, jacobian, tol, 1, maxiters,
-        alg.simplified_last_step, update_jacobian_infos)
+        alg.simplified_last_step, update_jacobian_infos, use_qr)
     CorrectorResult(result)
 end
 

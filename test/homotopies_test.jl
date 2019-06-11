@@ -5,7 +5,7 @@
         H = StraightLineHomotopy(F, G)
         @test H isa AbstractHomotopy
         @test size(H) == (6, 6)
-        @test gamma(H) isa ComplexF64
+        @test HC.gamma(H) isa ComplexF64
         HomotopyContinuation.homotopy_interface_test(H)
     end
 
