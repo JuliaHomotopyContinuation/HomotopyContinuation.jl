@@ -4,6 +4,7 @@ module HomotopyContinuation
     import FixedPolynomials
     import LinearAlgebra
     import MultivariatePolynomials
+    import PrettyTables
     import Printf
     import ProgressMeter
     import ProjectiveVectors

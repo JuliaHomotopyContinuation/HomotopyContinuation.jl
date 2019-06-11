@@ -779,6 +779,10 @@ function Base.show(io::IO, x::Result)
         println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
+    if s.singular > 0
+        println(io, "• multiplicity table singular solutions:")
+        singular_multiplicities_table(io, x, s)
+    end
 end
 
 function Base.show(io::IO, x::ProjectiveResult)
@@ -791,12 +795,16 @@ function Base.show(io::IO, x::ProjectiveResult)
         println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
+    if s.singular > 0
+        println(io, "• multiplicity table singular solutions:")
+        singular_multiplicities_table(io, x, s)
+    end
 end
 
 TreeViews.hastreeview(::Result) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
-TreeViews.numberofnodes(::Result) = 7
-TreeViews.numberofnodes(::ProjectiveResult) = 6
+TreeViews.numberofnodes(::Result) = 8
+TreeViews.numberofnodes(::ProjectiveResult) = 7
 TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">Result</span>")
 
@@ -816,6 +824,9 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.failed) failed")
     elseif i == 7
         print(io, "Random seed used")
+    elseif i == 8 && s.singular > 0
+        print(io, "  multiplicity table singular solutions: \n")
+        singular_multiplicities_table(io, x, s)
     end
 end
 
@@ -835,6 +846,8 @@ function TreeViews.treenode(r::Result, i::Integer)
         return failed(r)
     elseif i == 7
         return seed(r)
+    elseif i == 8 && s.singular > 0
+        return missing
     end
     missing
 end
@@ -853,6 +866,9 @@ function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"applica
         print(io, "$(s.failed) failed")
     elseif i == 6
         print(io, "Random seed used")
+    elseif i == 7 && s.singular > 0
+        print(io, "  multiplicity table singular solutions: \n")
+        singular_multiplicities_table(io, x, s)
     end
 end
 
@@ -870,8 +886,51 @@ function TreeViews.treenode(r::ProjectiveResult, i::Integer)
         return failed(r)
     elseif i == 6
         return seed(r)
+    elseif i == 7 && s.singular > 0
+        return missing
     end
     missing
 end
 
 plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
+
+function singular_multiplicities_table(io, result::Result, stats = statistics(result))
+    multiplicities_dict = Dict{Int, Vector{Vector{Int}}}()
+    for m in multiplicities(solution, singular(result))
+    	if haskey(multiplicities_dict, length(m))
+    		push!(multiplicities_dict[length(m)], m)
+    	else
+    		multiplicities_dict[length(m)] = [m]
+    	end
+    end
+    n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+
+    curr_n_real_sols = 0
+    curr_n_sols = 0
+
+    off = n_mults_total < stats.singular
+    data = Matrix{Int}(undef, off+length(multiplicities_dict), 4)
+    for (i, k) in enumerate(sort(collect(keys(multiplicities_dict))))
+    	data[i+off, 1] = k
+    	n_real_solsᵢ = count(M -> isreal(result.pathresults[first(M)]), multiplicities_dict[k])
+    	n_solsᵢ = length(multiplicities_dict[k])
+    	data[i+off, 2] = n_real_solsᵢ
+    	data[i+off, 3] = n_solsᵢ - n_real_solsᵢ
+    	data[i+off, 4] = n_solsᵢ
+
+    	curr_n_real_sols += k * n_real_solsᵢ
+    	curr_n_sols += k * n_solsᵢ
+    end
+
+    if off
+    	data[1,1] = 1
+    	data[1,2] = stats.real_singular - curr_n_real_sols
+    	data[1,3] = (stats.singular - curr_n_sols) - (stats.real_singular - curr_n_real_sols)
+    	data[1,4] = stats.singular - curr_n_sols
+    end
+
+    headers = ["multiplicity", "# real", "# non-real", "# total"]
+    PrettyTables.pretty_table(io, data, headers;
+            alignment=:c,
+            header_crayon=PrettyTables.Crayon(bold=false))
+end
