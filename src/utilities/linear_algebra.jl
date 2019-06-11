@@ -245,7 +245,7 @@ function custom_ldiv!(x, A::LinearAlgebra.QRPivoted{ComplexF64},
         # The following is equivalent to LA.lmul!(LA.adjoint(A.Q), b) but
         # we can also pass the preallocated work vector
         ormqr!('L', 'C', A.factors, A.τ, b, ormqr_work)
-        ldiv_upper!(A.factors, b)
+        ldiv_upper!(A.factors, b; singular_exception=false)
         @inbounds for i in 1:nr
             x[i] = b[i]
             perm[i] = A.p[i]
@@ -412,10 +412,10 @@ function _swap_rows!(B::StridedVector, i::Integer, j::Integer)
     B
 end
 
-@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
+@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b; singular_exception::Bool=true)
     n = size(A, 2)
     for j in n:-1:1
-        @inbounds iszero(A[j,j]) && throw(LinearAlgebra.SingularException(j))
+        @inbounds singular_exception && iszero(A[j,j]) && throw(LinearAlgebra.SingularException(j))
         @inbounds xj = x[j] = (@fastmath A[j,j] \ b[j])
         for i in 1:(j-1)
             @inbounds b[i] -= A[i,j] * xj
