@@ -14,26 +14,61 @@ In the following we show the different inputs `solve` takes.
 
     solve(F; options...)
 
-Solve the system `F` using a total degree homotopy. `F` can be
+Solve the system `F` using a start system computed from the degrees of the entries of `F`. The number of paths to track is equal to the total degree `d1⋯dn`, where `di` is the degree of the `i`th entry of `F`. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
 - A composition of polynomial systems constructed by [`compose`](@ref).
 - [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
 
-Additionally if `F` has a multi-homogenous structure you can provide variable groups
-to use a multi-homogenous totaldegree homotopy.
 
-### Examples
+### Example
 We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
 ```julia
 julia> @polyvar x y;
 julia> solve([x^2+y^2+1, 2x+3y-1])
-Result with 2 tracked paths
+Result with 2 solutions
 ==================================
-• 2 non-singular finite solutions (0 real)
-• 0 singular finite solutions (0 real)
-• 0 solutions at infinity
-• 0 failed paths
-• random seed: 448703
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 661766
+
+
+# Polyhedral Homotopy
+
+    solve(F; start_system = :polyhedral, options...)
+
+Solve the system `F` using a start system computed from the Newton Polytopes of the entries `F`. The number of paths to track is equal to the mixed volume of the Newton Polytopes of the entries of `F`. The mixed volume is at most the total degree of `F`. `F` can be
+- `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
+- A composition of polynomial systems constructed by [`compose`](@ref).
+- [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
+solve(f; start_system = :polyhedral, affine_tracking=true, seed = 141691, save_all_paths = true)
+
+### Example
+We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
+```julia
+julia> @polyvar x y;
+julia> solve([x^2+y^2+1, 2x+3y-1]; start_system = :polyhedral)
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 222880
+
+# Homogeneous Systems
+
+If `F` has is homogeneous, we return results in projective space
+
+### Examples
+```julia
+julia> @polyvar x y z;
+julia> solve([x^2+y^2+z^2, 2x+3y-z])
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 291729
 ```
 
 If your polynomial system is already homogeneous, but you would like to consider it as an affine system
@@ -43,6 +78,8 @@ you can do
 solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)
 ```
 This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
+
+# Multihomogeneous Systems
 
 By exploiting the multi-homogenous structure of a polynomial system it is possible
 to decrease the number of paths necessary to track.
@@ -166,20 +203,21 @@ const solve_supported_keywords = [:threading, :show_progress,
             # deprecated
             :report_progress]
 
+
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
     tracker, start_solutions = pathtracker_startsolutions(args...; rest...)
     solve(tracker, start_solutions; solve_kwargs...)
 end
 
-function solve(tracker::PathTracker, start_solutions;
+function solve(tracker::Union{<:PathTracker,<:PolyhedralTracker}, start_solutions;
         path_result_details=:default, save_all_paths=false,
         path_jumping_check=true, kwargs...)
-    results = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
+    results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
     if path_jumping_check
         path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
     end
-    Result(results, length(start_solutions), tracker.problem.seed)
+    Result(results, ntracked, seed(tracker))
 end
 
 mutable struct SolveStats
@@ -207,7 +245,7 @@ function track_paths(tracker, start_solutions;
     end
 
     stats = SolveStats()
-
+    ntracked = 0
     try
         nthreads = Threads.nthreads()
         if threading && nthreads > 1
@@ -226,6 +264,7 @@ function track_paths(tracker, start_solutions;
                     end
                 end
                 k += length(batch)
+                ntracked = k
                 if batch_tracker.interrupted
                     return results
                 end
@@ -245,6 +284,7 @@ function track_paths(tracker, start_solutions;
                     if return_code == PathTrackerStatus.success
                         update!(stats, R)
                     end
+                    ntracked = k
                 end
                 k % 32 == 0 && update_progress!(progress, k, stats)
             end
@@ -252,12 +292,12 @@ function track_paths(tracker, start_solutions;
         end
     catch e
         if isa(e, InterruptException)
-            return results
+            return results, ntracked
         else
             rethrow(e)
         end
     end
-    results
+    results, n
 end
 
 function update!(stats::SolveStats, R::PathResult)
@@ -270,18 +310,24 @@ function update!(stats::SolveStats, R::PathResult)
     end
 end
 
-function update_progress!(progress, ntracked, stats::SolveStats)
+function update_progress!(progress, ntracked, stats::SolveStats; finished::Bool=false)
     progress === nothing && return nothing
 
     nsols = stats.regular + stats.singular
     nreal = stats.regular_real + stats.singular_real
 
-    ProgressMeter.update!(progress, ntracked, showvalues=(
+    showvalues = (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular) ($(stats.regular_real))"),
         ("# singular solutions (real)", "$(stats.singular) ($(stats.singular_real))"),
         ("# total solutions (real)", "$nsols ($nreal)")
-    ))
+    )
+
+    ProgressMeter.update!(progress, ntracked; showvalues=showvalues)
+    if finished
+        ProgressMeter.finish!(progress; showvalues=showvalues)
+    end
+
     nothing
 end
 
@@ -348,7 +394,7 @@ end
 
 Try to detect path jumping by comparing the winding numbers of finite results.
 """
-function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker, details::Symbol; finite_results_only=false)
+function path_jumping_check!(results::Vector{<:PathResult}, tracker, details::Symbol; finite_results_only=false)
     if finite_results_only
         finite_results_indices = collect(1:length(results))
         finite_results = results
@@ -423,6 +469,9 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PathTracker
     end
 
     results
+end
+function path_jumping_check!(results::Vector{<:PathResult}, tracker::PolyhedralTracker, details::Symbol; kwargs...)
+    path_jumping_check!(results, tracker.generic_tracker, details; kwargs...)
 end
 
 

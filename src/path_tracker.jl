@@ -402,6 +402,7 @@ Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 
 
+seed(PT::PathTracker) = PT.problem.seed
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
 
@@ -589,6 +590,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
 
     # compute_unit_roots!(unit_roots, samples_per_loop)
     initial_step_size = core_tracker.options.initial_step_size
+    initial_max_steps = core_tracker.options.max_steps
     s = real(currt(core_tracker))
 
     base_point .= currx(core_tracker)
@@ -596,11 +598,14 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
 
     # during the loop we fix the affine patch
     @unpack accepted_steps, rejected_steps = core_tracker.state
+
+
     fix_patch!(core_tracker)
 
     m = k = 1
     ∂θ = 2π / samples_per_loop
     core_tracker.options.initial_step_size = ∂θ #0.5∂θ
+    core_tracker.options.max_steps = 25
     while m ≤ max_winding_number
         θⱼ = 0.0
         for j=1:samples_per_loop
@@ -615,6 +620,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
                 # during the loop we fixed the affine patch
                 unfix_patch!(core_tracker)
                 core_tracker.options.initial_step_size = initial_step_size
+                core_tracker.options.max_steps = initial_max_steps
                 @pack! core_tracker.state = accepted_steps, rejected_steps
 
                 return Symbol(retcode)
@@ -630,6 +636,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
         m += 1
     end
     core_tracker.options.initial_step_size = initial_step_size
+    core_tracker.options.max_steps = initial_max_steps
     # we have to undo the fixing of the patch
     unfix_patch!(core_tracker)
     @pack! core_tracker.state = accepted_steps, rejected_steps
@@ -809,10 +816,14 @@ to investigate single paths.
 function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
     invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
-
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); rest...)
+    tracker_startsolutions(prob, startsolutions; rest...)
+end
+
+function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
+    core_tracker_supported, pathtracker_kwargs = splitkwargs(kwargs, coretracker_supported_keywords)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions); pathtracker_kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 
@@ -982,6 +993,9 @@ function Base.show(io::IO, r::PathResult)
     iscompact = get(io, :compact, false)
     if iscompact || haskey(io, :typeinfo)
         println(io, "• return_code: $(r.return_code)")
+        if r.return_code != PathTrackerStatus.success
+            println(io, " • t: $(r.t)")
+        end
         println(io, " • solution: ", r.solution)
         r.accuracy !== nothing &&
             println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
@@ -993,6 +1007,9 @@ function Base.show(io::IO, r::PathResult)
         println(io, "PathResult")
         println(io, "=================")
         println(io, " • return_code: $(r.return_code)")
+        if r.return_code != PathTrackerStatus.success
+            println(io, " • t: $(r.t)")
+        end
         println(io, " • solution: ", r.solution)
         r.accuracy !== nothing &&
             println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")

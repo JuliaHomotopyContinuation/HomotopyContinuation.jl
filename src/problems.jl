@@ -3,7 +3,8 @@ export AbstractProblem, Problem, TrackingType, AffineTracking, ProjectiveTrackin
 
 
 const problem_startsolutions_supported_keywords = [
-	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling, :affine_tracking];
+	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling,
+	:affine_tracking, :start_system];
 	input_supported_keywords]
 
 
@@ -31,7 +32,7 @@ Indicates that paths should be tracked in projective space.
 """
 struct ProjectiveTracking <: TrackingType end
 
-abstract type AbstractProblem end
+abstract type AbstractProblem{T<:TrackingType} end
 Base.broadcastable(P::AbstractProblem) = Ref(P)
 """
     homotopy(prob::AbstractProblem)
@@ -45,7 +46,7 @@ homotopy(prob::AbstractProblem) = prob.homotopy
 
 Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs to be homogeneous.
 """
-struct Problem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem
+struct Problem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T}
 	tracking_type::T
     homotopy::AbstractHomotopy
     vargroups::VG
@@ -67,59 +68,85 @@ function Problem(T::TrackingType, G::AbstractSystem, F::AbstractSystem,
 end
 Problem{T}(args...; kwargs...) where {T<:TrackingType} = Problem(T(), args...; kwargs...)
 
+"""
+    Problem(T::TrackingType, H::AbstractHomotopy, homogenization::AbstractHomogenization, seed::Int)
+
+Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs to be homogeneous.
+"""
+struct PolyhedralProblem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T}
+	tracking_type::T
+    toric_homotopy::AbstractHomotopy
+	generic_homotopy::AbstractHomotopy
+    vargroups::VG
+    seed::Int
+	startsolutions_need_reordering::Bool
+	regauging_factors::Union{Nothing,Vector{Float64}}
+end
+function PolyhedralProblem(T::TrackingType,
+			toric_homotopy::ToricHomotopy,
+			generic_homotopy::AbstractHomotopy,
+			vargroups::VariableGroups, seed::Int;
+		startsolutions_need_reordering=false, regauging_factors=nothing)
+	if isa(T, AffineTracking) && startsolutions_need_reordering
+		error("Affine tracking doesn't support reodering.")
+	end
+	PolyhedralProblem(T, toric_homotopy, generic_homotopy,
+				vargroups, seed, startsolutions_need_reordering, regauging_factors)
+end
+PolyhedralProblem{T}(args...; kwargs...) where {T<:TrackingType} = Problem(T(), args...; kwargs...)
 
 """
     homvars(prob::AbstractProblem)
 
 Get the homogenization variables of the problem. Returns `nothing` if there are no.
 """
-function homvars(prob::Problem{ProjectiveTracking})
+function homvars(prob::AbstractProblem{ProjectiveTracking})
     if has_dedicated_homvars(prob.vargroups)
         map(last, prob.vargroups.groups)
     else
         nothing
     end
 end
-homvars(prob::Problem{AffineTracking}) = nothing
+homvars(prob::AbstractProblem{AffineTracking}) = nothing
 
 """
     embed(prob::Problem{ProjectiveTracking}, v)
 
 Embed the vector `v` into projective space if necessary.
 """
-function embed!(x, prob::Problem{ProjectiveTracking}, v)
+function embed!(x, prob::AbstractProblem{ProjectiveTracking}, v)
 	if prob.startsolutions_need_reordering
 		embed_projective!(x, prob.vargroups, v)
 	else
 		ProjectiveVectors.embed!(x, v)
 	end
 end
-embed!(x, prob::Problem{ProjectiveTracking}, v::PVector) = ProjectiveVectors.embed!(x, v)
-embed!(x, prob::Problem{AffineTracking}, v::AbstractVector) = begin x .= v; x end
+embed!(x, prob::AbstractProblem{ProjectiveTracking}, v::PVector) = ProjectiveVectors.embed!(x, v)
+embed!(x, prob::AbstractProblem{AffineTracking}, v::AbstractVector) = begin x .= v; x end
 
-function embed(prob::Problem{ProjectiveTracking}, v)
+function embed(prob::AbstractProblem{ProjectiveTracking}, v)
 	if prob.startsolutions_need_reordering
 		embed_projective(prob.vargroups, v)
 	else
 		ProjectiveVectors.embed(v, projective_dims(prob.vargroups))
 	end
 end
-embed(prob::Problem{ProjectiveTracking}, v::PVector) = v
-embed(prob::Problem{AffineTracking}, v::AbstractVector) = v
+embed(prob::AbstractProblem{ProjectiveTracking}, v::PVector) = v
+embed(prob::AbstractProblem{AffineTracking}, v::AbstractVector) = v
 
 """
     pull_back(prob::Problem, x)
 
 Pull the solution `x` into affine space if necessary. Creates a copy.
 """
-function pull_back(prob::Problem{AffineTracking}, x::AbstractVector; regauge=true)
+function pull_back(prob::AbstractProblem{AffineTracking}, x::AbstractVector; regauge=true)
 	if regauge
 		regauge!(copy(x), prob)
 	else
 		copy(x)
 	end
 end
-function pull_back(prob::Problem{ProjectiveTracking}, x::PVector; regauge=true)
+function pull_back(prob::AbstractProblem{ProjectiveTracking}, x::PVector; regauge=true)
 	if pull_back_is_to_affine(prob, x)
 		λ = prob.regauging_factors
 		if λ === nothing || !regauge
@@ -136,7 +163,7 @@ function pull_back(prob::Problem{ProjectiveTracking}, x::PVector; regauge=true)
 	end
 end
 
-function regauge!(x, prob::Problem)
+function regauge!(x, prob::AbstractProblem)
 	if prob.regauging_factors !== nothing
 		x .= prob.regauging_factors .* x
 	end
@@ -148,8 +175,8 @@ end
 
 Returns `true` if [`pull_back`](@ref) would pull the solution `x` into affine space.
 """
-pull_back_is_to_affine(prob::Problem{AffineTracking}, x::AbstractVector) = true
-function pull_back_is_to_affine(prob::Problem{ProjectiveTracking}, x::PVector)
+pull_back_is_to_affine(prob::AbstractProblem{AffineTracking}, x::AbstractVector) = true
+function pull_back_is_to_affine(prob::AbstractProblem{ProjectiveTracking}, x::PVector)
 	pull_back_is_to_affine(prob.vargroups, x)
 end
 pull_back_is_to_affine(::VariableGroups{M,true}, ::PVector{<:Number, M}) where {M} = true
@@ -199,10 +226,21 @@ function problem_startsolutions(input::AbstractInput, startsolutions, seed::Int;
     problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
 end
 
-function problem_startsolutions(input::HomotopyInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=false, system_scaling=nothing, kwargs...)
 	if !affine_tracking
 		check_homogeneous_degrees(FixedHomotopy(input.H, rand()))
-    	Problem{ProjectiveTracking}(input.H, VariableGroups(size(input.H)[2], homvar), seed), startsolutions
+		if homvar_info === nothing
+			N = size(input.H)[2]
+			if start_solution_sample(startsolutions) isa PVector
+				vargroups = VariableGroups(N)
+			else
+				vargroups = VariableGroups(N,N)
+			end
+    		Problem{ProjectiveTracking}(input.H, vargroups, seed), startsolutions
+		else
+			vargroups = VariableGroups(size(input.H)[2], homvar_info)
+			Problem{ProjectiveTracking}(input.H, vargroups, seed), startsolutions
+		end
 	else
 		Problem{AffineTracking}(input.H, VariableGroups(size(input.H)[2]), seed), startsolutions
 	end
@@ -214,15 +252,17 @@ end
 # TOTALDEGREE
 ##############
 
-function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed;
+				start_system=:total_degree, affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM,
+			 	kwargs...)
 	if affine_tracking
 		vargroups = VariableGroups(variables(input.system))
 		homvars = nothing
 		F = input.system
-		Prob = Problem{AffineTracking}
+		tracking_type = AffineTracking()
 	else
 		F, vargroups, homvars = homogenize_if_necessary(input.system, homvar_info)
-		Prob = Problem{ProjectiveTracking}
+		tracking_type = ProjectiveTracking()
 	end
 
 	classifcation = classify_system(F, vargroups; affine_tracking=affine_tracking)
@@ -243,7 +283,18 @@ function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothi
 		f, regauging_factors = F, nothing
 	end
 
-	if ngroups(vargroups) == 1
+	if ngroups(vargroups) > 1 # Multihomogeneous
+		affine_tracking && error("Affine tracking is currently not supported for variable groups.")
+
+		D = multidegrees(F, vargroups)
+		C = multi_bezout_coefficients(D, projective_dims(vargroups))
+
+		g = MultiHomTotalDegreeSystem(D, C)
+		problem = Problem(tracking_type, g, target_constructor(f), vargroups, seed;
+					regauging_factors=regauging_factors, kwargs...)
+		startsolutions = totaldegree_solutions(g, vargroups)
+    # We have ngroups(vargroups) == 1
+	elseif start_system == :total_degree
 		n = affine_tracking ? length(vars) : length(vars) - 1
 		degrees = maxdegrees(F)
 
@@ -261,26 +312,38 @@ function problem_startsolutions(input::TotalDegreeInput{<:MPPolyInputs}, ::Nothi
 			f̂ = target_constructor(f)
 		end
 		g = TotalDegreeSystem(degrees[1:n]; affine=affine_tracking)
-		problem = Prob(g, f̂, vargroups, seed;
+		problem = Problem(tracking_type, g, f̂, vargroups, seed;
 					regauging_factors=regauging_factors, kwargs...)
-	# Multihomogeneous
+		startsolutions = totaldegree_solutions(g, vargroups)
+	elseif start_system == :polyhedral
+		n = affine_tracking ? length(vars) : length(vars) - 1
+		degrees = maxdegrees(F)
+		if classifcation == :overdetermined
+			error("Overdetermined systems are only supported with `algorithm=:total_degree`")
+		end
+		support, coeffs = support_coefficients(f, vars)
+		if !affine_tracking
+			affine_support = map(A -> A[1:end-1,:], support)
+		else
+			affine_support = support
+		end
+
+		cell_iter = PolyhedralStartSolutionsIterator(affine_support)
+		toric_homotopy = ToricHomotopy(affine_support, cell_iter.start_coefficients)
+	    generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
+
+		problem = PolyhedralProblem(tracking_type, toric_homotopy, generic_homotopy, vargroups, seed;
+					regauging_factors=regauging_factors, kwargs...)
+		startsolutions = cell_iter
 	else
-		affine_tracking && error("Affine tracking is currently not supported for variable groups.")
-
-		D = multidegrees(F, vargroups)
-		C = multi_bezout_coefficients(D, projective_dims(vargroups))
-
-		g = MultiHomTotalDegreeSystem(D, C)
-		problem = Prob(g, target_constructor(f), vargroups, seed;
-					regauging_factors=regauging_factors, kwargs...)
+		throw(ArgumentError("Unsupported argument `start_system=$start_system`. " *
+            "Possible values are `:total_degree` and `:polyhedral`"))
 	end
-
-	startsolutions = totaldegree_solutions(g, vargroups)
 
 	problem, startsolutions
 end
 
-function problem_startsolutions(input::TotalDegreeInput{<:AbstractSystem}, ::Nothing, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem}, ::Nothing, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
@@ -291,7 +354,7 @@ function problem_startsolutions(input::TotalDegreeInput{<:AbstractSystem}, ::Not
      totaldegree_solutions(degrees))
 end
 
-function problem_startsolutions(input::TotalDegreeInput{<:AbstractSystem}, ::Nothing, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem}, ::Nothing, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)

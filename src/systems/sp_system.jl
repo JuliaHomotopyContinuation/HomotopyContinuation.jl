@@ -25,6 +25,11 @@ end
 
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = SPSystem(SP.PolynomialSystem(polys, variables=vars))
 SPSystem(polys::Vector{<:MP.AbstractPolynomial}; kwargs...) = SPSystem(SP.PolynomialSystem(polys; kwargs...))
+function SPSystem(exponents::Vector{<:Matrix}, coeffs::Vector{<:Vector})
+    n = length(exponents)
+    @assert n == length(coeffs)
+    SPSystem(SP.PolynomialSystem((SP.Polynomial(coeffs[i], exponents[i]) for i in 1:n)...))
+end
 
 Base.size(F::SPSystem) = (SP.npolynomials(F.system), SP.nvariables(F.system))
 
@@ -43,3 +48,21 @@ evaluate_and_jacobian(F::SPSystem, x, ::SystemNullCache) = SP.evaluate_and_jacob
 evaluate_and_jacobian(F::SPSystem, x, p, ::SystemNullCache) = SP.evaluate_and_jacobian(F.system, x, p)
 Base.@propagate_inbounds differentiate_parameters!(U, F::SPSystem, x, p, ::SystemNullCache) = SP.differentiate_parameters!(U, F.system, x, p)
 differentiate_parameters(F::SPSystem, x, p, ::SystemNullCache) = SP.differentiate_parameters(F.system, x, p)
+
+(F::SPSystem)(x...) = evaluate(F, x...)
+
+"""
+    set_coefficients!(F::SPSystem, coeffs::Vector{<:Vector})
+
+Set the coefficients of `F` to the provided coefficients
+"""
+@generated function set_coefficients!(G::SP.PolynomialSystem{N}, coefficients::AbstractVector{<:AbstractVector}) where {N}
+    quote
+        $((:(copyto!(G.polys[$i].coefficients, coefficients[$i])) for i=1:N)...)
+        G
+    end
+end
+function set_coefficients!(G::SPSystem, coefficients::AbstractVector{<:AbstractVector})
+    set_coefficients!(G.system, coefficients)
+    G
+end
