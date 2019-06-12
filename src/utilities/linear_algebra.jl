@@ -153,13 +153,14 @@ function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) 
         # qr!(Jac.qr.factors, Val(true)) but without allocating new memory
         geqp3!(Jac.qr.factors, Jac.qr.jpvt, Jac.qr.τ, Jac.qr_work, Jac.qr_rwork)
 
-        ε = max(n,m) * eps()
+        ε = max(n,m) * eps() * 10
         # check rank 0
         rnm = min(n,m)
         r₁ = abs(real(Jac.qr.factors[1,1]))
         corank = 0
         if r₁ < ε
             corank = rnm
+            Jac.cond = inv(ε)
         else
             for i in 2:rnm
                 rᵢ = abs(real(Jac.qr.factors[i,i]))
@@ -168,10 +169,10 @@ function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) 
                     break
                 end
             end
+            Jac.cond = max(1.0, r₁) / abs(real(Jac.qr.factors[rnm, rnm]))
         end
         Jac.corank_proposal = corank
-        # compute subcondition number
-        Jac.cond = r₁ / abs(real(Jac.qr.factors[rnm, rnm]))
+
         Jac.active_factorization = QR_FACTORIZATION
     end
     Jac
