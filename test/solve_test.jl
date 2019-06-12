@@ -322,4 +322,25 @@
         result = solve(f; affine_tracking=true, threading=false, seed=72843)
         @test nsolutions(result) == 80
     end
+
+    @testset "Singular1" begin
+        @polyvar x y z
+        # This has two roots of multiplicity 6 at the hyperplane z=0
+        F = [0.75x^4 + 1.5x^2*y^2-2.5x^2*z^2+0.75*y^4 - 2.5y^2*z^2 + 0.75z^4;
+            10x^2*z + 10*y^2*z-6z^3]
+
+        res = solve(F; threading=false)
+        @test nsingular(res) == 12
+        # @test length.(multiplicities(solutions(res))) == [6,6]
+
+        F_affine = subs.(F, Ref(y => 1))
+        res_affine = solve(F_affine; affine_tracking=true, threading=false)
+        @test nsingular(res_affine) == 12
+        @test length.(multiplicities(solutions(res_affine))) == [6,6]
+
+        res_affine2 = solve(F_affine; affine_tracking=false, threading=false)
+        @test nsingular(res_affine2) == 12
+        @test length.(multiplicities(solutions(res_affine2))) == [6,6]
+    end
+
 end
