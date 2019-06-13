@@ -141,15 +141,10 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     status = VALUATION_INDECISIVE
     all_positive = true
     indecisive = false
-    all_abs_x_sq_dot_small = true
     for i in eachindex(v)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if Δv̂ᵢ > 1e-2
+        if abs(v̇[i]) > 1e-2
             indecisive = true
-        end
-
-        if abs(abs_x_sq_dot[1]) > 1e-3
-            all_abs_x_sq_dot_small = false
         end
 
         if status != VALUATION_AT_INFINIY &&
@@ -167,10 +162,6 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
         end
     end
     status == VALUATION_AT_INFINIY && return VALUATION_AT_INFINIY
-
-    if all_abs_x_sq_dot_small && all_positive
-        return VALUATION_FINITE
-    end
     indecisive && return VALUATION_INDECISIVE
     # require s > 0 otherwise we can get false singular solutions
     all_positive && Δs > 0 && return VALUATION_FINITE
@@ -527,10 +518,9 @@ function is_singularish(val::Valuation, core_tracker::CoreTracker)
         v < -0.05 && return false # this function shouldn't be called in the first
         abs(round(v) - v) > 0.1 && return true
     end
-
     # 2) use condition number / digits_lost to decide
-    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e8 ||
-    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 6.0
+    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e6 ||
+    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 4.0
 end
 
 """
