@@ -836,7 +836,7 @@ function Base.show(io::IO, x::Result)
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
     if s.singular > 0
-        println(io, "• multiplicity table singular solutions:")
+        println(io, "• multiplicity table of singular solutions:")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -923,7 +923,7 @@ function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"applica
     elseif i == 6
         print(io, "Random seed used")
     elseif i == 7 && s.singular > 0
-        print(io, "  multiplicity table singular solutions: \n")
+        print(io, "  multiplicity table of singular solutions: \n")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -949,6 +949,8 @@ function TreeViews.treenode(r::ProjectiveResult, i::Integer)
 end
 
 plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
+
+
 
 function singular_multiplicities_table(io, result::Result, stats = statistics(result))
     multiplicities_dict = Dict{Int, Vector{Vector{Int}}}()
@@ -989,8 +991,11 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     	data[1,4] = stats.singular - curr_n_sols
     end
 
-    headers = ["multiplicity", "# real", "# non-real", "# total"]
-    PrettyTables.pretty_table(io, data, headers;
+
+    headers = ["mult.", "#real", "#nonreal", "total"]
+    PrettyTables.pretty_table(io, data, headers,
+            PrettyTables.unicode_rounded;
             alignment=:c,
-            header_crayon=PrettyTables.Crayon(bold=false))
+            header_crayon=PrettyTables.Crayon(bold=false),
+            border_crayon=PrettyTables.Crayon(faint=true))
 end
