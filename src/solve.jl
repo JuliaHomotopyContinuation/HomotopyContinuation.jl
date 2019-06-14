@@ -852,7 +852,7 @@ function Base.show(io::IO, x::ProjectiveResult)
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
     if s.singular > 0
-        println(io, "• multiplicity table singular solutions:")
+        println(io, "• multiplicity table of singular solutions:")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -881,7 +881,7 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
     elseif i == 7
         print(io, "Random seed used")
     elseif i == 8 && s.singular > 0
-        print(io, "  multiplicity table singular solutions: \n")
+        print(io, "  multiplicity table of singular solutions: \n")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -976,9 +976,10 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     	data[i+off, 1] = k
     	n_real_solsᵢ = count(M -> isreal(result.pathresults[first(M)]), multiplicities_dict[k])
     	n_solsᵢ = length(multiplicities_dict[k])
-    	data[i+off, 2] = n_real_solsᵢ
-    	data[i+off, 3] = n_solsᵢ - n_real_solsᵢ
-    	data[i+off, 4] = n_solsᵢ
+        data[i+off, 2] = n_solsᵢ
+    	data[i+off, 3] = n_real_solsᵢ
+    	data[i+off, 4] = n_solsᵢ - n_real_solsᵢ
+
 
     	curr_n_real_sols += k * n_real_solsᵢ
     	curr_n_sols += k * n_solsᵢ
@@ -986,13 +987,13 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
 
     if off
     	data[1,1] = 1
-    	data[1,2] = stats.real_singular - curr_n_real_sols
-    	data[1,3] = (stats.singular - curr_n_sols) - (stats.real_singular - curr_n_real_sols)
-    	data[1,4] = stats.singular - curr_n_sols
+        data[1,2] = stats.singular - curr_n_sols
+    	data[1,3] = stats.real_singular - curr_n_real_sols
+    	data[1,4] = (stats.singular - curr_n_sols) - (stats.real_singular - curr_n_real_sols)
     end
 
 
-    headers = ["mult.", "#real", "#nonreal", "total"]
+    headers = ["mult.", "total", "#real", "#nonreal"]
     PrettyTables.pretty_table(io, data, headers,
             PrettyTables.unicode_rounded;
             alignment=:c,
