@@ -35,8 +35,14 @@ end
     VALUATION_AT_INFINIY
 end
 
-Valuation(x::ProjectiveVectors.PVector) = Valuation(length(x) - length(ProjectiveVectors.dims(x)))
-Valuation(x::Vector) = Valuation(length(x))
+function Valuation(x::ProjectiveVectors.PVector; at_infinity_check::Bool=true)
+    if at_infinity_check
+        Valuation(length(x) - length(ProjectiveVectors.dims(x)))
+    else
+        Valuation(length(x))
+    end
+end
+Valuation(x::Vector; kwargs...) = Valuation(length(x))
 function Valuation(n::Integer)
     v = zeros(n)
     v̇ = zeros(n)
@@ -62,7 +68,16 @@ function reset!(val::Valuation)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, Δs::Float64)
+function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val{true})
+    _update!(val, z, ż, Δs)
+end
+function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{false})
+    _update!(val, z, ż, Δs)
+end
+function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{true})
+    _update_affine!(val, z, ż, Δs)
+end
+function _update!(val::Valuation, z::AbstractVector, ż, Δs::Float64)
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for i in eachindex(z)
         x, y = reim(z[i])
@@ -84,7 +99,7 @@ function update!(val::Valuation, z::Vector, ż, Δs::Float64)
     val
 end
 
-function update!(val::Valuation, z::PVector, ż, Δs::Float64)
+function _update_affine!(val::Valuation, z::PVector, ż, Δs::Float64)
     i = 1
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
@@ -128,9 +143,10 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     indecisive = false
     for i in eachindex(v)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if Δv̂ᵢ > 1e-2
+        if abs(v̇[i]) > 1e-2
             indecisive = true
         end
+
         if status != VALUATION_AT_INFINIY &&
             v[i] < -1/20 &&
             Δv̂ᵢ < 1e-5 &&
@@ -153,28 +169,16 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     VALUATION_INDECISIVE
 end
 
-function update!(val::Valuation, core_tracker::CoreTracker)
+@inline function update!(val::Valuation, core_tracker::CoreTracker; at_infinity_check::Bool=true)
     z = core_tracker.state.x
     ż = core_tracker.state.ẋ
     Δs = core_tracker.state.Δs_prev
-    # Don't use possible derivatives if the linear algebra becomes too ill-conditioned
-    if unpack(core_tracker.state.jacobian.cond, 0.0) > 4.0
-        update!(val, z, ż, Δs, core_tracker.cache.predictor)
+    if at_infinity_check
+        update!(val, z, ż, Δs, Val(true))
     else
-        update!(val, z, ż, Δs)
+        update!(val, z, ż, Δs, Val(false))
     end
 end
-
-function update!(val::Valuation, z::Vector, ż, Δs, predictor_cache::Pade21Cache)
-    z̈ = predictor_cache.x²
-    z³ = predictor_cache.x³
-    update!(val, z, ż, Δs)
-end
-
-function update!(val::Valuation, z, ż, Δs, predictor_cache::AbstractPredictorCache)
-    update!(val, z, ż, Δs)
-end
-
 
 function at_infinity_post_check(val::Valuation)
     for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
@@ -284,7 +288,7 @@ mutable struct PathTrackerState{V<:AbstractVector}
     val::Valuation
 end
 
-function PathTrackerState(x)
+function PathTrackerState(x; at_infinity_check::Bool=true)
     status = PathTrackerStatus.tracking
     s = 0.0
     prediction = copy(x)
@@ -292,7 +296,7 @@ function PathTrackerState(x)
     solution_accuracy = solution_cond = NaN
     endgame_zone_start = nothing
     winding_number = 0
-    val = Valuation(x)
+    val = Valuation(x; at_infinity_check=at_infinity_check)
 
     PathTrackerState(status, s, prediction, solution,
                     solution_accuracy, solution_cond,
@@ -392,7 +396,7 @@ function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infi
                         log_transform=true, predictor=Pade21(),
                         min_step_size=min_step_size,
                         core_tracker_supported...)
-    state = PathTrackerState(core_tracker.state.x)
+    state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
     options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
     cache = PathTrackerCache(prob, core_tracker)
     PathTracker(prob, core_tracker, state, options, cache)
@@ -476,7 +480,7 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         #    solutions we simply can track towards ∞.
 
         # update valuation and associated data
-        update!(state.val, core_tracker)
+        update!(state.val, core_tracker; at_infinity_check=tracker.options.at_infinity_check)
 
         verdict = judge(state.val, core_tracker.state.jacobian, state.s, max(36.0, s₀))
         if tracker.options.at_infinity_check && verdict == VALUATION_AT_INFINIY
@@ -514,10 +518,9 @@ function is_singularish(val::Valuation, core_tracker::CoreTracker)
         v < -0.05 && return false # this function shouldn't be called in the first
         abs(round(v) - v) > 0.1 && return true
     end
-
     # 2) use condition number / digits_lost to decide
-    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e8 ||
-    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 6.0
+    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e6 ||
+    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 4.0
 end
 
 """
@@ -701,7 +704,7 @@ function check_and_refine_solution!(tracker::PathTracker)
 
         state.solution_cond = condition_jacobian(tracker)
         # If cond is not so high, maybe we don't have a singular solution in the end?
-        if state.solution_cond < 1e12
+        if state.winding_number == 1 && state.solution_cond < 1e8
             result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
                 use_qr=true, max_iters=3,
                 accuracy=core_tracker.options.refinement_accuracy)
