@@ -6,6 +6,7 @@ module HomotopyContinuation
     import LinearAlgebra
     import MixedSubdivisions
     import MultivariatePolynomials
+    import PrettyTables
     import Printf
     import ProgressMeter
     import ProjectiveVectors
