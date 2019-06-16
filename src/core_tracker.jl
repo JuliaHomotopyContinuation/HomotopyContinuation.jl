@@ -133,11 +133,12 @@ mutable struct CoreTrackerOptions
     terminate_ill_conditioned::Bool
 end
 
-function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
+function CoreTrackerOptions(::Type{Precision}; parameter_homotopy=false,
+    accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
-    max_refinement_iters=10,
-    max_steps=1_000,
+    max_refinement_iters=5,
+    max_steps=parameter_homotopy ? 10_000 : 1_000,
     initial_step_size=0.1,
     min_step_size=1e-14,
     max_step_size=Inf,
@@ -337,7 +338,9 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
+    options = CoreTrackerOptions(real(eltype(x₁));
+                    parameter_homotopy=isa(homotopy, ParameterHomotopy),
+                    kwargs...)
     # disable auto scaling always in projective space
     options.auto_scaling = false
 
@@ -365,7 +368,9 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t�
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
+    options = CoreTrackerOptions(real(eltype(x₁));
+                parameter_homotopy=isa(homotopy, ParameterHomotopy),
+                kwargs...)
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
