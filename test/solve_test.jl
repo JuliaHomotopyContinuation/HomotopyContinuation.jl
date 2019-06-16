@@ -331,14 +331,14 @@
 
         res = solve(F; threading=false)
         @test nsingular(res) == 12
-        # @test length.(multiplicities(solutions(res))) == [6,6]
+        @test length.(multiplicities(solutions(res))) == [6,6]
 
         F_affine = subs.(F, Ref(y => 1))
         res_affine = solve(F_affine; affine_tracking=true, threading=false)
         @test nsingular(res_affine) == 12
         @test length.(multiplicities(solutions(res_affine))) == [6,6]
 
-        res_affine2 = solve(F_affine; affine_tracking=false, threading=false)
+        res_affine2 = solve(F_affine; threading=false)
         @test nsingular(res_affine2) == 12
         @test length.(multiplicities(solutions(res_affine2))) == [6,6]
     end
