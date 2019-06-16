@@ -518,7 +518,8 @@ end
 
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
              tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
-             accuracy, max_iters; update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
+             accuracy, max_iters, tracker.state.step_size;
+             update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
 end
 
 function step!(tracker::CoreTracker)
