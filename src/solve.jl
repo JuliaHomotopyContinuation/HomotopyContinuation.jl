@@ -995,7 +995,7 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
 
     headers = ["mult.", "total", "#real", "#nonreal"]
     PrettyTables.pretty_table(io, data, headers,
-            PrettyTables.unicode_rounded;
+            PrettyTables.unicode;
             alignment=:c,
             header_crayon=PrettyTables.Crayon(bold=false),
             border_crayon=PrettyTables.Crayon(faint=true))
