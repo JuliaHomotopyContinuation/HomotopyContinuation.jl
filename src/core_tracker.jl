@@ -143,7 +143,7 @@ function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
     max_step_size=Inf,
     simple_step_size_alg=false,
     update_patch=true,
-    maximal_lost_digits=default_maximal_lost_digits(Precision, accuracy),
+    maximal_lost_digits=default_maximal_lost_digits(Precision),
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
     terminate_ill_conditioned::Bool=true) where {Precision<:Real}
@@ -154,7 +154,7 @@ function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
             auto_scaling, auto_scaling_options, terminate_ill_conditioned)
 end
 
-default_maximal_lost_digits(::Type{T}, accuracy) where T = -log10(eps(T)) + log10(accuracy) + 3
+default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 4
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
