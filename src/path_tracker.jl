@@ -742,6 +742,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             state.status = PathTrackerStatus.at_infinity
             return nothing
         else
+            state.solution .= currx(core_tracker)
             state.status = PathTrackerStatus.post_check_failed
             return nothing
         end
