@@ -102,6 +102,17 @@ function AutoScalingOptions(;scale_min=0.01,
 end
 
 
+mutable struct StepSizeModel
+    ω::Float64
+    expected_Δx₀::Float64
+end
+StepSizeModel() = StepSizeModel(NaN, NaN)
+
+function reset!(model::StepSizeModel)
+    model.ω = model.expected_Δx₀ = NaN
+    model
+end
+
 ######################
 # CoreTrackerOptions #
 ######################
@@ -159,8 +170,7 @@ mutable struct CoreTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
     x̄::AV # canidate for new x
     ẋ::Vector{T} # derivative at current x
     inner_product::IP
-    η::Float64
-    ω::Float64
+    step_size::StepSizeModel
     segment::ComplexSegment
     s::Float64 # current step length (0 ≤ s ≤ length(segment))
     Δs::Float64 # current step size
@@ -186,7 +196,7 @@ function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrac
     end
     x̂, x̄ = copy(x), copy(x)
     ẋ = Vector(x)
-    η = ω = NaN
+    step_size_model = StepSizeModel()
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
     Δs = convert(Float64, min(options.initial_step_size, length(segment), options.max_step_size ))
@@ -198,7 +208,7 @@ function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrac
     status = CoreTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy,
+    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, step_size_model, segment, s, Δs, Δs_prev, accuracy,
         Jac, steps_jacobian_info_update, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
@@ -216,7 +226,6 @@ function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state.status = CoreTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
-    state.η = state.ω = NaN
     if options.auto_scaling
         init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
     end
@@ -227,6 +236,7 @@ function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, optio
     state.steps_jacobian_info_update = 0
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
+        reset!(state.step_size)
     state
 end
 
@@ -592,10 +602,11 @@ end
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
 δ(opts::CoreTrackerOptions, ω, μ) = @fastmath min(√(0.5ω) * τ(opts, μ), 0.25)
-τ(opts::CoreTrackerOptions, μ) = opts.accuracy^(1/(2 * opts.max_corrector_iters - μ))
+τ(opts::CoreTrackerOptions, μ) = @fastmath opts.accuracy^(1/(2opts.max_corrector_iters - μ))
 
 function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     @unpack state, options = tracker
+    model = state.step_size
     ord = order(tracker.predictor)
 
     if options.simple_step_size_alg
@@ -609,23 +620,24 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
     if result.iters == 1
-        ω = isnan(state.ω) ? 2.0 : 0.5state.ω
+        ω = isnan(model.ω) ? 2.0 : 0.5model.ω
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω₀
         d_x̂_x̄ = distance(state.x̂, state.x, state.inner_product)
     end
-
     Δx₀ = result.norm_Δx₀
     if isconverged(result)
-        λ = g(δ(options, ω, 0.25)) / (ω * d_x̂_x̄)
+        δ_N_ω = δ(options, ω, 0.25)
+        λ = g(δ_N_ω) / (ω * d_x̂_x̄)
         Δs = nthroot(λ, ord) * state.Δs
         if state.last_step_failed
             Δs = min(Δs, state.Δs)
         end
-        state.ω = ω
     else
-        ω = max(ω, state.ω)
+        if isfinite(model.ω)
+            ω = max(ω, model.ω)
+        end
         δ_N_ω = δ(options, ω, 0.25)
         ω_η = 0.5ω * Δx₀
         if δ_N_ω < ω_η
@@ -639,7 +651,8 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
             Δs = min(Δs, 0.25 * state.Δs)
         end
     end
-
+    model.expected_Δx₀ = 2δ_N_ω / ω
+    model.ω = ω
     Δs = min(Δs, options.max_step_size)
     if (length(state.segment) - state.s) < Δs
         state.Δs = length(state.segment) - state.s
