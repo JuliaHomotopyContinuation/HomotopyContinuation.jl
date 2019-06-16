@@ -250,11 +250,11 @@ function init_auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScaling
     for i in 1:length(w)
         wᵢ = abs(x[i])
         if wᵢ < opts.scale_min * point_norm
-            wᵢ = max(opts.scale_min * point_norm, opts.scale_abs_min)
+            wᵢ = opts.scale_min * point_norm
         elseif wᵢ > opts.scale_max * point_norm
             wᵢ = opts.scale_max * point_norm
         end
-        w[i] = wᵢ
+        w[i] = max(wᵢ, opts.scale_abs_min)
     end
     nothing
 end
@@ -702,11 +702,11 @@ function auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptio
     for i in 1:length(x)
         wᵢ = (abs(x[i]) + ip.weight[i]) / 2
         if wᵢ < opts.scale_min * norm_x
-            wᵢ = max(opts.scale_min * norm_x, opts.scale_abs_min)
+            wᵢ = opts.scale_min * norm_x
         elseif wᵢ > opts.scale_max * norm_x
             wᵢ = opts.scale_max * norm_x
         end
-        ip.weight[i] = wᵢ
+        ip.weight[i] = max(wᵢ, opts.scale_abs_min)
     end
     nothing
 end
