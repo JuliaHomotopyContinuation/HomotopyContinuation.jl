@@ -10,6 +10,7 @@ const problem_startsolutions_supported_keywords = [
 
 const DEFAULT_SYSTEM = @static VERSION < v"1.1" ? FPSystem : SPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
+const DEFAULT_SYSTEM_SCALING = true
 
 """
 	TrackingType
@@ -253,7 +254,7 @@ end
 ##############
 
 function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed;
-				start_system=:total_degree, affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM,
+				start_system=:total_degree, affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM,
 			 	kwargs...)
 	if affine_tracking
 		vargroups = VariableGroups(variables(input.system))
@@ -379,7 +380,7 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM, kwargs...)
     F, G = input.target, input.start
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
