@@ -575,9 +575,9 @@ function step!(tracker::CoreTracker)
             # Check termination criterion: we became too ill-conditioned
             if options.terminate_ill_conditioned && (
                 unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
-                state.jacobian.corank > 0
-                )
+                state.jacobian.corank > 0)
                 state.status = CoreTrackerStatus.terminated_ill_conditioned
+                return nothing
             end
 
             # Step failed, so we have to try with a new (smaller) step size
