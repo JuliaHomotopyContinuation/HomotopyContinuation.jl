@@ -390,7 +390,7 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=eps(), kwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=1e-30, kwargs...)
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
                         log_transform=true, predictor=Pade21(),
@@ -422,7 +422,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=36.0;
+function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size);
         start_parameters::Union{Nothing,<:AbstractVector}=nothing,
         target_parameters::Union{Nothing,<:AbstractVector}=nothing,
         kwargs...)
@@ -538,7 +538,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track(tracker::PathTracker, x₁, t₁=0.0, t₀=36.0; path_number::Int=1, details::Symbol=:default, kwargs...)
+function track(tracker::PathTracker, x₁, t₁=0.0, t₀=-log(tracker.core_tracker.options.min_step_size); path_number::Int=1, details::Symbol=:default, kwargs...)
     track!(tracker, x₁, t₁, t₀; kwargs...)
     PathResult(tracker, x₁, path_number; details=details)
 end
