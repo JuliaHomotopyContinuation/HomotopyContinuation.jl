@@ -718,6 +718,8 @@ function check_and_refine_solution!(tracker::PathTracker)
                 state.winding_number = 0
                 @goto non_singular_case
             end
+        elseif state.winding_number > 1 && state.solution_cond < 1e10 && residual(tracker) > 100
+            state.status = PathTrackerStatus.post_check_failed
         end
 
         # In the case of a squared up system we now have to get rid of the
