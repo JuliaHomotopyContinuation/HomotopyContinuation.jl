@@ -818,17 +818,16 @@ Construct a [`PathTracker`](@ref) and start solutions in the same way [`solve`](
 This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
-function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
+function pathtracker_startsolutions(args...; kwargs...)
     invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
-    prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
+    prob, startsolutions = problem_startsolutions(args...; supported...)
     tracker_startsolutions(prob, startsolutions; rest...)
 end
 
 function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
-    core_tracker_supported, pathtracker_kwargs = splitkwargs(kwargs, coretracker_supported_keywords)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); pathtracker_kwargs...)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 
