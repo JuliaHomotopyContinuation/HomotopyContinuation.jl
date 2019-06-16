@@ -68,7 +68,7 @@ function reset!(val::Valuation)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val{true})
+function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val)
     _update!(val, z, ż, Δs)
 end
 function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{false})
