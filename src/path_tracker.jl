@@ -464,6 +464,10 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # We only care if we moved forward
         core_tracker.state.last_step_failed && continue
 
+        # If we are too early, we also don't check the valuation
+        if state.s < 2 # ≈ 0.1353352832366127
+            continue
+        end
         # Our endgame strategy is split in different stages
         # 1) During the path tracking we update an approximation
         #    of the valuation of x(t) since this has for t ≈ 0
