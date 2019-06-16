@@ -441,7 +441,7 @@ Additionally also stores the result in `x₀` if the tracking was successfull.
 """
 function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
             loop::Bool=false, checkstartvalue::Bool=!loop)
-     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
+     _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
      retcode = currstatus(tracker)
      if retcode == CoreTrackerStatus.success
          x₀ .= currx(tracker)

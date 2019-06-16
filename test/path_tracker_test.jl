@@ -142,7 +142,7 @@
         # Let's store the generic solutions
         S_p₀ = solutions(result_p₀)
         # Construct the PathTracker
-        tracker = pathtracker(F; parameters=p, generic_parameters=p₀)
+        tracker = pathtracker(F; parameters=p, affine_tracking=true, generic_parameters=p₀)
 
         q = randn(3)
         result = track(tracker, first(S_p₀); target_parameters=q)
