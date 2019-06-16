@@ -216,27 +216,28 @@ end
 Base.show(io::IO, state::CoreTrackerState) = print_fieldnames(io, state)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", state::CoreTrackerState) = state
 
-function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions, setup_patch)
+function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions, setup_patch::Bool, loop::Bool)
     state.segment = ComplexSegment(promote(t₁, t₀)...)
     state.s = 0.0
     state.Δs = min(options.initial_step_size, length(state.segment), options.max_step_size )
     state.Δs_prev = 0.0
-    state.accuracy = 0.0
-    state.accepted_steps = state.rejected_steps = 0
     state.status = CoreTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
-    if options.auto_scaling
-        init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
-    end
-    state.jacobian.cond = 1.0
-    state.jacobian.corank = 0
-    state.jacobian.corank_proposal = 0
-    state.jacobian.digits_lost = nothing
-    state.steps_jacobian_info_update = 0
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
+    if !loop
+        state.accuracy = 0.0
+        state.accepted_steps = state.rejected_steps = 0
         reset!(state.step_size)
+
+        if options.auto_scaling
+            init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
+        end
+        reset!(state.jacobian)
+        state.steps_jacobian_info_update = 0
+    end
+
     state
 end
 
@@ -421,7 +422,7 @@ function track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; k
 end
 
 """
-     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, loop::Bool=false)
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 Returns one of the enum values of `CoreTrackerStatus.states` indicating the status.
@@ -433,19 +434,25 @@ of the tracking.
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch, checkstartvalue::Bool=true, compute_ẋ::Bool=true)
-     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
+            loop::Bool=false, checkstartvalue::Bool=!loop)
+     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
      retcode = currstatus(tracker)
      if retcode == CoreTrackerStatus.success
          x₀ .= currx(tracker)
      end
      retcode
 end
-@inline function track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
-    track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+@inline function track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0;
+        setup_patch::Bool=tracker.options.update_patch,
+        checkstartvalue::Bool=true,
+        loop::Bool=false)
+    _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
 end
-function track!(tracker::CoreTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
-    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+
+function _track!(tracker::CoreTracker, x₁, t₁, t₀,
+                    setup_patch::Bool, checkstartvalue::Bool, loop::Bool)
+    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
 
     while tracker.state.status == CoreTrackerStatus.tracking
         step!(tracker)
@@ -464,14 +471,14 @@ end
 Setup `coretracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
 coretracker as an iterator.
 """
-function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, loop::Bool=false)
     @unpack state, cache = tracker
 
     try
-        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
+        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop)
         reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
-        if compute_ẋ
+        if !loop
             compute_ẋ!(state, cache, tracker.options)
             setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), state.jacobian)
         end

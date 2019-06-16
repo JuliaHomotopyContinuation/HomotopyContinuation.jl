@@ -593,41 +593,38 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     @unpack unit_roots, base_point = cache
     @unpack samples_per_loop, max_winding_number = options
 
-    # compute_unit_roots!(unit_roots, samples_per_loop)
+    initial_segment = core_tracker.state.segment
+    initial_s = core_tracker.state.s
+    initial_Δs = core_tracker.state.Δs
+    initial_Δs_prev = core_tracker.state.Δs_prev
     initial_step_size = core_tracker.options.initial_step_size
-    initial_max_steps = core_tracker.options.max_steps
     s = real(currt(core_tracker))
 
     base_point .= currx(core_tracker)
     prediction .= zero(eltype(state.prediction))
 
     # during the loop we fix the affine patch
-    @unpack accepted_steps, rejected_steps = core_tracker.state
-
-
     fix_patch!(core_tracker)
 
     m = k = 1
     ∂θ = 2π / samples_per_loop
     core_tracker.options.initial_step_size = ∂θ #0.5∂θ
-    core_tracker.options.max_steps = 25
     while m ≤ max_winding_number
         θⱼ = 0.0
         for j=1:samples_per_loop
             θⱼ₋₁ = θⱼ
             θⱼ += ∂θ
 
-            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; checkstartvalue=false)
-            accepted_steps += core_tracker.state.accepted_steps
-            rejected_steps += core_tracker.state.rejected_steps
-
+            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; loop=true)
             if retcode != CoreTrackerStatus.success
                 # during the loop we fixed the affine patch
                 unfix_patch!(core_tracker)
+                core_tracker.state.segment = initial_segment
                 core_tracker.options.initial_step_size = initial_step_size
-                core_tracker.options.max_steps = initial_max_steps
-                @pack! core_tracker.state = accepted_steps, rejected_steps
-
+                core_tracker.state.s = initial_s
+                core_tracker.state.Δs = initial_Δs
+                core_tracker.state.Δs_prev = initial_Δs_prev
+                core_tracker.state.status = CoreTrackerStatus.tracking
                 return Symbol(retcode)
             end
 
@@ -640,11 +637,14 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
 
         m += 1
     end
+    core_tracker.state.segment = initial_segment
     core_tracker.options.initial_step_size = initial_step_size
-    core_tracker.options.max_steps = initial_max_steps
+    core_tracker.state.s = initial_s
+    core_tracker.state.Δs = initial_Δs
+    core_tracker.state.Δs_prev = initial_Δs_prev
+    core_tracker.state.status = CoreTrackerStatus.tracking
     # we have to undo the fixing of the patch
     unfix_patch!(core_tracker)
-    @pack! core_tracker.state = accepted_steps, rejected_steps
 
     if m > max_winding_number
         return :max_winding_number
