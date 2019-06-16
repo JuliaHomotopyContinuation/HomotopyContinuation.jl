@@ -23,6 +23,6 @@
     @testset "Polyhedral solve" begin
         f = equations(cyclic(5))
         result = solve(f; start_system=:polyhedral)
-        nfinite(result) == 70
+        @test nfinite(result) == 70
     end
 end
