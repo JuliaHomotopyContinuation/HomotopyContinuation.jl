@@ -143,7 +143,7 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     indecisive = false
     for i in eachindex(v)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if abs(v̇[i]) > 1e-2
+        if abs(v̇[i]) > 1e-3
             indecisive = true
         end
 
@@ -513,14 +513,16 @@ end
 
 
 function is_singularish(val::Valuation, core_tracker::CoreTracker)
+    cond = unpack(core_tracker.state.jacobian.cond, 0.0)
+    digits_lost = unpack(core_tracker.state.jacobian.digits_lost, 0.0)
     # 1) check if val is rational for some i, then the solution is singular
     for v in val.v
         v < -0.05 && return false # this function shouldn't be called in the first
-        abs(round(v) - v) > 0.1 && return true
+        fractional_val = abs(round(v) - v) > 0.1
+        fractional_val && return true
     end
     # 2) use condition number / digits_lost to decide
-    unpack(core_tracker.state.jacobian.cond, 0.0) > 1e6 ||
-    unpack(core_tracker.state.jacobian.digits_lost, 0.0) > 4.0
+    cond > 1e6 ||digits_lost > 4.0
 end
 
 """
