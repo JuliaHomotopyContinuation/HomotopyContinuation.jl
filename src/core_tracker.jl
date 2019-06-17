@@ -457,6 +457,11 @@ end
 
 function _track!(tracker::CoreTracker, x₁, t₁, t₀,
                     setup_patch::Bool, checkstartvalue::Bool, loop::Bool)
+    if t₁ == t₀
+        tracker.state.status = CoreTrackerStatus.success
+        return tracker.state.status
+    end
+
     setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
 
     while tracker.state.status == CoreTrackerStatus.tracking
