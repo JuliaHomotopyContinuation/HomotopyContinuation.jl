@@ -143,7 +143,7 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     indecisive = false
     for i in eachindex(v)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if abs(v̇[i]) > 1e-3
+        if Δs * abs(v̇[i]) > 1e-1
             indecisive = true
         end
 
@@ -474,10 +474,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # We only care if we moved forward
         core_tracker.state.last_step_failed && continue
 
-        # If we are too early, we also don't check the valuation
-        if state.s < 2 # ≈ 0.1353352832366127
-            continue
-        end
         # Our endgame strategy is split in different stages
         # 1) During the path tracking we update an approximation
         #    of the valuation of x(t) since this has for t ≈ 0
@@ -496,6 +492,10 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # update valuation and associated data
         update!(state.val, core_tracker; at_infinity_check=tracker.options.at_infinity_check)
 
+        # If we are too early, we also don't check the valuation
+        if state.s < 5 # ≈ 0.05
+            continue
+        end
         verdict = judge(state.val, core_tracker.state.jacobian, state.s, max(36.0, s₀))
         if tracker.options.at_infinity_check && verdict == VALUATION_AT_INFINIY
             state.status = PathTrackerStatus.at_infinity
@@ -536,7 +536,7 @@ function is_singularish(val::Valuation, core_tracker::CoreTracker)
         fractional_val && return true
     end
     # 2) use condition number / digits_lost to decide
-    cond > 1e6 ||digits_lost > 4.0
+    cond > 1e6 || digits_lost > 5.0
 end
 
 """
