@@ -952,7 +952,11 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     		multiplicities_dict[length(m)] = [m]
     	end
     end
-    n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+    if isempty(multiplicities_dict)
+        n_mults_total = 0
+    else
+        n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+    end
 
     curr_n_real_sols = 0
     curr_n_sols = 0

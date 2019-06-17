@@ -23,6 +23,12 @@
     @testset "Polyhedral solve" begin
         f = equations(cyclic(5))
         result = solve(f; start_system=:polyhedral)
-        nfinite(result) == 70
+        @test nfinite(result) == 70
+
+        @polyvar x y
+        result1 = solve([(x-3),(y-2)], start_system=:polyhedral, system_scaling=false)
+        @test [3,2] ≈ solutions(result1)[1] atol=1e-8
+        result1 = solve([(x-3),(y-2)], start_system=:polyhedral, system_scaling=true)
+        @test [3,2] ≈ solutions(result1)[1] atol=1e-8
     end
 end

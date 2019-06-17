@@ -68,7 +68,7 @@ function reset!(val::Valuation)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val{true})
+function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val)
     _update!(val, z, ż, Δs)
 end
 function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{false})
@@ -143,7 +143,7 @@ function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
     indecisive = false
     for i in eachindex(v)
         Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if abs(v̇[i]) > 1e-3
+        if Δs * abs(v̇[i]) > 1e-1
             indecisive = true
         end
 
@@ -390,7 +390,7 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=eps(), kwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=1e-30, kwargs...)
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
                         log_transform=true, predictor=Pade21(),
@@ -422,7 +422,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=36.0;
+function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size);
         start_parameters::Union{Nothing,<:AbstractVector}=nothing,
         target_parameters::Union{Nothing,<:AbstractVector}=nothing,
         kwargs...)
@@ -445,6 +445,16 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     embed!(core_tracker.state.x, tracker.problem, x₁)
     setup!(core_tracker, core_tracker.state.x, s₁, s₀)
     reset!(state)
+
+    # Handle the case that the start value is already a solution
+    if residual(tracker, core_tracker.state.x) < 1e-14
+        state.status = PathTrackerStatus.success
+        state.prediction .= core_tracker.state.x
+        state.s = Inf
+        # Set winding_number to 1 to get into the possible singular solution case in
+        # `check_and_refine_solution!`
+        state.winding_number = 1
+    end
 
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
@@ -482,6 +492,10 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # update valuation and associated data
         update!(state.val, core_tracker; at_infinity_check=tracker.options.at_infinity_check)
 
+        # If we are too early, we also don't check the valuation
+        if state.s < 5 # ≈ 0.05
+            continue
+        end
         verdict = judge(state.val, core_tracker.state.jacobian, state.s, max(36.0, s₀))
         if tracker.options.at_infinity_check && verdict == VALUATION_AT_INFINIY
             state.status = PathTrackerStatus.at_infinity
@@ -522,7 +536,7 @@ function is_singularish(val::Valuation, core_tracker::CoreTracker)
         fractional_val && return true
     end
     # 2) use condition number / digits_lost to decide
-    cond > 1e6 ||digits_lost > 4.0
+    cond > 1e6 || digits_lost > 5.0
 end
 
 """
@@ -538,7 +552,7 @@ Possible values for the options are
 * `start_parameters::AbstractVector`
 * `target_parameters::AbstractVector`
 """
-function track(tracker::PathTracker, x₁, t₁=0.0, t₀=36.0; path_number::Int=1, details::Symbol=:default, kwargs...)
+function track(tracker::PathTracker, x₁, t₁=0.0, t₀=-log(tracker.core_tracker.options.min_step_size); path_number::Int=1, details::Symbol=:default, kwargs...)
     track!(tracker, x₁, t₁, t₀; kwargs...)
     PathResult(tracker, x₁, path_number; details=details)
 end
@@ -593,41 +607,38 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     @unpack unit_roots, base_point = cache
     @unpack samples_per_loop, max_winding_number = options
 
-    # compute_unit_roots!(unit_roots, samples_per_loop)
+    initial_segment = core_tracker.state.segment
+    initial_s = core_tracker.state.s
+    initial_Δs = core_tracker.state.Δs
+    initial_Δs_prev = core_tracker.state.Δs_prev
     initial_step_size = core_tracker.options.initial_step_size
-    initial_max_steps = core_tracker.options.max_steps
     s = real(currt(core_tracker))
 
     base_point .= currx(core_tracker)
     prediction .= zero(eltype(state.prediction))
 
     # during the loop we fix the affine patch
-    @unpack accepted_steps, rejected_steps = core_tracker.state
-
-
     fix_patch!(core_tracker)
 
     m = k = 1
     ∂θ = 2π / samples_per_loop
     core_tracker.options.initial_step_size = ∂θ #0.5∂θ
-    core_tracker.options.max_steps = 25
     while m ≤ max_winding_number
         θⱼ = 0.0
         for j=1:samples_per_loop
             θⱼ₋₁ = θⱼ
             θⱼ += ∂θ
 
-            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; checkstartvalue=false)
-            accepted_steps += core_tracker.state.accepted_steps
-            rejected_steps += core_tracker.state.rejected_steps
-
+            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; loop=true)
             if retcode != CoreTrackerStatus.success
                 # during the loop we fixed the affine patch
                 unfix_patch!(core_tracker)
+                core_tracker.state.segment = initial_segment
                 core_tracker.options.initial_step_size = initial_step_size
-                core_tracker.options.max_steps = initial_max_steps
-                @pack! core_tracker.state = accepted_steps, rejected_steps
-
+                core_tracker.state.s = initial_s
+                core_tracker.state.Δs = initial_Δs
+                core_tracker.state.Δs_prev = initial_Δs_prev
+                core_tracker.state.status = CoreTrackerStatus.tracking
                 return Symbol(retcode)
             end
 
@@ -640,11 +651,14 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
 
         m += 1
     end
+    core_tracker.state.segment = initial_segment
     core_tracker.options.initial_step_size = initial_step_size
-    core_tracker.options.max_steps = initial_max_steps
+    core_tracker.state.s = initial_s
+    core_tracker.state.Δs = initial_Δs
+    core_tracker.state.Δs_prev = initial_Δs_prev
+    core_tracker.state.status = CoreTrackerStatus.tracking
     # we have to undo the fixing of the patch
     unfix_patch!(core_tracker)
-    @pack! core_tracker.state = accepted_steps, rejected_steps
 
     if m > max_winding_number
         return :max_winding_number
@@ -714,6 +728,8 @@ function check_and_refine_solution!(tracker::PathTracker)
                 state.winding_number = 0
                 @goto non_singular_case
             end
+        elseif state.winding_number > 1 && state.solution_cond < 1e10 && residual(tracker) > 100
+            state.status = PathTrackerStatus.post_check_failed
         end
 
         # In the case of a squared up system we now have to get rid of the
@@ -742,6 +758,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             state.status = PathTrackerStatus.at_infinity
             return nothing
         else
+            state.solution .= currx(core_tracker)
             state.status = PathTrackerStatus.post_check_failed
             return nothing
         end
@@ -818,17 +835,16 @@ Construct a [`PathTracker`](@ref) and start solutions in the same way [`solve`](
 This also takes the same input arguments as `solve`. This is convenient if you want
 to investigate single paths.
 """
-function pathtracker_startsolutions(args...; system_scaling=true, kwargs...)
+function pathtracker_startsolutions(args...; kwargs...)
     invalid = invalid_kwargs(kwargs, pathtracker_startsolutions_supported_keywords)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
-    prob, startsolutions = problem_startsolutions(args...; system_scaling=system_scaling, supported...)
+    prob, startsolutions = problem_startsolutions(args...; supported...)
     tracker_startsolutions(prob, startsolutions; rest...)
 end
 
 function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
-    core_tracker_supported, pathtracker_kwargs = splitkwargs(kwargs, coretracker_supported_keywords)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); pathtracker_kwargs...)
+    tracker = PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 

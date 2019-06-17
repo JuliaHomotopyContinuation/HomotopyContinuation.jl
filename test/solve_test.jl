@@ -334,7 +334,8 @@
         @test length.(multiplicities(solutions(res))) == [6,6]
 
         F_affine = subs.(F, Ref(y => 1))
-        res_affine = solve(F_affine; affine_tracking=true, threading=false)
+        res_affine = solve(F_affine; affine_tracking=true, threading=false,
+                    save_all_paths=true)
         @test nsingular(res_affine) == 12
         @test length.(multiplicities(solutions(res_affine))) == [6,6]
 
