@@ -137,10 +137,10 @@
         # Substitute p₀ for p
         F_p₀ = subs(F, p => p₀)
         # Compute all solutions for F_p₀
-        result_p₀ = solve(F_p₀)
+        result_p₀ = solve(F_p₀; affine_tracking=true)
 
         # Let's store the generic solutions
-        S_p₀ = solutions(result_p₀)
+        S_p₀ = solutions(nonsingular(result_p₀))
         # Construct the PathTracker
         tracker = pathtracker(F; parameters=p, affine_tracking=true, generic_parameters=p₀)
 
