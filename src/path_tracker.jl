@@ -446,6 +446,16 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     setup!(core_tracker, core_tracker.state.x, s₁, s₀)
     reset!(state)
 
+    # Handle the case that the start value is already a solution
+    if residual(tracker, core_tracker.state.x) < 1e-14
+        state.status = PathTrackerStatus.success
+        state.prediction .= core_tracker.state.x
+        state.s = Inf
+        # Set winding_number to 1 to get into the possible singular solution case in
+        # `check_and_refine_solution!`
+        state.winding_number = 1
+    end
+
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
         state.s = real(currt(core_tracker))
