@@ -326,8 +326,7 @@
     @testset "Singular1" begin
         @polyvar x y z
         # This has two roots of multiplicity 6 at the hyperplane z=0
-        F = [0.75x^4 + 1.5x^2*y^2-2.5x^2*z^2+0.75*y^4 - 2.5y^2*z^2 + 0.75z^4;
-            10x^2*z + 10*y^2*z-6z^3]
+        F = [0.75x^4 + 1.5x^2*y^2-2.5x^2*z^2+0.75*y^4 - 2.5y^2*z^2 + 0.75z^4; 10x^2*z + 10*y^2*z-6z^3]
 
         res = solve(F; threading=false)
         @test nsingular(res) == 12
