@@ -102,10 +102,9 @@ An ordinary Newton's method. If `simplified_last_step` is `true`, then for the l
 the previously Jacobian will be used. This uses an LU-factorization for square systems
 and a QR-factorization for overdetermined.
 """
-function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀);
-                tol=1e-6, miniters=1, maxiters=3, simplified_last_step=true)
+function newton(F::AbstractSystem, x₀, norm=euclidean_norm, cache=NewtonCache(F, x₀); kwargs...)
     x = copy(x₀)
-    x, newton!(x, F, x₀, norm, cache, tol, miniters, maxiters, simplified_last_step)
+    x, newton!(x, F, x₀, norm, cache; kwargs...)
 end
 
 """
@@ -115,14 +114,15 @@ In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` a
 """
 function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache;
                  tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3,
-                 simplified_last_step::Bool=true, use_qr::Bool=false)
+                 simplified_last_step::Bool=true, use_qr::Bool=false,
+                 ω::Float64=0.0, expected_Δx₀::Float64=0.0)
     newton!(out, F, x₀, norm, cache, cache.Jac, tol,
-            miniters, maxiters, simplified_last_step, false, use_qr)
+            miniters, maxiters, simplified_last_step, false, use_qr, ω, expected_Δx₀)
 end
 
 function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache, Jac::Jacobian,
                  tol::Float64, miniters::Int, maxiters::Int, simplified_last_step::Bool,
-                 update_jacobian_infos::Bool, use_qr::Bool)
+                 update_jacobian_infos::Bool, use_qr::Bool, ω::Float64, expected_Δx₀::Float64)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -133,11 +133,12 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache,
     T = real(eltype(xᵢ))
     Θ₀ = Θᵢ₋₁ = norm_Δxᵢ₋₁ = norm_Δxᵢ = norm_Δx₀ = zero(T)
     accuracy = T(Inf)
-    ω₀ = ω = 0.0
+    ω₀ = ω
     for i ∈ 0:maxiters
+        curr_accuracy = i == 0 ? expected_Δx₀ : accuracy
         newton_step!(cache, Jac, F, xᵢ;
                         tol=tol,
-                        curr_accuracy=accuracy,
+                        curr_accuracy=curr_accuracy,
                         ω = ω,
                         simple_step=(i == maxiters && simplified_last_step),
                         use_qr=use_qr,
@@ -219,9 +220,9 @@ end
 
 @inline function higher_precision(Jac::Jacobian{ComplexF64}, tol::Float64, curr_accuracy::Float64, ω::Float64)
     digits_lost = unpack(Jac.digits_lost, 0.0)
-    if isinf(curr_accuracy) || iszero(ω)
-        digits_lost > 14 + 0.5 * log₁₀(tol)
+    if !isfinite(curr_accuracy) || !isfinite(ω) || iszero(ω)
+        digits_lost > 12 + log₁₀(tol)
     else
-        digits_lost > 14 + log₁₀(max(ω * curr_accuracy^2, tol))
+        digits_lost > 10 + log₁₀(max(0.5ω * curr_accuracy^2, tol))
     end
 end

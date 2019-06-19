@@ -35,13 +35,14 @@ Result with 2 solutions
 
 # Polyhedral Homotopy
 
-    solve(F; start_system = :polyhedral, options...)
+    solve(F; start_system = :polyhedral, only_torus=false, options...)
 
 Solve the system `F` using a start system computed from the Newton Polytopes of the entries `F`. The number of paths to track is equal to the mixed volume of the Newton Polytopes of the entries of `F`. The mixed volume is at most the total degree of `F`. `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
 - A composition of polynomial systems constructed by [`compose`](@ref).
 - [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
-solve(f; start_system = :polyhedral, affine_tracking=true, seed = 141691, save_all_paths = true)
+
+If `only_torus == true` then only solutions in the algebraic torus ``(ℂ\\{0})^n`` will be computed.
 
 ### Example
 We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
@@ -952,7 +953,11 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     		multiplicities_dict[length(m)] = [m]
     	end
     end
-    n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+    if isempty(multiplicities_dict)
+        n_mults_total = 0
+    else
+        n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+    end
 
     curr_n_real_sols = 0
     curr_n_sols = 0

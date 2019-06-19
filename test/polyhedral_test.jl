@@ -23,6 +23,28 @@
     @testset "Polyhedral solve" begin
         f = equations(cyclic(5))
         result = solve(f; start_system=:polyhedral)
-        nfinite(result) == 70
+        @test nfinite(result) == 70
+
+        @polyvar x y
+        result1 = solve([(x-3),(y-2)], start_system=:polyhedral, system_scaling=false)
+        @test [3,2] ≈ solutions(result1)[1] atol=1e-8
+        result1 = solve([(x-3),(y-2)], start_system=:polyhedral, system_scaling=true)
+        @test [3,2] ≈ solutions(result1)[1] atol=1e-8
+    end
+
+    @testset "All affine solutions" begin
+        @polyvar x y
+        f = [2y + 3y^2 - x*y^3, x + 4*x^2 - 2*x^3*y]
+        res = solve(f, start_system=:polyhedral, only_torus=true)
+        @test nsolutions(res) == 3
+        @test ntracked(res) == 3
+
+        res = solve(f, start_system=:polyhedral, affine_tracking=false, only_torus=false)
+        @test nsolutions(res) == 6
+        @test ntracked(res) == 8
+
+        res = solve(f, start_system=:polyhedral, affine_tracking=true, only_torus=false)
+        @test nsolutions(res) == 6
+        @test ntracked(res) == 8
     end
 end

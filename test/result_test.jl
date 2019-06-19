@@ -46,9 +46,14 @@
         test_treeviews(R)
 
         @polyvar x y z
-        R = solve([(x-3)^3,(y-2)])
+        R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=true)
         @test R isa Result
         test_treeviews(R)
+        @test nnonsingular(R) == 0
+        @test nsingular(R) == 3
+        @test_nowarn sprint(show, R)
+
+        R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=false)
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
         @test_nowarn sprint(show, R)

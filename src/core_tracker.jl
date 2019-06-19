@@ -102,6 +102,17 @@ function AutoScalingOptions(;scale_min=0.01,
 end
 
 
+mutable struct StepSizeModel
+    ω::Float64
+    expected_Δx₀::Float64
+end
+StepSizeModel() = StepSizeModel(NaN, NaN)
+
+function reset!(model::StepSizeModel)
+    model.ω = model.expected_Δx₀ = NaN
+    model
+end
+
 ######################
 # CoreTrackerOptions #
 ######################
@@ -122,17 +133,18 @@ mutable struct CoreTrackerOptions
     terminate_ill_conditioned::Bool
 end
 
-function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
+function CoreTrackerOptions(::Type{Precision}; parameter_homotopy=false,
+    accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
-    max_refinement_iters=10,
-    max_steps=1_000,
+    max_refinement_iters=5,
+    max_steps=parameter_homotopy ? 10_000 : 1_000,
     initial_step_size=0.1,
     min_step_size=1e-14,
     max_step_size=Inf,
     simple_step_size_alg=false,
     update_patch=true,
-    maximal_lost_digits=default_maximal_lost_digits(Precision, accuracy),
+    maximal_lost_digits=default_maximal_lost_digits(Precision),
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
     terminate_ill_conditioned::Bool=true) where {Precision<:Real}
@@ -143,7 +155,7 @@ function CoreTrackerOptions(::Type{Precision}; accuracy=1e-7,
             auto_scaling, auto_scaling_options, terminate_ill_conditioned)
 end
 
-default_maximal_lost_digits(::Type{T}, accuracy) where T = -log10(eps(T)) + log10(accuracy) + 3
+default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 4
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
@@ -159,8 +171,7 @@ mutable struct CoreTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Uni
     x̄::AV # canidate for new x
     ẋ::Vector{T} # derivative at current x
     inner_product::IP
-    η::Float64
-    ω::Float64
+    step_size::StepSizeModel
     segment::ComplexSegment
     s::Float64 # current step length (0 ≤ s ≤ length(segment))
     Δs::Float64 # current step size
@@ -186,7 +197,7 @@ function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrac
     end
     x̂, x̄ = copy(x), copy(x)
     ẋ = Vector(x)
-    η = ω = NaN
+    step_size_model = StepSizeModel()
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
     Δs = convert(Float64, min(options.initial_step_size, length(segment), options.max_step_size ))
@@ -198,7 +209,7 @@ function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrac
     status = CoreTrackerStatus.tracking
     last_step_failed = false
     consecutive_successfull_steps = 0
-    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, η, ω, segment, s, Δs, Δs_prev, accuracy,
+    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, step_size_model, segment, s, Δs, Δs_prev, accuracy,
         Jac, steps_jacobian_info_update, status, patch,
         accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
 end
@@ -206,27 +217,28 @@ end
 Base.show(io::IO, state::CoreTrackerState) = print_fieldnames(io, state)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", state::CoreTrackerState) = state
 
-function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions, setup_patch)
+function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions, setup_patch::Bool, loop::Bool)
     state.segment = ComplexSegment(promote(t₁, t₀)...)
     state.s = 0.0
     state.Δs = min(options.initial_step_size, length(state.segment), options.max_step_size )
     state.Δs_prev = 0.0
-    state.accuracy = 0.0
-    state.accepted_steps = state.rejected_steps = 0
     state.status = CoreTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
-    state.η = state.ω = NaN
-    if options.auto_scaling
-        init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
-    end
-    state.jacobian.cond = 1.0
-    state.jacobian.corank = 0
-    state.jacobian.corank_proposal = 0
-    state.jacobian.digits_lost = nothing
-    state.steps_jacobian_info_update = 0
     state.last_step_failed = false
     state.consecutive_successfull_steps = 0
+    if !loop
+        state.accuracy = 0.0
+        state.accepted_steps = state.rejected_steps = 0
+        reset!(state.step_size)
+
+        if options.auto_scaling
+            init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
+        end
+        reset!(state.jacobian)
+        state.steps_jacobian_info_update = 0
+    end
+
     state
 end
 
@@ -239,11 +251,11 @@ function init_auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScaling
     for i in 1:length(w)
         wᵢ = abs(x[i])
         if wᵢ < opts.scale_min * point_norm
-            wᵢ = max(opts.scale_min * point_norm, opts.scale_abs_min)
+            wᵢ = opts.scale_min * point_norm
         elseif wᵢ > opts.scale_max * point_norm
             wᵢ = opts.scale_max * point_norm
         end
-        w[i] = wᵢ
+        w[i] = max(wᵢ, opts.scale_abs_min)
     end
     nothing
 end
@@ -326,7 +338,9 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
+    options = CoreTrackerOptions(real(eltype(x₁));
+                    parameter_homotopy=isa(homotopy, ParameterHomotopy),
+                    kwargs...)
     # disable auto scaling always in projective space
     options.auto_scaling = false
 
@@ -354,7 +368,9 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t�
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁)); kwargs...)
+    options = CoreTrackerOptions(real(eltype(x₁));
+                parameter_homotopy=isa(homotopy, ParameterHomotopy),
+                kwargs...)
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
@@ -411,7 +427,7 @@ function track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; k
 end
 
 """
-     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, compute_ẋ=true)
+     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, loop::Bool=false)
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 Returns one of the enum values of `CoreTrackerStatus.states` indicating the status.
@@ -423,19 +439,30 @@ of the tracking.
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch, checkstartvalue::Bool=true, compute_ẋ::Bool=true)
-     track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
+            loop::Bool=false, checkstartvalue::Bool=!loop)
+     _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
      retcode = currstatus(tracker)
      if retcode == CoreTrackerStatus.success
          x₀ .= currx(tracker)
      end
      retcode
 end
-@inline function track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
-    track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+@inline function track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0;
+        setup_patch::Bool=tracker.options.update_patch,
+        checkstartvalue::Bool=true,
+        loop::Bool=false)
+    _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
 end
-function track!(tracker::CoreTracker, x₁, t₁, t₀, setup_patch, checkstartvalue=true, compute_ẋ=true)
-    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, compute_ẋ)
+
+function _track!(tracker::CoreTracker, x₁, t₁, t₀,
+                    setup_patch::Bool, checkstartvalue::Bool, loop::Bool)
+    if t₁ == t₀
+        tracker.state.status = CoreTrackerStatus.success
+        return tracker.state.status
+    end
+
+    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
 
     while tracker.state.status == CoreTrackerStatus.tracking
         step!(tracker)
@@ -454,14 +481,14 @@ end
 Setup `coretracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
 coretracker as an iterator.
 """
-function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, loop::Bool=false)
     @unpack state, cache = tracker
 
     try
-        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch)
+        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop)
         reset!(cache.predictor, state.x, t₁)
         checkstartvalue && checkstartvalue!(tracker)
-        if compute_ẋ
+        if !loop
             compute_ẋ!(state, cache, tracker.options)
             setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), state.jacobian)
         end
@@ -508,7 +535,8 @@ end
 
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
              tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
-             accuracy, max_iters; update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
+             accuracy, max_iters, tracker.state.step_size;
+             update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
 end
 
 function step!(tracker::CoreTracker)
@@ -552,9 +580,9 @@ function step!(tracker::CoreTracker)
             # Check termination criterion: we became too ill-conditioned
             if options.terminate_ill_conditioned && (
                 unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
-                state.jacobian.corank > 0
-                )
+                state.jacobian.corank > 0)
                 state.status = CoreTrackerStatus.terminated_ill_conditioned
+                return nothing
             end
 
             # Step failed, so we have to try with a new (smaller) step size
@@ -592,10 +620,11 @@ end
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
 δ(opts::CoreTrackerOptions, ω, μ) = @fastmath min(√(0.5ω) * τ(opts, μ), 0.25)
-τ(opts::CoreTrackerOptions, μ) = opts.accuracy^(1/(2 * opts.max_corrector_iters - μ))
+τ(opts::CoreTrackerOptions, μ) = @fastmath opts.accuracy^(1/(2opts.max_corrector_iters - μ))
 
 function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     @unpack state, options = tracker
+    model = state.step_size
     ord = order(tracker.predictor)
 
     if options.simple_step_size_alg
@@ -609,23 +638,24 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     # in this case we cannot estimate ω and therefore just assume ω = 2
     # Also note ||x̂-x|| = ||Δx₀||
     if result.iters == 1
-        ω = isnan(state.ω) ? 2.0 : 0.5state.ω
+        ω = isnan(model.ω) ? 2.0 : 0.5model.ω
         d_x̂_x̄ = result.norm_Δx₀
     else
         ω = result.ω₀
         d_x̂_x̄ = distance(state.x̂, state.x, state.inner_product)
     end
-
     Δx₀ = result.norm_Δx₀
     if isconverged(result)
-        λ = g(δ(options, ω, 0.25)) / (ω * d_x̂_x̄)
+        δ_N_ω = δ(options, ω, 0.25)
+        λ = g(δ_N_ω) / (ω * d_x̂_x̄)
         Δs = nthroot(λ, ord) * state.Δs
         if state.last_step_failed
             Δs = min(Δs, state.Δs)
         end
-        state.ω = ω
     else
-        ω = max(ω, state.ω)
+        if isfinite(model.ω)
+            ω = max(ω, model.ω)
+        end
         δ_N_ω = δ(options, ω, 0.25)
         ω_η = 0.5ω * Δx₀
         if δ_N_ω < ω_η
@@ -639,7 +669,8 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
             Δs = min(Δs, 0.25 * state.Δs)
         end
     end
-
+    model.expected_Δx₀ = 2δ_N_ω / ω
+    model.ω = ω
     Δs = min(Δs, options.max_step_size)
     if (length(state.segment) - state.s) < Δs
         state.Δs = length(state.segment) - state.s
@@ -681,11 +712,11 @@ function auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptio
     for i in 1:length(x)
         wᵢ = (abs(x[i]) + ip.weight[i]) / 2
         if wᵢ < opts.scale_min * norm_x
-            wᵢ = max(opts.scale_min * norm_x, opts.scale_abs_min)
+            wᵢ = opts.scale_min * norm_x
         elseif wᵢ > opts.scale_max * norm_x
             wᵢ = opts.scale_max * norm_x
         end
-        ip.weight[i] = wᵢ
+        ip.weight[i] = max(wᵢ, opts.scale_abs_min)
     end
     nothing
 end

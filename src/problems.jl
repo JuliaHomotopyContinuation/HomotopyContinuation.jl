@@ -4,12 +4,13 @@ export AbstractProblem, Problem, TrackingType, AffineTracking, ProjectiveTrackin
 
 const problem_startsolutions_supported_keywords = [
 	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling,
-	:affine_tracking, :start_system];
+	:affine_tracking, :start_system, :only_torus];
 	input_supported_keywords]
 
 
 const DEFAULT_SYSTEM = @static VERSION < v"1.1" ? FPSystem : SPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
+const DEFAULT_SYSTEM_SCALING = true
 
 """
 	TrackingType
@@ -253,8 +254,8 @@ end
 ##############
 
 function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed;
-				start_system=:total_degree, affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM,
-			 	kwargs...)
+				start_system=:total_degree, affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM,
+				only_torus=false, kwargs...)
 	if affine_tracking
 		vargroups = VariableGroups(variables(input.system))
 		homvars = nothing
@@ -328,6 +329,18 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 			affine_support = support
 		end
 
+		if !only_torus
+			for i in 1:length(support)
+				if !iszero(@view affine_support[i][:,end])
+					affine_support[i] = [affine_support[i] zeros(Int32, n)]
+					push!(coeffs[i], zero(eltype(coeffs[i])))
+					if !affine_tracking
+						support[i] = [support[i] [zeros(Int32, n); degrees[i]]]
+					end
+				end
+			end
+		end
+
 		cell_iter = PolyhedralStartSolutionsIterator(affine_support)
 		toric_homotopy = ToricHomotopy(affine_support, cell_iter.start_coefficients)
 	    generic_homotopy = CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
@@ -379,7 +392,7 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=true, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM, kwargs...)
     F, G = input.target, input.start
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)

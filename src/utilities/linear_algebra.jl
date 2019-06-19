@@ -105,16 +105,16 @@ function Jacobian(A::AbstractMatrix, corank::Int=0)
 end
 
 function update_rank!(Jac::Jacobian)
-    # if Jac.corank_proposal < Jac.corank
-    #     Jac.corank = Jac.corank_proposal
-    # elseif Jac.corank_proposal > Jac.corank == 0 && issquare(Jac.J)
-    #     if unpack(Jac.digits_lost, 0.0) > maximal_lost_digits
-    #         Jac.corank = Jac.corank_proposal
-    #     end
-    # else
     Jac.corank = Jac.corank_proposal
-    # end
     Jac
+end
+
+function reset!(jacobian::Jacobian)
+    jacobian.cond = 1.0
+    jacobian.corank = 0
+    jacobian.corank_proposal = 0
+    jacobian.digits_lost = nothing
+    jacobian
 end
 
 """
@@ -185,7 +185,6 @@ Solve `Jac.J * x = b` inplace. Assumes `Jac` contains already the correct factor
 This stores the result in `x`.
 """
 function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost::Bool=false, refinement_step::Bool=false)
-    # @show Jac.active_factorization
     if Jac.active_factorization == LU_FACTORIZATION
         lu = Jac.lu
         if lu !== nothing
@@ -568,7 +567,6 @@ function hnf!(A, U)
             if !iszero(A[j, j]) || !iszero(A[j, ii])
                 # 4.1
                 r, p, q = gcdx(A[j, j], A[j, ii])
-                # @show r, p, q, A[j, j], A[j, ii]
                 # 4.2
                 d_j = -A[j, ii] ÷ r
                 d_ii = A[j, j] ÷ r
