@@ -121,6 +121,8 @@
         z = 1
         F = [x^2 + 2*y^2 + 2*im*y*z, (18 + 3*im)*x*y + 7*im*y^2 - (3 - 18*im)*x*z - 14*y*z - 7*im*z^2]
         result = solve(F)
+        @test multiplicity(first(nonsingular(result))) == 1
+        @test multiplicity(first(singular(result))) == 3
         @test nsingular(result) == 1
         @test nsingular(result; counting_multiplicities=true) == 3
         @test length(singular(result)) == 1

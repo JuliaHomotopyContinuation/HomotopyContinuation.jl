@@ -220,11 +220,26 @@ end
 function solve(tracker::Union{<:PathTracker,<:PolyhedralTracker}, start_solutions;
         path_result_details=:default, save_all_paths=false,
         path_jumping_check=true, kwargs...)
-    results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
+    all_results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
     if path_jumping_check
-        path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
+        path_jumping_check!(all_results, tracker, path_result_details; finite_results_only=!save_all_paths)
     end
-    Result(results, ntracked, seed(tracker))
+
+    #assign multiplicities
+    singular_results = results(all_results; onlysingular = true)
+    m_info = multiplicities_info(singular_results)
+    for k in keys(m_info)
+        for v in m_info[k]
+            for vᵢ in v
+                singular_results[vᵢ].multiplicity = k
+            end
+        end
+    end
+    for P in nonsingular(all_results)
+        P.multiplicity = 1
+    end
+
+    Result(all_results, ntracked, seed(tracker))
 end
 
 mutable struct SolveStats
@@ -750,7 +765,7 @@ function singular(R::Results; singulartol=1e10, multiplicitytol=1e-5, multiple_r
         S₁ = similar(S, 0)
         for k in keys(info)
             for v in info[k]
-                P = deepcopy(S[v[1]])
+                P = S[v[1]]
                 P.multiplicity = k
                 push!(S₁, P)
             end
