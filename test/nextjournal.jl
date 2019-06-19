@@ -138,6 +138,6 @@
 
 		R_with_group_action = monodromy_solve(f - p, start_sol, q₀, parameters=p, group_action = relabeling; target_solutions_count = 225)
 
-		@test length(vcat([relabeling(s) for s in solutions(R_with_group_action)]...)) == 1350
+		@test all(length.([relabeling(s) for s in solutions(R_with_group_action)]) .== 6)
     end
 end

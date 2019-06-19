@@ -43,9 +43,13 @@ GroupActions(actions) = GroupActions(actions...)
 
 function (actions::GroupActions)(s)
     S = [s]
+    T = typeof(s)
     apply_actions(actions, s) do sᵢ
-        push!(S, sᵢ)
-        false
+        sⱼ = convert(T,sᵢ)
+    	if sⱼ != s
+    		push!(S,sⱼ)
+    	end
+    	false
     end
     S
 end

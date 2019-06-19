@@ -35,4 +35,5 @@ end
     include("integration_tests.jl")
     include("monodromy_test.jl")
     include("real_world_test.jl")
+    include("nextjournal.jl")
 end
