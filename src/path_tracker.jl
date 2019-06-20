@@ -15,10 +15,15 @@ const pathtracker_supported_keywords = [
 ## VALUATION ##
 ###############
 
-struct Valuation
+mutable struct Valuation
     v::Vector{Float64}
     v̇::Vector{Float64}
     v̈::Vector{Float64}
+    norm_abs_ẋ::Vector{Float64}
+    v_data::NTuple{3,Vector{Float64}}
+    s_data::NTuple{3,Float64}
+
+    # legacy
     #  0.5|x(s)|^2
     abs_x_sq::Vector{Float64}
     # d/ds 0.5|x(s)|^2
@@ -47,11 +52,16 @@ function Valuation(n::Integer)
     v = zeros(n)
     v̇ = zeros(n)
     v̈ = zeros(n)
+    norm_abs_ẋ = zeros(n)
+    v_data = (zeros(n), zeros(n), zeros(n))
+    s_data = (NaN, NaN, NaN)
+    # legacy
     abs_x_sq = zeros(n)
     abs_x_sq_dot = zeros(n)
     abs_x_sq_ddot = zeros(n)
     abs_x_sq_dddot = zeros(n)
-    Valuation(v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot)
+    Valuation(v, v̇, v̈, norm_abs_ẋ, v_data, s_data,
+        abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot)
 end
 
 Base.show(io::IO, val::Valuation) = print_fieldnames(io, val)
@@ -59,8 +69,11 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 
 function reset!(val::Valuation)
     val.v .= 0.0
-    val.v̇ .= 0.0
-    val.v̈ .= 0.0
+    val.v̇ .= NaN
+    val.v̈ .= NaN
+    val.norm_abs_ẋ .= 0.0
+    val.s_data = (NaN, NaN, NaN)
+    # legacy
     val.abs_x_sq .= 0.0
     val.abs_x_sq_dot .= 0.0
     val.abs_x_sq_ddot .= 0.0
@@ -68,28 +81,39 @@ function reset!(val::Valuation)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val)
-    _update!(val, z, ż, Δs)
+function update!(val::Valuation, z::Vector, ż, s, Δs::Float64, ::Val)
+    _update!(val, z, ż, s, Δs)
 end
-function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{false})
-    _update!(val, z, ż, Δs)
+function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{false})
+    _update!(val, z, ż, s, Δs)
 end
-function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{true})
-    _update_affine!(val, z, ż, Δs)
+function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{true})
+    _update_affine!(val, z, ż, s, Δs)
 end
-function _update!(val::Valuation, z::AbstractVector, ż, Δs::Float64)
+function _update!(val::Valuation, z::AbstractVector, ż, s, Δs::Float64)
+    @unpack v, v_data, s_data, norm_abs_ẋ = val
+    v₂, v₁, v₀ = v_data
+    s₂, s₁, _ = s_data
+    for i in eachindex(z)
+        xᵢ, yᵢ = reim(z[i])
+        ẋᵢ, ẏᵢ = reim(ż[i])
+        xᵢ²_plus_yᵢ² = abs2(z[i])
+        v[i] = v₀[i] = -(xᵢ * ẋᵢ + yᵢ * ẏᵢ) / xᵢ²_plus_yᵢ²
+        norm_abs_ẋ[i] = abs(ż[i]) / max(sqrt(xᵢ²_plus_yᵢ²), 1.0)
+    end
+    # cycle data around
+    val.v_data = (v₀, v₂, v₁)
+    val.s_data = (s, s₂, s₁)
+
+    !isnan(s₁) && finite_differences!(val)
+
+    # Legacy
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for i in eachindex(z)
         x, y = reim(z[i])
         ẋ, ẏ = reim(ż[i])
         x²_plus_y² = abs2(z[i])
-        vᵢ, v̇ᵢ = v[i], v̇[i]
-        v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
-        v̇[i] = (v[i] - vᵢ) / Δs
-        v̈[i] = (v̇[i] - v̇ᵢ) / Δs
-
         abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ = val.abs_x_sq_dot[i], val.abs_x_sq_ddot[i]
-
         val.abs_x_sq[i] = 0.5x²_plus_y²
         val.abs_x_sq_dot[i] = x*ẋ + y*ẏ
         val.abs_x_sq_ddot[i] = (val.abs_x_sq_dot[i] - abs_x_sq_dotᵢ) / Δs
@@ -99,7 +123,33 @@ function _update!(val::Valuation, z::AbstractVector, ż, Δs::Float64)
     val
 end
 
-function _update_affine!(val::Valuation, z::PVector, ż, Δs::Float64)
+
+"""
+    finite_differences!(val::Valuation)
+
+Use a finite difference scheme to approximate the first and second derivative
+of the valuation map.
+
+Since we have a non-uniform grid, we need a more elaborate difference scheme.
+The implementation follows the formulas derived in [^BS05]
+
+[^BS05]: Bowen, M. K., and Ronald Smith. "Derivative formulae and errors for non-uniformly spaced points." Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences 461.2059 (2005): 1975-1997.
+"""
+function finite_differences!(val::Valuation)
+    @unpack v_data, s_data, v̇, v̈ = val
+    v₃, v₂, v₁ = v_data
+    s₃, s₂, s₁ = s_data
+    s₃₁ = s₃ - s₁
+    a₃, a₁ = s₃ - s₂, s₁ - s₂
+    for i in eachindex(v̇)
+        v̇[i] = (a₃*v₁[i])/(a₁*s₃₁) - ((a₁+a₃)*v₂[i])/(a₁*a₃) - (a₁*v₃[i])/(s₃₁*a₃)
+        v̈[i] = -2v₁[i]/((a₁)*s₃₁) + 2v₂[i]/(a₁*a₃) + 2v₃[i]/(s₃₁*a₃)
+    end
+    nothing
+end
+
+
+function _update_affine!(val::Valuation, z::PVector, ż, s, Δs::Float64)
     i = 1
     v, v̇, v̈ = val.v, val.v̇, val.v̈
     for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
@@ -173,10 +223,11 @@ end
     z = core_tracker.state.x
     ż = core_tracker.state.ẋ
     Δs = core_tracker.state.Δs_prev
+    s = core_tracker.state.s
     if at_infinity_check
-        update!(val, z, ż, Δs, Val(true))
+        update!(val, z, ż, s, Δs, Val(true))
     else
-        update!(val, z, ż, Δs, Val(false))
+        update!(val, z, ż, s, Δs, Val(false))
     end
 end
 
