@@ -101,7 +101,8 @@ function AutoScalingOptions(;scale_min=0.01,
                              scale_max=1.0 / eps() / sqrt(2))
     AutoScalingOptions(scale_min, scale_abs_min, scale_max)
 end
-
+Base.show(io::IO, opts::AutoScalingOptions) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::AutoScalingOptions) = opts
 
 mutable struct StepSizeModel
     ω::Float64
@@ -113,6 +114,8 @@ function reset!(model::StepSizeModel)
     model.ω = model.expected_Δx₀ = NaN
     model
 end
+Base.show(io::IO, opts::StepSizeModel) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::StepSizeModel) = opts
 
 ######################
 # CoreTrackerOptions #

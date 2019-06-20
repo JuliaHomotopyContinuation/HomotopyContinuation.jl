@@ -332,6 +332,9 @@ function PathTrackerOptions(;
                        overdetermined_min_accuracy)
 end
 
+Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
+
 mutable struct PathTrackerState{V<:AbstractVector}
     status::PathTrackerStatus.states
     s::Float64
