@@ -147,7 +147,7 @@ function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) 
         if m == n
             # only apply row scaling for square matrices since
             # otherwise we change the problem
-            row_scaling!(Jac.qr.factors, Jac.D, 1e-6)
+            row_scaling!(Jac.qr.factors, Jac.D, 1)
         end
         # this computes a pivoted qr factorization, i.e.,
         # qr!(Jac.qr.factors, Val(true)) but without allocating new memory
