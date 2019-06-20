@@ -64,7 +64,12 @@ function Valuation(n::Integer)
         abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot)
 end
 
-Base.show(io::IO, val::Valuation) = print_fieldnames(io, val)
+function Base.show(io::IO, val::Valuation)
+    println(io, typeof(val), ":")
+    for name in [:v, :v̇, :v̈, :norm_abs_ẋ]
+        println(io, " • ", name, " → ", getfield(val, name))
+    end
+end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 
 function reset!(val::Valuation)
