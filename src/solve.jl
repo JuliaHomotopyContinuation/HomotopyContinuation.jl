@@ -267,7 +267,7 @@ function track_paths(tracker, start_solutions;
                 k += length(batch)
                 ntracked = k
                 if batch_tracker.interrupted
-                    return results
+                    return results, ntracked
                 end
 
                 update_progress!(progress, k, stats)
