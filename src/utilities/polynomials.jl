@@ -1,4 +1,5 @@
-export ishomogeneous, homogenize, uniquevar, Composition, expand, compose, validate
+export ishomogeneous, homogenize, uniquevar, Composition, expand, compose, validate,
+		precondition, normalize_coefficients
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
@@ -972,4 +973,25 @@ function preconditioning_factors(f::MPPolys, vars)
 		end
 	end
 	(variables = exp10.(c[1:nvars]), equations = exp10.(c[nvars+1:end]))
+end
+
+
+"""
+	normalize_coefficients(f::Union{MPPolys,Composition})
+
+Rescale the equations of `f` such that each coefficient has absolute value between 0 and 1.
+"""
+function normalize_coefficients(f::Composition)
+  	Λ = maximum.(abs, MP.coefficients.(expand(f)))
+	scale(f, equations)
+end
+function normalize_coefficients(f::MPPolys)
+	map(f) do fᵢ
+	    cmax = maximum(abs, MP.coefficients(fᵢ))
+	    map(MP.terms(fᵢ)) do t
+	        c = MP.coefficient(t)
+	        m = MP.monomial(t)
+	        c / cmax * m
+	    end |> MP.polynomial
+	end
 end

@@ -10,7 +10,7 @@ const problem_startsolutions_supported_keywords = [
 
 const DEFAULT_SYSTEM = @static VERSION < v"1.1" ? FPSystem : SPSystem
 const DEFAULT_HOMOTOPY = StraightLineHomotopy
-const DEFAULT_SYSTEM_SCALING = true
+const DEFAULT_SYSTEM_SCALING = :equations
 
 """
 	TrackingType
@@ -191,6 +191,19 @@ function construct_system(F::MPPolys, system_constructor; homvars=nothing, kwarg
 	system_constructor(F; kwargs...)
 end
 
+function apply_system_scaling(F, vars, system_scaling::Union{Nothing, Symbol})
+	if system_scaling == :equations_and_variables
+		precondition(F, vars)
+	elseif system_scaling == :equations
+		normalize_coefficients(F), nothing
+	elseif system_scaling === nothing
+		F, nothing
+	else
+		throw(ArgumentError("Got unsupported argument `system_scaling=$(system_scaling)`." *
+		  " Valid values are `nothing`, `:equations` and `:equations_and_variables`."))
+	end
+end
+
 """
     problem_startsolutions(F; options...)
     problem_startsolutions(G, F, startsolutions; options...)
@@ -278,11 +291,7 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 	target_constructor(f) = construct_system(f, system; variables=vars, homvars=homvars)
 
 	# Scale systems
-	if system_scaling
-		f, regauging_factors = precondition(F, vars)
-	else
-		f, regauging_factors = F, nothing
-	end
+	f, regauging_factors = apply_system_scaling(F, vars, system_scaling)
 
 	if ngroups(vargroups) > 1 # Multihomogeneous
 		affine_tracking && error("Affine tracking is currently not supported for variable groups.")
@@ -397,11 +406,7 @@ function problem_startsolutions(input::StartTargetInput, startsolutions, homvar,
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
     if !affine_tracking && F_ishom && G_ishom
-		if system_scaling
-			f, regauging_factors = precondition(F, vars)
-		else
-			f, regauging_factors = F, nothing
-		end
+		f, regauging_factors = apply_system_scaling(F, vars, system_scaling)
 		vargroups = VariableGroups(vars, homvar)
 		F̄ = construct_system(f, system; variables=vars, homvars=homvar)
 		Ḡ = construct_system(G, system; variables=vars, homvars=homvar)
@@ -420,11 +425,7 @@ function problem_startsolutions(input::StartTargetInput, startsolutions, homvar,
         push!(vars, h)
         sort!(vars, rev=true)
 		g, f = homogenize(G, h), homogenize(F, h)
-		if system_scaling
-			f, regauging_factors = precondition(f, vars)
-		else
-			regauging_factors = nothing
-		end
+		f, regauging_factors = apply_system_scaling(f, vars, system_scaling)
         F̄ = construct_system(f, system; variables=vars, homvars=homvar)
 		Ḡ = construct_system(g, system; variables=vars, homvars=homvar)
 		vargroups = VariableGroups(vars, h)
@@ -433,11 +434,7 @@ function problem_startsolutions(input::StartTargetInput, startsolutions, homvar,
 				startsolutions_need_reordering=true, kwargs...)
 		prob, startsolutions
 	else # affine_tracking
-		if system_scaling
-			f, regauging_factors = precondition(F, vars)
-		else
-			f, regauging_factors = F, nothing
-		end
+		f, regauging_factors = apply_system_scaling(F, vars, system_scaling)
 		F̂ = construct_system(f, system; variables=vars)
 		Ĝ = construct_system(G, system; variables=vars)
 		prob = Problem{AffineTracking}(Ĝ, F̂, VariableGroups(vars), seed;

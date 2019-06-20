@@ -35,7 +35,10 @@
 
         # scaling
         F = equations(katsura(5))
-        @test nfinite(solve(F, system_scaling=false, threading=false)) == 32
+        @test nfinite(solve(F, system_scaling=nothing, threading=false)) == 32
+        @test nfinite(solve(F, system_scaling=:equations, threading=false)) == 32
+        @test nfinite(solve(F, system_scaling=:equations_and_variables, threading=false)) == 32
+        @test_throws ArgumentError solve(F, system_scaling=:lalala)
 
         @test nfinite(solve(F, homotopy=StraightLineHomotopy)) == 32
         result = solve(F, predictor=Euler(), homotopy=StraightLineHomotopy)
@@ -97,9 +100,9 @@
         f = [a * b - 2, a*c- 1]
         g = [x+y, y + 3, x + 2]
         res = solve(e ∘ f ∘ g)
-        nnonsingular(solve(e ∘ f ∘ g, system_scaling=false, threading=false))
+        nnonsingular(solve(e ∘ f ∘ g, system_scaling=nothing, threading=false))
         @test nnonsingular(res) == 2
-        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=false)) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=nothing)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
