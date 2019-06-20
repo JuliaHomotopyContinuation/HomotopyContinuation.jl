@@ -1082,7 +1082,7 @@ start_solution(r::PathResult) = r.start_solution
 
 Checks whether the path is successfull.
 """
-LinearAlgebra.issuccess(r::PathResult) = r.return_code == :success
+issuccess(r::PathResult) = r.return_code == :success
 
 """
     isfailed(pathresult)

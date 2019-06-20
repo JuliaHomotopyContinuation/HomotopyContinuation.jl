@@ -4,13 +4,13 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
-        set_max_refinement_iters!, set_max_step_size!
+        set_max_refinement_iters!, set_max_step_size!, digits_lost
 
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
     :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned,
-    :log_transform, :precision]
+    :log_transform, :precision, :steps_jacobian_info_update]
 
 
 ####################
@@ -135,6 +135,7 @@ mutable struct CoreTrackerOptions
     auto_scaling_options::AutoScalingOptions
     terminate_ill_conditioned::Bool
     precision::PrecisionOption
+    steps_jacobian_info_update::Int
 end
 
 function CoreTrackerOptions(;
@@ -153,13 +154,14 @@ function CoreTrackerOptions(;
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
     terminate_ill_conditioned::Bool=true,
-    precision::PrecisionOption=PRECISION_FIXED_64)
+    precision::PrecisionOption=PRECISION_FIXED_64,
+    steps_jacobian_info_update::Int=2)
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
             max_step_size, simple_step_size_alg, update_patch, maximal_lost_digits,
             auto_scaling, auto_scaling_options, terminate_ill_conditioned,
-            precision)
+            precision, steps_jacobian_info_update)
 end
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
@@ -373,7 +375,7 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t�
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(parameter_homotopy=isa(homotopy, ParameterHomotopy), kwargs...)
+    options = CoreTrackerOptions(;parameter_homotopy=isa(homotopy, ParameterHomotopy), kwargs...)
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
@@ -505,7 +507,7 @@ function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, 
 end
 
 function checkstartvalue!(tracker::CoreTracker)
-    result = correct!(tracker.state.x̄, tracker)
+    result = correct!(tracker.state.x̄, tracker; update_jacobian_infos=true)
     if isconverged(result)
         tracker.state.x .= tracker.state.x̄
     else
@@ -551,12 +553,14 @@ function step!(tracker::CoreTracker)
     try
         t, Δt = currt(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
-        # update_corank
-        update_jacobian_infos = state.last_step_failed || state.steps_jacobian_info_update ≥ 5
+        # check if we need to update the jacobian_infos
+        update_jacobian_infos =
+                state.last_step_failed ||
+                state.steps_jacobian_info_update ≥ options.steps_jacobian_info_update
+        # reset counter
+        update_jacobian_infos && (state.steps_jacobian_info_update = 0)
         result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
-        if update_jacobian_infos
-            state.steps_jacobian_info_update = 0
-        end
+
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
@@ -817,6 +821,25 @@ Return the current value of `x`.
 currx(tracker::CoreTracker) = currx(tracker.state)
 currx(state::CoreTrackerState) = state.x
 
+
+"""
+    LinearAlgebra.cond(tracker::CoreTracker)
+
+Returns the currently computed approximation of the condition number of the
+Jacobian.
+"""
+cond(tracker::CoreTracker) = LinearAlgebra.cond(tracker.state)
+cond(state::CoreTrackerState) = state.jacobian.cond
+
+
+"""
+    digits_lost(tracker::CoreTracker)
+
+Returns the currently computed approximation of the number of digits lost
+during the linear system solving in Newton's method.
+"""
+digits_lost(tracker::CoreTracker) = digits_lost(tracker.state)
+digits_lost(state::CoreTrackerState) = unpack(state.jacobian.digits_lost, 0.0)
 
 ##################
 # Modify options #

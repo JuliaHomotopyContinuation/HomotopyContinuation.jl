@@ -200,4 +200,22 @@
         tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3])
         @test tracker.options.precision == PRECISION_FIXED_64
     end
+
+    @testset "cond updates" begin
+        @polyvar x y
+        tracker, S = coretracker_startsolutions([x^2+y^2-4, x + y - 3]; affine_tracking=false, seed=130793)
+        @test cond(tracker) == 1.0
+        @test digits_lost(tracker) == 0.0
+        # check that checkstartvalue also updates cond and digits_lost
+        setup!(tracker, first(S))
+        cond(tracker)
+        digits_lost(tracker)
+        cond_start, digits_lost_start = cond(tracker), digits_lost(tracker)
+        @test cond_start != 1.0
+        @test digits_lost_start != 0.0
+        track(tracker, first(S), 1.0, 0.0)
+        @test cond(tracker) != cond_start
+        @test digits_lost(tracker) != digits_lost_start
+    end
+
 end
