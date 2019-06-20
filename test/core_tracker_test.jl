@@ -187,4 +187,17 @@
         end
         @test tracker.state.status == CoreTrackerStatus.success
     end
+
+    @testset "precision option" begin
+        @polyvar  x y
+        for P in [PRECISION_ADAPTIVE, PRECISION_FIXED_64, PRECISION_FIXED_128]
+            tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3]; precision=P)
+            @test tracker.options.precision == P
+            result = track(tracker, first(S), 1.0, 0.0)
+            @test result.returncode == CoreTrackerStatus.success
+        end
+        # test default
+        tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3])
+        @test tracker.options.precision == PRECISION_FIXED_64
+    end
 end

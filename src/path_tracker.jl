@@ -460,6 +460,7 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         step!(core_tracker)
         state.s = real(currt(core_tracker))
         check_terminated!(core_tracker)
+
         if core_tracker.state.status != CoreTrackerStatus.tracking &&
            core_tracker.state.status != CoreTrackerStatus.success
             state.status = PathTrackerStatus.status(core_tracker.state.status)

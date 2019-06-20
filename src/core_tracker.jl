@@ -10,7 +10,7 @@ const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
     :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned,
-    :log_transform]
+    :log_transform, :precision]
 
 
 ####################
@@ -116,6 +116,9 @@ end
 ######################
 # CoreTrackerOptions #
 ######################
+
+
+
 mutable struct CoreTrackerOptions
     accuracy::Float64
     max_corrector_iters::Int
@@ -131,9 +134,11 @@ mutable struct CoreTrackerOptions
     auto_scaling::Bool
     auto_scaling_options::AutoScalingOptions
     terminate_ill_conditioned::Bool
+    precision::PrecisionOption
 end
 
-function CoreTrackerOptions(::Type{Precision}; parameter_homotopy=false,
+function CoreTrackerOptions(;
+    parameter_homotopy=false,
     accuracy=1e-7,
     refinement_accuracy=1e-8,
     max_corrector_iters::Int=2,
@@ -144,18 +149,18 @@ function CoreTrackerOptions(::Type{Precision}; parameter_homotopy=false,
     max_step_size=Inf,
     simple_step_size_alg=false,
     update_patch=true,
-    maximal_lost_digits=default_maximal_lost_digits(Precision),
+    maximal_lost_digits=-log10(eps()) - 4,
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
-    terminate_ill_conditioned::Bool=true) where {Precision<:Real}
+    terminate_ill_conditioned::Bool=true,
+    precision::PrecisionOption=PRECISION_FIXED_64)
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
-            max_step_size, simple_step_size_alg, update_patch, float(maximal_lost_digits),
-            auto_scaling, auto_scaling_options, terminate_ill_conditioned)
+            max_step_size, simple_step_size_alg, update_patch, maximal_lost_digits,
+            auto_scaling, auto_scaling_options, terminate_ill_conditioned,
+            precision)
 end
-
-default_maximal_lost_digits(::Type{T}) where T = -log10(eps(T)) - 4
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
@@ -338,7 +343,7 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁));
+    options = CoreTrackerOptions(;
                     parameter_homotopy=isa(homotopy, ParameterHomotopy),
                     kwargs...)
     # disable auto scaling always in projective space
@@ -368,9 +373,7 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t�
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
 
-    options = CoreTrackerOptions(real(eltype(x₁));
-                parameter_homotopy=isa(homotopy, ParameterHomotopy),
-                kwargs...)
+    options = CoreTrackerOptions(parameter_homotopy=isa(homotopy, ParameterHomotopy), kwargs...)
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
@@ -536,6 +539,7 @@ end
     correct!(x̄, tracker.corrector, tracker.cache.corrector,
              tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
              accuracy, max_iters, tracker.state.step_size;
+             precision=tracker.options.precision,
              update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
 end
 

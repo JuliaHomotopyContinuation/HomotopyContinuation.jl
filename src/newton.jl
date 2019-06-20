@@ -112,17 +112,22 @@ end
 
 In-place version of [`newton`](@ref). Needs a [`NewtonCache`](@ref) and `norm` as input.
 """
-function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache;
+@inline function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache;
                  tol::Float64=1e-6, miniters::Int=1, maxiters::Int=3,
-                 simplified_last_step::Bool=true, use_qr::Bool=false,
-                 ω::Float64=0.0, expected_Δx₀::Float64=0.0)
+                 simplified_last_step::Bool=true,
+                 update_jacobian_infos::Bool=false,
+                 use_qr::Bool=false,
+                 ω::Float64=0.0, expected_Δx₀::Float64=0.0,
+                 precision::PrecisionOption=PRECISION_ADAPTIVE)
     newton!(out, F, x₀, norm, cache, cache.Jac, tol,
-            miniters, maxiters, simplified_last_step, false, use_qr, ω, expected_Δx₀)
+            miniters, maxiters, simplified_last_step,
+            update_jacobian_infos, use_qr, ω, expected_Δx₀, precision)
 end
 
 function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache, Jac::Jacobian,
                  tol::Float64, miniters::Int, maxiters::Int, simplified_last_step::Bool,
-                 update_jacobian_infos::Bool, use_qr::Bool, ω::Float64, expected_Δx₀::Float64)
+                 update_jacobian_infos::Bool, use_qr::Bool, ω::Float64,
+                 expected_Δx₀::Float64, precision::PrecisionOption)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     Jᵢ = Jac.J
     copyto!(out, x₀)
@@ -142,7 +147,8 @@ function newton!(out, F::AbstractSystem, x₀, norm, cache::AbstractNewtonCache,
                         ω = ω,
                         simple_step=(i == maxiters && simplified_last_step),
                         use_qr=use_qr,
-                        update_infos=(update_jacobian_infos && i == 0))
+                        update_infos=(update_jacobian_infos && i == 0),
+                        precision=precision)
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δxᵢ))
         @inbounds for k in eachindex(xᵢ)
@@ -181,7 +187,8 @@ end
 @inline function newton_step!(cache::NewtonCache, Jac::Jacobian, F, xᵢ;
                             tol::Float64=1e-7, ω::Float64=NaN, curr_accuracy::Float64=NaN,
                             simple_step::Bool=false, update_infos::Bool=true,
-                            use_qr::Bool=false)
+                            use_qr::Bool=false,
+                            precision::PrecisionOption=PRECISION_ADAPTIVE)
     rᵢ, Δxᵢ = cache.rᵢ, cache.Δxᵢ
     if simple_step
         evaluate!(rᵢ, F, xᵢ, cache.system_cache)
@@ -195,18 +202,19 @@ end
 @inline function newton_step!(cache::NewtonCacheF64, Jac::Jacobian, F, xᵢ;
                     tol::Float64=1e-7, ω::Float64=NaN, curr_accuracy::Float64=NaN,
                     simple_step::Bool=false, update_infos::Bool=true,
-                    use_qr::Bool=false)
+                    use_qr::Bool=false,
+                    precision::PrecisionOption=PRECISION_ADAPTIVE)
     Jᵢ = Jac.J
     @unpack rᵢ, rᵢ_D64, Δxᵢ, xᵢ_D64 = cache
     if simple_step
-        if higher_precision(Jac, tol, curr_accuracy, ω)
+        if higher_precision(Jac, tol, curr_accuracy, ω, precision)
             xᵢ_D64 .= xᵢ
             evaluate!(rᵢ, F, xᵢ_D64, cache.system_cache_D64)
         else
             evaluate!(rᵢ, F, xᵢ, cache.system_cache)
         end
     else
-        if higher_precision(Jac, tol, curr_accuracy, ω)
+        if higher_precision(Jac, tol, curr_accuracy, ω, precision)
             xᵢ_D64 .= xᵢ
             evaluate!(rᵢ, F, xᵢ_D64, cache.system_cache_D64)
             jacobian!(Jᵢ, F, xᵢ, cache.system_cache)
@@ -218,7 +226,14 @@ end
     solve!(Δxᵢ, Jac, rᵢ, update_digits_lost=update_infos)
 end
 
-@inline function higher_precision(Jac::Jacobian{ComplexF64}, tol::Float64, curr_accuracy::Float64, ω::Float64)
+@inline function higher_precision(Jac::Jacobian{ComplexF64}, tol::Float64,
+                            curr_accuracy::Float64, ω::Float64,
+                            precision::PrecisionOption)
+    if precision == PRECISION_FIXED_64
+        return false
+    elseif precision == PRECISION_FIXED_128
+        return true
+    end
     digits_lost = unpack(Jac.digits_lost, 0.0)
     if !isfinite(curr_accuracy) || !isfinite(ω) || iszero(ω)
         digits_lost > 12 + log₁₀(tol)
