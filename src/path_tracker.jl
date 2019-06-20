@@ -702,7 +702,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
             prediction .+= currx(core_tracker)
         end
 
-        if euclidean_distance(base_point, currx(core_tracker)) < 4core_tracker.options.accuracy
+        if distance(base_point, currx(core_tracker), inner(core_tracker)) < 4core_tracker.options.accuracy
             break
         end
 

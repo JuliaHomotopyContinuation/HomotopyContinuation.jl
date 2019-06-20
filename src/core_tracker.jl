@@ -4,13 +4,14 @@ export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
-        set_max_refinement_iters!, set_max_step_size!, digits_lost
+        set_max_refinement_iters!, set_max_step_size!, digits_lost, inner
 
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
     :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
     :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned,
-    :log_transform, :precision, :steps_jacobian_info_update]
+    :log_transform, :precision, :steps_jacobian_info_update,
+    :max_lost_digits]
 
 
 ####################
@@ -840,6 +841,15 @@ during the linear system solving in Newton's method.
 """
 digits_lost(tracker::CoreTracker) = digits_lost(tracker.state)
 digits_lost(state::CoreTrackerState) = unpack(state.jacobian.digits_lost, 0.0)
+
+
+"""
+    inner(tracker::CoreTracker)
+
+Returns the inner product used to compute distance during the path tracking.
+"""
+inner(tracker::CoreTracker) = inner(tracker.state)
+inner(state::CoreTrackerState) = state.inner_product
 
 ##################
 # Modify options #
