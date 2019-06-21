@@ -304,24 +304,6 @@ function residual!(u::AbstractVector, A, x, b, ::Type{T}=eltype(u)) where {T}
 end
 
 
-# """
-#     solve_with_digits_lost!(x, Jac::Jac, b)::Float64
-#
-# Solve `Jac.J * x = b` and apply one step of iterative refinment to get an estimate of the
-# (relative) lost digits.
-# Let ``δx`` be the update of the iterative refinement step.
-# Then, the estimate is computed by ``log₁₀(||δx||₂/ ϵ(||x||₂))`` where ``ϵ`` is the machine precision (`eps` in Julia).
-# This is a lower bound of the logarithm of the condition number, i.e., ``log₁₀(κ(J))``.
-# The estimate is returned.
-# """
-# function solve_with_digits_lost!(x::AbstractVector, Jac::Jacobian, b::AbstractVector)
-#     solve!(x, Jac, b)
-#     norm_x = euclidean_norm(x)
-#     norm_δx = iterative_refinement_step!(x, Jac, b)
-#     log₁₀(norm_δx / eps(norm_x))
-# end
-
-
 ###########################
 # CUSTOM LU Factorization #
 ###########################
