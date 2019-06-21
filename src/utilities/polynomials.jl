@@ -832,7 +832,9 @@ function check_square_system(F, vargroups::VariableGroups; affine_tracking=false
     if class == :overdetermined
         error(overdetermined_error_msg)
     elseif class == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported.")
+        error("Underdetermined polynomial systems are currently not supported." *
+		     " Consider adding linear polynomials to your system in order to reduce your system" *
+			 " to a zero dimensional system.")
     end
     nothing
 end
