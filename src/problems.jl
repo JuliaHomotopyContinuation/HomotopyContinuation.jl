@@ -191,12 +191,12 @@ function construct_system(F::MPPolys, system_constructor; homvars=nothing, kwarg
 	system_constructor(F; kwargs...)
 end
 
-function apply_system_scaling(F, vars, system_scaling::Union{Nothing, Symbol})
-	if system_scaling == :equations_and_variables
+function apply_system_scaling(F, vars, system_scaling::Union{Nothing, Symbol, Bool})
+	if system_scaling == :equations_and_variables || system_scaling == true
 		precondition(F, vars)
 	elseif system_scaling == :equations
 		normalize_coefficients(F), nothing
-	elseif system_scaling === nothing
+	elseif system_scaling === nothing || system_scaling == false
 		F, nothing
 	else
 		throw(ArgumentError("Got unsupported argument `system_scaling=$(system_scaling)`." *
