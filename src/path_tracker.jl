@@ -266,7 +266,6 @@ mutable struct PathTrackerState{V<:AbstractVector}
     solution::V
     solution_accuracy::Float64
     solution_cond::Float64
-    endgame_zone_start::Union{Nothing, Float64}
     winding_number::Int
     val::Valuation
 end
@@ -277,13 +276,12 @@ function PathTrackerState(x; at_infinity_check::Bool=true)
     prediction = copy(x)
     solution = copy(x)
     solution_accuracy = solution_cond = NaN
-    endgame_zone_start = nothing
     winding_number = 0
     val = Valuation(x; at_infinity_check=at_infinity_check)
 
     PathTrackerState(status, s, prediction, solution,
                     solution_accuracy, solution_cond,
-                     endgame_zone_start, winding_number, val)
+                    winding_number, val)
 end
 
 
@@ -293,7 +291,6 @@ function reset!(state::PathTrackerState)
     state.prediction .= zero(eltype(state.prediction))
     state.solution .= zero(eltype(state.prediction))
     state.solution_accuracy = state.solution_cond = NaN
-    state.endgame_zone_start = nothing
     state.winding_number = 0
     reset!(state.val)
 
@@ -905,7 +902,6 @@ Its fields are
 * `residual::Union{Nothing, Float64}`: The value of the 2-norm of `H(solution, 0)`.
 * `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
 * `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound on the multiplicity of the solution.
-* `endgame_zone_start::Union{Nothing, Float64}`: The value of `t` at which we entered the endgame zone, i.e., where the path `x(t)` has an expansion a convergent Puiseux series near `t=0`.
 * `start_solution::Union{Nothing, Int}`: The start solution of the path.
 * `accepted_steps::Int`: The number of accepted steps during the path tracking.
 * `rejected_steps::Int`: The number of rejected steps during the path tracking.
@@ -924,7 +920,6 @@ struct PathResult{V<:AbstractVector}
     residual::Union{Nothing, Float64} # level 1+
     condition_jacobian::Union{Nothing, Float64}
     winding_number::Union{Nothing, Int}
-    endgame_zone_start::Union{Nothing, Float64}
     path_number::Union{Nothing, Int}
     start_solution::Union{Nothing, V} # level 1+
     # performance stats
@@ -965,7 +960,6 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
         res = nothing
     end
 
-    endgame_zone_start = tracker.state.endgame_zone_start
     if details_level ≥ 1
         # mimic the behaviour in track! to get a start solution of the same type as x
         embed!(cache.base_point, tracker.problem, start_solution)
@@ -986,7 +980,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
 
     PathResult(return_code, x, t, accuracy, res, condition_jac,
-               windingnumber, endgame_zone_start, path_number,
+               windingnumber, path_number,
                startsolution, accepted_steps, rejected_steps,
                valuation, valuation_accuracy)
 end
