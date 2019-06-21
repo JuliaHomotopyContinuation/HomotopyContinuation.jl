@@ -11,12 +11,12 @@ for all possible scalings. In order to avoid scaling near zero rows back to
 1 we only scale a row if its ∞-norm is larger than `tol`.
 """
 function row_scaling!(A::AbstractMatrix{T}, tol=max(size(A)...)^2 * eps(real(T))) where {T}
+    bound = clamp(maximum(abs, A), tol, 1.0)
     @inbounds for i=1:size(A, 1)
-        rᵢ = abs(A[i, 1])
-        for j=2:size(A, 2)
+        rᵢ = bound
+        for j= 1:size(A, 2)
             rᵢ = max(rᵢ, abs(A[i, j]))
         end
-        rᵢ > tol || continue
         for j=1:size(A, 2)
             A[i, j] /= rᵢ
         end
@@ -25,20 +25,21 @@ function row_scaling!(A::AbstractMatrix{T}, tol=max(size(A)...)^2 * eps(real(T))
 end
 
 function row_scaling!(A::AbstractMatrix{T}, D::AbstractVector, tol=max(size(A)...)^2 * eps(real(T))) where {T}
-    @inbounds for i=1:size(A, 1)
-        rᵢ = abs(A[i, 1])
-        for j=2:size(A, 2)
-            rᵢ = max(rᵢ, abs(A[i, j]))
-        end
-        if rᵢ < tol
-            D[i] = one(rᵢ)
-            continue
-        end
-        D[i] = rᵢ
+    D .= 0.0
+    d_max = convert(real(T), -Inf)
+    @inbounds for j=1:size(A, 2), i=1:size(A, 1)
+        D[i] = @fastmath max(D[i], abs(A[i,j]))
+        d_max = @fastmath max(d_max, D[i])
+    end
 
-        for j=1:size(A, 2)
-            A[i, j] /= rᵢ
-        end
+    # In the case that the row norms are all less than 1 we have a lower bound
+    # the maximal row norm
+    # To avoid that we scale a zero matrix, we need a tol for wich we don't scale any more
+    bound = clamp(d_max, tol, 1.0)
+    D .= max.(D, bound)
+
+    @inbounds for j=1:size(A, 2), i=1:size(A, 1)
+        A[i, j] /= D[i]
     end
     A
 end
@@ -147,7 +148,7 @@ function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) 
         if m == n
             # only apply row scaling for square matrices since
             # otherwise we change the problem
-            row_scaling!(Jac.qr.factors, Jac.D, 1)
+            row_scaling!(Jac.qr.factors, Jac.D, 1e-5)
         end
         # this computes a pivoted qr factorization, i.e.,
         # qr!(Jac.qr.factors, Val(true)) but without allocating new memory
