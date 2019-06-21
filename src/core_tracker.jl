@@ -878,11 +878,19 @@ Current accuracy.
 accuracy(tracker::CoreTracker) = tracker.options.accuracy
 
 """
-     set_accuracy!(tracker::CoreTracker, accuracy)
+     set_accuracy!(tracker::CoreTracker, accuracy; update_max_lost_digits=true)
 
-Set the current accuracy to `accuracy`.
+Set the current accuracy to `accuracy`. If `update_max_lost_digits` is `true` then
+the setting `max_lost_digits` will be updated to the default setting.
 """
-set_accuracy!(tracker::CoreTracker, accuracy) = tracker.options.accuracy = accuracy
+function set_accuracy!(tracker::CoreTracker, accuracy; update_max_lost_digits::Bool=true)
+    @unpack options = tracker
+    options.accuracy = accuracy
+    if update_max_lost_digits
+        options.max_lost_digits = default_max_lost_digits(options.precision, accuracy)
+    end
+    tracker
+end
 
 """
      refinement_accuracy(tracker::CoreTracker)

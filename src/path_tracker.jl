@@ -13,6 +13,8 @@ const pathtracker_supported_keywords = [
     :t_eg_start, :tol_inf_accurate, :tol_finite_accurate, :accuracy, :accuracy_eg]
 
 
+const PATHTRACKER_DEFAULT_ACCURACY = 1e-6
+
 ###############
 ## VALUATION ##
 ###############
@@ -228,6 +230,8 @@ mutable struct PathTrackerOptions
     t_eg_start::Float64
     tol_inf_accurate::Float64
     tol_finite_accurate::Float64
+    accuracy::Float64
+    accuracy_eg::Float64
 end
 
 function PathTrackerOptions(;
@@ -240,14 +244,16 @@ function PathTrackerOptions(;
             cond_infinity_start::Float64=1e7,
             t_eg_start::Float64=0.1,
             tol_inf_accurate::Float64=1e-4,
-            tol_finite_accurate::Float64=1e-3)
+            tol_finite_accurate::Float64=1e-3,
+            accuracy::Float64=PATHTRACKER_DEFAULT_ACCURACY,
+            accuracy_eg::Float64=min(accuracy, 1e-5))
 
     PathTrackerOptions(at_infinity_check, samples_per_loop, max_winding_number,
                        overdetermined_min_residual,
                        overdetermined_min_accuracy, cond_eg_start,
                        cond_infinity_start,
                        t_eg_start,
-                       tol_inf_accurate, tol_finite_accurate)
+                       tol_inf_accurate, tol_finite_accurate, accuracy, accuracy_eg)
 end
 
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
@@ -367,14 +373,20 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=1e-30, kwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
+                at_infinity_check=default_at_infinity_check(prob),
+                accuracy=PATHTRACKER_DEFAULT_ACCURACY,
+                min_step_size=1e-30, kwargs...)
+
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
                         log_transform=true, predictor=Pade21(),
                         min_step_size=min_step_size,
+                        accuracy=accuracy,
                         core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
-    options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
+    options = PathTrackerOptions(;at_infinity_check=at_infinity_check,
+                                  accuracy=accuracy, optionskwargs...)
     cache = PathTrackerCache(prob, core_tracker)
     PathTracker(prob, core_tracker, state, options, cache)
 end
@@ -421,6 +433,7 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
 
     embed!(core_tracker.state.x, tracker.problem, x₁)
     setup!(core_tracker, core_tracker.state.x, s₁, s₀)
+    set_accuracy!(core_tracker, options.accuracy)
     reset!(state)
     # Handle the case that the start value is already a solution
     if residual(tracker, core_tracker.state.x) < 1e-14
@@ -433,7 +446,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     end
 
     s_eg_start = -log(options.t_eg_start)
-
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
         state.s = real(currt(core_tracker))
@@ -475,6 +487,7 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         end
 
         if verdict == VALUATION_FINITE
+            set_accuracy!(core_tracker, options.accuracy_eg)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
             if retcode == :success
                 state.status = PathTrackerStatus.success
@@ -510,7 +523,7 @@ end
 Judge the current valuation.
 """
 function judge(val::Valuation, options::PathTrackerOptions)
-    @unpack v, v̇, v̈, norm_abs_ẋ = val
+    @unpack v, v̇, v̈ = val
     finite = true
     for i in eachindex(v)
         # A coordinate goes to infinity if its valuation is negative.
@@ -586,6 +599,11 @@ vector_at_infinity(x::PVector, tol) = ProjectiveVectors.norm_affine_chart(x) > t
 ##########
 # Cauchy #
 ##########
+
+function set_eg_accuracy!(core_tracker::CoreTracker, options::PathTrackerOptions)
+    set_accuracy!(core_tracker, options.accuracy_eg)
+end
+
 
 """
     predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
