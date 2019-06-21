@@ -134,7 +134,7 @@ mutable struct CoreTrackerOptions
     max_step_size ::Float64
     simple_step_size_alg::Bool
     update_patch::Bool
-    maximal_lost_digits::Float64
+    max_lost_digits::Float64
     auto_scaling::Bool
     auto_scaling_options::AutoScalingOptions
     terminate_ill_conditioned::Bool
@@ -154,16 +154,16 @@ function CoreTrackerOptions(;
     max_step_size=Inf,
     simple_step_size_alg=false,
     update_patch=true,
-    maximal_lost_digits=-log10(eps()) - 4,
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
     terminate_ill_conditioned::Bool=true,
     precision::PrecisionOption=PRECISION_FIXED_64,
-    steps_jacobian_info_update::Int=2)
+    max_lost_digits=default_max_lost_digits(precision, accuracy),
+    steps_jacobian_info_update::Int=1)
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
-            max_step_size, simple_step_size_alg, update_patch, maximal_lost_digits,
+            max_step_size, simple_step_size_alg, update_patch, max_lost_digits,
             auto_scaling, auto_scaling_options, terminate_ill_conditioned,
             precision, steps_jacobian_info_update)
 end
@@ -171,6 +171,16 @@ end
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
 
+function default_max_lost_digits(prec::PrecisionOption, accuracy::Float64)
+    if prec == PRECISION_FIXED_64
+        # maximal_digits_available - digits necessary - buffer
+        -log10(eps()) + log10(accuracy) + 1
+    else
+        # if higher precision is available we will more like be constrained
+        # by the fact that the jacobian cannot be too ill-conditioned
+        min(-log10(eps()) - 3, -log10(eps()) + log10(accuracy) + 1)
+    end
+end
 
 ####################
 # CoreTrackerState #
@@ -309,7 +319,7 @@ needs to be homogeneous. Note that a `CoreTracker` is also a (mutable) iterator.
 * `max_steps=1_000`: The maximal number of iterations the path tracker has available.
 * `min_step_size=1e-14`: The minimal step size.
 * `max_step_size=Inf`: The maximal step size.
-* `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
+* `max_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
 * `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
 * `refinement_accuracy=1e-8`: The precision used to refine the final value.
@@ -590,9 +600,7 @@ function step!(tracker::CoreTracker)
             update_rank!(state.jacobian)
 
             # Check termination criterion: we became too ill-conditioned
-            if options.terminate_ill_conditioned && (
-                unpack(state.jacobian.digits_lost, 0.0) > options.maximal_lost_digits ||
-                state.jacobian.corank > 0)
+            if options.terminate_ill_conditioned && is_ill_conditioned(state, options)
                 state.status = CoreTrackerStatus.terminated_ill_conditioned
                 return nothing
             end
@@ -609,6 +617,11 @@ function step!(tracker::CoreTracker)
         tracker.state.status = CoreTrackerStatus.terminated_singularity
     end
     nothing
+end
+
+function is_ill_conditioned(state::CoreTrackerState, options::CoreTrackerOptions)
+    d = max(log₁₀(cond(state)), digits_lost(state))
+    d > options.max_lost_digits || state.jacobian.corank > 0
 end
 
 function is_overdetermined_tracking(tracker)
