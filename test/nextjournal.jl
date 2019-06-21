@@ -126,7 +126,7 @@
 				 show_progress = false)
 
 		all_real_sols = realsolutions(R2)
-		true_real_solutions  = filter(s -> all(s[7:9] .> 0), all_real_sols);
+		true_real_solutions  = filter(s -> all(s[7:9] .> -1e-3), all_real_sols);
 
 		S₃ = SymmetricGroup(3)
 		relabeling = GroupActions(v -> map(p -> (v[1:3][p]..., v[4:6][p]..., v[7:9][p]...), S₃))
