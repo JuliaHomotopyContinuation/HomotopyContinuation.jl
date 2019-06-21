@@ -592,19 +592,19 @@ function step!(tracker::CoreTracker)
             compute_ẋ!(state, cache, options)
             # tell the predictors about the new derivative if they need to update something
             update!(cache.predictor, H, x, ẋ, t + Δt, state.jacobian)
-            state.last_step_failed = false
             state.steps_jacobian_info_update += 1
-        else
-            # We have to reset the patch
-            state.rejected_steps += 1
-            update_rank!(state.jacobian)
 
             # Check termination criterion: we became too ill-conditioned
-            if options.terminate_ill_conditioned && is_ill_conditioned(state, options)
+            if options.terminate_ill_conditioned && is_ill_conditioned(state, options) && state.last_step_failed
                 state.status = CoreTrackerStatus.terminated_ill_conditioned
                 return nothing
             end
 
+            state.last_step_failed = false
+        else
+            # We have to reset the patch
+            state.rejected_steps += 1
+            update_rank!(state.jacobian)
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(tracker, result)
             Δt = currΔt(state)
