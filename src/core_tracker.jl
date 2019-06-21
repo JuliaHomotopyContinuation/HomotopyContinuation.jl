@@ -178,7 +178,7 @@ function default_max_lost_digits(prec::PrecisionOption, accuracy::Float64)
     else
         # if higher precision is available we will more like be constrained
         # by the fact that the jacobian cannot be too ill-conditioned
-        min(-log10(eps()) - 3, -log10(eps()) + log10(accuracy) + 1)
+        min(-log10(eps()) - 3, -log10(eps(Double64)) + log10(accuracy) - 3)
     end
 end
 
