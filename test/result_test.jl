@@ -1,6 +1,6 @@
 @testset "Result" begin
     @testset "Result+PathResult" begin
-        R = solve(equations(heart()), seed=506435, save_all_paths=true)
+        R = solve(equations(heart()), save_all_paths=true)
         @test R isa Result
         @test natinfinity(R) ≤ 572
         @test nfinite(R) == 4
@@ -46,14 +46,14 @@
         test_treeviews(R)
 
         @polyvar x y z
-        R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=true)
+        R = solve([(x-3)^3,(y-2)], affine_tracking=true)
         @test R isa Result
         test_treeviews(R)
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
         @test_nowarn sprint(show, R)
 
-        R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=false)
+        R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=nothing)
         @test nnonsingular(R) == 0
         @test nsingular(R) == 3
         @test_nowarn sprint(show, R)
@@ -103,7 +103,7 @@
     @testset "uniquesolutions" begin
         @polyvar x
         f = (x-3)^3*(x-2)
-        R = solve([f], seed=171090)
+        R = solve([f])
         @test length(uniquesolutions(R)) == 2
         @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2
@@ -112,8 +112,7 @@
 
         @polyvar x y
         f = (x-3y)^3*(x-2y)
-        R = solve([f], seed=171090)
-
+        R = solve([f])
         @test length(uniquesolutions(R)) == 2
         @test uniquesolutions(R) isa Vector{ProjectiveVectors.PVector{Complex{Float64}, 1}}
         @test length(uniquesolutions(R, multiplicities=true)) == 2

@@ -8,25 +8,23 @@ const pathtracker_supported_keywords = [
     :at_infinity_check, :min_step_size_endgame_start,
     :min_val_accuracy, :samples_per_loop,
     :max_winding_number, :max_affine_norm,
-    :overdetermined_min_accuracy, :overdetermined_min_residual]
+    :overdetermined_min_accuracy, :overdetermined_min_residual,
+    :cond_eg_start, :cond_infinity_start,
+    :t_eg_start, :tol_inf_accurate, :tol_finite_accurate, :accuracy, :accuracy_eg]
 
+
+const PATHTRACKER_DEFAULT_ACCURACY = 1e-6
 
 ###############
 ## VALUATION ##
 ###############
 
-struct Valuation
+mutable struct Valuation
     v::Vector{Float64}
     v̇::Vector{Float64}
     v̈::Vector{Float64}
-    #  0.5|x(s)|^2
-    abs_x_sq::Vector{Float64}
-    # d/ds 0.5|x(s)|^2
-    abs_x_sq_dot::Vector{Float64}
-    # d^2/ds^2 0.5|x(s)|^2
-    abs_x_sq_ddot::Vector{Float64}
-    # d^3/ds^3 0.5|x(s)|^2
-    abs_x_sq_dddot::Vector{Float64}
+    v_data::NTuple{3,Vector{Float64}}
+    s_data::NTuple{3,Float64}
 end
 
 @enum ValuationVerdict begin
@@ -47,147 +45,109 @@ function Valuation(n::Integer)
     v = zeros(n)
     v̇ = zeros(n)
     v̈ = zeros(n)
-    abs_x_sq = zeros(n)
-    abs_x_sq_dot = zeros(n)
-    abs_x_sq_ddot = zeros(n)
-    abs_x_sq_dddot = zeros(n)
-    Valuation(v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot)
+    v_data = (zeros(n), zeros(n), zeros(n))
+    s_data = (NaN, NaN, NaN)
+    Valuation(v, v̇, v̈, v_data, s_data)
 end
 
-Base.show(io::IO, val::Valuation) = print_fieldnames(io, val)
+function Base.show(io::IO, val::Valuation)
+    println(io, typeof(val), ":")
+    for name in [:v, :v̇, :v̈]
+        println(io, " • ", name, " → ", getfield(val, name))
+    end
+end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 
 function reset!(val::Valuation)
-    val.v .= 0.0
-    val.v̇ .= 0.0
-    val.v̈ .= 0.0
-    val.abs_x_sq .= 0.0
-    val.abs_x_sq_dot .= 0.0
-    val.abs_x_sq_ddot .= 0.0
-    val.abs_x_sq_dddot .= 0.0
+    val.v .= NaN
+    val.v̇ .= NaN
+    val.v̈ .= NaN
+    val.s_data = (NaN, NaN, NaN)
     val
 end
 
-function update!(val::Valuation, z::Vector, ż, Δs::Float64, ::Val)
-    _update!(val, z, ż, Δs)
+function update!(val::Valuation, z::Vector, ż, s, Δs::Float64, ::Val)
+    _update!(val, z, ż, s, Δs)
 end
-function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{false})
-    _update!(val, z, ż, Δs)
+function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{false})
+    _update!(val, z, ż, s, Δs)
 end
-function update!(val::Valuation, z::PVector, ż, Δs::Float64, ::Val{true})
-    _update_affine!(val, z, ż, Δs)
+function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{true})
+    _update_affine!(val, z, ż, s, Δs)
 end
-function _update!(val::Valuation, z::AbstractVector, ż, Δs::Float64)
-    v, v̇, v̈ = val.v, val.v̇, val.v̈
-    for i in eachindex(z)
-        x, y = reim(z[i])
-        ẋ, ẏ = reim(ż[i])
-        x²_plus_y² = abs2(z[i])
-        vᵢ, v̇ᵢ = v[i], v̇[i]
-        v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
-        v̇[i] = (v[i] - vᵢ) / Δs
-        v̈[i] = (v̇[i] - v̇ᵢ) / Δs
+function _update!(val::Valuation, z::AbstractVector, ż, s, Δs::Float64)
+    @unpack v, v_data, s_data = val
+    (v₂, v₁, v₀), (s₂, s₁, _) = v_data, s_data
+    v .= v₀ .= ν.(z, ż)
+    # cycle data around
+    val.v_data = (v₀, v₂, v₁)
+    val.s_data = (s, s₂, s₁)
 
-        abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ = val.abs_x_sq_dot[i], val.abs_x_sq_ddot[i]
-
-        val.abs_x_sq[i] = 0.5x²_plus_y²
-        val.abs_x_sq_dot[i] = x*ẋ + y*ẏ
-        val.abs_x_sq_ddot[i] = (val.abs_x_sq_dot[i] - abs_x_sq_dotᵢ) / Δs
-        val.abs_x_sq_dddot[i] = (val.abs_x_sq_ddot[i] - abs_x_sq_ddotᵢ) / Δs
-    end
+    !isnan(s₁) && finite_differences!(val)
 
     val
 end
-
-function _update_affine!(val::Valuation, z::PVector, ż, Δs::Float64)
-    i = 1
-    v, v̇, v̈ = val.v, val.v̇, val.v̈
-    for (rⱼ, homⱼ) in ProjectiveVectors.dimension_indices_homvars(z)
-        xⱼ, yⱼ = reim(z[homⱼ])
-        ẋⱼ, ẏⱼ = reim(ż[homⱼ])
-        xⱼ²_plus_yⱼ² = xⱼ^2 + xⱼ^2
-        vⱼ = -(xⱼ*ẋⱼ + yⱼ*ẏⱼ) / xⱼ²_plus_yⱼ²
-        for k in rⱼ
-            x, y = reim(z[k])
-            ẋ, ẏ = reim(ż[k])
-            x²_plus_y² = x^2 + y^2
-            vᵢ, v̇ᵢ = v[i], v̇[i]
-            v[i] = -(x*ẋ + y*ẏ) / x²_plus_y²
-
-            v[i] -= vⱼ
-            v̇[i] = (v[i] - vᵢ) / Δs
-            v̈[i] = (v̇[i] - v̇ᵢ) / Δs
-
-            abs_x_sqᵢ, abs_x_sq_dotᵢ, abs_x_sq_ddotᵢ =
-                                val.abs_x_sq[i], val.abs_x_sq_dot[i], val.abs_x_sq_ddot[i]
-            val.abs_x_sq[i] = 0.5 * x²_plus_y² / xⱼ²_plus_yⱼ²
-            val.abs_x_sq_dot[i] =  (val.abs_x_sq[i] - abs_x_sqᵢ) / Δs
-            val.abs_x_sq_ddot[i] = (val.abs_x_sq_dot[i] - abs_x_sq_dotᵢ) / Δs
-            val.abs_x_sq_dddot[i] = (val.abs_x_sq_ddot[i] - abs_x_sq_ddotᵢ) / Δs
-            i += 1
+function _update_affine!(val::Valuation, z::PVector, ż, s, Δs::Float64)
+    @unpack v, v_data, s_data = val
+    (v₂, v₁, v₀), (s₂, s₁, _) = v_data, s_data
+    k = 1
+    for (rⱼ, j) in ProjectiveVectors.dimension_indices_homvars(z)
+        vⱼ = ν(z[j], ż[j])
+        for i in rⱼ
+            v[k] = v₀[k] =  ν(z[i], ż[i]) - vⱼ
+            k += 1
         end
     end
+    # cycle data around
+    val.v_data = (v₀, v₂, v₁)
+    val.s_data = (s, s₂, s₁)
+
+    !isnan(s₁) && finite_differences!(val)
+
     val
+end
+
+function ν(z::Complex, ż::Complex)
+    x, y = reim(z); ẋ, ẏ = reim(ż);
+    -(x * ẋ + y * ẏ) / abs2(z)
 end
 
 """
-    judge(val::Valuation; s_max::Float64=-log(eps()))::ValuationVerdict
+    finite_differences!(val::Valuation)
 
-Judge the current valuation.
+Use a finite difference scheme to approximate the first and second derivative
+of the valuation map.
+
+Since we have a non-uniform grid, we need a more elaborate difference scheme.
+The implementation follows the formulas derived in [^BS05]
+
+[^BS05]: Bowen, M. K., and Ronald Smith. "Derivative formulae and errors for non-uniformly spaced points." Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences 461.2059 (2005): 1975-1997.
 """
-function judge(val::Valuation, J::Jacobian, s, s_max::Float64=-log(eps()))
-    @unpack v, v̇, v̈, abs_x_sq, abs_x_sq_dot, abs_x_sq_ddot, abs_x_sq_dddot = val
-    Δs = abs(s_max - s)
-    status = VALUATION_INDECISIVE
-    all_positive = true
-    indecisive = false
-    for i in eachindex(v)
-        Δv̂ᵢ = Δs * abs(v̇[i]) + Δs^2 * abs(v̈[i])
-        if Δs * abs(v̇[i]) > 1e-1
-            indecisive = true
-        end
-
-        if status != VALUATION_AT_INFINIY &&
-            v[i] < -1/20 &&
-            Δv̂ᵢ < 1e-5 &&
-            abs_x_sq[i] > -2v[i] * abs_x_sq_dot[i] > 0 &&
-            abs_x_sq_dot[i] > -2v[i] * abs_x_sq_ddot[i] > 0.1 &&
-            abs_x_sq_ddot[i] > -2v[i] * abs_x_sq_dddot[i] > 0.1
-
-            status = VALUATION_AT_INFINIY
-        end
-
-        if v[i] < -0.05
-            all_positive = false
-        end
+function finite_differences!(val::Valuation)
+    @unpack v_data, s_data, v̇, v̈ = val
+    v₃, v₂, v₁ = v_data
+    s₃, s₂, s₁ = s_data
+    s₃₁ = s₃ - s₁
+    a₃, a₁ = s₃ - s₂, s₁ - s₂
+    for i in eachindex(v̇)
+        v̇[i] = (a₃*v₁[i])/(a₁*s₃₁) - ((a₁+a₃)*v₂[i])/(a₁*a₃) - (a₁*v₃[i])/(s₃₁*a₃)
+        v̈[i] = -2v₁[i]/((a₁)*s₃₁) + 2v₂[i]/(a₁*a₃) + 2v₃[i]/(s₃₁*a₃)
     end
-    status == VALUATION_AT_INFINIY && return VALUATION_AT_INFINIY
-    indecisive && return VALUATION_INDECISIVE
-    # require s > 0 otherwise we can get false singular solutions
-    all_positive && Δs > 0 && return VALUATION_FINITE
-
-    VALUATION_INDECISIVE
+    nothing
 end
 
 @inline function update!(val::Valuation, core_tracker::CoreTracker; at_infinity_check::Bool=true)
     z = core_tracker.state.x
     ż = core_tracker.state.ẋ
     Δs = core_tracker.state.Δs_prev
+    s = core_tracker.state.s
     if at_infinity_check
-        update!(val, z, ż, Δs, Val(true))
+        update!(val, z, ż, s, Δs, Val(true))
     else
-        update!(val, z, ż, Δs, Val(false))
+        update!(val, z, ż, s, Δs, Val(false))
     end
 end
 
-function at_infinity_post_check(val::Valuation)
-    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
-        if vᵢ < -1/20 && abs(v̇ᵢ) < 1e-3
-            return true
-        end
-    end
-    false
-end
 #################
 ## PATHTRACKER ##
 #################
@@ -248,33 +208,47 @@ end
 
 mutable struct PathTrackerOptions
     at_infinity_check::Bool
-    min_step_size_endgame_start::Float64
-    min_val_accuracy::Float64
     samples_per_loop::Int
     max_winding_number::Int
-    # Fallback tolerance only used if we track a path to the end without agreeing
-    # on a valuation
-    max_affine_norm::Float64
     # The minimal residual a solution needs to have to be considered
     # a solution of the original system (only applied for singular solutions)
     overdetermined_min_residual::Float64
     overdetermined_min_accuracy::Float64
+    # minimial condition number where the endgame starts
+    cond_eg_start::Float64
+    cond_infinity_start::Float64
+    # maximal t where the endgame starts
+    t_eg_start::Float64
+    tol_inf_accurate::Float64
+    tol_finite_accurate::Float64
+    accuracy::Float64
+    accuracy_eg::Float64
 end
 
 function PathTrackerOptions(;
             at_infinity_check=true,
-            min_step_size_endgame_start::Float64=1e-10,
-            min_val_accuracy::Float64=0.001,
             samples_per_loop::Int=12,
             max_winding_number::Int=12,
-            max_affine_norm::Float64=1e6,
             overdetermined_min_residual::Float64=1e-3,
-            overdetermined_min_accuracy::Float64=1e-4)
-    PathTrackerOptions(at_infinity_check, min_step_size_endgame_start, min_val_accuracy,
-                       samples_per_loop, max_winding_number, max_affine_norm,
+            overdetermined_min_accuracy::Float64=1e-4,
+            cond_eg_start::Float64=1e4,
+            cond_infinity_start::Float64=1e7,
+            t_eg_start::Float64=0.1,
+            tol_inf_accurate::Float64=1e-4,
+            tol_finite_accurate::Float64=1e-3,
+            accuracy::Float64=error("You have to set `accuracy`"),
+            accuracy_eg::Float64=min(accuracy, 1e-5))
+
+    PathTrackerOptions(at_infinity_check, samples_per_loop, max_winding_number,
                        overdetermined_min_residual,
-                       overdetermined_min_accuracy)
+                       overdetermined_min_accuracy, cond_eg_start,
+                       cond_infinity_start,
+                       t_eg_start,
+                       tol_inf_accurate, tol_finite_accurate, accuracy, accuracy_eg)
 end
+
+Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
 mutable struct PathTrackerState{V<:AbstractVector}
     status::PathTrackerStatus.states
@@ -283,7 +257,6 @@ mutable struct PathTrackerState{V<:AbstractVector}
     solution::V
     solution_accuracy::Float64
     solution_cond::Float64
-    endgame_zone_start::Union{Nothing, Float64}
     winding_number::Int
     val::Valuation
 end
@@ -294,13 +267,12 @@ function PathTrackerState(x; at_infinity_check::Bool=true)
     prediction = copy(x)
     solution = copy(x)
     solution_accuracy = solution_cond = NaN
-    endgame_zone_start = nothing
     winding_number = 0
     val = Valuation(x; at_infinity_check=at_infinity_check)
 
     PathTrackerState(status, s, prediction, solution,
                     solution_accuracy, solution_cond,
-                     endgame_zone_start, winding_number, val)
+                    winding_number, val)
 end
 
 
@@ -310,7 +282,6 @@ function reset!(state::PathTrackerState)
     state.prediction .= zero(eltype(state.prediction))
     state.solution .= zero(eltype(state.prediction))
     state.solution_accuracy = state.solution_cond = NaN
-    state.endgame_zone_start = nothing
     state.winding_number = 0
     reset!(state.val)
 
@@ -340,7 +311,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     end
     if affine_tracking(core_tracker)
         target_system = F
-    elseif pull_back_is_to_affine(prob, x)
+    elseif pull_back_is_to_affine(prob)
         target_system = PatchedSystem(F, state(EmbeddingPatch(), x))
     else # result is projective
         target_system = PatchedSystem(F, state(OrthogonalPatch(), x))
@@ -390,14 +361,20 @@ struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCac
     cache::PTC
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number}; at_infinity_check=default_at_infinity_check(prob), min_step_size=1e-30, kwargs...)
+function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
+                at_infinity_check=default_at_infinity_check(prob),
+                accuracy=default_accuracy(prob),
+                min_step_size=1e-30, kwargs...)
+
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
     core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
                         log_transform=true, predictor=Pade21(),
                         min_step_size=min_step_size,
+                        accuracy=accuracy,
                         core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
-    options = PathTrackerOptions(; at_infinity_check=at_infinity_check, optionskwargs...)
+    options = PathTrackerOptions(;at_infinity_check=at_infinity_check,
+                                  accuracy=accuracy, optionskwargs...)
     cache = PathTrackerCache(prob, core_tracker)
     PathTracker(prob, core_tracker, state, options, cache)
 end
@@ -409,6 +386,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 seed(PT::PathTracker) = PT.problem.seed
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
+default_accuracy(prob::Problem) = pull_back_is_to_affine(prob) ? 1e-6 : 1e-8
 
 """
     track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states
@@ -444,8 +422,8 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
 
     embed!(core_tracker.state.x, tracker.problem, x₁)
     setup!(core_tracker, core_tracker.state.x, s₁, s₀)
+    set_accuracy!(core_tracker, options.accuracy)
     reset!(state)
-
     # Handle the case that the start value is already a solution
     if residual(tracker, core_tracker.state.x) < 1e-14
         state.status = PathTrackerStatus.success
@@ -456,12 +434,17 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         state.winding_number = 1
     end
 
+    s_eg_start = -log(options.t_eg_start)
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
         state.s = real(currt(core_tracker))
+        # println("s: ", state.s)
         check_terminated!(core_tracker)
-        if core_tracker.state.status != CoreTrackerStatus.tracking &&
-           core_tracker.state.status != CoreTrackerStatus.success
+
+        if core_tracker.state.status == CoreTrackerStatus.success
+            state.status = PathTrackerStatus.success
+            break
+        elseif core_tracker.state.status != CoreTrackerStatus.tracking
             state.status = PathTrackerStatus.status(core_tracker.state.status)
             break
         end
@@ -473,49 +456,37 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
 
         # We only care if we moved forward
         core_tracker.state.last_step_failed && continue
-
-        # Our endgame strategy is split in different stages
-        # 1) During the path tracking we update an approximation
-        #    of the valuation of x(t) since this has for t ≈ 0
-        #    an expansion as a Puiseux series.
-        #
-        # 2) If one of the valuation coordinates is sufficiently accurate
-        #    we can decide whether this coordinate goes to infinity or not
-        #    This happens in `judge`.
-        #
-        # 3) Now assume that val(xᵢ(t_k)) ≥ 0 for all i. Then we know
-        #    that this converges to a finite solution. Now we have to distinguish
-        #    between singular and regular solutions.
-        #    We can handle singular by the Cauchy Endgame whereas for regular
-        #    solutions we simply can track towards ∞.
-
         # update valuation and associated data
         update!(state.val, core_tracker; at_infinity_check=tracker.options.at_infinity_check)
+        verdict = judge(state.val, options)
+        # If we are too early, we don't work on the endgame
+        state.s > s_eg_start || verdict == VALUATION_FINITE || continue
+        # If the condition number is too low we also do not care
+        start_eg(core_tracker, options) || continue
+        # possibly reduce desired accuracy
+        # @show state.val
+        # @show verdict
+        # @show start_infinity_cutoff(core_tracker, options)
+        if tracker.options.at_infinity_check &&
+           verdict == VALUATION_AT_INFINIY &&
+           start_infinity_cutoff(core_tracker, options)
 
-        # If we are too early, we also don't check the valuation
-        if state.s < 5 # ≈ 0.05
-            continue
-        end
-        verdict = judge(state.val, core_tracker.state.jacobian, state.s, max(36.0, s₀))
-        if tracker.options.at_infinity_check && verdict == VALUATION_AT_INFINIY
             state.status = PathTrackerStatus.at_infinity
             break
         end
 
-        if verdict == VALUATION_FINITE && is_singularish(state.val, core_tracker)
+        if verdict == VALUATION_FINITE
+            set_accuracy!(core_tracker, options.accuracy_eg)
             retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
             if retcode == :success
                 state.status = PathTrackerStatus.success
+                break
             elseif retcode == :max_winding_number
                 continue
             else # path tracker failed during the loops -> break
                 state.status = PathTrackerStatus.tracker_failed
+                break
             end
-        end
-
-        if core_tracker.state.status == CoreTrackerStatus.success
-            state.status = PathTrackerStatus.success
-            break
         end
     end
 
@@ -525,18 +496,54 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     state.status
 end
 
+function start_eg(core_tracker, options)
+    C = max(cond(core_tracker), exp10(digits_lost(core_tracker)))
+    C > options.cond_eg_start
+end
 
-function is_singularish(val::Valuation, core_tracker::CoreTracker)
-    cond = unpack(core_tracker.state.jacobian.cond, 0.0)
-    digits_lost = unpack(core_tracker.state.jacobian.digits_lost, 0.0)
-    # 1) check if val is rational for some i, then the solution is singular
-    for v in val.v
-        v < -0.05 && return false # this function shouldn't be called in the first
-        fractional_val = abs(round(v) - v) > 0.1
-        fractional_val && return true
+function start_infinity_cutoff(core_tracker, options)
+    C = max(cond(core_tracker), exp10(digits_lost(core_tracker)))
+    C > options.cond_infinity_start
+end
+
+"""
+    judge(val::Valuation, J::Jacobian)::ValuationVerdict
+
+Judge the current valuation.
+"""
+function judge(val::Valuation, options::PathTrackerOptions)
+    @unpack v, v̇, v̈ = val
+    finite = true
+    for i in eachindex(v)
+        # A coordinate goes to infinity if its valuation is negative.
+        # We argue that a valuation is "stable" if it's first and second
+        # derivative are "small".
+        if v[i] < -0.1 &&
+            abs(v̇[i]) < options.tol_inf_accurate &&
+            abs(v̈[i]) < options.tol_inf_accurate
+
+            return VALUATION_AT_INFINIY
+        end
+
+        if v[i] < -options.tol_finite_accurate ||
+            !(abs(v̇[i]) < options.tol_finite_accurate &&
+              abs(v̈[i]) < options.tol_finite_accurate)
+
+            finite = false
+        end
     end
-    # 2) use condition number / digits_lost to decide
-    cond > 1e6 || digits_lost > 5.0
+    finite && return VALUATION_FINITE
+
+    VALUATION_INDECISIVE
+end
+
+function at_infinity_post_check(val::Valuation, options::PathTrackerOptions)
+    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
+        if vᵢ < -0.1 && abs(v̇ᵢ) < sqrt(options.tol_inf_accurate)
+            return true
+        end
+    end
+    false
 end
 
 """
@@ -584,14 +591,17 @@ Set the parameters of a parameter homotopy.
     nothing
 end
 
-
 vector_at_infinity(x::AbstractVector, tol) = false
 vector_at_infinity(x::PVector, tol) = ProjectiveVectors.norm_affine_chart(x) > tol
-
 
 ##########
 # Cauchy #
 ##########
+
+function set_eg_accuracy!(core_tracker::CoreTracker, options::PathTrackerOptions)
+    set_accuracy!(core_tracker, options.accuracy_eg)
+end
+
 
 """
     predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
@@ -645,7 +655,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
             prediction .+= currx(core_tracker)
         end
 
-        if euclidean_distance(base_point, currx(core_tracker)) < 4core_tracker.options.accuracy
+        if distance(base_point, currx(core_tracker), inner(core_tracker)) < 4core_tracker.options.accuracy
             break
         end
 
@@ -693,7 +703,7 @@ function check_and_refine_solution!(tracker::PathTracker)
     if (state.status == PathTrackerStatus.terminated_ill_conditioned ||
         state.status == PathTrackerStatus.terminated_step_size_too_small ||
         state.status == PathTrackerStatus.terminated_singularity) &&
-        at_infinity_post_check(state.val)
+        at_infinity_post_check(state.val, options)
 
        state.status = PathTrackerStatus.at_infinity
    end
@@ -714,7 +724,7 @@ function check_and_refine_solution!(tracker::PathTracker)
     if is_singular
         state.solution .= state.prediction
         # check that solution is indeed singular
-        if !pull_back_is_to_affine(tracker.problem, state.solution)
+        if !pull_back_is_to_affine(tracker.problem)
             LinearAlgebra.normalize!(state.solution)
         end
 
@@ -752,7 +762,7 @@ function check_and_refine_solution!(tracker::PathTracker)
         if isconverged(result) && core_tracker.state.jacobian.corank_proposal == 0
             state.solution .= core_tracker.state.x̄
         elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
-               at_infinity_post_check(state.val)
+               at_infinity_post_check(state.val, options)
 
             state.solution .= currx(core_tracker)
             state.status = PathTrackerStatus.at_infinity
@@ -766,7 +776,7 @@ function check_and_refine_solution!(tracker::PathTracker)
         # We want to check that if we present an affine solution to a user
         # that this is still in a convergent region of the affine target system
         # This covers that we have a squared up system and when we tracked in projective space
-        if pull_back_is_to_affine(tracker.problem, state.solution) &&
+        if pull_back_is_to_affine(tracker.problem) &&
             (is_squared_up_system(core_tracker.homotopy) ||
              !affine_tracking(core_tracker))
 
@@ -788,7 +798,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
             state.solution_accuracy = target_result.accuracy
 
-            if !pull_back_is_to_affine(tracker.problem, state.solution)
+            if !pull_back_is_to_affine(tracker.problem)
                 LinearAlgebra.normalize!(state.solution)
                 changepatch!(cache.target_system.patch, state.solution)
                 state.solution_accuracy = result.accuracy
@@ -797,7 +807,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
         # We have a purely projective solution. Here we only have to handle the case
         # of overdetermined systems.
-        elseif !pull_back_is_to_affine(tracker.problem, state.solution) &&
+        elseif !pull_back_is_to_affine(tracker.problem) &&
                 is_squared_up_system(core_tracker.homotopy)
 
             LinearAlgebra.normalize!(state.solution)
@@ -893,7 +903,6 @@ Its fields are
 * `residual::Union{Nothing, Float64}`: The value of the 2-norm of `H(solution, 0)`.
 * `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
 * `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound on the multiplicity of the solution.
-* `endgame_zone_start::Union{Nothing, Float64}`: The value of `t` at which we entered the endgame zone, i.e., where the path `x(t)` has an expansion a convergent Puiseux series near `t=0`.
 * `start_solution::Union{Nothing, Int}`: The start solution of the path.
 * `accepted_steps::Int`: The number of accepted steps during the path tracking.
 * `rejected_steps::Int`: The number of rejected steps during the path tracking.
@@ -912,7 +921,6 @@ struct PathResult{V<:AbstractVector}
     residual::Union{Nothing, Float64} # level 1+
     condition_jacobian::Union{Nothing, Float64}
     winding_number::Union{Nothing, Int}
-    endgame_zone_start::Union{Nothing, Float64}
     path_number::Union{Nothing, Int}
     start_solution::Union{Nothing, V} # level 1+
     # performance stats
@@ -942,7 +950,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
     # condition
     if isnan(state.solution_cond)
-        condition_jac = nothing
+        condition_jac = cond(core_tracker)
     else
         condition_jac = state.solution_cond
     end
@@ -953,7 +961,6 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
         res = nothing
     end
 
-    endgame_zone_start = tracker.state.endgame_zone_start
     if details_level ≥ 1
         # mimic the behaviour in track! to get a start solution of the same type as x
         embed!(cache.base_point, tracker.problem, start_solution)
@@ -974,7 +981,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
 
     PathResult(return_code, x, t, accuracy, res, condition_jac,
-               windingnumber, endgame_zone_start, path_number,
+               windingnumber, path_number,
                startsolution, accepted_steps, rejected_steps,
                valuation, valuation_accuracy)
 end
@@ -1081,7 +1088,7 @@ start_solution(r::PathResult) = r.start_solution
 
 Checks whether the path is successfull.
 """
-LinearAlgebra.issuccess(r::PathResult) = r.return_code == :success
+issuccess(r::PathResult) = r.return_code == :success
 
 """
     isfailed(pathresult)

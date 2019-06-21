@@ -1,4 +1,5 @@
-export ishomogeneous, homogenize, uniquevar, Composition, expand, compose, validate
+export ishomogeneous, homogenize, uniquevar, Composition, expand, compose, validate,
+		precondition, normalize_coefficients
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
@@ -597,19 +598,6 @@ function compute_numerically_degrees(F)
 end
 
 """
-	check_homogeneous_degrees(F::AbstractSystem)
-
-Compute (numerically) the degrees of `F` and verify that `F` is homogeneous.
-"""
-function check_homogeneous_degrees(F)
-	degs = compute_numerically_degrees(F)
-	if degs === nothing
-		error("Input system is not homogeneous by our numerical check.")
-	end
-	degs
-end
-
-"""
     uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)
     uniquevar(F::MPPolys, tag=:x0)
 
@@ -831,7 +819,9 @@ function check_square_system(F, vargroups::VariableGroups; affine_tracking=false
     if class == :overdetermined
         error(overdetermined_error_msg)
     elseif class == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported.")
+        error("Underdetermined polynomial systems are currently not supported." *
+		     " Consider adding linear polynomials to your system in order to reduce your system" *
+			 " to a zero dimensional system.")
     end
     nothing
 end
@@ -972,4 +962,25 @@ function preconditioning_factors(f::MPPolys, vars)
 		end
 	end
 	(variables = exp10.(c[1:nvars]), equations = exp10.(c[nvars+1:end]))
+end
+
+
+"""
+	normalize_coefficients(f::Union{MPPolys,Composition})
+
+Rescale the equations of `f` such that each coefficient has absolute value between 0 and 1.
+"""
+function normalize_coefficients(f::Composition)
+  	Λ = maximum.(abs, MP.coefficients.(expand(f)))
+	scale(f, Λ)
+end
+function normalize_coefficients(f::MPPolys)
+	map(f) do fᵢ
+	    cmax = maximum(abs, MP.coefficients(fᵢ))
+	    map(MP.terms(fᵢ)) do t
+	        c = MP.coefficient(t)
+	        m = MP.monomial(t)
+	        c / cmax * m
+	    end |> MP.polynomial
+	end
 end

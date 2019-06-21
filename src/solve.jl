@@ -168,7 +168,7 @@ General options:
 * `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the *homogeneous* system `F` as an affine system which was homogenized by `homvar`. If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`) `homvar` is the actual variable used in the system `F`.
 * `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref). The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`. The constructor is called with `system(polynomials, variables)` where `polynomials` is a vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the variable ordering. If you experience significant compilation times, consider to change system to `FPSystem`.
 * `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) for the totaldegree and start target homotopy. The default is [`StraightLineHomotopy`](@ref). The constructor is called with `homotopy(start, target)` where `start` and `target` are homogeneous [`AbstractSystem`](@ref)s.
-* `affine_tracking::Bool=false`: Indicate whether path tracking should happen in affine space rather than projective space. Currently this is only supported for parameter homotopies.
+* `affine_tracking::Bool=true`: Indicate whether path tracking should happen in affine space rather than projective space. Currently this is only supported for parameter homotopies.
 * `path_jumping_check::Bool=true`: Enable a check whether one of the paths jumped to another one.
 
 Path tracking specific options:
@@ -267,7 +267,7 @@ function track_paths(tracker, start_solutions;
                 k += length(batch)
                 ntracked = k
                 if batch_tracker.interrupted
-                    return results
+                    return results, ntracked
                 end
 
                 update_progress!(progress, k, stats)

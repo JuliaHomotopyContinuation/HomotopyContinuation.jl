@@ -20,18 +20,6 @@
         @test norm(v) ≈ 1.0 atol=1e-7
     end
 
-    @testset "EarlyAtInfinity" begin
-        f = equations(griewank_osborne())
-
-        tracker, startsolutions = pathtracker_startsolutions(f, seed=130793)
-        S = collect(startsolutions)
-        # This path has the special case that we track towards a non-singular solution
-        # at infinity and the valuation doesn't stabilize fast enough
-        result = track(tracker, S[3], details=:extensive)
-        @test result.return_code != :success
-    end
-
-
     @testset "Affine tracking" begin
         @polyvar x a y b
         F = [x^2-a, x*y-a+b]
@@ -85,7 +73,7 @@
         F = [x^2-a, x*y-a+b]
         p = [a, b]
 
-        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
 
         res = track(tracker, [1, 1]; details=:minimal)
         test_show_juno(res)
@@ -106,7 +94,7 @@
         F = SPSystem([x^2-a, x*y-a+b]; parameters=[a, b])
 
         tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im],
-                        p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
+                        p₁=[1, 0], p₀=[2, 4])
         res = track(tracker, starts[1])
         @test res.return_code == :success
 
@@ -119,9 +107,19 @@
         @polyvar x y z a b
         F = SPSystem([x^2-a*z^2, x*y-a*z^2+b*z^2]; parameters=[a, b])
 
-        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im], p₁=[1, 0], p₀=[2, 4], affine_tracking=false)
+        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im],
+                    p₁=[1, 0], p₀=[2, 4])
         res = track(tracker, starts[1])
         @test res.return_code == :success
+        @test isa(res.solution, ProjectiveVectors.PVector)
+
+        # projective with homvar
+        tracker, starts = pathtracker_startsolutions(F, [1.0, 1.0 + 0.0*im],
+                    p₁=[1, 0], p₀=[2, 4], homvar=z)
+        @test isa(tracker.core_tracker.affine_patch, EmbeddingPatch)
+        res = track(tracker, starts[1])
+        @test res.return_code == :success
+        @test isa(res.solution, Vector)
     end
 
     @testset "Parameter homotopy, change parameters" begin
@@ -142,7 +140,7 @@
         # Let's store the generic solutions
         S_p₀ = solutions(nonsingular(result_p₀))
         # Construct the PathTracker
-        tracker = pathtracker(F; parameters=p, affine_tracking=true, generic_parameters=p₀)
+        tracker = pathtracker(F; parameters=p, generic_parameters=p₀)
 
         q = randn(3)
         result = track(tracker, first(S_p₀); target_parameters=q)
@@ -160,7 +158,7 @@
 
     @testset "Real Jacobian" begin
         @polyvar v w
-        @test nfinite(solve([v - 2w , -v + 2w, v + w - 3], affine_tracking=true)) == 1
+        @test nfinite(solve([v - 2w , -v + 2w, v + w - 3])) == 1
         @test nfinite(solve([v - 2w , -v + 2w, v + w - 3], affine_tracking=false)) == 1
     end
 end

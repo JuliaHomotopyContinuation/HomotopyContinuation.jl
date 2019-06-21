@@ -163,6 +163,6 @@
         @test u ≈ evaluate(S, v)
         @test U ≈ jacobian(S, v)
 
-        @test HC.check_homogeneous_degrees(S) == [4, 3, 2]
+        @test HC.compute_numerically_degrees(S) == [4, 3, 2]
     end
 end

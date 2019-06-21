@@ -32,8 +32,7 @@ end
     include("solve_test.jl")
     include("polyhedral_test.jl")
     include("result_test.jl")
-    include("integration_tests.jl")
+    include("root_count_test.jl")
     include("monodromy_test.jl")
-    include("real_world_test.jl")
     include("nextjournal.jl")
 end
