@@ -972,7 +972,7 @@ Rescale the equations of `f` such that each coefficient has absolute value betwe
 """
 function normalize_coefficients(f::Composition)
   	Λ = maximum.(abs, MP.coefficients.(expand(f)))
-	scale(f, equations)
+	scale(f, Λ)
 end
 function normalize_coefficients(f::MPPolys)
 	map(f) do fᵢ

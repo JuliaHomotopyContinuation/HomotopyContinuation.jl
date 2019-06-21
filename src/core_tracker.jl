@@ -357,7 +357,8 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     patch=has_dedicated_homvars(prob.vargroups) ? EmbeddingPatch() : OrthogonalPatch(),
     corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁),
-    log_transform=false, kwargs...)
+    log_transform=false,
+    simple_step_size_alg=!isa(patch, EmbeddingPatch), kwargs...)
 
     options = CoreTrackerOptions(;
                     parameter_homotopy=isa(homotopy, ParameterHomotopy),

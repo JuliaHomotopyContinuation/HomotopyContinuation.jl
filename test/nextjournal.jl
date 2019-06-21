@@ -9,7 +9,7 @@
         result = solve(f)
         @test nfinite(result) == 4
     end
-    @testset "Start systems" begin
+	@testset "Start systems" begin
         @polyvar x y
 
         f = [x^2 + 2y, y^2 - 2]
@@ -46,11 +46,10 @@
         reals = realsolutions(result)
         minval, minindex = findmin(map(s -> J(s[1:3]), reals))
         minarg = reals[minindex][1:3]
-        @test minarg ≈ [0.6893448348668392; 0.19072105130305433; 0.9376180557378104] || minarg ≈ -[0.6893448348668392; 0.19072105130305433; 0.9376180557378104]
+        @test minarg ≈ [0.6893448348668392; 0.19072105130305433; 0.9376180557378104] ||
+		      minarg ≈ -[0.6893448348668392; 0.19072105130305433; 0.9376180557378104]
     end
     @testset "6R inverse problem" begin
-        using HomotopyContinuation, LinearAlgebra, DynamicPolynomials
-
         # initialize the variables
         @polyvar z[1:6,1:3] p[1:3]
         α = randn(5)
@@ -104,12 +103,9 @@
 		m7 = a[1]*(μ[1]^7+21*σ²[1]*μ[1]^5+105*μ[1]^3*σ²[1]^2+105*μ[1]*σ²[1]^3)+
 		      a[2]*(μ[2]^7+21*σ²[2]*μ[2]^5+105*μ[2]^3*σ²[2]^2+105*μ[2]*σ²[2]^3)+
 		      a[3]*(μ[3]^7+21*σ²[3]*μ[3]^5+105*μ[3]^3*σ²[3]^2+105*μ[3]*σ²[3]^3);
-		m8 = a[1]*
-					(μ[1]^8+28*σ²[1]*μ[1]^6+210*μ[1]^4*σ²[1]^2+420*μ[1]^2*σ²[1]^3+105*σ²[1]^4)+
-		      a[2]*
-					(μ[2]^8+28*σ²[2]*μ[2]^6+210*μ[2]^4*σ²[2]^2+420*μ[2]^2*σ²[2]^3+105*σ²[2]^4)+
-		      a[3]*
-					(μ[3]^8+28*σ²[3]*μ[3]^6+210*μ[3]^4*σ²[3]^2+420*μ[3]^2*σ²[3]^3+105*σ²[3]^4)
+		m8 = a[1] * (μ[1]^8+28*σ²[1]*μ[1]^6+210*μ[1]^4*σ²[1]^2+420*μ[1]^2*σ²[1]^3+105*σ²[1]^4)+
+		      a[2] * (μ[2]^8+28*σ²[2]*μ[2]^6+210*μ[2]^4*σ²[2]^2+420*μ[2]^2*σ²[2]^3+105*σ²[2]^4)+
+		      a[3] * (μ[3]^8+28*σ²[3]*μ[3]^6+210*μ[3]^4*σ²[3]^2+420*μ[3]^2*σ²[3]^3+105*σ²[3]^4)
 
 		f = [m0, m1, m2, m3, m4, m5, m6, m7, m8]
 
@@ -124,9 +120,10 @@
 
 		q₀ = [m([a; μ; σ²] => start_sol) for m in f]
 		@polyvar p[1:9]
-		R = monodromy_solve(f - p, start_sol, q₀, parameters=p; target_solutions_count = 1350)
-		R2 = solve(f - p, solutions(R), parameters = p,
-  				 start_parameters=q₀, target_parameters = p₀, show_progress = false)
+		R = monodromy_solve(f - p, start_sol, q₀; parameters=p, target_solutions_count = 1350)
+		R2 = solve(f - p, solutions(R); parameters = p,
+  				 start_parameters=q₀, target_parameters = p₀,
+				 show_progress = false)
 
 		all_real_sols = realsolutions(R2)
 		true_real_solutions  = filter(s -> all(s[7:9] .> 0), all_real_sols);
@@ -136,7 +133,9 @@
 		mults = multiplicities(true_real_solutions, group_action = relabeling)
 		@test length(mults) == 2
 
-		R_with_group_action = monodromy_solve(f - p, start_sol, q₀, parameters=p, group_action = relabeling; target_solutions_count = 225)
+		R_with_group_action = monodromy_solve(f - p, start_sol, q₀;
+					parameters=p, group_action = relabeling,
+					target_solutions_count=225)
 
 		@test all(length.([relabeling(s) for s in solutions(R_with_group_action)]) .== 6)
     end

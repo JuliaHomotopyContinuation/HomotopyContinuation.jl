@@ -236,7 +236,7 @@ function PathTrackerOptions(;
             t_eg_start::Float64=0.1,
             tol_inf_accurate::Float64=1e-4,
             tol_finite_accurate::Float64=1e-3,
-            accuracy::Float64=PATHTRACKER_DEFAULT_ACCURACY,
+            accuracy::Float64=error("You have to set `accuracy`"),
             accuracy_eg::Float64=min(accuracy, 1e-5))
 
     PathTrackerOptions(at_infinity_check, samples_per_loop, max_winding_number,
@@ -311,7 +311,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     end
     if affine_tracking(core_tracker)
         target_system = F
-    elseif pull_back_is_to_affine(prob, x)
+    elseif pull_back_is_to_affine(prob)
         target_system = PatchedSystem(F, state(EmbeddingPatch(), x))
     else # result is projective
         target_system = PatchedSystem(F, state(OrthogonalPatch(), x))
@@ -363,7 +363,7 @@ end
 
 function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
                 at_infinity_check=default_at_infinity_check(prob),
-                accuracy=PATHTRACKER_DEFAULT_ACCURACY,
+                accuracy=default_accuracy(prob),
                 min_step_size=1e-30, kwargs...)
 
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
@@ -386,6 +386,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
 seed(PT::PathTracker) = PT.problem.seed
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
+default_accuracy(prob::Problem) = pull_back_is_to_affine(prob) ? 1e-6 : 1e-8
 
 """
     track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states
@@ -723,7 +724,7 @@ function check_and_refine_solution!(tracker::PathTracker)
     if is_singular
         state.solution .= state.prediction
         # check that solution is indeed singular
-        if !pull_back_is_to_affine(tracker.problem, state.solution)
+        if !pull_back_is_to_affine(tracker.problem)
             LinearAlgebra.normalize!(state.solution)
         end
 
@@ -775,7 +776,7 @@ function check_and_refine_solution!(tracker::PathTracker)
         # We want to check that if we present an affine solution to a user
         # that this is still in a convergent region of the affine target system
         # This covers that we have a squared up system and when we tracked in projective space
-        if pull_back_is_to_affine(tracker.problem, state.solution) &&
+        if pull_back_is_to_affine(tracker.problem) &&
             (is_squared_up_system(core_tracker.homotopy) ||
              !affine_tracking(core_tracker))
 
@@ -797,7 +798,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
             state.solution_accuracy = target_result.accuracy
 
-            if !pull_back_is_to_affine(tracker.problem, state.solution)
+            if !pull_back_is_to_affine(tracker.problem)
                 LinearAlgebra.normalize!(state.solution)
                 changepatch!(cache.target_system.patch, state.solution)
                 state.solution_accuracy = result.accuracy
@@ -806,7 +807,7 @@ function check_and_refine_solution!(tracker::PathTracker)
             end
         # We have a purely projective solution. Here we only have to handle the case
         # of overdetermined systems.
-        elseif !pull_back_is_to_affine(tracker.problem, state.solution) &&
+        elseif !pull_back_is_to_affine(tracker.problem) &&
                 is_squared_up_system(core_tracker.homotopy)
 
             LinearAlgebra.normalize!(state.solution)
@@ -949,7 +950,7 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
     end
     # condition
     if isnan(state.solution_cond)
-        condition_jac = nothing
+        condition_jac = cond(core_tracker)
     else
         condition_jac = state.solution_cond
     end

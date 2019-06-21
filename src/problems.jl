@@ -148,7 +148,7 @@ function pull_back(prob::AbstractProblem{AffineTracking}, x::AbstractVector; reg
 	end
 end
 function pull_back(prob::AbstractProblem{ProjectiveTracking}, x::PVector; regauge=true)
-	if pull_back_is_to_affine(prob, x)
+	if pull_back_is_to_affine(prob)
 		λ = prob.regauging_factors
 		if λ === nothing || !regauge
 			map(kᵢ -> x[kᵢ[1]] / x[kᵢ[2]],
@@ -172,16 +172,16 @@ function regauge!(x, prob::AbstractProblem)
 end
 
 """
-    pull_back_is_to_affine(prob::ProjectiveProblem, x)
+    pull_back_is_to_affine(prob::ProjectiveProblem)
 
-Returns `true` if [`pull_back`](@ref) would pull the solution `x` into affine space.
+Returns `true` if [`pull_back`](@ref) would pull a solution `x` into affine space.
 """
-pull_back_is_to_affine(prob::AbstractProblem{AffineTracking}, x::AbstractVector) = true
-function pull_back_is_to_affine(prob::AbstractProblem{ProjectiveTracking}, x::PVector)
-	pull_back_is_to_affine(prob.vargroups, x)
+pull_back_is_to_affine(prob::AbstractProblem{AffineTracking}) = true
+function pull_back_is_to_affine(prob::AbstractProblem{ProjectiveTracking})
+	_pull_back_is_to_affine(prob.vargroups)
 end
-pull_back_is_to_affine(::VariableGroups{M,true}, ::PVector{<:Number, M}) where {M} = true
-pull_back_is_to_affine(::VariableGroups{M,false},::PVector{<:Number, M}) where {M} = false
+_pull_back_is_to_affine(::VariableGroups{M,true}) where {M} = true
+_pull_back_is_to_affine(::VariableGroups{M,false}) where {M} = false
 
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
@@ -214,7 +214,7 @@ function default_affine_tracking(F::TargetSystemInput{<:MPPolyInputs}, hominfo::
 	end
 
 	!(is_hom ||
-	  (hominfo.vargroups !== nothing && ngroups(hominfo.vargroups) > 1))
+	  (hominfo.vargroups !== nothing && length(hominfo.vargroups) > 1))
 end
 function default_affine_tracking(input::StartTargetInput{<:MPPolyInputs}, hominfo)
 	F, G = input.target, input.start
