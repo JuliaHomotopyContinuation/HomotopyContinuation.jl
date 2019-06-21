@@ -349,12 +349,12 @@ end
 Construct a [`CoreTracker`](@ref) from the given `problem`.
 """
 function CoreTracker(prob::AbstractProblem, x₁, t₁, t₀; kwargs...)
-    CoreTracker(prob.homotopy, embed(prob, x₁), t₁, t₀; kwargs...)
+    CoreTracker(prob.homotopy, embed(prob, x₁), t₁, t₀, prob; kwargs...)
 end
 
 # Tracking in Projective Space
-function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀;
-    patch=OrthogonalPatch(),
+function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀, prob::AbstractProblem;
+    patch=has_dedicated_homvars(prob.vargroups) ? EmbeddingPatch() : OrthogonalPatch(),
     corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
@@ -362,39 +362,45 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     options = CoreTrackerOptions(;
                     parameter_homotopy=isa(homotopy, ParameterHomotopy),
                     kwargs...)
-    # disable auto scaling always in projective space
-    options.auto_scaling = false
 
     if homotopy isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to CoreTracker. Instead pass the homotopy and patch separate.")
     end
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
-
     patch_state = state(patch, x₁)
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
     HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
-
+    if patch isa EmbeddingPatch
+        inner_product = WeightedIP(x₁)
+    else
+        inner_product = EuclideanIP()
+    end
     # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state)
+    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state, inner_product)
     cache = CoreTrackerCache(HC, predictor, corrector, tracker_state)
 
     CoreTracker(H, predictor, corrector, patch, tracker_state, options, cache)
 end
 
 # Tracking in affine space
-function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t₀;
+function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t₀, prob::AbstractProblem;
+    patch=nothing,
     corrector::AbstractCorrector=NewtonCorrector(),
     predictor::AbstractPredictor=default_predictor(x₁),
     log_transform=false, kwargs...)
+
+    if patch !== nothing
+        throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
+    end
 
     options = CoreTrackerOptions(;parameter_homotopy=isa(homotopy, ParameterHomotopy), kwargs...)
 
     H = log_transform ? LogHomotopy(homotopy) : homotopy
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
-    HC = HomotopyWithCache(H, x₁, t₁)
+    HC = HomotopyWithCache(H, Vector(x₁), t₁)
 
     inner_product = options.auto_scaling ? WeightedIP(x₁) : EuclideanIP()
     # We have to make sure that the element type of x is invariant under evaluation
@@ -566,6 +572,7 @@ function step!(tracker::CoreTracker)
 
     try
         t, Δt = currt(state), currΔt(state)
+        # println("t: ", real(t), " Δt: ", real(Δt))
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
         update_jacobian_infos =
@@ -672,6 +679,9 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     Δx₀ = result.norm_Δx₀
     if isconverged(result)
         δ_N_ω = δ(options, ω, 0.25)
+        # This is to handle the edge case that g(δ_N_ω) >> (ω * d_x̂_x̄) > 0 but
+        # at the same time δ_N_ω < eps(). Since then g(δ_N_ω) = 0
+        δ_N_ω = max(δ_N_ω, 1e-15) #
         λ = g(δ_N_ω) / (ω * d_x̂_x̄)
         Δs = nthroot(λ, ord) * state.Δs
         if state.last_step_failed
@@ -953,7 +963,6 @@ set_max_step_size!(T::CoreTracker, Δs) = T.options.max_step_size  = Δs
 ################
 struct PathIterator{Tracker<:CoreTracker}
     tracker::Tracker
-    x_affine::Bool
     t_real::Bool
 end
 Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()
@@ -983,16 +992,15 @@ For example to check whether the tracker was successfull
 println("Success: ", currstatus(tracker) == CoreTrackerStatus.success)
 ```
 """
-function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; affine=true, kwargs...)
+function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
     setup!(tracker, x₁, t₁, t₀; kwargs...)
-    PathIterator(tracker, affine, typeof(t₁ - t₀) <: Real)
+    PathIterator(tracker, typeof(t₁ - t₀) <: Real)
 end
 
 function current_x_t(iter::PathIterator)
     x = currx(iter.tracker)
     t = currt(iter.tracker)
-    (iter.x_affine ? ProjectiveVectors.affine_chart(x) : x,
-     iter.t_real ? real(t) : t)
+    (x, iter.t_real ? real(t) : t)
 end
 
 function Base.iterate(iter::PathIterator, state=nothing)

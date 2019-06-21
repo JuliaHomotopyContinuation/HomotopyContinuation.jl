@@ -204,6 +204,37 @@ function apply_system_scaling(F, vars, system_scaling::Union{Nothing, Symbol, Bo
 	end
 end
 
+function default_affine_tracking(F::TargetSystemInput{<:MPPolyInputs}, hominfo)
+	!(ishomogeneous(F.system, hominfo))
+end
+function default_affine_tracking(F::TargetSystemInput{<:MPPolyInputs}, hominfo::HomogenizationInformation)
+	is_hom = ishomogeneous(F.system, hominfo)
+	if !is_hom && !isnothing(hominfo.homvars)
+        throw(ArgumentError("Input system is not homogeneous although `homvars=$(hominfo.homvars)` was passed."))
+	end
+
+	!(is_hom ||
+	  (hominfo.vargroups !== nothing && ngroups(hominfo.vargroups) > 1))
+end
+function default_affine_tracking(input::StartTargetInput{<:MPPolyInputs}, hominfo)
+	F, G = input.target, input.start
+	!(ishomogeneous(F, hominfo) && ishomogeneous(G, hominfo))
+end
+function default_affine_tracking(input::HomotopyInput, hominfo)
+	!(ishomogeneous(input.H))
+end
+function default_affine_tracking(F::ParameterSystemInput{<:MPPolyInputs}, hominfo)
+	!(ishomogeneous(F.system, hominfo; parameters=F.parameters))
+end
+function default_affine_tracking(input::ParameterSystemInput{<:AbstractSystem}, hominfo)
+	H = ParameterHomotopy(input.system, p₁=input.p₁, p₀=input.p₀, γ₁=input.γ₁, γ₀=input.γ₀)
+	!(ishomogeneous(H))
+end
+
+
+ishomogeneous(F::AbstractSystem) = compute_numerically_degrees(F) !== nothing
+ishomogeneous(H::AbstractHomotopy) = ishomogeneous(FixedHomotopy(H, rand()))
+
 """
     problem_startsolutions(F; options...)
     problem_startsolutions(G, F, startsolutions; options...)
@@ -240,9 +271,9 @@ function problem_startsolutions(input::AbstractInput, startsolutions, seed::Int;
     problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
 end
 
-function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=false, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=default_affine_tracking(input, homvar_info), system_scaling=nothing, kwargs...)
 	if !affine_tracking
-		check_homogeneous_degrees(FixedHomotopy(input.H, rand()))
+		ishomogeneous(input.H) || throw(ArgumentError("Input homotopy is not homogeneous by our numerical check."))
 		if homvar_info === nothing
 			N = size(input.H)[2]
 			if start_solution_sample(startsolutions) isa PVector
@@ -267,7 +298,9 @@ end
 ##############
 
 function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Nothing, homvar_info, seed;
-				start_system=:total_degree, affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM,
+				start_system=:total_degree,
+				affine_tracking=default_affine_tracking(input, homvar_info),
+				system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM,
 				only_torus=false, kwargs...)
 	if affine_tracking
 		vargroups = VariableGroups(variables(input.system))
@@ -365,8 +398,11 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 	problem, startsolutions
 end
 
-function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem}, ::Nothing, homvaridx::Nothing, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
+				::Nothing, homvaridx::Nothing, seed;
+				system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
+
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
 	# Check overdetermined case
@@ -376,7 +412,9 @@ function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem}, ::No
      totaldegree_solutions(degrees))
 end
 
-function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem}, ::Nothing, hominfo::HomogenizationInformation, seed; system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
+				::Nothing, hominfo::HomogenizationInformation, seed;
+				system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
@@ -387,7 +425,9 @@ end
 
 function abstract_system_degrees(F)
 	n, N = size(F)
-	degrees = check_homogeneous_degrees(F)
+
+	degrees = compute_numerically_degrees(F)
+	isnothing(degrees) && error("Input system is not homogeneous by our numerical check.")
 	# system needs to be homogeneous
 	if n + 1 > N
 		error(overdetermined_error_msg)
@@ -401,7 +441,10 @@ end
 # START TARGET
 ###############
 
-function problem_startsolutions(input::StartTargetInput, startsolutions, homvar, seed; affine_tracking=false, system_scaling=DEFAULT_SYSTEM_SCALING, system=DEFAULT_SYSTEM, kwargs...)
+function problem_startsolutions(input::StartTargetInput{<:MPPolyInputs, <:MPPolyInputs}, startsolutions, homvar, seed;
+				affine_tracking=default_affine_tracking(input, homvar),
+				system_scaling=DEFAULT_SYSTEM_SCALING,
+				system=DEFAULT_SYSTEM, kwargs...)
     F, G = input.target, input.start
     F_ishom, G_ishom = ishomogeneous.((F, G))
 	vars = variables(F)
@@ -415,11 +458,9 @@ function problem_startsolutions(input::StartTargetInput, startsolutions, homvar,
 				startsolutions_need_reordering=true, kwargs...)
 		prob, startsolutions
     elseif F_ishom || G_ishom
-        error("One of the input polynomials is homogeneous and the other not!")
-	elseif affine_tracking && F_ishom && G_ishom
-		error("Both of the input systems are homogenous but `affine_tracking=true` was passed.")
+        throw(ArgumentError("One of the input polynomials is homogeneous and the other not. Make either both homogeneous or non-homogeneous!"))
     elseif !affine_tracking
-        homvar === nothing || error("Input system is not homogeneous although `homvar` was passed.")
+        homvar === nothing || throw(ArgumentError("Input system is not homogeneous although `homvar` was passed."))
 
 		h = uniquevar(F)
         push!(vars, h)
@@ -447,7 +488,9 @@ end
 # Parameter homotopy
 #####################
 
-function problem_startsolutions(input::ParameterSystemInput{<:MPPolyInputs}, startsolutions, hominfo, seed; affine_tracking=false, system=SPSystem, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::ParameterSystemInput{<:MPPolyInputs}, startsolutions, hominfo, seed;
+						affine_tracking=default_affine_tracking(input, hominfo),
+						system=SPSystem, system_scaling=nothing, kwargs...)
 	Prob = affine_tracking ? Problem{AffineTracking} : Problem{ProjectiveTracking}
 	if affine_tracking
 		variable_groups = VariableGroups(variables(input.system; parameters=input.parameters))
@@ -462,20 +505,12 @@ function problem_startsolutions(input::ParameterSystemInput{<:MPPolyInputs}, sta
 	Prob(H, variable_groups, seed; startsolutions_need_reordering=!affine_tracking), startsolutions
 end
 
-function problem_startsolutions(input::ParameterSystemInput{<:AbstractSystem}, startsolutions, hominfo, seed; affine_tracking=nothing, system=SPSystem, system_scaling=nothing, kwargs...)
+function problem_startsolutions(input::ParameterSystemInput{<:AbstractSystem}, startsolutions, hominfo, seed;
+				affine_tracking=default_affine_tracking(input, hominfo),
+				system=nothing, system_scaling=nothing, kwargs...)
 	n, N = size(input.system)
 	H = ParameterHomotopy(input.system, p₁=input.p₁, p₀=input.p₀, γ₁=input.γ₁, γ₀=input.γ₀)
 	variable_groups = VariableGroups(N, hominfo)
-
-	# We do not set affine tracking here, to handle the case that the input system
-	# is not homogenous.
-	if affine_tracking === nothing
-	   affine_tracking = compute_numerically_degrees(FixedHomotopy(H, rand())) === nothing
-   end
-
-	if affine_tracking
-		Problem{AffineTracking}(H, variable_groups, seed; startsolutions_need_reordering=false), startsolutions
-	else
-    	Problem{ProjectiveTracking}(H, variable_groups, seed; startsolutions_need_reordering=false), startsolutions
-	end
+	tracking_type = affine_tracking ? AffineTracking() : ProjectiveTracking()
+	Problem(tracking_type, H, variable_groups, seed; startsolutions_need_reordering=false), startsolutions
 end

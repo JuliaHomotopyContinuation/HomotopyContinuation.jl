@@ -598,19 +598,6 @@ function compute_numerically_degrees(F)
 end
 
 """
-	check_homogeneous_degrees(F::AbstractSystem)
-
-Compute (numerically) the degrees of `F` and verify that `F` is homogeneous.
-"""
-function check_homogeneous_degrees(F)
-	degs = compute_numerically_degrees(F)
-	if degs === nothing
-		error("Input system is not homogeneous by our numerical check.")
-	end
-	degs
-end
-
-"""
     uniquevar(f::MP.AbstractPolynomialLike, tag=:x0)
     uniquevar(F::MPPolys, tag=:x0)
 
