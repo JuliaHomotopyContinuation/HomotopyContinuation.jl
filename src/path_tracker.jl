@@ -148,15 +148,6 @@ end
     end
 end
 
-function at_infinity_post_check(val::Valuation)
-    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
-        if vᵢ < -1/20 && abs(v̇ᵢ) < 1e-3
-            return true
-        end
-    end
-    false
-end
-
 #################
 ## PATHTRACKER ##
 #################
@@ -545,6 +536,15 @@ function judge(val::Valuation, options::PathTrackerOptions)
     VALUATION_INDECISIVE
 end
 
+function at_infinity_post_check(val::Valuation, options::PathTrackerOptions)
+    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
+        if vᵢ < -0.1 && abs(v̇ᵢ) < sqrt(options.tol_inf_accurate)
+            return true
+        end
+    end
+    false
+end
+
 """
     track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, options...)::PathResult
 
@@ -702,7 +702,7 @@ function check_and_refine_solution!(tracker::PathTracker)
     if (state.status == PathTrackerStatus.terminated_ill_conditioned ||
         state.status == PathTrackerStatus.terminated_step_size_too_small ||
         state.status == PathTrackerStatus.terminated_singularity) &&
-        at_infinity_post_check(state.val)
+        at_infinity_post_check(state.val, options)
 
        state.status = PathTrackerStatus.at_infinity
    end
@@ -761,7 +761,7 @@ function check_and_refine_solution!(tracker::PathTracker)
         if isconverged(result) && core_tracker.state.jacobian.corank_proposal == 0
             state.solution .= core_tracker.state.x̄
         elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
-               at_infinity_post_check(state.val)
+               at_infinity_post_check(state.val, options)
 
             state.solution .= currx(core_tracker)
             state.status = PathTrackerStatus.at_infinity
