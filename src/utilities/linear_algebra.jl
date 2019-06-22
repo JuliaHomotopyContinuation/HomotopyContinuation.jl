@@ -4,26 +4,12 @@ import DoubleFloats: Double64
 issquare(A::AbstractMatrix) = isequal(size(A)...)
 
 """
-    row_scaling!(A, tol=maximum(size(A))^2 * eps(real(eltype(A))))
+    row_scaling!(A, D::AbstractVector, tol=maximum(size(A))^2 * eps(real(eltype(A))))
 
 Divide each row of `A` by its ∞-norm. This minimizes the ∞ condition number
 for all possible scalings. In order to avoid scaling near zero rows back to
 1 we only scale a row if its ∞-norm is larger than `tol`.
 """
-function row_scaling!(A::AbstractMatrix{T}, tol=max(size(A)...)^2 * eps(real(T))) where {T}
-    bound = clamp(maximum(abs, A), tol, 1.0)
-    @inbounds for i=1:size(A, 1)
-        rᵢ = bound
-        for j= 1:size(A, 2)
-            rᵢ = max(rᵢ, abs(A[i, j]))
-        end
-        for j=1:size(A, 2)
-            A[i, j] /= rᵢ
-        end
-    end
-    A
-end
-
 function row_scaling!(A::AbstractMatrix{T}, D::AbstractVector, tol=max(size(A)...)^2 * eps(real(T))) where {T}
     D .= 0.0
     d_max = convert(real(T), -Inf)
