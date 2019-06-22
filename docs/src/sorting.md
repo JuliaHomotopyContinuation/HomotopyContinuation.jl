@@ -3,9 +3,17 @@
 We provide functions for sorting analyzing arrays of vectors.
 
 ## Computing unique points in an array of vectors
+
+We provide the [`unique_points`](@ref) methods to sort through solutions.
+```@docs
+unique_points
+```
+The [`unique_points`](@ref) method is powered by the [`UniquePoints`](@ref) data structure.
+
 ```@docs
 UniquePoints
 ```
+
 We provide several helper functions for `UniquePoints`.
 ```@docs
 points

@@ -1,15 +1,9 @@
 # Monodromy Solve
 
-Next to [`solve`](@ref), HomotopyContinuation.jl provides the function `monodromy_solve`. Instead of taking a two systems `f` and `g` and tracking an array of start solutions from `f` to `g`, `monodromy_solve` takes as input a single system with parameters `p` and together with a start solution `s`. Then by tracking `s` around loops in the parameters `p`, `monodromy_solve` duplicates the solution until a stopping criterion is reached.
+Next to [`solve`](@ref), HomotopyContinuation.jl provides the function [`monodromy_solve`](@ref). Instead of taking two systems `f` and `g` and tracking an array of start solutions from `f` to `g`, [`monodromy_solve`](@ref) takes as input a single system with parameters `p` and together with a start solution `s`. Then by tracking `s` around loops in the parameters `p`, [`monodromy_solve`](@ref) tries to find new solutions until a stopping criterion is reached. Make sure to check out our [monodromy guide](https://www.juliahomotopycontinuation.org/guides/monodromy/) for a more in depth introduction into this method.
 
 ```@docs
 monodromy_solve
-```
-
-## Strategies
-```@docs
-Triangle
-Petal
 ```
 
 ## GroupActions
@@ -27,6 +21,11 @@ To help with the more common group actions we provide some helper functions:
 SymmetricGroup
 ```
 
+## Strategies
+```@docs
+Triangle
+Petal
+```
 
 ## Helper functions
 ```@docs

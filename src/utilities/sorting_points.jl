@@ -447,14 +447,17 @@ Compute all unique points with respect to the given options. See [`UniquePoints`
 for possible options. In particular, it is possible to pass group actions.
 
 ## Example
-```julia-repl
-julia> unique_points([[1.0,0.5], [1.0,0.5], [0.5,1.0]])
+
+```julia
+julia> pts = [[1.0,0.5], [1.0,0.5], [0.5,1.0]];
+julia> unique_points(pts)
 2-element Array{Array{Float64,1},1}:
  [1.0, 0.5]
  [0.5, 1.0]
 
-julia> unique_points([[1.0,0.5], [1.0,0.5], [0.5,1.0]]; group_action = x -> [x[2],x[1]])
+julia> unique_points(pts; group_action = x -> [x[2],x[1]])
 1-element Array{Array{Float64,1},1}:
  [1.0, 0.5]
+```
 """
 unique_points(v::AbstractVector{<:AbstractVector}; kwargs...) = points(UniquePoints(v; kwargs...))

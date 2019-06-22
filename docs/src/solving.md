@@ -1,11 +1,11 @@
-# Solving Polynomial Systems
+# Solving general polynomial systems
 
+The [`solve`](@ref) function is the most convenient way to solve general polynomial systems.
+For the mathematical background take a look at our [How does it work?](https://www.juliahomotopycontinuation.org/guides/how-does-it-work/) guide.
 
-## solve
 ```@docs
 solve
 ```
-
 
 ## Result
 
@@ -44,3 +44,10 @@ nfailed
 ```
 
 Also make sure to check the documentation for [`PathResult`](@ref).
+
+## Estimate the complexity
+We provide methods to compute the maximal number of solutions of polynomial systems.
+```@docs
+bezout_number
+mixed_volume
+```

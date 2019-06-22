@@ -3,18 +3,23 @@
 We also export the path tracking primitive to make the core path tracking routine
 available for other applications.
 At the heart is a [`CoreTracker`](@ref) object which holds
-all the state. The easiest way to construct a `CoreTracker` is to use the [`coretracker_startsolutions`](@ref) routine.
+all the state.
 
+```@docs
+CoreTracker
+```
+
+The easiest way to construct a `CoreTracker`:
 ```@docs
 coretracker_startsolutions
 coretracker
 ```
 
-## Types
+## Other types
 ```@docs
-CoreTracker
 CoreTrackerResult
 CoreTrackerStatus.states
+CoreTrackerOptions
 ```
 
 ## Methods
@@ -41,12 +46,15 @@ currt
 currΔt
 curriters
 currstatus
+cond
+digits_lost
+options
 ```
 
 ## Changing options
 To change settings
 ```@docs
-accuracy
+accuracy(::CoreTracker)
 set_accuracy!
 max_corrector_iters
 set_max_corrector_iters!

@@ -8,7 +8,7 @@ export solve, Result, nresults, nsolutions, nfinite, nsingular, natinfinity,
 
 The solve function takes many different arguments and options depending on your specific situation,
 but in the it always returns a [`Result`](@ref) containing the result of the computations.
-In the following we show the different inputs `solve` takes.
+In the following we show the different inputs `solve` takes and at the end we list all possible options.
 
 # Total Degree Homotopy
 
@@ -31,7 +31,7 @@ Result with 2 solutions
 • 0 singular solutions (0 real)
 • 2 paths tracked
 • random seed: 661766
-
+```
 
 # Polyhedral Homotopy
 
@@ -42,7 +42,7 @@ Solve the system `F` using a start system computed from the Newton Polytopes of 
 - A composition of polynomial systems constructed by [`compose`](@ref).
 - [`AbstractSystem`](@ref) (the system has to represent a **homogeneous** polynomial system.)
 
-If `only_torus == true` then only solutions in the algebraic torus ``(ℂ\\{0})^n`` will be computed.
+If `only_torus == true` then only solutions in the algebraic torus ``(ℂ\\setminus \\{0\\})^n`` will be computed.
 
 ### Example
 We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
@@ -159,7 +159,7 @@ if the third variable is the homogenization variable.
 
 
 # Options
-General options:
+### General options:
 
 * `seed::Int`: The random seed used during the computations.
 * `show_progress=true`: Whether a progress bar should be printed to standard out.
@@ -171,31 +171,37 @@ General options:
 * `affine_tracking::Bool=true`: Indicate whether path tracking should happen in affine space rather than projective space. Currently this is only supported for parameter homotopies.
 * `path_jumping_check::Bool=true`: Enable a check whether one of the paths jumped to another one.
 
-Path tracking specific options:
-
+### Path tracking specific options:
+* `accuracy=1e-7`: The accuracy required during the path tracking.
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
-* `max_corrector_iters=3`: The maximal number of correction steps in a single step.
-* `initial_step_size=0.1`: The step size of the first step.
-* `max_steps=1_000`: The maximal number of iterations the path tracker has available.
-* `min_step_size=1e-14`: The minimal step size.
+* `initial_step_size=0.1`: The size of the first step.
+* `max_corrector_iters=2`: The maximal number of correction steps in a single step.
+* `max_lost_digits::Real`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps. This threshold depends on the `precision` argument.
+* `max_refinement_iters=5`: The maximal number of correction steps used to refine the final value.
+* `max_steps=1_000`: The maximal number of iterations the path tracker has available. Note that this changes to `10_000` for parameter homotopies.
 * `max_step_size=Inf`: The maximal step size.
-* `maximal_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `maximal_lost_digits` in the linear algebra steps.
+* `min_step_size=1e-14`: The minimal step size.
+* `precision::PrecisionOption=PRECISION_FIXED_64`: The precision used for evaluating the residual in Newton's method.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
-* `refinement_accuracy=1e-8`: The precision used to refine the final value.
-* `accuracy=1e-7`: The precision used to track a value.
-* `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
+* `refinement_accuracy=1e-8`: The precision required for the final value.
+* `simple_step_size_alg=false`: Use a more simple step size algorithm.
+* `steps_jacobian_info_update::Int=1`: Every n-th step a linear system will be solved using a QR factorization to obtain an estimate for the condition number of the Jacobian.
+* `terminate_ill_conditioned::Bool=true`: Indicates whether the path tracking should be terminated for ill-conditioned paths. A path is considerd ill-conditioned if the condition number of the Jacobian is larger than ≈1e14 or if it is larger than 1e`max_lost_digits`.
+
+### Endgame specific options:
+* `accuracy_eg::Float64=min(accuracy, 1e-5))`: It is possible to change the accuracy during the path tracking. Usually you want lower the accuracy.
+* `cond_eg_start::Float64=1e4`: The endgame is only started if the condition of the Jacobian is larger than this threshold.
+* `max_winding_number::Int=12`: This limits the maximal number of loops taken in applying Cauchy's formula.
+* `min_cond_at_infinity::Float64=1e7`: A path is declared as going to infinity only if it's Jacobian is also larger than this threshold.
+* `samples_per_loop::Int=12`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
+* `t_eg_start::Float64=0.1`: The endgame starts only if `t` is smaller than this threshold.
+* `tol_val_inf_accurate::Float64=1e-4`: A valuation which would result in a path declared as going to infinity is only accepted if the estimated accuracy of the valuation is less than this threshold.
+* `tol_val_finite_accurate::Float64=1e-3`: A valuation which would result in a proper solution is only accepted if the estimated accuracy of the valuation is less than this threshold. This is only affects solutions where the path has at some point near 0 a condition number larger than `cond_eg_start`.
+It is recommended to also take a look at the [`PathTracker`](@ref) documentation for some context.
+
+### Overdetermined system specific options:
 * `overdetermined_min_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
 * `overdetermined_min_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
-
-Endgame specific options:
-
-* `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
-* `min_step_size_endgame_start=1e-10`: The endgame only starts if the step size becomes smaller that the provided value.
-* `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
-* `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
-* `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
-* `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
 """
 function solve end
 

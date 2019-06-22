@@ -1,10 +1,10 @@
-export CoreTracker, CoreTrackerResult, CoreTrackerStatus,
+export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
         currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
-        set_max_refinement_iters!, set_max_step_size!, digits_lost, inner
+        set_max_refinement_iters!, set_max_step_size!, digits_lost, options
 
 const coretracker_supported_keywords = [:corrector, :predictor, :patch,
     :initial_step_size, :min_step_size , :max_step_size,
@@ -122,7 +122,12 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::StepSizeModel) = op
 ######################
 
 
+"""
+    CoreTrackerOptions
 
+The set of options set for a [`CoreTracker`](@ref). See the description of [`CoreTracker`](@ref)
+for all possible options.
+"""
 mutable struct CoreTrackerOptions
     accuracy::Float64
     max_corrector_iters::Int
@@ -143,23 +148,23 @@ mutable struct CoreTrackerOptions
 end
 
 function CoreTrackerOptions(;
-    parameter_homotopy=false,
     accuracy=1e-7,
-    refinement_accuracy=1e-8,
-    max_corrector_iters::Int=2,
-    max_refinement_iters=5,
-    max_steps=parameter_homotopy ? 10_000 : 1_000,
-    initial_step_size=0.1,
-    min_step_size=1e-14,
-    max_step_size=Inf,
-    simple_step_size_alg=false,
-    update_patch=true,
     auto_scaling=true,
     auto_scaling_options=AutoScalingOptions(),
-    terminate_ill_conditioned::Bool=true,
+    initial_step_size=0.1,
+    max_corrector_iters::Int=2,
+    max_refinement_iters=5,
+    max_step_size=Inf,
+    min_step_size=1e-14,
+    parameter_homotopy=false,
+    max_steps=parameter_homotopy ? 10_000 : 1_000,
     precision::PrecisionOption=PRECISION_FIXED_64,
     max_lost_digits=default_max_lost_digits(precision, accuracy),
-    steps_jacobian_info_update::Int=1)
+    refinement_accuracy=1e-8,
+    simple_step_size_alg=false,
+    steps_jacobian_info_update::Int=1,
+    terminate_ill_conditioned::Bool=true,
+    update_patch=true)
 
     CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
             max_refinement_iters, max_steps, initial_step_size, min_step_size,
@@ -307,24 +312,29 @@ end
 # CoreTracker #
 ###############
 """
-     CoreTracker(H::AbstractHomotopy, x₁, t₁, t₀; options...)::CoreTracker
+    CoreTracker(problem::AbstractProblem, x₁; kwargs...)
 
-Create a `CoreTracker` to track `x₁` from `t₁` to `t₀`. The homotopy `H`
-needs to be homogeneous. Note that a `CoreTracker` is also a (mutable) iterator.
+Construct a `CoreTracker` from the given `problem` to track elements of type `x₁`.
+The path is tracked using a predictor-corrector scheme. The recommended methods to construct
+a `CoreTracker` are [`coretracker`](@ref) and [`coretracker_startsolutions`](@ref).
+Note that a `CoreTracker` is also a (mutable) iterator.
 
-## CoreTrackerOptions
+## Keyword arguments
+* `accuracy=1e-7`: The accuracy required during the path tracking.
 * `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
-* `max_corrector_iters=3`: The maximal number of correction steps in a single step.
-* `initial_step_size=0.1`: The step size of the first step.
-* `max_steps=1_000`: The maximal number of iterations the path tracker has available.
-* `min_step_size=1e-14`: The minimal step size.
+* `initial_step_size=0.1`: The size of the first step.
+* `max_corrector_iters=2`: The maximal number of correction steps in a single step.
+* `max_lost_digits::Real`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps. This threshold depends on the `precision` argument.
+* `max_refinement_iters=5`: The maximal number of correction steps used to refine the final value.
+* `max_steps=1_000`: The maximal number of iterations the path tracker has available. Note that this changes to `10_000` for parameter homotopies.
 * `max_step_size=Inf`: The maximal step size.
-* `max_lost_digits::Real=-(log₁₀(eps) + 3)`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps.
+* `min_step_size=1e-14`: The minimal step size.
+* `precision::PrecisionOption=PRECISION_FIXED_64`: The precision used for evaluating the residual in Newton's method.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `max_refinement_iters=10`: The maximal number of correction steps used to refine the final value.
-* `refinement_accuracy=1e-8`: The precision used to refine the final value.
-* `accuracy=1e-7`: The precision used to track a value.
-* `auto_scaling=true`: This only applies if we track in affine space. Automatically regauges the variables to effectively compute with a relative accuracy instead of an absolute one.
+* `refinement_accuracy=1e-8`: The precision required for the final value.
+* `simple_step_size_alg=false`: Use a more simple step size algorithm.
+* `steps_jacobian_info_update::Int=1`: Every n-th step a linear system will be solved using a QR factorization to obtain an estimate for the condition number of the Jacobian.
+* `terminate_ill_conditioned::Bool=true`: Indicates whether the path tracking should be terminated for ill-conditioned paths. A path is considerd ill-conditioned if the condition number of the Jacobian is larger than ≈1e14 or if it is larger than 1e`max_lost_digits`.
 """
 struct CoreTracker{H<:AbstractHomotopy,
     Predictor<:AbstractPredictor,
@@ -343,13 +353,8 @@ struct CoreTracker{H<:AbstractHomotopy,
     cache::C
 end
 
-"""
-    CoreTracker(problem::AbstractProblem, x₁, t₁, t₀; kwargs...)
-
-Construct a [`CoreTracker`](@ref) from the given `problem`.
-"""
-function CoreTracker(prob::AbstractProblem, x₁, t₁, t₀; kwargs...)
-    CoreTracker(prob.homotopy, embed(prob, x₁), t₁, t₀, prob; kwargs...)
+function CoreTracker(prob::AbstractProblem, x₁; kwargs...)
+    CoreTracker(prob.homotopy, embed(prob, x₁), complex(1.0), complex(0.0), prob; kwargs...)
 end
 
 # Tracking in Projective Space
@@ -433,7 +438,7 @@ function indempotent_x(H, x₁, t₁)
     indem_x .= x₁
 end
 
-Base.show(io::IO, ::CoreTracker) = print(io, "CoreTracker()")
+Base.show(io::IO, C::CoreTracker) = print(io, "CoreTracker tracking a path of type $(typeof(C.state.x))")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::CoreTracker) = x
 
 ##############
@@ -453,7 +458,7 @@ function track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; k
 end
 
 """
-     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, loop::Bool=false)
+     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, loop::Bool=false)::CoreTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 Returns one of the enum values of `CoreTrackerStatus.states` indicating the status.
@@ -461,7 +466,7 @@ If the tracking was successfull it is `CoreTrackerStatus.success`.
 If `setup_patch` is `true` then [`setup!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)
+    track!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)::CoreTrackerStatus.states
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
@@ -876,6 +881,13 @@ Returns the inner product used to compute distance during the path tracking.
 inner(tracker::CoreTracker) = inner(tracker.state)
 inner(state::CoreTrackerState) = state.inner_product
 
+"""
+    options(tracker::CoreTracker)
+
+Returns the options used in the tracker.
+"""
+options(tracker::CoreTracker) = tracker.options
+
 ##################
 # Modify options #
 ##################
@@ -1035,7 +1047,7 @@ to investigate single paths.
 function coretracker_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
-    tracker = CoreTracker(prob, start_solution_sample(startsolutions), one(ComplexF64), zero(ComplexF64); rest...)
+    tracker = CoreTracker(prob, start_solution_sample(startsolutions); rest...)
     (tracker=tracker, startsolutions=startsolutions)
 end
 
