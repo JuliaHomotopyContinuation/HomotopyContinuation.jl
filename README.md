@@ -1,4 +1,4 @@
-<img src="https://i.imgur.com/8ycOn14.png" width="320px">
+<img src="https://www.juliahomotopycontinuation.org/images/logo_transparent_bg.png" width="320px">
 
 | **Documentation** | **Build Status** |
 |:-----------------:|:----------------:|
