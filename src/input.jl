@@ -100,7 +100,7 @@ function input_startsolutions(F::MPPolyInputs; parameters=nothing, kwargs...)
     remove_zeros!(F)
     # square system and each polynomial is non-zero
     if length(F) == nvariables(F) && ishomogeneous(F)
-        error("Cannot construct a start system for a square homogeneous system.")
+        throw(ArgumentError("Cannot construct a start system for a square homogeneous system."))
     end
 
     (input=TargetSystemInput(F), startsolutions=nothing)
@@ -112,7 +112,7 @@ end
 
 function input_startsolutions(G::MPPolyInputs, F::MPPolyInputs, startsolutions=nothing)
     if length(G) ≠ length(F)
-        error("Start and target system don't have the same length")
+        throw(ArgumentError("Start and target system don't have the same length"))
     end
     check_zero_dimensional(F)
     if startsolutions === nothing

@@ -405,7 +405,7 @@ function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
 	# Check overdetermined case
-	n > N && error(overdetermined_error_msg)
+	n > N && throw(ArgumentError("Currently custom overdetermined systems are not supported."))
 	variable_groups = VariableGroups(N, homvaridx)
     (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
@@ -426,12 +426,12 @@ function abstract_system_degrees(F)
 	n, N = size(F)
 
 	degrees = compute_numerically_degrees(F)
-	isnothing(degrees) && error("Input system is not homogeneous by our numerical check.")
+	isnothing(degrees) && throw(ArgumentError("Input system is not homogeneous by our numerical check."))
 	# system needs to be homogeneous
 	if n + 1 > N
-		error(overdetermined_error_msg)
+		throw(ArgumentError("Currently custom overdetermined systems are not supported."))
 	elseif  n + 1 ≠ N
-		error("Input system is not a square homogeneous system!")
+		throw(ArgumentError("Input system is not a square homogeneous system!"))
 	end
 	degrees
 end

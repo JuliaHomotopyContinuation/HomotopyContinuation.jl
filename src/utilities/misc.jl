@@ -208,7 +208,7 @@ function check_kwargs_empty(kwargs, allowed_kwargs=[])
             msg *= "\nAllowed keywords are\n"
             msg *= join(allowed_kwargs, ", ")
         end
-        throw(ErrorException(msg))
+        throw(ArgumentError(msg))
     end
 end
 
