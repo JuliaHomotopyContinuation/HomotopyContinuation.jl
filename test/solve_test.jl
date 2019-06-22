@@ -98,6 +98,7 @@
         res = solve(e ∘ f ∘ g)
         @test nnonsingular(res) == 2
         @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=nothing)) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=:equations_and_variables)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
