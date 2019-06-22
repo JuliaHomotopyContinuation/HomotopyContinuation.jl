@@ -178,11 +178,8 @@ Returns `true` if [`pull_back`](@ref) would pull a solution `x` into affine spac
 """
 pull_back_is_to_affine(prob::AbstractProblem{AffineTracking}) = true
 function pull_back_is_to_affine(prob::AbstractProblem{ProjectiveTracking})
-	_pull_back_is_to_affine(prob.vargroups)
+	has_dedicated_homvars(prob.vargroups)
 end
-_pull_back_is_to_affine(::VariableGroups{M,true}) where {M} = true
-_pull_back_is_to_affine(::VariableGroups{M,false}) where {M} = false
-
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
 	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)

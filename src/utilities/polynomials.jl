@@ -289,7 +289,7 @@ Base.length(::VariableGroups{N}) where N = N
 
 Returns the variable groups.
 """
-variable_groups(VG::VariableGroups) = map(g -> VG.variables[g], VG.groups)
+variable_groups(VG::VariableGroups) = map(g -> variables(VG)[g], VG.groups)
 
 """
 	flattened_groups(VG::VariableGroups)
