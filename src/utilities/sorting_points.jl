@@ -422,7 +422,9 @@ default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_di
 function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
     mults = Dict{Int, Vector{Int}}()
     positions = Vector{Int32}()
-    data = UniquePoints(typeof(float.(f(first(v)))), distance; check_real=check_real, kwargs...)
+    x₀ = f(first(v))
+    T = typeof(similar(x₀, promote_type(eltype(x₀), Float64)))
+    data = UniquePoints(T, distance; check_real=check_real, kwargs...)
     for (i, vᵢ) in enumerate(v)
         k = add!(data, f(vᵢ), Val(true); tol = tol)
         if k > 0
