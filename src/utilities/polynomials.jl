@@ -46,7 +46,6 @@ compose(g::MPPolys, f::Composition, h::Composition...) = compose(Composition([g,
 compose(g::MPPolys, fs::MPPolys...) = Composition([g, fs...])
 
 import Base: ∘
-∘(g::Union{Composition, <:MPPolys}, f::Union{<:MPPolys, <:Composition}) = compose(g, f)
 ∘(g::Union{Composition, <:MPPolys}, f::MPPolys) = compose(g, f)
 ∘(g::Union{Composition, <:MPPolys}, f::MPPolys...) = compose(g, f...)
 ∘(g::Union{Composition, <:MPPolys}, f::Composition...) = compose(g, f...)

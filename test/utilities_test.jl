@@ -169,6 +169,9 @@
         g = [x+y, y + z, x + z]
         @test expand(f ∘ g) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2]
         @test expand(e ∘ f ∘ g) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2 + 1]
+        @test expand(e ∘ (f ∘ g)) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2 + 1]
+        @test expand((e ∘ f) ∘ g) == [x^2*y + x^2*z + x*y^2 + 2*x*y*z + x*z^2 + y^2*z + y*z^2 + 1]
+        @test e ∘ f == e ∘ f
 
         @test validate(f ∘ g) == true
         @test validate(f ∘ g, parameters=[z]) == true
