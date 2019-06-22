@@ -24,7 +24,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-DynamicPolynomials = "^0.1.2"
+DynamicPolynomials = "^0.1, ^0.2"
 ElasticArrays = "^0.3"
 FixedPolynomials = "^0.4.0"
 MixedSubdivisions = "^0.2"
