@@ -448,7 +448,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
         state.s = real(currt(core_tracker))
-        # println("s: ", state.s)
         check_terminated!(core_tracker)
 
         if core_tracker.state.status == CoreTrackerStatus.success
@@ -456,11 +455,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
             break
         elseif core_tracker.state.status != CoreTrackerStatus.tracking
             state.status = PathTrackerStatus.status(core_tracker.state.status)
-            break
-        end
-
-        if core_tracker.state.jacobian.corank > 0
-            state.status = PathTrackerStatus.terminated_ill_conditioned
             break
         end
 
@@ -474,9 +468,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # If the condition number is too low we also do not care
         start_eg(core_tracker, options) || continue
         # possibly reduce desired accuracy
-        # @show state.val
-        # @show verdict
-        # @show start_infinity_cutoff(core_tracker, options)
         if tracker.options.at_infinity_check &&
            verdict == VALUATION_AT_INFINIY &&
            start_infinity_cutoff(core_tracker, options)

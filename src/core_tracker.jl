@@ -573,7 +573,6 @@ function step!(tracker::CoreTracker)
 
     try
         t, Δt = currt(state), currΔt(state)
-        # println("t: ", real(t), " Δt: ", real(Δt))
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
         update_jacobian_infos =
@@ -582,7 +581,6 @@ function step!(tracker::CoreTracker)
         # reset counter
         update_jacobian_infos && (state.steps_jacobian_info_update = 0)
         result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
-
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
