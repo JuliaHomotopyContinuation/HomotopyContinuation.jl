@@ -314,7 +314,9 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 
 	classifcation = classify_system(F, vargroups; affine_tracking=affine_tracking)
 	if classifcation == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported.")
+		throw(ArgumentError("Underdetermined polynomial systems are currently not supported." *
+		     " Consider adding linear polynomials to your system in order to reduce your system" *
+			 " to a zero dimensional system."))
 	# The following case is too annoying right now
 	elseif classifcation == :overdetermined && ngroups(vargroups) > 1
 		error("Overdetermined polynomial systems with a multi-homogenous structure are currently not supported.")

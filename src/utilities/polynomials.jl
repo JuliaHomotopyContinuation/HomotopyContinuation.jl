@@ -802,30 +802,6 @@ function classify_system(F, vargroups::VariableGroups; affine_tracking=false)
     end
 end
 
-const overdetermined_error_msg = """
-The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
-See
-    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
-for details.
-"""
-
-"""
-    check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
-
-Checks whether `F` is a square polynomial system.
-"""
-function check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
-    class = classify_system(F, vargroups; affine_tracking=affine_tracking)
-    if class == :overdetermined
-        error(overdetermined_error_msg)
-    elseif class == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported." *
-		     " Consider adding linear polynomials to your system in order to reduce your system" *
-			 " to a zero dimensional system.")
-    end
-    nothing
-end
-
 exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
 
 function coefficient_dot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
