@@ -37,7 +37,7 @@
         ∇L = differentiate(L, [x, y, z, λ])
 
         # Now we solve the polynomial system ∇L = 0
-        result = solve(∇L)
+        result = solve(∇L; show_progress=false)
         @test nfinite(result) == 108
 
         result = solve(∇L, variable_groups = [(x,y,z), (λ,)], show_progress = false)
@@ -120,7 +120,7 @@
 
 		q₀ = [m([a; μ; σ²] => start_sol) for m in f]
 		@polyvar p[1:9]
-		R = monodromy_solve(f - p, start_sol, q₀; parameters=p, target_solutions_count = 1350)
+		R = monodromy_solve(f - p, start_sol, q₀; parameters=p, target_solutions_count = 1350, show_progress=false)
 		R2 = solve(f - p, solutions(R); parameters = p,
   				 start_parameters=q₀, target_parameters = p₀,
 				 show_progress = false)
@@ -135,6 +135,7 @@
 
 		R_with_group_action = monodromy_solve(f - p, start_sol, q₀;
 					parameters=p, group_action = relabeling,
+					show_progress=false,
 					target_solutions_count=225)
 
 		@test all(length.([relabeling(s) for s in solutions(R_with_group_action)]) .== 6)

@@ -1,17 +1,17 @@
 @testset "Root counts" begin
 
     @testset "Benchmark systems" begin
-        kat10 = solve(equations(katsura(10)))
+        kat10 = solve(equations(katsura(10)); show_progress=false)
         @test nfinite(kat10) == 1024
         @test nsingular(kat10) == 0
         @test nreal(kat10) == 216
 
-        cyclic5 = solve(equations(cyclic(5)))
+        cyclic5 = solve(equations(cyclic(5)); show_progress=false)
         @test nfinite(cyclic5) == 70
         @test nreal(cyclic5) == 10
         @test nsingular(cyclic5) == 0
 
-        cyclic7 = solve(equations(cyclic(7)))
+        cyclic7 = solve(equations(cyclic(7)); show_progress=false)
         @test nfinite(cyclic7) == 924
         @test nreal(cyclic7) == 56
         @test nsingular(cyclic7) == 0
@@ -36,19 +36,21 @@
     end
 
     @testset "Bio-chemical reaction networks" begin
-        res = solve(equations(PolynomialTestSystems.bacillus_subtilis()))
-        @test nsolutions(res) == 44
+        res = solve(equations(PolynomialTestSystems.bacillus_subtilis()); show_progress=false)
+        @test 40 ≤ nsolutions(res) ≤ 44
+        res = solve(equations(PolynomialTestSystems.bacillus_subtilis()); start_system=:polyhedral, show_progress=false)
+        @test 40 ≤ nsolutions(res) ≤ 44
 
         # These test got prepared by Torkel Loman to test the BioDiffEq integration
         @polyvar x[1:3] p[1:10]
-        results1_direct = fill(0,10)
-        results1_template = fill(0,10)
-        results2_direct = fill(0,10)
-        results2_template = fill(0,10)
-        results3_direct = fill(0,10)
-        results3_template = fill(0,10)
-        results4_direct = fill(0,10)
-        results4_template = fill(0,10)
+        results1_direct = fill(0,12)
+        results1_template = fill(0,12)
+        results2_direct = fill(0,12)
+        results2_template = fill(0,12)
+        results3_direct = fill(0,12)
+        results3_template = fill(0,12)
+        results4_direct = fill(0,12)
+        results4_template = fill(0,12)
 
         for i = 1:100
             pol = [ -x[1]*x[3]*p[3] - x[1]*p[2] + p[1],
@@ -78,7 +80,7 @@
             f2_template = DynamicPolynomials.subs.(pol2, Ref(p => p2_template))
             solve_templ2 = HomotopyContinuation.solve(f2_template, show_progress=false)
             result2_template = solutions(solve_templ2)
-            sol2_again = solutions(HomotopyContinuation.solve(pol2, result2_template, max_steps=10_000, parameters=p[1:8], p₁=p2_template, p₀=ComplexF64.(p2_vals), show_progress=false))
+            sol2_again = solutions(HomotopyContinuation.solve(pol2, result2_template, precision=PRECISION_ADAPTIVE, parameters=p[1:8], p₁=p2_template, p₀=ComplexF64.(p2_vals), show_progress=false))
             results2_template[length(sol2_again)+1] +=1
 
             pol3 = pol2
@@ -109,8 +111,7 @@
 
         @test results1_template[4] == 100
         @test 98 <= results1_direct[4] <= 100
-        @test 95 <= results2_direct[7] <= 100
-        @test results2_direct[8] <= 1
+        @test 98 <= results2_direct[7] <= 100
         @test 98 ≤ results2_template[7] ≤ 100
         @test 98 ≤ results3_direct[7] ≤ 100
         @test 98 ≤ results3_template[7] ≤ 100

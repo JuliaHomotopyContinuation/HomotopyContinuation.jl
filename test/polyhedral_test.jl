@@ -18,6 +18,11 @@
             end
         end
         @test mv == 70
+
+        Random.seed!(130793) # this seed should result in the use of 128 bit hnf
+        f = equations(PolynomialTestSystems.tritangents())
+        iter = HC.PolyhedralStartSolutionsIterator(f)
+        @test sum(cell_X -> first(cell_X).volume, iter) == 12636
     end
 
     @testset "Polyhedral solve" begin
