@@ -246,12 +246,6 @@ end
 UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
 UniquePoints(v; distance=euclidean_distance, kwargs...) = UniquePoints(v, distance; kwargs...)
 
-function Base.similar(data::UniquePoints{V, T}) where {V, T}
-    root = SearchBlock(T)
-    points = Vector{V}()
-    UniquePoints(root, points, data.distance_function, data.group_actions, data.check_real)
-end
-
 function Base.show(io::IO, data::UniquePoints)
     print(io, typeof(data), " with ", length(points(data)), " points")
 end

@@ -803,27 +803,6 @@ end
 
 exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
 
-function coefficient_dot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
-    if f === g
-        return sum(t -> abs2(float(MP.coefficient(t))), f)
-    end
-    result = zero(promote_type(T,S, Float64))
-    for term_f in f
-        c_f = MP.coefficient(term_f)
-        exp_f = exponent(term_f, vars)
-        for term_g in g
-            c_g = MP.coefficient(term_g)
-            exp_g = exponent(term_g, vars)
-            if exp_f == exp_g
-                result += (c_f * conj(c_g))
-                break
-            end
-        end
-    end
-    result
-end
-coefficient_norm(f::MPPoly, vars=variables(f)) = √(coefficient_dot(f, f, vars))
-
 """
     weyldot(f::Polynomial, g::Polynomial)
 Compute the [Bombieri-Weyl dot product](https://en.wikipedia.org/wiki/Bombieri_norm).
