@@ -147,25 +147,6 @@ Base.length(F::AbstractHomotopy) = size(F, 1)
 
 
 """
-    precondition!(H::AbstractHomotopy, x, t, cache)
-
-Prepare a homotopy for things like pathtracking starting at `x` and `t`.
-This can modify `x` as well as `H` and anything in `cache`.
-By default this is a no-op. If `H` wraps another homotopy this should call
-`precondition!` on this as well.
-"""
-precondition!(H::AbstractHomotopy, x, t, cache) = nothing
-"""
-    update!(H::AbstractHomotopy, x, t, cache)
-
-Update a homotopy for new values of `x` and `x`, i.e., update an affine patch.
-This can modify `x` as well as `H` and anything in `cache`.
-By default this is a no-op. If `H` wraps another homotopy this should call
-`update!` on this as well.
-"""
-update!(H::AbstractHomotopy, x, t, cache) = nothing
-
-"""
     basehomotopy(H::AbstractHomotopy)
 
 Returns the 'proper' homotopy describing the problem. Any wrapper homotopy

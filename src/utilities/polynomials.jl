@@ -46,7 +46,6 @@ compose(g::MPPolys, f::Composition, h::Composition...) = compose(Composition([g,
 compose(g::MPPolys, fs::MPPolys...) = Composition([g, fs...])
 
 import Base: ∘
-∘(g::Union{Composition, <:MPPolys}, f::Union{<:MPPolys, <:Composition}) = compose(g, f)
 ∘(g::Union{Composition, <:MPPolys}, f::MPPolys) = compose(g, f)
 ∘(g::Union{Composition, <:MPPolys}, f::MPPolys...) = compose(g, f...)
 ∘(g::Union{Composition, <:MPPolys}, f::Composition...) = compose(g, f...)
@@ -289,7 +288,7 @@ Base.length(::VariableGroups{N}) where N = N
 
 Returns the variable groups.
 """
-variable_groups(VG::VariableGroups) = map(g -> VG.variables[g], VG.groups)
+variable_groups(VG::VariableGroups) = map(g -> variables(VG)[g], VG.groups)
 
 """
 	flattened_groups(VG::VariableGroups)
@@ -802,52 +801,7 @@ function classify_system(F, vargroups::VariableGroups; affine_tracking=false)
     end
 end
 
-const overdetermined_error_msg = """
-The input system is overdetermined. Therefore it is necessary to provide an explicit start system.
-See
-    https://www.JuliaHomotopyContinuation.org/guides/latest/overdetermined_tracking/
-for details.
-"""
-
-"""
-    check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
-
-Checks whether `F` is a square polynomial system.
-"""
-function check_square_system(F, vargroups::VariableGroups; affine_tracking=false)
-    class = classify_system(F, vargroups; affine_tracking=affine_tracking)
-    if class == :overdetermined
-        error(overdetermined_error_msg)
-    elseif class == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported." *
-		     " Consider adding linear polynomials to your system in order to reduce your system" *
-			 " to a zero dimensional system.")
-    end
-    nothing
-end
-
 exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
-
-function coefficient_dot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
-    if f === g
-        return sum(t -> abs2(float(MP.coefficient(t))), f)
-    end
-    result = zero(promote_type(T,S, Float64))
-    for term_f in f
-        c_f = MP.coefficient(term_f)
-        exp_f = exponent(term_f, vars)
-        for term_g in g
-            c_g = MP.coefficient(term_g)
-            exp_g = exponent(term_g, vars)
-            if exp_f == exp_g
-                result += (c_f * conj(c_g))
-                break
-            end
-        end
-    end
-    result
-end
-coefficient_norm(f::MPPoly, vars=variables(f)) = √(coefficient_dot(f, f, vars))
 
 """
     weyldot(f::Polynomial, g::Polynomial)

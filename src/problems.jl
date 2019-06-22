@@ -178,11 +178,8 @@ Returns `true` if [`pull_back`](@ref) would pull a solution `x` into affine spac
 """
 pull_back_is_to_affine(prob::AbstractProblem{AffineTracking}) = true
 function pull_back_is_to_affine(prob::AbstractProblem{ProjectiveTracking})
-	_pull_back_is_to_affine(prob.vargroups)
+	has_dedicated_homvars(prob.vargroups)
 end
-_pull_back_is_to_affine(::VariableGroups{M,true}) where {M} = true
-_pull_back_is_to_affine(::VariableGroups{M,false}) where {M} = false
-
 
 function construct_system(F::Composition, system_constructor; homvars=nothing, kwargs...)
 	CompositionSystem(F, system_constructor; homvars=homvars, kwargs...)
@@ -314,7 +311,9 @@ function problem_startsolutions(input::TargetSystemInput{<:MPPolyInputs}, ::Noth
 
 	classifcation = classify_system(F, vargroups; affine_tracking=affine_tracking)
 	if classifcation == :underdetermined
-        error("Underdetermined polynomial systems are currently not supported.")
+		throw(ArgumentError("Underdetermined polynomial systems are currently not supported." *
+		     " Consider adding linear polynomials to your system in order to reduce your system" *
+			 " to a zero dimensional system."))
 	# The following case is too annoying right now
 	elseif classifcation == :overdetermined && ngroups(vargroups) > 1
 		error("Overdetermined polynomial systems with a multi-homogenous structure are currently not supported.")
@@ -406,7 +405,7 @@ function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
 	degrees = abstract_system_degrees(input.system)
     G = TotalDegreeSystem(degrees)
 	# Check overdetermined case
-	n > N && error(overdetermined_error_msg)
+	n > N && throw(ArgumentError("Currently custom overdetermined systems are not supported."))
 	variable_groups = VariableGroups(N, homvaridx)
     (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
@@ -427,12 +426,12 @@ function abstract_system_degrees(F)
 	n, N = size(F)
 
 	degrees = compute_numerically_degrees(F)
-	isnothing(degrees) && error("Input system is not homogeneous by our numerical check.")
+	isnothing(degrees) && throw(ArgumentError("Input system is not homogeneous by our numerical check."))
 	# system needs to be homogeneous
 	if n + 1 > N
-		error(overdetermined_error_msg)
+		throw(ArgumentError("Currently custom overdetermined systems are not supported."))
 	elseif  n + 1 ≠ N
-		error("Input system is not a square homogeneous system!")
+		throw(ArgumentError("Input system is not a square homogeneous system!"))
 	end
 	degrees
 end

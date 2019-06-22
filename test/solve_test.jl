@@ -1,24 +1,24 @@
 @testset "solve" begin
     @testset "Invalid input" begin
         @polyvar x y z
-        @test_throws ErrorException solve([x-2y+2, 0])
-        @test_throws ErrorException solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
+        @test_throws ArgumentError solve([x-2y+2, 0])
+        @test_throws ArgumentError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
         @test_throws ArgumentError solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
         # overdetermined and abstract system
-        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
-        @test_throws ErrorException solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
+        @test_throws ArgumentError solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
+        @test_throws ArgumentError solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
 
-        @test_throws ErrorException solve([x-2z, y^2+3z^2, z^3+x^3])
+        @test_throws ArgumentError solve([x-2z, y^2+3z^2, z^3+x^3])
 
         @test_throws ArgumentError solve([x-2z, y^2+3z], homvar=z)
         @test_throws ArgumentError solve([x - 1], patch=OrthogonalPatch())
         # invalid kwargs
-        @test_throws ErrorException solve(equations(cyclic(5)), def=0.4, abc=23)
+        @test_throws ArgumentError solve(equations(cyclic(5)), def=0.4, abc=23)
 
         # test numerical homogeneous check fails
         @polyvar x y z
         G = FPSystem([x-2z, y^2+3z])
-        @test_throws ErrorException solve(G, homvar=3)
+        @test_throws ArgumentError solve(G, homvar=3)
     end
 
     @testset "solve" begin
@@ -98,6 +98,7 @@
         res = solve(e ∘ f ∘ g)
         @test nnonsingular(res) == 2
         @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=nothing)) == 2
+        @test nnonsingular(solve(e ∘ f ∘ g, system_scaling=:equations_and_variables)) == 2
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2

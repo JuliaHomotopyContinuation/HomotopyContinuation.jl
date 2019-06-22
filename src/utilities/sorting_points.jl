@@ -1,4 +1,4 @@
-export UniquePoints, multiplicities, iscontained, add!, simple_add!, empty!, points
+export UniquePoints, multiplicities, iscontained, add!, simple_add!, empty!, points, unique_points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -196,15 +196,16 @@ Optional keywords:
 * `check_real=true` adds real from points from group orbits (if they exist). The default is `check_real=true`.
 * The user can use `group_action=foo` or, if there is more than one group acting, `group_actions=[foo, bar]`. Then, points that are in the same group orbit are considered equal. See [`GroupActions`](@ref) for details regarding the application rules.
 
-
-## Example
+## Examples
 ```julia-repl
-julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]])
-[1.0, 0.5]
-[0.5, 1.0]
+julia> points(UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]]))
+2-element Array{Array{Float64,1},1}:
+ [1.0, 0.5]
+ [0.5, 1.0]
 
-julia> UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -> ([x[2];x[1]],))
-[1.0, 0.5]
+julia> points(UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -> [x[2],x[1]]))
+1-element Array{Array{Float64,1},1}:
+ [1.0, 0.5]
 ```
 """
 struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, GroupActions}}
@@ -245,12 +246,6 @@ function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Rea
 end
 UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
 UniquePoints(v; distance=euclidean_distance, kwargs...) = UniquePoints(v, distance; kwargs...)
-
-function Base.similar(data::UniquePoints{V, T}) where {V, T}
-    root = SearchBlock(T)
-    points = Vector{V}()
-    UniquePoints(root, points, data.distance_function, data.group_actions, data.check_real)
-end
 
 function Base.show(io::IO, data::UniquePoints)
     print(io, typeof(data), " with ", length(points(data)), " points")
@@ -413,13 +408,12 @@ multiplicities([[1,0.5]; [1,0.5]; [1,1]]; distance=(x,y) -> LinearAlgebra.norm(x
 ```
 Here is an example for using group actions.
 ```julia-repl
-julia> X = [[1, 2, 3, 4]; [2,1,3,4]; [1,2,4,3]; [2,1,4,3]]
-julia> permutation(x) = ([x[2], x[1], x[3], x[4]],)
+julia> X = [[1, 2, 3, 4], [2,1,3,4], [1,2,4,3], [2,1,4,3]]
+julia> permutation(x) = [x[2], x[1], x[3], x[4]]
 julia> m = multiplicities(X, group_action = permutation)
 [[1,2], [3,4]]
 ```
 """
-
 multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
 function multiplicities(f, v; distance=default_distance(f,v), kwargs...) where {F<:Function}
     _multiplicities(f, v, distance; kwargs...)
@@ -428,7 +422,9 @@ default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_di
 function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
     mults = Dict{Int, Vector{Int}}()
     positions = Vector{Int32}()
-    data = UniquePoints(typeof(f(first(v))), distance; check_real=check_real, kwargs...)
+    x₀ = f(first(v))
+    T = typeof(similar(x₀, promote_type(eltype(x₀), Float64)))
+    data = UniquePoints(T, distance; check_real=check_real, kwargs...)
     for (i, vᵢ) in enumerate(v)
         k = add!(data, f(vᵢ), Val(true); tol = tol)
         if k > 0
@@ -443,3 +439,22 @@ function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false,
     end
     collect(values(mults))
 end
+
+"""
+    unique_points(points::AbstractVector{<:AbstractVector}; options...)
+
+Compute all unique points with respect to the given options. See [`UniquePoints`](@ref)
+for possible options. In particular, it is possible to pass group actions.
+
+## Example
+```julia-repl
+julia> unique_points([[1.0,0.5], [1.0,0.5], [0.5,1.0]])
+2-element Array{Array{Float64,1},1}:
+ [1.0, 0.5]
+ [0.5, 1.0]
+
+julia> unique_points([[1.0,0.5], [1.0,0.5], [0.5,1.0]]; group_action = x -> [x[2],x[1]])
+1-element Array{Array{Float64,1},1}:
+ [1.0, 0.5]
+"""
+unique_points(v::AbstractVector{<:AbstractVector}; kwargs...) = points(UniquePoints(v; kwargs...))
