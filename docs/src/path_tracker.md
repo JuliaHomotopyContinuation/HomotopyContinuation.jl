@@ -43,6 +43,7 @@ PathResult
 The following helper functions are provided
 ```@docs
 solution
+accuracy
 residual
 start_solution
 Base.isreal(::PathResult)
