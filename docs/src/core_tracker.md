@@ -46,7 +46,7 @@ currt
 currΔt
 curriters
 currstatus
-cond
+LinearAlgebra.cond(::CoreTracker)
 digits_lost
 options
 ```
