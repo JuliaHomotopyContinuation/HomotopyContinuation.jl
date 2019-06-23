@@ -31,7 +31,6 @@ results
 mapresults
 solutions
 realsolutions
-uniquesolutions
 finite
 Base.real(::HomotopyContinuation.Results)
 atinfinity

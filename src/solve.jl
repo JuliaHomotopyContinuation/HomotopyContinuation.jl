@@ -573,7 +573,6 @@ Base.iterate(r::Result, state) = iterate(r.pathresults, state)
 Base.lastindex(r::Result) = lastindex(r.pathresults)
 Base.eltype(r::Type{Result{V}}) where {V} = PathResult{V}
 
-
 is_multiple_result(r::PathResult, R::Result) = is_multiple_result(r, R.multiplicity_info)
 is_multiple_result(r::PathResult, R::Vector{<:PathResult}) = false
 
@@ -677,7 +676,7 @@ nfinite(R::Results) = count(isfinite, R)
 
 The number of solutions.
 """
-nsolutions(R::Results) = count(issuccess, R)
+nsolutions(R::Results) = nresults(R)
 
 """
     nsingular(result; singulartol=1e10, multiplicitytol=1e-5, counting_multiplicities=false, kwargs...)
@@ -833,7 +832,7 @@ If `multiple_results=false` only one point from each cluster of multiple solutio
 If If `multiple_results=true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Result; tol=1e10, kwargs...)
+function singular(R::Results; tol=1e10, kwargs...)
     results(R; onlysingular = true, singulartol=tol, kwargs...)
 end
 
@@ -877,54 +876,6 @@ Two solutions are regarded as equal, when their pairwise distance is less than '
 function multiplicities(results::Results; tol=1e-6)
     map(i -> results[i], multiplicities(solution, results; tol = tol))
 end
-
-"""
-    uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)
-
-Return all *unique* solutions. If `multiplicities` is `true`, then
-all *unique* solutions with their correspnding multiplicities as pairs `(s, m)`
-where `s` is the solution and `m` the multiplicity are returned.
-For the possible `conditions` see [`results`](@ref).
-
-## Example
-```julia-repl
-julia> @polyvar x;
-julia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)
-[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]
-julia> uniquesolutions([(x-3)^3*(x+2)])
-[[3.0+0.0im], [-2.0+0.0im]]
-```
-"""
-function uniquesolutions(R::Results; tol=1e-6, multiplicities=false, conditions...)
-    uniquesolutions(R, Val(multiplicities); tol=tol, conditions...)
-end
-
-function uniquesolutions(R::Results, ::Val{Multiplicities}; tol=1e-6, conditions...)  where {Multiplicities}
-    sols = solutions(R; conditions...)
-    M = multiplicities(sols; tol=tol)
-    indicator = trues(length(sols))
-    uniques = map(M) do m
-        for k in m
-            indicator[k] = false
-        end
-        if Multiplicities
-            (sols[m[1]], length(m))
-        else
-            sols[m[1]]
-        end
-    end
-    for (k, s) in enumerate(sols)
-        if indicator[k]
-            if Multiplicities
-                push!(uniques, (s, 1))
-            else
-                push!(uniques, s)
-            end
-        end
-    end
-    uniques
-end
-
 
 ####Show function
 
