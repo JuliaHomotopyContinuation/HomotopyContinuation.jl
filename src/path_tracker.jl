@@ -5,9 +5,7 @@ export PathResult, PathTrackerStatus, PathTracker,
 
 
 const pathtracker_supported_keywords = [
-    :at_infinity_check, :min_step_size_endgame_start,
-    :min_val_accuracy, :samples_per_loop,
-    :max_winding_number, :max_affine_norm,
+    :at_infinity_check, :samples_per_loop, :max_winding_number,
     :overdetermined_min_accuracy, :overdetermined_min_residual,
     :cond_eg_start, :min_cond_at_infinity,
     :t_eg_start, :tol_val_inf_accurate, :tol_val_finite_accurate, :accuracy, :accuracy_eg]
