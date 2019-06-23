@@ -121,8 +121,10 @@
         z = 1
         F = [x^2 + 2*y^2 + 2*im*y*z, (18 + 3*im)*x*y + 7*im*y^2 - (3 - 18*im)*x*z - 14*y*z - 7*im*z^2]
         result = solve(F)
-        @test nsingular(result) == 3
-        @test all(r -> r.winding_number == 3, singular(result))
+        @test nsingular(result) == 1
+        @test nsingular(result; counting_multiplicities=true) == 3
+        @test length(singular(result)) == 1
+        @test all(r -> r.winding_number == 3, singular(result; multiple_results = true))
     end
 
     @testset "Path jumping" begin
@@ -316,17 +318,20 @@
         # This has two roots of multiplicity 6 at the hyperplane z=0
         F = [0.75x^4 + 1.5x^2*y^2-2.5x^2*z^2+0.75*y^4 - 2.5y^2*z^2 + 0.75z^4; 10x^2*z + 10*y^2*z-6z^3]
         res = solve(F; threading=false)
-        @test nsingular(res) == 12
+        @test nsingular(res) == 2
+        @test nsingular(res; counting_multiplicities=true) == 12
         @test length.(multiplicities(solutions(res))) == [6,6]
 
         F_affine = subs.(F, Ref(y => 1))
         res_affine = solve(F_affine; threading=false)
-        @test nsingular(res_affine) == 12
+        @test nsingular(res_affine) == 2
+        @test nsingular(res_affine; counting_multiplicities=true) == 12
         @test length.(multiplicities(solutions(res_affine))) == [6,6]
         @test_nowarn sprint(show, res_affine)
 
         res_affine2 = solve(F_affine; affine_tracking=false, threading=false)
-        @test nsingular(res_affine2) == 12
+        @test nsingular(res_affine2) == 2
+        @test nsingular(res_affine2; counting_multiplicities=true) == 12
         @test length.(multiplicities(solutions(res_affine2))) == [6,6]
     end
 end

@@ -50,12 +50,14 @@
         @test R isa Result
         test_treeviews(R)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
         @test_nowarn sprint(show, R)
 
         R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=nothing)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
         @test_nowarn sprint(show, R)
 
         @polyvar x y z
@@ -70,7 +72,8 @@
         @test R isa Result{<:ProjectiveVectors.PVector}
         test_treeviews(R)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
 
         @polyvar x y z
         V = x^2 + y^2 - z^2

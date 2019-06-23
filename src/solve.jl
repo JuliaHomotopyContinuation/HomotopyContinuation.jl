@@ -584,12 +584,26 @@ The number of solutions.
 nsolutions(R::Results) = count(issuccess, R)
 
 """
-    nsingular(result; tol=1e10)
+    nsingular(result; singulartol=1e10, multiplicitytol=1e-5, counting_multiplicities=false, kwargs...)
 
 The number of singular solutions. A solution is considered singular
-if its windingnumber is larger than 1 or the condition number is larger than `tol`.
+if its windingnumber is larger than 1 or the condition number is larger than `tol`. If `counting_multiplicities=true` the number of singular solutions times their multiplicities is returned.
 """
-nsingular(R::Results; tol=1e10) = count(r -> issingular(r, tol), R)
+function nsingular(R::Results; singulartol=1e10, multiplicitytol=1e-5, counting_multiplicities=false, kwargs...)
+    S = results(R; onlysingular = true, singulartol=singulartol, kwargs...)
+    if !isempty(S)
+        s = length(S)
+        if !counting_multiplicities
+            info = multiplicities_info(S, multiplicitytol)
+            if !isempty(info)
+                s -= sum(length(info[k])  * (k - 1) for k in keys(info))
+            end
+        end
+        return s
+    else
+        return 0
+    end
+end
 
 """
     natinfinity(result)
@@ -723,13 +737,26 @@ for `results(R; onlynonsingular=true, conditions...)`. For the possible `conditi
 nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 
 """
-    singular(result::Results; conditions...)
+    singular(R::Results; singulartol=1e10, multiplicitytol=1e-5, multiple_results=false, kwargs...)
 
-Return all `PathResult`s for which the solution is singular. This is just a shorthand
-for `results(R; onlysingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+Return all `PathResult`s for which the solution is singular. A solution is labeled singular if the condition number is greater than `singulartol`, or if the winding number is > 1. If `multiple_results=false` only one point from each cluster of multiple points (computed from [`multiplicities`](@ref) with tolerance `multiplicitytol`) is returned. If If `multiple_results=true` all singular solutions in `R` are returned.  For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Results; singulartol=1e10, tol=singulartol, kwargs...)
-    results(R; onlysingular=true, singulartol=tol, kwargs...)
+function singular(R::Results; singulartol=1e10, multiplicitytol=1e-5, multiple_results=false, kwargs...)
+    S = results(R; onlysingular = true, singulartol=singulartol, kwargs...)
+    if isempty(S) || multiple_results
+        return S
+    else
+        info = multiplicities_info(S, multiplicitytol)
+        S₁ = similar(S, 0)
+        for k in keys(info)
+            for v in info[k]
+                P = deepcopy(S[v[1]])
+                P.multiplicity = k
+                push!(S₁, P)
+            end
+        end
+        return S₁
+    end
 end
 
 
@@ -951,16 +978,22 @@ end
 plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
 
 
+function multiplicities_info(result::Union{Result, Vector{PathResult{T}}}, tol::Real = 1e-5) where T
+    multiplicities_dict = Dict{Int, Vector{Vector{Int}}}()
+    for m in multiplicities(solution, result, tol = tol)
+        if haskey(multiplicities_dict, length(m))
+            push!(multiplicities_dict[length(m)], m)
+        else
+            multiplicities_dict[length(m)] = [m]
+        end
+    end
+    multiplicities_dict
+end
+
 
 function singular_multiplicities_table(io, result::Result, stats = statistics(result))
-    multiplicities_dict = Dict{Int, Vector{Vector{Int}}}()
-    for m in multiplicities(solution, singular(result))
-    	if haskey(multiplicities_dict, length(m))
-    		push!(multiplicities_dict[length(m)], m)
-    	else
-    		multiplicities_dict[length(m)] = [m]
-    	end
-    end
+    S = results(result; onlysingular = true)
+    multiplicities_dict = multiplicities_info(S)
     if isempty(multiplicities_dict)
         n_mults_total = 0
     else
