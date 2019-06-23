@@ -222,7 +222,7 @@ mutable struct PathTrackerOptions
     accuracy_eg::Float64
 end
 
-function PathTrackerOptions(;
+function PathTrackerOptions(prob::Problem;
             at_infinity_check=true,
             samples_per_loop::Int=12,
             max_winding_number::Int=12,
@@ -383,7 +383,7 @@ function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
                         accuracy=accuracy,
                         core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
-    options = PathTrackerOptions(;at_infinity_check=at_infinity_check,
+    options = PathTrackerOptions(prob; at_infinity_check=at_infinity_check,
                                   accuracy=accuracy, optionskwargs...)
     cache = PathTrackerCache(prob, core_tracker)
     PathTracker(prob, core_tracker, state, options, cache)
