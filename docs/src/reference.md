@@ -30,7 +30,6 @@ compose
 ## Utilities
 
 ```@docs
-bezout_number
 ishomogeneous
 uniquevar
 homogenize

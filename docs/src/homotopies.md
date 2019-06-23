@@ -12,6 +12,7 @@ The following homotopies are available by default
 StraightLineHomotopy
 FixedPointHomotopy
 ParameterHomotopy
+CoefficientHomotopy
 ```
 
 We also provide more specialised homotopies, which are mostly used internally currently

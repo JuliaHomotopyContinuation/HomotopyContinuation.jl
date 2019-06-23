@@ -5,20 +5,19 @@ makedocs(
     sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
-        "Solving Polynomial Systems" => "solving.md",
-        "Solving Systems with Monodromy" => "monodromy.md",
-        "Path tracker" => "path_tracker.md",
-        "Newton's method" => "newton.md",
+        "Solving general systems" => "solving.md",
+        "Solving paremeterized systems with monodromy" => "monodromy.md",
         "Sorting arrays of solutions" => "sorting.md",
-        "Norms and Distances" => "norms_distances.md",
-        "Data structures for polynomial systems" => "systems.md",
+        "PathTracker" => "path_tracker.md",
+        "CoreTracker" => "core_tracker.md",
+        "Newton's method" => "newton.md",
         "Homotopies" => "homotopies.md",
-        "Predictors and Correctors" => "predictors-correctors.md",
-        "Core tracker" => "core_tracker.md",
+        "Predictors and correctors" => "predictors-correctors.md",
+        "Data structures for polynomial systems" => "systems.md",
+        "Norms and distances" => "norms_distances.md",
         "Reference" => "reference.md"
         ],
-    strict=true
-)
+    strict=true)
 
 deploydocs(
     repo = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git"

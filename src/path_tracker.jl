@@ -9,11 +9,8 @@ const pathtracker_supported_keywords = [
     :min_val_accuracy, :samples_per_loop,
     :max_winding_number, :max_affine_norm,
     :overdetermined_min_accuracy, :overdetermined_min_residual,
-    :cond_eg_start, :cond_infinity_start,
-    :t_eg_start, :tol_inf_accurate, :tol_finite_accurate, :accuracy, :accuracy_eg]
-
-
-const PATHTRACKER_DEFAULT_ACCURACY = 1e-6
+    :cond_eg_start, :min_cond_at_infinity,
+    :t_eg_start, :tol_val_inf_accurate, :tol_val_finite_accurate, :accuracy, :accuracy_eg]
 
 ###############
 ## VALUATION ##
@@ -216,11 +213,11 @@ mutable struct PathTrackerOptions
     overdetermined_min_accuracy::Float64
     # minimial condition number where the endgame starts
     cond_eg_start::Float64
-    cond_infinity_start::Float64
+    min_cond_at_infinity::Float64
     # maximal t where the endgame starts
     t_eg_start::Float64
-    tol_inf_accurate::Float64
-    tol_finite_accurate::Float64
+    tol_val_inf_accurate::Float64
+    tol_val_finite_accurate::Float64
     accuracy::Float64
     accuracy_eg::Float64
 end
@@ -232,19 +229,19 @@ function PathTrackerOptions(;
             overdetermined_min_residual::Float64=1e-3,
             overdetermined_min_accuracy::Float64=1e-4,
             cond_eg_start::Float64=1e4,
-            cond_infinity_start::Float64=1e7,
+            min_cond_at_infinity::Float64=1e7,
             t_eg_start::Float64=0.1,
-            tol_inf_accurate::Float64=1e-4,
-            tol_finite_accurate::Float64=1e-3,
+            tol_val_inf_accurate::Float64=1e-4,
+            tol_val_finite_accurate::Float64=1e-3,
             accuracy::Float64=error("You have to set `accuracy`"),
             accuracy_eg::Float64=min(accuracy, 1e-5))
 
     PathTrackerOptions(at_infinity_check, samples_per_loop, max_winding_number,
                        overdetermined_min_residual,
                        overdetermined_min_accuracy, cond_eg_start,
-                       cond_infinity_start,
+                       min_cond_at_infinity,
                        t_eg_start,
-                       tol_inf_accurate, tol_finite_accurate, accuracy, accuracy_eg)
+                       tol_val_inf_accurate, tol_val_finite_accurate, accuracy, accuracy_eg)
 end
 
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
@@ -335,23 +332,36 @@ squared_up_system(H::LogHomotopy) = squared_up_system(H.homotopy)
      PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
 
 `PathTracker` the way to track single paths. It combines the core path tracking routine
-with an endgame, i.e., it can also deal with singular solutions as well as paths going to infinity.
+with an endgame, i.e., it can also deal with singular solutions as well as diverging paths.
+We call a diverged path a path going to infinity.
+By convention a path is always tracked from t₁ > 0 towards 0.
+During the path tracking an approximation of the valuation of a Puiseux series expansion of the solution is computed.
+This is used to decide whether a path is diverging.
+To compute singular solutions Cauchy's integral formula is used. There you have to trace out loops around the solution.
+The number of loops necessary to arrive back at the start point is called the *winding number*.
+In order to construct a `PathTracker` it is recommended to use the [`pathtracker`](@ref) and
+[`pathtracker_startsolutions`](@ref) helper functions.
+With a `PathTracker` constructed you can track a single path using the [`track`](@ref) method.
+The result of this will be a [`PathResult`](@ref).
+
+## Keyword arguments
 `PathTracker` is a wrapper around [`CoreTracker`](@ref)
-and thus has all configuration possibilities [`CoreTracker`](@ref) has.
+and thus it is possible to set all options which are available for [`CoreTracker`](@ref).
+There are the following `PathTracker` specific options:
 
-There are the following `PathTracker` specific options (with their defaults in parens):
+### General endgame parameters
+* `accuracy_eg::Float64=min(accuracy, 1e-5))`: It is possible to change the accuracy during the path tracking. Usually you want lower the accuracy.
+* `cond_eg_start::Float64=1e4`: The endgame is only started if the condition of the Jacobian is larger than this threshold.
+* `max_winding_number::Int=12`: This limits the maximal number of loops taken in applying Cauchy's formula.
+* `min_cond_at_infinity::Float64=1e7`: A path is declared as going to infinity only if it's Jacobian is also larger than this threshold.
+* `samples_per_loop::Int=12`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
+* `t_eg_start::Float64=0.1`: The endgame starts only if `t` is smaller than this threshold.
+* `tol_val_inf_accurate::Float64=1e-4`: A valuation which would result in a path declared as going to infinity is only accepted if the estimated accuracy of the valuation is less than this threshold.
+* `tol_val_finite_accurate::Float64=1e-3`: A valuation which would result in a proper solution is only accepted if the estimated accuracy of the valuation is less than this threshold. This is only affects solutions where the path has at some point near 0 a condition number larger than `cond_eg_start`.
 
-* `at_infinity_check::Bool=true`: Whether the path tracker should stop paths going to infinity early.
-* `min_step_size_endgame_start=1e-10`: The endgame only starts if the step size becomes smaller that the provided value.
-* `samples_per_loop::Int=5`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
-* `max_winding_number::Int=12`: The maximal number of loops used in Cauchy's integral formula.
-* `max_affine_norm::Float64=1e6`: A fallback heuristic to decide whether a path is going to infinity.
-* `min_val_accuracy::Float64=0.001`: A tolerance used to decide whether we are in the endgame zone.
+### Overdetermined system specific
 * `overdetermined_min_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
 * `overdetermined_min_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
-
-In order to construct a pathtracker it is recommended to use the [`pathtracker`](@ref) and
-[`pathtracker_startsolutions`](@ref) helper functions.
 """
 struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCache, CT<:CoreTracker}
     problem::Prob
@@ -367,7 +377,7 @@ function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
                 min_step_size=1e-30, kwargs...)
 
     core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
-    core_tracker = CoreTracker(prob, x, complex(0.0), 36.0;
+    core_tracker = CoreTracker(prob, x;
                         log_transform=true, predictor=Pade21(),
                         min_step_size=min_step_size,
                         accuracy=accuracy,
@@ -438,7 +448,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
         state.s = real(currt(core_tracker))
-        # println("s: ", state.s)
         check_terminated!(core_tracker)
 
         if core_tracker.state.status == CoreTrackerStatus.success
@@ -446,11 +455,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
             break
         elseif core_tracker.state.status != CoreTrackerStatus.tracking
             state.status = PathTrackerStatus.status(core_tracker.state.status)
-            break
-        end
-
-        if core_tracker.state.jacobian.corank > 0
-            state.status = PathTrackerStatus.terminated_ill_conditioned
             break
         end
 
@@ -464,9 +468,6 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
         # If the condition number is too low we also do not care
         start_eg(core_tracker, options) || continue
         # possibly reduce desired accuracy
-        # @show state.val
-        # @show verdict
-        # @show start_infinity_cutoff(core_tracker, options)
         if tracker.options.at_infinity_check &&
            verdict == VALUATION_AT_INFINIY &&
            start_infinity_cutoff(core_tracker, options)
@@ -503,7 +504,7 @@ end
 
 function start_infinity_cutoff(core_tracker, options)
     C = max(cond(core_tracker), exp10(digits_lost(core_tracker)))
-    C > options.cond_infinity_start
+    C > options.min_cond_at_infinity
 end
 
 """
@@ -519,15 +520,15 @@ function judge(val::Valuation, options::PathTrackerOptions)
         # We argue that a valuation is "stable" if it's first and second
         # derivative are "small".
         if v[i] < -0.1 &&
-            abs(v̇[i]) < options.tol_inf_accurate &&
-            abs(v̈[i]) < options.tol_inf_accurate
+            abs(v̇[i]) < options.tol_val_inf_accurate &&
+            abs(v̈[i]) < options.tol_val_inf_accurate
 
             return VALUATION_AT_INFINIY
         end
 
-        if v[i] < -options.tol_finite_accurate ||
-            !(abs(v̇[i]) < options.tol_finite_accurate &&
-              abs(v̈[i]) < options.tol_finite_accurate)
+        if v[i] < -options.tol_val_finite_accurate ||
+            !(abs(v̇[i]) < options.tol_val_finite_accurate &&
+              abs(v̈[i]) < options.tol_val_finite_accurate)
 
             finite = false
         end
@@ -539,7 +540,7 @@ end
 
 function at_infinity_post_check(val::Valuation, options::PathTrackerOptions)
     for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
-        if vᵢ < -0.1 && abs(v̇ᵢ) < sqrt(options.tol_inf_accurate)
+        if vᵢ < -0.1 && abs(v̇ᵢ) < sqrt(options.tol_val_inf_accurate)
             return true
         end
     end
@@ -550,7 +551,7 @@ end
     track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, options...)::PathResult
 
 Track the path with start solution `x₁` from `t₁` towards `t=0`. The `details` options controls
-the level of details of the informations available in `PathResult`.
+the level of details of the informations available in the [`PathResult`](@ref).
 
 Possible values for the options are
 * `accuracy::Float64`

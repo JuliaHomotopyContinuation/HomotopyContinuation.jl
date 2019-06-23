@@ -1,5 +1,6 @@
-export PolyhedralTracker, update_cell!
-import MixedSubdivisions: MixedCell, MixedCellIterator, RegenerationTraverser
+export PolyhedralStartSolutionsIterator, update_cell!, mixed_volume
+
+import MixedSubdivisions: MixedCell, MixedCellIterator, RegenerationTraverser, mixed_volume
 import ElasticArrays: ElasticArray
 
 
@@ -8,10 +9,10 @@ import ElasticArrays: ElasticArray
 #####################
 
 """
-    PolyhedralStartSolutionsIterator(support, lifting, start_coefficients)
+    PolyhedralStartSolutionsIterator(f)
 
-Creates an iterator over all mixed cells and their solutions induced by the given `lifting` of the
-`support` with the given `start_coefficients`.
+Creates an iterator over all mixed cells and their solutions corresponding to the polynomial
+system `f`.
 The iterator returns a tuple `(cell, X)` where `cell` is a `MixedCell` and
 `X` is a `n × D` matrix containing the in each column a solution of the binomial
 system corresponding to the mixed cell.
