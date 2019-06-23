@@ -104,7 +104,11 @@ end
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isnothing(iter.mixed_cells) || isnothing(iter.lifting)
-        mixed_cells, lifting = MixedSubdivisions.fine_mixed_cells(iter.support)
+        res = MixedSubdivisions.fine_mixed_cells(iter.support)
+        if isnothing(res)
+            error("Cannot compute a start system due to technical limitations of our current implementation.")
+        end
+        mixed_cells, lifting = res
         iter.mixed_cells = mixed_cells
         iter.lifting = lifting
     end
