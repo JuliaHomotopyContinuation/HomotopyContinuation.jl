@@ -8,6 +8,8 @@ is basically the same as tracking in affine space.
 """
 struct EmbeddingPatch <: AbstractAffinePatch end
 
+is_global_patch(::EmbeddingPatch) = true
+
 struct EmbeddingPatchState{N} <: AbstractAffinePatchState{N} end
 
 function state(::EmbeddingPatch, x::PVector{T,N}) where {T,N}

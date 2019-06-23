@@ -11,6 +11,8 @@ struct RandomPatchState{T, N} <: AbstractAffinePatchState{N}
     v̄::PVector{T, N}
 end
 
+is_global_patch(::RandomPatch) = true
+
 function state(::RandomPatch, x::PVector)
     v = copy(x)
     Random.randn!(v)
