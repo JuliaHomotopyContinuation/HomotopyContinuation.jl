@@ -36,6 +36,7 @@ finite
 Base.real(::HomotopyContinuation.Results)
 atinfinity
 failed
+multiplicities!(::HomotopyContinuation.Result)
 multiplicities(::HomotopyContinuation.Results)
 ```
 

@@ -126,7 +126,7 @@
         @test nsingular(result) == 1
         @test nsingular(result; counting_multiplicities=true) == 3
         @test length(singular(result)) == 1
-        @test all(r -> r.winding_number == 3, singular(result; multiple_results = true))
+        @test all(r -> multiplicity(r) == 3, singular(result; multiple_results = true))
     end
 
     @testset "Path jumping" begin
@@ -316,24 +316,36 @@
     end
 
     @testset "Singular1" begin
-        @polyvar x y z
+        @polyvar x z y
         # This has two roots of multiplicity 6 at the hyperplane z=0
         F = [0.75x^4 + 1.5x^2*y^2-2.5x^2*z^2+0.75*y^4 - 2.5y^2*z^2 + 0.75z^4; 10x^2*z + 10*y^2*z-6z^3]
         res = solve(F; threading=false)
         @test nsingular(res) == 2
         @test nsingular(res; counting_multiplicities=true) == 12
-        @test length.(multiplicities(solutions(res))) == [6,6]
+        @test multiplicity.(results(res)) == [6,6]
 
         F_affine = subs.(F, Ref(y => 1))
         res_affine = solve(F_affine; threading=false)
         @test nsingular(res_affine) == 2
         @test nsingular(res_affine; counting_multiplicities=true) == 12
-        @test length.(multiplicities(solutions(res_affine))) == [6,6]
+        @test multiplicity.(results(res_affine)) == [6,6]
+        @test_nowarn sprint(show, res_affine)
+
+        res_affine = solve(F_affine; threading=true)
+        @test nsingular(res_affine) == 2
+        @test nsingular(res_affine; counting_multiplicities=true) == 12
+        @test multiplicity.(results(res_affine)) == [6,6]
         @test_nowarn sprint(show, res_affine)
 
         res_affine2 = solve(F_affine; affine_tracking=false, threading=false)
         @test nsingular(res_affine2) == 2
         @test nsingular(res_affine2; counting_multiplicities=true) == 12
-        @test length.(multiplicities(solutions(res_affine2))) == [6,6]
+        @test multiplicity.(results(res_affine2)) == [6,6]
+        @test_nowarn sprint(show, res_affine2)
+
+        # change multiplicity tolerance to only have one
+        multiplicities!(res_affine2; tol=10)
+        @test nsingular(res_affine2) == 1
+        @test multiplicity.(results(res_affine2)) == [12]
     end
 end
