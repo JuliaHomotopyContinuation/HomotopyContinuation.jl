@@ -85,7 +85,7 @@
         res = track(tracker, [1, 1]; details=:extensive)
         @test res.valuation !== nothing
 
-        @test isnonsingular(res)
+        @test is_nonsingular(res)
     end
 
     @testset "Parameter homotopy with AbstractSystem" begin

@@ -54,5 +54,5 @@ is_affine
 is_projective
 is_at_infinity
 is_singular
-isnonsingular
+is_nonsingular
 ```

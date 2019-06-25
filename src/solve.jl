@@ -608,7 +608,7 @@ function nresults(R::Results; only_real=false, real_tol=1e-6,
     only_nonsingular=false, only_singular=false, singular_tol=1e10, onlyfinite=true, multiple_results=false)
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
-        (!only_nonsingular || isnonsingular(r, singular_tol)) &&
+        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
         (!only_singular || is_singular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r, R))
@@ -710,7 +710,7 @@ nfailed(R::Results) = count(is_failed, R)
 
 The number of non-singular solutions.
 """
-nnonsingular(R::Result; tol = 1e10) = count(r -> isnonsingular(r, tol), R)
+nnonsingular(R::Result; tol = 1e10) = count(r -> is_nonsingular(r, tol), R)
 
 """
     nreal(result; tol=1e-6)
@@ -773,7 +773,7 @@ function mapresults(f::Function, R::Results;
     onlyfinite=true, multiple_results=false)
     [f(r) for r in R if
         (!only_real || is_real(r, real_tol)) &&
-        (!only_nonsingular || isnonsingular(r, singular_tol)) &&
+        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
         (!only_singular || is_singular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r,R))]

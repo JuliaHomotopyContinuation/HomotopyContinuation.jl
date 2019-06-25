@@ -1,7 +1,7 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
-       is_singular, isnonsingular, is_projective, is_affine, set_parameters!, multiplicity
+       is_singular, is_nonsingular, is_projective, is_affine, set_parameters!, multiplicity
 
 
 const pathtracker_supported_keywords = [
@@ -1136,13 +1136,13 @@ function is_singular(r::PathResult, tol::Real)
 end
 
 """
-    isnonsingular(pathresult; tol=1e10)
+    is_nonsingular(pathresult; tol=1e10)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && LinearAlgebra.is_success(r)
-isnonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && LinearAlgebra.is_success(r)
+is_nonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && LinearAlgebra.is_success(r)
+is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && LinearAlgebra.is_success(r)
 
 
 """
