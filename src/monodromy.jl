@@ -810,13 +810,13 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     node = loop.nodes[job.edge.target]
 
     if node.main_node
-        y = verified_affine_vector(C, currx(C.tracker), job.x, options)
+        y = verified_affine_vector(C, current_x(C.tracker), job.x, options)
         # is the solution at infinity?
         if y === nothing
             return :incomplete
         end
     else
-        y = affine_chart(job.x, currx(C.tracker))
+        y = affine_chart(job.x, current_x(C.tracker))
     end
     next_edge = nextedge(loop, job.edge)
     add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done

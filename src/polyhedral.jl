@@ -314,7 +314,7 @@ function cell_solutions_homotopy!(iter::PolyhedralStartSolutionsIterator, cell::
         end
 
         ret = track!(binomial_tracker, x, 1.0, 0.0)
-        x̄ = currx(binomial_tracker)
+        x̄ = current_x(binomial_tracker)
         for j in 1:n
             X[j,i] = x̄[j]
         end
@@ -366,7 +366,7 @@ function track!(PT::PolyhedralTracker, x∞)
     if retcode != CoreTrackerStatus.success
         return PathTrackerStatus.status(retcode)
     end
-    track!(PT.generic_tracker, currx(PT.toric_tracker))
+    track!(PT.generic_tracker, current_x(PT.toric_tracker))
 end
 
 @inline function PathResult(PT::PolyhedralTracker, args...; kwargs...)

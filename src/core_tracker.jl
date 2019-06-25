@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
+        current_x, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -475,7 +475,7 @@ function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patc
      _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
      retcode = currstatus(tracker)
      if retcode == CoreTrackerStatus.success
-         x₀ .= currx(tracker)
+         x₀ .= current_x(tracker)
      end
      retcode
 end
@@ -845,12 +845,12 @@ currstatus(tracker::CoreTracker) = currstatus(tracker.state)
 currstatus(state::CoreTrackerState) = state.status
 
 """
-    currx(tracker::CoreTracker)
+    current_x(tracker::CoreTracker)
 
 Return the current value of `x`.
 """
-currx(tracker::CoreTracker) = currx(tracker.state)
-currx(state::CoreTrackerState) = state.x
+current_x(tracker::CoreTracker) = current_x(tracker.state)
+current_x(state::CoreTrackerState) = state.x
 
 
 """
@@ -1009,7 +1009,7 @@ function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
 end
 
 function current_x_t(iter::PathIterator)
-    x = currx(iter.tracker)
+    x = current_x(iter.tracker)
     t = currt(iter.tracker)
     (x, iter.t_real ? real(t) : t)
 end

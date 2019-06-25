@@ -298,7 +298,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     unit_roots = ComplexF64[]
     base_point = copy(core_tracker.state.x)
 
-    x = currx(core_tracker)
+    x = current_x(core_tracker)
     if is_squared_up_system(core_tracker.homotopy)
         F = squared_up_system(core_tracker.homotopy).F
     else
@@ -313,7 +313,7 @@ function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
     end
     target_newton_cache = newton_cache(target_system, x)
 
-    res = evaluate(target_system, currx(core_tracker), target_newton_cache.system_cache)
+    res = evaluate(target_system, current_x(core_tracker), target_newton_cache.system_cache)
     jac = similar(res, size(target_system))
     weighted_ip = WeightedIP(x)
     PathTrackerCache(unit_roots, base_point, target_system, res, Jacobian(Random.rand!(jac)), target_newton_cache, weighted_ip)
@@ -623,7 +623,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     initial_step_size = core_tracker.options.initial_step_size
     s = real(currt(core_tracker))
 
-    base_point .= currx(core_tracker)
+    base_point .= current_x(core_tracker)
     prediction .= zero(eltype(state.prediction))
 
     # during the loop we fix the affine patch
@@ -638,7 +638,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
             θⱼ₋₁ = θⱼ
             θⱼ += ∂θ
 
-            retcode = track!(core_tracker, currx(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; loop=true)
+            retcode = track!(core_tracker, current_x(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; loop=true)
             if retcode != CoreTrackerStatus.success
                 # during the loop we fixed the affine patch
                 unfix_patch!(core_tracker)
@@ -651,10 +651,10 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
                 return Symbol(retcode)
             end
 
-            prediction .+= currx(core_tracker)
+            prediction .+= current_x(core_tracker)
         end
 
-        if distance(base_point, currx(core_tracker), inner(core_tracker)) < 4core_tracker.options.accuracy
+        if distance(base_point, current_x(core_tracker), inner(core_tracker)) < 4core_tracker.options.accuracy
             break
         end
 
@@ -708,7 +708,7 @@ function check_and_refine_solution!(tracker::PathTracker)
    end
 
     if state.status ≠ PathTrackerStatus.success
-        state.solution .= currx(core_tracker)
+        state.solution .= current_x(core_tracker)
         return nothing
     end
 
@@ -751,7 +751,7 @@ function check_and_refine_solution!(tracker::PathTracker)
     # 1.a) + 2.a)
     else
         # First we refine the obtained solution if possible
-        result = correct!(core_tracker.state.x̄, core_tracker, currx(core_tracker), Inf;
+        result = correct!(core_tracker.state.x̄, core_tracker, current_x(core_tracker), Inf;
             use_qr=true, max_iters=3,
             accuracy=core_tracker.options.refinement_accuracy)
         @label non_singular_case
@@ -763,11 +763,11 @@ function check_and_refine_solution!(tracker::PathTracker)
         elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
                at_infinity_post_check(state.val, options)
 
-            state.solution .= currx(core_tracker)
+            state.solution .= current_x(core_tracker)
             state.status = PathTrackerStatus.at_infinity
             return nothing
         else
-            state.solution .= currx(core_tracker)
+            state.solution .= current_x(core_tracker)
             state.status = PathTrackerStatus.post_check_failed
             return nothing
         end

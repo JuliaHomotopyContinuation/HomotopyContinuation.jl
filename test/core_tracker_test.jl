@@ -34,8 +34,8 @@
         set_max_refinement_iters!(t1, rmaxiter)
 
         @test t1 isa CoreTracker
-        @test isa(currx(t1), Vector)
-        @test length(currx(t1)) == 6
+        @test isa(current_x(t1), Vector)
+        @test length(current_x(t1)) == 6
 
         t3, start_sols = coretracker_startsolutions(F, predictor=Euler())
         @test t3.predictor isa Euler
@@ -121,7 +121,7 @@
         retcode = track!(x_final, tracker, x_inter, 0.1, 0.0)
         @test retcode == CoreTrackerStatus.success
         @test curriters(tracker) < 3
-        x = currx(tracker)
+        x = current_x(tracker)
         @test norm(x - A \ b) < 1e-6
     end
 
@@ -138,7 +138,7 @@
         v1 = copy(fixedpatch.v̄)
         track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=false)
         @test v1 == fixedpatch.v̄
-        track!(fixedtracker, currx(tracker), 0.05, 0.01, setup_patch=false)
+        track!(fixedtracker, current_x(tracker), 0.05, 0.01, setup_patch=false)
         @test v1 == fixedpatch.v̄
         track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=true)
         @test v1 != fixedpatch.v̄
