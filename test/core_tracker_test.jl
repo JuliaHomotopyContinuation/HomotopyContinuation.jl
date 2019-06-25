@@ -42,11 +42,11 @@
 
         setup!(t1, first(start_sols), 1.0, 0.4)
         @test currstatus(t1) == CoreTrackerStatus.tracking
-        @test currt(t1) == 1.0
+        @test current_t(t1) == 1.0
 
         setup!(t1, first(start_sols), 0.5, 0.4)
         @test currstatus(t1) == CoreTrackerStatus.terminated_invalid_startvalue
-        @test currt(t1) == 0.5
+        @test current_t(t1) == 0.5
 
         R = track(t1, first(start_sols), 1.0, 0.0)
         @test R isa CoreTrackerResult

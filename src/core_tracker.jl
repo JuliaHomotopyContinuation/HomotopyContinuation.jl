@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        current_x, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
+        current_x, current_t, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -521,7 +521,7 @@ function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, 
         checkstartvalue && checkstartvalue!(tracker)
         if !loop
             compute_ẋ!(state, cache, tracker.options)
-            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), state.jacobian)
+            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -543,7 +543,7 @@ function checkstartvalue!(tracker::CoreTracker)
 end
 
 function compute_ẋ!(state, cache, options::CoreTrackerOptions)
-    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, currt(state))
+    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, current_t(state))
     # apply row scaling to J and compute factorization
     updated_jacobian!(state.jacobian)
 
@@ -577,7 +577,7 @@ function step!(tracker::CoreTracker)
     H = cache.homotopy
 
     try
-        t, Δt = currt(state), currΔt(state)
+        t, Δt = current_t(state), currΔt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
         update_jacobian_infos =
@@ -813,12 +813,12 @@ affine_tracking(tracker::CoreTracker) = !isa(tracker.state.x, ProjectiveVectors.
 ## Query State ##
 #################
 """
-     currt(tracker::CoreTracker)
+     current_t(tracker::CoreTracker)
 
 Current `t`.
 """
-currt(tracker::CoreTracker) = currt(tracker.state)
-currt(state::CoreTrackerState) = state.segment[state.s]
+current_t(tracker::CoreTracker) = current_t(tracker.state)
+current_t(state::CoreTrackerState) = state.segment[state.s]
 
 """
      currΔt(tracker::CoreTracker)
@@ -1010,7 +1010,7 @@ end
 
 function current_x_t(iter::PathIterator)
     x = current_x(iter.tracker)
-    t = currt(iter.tracker)
+    t = current_t(iter.tracker)
     (x, iter.t_real ? real(t) : t)
 end
 

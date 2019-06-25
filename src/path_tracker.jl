@@ -445,7 +445,7 @@ function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
     s_eg_start = -log(options.t_eg_start)
     while state.status == PathTrackerStatus.tracking
         step!(core_tracker)
-        state.s = real(currt(core_tracker))
+        state.s = real(current_t(core_tracker))
         check_terminated!(core_tracker)
 
         if core_tracker.state.status == CoreTrackerStatus.success
@@ -621,7 +621,7 @@ function predict_with_cauchy_integral_method!(state, core_tracker, options, cach
     initial_Δs = core_tracker.state.Δs
     initial_Δs_prev = core_tracker.state.Δs_prev
     initial_step_size = core_tracker.options.initial_step_size
-    s = real(currt(core_tracker))
+    s = real(current_t(core_tracker))
 
     base_point .= current_x(core_tracker)
     prediction .= zero(eltype(state.prediction))

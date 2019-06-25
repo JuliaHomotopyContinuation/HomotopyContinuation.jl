@@ -42,7 +42,7 @@ iterator
 To introspect the current state we provide the following routines.
 ```@docs
 current_x
-currt
+current_t
 currΔt
 curriters
 currstatus
