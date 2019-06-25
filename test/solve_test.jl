@@ -237,7 +237,7 @@
         target = [randn(ComplexF64, 3), randn(ComplexF64, 2)]
         H = CoefficientHomotopy(E, start, target)
         result = solve(H, [[1, 1]])
-        @test issuccess(result[1])
+        @test is_success(result[1])
     end
 
     @testset "Overdetermined" begin
@@ -269,7 +269,7 @@
         tracker, starts = pathtracker_startsolutions(
                 [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
                 affine_tracking=false)
-        @test issuccess(track(tracker, s))
+        @test is_success(track(tracker, s))
     end
 
     @testset "MultiHomogeneous" begin

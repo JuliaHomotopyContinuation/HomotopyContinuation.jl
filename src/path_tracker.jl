@@ -1,6 +1,6 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
-       accuracy, residual, start_solution, isfailed, is_at_infinity,
+       accuracy, residual, start_solution, is_success, isfailed, is_at_infinity,
        issingular, isnonsingular, isprojective, isaffine, set_parameters!, multiplicity
 
 
@@ -1095,11 +1095,11 @@ Get the start solution of the solution ``x`` of the path.
 start_solution(r::PathResult) = r.start_solution
 
 """
-    issuccess(pathresult)
+    is_success(pathresult)
 
 Checks whether the path is successfull.
 """
-issuccess(r::PathResult) = r.return_code == :success
+is_success(r::PathResult) = r.return_code == :success
 
 """
     isfailed(pathresult)
@@ -1132,7 +1132,7 @@ is larger than `tol`.
 """
 issingular(r::PathResult; tol=1e10) = issingular(r, tol)
 function issingular(r::PathResult, tol::Real)
-    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.issuccess(r)
+    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.is_success(r)
 end
 
 """
@@ -1141,8 +1141,8 @@ end
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-isnonsingular(r::PathResult; kwargs...) = !issingular(r; kwargs...) && LinearAlgebra.issuccess(r)
-isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.issuccess(r)
+isnonsingular(r::PathResult; kwargs...) = !issingular(r; kwargs...) && LinearAlgebra.is_success(r)
+isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.is_success(r)
 
 
 """

@@ -270,7 +270,7 @@ function track_paths(tracker, start_solutions;
                 for R in batch_tracker.results
                     if R !== nothing
                         push!(results, R)
-                        issuccess(R) && update!(stats, R)
+                        is_success(R) && update!(stats, R)
                     end
                 end
                 ntracked += length(batch)

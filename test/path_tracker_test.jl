@@ -144,10 +144,10 @@
 
         q = randn(3)
         result = track(tracker, first(S_p₀); target_parameters=q)
-        @test issuccess(result)
+        @test is_success(result)
 
         result = track(tracker, first(S_p₀); start_parameters=p₀, target_parameters=q)
-        @test issuccess(result)
+        @test is_success(result)
 
         # Construct the PathTracker
         tracker = pathtracker(F; parameters=p, generic_parameters=p₀)

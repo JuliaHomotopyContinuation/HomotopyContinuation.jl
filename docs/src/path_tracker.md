@@ -48,7 +48,7 @@ multiplicity
 residual
 start_solution
 is_real(::PathResult)
-LinearAlgebra.issuccess(::PathResult)
+is_success(::PathResult)
 isfailed
 isaffine
 isprojective
