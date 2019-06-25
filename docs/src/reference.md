@@ -30,7 +30,7 @@ compose
 ## Utilities
 
 ```@docs
-ishomogeneous
+is_homogeneous
 uniquevar
 homogenize
 ```
