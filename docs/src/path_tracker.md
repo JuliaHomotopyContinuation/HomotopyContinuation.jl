@@ -51,7 +51,7 @@ is_real(::PathResult)
 is_success(::PathResult)
 is_failed
 is_affine
-isprojective
+is_projective
 is_at_infinity
 issingular
 isnonsingular

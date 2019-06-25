@@ -1,7 +1,7 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
-       issingular, isnonsingular, isprojective, is_affine, set_parameters!, multiplicity
+       issingular, isnonsingular, is_projective, is_affine, set_parameters!, multiplicity
 
 
 const pathtracker_supported_keywords = [
@@ -1154,16 +1154,16 @@ is_real(r::PathResult; tol=1e-6) = is_real(r, tol)
 is_real(r::PathResult, tol::Real) = is_real_vector(r.solution, tol)
 
 """
-    isprojective(pathresult)
+    is_projective(pathresult)
 
 Return`s true if the solution is a projective vector.
 """
-isprojective(r::PathResult{<:PVector}) = true
-isprojective(r::PathResult) = false
+is_projective(r::PathResult{<:PVector}) = true
+is_projective(r::PathResult) = false
 
 """
     is_affine(pathresult)
 
 Return`s true if the solution is an affine vector.
 """
-is_affine(r::PathResult) = !isprojective(r)
+is_affine(r::PathResult) = !is_projective(r)

@@ -610,7 +610,7 @@ function nresults(R::Results; only_real=false, real_tol=1e-6,
         (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
         (!only_singular || issingular(r, singular_tol)) &&
-        (!onlyfinite || isfinite(r) || isprojective(r)) &&
+        (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r, R))
     end
 end
@@ -643,7 +643,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
             end
             singular += 1
             singular_with_multiplicity += unpack(multiplicity(r), 1)
-        elseif !isprojective(r) && !isfinite(r)
+        elseif !is_projective(r) && !isfinite(r)
             at_infinity += 1
         else # finite, nonsingular
             if is_real(r, real_tol)
@@ -775,7 +775,7 @@ function mapresults(f::Function, R::Results;
         (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
         (!only_singular || issingular(r, singular_tol)) &&
-        (!onlyfinite || isfinite(r) || isprojective(r)) &&
+        (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r,R))]
 end
 

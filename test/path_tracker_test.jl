@@ -34,7 +34,7 @@
         @test res.return_code == :success
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
-        @test !isprojective(res)
+        @test !is_projective(res)
         @test is_affine(res)
 
         x = @SVector [1.0, 1.0 + 0.0*im]
@@ -55,7 +55,7 @@
         @test res.return_code == :success
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
-        @test !isprojective(res)
+        @test !is_projective(res)
         @test is_affine(res)
 
         # total degree
@@ -64,7 +64,7 @@
         @test res.return_code == :success
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 6
-        @test !isprojective(res)
+        @test !is_projective(res)
         @test is_affine(res)
     end
 
