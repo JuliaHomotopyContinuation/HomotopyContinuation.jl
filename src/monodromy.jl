@@ -8,7 +8,7 @@ const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_c
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
-    :minimal_number_of_solutions, :max_loops_no_progress]
+    :min_solutions, :max_loops_no_progress]
 
 struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     distance_function::F
@@ -23,7 +23,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     # stopping heuristic
     target_solutions_count::Int
     timeout::Float64
-    minimal_number_of_solutions::Int
+    min_solutions::Int
     max_loops_no_progress::Int
 end
 
@@ -41,7 +41,7 @@ function MonodromyOptions(isrealsystem;
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
-    minimal_number_of_solutions::Int=default_minimal_number_of_solutions(target_solutions_count),
+    min_solutions::Int=default_min_solutions(target_solutions_count),
     max_loops_no_progress::Int=10)
 
     if group_actions isa GroupActions
@@ -58,12 +58,12 @@ function MonodromyOptions(isrealsystem;
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation, check_startsolutions,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
-        minimal_number_of_solutions,
+        min_solutions,
         max_loops_no_progress)
 end
 
-default_minimal_number_of_solutions(::Nothing) = 1
-function default_minimal_number_of_solutions(target_solutions_count::Int)
+default_min_solutions(::Nothing) = 1
+function default_min_solutions(target_solutions_count::Int)
     div(target_solutions_count, 2)
 end
 
@@ -549,7 +549,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `equivalence_classes=true`: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.
 * `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
-* `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
+* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
 function monodromy_solve(F::Inputs, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, [solution], p₀; kwargs...)
@@ -750,7 +750,7 @@ function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptio
             n = n_new
         end
         if iterations_without_progress == options.max_loops_no_progress &&
-            n_new ≥ options.minimal_number_of_solutions
+            n_new ≥ options.min_solutions
             return :heuristic_stop
         end
 
