@@ -45,7 +45,7 @@ current_x
 current_t
 current_Δt
 iters
-currstatus
+status
 LinearAlgebra.cond(::CoreTracker)
 digits_lost
 options

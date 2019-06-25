@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        current_x, current_t, current_Δt, iters, currstatus, accuracy, max_corrector_iters,
+        current_x, current_t, current_Δt, iters, status, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -473,7 +473,7 @@ Additionally also stores the result in `x₀` if the tracking was successfull.
 function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
             loop::Bool=false, checkstartvalue::Bool=!loop)
      _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
-     retcode = currstatus(tracker)
+     retcode = status(tracker)
      if retcode == CoreTrackerStatus.success
          x₀ .= current_x(tracker)
      end
@@ -837,12 +837,12 @@ iters(tracker::CoreTracker) = iters(tracker.state)
 iters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
 
 """
-     currstatus(tracker::CoreTracker)
+     status(tracker::CoreTracker)
 
 Current status.
 """
-currstatus(tracker::CoreTracker) = currstatus(tracker.state)
-currstatus(state::CoreTrackerState) = state.status
+status(tracker::CoreTracker) = status(tracker.state)
+status(state::CoreTrackerState) = state.status
 
 """
     current_x(tracker::CoreTracker)
@@ -1000,7 +1000,7 @@ Note that this is a stateful iterator. You can still introspect the state of the
 For example to check whether the tracker was successfull
 (and did not terminate early due to some problem) you can do
 ```julia
-println("Success: ", currstatus(tracker) == CoreTrackerStatus.success)
+println("Success: ", status(tracker) == CoreTrackerStatus.success)
 ```
 """
 function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
