@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        current_x, current_t, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
+        current_x, current_t, current_Δt, curriters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -577,7 +577,7 @@ function step!(tracker::CoreTracker)
     H = cache.homotopy
 
     try
-        t, Δt = current_t(state), currΔt(state)
+        t, Δt = current_t(state), current_Δt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
         update_jacobian_infos =
@@ -618,7 +618,7 @@ function step!(tracker::CoreTracker)
             update_rank!(state.jacobian)
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(tracker, result)
-            Δt = currΔt(state)
+            Δt = current_Δt(state)
             state.last_step_failed = true
         end
     catch err
@@ -821,12 +821,12 @@ current_t(tracker::CoreTracker) = current_t(tracker.state)
 current_t(state::CoreTrackerState) = state.segment[state.s]
 
 """
-     currΔt(tracker::CoreTracker)
+     current_Δt(tracker::CoreTracker)
 
 Current step_size `Δt`.
 """
-currΔt(tracker::CoreTracker) = currΔt(tracker.state)
-currΔt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
+current_Δt(tracker::CoreTracker) = current_Δt(tracker.state)
+current_Δt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
 
 """
      curriters(tracker::CoreTracker)

@@ -43,7 +43,7 @@ To introspect the current state we provide the following routines.
 ```@docs
 current_x
 current_t
-currΔt
+current_Δt
 curriters
 currstatus
 LinearAlgebra.cond(::CoreTracker)

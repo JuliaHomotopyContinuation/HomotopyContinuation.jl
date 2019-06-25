@@ -11,7 +11,7 @@
         test_show_juno(t1.state)
         @test !isempty(string(t1.state))
 
-        @test_nowarn currΔt(t1)
+        @test_nowarn current_Δt(t1)
 
         raccuracy = refinement_accuracy(t1)
         @test_nowarn set_refinement_accuracy!(t1, 5e-5)
