@@ -44,6 +44,7 @@ The following helper functions are provided
 ```@docs
 solution
 accuracy(::PathResult)
+multiplicity
 residual
 start_solution
 Base.isreal(::PathResult)

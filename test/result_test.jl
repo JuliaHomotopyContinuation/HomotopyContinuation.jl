@@ -50,12 +50,14 @@
         @test R isa Result
         test_treeviews(R)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
         @test_nowarn sprint(show, R)
 
         R = solve([(x-3)^3,(y-2)], affine_tracking=true, system_scaling=nothing)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
         @test_nowarn sprint(show, R)
 
         @polyvar x y z
@@ -70,13 +72,28 @@
         @test R isa Result{<:ProjectiveVectors.PVector}
         test_treeviews(R)
         @test nnonsingular(R) == 0
-        @test nsingular(R) == 3
+        @test nsingular(R) == 1
+        @test nsingular(R, counting_multiplicities=true) == 3
 
         @polyvar x y z
         V = x^2 + y^2 - z^2
         L = randn(1,3) * [x, y, z]
         R = solve([V; L])
         @test_nowarn sprint(show, R)
+    end
+
+    @testset "singular result" begin
+        @polyvar x
+        f = (x-3)^3*(x-2)
+        R = solve([f])
+        @test length(solutions(R)) == 2
+        @test sort(results(multiplicity, R)) == [1,3]
+
+        @polyvar x y
+        f = (x-3y)^3*(x-2y)
+        R = solve([f])
+        @test nsolutions(R) == 2
+        @test sort(results(multiplicity, R)) == [1,3]
     end
 
     @testset "multiplicities" begin
@@ -98,25 +115,5 @@
         @test length(multiplicities(S.pathresults, tol=1e-1)) == 1
         @test length(multiplicities(S.pathresults, tol=1e-5)) == 0
         @test norm(solution(S[1]) - solution(S[2])) < 1e-1
-    end
-
-    @testset "uniquesolutions" begin
-        @polyvar x
-        f = (x-3)^3*(x-2)
-        R = solve([f])
-        @test length(uniquesolutions(R)) == 2
-        @test uniquesolutions(R) isa Vector{Vector{Complex{Float64}}}
-        @test length(uniquesolutions(R, multiplicities=true)) == 2
-        a, b = uniquesolutions(R, multiplicities=true)
-        @test (a[2] == 3 && b[2] == 1) || (b[2] == 3 && a[2] == 1)
-
-        @polyvar x y
-        f = (x-3y)^3*(x-2y)
-        R = solve([f])
-        @test length(uniquesolutions(R)) == 2
-        @test uniquesolutions(R) isa Vector{ProjectiveVectors.PVector{Complex{Float64}, 1}}
-        @test length(uniquesolutions(R, multiplicities=true)) == 2
-        a, b = uniquesolutions(R, multiplicities=true)
-        @test (a[2] == 3 && b[2] == 1) || (b[2] == 3 && a[2] == 1)
     end
 end

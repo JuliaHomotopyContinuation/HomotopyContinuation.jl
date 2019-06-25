@@ -55,6 +55,8 @@ The same as [`setup!`](@ref) but only called during the path tracking.
 """
 changepatch!(::AbstractAffinePatchState, x::AbstractVector) = nothing
 
+is_global_patch(::AbstractAffinePatch) = false
+
 include("affine_patches/common.jl")
 include("affine_patches/orthogonal_patch.jl")
 include("affine_patches/embedding_patch.jl")

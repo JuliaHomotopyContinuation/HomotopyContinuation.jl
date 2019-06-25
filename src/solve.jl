@@ -1,7 +1,7 @@
 export solve, Result, nresults, nsolutions, nfinite, nsingular, natinfinity,
     nfailed, nnonsingular, nreal, ntracked, finite, results, mapresults,
     failed, atinfinity, singular, nonsingular, seed,
-    solutions, realsolutions, multiplicities, uniquesolutions, statistics
+    solutions, realsolutions, multiplicities, uniquesolutions, statistics, multiplicities!
 
 """
     solve(args...; options...)::Result
@@ -220,12 +220,16 @@ end
 function solve(tracker::Union{<:PathTracker,<:PolyhedralTracker}, start_solutions;
         path_result_details=:default, save_all_paths=false,
         path_jumping_check=true, kwargs...)
-    results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
+    all_results, ntracked = track_paths(tracker, start_solutions; path_result_details=path_result_details, save_all_paths=save_all_paths, kwargs...)
     if path_jumping_check
-        path_jumping_check!(results, tracker, path_result_details; finite_results_only=!save_all_paths)
+        path_jumping_check!(all_results, tracker, path_result_details; finite_results_only=!save_all_paths)
     end
-    Result(results, ntracked, seed(tracker))
+
+    Result(all_results, ntracked, seed(tracker); multiplicity_tol=100*accuracy(tracker))
 end
+
+accuracy(T::PathTracker) = T.options.accuracy
+accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 
 mutable struct SolveStats
     regular::Int
@@ -259,9 +263,8 @@ function track_paths(tracker, start_solutions;
             batch_size = 32 * nthreads
             batches = BatchIterator(start_solutions, batch_size)
             batch_tracker = BatchTracker(tracker, batches, path_result_details, save_all_paths)
-            k = 0
             for batch in batches
-                prepare_batch!(batch_tracker, batch)
+                prepare_batch!(batch_tracker, batch, ntracked)
                 ccall(:jl_threading_run, Ref{Cvoid}, (Any,), batch_tracker)
 
                 for R in batch_tracker.results
@@ -270,13 +273,12 @@ function track_paths(tracker, start_solutions;
                         issuccess(R) && update!(stats, R)
                     end
                 end
-                k += length(batch)
-                ntracked = k
+                ntracked += length(batch)
                 if batch_tracker.interrupted
                     return results, ntracked
                 end
 
-                update_progress!(progress, k, stats)
+                update_progress!(progress, ntracked, stats)
             end
         else
             for (k, s) in enumerate(start_solutions)
@@ -346,6 +348,7 @@ mutable struct BatchTracker{Tracker<:PathTracker, V, R} <: Function
     details::Symbol
     all_paths::Bool
     interrupted::Bool
+    ntracked::Int
 end
 
 function BatchTracker(tracker::PathTracker, batches::BatchIterator, path_result_details::Symbol, save_all_paths::Bool)
@@ -355,16 +358,16 @@ function BatchTracker(tracker::PathTracker, batches::BatchIterator, path_result_
     batch_results .= nothing
     ranges = partition_work(1:batch_size, length(trackers))
     BatchTracker(trackers, batch_results, ranges, batches.batch,
-                 path_result_details, save_all_paths, false)
+                 path_result_details, save_all_paths, false, 0)
 end
 
-function prepare_batch!(batch_tracker::BatchTracker, batch)
+function prepare_batch!(batch_tracker::BatchTracker, batch, ntracked)
     n = length(batch)
     if length(batch_tracker.results) ≠ n
         resize!(batch_tracker.results, n)
     end
     batch_tracker.results .= nothing
-
+    batch_tracker.ntracked = ntracked
     partition_work!(batch_tracker.ranges, 1:n, length(batch_tracker.trackers))
 end
 
@@ -372,7 +375,7 @@ function (batch::BatchTracker)()
     tid = Threads.threadid()
     try
         track_batch!(batch.results, batch.trackers[tid], batch.ranges[tid],
-                 batch.batch, batch.details, batch.all_paths)
+                 batch.batch, batch.details, batch.all_paths, batch.ntracked)
      catch e
          if isa(e, InterruptException)
              batch.interrupted = true
@@ -381,14 +384,14 @@ function (batch::BatchTracker)()
          end
      end
 end
-function track_batch!(results, pathtracker, range, starts, details, all_paths)
+function track_batch!(results, pathtracker, range, starts, details, all_paths, ntracked)
     for k in range
         return_code = track!(pathtracker, starts[k])
         if all_paths ||
            return_code == PathTrackerStatus.success ||
            return_code == PathTrackerStatus.terminated_invalid_startvalue
 
-            results[k] = PathResult(pathtracker, starts[k], k; details=details)
+            results[k] = PathResult(pathtracker, starts[k], ntracked+k; details=details)
         else
             results[k] = nothing
         end
@@ -482,16 +485,84 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker::PolyhedralT
 end
 
 
+######################
+## MultiplicityInfo ##
+######################
+
+"""
+    MultiplicityInfo
+
+This contains informations about the multiplicities of the solutions.
+"""
+struct MultiplicityInfo
+    multiplicities::Dict{Int, Vector{Vector{Int}}}
+    # This set stores all path numbers which we want to ignore if we don't show multiple results
+    multiple_indicator::Set{Int32}
+end
+
+function MultiplicityInfo(pathresults::Vector{<:PathResult}; tol=1e-6)
+    multiple_indicator = Set{Int32}()
+    multiplicities = compute_multiplicities(pathresults; tol=float(tol))
+    for clusters in values(multiplicities), cluster in clusters
+        for i in 2:length(cluster)
+            push!(multiple_indicator, pathresults[cluster[i]].path_number)
+        end
+    end
+    MultiplicityInfo(multiplicities, multiple_indicator)
+end
+
+function compute_multiplicities(result::Vector{<:PathResult}; kwargs...) where T
+    D = Dict{Int, Vector{Vector{Int}}}()
+    compute_multiplicities!(D, result; kwargs...)
+end
+function compute_multiplicities!(D::Dict, result::Vector{<:PathResult}; tol::Float64 = 1e-6) where T
+    for m in multiplicities(solution, result, tol = tol)
+        if haskey(D, length(m))
+            push!(D[length(m)], m)
+        else
+            D[length(m)] = [m]
+        end
+    end
+    D
+end
+
+"""
+    assign_multiplicities!(path_results::Vector{<:PathResult}, I::MultiplicityInfo)
+
+Assign the path results their multiplicity according to the multiplicity info `I`.
+"""
+function assign_multiplicities!(path_results::Vector{<:PathResult}, I::MultiplicityInfo)
+    #assign multiplicities
+    for r in path_results
+        r.multiplicity = 1
+    end
+    for (k, clusters) in I.multiplicities, cluster in clusters, vᵢ in cluster
+        path_results[vᵢ].multiplicity = k
+    end
+    path_results
+end
+
+is_multiple_result(r::PathResult, I::MultiplicityInfo) = r.path_number ∈ I.multiple_indicator
+
+
 """
     Result{V<:AbstractVector}
 
 The result of `solve`. This is a wrapper around the results of each single path ([`PathResult`](@ref)) and it contains some additional informations like
 a random seed to replicate the result.
 """
-struct Result{V}
+mutable struct Result{V}
     pathresults::Vector{PathResult{V}}
     tracked_paths::Int
     seed::Int
+    multiplicity_info::MultiplicityInfo
+end
+
+function Result(pathresults::Vector{PathResult{V}}, tracked_paths::Int, seed::Int;
+                    multiplicity_tol=1e-6) where {V}
+    multiplicity_info = MultiplicityInfo(pathresults; tol=multiplicity_tol)
+    assign_multiplicities!(pathresults, multiplicity_info)
+    Result(pathresults, tracked_paths, seed, multiplicity_info)
 end
 
 Base.length(r::Result) = length(r.pathresults)
@@ -502,8 +573,25 @@ Base.iterate(r::Result, state) = iterate(r.pathresults, state)
 Base.lastindex(r::Result) = lastindex(r.pathresults)
 Base.eltype(r::Type{Result{V}}) where {V} = PathResult{V}
 
+is_multiple_result(r::PathResult, R::Result) = is_multiple_result(r, R.multiplicity_info)
+is_multiple_result(r::PathResult, R::Vector{<:PathResult}) = false
+
+
+"""
+    multiplicities!(result::Result; tol=1e-6)
+
+Compute the multiplicities of the solutions in `result` with respect to the given tolerance.
+"""
+function multiplicities!(result::Result; tol=1e-6)
+    multiplicity_info = MultiplicityInfo(result.pathresults; tol=tol)
+    result.multiplicity_info = multiplicity_info
+    assign_multiplicities!(result.pathresults, multiplicity_info)
+    result
+end
+
 const Results = Union{Result, Vector{<:PathResult}}
 const ProjectiveResult = Result{<:PVector}
+
 """
     nresults(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, singulartol=1e10, onlyfinite=true)
 
@@ -517,12 +605,13 @@ nresults(result, onlyreal=true, realtol=1e-8, onlynonsingular=true)
 ```
 """
 function nresults(R::Results; onlyreal=false, realtol=1e-6,
-    onlynonsingular=false, onlysingular=false, singulartol=1e10, onlyfinite=true)
+    onlynonsingular=false, onlysingular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
     count(R) do r
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
         (!onlysingular || issingular(r, singulartol)) &&
-        (!onlyfinite || isfinite(r) || isprojective(r))
+        (!onlyfinite || isfinite(r) || isprojective(r)) &&
+        (multiple_results || !is_multiple_result(r, R))
     end
 end
 
@@ -541,15 +630,19 @@ function statistics(R::Results, onlyreal=false, realtol=1e-6,
     onlynonsingular=false, onlysingular=false, singulartol=1e10)
 
     failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
-
+    singular_with_multiplicity = real_singular_with_multiplicity = 0
     for r in R
+        is_multiple_result(r, R) && continue
+
         if isfailed(r)
             failed += 1
         elseif issingular(r, singulartol)
             if isreal(r, realtol)
                 real_singular += 1
+                real_singular_with_multiplicity += unpack(multiplicity(r), 1)
             end
             singular += 1
+            singular_with_multiplicity += unpack(multiplicity(r), 1)
         elseif !isprojective(r) && !isfinite(r)
             atinfinity += 1
         else # finite, nonsingular
@@ -561,8 +654,10 @@ function statistics(R::Results, onlyreal=false, realtol=1e-6,
     end
     (nonsingular = nonsingular,
     singular = singular,
+    singular_with_multiplicity=singular_with_multiplicity,
     real_nonsingular = real_nonsingular,
     real_singular = real_singular,
+    real_singular_with_multiplicity=real_singular_with_multiplicity,
     real = real_nonsingular + real_singular,
     atinfinity = atinfinity,
     failed = failed,
@@ -581,15 +676,20 @@ nfinite(R::Results) = count(isfinite, R)
 
 The number of solutions.
 """
-nsolutions(R::Results) = count(issuccess, R)
+nsolutions(R::Results) = nresults(R)
 
 """
-    nsingular(result; tol=1e10)
+    nsingular(result; singulartol=1e10, multiplicitytol=1e-5, counting_multiplicities=false, kwargs...)
 
-The number of singular solutions. A solution is considered singular
-if its windingnumber is larger than 1 or the condition number is larger than `tol`.
+The number of singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than `tol`.
+If `counting_multiplicities=true` the number of singular solutions times their multiplicities is returned.
 """
-nsingular(R::Results; tol=1e10) = count(r -> issingular(r, tol), R)
+function nsingular(R::Results; singulartol=1e10, counting_multiplicities=false, kwargs...)
+    S = results(R; onlysingular=true, multiple_results=false, singulartol=singulartol, kwargs...)
+    isempty(S) && return 0
+    counting_multiplicities && return sum(multiplicity, S)
+    length(S)
+end
 
 """
     natinfinity(result)
@@ -639,7 +739,8 @@ seed(result::Result) = result.seed
 
 # Filtering
 """
-    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysigular=false, singulartol=1e10, onlyfinite=true)
+    results(result; onlyreal=false, realtol=1e-6, onlynonsingular=false,
+                onlysigular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
 
 Return all `PathResult`s for which the given conditions apply.
 
@@ -669,12 +770,13 @@ realsolutions = mapresults(solution, R, onlyreal=true)
 """
 function mapresults(f::Function, R::Results;
     onlyreal=false, realtol=1e-6, onlynonsingular=false, onlysingular=false, singulartol=1e10,
-    onlyfinite=true)
+    onlyfinite=true, multiple_results=false)
     [f(r) for r in R if
         (!onlyreal || isreal(r, realtol)) &&
         (!onlynonsingular || isnonsingular(r, singulartol)) &&
         (!onlysingular || issingular(r, singulartol)) &&
-        (!onlyfinite || isfinite(r) || isprojective(r))]
+        (!onlyfinite || isfinite(r) || isprojective(r)) &&
+        (multiple_results || !is_multiple_result(r,R))]
 end
 
 """
@@ -723,13 +825,15 @@ for `results(R; onlynonsingular=true, conditions...)`. For the possible `conditi
 nonsingular(R::Results; kwargs...) = results(R; onlynonsingular=true, kwargs...)
 
 """
-    singular(result::Results; conditions...)
+    singular(R::Results; tol=1e10, multiple_results=false, kwargs...)
 
-Return all `PathResult`s for which the solution is singular. This is just a shorthand
-for `results(R; onlysingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+Return all `PathResult`s for which the solution is singular. A solution is labeled singular if the condition number is greater than `singulartol`, or if the winding number is > 1.
+If `multiple_results=false` only one point from each cluster of multiple solutions is returned.
+If If `multiple_results=true` all singular solutions in `R` are returned.
+For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Results; singulartol=1e10, tol=singulartol, kwargs...)
-    results(R; onlysingular=true, singulartol=tol, kwargs...)
+function singular(R::Results; tol=1e10, kwargs...)
+    results(R; onlysingular = true, singulartol=tol, kwargs...)
 end
 
 
@@ -773,54 +877,6 @@ function multiplicities(results::Results; tol=1e-6)
     map(i -> results[i], multiplicities(solution, results; tol = tol))
 end
 
-"""
-    uniquesolutions(R::Result; tol=1e-6, multiplicities=false, conditions...)
-
-Return all *unique* solutions. If `multiplicities` is `true`, then
-all *unique* solutions with their correspnding multiplicities as pairs `(s, m)`
-where `s` is the solution and `m` the multiplicity are returned.
-For the possible `conditions` see [`results`](@ref).
-
-## Example
-```julia-repl
-julia> @polyvar x;
-julia> uniquesolutions([(x-3)^3*(x+2)], multiplicities=true)
-[([3.0+0.0im], 3), ([-2.0+0.0im], 1)]
-julia> uniquesolutions([(x-3)^3*(x+2)])
-[[3.0+0.0im], [-2.0+0.0im]]
-```
-"""
-function uniquesolutions(R::Results; tol=1e-6, multiplicities=false, conditions...)
-    uniquesolutions(R, Val(multiplicities); tol=tol, conditions...)
-end
-
-function uniquesolutions(R::Results, ::Val{Multiplicities}; tol=1e-6, conditions...)  where {Multiplicities}
-    sols = solutions(R; conditions...)
-    M = multiplicities(sols; tol=tol)
-    indicator = trues(length(sols))
-    uniques = map(M) do m
-        for k in m
-            indicator[k] = false
-        end
-        if Multiplicities
-            (sols[m[1]], length(m))
-        else
-            sols[m[1]]
-        end
-    end
-    for (k, s) in enumerate(sols)
-        if indicator[k]
-            if Multiplicities
-                push!(uniques, (s, 1))
-            else
-                push!(uniques, s)
-            end
-        end
-    end
-    uniques
-end
-
-
 ####Show function
 
 function Base.show(io::IO, x::Result)
@@ -836,7 +892,7 @@ function Base.show(io::IO, x::Result)
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
     if s.singular > 0
-        println(io, "• multiplicity table singular solutions:")
+        println(io, "• multiplicity table of singular solutions:")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -852,7 +908,7 @@ function Base.show(io::IO, x::ProjectiveResult)
     println(io, "• $(ntracked(x)) paths tracked")
     println(io, "• random seed: $(seed(x))")
     if s.singular > 0
-        println(io, "• multiplicity table singular solutions:")
+        println(io, "• multiplicity table of singular solutions:")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -881,7 +937,7 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
     elseif i == 7
         print(io, "Random seed used")
     elseif i == 8 && s.singular > 0
-        print(io, "  multiplicity table singular solutions: \n")
+        print(io, "  multiplicity table of singular solutions: \n")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -923,7 +979,7 @@ function TreeViews.nodelabel(io::IO, x::ProjectiveResult, i::Int, ::MIME"applica
     elseif i == 6
         print(io, "Random seed used")
     elseif i == 7 && s.singular > 0
-        print(io, "  multiplicity table singular solutions: \n")
+        print(io, "  multiplicity table of singular solutions: \n")
         singular_multiplicities_table(io, x, s)
     end
 end
@@ -951,46 +1007,40 @@ end
 plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
 
 function singular_multiplicities_table(io, result::Result, stats = statistics(result))
-    multiplicities_dict = Dict{Int, Vector{Vector{Int}}}()
-    for m in multiplicities(solution, singular(result))
-    	if haskey(multiplicities_dict, length(m))
-    		push!(multiplicities_dict[length(m)], m)
-    	else
-    		multiplicities_dict[length(m)] = [m]
-    	end
-    end
-    if isempty(multiplicities_dict)
-        n_mults_total = 0
+    M = result.multiplicity_info.multiplicities
+    if isempty(M)
+        n_higher_mults_total = 0
     else
-        n_mults_total = sum(M -> sum(length, M), values(multiplicities_dict))
+        n_higher_mults_total = sum(length, values(M))
     end
 
-    curr_n_real_sols = 0
-    curr_n_sols = 0
+    headers = ["mult.", "total", "# real", "# non-real"]
+    mult_1_exists = n_higher_mults_total < stats.singular
+    data = Matrix{Int}(undef, mult_1_exists+length(M), 4)
 
-    off = n_mults_total < stats.singular
-    data = Matrix{Int}(undef, off+length(multiplicities_dict), 4)
-    for (i, k) in enumerate(sort(collect(keys(multiplicities_dict))))
-    	data[i+off, 1] = k
-    	n_real_solsᵢ = count(M -> isreal(result.pathresults[first(M)]), multiplicities_dict[k])
-    	n_solsᵢ = length(multiplicities_dict[k])
-    	data[i+off, 2] = n_real_solsᵢ
-    	data[i+off, 3] = n_solsᵢ - n_real_solsᵢ
-    	data[i+off, 4] = n_solsᵢ
-
-    	curr_n_real_sols += k * n_real_solsᵢ
-    	curr_n_sols += k * n_solsᵢ
+    n_higher_real = 0
+    i = mult_1_exists + 1
+    for k in sort(collect(keys(M)))
+    	data[i, 1] = k
+    	n_real_solsᵢ = count(Mᵢ -> isreal(result.pathresults[Mᵢ[1]]), M[k])
+    	n_solsᵢ = length(M[k])
+        data[i, 2] = n_solsᵢ
+    	data[i, 3] = n_real_solsᵢ
+    	data[i, 4] = n_solsᵢ - n_real_solsᵢ
+    	n_higher_real += n_real_solsᵢ
+        i += 1
     end
 
-    if off
-    	data[1,1] = 1
-    	data[1,2] = stats.real_singular - curr_n_real_sols
-    	data[1,3] = (stats.singular - curr_n_sols) - (stats.real_singular - curr_n_real_sols)
-    	data[1,4] = stats.singular - curr_n_sols
+    if mult_1_exists
+        data[1,1] = 1
+        data[1,2] = stats.singular - n_higher_mults_total
+    	data[1,3] = stats.real_singular - n_higher_real
+    	data[1,4] = data[1,2] - data[1,3]
     end
 
-    headers = ["multiplicity", "# real", "# non-real", "# total"]
-    PrettyTables.pretty_table(io, data, headers;
+    PrettyTables.pretty_table(io, data, headers,
+            PrettyTables.unicode;
             alignment=:c,
-            header_crayon=PrettyTables.Crayon(bold=false))
+            header_crayon=PrettyTables.Crayon(bold=false),
+            border_crayon=PrettyTables.Crayon(faint=true))
 end

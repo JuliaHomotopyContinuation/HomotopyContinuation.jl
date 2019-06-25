@@ -1,13 +1,11 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, isfailed, isatinfinity,
-       issingular, isnonsingular, isprojective, isaffine, set_parameters!
+       issingular, isnonsingular, isprojective, isaffine, set_parameters!, multiplicity
 
 
 const pathtracker_supported_keywords = [
-    :at_infinity_check, :min_step_size_endgame_start,
-    :min_val_accuracy, :samples_per_loop,
-    :max_winding_number, :max_affine_norm,
+    :at_infinity_check, :samples_per_loop, :max_winding_number,
     :overdetermined_min_accuracy, :overdetermined_min_residual,
     :cond_eg_start, :min_cond_at_infinity,
     :t_eg_start, :tol_val_inf_accurate, :tol_val_finite_accurate, :accuracy, :accuracy_eg]
@@ -222,7 +220,7 @@ mutable struct PathTrackerOptions
     accuracy_eg::Float64
 end
 
-function PathTrackerOptions(;
+function PathTrackerOptions(prob::Problem;
             at_infinity_check=true,
             samples_per_loop::Int=12,
             max_winding_number::Int=12,
@@ -383,7 +381,7 @@ function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
                         accuracy=accuracy,
                         core_tracker_supported...)
     state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
-    options = PathTrackerOptions(;at_infinity_check=at_infinity_check,
+    options = PathTrackerOptions(prob; at_infinity_check=at_infinity_check,
                                   accuracy=accuracy, optionskwargs...)
     cache = PathTrackerCache(prob, core_tracker)
     PathTracker(prob, core_tracker, state, options, cache)
@@ -902,6 +900,7 @@ Its fields are
 * `t::Float64`: The value of `t` at which `solution` was computed. Note that if `return_code` is `:at_infinity`, then `t` is the value when this was decided.
 * `accuracy::Union{Nothing, Float64}`: An approximation of ``||x-x^*||₂`` where ``x`` is the computed solution and ``x^*`` is the true solution.
 * `residual::Union{Nothing, Float64}`: The value of the 2-norm of `H(solution, 0)`.
+* `multiplicity::Union{Nothing, Int}` is the multiplicity of the `solution`. This is only assigned by. [`singular`](@ref).
 * `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
 * `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound on the multiplicity of the solution.
 * `start_solution::Union{Nothing, Int}`: The start solution of the path.
@@ -914,12 +913,13 @@ Its fields are
 
 Possible `details` values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
 """
-struct PathResult{V<:AbstractVector}
+mutable struct PathResult{V<:AbstractVector}
     return_code::Symbol
     solution::V
     t::Float64
     accuracy::Union{Nothing, Float64}
     residual::Union{Nothing, Float64} # level 1+
+    multiplicity::Union{Nothing, Int} # only assigned by singular(Result)
     condition_jacobian::Union{Nothing, Float64}
     winding_number::Union{Nothing, Int}
     path_number::Union{Nothing, Int}
@@ -981,7 +981,10 @@ function PathResult(tracker::PathTracker, start_solution, path_number::Union{Not
         valuation_accuracy = nothing
     end
 
-    PathResult(return_code, x, t, accuracy, res, condition_jac,
+    # this is only assigned by using the singular() function
+    multiplicity = nothing
+
+    PathResult(return_code, x, t, accuracy, res, multiplicity, condition_jac,
                windingnumber, path_number,
                startsolution, accepted_steps, rejected_steps,
                valuation, valuation_accuracy)
@@ -1010,6 +1013,13 @@ function condition_jacobian(tracker::PathTracker, x=tracker.state.solution)
     updated_jacobian!(jac; update_infos=true)
     jac.cond
 end
+
+"""
+    multiplicity(P::PathResult{T})
+
+Returns the multiplicity of `P`.
+"""
+multiplicity(P::PathResult{T}) where T = P.multiplicity
 
 """
     result_type(tracker::PathTracker)

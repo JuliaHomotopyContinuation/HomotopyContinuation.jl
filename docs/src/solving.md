@@ -15,19 +15,27 @@ Result
 seed
 ```
 
-In order to analyse a `Result` we provide the following helper functions
+The nonsingular solutions are obtained as follows.
+```@docs
+nonsingular
+```
+
+The singular solutions are returned by using the following.
+```@docs
+singular
+```
+
+In order to analyse a `Result` we provide the following additional helper functions
 ```@docs
 results
 mapresults
 solutions
 realsolutions
-uniquesolutions
 finite
 Base.real(::HomotopyContinuation.Results)
 atinfinity
-singular
-nonsingular
 failed
+multiplicities!(::HomotopyContinuation.Result)
 multiplicities(::HomotopyContinuation.Results)
 ```
 
