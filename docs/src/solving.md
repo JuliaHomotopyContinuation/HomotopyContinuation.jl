@@ -33,7 +33,7 @@ solutions
 real_solutions
 finite
 Base.real(::HomotopyContinuation.Results)
-atinfinity
+at_infinity
 failed
 multiplicities!(::HomotopyContinuation.Result)
 multiplicities(::HomotopyContinuation.Results)
@@ -47,7 +47,7 @@ nfinite
 nreal
 nsingular
 nnonsingular
-natinfinity
+nat_infinity
 nfailed
 ```
 

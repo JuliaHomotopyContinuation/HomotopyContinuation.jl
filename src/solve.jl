@@ -1,6 +1,6 @@
-export solve, Result, nresults, nsolutions, nfinite, nsingular, natinfinity,
+export solve, Result, nresults, nsolutions, nfinite, nsingular, nat_infinity,
     nfailed, nnonsingular, nreal, ntracked, finite, results, mapresults,
-    failed, atinfinity, singular, nonsingular, seed,
+    failed, at_infinity, singular, nonsingular, seed,
     solutions, real_solutions, multiplicities, statistics, multiplicities!
 
 """
@@ -624,12 +624,12 @@ Statistic about the number of (real) singular and non-singular solutions etc. Re
 ## Example
 ```julia
 julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
-(nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
+(nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, at_infinity = 0, failed = 0, total = 2)
 """
 function statistics(R::Results, only_real=false, real_tol=1e-6,
     only_nonsingular=false, only_singular=false, singular_tol=1e10)
 
-    failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
+    failed = at_infinity = nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
     for r in R
         is_multiple_result(r, R) && continue
@@ -644,7 +644,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
             singular += 1
             singular_with_multiplicity += unpack(multiplicity(r), 1)
         elseif !isprojective(r) && !isfinite(r)
-            atinfinity += 1
+            at_infinity += 1
         else # finite, nonsingular
             if isreal(r, real_tol)
                 real_nonsingular += 1
@@ -659,7 +659,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
     real_singular = real_singular,
     real_singular_with_multiplicity=real_singular_with_multiplicity,
     real = real_nonsingular + real_singular,
-    atinfinity = atinfinity,
+    at_infinity = at_infinity,
     failed = failed,
     total = R.tracked_paths)
 end
@@ -692,11 +692,11 @@ function nsingular(R::Results; singular_tol=1e10, counting_multiplicities=false,
 end
 
 """
-    natinfinity(result)
+    nat_infinity(result)
 
 The number of solutions at infinity.
 """
-natinfinity(R::Results) = count(is_at_infinity, R)
+nat_infinity(R::Results) = count(is_at_infinity, R)
 
 """
     nafailed(result)
@@ -862,11 +862,11 @@ Get all results where the path tracking failed.
 failed(R::Results) = [r for r in R if isfailed(r)]
 
 """
-    atinfinity(result::AffineResult)
+    at_infinity(result::AffineResult)
 
 Get all results where the solutions is at infinity.
 """
-atinfinity(R::Results) = [r for r in R if is_at_infinity(r)]
+at_infinity(R::Results) = [r for r in R if is_at_infinity(r)]
 
 """
     multiplicities(V::Results; tol=1e-6)
@@ -886,8 +886,8 @@ function Base.show(io::IO, x::Result)
     println(io, "==================================")
     println(io, "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ($(s.real_nonsingular) real)")
     println(io, "• $(s.singular) singular $(plural("solution", s.singular)) ($(s.real_singular) real)")
-    s.atinfinity > 0 &&
-        println(io, "• $(s.atinfinity) $(plural("solution", s.atinfinity)) at infinity")
+    s.at_infinity > 0 &&
+        println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
     s.failed > 0 &&
         println(io, "• $(s.failed) failed $(plural("path", s.failed))")
     println(io, "• $(ntracked(x)) paths tracked")
@@ -931,8 +931,8 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.singular) singular ($(s.real_singular) real)")
     elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
         print(io, "$(s.real_nonsingular+s.real_singular) real")
-    elseif i == 5 && s.atinfinity > 0
-        print(io, "$(s.atinfinity) atinfinity")
+    elseif i == 5 && s.at_infinity > 0
+        print(io, "$(s.at_infinity) at_infinity")
     elseif i == 6 && s.failed > 0
         print(io, "$(s.failed) failed")
     elseif i == 7
@@ -953,8 +953,8 @@ function TreeViews.treenode(r::Result, i::Integer)
         return finite(r, only_singular=true)
     elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
         return finite(r, only_real = true)
-    elseif i == 5 && s.atinfinity > 0
-        return atinfinity(r)
+    elseif i == 5 && s.at_infinity > 0
+        return at_infinity(r)
     elseif i == 6 && s.failed > 0
         return failed(r)
     elseif i == 7

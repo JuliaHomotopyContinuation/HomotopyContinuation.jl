@@ -2,7 +2,7 @@
     @testset "Result+PathResult" begin
         R = solve(equations(heart()), save_all_paths=true, show_progress=false)
         @test R isa Result
-        @test natinfinity(R) ≤ 572
+        @test nat_infinity(R) ≤ 572
         @test nfinite(R) == 4
         @test length(collect(R)) == 576
         @test finite(R) isa Vector{<:PathResult}
@@ -10,12 +10,12 @@
         @test length(finite(R, only_nonsingular=false)) == 4
         @test length(finite(R, only_nonsingular=true)) == 4
         @test length(finite(R, only_singular=true)) == 0
-        @test 572 - length(failed(R)) == natinfinity(R)
+        @test 572 - length(failed(R)) == nat_infinity(R)
         @test length(real(R, tol=1e-6)) == 2
         @test nreal(R, tol=1e-6) == 2
         @test length(real_solutions(R)) == 2
         @test_deprecated realsolutions(R)
-        @test length(atinfinity(R)) ≤ 572
+        @test length(at_infinity(R)) ≤ 572
         @test length(results(R, only_real=true, real_tol=1e-8)) == 2
         @test length(results(R, only_nonsingular=true, singular_tol=1e9)) == 4
         @test length(finite(results(R, only_real=true))) == 2
