@@ -450,7 +450,7 @@ end
 
 
 """
-    mapresults(f, result::MonodromyResult; only_real=false, realtol=1e-6)
+    mapresults(f, result::MonodromyResult; only_real=false, real_tol=1e-6)
 
 Apply the function `f` to all entries of `MonodromyResult` for which the given conditions apply.
 
@@ -461,13 +461,13 @@ realsolutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f, R::MonodromyResult;
-    only_real=false, realtol=1e-6)
+    only_real=false, real_tol=1e-6)
     [f(r) for r in R.solutions if
-        (!only_real || isrealvector(r, realtol))]
+        (!only_real || isrealvector(r, real_tol))]
 end
 
 """
-    solutions(result::MonodromyResult; only_real=false, realtol=1e-6)
+    solutions(result::MonodromyResult; only_real=false, real_tol=1e-6)
 
 Return all solutions (as `SVector`s) for which the given conditions apply.
 

@@ -593,7 +593,7 @@ const Results = Union{Result, Vector{<:PathResult}}
 const ProjectiveResult = Result{<:PVector}
 
 """
-    nresults(result; only_real=false, realtol=1e-6, only_nonsingular=false, singulartol=1e10, onlyfinite=true)
+    nresults(result; only_real=false, real_tol=1e-6, only_nonsingular=false, singulartol=1e10, onlyfinite=true)
 
 The number of solutions which satisfy the corresponding predicates.
 
@@ -601,13 +601,13 @@ The number of solutions which satisfy the corresponding predicates.
 ```julia
 result = solve(F)
 # Get all non-singular results where all imaginary parts are smaller than 1e-8
-nresults(result, only_real=true, realtol=1e-8, only_nonsingular=true)
+nresults(result, only_real=true, real_tol=1e-8, only_nonsingular=true)
 ```
 """
-function nresults(R::Results; only_real=false, realtol=1e-6,
+function nresults(R::Results; only_real=false, real_tol=1e-6,
     only_nonsingular=false, only_singular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
     count(R) do r
-        (!only_real || isreal(r, realtol)) &&
+        (!only_real || isreal(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singulartol)) &&
         (!only_singular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
@@ -616,7 +616,7 @@ function nresults(R::Results; only_real=false, realtol=1e-6,
 end
 
 """
-    statistics(R::Result; only_real=false, realtol=1e-6,
+    statistics(R::Result; only_real=false, real_tol=1e-6,
         only_nonsingular=false, only_singular=false, singulartol=1e10)
 
 Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
@@ -626,7 +626,7 @@ Statistic about the number of (real) singular and non-singular solutions etc. Re
 julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
 (nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
 """
-function statistics(R::Results, only_real=false, realtol=1e-6,
+function statistics(R::Results, only_real=false, real_tol=1e-6,
     only_nonsingular=false, only_singular=false, singulartol=1e10)
 
     failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
@@ -637,7 +637,7 @@ function statistics(R::Results, only_real=false, realtol=1e-6,
         if isfailed(r)
             failed += 1
         elseif issingular(r, singulartol)
-            if isreal(r, realtol)
+            if isreal(r, real_tol)
                 real_singular += 1
                 real_singular_with_multiplicity += unpack(multiplicity(r), 1)
             end
@@ -646,7 +646,7 @@ function statistics(R::Results, only_real=false, realtol=1e-6,
         elseif !isprojective(r) && !isfinite(r)
             atinfinity += 1
         else # finite, nonsingular
-            if isreal(r, realtol)
+            if isreal(r, real_tol)
                 real_nonsingular += 1
             end
             nonsingular += 1
@@ -739,7 +739,7 @@ seed(result::Result) = result.seed
 
 # Filtering
 """
-    results(result; only_real=false, realtol=1e-6, only_nonsingular=false,
+    results(result; only_real=false, real_tol=1e-6, only_nonsingular=false,
                 onlysigular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
 
 Return all `PathResult`s for which the given conditions apply.
@@ -769,10 +769,10 @@ realsolutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f::Function, R::Results;
-    only_real=false, realtol=1e-6, only_nonsingular=false, only_singular=false, singulartol=1e10,
+    only_real=false, real_tol=1e-6, only_nonsingular=false, only_singular=false, singulartol=1e10,
     onlyfinite=true, multiple_results=false)
     [f(r) for r in R if
-        (!only_real || isreal(r, realtol)) &&
+        (!only_real || isreal(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singulartol)) &&
         (!only_singular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
@@ -802,7 +802,7 @@ end
 
 Return all real solution (as `Vector`s of reals) for which the given conditions apply.
 For the possible `conditions` see [`results`](@ref). Note that `only_real` is always `true`
-and `realtol` is now `tol`.
+and `real_tol` is now `tol`.
 
 ## Example
 ```julia
@@ -813,7 +813,7 @@ julia> realsolutions(result)
 ```
 """
 function realsolutions(result::Results; only_real=true, tol=1e-6, kwargs...)
-    mapresults(r -> real.(solution(r)), result; only_real=true, realtol=tol, kwargs...)
+    mapresults(r -> real.(solution(r)), result; only_real=true, real_tol=tol, kwargs...)
 end
 
 """
