@@ -7,17 +7,17 @@
         @test length(collect(R)) == 576
         @test finite(R) isa Vector{<:PathResult}
 
-        @test length(finite(R, onlynonsingular=false)) == 4
-        @test length(finite(R, onlynonsingular=true)) == 4
+        @test length(finite(R, only_nonsingular=false)) == 4
+        @test length(finite(R, only_nonsingular=true)) == 4
         @test length(finite(R, onlysingular=true)) == 0
         @test 572 - length(failed(R)) == natinfinity(R)
         @test length(real(R, tol=1e-6)) == 2
         @test nreal(R, tol=1e-6) == 2
         @test length(atinfinity(R)) ≤ 572
         @test length(results(R, only_real=true, realtol=1e-8)) == 2
-        @test length(results(R, onlynonsingular=true, singulartol=1e9)) == 4
+        @test length(results(R, only_nonsingular=true, singulartol=1e9)) == 4
         @test length(finite(results(R, only_real=true))) == 2
-        @test nresults(R, onlynonsingular=true, singulartol=1e9) == 4
+        @test nresults(R, only_nonsingular=true, singulartol=1e9) == 4
         @test length(results(R, onlyfinite=false)) == 576
         @test nresults(R, onlyfinite=false) == 576
         @test nnonsingular(R) == 4
