@@ -450,30 +450,30 @@ end
 
 
 """
-    mapresults(f, result::MonodromyResult; onlyreal=false, realtol=1e-6)
+    mapresults(f, result::MonodromyResult; only_real=false, realtol=1e-6)
 
 Apply the function `f` to all entries of `MonodromyResult` for which the given conditions apply.
 
 ## Example
 ```julia
 # This gives us all solutions considered real (but still as a complex vector).
-realsolutions = mapresults(solution, R, onlyreal=true)
+realsolutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f, R::MonodromyResult;
-    onlyreal=false, realtol=1e-6)
+    only_real=false, realtol=1e-6)
     [f(r) for r in R.solutions if
-        (!onlyreal || isrealvector(r, realtol))]
+        (!only_real || isrealvector(r, realtol))]
 end
 
 """
-    solutions(result::MonodromyResult; onlyreal=false, realtol=1e-6)
+    solutions(result::MonodromyResult; only_real=false, realtol=1e-6)
 
 Return all solutions (as `SVector`s) for which the given conditions apply.
 
 ## Example
 ```julia
-realsolutions = solutions(R, onlyreal=true)
+realsolutions = solutions(R, only_real=true)
 ```
 """
 function solutions(R::MonodromyResult; kwargs...)
