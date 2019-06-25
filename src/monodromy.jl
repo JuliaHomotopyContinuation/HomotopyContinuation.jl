@@ -8,7 +8,7 @@ const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_c
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
-    :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
+    :minimal_number_of_solutions, :max_loops_no_progress]
 
 struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     distance_function::F
@@ -24,7 +24,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     target_solutions_count::Int
     timeout::Float64
     minimal_number_of_solutions::Int
-    maximal_number_of_iterations_without_progress::Int
+    max_loops_no_progress::Int
 end
 
 function MonodromyOptions(isrealsystem;
@@ -42,7 +42,7 @@ function MonodromyOptions(isrealsystem;
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
     minimal_number_of_solutions::Int=default_minimal_number_of_solutions(target_solutions_count),
-    maximal_number_of_iterations_without_progress::Int=10)
+    max_loops_no_progress::Int=10)
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -59,7 +59,7 @@ function MonodromyOptions(isrealsystem;
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         minimal_number_of_solutions,
-        maximal_number_of_iterations_without_progress)
+        max_loops_no_progress)
 end
 
 default_minimal_number_of_solutions(::Nothing) = 1
@@ -537,7 +537,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 ## Options
 * `target_solutions_count=nothing`: The computations are stopped if this number of solutions is reached.
 * `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
-* `maximal_number_of_iterations_without_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
+* `max_loops_no_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
 * `show_progress=true`: Enable a progress meter.
@@ -749,7 +749,7 @@ function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptio
             iterations_without_progress = 0
             n = n_new
         end
-        if iterations_without_progress == options.maximal_number_of_iterations_without_progress &&
+        if iterations_without_progress == options.max_loops_no_progress &&
             n_new ≥ options.minimal_number_of_solutions
             return :heuristic_stop
         end
