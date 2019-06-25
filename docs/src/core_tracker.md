@@ -44,7 +44,7 @@ To introspect the current state we provide the following routines.
 current_x
 current_t
 current_Δt
-curriters
+iters
 currstatus
 LinearAlgebra.cond(::CoreTracker)
 digits_lost

@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        current_x, current_t, current_Δt, curriters, currstatus, accuracy, max_corrector_iters,
+        current_x, current_t, current_Δt, iters, currstatus, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -764,7 +764,7 @@ auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = no
 function check_terminated!(tracker::CoreTracker)
     if abs(tracker.state.s - length(tracker.state.segment)) < 2eps(length(tracker.state.segment))
         tracker.state.status = CoreTrackerStatus.success
-    elseif curriters(tracker) ≥ tracker.options.max_steps
+    elseif iters(tracker) ≥ tracker.options.max_steps
         tracker.state.status = CoreTrackerStatus.terminated_maximal_iterations
     end
     nothing
@@ -829,12 +829,12 @@ current_Δt(tracker::CoreTracker) = current_Δt(tracker.state)
 current_Δt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
 
 """
-     curriters(tracker::CoreTracker)
+     iters(tracker::CoreTracker)
 
 Current number of iterations.
 """
-curriters(tracker::CoreTracker) = curriters(tracker.state)
-curriters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
+iters(tracker::CoreTracker) = iters(tracker.state)
+iters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
 
 """
      currstatus(tracker::CoreTracker)

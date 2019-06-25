@@ -120,7 +120,7 @@
         x_final = zero(x_inter)
         retcode = track!(x_final, tracker, x_inter, 0.1, 0.0)
         @test retcode == CoreTrackerStatus.success
-        @test curriters(tracker) < 3
+        @test iters(tracker) < 3
         x = current_x(tracker)
         @test norm(x - A \ b) < 1e-6
     end
