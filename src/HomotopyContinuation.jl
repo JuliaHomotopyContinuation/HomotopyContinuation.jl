@@ -17,7 +17,7 @@ module HomotopyContinuation
 
     import LinearAlgebra: issuccess, cond
     import Parameters: @pack!, @unpack
-    import DynamicPolynomials: @polyvar
+    import DynamicPolynomials: @polyvar, subs, differentiate
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
     import Test: @test
@@ -26,7 +26,7 @@ module HomotopyContinuation
     const MP = MultivariatePolynomials
     const SP = StaticPolynomials
 
-    export @polyvar
+    export @polyvar, subs, differentiate
     export issuccess, cond
 
     include("utilities.jl")
