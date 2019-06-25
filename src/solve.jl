@@ -310,7 +310,7 @@ function track_paths(tracker, start_solutions;
 end
 
 function update!(stats::SolveStats, R::PathResult)
-    if issingular(R)
+    if is_singular(R)
         stats.singular_real += is_real(R)
         stats.singular += 1
     else
@@ -609,7 +609,7 @@ function nresults(R::Results; only_real=false, real_tol=1e-6,
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
-        (!only_singular || issingular(r, singular_tol)) &&
+        (!only_singular || is_singular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r, R))
     end
@@ -636,7 +636,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
 
         if is_failed(r)
             failed += 1
-        elseif issingular(r, singular_tol)
+        elseif is_singular(r, singular_tol)
             if is_real(r, real_tol)
                 real_singular += 1
                 real_singular_with_multiplicity += unpack(multiplicity(r), 1)
@@ -774,7 +774,7 @@ function mapresults(f::Function, R::Results;
     [f(r) for r in R if
         (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
-        (!only_singular || issingular(r, singular_tol)) &&
+        (!only_singular || is_singular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || is_projective(r)) &&
         (multiple_results || !is_multiple_result(r,R))]
 end

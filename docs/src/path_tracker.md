@@ -53,6 +53,6 @@ is_failed
 is_affine
 is_projective
 is_at_infinity
-issingular
+is_singular
 isnonsingular
 ```

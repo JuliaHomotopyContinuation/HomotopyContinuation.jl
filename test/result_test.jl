@@ -30,7 +30,7 @@
         @test_nowarn mapresults(solution, R)
         @test_nowarn mapresults(start_solution, R)
         @test_nowarn mapresults(residual, R)
-        @test_nowarn mapresults(issingular, R)
+        @test_nowarn mapresults(is_singular, R)
         @test count(mapresults(is_real, R)) == 2
         # test fallback
         @test count(results(is_real, R)) == 2
