@@ -96,7 +96,7 @@ MonodromyStatistics(nsolutions::Int) = MonodromyStatistics(0, 0, 0, 1, [nsolutio
 function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
-        if isrealvector(s)
+        if is_real_vector(s)
             stats.nreal +=1
         end
     end
@@ -463,7 +463,7 @@ real_solutions = mapresults(solution, R, only_real=true)
 function mapresults(f, R::MonodromyResult;
     only_real=false, real_tol=1e-6)
     [f(r) for r in R.solutions if
-        (!only_real || isrealvector(r, real_tol))]
+        (!only_real || is_real_vector(r, real_tol))]
 end
 
 """

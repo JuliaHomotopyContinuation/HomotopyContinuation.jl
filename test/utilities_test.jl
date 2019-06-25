@@ -110,11 +110,11 @@
         X = [im.*x, x, randn(ComplexF64, 4)]
 
         data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real=false)
-        @test HC.isrealvector(points(data)[1]) == false
+        @test HC.is_real_vector(points(data)[1]) == false
         @test length(points(data)) == 2
 
         data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real = true)
-        @test HC.isrealvector(points(data)[1]) == true
+        @test HC.is_real_vector(points(data)[1]) == true
         @test length(points(data)) == 2
 
         data = HC.UniquePoints(randn(ComplexF64, 4), check_real = true)
@@ -369,7 +369,7 @@
         @test HC.nthroot(x, 0) == one(x)
 
         x = rand(6)
-        @test HC.isrealvector(x)
+        @test HC.is_real_vector(x)
 
         segment = HC.ComplexSegment(2, 4)
         @test length(segment) ≈ 2

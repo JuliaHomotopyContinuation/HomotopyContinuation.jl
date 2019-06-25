@@ -321,13 +321,13 @@ function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol:
         simple_add!(data, x, tol)
         return NOT_FOUND
     else
-        if isrealvector(x)
+        if is_real_vector(x)
             simple_add!(data, x, tol)
             return NOT_FOUND_AND_REAL
         elseif data.group_actions !== nothing
             not_found_and_real = false
             apply_actions(data.group_actions, x) do y
-                if isrealvector(y)
+                if is_real_vector(y)
                     simple_add!(data, y, tol)
                     not_found_and_real = true
                     return true
