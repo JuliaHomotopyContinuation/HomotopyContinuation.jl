@@ -15,9 +15,9 @@
         @test nreal(R, tol=1e-6) == 2
         @test length(atinfinity(R)) ≤ 572
         @test length(results(R, only_real=true, real_tol=1e-8)) == 2
-        @test length(results(R, only_nonsingular=true, singulartol=1e9)) == 4
+        @test length(results(R, only_nonsingular=true, singular_tol=1e9)) == 4
         @test length(finite(results(R, only_real=true))) == 2
-        @test nresults(R, only_nonsingular=true, singulartol=1e9) == 4
+        @test nresults(R, only_nonsingular=true, singular_tol=1e9) == 4
         @test length(results(R, onlyfinite=false)) == 576
         @test nresults(R, onlyfinite=false) == 576
         @test nnonsingular(R) == 4
