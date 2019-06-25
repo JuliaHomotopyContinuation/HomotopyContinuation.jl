@@ -730,12 +730,19 @@ function check_and_refine_solution!(tracker::PathTracker)
 
         state.solution_cond = condition_jacobian(tracker)
         # If cond is not so high, maybe we don't have a singular solution in the end?
-        if state.winding_number == 1 && state.solution_cond < 1e8
-            result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
-                use_qr=true, max_iters=3,
-                accuracy=core_tracker.options.refinement_accuracy)
+        if state.winding_number == 1 && state.solution_cond < 1e10
+            try
+                result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
+                    use_qr=true, max_iters=3,
+                    precision=PRECISION_ADAPTIVE,
+                    accuracy=core_tracker.options.refinement_accuracy)
+            catch e
+                result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
+                    use_qr=true, max_iters=3,
+                    precision=PRECISION_FIXED_64,
+                    accuracy=core_tracker.options.refinement_accuracy)
+            end
             if isconverged(result)
-                state.winding_number = 0
                 @goto non_singular_case
             end
         elseif state.winding_number > 1 && state.solution_cond < 1e10 && residual(tracker) > 100
@@ -1133,7 +1140,7 @@ is larger than `tol`.
 """
 is_singular(r::PathResult; tol=1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
-    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && is_success(r)
+    (unpack(r.condition_jacobian, 1.0) > tol) && is_success(r)
 end
 
 """
