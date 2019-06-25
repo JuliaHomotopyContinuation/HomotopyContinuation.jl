@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, parameters
+export monodromy_solve, MonodromyResult, realsolutions, nreal, parameters
 
 
 #####################
@@ -377,6 +377,11 @@ end
 #############
 ## Results ##
 #############
+"""
+    MonodromyResult
+
+The monodromy result contains the result of the `monodromy_solve` computation.
+"""
 struct MonodromyResult{N, T1, T2}
     returncode::Symbol
     solutions::Vector{SVector{N, T1}}
@@ -635,6 +640,8 @@ function monodromy_solve(F::Inputs,
     else
         progress = nothing
     end
+
+    n_blas_threads = single_thread_blas()
     try
         retcode = monodromy_solve!(loop, C, options, statistics, progress)
     catch e
@@ -644,6 +651,8 @@ function monodromy_solve(F::Inputs,
             rethrow(e)
         end
     end
+    n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
+
     finished!(statistics, nsolutions(loop))
     MonodromyResult(retcode, points(solutions(loop)), p₀, statistics, options.equivalence_classes)
 end

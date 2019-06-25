@@ -4,6 +4,9 @@ Next to [`solve`](@ref), HomotopyContinuation.jl provides the function [`monodro
 
 ```@docs
 monodromy_solve
+MonodromyResult
+solutions(::MonodromyResult)
+parameters(::MonodromyResult)
 ```
 
 ## GroupActions
@@ -25,9 +28,4 @@ SymmetricGroup
 ```@docs
 Triangle
 Petal
-```
-
-## Helper functions
-```@docs
-parameters
 ```
