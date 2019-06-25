@@ -1,7 +1,8 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
-       is_singular, is_nonsingular, is_projective, is_affine, set_parameters!, multiplicity
+       is_singular, is_nonsingular, is_real, is_projective, is_affine,
+       set_parameters!, multiplicity
 
 
 const pathtracker_supported_keywords = [
@@ -1152,6 +1153,9 @@ We consider a result as `real` if the 2-norm of the imaginary part of the soluti
 """
 is_real(r::PathResult; tol=1e-6) = is_real(r, tol)
 is_real(r::PathResult, tol::Real) = is_real_vector(r.solution, tol)
+# provide fallback since this in in Base
+Base.isreal(r::PathResult, tol) = is_real(r, tol)
+Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)
 
 """
     is_projective(pathresult)
