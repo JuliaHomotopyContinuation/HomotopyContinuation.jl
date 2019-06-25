@@ -30,7 +30,7 @@ In order to analyse a `Result` we provide the following additional helper functi
 results
 mapresults
 solutions
-realsolutions
+real_solutions
 finite
 Base.real(::HomotopyContinuation.Results)
 atinfinity

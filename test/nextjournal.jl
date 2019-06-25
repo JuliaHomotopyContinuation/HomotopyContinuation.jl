@@ -21,7 +21,7 @@
 
         result = solve(g, f, start_sols)
         @test nfinite(result) == 4
-        @test length(realsolutions(result)) == 2
+        @test length(real_solutions(result)) == 2
     end
     @testset "Groups of variables" begin
         @polyvar x y z
@@ -43,7 +43,7 @@
         result = solve(∇L, variable_groups = [(x,y,z), (λ,)], show_progress = false)
         @test nfinite(result) == 108
 
-        reals = realsolutions(result)
+        reals = real_solutions(result)
         minval, minindex = findmin(map(s -> J(s[1:3]), reals))
         minarg = reals[minindex][1:3]
         @test minarg ≈ [0.6893448348668392; 0.19072105130305433; 0.9376180557378104] ||
@@ -126,7 +126,7 @@
 				 precision=PRECISION_ADAPTIVE,
 				 show_progress = false)
 
-		all_real_sols = realsolutions(R2)
+		all_real_sols = real_solutions(R2)
 		true_real_solutions  = filter(s -> all(s[7:9] .> -1e-3), all_real_sols);
 
 		S₃ = SymmetricGroup(3)

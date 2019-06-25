@@ -1,7 +1,7 @@
 export solve, Result, nresults, nsolutions, nfinite, nsingular, natinfinity,
     nfailed, nnonsingular, nreal, ntracked, finite, results, mapresults,
     failed, atinfinity, singular, nonsingular, seed,
-    solutions, realsolutions, multiplicities, uniquesolutions, statistics, multiplicities!
+    solutions, real_solutions, multiplicities, statistics, multiplicities!
 
 """
     solve(args...; options...)::Result
@@ -750,7 +750,7 @@ Return all `PathResult`s for which the given conditions apply.
 R = solve(F)
 
 # This gives us all PathResults considered non-singular and real (but still as a complex vector).
-realsolutions = results(R, only_real=true, only_nonsingular=true)
+real_solutions = results(R, only_real=true, only_nonsingular=true)
 ```
 """
 results(R::Results; kwargs...) = mapresults(identity, R; kwargs...)
@@ -765,7 +765,7 @@ conditions see [`results`](@ref).
 ## Example
 ```julia
 # This gives us all solutions considered real (but still as a complex vector).
-realsolutions = mapresults(solution, R, only_real=true)
+real_solutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f::Function, R::Results;
@@ -798,7 +798,7 @@ function solutions(result::Results; kwargs...)
 end
 
 """
-    realsolutions(result; tol=1e-6, conditions...)
+    real_solutions(result; tol=1e-6, conditions...)
 
 Return all real solution (as `Vector`s of reals) for which the given conditions apply.
 For the possible `conditions` see [`results`](@ref). Note that `only_real` is always `true`
@@ -808,13 +808,14 @@ and `real_tol` is now `tol`.
 ```julia
 julia> @polyvar x y
 julia> result = solve([(x-2)y, y+x+3]);
-julia> realsolutions(result)
+julia> real_solutions(result)
 [[2.0, -5.0], [-3.0, 0.0]]
 ```
 """
-function realsolutions(result::Results; only_real=true, tol=1e-6, kwargs...)
+function real_solutions(result::Results; only_real=true, tol=1e-6, kwargs...)
     mapresults(r -> real.(solution(r)), result; only_real=true, real_tol=tol, kwargs...)
 end
+@deprecate realsolutions(result; kwargs...) real_solutions(result; kwargs...)
 
 """
     nonsingular(result::Results; conditions...)

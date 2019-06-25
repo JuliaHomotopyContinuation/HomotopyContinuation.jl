@@ -1,4 +1,4 @@
-export monodromy_solve, MonodromyResult, realsolutions, nreal, parameters
+export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters
 
 
 #####################
@@ -437,7 +437,7 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
     if i == 1
         return r.solutions
     elseif i == 2
-        return realsolutions(r)
+        return real_solutions(r)
     elseif i == 3
         return r.returncode
     elseif i == 4
@@ -457,7 +457,7 @@ Apply the function `f` to all entries of `MonodromyResult` for which the given c
 ## Example
 ```julia
 # This gives us all solutions considered real (but still as a complex vector).
-realsolutions = mapresults(solution, R, only_real=true)
+real_solutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f, R::MonodromyResult;
@@ -473,7 +473,7 @@ Return all solutions (as `SVector`s) for which the given conditions apply.
 
 ## Example
 ```julia
-realsolutions = solutions(R, only_real=true)
+real_solutions = solutions(R, only_real=true)
 ```
 """
 function solutions(R::MonodromyResult; kwargs...)
@@ -488,11 +488,11 @@ Returns the number solutions of the `result`.
 nsolutions(res::MonodromyResult) = length(res.solutions)
 
 """
-    realsolutions(res::MonodromyResult; tol=1e-6)
+    real_solutions(res::MonodromyResult; tol=1e-6)
 
 Returns the solutions of `res` whose imaginary part has norm less than 1e-6.
 """
-function realsolutions(res::MonodromyResult; tol=1e-6)
+function real_solutions(res::MonodromyResult; tol=1e-6)
     map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
 end
 

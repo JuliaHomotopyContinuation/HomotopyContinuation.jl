@@ -97,7 +97,7 @@ end
             group_actions=(roots_of_unity, s -> (conj.(s),)))
         @test length(result.solutions) == 21
         @test length(solutions(result)) == 21
-        @test length(realsolutions(result)) < 21
+        @test length(real_solutions(result)) < 21
         test_treeviews(result)
 
         # group_actions as a vector
