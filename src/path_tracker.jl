@@ -1,6 +1,6 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
-       accuracy, residual, start_solution, is_success, isfailed, is_at_infinity,
+       accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
        issingular, isnonsingular, isprojective, isaffine, set_parameters!, multiplicity
 
 
@@ -1102,11 +1102,11 @@ Checks whether the path is successfull.
 is_success(r::PathResult) = r.return_code == :success
 
 """
-    isfailed(pathresult)
+    is_failed(pathresult)
 
 Checks whether the path failed.
 """
-isfailed(r::PathResult) =!(r.return_code == :at_infinity || r.return_code == :success)
+is_failed(r::PathResult) =!(r.return_code == :at_infinity || r.return_code == :success)
 
 
 """

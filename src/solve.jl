@@ -634,7 +634,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
     for r in R
         is_multiple_result(r, R) && continue
 
-        if isfailed(r)
+        if is_failed(r)
             failed += 1
         elseif issingular(r, singular_tol)
             if is_real(r, real_tol)
@@ -703,7 +703,7 @@ nat_infinity(R::Results) = count(is_at_infinity, R)
 
 The number of failed paths.
 """
-nfailed(R::Results) = count(isfailed, R)
+nfailed(R::Results) = count(is_failed, R)
 
 """
     nnonsingular(result; tol=1e-10)
@@ -859,7 +859,7 @@ Base.real(R::Results; tol=1e-6) = [r for r in R if is_real(r, tol)]
 
 Get all results where the path tracking failed.
 """
-failed(R::Results) = [r for r in R if isfailed(r)]
+failed(R::Results) = [r for r in R if is_failed(r)]
 
 """
     at_infinity(result::AffineResult)

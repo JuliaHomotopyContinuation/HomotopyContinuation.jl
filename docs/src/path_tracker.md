@@ -49,7 +49,7 @@ residual
 start_solution
 is_real(::PathResult)
 is_success(::PathResult)
-isfailed
+is_failed
 isaffine
 isprojective
 is_at_infinity
