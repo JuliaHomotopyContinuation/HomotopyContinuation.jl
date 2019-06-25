@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, parameters
+export monodromy_solve, MonodromyResult, realsolutions, nreal, parameters
 
 
 #####################
@@ -377,6 +377,11 @@ end
 #############
 ## Results ##
 #############
+"""
+    MonodromyResult
+
+The monodromy result contains the result of the `monodromy_solve` computation.
+"""
 struct MonodromyResult{N, T1, T2}
     returncode::Symbol
     solutions::Vector{SVector{N, T1}}
