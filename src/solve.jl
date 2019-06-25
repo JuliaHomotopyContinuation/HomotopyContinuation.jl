@@ -311,10 +311,10 @@ end
 
 function update!(stats::SolveStats, R::PathResult)
     if issingular(R)
-        stats.singular_real += isreal(R)
+        stats.singular_real += is_real(R)
         stats.singular += 1
     else
-        stats.regular_real += isreal(R)
+        stats.regular_real += is_real(R)
         stats.regular += 1
     end
 end
@@ -607,7 +607,7 @@ nresults(result, only_real=true, real_tol=1e-8, only_nonsingular=true)
 function nresults(R::Results; only_real=false, real_tol=1e-6,
     only_nonsingular=false, only_singular=false, singular_tol=1e10, onlyfinite=true, multiple_results=false)
     count(R) do r
-        (!only_real || isreal(r, real_tol)) &&
+        (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
         (!only_singular || issingular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
@@ -637,7 +637,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
         if isfailed(r)
             failed += 1
         elseif issingular(r, singular_tol)
-            if isreal(r, real_tol)
+            if is_real(r, real_tol)
                 real_singular += 1
                 real_singular_with_multiplicity += unpack(multiplicity(r), 1)
             end
@@ -646,7 +646,7 @@ function statistics(R::Results, only_real=false, real_tol=1e-6,
         elseif !isprojective(r) && !isfinite(r)
             at_infinity += 1
         else # finite, nonsingular
-            if isreal(r, real_tol)
+            if is_real(r, real_tol)
                 real_nonsingular += 1
             end
             nonsingular += 1
@@ -718,7 +718,7 @@ nnonsingular(R::Result; tol = 1e10) = count(r -> isnonsingular(r, tol), R)
 The number of real solutions where all imaginary parts of each solution
 are smaller than `tol`.
 """
-nreal(R::Results; tol = 1e-6) = count(r -> isreal(r, tol), R)
+nreal(R::Results; tol = 1e-6) = count(r -> is_real(r, tol), R)
 
 
 """
@@ -772,7 +772,7 @@ function mapresults(f::Function, R::Results;
     only_real=false, real_tol=1e-6, only_nonsingular=false, only_singular=false, singular_tol=1e10,
     onlyfinite=true, multiple_results=false)
     [f(r) for r in R if
-        (!only_real || isreal(r, real_tol)) &&
+        (!only_real || is_real(r, real_tol)) &&
         (!only_nonsingular || isnonsingular(r, singular_tol)) &&
         (!only_singular || issingular(r, singular_tol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
@@ -850,9 +850,9 @@ finite(R::Results; kwargs...) = results(R; onlyfinite=true, kwargs...)
     real(result, tol=1e-6)
 
 Get all results where the solutions are real with the given tolerance `tol`.
-See [`isreal`](@ref) for details regarding the determination of 'realness'.
+See [`is_real`](@ref) for details regarding the determination of 'realness'.
 """
-Base.real(R::Results; tol=1e-6) = [r for r in R if isreal(r, tol)]
+Base.real(R::Results; tol=1e-6) = [r for r in R if is_real(r, tol)]
 
 """
     failed(result)
@@ -1023,7 +1023,7 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     i = mult_1_exists + 1
     for k in sort(collect(keys(M)))
     	data[i, 1] = k
-    	n_real_solsᵢ = count(Mᵢ -> isreal(result.pathresults[Mᵢ[1]]), M[k])
+    	n_real_solsᵢ = count(Mᵢ -> is_real(result.pathresults[Mᵢ[1]]), M[k])
     	n_solsᵢ = length(M[k])
         data[i, 2] = n_solsᵢ
     	data[i, 3] = n_real_solsᵢ

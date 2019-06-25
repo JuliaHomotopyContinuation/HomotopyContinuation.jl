@@ -31,9 +31,9 @@
         @test_nowarn mapresults(start_solution, R)
         @test_nowarn mapresults(residual, R)
         @test_nowarn mapresults(issingular, R)
-        @test count(mapresults(isreal, R)) == 2
+        @test count(mapresults(is_real, R)) == 2
         # test fallback
-        @test count(results(isreal, R)) == 2
+        @test count(results(is_real, R)) == 2
 
         @test length(solutions(R)) == 4
         @test solutions(R) isa Vector{Vector{ComplexF64}}

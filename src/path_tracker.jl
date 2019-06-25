@@ -1146,12 +1146,12 @@ isnonsingular(r::PathResult, tol::Real) = !issingular(r, tol) && LinearAlgebra.i
 
 
 """
-    isreal(pathresult; tol=1e-6)
+    is_real(pathresult; tol=1e-6)
 
 We consider a result as `real` if the 2-norm of the imaginary part of the solution is at most `tol`.
 """
-Base.isreal(r::PathResult; tol=1e-6) = isreal(r, tol)
-Base.isreal(r::PathResult, tol::Real) = is_real_vector(r.solution, tol)
+is_real(r::PathResult; tol=1e-6) = is_real(r, tol)
+is_real(r::PathResult, tol::Real) = is_real_vector(r.solution, tol)
 
 """
     isprojective(pathresult)

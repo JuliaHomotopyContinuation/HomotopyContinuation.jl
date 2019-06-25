@@ -47,7 +47,7 @@ accuracy(::PathResult)
 multiplicity
 residual
 start_solution
-Base.isreal(::PathResult)
+is_real(::PathResult)
 LinearAlgebra.issuccess(::PathResult)
 isfailed
 isaffine

@@ -27,7 +27,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     max_loops_no_progress::Int
 end
 
-function MonodromyOptions(isrealsystem;
+function MonodromyOptions(is_real_system;
     distance=euclidean_distance,
     identical_tol::Float64=1e-6,
     done_callback=always_false,
@@ -36,7 +36,7 @@ function MonodromyOptions(isrealsystem;
     group_action_on_all_nodes=false,
     parameter_sampler=independent_normal,
     equivalence_classes=true,
-    complex_conjugation=isrealsystem,
+    complex_conjugation=is_real_system,
     check_startsolutions=true,
     # stopping heuristic
     target_solutions_count=nothing,
@@ -589,9 +589,9 @@ function monodromy_solve(F::Inputs,
     end
 
     # Check whether homotopy is real
-    isrealsystem = numerically_check_real(tracker.homotopy, tracker.state.x)
+    is_real_system = numerically_check_real(tracker.homotopy, tracker.state.x)
 
-    options = MonodromyOptions(isrealsystem; optionskwargs...)
+    options = MonodromyOptions(is_real_system; optionskwargs...)
     # construct cache
     newt_cache = newton_cache(F₀, tracker.state.x)
     C =  MonodromyCache(F₀, tracker, newt_cache, copy(tracker.state.x))
@@ -623,7 +623,7 @@ function monodromy_solve(F::Inputs,
     end
 
     if strategy === nothing
-        strategy = default_strategy(F, parameters, p; isrealsystem=isrealsystem)
+        strategy = default_strategy(F, parameters, p; is_real_system=is_real_system)
     end
 
     # construct Loop
@@ -664,21 +664,21 @@ function make_monodromy_progress(desc::String; dt::Real=0.1, output::IO=stderr)
     ProgressMeter.ProgressUnknown(false, dt, 0, false, tfirst, tlast, printed, desc, :green, output, 0)
 end
 
-function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; isrealsystem=false) where {TC,TP}
+function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
     vars = variables(F; parameters=parameters)
     if all(d -> d ≤ 1, maxdegrees(F; parameters=vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
-    elseif isrealsystem
+    elseif is_real_system
         Triangle(useweights=true)
     else
         Triangle(useweights=false)
     end
 end
-function default_strategy(F::AbstractSystem, parameters, p₀; isrealsystem=false)
+function default_strategy(F::AbstractSystem, parameters, p₀; is_real_system=false)
     # For a real system we should introduce some weights to avoid the discriminant
-    if isrealsystem
+    if is_real_system
         Triangle(useweights=true)
     else
         Triangle(useweights=false)
