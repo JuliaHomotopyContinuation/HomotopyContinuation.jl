@@ -1132,7 +1132,7 @@ is larger than `tol`.
 """
 is_singular(r::PathResult; tol=1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
-    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && LinearAlgebra.is_success(r)
+    (unpack(r.winding_number, 0) ≥ 1 || unpack(r.condition_jacobian, 1.0) > tol) && is_success(r)
 end
 
 """
@@ -1141,8 +1141,8 @@ end
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-is_nonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && LinearAlgebra.is_success(r)
-is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && LinearAlgebra.is_success(r)
+is_nonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && is_success(r)
+is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
 
 
 """
