@@ -25,8 +25,8 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
 DynamicPolynomials = "^0.1, ^0.2"
-ElasticArrays = "^0.3"
-FixedPolynomials = "^0.4.0"
+ElasticArrays = "^0.3, ^0.4"
+FixedPolynomials = "^0.4"
 MixedSubdivisions = "^0.3"
 MultivariatePolynomials = "^0.2.3"
 Parameters = "^0.10.3"
