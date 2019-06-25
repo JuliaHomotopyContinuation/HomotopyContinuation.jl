@@ -17,7 +17,7 @@ UniquePoints
 We provide several helper functions for `UniquePoints`.
 ```@docs
 points
-iscontained
+is_contained
 add!
 simple_add!
 empty!

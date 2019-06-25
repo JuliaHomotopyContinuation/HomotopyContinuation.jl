@@ -71,11 +71,11 @@
         @test length(data) == 2_000
 
         for i ∈ indices
-            @test HC.iscontained(data, X[i])
-            @test HC.iscontained(data, X[i], Val(true)) == i
-            @test HC.iscontained(data, X[i] .+ 1e-4) == false
-            @test HC.iscontained(data, X[i] .+ 1e-9, Val(true)) == i
-            @test HC.iscontained(data, X[i] .+ 1e-9) == true
+            @test HC.is_contained(data, X[i])
+            @test HC.is_contained(data, X[i], Val(true)) == i
+            @test HC.is_contained(data, X[i] .+ 1e-4) == false
+            @test HC.is_contained(data, X[i] .+ 1e-9, Val(true)) == i
+            @test HC.is_contained(data, X[i] .+ 1e-9) == true
             @test HC.add!(data, X[i]) == false
             @test HC.add!(data, X[i], Val(true)) == i
             @test data[i] == X[i]
@@ -89,7 +89,7 @@
         # Test many points with nearly indentical distance to the inserted point
         p = shuffle!([[cis(k/100*2π)] for k=0:99])
         data = HC.UniquePoints(p)
-        @test HC.iscontained(data, [0.0im]) == false
+        @test HC.is_contained(data, [0.0im]) == false
 
         # Test with group action
         x = randn(ComplexF64, 4)
