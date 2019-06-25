@@ -35,7 +35,7 @@
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
         @test !isprojective(res)
-        @test isaffine(res)
+        @test is_affine(res)
 
         x = @SVector [1.0, 1.0 + 0.0*im]
         tracker, starts = pathtracker_startsolutions(F, x;
@@ -56,7 +56,7 @@
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
         @test !isprojective(res)
-        @test isaffine(res)
+        @test is_affine(res)
 
         # total degree
         tracker, starts = pathtracker_startsolutions(equations(katsura(5)), affine_tracking=true)
@@ -65,7 +65,7 @@
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 6
         @test !isprojective(res)
-        @test isaffine(res)
+        @test is_affine(res)
     end
 
     @testset "Details Level" begin

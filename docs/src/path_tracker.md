@@ -50,7 +50,7 @@ start_solution
 is_real(::PathResult)
 is_success(::PathResult)
 is_failed
-isaffine
+is_affine
 isprojective
 is_at_infinity
 issingular

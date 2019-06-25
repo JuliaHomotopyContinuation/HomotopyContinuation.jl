@@ -1,7 +1,7 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
        accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
-       issingular, isnonsingular, isprojective, isaffine, set_parameters!, multiplicity
+       issingular, isnonsingular, isprojective, is_affine, set_parameters!, multiplicity
 
 
 const pathtracker_supported_keywords = [
@@ -1121,7 +1121,7 @@ is_at_infinity(r::PathResult) = r.return_code == :at_infinity
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathResult) = r.return_code == :success # we don't check isaffine to make other code easier
+Base.isfinite(r::PathResult) = r.return_code == :success # we don't check is_affine to make other code easier
 
 """
     issingular(pathresult; tol=1e10)
@@ -1162,8 +1162,8 @@ isprojective(r::PathResult{<:PVector}) = true
 isprojective(r::PathResult) = false
 
 """
-    isaffine(pathresult)
+    is_affine(pathresult)
 
 Return`s true if the solution is an affine vector.
 """
-isaffine(r::PathResult) = !isprojective(r)
+is_affine(r::PathResult) = !isprojective(r)
