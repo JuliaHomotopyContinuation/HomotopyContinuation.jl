@@ -605,11 +605,11 @@ nresults(result, only_real=true, realtol=1e-8, only_nonsingular=true)
 ```
 """
 function nresults(R::Results; only_real=false, realtol=1e-6,
-    only_nonsingular=false, onlysingular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
+    only_nonsingular=false, only_singular=false, singulartol=1e10, onlyfinite=true, multiple_results=false)
     count(R) do r
         (!only_real || isreal(r, realtol)) &&
         (!only_nonsingular || isnonsingular(r, singulartol)) &&
-        (!onlysingular || issingular(r, singulartol)) &&
+        (!only_singular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
         (multiple_results || !is_multiple_result(r, R))
     end
@@ -617,7 +617,7 @@ end
 
 """
     statistics(R::Result; only_real=false, realtol=1e-6,
-        only_nonsingular=false, onlysingular=false, singulartol=1e10)
+        only_nonsingular=false, only_singular=false, singulartol=1e10)
 
 Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
 
@@ -627,7 +627,7 @@ julia> statistics(solve([x^2+y^2-2, 2x+3y-1]))
 (nonsingular = 2, singular = 0, real_nonsingular = 2, real_singular = 0, real = 2, atinfinity = 0, failed = 0, total = 2)
 """
 function statistics(R::Results, only_real=false, realtol=1e-6,
-    only_nonsingular=false, onlysingular=false, singulartol=1e10)
+    only_nonsingular=false, only_singular=false, singulartol=1e10)
 
     failed = atinfinity = nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -685,7 +685,7 @@ The number of singular solutions. A solution is considered singular if its windi
 If `counting_multiplicities=true` the number of singular solutions times their multiplicities is returned.
 """
 function nsingular(R::Results; singulartol=1e10, counting_multiplicities=false, kwargs...)
-    S = results(R; onlysingular=true, multiple_results=false, singulartol=singulartol, kwargs...)
+    S = results(R; only_singular=true, multiple_results=false, singulartol=singulartol, kwargs...)
     isempty(S) && return 0
     counting_multiplicities && return sum(multiplicity, S)
     length(S)
@@ -769,12 +769,12 @@ realsolutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f::Function, R::Results;
-    only_real=false, realtol=1e-6, only_nonsingular=false, onlysingular=false, singulartol=1e10,
+    only_real=false, realtol=1e-6, only_nonsingular=false, only_singular=false, singulartol=1e10,
     onlyfinite=true, multiple_results=false)
     [f(r) for r in R if
         (!only_real || isreal(r, realtol)) &&
         (!only_nonsingular || isnonsingular(r, singulartol)) &&
-        (!onlysingular || issingular(r, singulartol)) &&
+        (!only_singular || issingular(r, singulartol)) &&
         (!onlyfinite || isfinite(r) || isprojective(r)) &&
         (multiple_results || !is_multiple_result(r,R))]
 end
@@ -833,7 +833,7 @@ If If `multiple_results=true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
 function singular(R::Results; tol=1e10, kwargs...)
-    results(R; onlysingular = true, singulartol=tol, kwargs...)
+    results(R; only_singular = true, singulartol=tol, kwargs...)
 end
 
 
@@ -949,7 +949,7 @@ function TreeViews.treenode(r::Result, i::Integer)
     elseif i == 2 && s.nonsingular > 0
         return finite(r, only_nonsingular=true)
     elseif i == 3 && s.singular > 0
-        return finite(r, onlysingular=true)
+        return finite(r, only_singular=true)
     elseif i == 4 && (s.real_nonsingular+s.real_singular) > 0
         return finite(r, only_real = true)
     elseif i == 5 && s.atinfinity > 0
@@ -991,7 +991,7 @@ function TreeViews.treenode(r::ProjectiveResult, i::Integer)
     elseif i == 2 && s.nonsingular > 0
         return finite(r, only_nonsingular=true)
     elseif i == 3 && s.singular > 0
-        return finite(r, onlysingular=true)
+        return finite(r, only_singular=true)
     elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
         return finite(r, only_real=true)
     elseif i == 5 && s.failed > 0

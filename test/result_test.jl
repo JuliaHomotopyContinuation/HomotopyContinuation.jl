@@ -9,7 +9,7 @@
 
         @test length(finite(R, only_nonsingular=false)) == 4
         @test length(finite(R, only_nonsingular=true)) == 4
-        @test length(finite(R, onlysingular=true)) == 0
+        @test length(finite(R, only_singular=true)) == 0
         @test 572 - length(failed(R)) == natinfinity(R)
         @test length(real(R, tol=1e-6)) == 2
         @test nreal(R, tol=1e-6) == 2
