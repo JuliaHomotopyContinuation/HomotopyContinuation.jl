@@ -52,7 +52,7 @@ LinearAlgebra.issuccess(::PathResult)
 isfailed
 isaffine
 isprojective
-isatinfinity
+is_at_infinity
 issingular
 isnonsingular
 ```

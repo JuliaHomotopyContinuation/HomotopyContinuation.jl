@@ -1,6 +1,6 @@
 export PathResult, PathTrackerStatus, PathTracker,
        pathtracker, pathtracker_startsolutions, solution,
-       accuracy, residual, start_solution, isfailed, isatinfinity,
+       accuracy, residual, start_solution, isfailed, is_at_infinity,
        issingular, isnonsingular, isprojective, isaffine, set_parameters!, multiplicity
 
 
@@ -1110,11 +1110,11 @@ isfailed(r::PathResult) =!(r.return_code == :at_infinity || r.return_code == :s
 
 
 """
-    isatinfinity(pathresult)
+    is_at_infinity(pathresult)
 
 Checks whether the path goes to infinity.
 """
-isatinfinity(r::PathResult) = r.return_code == :at_infinity
+is_at_infinity(r::PathResult) = r.return_code == :at_infinity
 
 """
     isfinite(pathresult)

@@ -696,7 +696,7 @@ end
 
 The number of solutions at infinity.
 """
-natinfinity(R::Results) = count(isatinfinity, R)
+natinfinity(R::Results) = count(is_at_infinity, R)
 
 """
     nafailed(result)
@@ -866,7 +866,7 @@ failed(R::Results) = [r for r in R if isfailed(r)]
 
 Get all results where the solutions is at infinity.
 """
-atinfinity(R::Results) = [r for r in R if isatinfinity(r)]
+atinfinity(R::Results) = [r for r in R if is_at_infinity(r)]
 
 """
     multiplicities(V::Results; tol=1e-6)
