@@ -21,6 +21,7 @@ module HomotopyContinuation
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
     import Test: @test
+    import MixedSubdivisions: mixed_volume
 
     const FP = FixedPolynomials
     const MP = MultivariatePolynomials
@@ -28,6 +29,7 @@ module HomotopyContinuation
 
     export @polyvar, subs, differentiate
     export issuccess, cond
+    export mixed_volume
 
     include("utilities.jl")
     include("affine_patches.jl")
