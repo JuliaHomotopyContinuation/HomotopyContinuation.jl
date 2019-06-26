@@ -1,4 +1,4 @@
-export monodromy_solve, realsolutions, nreal, parameters
+export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters
 
 
 #####################
@@ -8,7 +8,7 @@ const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_c
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
-    :minimal_number_of_solutions, :maximal_number_of_iterations_without_progress]
+    :min_solutions, :max_loops_no_progress]
 
 struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     distance_function::F
@@ -23,11 +23,11 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     # stopping heuristic
     target_solutions_count::Int
     timeout::Float64
-    minimal_number_of_solutions::Int
-    maximal_number_of_iterations_without_progress::Int
+    min_solutions::Int
+    max_loops_no_progress::Int
 end
 
-function MonodromyOptions(isrealsystem;
+function MonodromyOptions(is_real_system;
     distance=euclidean_distance,
     identical_tol::Float64=1e-6,
     done_callback=always_false,
@@ -36,13 +36,13 @@ function MonodromyOptions(isrealsystem;
     group_action_on_all_nodes=false,
     parameter_sampler=independent_normal,
     equivalence_classes=true,
-    complex_conjugation=isrealsystem,
+    complex_conjugation=is_real_system,
     check_startsolutions=true,
     # stopping heuristic
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
-    minimal_number_of_solutions::Int=default_minimal_number_of_solutions(target_solutions_count),
-    maximal_number_of_iterations_without_progress::Int=10)
+    min_solutions::Int=default_min_solutions(target_solutions_count),
+    max_loops_no_progress::Int=10)
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -58,12 +58,12 @@ function MonodromyOptions(isrealsystem;
         group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation, check_startsolutions,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
-        minimal_number_of_solutions,
-        maximal_number_of_iterations_without_progress)
+        min_solutions,
+        max_loops_no_progress)
 end
 
-default_minimal_number_of_solutions(::Nothing) = 1
-function default_minimal_number_of_solutions(target_solutions_count::Int)
+default_min_solutions(::Nothing) = 1
+function default_min_solutions(target_solutions_count::Int)
     div(target_solutions_count, 2)
 end
 
@@ -96,7 +96,7 @@ MonodromyStatistics(nsolutions::Int) = MonodromyStatistics(0, 0, 0, 1, [nsolutio
 function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
-        if isrealvector(s)
+        if is_real_vector(s)
             stats.nreal +=1
         end
     end
@@ -377,6 +377,11 @@ end
 #############
 ## Results ##
 #############
+"""
+    MonodromyResult
+
+The monodromy result contains the result of the `monodromy_solve` computation.
+"""
 struct MonodromyResult{N, T1, T2}
     returncode::Symbol
     solutions::Vector{SVector{N, T1}}
@@ -432,7 +437,7 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
     if i == 1
         return r.solutions
     elseif i == 2
-        return realsolutions(r)
+        return real_solutions(r)
     elseif i == 3
         return r.returncode
     elseif i == 4
@@ -445,30 +450,30 @@ end
 
 
 """
-    mapresults(f, result::MonodromyResult; onlyreal=false, realtol=1e-6)
+    mapresults(f, result::MonodromyResult; only_real=false, real_tol=1e-6)
 
 Apply the function `f` to all entries of `MonodromyResult` for which the given conditions apply.
 
 ## Example
 ```julia
 # This gives us all solutions considered real (but still as a complex vector).
-realsolutions = mapresults(solution, R, onlyreal=true)
+real_solutions = mapresults(solution, R, only_real=true)
 ```
 """
 function mapresults(f, R::MonodromyResult;
-    onlyreal=false, realtol=1e-6)
+    only_real=false, real_tol=1e-6)
     [f(r) for r in R.solutions if
-        (!onlyreal || isrealvector(r, realtol))]
+        (!only_real || is_real_vector(r, real_tol))]
 end
 
 """
-    solutions(result::MonodromyResult; onlyreal=false, realtol=1e-6)
+    solutions(result::MonodromyResult; only_real=false, real_tol=1e-6)
 
 Return all solutions (as `SVector`s) for which the given conditions apply.
 
 ## Example
 ```julia
-realsolutions = solutions(R, onlyreal=true)
+real_solutions = solutions(R, only_real=true)
 ```
 """
 function solutions(R::MonodromyResult; kwargs...)
@@ -483,11 +488,11 @@ Returns the number solutions of the `result`.
 nsolutions(res::MonodromyResult) = length(res.solutions)
 
 """
-    realsolutions(res::MonodromyResult; tol=1e-6)
+    real_solutions(res::MonodromyResult; tol=1e-6)
 
 Returns the solutions of `res` whose imaginary part has norm less than 1e-6.
 """
-function realsolutions(res::MonodromyResult; tol=1e-6)
+function real_solutions(res::MonodromyResult; tol=1e-6)
     map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
 end
 
@@ -532,7 +537,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 ## Options
 * `target_solutions_count=nothing`: The computations are stopped if this number of solutions is reached.
 * `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
-* `maximal_number_of_iterations_without_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
+* `max_loops_no_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
 * `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
 * `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
 * `show_progress=true`: Enable a progress meter.
@@ -544,7 +549,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `equivalence_classes=true`: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.
 * `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
-* `minimal_number_of_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
+* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
 function monodromy_solve(F::Inputs, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     monodromy_solve(F, [solution], p₀; kwargs...)
@@ -584,9 +589,9 @@ function monodromy_solve(F::Inputs,
     end
 
     # Check whether homotopy is real
-    isrealsystem = numerically_check_real(tracker.homotopy, tracker.state.x)
+    is_real_system = numerically_check_real(tracker.homotopy, tracker.state.x)
 
-    options = MonodromyOptions(isrealsystem; optionskwargs...)
+    options = MonodromyOptions(is_real_system; optionskwargs...)
     # construct cache
     newt_cache = newton_cache(F₀, tracker.state.x)
     C =  MonodromyCache(F₀, tracker, newt_cache, copy(tracker.state.x))
@@ -618,7 +623,7 @@ function monodromy_solve(F::Inputs,
     end
 
     if strategy === nothing
-        strategy = default_strategy(F, parameters, p; isrealsystem=isrealsystem)
+        strategy = default_strategy(F, parameters, p; is_real_system=is_real_system)
     end
 
     # construct Loop
@@ -635,6 +640,8 @@ function monodromy_solve(F::Inputs,
     else
         progress = nothing
     end
+
+    n_blas_threads = single_thread_blas()
     try
         retcode = monodromy_solve!(loop, C, options, statistics, progress)
     catch e
@@ -644,6 +651,8 @@ function monodromy_solve(F::Inputs,
             rethrow(e)
         end
     end
+    n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
+
     finished!(statistics, nsolutions(loop))
     MonodromyResult(retcode, points(solutions(loop)), p₀, statistics, options.equivalence_classes)
 end
@@ -655,21 +664,21 @@ function make_monodromy_progress(desc::String; dt::Real=0.1, output::IO=stderr)
     ProgressMeter.ProgressUnknown(false, dt, 0, false, tfirst, tlast, printed, desc, :green, output, 0)
 end
 
-function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; isrealsystem=false) where {TC,TP}
+function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
     vars = variables(F; parameters=parameters)
     if all(d -> d ≤ 1, maxdegrees(F; parameters=vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
-    elseif isrealsystem
+    elseif is_real_system
         Triangle(useweights=true)
     else
         Triangle(useweights=false)
     end
 end
-function default_strategy(F::AbstractSystem, parameters, p₀; isrealsystem=false)
+function default_strategy(F::AbstractSystem, parameters, p₀; is_real_system=false)
     # For a real system we should introduce some weights to avoid the discriminant
-    if isrealsystem
+    if is_real_system
         Triangle(useweights=true)
     else
         Triangle(useweights=false)
@@ -740,8 +749,8 @@ function monodromy_solve!(loop::Loop, C::MonodromyCache, options::MonodromyOptio
             iterations_without_progress = 0
             n = n_new
         end
-        if iterations_without_progress == options.maximal_number_of_iterations_without_progress &&
-            n_new ≥ options.minimal_number_of_solutions
+        if iterations_without_progress == options.max_loops_no_progress &&
+            n_new ≥ options.min_solutions
             return :heuristic_stop
         end
 
@@ -801,13 +810,13 @@ function process!(queue::Vector{<:Job}, job::Job, C::MonodromyCache, loop::Loop,
     node = loop.nodes[job.edge.target]
 
     if node.main_node
-        y = verified_affine_vector(C, currx(C.tracker), job.x, options)
+        y = verified_affine_vector(C, current_x(C.tracker), job.x, options)
         # is the solution at infinity?
         if y === nothing
             return :incomplete
         end
     else
-        y = affine_chart(job.x, currx(C.tracker))
+        y = affine_chart(job.x, current_x(C.tracker))
     end
     next_edge = nextedge(loop, job.edge)
     add_and_schedule!(node, queue, y, options, stats, next_edge) && return :done

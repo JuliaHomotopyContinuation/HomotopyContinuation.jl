@@ -41,11 +41,11 @@ iterator
 ## Introspecting the current state
 To introspect the current state we provide the following routines.
 ```@docs
-currx
-currt
-currΔt
-curriters
-currstatus
+current_x
+current_t
+current_Δt
+iters
+status
 LinearAlgebra.cond(::CoreTracker)
 digits_lost
 options

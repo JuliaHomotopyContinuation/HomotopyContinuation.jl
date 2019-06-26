@@ -71,11 +71,11 @@
         @test length(data) == 2_000
 
         for i ∈ indices
-            @test HC.iscontained(data, X[i])
-            @test HC.iscontained(data, X[i], Val(true)) == i
-            @test HC.iscontained(data, X[i] .+ 1e-4) == false
-            @test HC.iscontained(data, X[i] .+ 1e-9, Val(true)) == i
-            @test HC.iscontained(data, X[i] .+ 1e-9) == true
+            @test HC.is_contained(data, X[i])
+            @test HC.is_contained(data, X[i], Val(true)) == i
+            @test HC.is_contained(data, X[i] .+ 1e-4) == false
+            @test HC.is_contained(data, X[i] .+ 1e-9, Val(true)) == i
+            @test HC.is_contained(data, X[i] .+ 1e-9) == true
             @test HC.add!(data, X[i]) == false
             @test HC.add!(data, X[i], Val(true)) == i
             @test data[i] == X[i]
@@ -89,7 +89,7 @@
         # Test many points with nearly indentical distance to the inserted point
         p = shuffle!([[cis(k/100*2π)] for k=0:99])
         data = HC.UniquePoints(p)
-        @test HC.iscontained(data, [0.0im]) == false
+        @test HC.is_contained(data, [0.0im]) == false
 
         # Test with group action
         x = randn(ComplexF64, 4)
@@ -110,11 +110,11 @@
         X = [im.*x, x, randn(ComplexF64, 4)]
 
         data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real=false)
-        @test HC.isrealvector(points(data)[1]) == false
+        @test HC.is_real_vector(points(data)[1]) == false
         @test length(points(data)) == 2
 
         data = HC.UniquePoints(X, group_action = x -> (im.*x, (-1).*x, (-im).*x), check_real = true)
-        @test HC.isrealvector(points(data)[1]) == true
+        @test HC.is_real_vector(points(data)[1]) == true
         @test length(points(data)) == 2
 
         data = HC.UniquePoints(randn(ComplexF64, 4), check_real = true)
@@ -193,22 +193,22 @@
         @test HC.nvariables(f ∘ g, parameters=[z]) == 2
 
         @polyvar x y z
-        @test ishomogeneous([x^2+y^2+x*y, x^5])
-        @test ishomogeneous([x^2+y^2+x*y, x^4+1]) == false
+        @test is_homogeneous([x^2+y^2+x*y, x^5])
+        @test is_homogeneous([x^2+y^2+x*y, x^4+1]) == false
 
         #test weighted degree
-        @test ishomogeneous(x^3+x*y, [(x, 2), (y, 4)])
+        @test is_homogeneous(x^3+x*y, [(x, 2), (y, 4)])
         @test homogenize(x+x*y, [(x, 2), (y, 4)], z) == x*z^4+x*y
 
-        @test ishomogeneous(homogenize([x^2+y^2+x*y, x^4+1]))
-        @test ishomogeneous([x^2+z^2 + y, x^4+z^4], [x,z]) == false
-        @test ishomogeneous(homogenize([x^2+z^2*y, x^4+z^4*y], [x,z]), [x,z]) == true
+        @test is_homogeneous(homogenize([x^2+y^2+x*y, x^4+1]))
+        @test is_homogeneous([x^2+z^2 + y, x^4+z^4], [x,z]) == false
+        @test is_homogeneous(homogenize([x^2+z^2*y, x^4+z^4*y], [x,z]), [x,z]) == true
 
-        @test ishomogeneous(f ∘ g) == true
+        @test is_homogeneous(f ∘ g) == true
         h = [a * b * c  + p * c^3] ∘ [x+y, y + z, x + z]
-        @test ishomogeneous(h, parameters=[p]) == true
+        @test is_homogeneous(h, parameters=[p]) == true
         h2 = [a * b * c  + p] ∘ [x+y, y + z, x + z]
-        @test ishomogeneous(h2, parameters=[p]) == false
+        @test is_homogeneous(h2, parameters=[p]) == false
 
 
         #homogenize
@@ -239,15 +239,15 @@
         f = [x*y-2, x^2-4]
 
         affine_hominfo = HC.HomogenizationInformation(variable_groups = ((x,), (y,)))
-        @test HC.ishomogeneous(f, affine_hominfo) == false
+        @test HC.is_homogeneous(f, affine_hominfo) == false
 
         @polyvar v w
         g = [x * y - 2v * w, x^2-4v^2]
         hominfo = HC.HomogenizationInformation(variable_groups = ((x,v), (y,w)))
-        @test HC.ishomogeneous(g, hominfo) == true
+        @test HC.is_homogeneous(g, hominfo) == true
 
         hominfo = HC.HomogenizationInformation(homvars=(v,w), variable_groups = ((x,v), (y,w)))
-        @test HC.ishomogeneous(g, hominfo) == true
+        @test HC.is_homogeneous(g, hominfo) == true
 
         @test HC.homogenize(f, hominfo) == g
         HC.multidegrees(f, ([x], [y])) == [1 2; 1 0]
@@ -369,7 +369,7 @@
         @test HC.nthroot(x, 0) == one(x)
 
         x = rand(6)
-        @test HC.isrealvector(x)
+        @test HC.is_real_vector(x)
 
         segment = HC.ComplexSegment(2, 4)
         @test length(segment) ≈ 2

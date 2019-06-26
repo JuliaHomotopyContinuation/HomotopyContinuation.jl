@@ -15,7 +15,7 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
-    import LinearAlgebra: issuccess, cond
+    import LinearAlgebra: cond
     import Parameters: @pack!, @unpack
     import DynamicPolynomials: @polyvar, subs, differentiate
     import ProjectiveVectors: PVector
@@ -28,8 +28,8 @@ module HomotopyContinuation
     const SP = StaticPolynomials
 
     export @polyvar, subs, differentiate
-    export issuccess, cond
     export mixed_volume
+    export cond
 
     include("utilities.jl")
     include("affine_patches.jl")

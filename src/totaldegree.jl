@@ -136,7 +136,7 @@ function bezout_number(F::MPPolys; parameters=nothing, variable_groups=nothing, 
     vars = variables(F; parameters=parameters)
     hominfo = HomogenizationInformation(variable_groups=variable_groups, homvars=homvars)
     D = multidegrees(F, variable_groups)
-    if ishomogeneous(F, hominfo; parameters=parameters)
+    if is_homogeneous(F, hominfo; parameters=parameters)
         bezout_number(D, length.(variable_groups) .- 1)
     else
         bezout_number(D, length.(variable_groups))

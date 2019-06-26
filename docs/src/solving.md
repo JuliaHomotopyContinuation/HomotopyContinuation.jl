@@ -30,10 +30,10 @@ In order to analyse a `Result` we provide the following additional helper functi
 results
 mapresults
 solutions
-realsolutions
+real_solutions
 finite
 Base.real(::HomotopyContinuation.Results)
-atinfinity
+at_infinity
 failed
 multiplicities!(::HomotopyContinuation.Result)
 multiplicities(::HomotopyContinuation.Results)
@@ -47,7 +47,7 @@ nfinite
 nreal
 nsingular
 nnonsingular
-natinfinity
+nat_infinity
 nfailed
 ```
 

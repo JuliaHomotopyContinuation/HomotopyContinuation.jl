@@ -74,7 +74,7 @@
         F = equations(katsura(5))
         result = solve(homogenize(F), threading=false)
         @test result isa Result{<:ProjectiveVectors.PVector}
-        @test isprojective(first(result))
+        @test is_projective(first(result))
         @test nnonsingular(result) == 32
 
 
@@ -89,6 +89,12 @@
         @test result isa Result{<:Vector}
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
+
+        prob, startsolutions = problem_startsolutions(TargetSystemInput(F); projective_tracking=true)
+        proj_starts = HC.embed.(prob, startsolutions)
+        result = solve(prob.homotopy, proj_starts)
+        @test result isa Result{<:ProjectiveVectors.PVector}
+
 
         # Composition
         @polyvar a b c x y z u v
@@ -237,7 +243,7 @@
         target = [randn(ComplexF64, 3), randn(ComplexF64, 2)]
         H = CoefficientHomotopy(E, start, target)
         result = solve(H, [[1, 1]])
-        @test issuccess(result[1])
+        @test is_success(result[1])
     end
 
     @testset "Overdetermined" begin
@@ -269,7 +275,13 @@
         tracker, starts = pathtracker_startsolutions(
                 [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
                 affine_tracking=false)
-        @test issuccess(track(tracker, s))
+        @test is_success(track(tracker, s))
+
+        s = first(solutions(solve([x^2+y^2+z^2 - 1; L₁])))
+        tracker, starts = pathtracker_startsolutions(
+                [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
+                projective_tracking=true)
+        @test is_success(track(tracker, s))
     end
 
     @testset "MultiHomogeneous" begin

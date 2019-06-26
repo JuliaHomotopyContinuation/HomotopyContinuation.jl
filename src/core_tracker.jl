@@ -1,7 +1,7 @@
 export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
         coretracker, coretracker_startsolutions, affine_tracking,
         track, track!, setup!, iterator,
-        currx, currt, currΔt, curriters, currstatus, accuracy, max_corrector_iters,
+        current_x, current_t, current_Δt, iters, status, accuracy, max_corrector_iters,
         max_step_size , refinement_accuracy, max_refinement_iters,
         set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
         set_max_refinement_iters!, set_max_step_size!, digits_lost, options
@@ -473,9 +473,9 @@ Additionally also stores the result in `x₀` if the tracking was successfull.
 function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
             loop::Bool=false, checkstartvalue::Bool=!loop)
      _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
-     retcode = currstatus(tracker)
+     retcode = status(tracker)
      if retcode == CoreTrackerStatus.success
-         x₀ .= currx(tracker)
+         x₀ .= current_x(tracker)
      end
      retcode
 end
@@ -521,7 +521,7 @@ function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, 
         checkstartvalue && checkstartvalue!(tracker)
         if !loop
             compute_ẋ!(state, cache, tracker.options)
-            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, currt(state), state.jacobian)
+            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
         end
     catch err
         if !(err isa LinearAlgebra.SingularException)
@@ -543,7 +543,7 @@ function checkstartvalue!(tracker::CoreTracker)
 end
 
 function compute_ẋ!(state, cache, options::CoreTrackerOptions)
-    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, currt(state))
+    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, current_t(state))
     # apply row scaling to J and compute factorization
     updated_jacobian!(state.jacobian)
 
@@ -577,7 +577,7 @@ function step!(tracker::CoreTracker)
     H = cache.homotopy
 
     try
-        t, Δt = currt(state), currΔt(state)
+        t, Δt = current_t(state), current_Δt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
         update_jacobian_infos =
@@ -618,7 +618,7 @@ function step!(tracker::CoreTracker)
             update_rank!(state.jacobian)
             # Step failed, so we have to try with a new (smaller) step size
             update_stepsize!(tracker, result)
-            Δt = currΔt(state)
+            Δt = current_Δt(state)
             state.last_step_failed = true
         end
     catch err
@@ -764,7 +764,7 @@ auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = no
 function check_terminated!(tracker::CoreTracker)
     if abs(tracker.state.s - length(tracker.state.segment)) < 2eps(length(tracker.state.segment))
         tracker.state.status = CoreTrackerStatus.success
-    elseif curriters(tracker) ≥ tracker.options.max_steps
+    elseif iters(tracker) ≥ tracker.options.max_steps
         tracker.state.status = CoreTrackerStatus.terminated_maximal_iterations
     end
     nothing
@@ -813,44 +813,44 @@ affine_tracking(tracker::CoreTracker) = !isa(tracker.state.x, ProjectiveVectors.
 ## Query State ##
 #################
 """
-     currt(tracker::CoreTracker)
+     current_t(tracker::CoreTracker)
 
 Current `t`.
 """
-currt(tracker::CoreTracker) = currt(tracker.state)
-currt(state::CoreTrackerState) = state.segment[state.s]
+current_t(tracker::CoreTracker) = current_t(tracker.state)
+current_t(state::CoreTrackerState) = state.segment[state.s]
 
 """
-     currΔt(tracker::CoreTracker)
+     current_Δt(tracker::CoreTracker)
 
 Current step_size `Δt`.
 """
-currΔt(tracker::CoreTracker) = currΔt(tracker.state)
-currΔt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
+current_Δt(tracker::CoreTracker) = current_Δt(tracker.state)
+current_Δt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
 
 """
-     curriters(tracker::CoreTracker)
+     iters(tracker::CoreTracker)
 
 Current number of iterations.
 """
-curriters(tracker::CoreTracker) = curriters(tracker.state)
-curriters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
+iters(tracker::CoreTracker) = iters(tracker.state)
+iters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
 
 """
-     currstatus(tracker::CoreTracker)
+     status(tracker::CoreTracker)
 
 Current status.
 """
-currstatus(tracker::CoreTracker) = currstatus(tracker.state)
-currstatus(state::CoreTrackerState) = state.status
+status(tracker::CoreTracker) = status(tracker.state)
+status(state::CoreTrackerState) = state.status
 
 """
-    currx(tracker::CoreTracker)
+    current_x(tracker::CoreTracker)
 
 Return the current value of `x`.
 """
-currx(tracker::CoreTracker) = currx(tracker.state)
-currx(state::CoreTrackerState) = state.x
+current_x(tracker::CoreTracker) = current_x(tracker.state)
+current_x(state::CoreTrackerState) = state.x
 
 
 """
@@ -1000,7 +1000,7 @@ Note that this is a stateful iterator. You can still introspect the state of the
 For example to check whether the tracker was successfull
 (and did not terminate early due to some problem) you can do
 ```julia
-println("Success: ", currstatus(tracker) == CoreTrackerStatus.success)
+println("Success: ", status(tracker) == CoreTrackerStatus.success)
 ```
 """
 function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
@@ -1009,8 +1009,8 @@ function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
 end
 
 function current_x_t(iter::PathIterator)
-    x = currx(iter.tracker)
-    t = currt(iter.tracker)
+    x = current_x(iter.tracker)
+    t = current_t(iter.tracker)
     (x, iter.t_real ? real(t) : t)
 end
 
