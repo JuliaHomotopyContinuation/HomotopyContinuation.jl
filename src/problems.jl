@@ -4,7 +4,7 @@ export AbstractProblem, Problem, TrackingType, AffineTracking, ProjectiveTrackin
 
 const problem_startsolutions_supported_keywords = [
 	[:seed, :homvar, :homvars, :variable_groups, :homotopy, :system, :system_scaling,
-	:affine_tracking, :start_system, :only_torus];
+	:affine_tracking, :projective_tracking, :start_system, :only_torus];
 	input_supported_keywords]
 
 
@@ -263,9 +263,21 @@ function problem_startsolutions(input::AbstractInput, startsolutions=nothing; se
     problem_startsolutions(input, startsolutions, seed; kwargs...)
 end
 function problem_startsolutions(input::AbstractInput, startsolutions, seed::Int;
-	homvar=nothing, homvars=nothing, variable_groups=nothing, kwargs...)
+	homvar=nothing, homvars=nothing, variable_groups=nothing, affine_tracking=nothing, projective_tracking=nothing, kwargs...)
+
 	homvar_info = HomogenizationInformation(;homvar=homvar, homvars=homvars, variable_groups=variable_groups)
-    problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
+
+	#projective_tracking is for the frontend
+	#internally, we use affine_tracking
+	if isnothing(affine_tracking)
+		if isnothing(projective_tracking)
+			affine_tracking = default_affine_tracking(input, homvar_info)
+		else
+			affine_tracking = !projective_tracking
+		end
+	end
+
+    problem_startsolutions(input, startsolutions, homvar_info, seed; affine_tracking=affine_tracking, kwargs...)
 end
 
 function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=default_affine_tracking(input, homvar_info), system_scaling=nothing, kwargs...)

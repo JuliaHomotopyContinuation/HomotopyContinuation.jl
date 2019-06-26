@@ -90,6 +90,12 @@
         @test nnonsingular(result) == 32
         @test nfinite(result) == 32
 
+        prob, startsolutions = problem_startsolutions(TargetSystemInput(F); projective_tracking=true)
+        proj_starts = HC.embed.(prob, startsolutions)
+        result = solve(prob.homotopy, proj_starts)
+        @test result isa Result{<:ProjectiveVectors.PVector}
+
+
         # Composition
         @polyvar a b c x y z u v
         e = [u + 1, v - 2]
@@ -269,6 +275,12 @@
         tracker, starts = pathtracker_startsolutions(
                 [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
                 affine_tracking=false)
+        @test is_success(track(tracker, s))
+
+        s = first(solutions(solve([x^2+y^2+z^2 - 1; L₁])))
+        tracker, starts = pathtracker_startsolutions(
+                [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
+                projective_tracking=true)
         @test is_success(track(tracker, s))
     end
 
