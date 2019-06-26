@@ -249,6 +249,8 @@ is_homogeneous(H::AbstractHomotopy) = is_homogeneous(FixedHomotopy(H, rand()))
     * `homotopy=StraightLineHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) an `AbstractSystem`. The constructor
     is called with `homotopy(start, target)` where `start` and `target` are systems constructed
     with `system`.
+	* `affine_tracking::Bool=true`: Indicate whether path tracking should happen in affine space.
+	* `projective_tracking::Bool=false`: Indicate whether path tracking should happen in projective space. The flag `affine_tracking` is dominant.
 """
 function problem_startsolutions end
 
