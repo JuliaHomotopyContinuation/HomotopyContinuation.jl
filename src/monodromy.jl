@@ -657,11 +657,11 @@ function monodromy_solve(F::Inputs,
     MonodromyResult(retcode, points(solutions(loop)), p₀, statistics, options.equivalence_classes)
 end
 
-function make_monodromy_progress(desc::String; dt::Real=0.1, output::IO=stderr)
+function make_monodromy_progress(desc::String; dt::Real=0.1, output::IO=stdout)
     tfirst = time()
     tlast = tfirst + 0.5 # half a second delay before something is displayed
     printed = false
-    ProgressMeter.ProgressUnknown(false, dt, 0, false, tfirst, tlast, printed, desc, :green, output, 0)
+    ProgressMeter.ProgressUnknown(false, dt, 0, false, tfirst, tlast, printed, desc, :green, output, 0, true)
 end
 
 function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}
