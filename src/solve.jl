@@ -251,7 +251,8 @@ function track_paths(tracker, start_solutions;
     @deprecatekwarg report_progress show_progress
 
     if show_progress
-        progress = ProgressMeter.Progress(n; dt=0.25, desc="Tracking $n paths... ", clear_output_ijulia=true, output=stdout)
+        progress = ProgressMeter.Progress(n; dt=0.1, desc="Tracking $n paths... ",
+                                    clear_output_ijulia=true, delay=0.3)
     else
         progress = nothing
     end
