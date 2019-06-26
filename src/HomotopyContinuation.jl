@@ -17,16 +17,18 @@ module HomotopyContinuation
 
     import LinearAlgebra: cond
     import Parameters: @pack!, @unpack
-    import DynamicPolynomials: @polyvar
+    import DynamicPolynomials: @polyvar, subs, differentiate
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
     import Test: @test
+    import MixedSubdivisions: mixed_volume
 
     const FP = FixedPolynomials
     const MP = MultivariatePolynomials
     const SP = StaticPolynomials
 
-    export @polyvar
+    export @polyvar, subs, differentiate
+    export mixed_volume
     export cond
 
     include("utilities.jl")
