@@ -38,6 +38,7 @@
     @testset "Bio-chemical reaction networks" begin
         res = solve(equations(PolynomialTestSystems.bacillus_subtilis()); show_progress=false)
         @test 40 ≤ nsolutions(res) ≤ 44
+        @test nsingular(res) == 0
         res = solve(equations(PolynomialTestSystems.bacillus_subtilis()); start_system=:polyhedral, show_progress=false)
         @test 40 ≤ nsolutions(res) ≤ 44
 

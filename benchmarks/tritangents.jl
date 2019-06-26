@@ -5,5 +5,5 @@ f = equations(tritangents())
 res = solve(f)
 println("# nonsingular: ", nnonsingular(res)) # should be 720
 
-using Bertini
-@time bertini(f; MPTYPE=0)
+res = solve(f; start_system=:polyhedral)
+println("# nonsingular: ", nnonsingular(res)) # should be 720
