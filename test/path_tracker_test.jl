@@ -26,8 +26,24 @@
         p = [a, b]
 
         # parameter homotopy
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], projective_tracking=true)
+        @test tracker.problem isa Problem{ProjectiveTracking}
+
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], projective_tracking=false)
+        @test tracker.problem isa Problem{AffineTracking}
+
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], projective_tracking=true, affine_tracking=true)
+        @test tracker.problem isa Problem{AffineTracking}
+
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], projective_tracking=false, affine_tracking=false)
+        @test tracker.problem isa Problem{ProjectiveTracking}
+
+        tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=false)
+        @test tracker.problem isa Problem{ProjectiveTracking}
+
         tracker = pathtracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
         @test tracker.problem isa Problem{AffineTracking}
+
         @test affine_tracking(tracker.core_tracker) == true
         @test HC.type_of_x(tracker) == Vector{ComplexF64}
         res = track(tracker, [1, 1])

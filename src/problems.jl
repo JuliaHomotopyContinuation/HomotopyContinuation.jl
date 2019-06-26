@@ -271,13 +271,13 @@ function problem_startsolutions(input::AbstractInput, startsolutions, seed::Int;
 	#internally, we use affine_tracking
 	if isnothing(affine_tracking)
 		if isnothing(projective_tracking)
-			affine_tracking = default_affine_tracking(input, homvar_info)
+			problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
 		else
-			affine_tracking = !projective_tracking
+			problem_startsolutions(input, startsolutions, homvar_info, seed; affine_tracking=!projective_tracking, kwargs...)
 		end
+	else
+		problem_startsolutions(input, startsolutions, homvar_info, seed; affine_tracking=affine_tracking, kwargs...)
 	end
-
-    problem_startsolutions(input, startsolutions, homvar_info, seed; affine_tracking=affine_tracking, kwargs...)
 end
 
 function problem_startsolutions(input::HomotopyInput, startsolutions, homvar_info, seed; affine_tracking=default_affine_tracking(input, homvar_info), system_scaling=nothing, kwargs...)
