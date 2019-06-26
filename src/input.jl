@@ -99,7 +99,7 @@ function input_startsolutions(F::MPPolyInputs; parameters=nothing, kwargs...)
 
     remove_zeros!(F)
     # square system and each polynomial is non-zero
-    if length(F) == nvariables(F) && ishomogeneous(F)
+    if length(F) == nvariables(F) && is_homogeneous(F)
         throw(ArgumentError("Cannot construct a start system for a square homogeneous system."))
     end
 

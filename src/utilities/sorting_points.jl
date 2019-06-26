@@ -1,4 +1,4 @@
-export UniquePoints, multiplicities, iscontained, add!, simple_add!, empty!, points, unique_points
+export UniquePoints, multiplicities, is_contained, add!, simple_add!, empty!, points, unique_points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -30,11 +30,11 @@ function SearchBlock(::Type{T}, index::Int; kwargs...) where T
     block
 end
 
-function iscontained(block::SearchBlock{T}, x::NTuple{N,S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, N, S, F<:Function}
-    iscontained(block, SVector{N,S}(x), tol, points, distance)
+function is_contained(block::SearchBlock{T}, x::NTuple{N,S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, N, S, F<:Function}
+    is_contained(block, SVector{N,S}(x), tol, points, distance)
 end
 
-function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, S, F<:Function}
+function is_contained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, S, F<:Function}
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -87,7 +87,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, poi
     #            we need to sort the distances vector and look through everything
 
     # Check smallest element first
-    retidx = iscontained(block.children[m₁[2]], x, tol, points, distance, threadid)
+    retidx = is_contained(block.children[m₁[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -98,7 +98,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, poi
         return NOT_FOUND # already checked first tree
     end
     # Case 2) We know m₂[1] - m₁[1] ≤ 2tol
-    retidx = iscontained(block.children[m₂[2]], x, tol, points, distance, threadid)
+    retidx = is_contained(block.children[m₂[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -110,7 +110,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, poi
     end
 
     # Since we know als the third element, let's check it
-    retidx = iscontained(block.children[m₃[2]], x, tol, points, distance, threadid)
+    retidx = is_contained(block.children[m₃[2]], x, tol, points, distance, threadid)
     if retidx ≠ NOT_FOUND
         distances[1] = m₁ # we rely on the distances for look up, so place at the first place the smallest element
         return retidx
@@ -125,7 +125,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, poi
     for k ∈ 4:n
         dᵢ, i = distances[k]
         if dᵢ - m₁[1] < 2tol
-            retidx = iscontained(block.children[i], x, tol, points, distance, threadid)
+            retidx = is_contained(block.children[i], x, tol, points, distance, threadid)
             if retidx ≠ NOT_FOUND
                 return retidx
             end
@@ -136,7 +136,7 @@ function iscontained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, poi
 
     return NOT_FOUND
 end
-iscontained(::Nothing, x::AbstractVector, tol::Real, points::Vector, distance, threadid) = NOT_FOUND
+is_contained(::Nothing, x::AbstractVector, tol::Real, points::Vector, distance, threadid) = NOT_FOUND
 
 # This assumes that distances_cache is filled
 function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
@@ -264,28 +264,28 @@ Base.getindex(data::UniquePoints, i::Integer) = data.points[i]
 
 
 """
-    iscontained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool
+    is_contained(data::UniquePoints{V}, x::V; tol=1e-5)::Bool
 
 Check whether `x` is contained in the `data` by using the tolerance `tol` to decide for duplicates.
 
-    iscontained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int
+    is_contained(data::UniquePoints{V}, x::V, Val{true}(); tol=1e-5)::Int
 
 If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added.
 """
-function iscontained(data::UniquePoints, x, val=Val{false}(); tol::Real=1e-5)
-    iscontained(data, x, val, tol)
+function is_contained(data::UniquePoints, x, val=Val{false}(); tol::Real=1e-5)
+    is_contained(data, x, val, tol)
 end
-function iscontained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N, T}
-    iscontained(data, SVector{N,T}(x), val, tol)
+function is_contained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N, T}
+    is_contained(data, SVector{N,T}(x), val, tol)
 end
-function iscontained(data::UniquePoints{T}, x::AbstractVector{S}, ::Val{Index}, tol::Real) where {T,S,Index}
-    index = iscontained(data.root, x, tol, data.points, data.distance_function)
+function is_contained(data::UniquePoints{T}, x::AbstractVector{S}, ::Val{Index}, tol::Real) where {T,S,Index}
+    index = is_contained(data.root, x, tol, data.points, data.distance_function)
     if index == NOT_FOUND
         if data.group_actions !== nothing # extra if statement since inference cannot look through &&
             apply_actions(data.group_actions, x) do y
-                k = iscontained(data.root, y, tol, data.points, data.distance_function)
+                k = is_contained(data.root, y, tol, data.points, data.distance_function)
                 if k ≠ NOT_FOUND
                     index = k
                     return true
@@ -314,20 +314,20 @@ of the data point which already exists. If the data point is not existing add it
 return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
 function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol::Real=1e-5)
-    idx = iscontained(data, x, Val(true), tol)
+    idx = is_contained(data, x, Val(true), tol)
     idx == NOT_FOUND || return idx
 
     if !data.check_real
         simple_add!(data, x, tol)
         return NOT_FOUND
     else
-        if isrealvector(x)
+        if is_real_vector(x)
             simple_add!(data, x, tol)
             return NOT_FOUND_AND_REAL
         elseif data.group_actions !== nothing
             not_found_and_real = false
             apply_actions(data.group_actions, x) do y
-                if isrealvector(y)
+                if is_real_vector(y)
                     simple_add!(data, y, tol)
                     not_found_and_real = true
                     return true
@@ -359,7 +359,7 @@ If the data point is not existing add it to `data` and return `-1`. Otherwise
 the index of `x` in `data.points` is returned.
 """
 function simple_add!(data::UniquePoints, x::AbstractVector, tol::Real)
-    idx = iscontained(data.root, x, tol, data.points, data.distance_function)
+    idx = is_contained(data.root, x, tol, data.points, data.distance_function)
     if idx ≠ NOT_FOUND
         return idx
     end

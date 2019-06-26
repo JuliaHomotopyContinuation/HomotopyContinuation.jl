@@ -31,10 +31,10 @@ end
 
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                 target_solutions_count=21,
-                maximal_number_of_iterations_without_progress=20)
+                max_loops_no_progress=20)
         @test result.returncode == :success
         @test length(solutions(result)) == 21
-        @test length(solutions(result, onlyreal = true)) >= 1
+        @test length(solutions(result, only_real = true)) >= 1
         @test result.statistics.ntrackedpaths ≥ 21
         @test result.statistics.nparametergenerations ≥ 1
         @test length(HC.UniquePoints(result.solutions).points) == 21
@@ -70,7 +70,7 @@ end
         # By group_actions=nothing we force that complex conjugation is not used.
         result2 = monodromy_solve(F, x₀, p₀, parameters=p,
                         target_solutions_count=21, complex_conjugation=false,
-                        maximal_number_of_iterations_without_progress=100)
+                        max_loops_no_progress=100)
         @test result2.returncode == :success
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
@@ -85,24 +85,24 @@ end
         end
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
-            maximal_number_of_iterations_without_progress=100,
+            max_loops_no_progress=100,
             equivalence_classes=false,
             group_action=roots_of_unity)
         @test length(result.solutions) == 21
 
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
-            maximal_number_of_iterations_without_progress=100,
+            max_loops_no_progress=100,
             complex_conjugation=false, # disable complex conjugation to test it as a group action.
             equivalence_classes=false,
             group_actions=(roots_of_unity, s -> (conj.(s),)))
         @test length(result.solutions) == 21
         @test length(solutions(result)) == 21
-        @test length(realsolutions(result)) < 21
+        @test length(real_solutions(result)) < 21
         test_treeviews(result)
 
         # group_actions as a vector
         result = monodromy_solve(F, x₀, p₀, parameters=p, target_solutions_count=21,
-            maximal_number_of_iterations_without_progress=100,
+            max_loops_no_progress=100,
             complex_conjugation=false,
             equivalence_classes=false,
             group_actions=[roots_of_unity, s -> (conj.(s),)])
@@ -113,20 +113,20 @@ end
         result = monodromy_solve(F, x₀, p₀, parameters=p,
             equivalence_classes=true,
             target_solutions_count=7,
-            maximal_number_of_iterations_without_progress=100,
+            max_loops_no_progress=100,
             group_actions=roots_of_unity)
         @test length(result.solutions) == 7
         # Test that equivalence classes are on by default if we supply a group action
         result = monodromy_solve(F, x₀, p₀, parameters=p,
                             group_action=roots_of_unity,
-                            maximal_number_of_iterations_without_progress=20)
+                            max_loops_no_progress=20)
         @test length(result.solutions) == 7
 
         # Test affine tracking
         result = monodromy_solve(F, x₀, p₀, parameters=p, affine_tracking=true,
                         group_action=roots_of_unity,
                         target_solutions_count=7,
-                        maximal_number_of_iterations_without_progress=200)
+                        max_loops_no_progress=200)
         @test length(result.solutions) == 7
 
         # AbstractSystem as input
@@ -134,7 +134,7 @@ end
         result = monodromy_solve(F_p, x₀, p₀, affine_tracking=true,
                         group_action=roots_of_unity,
                         target_solutions_count=7,
-                        maximal_number_of_iterations_without_progress=200)
+                        max_loops_no_progress=200)
         @test length(result.solutions) == 7
     end
 
@@ -184,7 +184,7 @@ end
         			parameters=p, group_action=relabeling,
         			parameter_sampler=last ∘ sample_moments,
                     show_progress=false,
-                    maximal_number_of_iterations_without_progress=5)
+                    max_loops_no_progress=5)
         @test length(solutions(R)) ≤ 225
 
         R = monodromy_solve(f - p, y₀, p₀;
@@ -193,7 +193,7 @@ end
                     affine_tracking=true,
         			parameter_sampler=last ∘ sample_moments,
                     show_progress=false,
-                    maximal_number_of_iterations_without_progress=20)
+                    max_loops_no_progress=20)
         @test length(solutions(R)) == 225
     end
 end

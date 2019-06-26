@@ -213,19 +213,19 @@ function check_kwargs_empty(kwargs, allowed_kwargs=[])
 end
 
 """
-    isrealvector(v::AbstractVector, tol=1e-6)
+    is_real_vector(v::AbstractVector, tol=1e-6)
 
 Check whether the 2-norm of the imaginary part of `v` is at most `tol`.
 """
-isrealvector(z::AbstractVector{<:Real}, tol=1e-6) = true
-function isrealvector(z::AbstractVector{<:Complex}, tol=1e-6)
+is_real_vector(z::AbstractVector{<:Real}, tol=1e-6) = true
+function is_real_vector(z::AbstractVector{<:Complex}, tol=1e-6)
     total = zero(real(eltype(z)))
     for zᵢ in z
         total += abs2(imag(zᵢ))
     end
     sqrt(total) < tol
 end
-isrealvector(z::NTuple{N, T}, tol=1e-6) where {N,T} = isrealvector(SVector{N}(z), tol)
+is_real_vector(z::NTuple{N, T}, tol=1e-6) where {N,T} = is_real_vector(SVector{N}(z), tol)
 
 """
     randseed(range=1_000:1_000_000)

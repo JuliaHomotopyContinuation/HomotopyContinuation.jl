@@ -11,7 +11,7 @@
         test_show_juno(t1.state)
         @test !isempty(string(t1.state))
 
-        @test_nowarn currΔt(t1)
+        @test_nowarn current_Δt(t1)
 
         raccuracy = refinement_accuracy(t1)
         @test_nowarn set_refinement_accuracy!(t1, 5e-5)
@@ -34,19 +34,19 @@
         set_max_refinement_iters!(t1, rmaxiter)
 
         @test t1 isa CoreTracker
-        @test isa(currx(t1), Vector)
-        @test length(currx(t1)) == 6
+        @test isa(current_x(t1), Vector)
+        @test length(current_x(t1)) == 6
 
         t3, start_sols = coretracker_startsolutions(F, predictor=Euler())
         @test t3.predictor isa Euler
 
         setup!(t1, first(start_sols), 1.0, 0.4)
-        @test currstatus(t1) == CoreTrackerStatus.tracking
-        @test currt(t1) == 1.0
+        @test status(t1) == CoreTrackerStatus.tracking
+        @test current_t(t1) == 1.0
 
         setup!(t1, first(start_sols), 0.5, 0.4)
-        @test currstatus(t1) == CoreTrackerStatus.terminated_invalid_startvalue
-        @test currt(t1) == 0.5
+        @test status(t1) == CoreTrackerStatus.terminated_invalid_startvalue
+        @test current_t(t1) == 0.5
 
         R = track(t1, first(start_sols), 1.0, 0.0)
         @test R isa CoreTrackerResult
@@ -120,8 +120,8 @@
         x_final = zero(x_inter)
         retcode = track!(x_final, tracker, x_inter, 0.1, 0.0)
         @test retcode == CoreTrackerStatus.success
-        @test curriters(tracker) < 3
-        x = currx(tracker)
+        @test iters(tracker) < 3
+        x = current_x(tracker)
         @test norm(x - A \ b) < 1e-6
     end
 
@@ -138,7 +138,7 @@
         v1 = copy(fixedpatch.v̄)
         track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=false)
         @test v1 == fixedpatch.v̄
-        track!(fixedtracker, currx(tracker), 0.05, 0.01, setup_patch=false)
+        track!(fixedtracker, current_x(tracker), 0.05, 0.01, setup_patch=false)
         @test v1 == fixedpatch.v̄
         track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=true)
         @test v1 != fixedpatch.v̄
