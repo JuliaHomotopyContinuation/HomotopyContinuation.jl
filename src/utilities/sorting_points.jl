@@ -415,11 +415,12 @@ julia> m = multiplicities(X, group_action = permutation)
 ```
 """
 multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
-function multiplicities(f, v; distance=default_distance(f,v), kwargs...) where {F<:Function}
-    _multiplicities(f, v, distance; kwargs...)
+function multiplicities(f, v; kwargs...) where {F<:Function}
+    isempty(v) && return Vector{Vector{Int}}()
+    _multiplicities(f, v; kwargs...)
 end
 default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_distance
-function _multiplicities(f, v, distance::F; tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
+function _multiplicities(f, v; distance=default_distance(f,v), tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
     mults = Dict{Int, Vector{Int}}()
     positions = Vector{Int32}()
     x₀ = f(first(v))
