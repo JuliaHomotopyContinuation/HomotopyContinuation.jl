@@ -1135,12 +1135,14 @@ Base.isfinite(r::PathResult) = r.return_code == :success # we don't check is_aff
     is_singular(pathresult; tol=1e10)
 
 Checks whether the path result is singular. This is true if
-the winding number is larger than  1 or if the condition number of the Jacobian
+the multiplicity is larger than  1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
 is_singular(r::PathResult; tol=1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
-    (unpack(r.condition_jacobian, 1.0) > tol) && is_success(r)
+    (unpack(r.condition_jacobian, 1.0) > tol ||
+     unpack(r.multiplicity, 1) > 1) &&
+     is_success(r)
 end
 
 """
