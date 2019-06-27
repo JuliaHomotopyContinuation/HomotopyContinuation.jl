@@ -132,6 +132,9 @@
     end
 
     @testset "Multiplicities" begin
+        # test empty input
+        @test isempty(multiplicities(Vector{Vector{ComplexF64}}()))
+        
         V = [randn(3) + im.* randn(3) for i in 1:10]
         W = [map(v -> v + [1e-7 * v[1] ;1.0;1.0], V); V; map(v -> v + [1e-6 * v[1]; 0; 0], V)]
         U = [[cis(rand()) for _=1:3] for _=1:20]
