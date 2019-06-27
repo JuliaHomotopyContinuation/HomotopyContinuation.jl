@@ -14,6 +14,7 @@
         evaluate!(u, F, x, system_cache)
         @test evaluate(F, x, system_cache) ≈ u
         @test evaluate(F, x) ≈ u
+        @test F(x) ≈ u
 
         U = zeros(Complex{Float64}, 6, 6)
         jacobian!(U, F, x, system_cache)
@@ -22,6 +23,30 @@
 
         evaluate_and_jacobian!(u, U, F, x, system_cache)
         @test all(evaluate_and_jacobian(F, x, system_cache) .≈ (u, U))
+
+
+        @polyvar x y a b
+        F = SPSystem([x^2+2y*x+a*x+b+3., b*x*y^3+a+2]; parameters=[a,b])
+        @test size(F) == (2, 2)
+        @test length(F) == 2
+        x = rand(Complex{Float64}, 2)
+        p = rand(Complex{Float64}, 2)
+        system_cache = cache(F, x, p)
+        @test system_cache isa HomotopyContinuation.SystemNullCache
+        u = zeros(Complex{Float64}, 2)
+        evaluate!(u, F, x, p, system_cache)
+        @test evaluate(F, x, p, system_cache) ≈ u
+        @test evaluate(F, x, p) ≈ u
+        @test F(x, p) ≈ u
+
+        U = zeros(Complex{Float64}, 2, 2)
+        jacobian!(U, F, x, p, system_cache)
+        @test jacobian(F, x, p, system_cache) ≈ U
+        @test jacobian(F, x, p) ≈ U
+
+        evaluate_and_jacobian!(u, U, F, x, p, system_cache)
+        @test all(evaluate_and_jacobian(F, x, p, system_cache) .≈ (u, U))
+        @test all(evaluate_and_jacobian(F, x, p) .≈ (u, U))
     end
 
     @testset "FixedHomotopy" begin

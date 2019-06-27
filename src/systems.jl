@@ -54,6 +54,7 @@ Evaluate the system `F` at `x`.
 Evaluate the system `F` at `x` and parameters `p`.
 """
 evaluate(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = evaluate(F, x, c)
+evaluate(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F,x,p)) = evaluate(F, x, p, c)
 
 
 """
@@ -72,11 +73,12 @@ jacobian!(u, F::AbstractSystem, args...) = error(MethodError(jacobian!, tuple(u,
 
 Evaluate the Jacobian of the system `F` at `x`.
 
-    jacobian(F::AbstractSystem, x , p, cache::AbstractSystemCache)
+    jacobian(F::AbstractSystem, x , p, cache=cache(F, x))
 
 Evaluate the Jacobian of the system `F` at `x` and parameters `p`.
 """
 jacobian(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = jacobian(F, x, c)
+jacobian(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F,x,p)) = jacobian(F, x, p, c)
 
 
 """
@@ -92,7 +94,7 @@ function differentiate_parameters! end
 
 Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters
 """
-differentiate_parameters(F::AbstractSystem, x, c::AbstractSystemCache=cache(F, x)) = differentiate_parameters(F, x, c)
+differentiate_parameters(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F, x)) = differentiate_parameters(F, x, p, c)
 
 # Optional
 """
