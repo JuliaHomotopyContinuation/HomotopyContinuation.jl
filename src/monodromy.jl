@@ -633,10 +633,11 @@ function monodromy_solve(F::Inputs,
     retcode = :not_assigned
     if show_progress
         if !options.equivalence_classes
-            progress = make_monodromy_progress("Solutions found:")
+            desc = "Solutions found:"
         else
-            progress = make_monodromy_progress("Classes of solutions (modulo group action) found:")
+            desc = "Classes of solutions (modulo group action) found:"
         end
+        progress = ProgressMeter.ProgressUnknown(desc; delay=0.5, clear_output_ijulia=true)
     else
         progress = nothing
     end
@@ -655,13 +656,6 @@ function monodromy_solve(F::Inputs,
 
     finished!(statistics, nsolutions(loop))
     MonodromyResult(retcode, points(solutions(loop)), p₀, statistics, options.equivalence_classes)
-end
-
-function make_monodromy_progress(desc::String; dt::Real=0.1, output::IO=stderr)
-    tfirst = time()
-    tlast = tfirst + 0.5 # half a second delay before something is displayed
-    printed = false
-    ProgressMeter.ProgressUnknown(false, dt, 0, false, tfirst, tlast, printed, desc, :green, output, 0)
 end
 
 function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}

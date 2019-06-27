@@ -402,7 +402,8 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
 
     n = length(start_solutions)
     if show_progress
-        progress = ProgressMeter.Progress(n, 0.1, "Tracking $n paths... ")
+        progress = ProgressMeter.Progress(n; dt=0.1, desc="Tracking $n paths... ",
+                                    delay=0.3, clear_output_ijulia=true)
     else
         progress = nothing
     end
