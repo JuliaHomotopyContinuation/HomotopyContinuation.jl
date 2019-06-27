@@ -14,6 +14,7 @@
         evaluate!(u, F, x, system_cache)
         @test evaluate(F, x, system_cache) ≈ u
         @test evaluate(F, x) ≈ u
+        @test F(x) ≈ u
 
         U = zeros(Complex{Float64}, 6, 6)
         jacobian!(U, F, x, system_cache)
@@ -36,6 +37,7 @@
         evaluate!(u, F, x, p, system_cache)
         @test evaluate(F, x, p, system_cache) ≈ u
         @test evaluate(F, x, p) ≈ u
+        @test F(x, p) ≈ u
 
         U = zeros(Complex{Float64}, 2, 2)
         jacobian!(U, F, x, p, system_cache)
