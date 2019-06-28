@@ -2,7 +2,7 @@ using Test, LinearAlgebra, Random
 using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
 
-import PolynomialTestSystems: cyclic, katsura, equations, ipp2, heart, griewank_osborne
+import PolynomialTestSystems: cyclic, cyclooctane, katsura, equations, ipp2, heart, griewank_osborne
 const HC = HomotopyContinuation
 
 function test_treeviews(x)

@@ -52,4 +52,10 @@
         @test nsolutions(res) == 6
         @test ntracked(res) == 8
     end
+
+    @testset "Overflow error message" begin
+        f = equations(cyclooctane())
+        F = [f; randn(2, 18) * [variables(f);1]]
+        @test_throws OverflowError solve(F; start_system=:polyhedral)
+    end
 end

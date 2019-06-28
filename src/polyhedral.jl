@@ -106,7 +106,7 @@ function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isnothing(iter.mixed_cells) || isnothing(iter.lifting)
         res = MixedSubdivisions.fine_mixed_cells(iter.support)
         if isnothing(res)
-            error("Cannot compute a start system due to technical limitations of our current implementation.")
+            throw(OverflowError("Cannot compute a start system due to an overflow in the mixed subdivision algorithm."))
         end
         mixed_cells, lifting = res
         iter.mixed_cells = mixed_cells
