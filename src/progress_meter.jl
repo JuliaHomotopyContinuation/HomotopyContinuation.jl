@@ -166,7 +166,7 @@ function updateProgress!(p::Progress; showvalues = Any[], valuecolor = :blue, of
             if keep
                 println(p.output)
             else
-                print(p.output, "\r\u1b[A" ^ (p.offset + p.numprintedvalues))
+                !flush_display(p) && print(p.output, "\r\u1b[A" ^ (p.offset + p.numprintedvalues))
             end
             flush(p.output)
         end
