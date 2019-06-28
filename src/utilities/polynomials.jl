@@ -719,6 +719,19 @@ function remove_zeros!(C::Composition)
     C
 end
 
+"""
+    has_constant_polynomial(F::Vector{<:MP.AbstractPolynomialLike})
+
+Returns true if the system `F` contains a constant polynomial.
+"""
+function has_constant_polynomial(F::MPPolys)
+    for f in F
+		MP.nterms(f) == 1 && MP.isconstant(first(MP.terms(f))) && return true
+	end
+	false
+end
+has_constant_polynomial(C::Composition) = has_constant_polynomial(C.polys[1])
+
 permute(F::MPPolys, perm) = F[perm]
 permute(C::Composition, perm) = Composition([[C.polys[1][perm]]; C.polys[2:end]])
 

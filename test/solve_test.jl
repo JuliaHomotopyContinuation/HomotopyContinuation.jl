@@ -4,6 +4,11 @@
         @test_throws ArgumentError solve([x-2y+2, 0])
         @test_throws ArgumentError solve([x-2, y-2], [x-2, y-2,y+2], [[2, -3]])
         @test_throws ArgumentError solve([x-2z, y^2+3z, z^3+x^3], homvar=z)
+
+        # constant term
+        @test_throws ArgumentError solve([subs(x+2, x=>2), y^2+3x])
+        @polyvar u v
+        @test_throws ArgumentError solve([subs(x+2, x=>2), y^2+3x] ∘ [u, v])
         # overdetermined and abstract system
         @test_throws ArgumentError solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]))
         @test_throws ArgumentError solve(FPSystem([x-2z, y^2+3z^2, z^3+x^3, z+x]), homvar=4)
