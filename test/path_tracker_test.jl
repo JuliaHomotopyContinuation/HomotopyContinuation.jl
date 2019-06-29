@@ -177,4 +177,14 @@
         @test nfinite(solve([v - 2w , -v + 2w, v + w - 3])) == 1
         @test nfinite(solve([v - 2w , -v + 2w, v + w - 3], affine_tracking=false)) == 1
     end
+
+    @testset "accuracy assigned" begin
+        @polyvar x y
+        f₁ = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        f₂ = x^2+2x*y^2 - 2y^2 - 1/2
+        result = solve([f₁, f₂])
+        acc = results(result; only_real=true)[1].accuracy
+        @test acc !== nothing
+        @test !isnan(acc)
+    end
 end
