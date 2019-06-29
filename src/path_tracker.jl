@@ -763,11 +763,11 @@ function check_and_refine_solution!(tracker::PathTracker)
             use_qr=true, max_iters=3,
             accuracy=core_tracker.options.refinement_accuracy)
         @label non_singular_case
-
         state.solution_cond = core_tracker.state.jacobian.cond
 
         if isconverged(result) && core_tracker.state.jacobian.corank_proposal == 0
             state.solution .= core_tracker.state.x̄
+            state.solution_accuracy = result.accuracy
         elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
                at_infinity_post_check(state.val, options)
 
@@ -803,7 +803,6 @@ function check_and_refine_solution!(tracker::PathTracker)
             else
                 state.status = PathTrackerStatus.post_check_failed
             end
-            state.solution_accuracy = target_result.accuracy
 
             if !pull_back_is_to_affine(tracker.problem)
                 LinearAlgebra.normalize!(state.solution)
