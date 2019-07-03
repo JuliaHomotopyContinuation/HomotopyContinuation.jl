@@ -70,7 +70,7 @@ end
 
 function Jacobian(A::AbstractMatrix, corank::Int=0)
     m, n = size(A)
-    lu = m ≠ n ? nothing : LinearAlgebra.lu!(Random.randn!(similar(A)))
+    lu = m ≠ n ? nothing : LinearAlgebra.lu!(Random.randn!(complex.(float.(A))))
 
     work = Vector{ComplexF64}(undef, 1)
     ormqr_work = Vector{ComplexF64}(undef, 1)
