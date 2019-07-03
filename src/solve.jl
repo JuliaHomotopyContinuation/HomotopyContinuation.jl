@@ -55,6 +55,7 @@ Result with 2 solutions
 • 0 singular solutions (0 real)
 • 2 paths tracked
 • random seed: 222880
+```
 
 # Homogeneous Systems
 
