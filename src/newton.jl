@@ -85,7 +85,7 @@ end
 
 function newton_cache(F::AbstractSystem, x::AbstractVector{ComplexF64})
     system_cache = cache(F, x)
-    Jac = Jacobian(Random.randn!(jacobian(F, x, system_cache)))
+    Jac = Jacobian(Random.randn!(complex.(float.(jacobian(F, x, system_cache)))))
     rᵢ = evaluate(F, x, system_cache)
     xD64 = similar(x, Complex{Double64})
     system_cache_D64 = cache(F, xD64)

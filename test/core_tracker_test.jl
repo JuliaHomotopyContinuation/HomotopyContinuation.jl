@@ -216,4 +216,15 @@
         @test digits_lost(tracker) != digits_lost_start
     end
 
+    @testset "path iterator" begin
+        @polyvar x a
+        f = [x - a]
+        ct = coretracker(f, [1.0], parameters=[a], p₁=[1.],
+                p₀=[2.], max_step_size=0.1)
+        Xs = Vector{ComplexF64}[]
+        for (x, t) in iterator(ct, [1.0], 1.0, 0.0)
+            push!(Xs, x)
+        end
+        @test round.(Int, real.(first.(Xs)) .* 10) == collect(10:20)
+    end
 end

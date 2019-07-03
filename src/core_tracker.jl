@@ -1012,7 +1012,7 @@ end
 function current_x_t(iter::PathIterator)
     x = current_x(iter.tracker)
     t = current_t(iter.tracker)
-    (x, iter.t_real ? real(t) : t)
+    (copy(x), iter.t_real ? real(t) : t)
 end
 
 function Base.iterate(iter::PathIterator, state=nothing)
