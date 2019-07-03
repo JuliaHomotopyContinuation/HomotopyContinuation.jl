@@ -1,7 +1,7 @@
 # Solving general polynomial systems
 
 The [`solve`](@ref) function is the most convenient way to solve general polynomial systems.
-For the mathematical background take a look at our [How does it work?](https://www.juliahomotopycontinuation.org/guides/how-does-it-work/) guide.
+For the mathematical background take a look at our [introduction](https://www.juliahomotopycontinuation.org/guides/introduction/) guide.
 
 ```@docs
 solve
