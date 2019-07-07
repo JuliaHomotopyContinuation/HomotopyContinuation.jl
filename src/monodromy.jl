@@ -359,7 +359,7 @@ function track(tracker::CoreTracker, x::AbstractVector, stats::MonodromyStatisti
     retcode
 end
 
-"""x
+"""
     set_parameters!(tracker::CoreTracker, e::Edge, loop::Loop)
 
 Setup the parameters in the ParameterHomotopy in `tracker` to fit the edge `e`.
