@@ -409,7 +409,7 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
     end
 
     stats = SolveStats()
-    ntracked = 1
+    ntracked = 0
     try
         nthreads = Threads.nthreads()
         if threading && nthreads > 1
@@ -430,15 +430,13 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
                     end
                 end
                 ntracked += 1
-                if ntracked % 32 == 0
-                    if progress !== nothing
-                        update_progress!(progress, ntracked, stats)
-                    end
+                if progress !== nothing && ntracked % 32 == 0
+                    update_progress!(progress, ntracked, stats)
                 end
             end
         end
-        if progress !== nothing
-            update_progress!(progress, ntracked - 1, stats; finished=true)
+        if progress !== nothing && ntracked % 32 != 0
+            update_progress!(progress, ntracked, stats; finished=true)
         end
     catch e
         if isa(e, InterruptException)
@@ -447,7 +445,7 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
             rethrow(e)
         end
     end
-    results, ntracked - 1
+    results, ntracked
 end
 
 function tracker_startsolutions(prob::PolyhedralProblem, startsolutions::PolyhedralStartSolutionsIterator; kwargs...)

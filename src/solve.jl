@@ -300,7 +300,8 @@ function track_paths(tracker, start_solutions;
                 end
                 k % 32 == 0 && update_progress!(progress, k, stats)
             end
-            update_progress!(progress, n, stats)
+            # don't print if it already got printed above
+            n % 32 != 0 && update_progress!(progress, n, stats)
         end
     catch e
         if isa(e, InterruptException)
@@ -336,10 +337,6 @@ function update_progress!(progress, ntracked, stats::SolveStats; finished::Bool=
     )
 
     ProgressMeter.update!(progress, ntracked; showvalues=showvalues)
-    if finished
-        ProgressMeter.finish!(progress; showvalues=showvalues)
-    end
-
     nothing
 end
 
