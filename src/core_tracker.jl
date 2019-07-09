@@ -378,7 +378,7 @@ function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
     HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
-    if is_global_patch(patch)
+    if is_global_patch(patch) && options.auto_scaling
         inner_product = WeightedIP(x₁)
     else
         inner_product = EuclideanIP()
