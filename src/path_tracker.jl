@@ -424,7 +424,7 @@ function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tra
     state.status
 end
 
-function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
+function _track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size))
     @unpack core_tracker, state, options, cache = tracker
     # For performance reasons we single thread blas
     n_blas_threads = single_thread_blas()
