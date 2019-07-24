@@ -40,6 +40,13 @@ end
         @test length(HC.UniquePoints(result.solutions).points) == 21
         @test isempty(sprint(show, result)) == false
 
+        # test seed
+        result2 = monodromy_solve(F, x₀, p₀, parameters=p,
+                target_solutions_count=21,
+                max_loops_no_progress=20,
+                seed=result.seed)
+        @test result2.statistics.ntrackedpaths == result.statistics.ntrackedpaths
+
         # test input of length > 1
         result = monodromy_solve(F, [x₀ for _ in 1:30], p₀, parameters=p)
         @test length(solutions(result)) == 21
@@ -134,6 +141,27 @@ end
         result = monodromy_solve(F_p, x₀, p₀, affine_tracking=true,
                         group_action=roots_of_unity,
                         target_solutions_count=7,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
+
+
+        # test reuse strategies
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:all,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:random,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:none,
                         max_loops_no_progress=200)
         @test length(result.solutions) == 7
     end
