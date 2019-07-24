@@ -588,6 +588,7 @@ function step!(tracker::CoreTracker)
         # reset counter
         update_jacobian_infos && (state.steps_jacobian_info_update = 0)
         result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
+        # println("ω: ", result.ω, " t: ", real(t))
         if isconverged(result)
             # Step is accepted, assign values
             state.accepted_steps += 1
