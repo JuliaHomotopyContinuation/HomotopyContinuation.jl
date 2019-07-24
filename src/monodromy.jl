@@ -273,6 +273,7 @@ struct MonodromyResult{N, T1, T2}
     parameters::Vector{T2}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
+    seed::Int
 end
 
 Base.iterate(R::MonodromyResult) = iterate(R.solutions)
@@ -289,11 +290,12 @@ function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
     end
     println(io, "• return code → $(result.returncode)")
     println(io, "• $(result.statistics.ntrackedpaths) tracked paths")
+    println(io, "• seed → $(result.seed)")
 end
 
 
 TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 5
+TreeViews.numberofnodes(::MonodromyResult) = 6
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
 
@@ -316,6 +318,8 @@ function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"applicat
         print(io, "Tracked paths")
     elseif i == 5
         print(io, "Parameters")
+    elseif i == 6
+        print(io, "Seed")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
@@ -329,6 +333,8 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
         return r.statistics.ntrackedpaths
     elseif i == 5
         return r.parameters
+    elseif i == 6
+        return r.seed
     end
     missing
 end
@@ -535,8 +541,9 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `min_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
 """
-function monodromy_solve(args...; show_progress=true, kwargs...)
-    monodromy_solve!(MonodromySolver(args...; kwargs...); show_progress=show_progress)
+function monodromy_solve(args...; seed=randseed(), show_progress=true, kwargs...)
+    Random.seed!(seed)
+    monodromy_solve!(MonodromySolver(args...; kwargs...), seed; show_progress=show_progress)
 end
 
 function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}
@@ -595,12 +602,12 @@ struct MonodromyJob
     loop_id::Int
 end
 
-function monodromy_solve!(MS::MonodromySolver; show_progress=true)
+function monodromy_solve!(MS::MonodromySolver, seed; show_progress=true)
     if nsolutions(MS) == 0
         @warn "None of the provided solutions is a valid start solution."
         return MonodromyResult(:invalid_startvalue,
                 similar(MS.solutions.points, 0), MS.parameters, MS.statistics,
-                MS.options.equivalence_classes)
+                MS.options.equivalence_classes, seed)
     end
     # solve
     retcode = :not_assigned
@@ -617,7 +624,7 @@ function monodromy_solve!(MS::MonodromySolver; show_progress=true)
 
     n_blas_threads = single_thread_blas()
     try
-        retcode = monodromy_solve!(MS, progress)
+        retcode = monodromy_solve!(MS, seed, progress)
     catch e
         if (e isa InterruptException)
             retcode = :interrupt
@@ -627,11 +634,12 @@ function monodromy_solve!(MS::MonodromySolver; show_progress=true)
     end
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
     finished!(MS.statistics, nsolutions(MS))
-    MonodromyResult(retcode, solutions(MS), MS.parameters, MS.statistics, MS.options.equivalence_classes)
+    MonodromyResult(retcode, solutions(MS), MS.parameters, MS.statistics,
+        MS.options.equivalence_classes, seed)
 end
 
 
-function monodromy_solve!(MS::MonodromySolver, progress::Union{Nothing,ProgressMeter.ProgressUnknown})
+function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,ProgressMeter.ProgressUnknown})
     t₀ = time_ns()
     iterations_without_progress = 0 # stopping heuristic
     # intialize job queue
