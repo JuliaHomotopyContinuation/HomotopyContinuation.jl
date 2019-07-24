@@ -19,7 +19,7 @@ mutable struct Valuation
     v::Vector{Float64}
     v̇::Vector{Float64}
     v̈::Vector{Float64}
-    v_data::NTuple{3,Vector{Float64}}
+    v_data::Matrix{Float64} # 3 × n matrix
     s_data::NTuple{3,Float64}
 end
 
@@ -41,7 +41,7 @@ function Valuation(n::Integer)
     v = zeros(n)
     v̇ = zeros(n)
     v̈ = zeros(n)
-    v_data = (zeros(n), zeros(n), zeros(n))
+    v_data = zeros(3, n)
     s_data = (NaN, NaN, NaN)
     Valuation(v, v̇, v̈, v_data, s_data)
 end
@@ -59,6 +59,7 @@ function reset!(val::Valuation)
     val.v̇ .= NaN
     val.v̈ .= NaN
     val.s_data = (NaN, NaN, NaN)
+    val.v_data .= NaN
     val
 end
 
@@ -73,10 +74,14 @@ function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{true})
 end
 function _update!(val::Valuation, z::AbstractVector, ż, s, Δs::Float64)
     @unpack v, v_data, s_data = val
-    (v₂, v₁, v₀), (s₂, s₁, _) = v_data, s_data
-    v .= v₀ .= ν.(z, ż)
-    # cycle data around
-    val.v_data = (v₀, v₂, v₁)
+    (s₂, s₁, _) =  s_data
+    @inbounds for i in 1:length(v)
+        (v₂, v₁, v₀), v_data
+        valᵢ = ν(z[i], ż[i])
+        v_data[1, i] = v_data[2, i]
+        v_data[2, i] = v_data[3, i]
+        v_data[3, i] = v[i] = valᵢ
+    end
     val.s_data = (s, s₂, s₁)
 
     !isnan(s₁) && finite_differences!(val)
@@ -85,17 +90,19 @@ function _update!(val::Valuation, z::AbstractVector, ż, s, Δs::Float64)
 end
 function _update_affine!(val::Valuation, z::PVector, ż, s, Δs::Float64)
     @unpack v, v_data, s_data = val
-    (v₂, v₁, v₀), (s₂, s₁, _) = v_data, s_data
+    (s₂, s₁, _) = s_data
     k = 1
-    for (rⱼ, j) in ProjectiveVectors.dimension_indices_homvars(z)
+    @inbounds for (rⱼ, j) in ProjectiveVectors.dimension_indices_homvars(z)
         vⱼ = ν(z[j], ż[j])
         for i in rⱼ
-            v[k] = v₀[k] =  ν(z[i], ż[i]) - vⱼ
+            valᵢ = ν(z[i], ż[i]) - vⱼ
+            v_data[1, k] = v_data[2, k]
+            v_data[2, k] = v_data[3, k]
+            v_data[3, k] = v[k] = valᵢ
             k += 1
         end
     end
     # cycle data around
-    val.v_data = (v₀, v₂, v₁)
     val.s_data = (s, s₂, s₁)
 
     !isnan(s₁) && finite_differences!(val)
@@ -103,7 +110,7 @@ function _update_affine!(val::Valuation, z::PVector, ż, s, Δs::Float64)
     val
 end
 
-function ν(z::Complex, ż::Complex)
+@inline function ν(z::Complex, ż::Complex)
     x, y = reim(z); ẋ, ẏ = reim(ż);
     -(x * ẋ + y * ẏ) / abs2(z)
 end
@@ -121,13 +128,12 @@ The implementation follows the formulas derived in [^BS05]
 """
 function finite_differences!(val::Valuation)
     @unpack v_data, s_data, v̇, v̈ = val
-    v₃, v₂, v₁ = v_data
     s₃, s₂, s₁ = s_data
     s₃₁ = s₃ - s₁
     a₃, a₁ = s₃ - s₂, s₁ - s₂
-    for i in eachindex(v̇)
-        v̇[i] = (a₃*v₁[i])/(a₁*s₃₁) - ((a₁+a₃)*v₂[i])/(a₁*a₃) - (a₁*v₃[i])/(s₃₁*a₃)
-        v̈[i] = -2v₁[i]/((a₁)*s₃₁) + 2v₂[i]/(a₁*a₃) + 2v₃[i]/(s₃₁*a₃)
+    @inbounds for i in eachindex(v̇)
+        v̇[i] = (a₃*v_data[1,i])/(a₁*s₃₁) - ((a₁+a₃)*v_data[2,i])/(a₁*a₃) - (a₁*v_data[3,i])/(s₃₁*a₃)
+        v̈[i] = -2v_data[1,i]/((a₁)*s₃₁) + 2v_data[2,i]/(a₁*a₃) + 2v_data[3,i]/(s₃₁*a₃)
     end
     nothing
 end
@@ -424,7 +430,7 @@ function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tra
     state.status
 end
 
-function _track!(tracker::PathTracker, x₁, s₁::Real, s₀::Real)
+function _track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size))
     @unpack core_tracker, state, options, cache = tracker
     # For performance reasons we single thread blas
     n_blas_threads = single_thread_blas()
