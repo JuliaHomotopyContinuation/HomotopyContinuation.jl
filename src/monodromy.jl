@@ -8,7 +8,7 @@ const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_c
     :group_action,:group_actions, :group_action_on_all_nodes,
     :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
     :target_solutions_count, :timeout,
-    :min_solutions, :max_loops_no_progress]
+    :min_solutions, :max_loops_no_progress, :reuse_loops]
 
 struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     distance_function::F
@@ -25,6 +25,7 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     timeout::Float64
     min_solutions::Int
     max_loops_no_progress::Int
+    reuse_loops::Symbol
 end
 
 function MonodromyOptions(is_real_system;
@@ -42,7 +43,8 @@ function MonodromyOptions(is_real_system;
     target_solutions_count=nothing,
     timeout=float(typemax(Int)),
     min_solutions::Int=default_min_solutions(target_solutions_count),
-    max_loops_no_progress::Int=10)
+    max_loops_no_progress::Int=10,
+    reuse_loops::Symbol=:all)
 
     if group_actions isa GroupActions
        actions = group_actions
@@ -59,7 +61,8 @@ function MonodromyOptions(is_real_system;
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         min_solutions,
-        max_loops_no_progress)
+        max_loops_no_progress,
+        reuse_loops)
 end
 
 default_min_solutions(::Nothing) = 1
@@ -540,6 +543,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
 * `min_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
+* `resuse_loops::Symbol=:all`: Strategy to reuse other loops for new found solutions. `:all` propagates a new solution through all other loops, `:random` picks a random loop, `:none` doesn't reuse a loop.
 """
 function monodromy_solve(args...; seed=randseed(), show_progress=true, kwargs...)
     Random.seed!(seed)
@@ -757,7 +761,19 @@ function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) whe
         # Check if we are done
         isdone(MS.solutions, y, MS.options) && return true
         push!(queue, MonodromyJob(nsolutions(MS), job.loop_id))
-        # TODO: Schedule on other loops
+        # Schedule also on other loops
+        if MS.options.reuse_loops == :random && length(MS.loops) > 1
+            r_loop_id = rand(2:length(MS.loops))
+            if r_loop_id == job.loop_id
+                r_loop_id -= 1
+            end
+            push!(queue, MonodromyJob(nsolutions(MS), r_loop_id))
+        elseif MS.options.reuse_loops == :all
+            for r_loop_id in 1:length(MS.loops)
+                r_loop_id != job.loop_id || continue
+                push!(queue, MonodromyJob(nsolutions(MS), r_loop_id))
+            end
+        end
     end
     MS.statistics.nreal += (k == NOT_FOUND_AND_REAL)
     false
@@ -788,9 +804,9 @@ end
 function regenerate_loop_and_schedule_jobs!(queue, MS::MonodromySolver)
     es = MS.loops[1].edges
     loop = MonodromyLoop(MS.parameters, length(es), MS.options, weights=!isnothing(es[1].weights))
-    MS.loops[1] = loop
+    push!(MS.loops, loop)
     for id in 1:nsolutions(MS)
-        push!(queue, MonodromyJob(id, 1))
+        push!(queue, MonodromyJob(id, length(MS.loops)))
     end
     generated_parameters!(MS.statistics, nsolutions(MS))
     nothing

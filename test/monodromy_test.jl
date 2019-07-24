@@ -143,6 +143,27 @@ end
                         target_solutions_count=7,
                         max_loops_no_progress=200)
         @test length(result.solutions) == 7
+
+
+        # test reuse strategies
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:all,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:random,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
+        result = monodromy_solve(F_p, x₀, p₀,
+                        group_action=roots_of_unity,
+                        target_solutions_count=7,
+                        reuse_loops=:none,
+                        max_loops_no_progress=200)
+        @test length(result.solutions) == 7
     end
 
     @testset "Method of Moments" begin
