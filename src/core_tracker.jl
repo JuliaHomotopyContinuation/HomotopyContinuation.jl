@@ -533,6 +533,13 @@ function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, 
     tracker
 end
 
+function checkstartvalue(tracker::CoreTracker, x, t)
+    embed!(tracker.state.x̄, x)
+    init_auto_scaling!(tracker.state.inner_product, tracker.state.x̄, tracker.options.auto_scaling_options)
+    result = correct!(tracker.state.x̄, tracker, x, t; update_jacobian_infos=true)
+    isconverged(result)
+end
+
 function checkstartvalue!(tracker::CoreTracker)
     result = correct!(tracker.state.x̄, tracker; update_jacobian_infos=true)
     if isconverged(result)

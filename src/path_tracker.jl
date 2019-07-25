@@ -512,6 +512,10 @@ function start_infinity_cutoff(core_tracker, options)
     C > options.min_cond_at_infinity
 end
 
+function is_valid_start_value(tracker::PathTracker, x)
+    checkstartvalue(tracker.core_tracker, x, 0.0)
+end
+
 """
     judge(val::Valuation, J::Jacobian)::ValuationVerdict
 
