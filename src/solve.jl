@@ -446,7 +446,7 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker, details::Sy
             for i in cluster
                 cond = unpack(finite_results[i].condition_jacobian, 1.0)
                 w = unpack(finite_results[i].winding_number, 0)
-                if w == 0 && cond < 1e12
+                if w ≤ 1 && cond < 1e10
                     jumping = true
                     break
                 end
