@@ -28,9 +28,10 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     reuse_loops::Symbol
 end
 
-function MonodromyOptions(is_real_system;
+function MonodromyOptions(is_real_system::Bool,
+    refinement_accuracy::Float64;
     distance=euclidean_distance,
-    identical_tol::Float64=1e-6,
+    identical_tol::Float64=sqrt(refinement_accuracy),
     done_callback=always_false,
     group_action=nothing,
     group_actions=group_action === nothing ? nothing : GroupActions(group_action),
@@ -111,7 +112,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) =
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
-    if retcode == CoreTrackerStatus.success
+    if retcode == PathTrackerStatus.success
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
@@ -131,7 +132,7 @@ function n_completed_loops_without_change(stats, nsolutions)
     k = 0
     for i in length(stats.nsolutions_development):-1:1
         if stats.nsolutions_development[i] != nsolutions
-            return k
+            return max(k - 1, 0)
         end
         k += 1
     end
@@ -247,16 +248,16 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker::CoreTracker, x::AbstractVector, loop::MonodromyLoop, stats::MonodromyStatistics)
-    H = basehomotopy(tracker.homotopy)
-    local retcode::CoreTrackerStatus.states
+function track(tracker::PathTracker, x::AbstractVector, loop::MonodromyLoop, stats::MonodromyStatistics)
+    H = basehomotopy(tracker.core_tracker.homotopy)
+    local retcode::PathTrackerStatus.states
     y = x
     for e in loop.edges
         set_parameters!(H, (e.p₁, e.p₀), e.weights)
-        retcode = track!(tracker, y)
+        retcode = _track!(tracker, y)
         trackedpath!(stats, retcode)
-        retcode == CoreTrackerStatus.success || break
-        y = current_x(tracker)
+        retcode == PathTrackerStatus.success || break
+        y = solution(tracker)
     end
     retcode
 end
@@ -409,27 +410,14 @@ parameters(r::MonodromyResult) = r.parameters
 #####################
 ## monodromy solve ##
 #####################
-"""
-    MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:AbstractNewtonCache}
-
-Cache for monodromy loops.
-"""
-struct MonodromyCache{FT<:FixedHomotopy, Tracker<:CoreTracker, NC<:AbstractNewtonCache, AV<:AbstractVector}
-    F::FT
-    tracker::Tracker
-    newton_cache::NC
-    out::AV
-end
-
-struct MonodromySolver{T<:Number, UP<:UniquePoints, MO<:MonodromyOptions, MC<:MonodromyCache}
+struct MonodromySolver{T<:Number, UP<:UniquePoints, MO<:MonodromyOptions, Tracker<:PathTracker}
     parameters::Vector{T}
     solutions::UP
     loops::Vector{MonodromyLoop}
     options::MO
     statistics::MonodromyStatistics
-    cache::MC
+    tracker::Tracker
 end
-
 
 function MonodromySolver(F::Inputs, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
     MonodromySolver(F, [solution], p₀; kwargs...)
@@ -444,6 +432,7 @@ function MonodromySolver(F::Inputs,
         strategy=nothing,
         show_progress=true,
         showprogress=nothing, #deprecated
+        refinement_accuracy=1e-10, # set a higher refinement_accuracy than the default
         kwargs...) where {TP, NVars}
 
     @deprecatekwarg showprogress show_progress
@@ -452,29 +441,18 @@ function MonodromySolver(F::Inputs,
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
+    x₀ = Vector(first(startsolutions))
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
 
     # construct tracker
-    tracker = coretracker(F, startsolutions; parameters=parameters, generic_parameters=p₀, restkwargs...)
-    if affine_tracking(tracker)
-        HC = HomotopyWithCache(tracker.homotopy, tracker.state.x, 1.0)
-        F₀ = FixedHomotopy(HC, 0.0)
-    else
-        # Force affine newton method
-        patch_state = state(EmbeddingPatch(), tracker.state.x)
-        HC = HomotopyWithCache(PatchedHomotopy(tracker.homotopy, patch_state), tracker.state.x, 1.0)
-        F₀ = FixedHomotopy(HC, 0.0)
-    end
-
+    tracker = pathtracker(F, startsolutions; refinement_accuracy=refinement_accuracy,
+                        parameters=parameters, generic_parameters=p₀, restkwargs...)
     # Check whether homotopy is real
-    is_real_system = numerically_check_real(tracker.homotopy, tracker.state.x)
-
-    options = MonodromyOptions(is_real_system; optionskwargs...)
-    # construct cache
-    newt_cache = newton_cache(F₀, tracker.state.x)
-    C =  MonodromyCache(F₀, tracker, newt_cache, copy(tracker.state.x))
+    is_real_system = numerically_check_real(tracker.core_tracker.homotopy, x₀)
+    options = MonodromyOptions(is_real_system, refinement_accuracy;
+                    optionskwargs...)
     # construct UniquePoints
     if options.equivalence_classes
         uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function;
@@ -484,16 +462,12 @@ function MonodromySolver(F::Inputs,
         uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function; check_real = true)
     end
     # add only unique points that are true solutions
-    if options.check_startsolutions
-        for s in startsolutions
-            y = verified_affine_vector(C, s, s, options)
-            if y !== nothing
-                add!(uniquepoints, y; tol=options.identical_tol)
-            end
+    for s in startsolutions
+        if !options.check_startsolutions || is_valid_start_value(tracker, s)
+            add!(uniquepoints, s; tol=options.identical_tol)
         end
-    else
-        add!(uniquepoints, startsolutions; tol=options.identical_tol)
     end
+
     statistics = MonodromyStatistics(uniquepoints)
 
     if strategy === nothing
@@ -503,7 +477,7 @@ function MonodromySolver(F::Inputs,
     # construct Loop
     loops = [MonodromyLoop(strategy, p₀, options)]
 
-    MonodromySolver(p₀, uniquepoints, loops, options, statistics, C)
+    MonodromySolver(p₀, uniquepoints, loops, options, statistics, tracker)
 end
 
 """
@@ -699,42 +673,22 @@ function empty_queue!(queue, MS::MonodromySolver, t₀::UInt, progress)
     :incomplete
 end
 
-function verified_affine_vector(C::MonodromyCache, ŷ, x, options)
-    # We distinguish solutions which have a distance larger than identical_tol
-    # But due to the numerical error in the evaluation of the distance, we need to be a little bit
-    # careful. Therefore, we require that the solutions should be one magnitude closer to
-    # the true solutions as necessary
-    tol = 0.1 * options.identical_tol
-    result = newton!(C.out, C.F, ŷ, euclidean_norm, C.newton_cache,
-                tol=tol, miniters=1, maxiters=3, simplified_last_step=false)
-
-    if isconverged(result)
-        return affine_chart(x, C.out)
-    else
-        return nothing
-    end
-end
-
 affine_chart(x::SVector, y::PVector) = ProjectiveVectors.affine_chart!(x, y)
 affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
 
 function process!(queue, job::MonodromyJob, MS::MonodromySolver, progress)
     x = solutions(MS)[job.id]
     loop = MS.loops[job.loop_id]
-    retcode = track(MS.cache.tracker, x, loop, MS.statistics)
-    if retcode ≠ CoreTrackerStatus.success
-        if retcode == CoreTrackerStatus.terminated_invalid_startvalue &&
+    retcode = track(MS.tracker, x, loop, MS.statistics)
+    if retcode ≠ PathTrackerStatus.success
+        if retcode == PathTrackerStatus.terminated_invalid_startvalue &&
            MS.statistics.ntrackedpaths == 0
             return :invalid_startvalue
         end
         return :incomplete
     end
 
-
-    y = verified_affine_vector(MS.cache, current_x(MS.cache.tracker), x, MS.options)
-    # is the solution at infinity?
-    y !== nothing || return :incomplete
-
+    y = solution(MS.tracker)
     add_and_schedule!(MS, queue, y, job) && return :done
 
     if MS.options.complex_conjugation
