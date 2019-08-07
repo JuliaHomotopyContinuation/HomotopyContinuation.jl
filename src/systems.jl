@@ -94,7 +94,7 @@ function differentiate_parameters! end
 
 Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters
 """
-differentiate_parameters(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F, x)) = differentiate_parameters(F, x, p, c)
+differentiate_parameters(F::AbstractSystem, x, p, c::AbstractSystemCache=cache(F, x, p)) = differentiate_parameters(F, x, p, c)
 
 # Optional
 """
@@ -161,3 +161,5 @@ include("systems/composition_system.jl")
 include("systems/fixed_parameter_system.jl")
 include("systems/patched_system.jl")
 include("systems/squared_up_system.jl")
+include("systems/trace_test_system.jl")
+include("systems/trace_test_pencil.jl")
