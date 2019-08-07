@@ -7,6 +7,8 @@ monodromy_solve
 MonodromyResult
 solutions(::MonodromyResult)
 parameters(::MonodromyResult)
+verify_solution_completeness
+solution_completeness_witnesses
 ```
 
 ## GroupActions
