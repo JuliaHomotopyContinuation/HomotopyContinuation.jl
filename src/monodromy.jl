@@ -1,4 +1,4 @@
-export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters
+export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters, verify_solution_completeness
 
 
 #####################
@@ -764,4 +764,161 @@ function regenerate_loop_and_schedule_jobs!(queue, MS::MonodromySolver)
     end
     generated_parameters!(MS.statistics, nsolutions(MS))
     nothing
+end
+
+
+##################
+## VERIFICATION ##
+##################
+"""
+    verify_solution_completeness(F, res::MonodromyResult; parameters=..., trace_tol=1e-8, options...)
+
+Verify that the monodromy computation found all solutions by [`monodromy_solve`](@ref).
+This uses a multi-projective trace test as described in [^LRS18].
+The trace is a numerical value which is 0 if all solutions are found, for this the `trace_tol` keyword argument is used.
+The function returns `nothing` if some computation couldn't be carried out. Otherwise returns a boolean.
+Note that this function requires the computation of solutions to another polynomial system using monodromy.
+This routine can return `false` although all solutions are found if this additional solution set is not complete.
+The `options...` arguments can be everything which is accepted by `solve` and `monodromy_solve`.
+
+### Example
+
+```
+julia> @polyvar x y a b c;
+
+julia> f = x^2+y^2-1;
+
+julia> l = a*x+b*y+c;
+
+julia> res = monodromy_solve([f,l], [-0.6-0.8im, -1.2+0.4im], [1,2,3]; parameters=[a,b,c])
+MonodromyResult
+==================================
+• 2 solutions (0 real)
+• return code → heuristic_stop
+• 44 tracked paths
+• seed → 367230
+
+julia> verify_solution_completeness([f,l], res; parameters=[a,b,c])
+Compute additional witnesses for completeness...
+Found 2 additional witnesses
+Found 2 additional witnesses
+Compute trace...
+true
+```
+
+    verify_solution_completeness(F, S, p; parameters=..., kwargs...)
+
+Verify the solution completeness using the computed solutions `S` to the parameter `p`.
+
+    verify_solution_completeness(TTS, S, W₁₀, p₀::Vector{<:Number}, l₀)
+
+Use the already computeded additional witnesses `W₁₀`. You want to obtain
+`TTS`, `W₁₀` and `l₀` as the output from [`solution_completeness_witnesses`](@ref).
+
+
+[^LRS18]:
+    Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test." Arnold Mathematical Journal 4.1 (2018): 113-125.
+"""
+function verify_solution_completeness(F, R::MonodromyResult; kwargs...)
+    verify_solution_completeness(F, solutions(R), R.parameters; kwargs...)
+end
+
+function verify_solution_completeness(F, W₀₁::AbstractVector{<:AbstractVector}, p₀::Vector{<:Number}; show_progress=true, parameters=nothing, trace_tol=1e-8, kwargs...)
+	W₁₀, TTS, l₀ = solution_completeness_witnesses(F, W₀₁, p₀; show_progress=show_progress, parameters=parameters, kwargs...)
+	verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress=show_progress)
+end
+
+function verify_solution_completeness(TTS, W₀₁::AbstractVector{<:AbstractVector}, W₁₀::AbstractVector{<:AbstractVector}, p₀::Vector{<:Number}, l₀; show_progress=true, trace_tol=1e-8, kwargs...)
+	if show_progress
+		print("Found $(length(W₁₀)) additional witnesses\n")
+	end
+
+	# Combine W₀₁ and W₁₀.
+	S = append!([[x;0.] for x in W₀₁], W₁₀)
+	# To verify that we found all solutions we need move in the pencil
+	if show_progress
+		print("Compute trace...\n")
+	end
+
+	trace = track_and_compute_trace(TTS, S, l₀; kwargs...)
+	if isnothing(trace)
+		return nothing
+	else
+        show_progress && println("Norm of trace: ", LinearAlgebra.norm(trace))
+		LinearAlgebra.norm(trace) < trace_tol
+	end
+end
+
+"""
+    solution_completeness_witnesses(F, S, p; parameters=..., kwargs...)
+
+Compute the additional necessary witnesses. Returns a triple `(W₁₀, TTS, l)`
+containing the additional witnesses `W₁₀`, a trace test system `TTS` and
+the parameters `l` for `TTS`.
+"""
+function solution_completeness_witnesses(F, W₀₁, p₀::Vector{<:Number}; parameters=nothing, show_progress=true, kwargs...)
+	# generate another start pair
+	q₀ = randn(ComplexF64, length(p₀))
+	# Construct the trace test system
+	TTS = TraceTestSystem(SPSystem(F; parameters=parameters), p₀, q₀ - p₀)
+
+	y₁ = solution(solve(F, W₀₁[1]; p₁=p₀, p₀=q₀, parameters=parameters, kwargs...)[1])
+	# construct an affine hyperplane l(x) going through y₀
+	l₁ = cis.(2π .* rand(length(y₁)))
+	push!(l₁, -sum(l₁ .* y₁))
+	# This is numerically sometimes not so nice. Let's move to a truly generic one.
+	l₀ = randn(ComplexF64, length(l₁))
+	y₀ = solution(solve(TTS, [y₁;1]; p₁=l₁, p₀=l₀)[1])
+
+	if show_progress
+		print("Compute additional witnesses for completeness...\n")
+	end
+
+    R₁₀ = monodromy_solve(TTS, y₀, l₀; max_loops_no_progress=5, kwargs...)
+    best_result = R₁₀
+	best_params = l₀
+    result_agreed = 0
+    for i in 1:10
+        k₀ = randn(ComplexF64, length(l₀))
+        S_k₀ = solutions(solve(TTS, solutions(R₁₀); start_parameters=l₀, target_parameters=k₀))
+        new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress=5)
+        if nsolutions(new_result) == nsolutions(best_result)
+            result_agreed += 1
+        elseif nsolutions(new_result) > nsolutions(best_result)
+            best_result = new_result
+			best_params = k₀
+        end
+		if result_agreed > 2
+			break
+		end
+    end
+
+	W₁₀ = solutions(best_result)
+
+	if show_progress
+		print("Found $(length(W₁₀)) additional witnesses\n")
+	end
+	W₁₀, TTS, best_params
+end
+
+
+function track_and_compute_trace(TTS::TraceTestSystem, S, l₀; kwargs...)
+	for i in 1:3
+		TTP = TraceTestPencil(TTS, l₀)
+		R₁ = solve(TTP, S, start_parameters=[0.0], target_parameters=[.1], kwargs...)
+		R₂ = solve(TTP, S, start_parameters=[0.0], target_parameters=[-.1], kwargs...)
+		if nsolutions(R₁) ≠ length(S) || nsolutions(R₂) ≠ length(S)
+			if i == 3
+				printstyled("Lost solutions for $i times. Abort.\n", color=:red, bold=true)
+				return nothing
+			end
+			printstyled("Lost solutions, need to recompute trace...\n", color=:yellow, bold=true)
+		end
+		s₁ = sum(solutions(R₁))
+		s = sum(S)
+		s₂ = sum(solutions(R₂))
+		trace = (s₁ - s) - (s - s₂)
+		return trace
+	end
+	nothing
 end
