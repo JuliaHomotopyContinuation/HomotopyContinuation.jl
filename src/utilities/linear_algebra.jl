@@ -557,6 +557,12 @@ function hnf!(A, U)
         #5
         reduce_off_diagonal!(A, U, ii)
     end
+    # Special case for 1 × 1 matrices to guarantee that the diagonal is positive
+    # This comes up in polyhedral homotopy for univariate polynomials
+    if n == 1
+        U[1,1] = flipsign(U[1,1], A[1,1])
+        A[1,1] = flipsign(A[1,1], A[1,1])
+    end
 
     nothing
 end

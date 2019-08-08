@@ -380,9 +380,15 @@
         @test string(segment) == "ComplexSegment(2.0 + 0.0im, 4.0 + 0.0im)"
     end
 
-    @testset "Linear Algebra" begin
+    @testset "Hermite Normal Form" begin
         A = [0 3 1 0; -2 2 -1 2; 1 -1 2 3; -3 3 3 2]
         H, U = HC.hnf(A)
         @test A * U == H
+
+        D = zeros(Int, 1,1)
+        D[1,1] = -2
+        H, U = HC.hnf(D)
+        @test H[1,1] == 2
+        @test U[1,1] == -1
     end
 end
