@@ -1,4 +1,4 @@
-export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters, verify_solution_completeness
+export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters, verify_solution_completeness, solution_completeness_witnesses
 
 
 #####################
