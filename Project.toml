@@ -23,6 +23,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
+DoubleFloats = "^0.9"
 DynamicPolynomials = "^0.1, ^0.2, ^0.3"
 ElasticArrays = "^0.3, ^0.4"
 FixedPolynomials = "^0.4"
