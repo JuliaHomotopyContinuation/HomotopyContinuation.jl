@@ -35,6 +35,11 @@
         @test [3,2] ≈ solutions(result1)[1] atol=1e-8
         result1 = solve([(x-3),(y-2)], start_system=:polyhedral, system_scaling=:equations_and_variables)
         @test [3,2] ≈ solutions(result1)[1] atol=1e-8
+
+        g = (x-3)*(x+2)*(x-0.5)
+        result2 = solve([g], start_system=:polyhedral)
+        @test nsolutions(result2) == 3
+        @test sort!(first.(real_solutions(result2))) ≈ [-2,0.5,3] atol=1e-10
     end
 
     @testset "All affine solutions" begin
