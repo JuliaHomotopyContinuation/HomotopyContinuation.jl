@@ -49,6 +49,8 @@ evaluate_and_jacobian(F::SPSystem, x, p, ::SystemNullCache) = SP.evaluate_and_ja
 Base.@propagate_inbounds differentiate_parameters!(U, F::SPSystem, x, p, ::SystemNullCache) = SP.differentiate_parameters!(U, F.system, x, p)
 differentiate_parameters(F::SPSystem, x, p, ::SystemNullCache) = SP.differentiate_parameters(F.system, x, p)
 
+degrees(F::SPSystem) = collect(maximum.(sum.(SP.exponents.(F.system.polys), dims=1)))
+
 (F::SPSystem)(x...) = evaluate(F, x...)
 
 """

@@ -49,6 +49,11 @@ differentiate_parameters!
 differentiate_parameters
 ```
 
+If a total degree homotopy with a system as input should be supported `degrees(F)` needs to be defined:
+```@docs
+HomotopyContinuation.degrees(::AbstractSystem)
+```
+
 ### Optional
 The following methods are mandatory to implement.
 The following are optional to implement but usually you want to define at least

@@ -416,12 +416,12 @@ function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
 				system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
 
-	degrees = abstract_system_degrees(input.system)
-    G = TotalDegreeSystem(degrees)
+	degrees, is_homogeneous = degrees_ishomogeneous(input.system)
+    G = TotalDegreeSystem(degrees; affine=!is_homogeneous)
 	# Check overdetermined case
 	n > N && throw(ArgumentError("Currently custom overdetermined systems are not supported."))
 	variable_groups = VariableGroups(N, homvaridx)
-    (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
+    (Problem{is_homogeneous ? ProjectiveTracking : AffineTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
 end
 
@@ -429,25 +429,31 @@ function problem_startsolutions(input::TargetSystemInput{<:AbstractSystem},
 				::Nothing, hominfo::HomogenizationInformation, seed;
 				system=DEFAULT_SYSTEM, system_scaling=nothing, kwargs...)
     n, N = size(input.system)
-	degrees = abstract_system_degrees(input.system)
-    G = TotalDegreeSystem(degrees)
+	degrees, is_homogeneous = degrees_ishomogeneous(input.system)
+    G = TotalDegreeSystem(degrees; affine=!is_homogeneous)
 	variable_groups = VariableGroups(N, hominfo)
-    (Problem{ProjectiveTracking}(G, input.system, variable_groups, seed; kwargs...),
+    (Problem{is_homogeneous ? ProjectiveTracking : AffineTracking}(G, input.system, variable_groups, seed; kwargs...),
      totaldegree_solutions(degrees))
 end
 
-function abstract_system_degrees(F)
+function degrees_ishomogeneous(F)
 	n, N = size(F)
 
-	degrees = compute_numerically_degrees(F)
-	isnothing(degrees) && throw(ArgumentError("Input system is not homogeneous by our numerical check."))
-	# system needs to be homogeneous
-	if n + 1 > N
-		throw(ArgumentError("Currently custom overdetermined systems are not supported."))
-	elseif  n + 1 ≠ N
-		throw(ArgumentError("Input system is not a square homogeneous system!"))
+	degs = compute_numerically_degrees(F)
+	is_homogeneous = !isnothing(degs)
+	if isnothing(degs)
+		degs = degrees(F)
 	end
-	degrees
+	isnothing(degs) &&
+	    throw(ArgumentError("Cannot compute degrees of the input system. Consider overloading `system_degree(F)."))
+
+	# system needs to be homogeneous
+	if n + is_homogeneous > N
+		throw(ArgumentError("Currently custom overdetermined systems are not supported."))
+	end
+
+
+	degs, is_homogeneous
 end
 
 ###############

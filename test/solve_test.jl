@@ -113,6 +113,9 @@
 
         res = solve(e ∘ f ∘ g, system=SPSystem)
         @test nnonsingular(res) == 2
+
+        # Affine SPSystem input
+        @test nsolutions(solve(SPSystem(equations(katsura(5))); threading=false)) == 32
     end
 
 
