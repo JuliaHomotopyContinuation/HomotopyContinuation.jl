@@ -152,6 +152,13 @@ Base.size(::AbstractSystem) = error("Mandatory to define `Base.size` for `Abstra
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
 Base.length(F::AbstractSystem) = size(F, 1)
 
+"""
+    degrees(F::AbstractSystem)
+
+Returns a the degrees of the polynomials.
+"""
+degrees(F::AbstractSystem) = nothing
+
 include("systems/sp_system.jl")
 include("systems/fixed_homotopy.jl")
 include("systems/fp_system.jl")
