@@ -624,16 +624,15 @@ function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,Pro
     queue = MonodromyJob.(1:nsolutions(MS), 1)
 
     n = nsolutions(MS)
+    retcode = :none
     while n < MS.options.target_solutions_count
         retcode = empty_queue!(queue, MS, t₀, progress)
 
         if retcode == :done
-            update_progress!(progress, nsolutions(MS), MS.statistics; finish=true)
+            retcode = :success
             break
-        elseif retcode == :timeout
-            return :timeout
-        elseif retcode == :invalid_startvalue
-            return :invalid_startvalue
+        elseif retcode == :timeout || retcode == :invalid_startvalue
+            break
         end
 
         # Iterations heuristic
@@ -646,13 +645,15 @@ function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,Pro
         end
         if iterations_without_progress == MS.options.max_loops_no_progress &&
             n_new ≥ MS.options.min_solutions
-            return :heuristic_stop
+            retcode = :heuristic_stop
+            break
         end
 
         regenerate_loop_and_schedule_jobs!(queue, MS)
     end
+    update_progress!(progress, nsolutions(MS), MS.statistics; finish=true)
 
-    :success
+    retcode
 end
 
 function empty_queue!(queue, MS::MonodromySolver, t₀::UInt, progress)
