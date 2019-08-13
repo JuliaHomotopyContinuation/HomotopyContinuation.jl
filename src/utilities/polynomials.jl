@@ -1,5 +1,5 @@
 export is_homogeneous, homogenize, uniquevar, Composition, expand, compose, validate,
-		precondition, normalize_coefficients
+		precondition, normalize_coefficients, linear_system
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
@@ -950,4 +950,52 @@ function normalize_coefficients(f::MPPolys)
 	        c / cmax * m
 	    end |> MP.polynomial
 	end
+end
+
+
+"""
+    linear_system(f::Vector{<:MP.AbstractPolynomialLike})
+
+Given a polynomial system which represents a linear system ``Ax=b`` return
+`A` and `b`. If `f ` is not a linear system `nothing` is returned.
+
+### Example
+```
+julia> @polyvar x y z;
+julia> f = [2x+3y+z+5, -1x+2y+4z-2];
+julia> A, b = linear_system(f);
+julia> A
+2×3 Array{Int64,2}:
+  2  3  1
+ -1  2  4
+
+julia> b
+2-element Array{Int64,1}:
+ -5
+  2
+```
+"""
+function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = MP.variables(f))
+    n = length(vars)
+    A = zeros(MP.coefficienttype(f[1]), length(f), n)
+    b = zeros(eltype(A), length(f))
+    for (i, fᵢ) in enumerate(f)
+        for t in MP.terms(fᵢ)
+            constant = true
+            for (j, v) in enumerate(vars)
+                d = MP.degree(t, v)
+                d ≤ 1 || return nothing
+
+                if d == 1
+                    A[i,j] = MP.coefficient(t)
+                    constant = false
+                    break
+                end
+            end
+            if constant
+                b[i] = -MP.coefficient(t)
+            end
+        end
+    end
+    A, b
 end
