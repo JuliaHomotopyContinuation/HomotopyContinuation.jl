@@ -134,7 +134,7 @@
     @testset "Multiplicities" begin
         # test empty input
         @test isempty(multiplicities(Vector{Vector{ComplexF64}}()))
-        
+
         V = [randn(3) + im.* randn(3) for i in 1:10]
         W = [map(v -> v + [1e-7 * v[1] ;1.0;1.0], V); V; map(v -> v + [1e-6 * v[1]; 0; 0], V)]
         U = [[cis(rand()) for _=1:3] for _=1:20]
@@ -235,6 +235,14 @@
         @test HC.weylnorm(f)^2 ≈ HC.weyldot(f,f)
         @test HC.weyldot([f, f], [g, g]) == 2 * HC.weyldot(f, g)
         @test HC.weylnorm([f, f]) == √HC.weyldot([f, f], [f, f])
+
+        # linear system
+        @polyvar x y z
+        f = [2x+3y+z+5, -1x+2y+4z-2]
+        A, b = linear_system(f)
+        @test A == [2 3 1; -1 2 4]
+        @test b == [-5, 2]
+        @test A * [x,y,z] - b == f
     end
 
     @testset "Multihomogeneous" begin

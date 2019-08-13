@@ -33,6 +33,7 @@ compose
 is_homogeneous
 uniquevar
 homogenize
+linear_system
 ```
 
 ## AffinePatches
