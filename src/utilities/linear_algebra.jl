@@ -354,8 +354,9 @@ end
             end
             # Update the rest
             for j = k+1:n
+                A_kj = A[k,j]
                 for i = k+1:m
-                    A[i,j] -= A[i,k]*A[k,j]
+                    A[i,j] -= A[i,k] * A_kj
                 end
             end
         end
