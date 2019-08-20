@@ -78,7 +78,8 @@ function Jacobian(A::AbstractMatrix, corank::Int=0)
     jpvt = zeros(BlasInt, n)
     B = ComplexF64.(A)
     tau = similar(B, min(m, n))
-    qr = LinearAlgebra.QRPivoted(geqp3!(B, jpvt, tau, work, rwork)...)
+    geqp3!(B, jpvt, tau, work, rwork)
+    qr = LinearAlgebra.QRPivoted(B, tau, jpvt)
     active_factorization = lu === nothing ? QR_FACTORIZATION : LU_FACTORIZATION
     J = copy(B)
     D = ones(m)
@@ -125,7 +126,7 @@ function updated_jacobian!(Jac::Jacobian{ComplexF64}; update_infos::Bool=false) 
     if !update_infos && issquare(Jac.J) && Jac.corank == 0
         Jac.lu !== nothing || return Jac
         copyto!(Jac.lu.factors, Jac.J)
-        lu_factorization!(Jac.lu.factors, nothing, Jac.lu.ipiv)
+        lu!(Jac.lu.factors, nothing, Jac.lu.ipiv)
         Jac.active_factorization = LU_FACTORIZATION
     else
         copyto!(Jac.qr.factors, Jac.J)
@@ -175,7 +176,7 @@ function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost::Bool=fa
     if Jac.active_factorization == LU_FACTORIZATION
         lu = Jac.lu
         if lu !== nothing
-            custom_ldiv!(x, lu, b)
+            lu_ldiv!(x, lu, b)
         end
     elseif Jac.active_factorization == QR_FACTORIZATION
         if issquare(Jac.J)
@@ -199,16 +200,6 @@ function solve!(x, Jac::Jacobian, b::AbstractVector; update_digits_lost::Bool=fa
     x
 end
 solve!(A::Jacobian, b) = solve!(b, A::Jacobian, b)
-
-function custom_ldiv!(x, LU::LinearAlgebra.LU, b::AbstractVector)
-    if x !== b
-        copyto!(x, b)
-    end
-     _ipiv!(LU, x)
-     ldiv_unit_lower!(LU.factors, x)
-     ldiv_upper!(LU.factors, x)
-     x
-end
 
 const LA = LinearAlgebra
 
@@ -270,320 +261,4 @@ function iterative_refinement_step!(x, Jac::Jacobian, b, ::Type{T}=eltype(x)) wh
     end
 
     return norm_δx
-end
-
-"""
-    residual!(u, A, x, b, ::Type{T}=eltype(u))
-
-Compute the residual `Ax-b` in precision `T` and store in `u`.
-"""
-function residual!(u::AbstractVector, A, x, b, ::Type{T}=eltype(u)) where {T}
-    @boundscheck size(A, 1) == length(b) && size(A,2) == length(x)
-    m, n = size(A)
-    @inbounds for i in 1:m
-        dot = zero(T)
-        for j in 1:n
-            dot = muladd(convert(T, A[i,j]), convert(T, x[j]), dot)
-        end
-        u[i] = dot - convert(T, b[i])
-    end
-    u
-end
-
-
-###########################
-# CUSTOM LU Factorization #
-###########################
-
-# This is an adoption of LinearAlgebra.generic_lufact!
-# with 3 changes:
-# 1) For choosing the pivot we use abs2 instead of abs
-# 2) Instead of using the robust complex division we
-#    just use the naive division. This shouldn't
-#    lead to problems since numerical diffuculties only
-#    arise for very large or small exponents
-# 3) We fold lu! and ldiv! into one routine
-#    this has the effect that we do not need to allocate
-#    the pivot vector anymore and also avoid the allocations
-#    coming from the LU wrapper
-@inline function lu_factorization!(A::AbstractMatrix{T},
-                           b::Union{AbstractVector, Nothing}=nothing,
-                           ipiv::Union{Vector{I}, Nothing}=nothing,
-                           ::Val{Pivot} = Val(true)) where {T,I,Pivot}
-    m, n = size(A)
-    minmn = min(m,n)
-    # LU Factorization
-    @inbounds begin
-        for k = 1:minmn
-            # find index max
-            kp = k
-            if Pivot
-                amax = zero(real(T))
-                for i = k:m
-                    if T <: Complex
-                        absi = abs2(A[i,k])
-                    else
-                        absi = abs(A[i,k])
-                    end
-                    if absi > amax
-                        kp = i
-                        amax = absi
-                    end
-                end
-            end
-            if !(ipiv isa Nothing)
-                ipiv[k] = kp
-            end
-            if !iszero(A[kp,k])
-                if k != kp
-                    # Interchange
-                    for i = 1:n
-                        tmp = A[k,i]
-                        A[k,i] = A[kp,i]
-                        A[kp,i] = tmp
-                    end
-                    if !(b isa Nothing)
-                        b[k], b[kp] = b[kp], b[k]
-                    end
-                end
-                # Scale first column
-                Akkinv = @fastmath inv(A[k,k])
-                for i = k+1:m
-                    A[i,k] *= Akkinv
-                end
-            end
-            # Update the rest
-            for j = k+1:n
-                A_kj = A[k,j]
-                for i = k+1:m
-                    A[i,j] -= A[i,k] * A_kj
-                end
-            end
-        end
-    end
-    A
-end
-
-
-_ipiv!(A::LinearAlgebra.LU, b::AbstractVector) = apply_ipiv!(b, A.ipiv)
-
-function apply_ipiv!(b::AbstractVector, ipiv)
-    @inbounds for i = 1:length(ipiv)
-        if i != ipiv[i]
-            _swap_rows!(b, i, ipiv[i])
-        end
-    end
-    b
-end
-
-
-function _swap_rows!(B::StridedVector, i::Integer, j::Integer)
-    B[i], B[j] = B[j], B[i]
-    B
-end
-
-@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b; singular_exception::Bool=true)
-    n = size(A, 2)
-    for j in n:-1:1
-        @inbounds singular_exception && iszero(A[j,j]) && throw(LinearAlgebra.SingularException(j))
-        @inbounds xj = x[j] = (@fastmath A[j,j] \ b[j])
-        for i in 1:(j-1)
-            @inbounds b[i] -= A[i,j] * xj
-        end
-    end
-    b
-end
-@inline function ldiv_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
-    n = size(A, 2)
-    @inbounds for j in 1:n
-        xj = x[j] = b[j]
-        for i in j+1:n
-            b[i] -= A[i,j] * xj
-        end
-    end
-    x
-end
-
-import LinearAlgebra: BlasInt
-
-"""
-    geqp3!(A::AbstractMatrix{ComplexF64},
-        jpvt::AbstractVector{BlasInt},
-        tau::AbstractVector{ComplexF64},
-        work::Vector{ComplexF64},
-        rwork=Vector{Float64}(undef, 2*size(A,2)))
-
-Version of `LAPACK.geqp3!` which also accepts the work buffers.
-"""
-function geqp3!(A::AbstractMatrix{ComplexF64},
-		jpvt::AbstractVector{BlasInt},
-		tau::AbstractVector{ComplexF64},
-		work::Vector{ComplexF64},
-		rwork=Vector{Float64}(undef, 2*size(A,2)))
-	m,n = size(A)
-	lda = stride(A,2)
-	if lda == 0
-		return return A, tau, jpvt
-	end # Early exit
-    jpvt .= BlasInt(0)
-	lwork = BlasInt(-1)
-	info = Ref{BlasInt}()
-	for i = 1:2
-		ccall((LinearAlgebra.LAPACK.@blasfunc(zgeqp3_), LinearAlgebra.LAPACK.liblapack), Cvoid,
-			  (Ref{BlasInt}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
-			   Ptr{BlasInt}, Ptr{ComplexF64}, Ptr{ComplexF64}, Ref{BlasInt},
-			   Ptr{Float64}, Ptr{BlasInt}),
-			  m, n, A, lda,
-			  jpvt, tau, work, lwork,
-			  rwork, info)
-		LinearAlgebra.LAPACK.chklapackerror(info[])
-		if i == 1
-			lwork = BlasInt(real(work[1]))
-			resize!(work, lwork)
-		end
-	end
-	return A, tau, jpvt
-end
-
-"""
-    ormqr!(side, trans, A, tau, C, work)
-
-Version of `LAPACK.ormqr!` which also accepts the work buffer.
-Computes `Q * C` (`trans = N`), `transpose(Q) * C` (`trans = T`), `adjoint(Q) * C`
-(`trans = C`) for `side = L` or the equivalent right-sided multiplication
-for `side = R` using `Q` from a `QR` factorization of `A` computed using
-`geqrf!`. `C` is overwritten.
-"""
-function ormqr!(side::AbstractChar, trans::AbstractChar, A::Matrix{ComplexF64},
-                tau::Vector{ComplexF64}, C::Vector{ComplexF64},
-                work::Vector{ComplexF64})
-    m,n = (size(C, 1), 1)
-    mA  = size(A, 1)
-    k   = length(tau)
-    if side == 'L' && m != mA
-        throw(DimensionMismatch("for a left-sided multiplication, the first dimension of C, $m, must equal the second dimension of A, $mA"))
-    end
-    if side == 'R' && n != mA
-        throw(DimensionMismatch("for a right-sided multiplication, the second dimension of C, $m, must equal the second dimension of A, $mA"))
-    end
-    if side == 'L' && k > m
-        throw(DimensionMismatch("invalid number of reflectors: k = $k should be <= m = $m"))
-    end
-    if side == 'R' && k > n
-        throw(DimensionMismatch("invalid number of reflectors: k = $k should be <= n = $n"))
-    end
-    lwork = BlasInt(-1)
-    info  = Ref{BlasInt}()
-    for i = 1:2  # first call returns lwork as work[1]
-        ccall((LA.LAPACK.@blasfunc(zunmqr_), LA.LAPACK.liblapack), Cvoid,
-              (Ref{UInt8}, Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt},
-               Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt}, Ptr{ComplexF64},
-               Ptr{ComplexF64}, Ref{BlasInt}, Ptr{ComplexF64}, Ref{BlasInt},
-               Ptr{BlasInt}),
-              side, trans, m, n,
-              k, A, max(1,stride(A,2)), tau,
-              C, max(1, stride(C,2)), work, lwork,
-              info)
-        LA.LAPACK.chklapackerror(info[])
-        if i == 1
-            lwork = BlasInt(real(work[1]))
-            resize!(work, lwork)
-        end
-    end
-    C
-end
-
-"""
-    hnf(A, T=elytpe(A))
-
-    Compute the hermite normal form `H` of `A` by overwriting `A` and the corresponding transformation
-    matrix `U` using precision T. This is `A*U == H` and `H` is a lower triangular matrix.
-
-    The implementation follows the algorithm described in [1].
-
-    [1] Kannan, Ravindran, and Achim Bachem. "Polynomial algorithms for computing the Smith and Hermite normal forms of an integer matrix." SIAM Journal on Computing 8.4 (1979): 499-507.
-"""
-function hnf(A, T=eltype(A))
-    H = similar(A, T)
-    H .= A
-    U = similar(A, T)
-    hnf!(H, U)
-    H, U
-end
-
-# use checked arithmethic
-⊡(x,y) = Base.checked_mul(x, y)
-⊞(x,y) = Base.checked_add(x, y)
-
-"""
-    hnf!(H, U, A)
-
-Inplace version of [hnf](@ref).
-
-    hnf!(A, U)
-
-Inplace version of [hnf](@ref) overwriting `A` with `H`.
-"""
-hnf!(H, U, A) = hnf!(copyto!(H, A), U)
-function hnf!(A, U)
-    n = size(A, 1)
-    U .= 0
-    @inbounds for i in 1:n
-        U[i,i] = one(eltype(U))
-    end
-    @inbounds for i in 1:(n-1)
-        ii = i ⊞ 1
-        for j in 1:i
-            if !iszero(A[j, j]) || !iszero(A[j, ii])
-                # 4.1
-                r, p, q = gcdx(A[j, j], A[j, ii])
-                # 4.2
-                d_j = -A[j, ii] ÷ r
-                d_ii = A[j, j] ÷ r
-                for k = 1:n
-                    a_kj, a_kii = A[k,j], A[k,ii]
-                    A[k, j] = a_kj ⊡ p ⊞ a_kii ⊡ q
-                    A[k, ii] = a_kj ⊡ d_j ⊞ a_kii ⊡ d_ii
-
-                    u_kj, u_kii = U[k,j], U[k,ii]
-                    U[k, j] = u_kj ⊡ p ⊞ u_kii ⊡ q
-                    U[k, ii] = u_kj ⊡ d_j ⊞ u_kii ⊡ d_ii
-                end
-            end
-            # 4.3
-            if j > 1
-                reduce_off_diagonal!(A, U, j)
-            end
-        end
-        #5
-        reduce_off_diagonal!(A, U, ii)
-    end
-    # Special case for 1 × 1 matrices to guarantee that the diagonal is positive
-    # This comes up in polyhedral homotopy for univariate polynomials
-    if n == 1
-        U[1,1] = flipsign(U[1,1], A[1,1])
-        A[1,1] = flipsign(A[1,1], A[1,1])
-    end
-
-    nothing
-end
-
-@inline function reduce_off_diagonal!(A, U, k)
-    n = size(A, 1)
-    @inbounds if A[k,k] < 0
-        for i in 1:n
-            A[i, k] = -A[i, k]
-            U[i, k] = -U[i, k]
-        end
-    end
-    @inbounds for z in 1:(k-1)
-        if !iszero(A[z,z])
-            r = -ceil(eltype(A), A[k,z] / A[z,z])
-            for i in 1:n
-                U[i,z] = U[i,z] ⊞ r ⊡ U[i,k]
-                A[i,z] = A[i,z] ⊞ r ⊡ A[i,k]
-            end
-        end
-    end
-    nothing
 end
