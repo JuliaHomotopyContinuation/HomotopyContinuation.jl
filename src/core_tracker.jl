@@ -666,7 +666,7 @@ end
 g(Θ) = sqrt(1+4Θ) - 1
 # Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
 δ(opts::CoreTrackerOptions, ω, μ) = @fastmath min(√(0.5ω) * τ(opts, μ), 0.25)
-τ(opts::CoreTrackerOptions, μ) = @fastmath opts.accuracy^(1/(2opts.max_corrector_iters - μ))
+τ(opts::CoreTrackerOptions, μ) = @fastmath opts.accuracy^(1/(2(opts.max_corrector_iters - μ)))
 
 function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
     @unpack state, options = tracker
@@ -712,10 +712,6 @@ function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
             Δs = min(nthroot(λ, ord), 0.9) * state.Δs
         else
             Δs = 0.5 * state.Δs
-        end
-        # If we fail consecutively reduce step size more aggressively.
-        if state.last_step_failed
-            Δs = min(Δs, 0.25 * state.Δs)
         end
     end
     model.expected_Δx₀ = 2δ_N_ω / ω
