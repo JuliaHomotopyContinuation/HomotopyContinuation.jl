@@ -589,9 +589,9 @@ function step!(tracker::CoreTracker)
         t, Δt = current_t(state), current_Δt(state)
         predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
         # check if we need to update the jacobian_infos
-        update_jacobian_infos =
+        update_jacobian_infos = options.steps_jacobian_info_update > 0 && (
                 state.last_step_failed ||
-                state.steps_jacobian_info_update ≥ options.steps_jacobian_info_update
+                state.steps_jacobian_info_update ≥ options.steps_jacobian_info_update)
         # reset counter
         update_jacobian_infos && (state.steps_jacobian_info_update = 0)
         result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
