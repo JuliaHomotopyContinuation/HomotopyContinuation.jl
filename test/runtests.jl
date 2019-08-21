@@ -21,6 +21,7 @@ end
 # We order the tests such that isolated things are tested first
 @testset "HomotopyContinuation" begin
     include("utilities_test.jl")
+    include("linear_algebra_test.jl")
     include("affine_patches_test.jl")
     include("problem_test.jl")
     include("systems_test.jl")
