@@ -62,17 +62,3 @@ LinearAlgebra.norm(x::AbstractVector, ip::AbstractInnerProduct) = sqrt(norm2(x, 
 
 (ip::EuclideanIP)(x::AbstractVector) = LinearAlgebra.norm(x, ip)
 (ip::WeightedIP)(x::AbstractVector) = LinearAlgebra.norm(x, ip)
-
-"""
-    euclidean_distance(u, v)
-
-Compute ||u-v||₂.
-"""
-euclidean_distance(u, v) = distance(u, v, EuclideanIP())
-
-"""
-    euclidean_norm(u)
-
-Compute ||u||₂.
-"""
-euclidean_norm(x::AbstractVector) = LinearAlgebra.norm(x, EuclideanIP())
