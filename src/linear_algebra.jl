@@ -8,7 +8,7 @@ const LA = LinearAlgebra
     QR_FACT
     LU_FACT
 end
-struct MatrixWorkspace{T}
+struct MatrixWorkspace{T} <: AbstractMatrix{Complex{T}}
     A::Matrix{Complex{T}} # Matrix
     d::Vector{T} # Inverse of scaling factors
     # factorizations
@@ -25,8 +25,6 @@ struct MatrixWorkspace{T}
     qr_rhs::Vector{Complex{T}}
     # iterative refinement
     ir_r::Vector{Complex{T}}
-    # Condition estimates
-    cond::Base.RefValue{T}
     # cond estimators
     lu_cond_work::Vector{ComplexF64}
     lu_cond_rwork::Vector{Float64}
@@ -54,7 +52,6 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
 
     ir_r = Vector{ComplexF64}(undef, m)
     qr_rhs = copy(ir_r)
-    cond = Ref(1.0)
     lu_cond_work = Vector{ComplexF64}(undef, 2n)
     lu_cond_rwork = Vector{Float64}(undef, 2n)
     qr_cond_work  = Vector{ComplexF64}(undef, 2n)
@@ -63,9 +60,26 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     inf_norm_est_rwork = Vector{Float64}(undef, n)
     MatrixWorkspace(A, d, Ref(fact), Ref(true), lu,
         qr, qr_perm, qr_work, qr_rwork, qr_ormqr_work, qr_rhs,
-        ir_r, cond, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
+        ir_r, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
         inf_norm_est_work, inf_norm_est_rwork)
 end
+
+Base.size(MW::MatrixWorkspace) = size(MW.A)
+
+import Base: @propagate_inbounds
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer) = getindex(MW.A, i)
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer, j::Integer) = getindex(MW.A, i, j)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) = setindex!(MW.A, x, i)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) = setindex!(MW.A, x, i, j)
+@propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
+@propagate_inbounds Base.copy!(MW::MatrixWorkspace, A::AbstractArray) = copy!(MW.A, A)
+
+"""
+    updated!(MW::MatrixWorkspace)
+
+Indicate that the matrix `MW` got updated.
+"""
+updated!(MW::MatrixWorkspace) = (MW.factorized[] = false; MW)
 
 """
     update!(MW::MatrixWorkspace, A::Matrix)
@@ -74,9 +88,8 @@ Update the matrix in `MW` with `A`.
 """
 function update!(MW::MatrixWorkspace, A::Matrix)
     @boundscheck (size(MW.A) == size(A) || throw(ArgumentError("Matrix of invalid size.")))
-    @inbounds copy!(MW.A, A)
-    MW.factorized[] = false
-    MW
+    @inbounds copyto!(MW.A, A)
+    updated!(MW)
 end
 
 """
@@ -435,16 +448,16 @@ function residual!(u::AbstractVector{S}, A::AbstractMatrix{S},
 end
 
 """
-    iterative_refinement_step!([x,] MW::MatrixWorkspace, x̂, b, T=eltype(x̂), norm=x->norm(x,Inf))
+    iterative_refinement_step!([x,] MW::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), T=eltype(x̂))
 
 Apply one step of iterative refinement where the residual is computed with precision `T`.
 Stores the result in `x` and returns the norm of the update `δx`. If `x` is not provided
 `x̂` is updated inplace.
 """
-function iterative_refinement_step!(WS::MatrixWorkspace, x̂, b, ::Type{T}=eltype(x̂), norm=∞_norm) where T
-    iterative_refinement_step!(x̂, WS, x̂, b, T, norm)
+function iterative_refinement_step!(WS::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), ::Type{T}=eltype(x̂), ) where T
+    iterative_refinement_step!(x̂, WS, x̂, b, norm, T)
 end
-function iterative_refinement_step!(x, WS::MatrixWorkspace, x̂, b, ::Type{T}=eltype(x̂), norm=∞_norm) where T
+function iterative_refinement_step!(x, WS::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), ::Type{T}=eltype(x̂)) where T
     residual!(WS.ir_r, WS.A, x̂, b, T)
     δx = LA.ldiv!(WS.ir_r, WS, WS.ir_r)
     for i in eachindex(x)
@@ -607,6 +620,41 @@ function inf_norm_est(lu::LA.LU,
     end
     γ
 end
+
+#####################
+## JacobianMonitor ##
+#####################
+struct JacobianMonitor{T}
+    J::MatrixWorkspace{T}
+    cond::Base.RefValue{Float64}
+    forward_err::Base.RefValue{Float64}
+    corank::Int
+end
+function JacobianMonitor(A::AbstractMatrix)
+    J = MatrixWorkspace(A)
+    cond = Ref(1.0)
+    forward_err = Ref(0.0)
+    corank = 0
+    JacobianMonitor(J, cond, forward_err, corank)
+end
+
+"""
+    forward_err!(x̂::AbstractVector, JM::JacobianMonitor, b::AbstractVector, norm::AbstractNorm)
+
+Compute an estimate of the forward error ||x-x̂||/||x||.
+"""
+function forward_err!(JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::AbstractNorm, T=eltype(x̂))
+    forward_err!(x̂, JM, x̂, b, norm, T)
+end
+function forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::AbstractNorm, T=eltype(x̂))
+    norm_x̂ = norm(x̂)
+    iterative_refinement_step!(x, JM.J, x̂, b, norm, T) / norm_x̂
+end
+
+updated!(JM::JacobianMonitor) = updated!(JM.J)
+jacobian(JM::JacobianMonitor) = JM.J
+LA.ldiv!(x::AbstractVector, JM::JacobianMonitor, b::AbstractVector) = LA.ldiv!(x, JM.J, b)
+
 
 #########################
 ## Hermite Normal Form ##

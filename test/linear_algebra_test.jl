@@ -29,6 +29,15 @@ import DoubleFloats: Double64, ComplexDF64
 		HC.factorize!(WS) # first factorize resizes the work buffers
 		WS.factorized[] = false
 		@test (@allocated HC.factorize!(WS)) == 0
+
+		# test indexing etc
+		@test WS[1,2] == B[1,2]
+		WS[2,3] = 5.0
+		@test WS[2,3] == 5.0
+		@test size(WS) == (12,12)
+		C = randn(ComplexF64, 12, 12)
+		WS .= C
+		@test WS.A == C
 	end
 
 	@testset "ldiv" begin
@@ -91,9 +100,9 @@ import DoubleFloats: Double64, ComplexDF64
 		update!(WS, A2)
 		cond(A2)
 		ldiv!(x̂, WS, b)
-		δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, ComplexDF64)
+		δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
 		@test δx1 / norm(x, Inf) > 1e-14
-		δx2 = HC.iterative_refinement_step!(WS, x, b,  ComplexDF64)
+		δx2 = HC.iterative_refinement_step!(WS, x, b, HC.InfNorm(), ComplexDF64)
 		@test δx2/ norm(x, Inf) < 1e-16
 
 		δx = HC.iterative_refinement_step!(x, WS, x̂, b)
@@ -147,6 +156,38 @@ import DoubleFloats: Double64, ComplexDF64
 		@test 0.1 ≤ opnorm(D*inv(B), Inf) / HC.inf_norm_est(WS, nothing, d) ≤ 10
 		@test 0.1 ≤ opnorm(inv(B)*G, Inf) / HC.inf_norm_est(WS, g, nothing) ≤ 10
 		@test 0.1 ≤ opnorm(D*inv(B)*G, Inf) / HC.inf_norm_est(WS, g, d) ≤ 10
+	end
+
+	@testset "JacobianMonitor" begin
+		A = randn(ComplexF64, 6, 6)
+		b = randn(ComplexF64, 6)
+		x̂ = similar(b)
+		x = similar(b)
+		JM = HC.JacobianMonitor(zeros(ComplexF64, 6, 6))
+		@test JM isa HC.JacobianMonitor
+		HC.jacobian(JM) .= A
+		HC.updated!(JM)
+		ldiv!(x̂, JM, b)
+		ldiv!(x, jacobian(JM), b)
+		@test x == x̂
+	end
+	@testset "Forward error" begin
+		A = [1.81451+0.46473im -0.473651+0.813117im 0.130822-0.254704im -0.203277+0.397106im;
+			 -2.04468-1.59228im 0.441157-1.39994im -0.0984804+1.42619im -0.818292-0.487898im;
+			 0.35501+0.0235574im 1.32618+0.577264im 1.12561+0.43383im 0.579533+1.49484im;
+			 0.144381+0.104175im 0.665384-1.43389im 0.22097+0.258016im 0.374103-0.635066im]
+		b = [-0.14581-0.868847im, 0.0162454+0.91156im, -0.133769+0.510834im, -0.867022+0.752196im]
+		x̂ = similar(b)
+		x = similar(b)
+		JM = HC.JacobianMonitor(A)
+		HC.updated!(JM)
+		ldiv!(x̂, JM, b)
+
+		ferr = HC.forward_err!(x, JM, x̂, b, HC.InfNorm())
+		@test ferr < eps()*cond(A)
+		@test ferr > 1e-12
+		ferrD64 = HC.forward_err!(x, JM, x̂, b, HC.InfNorm(), ComplexDF64)
+		@test 0.5 ≤ ferrD64 / ferr ≤ 2
 	end
 
 	@testset "Hermite Normal Form" begin
