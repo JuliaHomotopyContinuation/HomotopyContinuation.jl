@@ -72,7 +72,6 @@ import Base: @propagate_inbounds
 @propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) = setindex!(MW.A, x, i)
 @propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) = setindex!(MW.A, x, i, j)
 @propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
-@propagate_inbounds Base.copy!(MW::MatrixWorkspace, A::AbstractArray) = copy!(MW.A, A)
 
 """
     updated!(MW::MatrixWorkspace)

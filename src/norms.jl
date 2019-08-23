@@ -22,7 +22,7 @@ struct WeightedNorm{N<:AbstractNorm} <: AbstractNorm
     weights::Vector{Float64}
     norm::N
 end
-WeightedNorm(norm::AbstractNorm, x::AbstractVector) = WeightedNorm(ones(length(x)), norm)
+WeightedNorm(norm::AbstractNorm, x::AbstractVector) = WeightedNorm(norm, length(x))
 WeightedNorm(norm::AbstractNorm, n::Integer) = WeightedNorm(ones(n), norm)
 
 (N::WeightedNorm)(x::AbstractVector) = LinearAlgebra.norm(x, N)

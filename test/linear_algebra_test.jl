@@ -31,9 +31,12 @@ import DoubleFloats: Double64, ComplexDF64
 		@test (@allocated HC.factorize!(WS)) == 0
 
 		# test indexing etc
-		@test WS[1,2] == B[1,2]
+		@test WS[2,1] == B[2, 1]
+		@test WS[2] == B[2]
 		WS[2,3] = 5.0
 		@test WS[2,3] == 5.0
+		WS[5] = 2.32
+		@test WS[5] == 2.32
 		@test size(WS) == (12,12)
 		C = randn(ComplexF64, 12, 12)
 		WS .= C
@@ -64,6 +67,7 @@ import DoubleFloats: Double64, ComplexDF64
 		b = A*x
 		WS = HC.MatrixWorkspace(A)
 		HC.update!(WS, A)
+		@test_throws ArgumentError HC.factorization!(WS, HC.LU_FACT)
 		ldiv!(x, WS, b)
 		WS.factorized[] = false
 		x .= 0
@@ -188,6 +192,10 @@ import DoubleFloats: Double64, ComplexDF64
 		@test ferr > 1e-12
 		ferrD64 = HC.forward_err!(x, JM, x̂, b, HC.InfNorm(), ComplexDF64)
 		@test 0.5 ≤ ferrD64 / ferr ≤ 2
+
+		ferr = HC.forward_err!(JM, x̂, b, HC.InfNorm(), ComplexF64)
+		@test ferr < eps()*cond(A)
+		@test ferr > 1e-12
 	end
 
 	@testset "Hermite Normal Form" begin
