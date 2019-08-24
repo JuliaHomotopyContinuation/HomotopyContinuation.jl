@@ -534,7 +534,7 @@ end
     inf_norm_est(lu::LA.LU, g::Union{Nothing,Vector{<:Real}}=nothing, d::Union{Nothing,Vector{<:Real}}=nothing)
     inf_norm_est(lu::LA.LU, g::Union{Nothing,Vector{<:Real}}, d::Union{Nothing,Vector{<:Real}}, work{<:Complex}, rwork::Vector{<:Real})
 
-Estimation of the infinity norm of `diag(d)A⁻¹g` where `g` and `d` are optional positive vectors
+Estimation of the infinity norm of `diag(d)⁻¹A⁻¹g` where `g` and `d` are optional positive vectors
 and `A=LU`. If `g` is `nothing` the infinity norm of `A⁻¹` is estimated.
 This uses the 1-norm lapack condition estimator described by Highahm in [^H88].
 
@@ -561,7 +561,7 @@ function inf_norm_est(lu::LA.LU,
     n = size(lu.factors,1)
     x .= inv(n)
     if d !== nothing
-        x .*= d
+        x ./= d
     end
     lu_ldiv_adj!(y, lu, x)
     if g !== nothing
@@ -574,7 +574,7 @@ function inf_norm_est(lu::LA.LU,
     end
     lu_ldiv!(z, lu, ξ)
     if d !== nothing
-        x .= real.(z) .* d
+        x .= real.(z) ./ d
     else
         x .= real.(z)
     end
@@ -590,7 +590,7 @@ function inf_norm_est(lu::LA.LU,
         x .= zero(eltype(x))
         x[j] = one(eltype(x))
         if d !== nothing
-            x .*= d
+            x ./= d
         end
         lu_ldiv_adj!(y, lu, x)
         if g !== nothing
@@ -605,7 +605,7 @@ function inf_norm_est(lu::LA.LU,
         end
         lu_ldiv!(z, lu, ξ)
         if d !== nothing
-            x .= real.(z) .* d
+            x .= real.(z) ./ d
         else
             x .= real.(z)
         end
@@ -651,19 +651,28 @@ end
     strong_forward_err!(x̂::AbstractVector, JM::JacobianMonitor, b::AbstractVector, norm::AbstractNorm)
 
 Compute a more robust estimate of the forward error ||x-x̂||/||x|| using eq. (2.14) in [Demmel, Section 2.4.4].
+If `jacobian(JM).fact[] == QR_FACT` then this falls back to [`forward_err!`](@ref).
 
 [Demmel]: Demmel, James W. Applied numerical linear algebra. Vol. 56. Siam, 1997.
 """
 function strong_forward_err!(JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::InfNorm, T=eltype(x̂))
     strong_forward_err!(x̂, JM, x̂, b, norm, T)
 end
-function strong_forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::InfNorm, T=eltype(x̂))
+function strong_forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::Union{InfNorm, WeightedNorm{InfNorm}}, T=eltype(x̂))
+    if jacobian(JM).fact[] == QR_FACT
+        return forward_err!(x, JM, x̂, b, norm)
+    end
     norm_x̂ = norm(x̂)
     WS = jacobian(JM)
     residual!(WS.ir_r, WS.A, x̂, b, T)
     WS.residual_abs .= abs.(WS.ir_r)
-    inf_norm_est(WS, WS.residual_abs) / norm_x̂
+    if norm isa WeightedNorm
+        inf_norm_est(WS, WS.residual_abs, weights(norm)) / norm_x̂
+    else
+        inf_norm_est(WS, WS.residual_abs) / norm_x̂
+    end
 end
+
 
 # TODO weighted inf norm
 

@@ -145,21 +145,21 @@ import DoubleFloats: Double64, ComplexDF64
 		s[end] *= 1e-6
 		B = U*diagm(0=>s)*Vt'
 
-		d = rand(5)*0.001
+		d = rand(5)*1000
 		D = diagm(0=>d)
 		g = rand(5) .* 1000
 		G = diagm(0=>g)
 
 		@test 0.1 ≤ opnorm(inv(B), Inf) / HC.inf_norm_est(lu(B)) ≤ 10
-		@test 0.1 ≤ opnorm(D*inv(B), Inf) / HC.inf_norm_est(lu(B), nothing, d) ≤ 10
+		@test 0.1 ≤ opnorm(inv(D)*inv(B), Inf) / HC.inf_norm_est(lu(B), nothing, d) ≤ 10
 		@test 0.1 ≤ opnorm(inv(B)*G, Inf) / HC.inf_norm_est(lu(B), g, nothing) ≤ 10
-		@test 0.1 ≤ opnorm(D*inv(B)*G, Inf) / HC.inf_norm_est(lu(B), g, d) ≤ 10
+		@test 0.1 ≤ opnorm(inv(D)*inv(B)*G, Inf) / HC.inf_norm_est(lu(B), g, d) ≤ 10
 
 		WS = HC.MatrixWorkspace(B)
 		@test 0.1 ≤ opnorm(inv(B), Inf) / HC.inf_norm_est(WS) ≤ 10
-		@test 0.1 ≤ opnorm(D*inv(B), Inf) / HC.inf_norm_est(WS, nothing, d) ≤ 10
+		@test 0.1 ≤ opnorm(inv(D)*inv(B), Inf) / HC.inf_norm_est(WS, nothing, d) ≤ 10
 		@test 0.1 ≤ opnorm(inv(B)*G, Inf) / HC.inf_norm_est(WS, g, nothing) ≤ 10
-		@test 0.1 ≤ opnorm(D*inv(B)*G, Inf) / HC.inf_norm_est(WS, g, d) ≤ 10
+		@test 0.1 ≤ opnorm(inv(D)*inv(B)*G, Inf) / HC.inf_norm_est(WS, g, d) ≤ 10
 	end
 
 	@testset "JacobianMonitor" begin
@@ -209,6 +209,21 @@ import DoubleFloats: Double64, ComplexDF64
 		sferr2 = HC.strong_forward_err!(JM, x̂, D*b, HC.InfNorm())
 		@test sferr == sferr2
 		@test x̂ ≈ x
+
+		DR = diagm(0=>[10.0^(2i-4) for i in 1:4])
+		JM = HC.JacobianMonitor(A*DR)
+		ldiv!(x̂, JM, b)
+
+		WN = HC.WeightedNorm(HC.InfNorm(), x̂)
+		WN .= abs.(x̂)
+
+		wferr = HC.forward_err!(x, JM, x̂, b, WN)
+		ferr = HC.forward_err!(x, JM, x̂, b, HC.InfNorm())
+
+		strong_wferr = HC.strong_forward_err!(x, JM, x̂, b, WN)
+		strong_ferr = HC.strong_forward_err!(x, JM, x̂, b, HC.InfNorm())
+		@test ferr ≤ strong_ferr ≤ eps()*inv(HC.rcond(jacobian(JM)))
+		@test wferr ≤ strong_wferr ≤ eps()*inv(HC.rcond(jacobian(JM)))
 	end
 
 	@testset "Hermite Normal Form" begin
