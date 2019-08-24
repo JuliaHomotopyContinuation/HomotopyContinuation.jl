@@ -1,8 +1,5 @@
-export QR_FACT, LU_FACT
 import LinearAlgebra: BlasInt
 const LA = LinearAlgebra
-
-∞_norm(x) = LA.norm(x, Inf)
 
 @enum Factorization begin
     QR_FACT
@@ -25,6 +22,7 @@ struct MatrixWorkspace{T} <: AbstractMatrix{Complex{T}}
     qr_rhs::Vector{Complex{T}}
     # iterative refinement
     ir_r::Vector{Complex{T}}
+    ir_δx::Vector{Complex{T}}
     residual_abs::Vector{T}
     # cond estimators
     lu_cond_work::Vector{ComplexF64}
@@ -52,6 +50,7 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     qr_rwork = Vector{Float64}(undef, 2n)
 
     ir_r = Vector{ComplexF64}(undef, m)
+    ir_δx = Vector{ComplexF64}(undef, n)
     residual_abs = Vector{Float64}(undef, m)
     qr_rhs = copy(ir_r)
     lu_cond_work = Vector{ComplexF64}(undef, 2n)
@@ -62,7 +61,7 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     inf_norm_est_rwork = Vector{Float64}(undef, n)
     MatrixWorkspace(A, d, Ref(fact), Ref(true), lu,
         qr, qr_perm, qr_work, qr_rwork, qr_ormqr_work, qr_rhs,
-        ir_r, residual_abs, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
+        ir_r, ir_δx, residual_abs, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
         inf_norm_est_work, inf_norm_est_rwork)
 end
 
@@ -368,7 +367,7 @@ end
 
 # This is an adoption of the Julia implementation of ldiv! for QRPivoted
 function qr_ldiv!(x, A::LA.QRPivoted{ComplexF64},
-                      b::Vector{ComplexF64}, perm::Vector{Int}, ormqr_work::Vector{ComplexF64},
+                     b::Vector{ComplexF64}, perm::Vector{Int}, ormqr_work::Vector{ComplexF64},
       #corank::Int,
       )
     mA, nA = size(A.factors)
@@ -463,9 +462,9 @@ function iterative_refinement_step!(WS::MatrixWorkspace, x̂, b, norm::AbstractN
 end
 function iterative_refinement_step!(x, WS::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), ::Type{T}=eltype(x̂)) where T
     residual!(WS.ir_r, WS.A, x̂, b, T)
-    δx = LA.ldiv!(WS.ir_r, WS, WS.ir_r)
+    δx = LA.ldiv!(WS.ir_δx, WS, WS.ir_r)
     for i in eachindex(x)
-        x[i] = x̂[i] - convert(T, δx[i])
+        x[i] = x̂[i] - δx[i]
     end
     return norm(δx)
 end

@@ -15,16 +15,16 @@ import DoubleFloats: Double64, ComplexDF64
 		@test WS.factorized[] == false
 
 
-		HC.factorization!(WS, LU_FACT)
-		@test WS.fact[] == LU_FACT
+		HC.factorization!(WS, HC.LU_FACT)
+		@test WS.fact[] == HC.LU_FACT
 		WS.factorized[] = true
-		HC.factorization!(WS, QR_FACT)
-		@test WS.fact[] == QR_FACT
+		HC.factorization!(WS, HC.QR_FACT)
+		@test WS.fact[] == HC.QR_FACT
 		@test WS.factorized[] == false
 
-		HC.factorization!(WS, LU_FACT)
+		HC.factorization!(WS, HC.LU_FACT)
 		@test (@allocated HC.factorize!(WS)) == 0
-		HC.factorization!(WS, QR_FACT)
+		HC.factorization!(WS, HC.QR_FACT)
 		@test WS.factorized[] == false
 		HC.factorize!(WS) # first factorize resizes the work buffers
 		WS.factorized[] = false
@@ -54,7 +54,7 @@ import DoubleFloats: Double64, ComplexDF64
 		@test (@allocated ldiv!(x, WS, b)) == 0
 		@test (lu(A) \ b) ≈ x atol=1e-12
 
-		HC.factorization!(WS, QR_FACT)
+		HC.factorization!(WS, HC.QR_FACT)
 		x .= 0
 		ldiv!(x, WS, b)
 		@test (qr(A, Val(true)) \ b) ≈ x atol=1e-12
@@ -102,7 +102,25 @@ import DoubleFloats: Double64, ComplexDF64
 		S[end] *= 1e-4
 		A2 = U * diagm(0=>S) * VT'
 		update!(WS, A2)
-		cond(A2)
+		ldiv!(x̂, WS, b)
+		δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
+		@test δx1 / norm(x, Inf) > 1e-14
+		δx2 = HC.iterative_refinement_step!(WS, x, b, HC.InfNorm(), ComplexDF64)
+		@test δx2/ norm(x, Inf) < 1e-16
+
+		δx = HC.iterative_refinement_step!(x, WS, x̂, b)
+		@test δx1 / norm(x, Inf) > 1e-14
+
+		# overdetermined
+		A = randn(ComplexF64, 4, 3)
+		x̂ = zeros(ComplexF64, 3)
+		x = copy(x̂)
+		WS = HC.MatrixWorkspace(A)
+		U, S, VT = svd(A)
+		S[end] *= 1e-4
+		A2 = U * diagm(0=>S) * VT'
+		update!(WS, A2)
+		b = A2 * randn(ComplexF64, 3)
 		ldiv!(x̂, WS, b)
 		δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
 		@test δx1 / norm(x, Inf) > 1e-14
@@ -120,11 +138,10 @@ import DoubleFloats: Double64, ComplexDF64
 		S[end] *= 1e-5
 		A2 = U * diagm(0=>S) * VT'
 		HC.update!(WS, A2)
-		HC.factorization!(WS, LU_FACT)
+		HC.factorization!(WS, HC.LU_FACT)
 		HC.factorize!(WS)
 		@test cond(A2, Inf) ≈ inv(HC.rcond(WS))
-		# @test (@allocated rcond(WS)) == 0
-		HC.factorization!(WS, QR_FACT)
+		HC.factorization!(WS, HC.QR_FACT)
 		@test 0.5 ≤ cond(A2, Inf) / inv(HC.rcond(WS)) ≤ 1.5
 		# @test (@allocated rcond(WS)) == 0
 
@@ -137,6 +154,10 @@ import DoubleFloats: Double64, ComplexDF64
 		HC.factorize!(WS)
 		@test 1 / HC.rcond(WS) ≈ cond(UpperTriangular(WS.qr.R), Inf) rtol=1e-14
 		# @test (@allocated rcond(WS)) == 0
+
+		# meddle aroudn with the internals to check dead branch
+		WS.fact[] = HC.LU_FACT
+		@test isnan(HC.rcond(WS))
 	end
 
 	@testset "inf norm est" begin
@@ -224,6 +245,20 @@ import DoubleFloats: Double64, ComplexDF64
 		strong_ferr = HC.strong_forward_err!(x, JM, x̂, b, HC.InfNorm())
 		@test ferr ≤ strong_ferr ≤ eps()*inv(HC.rcond(jacobian(JM)))
 		@test wferr ≤ strong_wferr ≤ eps()*inv(HC.rcond(jacobian(JM)))
+
+		# overdetermined
+		A = randn(ComplexF64, 3, 2)
+		x = randn(ComplexF64, 2)
+		b = A * x
+		x̂ = similar(x)
+
+		JM = HC.JacobianMonitor(A)
+		ldiv!(x̂, JM, b)
+
+		ferr = HC.forward_err!(x, JM, x̂, b, HC.InfNorm())
+		strong_ferr = HC.strong_forward_err!(x, JM, x̂, b, HC.InfNorm())
+		@test ferr < 1e-15
+		@test ferr == strong_ferr # test fallback to ferr for qr
 	end
 
 	@testset "Hermite Normal Form" begin
