@@ -25,6 +25,7 @@ struct MatrixWorkspace{T} <: AbstractMatrix{Complex{T}}
     qr_rhs::Vector{Complex{T}}
     # iterative refinement
     ir_r::Vector{Complex{T}}
+    residual_abs::Vector{T}
     # cond estimators
     lu_cond_work::Vector{ComplexF64}
     lu_cond_rwork::Vector{Float64}
@@ -51,6 +52,7 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     qr_rwork = Vector{Float64}(undef, 2n)
 
     ir_r = Vector{ComplexF64}(undef, m)
+    residual_abs = Vector{Float64}(undef, m)
     qr_rhs = copy(ir_r)
     lu_cond_work = Vector{ComplexF64}(undef, 2n)
     lu_cond_rwork = Vector{Float64}(undef, 2n)
@@ -60,7 +62,7 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     inf_norm_est_rwork = Vector{Float64}(undef, n)
     MatrixWorkspace(A, d, Ref(fact), Ref(true), lu,
         qr, qr_perm, qr_work, qr_rwork, qr_ormqr_work, qr_rhs,
-        ir_r, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
+        ir_r, residual_abs, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
         inf_norm_est_work, inf_norm_est_rwork)
 end
 
@@ -68,9 +70,12 @@ Base.size(MW::MatrixWorkspace) = size(MW.A)
 
 import Base: @propagate_inbounds
 @propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer) = getindex(MW.A, i)
-@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer, j::Integer) = getindex(MW.A, i, j)
-@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) = setindex!(MW.A, x, i)
-@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) = setindex!(MW.A, x, i, j)
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer, j::Integer) =
+    getindex(MW.A, i, j)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) =
+    setindex!(MW.A, x, i)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) =
+    setindex!(MW.A, x, i, j)
 @propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
 
 """
@@ -560,9 +565,7 @@ function inf_norm_est(lu::LA.LU,
     end
     lu_ldiv_adj!(y, lu, x)
     if g !== nothing
-        x .= g
-        _inverse_ipiv!(lu, x)
-        y .*= x
+        y .*= g
     end
     γ = sum(abs, y)
     y ./= abs.(y)
@@ -571,9 +574,7 @@ function inf_norm_est(lu::LA.LU,
     end
     lu_ldiv!(z, lu, ξ)
     if d !== nothing
-        x .= d
-        _inverse_ipiv!(lu, x)
-        x .= real.(z) .* x
+        x .= real.(z) .* d
     else
         x .= real.(z)
     end
@@ -593,9 +594,7 @@ function inf_norm_est(lu::LA.LU,
         end
         lu_ldiv_adj!(y, lu, x)
         if g !== nothing
-            x .= g
-            _inverse_ipiv!(lu, x)
-            y .*= x
+            y .*= g
         end
         γ̄ = γ
         γ = sum(abs, y)
@@ -606,9 +605,7 @@ function inf_norm_est(lu::LA.LU,
         end
         lu_ldiv!(z, lu, ξ)
         if d !== nothing
-            x .= d
-            _inverse_ipiv!(lu, x)
-            x .= real.(z) .* x
+            x .= real.(z) .* d
         else
             x .= real.(z)
         end
@@ -649,6 +646,26 @@ function forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVecto
     norm_x̂ = norm(x̂)
     iterative_refinement_step!(x, JM.J, x̂, b, norm, T) / norm_x̂
 end
+
+"""
+    strong_forward_err!(x̂::AbstractVector, JM::JacobianMonitor, b::AbstractVector, norm::AbstractNorm)
+
+Compute a more robust estimate of the forward error ||x-x̂||/||x|| using eq. (2.14) in [Demmel, Section 2.4.4].
+
+[Demmel]: Demmel, James W. Applied numerical linear algebra. Vol. 56. Siam, 1997.
+"""
+function strong_forward_err!(JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::InfNorm, T=eltype(x̂))
+    strong_forward_err!(x̂, JM, x̂, b, norm, T)
+end
+function strong_forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::InfNorm, T=eltype(x̂))
+    norm_x̂ = norm(x̂)
+    WS = jacobian(JM)
+    residual!(WS.ir_r, WS.A, x̂, b, T)
+    WS.residual_abs .= abs.(WS.ir_r)
+    inf_norm_est(WS, WS.residual_abs) / norm_x̂
+end
+
+# TODO weighted inf norm
 
 updated!(JM::JacobianMonitor) = updated!(JM.J)
 jacobian(JM::JacobianMonitor) = JM.J

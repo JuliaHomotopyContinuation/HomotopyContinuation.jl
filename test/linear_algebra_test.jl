@@ -196,6 +196,19 @@ import DoubleFloats: Double64, ComplexDF64
 		ferr = HC.forward_err!(JM, x̂, b, HC.InfNorm(), ComplexF64)
 		@test ferr < eps()*cond(A)
 		@test ferr > 1e-12
+
+		D = diagm(0 => [10.0^(2i) for i in 1:4])
+		JM = HC.JacobianMonitor(D*A)
+		HC.updated!(JM)
+		ldiv!(x̂, JM, D*b)
+		conderr = HC.cond(D*A)*eps()
+		sferr = HC.strong_forward_err!(x, JM, x̂, D*b, HC.InfNorm())
+		ferr = HC.forward_err!(x, JM, x̂, D*b, HC.InfNorm())
+		@test ferr < sferr < conderr*1e-4 # check that error estimate is actually substantially less
+
+		sferr2 = HC.strong_forward_err!(JM, x̂, D*b, HC.InfNorm())
+		@test sferr == sferr2
+		@test x̂ ≈ x
 	end
 
 	@testset "Hermite Normal Form" begin
