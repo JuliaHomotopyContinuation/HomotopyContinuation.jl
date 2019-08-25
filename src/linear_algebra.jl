@@ -1,14 +1,11 @@
-export QR_FACT, LU_FACT
 import LinearAlgebra: BlasInt
 const LA = LinearAlgebra
-
-∞_norm(x) = LA.norm(x, Inf)
 
 @enum Factorization begin
     QR_FACT
     LU_FACT
 end
-struct MatrixWorkspace{T}
+struct MatrixWorkspace{T} <: AbstractMatrix{Complex{T}}
     A::Matrix{Complex{T}} # Matrix
     d::Vector{T} # Inverse of scaling factors
     # factorizations
@@ -25,21 +22,22 @@ struct MatrixWorkspace{T}
     qr_rhs::Vector{Complex{T}}
     # iterative refinement
     ir_r::Vector{Complex{T}}
-    # Condition estimates
-    cond::Base.RefValue{T}
+    ir_δx::Vector{Complex{T}}
+    residual_abs::Vector{T}
     # cond estimators
-    lu_cond_work::Vector{ComplexF64}
-    lu_cond_rwork::Vector{Float64}
+    lu_cond_work::Vector{Complex{T}}
+    lu_cond_rwork::Vector{T}
     qr_cond_work::Vector{ComplexF64}
-    qr_cond_rwork::Vector{Float64}
+    qr_cond_rwork::Vector{T}
     # inf_norm_est
-    inf_norm_est_work::Vector{ComplexF64}
-    inf_norm_est_rwork::Vector{Float64}
+    inf_norm_est_work::Vector{Complex{T}}
+    inf_norm_est_rwork::Vector{T}
+    row_scaling::Vector{T}
 end
 
 MatrixWorkspace(Â::AbstractMatrix) = MatrixWorkspace(Â, promote_type(real(eltype(Â)), Float64))
-function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
-    A = Matrix{ComplexF64}(Â)
+function MatrixWorkspace(Â::AbstractMatrix, ::Type{T}) where {T}
+    A = Matrix{Complex{T}}(Â)
     m, n = size(A)
     d = ones(m)
     fact = m == n ? LU_FACT : QR_FACT
@@ -48,24 +46,45 @@ function MatrixWorkspace(Â::AbstractMatrix, T::Type{Float64})
     # qr
     qr = LA.qr(A, Val(true))
     qr_perm = zeros(Int, length(qr.p))
-    qr_work = Vector{ComplexF64}(undef, 1)
-    qr_ormqr_work = Vector{ComplexF64}(undef, 1)
-    qr_rwork = Vector{Float64}(undef, 2n)
+    qr_work = Vector{Complex{T}}(undef, 1)
+    qr_ormqr_work = Vector{Complex{T}}(undef, 1)
+    qr_rwork = Vector{T}(undef, 2n)
 
-    ir_r = Vector{ComplexF64}(undef, m)
+    ir_r = Vector{Complex{T}}(undef, m)
+    ir_δx = Vector{Complex{T}}(undef, n)
+    residual_abs = Vector{T}(undef, m)
     qr_rhs = copy(ir_r)
-    cond = Ref(1.0)
-    lu_cond_work = Vector{ComplexF64}(undef, 2n)
-    lu_cond_rwork = Vector{Float64}(undef, 2n)
-    qr_cond_work  = Vector{ComplexF64}(undef, 2n)
-    qr_cond_rwork = Vector{Float64}(undef, n)
-    inf_norm_est_work = Vector{ComplexF64}(undef, n)
-    inf_norm_est_rwork = Vector{Float64}(undef, n)
+    lu_cond_work = Vector{Complex{T}}(undef, 2n)
+    lu_cond_rwork = Vector{T}(undef, 2n)
+    qr_cond_work  = Vector{Complex{T}}(undef, 2n)
+    qr_cond_rwork = Vector{T}(undef, n)
+    inf_norm_est_work = Vector{Complex{T}}(undef, n)
+    inf_norm_est_rwork = Vector{T}(undef, n)
+    row_scaling = Vector{T}(undef, n)
     MatrixWorkspace(A, d, Ref(fact), Ref(true), lu,
         qr, qr_perm, qr_work, qr_rwork, qr_ormqr_work, qr_rhs,
-        ir_r, cond, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
-        inf_norm_est_work, inf_norm_est_rwork)
+        ir_r, ir_δx, residual_abs, lu_cond_work, lu_cond_rwork, qr_cond_work, qr_cond_rwork,
+        inf_norm_est_work, inf_norm_est_rwork, row_scaling)
 end
+
+Base.size(MW::MatrixWorkspace) = size(MW.A)
+
+import Base: @propagate_inbounds
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer) = getindex(MW.A, i)
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer, j::Integer) =
+    getindex(MW.A, i, j)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) =
+    setindex!(MW.A, x, i)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) =
+    setindex!(MW.A, x, i, j)
+@propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
+
+"""
+    updated!(MW::MatrixWorkspace)
+
+Indicate that the matrix `MW` got updated.
+"""
+updated!(MW::MatrixWorkspace) = (MW.factorized[] = false; MW)
 
 """
     update!(MW::MatrixWorkspace, A::Matrix)
@@ -74,9 +93,8 @@ Update the matrix in `MW` with `A`.
 """
 function update!(MW::MatrixWorkspace, A::Matrix)
     @boundscheck (size(MW.A) == size(A) || throw(ArgumentError("Matrix of invalid size.")))
-    @inbounds copy!(MW.A, A)
-    MW.factorized[] = false
-    MW
+    @inbounds copyto!(MW.A, A)
+    updated!(MW)
 end
 
 """
@@ -351,7 +369,7 @@ end
 
 # This is an adoption of the Julia implementation of ldiv! for QRPivoted
 function qr_ldiv!(x, A::LA.QRPivoted{ComplexF64},
-                      b::Vector{ComplexF64}, perm::Vector{Int}, ormqr_work::Vector{ComplexF64},
+                     b::Vector{ComplexF64}, perm::Vector{Int}, ormqr_work::Vector{ComplexF64},
       #corank::Int,
       )
     mA, nA = size(A.factors)
@@ -435,20 +453,20 @@ function residual!(u::AbstractVector{S}, A::AbstractMatrix{S},
 end
 
 """
-    iterative_refinement_step!([x,] MW::MatrixWorkspace, x̂, b, T=eltype(x̂), norm=x->norm(x,Inf))
+    iterative_refinement_step!([x,] MW::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), T=eltype(x̂))
 
 Apply one step of iterative refinement where the residual is computed with precision `T`.
 Stores the result in `x` and returns the norm of the update `δx`. If `x` is not provided
 `x̂` is updated inplace.
 """
-function iterative_refinement_step!(WS::MatrixWorkspace, x̂, b, ::Type{T}=eltype(x̂), norm=∞_norm) where T
-    iterative_refinement_step!(x̂, WS, x̂, b, T, norm)
+function iterative_refinement_step!(WS::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), ::Type{T}=eltype(x̂), ) where T
+    iterative_refinement_step!(x̂, WS, x̂, b, norm, T)
 end
-function iterative_refinement_step!(x, WS::MatrixWorkspace, x̂, b, ::Type{T}=eltype(x̂), norm=∞_norm) where T
+function iterative_refinement_step!(x, WS::MatrixWorkspace, x̂, b, norm::AbstractNorm=InfNorm(), ::Type{T}=eltype(x̂)) where T
     residual!(WS.ir_r, WS.A, x̂, b, T)
-    δx = LA.ldiv!(WS.ir_r, WS, WS.ir_r)
+    δx = LA.ldiv!(WS.ir_δx, WS, WS.ir_r)
     for i in eachindex(x)
-        x[i] = x̂[i] - convert(T, δx[i])
+        x[i] = x̂[i] - δx[i]
     end
     return norm(δx)
 end
@@ -517,7 +535,7 @@ end
     inf_norm_est(lu::LA.LU, g::Union{Nothing,Vector{<:Real}}=nothing, d::Union{Nothing,Vector{<:Real}}=nothing)
     inf_norm_est(lu::LA.LU, g::Union{Nothing,Vector{<:Real}}, d::Union{Nothing,Vector{<:Real}}, work{<:Complex}, rwork::Vector{<:Real})
 
-Estimation of the infinity norm of `diag(d)A⁻¹g` where `g` and `d` are optional positive vectors
+Estimation of the infinity norm of `diag(d)⁻¹A⁻¹g` where `g` and `d` are optional positive vectors
 and `A=LU`. If `g` is `nothing` the infinity norm of `A⁻¹` is estimated.
 This uses the 1-norm lapack condition estimator described by Highahm in [^H88].
 
@@ -544,13 +562,11 @@ function inf_norm_est(lu::LA.LU,
     n = size(lu.factors,1)
     x .= inv(n)
     if d !== nothing
-        x .*= d
+        x ./= d
     end
     lu_ldiv_adj!(y, lu, x)
     if g !== nothing
-        x .= g
-        _inverse_ipiv!(lu, x)
-        y .*= x
+        y .*= g
     end
     γ = sum(abs, y)
     y ./= abs.(y)
@@ -559,9 +575,7 @@ function inf_norm_est(lu::LA.LU,
     end
     lu_ldiv!(z, lu, ξ)
     if d !== nothing
-        x .= d
-        _inverse_ipiv!(lu, x)
-        x .= real.(z) .* x
+        x .= real.(z) ./ d
     else
         x .= real.(z)
     end
@@ -577,13 +591,11 @@ function inf_norm_est(lu::LA.LU,
         x .= zero(eltype(x))
         x[j] = one(eltype(x))
         if d !== nothing
-            x .*= d
+            x ./= d
         end
         lu_ldiv_adj!(y, lu, x)
         if g !== nothing
-            x .= g
-            _inverse_ipiv!(lu, x)
-            y .*= x
+            y .*= g
         end
         γ̄ = γ
         γ = sum(abs, y)
@@ -594,9 +606,7 @@ function inf_norm_est(lu::LA.LU,
         end
         lu_ldiv!(z, lu, ξ)
         if d !== nothing
-            x .= d
-            _inverse_ipiv!(lu, x)
-            x .= real.(z) .* x
+            x .= real.(z) ./ d
         else
             x .= real.(z)
         end
@@ -608,6 +618,131 @@ function inf_norm_est(lu::LA.LU,
     γ
 end
 
+function row_scaling_inf!(WS::MatrixWorkspace{T}) where T
+    d = WS.row_scaling
+    d .= zero(T)
+    m = length(d)
+    @inbounds for j=1:size(WS.A, 2), i=1:m
+        d[i] += abs(WS.A[i,j])
+    end
+    # Don't scale zero rows -> set dᵢ = 1 if too small
+    d_max_eps = sqrt(eps(min(maximum(d), one(T))))
+    @inbounds for i in 1:m
+        if d[i] < d_max_eps
+            d[i] = one(T)
+        end
+    end
+    d
+end
+
+"""
+    scaled_cond_inf(WS::MatrixWorkspace)
+
+Compute the condition number ``κ`` of the row-equilibrated matrix `WS.A`.
+This is the best possible condition number under row scaling (e.g. [Higham02, Thm 7.5]).
+
+[Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
+"""
+function scaled_cond_inf(WS::MatrixWorkspace)
+    d = row_scaling_inf!(WS)
+    # row scaling makes ||A||_∞ = 1 so we don't this here
+    inf_norm_est(WS, d)
+end
+
+#####################
+## JacobianMonitor ##
+#####################
+struct JacobianMonitor{T}
+    J::MatrixWorkspace{T}
+    cond::Base.RefValue{Float64}
+    forward_err::Base.RefValue{Float64}
+    corank::Int # not used currently
+end
+function JacobianMonitor(A::AbstractMatrix)
+    J = MatrixWorkspace(A)
+    cond = Ref(1.0)
+    forward_err = Ref(0.0)
+    corank = 0
+    JacobianMonitor(J, cond, forward_err, corank)
+end
+
+
+updated!(JM::JacobianMonitor) = updated!(JM.J)
+jacobian(JM::JacobianMonitor) = JM.J
+LA.ldiv!(x::AbstractVector, JM::JacobianMonitor, b::AbstractVector) = LA.ldiv!(x, JM.J, b)
+
+"""
+    forward_err(JM::JacobianMonitor)
+
+Return the last estimate of the forward error as computed by [`forward_err`](@ref) or [`strong_forward_err`](@ref).
+"""
+forward_err(JM::JacobianMonitor) = JM.forward_err[]
+
+"""
+    forward_err!(x̂::AbstractVector, JM::JacobianMonitor, b::AbstractVector, norm::AbstractNorm)
+
+Compute an estimate of the forward error ||x-x̂||/||x|| and update the value in `JM`.
+"""
+function forward_err!(JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::AbstractNorm, T=eltype(x̂))
+    forward_err!(x̂, JM, x̂, b, norm, T)
+end
+function forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::AbstractNorm, T=eltype(x̂))
+    norm_x̂ = norm(x̂)
+    JM.forward_err[] = iterative_refinement_step!(x, JM.J, x̂, b, norm, T) / norm_x̂
+end
+
+"""
+    strong_forward_err!(x̂::AbstractVector, JM::JacobianMonitor, b::AbstractVector, norm::AbstractNorm)
+
+Compute a more robust estimate of the forward error ||x-x̂||/||x|| using eq. (2.14) in [Demmel, Section 2.4.4]
+and update the value in `JM`.
+If `jacobian(JM).fact[] == QR_FACT` then this falls back to [`forward_err!`](@ref).
+
+[Demmel]: Demmel, James W. Applied numerical linear algebra. Vol. 56. Siam, 1997.
+"""
+function strong_forward_err!(JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::InfNorm, T=eltype(x̂))
+    strong_forward_err!(x̂, JM, x̂, b, norm, T)
+end
+function strong_forward_err!(x::AbstractVector, JM::JacobianMonitor, x̂::AbstractVector, b::AbstractVector, norm::Union{InfNorm, WeightedNorm{InfNorm}}, T=eltype(x̂))
+    if jacobian(JM).fact[] == QR_FACT
+        return JM.forward_err[] = forward_err!(x, JM, x̂, b, norm)
+    end
+    norm_x̂ = norm(x̂)
+    WS = jacobian(JM)
+    residual!(WS.ir_r, WS.A, x̂, b, T)
+    WS.residual_abs .= abs.(WS.ir_r)
+    if norm isa WeightedNorm
+        JM.forward_err[] = inf_norm_est(WS, WS.residual_abs, weights(norm)) / norm_x̂
+    else
+        JM.forward_err[] = inf_norm_est(WS, WS.residual_abs) / norm_x̂
+    end
+end
+
+"""
+    cond!(JM::JacobianMonitor)
+
+Compute the condition number ``κ`` of the Jacobian ``J`` with respect to the
+infinity norm and store it. If ``J`` is a square matrix the condition number of the
+row-equilibrated is computed.
+This is the best possible condition number under row scaling (e.g. [Higham02, Thm 7.5]).
+
+[Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
+"""
+function cond!(JM::JacobianMonitor)
+    if jacobian(JM).fact[] == LU_FACT
+        JM.cond[] = scaled_cond_inf(jacobian(JM))
+    else
+        JM.cond[] = inv(rcond(jacobian(JM)))
+    end
+end
+
+"""
+    cond(JM::JacobianMonitor)
+
+Returns the with [`cond!`](@ref) computed condition number.
+"""
+LA.cond(JM::JacobianMonitor) = JM.cond[]
+
 #########################
 ## Hermite Normal Form ##
 #########################
@@ -615,12 +750,12 @@ end
 """
     hnf(A, T=elytpe(A))
 
-    Compute the hermite normal form `H` of `A` by overwriting `A` and the corresponding transformation
-    matrix `U` using precision T. This is `A*U == H` and `H` is a lower triangular matrix.
+Compute the hermite normal form `H` of `A` by overwriting `A` and the corresponding transformation
+matrix `U` using precision T. This is `A*U == H` and `H` is a lower triangular matrix.
 
-    The implementation follows the algorithm described in [1].
+The implementation follows the algorithm described in [1].
 
-    [1] Kannan, Ravindran, and Achim Bachem. "Polynomial algorithms for computing the Smith and Hermite normal forms of an integer matrix." SIAM Journal on Computing 8.4 (1979): 499-507.
+[1] Kannan, Ravindran, and Achim Bachem. "Polynomial algorithms for computing the Smith and Hermite normal forms of an integer matrix." SIAM Journal on Computing 8.4 (1979): 499-507.
 """
 function hnf(A, T=eltype(A))
     H = similar(A, T)
