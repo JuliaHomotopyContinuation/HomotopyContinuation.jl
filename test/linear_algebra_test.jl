@@ -209,6 +209,7 @@ import DoubleFloats: Double64, ComplexDF64
 		ldiv!(x̂, JM, b)
 
 		ferr = HC.forward_err!(x, JM, x̂, b, HC.InfNorm())
+		@test HC.forward_err(JM) == ferr
 		@test ferr < eps()*cond(A)
 		@test ferr > 1e-12
 		ferrD64 = HC.forward_err!(x, JM, x̂, b, HC.InfNorm(), ComplexDF64)
@@ -224,6 +225,7 @@ import DoubleFloats: Double64, ComplexDF64
 		ldiv!(x̂, JM, D*b)
 		conderr = HC.cond(D*A)*eps()
 		sferr = HC.strong_forward_err!(x, JM, x̂, D*b, HC.InfNorm())
+		@test HC.forward_err(JM) == sferr
 		ferr = HC.forward_err!(x, JM, x̂, D*b, HC.InfNorm())
 		@test ferr < sferr < conderr*1e-4 # check that error estimate is actually substantially less
 
@@ -259,6 +261,16 @@ import DoubleFloats: Double64, ComplexDF64
 		strong_ferr = HC.strong_forward_err!(x, JM, x̂, b, HC.InfNorm())
 		@test ferr < 1e-15
 		@test ferr == strong_ferr # test fallback to ferr for qr
+	end
+
+	@testset "cond" begin
+		A = randn(ComplexF64, 13, 13)
+		D = diagm(0=>[2.0^(i-5) for i in 1:13])
+		JM = HC.JacobianMonitor(D*A)
+		comp_cond = HC.cond!(JM)
+		@test comp_cond === cond(JM)
+		B = diagm(0=>inv.(JM.J.row_scaling)) * D * A
+		@test abs(cond(JM) - cond(B, Inf)) / cond(JM) < 2
 	end
 
 	@testset "Hermite Normal Form" begin
