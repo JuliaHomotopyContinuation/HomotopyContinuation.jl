@@ -721,14 +721,19 @@ end
 """
     cond!(JM::JacobianMonitor)
 
-Compute the condition number ``κ`` of the row-equilibrated Jacobian with respect to the
-infinity norm and store it.
+Compute the condition number ``κ`` of the Jacobian ``J`` with respect to the
+infinity norm and store it. If ``J`` is a square matrix the condition number of the
+row-equilibrated is computed.
 This is the best possible condition number under row scaling (e.g. [Higham02, Thm 7.5]).
 
 [Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
 """
 function cond!(JM::JacobianMonitor)
-    JM.cond[] = scaled_cond_inf(jacobian(JM))
+    if jacobian(JM).fact[] == LU_FACT
+        JM.cond[] = scaled_cond_inf(jacobian(JM))
+    else
+        JM.cond[] = inv(rcond(jacobian(JM)))
+    end
 end
 
 """

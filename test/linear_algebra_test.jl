@@ -271,6 +271,11 @@ import DoubleFloats: Double64, ComplexDF64
 		@test comp_cond === cond(JM)
 		B = diagm(0=>inv.(JM.J.row_scaling)) * D * A
 		@test abs(cond(JM) - cond(B, Inf)) / cond(JM) < 2
+
+		A = randn(ComplexF64, 13, 12)
+		JM = HC.JacobianMonitor(D*A)
+		comp_cond = HC.cond!(JM)
+		@test comp_cond === cond(JM)
 	end
 
 	@testset "Hermite Normal Form" begin
