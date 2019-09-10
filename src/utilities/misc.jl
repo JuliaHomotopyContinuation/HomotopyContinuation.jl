@@ -181,7 +181,13 @@ end
      println(io, typeof(obj), ":")
      for name in fieldnames(typeof(obj))
          if getfield(obj, name) !== nothing
-             println(io, " • ", name, " → ", getfield(obj, name))
+             val = getfield(obj, name)
+             print(io, " • ", name, " → ")
+             if val isa AbstractFloat
+                 println(io, round(val; sigdigits=5))
+             else
+                 println(io, val)
+             end
          end
      end
  end
