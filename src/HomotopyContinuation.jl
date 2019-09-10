@@ -14,6 +14,7 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
+    import Base: @propagate_inbounds
     import LinearAlgebra: cond
     import Parameters: @pack!, @unpack
     import DynamicPolynomials: @polyvar, subs, differentiate
@@ -49,6 +50,11 @@ module HomotopyContinuation
 
     include("core_tracker.jl")
     include("path_tracker.jl")
+
+
+    include("newton_corrector.jl")
+    include("core_tracker2.jl")
+
     include("polyhedral.jl")
     include("solve.jl")
     include("monodromy.jl")

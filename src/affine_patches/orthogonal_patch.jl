@@ -24,7 +24,7 @@ function setup!(state::OrthogonalPatchState, x::AbstractVector)
     end
     state
 end
-Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
+@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
 
 onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
 evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)
