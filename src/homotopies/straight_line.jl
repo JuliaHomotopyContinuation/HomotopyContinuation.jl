@@ -54,28 +54,28 @@ Obtain the gamma used in the StraightLineHomotopy.
 """
 γ(H::StraightLineHomotopy) = gamma(H)
 
-function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    @inbounds evaluate!(c.u, H.start, x, c.start)
-    @inbounds evaluate!(u, H.target, x, c.target)
+@propagate_inbounds function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    evaluate!(c.u, H.start, x, c.start)
+    evaluate!(u, H.target, x, c.target)
 
-    @inbounds for i in eachindex(u)
+    for i in eachindex(u)
         u[i] = (γ(H) * t) * c.u[i] + (1.0 - t) * u[i]
     end
 
     u
 end
 
-function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    @inbounds evaluate!(c.u, H.start, x, c.start)
-    @inbounds evaluate!(u, H.target, x, c.target)
+@propagate_inbounds function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    evaluate!(c.u, H.start, x, c.start)
+    evaluate!(u, H.target, x, c.target)
 
-    @inbounds for i in eachindex(u)
+    for i in eachindex(u)
         u[i] = γ(H) * c.u[i] - u[i]
     end
     u
 end
 
-function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
     @inbounds jacobian!(c.U, H.start, x, c.start)
     @inbounds jacobian!(U, H.target, x, c.target)
 
@@ -86,14 +86,14 @@ function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCach
     U
 end
 
-function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    @inbounds evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
-    @inbounds evaluate_and_jacobian!(u, U, H.target, x, c.target)
+@propagate_inbounds function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
+    evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
-    @inbounds for i in eachindex(u)
+    for i in eachindex(u)
         u[i] = (γ(H) * t) * c.u[i] + (1.0 - t) * u[i]
     end
-    @inbounds for i in eachindex(U)
+    for i in eachindex(U)
         U[i] = (γ(H) * t) * c.U[i] + (1.0 - t) * U[i]
     end
 
@@ -101,14 +101,14 @@ function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::Straight
 end
 
 
-function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
-    @inbounds evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
-    @inbounds evaluate_and_jacobian!(u, U, H.target, x, c.target)
+@propagate_inbounds function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+    evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
+    evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
-    @inbounds for i in eachindex(U)
+    for i in eachindex(U)
         U[i] = (γ(H) * t) * c.U[i] + (1.0 - t) * U[i]
     end
-    @inbounds for i in eachindex(u)
+    for i in eachindex(u)
         u[i] = γ(H) * c.u[i] - u[i]
     end
 

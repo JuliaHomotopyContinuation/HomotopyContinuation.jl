@@ -180,25 +180,25 @@ end
 end
 
 
-function evaluate!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function evaluate!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     evaluate!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function evaluate(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     evaluate(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-function jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     jacobian!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function jacobian(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     jacobian(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     evaluate_and_jacobian!(u, U, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-function dt!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function dt!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     # apply chain rule to H(x, p(t))
     p!(c.pt, H, t)
     ∂p∂t!(c.∂p∂t, H, t, c)

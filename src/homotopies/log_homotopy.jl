@@ -21,24 +21,24 @@ function cache(H::LogHomotopy, x, s)
     LogHomotopyCache(c)
 end
 
-function evaluate!(u, H::LogHomotopy, x, s, c::LogHomotopyCache)
+@propagate_inbounds function evaluate!(u, H::LogHomotopy, x, s, c::LogHomotopyCache)
     evaluate!(u, H.homotopy, x, exp(-s), c.cache)
 end
-function jacobian!(U, H::LogHomotopy, x, s, c::LogHomotopyCache)
+@propagate_inbounds function jacobian!(U, H::LogHomotopy, x, s, c::LogHomotopyCache)
     jacobian!(U, H.homotopy, x, exp(-s), c.cache)
 end
-function dt!(u, H::LogHomotopy, x, s, c::LogHomotopyCache)
+@propagate_inbounds function dt!(u, H::LogHomotopy, x, s, c::LogHomotopyCache)
     t = exp(-s)
     dt!(u, H.homotopy, x, t, c.cache)
     LinearAlgebra.rmul!(u, -t)
     u
 end
 
-function evaluate_and_jacobian!(u, U, H::LogHomotopy, x, s, c::LogHomotopyCache)
+@propagate_inbounds function evaluate_and_jacobian!(u, U, H::LogHomotopy, x, s, c::LogHomotopyCache)
     evaluate_and_jacobian!(u, U, H.homotopy, x, exp(-s), c.cache)
 end
 
-function jacobian_and_dt!(U, u, H::LogHomotopy, x, s, c::LogHomotopyCache)
+@propagate_inbounds function jacobian_and_dt!(U, u, H::LogHomotopy, x, s, c::LogHomotopyCache)
     t = exp(-s)
     jacobian_and_dt!(U, u, H.homotopy, x, t, c.cache)
     LinearAlgebra.rmul!(u, -t)
