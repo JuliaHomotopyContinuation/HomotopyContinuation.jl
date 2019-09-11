@@ -368,4 +368,34 @@
         @test nsingular(res_affine2) == 1
         @test multiplicity.(results(res_affine2)) == [12]
     end
+
+    @testset "Parameter promotion to Float64" begin
+        d = 3
+        k = 1
+
+        R = 1.0
+        r = 0.5
+
+        @polyvar lam[1:k] p[1:6]
+        F = [(R^2 - r^2 + (p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2 + (p[3] + p[6] * lam[1])^2)^2 - 4 * R^2 * ((p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2)]
+        #Randomly choose a start system
+        # with only Complex{Float32 parameters
+        p0 = randn(Complex{Float32}, 6)
+        F0 = subs(F, p => p0)
+        res0 = solve(F0)
+        S0 = solutions(res0)
+
+        #Construct the tracker
+        tracker = pathtracker(F; parameters=p, generic_parameters=p0)
+
+        @test last(tracker.core_tracker.homotopy.homotopy.p) isa Vector{ComplexF64}
+        @test first(tracker.core_tracker.homotopy.homotopy.p) isa Vector{ComplexF64}
+
+        #Let's solve another system using PathTracking
+        p_current = randn(6)
+        result = track(tracker, S0[1]; target_parameters=p_current, accuracy=1e-9)
+        sol = solution(result)
+        F_SP = SPSystem(F; parameters=p)
+        @test residual(result) ≈ euclidean_norm(F_SP(sol, p_current)) atol=1e-13
+    end
 end
