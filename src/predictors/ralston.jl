@@ -18,7 +18,7 @@ function cache(::Ralston, H, x, ẋ, t)
     RalstonCache(dt(H, x,t), copy(ẋ), copy(ẋ))
 end
 #
-function predict!(xnext, ::Ralston, cache::RalstonCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
+function predict!(xnext, cache::RalstonCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
     dt, mk₁, mk₂ = cache.dt, cache.mk₁, cache.mk₂
     n = length(xnext)
     @inbounds for i=1:n
@@ -35,4 +35,4 @@ function predict!(xnext, ::Ralston, cache::RalstonCache, H::HomotopyWithCache, x
     nothing
 end
 
-order(::Ralston) = 3
+order(::RalstonCache) = 3

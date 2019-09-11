@@ -110,12 +110,12 @@ end
 Compute the `n`-th root of `x`.
 """
 function nthroot(x::Real, N::Integer)
-    if N == 3
-        cbrt(x)
+    if N == 4
+        √(√(x))
     elseif N == 2
         √(x)
-    elseif N == 4
-        √(√(x))
+    elseif N == 3
+        cbrt(x)
     elseif N == 1
         x
     elseif N == 0
@@ -330,7 +330,7 @@ struct ComplexSegment
     Δ_target_start::ComplexF64
     abs_target_start::Float64
 end
-function ComplexSegment(start, target)
+function ComplexSegment(start::Number, target::Number)
     Δ_target_start = convert(ComplexF64, target) - convert(ComplexF64, start)
     abs_target_start = abs(Δ_target_start)
 

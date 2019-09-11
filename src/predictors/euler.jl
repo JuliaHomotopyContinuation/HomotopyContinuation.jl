@@ -14,11 +14,11 @@ end
 
 cache(::Euler, H, x, ẋ, t) = EulerCache(jacobian(H, x, t), dt(H, x, t))
 
-function predict!(xnext, ::Euler, cache::EulerCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac)
+function predict!(xnext, cache::EulerCache, H::HomotopyWithCache, x, t, Δt, ẋ, ::JacobianMonitor)
     @inbounds for i=1:length(x)
         xnext[i] = x[i] + Δt * ẋ[i]
     end
     nothing
 end
 
-order(::Euler) = 2
+order(::EulerCache) = 2

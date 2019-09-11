@@ -15,7 +15,7 @@ function state(::FixedPatch, x::PVector)
     FixedPatchState(v)
 end
 
-function setup!(state::FixedPatchState, x::AbstractVector)
+function init!(state::FixedPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
     LinearAlgebra.normalize!(x)
     @inbounds for i in eachindex(state.v̄)

@@ -27,6 +27,7 @@ function cache(::Pade21, H, x, ẋ, t)
     h₃ = nthroot(eps(), 3+2) # x³ is the third order derivative and has a 2nd order approximation
     Pade21Cache(x², x³, x_h, u, u₁, u₂, h₂, h₃)
 end
+
 @inline function g!(u, H, x, ẋ, t, h, x_h)
     @inbounds for i in eachindex(x)
         x_h[i] = x[i] + h * ẋ[i]
@@ -42,7 +43,7 @@ end
     evaluate!(u, H, x_h, t + h)
 end
 
-function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
+function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor)
     # unpack stuff to make the rest easier to read
     u, u₁, u₂ = cache.u, cache.u₁, cache.u₂
     x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
@@ -57,7 +58,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
     @inbounds for i in eachindex(u₁)
         u[i] = -(u₁[i] + u₂[i]) / h²
     end
-    solve!(x², Jac, u)
+    LA.ldiv!(x², Jac, u)
 
     h₃ *= max(abs(t), 1.0)
     g!(u₁, H, x, ẋ, x², t, h₃, x_h)
@@ -67,12 +68,13 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::Jacobian)
     @inbounds for i in eachindex(u₁)
         u[i] = -3(u₁[i] - u₂[i]) / h³
     end
-    solve!(x³, Jac, u)
+    LA.ldiv!(x³, Jac, u)
 
     cache
 end
 
-function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
+
+function predict!(xnext, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
     x², x³ = cache.x², cache.x³
     @inbounds for i in eachindex(x)
         δ = 1 - Δt * x³[i] / (3 * x²[i])
@@ -85,4 +87,4 @@ function predict!(xnext, ::Pade21, cache::Pade21Cache, H::HomotopyWithCache, x, 
     nothing
 end
 
-order(::Pade21) = 4
+order(::Pade21Cache) = 4

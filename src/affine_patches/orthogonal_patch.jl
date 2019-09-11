@@ -16,7 +16,7 @@ function state(::OrthogonalPatch, x::PVector)
     OrthogonalPatchState(v)
 end
 
-function setup!(state::OrthogonalPatchState, x::AbstractVector)
+function init!(state::OrthogonalPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
     LinearAlgebra.normalize!(x)
     @inbounds for i in eachindex(state.v̄)

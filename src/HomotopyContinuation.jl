@@ -46,16 +46,13 @@ module HomotopyContinuation
 
     include("newton.jl")
     include("predictors.jl")
-    include("correctors.jl")
-
-    include("core_tracker.jl")
-    include("path_tracker.jl")
-
 
     include("newton_corrector.jl")
-    include("core_tracker2.jl")
+    include("core_tracker.jl")
 
-    include("polyhedral.jl")
-    include("solve.jl")
-    include("monodromy.jl")
+    # include("path_tracker.jl")
+    #
+    # include("polyhedral.jl")
+    # include("solve.jl")
+    # include("monodromy.jl")
 end

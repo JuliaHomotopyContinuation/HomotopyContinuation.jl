@@ -296,12 +296,12 @@ import DoubleFloats: Double64, ComplexDF64
         x = similar(b)
         JM = HC.JacobianMonitor(zeros(ComplexF64, 6, 6))
         @test JM isa HC.JacobianMonitor
-        ldiv!(x, jacobian(JM), b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_FERR)
+        ldiv!(x, JM, b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_FERR)
         @test HC.forward_err(JM) != 0.0
-        ldiv!(x, jacobian(JM), b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_COND)
+        ldiv!(x, JM, b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_COND)
         @test cond(JM) != 1.0
         JM = HC.JacobianMonitor(zeros(ComplexF64, 6, 6))
-        ldiv!(x, jacobian(JM), b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_ALL)
+        ldiv!(x, JM, b, HC.InfNorm(), HC.JAC_MONITOR_UPDATE_ALL)
         @test cond(JM) != 1.0
         @test HC.forward_err(JM) != 0.0
     end

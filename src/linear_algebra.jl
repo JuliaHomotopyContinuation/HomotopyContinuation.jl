@@ -962,7 +962,7 @@ This is the best possible condition number under row scaling (e.g. [Higham02, Th
 
 [Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
 """
-function cond!(JM::JacobianMonitor, norm::AbstractNorm)
+function cond!(JM::JacobianMonitor, norm::AbstractNorm = InfNorm())
     if jacobian(JM).fact[] == LU_FACT
         JM.cond[] = scaled_cond(jacobian(JM), norm)
     else
