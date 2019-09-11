@@ -122,10 +122,13 @@ end
 
 
 """
-    limit_accuracy(H::HomotopyWithCache, x t, JM::JacobianMonitor, norm, cache::NewtonCorrectorCache;
-       accuracy::Float64 = 1e-6,
-       safety_margin::Float64 = 100,
-       update_jacobian::Bool = false)
+    limit_accuracy!(
+        res::AbstractVector{<:Real},
+        H::HomotopyWithCache, x t,
+        JM::JacobianMonitor, norm, cache::NewtonCorrectorCache;
+        accuracy::Float64 = 1e-6,
+        safety_margin::Float64 = 100,
+        update_jacobian::Bool = false)
 
 Obtain an estimate of the limiting accuracy of Newton's method.
 If `update_jacobian == true` a new Jacobian is computed, otherwise the currently stored
@@ -137,7 +140,8 @@ The reason for the two step procedure is that the first update does not necessar
 the limiting accuracy, but if it is sufficiently good then there is no need to obtain the
 actual limiting accuracy.
 """
-function limit_accuracy(
+function limit_accuracy!(
+    limit_res::AbstractVector{<:Real},
     H::HomotopyWithCache,
     x::AbstractVector,
     t::Number,
@@ -146,7 +150,6 @@ function limit_accuracy(
     cache::NewtonCorrectorCache;
     accuracy::Float64 = 1e-6, safety_margin::Float64 = 100.0, update_jacobian::Bool = false
 )
-
     @unpack Δx, r = cache
 
     if update_jacobian
@@ -161,7 +164,7 @@ function limit_accuracy(
 
     # abs.(r) is ≈ limit residual
     limit_acc = Float64(norm(Δx))
-    limit_res = abs.(r)
+    limit_res .= abs.(r)
 
 
     return limit_acc

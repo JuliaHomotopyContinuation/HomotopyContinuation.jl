@@ -258,6 +258,8 @@ mutable struct CoreTrackerState{
 
     norm::AN
     jacobian::JacobianMonitor{T}
+    residual::Vector{Float64}
+
     steps_jacobian_info_update::Int
     status::CoreTrackerStatus
     patch::MaybePatchState
@@ -290,6 +292,7 @@ function CoreTrackerState(
     accuracy = limit_accuracy = 0.0
     ω = 1.0
     JM = JacobianMonitor(jacobian(H, x, t₁))
+    residual = zeros(first(size(H)))
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CT_TRACKING
@@ -309,6 +312,7 @@ function CoreTrackerState(
         limit_accuracy,
         norm,
         JM,
+        residual,
         steps_jacobian_info_update,
         status,
         patch,
@@ -583,7 +587,8 @@ end
     norm::AbstractNorm = tracker.state.norm
 )
 
-    limit_acc = limit_accuracy(
+    limit_acc = limit_accuracy!(
+        tracker.state.residual,
         tracker.homotopy,
         x,
         t,
@@ -673,6 +678,7 @@ function init!(
         state.accepted_steps = state.rejected_steps = 0
         init!(state.norm, state.x)
         init!(state.jacobian)
+        state.residual .= 0.0
         state.steps_jacobian_info_update = 0
     end
 

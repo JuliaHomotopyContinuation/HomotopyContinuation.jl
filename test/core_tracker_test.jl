@@ -88,9 +88,8 @@
         tracker, start_sols = coretracker_startsolutions(F; seed=12356)
         s = first(start_sols)
         @allocated track!(tracker, s, 1.0, 0.01)
-        # The path tracker not using a rank-deficient QR
-        # should not allocate after the first tracked path
-        @test_broken (@allocated track!(tracker, s, 1.0, 0.01)) == 0
+        # The path tracker should not allocate after the first tracked path
+        @test (@allocated track!(tracker, s, 1.0, 0.01)) == 0
     end
 
     @testset "LinearSystem" begin
