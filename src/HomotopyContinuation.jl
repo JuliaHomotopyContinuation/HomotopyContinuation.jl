@@ -1,5 +1,6 @@
 module HomotopyContinuation
 
+    import DoubleFloats
     import DynamicPolynomials
     import ElasticArrays
     import FixedPolynomials
@@ -17,6 +18,7 @@ module HomotopyContinuation
     import Base: @propagate_inbounds
     import LinearAlgebra: cond
     import Parameters: @pack!, @unpack
+    import DoubleFloats: Double64
     import DynamicPolynomials: @polyvar, subs, differentiate
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
