@@ -42,7 +42,8 @@ function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::Abstra
     length(p₁) == length(p₀) || error("Length of parameters provided doesn't match.")
 
     γ = (γ₁ === nothing || γ₀ === nothing) ? nothing : (γ₁, γ₀)
-    p = Vector.(promote(p₁, p₀))
+    T = promote_type(Float64, eltype(p₁), eltype(p₀))
+    p = Vector{T}.((p₁, p₀))
 
     ParameterHomotopy(F, p, γ)
 end
