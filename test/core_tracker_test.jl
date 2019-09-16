@@ -13,11 +13,6 @@
 
         @test_nowarn current_Δt(t1)
 
-        raccuracy = refinement_accuracy(t1)
-        @test_nowarn set_refinement_accuracy!(t1, 5e-5)
-        @test refinement_accuracy(t1) == 5e-5
-        set_refinement_accuracy!(t1, raccuracy)
-
         caccuracy = accuracy(t1)
         @test_nowarn set_accuracy!(t1, 5e-5)
         @test accuracy(t1) == 5e-5
@@ -27,11 +22,6 @@
         @test_nowarn set_max_corrector_iters!(t1, 11)
         @test max_corrector_iters(t1) == 11
         set_max_corrector_iters!(t1, cmaxiter)
-
-        rmaxiter = max_refinement_iters(t1)
-        @test_nowarn set_max_refinement_iters!(t1, 11)
-        @test max_refinement_iters(t1) == 11
-        set_max_refinement_iters!(t1, rmaxiter)
 
         @test t1 isa CoreTracker
         @test isa(current_x(t1), Vector)
@@ -60,6 +50,25 @@
         retcode = track!(out, t1, first(start_sols), 1.0, 0.0)
         @test is_success(retcode)
         @test out == R.x
+    end
+
+    @testset "log_homotopy" begin
+        F = equations(katsura(5))
+        log_tracker, start_sols = coretracker_startsolutions(F; log_homotopy=true)
+        @test log_tracker.homotopy.homotopy isa HC.LogHomotopy
+        @test log_tracker.options.logarithmic_time_scale
+        @test is_success(track!(log_tracker, first(start_sols), 0.0, 32.0))
+    end
+
+    @testset "deprecated" begin
+        F = equations(katsura(5))
+        # test construction
+        t1 = coretracker(F)
+
+        @test_warn(_ -> true, refinement_accuracy(t1))
+        @test_warn(_ -> true, set_refinement_accuracy!(t1, 1e-4))
+        @test_warn(_ -> true, max_refinement_iters(t1))
+        @test_warn(_ -> true, set_max_refinement_iters!(t1, 11))
     end
 
     @testset "Affine tracking" begin

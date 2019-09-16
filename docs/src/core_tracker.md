@@ -60,6 +60,12 @@ max_corrector_iters
 set_max_corrector_iters!
 max_step_size
 set_max_step_size!
+```
+
+## Deprecated
+
+The following functions are deprecated.
+```@docs
 max_refinement_iters
 set_max_refinement_iters!
 refinement_accuracy

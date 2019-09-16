@@ -22,15 +22,17 @@ export CoreTracker,
        accuracy,
        max_corrector_iters,
        max_step_size,
-       refinement_accuracy,
-       max_refinement_iters,
        set_accuracy!,
        set_max_corrector_iters!,
-       set_refinement_accuracy!,
-       set_max_refinement_iters!,
        set_max_step_size!,
        digits_lost,
-       options
+       options,
+       # deprecated
+       refinement_accuracy,
+       max_refinement_iters,
+       set_max_refinement_iters!,
+       set_refinement_accuracy!
+
 
 
 const coretracker_supported_keywords = [
@@ -162,8 +164,6 @@ for all possible options.
 mutable struct CoreTrackerOptions
     accuracy::Float64
     max_corrector_iters::Int
-    refinement_accuracy::Float64
-    max_refinement_iters::Int
     max_steps::Int
     initial_step_size::Float64
     min_step_size::Float64
@@ -183,14 +183,14 @@ function CoreTrackerOptions(
     accuracy = 1e-7,
     initial_step_size = 0.1,
     max_corrector_iters::Int = 2,
-    max_refinement_iters = 5,
+    max_refinement_iters = nothing,
     max_step_size = Inf,
     min_step_size = 1e-14,
     parameter_homotopy = false,
     max_steps = parameter_homotopy ? 10_000 : 1_000,
     precision::PrecisionOption = PRECISION_FIXED_64,
     max_lost_digits = default_max_lost_digits(precision, accuracy),
-    refinement_accuracy = 1e-8,
+    refinement_accuracy = nothing, # deprecated
     simple_step_size_alg = false,
     steps_jacobian_info_update::Int = 3,
     terminate_ill_conditioned::Bool = true,
@@ -198,11 +198,12 @@ function CoreTrackerOptions(
     logarithmic_time_scale = false,
 )
 
+    refinement_accuracy !== nothing && warn("Passing `refinement_accuracy` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+    max_refinement_iters !== nothing && warn("Passing `max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+
     CoreTrackerOptions(
         accuracy,
         max_corrector_iters,
-        refinement_accuracy,
-        max_refinement_iters,
         max_steps,
         initial_step_size,
         min_step_size,
@@ -347,13 +348,11 @@ Note that a `CoreTracker` is also a (mutable) iterator.
 * `initial_step_size=0.1`: The size of the first step.
 * `max_corrector_iters=2`: The maximal number of correction steps in a single step.
 * `max_lost_digits::Real`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps. This threshold depends on the `precision` argument.
-* `max_refinement_iters=5`: The maximal number of correction steps used to refine the final value.
 * `max_steps=1_000`: The maximal number of iterations the path tracker has available. Note that this changes to `10_000` for parameter homotopies.
 * `max_step_size=Inf`: The maximal step size.
 * `min_step_size=1e-14`: The minimal step size.
 * `precision::PrecisionOption=PRECISION_FIXED_64`: The precision used for evaluating the residual in Newton's method.
 * `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `refinement_accuracy=1e-8`: The precision required for the final value.
 * `simple_step_size_alg=false`: Use a more simple step size algorithm.
 * `steps_jacobian_info_update::Int=1`: Every n-th step a linear system will be solved using a QR factorization to obtain an estimate for the condition number of the Jacobian.
 * `terminate_ill_conditioned::Bool=true`: Indicates whether the path tracking should be terminated for ill-conditioned paths. A path is considerd ill-conditioned if the condition number of the Jacobian is larger than ≈1e14 or if it is larger than 1e`max_lost_digits`.
@@ -781,10 +780,7 @@ end
     check_start_value::Bool,
     debug::Bool,
 )
-
-    @unpack state = tracker
-
-    t₁ == t₀ && return (state.status = CT_SUCCESS)
+    t₁ == t₀ && return (tracker.state.status = CT_SUCCESS)
 
     init!(
         tracker,
@@ -796,14 +792,11 @@ end
         loop = loop,
     )
 
-    while is_tracking(state.status)
+    while is_tracking(tracker.state.status)
         step!(tracker, debug)
-        check_terminated!(tracker)
     end
 
-    is_success(state.status) && refine!(tracker)
-
-    state.status
+    tracker.state.status
 end
 
 
@@ -890,6 +883,10 @@ function step!(tracker::CT, debug::Bool = false)
         state.rejected_steps += 1
     end
     state.last_step_failed = is_converged(result)
+
+    check_terminated!(state, options)
+
+    state.last_step_failed
 end
 
 ## Step size update
@@ -988,42 +985,23 @@ function τ(opts::CTO, μ::Real)
 end
 
 
-function check_terminated!(tracker::CT)
-    Δs = length(tracker.state.segment) - tracker.state.s
-    if Δs < eps(length(tracker.state.segment))
-        tracker.state.status = CT_SUCCESS
-        tracker.state.s = length(tracker.state.segment)
-    elseif steps(tracker) ≥ tracker.options.max_steps
-        tracker.state.status = CT_TERMINATED_MAX_ITERS
+function check_terminated!(state::CTS, options::CTO)
+    Δs = length(state.segment) - state.s
+    if Δs < eps(length(state.segment))
+        state.status = CT_SUCCESS
+        state.s = length(state.segment)
+    elseif steps(state) ≥ options.max_steps
+        state.status = CT_TERMINATED_MAX_ITERS
     end
     nothing
 end
 
-function refine!(tracker::CT, accuracy = tracker.options.refinement_accuracy)
-    # if tracker.state.accuracy < accuracy
-    #     return
-    # end
-    # result = correct!(tracker.state.x̄, tracker;
-    #         accuracy = accuracy,
-    #         max_iters = tracker.options.max_refinement_iters)
-    # if is_converged(result)
-    #     tracker.state.x .= tracker.state.x̄
-    #     tracker.state.accuracy = result.accuracy
-    # end
-    nothing
-end
 
 function Base.iterate(tracker::CoreTracker, state::Union{Nothing,Int} = nothing)
     state === nothing && return tracker, 1
 
     if is_tracking(tracker.state.status)
         step!(tracker)
-        check_terminated!(tracker)
-
-        if is_success(tracker.state.status)
-            refine!(tracker)
-        end
-
         tracker, state + 1
     else
         nothing
@@ -1147,33 +1125,6 @@ function set_accuracy!(tracker::CT, accuracy, update_max_lost_digits::Bool = tru
     tracker
 end
 
-"""
-    refinement_accuracy(tracker::CT)
-
-Current refinement accuracy.
-"""
-refinement_accuracy(tracker::CT) = tracker.options.refinement_accuracy
-
-"""
-    set_max_refinement_iters!(tracker::CT, accuracy)
-
-Set the current refinement accuracy to `accuracy`.
-"""
-set_refinement_accuracy!(T::CT, accuracy) = T.options.refinement_accuracy = accuracy
-
-"""
-    max_refinement_iters(tracker::CT)
-
-Current refinement max_steps.
-"""
-max_refinement_iters(T::CT) = T.options.max_refinement_iters
-
-"""
-    set_max_refinement_iters!(tracker::CT, n)
-
-Set the current refinement max_steps to `n`.
-"""
-set_max_refinement_iters!(T::CT, n) = T.options.max_refinement_iters = n
 
 """
     max_corrector_iters(tracker::CT)
@@ -1202,6 +1153,45 @@ max_step_size(T::CT) = T.options.max_step_size
 Set the maximal step size to `Δs`.
 """
 set_max_step_size!(T::CT, Δs) = T.options.max_step_size = Δs
+
+## Deprecated ##
+"""
+    refinement_accuracy(tracker::CT)
+
+Current refinement accuracy.
+"""
+function refinement_accuracy(tracker::CT)
+    @warn("Solutions are now automatically refined to maximal achievable accuracy.")
+    return tracker.options.accuracy
+end
+
+"""
+    set_max_refinement_iters!(tracker::CT, accuracy)
+
+Set the current refinement accuracy to `accuracy`.
+"""
+function set_refinement_accuracy!(T::CT, accuracy)
+    @warn("`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.")
+end
+
+"""
+    max_refinement_iters(tracker::CT)
+
+Current refinement max_steps.
+"""
+function max_refinement_iters(T::CT)
+    @warn("`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+    T.options.max_corrector_iters
+end
+
+"""
+    set_max_refinement_iters!(tracker::CT, n)
+
+Set the current refinement max_steps to `n`.
+"""
+function set_max_refinement_iters!(T::CT, n)
+    @warn("`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+end
 
 ################
 # PathIterator #
@@ -1255,14 +1245,7 @@ function Base.iterate(iter::PathIterator, state = nothing)
     t = current_t(iter.tracker)
     step_done = false
     while !step_done && is_tracking(iter.tracker.state.status)
-
         step!(iter.tracker)
-        check_terminated!(iter.tracker)
-
-        if is_success(iter.tracker.state.status)
-            refine!(iter.tracker)
-        end
-
         step_done = current_t(iter.tracker) != t
     end
     current_x_t(iter), state + 1
