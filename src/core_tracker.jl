@@ -31,7 +31,9 @@ export CoreTracker,
        refinement_accuracy,
        max_refinement_iters,
        set_max_refinement_iters!,
-       set_refinement_accuracy!
+       set_refinement_accuracy!,
+       start_parameters!,
+       target_parameters!
 
 
 
@@ -882,7 +884,7 @@ function step!(tracker::CT, debug::Bool = false)
         # Update other state
         state.rejected_steps += 1
     end
-    state.last_step_failed = is_converged(result)
+    state.last_step_failed = !is_converged(result)
 
     check_terminated!(state, options)
 
@@ -938,7 +940,7 @@ function simple_step_size_alg!(state::CTS, options::CTO, result::NewtonCorrector
     end
 
     state.consecutive_successfull_steps = (state.consecutive_successfull_steps + 1) % 5
-    state.consecutive_successfull_steps == 0 ? 2state.Δs : state.Δs
+    state.consecutive_successfull_steps == 0 ? 2 * state.Δs : state.Δs
 end
 
 ## Adaptive step size algorithm
@@ -966,21 +968,21 @@ function adaptive_step_size_alg!(
         if δ_N_ω < ω_η
             Δs = min(nthroot(g(δ_N_ω) / g(ω_η), ord), 0.9) * state.Δs
         else
-            Δs = 0.5state.Δs
+            Δs = 0.5 * state.Δs
         end
     end
 
     Δs
 end
 
-g(Θ::Real) = sqrt(1. + 4Θ) - 1.0
+g(Θ::Real) = sqrt(1.0 + 4Θ) - 1.0
 δ(opts::CTO, ω::Real, μ::Real) = min(√(0.5ω) * τ(opts, μ), 0.25)
 function τ(opts::CTO, μ::Real)
     # most common case: 2(2 - 0.5) == 3
     if opts.max_corrector_iters == 2 && μ == 0.5
         cbrt(opts.accuracy)
     else
-        opts.accuracy^(1 / (2(opts.max_corrector_iters - μ)))
+        opts.accuracy^(1 / (2 * (opts.max_corrector_iters - μ)))
     end
 end
 
@@ -1171,7 +1173,9 @@ end
 Set the current refinement accuracy to `accuracy`.
 """
 function set_refinement_accuracy!(T::CT, accuracy)
-    @warn("`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.")
+    @warn(
+        "`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.",
+    )
 end
 
 """
@@ -1180,7 +1184,9 @@ end
 Current refinement max_steps.
 """
 function max_refinement_iters(T::CT)
-    @warn("`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+    @warn(
+        "`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
     T.options.max_corrector_iters
 end
 
@@ -1190,8 +1196,28 @@ end
 Set the current refinement max_steps to `n`.
 """
 function set_max_refinement_iters!(T::CT, n)
-    @warn("`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+    @warn(
+        "`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
 end
+
+
+"""
+    start_parameters!(tracker::CoreTracker, p)
+
+Set the start parameters of the homotopy in in `tracker` to `p`.
+"""
+start_parameters!(tracker::CT, p::AbstractVector) =
+    (set_start_parameters!(basehomotopy(tracker.homotopy), p); tracker)
+
+"""
+    target_parameters!(tracker::CoreTracker, p)
+
+Set the target parameters of the homotopy in in `tracker` to `p`.
+"""
+target_parameters!(tracker::CT, p::AbstractVector) =
+    (set_target_parameters!(basehomotopy(tracker.homotopy), p); tracker)
+
 
 ################
 # PathIterator #
