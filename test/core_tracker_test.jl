@@ -27,7 +27,7 @@
         @test isa(current_x(t1), Vector)
         @test length(current_x(t1)) == 6
 
-        t3, start_sols = coretracker_startsolutions(F, predictor=Euler())
+        t3, start_sols = coretracker_startsolutions(F, predictor = Euler())
         @test t3.predictor isa HC.EulerCache
 
         @test_deprecated setup!(t1, first(start_sols), 1.0, 0.4)
@@ -54,7 +54,7 @@
 
     @testset "log_homotopy" begin
         F = equations(katsura(5))
-        log_tracker, start_sols = coretracker_startsolutions(F; log_homotopy=true)
+        log_tracker, start_sols = coretracker_startsolutions(F; log_homotopy = true)
         @test log_tracker.homotopy.homotopy isa HC.LogHomotopy
         @test log_tracker.options.logarithmic_time_scale
         @test is_success(track!(log_tracker, first(start_sols), 0.0, 32.0))
@@ -73,19 +73,32 @@
 
     @testset "Affine tracking" begin
         @polyvar x a y b
-        F = [x^2-a, x*y-a+b]
+        F = [x^2 - a, x * y - a + b]
         p = [a, b]
 
-        tracker, starts = coretracker_startsolutions(F, [1.0, 1.0 + 0.0*im], parameters=p, p₁=[1, 0], p₀=[2, 4],
-                    affine_tracking=true)
+        tracker, starts = coretracker_startsolutions(
+            F,
+            [1.0, 1.0 + 0.0 * im],
+            parameters = p,
+            p₁ = [1, 0],
+            p₀ = [2, 4],
+            affine_tracking = true,
+        )
         @test affine_tracking(tracker) == true
         res = track(tracker, starts[1], 1.0, 0.0)
         @test is_success(res)
         @test isa(res.x, Vector{ComplexF64})
         @test length(res.x) == 2
 
-        x = @SVector [1.0, 1.0 + 0.0*im]
-        tracker, starts = coretracker_startsolutions(F, x, parameters=p, p₁=[1, 0], p₀=[2, 4], affine_tracking=true)
+        x = @SVector [1.0, 1.0 + 0.0 * im]
+        tracker, starts = coretracker_startsolutions(
+            F,
+            x,
+            parameters = p,
+            p₁ = [1, 0],
+            p₀ = [2, 4],
+            affine_tracking = true,
+        )
         @test length(starts) == 1
         res = track(tracker, starts[1], 1.0, 0.0)
         @test isa(res.x, Vector{ComplexF64})
@@ -94,14 +107,18 @@
 
     @testset "Allocations" begin
         F = equations(cyclic(5))
-        tracker, start_sols = coretracker_startsolutions(F; seed=12356)
+        tracker, start_sols = coretracker_startsolutions(F; seed = 12356)
         s = first(start_sols)
         @allocated track!(tracker, s, 1.0, 0.01)
         # The path tracker should not allocate after the first tracked path
         @test (@allocated track!(tracker, s, 1.0, 0.01)) == 0
 
         # log homotopy as well
-        log_tracker, log_start_sols = coretracker_startsolutions(F; seed=12356, log_homotopy=true)
+        log_tracker, log_start_sols = coretracker_startsolutions(
+            F;
+            seed = 12356,
+            log_homotopy = true,
+        )
         log_s = first(log_start_sols)
         @allocated track!(log_tracker, log_s, 0.0, -log(0.01))
         # The path tracker should not allocate after the first tracked path
@@ -115,13 +132,13 @@
         @polyvar x[1:3]
         F = A * x - b
 
-        tracker, start_sols = coretracker_startsolutions(F; max_steps=10)
+        tracker, start_sols = coretracker_startsolutions(F; max_steps = 10)
         s = first(start_sols)
         result = track(tracker, s, 1.0, 0.0)
         @test is_success(result)
         @test result.t == 0.0
         x = result.x
-        @test norm(x - A \ b) < 1e-6
+        @test norm(x - A \ b) < 1e-6
 
         x_inter = copy(s)
         retcode = track!(x_inter, tracker, s, 1.0, 0.1)
@@ -131,25 +148,25 @@
         @test is_success(retcode)
         @test steps(tracker) < 3
         x = current_x(tracker)
-        @test norm(x - A \ b) < 1e-6
+        @test norm(x - A \ b) < 1e-6
     end
 
     @testset "FixedPatch continuation" begin
         F = homogenize(equations(katsura(5)))
         # test construction
-        tracker, start_sols = coretracker_startsolutions(F, patch=OrthogonalPatch())
+        tracker, start_sols = coretracker_startsolutions(F, patch = OrthogonalPatch())
         patch = tracker.state.patch
-        fixedtracker = coretracker(F, patch=FixedPatch())
+        fixedtracker = coretracker(F, patch = FixedPatch())
         fixedpatch = fixedtracker.state.patch
         x1 = first(start_sols)
 
         r1 = track(fixedtracker, x1, 1.0, 0.1)
         v1 = copy(fixedpatch.v̄)
-        track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=false)
+        track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch = false)
         @test v1 == fixedpatch.v̄
-        track!(fixedtracker, current_x(tracker), 0.05, 0.01, setup_patch=false)
+        track!(fixedtracker, current_x(tracker), 0.05, 0.01, setup_patch = false)
         @test v1 == fixedpatch.v̄
-        track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch=true)
+        track!(fixedtracker, r1.x, 0.1, 0.05, setup_patch = true)
         @test v1 != fixedpatch.v̄
 
         r1 = track(tracker, x1, 1.0, 0.1)
@@ -160,22 +177,22 @@
 
     @testset "coretracker_startsolutions" begin
         @polyvar x y
-        tracker, S = coretracker_startsolutions([x^2+y^2-4, x + y - 3])
+        tracker, S = coretracker_startsolutions([x^2 + y^2 - 4, x + y - 3])
         result = track(tracker, first(S), 1.0, 0.0)
         @test is_success(result)
 
         # test type promotion of startsolutions
-        tracker, S = coretracker_startsolutions([x^2+y^2-4, x + y - 3])
+        tracker, S = coretracker_startsolutions([x^2 + y^2 - 4, x + y - 3])
         result = track(tracker, [1, 1], 1.0, 0.0)
         @test is_success(result)
     end
 
     @testset "iterator" begin
         @polyvar x a y b
-        F = [x^2-a, x*y-a+b]
+        F = [x^2 - a, x * y - a + b]
         p = [a, b]
-        s = [1.0, 1.0 + 0.0*im]
-        tracker = coretracker(F, parameters=p, p₁=[1, 0], p₀=[2, 4])
+        s = [1.0, 1.0 + 0.0 * im]
+        tracker = coretracker(F, parameters = p, p₁ = [1, 0], p₀ = [2, 4])
         init!(tracker, s, 1.0, 0.0)
         for tr in tracker
             # nothing
@@ -183,8 +200,7 @@
         @test is_success(status(tracker))
 
         # path iterator
-        typeof(first(iterator(tracker, s, 1.0, 0.0))) ==
-            Tuple{Vector{ComplexF64}, Float64}
+        typeof(first(iterator(tracker, s, 1.0, 0.0))) == Tuple{Vector{ComplexF64},Float64}
 
         @test max_step_size(tracker) == Inf
         set_max_step_size!(tracker, 0.01)
@@ -194,7 +210,14 @@
 
         @polyvar x a
         f = [x - a]
-        ct = coretracker(f, [1.0], parameters=[a], p₁=[1.], p₀=[2.], max_step_size=0.1)
+        ct = coretracker(
+            f,
+            [1.0],
+            parameters = [a],
+            p₁ = [1.0],
+            p₀ = [2.0],
+            max_step_size = 0.1,
+        )
         Xs = Vector{ComplexF64}[]
         for (x, t) in iterator(ct, [1.0], 1.0, 0.0)
             push!(Xs, x)
