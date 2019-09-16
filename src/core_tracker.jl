@@ -259,6 +259,7 @@ mutable struct CoreTrackerState{
     norm::AN
     jacobian::JacobianMonitor{T}
     residual::Vector{Float64}
+    eval_error::Vector{Float64} # an estimate of evalation error
 
     steps_jacobian_info_update::Int
     status::CoreTrackerStatus
@@ -293,6 +294,7 @@ function CoreTrackerState(
     ω = 1.0
     JM = JacobianMonitor(jacobian(H, x, t₁))
     residual = zeros(first(size(H)))
+    eval_error = copy(residual)
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CT_TRACKING
@@ -313,6 +315,7 @@ function CoreTrackerState(
         norm,
         JM,
         residual,
+        eval_error,
         steps_jacobian_info_update,
         status,
         patch,
@@ -584,7 +587,8 @@ end
     tracker::CT,
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state),
-    norm::AbstractNorm = tracker.state.norm
+    norm::AbstractNorm = tracker.state.norm;
+    update_jacobian::Bool = false
 )
 
     limit_acc = limit_accuracy!(
@@ -595,9 +599,15 @@ end
         tracker.state.jacobian,
         norm,
         tracker.corrector;
-        accuracy = tracker.options.accuracy
+        accuracy = tracker.options.accuracy,
+        update_jacobian = update_jacobian
     )
+    tracker.state.accuracy = limit_acc
     tracker.state.limit_accuracy = limit_acc
+
+    cond!(tracker.state.jacobian, norm, tracker.state.residual)
+    copyto!(tracker.state.eval_error, tracker.state.residual)
+    apply_row_scaling!(tracker.state.eval_error, tracker.state.jacobian)
 end
 
 ####################
@@ -841,16 +851,21 @@ function step!(tracker::CT, debug::Bool = false)
         # If we use a weighted norm, now we update this
         update!(state.norm, x)
 
-        # TODO: THIS SHOULDN'T BE DONE IN EVERY STEP!
-        # Update informations regarding limit accuracy
-        limit_accuracy!(tracker)
+        # Compute the new tangent ẋ(t).
+        # We can avoid an update of the Jacobian since we already
+        # did this for limit_accuracy
+        compute_ẋ!(tracker;
+            # If limit accuracy doesn't update the jacobian this should be true
+            update_jacobian = true)
+
+        # Make an additional newton step to check the limiting accuracy
+        # We perform an update of the jacobian since we need
+        # to do this anyway for the computation of ẋ
+        limit_accuracy!(tracker; update_jacobian = false) # TODO: THIS SHOULDN'T BE DONE IN EVERY STEP!
 
         if debug
             println("limit_acc: ", round(state.limit_accuracy; sigdigits = 5))
         end
-
-        # Compute the new tangent ẋ(t)
-        compute_ẋ!(tracker)
 
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian)

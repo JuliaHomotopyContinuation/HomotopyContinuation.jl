@@ -127,10 +127,11 @@ end
         H::HomotopyWithCache, x t,
         JM::JacobianMonitor, norm, cache::NewtonCorrectorCache;
         accuracy::Float64 = 1e-6,
-        safety_margin::Float64 = 100,
+        safety_margin::Float64 = 1e2,
         update_jacobian::Bool = false)
 
-Obtain an estimate of the limiting accuracy of Newton's method.
+Obtain an estimate of the limiting accuracy of Newton's method
+and of the limiting residual.
 If `update_jacobian == true` a new Jacobian is computed, otherwise the currently stored
 Jacobian is used.
 The method first produces a single (simplified) Newton update `Δx`.
@@ -148,7 +149,7 @@ function limit_accuracy!(
     JM::JacobianMonitor,
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
-    accuracy::Float64 = 1e-6, safety_margin::Float64 = 100.0, update_jacobian::Bool = false
+    accuracy::Float64 = 1e-6, safety_margin::Float64 = 1e2, update_jacobian::Bool = false
 )
     @unpack Δx, r = cache
 
@@ -158,13 +159,24 @@ function limit_accuracy!(
     else
         evaluate!(r, H, x, t)
     end
+    # limit residual ≈ abs.(r) is
+    limit_res .= abs.(r)
+    
     # Update cond info etc?
     LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
-    x .= x .- Δx
+    x .-= Δx
 
-    # abs.(r) is ≈ limit residual
     limit_acc = Float64(norm(Δx))
-    limit_res .= abs.(r)
+
+    # accuracy is not yet sufficient, maybe this is just an artifact
+    # of the Newton step. So let's do another simplified Newton step
+    if accuracy / limit_acc < safety_margin
+        evaluate!(r, H, x, t)
+        # Update cond info etc?
+        LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
+        x .-= Δx
+        limit_acc = Float64(norm(Δx))
+    end
 
 
     return limit_acc

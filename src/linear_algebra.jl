@@ -778,54 +778,88 @@ function inf_norm_est(
     γ
 end
 
-function row_scaling!(WS::MatrixWorkspace{T}, norm::InfNorm) where T
-    d = WS.row_scaling
-    d .= zero(T)
-    m = length(d)
-    @inbounds for j = 1:size(WS.A, 2), i = 1:m
-        d[i] += abs(WS.A[i, j])
-    end
-    # Don't scale zero rows -> set dᵢ = 1 if too small
-    d_max_eps = sqrt(eps(min(maximum(d), one(T))))
-    @inbounds for i = 1:m
-        if d[i] < d_max_eps
-            d[i] = one(T)
-        end
-    end
-    d
-end
-function row_scaling(
+"""
+    row_scaling!(WS::MatrixWorkspace,
+        norm::Union{InfNorm, WeightedNorm{<:InfNorm}},
+        residual::Union{Nothing,AbstractVector{<:Real}} = nothing)
+
+Compute a suitable scaling `D` of the rows of `WS.A` and store it in `WS.row_scaling`.
+The returned scaling has the property that the from `norm` induced operator for `D⁻¹ * WS.A`
+is 1.
+The vector `residual` is a an optional vector containing the absolute values of the limiting
+residual of Newton's method. The scaling is performaned in such a way that `norm(residual)`
+is *not* increase. Unless the from `norm` induced operator norm is less than 1.
+Then the residual is increased by the minimal amount necessary.
+"""
+function row_scaling!(
     WS::MatrixWorkspace{T},
-    norm::WeightedNorm{<:InfNorm},
-    r::AbstractVector{<:Real}
+    norm::Union{InfNorm, WeightedNorm{<:InfNorm}},
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing
 ) where T
     d = WS.row_scaling
     d .= zero(T)
     m = length(d)
-    for j = 1:size(WS.A, 2), i = 1:m
-        d[i] += abs(WS.A[i, j]) * norm[j]
+    if isa(norm, WeightedNorm)
+        for j = 1:size(WS.A, 2), i = 1:m
+            d[i] += abs(WS.A[i, j]) * norm[j]
+        end
+    else
+        for j = 1:size(WS.A, 2), i = 1:m
+            d[i] += abs(WS.A[i, j])
+        end
     end
 
-    norm_r = r[1] * max(d[1], 1.0)
-    for i = 2:m
-        norm_r = max(norm_r, max(d[i], 1.0))
-    end
+    if r !== nothing
+        # d̂ = clamp(maximum(d), 1e-4, 1.0)
+        d̂ = 1e-4
+        for dᵢ in d
+            dᵢ ≥ 1.0 && (d̂ = 1.0; break)
+            d̂ = max(d̂, dᵢ)
+        end
 
-    d .= max.(d, r ./ norm_r)
+        # compute the norm of r under the scaling of all rows whose norm is larger
+        # than d̂, i.e. all rows that either decrease the value of |rᵢ| or
+        # or increase it by the minimal abount to still have opnorm 1.
+        norm_scaled_r = r[1] / max(d[1], d̂)
+        for i = 2:m
+            norm_scaled_r = max(norm_scaled_r, r[i] / max(d[i], d̂))
+        end
+
+        d .= max.(d, r ./ norm_scaled_r)
+    else
+        # Don't scale zero rows -> set dᵢ = 1 if too small
+        d_max_eps = sqrt(eps(min(maximum(d), one(T))))
+        @inbounds for i = 1:m
+            if d[i] < d_max_eps
+                d[i] = one(T)
+            end
+        end
+    end
+    d
 end
 
 """
-    scaled_cond(WS::MatrixWorkspace)
+    scaled_cond!(WS::MatrixWorkspace, norm, residual)
 
-Compute the condition number ``κ`` of the row-equilibrated matrix `WS.A`.
+Perform first a row scaling as described by [`row_scaling!`](@ref) and then
+compute the condition number ``κ`` of the row-equilibrated matrix `WS.A`.
 This is the best possible condition number under row scaling (e.g. [Higham02, Thm 7.5]).
 
 [Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
 """
-function scaled_cond(WS::MatrixWorkspace, norm::Union{<:WeightedNorm{<:InfNorm},InfNorm})
-    d = row_scaling!(WS, norm)
+function scaled_cond!(
+    WS::MatrixWorkspace,
+    norm::Union{<:WeightedNorm{<:InfNorm},InfNorm},
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing
+)
+    d = row_scaling!(WS, norm, r)
     # row scaling makes ||A||_∞ = 1 so we don't this here
-    inf_norm_est(WS, d)
+    if (norm isa WeightedNorm)
+        cond_est = inf_norm_est(WS, d, weights(norm))
+    else
+        cond_est = inf_norm_est(WS, d)
+    end
+    cond_est
 end
 
 #####################
@@ -953,22 +987,31 @@ function strong_forward_err!(
 end
 
 """
-    cond!(JM::JacobianMonitor)
+    cond!(JM::JacobianMonitor, norm, residual)
 
 Compute the condition number ``κ`` of the Jacobian ``J`` with respect to the
 infinity norm and store it. If ``J`` is a square matrix the condition number of the
-row-equilibrated is computed.
-This is the best possible condition number under row scaling (e.g. [Higham02, Thm 7.5]).
-
-[Higham02]: Higham, Nicholas J. Accuracy and stability of numerical algorithms. Vol. 80. Siam, 200
+row-equilibrated Jacobian is computed. See [`scaled_cond!`](@ref) for details.
 """
-function cond!(JM::JacobianMonitor, norm::AbstractNorm = InfNorm())
+function cond!(
+    JM::JacobianMonitor,
+    norm::AbstractNorm = InfNorm(),
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing
+)
     if jacobian(JM).fact[] == LU_FACT
-        JM.cond[] = scaled_cond(jacobian(JM), norm)
+        JM.cond[] = scaled_cond!(jacobian(JM), norm, r)
     else
+        # TODO: The weighted norm is NOT considered currently.
         JM.cond[] = inv(rcond(jacobian(JM)))
     end
 end
+
+"""
+    apply_row_scaling!(r, JM::JacobianMonitor)
+
+Apply the computed row scaling used in [`cond!`](@ref) resp. [`scaled_cond!`](@ref) to `r`.
+"""
+apply_row_scaling!(r::AbstractVector, JM::JacobianMonitor) = (r ./= JM.J.row_scaling; r)
 
 """
     cond(JM::JacobianMonitor)
