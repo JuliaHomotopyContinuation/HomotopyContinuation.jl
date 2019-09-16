@@ -30,9 +30,12 @@ struct WeightedNormOptions
     scale_abs_min::Float64
     scale_max::Float64
 end
-function WeightedNormOptions(;scale_min=0.001,
-                             scale_abs_min=min(scale_min^2, 200 * sqrt(eps())),
-                             scale_max=1.0 / eps() / sqrt(2))
+function WeightedNormOptions(
+    ;
+    scale_min = 0.001,
+    scale_abs_min = min(scale_min^2, 200 * sqrt(eps())),
+    scale_max = 1.0 / eps() / sqrt(2),
+)
     WeightedNormOptions(scale_min, scale_abs_min, scale_max)
 end
 Base.show(io::IO, opts::WeightedNormOptions) = print_fieldnames(io, opts)
@@ -52,7 +55,8 @@ end
 function WeightedNorm(weights::Vector{Float64}, norm::AbstractNorm; opts...)
     WeightedNorm(weights, norm, WeightedNormOptions(opts...))
 end
-WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) = WeightedNorm(norm, length(x); opts...)
+WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
+    WeightedNorm(norm, length(x); opts...)
 WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), norm; opts...)
 
 (N::WeightedNorm)(x::AbstractVector) = LinearAlgebra.norm(x, N)
@@ -69,7 +73,8 @@ Base.length(WN::WeightedNorm) = length(WN.weights)
 Base.size(WN::WeightedNorm) = (length(WN),)
 Base.copyto!(WN::WeightedNorm, x) = copyto!(WN.weights, x)
 @propagate_inbounds Base.getindex(WN::WeightedNorm, i::Integer) = getindex(WN.weights, i)
-@propagate_inbounds Base.setindex!(WN::WeightedNorm, x, i::Integer) = setindex!(WN.weights, x, i)
+@propagate_inbounds Base.setindex!(WN::WeightedNorm, x, i::Integer) =
+    setindex!(WN.weights, x, i)
 
 
 """
@@ -79,7 +84,7 @@ Setup the weighted norm `w` for `x`.
 """
 function init!(w::WeightedNorm, x::AbstractVector)
     point_norm = w.norm(x)
-    for i in 1:length(w)
+    for i = 1:length(w)
         wᵢ = abs(x[i])
         if wᵢ < w.options.scale_min * point_norm
             wᵢ = w.options.scale_min * point_norm
@@ -100,7 +105,7 @@ and the norm of `x`.
 """
 function update!(w::WeightedNorm, x::AbstractVector)
     norm_x = w(x)
-    for i in 1:length(x)
+    for i = 1:length(x)
         wᵢ = (abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
@@ -129,7 +134,7 @@ function distance(x::AbstractVector, y::AbstractVector, ::EuclideanNorm)
     n = length(x)
     @boundscheck n == length(y)
     @inbounds d = abs2(x[1] - y[1])
-    for i in 2:n
+    for i = 2:n
         @inbounds d += abs2(x[i] - y[i])
     end
     sqrt(d)
@@ -137,7 +142,7 @@ end
 function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{EuclideanNorm})
     @boundscheck length(w) == length(x) == length(y)
     @inbounds d = abs2(x[1] - y[1]) / (w[1]^2)
-    for i in 2:length(x)
+    for i = 2:length(x)
         @inbounds d += abs2(x[i] - y[i]) / (w[i]^2)
     end
     sqrt(d)
@@ -146,7 +151,7 @@ end
 function LinearAlgebra.norm(x::AbstractVector, ::EuclideanNorm)
     n = length(x)
     @inbounds d = abs2(x[1])
-    for i in 2:n
+    for i = 2:n
         @inbounds d += abs2(x[i])
     end
     sqrt(d)
@@ -154,7 +159,7 @@ end
 function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{EuclideanNorm})
     @boundscheck length(w) == length(x)
     @inbounds out = abs2(x[1]) / (w[1]^2)
-    for i in 2:length(x)
+    for i = 2:length(x)
         @inbounds out += abs2(x[i]) / (w[i]^2)
     end
     sqrt(out)
@@ -173,7 +178,7 @@ function distance(x::AbstractVector, y::AbstractVector, ::InfNorm)
     n = length(x)
     @boundscheck n == length(y)
     @inbounds dmax = abs2(x[1] - y[1])
-    for i in 2:n
+    for i = 2:n
         @inbounds dᵢ = abs2(x[i] - y[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
@@ -183,7 +188,7 @@ function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm}
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2(x[1] - y[1]) / (w[1]^2)
-    for i in 2:n
+    for i = 2:n
         @inbounds dᵢ = abs2(x[i] - y[i]) / (w[i]^2)
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
@@ -193,7 +198,7 @@ end
 function LinearAlgebra.norm(x::AbstractVector, ::InfNorm)
     n = length(x)
     @inbounds dmax = abs2(x[1])
-    for i in 2:n
+    for i = 2:n
         @inbounds dᵢ = abs2(x[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
@@ -203,7 +208,7 @@ function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2(x[1]) / (w[1]^2)
-    for i in 2:n
+    for i = 2:n
         @inbounds dᵢ = abs2(x[i]) / (w[i]^2)
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end

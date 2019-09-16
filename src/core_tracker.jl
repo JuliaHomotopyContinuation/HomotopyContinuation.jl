@@ -51,7 +51,7 @@ const coretracker_supported_keywords = [
     :log_transform,
     :precision,
     :steps_jacobian_info_update,
-    :max_lost_digits
+    :max_lost_digits,
 ]
 
 
@@ -133,7 +133,7 @@ function CoreTrackerResult(tracker)
         state.segment[state.s],
         state.accuracy,
         state.accepted_steps,
-        state.rejected_steps
+        state.rejected_steps,
     )
 end
 
@@ -195,7 +195,7 @@ function CoreTrackerOptions(
     steps_jacobian_info_update::Int = 3,
     terminate_ill_conditioned::Bool = true,
     update_patch = true,
-    logarithmic_time_scale = false
+    logarithmic_time_scale = false,
 )
 
     CoreTrackerOptions(
@@ -213,7 +213,7 @@ function CoreTrackerOptions(
         terminate_ill_conditioned,
         steps_jacobian_info_update,
         precision,
-        logarithmic_time_scale
+        logarithmic_time_scale,
     )
 end
 
@@ -240,7 +240,7 @@ mutable struct CoreTrackerState{
     T,
     AV<:AbstractVector{Complex{T}},
     AN<:AbstractNorm,
-    MaybePatchState<:Union{AbstractAffinePatchState,Nothing}
+    MaybePatchState<:Union{AbstractAffinePatchState,Nothing},
 }
     x::AV # current x
     x̂::AV # last prediction
@@ -278,7 +278,7 @@ function CoreTrackerState(
     t₀,
     options::CoreTrackerOptions,
     patch::Union{Nothing,AbstractAffinePatchState},
-    norm::AbstractNorm
+    norm::AbstractNorm,
 )
     x = isa(x₁, SVector) ? Vector(x₁) : copy(x₁)
     x̂, x̄ = copy(x), copy(x)
@@ -287,7 +287,7 @@ function CoreTrackerState(
     s = 0.0
     Δs = convert(
         Float64,
-        min(options.initial_step_size, length(segment), options.max_step_size)
+        min(options.initial_step_size, length(segment), options.max_step_size),
     )
     Δs_prev = 0.0
     accuracy = limit_accuracy = 0.0
@@ -322,7 +322,7 @@ function CoreTrackerState(
         accepted_steps,
         rejected_steps,
         last_step_failed,
-        consecutive_successfull_steps
+        consecutive_successfull_steps,
     )
 end
 
@@ -364,7 +364,7 @@ struct CoreTracker{
     AN<:AbstractNorm,
     P<:AbstractPredictorCache,
     AP<:Union{Nothing,AbstractAffinePatchState},
-    H<:HomotopyWithCache
+    H<:HomotopyWithCache,
 }
     homotopy::H
     predictor::P
@@ -380,7 +380,8 @@ function CoreTracker(
     prob::AbstractProblem,
     x₁;
     log_homotopy::Bool = false,
-    logarithmic_time_scale = nothing, kwargs...
+    logarithmic_time_scale = nothing,
+    kwargs...,
 )
     if log_homotopy
         H = LogHomotopy(prob.homotopy)
@@ -390,7 +391,8 @@ function CoreTracker(
             complex(0.0),
             complex(36.0),
             prob;
-            logarithmic_time_scale = unpack(logarithmic_time_scale, true), kwargs...
+            logarithmic_time_scale = unpack(logarithmic_time_scale, true),
+            kwargs...,
         )
     else
         CoreTracker(
@@ -400,7 +402,7 @@ function CoreTracker(
             complex(0.0),
             prob;
             logarithmic_time_scale = unpack(logarithmic_time_scale, false),
-            kwargs...
+            kwargs...,
         )
     end
 end
@@ -417,14 +419,15 @@ function CoreTracker(
     predictor::AbstractPredictor = default_predictor(x₁),
     auto_scaling::Bool = true,
     norm::AbstractNorm = InfNorm(),
-    kwargs...
+    kwargs...,
 )
 
     patch === nothing || throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
 
     options = CoreTrackerOptions(
         ;
-        parameter_homotopy = isa(homotopy, ParameterHomotopy), kwargs...
+        parameter_homotopy = isa(homotopy, ParameterHomotopy),
+        kwargs...,
     )
 
     # We close over the homotopy and its cache to be able to pass things around more easily
@@ -439,7 +442,7 @@ function CoreTracker(
         t₀,
         options,
         nothing,
-        used_norm
+        used_norm,
     )
 
     pred_cache = cache(predictor, H, state.x, state.ẋ, t₁)
@@ -463,12 +466,13 @@ function CoreTracker(
     auto_scaling::Bool = true,
     norm::AbstractNorm = InfNorm(),
     simple_step_size_alg = !isa(patch, EmbeddingPatch),
-    kwargs...
+    kwargs...,
 )
 
     options = CoreTrackerOptions(
         ;
-        parameter_homotopy = isa(homotopy, ParameterHomotopy), kwargs...
+        parameter_homotopy = isa(homotopy, ParameterHomotopy),
+        kwargs...,
     )
 
     if homotopy isa PatchedHomotopy
@@ -494,7 +498,7 @@ function CoreTracker(
         t₀,
         options,
         patch_state,
-        used_norm
+        used_norm,
     )
 
     pred_cache = cache(predictor, H, ct_state.x, ct_state.ẋ, t₁)
@@ -568,7 +572,7 @@ end
     x̄::AbstractVector,
     tracker::CT,
     x::AbstractVector = tracker.state.x,
-    t::Number = current_t(tracker.state)
+    t::Number = current_t(tracker.state),
 )
 
     newton!(
@@ -579,7 +583,8 @@ end
         tracker.state.jacobian,
         tracker.state.norm,
         tracker.corrector;
-        tol = tracker.options.accuracy, max_iters = tracker.options.max_corrector_iters + 1
+        tol = tracker.options.accuracy,
+        max_iters = tracker.options.max_corrector_iters + 1,
     )
 end
 
@@ -588,7 +593,7 @@ end
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state),
     norm::AbstractNorm = tracker.state.norm;
-    update_jacobian::Bool = false
+    update_jacobian::Bool = false,
 )
 
     limit_acc = limit_accuracy!(
@@ -600,7 +605,7 @@ end
         norm,
         tracker.corrector;
         accuracy = tracker.options.accuracy,
-        update_jacobian = update_jacobian
+        update_jacobian = update_jacobian,
     )
     tracker.state.accuracy = limit_acc
     tracker.state.limit_accuracy = limit_acc
@@ -651,7 +656,7 @@ function init!(
     t₀;
     setup_patch::Bool = tracker.options.update_patch,
     loop::Bool = false,
-    check_start_value::Bool = !loop
+    check_start_value::Bool = !loop,
 )
     @unpack state, predictor, homotopy = tracker
 
@@ -671,7 +676,7 @@ function init!(
     t₀,
     options::CTO,
     setup_patch::Bool,
-    loop::Bool
+    loop::Bool,
 )
     state.segment = ComplexSegment(t₁, t₀)
     state.s = 0.0
@@ -700,7 +705,7 @@ end
     x₁,
     t₁,
     t₀;
-    kwargs...
+    kwargs...,
 )
 
 ##############
@@ -742,7 +747,7 @@ function track!(
     setup_patch::Bool = tracker.options.update_patch,
     loop::Bool = false,
     check_start_value::Bool = !loop,
-    debug::Bool = false
+    debug::Bool = false,
 )
 
     _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
@@ -760,7 +765,7 @@ function track!(
     setup_patch::Bool = tracker.options.update_patch,
     loop::Bool = false,
     check_start_value::Bool = !loop,
-    debug::Bool = false
+    debug::Bool = false,
 )
 
     _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
@@ -774,7 +779,7 @@ end
     setup_patch::Bool,
     loop::Bool,
     check_start_value::Bool,
-    debug::Bool
+    debug::Bool,
 )
 
     @unpack state = tracker
@@ -786,7 +791,9 @@ end
         x₁,
         t₁,
         t₀;
-        setup_patch = setup_patch, check_start_value = check_start_value, loop = loop
+        setup_patch = setup_patch,
+        check_start_value = check_start_value,
+        loop = loop,
     )
 
     while is_tracking(state.status)
@@ -820,7 +827,7 @@ function step!(tracker::CT, debug::Bool = false)
         " Δt: ",
         round(Δt; sigdigits = 5),
         "\n";
-        color = :yellow
+        color = :yellow,
     )
 
     # Use the current approximation of x(t) to obtain estimate
@@ -854,9 +861,11 @@ function step!(tracker::CT, debug::Bool = false)
         # Compute the new tangent ẋ(t).
         # We can avoid an update of the Jacobian since we already
         # did this for limit_accuracy
-        compute_ẋ!(tracker;
+        compute_ẋ!(
+            tracker;
             # If limit accuracy doesn't update the jacobian this should be true
-            update_jacobian = true)
+            update_jacobian = true,
+        )
 
         # Make an additional newton step to check the limiting accuracy
         # We perform an update of the jacobian since we need
@@ -942,7 +951,7 @@ function adaptive_step_size_alg!(
     state::CTS,
     options::CTO,
     result::NewtonCorrectorResult,
-    ord::Int
+    ord::Int,
 )
     @unpack s, ω = state
 
@@ -1004,7 +1013,7 @@ function refine!(tracker::CT, accuracy = tracker.options.refinement_accuracy)
     nothing
 end
 
-function Base.iterate(tracker::CoreTracker, state::Union{Nothing,Int}=nothing)
+function Base.iterate(tracker::CoreTracker, state::Union{Nothing,Int} = nothing)
     state === nothing && return tracker, 1
 
     if is_tracking(tracker.state.status)

@@ -84,7 +84,7 @@ function MatrixWorkspace(Â::AbstractMatrix, ::Type{T}) where {T}
         qr_cond_rwork,
         inf_norm_est_work,
         inf_norm_est_rwork,
-        row_scaling
+        row_scaling,
     )
 end
 
@@ -154,7 +154,7 @@ function lu!(
     A::AbstractMatrix{T},
     b::Union{AbstractVector,Nothing} = nothing,
     ipiv::Union{Vector{I},Nothing} = nothing,
-    ::Val{Pivot} = Val(true)
+    ::Val{Pivot} = Val(true),
 ) where {T,I<:Integer,Pivot}
     m, n = size(A)
     minmn = min(m, n)
@@ -228,7 +228,7 @@ function geqp3!(
     jpvt::AbstractVector{BlasInt},
     tau::AbstractVector{ComplexF64},
     work::Vector{ComplexF64},
-    rwork = Vector{Float64}(undef, 2 * size(A, 2))
+    rwork = Vector{Float64}(undef, 2 * size(A, 2)),
 )
     m, n = size(A)
     lda = stride(A, 2)
@@ -250,7 +250,7 @@ function geqp3!(
              Ptr{ComplexF64},
              Ref{BlasInt},
              Ptr{Float64},
-             Ptr{BlasInt}
+             Ptr{BlasInt},
             ),
             m,
             n,
@@ -261,7 +261,7 @@ function geqp3!(
             work,
             lwork,
             rwork,
-            info
+            info,
         )
         LA.LAPACK.chklapackerror(info[])
         if i == 1
@@ -317,7 +317,7 @@ end
     A::AbstractMatrix,
     b::AbstractVector,
     x::AbstractVector = b;
-    singular_exception::Bool = false
+    singular_exception::Bool = false,
 )
     n = size(A, 2)
     @inbounds for j = n:-1:1
@@ -333,7 +333,7 @@ end
 @inline function ldiv_unit_lower!(
     A::AbstractMatrix,
     b::AbstractVector,
-    x::AbstractVector = b
+    x::AbstractVector = b,
 )
     n = size(A, 2)
     @inbounds for j = 1:n
@@ -370,7 +370,7 @@ function ldiv_adj_upper!(
     A::AbstractMatrix,
     b::AbstractVector,
     x::AbstractVector = b;
-    singular_exception::Bool = false
+    singular_exception::Bool = false,
 )
     n = size(A, 1)
     @inbounds for j = 1:n
@@ -407,7 +407,7 @@ function ormqr!(
     A::Matrix{ComplexF64},
     tau::Vector{ComplexF64},
     C::Vector{ComplexF64},
-    work::Vector{ComplexF64}
+    work::Vector{ComplexF64},
 )
     m, n = (size(C, 1), 1)
     mA = size(A, 1)
@@ -431,7 +431,7 @@ function ormqr!(
              Ref{BlasInt},
              Ptr{ComplexF64},
              Ref{BlasInt},
-             Ptr{BlasInt}
+             Ptr{BlasInt},
             ),
             side,
             trans,
@@ -445,7 +445,7 @@ function ormqr!(
             max(1, stride(C, 2)),
             work,
             lwork,
-            info
+            info,
         )
         LA.LAPACK.chklapackerror(info[])
         if i == 1
@@ -535,7 +535,7 @@ function residual!(
     A::AbstractMatrix{S},
     x::AbstractVector{S},
     b::AbstractVector{S},
-    ::Type{T} = eltype(u)
+    ::Type{T} = eltype(u),
 ) where {S,T}
     @boundscheck size(A, 1) == length(b) && size(A, 2) == length(x)
     m, n = size(A)
@@ -571,7 +571,7 @@ function iterative_refinement_step!(
     x̂,
     b,
     norm::AbstractNorm = InfNorm(),
-    ::Type{T} = eltype(x̂)
+    ::Type{T} = eltype(x̂),
 ) where T
     residual!(WS.ir_r, WS.A, x̂, b, T)
     δx = LA.ldiv!(WS.ir_δx, WS, WS.ir_r)
@@ -622,7 +622,7 @@ function rcond(LU::LA.LU, anorm, work, rwork)
          Ref{Float64},
          Ptr{ComplexF64},
          Ptr{Float64},
-         Ptr{Int64}
+         Ptr{Int64},
         ),
         'I',
         n,
@@ -632,7 +632,7 @@ function rcond(LU::LA.LU, anorm, work, rwork)
         rcond,
         work,
         rwork,
-        info
+        info,
     )
     rcond[]
 end
@@ -655,7 +655,7 @@ function rcond(qr::LA.QRPivoted, work, rwork)
          Ref{Float64},
          Ptr{ComplexF64},
          Ptr{Float64},
-         Ptr{BlasInt}
+         Ptr{BlasInt},
         ),
         'I',
         'U',
@@ -666,7 +666,7 @@ function rcond(qr::LA.QRPivoted, work, rwork)
         rcond,
         work,
         rwork,
-        info
+        info,
     )
     if m == n
         # Q has condition number 1 in the 2 norm
@@ -693,7 +693,7 @@ This uses the 1-norm lapack condition estimator described by Highahm in [^H88].
 function inf_norm_est(
     lu::LA.LU,
     g::Union{Nothing,Vector{<:Real}} = nothing,
-    d::Union{Nothing,Vector{<:Real}} = nothing
+    d::Union{Nothing,Vector{<:Real}} = nothing,
 )
     n = size(lu.factors, 2)
     work = Vector{eltype(lu.factors)}(undef, n)
@@ -703,7 +703,7 @@ end
 function inf_norm_est(
     WS::MatrixWorkspace,
     g::Union{Nothing,Vector{<:Real}} = nothing,
-    d::Union{Nothing,Vector{<:Real}} = nothing
+    d::Union{Nothing,Vector{<:Real}} = nothing,
 )
     WS.fact[] == LU_FACT || factorization!(WS, LU_FACT)
     WS.factorized[] || factorize!(WS)
@@ -714,7 +714,7 @@ function inf_norm_est(
     g::Union{Nothing,Vector{<:Real}},
     d::Union{Nothing,Vector{<:Real}},
     work::Vector{<:Complex},
-    rwork::Vector{<:Real}
+    rwork::Vector{<:Real},
 )
     z = ξ = y = work
     x = rwork
@@ -793,8 +793,8 @@ Then the residual is increased by the minimal amount necessary.
 """
 function row_scaling!(
     WS::MatrixWorkspace{T},
-    norm::Union{InfNorm, WeightedNorm{<:InfNorm}},
-    r::Union{Nothing,AbstractVector{<:Real}} = nothing
+    norm::Union{InfNorm,WeightedNorm{<:InfNorm}},
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing,
 ) where T
     d = WS.row_scaling
     d .= zero(T)
@@ -850,7 +850,7 @@ This is the best possible condition number under row scaling (e.g. [Higham02, Th
 function scaled_cond!(
     WS::MatrixWorkspace,
     norm::Union{<:WeightedNorm{<:InfNorm},InfNorm},
-    r::Union{Nothing,AbstractVector{<:Real}} = nothing
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing,
 )
     d = row_scaling!(WS, norm, r)
     # row scaling makes ||A||_∞ = 1 so we don't this here
@@ -921,7 +921,7 @@ function forward_err!(
     x̂::AbstractVector,
     b::AbstractVector,
     norm::AbstractNorm,
-    T = eltype(x̂)
+    T = eltype(x̂),
 )
     forward_err!(x̂, JM, x̂, b, norm, T)
 end
@@ -931,7 +931,7 @@ function forward_err!(
     x̂::AbstractVector,
     b::AbstractVector,
     norm::AbstractNorm,
-    T = eltype(x̂)
+    T = eltype(x̂),
 )
     norm_x̂ = norm(x̂)
     JM.forward_err[] = iterative_refinement_step!(x, JM.J, x̂, b, norm, T) / norm_x̂
@@ -951,7 +951,7 @@ function strong_forward_err!(
     x̂::AbstractVector,
     b::AbstractVector,
     norm::InfNorm,
-    T = eltype(x̂)
+    T = eltype(x̂),
 )
     strong_forward_err!(x̂, JM, x̂, b, norm, T)
 end
@@ -961,7 +961,7 @@ function strong_forward_err!(
     x̂::AbstractVector,
     b::AbstractVector,
     norm::Union{InfNorm,WeightedNorm{InfNorm}},
-    T = eltype(x̂)
+    T = eltype(x̂),
 )
     if jacobian(JM).fact[] == QR_FACT
         return JM.forward_err[] = forward_err!(x, JM, x̂, b, norm)
@@ -996,7 +996,7 @@ row-equilibrated Jacobian is computed. See [`scaled_cond!`](@ref) for details.
 function cond!(
     JM::JacobianMonitor,
     norm::AbstractNorm = InfNorm(),
-    r::Union{Nothing,AbstractVector{<:Real}} = nothing
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing,
 )
     if jacobian(JM).fact[] == LU_FACT
         JM.cond[] = scaled_cond!(jacobian(JM), norm, r)
@@ -1052,7 +1052,7 @@ function LA.ldiv!(
     JM::JacobianMonitor,
     b::AbstractVector,
     norm::AbstractNorm = InfNorm(),
-    update::JacobianMonitorUpdates = JAC_MONITOR_UPDATE_NOTHING
+    update::JacobianMonitorUpdates = JAC_MONITOR_UPDATE_NOTHING,
 )
     # stats update
     JM.factorizations[] += !jacobian(JM).factorized[]
