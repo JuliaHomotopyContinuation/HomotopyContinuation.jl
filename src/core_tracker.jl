@@ -301,7 +301,7 @@ function CoreTrackerState(
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CT_TRACKING
-    last_step_failed = false
+    last_step_failed = true
     consecutive_successfull_steps = 0
     CoreTrackerState(
         x,
@@ -573,7 +573,7 @@ end
     x̄::AbstractVector,
     tracker::CT,
     x::AbstractVector = tracker.state.x,
-    t::Number = current_t(tracker.state),
+    t::Number = current_t(tracker.state)
 )
 
     newton!(
@@ -631,8 +631,26 @@ function check_start_value(tracker::CT, x, t)
 end
 
 function check_start_value!(tracker::CT)
-    result = correct!(tracker.state.x̄, tracker)
+    # We perturb the provided soution by sligthly more than the desired accuracy
+    # to check that the Newton iteration converges properly and to obtain an estimate
+    # of ω
+    Δ = 10 * tracker.options.accuracy
+    tracker.state.x̄ .= tracker.state.x .+ Δ
+
+    result = newton!(
+        tracker.state.x̄,
+        tracker.homotopy,
+        tracker.state.x̄,
+        current_t(tracker.state),
+        tracker.state.jacobian,
+        tracker.state.norm,
+        tracker.corrector;
+        tol = tracker.options.accuracy,
+        max_iters = 2,
+        simplified_last_step = false,
+    )
     if is_converged(result)
+        tracker.state.ω = result.ω₀
         tracker.state.x .= tracker.state.x̄
     else
         tracker.state.status = CT_TERMINATED_INVALID_STARTVALUE
@@ -662,10 +680,11 @@ function init!(
     @unpack state, predictor, homotopy = tracker
 
     init!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop)
-    check_start_value && check_start_value!(tracker)
     if !loop
-        compute_ẋ!(tracker; update_jacobian = true)
+        check_start_value!(tracker)
+        compute_ẋ!(tracker; update_jacobian = false)
         init!(predictor, homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
+        initial_step_size!(state, predictor, tracker.options)
     end
     tracker
 end
@@ -681,12 +700,11 @@ function init!(
 )
     state.segment = ComplexSegment(t₁, t₀)
     state.s = 0.0
-    state.Δs = min(options.initial_step_size, length(state.segment), options.max_step_size)
     state.Δs_prev = 0.0
     state.status = CT_TRACKING
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && init!(state.patch, state.x)
-    state.last_step_failed = false
+    state.last_step_failed = true
     state.consecutive_successfull_steps = 0
     if !loop
         state.accuracy = 0.0
@@ -877,18 +895,41 @@ function step!(tracker::CT, debug::Bool = false)
         # Update other state
         state.accepted_steps += 1
         state.steps_jacobian_info_update += 1
+        state.last_step_failed = false
     else
         # Step failed, so we have to try with a new (smaller) step size
         update_stepsize!(tracker, result)
 
         # Update other state
         state.rejected_steps += 1
+        state.last_step_failed = true
     end
-    state.last_step_failed = !is_converged(result)
 
     check_terminated!(state, options)
 
     state.last_step_failed
+end
+
+###############
+## STEP SIZE ##
+###############
+
+## intial step size
+function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, options::CTO)
+    ω = max(state.ω, 1e-8)
+    p = order(predictor)
+    ẍ = second_derivative(predictor)
+    if ẍ !== nothing
+        η = √(0.5 * state.norm(ẍ))^p
+    else
+        η = state.norm(state.ẋ)^p
+    end
+    δ_N_ω = δ(options, ω, options.max_corrector_iters / 2)
+    Δs = nthroot(g(δ_N_ω) / (ω * η), p)
+    if isnan(Δs)
+        Δs = 0.05 * length(state.segment)
+    end
+    state.Δs = min(Δs, length(state.segment), options.max_step_size)
 end
 
 ## Step size update
@@ -960,10 +1001,13 @@ function adaptive_step_size_alg!(
     if is_converged(result)
         # This is to handle the edge case that g(δ_N_ω) >> (ω * d_x̂_x̄) > 0 but
         # at the same time δ_N_ω < eps(). Since then g(δ_N_ω) = 0
-        δ_N_ω = max(δ(options, ω, 0.5), 1e-15)
+        δ_N_ω = max(δ(options, ω, options.max_corrector_iters / 4), 1e-15)
         Δs = nthroot(g(δ_N_ω) / (ω * d_x̂_x), ord) * state.Δs
+        if state.last_step_failed
+            Δs = min(Δs, state.Δs)
+        end
     else
-        δ_N_ω = δ(options, ω, 0.5)
+        δ_N_ω = δ(options, ω, options.max_corrector_iters / 4)
         ω_η = 0.5ω * Δx₀
         if δ_N_ω < ω_η
             Δs = min(nthroot(g(δ_N_ω) / g(ω_η), ord), 0.9) * state.Δs
@@ -999,9 +1043,7 @@ function check_terminated!(state::CTS, options::CTO)
 end
 
 
-function Base.iterate(tracker::CoreTracker, state::Union{Nothing,Int} = nothing)
-    state === nothing && return tracker, 1
-
+function Base.iterate(tracker::CoreTracker, state::Int = 0)
     if is_tracking(tracker.state.status)
         step!(tracker)
         tracker, state + 1

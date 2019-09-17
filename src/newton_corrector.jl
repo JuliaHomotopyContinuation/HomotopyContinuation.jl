@@ -52,7 +52,10 @@ function newton!(
     JM::JacobianMonitor,
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
-    tol::Float64 = 1e-6, max_iters::Int = 3, debug::Bool = false
+    tol::Float64 = 1e-6,
+    max_iters::Int = 3,
+    debug::Bool = false,
+    simplified_last_step::Bool = true,
 )
 
     # Setup values
@@ -66,7 +69,7 @@ function newton!(
     for i ∈ 1:max_iters
         debug && println("i = ", i)
 
-        compute_jacobian = i == 1 || i < max_iters
+        compute_jacobian = !simplified_last_step || i == 1 || i < max_iters
         if compute_jacobian
             evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
             updated!(JM)
@@ -99,7 +102,7 @@ function newton!(
             θ = norm_Δxᵢ / norm_Δxᵢ₋₁
             ω = max(ω, 2θ / norm_Δxᵢ₋₁)
         end
-        acc = norm_Δxᵢ / (1.0 - min(0.5, 2θ^2))
+        acc = norm_Δxᵢ / (1.0 - min(0.5, 2 * θ^2))
         if acc ≤ tol
             return NewtonCorrectorResult(NEWT_CONVERGED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
         end
@@ -116,7 +119,7 @@ function newton!(
         ω,
         θ₀,
         θ,
-        norm_Δx₀
+        norm_Δx₀,
     )
 end
 
@@ -149,7 +152,9 @@ function limit_accuracy!(
     JM::JacobianMonitor,
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
-    accuracy::Float64 = 1e-6, safety_margin::Float64 = 1e2, update_jacobian::Bool = false
+    accuracy::Float64 = 1e-6,
+    safety_margin::Float64 = 1e2,
+    update_jacobian::Bool = false,
 )
     @unpack Δx, r = cache
 
@@ -161,7 +166,7 @@ function limit_accuracy!(
     end
     # limit residual ≈ abs.(r) is
     limit_res .= abs.(r)
-    
+
     # Update cond info etc?
     LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
     x .-= Δx
