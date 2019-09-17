@@ -33,7 +33,7 @@ function test_predictor(PREDICTOR, CACHE)
     @test predictor_cache isa CACHE
     # check that this doesn't throw
     HC.update!(predictor_cache, H, x, ẋ, t, Jac)
-    @test_nowarn predict!(xnext, predictor_cache, H, x, t, 0.05, ẋ, Jac)
+    @test_nowarn HC.predict!(xnext, predictor_cache, H, x, t, 0.05, ẋ, Jac)
 
 
     H, x, xnext, t, ẋ, Jac = setup_overdetermined_prediction_test()
@@ -44,7 +44,7 @@ function test_predictor(PREDICTOR, CACHE)
     @test predictor_cache isa CACHE
     # check that this doesn't throw
     HC.update!(predictor_cache, H, x, ẋ, t, Jac)
-    @test_nowarn predict!(xnext, predictor_cache, H, x, t, 0.05, ẋ, Jac)
+    @test_nowarn HC.predict!(xnext, predictor_cache, H, x, t, 0.05, ẋ, Jac)
 end
 
 

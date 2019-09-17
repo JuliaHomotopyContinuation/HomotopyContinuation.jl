@@ -101,7 +101,7 @@ import DoubleFloats: Double64, ComplexDF64
         U, S, VT = svd(A)
         S[end] *= 1e-4
         A2 = U * diagm(0 => S) * VT'
-        update!(WS, A2)
+        HC.update!(WS, A2)
         ldiv!(x̂, WS, b)
         δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
         @test δx1 / norm(x, Inf) > 1e-14
@@ -119,7 +119,7 @@ import DoubleFloats: Double64, ComplexDF64
         U, S, VT = svd(A)
         S[end] *= 1e-4
         A2 = U * diagm(0 => S) * VT'
-        update!(WS, A2)
+        HC.update!(WS, A2)
         b = A2 * randn(ComplexF64, 3)
         ldiv!(x̂, WS, b)
         δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)

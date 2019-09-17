@@ -14,7 +14,7 @@ end
         @test patch isa HomotopyContinuation.OrthogonalPatchState
         @test nequations(patch) == 1
 
-        setup!(patch, x)
+        init!(patch, x)
         @test norm(patch.v̄) ≈ (1.0,) atol=1e-15
         u = [0.0im]
         evaluate!(u, patch, x)
@@ -36,7 +36,7 @@ end
         @test patch isa HomotopyContinuation.EmbeddingPatchState
         @test nequations(patch) == 1
 
-        setup!(patch, x)
+        init!(patch, x)
         @test x[3] ≈ 1.0 atol=1e-15
         u = [0.0im]
         evaluate!(u, patch, x)
@@ -59,7 +59,7 @@ end
         @test patch isa HomotopyContinuation.RandomPatchState
         @test nequations(patch) == 1
 
-        setup!(patch, x)
+        init!(patch, x)
         u = [0.0im]
         evaluate!(u, patch, x)
         @test u[1] ≈ 0.0 atol=1e-14
@@ -80,7 +80,7 @@ end
         @test patch isa HomotopyContinuation.FixedPatchState
         @test nequations(patch) == 1
 
-        setup!(patch, x)
+        init!(patch, x)
         u = [0.0im]
         evaluate!(u, patch, x)
         u
