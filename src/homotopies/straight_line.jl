@@ -58,8 +58,9 @@ Obtain the gamma used in the StraightLineHomotopy.
     evaluate!(c.u, H.start, x, c.start)
     evaluate!(u, H.target, x, c.target)
 
+    γt = γ(H) * t
     for i in eachindex(u)
-        u[i] = (γ(H) * t) * c.u[i] + (1.0 - t) * u[i]
+        u[i] = -t * u[i] + (γt * c.u[i] + u[i])
     end
 
     u
@@ -90,11 +91,12 @@ end
     evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
     evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
+    γt = γ(H) * t
     for i in eachindex(u)
-        u[i] = (γ(H) * t) * c.u[i] + (1.0 - t) * u[i]
+        u[i] = -t * u[i] + (γt * c.u[i] + u[i])
     end
     for i in eachindex(U)
-        U[i] = (γ(H) * t) * c.U[i] + (1.0 - t) * U[i]
+        U[i] = -t * U[i] + (γt * c.U[i] + U[i])
     end
 
     nothing
@@ -105,8 +107,9 @@ end
     evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
     evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
+    γt = γ(H) * t
     for i in eachindex(U)
-        U[i] = (γ(H) * t) * c.U[i] + (1.0 - t) * U[i]
+        U[i] = -t * U[i] + (γt * c.U[i] + U[i])
     end
     for i in eachindex(u)
         u[i] = γ(H) * c.u[i] - u[i]
