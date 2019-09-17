@@ -918,12 +918,8 @@ end
 function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, options::CTO)
     ω = max(state.ω, 1e-8)
     p = order(predictor)
-    ẍ = second_derivative(predictor)
-    if ẍ !== nothing
-        η_p = √(0.5 * state.norm(ẍ))
-    else
-        η_p = state.norm(state.ẋ)
-    end
+    deriv, k = unpack(highest_derivative(predictor), (state.ẋ, 1))
+    η_p = nthroot(state.norm(deriv) / factorial(k), k)
     δ_N_ω = δ(options, ω, options.max_corrector_iters / 2)
     Δs = nthroot(g(δ_N_ω) / ω, p) / η_p
     if isnan(Δs)
