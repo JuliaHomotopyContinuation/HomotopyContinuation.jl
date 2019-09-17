@@ -920,16 +920,19 @@ function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, optio
     p = order(predictor)
     ẍ = second_derivative(predictor)
     if ẍ !== nothing
-        η = √(0.5 * state.norm(ẍ))^p
+        η_p = √(0.5 * state.norm(ẍ))
     else
-        η = state.norm(state.ẋ)^p
+        η_p = state.norm(state.ẋ)
     end
     δ_N_ω = δ(options, ω, options.max_corrector_iters / 2)
-    Δs = nthroot(g(δ_N_ω) / (ω * η), p)
+    Δs = nthroot(g(δ_N_ω) / ω, p) / η_p
     if isnan(Δs)
         Δs = 0.05 * length(state.segment)
     end
-    state.Δs = min(Δs, length(state.segment), options.max_step_size)
+    state.Δs = max(
+        min(Δs, length(state.segment), options.max_step_size),
+        options.min_step_size,
+    )
 end
 
 ## Step size update
