@@ -18,7 +18,7 @@ module HomotopyContinuation
     import Base: @propagate_inbounds
     import LinearAlgebra: cond
     import Parameters: @pack!, @unpack
-    import DoubleFloats: Double64
+    import DoubleFloats: Double64, ComplexDF64
     import DynamicPolynomials: @polyvar, subs, differentiate
     import ProjectiveVectors: PVector
     import StaticArrays: SVector, @SVector
@@ -46,9 +46,7 @@ module HomotopyContinuation
     include("problems.jl")
     include("totaldegree.jl")
 
-    include("newton.jl")
     include("predictors.jl")
-
     include("newton_corrector.jl")
     include("core_tracker.jl")
 
