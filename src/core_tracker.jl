@@ -10,7 +10,6 @@ export CoreTracker,
        affine_tracking,
        track,
        track!,
-       setup!, # deprecated
        init!,
        iterator,
        current_x,
@@ -28,6 +27,7 @@ export CoreTracker,
        digits_lost,
        options,
        # deprecated
+       setup!,
        refinement_accuracy,
        max_refinement_iters,
        set_max_refinement_iters!,
@@ -200,8 +200,12 @@ function CoreTrackerOptions(
     logarithmic_time_scale = false,
 )
 
-    refinement_accuracy !== nothing && warn("Passing `refinement_accuracy` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
-    max_refinement_iters !== nothing && warn("Passing `max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.")
+    refinement_accuracy !== nothing && @warn(
+        "Passing `refinement_accuracy` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
+    max_refinement_iters !== nothing && @warn(
+        "Passing `max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
 
     CoreTrackerOptions(
         accuracy,
@@ -573,7 +577,7 @@ end
     x̄::AbstractVector,
     tracker::CT,
     x::AbstractVector = tracker.state.x,
-    t::Number = current_t(tracker.state)
+    t::Number = current_t(tracker.state),
 )
 
     newton!(
@@ -885,10 +889,6 @@ function step!(tracker::CT, debug::Bool = false)
         # to do this anyway for the computation of ẋ
         limit_accuracy!(tracker; update_jacobian = false) # TODO: THIS SHOULDN'T BE DONE IN EVERY STEP!
 
-        if debug
-            println("limit_acc: ", round(state.limit_accuracy; sigdigits = 5))
-        end
-
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian)
 
@@ -1033,7 +1033,7 @@ end
 
 function check_terminated!(state::CTS, options::CTO)
     Δs = length(state.segment) - state.s
-    if Δs < eps(length(state.segment))
+    if Δs < options.min_step_size
         state.status = CT_SUCCESS
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
