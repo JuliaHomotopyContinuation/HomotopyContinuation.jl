@@ -58,8 +58,15 @@ The order of a predictor is defined as the order of asymptotic error.
 """
 function order end
 
-# HELPERS
 
+"""
+    second_derivative(::AbstractPredictor)
+
+Optional query for the second derivative.
+"""
+second_derivative(::AbstractPredictor) = nothing
+
+## HELPERS
 """
     minus_ẋ!(out, H, x, t, J, dt)
 

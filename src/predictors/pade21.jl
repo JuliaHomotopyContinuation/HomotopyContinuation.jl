@@ -88,3 +88,4 @@ function predict!(xnext, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, x�
 end
 
 order(::Pade21Cache) = 4
+second_derivative(cache::Pade21Cache) = cache.x²
