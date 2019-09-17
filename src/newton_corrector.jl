@@ -130,7 +130,7 @@ end
         H::HomotopyWithCache, x t,
         JM::JacobianMonitor, norm, cache::NewtonCorrectorCache;
         accuracy::Float64 = 1e-6,
-        safety_margin::Float64 = 1e2,
+        safety_factor::Float64 = 1e2,
         update_jacobian::Bool = false)
 
 Obtain an estimate of the limiting accuracy of Newton's method
@@ -138,7 +138,7 @@ and of the limiting residual.
 If `update_jacobian == true` a new Jacobian is computed, otherwise the currently stored
 Jacobian is used.
 The method first produces a single (simplified) Newton update `Δx`.
-If `accuracy / norm(Δx) > safety_margin` then `norm(Δx)` is obtained.
+If `accuracy / norm(Δx) > safety_factor` then `norm(Δx)` is obtained.
 Otherwise a second simplified Newton update is produced and the norm of this is returned.
 The reason for the two step procedure is that the first update does not necessarily yield
 the limiting accuracy, but if it is sufficiently good then there is no need to obtain the
@@ -153,7 +153,7 @@ function limit_accuracy!(
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
     accuracy::Float64 = 1e-6,
-    safety_margin::Float64 = 1e2,
+    safety_factor::Float64 = 1e2,
     update_jacobian::Bool = false,
 )
     @unpack Δx, r = cache
@@ -175,7 +175,7 @@ function limit_accuracy!(
 
     # accuracy is not yet sufficient, maybe this is just an artifact
     # of the Newton step. So let's do another simplified Newton step
-    if accuracy / limit_acc < safety_margin
+    if accuracy / limit_acc < safety_factor
         evaluate!(r, H, x, t)
         # Update cond info etc?
         LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
