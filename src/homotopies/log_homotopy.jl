@@ -10,6 +10,7 @@ struct LogHomotopy{H<:AbstractHomotopy} <: AbstractHomotopy
 end
 
 Base.size(H::LogHomotopy) = size(H.homotopy)
+basehomotopy(H::LogHomotopy) = basehomotopy(H.homotopy)
 
 struct LogHomotopyCache{HC} <: AbstractHomotopyCache
     cache::HC
@@ -58,5 +59,3 @@ function dt(H::LogHomotopy, x, s, c::LogHomotopyCache)
     LinearAlgebra.rmul!(u, -t)
     u
 end
-
-basehomotopy(H::LogHomotopy) = H.homotopy

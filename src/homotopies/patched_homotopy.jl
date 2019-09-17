@@ -117,4 +117,4 @@ function dt(H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
     dt!(similar(c.b, M), H, x, t, c)
 end
 
-basehomotopy(H::PatchedHomotopy) = H.homotopy
+basehomotopy(H::PatchedHomotopy) = basehomotopy(H.homotopy)

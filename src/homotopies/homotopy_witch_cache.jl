@@ -22,4 +22,4 @@ jacobian_and_dt(H::HomotopyWithCache, x, t, ::HNC=HNC()) = jacobian_and_dt(H.hom
 @propagate_inbounds jacobian_and_dt!(U, u, H::HomotopyWithCache, x, t, ::HNC=HNC()) = jacobian_and_dt!(U, u, H.homotopy, x, t, H.cache)
 evaluate_and_jacobian(H::HomotopyWithCache, x, t, ::HNC=HNC()) = evaluate_and_jacobian(H.homotopy, x, t, H.cache)
 @propagate_inbounds evaluate_and_jacobian!(u, U, H::HomotopyWithCache, x, t, ::HNC=HNC()) = evaluate_and_jacobian!(u, U, H.homotopy, x, t, H.cache)
-basehomotopy(H::HomotopyWithCache) = H.homotopy
+basehomotopy(H::HomotopyWithCache) = basehomotopy(H.homotopy)
