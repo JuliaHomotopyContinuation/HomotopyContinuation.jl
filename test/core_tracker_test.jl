@@ -238,7 +238,7 @@
             log_homotopy=true,
             min_step_size=eps()^2,
             accuracy = 1e-7,
-            precision=PRECISION_FIXED_64)
+            precision=:double)
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
 
@@ -251,7 +251,7 @@
             log_homotopy=true,
             min_step_size=eps()^2,
             accuracy = 1e-7,
-            precision=PRECISION_FIXED_64)
+            precision=:double)
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(r -> is_success(r) || r.returncode == HC.CT_TERMINATED_ACCURACY_LIMIT, results)
 
