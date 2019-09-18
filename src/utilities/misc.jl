@@ -7,22 +7,6 @@ export SymmetricGroup, infinity_norm, infinity_distance, fubini_study,
     COEFFS_UNKNOWN
 end
 
-"""
-    PrecisionOption
-
-Controls the used precision for computing the residual in Newton's method.
-See [[Tisseur01]](https://epubs.siam.org/doi/abs/10.1137/S0895479899359837) for the analysis behind this approach.
-
-## Values
-* `PRECISION_FIXED_64`: Only use default 64 bit machine precision
-* `PRECISION_FIXED_128`: Always use emulated 128 bit floating point numbers. These are provided by the [DoubleFloats.jl](https://github.com/JuliaMath/DoubleFloats.jl) package.
-* `PRECISION_ADAPTIVE`: Adaptively switch between 64 and 128 bit floating point numbers.
-"""
-@enum PrecisionOption begin
-    PRECISION_FIXED_64
-    PRECISION_FIXED_128
-    PRECISION_ADAPTIVE
-end
 
 """
     unpack(a::Union{Nothing, T}, b::T)

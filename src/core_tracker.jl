@@ -83,6 +83,7 @@ The possible states the `CoreTracker` can achieve are
     CT_TERMINATED_STEP_SIZE_TOO_SMALL
     CT_TERMINATED_SINGULARITY
     CT_TERMINATED_ILL_CONDITIONED
+    CT_TERMINATED_ACCURACY_LIMIT
 end
 
 """
@@ -155,7 +156,22 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", result::CoreTrackerResult
 ######################
 # CoreTrackerOptions #
 ######################
+"""
+    PrecisionOption
 
+Controls the used precision for computing the residual in Newton's method.
+See [[Tisseur01]](https://epubs.siam.org/doi/abs/10.1137/S0895479899359837) for the analysis behind this approach.
+
+## Values
+* `PRECISION_FIXED_64`: Only use default 64 bit machine precision
+* `PRECISION_FIXED_128`: Always use emulated 128 bit floating point numbers. These are provided by the [DoubleFloats.jl](https://github.com/JuliaMath/DoubleFloats.jl) package.
+* `PRECISION_ADAPTIVE`: Adaptively switch between 64 and 128 bit floating point numbers.
+"""
+@enum PrecisionOption begin
+    PRECISION_FIXED_64
+    PRECISION_FIXED_128
+    PRECISION_ADAPTIVE
+end
 
 """
     CoreTrackerOptions
@@ -260,6 +276,7 @@ mutable struct CoreTrackerState{
     Δs_prev::Float64 # previous step size
 
     accuracy::Float64 # norm(x - x(t))
+    norm_Δx₀::Float64 # norm of the first newton update
     ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
     limit_accuracy::Float64
 
@@ -297,7 +314,7 @@ function CoreTrackerState(
         min(options.initial_step_size, length(segment), options.max_step_size),
     )
     Δs_prev = 0.0
-    accuracy = limit_accuracy = 0.0
+    norm_Δx₀ = accuracy = limit_accuracy = 0.0
     ω = 1.0
     JM = JacobianMonitor(jacobian(H, x, t₁))
     residual = zeros(first(size(H)))
@@ -317,6 +334,7 @@ function CoreTrackerState(
         Δs,
         Δs_prev,
         accuracy,
+        norm_Δx₀,
         ω,
         limit_accuracy,
         norm,
@@ -370,10 +388,11 @@ struct CoreTracker{
     P<:AbstractPredictorCache,
     AP<:Union{Nothing,AbstractAffinePatchState},
     H<:HomotopyWithCache,
+    NCC<:NewtonCorrectorCache,
 }
     homotopy::H
     predictor::P
-    corrector::NewtonCorrectorCache{T}
+    corrector::NCC
     # these are mutable
     state::CoreTrackerState{T,AV,AN,AP}
     options::CoreTrackerOptions
@@ -579,6 +598,11 @@ end
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state),
 )
+    if tracker.options.precision == PRECISION_ADAPTIVE
+        double_64_evaluation = at_limit_accuracy(tracker.state, tracker.options)
+    else
+        double_64_evaluation = tracker.options.precision == PRECISION_FIXED_128
+    end
 
     newton!(
         x̄,
@@ -590,6 +614,7 @@ end
         tracker.corrector;
         tol = tracker.options.accuracy,
         max_iters = tracker.options.max_corrector_iters + 1,
+        double_64_evaluation = double_64_evaluation,
     )
 end
 
@@ -601,6 +626,8 @@ end
     update_jacobian::Bool = false,
 )
 
+    curr_accuracy = tracker.state.accuracy
+
     limit_acc = limit_accuracy!(
         tracker.state.residual,
         tracker.homotopy,
@@ -610,9 +637,15 @@ end
         norm,
         tracker.corrector;
         accuracy = tracker.options.accuracy,
+        x_accuracy = tracker.state.accuracy,
         update_jacobian = update_jacobian,
+        # Never use Double64 precision in limt_accuracy estimate
+        double_64_evaluation = false,
     )
-    tracker.state.accuracy = limit_acc
+
+    if limit_acc < tracker.state.accuracy
+        tracker.state.accuracy = limit_acc
+    end
     tracker.state.limit_accuracy = limit_acc
 
     cond!(tracker.state.jacobian, norm, tracker.state.residual)
@@ -620,6 +653,9 @@ end
     apply_row_scaling!(tracker.state.eval_error, tracker.state.jacobian)
 end
 
+function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 100.0)
+    opts.accuracy < safety_factor * state.limit_accuracy
+end
 ####################
 ## INITIALIZATION ##
 ####################
@@ -656,6 +692,8 @@ function check_start_value!(tracker::CT)
     if is_converged(result)
         tracker.state.ω = result.ω₀
         tracker.state.x .= tracker.state.x̄
+        tracker.state.accuracy = result.accuracy
+        limit_accuracy!(tracker; update_jacobian = false)
     else
         tracker.state.status = CT_TERMINATED_INVALID_STARTVALUE
     end
@@ -878,17 +916,12 @@ function step!(tracker::CT, debug::Bool = false)
         # Compute the new tangent ẋ(t).
         # We can avoid an update of the Jacobian since we already
         # did this for limit_accuracy
-        compute_ẋ!(
-            tracker;
-            # If limit accuracy doesn't update the jacobian this should be true
-            update_jacobian = true,
-        )
+        compute_ẋ!(tracker; update_jacobian = true,)
 
         # Make an additional newton step to check the limiting accuracy
         # We perform an update of the jacobian since we need
         # to do this anyway for the computation of ẋ
-        limit_accuracy!(tracker; update_jacobian = false) # TODO: THIS SHOULDN'T BE DONE IN EVERY STEP!
-
+        limit_accuracy!(tracker; update_jacobian = false)
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian)
 
@@ -904,6 +937,7 @@ function step!(tracker::CT, debug::Bool = false)
         state.rejected_steps += 1
         state.last_step_failed = true
     end
+    state.norm_Δx₀ = result.norm_Δx₀
 
     check_terminated!(state, options)
 
@@ -943,12 +977,13 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
         state.ω = is_converged(result) ? result.ω₀ : result.ω
     end
 
-    Δs = let
-        if options.simple_step_size_alg
-            simple_step_size_alg!(state, options, result)
-        else
-            adaptive_step_size_alg!(state, options, result, order(tracker.predictor))
-        end
+
+    near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 1000.0)
+    if options.simple_step_size_alg ||
+       (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
+        Δs = simple_step_size_alg!(state, options, result)
+    else
+        Δs = adaptive_step_size_alg!(state, options, result, order(tracker.predictor))
     end
 
     # Make sure to not overshoot.
@@ -1037,6 +1072,9 @@ function check_terminated!(state::CTS, options::CTO)
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
         state.status = CT_TERMINATED_MAX_ITERS
+    elseif at_limit_accuracy(state, options; safety_factor = 10.0) &&
+           options.precision == PRECISION_FIXED_64
+        state.status = CT_TERMINATED_ACCURACY_LIMIT
     end
     nothing
 end

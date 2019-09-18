@@ -1,16 +1,22 @@
 struct NewtonCorrector end
 
-struct NewtonCorrectorCache{T}
-    Δx::Vector{Complex{T}}
-    r::Vector{Complex{T}}
+struct NewtonCorrectorCache{HC<:AbstractHomotopyCache}
+    Δx::Vector{ComplexF64}
+    r::Vector{ComplexF64}
+    # D64 evaluation
+    x_D64::Vector{ComplexDF64}
+    r_D64::Vector{ComplexDF64}
+    cache_D64::HC
 end
 
 function NewtonCorrectorCache(H::HomotopyWithCache, x::AbstractVector, t::Number)
-    rx = evaluate(H, x, t)
-    T = complex(float(eltype(rx)))
-    Δx = Vector{T}(undef, length(x))
-    r = Vector{T}(undef, length(rx))
-    NewtonCorrectorCache(Δx, r)
+    m, n = size(H)
+    Δx = Vector{ComplexF64}(undef, n)
+    r = Vector{ComplexF64}(undef, m)
+    x_D64 = similar(x, ComplexDF64)
+    r_D64 = Vector{ComplexDF64}(undef, m)
+    cache_D64 = cache(H.homotopy, x_D64, t)
+    NewtonCorrectorCache(Δx, r, x_D64, r_D64, cache_D64)
 end
 
 cache(::NewtonCorrector, H, x, t) = NewtonCorrectorCache(H, x, t)
@@ -29,15 +35,15 @@ The possible return codes of Newton's method
     NEWT_MAX_ITERS
 end
 
-struct NewtonCorrectorResult{T}
+struct NewtonCorrectorResult
     return_code::NewtonCorrectorCodes
-    accuracy::T
+    accuracy::Float64
     iters::Int
     ω₀::Float64
     ω::Float64
     θ₀::Float64
     θ::Float64
-    norm_Δx₀::T
+    norm_Δx₀::Float64
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonCorrectorResult) = r
@@ -56,29 +62,38 @@ function newton!(
     max_iters::Int = 3,
     debug::Bool = false,
     simplified_last_step::Bool = true,
+    double_64_evaluation::Bool = false,
 )
 
     # Setup values
     x̄ .= x₀
     acc = limit_acc = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = Inf
     ω = ω₀ = θ₀ = θ = NaN
-    @unpack Δx, r = cache
+    @unpack Δx, r, x_D64, r_D64, cache_D64 = cache
     # alias to make logic easier
     xᵢ₊₁ = xᵢ = x̄
 
     for i ∈ 1:max_iters
         debug && println("i = ", i)
 
-        compute_jacobian = !simplified_last_step || i == 1 || i < max_iters
-        if compute_jacobian
+        compute_jacobian = !simplified_last_step || i == 1 || i < max_iters
+
+        if compute_jacobian && double_64_evaluation
+            x_D64 .= xᵢ
+            evaluate!(r, H.homotopy, x_D64, ComplexDF64(t), cache_D64)
+            jacobian!(jacobian(JM), H, xᵢ, t)
+            updated!(JM)
+        elseif compute_jacobian
             evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
             updated!(JM)
+        elseif double_64_evaluation
+            x_D64 .= xᵢ
+            evaluate!(r, H.homotopy, x_D64, t, cache_D64)
         else
             evaluate!(r, H, xᵢ, t)
         end
 
-        # Update cond info etc?
-        LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
+        LA.ldiv!(Δx, JM, r, norm)
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δx))
@@ -152,37 +167,57 @@ function limit_accuracy!(
     JM::JacobianMonitor,
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
+    x_accuracy::Float64 = 1e-8,
     accuracy::Float64 = 1e-6,
-    safety_factor::Float64 = 1e2,
+    safety_factor::Float64 = 1e3,
     update_jacobian::Bool = false,
+    double_64_evaluation::Bool = false,
 )
-    @unpack Δx, r = cache
+    @unpack Δx, r, x_D64, cache_D64 = cache
 
-    if update_jacobian
+    if update_jacobian && double_64_evaluation
+        x_D64 .= x
+        evaluate!(r, H.homotopy, x_D64, ComplexDF64(t), cache_D64)
+        jacobian!(jacobian(JM), H, x, t)
+        updated!(JM)
+    elseif update_jacobian
         evaluate_and_jacobian!(r, jacobian(JM), H, x, t)
         updated!(JM)
+    elseif double_64_evaluation
+        x_D64 .= x
+        evaluate!(r, H.homotopy, x_D64, t, cache_D64)
     else
         evaluate!(r, H, x, t)
     end
     # limit residual ≈ abs.(r) is
     limit_res .= abs.(r)
 
-    # Update cond info etc?
-    LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
-    x .-= Δx
-
+    LA.ldiv!(Δx, JM, r, norm)
     limit_acc = Float64(norm(Δx))
+
+    if limit_acc < x_accuracy
+        x .-= Δx
+    end
 
     # accuracy is not yet sufficient, maybe this is just an artifact
     # of the Newton step. So let's do another simplified Newton step
     if accuracy / limit_acc < safety_factor
-        evaluate!(r, H, x, t)
-        # Update cond info etc?
-        LA.ldiv!(Δx, JM, r, norm, JAC_MONITOR_UPDATE_NOTHING)
-        x .-= Δx
-        limit_acc = Float64(norm(Δx))
-    end
+        if double_64_evaluation
+            x_D64 .= x
+            evaluate!(r, H.homotopy, x_D64, t, cache_D64)
+        else
+            evaluate!(r, H, x, t)
+        end
+        LA.ldiv!(Δx, JM, r, norm)
 
+        # take here the maximum to capture the phenomen that we "bounce"
+        # around the limit accuracy
+        limit_acc = max(Float64(norm(Δx)), limit_acc)
+        if limit_acc < x_accuracy
+            x .-= Δx
+        end
+
+    end
 
     return limit_acc
 end
