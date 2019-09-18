@@ -824,8 +824,12 @@ function row_scaling!(
         for i = 2:m
             norm_scaled_r = max(norm_scaled_r, r[i] / max(d[i], d̂))
         end
-
-        d .= max.(d, r ./ norm_scaled_r)
+        for i in 1:length(d)
+            r̂ᵢ = r[i] / norm_scaled_r
+            if isfinite(r̂ᵢ)
+                d[i] = max(d[i], r̂ᵢ)
+            end
+        end
     else
         # Don't scale zero rows -> set dᵢ = 1 if too small
         d_max_eps = sqrt(eps(min(maximum(d), one(T))))

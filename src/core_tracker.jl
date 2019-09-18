@@ -625,32 +625,33 @@ end
     norm::AbstractNorm = tracker.state.norm;
     update_jacobian::Bool = false,
 )
-
-    curr_accuracy = tracker.state.accuracy
+    @unpack state, options = tracker
 
     limit_acc = limit_accuracy!(
-        tracker.state.residual,
+        state.residual,
         tracker.homotopy,
         x,
         t,
-        tracker.state.jacobian,
+        state.jacobian,
         norm,
         tracker.corrector;
-        accuracy = tracker.options.accuracy,
-        x_accuracy = tracker.state.accuracy,
+        accuracy = options.accuracy,
+        x_accuracy = state.accuracy,
         update_jacobian = update_jacobian,
-        # Never use Double64 precision in limt_accuracy estimate
+        # Don't use Double64 precision in limit_accuracy estimate
         double_64_evaluation = false,
     )
 
-    if limit_acc < tracker.state.accuracy
-        tracker.state.accuracy = limit_acc
-    end
-    tracker.state.limit_accuracy = limit_acc
+    state.accuracy = min(state.accuracy, limit_acc)
+    state.limit_accuracy = limit_acc
 
-    cond!(tracker.state.jacobian, norm, tracker.state.residual)
-    copyto!(tracker.state.eval_error, tracker.state.residual)
-    apply_row_scaling!(tracker.state.eval_error, tracker.state.jacobian)
+    cond!(state.jacobian, norm, tracker.state.residual)
+
+    copyto!(state.eval_error, state.residual)
+    apply_row_scaling!(state.eval_error, state.jacobian)
+    state.eval_error .+= eps()
+
+    nothing
 end
 
 function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 100.0)
@@ -888,7 +889,6 @@ function step!(tracker::CT, debug::Bool = false)
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the provided predictor
     predict!(x̂, predictor, homotopy, x, t, Δt, ẋ, state.jacobian)
-
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
     result = correct!(x̄, tracker, x̂, t + Δt)
@@ -917,7 +917,6 @@ function step!(tracker::CT, debug::Bool = false)
         # We can avoid an update of the Jacobian since we already
         # did this for limit_accuracy
         compute_ẋ!(tracker; update_jacobian = true,)
-
         # Make an additional newton step to check the limiting accuracy
         # We perform an update of the jacobian since we need
         # to do this anyway for the computation of ẋ

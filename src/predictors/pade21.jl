@@ -48,7 +48,6 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Flo
     u, u₁, u₂ = cache.u, cache.u₁, cache.u₂
     x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
     x², x³ = cache.x², cache.x³
-
     h₂ = nthroot(10ψ, 4)
     g!(u₁, H, x, ẋ, t, h₂, x_h)
     g!(u₂, H, x, ẋ, t, -h₂, x_h)
