@@ -48,8 +48,8 @@
 
         R1 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-3)
         @test R1.iters == 1
-        @test R1.accuracy ≤ 1.1e-4
-        @test R1.norm_Δx₀ < 1.1e-4
+        @test R1.accuracy ≤ 1e-4
+        @test R1.norm_Δx₀ < 1e-4
 
 
         R2 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-7)

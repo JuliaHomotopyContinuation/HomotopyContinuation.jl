@@ -225,35 +225,42 @@
         @test round.(Int, real.(first.(Xs)) .* 10) == collect(10:20)
     end
 
-    @testset "precision option" begin
-        @test_broken false
-        # @polyvar  x y
-        # for P in [PRECISION_ADAPTIVE, PRECISION_FIXED_64, PRECISION_FIXED_128]
-        #     tracker, S = coretracker_startsolutions([x^2+y^2-4, x + y - 3]; precision=P)
-        #     @test tracker.options.precision == P
-        #     result = track(tracker, first(S), 1.0, 0.0)
-        #     @test is_success(result)
-        # end
-        # # test default
-        # tracker, S = coretracker_startsolutions([x^2-y^2+4, x + y - 3])
-        # @test tracker.options.precision == PRECISION_FIXED_64
-    end
+    @testset "Limit Accuracy / Adaptive Precision" begin
+        # We use Wilkinson polynomials of degree 12 and 15
+        # 12 is fine for 64 bit precision, but in 15 is the evaluation error too large
+        @polyvar x
+        n = 12
+        g = [x^n - 1]
+        f = [prod(x-i for i in 1:n)]
+        S = [[cis(i*2π/n)] for i in 0:(n-1)]
 
-    @testset "cond updates" begin
-        @test_broken false
-        # @polyvar x y
-        # tracker, S = coretracker_startsolutions([x^2+y^2-4, x + y - 3]; affine_tracking=false, seed=130793)
-        # @test cond(tracker) == 1.0
-        # @test digits_lost(tracker) == 0.0
-        # # check that checkstartvalue also updates cond and digits_lost
-        # setup!(tracker, first(S))
-        # cond(tracker)
-        # digits_lost(tracker)
-        # cond_start, digits_lost_start = cond(tracker), digits_lost(tracker)
-        # @test cond_start != 1.0
-        # @test digits_lost_start != 0.0
-        # track(tracker, first(S), 1.0, 0.0)
-        # @test cond(tracker) != cond_start
-        # @test digits_lost(tracker) != digits_lost_start
+        tracker = coretracker(g, f, S;
+            log_homotopy=true,
+            min_step_size=eps()^2,
+            accuracy = 1e-7,
+            precision=PRECISION_FIXED_64)
+        results = map(s -> track(tracker, s, 0.0, 70), S)
+        @test all(is_success, results)
+
+        n = 15
+        g = [x^n - 1]
+        f = [prod(x-i for i in 1:n)]
+        S = [[cis(i*2π/n)] for i in 0:(n-1)]
+
+        tracker = coretracker(g, f, S;
+            log_homotopy=true,
+            min_step_size=eps()^2,
+            accuracy = 1e-7,
+            precision=PRECISION_FIXED_64)
+        results = map(s -> track(tracker, s, 0.0, 70), S)
+        @test all(r -> is_success(r) || r.returncode == HC.CT_TERMINATED_ACCURACY_LIMIT, results)
+
+        tracker.options.precision = PRECISION_FIXED_128
+        results = map(s -> track(tracker, s, 0.0, 70), S)
+        @test all(is_success, results)
+
+        tracker.options.precision = PRECISION_ADAPTIVE
+        results = map(s -> track(tracker, s, 0.0, 70), S)
+        @test all(is_success, results)
     end
 end

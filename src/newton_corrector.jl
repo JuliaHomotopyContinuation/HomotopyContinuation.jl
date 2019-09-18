@@ -1,10 +1,10 @@
 struct NewtonCorrector end
 
-struct NewtonCorrectorCache{HC<:AbstractHomotopyCache}
+struct NewtonCorrectorCache{HC<:AbstractHomotopyCache, AV<:AbstractVector{ComplexDF64}}
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
     # D64 evaluation
-    x_D64::Vector{ComplexDF64}
+    x_D64::AV
     r_D64::Vector{ComplexDF64}
     cache_D64::HC
 end
