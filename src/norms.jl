@@ -1,16 +1,33 @@
-export euclidean_distance, euclidean_norm
+export AbstractNorm,
+       WeightedNorm,
+       EuclideanNorm,
+       InfNorm,
+       distance,
+       norm,
+       # deprecated
+       euclidean_distance,
+       euclidean_norm
 
 """
     AbstractNorm
 
 An `AbstractNorm` represents any norm of a vector space.
+
+Current implementations are:
+
+* [EuclideanNorm](@ref)
+* [InfNorm](@ref)
+* [WeightedNorm](@ref)
+
+All norms are callable. `norm(x)` computes the norm of `x` and `norm(x,y) computes the distance
+`norm(x - y).`
 """
 abstract type AbstractNorm end
 
 """
     distance(u, v, norm::AbstractNorm)
 
-Compute the distance ||u-v|| with the given norm.
+Compute the distance ||u-v|| with the given norm `norm`.
 """
 function distance end
 
@@ -19,7 +36,7 @@ function distance end
 ## WeightedNorm ##
 ##################
 """
-    WeightedNormOptions(;scale_min=0.01,
+    WeightedNormOptions(;scale_min=0.001,
                      scale_abs_min=min(scale_min^2, 200 * sqrt(eps()),
                      scale_max=1.0 / eps() / sqrt(2)
 
@@ -42,18 +59,38 @@ Base.show(io::IO, opts::WeightedNormOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::WeightedNormOptions) = opts
 
 """
-    WeightedNorm(norm, n::Integer)
-    WeightedNorm(norm, x::AbstractVector)
+    WeightedNorm(d::AbstractVector, norm::AbstractNorm; options...)
+    WeightedNorm(norm::AbstractNorm, n::Integer; options...)
+    WeightedNorm(norm::AbstractNorm, x::AbstractVector; options...)
 
 A `WeightedNorm` represents a weighted variant of norm `norm` of a `n`-dimensional vector space.`
+A norm ``||x||`` is weighted by introducing a vector of additional weights `d` such that
+the new norm is ``||D⁻¹x||`` where ``D`` is the diagonal matrix with diagonal ``d`.
+The `WeightedNorm` is desigened to change the weights dynamically by using [`init(::WeightedNorm, x)`](@ref)
+and [`update(::WeightedNorm, x)`](@ref). The weights are there constructed such that
+``||D⁻¹x|| ≈ 1.0``.
+The weights can be accessed and changed by indexing.
+
+### Options
+
+* `scale_min = 0.001`: The minimal size of `dᵢ` is `scale_min` time the (weighted) norm of `x`.
+* `scale_abs_min = min(scale_min^2, 200 * sqrt(eps()))`: The absolute minimal size of `dᵢ`.
+* `scale_max = 1.0 / eps() / sqrt(2)`: The absolute maximal size of `dᵢ`
+
 """
 struct WeightedNorm{N<:AbstractNorm} <: AbstractNorm
     weights::Vector{Float64}
     norm::N
     options::WeightedNormOptions
 end
-function WeightedNorm(weights::Vector{Float64}, norm::AbstractNorm; opts...)
-    WeightedNorm(weights, norm, WeightedNormOptions(opts...))
+function WeightedNorm(
+    weights::Vector{Float64},
+    norm::AbstractNorm;
+    scale_min = 0.001,
+    scale_abs_min = min(scale_min^2, 200 * sqrt(eps())),
+    scale_max = 1.0 / eps() / sqrt(2),
+)
+    WeightedNorm(weights, norm, WeightedNormOptions(scale_min, scale_abs_min, scale_max))
 end
 WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
     WeightedNorm(norm, length(x); opts...)
@@ -65,7 +102,7 @@ WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), no
 """
     weights(WN::WeightedNorm)
 
-Returns the inverse weights of the weighted norm.
+Returns the weights of the weighted norm.
 """
 weights(WN::WeightedNorm) = WN.weights
 
@@ -100,7 +137,7 @@ init!(n::AbstractNorm, ::AbstractVector) = n
 """
     update!(w::WeightedNorm, x::AbstractVector)
 
-Ipdate the weighted norm `w` for `x`, this will interpolate between the previous weights
+Update the weighted norm `w` for `x`, this will interpolate between the previous weights
 and the norm of `x`.
 """
 function update!(w::WeightedNorm, x::AbstractVector)
@@ -126,7 +163,7 @@ update!(n::AbstractNorm, ::AbstractVector) = n
 """
     EuclideanNorm <: AbstractNorm
 
-The usual euclidean norm resp. 2-norm.
+The usual [Euclidean norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm) resp. 2-norm.
 """
 struct EuclideanNorm <: AbstractNorm end
 
@@ -170,7 +207,7 @@ end
 """
     InfNorm <: AbstractNorm
 
-The ∞-norm.
+The infinity or [maximum norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Maximum_norm_.28special_case_of:_infinity_norm.2C_uniform_norm.2C_or_supremum_norm.29).
 """
 struct InfNorm <: AbstractNorm end
 

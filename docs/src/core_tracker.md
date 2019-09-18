@@ -1,39 +1,44 @@
 # Core Tracker
 
-We also export the path tracking primitive to make the core path tracking routine
-available for other applications.
-At the heart is a [`CoreTracker`](@ref) object which holds
-all the state.
+A [`CoreTracker`](@ref) is the low-level path tracker. Its job is to track an initial solution
+`x₁` from `t₁` to `t₀` by following a solution path ``x(t)``. For this a *predictor-corrector* scheme is used.
+See our [introduction guide](https://www.juliahomotopycontinuation.org/guides/introduction/#tracking-solution-paths)
+for a high-level explanation of the predictor corrector scheme
+
 
 ```@docs
 CoreTracker
 ```
 
-The easiest way to construct a `CoreTracker`:
+The easiest way to construct a `CoreTracker` is to use `coretracker` and `coretracker_startsolutions`.
 ```@docs
 coretracker_startsolutions
 coretracker
 ```
 
-## Other types
+## Result and Status
 ```@docs
 CoreTrackerResult
-CoreTrackerStatus.states
-CoreTrackerOptions
+is_success(::CoreTrackerResult)
+solution(::CoreTrackerResult)
+```
+
+```@docs
+CoreTrackerStatus
 ```
 
 ## Methods
 To track from a start to an endpoint with the `CoreTracker` we provide the following
 routines.
 ```@docs
-track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; kwargs...)
-track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch=tracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
-setup!
+track(tracker::CoreTracker, x₁::AbstractVector, t₁, t₀)
+track!(x₀, tracker::CoreTracker, x₁, t₁, t₀)
+init!(tracker::CoreTracker, x₁, t₁, t₀)
 ```
 
 It is also possible to use a `CoreTracker` as an iterator. This can either
 be done by the high level `iterator` method or by directly using a `CoreTracker`
-as an iterator. The recommend approach is simply using `iterator`.
+as an iterator. The recommend approach is to simply use `iterator`.
 ```@docs
 iterator
 ```
@@ -44,10 +49,9 @@ To introspect the current state we provide the following routines.
 current_x
 current_t
 current_Δt
-iters
+steps
 status
 LinearAlgebra.cond(::CoreTracker)
-digits_lost
 options
 ```
 

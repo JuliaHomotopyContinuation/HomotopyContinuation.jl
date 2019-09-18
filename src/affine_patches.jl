@@ -8,7 +8,12 @@ export AbstractAffinePatch,
 """
     AbstractAffinePatch
 
-An affine patch is a hyperplane defined by ``v⋅x-1=0``.
+An affine patch is a hyperplane defined by ``v⋅x-1=0``. The currently implemented affine patches
+are:
+* [`EmbeddingPatch`](@ref)
+* [`FixedPatch`](@ref)
+* [`OrthogonalPatch`](@ref)
+* [`RandomPatch`](@ref)
 """
 abstract type AbstractAffinePatch end
 
