@@ -43,14 +43,13 @@ end
     evaluate!(u, H, x_h, t + h)
 end
 
-function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor)
+function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Float64)
     # unpack stuff to make the rest easier to read
     u, u₁, u₂ = cache.u, cache.u₁, cache.u₂
     x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
     x², x³ = cache.x², cache.x³
 
-    h₂ *= max(abs(t), 1.0)
-    # compute the second derivative at (x,t)
+    h₂ = nthroot(10ψ, 4)
     g!(u₁, H, x, ẋ, t, h₂, x_h)
     g!(u₂, H, x, ẋ, t, -h₂, x_h)
 
@@ -60,7 +59,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor)
     end
     LA.ldiv!(x², Jac, u)
 
-    h₃ *= max(abs(t), 1.0)
+    h₃ = nthroot(10ψ, 5)
     g!(u₁, H, x, ẋ, x², t, h₃, x_h)
     g!(u₂, H, x, ẋ, x², t, -h₃, x_h)
 

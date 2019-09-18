@@ -35,12 +35,12 @@ Perform a prediction step for the value of `x` with step size `Δt`. `ẋ` is th
 function predict! end
 
 """
-    update!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac)
+    update!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac, ψ::Float64=eps())
 
 Update the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
-`fac` is a factorization of the Jacobian at `(x,t)`.
+`fac` is a factorization of the Jacobian at `(x,t)`. `ψ` is an estimate of the evaluation error.
 """
-update!(::AbstractPredictorCache, H, x, ẋ, t, fac) = nothing
+update!(::AbstractPredictorCache, H, x, ẋ, t, fac, ψ=eps()) = nothing
 
 """
     init!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, Jac::JacobianMonitor)
@@ -48,7 +48,7 @@ update!(::AbstractPredictorCache, H, x, ẋ, t, fac) = nothing
 Setup the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
 `fac` is a factorization of the Jacobian at `(x,t)`. This falls back to calling `update`.
 """
-init!(C::AbstractPredictorCache, H, x, ẋ, t, Jac) = update!(C, H, x, ẋ, t, Jac)
+init!(C::AbstractPredictorCache, H, x, ẋ, t, Jac, ψ=eps()) = update!(C, H, x, ẋ, t, Jac, ψ)
 
 
 """
