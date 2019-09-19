@@ -60,12 +60,12 @@ function order end
 
 
 """
-    highest_derivative(::AbstractPredictor)
+    highest_derivative(::AbstractPredictorCache)
 
 Optional query for the highest derivative of `x(t)` and available.
 Returns `x^{(k)}(t), k` or `nothing` if none is stored.
 """
-highest_derivative(::AbstractPredictor) = nothing
+highest_derivative(::AbstractPredictorCache) = nothing
 
 ## HELPERS
 """

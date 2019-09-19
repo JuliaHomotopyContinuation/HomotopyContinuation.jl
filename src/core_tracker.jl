@@ -429,7 +429,7 @@ In this case the `min_step_size` criterion is still applied to ``t`` and not ``s
   `auto_scaling` is true, this will automatically be converted to a [`WeightedNorm`](@ref).
 * `patch`: It is possible to perform tracking in projective space. For the actual
   compuations we still need to choose an affine chart. There are multiple charts possible,
-  see [`AbstractAffinePatch`](@ref).
+  see [`AbstractAffinePatch`](@ref). The default is [`Random`](@ref).
 * `precision` (default `:double`): This controls the precision used in the computation
   of ``H(x,t)``. If it is set to `:double` only double precision arithmetic is used
   (`Complex{Float64}`).  If it set to `:double_double` double double arithmetic
@@ -506,7 +506,7 @@ function CoreTracker(
     prob::AbstractProblem;
     patch = nothing,
     corrector::NewtonCorrector = NewtonCorrector(),
-    predictor::AbstractPredictor = default_predictor(x₁),
+    predictor::AbstractPredictor = Pade21(),
     auto_scaling::Bool = true,
     norm::AbstractNorm = InfNorm(),
     kwargs...,
@@ -550,12 +550,12 @@ function CoreTracker(
     t₁::Number,
     t₀::Number,
     prob::AbstractProblem;
-    patch = has_dedicated_homvars(prob.vargroups) ? EmbeddingPatch() : Random(),
+    patch = RandomPatch(),
     corrector::NewtonCorrector = NewtonCorrector(),
-    predictor::AbstractPredictor = default_predictor(x₁),
+    predictor::AbstractPredictor = Pade21(),
     auto_scaling::Bool = true,
     norm::AbstractNorm = InfNorm(),
-    simple_step_size_alg = !isa(patch, EmbeddingPatch),
+    simple_step_size_alg = isa(patch, OrthogonalPatch),
     kwargs...,
 )
 
@@ -597,12 +597,6 @@ function CoreTracker(
 
     CoreTracker(H, pred_cache, corr_cache, ct_state, options, dt)
 end
-
-
-default_predictor(x::AbstractVector) = Pade21()
-# Do not really understand this but Heun doesn't work that great for multi-homogeneous tracking
-default_predictor(x::ProjectiveVectors.PVector{T,1}) where {T} = Pade21()
-default_predictor(x::ProjectiveVectors.PVector{T,N}) where {T,N} = Euler()
 
 """
     indempotent_x(H, x₁, t₁)

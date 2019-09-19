@@ -5,7 +5,7 @@ export RandomPatch
 
 A random patch. For this we first draw entries of a vector `v` independently from a
 complex normal distribution (`randn(ComplexF64)`). And then normalize `v` with respect
-to the 1-norm.
+to the 2-norm.
 """
 struct RandomPatch <: AbstractAffinePatch end
 
@@ -18,7 +18,7 @@ is_global_patch(::RandomPatch) = true
 function state(::RandomPatch, x::PVector)
     v = similar(x, ComplexF64)
     Random.randn!(v)
-    LinearAlgebra.normalize!(v, 1)
+    LinearAlgebra.normalize!(v)
     RandomPatchState(v)
 end
 

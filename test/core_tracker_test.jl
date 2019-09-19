@@ -5,10 +5,12 @@
         t1, start_sols = coretracker_startsolutions(F)
 
         test_show_juno(t1)
+        @test_nowarn show(devnull, t1)
         @test !isempty(string(t1))
-        test_show_juno(t1.options)
-        @test !isempty(string(t1.options))
+        test_show_juno(options(t1))
+        @test_nowarn show(devnull, options(t1))
         test_show_juno(t1.state)
+        @test_nowarn show(devnull, t1.state)
         @test !isempty(string(t1.state))
 
         @test_nowarn current_Δt(t1)
@@ -39,17 +41,24 @@
         @test status(t1) == HC.CT_TERMINATED_INVALID_STARTVALUE
         @test is_terminated(status(t1))
         @test current_t(t1) == 0.5
+        @test real(current_Δt(t1)) < 0
+        @test cond(t1) ≥ 1
 
         R = track(t1, first(start_sols), 1.0, 0.0)
         @test R isa CoreTrackerResult
         @test is_success(R.returncode)
         @test R.accuracy < 1e-7
         @test_nowarn show(devnull, R)
+        @test !isempty(string(R))
+        test_show_juno(R)
 
         out = copy(first(start_sols))
         retcode = track!(out, t1, first(start_sols), 1.0, 0.0)
         @test is_success(retcode)
-        @test out == R.x
+        @test out == solution(R)
+
+
+        @test norm(t1) isa AbstractNorm
     end
 
     @testset "log_homotopy" begin
@@ -116,8 +125,7 @@
         # log homotopy as well
         log_tracker, log_start_sols = coretracker_startsolutions(
             F;
-            seed = 12356,
-            log_homotopy = true,
+            seed = 12356, log_homotopy = true,
         )
         log_s = first(log_start_sols)
         @allocated track!(log_tracker, log_s, 0.0, -log(0.01))
@@ -146,7 +154,7 @@
         x_final = zero(x_inter)
         retcode = track!(x_final, tracker, x_inter, 0.1, 0.0)
         @test is_success(retcode)
-        @test steps(tracker) < 3
+        @test steps(tracker) < 4
         x = current_x(tracker)
         @test norm(x - A \ b) < 1e-6
     end
@@ -231,36 +239,105 @@
         @polyvar x
         n = 12
         g = [x^n - 1]
-        f = [prod(x-i for i in 1:n)]
-        S = [[cis(i*2π/n)] for i in 0:(n-1)]
+        f = [prod(x - i for i = 1:n)]
+        S = [[cis(i * 2π / n)] for i = 0:(n-1)]
 
-        tracker = coretracker(g, f, S;
-            log_homotopy=true,
-            min_step_size=eps()^2,
+        tracker = coretracker(
+            g,
+            f,
+            S;
+            log_homotopy = true,
+            min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision=:double)
+            precision = PRECISION_FIXED_64
+        )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
 
         n = 15
         g = [x^n - 1]
-        f = [prod(x-i for i in 1:n)]
-        S = [[cis(i*2π/n)] for i in 0:(n-1)]
+        f = [prod(x - i for i = 1:n)]
+        S = [[cis(i * 2π / n)] for i = 0:(n-1)]
 
-        tracker = coretracker(g, f, S;
-            log_homotopy=true,
-            min_step_size=eps()^2,
+        tracker = coretracker(
+            g,
+            f,
+            S;
+            log_homotopy = true,
+            min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision=:double)
+            precision = :double
+        )
         results = map(s -> track(tracker, s, 0.0, 70), S)
-        @test all(r -> is_success(r) || r.returncode == HC.CT_TERMINATED_ACCURACY_LIMIT, results)
+        @test all(
+            r -> is_success(r) || r.returncode == HC.CT_TERMINATED_ACCURACY_LIMIT,
+            results
+        )
 
-        tracker.options.precision = PRECISION_FIXED_128
+
+        tracker = coretracker(
+            g,
+            f,
+            S;
+            log_homotopy = true,
+            min_step_size = eps()^2,
+            accuracy = 1e-7,
+            precision = :double_double
+        )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
 
-        tracker.options.precision = PRECISION_ADAPTIVE
+        tracker = coretracker(
+            g,
+            f,
+            S;
+            log_homotopy = true,
+            min_step_size = eps()^2,
+            accuracy = 1e-7,
+            precision = :adaptive
+        )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
+
+
+        @test_throws ArgumentError coretracker(
+            g,
+            f,
+            S;
+            log_homotopy = true, precision = :NOT_A_PRECISION
+        )
+    end
+
+    @testset "Change parameters" begin
+        @polyvar x a y b
+        F = SPSystem([x^2 - a, x * y - a + b]; parameters = [a, b])
+
+        tracker, starts = coretracker_startsolutions(
+            F,
+            [1.0, 1.0 + 0.0 * im],
+            generic_parameters = [2.2, 3.2]
+        )
+        start_parameters!(tracker, [1, 0])
+        target_parameters!(tracker, [2, 4])
+        @test is_success(track(tracker, starts[1], 1.0, 0.0))
+    end
+
+    @testset "(Multi-) projective" begin
+        @polyvar x y u v
+        f = [x * y - 6, x^2 - 5]
+        tracker, starts = coretracker_startsolutions(
+            f,
+            variable_groups = [[x], [y]],
+            seed = 123456,
+            predictor = Pade21()
+        )
+        current_x(tracker) isa ProjectiveVectors.PVector{ComplexF64,2}
+        S = collect(starts)
+        R1 = track(tracker, S[1], 1.0, 0.0)
+        @test is_success(R1)
+        @test solution(R1) isa ProjectiveVectors.PVector{ComplexF64,2}
+
+        R2 = track(tracker, S[2], 1.0, 0.0)
+        @test is_success(R2)
     end
 end
