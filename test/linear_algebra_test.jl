@@ -106,7 +106,7 @@ import DoubleFloats: Double64, ComplexDF64
         δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
         @test δx1 / norm(x, Inf) > 1e-14
         δx2 = HC.iterative_refinement_step!(WS, x, b, HC.InfNorm(), ComplexDF64)
-        @test δx2 / norm(x, Inf) < 1e-16
+        @test δx2 / norm(x, Inf) < eps()
 
         δx = HC.iterative_refinement_step!(x, WS, x̂, b)
         @test δx1 / norm(x, Inf) > 1e-14
@@ -125,7 +125,7 @@ import DoubleFloats: Double64, ComplexDF64
         δx1 = HC.iterative_refinement_step!(x, WS, x̂, b, HC.InfNorm(), ComplexDF64)
         @test δx1 / norm(x, Inf) > 1e-14
         δx2 = HC.iterative_refinement_step!(WS, x, b, HC.InfNorm(), ComplexDF64)
-        @test δx2 / norm(x, Inf) < 1e-16
+        @test δx2 / norm(x, Inf) < eps()
 
         δx = HC.iterative_refinement_step!(x, WS, x̂, b)
         @test δx1 / norm(x, Inf) > 1e-14

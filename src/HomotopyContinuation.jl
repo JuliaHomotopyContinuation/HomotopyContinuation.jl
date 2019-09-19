@@ -50,6 +50,7 @@ module HomotopyContinuation
     include("newton_corrector.jl")
     include("core_tracker.jl")
 
+    include("valuation.jl")
     # include("path_tracker.jl")
     #
     # include("polyhedral.jl")

@@ -67,6 +67,9 @@ Returns `x^{(k)}(t), k` or `nothing` if none is stored.
 """
 highest_derivative(::AbstractPredictorCache) = nothing
 
+second_derivative(::AbstractPredictorCache) = nothing
+third_derivative(::AbstractPredictorCache) = nothing
+
 ## HELPERS
 """
     minus_ẋ!(out, H, x, t, J, dt)

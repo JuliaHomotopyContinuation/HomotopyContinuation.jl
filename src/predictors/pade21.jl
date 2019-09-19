@@ -86,4 +86,6 @@ function predict!(xnext, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, x�
 end
 
 order(::Pade21Cache) = 4
-highest_derivative(cache::Pade21Cache) = (cache.x³, 3)
+@inline highest_derivative(cache::Pade21Cache) = (cache.x³, 3)
+second_derivative(cache::Pade21Cache) = cache.x²
+third_derivative(cache::Pade21Cache) = cache.x³

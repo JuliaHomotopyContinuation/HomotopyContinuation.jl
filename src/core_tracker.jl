@@ -850,7 +850,13 @@ Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracke
 This returns a `CoreTrackerResult`. This modifies `tracker`.
 See [`track!`](@ref) for the possible options.
 """
-function track(tracker::CT, x₁::AbstractVector, t₁::Number = 1.0, t₀::Number = 0.0; kwargs...)
+function track(
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
+    kwargs...,
+)
     track!(tracker, x₁, t₁, t₀; kwargs...)
     CoreTrackerResult(tracker)
 end
@@ -879,6 +885,9 @@ function track!(
     check_start_value::Bool = !loop,
     debug::Bool = false,
 )
+    _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
+end
+
 function track!(
     x₀::AbstractVector,
     tracker::CT,
@@ -898,11 +907,6 @@ function track!(
     end
     retcode
 end
-
-
-    _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
-end
-
 @inline function _track!(
     tracker::CT,
     x₁::AbstractVector,

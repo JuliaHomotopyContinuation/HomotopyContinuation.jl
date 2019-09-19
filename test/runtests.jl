@@ -30,6 +30,7 @@ end
     include("predictors_test.jl")
     include("newton_corrector_test.jl")
     include("core_tracker_test.jl")
+    include("valuation_test.jl")
     # include("path_tracker_test.jl")
     # include("solve_test.jl")
     # include("polyhedral_test.jl")
