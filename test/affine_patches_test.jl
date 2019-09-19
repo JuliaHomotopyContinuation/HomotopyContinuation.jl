@@ -66,7 +66,7 @@ end
 
         U = zeros(Complex{Float64}, 1, 3)
         jacobian!(U, patch, x)
-        @test U == reshape(patch.v̄, 1, 3)
+        @test U == reshape(patch.v, 1, 3)
 
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         onpatch!(y, patch)

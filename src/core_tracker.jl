@@ -38,24 +38,26 @@ export CoreTracker,
 
 
 const coretracker_supported_keywords = [
-    :corrector,
-    :predictor,
-    :patch,
+    :accuracy,
+    :auto_scaling,
     :initial_step_size,
     :min_step_size,
-    :max_step_size,
-    :accuracy,
-    :refinement_accuracy,
     :max_corrector_iters,
-    :max_refinement_iters,
+    :max_step_size,
     :max_steps,
-    :simple_step_size_alg,
-    :auto_scaling,
-    :terminate_ill_conditioned,
-    :log_transform,
+    :norm,
+    :patch,
     :precision,
-    :steps_jacobian_info_update,
+    :predictor,
+    :simple_step_size_alg,
+    :terminate_ill_conditioned,
+    :log_homotopy,
+    :log_transform,
+    :logarithmic_time_scale,
+    # deprecated,
     :max_lost_digits,
+    :max_refinement_iters,
+    :refinement_accuracy,
 ]
 
 
@@ -273,18 +275,6 @@ end
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
 
-const eps_double_64 = Float64(eps(Double64))
-function default_max_lost_digits(prec::PrecisionOption, accuracy::Float64)
-    if prec == PRECISION_FIXED_64
-        # maximal_digits_available - digits necessary - buffer
-        -log10(eps()) + log10(accuracy) + 1
-    else
-        # if higher precision is available we will more like be constrained
-        # by the fact that the jacobian cannot be too ill-conditioned
-        min(-log10(eps()) - 3, -log10(eps_double_64) + log10(accuracy) - 3)
-    end
-end
-
 ####################
 # CoreTrackerState #
 ####################
@@ -479,7 +469,7 @@ function CoreTracker(
     x₁;
     log_transform::Bool = false,
     log_homotopy::Bool = log_transform,
-    logarithmic_time_scale = log_transform,
+    logarithmic_time_scale = log_transform || log_homotopy,
     kwargs...,
 )
     if log_homotopy
@@ -1275,17 +1265,13 @@ Current accuracy.
 accuracy(tracker::CT) = tracker.options.accuracy
 
 """
-    set_accuracy!(tracker::CT, accuracy, update_max_lost_digits=true)
+    set_accuracy!(tracker::CT, accuracy)
 
-Set the current accuracy to `accuracy`. If `update_max_lost_digits` is `true` then
-the setting `max_lost_digits` will be updated to the default setting.
+Set the current accuracy to `accuracy`.
 """
-function set_accuracy!(tracker::CT, accuracy, update_max_lost_digits::Bool = true)
+function set_accuracy!(tracker::CT, accuracy)
     @unpack options = tracker
     options.accuracy = accuracy
-    if update_max_lost_digits
-        options.max_lost_digits = default_max_lost_digits(options.precision, accuracy)
-    end
     tracker
 end
 

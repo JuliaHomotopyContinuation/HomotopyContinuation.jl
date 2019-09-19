@@ -3,10 +3,12 @@ export AbstractNorm,
        EuclideanNorm,
        InfNorm,
        distance,
-       norm,
        # deprecated
        euclidean_distance,
        euclidean_norm
+
+import LinearAlgebra: norm
+export norm
 
 """
     AbstractNorm
@@ -96,7 +98,7 @@ WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
     WeightedNorm(norm, length(x); opts...)
 WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), norm; opts...)
 
-(N::WeightedNorm)(x::AbstractVector) = LinearAlgebra.norm(x, N)
+(N::WeightedNorm)(x::AbstractVector) = norm(x, N)
 (N::WeightedNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
 
 """
@@ -185,7 +187,7 @@ function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{Euclidea
     sqrt(d)
 end
 
-function LinearAlgebra.norm(x::AbstractVector, ::EuclideanNorm)
+function norm(x::AbstractVector, ::EuclideanNorm)
     n = length(x)
     @inbounds d = abs2(x[1])
     for i = 2:n
@@ -193,7 +195,7 @@ function LinearAlgebra.norm(x::AbstractVector, ::EuclideanNorm)
     end
     sqrt(d)
 end
-function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{EuclideanNorm})
+function norm(x::AbstractVector, w::WeightedNorm{EuclideanNorm})
     @boundscheck length(w) == length(x)
     @inbounds out = abs2(x[1]) / (w[1]^2)
     for i = 2:length(x)
@@ -201,7 +203,7 @@ function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{EuclideanNorm})
     end
     sqrt(out)
 end
-(N::EuclideanNorm)(x::AbstractVector) = LinearAlgebra.norm(x, N)
+(N::EuclideanNorm)(x::AbstractVector) = norm(x, N)
 (N::EuclideanNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
 
 """
@@ -232,7 +234,7 @@ function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm}
     sqrt(dmax)
 end
 
-function LinearAlgebra.norm(x::AbstractVector, ::InfNorm)
+function norm(x::AbstractVector, ::InfNorm)
     n = length(x)
     @inbounds dmax = abs2(x[1])
     for i = 2:n
@@ -241,7 +243,7 @@ function LinearAlgebra.norm(x::AbstractVector, ::InfNorm)
     end
     sqrt(dmax)
 end
-function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{InfNorm})
+function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2(x[1]) / (w[1]^2)
@@ -251,7 +253,7 @@ function LinearAlgebra.norm(x::AbstractVector, w::WeightedNorm{InfNorm})
     end
     sqrt(dmax)
 end
-(N::InfNorm)(x::AbstractVector) = LinearAlgebra.norm(x, N)
+(N::InfNorm)(x::AbstractVector) = norm(x, N)
 (N::InfNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
 
 """
@@ -266,4 +268,4 @@ euclidean_distance(u, v) = distance(u, v, EuclideanNorm())
 
 Compute ||u||₂.
 """
-euclidean_norm(x::AbstractVector) = LinearAlgebra.norm(x, EuclideanNorm())
+euclidean_norm(x::AbstractVector) = norm(x, EuclideanNorm())
