@@ -844,19 +844,19 @@ end
 ##############
 
 """
-    track(tracker, x₁, t₁=1.0, t₀=0.0; options...)::CTR
+    track(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 This returns a `CoreTrackerResult`. This modifies `tracker`.
 See [`track!`](@ref) for the possible options.
 """
-function track(tracker::CT, x₁::AbstractVector, t₁ = 1.0, t₀ = 0.0; kwargs...)
+function track(tracker::CT, x₁::AbstractVector, t₁::Number = 1.0, t₀::Number = 0.0; kwargs...)
     track!(tracker, x₁, t₁, t₀; kwargs...)
     CoreTrackerResult(tracker)
 end
 
 """
-    track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, check_start_value=true, loop::Bool=false)::CTR
+    track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 Returns one of the enum values of `CoreTrackerStatus` indicating the status.
@@ -865,16 +865,26 @@ Check [`is_success`](@ref) and [`is_terminated`](@ref) to test for the status.
 If `setup_patch` is `true` then [`init!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)::CTStatus
+    track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
 function track!(
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
+    setup_patch::Bool = tracker.options.update_patch,
+    loop::Bool = false,
+    check_start_value::Bool = !loop,
+    debug::Bool = false,
+)
+function track!(
     x₀::AbstractVector,
     tracker::CT,
     x₁::AbstractVector,
-    t₁ = 1.0,
-    t₀ = 0.0;
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
     setup_patch::Bool = tracker.options.update_patch,
     loop::Bool = false,
     check_start_value::Bool = !loop,
@@ -888,16 +898,7 @@ function track!(
     end
     retcode
 end
-function track!(
-    tracker::CT,
-    x₁,
-    t₁ = 1.0,
-    t₀ = 0.0;
-    setup_patch::Bool = tracker.options.update_patch,
-    loop::Bool = false,
-    check_start_value::Bool = !loop,
-    debug::Bool = false,
-)
+
 
     _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
 end

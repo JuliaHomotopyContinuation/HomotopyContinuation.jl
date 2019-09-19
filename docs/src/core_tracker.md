@@ -31,9 +31,9 @@ CoreTrackerStatus
 To track from a start to an endpoint with the `CoreTracker` we provide the following
 routines.
 ```@docs
-track(tracker::CoreTracker, x₁::AbstractVector, t₁, t₀)
-track!(x₀, tracker::CoreTracker, x₁, t₁, t₀)
-init!(tracker::CoreTracker, x₁, t₁, t₀)
+track(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
+track!(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
+init!(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
 ```
 
 It is also possible to use a `CoreTracker` as an iterator. This can either
