@@ -193,3 +193,51 @@ function update!(
     val
 end
 
+
+
+"""
+    enum ValuationVerdict
+
+The possible states the [`judge`](@ref) function returns:
+
+* `VAL_INDECISIVE`: The estimates are not trustworthy enough.
+* `VAL_FINITE`: The valuation indicates that the path is finite.
+* `VAL_AT_INFINITY`: The valuation indicates that the path is diverging.
+"""
+@enum ValuationVerdict begin
+    VAL_INDECISIVE
+    VAL_FINITE
+    VAL_AT_INFINITY
+end
+
+"""
+    judge(val::Valuation; tol = 1e-3, tol_at_infinity = 1e-4)::ValuationVerdict
+
+Judge the current valuation to determine whether a path is diverging. Returns
+a [`ValuationVerdict`](@ref).
+A path is diverging if one entry of the valuation is negative. To assure that
+the estimate is trust worthy we require that the first and second derivative
+of [`ν``](@ref) is smaller than `tol_at_infinity`.
+The `tol` is used to estimate whether a finite valuation is trustworthy.
+"""
+function judge(val::Valuation; tol::Float64 = 1e-3, tol_at_infinity::Float64 = 1e-4)
+    @unpack ν, ν̇, ν̈ = val
+    finite = true
+    indecisive = false
+    for (i, νᵢ) in enumerate(ν)
+        if νᵢ < -tol
+            finite = false
+        end
+
+        if νᵢ < -0.05 && abs(ν̇[i]) < tol_at_infinity && abs(ν̈[i]) < tol_at_infinity
+            return VAL_AT_INFINITY
+        end
+
+        if abs(ν̇[i]) > tol || abs(ν̈[i]) > tol
+            indecisive = true
+        end
+    end
+    finite && !indecisive && return VAL_FINITE
+
+    VAL_INDECISIVE
+end

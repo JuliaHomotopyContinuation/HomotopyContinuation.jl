@@ -80,6 +80,7 @@
         @test val.ν ≈ [-0.5, -1] atol = 1e-5
         @test norm(val.ν̇) < 1e-5
         @test norm(val.ν̈) < 1e-5
+        @test HC.judge(val; tol = 1e-10, tol_at_infinity = 1e-5) == HC.VAL_AT_INFINITY
 
         init!(val)
         init!(tracker, S[2], 0.0, 25.0)
@@ -91,6 +92,7 @@
         @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
         @test norm(val.ν̇) < 1e-3
         @test norm(val.ν̈) < 1e-3
+        @test HC.judge(val; tol = 1e-3) == HC.VAL_FINITE
 
         init!(val)
         init!(tracker, S[2], 0.0, 25.0)
@@ -102,6 +104,8 @@
         @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
         @test norm(val.ν̇) < 1e-3
         @test norm(val.ν̈) < 1e-3
+        @test HC.judge(val; tol = 1e-3) == HC.VAL_FINITE
+        @test HC.judge(val; tol = 1e-10) == HC.VAL_INDECISIVE
 
         init!(val)
         init!(tracker, S[3], 0.0, 25.0)
@@ -113,6 +117,7 @@
         @test val.ν ≈ [2, -1] atol = 1e-5
         @test norm(val.ν̇) < 1e-5
         @test norm(val.ν̈) < 1e-5
+        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
     end
 
     @testset "Correctness projective (non-zero valuation)" begin
@@ -136,6 +141,7 @@
         @test val.ν ≈ [-0.5, -1] atol = 1e-5
         @test norm(val.ν̇) < 1e-5
         @test norm(val.ν̈) < 1e-5
+        @test HC.judge(val; tol_at_infinity = 1e-5) == HC.VAL_AT_INFINITY
 
         # Use analytic estimates for ν̇ and ν̈
         init!(val)
@@ -149,6 +155,8 @@
         @test val.ν ≈ [-0.5, -1] atol = 1e-5
         @test norm(val.ν̇) < 1e-5
         @test norm(val.ν̈) < 1e-5
+        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
+        @test HC.judge(val; tol_at_infinity = 1e-10) == HC.VAL_INDECISIVE
 
         # PROJECTIVE VALUATIONS
 
@@ -162,6 +170,7 @@
         @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
         @test norm(val.ν̇) < 1e-3
         @test norm(val.ν̈) < 1e-3
+        @test HC.judge(val; tol = 1e-2) == HC.VAL_FINITE
 
         # Use analytic estimates for ν̇ and ν̈
         init!(val)
@@ -175,5 +184,6 @@
         @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
         @test norm(val.ν̇) < 1e-3
         @test norm(val.ν̈) < 1e-3
+        @test HC.judge(val; tol = 1e-2) == HC.VAL_FINITE
     end
 end
