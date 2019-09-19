@@ -3,6 +3,10 @@ export OrthogonalPatch
 """
     OrthogonalPatch()
 
+The orthogonal patch is a dynamically changing patch. It computes in such a way that
+`||x||=1` with respect to the 2-norm. See (for example) Section 3.2 in [^HR18].
+
+[^HR18]: https://arxiv.org/pdf/1710.06362.pdf
 """
 struct OrthogonalPatch <: AbstractAffinePatch end
 

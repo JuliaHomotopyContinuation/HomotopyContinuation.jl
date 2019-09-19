@@ -2,6 +2,9 @@ export FixedPatch
 
 """
     FixedPatch()
+
+The `FixedPatch` is similar to the [`OrthogonalPatch`](@ref) but it doesn't change during
+the tracking. Instead it only updates at the start of the tracking.
 """
 struct FixedPatch <: AbstractAffinePatch end
 

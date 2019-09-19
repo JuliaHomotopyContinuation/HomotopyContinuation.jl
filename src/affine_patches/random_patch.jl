@@ -3,7 +3,9 @@ export RandomPatch
 """
     RandomPatch()
 
-A random patch. The vector has norm 1.
+A random patch. For this we first draw entries of a vector `v` independently from a
+complex normal distribution (`randn(ComplexF64)`). And then normalize `v` with respect
+to the 1-norm.
 """
 struct RandomPatch <: AbstractAffinePatch end
 
