@@ -101,4 +101,25 @@
         @test ProjectiveVectors.affine_chart(p) ≈ [0, 0] atol = 1e-8
         @test m == 3
     end
+
+    @testset "Limit accuracy error" begin
+        # affine
+        @polyvar x
+        f = [(x - 3)^5]
+        tracker, starts = coretracker_startsolutions(
+            f;
+            seed = 1234,
+            min_step_size = eps()^2,
+            log_homotopy = true,
+        )
+        S = collect(starts)
+        tracker.options.precision = PRECISION_ADAPTIVE
+        track(tracker, S[3], 0.0, 40.0)
+        tracker.options.precision = PRECISION_FIXED_64
+        s = copy(tracker.state.x)
+        eg = HC.CauchyEndgame(s)
+        p = copy(tracker.state.x)
+        code, m = HC.predict!(p, tracker, eg)
+        @test code == HC.CAUCHY_TERMINATED_ACCURACY_LIMIT
+    end
 end
