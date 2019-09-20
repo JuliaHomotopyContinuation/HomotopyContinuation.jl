@@ -787,17 +787,18 @@ function init!(
     t₀;
     setup_patch::Bool = tracker.options.update_patch,
     loop::Bool = false,
+    keep_steps::Bool = false,
     check_start_value::Bool = !loop,
 )
     @unpack state, predictor, homotopy = tracker
 
-    init!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop)
+    init!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop, keep_steps)
     if !loop
         check_start_value!(tracker)
         compute_ẋ!(tracker; update_jacobian = false)
         init!(predictor, homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
-        initial_step_size!(state, predictor, tracker.options)
     end
+    initial_step_size!(state, predictor, tracker.options)
     tracker
 end
 
@@ -809,6 +810,7 @@ function init!(
     options::CTO,
     setup_patch::Bool,
     loop::Bool,
+    keep_steps::Bool,
 )
     state.segment = ComplexSegment(t₁, t₀)
     state.s = 0.0
@@ -821,7 +823,9 @@ function init!(
     if !loop
         state.accuracy = 0.0
         state.ω = 1.0
-        state.accepted_steps = state.rejected_steps = 0
+        if !keep_steps
+            state.accepted_steps = state.rejected_steps = 0
+        end
         init!(state.norm, state.x)
         init!(state.jacobian)
         state.residual .= 0.0
@@ -1039,6 +1043,7 @@ function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, optio
     if isnan(Δs)
         Δs = 0.05 * length(state.segment)
     end
+
     state.Δs = max(
         min(Δs, length(state.segment), options.max_step_size),
         options.min_step_size,

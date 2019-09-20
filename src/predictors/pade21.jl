@@ -6,7 +6,7 @@ export Pade21
 This uses a Padé-approximation of type (2,1) for prediction.
 """
 struct Pade21 <: AbstractPredictor end
-struct Pade21Cache{T, AV<:AbstractVector{T}} <: AbstractPredictorCache
+struct Pade21Cache{T,AV<:AbstractVector{T}} <: AbstractPredictorCache
     x²::Vector{T}
     x³::Vector{T}
     x_h::AV
@@ -14,18 +14,13 @@ struct Pade21Cache{T, AV<:AbstractVector{T}} <: AbstractPredictorCache
     u::Vector{T}
     u₁::Vector{T}
     u₂::Vector{T}
-
-    h₂::Float64
-    h₃::Float64
 end
 
 function cache(::Pade21, H, x, ẋ, t)
     x², x³, x_h = copy(ẋ), copy(ẋ), copy(x)
     u = evaluate(H, x, t)
     u₁, u₂ = copy(u), copy(u)
-    h₂ = nthroot(eps(), 2+2) # x² is the second order derivative and has a 2nd order approximation
-    h₃ = nthroot(eps(), 3+2) # x³ is the third order derivative and has a 2nd order approximation
-    Pade21Cache(x², x³, x_h, u, u₁, u₂, h₂, h₃)
+    Pade21Cache(x², x³, x_h, u, u₁, u₂)
 end
 
 @inline function g!(u, H, x, ẋ, t, h, x_h)
@@ -45,9 +40,8 @@ end
 
 function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Float64)
     # unpack stuff to make the rest easier to read
-    u, u₁, u₂ = cache.u, cache.u₁, cache.u₂
-    x_h, h₂, h₃ = cache.x_h, cache.h₂, cache.h₃
-    x², x³ = cache.x², cache.x³
+    @unpack u, u₁, u₂, x_h, x², x³ = cache
+
     h₂ = nthroot(10ψ, 4)
     g!(u₁, H, x, ẋ, t, h₂, x_h)
     g!(u₂, H, x, ẋ, t, -h₂, x_h)
@@ -64,7 +58,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Flo
 
     h³ = h₃^3
     @inbounds for i in eachindex(u₁)
-        u[i] = -3(u₁[i] - u₂[i]) / h³
+        u[i] = -3 * (u₁[i] - u₂[i]) / h³
     end
     LA.ldiv!(x³, Jac, u)
 
@@ -72,14 +66,14 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Flo
 end
 
 
-function predict!(xnext, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
-    x², x³ = cache.x², cache.x³
+function predict!(x̂, cache::Pade21Cache, H::HomotopyWithCache, x, t, Δt, ẋ, J)
+    @unpack x², x³ = cache
     @inbounds for i in eachindex(x)
         δ = 1 - Δt * x³[i] / (3 * x²[i])
-        if isnan(δ) || iszero(δ)
-            xnext[i] = x[i] + Δt * ẋ[i] + 0.5 * Δt^2 * x²[i]
+        if isnan(δ) || iszero(δ)
+            x̂[i] = x[i] + Δt * ẋ[i] + 0.5 * Δt^2 * x²[i]
         else
-            xnext[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / δ
+            x̂[i] = x[i] + Δt * ẋ[i] + (0.5 * Δt^2 * x²[i]) / δ
         end
     end
     nothing

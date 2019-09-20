@@ -51,6 +51,7 @@ module HomotopyContinuation
     include("core_tracker.jl")
 
     include("valuation.jl")
+    include("cauchy_endgame.jl")
     # include("path_tracker.jl")
     #
     # include("polyhedral.jl")
