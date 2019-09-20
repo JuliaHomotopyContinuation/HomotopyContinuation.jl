@@ -996,7 +996,7 @@ function step!(tracker::CT, debug::Bool = false)
         # to do this anyway for the computation of ẋ
         limit_accuracy!(tracker; update_jacobian = false)
         # tell the predictors about the new derivative if they need to update something
-        Ψ = maximum(state.eval_error)
+        Ψ = max(100state.limit_accuracy, eps())
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, Ψ)
 
         # Update other state
