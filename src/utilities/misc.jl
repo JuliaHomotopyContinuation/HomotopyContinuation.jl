@@ -323,9 +323,6 @@ end
 
 function Base.getindex(segment::ComplexSegment, t::Real)
     Δ = t / segment.abs_target_start
-    if 1.0 - Δ < 2eps()
-        Δ = 1.0
-    end
     segment.start + Δ * segment.Δ_target_start
 end
 Base.length(segment::ComplexSegment) = segment.abs_target_start
