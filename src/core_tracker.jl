@@ -996,7 +996,7 @@ function step!(tracker::CT, debug::Bool = false)
         # to do this anyway for the computation of ẋ
         limit_accuracy!(tracker; update_jacobian = false)
         # tell the predictors about the new derivative if they need to update something
-        Ψ = max(100state.limit_accuracy, eps())
+        Ψ = max(100 * state.limit_accuracy, eps())
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, Ψ)
 
         # Update other state
@@ -1056,7 +1056,6 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
         # In the divergend case this should not happen
         state.ω = is_converged(result) ? result.ω₀ : result.ω
     end
-
 
     near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 1000.0)
     if options.simple_step_size_alg ||
