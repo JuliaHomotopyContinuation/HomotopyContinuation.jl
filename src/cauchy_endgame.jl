@@ -1,5 +1,5 @@
 """
-    CauchyEndgame(x::AbstractVector)
+    CauchyEndgame(x::AbstractVector; samples_per_loop = 8, max_winding_number = 12)
 
 The Cauchy endgame tries to to predict the value a solution path `x(t)` at `0` , i.e. `x(0)`,
 by using a generalization of [Cauchy's integral formula]. This is derived in [^MSW90].
@@ -11,7 +11,16 @@ The number of loops is referred to as the *winding* or *cycle number*.
 """
 struct CauchyEndgame{AV<:AbstractVector}
     base_point::AV
-    CauchyEndgame(x::AV) where {AV<:AbstractVector} = new{AV}(copy(x))
+    samples_per_loop::Int
+    max_winding_number::Int
+
+    function CauchyEndgame(
+        x::AV;
+        samples_per_loop::Int = 8,
+        max_winding_number::Int = 12,
+    ) where {AV<:AbstractVector}
+        new{AV}(copy(x), samples_per_loop, max_winding_number)
+    end
 end
 
 """
@@ -36,8 +45,7 @@ An enum indicating the result of the [`predict!`](@ref) computation.
 end
 
 """
-    predict!(p, tracker::CoreTracker, ::CauchyEndgame;
-             samples_per_loop::Int = 8, max_winding_number::Int = 12)
+    predict!(p, tracker::CoreTracker, ::CauchyEndgame)
 
 Try to predict the value of `x(0)` using the [`CauchyEndgame`](@ref).
 For this we track the polygon defined by ``te^{i2πk/n}`` until we end again at ``x``.
@@ -48,14 +56,9 @@ winding number `m`.
 
 [Cauchy's integral formula]: https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula
 """
-function predict!(
-    p,
-    tracker::CoreTracker,
-    eg::CauchyEndgame;
-    samples_per_loop::Int = 8,
-    max_winding_number::Int = 12,
-)
-    @unpack base_point = eg
+function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
+    @unpack base_point, samples_per_loop, max_winding_number = cauchy
+
     tracker.options.logarithmic_time_scale || throw(ArgumentError("The `CoreTracker` needs to use a logarithmic time scale for the cauchy endgame."))
 
     s = current_t(tracker)

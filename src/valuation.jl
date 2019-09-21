@@ -41,7 +41,7 @@ function Valuation(x::ProjectiveVectors.PVector; affine::Bool = true)
         Valuation(length(x), affine)
     end
 end
-Valuation(x::Vector) = Valuation(length(x))
+Valuation(x::Vector; affine::Bool = true) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
     println(io, typeof(val), ":")
