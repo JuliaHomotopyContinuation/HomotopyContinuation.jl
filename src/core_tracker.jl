@@ -74,6 +74,7 @@ The possible states the `CoreTracker` can achieve are
 * `CT_SUCCESS`: Indicates a successfull completed tracking
 * `CT_TRACKING`: The tracking is still in progress
 * `CT_TERMINATED_MAX_ITERS`: Tracking terminated since maximal iterations reached.
+* `CT_TERMINATED_ILL_CONDITIONED`: Tracking terminated since the path was too ill-conditioned.
 * `CT_TERMINATED_INVALID_STARTVALUE`: Tracking terminated since the provided start value was invalid.
 * `CT_TERMINATED_STEP_SIZE_TOO_SMALL`
 """ @enum CoreTrackerStatus begin
@@ -83,6 +84,7 @@ The possible states the `CoreTracker` can achieve are
     CT_TERMINATED_INVALID_STARTVALUE
     CT_TERMINATED_STEP_SIZE_TOO_SMALL
     CT_TERMINATED_ACCURACY_LIMIT
+    CT_TERMINATED_ILL_CONDITIONED
 end
 
 """
