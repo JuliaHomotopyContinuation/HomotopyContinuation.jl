@@ -1,6 +1,6 @@
 struct NewtonCorrector end
 
-struct NewtonCorrectorCache{HC<:AbstractHomotopyCache, AV<:AbstractVector{ComplexDF64}}
+struct NewtonCorrectorCache{HC<:AbstractHomotopyCache,AV<:AbstractVector{ComplexDF64}}
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
     # D64 evaluation
@@ -169,55 +169,25 @@ function limit_accuracy!(
     cache::NewtonCorrectorCache;
     x_accuracy::Float64 = 1e-8,
     accuracy::Float64 = 1e-6,
-    safety_factor::Float64 = 1e3,
     update_jacobian::Bool = false,
-    double_64_evaluation::Bool = false,
 )
-    @unpack Δx, r, x_D64, cache_D64 = cache
+    @unpack Δx, r = cache
 
-    if update_jacobian && double_64_evaluation
-        x_D64 .= x
-        evaluate!(r, H.homotopy, x_D64, ComplexDF64(t), cache_D64)
-        jacobian!(jacobian(JM), H, x, t)
-        updated!(JM)
-    elseif update_jacobian
+    if update_jacobian
         evaluate_and_jacobian!(r, jacobian(JM), H, x, t)
         updated!(JM)
-    elseif double_64_evaluation
-        x_D64 .= x
-        evaluate!(r, H.homotopy, x_D64, t, cache_D64)
     else
         evaluate!(r, H, x, t)
     end
-    # limit residual ≈ abs.(r) is
-    limit_res .= abs.(r)
 
     LA.ldiv!(Δx, JM, r, norm)
-    limit_acc = Float64(norm(Δx))
 
+    limit_acc = Float64(norm(Δx))
     if limit_acc < x_accuracy
         x .-= Δx
     end
 
-    # accuracy is not yet sufficient, maybe this is just an artifact
-    # of the Newton step. So let's do another simplified Newton step
-    if accuracy / limit_acc < safety_factor
-        if double_64_evaluation
-            x_D64 .= x
-            evaluate!(r, H.homotopy, x_D64, t, cache_D64)
-        else
-            evaluate!(r, H, x, t)
-        end
-        LA.ldiv!(Δx, JM, r, norm)
-
-        # take here the maximum to capture the phenomen that we "bounce"
-        # around the limit accuracy
-        limit_acc = max(Float64(norm(Δx)), limit_acc)
-        if limit_acc < x_accuracy
-            x .-= Δx
-        end
-
-    end
+    limit_res .= abs.(r)
 
     return limit_acc
 end

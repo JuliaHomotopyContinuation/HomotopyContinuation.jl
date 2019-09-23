@@ -658,10 +658,15 @@ end
     x̄::AbstractVector,
     tracker::CT,
     x::AbstractVector = tracker.state.x,
-    t::Number = current_t(tracker.state),
+    t::Number = current_t(tracker.state);
+    simplified_last_step::Bool = true,
 )
     if tracker.options.precision == PRECISION_ADAPTIVE
-        double_64_evaluation = at_limit_accuracy(tracker.state, tracker.options)
+        double_64_evaluation = at_limit_accuracy(
+            tracker.state,
+            tracker.options;
+            safety_factor = 100.0,
+        )
     else
         double_64_evaluation = tracker.options.precision == PRECISION_FIXED_128
     end
@@ -677,6 +682,7 @@ end
         tol = tracker.options.accuracy,
         max_iters = tracker.options.max_corrector_iters + 1,
         double_64_evaluation = double_64_evaluation,
+        simplified_last_step = simplified_last_step,
     )
 end
 
@@ -689,23 +695,26 @@ end
 )
     @unpack state, options = tracker
 
-    limit_acc = limit_accuracy!(
-        state.residual,
-        tracker.homotopy,
-        x,
-        t,
-        state.jacobian,
-        norm,
-        tracker.corrector;
-        accuracy = options.accuracy,
-        x_accuracy = state.accuracy,
-        update_jacobian = update_jacobian,
-        # Don't use Double64 precision in limit_accuracy estimate
-        double_64_evaluation = false,
-    )
+    for i = 1:2
+        # We do a second if we would terminate the path tracking to make sure that this
+        # is not just an artifact
+        i == 2 && !terminate_limit_accuracy(state, options) && continue
+        limit_acc = limit_accuracy!(
+            state.residual,
+            tracker.homotopy,
+            x,
+            t,
+            state.jacobian,
+            norm,
+            tracker.corrector;
+            accuracy = options.accuracy,
+            x_accuracy = state.accuracy,
+            update_jacobian = i == 1 && update_jacobian,
+        )
 
-    state.accuracy = min(state.accuracy, limit_acc)
-    state.limit_accuracy = limit_acc
+        state.accuracy = min(state.accuracy, limit_acc)
+        state.limit_accuracy = limit_acc
+    end
 
     cond!(state.jacobian, norm, tracker.state.residual)
 
@@ -716,7 +725,14 @@ end
     nothing
 end
 
-function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 100.0)
+function terminate_limit_accuracy(state, options)
+    (options.precision == PRECISION_FIXED_64) && at_limit_accuracy(
+        state,
+        options;
+        safety_factor = 10.0,
+    )
+end
+function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 10.0)
     opts.accuracy < safety_factor * state.limit_accuracy
 end
 ####################
@@ -971,7 +987,7 @@ function step!(tracker::CT, debug::Bool = false)
     predict!(x̂, predictor, homotopy, x, t, Δt, ẋ, state.jacobian)
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
-    result = correct!(x̄, tracker, x̂, t + Δt)
+    result = correct!(x̄, tracker, x̂, t + Δt; simplified_last_step = true)
 
     debug && show(result)
 
@@ -994,12 +1010,8 @@ function step!(tracker::CT, debug::Bool = false)
         update!(state.norm, x)
 
         # Compute the new tangent ẋ(t).
-        # We can avoid an update of the Jacobian since we already
-        # did this for limit_accuracy
-        compute_ẋ!(tracker; update_jacobian = true,)
+        compute_ẋ!(tracker; update_jacobian = true)
         # Make an additional newton step to check the limiting accuracy
-        # We perform an update of the jacobian since we need
-        # to do this anyway for the computation of ẋ
         limit_accuracy!(tracker; update_jacobian = false)
         # tell the predictors about the new derivative if they need to update something
         Ψ = max(100 * state.limit_accuracy, eps())
@@ -1064,7 +1076,10 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
         state.ω = is_converged(result) ? result.ω₀ : result.ω
     end
 
-    near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 1000.0)
+    # Use the simple step size algorithm in the case that we get very close to
+    # the accuracy limit. The motivation is that we can run into danger that the computed
+    # estimate of ω is too high due to hitting limit accuracy.
+    near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 100.0)
     if options.simple_step_size_alg ||
        (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
         Δs = simple_step_size_alg!(state, options, result)
@@ -1158,9 +1173,7 @@ function check_terminated!(state::CTS, options::CTO)
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
         state.status = CT_TERMINATED_MAX_ITERS
-    elseif options.terminate_ill_conditioned &&
-           at_limit_accuracy(state, options; safety_factor = 10.0) &&
-           options.precision == PRECISION_FIXED_64
+    elseif options.terminate_ill_conditioned && terminate_limit_accuracy(state, options)
         state.status = CT_TERMINATED_ACCURACY_LIMIT
     elseif options.terminate_ill_conditioned && cond(state) > 1e14
         state.status = CT_TERMINATED_ILL_CONDITIONED
