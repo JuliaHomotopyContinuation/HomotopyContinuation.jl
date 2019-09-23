@@ -174,7 +174,15 @@ function update!(
             z³ = third_derivative(predictor)
             if !isnothing(z̈) && !isnothing(z³)
                 νᵢ, ν̇ᵢ, ν̈ᵢ = ν_ν̇_ν̈(z[i], ż[i], z̈[i], z³[i])
-                ν̇[i], ν̈[i] = ν̇ᵢ, ν̈ᵢ
+                if !isnan(s₁)
+                    # The estimates can be sensitive to numerical errors, so we still compare
+                    # against the numerical derivatives since this is cheap anyway
+                    ν̇ᵢ′, ν̈ᵢ′ = ν̇_ν̈(νᵢ, s, ν₂[i], s₂, ν₁[i], s₁)
+                    ν̇[i] = abs(ν̇ᵢ) < abs(ν̇ᵢ′) ? ν̇ᵢ : ν̇ᵢ′
+                    ν̈[i] = abs(ν̈ᵢ) < abs(ν̈ᵢ′) ? ν̈ᵢ : ν̈ᵢ′
+                else
+                    ν̇[i], ν̈[i] = ν̇ᵢ, ν̈ᵢ
+                end
             else
                 νᵢ = ν(z[i], ż[i])
                 if !isnan(s₁)
