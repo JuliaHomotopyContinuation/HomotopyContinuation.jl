@@ -43,6 +43,7 @@ const coretracker_supported_keywords = [
     :auto_scaling,
     :initial_step_size,
     :min_step_size,
+    :max_cond,
     :max_corrector_iters,
     :max_step_size,
     :max_steps,
@@ -198,10 +199,11 @@ for all possible options.
 mutable struct CoreTrackerOptions
     accuracy::Float64
     initial_step_size::Union{Nothing,Float64}
-    min_step_size::Float64
+    max_cond::Float64
     max_corrector_iters::Int
     max_step_size::Float64
     max_steps::Int
+    min_step_size::Float64
     precision::PrecisionOption
     simple_step_size_alg::Bool
     terminate_ill_conditioned::Bool
@@ -221,6 +223,7 @@ function CoreTrackerOptions(
     # public
     accuracy = 1e-7,
     initial_step_size = nothing,
+    max_cond::Float64 = 1e12,
     max_corrector_iters::Int = 2,
     max_step_size = Inf,
     max_steps = parameter_homotopy ? 10_000 : 1_000,
@@ -249,10 +252,11 @@ function CoreTrackerOptions(
     CoreTrackerOptions(
         accuracy,
         initial_step_size,
-        min_step_size,
+        max_cond,
         max_corrector_iters,
         max_step_size,
         max_steps,
+        min_step_size,
         make_precision(precision),
         simple_step_size_alg,
         terminate_ill_conditioned,
@@ -277,6 +281,35 @@ end
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
+
+Base.copy(opts::CoreTrackerOptions) = copy!(CoreTrackerOptions(), opts)
+function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
+    @unpack accuracy,
+        initial_step_size,
+        min_step_size,
+        max_cond,
+        max_corrector_iters,
+        max_step_size,
+        max_steps,
+        precision,
+        simple_step_size_alg,
+        terminate_ill_conditioned,
+        update_patch,
+        logarithmic_time_scale = opts2
+    @pack! opts = accuracy,
+        initial_step_size,
+        min_step_size,
+        max_cond,
+        max_corrector_iters,
+        max_step_size,
+        max_steps,
+        precision,
+        simple_step_size_alg,
+        terminate_ill_conditioned,
+        update_patch,
+        logarithmic_time_scale
+    opts
+end
 
 ####################
 # CoreTrackerState #
@@ -420,6 +453,8 @@ In this case the `min_step_size` criterion is still applied to ``t`` and not ``s
   introducing a *weighted norm*. See also [`WeightedNorm`](@ref).
 * `initial_step_size`: The size of the first step. By default an automatic estimate is
   computed but this can be overwritten with this option.
+* `max_cond` (default `1e10`): The maximal condition number before a path is terminated due
+  to ill-conditioning. This is only applicable if `terminate_ill_conditioned` is `true`.
 * `max_corrector_iters (default `2`): The maximal number of Newton iteration steps until
   which the desired accuracy has to be achieved.
 * `max_step_size` (default `Inf`): Limit the path tracker to a maximal step size.
@@ -1175,7 +1210,7 @@ function check_terminated!(state::CTS, options::CTO)
         state.status = CT_TERMINATED_MAX_ITERS
     elseif options.terminate_ill_conditioned && terminate_limit_accuracy(state, options)
         state.status = CT_TERMINATED_ACCURACY_LIMIT
-    elseif options.terminate_ill_conditioned && cond(state) > 1e14
+    elseif options.terminate_ill_conditioned && cond(state) > options.max_cond
         state.status = CT_TERMINATED_ILL_CONDITIONED
     end
     nothing

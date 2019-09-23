@@ -72,7 +72,6 @@ function newton!(
     @unpack Δx, r, x_D64, r_D64, cache_D64 = cache
     # alias to make logic easier
     xᵢ₊₁ = xᵢ = x̄
-
     for i ∈ 1:max_iters
         debug && println("i = ", i)
 
@@ -80,7 +79,7 @@ function newton!(
 
         if compute_jacobian && double_64_evaluation
             x_D64 .= xᵢ
-            evaluate!(r, H.homotopy, x_D64, ComplexDF64(t), cache_D64)
+            evaluate!(r, H.homotopy, x_D64, t, cache_D64)
             jacobian!(jacobian(JM), H, xᵢ, t)
             updated!(JM)
         elseif compute_jacobian
