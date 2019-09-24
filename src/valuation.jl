@@ -233,7 +233,7 @@ function judge(val::Valuation; tol::Float64 = 1e-3, tol_at_infinity::Float64 = 1
     finite = true
     indecisive = false
     for (i, νᵢ) in enumerate(ν)
-        if νᵢ < -tol
+        if νᵢ < -max(0.01, tol)
             finite = false
         end
 
