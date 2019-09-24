@@ -12,13 +12,14 @@ import PolynomialTestSystems
     @testset "Simple" begin
         @polyvar x y
         f = [x^2 - 2, x + y - 1]
-        @test pathtracker(f) isa PathTracker{Vector{ComplexF64}}
-        @test pathtracker(f; projective_tracking = true) isa PathTracker{PVector{
-            ComplexF64,
-            1,
-        }}
+        @test pathtracker(f; system = FPSystem) isa PathTracker{Vector{ComplexF64}}
+        @test pathtracker(
+            f;
+            projective_tracking = true,
+            system = FPSystem,
+        ) isa PathTracker{PVector{ComplexF64,1}}
 
-        tracker, starts = pathtracker_startsolutions(f)
+        tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
         S = collect(starts)
         for i = 1:2
             @test is_success(track!(tracker, S[i]))
@@ -36,71 +37,29 @@ import PolynomialTestSystems
     # Univariate singular
     @testset "Univariate singular" begin
         @polyvar x
-        n = 8
-        f = [(x - 3)^n]
-        g = [x^n - 1]
-        S = [[cis(i * 2π / n)] for i = 0:(n-1)]
-
-        tracker = pathtracker(g, f, S; seed = 842121, system = FPSystem)
-        @test_broken all(S) do s
-            is_success(track!(tracker, s)) && winding_number(tracker) == 8
-        end
-
-        # Test all Univariate singular solutions
-        @test_broken all(2:8) do n
+        for n = 2:12
             f = [(x - 3)^n]
             g = [x^n - 1]
             S = [[cis(i * 2π / n)] for i = 0:(n-1)]
-            tracker = pathtracker(g, f, S; seed = 132152, system = FPSystem)
-            all(S) do s
-                is_success(track!(tracker, s)) && winding_number(tracker) == n
+
+            tracker = pathtracker(g, f, S; seed = 842121, system = FPSystem)
+            @test all(S) do s
+                is_success(track!(tracker, s)) &&
+                winding_number(tracker) == n &&
+                isapprox(solution(tracker)[1], 3.0; atol = 1e-6)
             end
         end
     end
 
-
     # Wilkinson
     @testset "Wilkinson" begin
         @polyvar x
-        n = 17
-        g = [x^n - 1]
-        f = [prod(x - i for i = 1:n)]
-        S = [[cis(i * 2π / n)] for i = 0:(n-1)]
-
-        tracker = pathtracker(
-            g,
-            f,
-            S;
-            seed = 132123,
-            accuracy = 1e-14,
-            precision = :adaptive,
-            system = FPSystem,
-        )
-        @test_broken all(s -> is_success(track!(tracker, s)), S)
-
-        tracker = pathtracker(g, f, S; seed = 132123, system = FPSystem)
-        @test_broken all(s -> is_success(track!(tracker, s)), S)
-
-        tracker = pathtracker(
-            g,
-            f,
-            S;
-            seed = 132123,
-            precision = :adaptive,
-            system = FPSystem,
-        )
-        @test all(s -> is_success(track!(tracker, s)), S)
-
-        tracker = pathtracker(g, f, S; seed = 132123, accuracy = 1e-5, system = FPSystem)
-        @test_broken all(s -> is_success(track!(tracker, s)), S)
-
-        # Test all Wilkinson up to 18
-        @test_broken all(1:18) do n
+        for n = 2:18
             g = [x^n - 1]
             f = [prod(x - i for i = 1:n)]
             S = [[cis(i * 2π / n)] for i = 0:(n-1)]
             tracker = pathtracker(g, f, S; seed = 512321, system = FPSystem)
-            all(s -> is_success(track!(tracker, s)), S)
+            @test all(s -> is_success(track!(tracker, s)), S)
         end
     end
 
@@ -124,15 +83,15 @@ import PolynomialTestSystems
         ]
         @test pathtracker(F) isa PathTracker{PVector{ComplexF64,1}}
         tracker, starts = pathtracker_startsolutions(F; seed = 29831, system = FPSystem)
-        @test_broken map(s -> is_success(track!(tracker, s)), starts)
-        @test_broken all(starts) do s
+        @test all(s -> is_success(track!(tracker, s)), starts)
+        @test all(starts) do s
             retcode = track!(tracker, s)
             (is_success(retcode) && winding_number(tracker) == 3)
         end
         # affine
         F̂ = subs.(F, Ref(y => 1))
         tracker, starts = pathtracker_startsolutions(F̂; seed = 29831, system = FPSystem)
-        @test_broken all(starts) do s
+        @test all(starts) do s
             retcode = track!(tracker, s)
             (is_success(retcode) && winding_number(tracker) == 3)
         end
@@ -141,14 +100,13 @@ import PolynomialTestSystems
         G = subs.(F, Ref(z => 1))
         tracker, starts = pathtracker_startsolutions(G; seed = 29831, system = FPSystem)
         @test all(starts) do s
-            retcode = track!(tracker, s)
-            is_at_infinity(retcode)
+            is_at_infinity(track!(tracker, s))
         end
     end
 
     @testset "Non-Singular bad-conditioned" begin
         f = equations(PolynomialTestSystems.bacillus_subtilis())
-        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = FPSystem)
+        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = SPSystem)
         @test count(s -> is_success(track!(tracker, s)), starts) == 44
     end
 end
