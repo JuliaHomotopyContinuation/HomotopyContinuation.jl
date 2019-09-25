@@ -97,7 +97,10 @@ mutable struct PathTrackerOptions
     endgame_start::Float64
     at_infinity_check::Bool
     min_accuracy::Float64
+    min_step_size_before_eg::Float64
+    min_step_size_eg::Float64
     precision_strategy::PrecisionStrategy
+    s_always_consider_valuation::Float64
 end
 
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
@@ -220,6 +223,9 @@ function PathTracker(
     endgame_start_callback = always_true,
     precision_strategy::PrecisionStrategy = PREC_STRATEGY_FINITE,
     min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
+    min_step_size_before_eg::Float64 = exp2(-40),
+    min_step_size_eg = exp2(-100),
+    s_always_consider_valuation::Float64 = -log(1e-16),
 )
     state = PathTrackerState(current_x(core_tracker); at_infinity_check = at_infinity_check)
     endgame = CauchyEndgame(
@@ -232,7 +238,10 @@ function PathTracker(
         endgame_start,
         at_infinity_check,
         min_accuracy,
+        min_step_size_before_eg,
+        min_step_size_eg,
         precision_strategy,
+        s_always_consider_valuation,
     )
 
     PathTracker(
@@ -258,18 +267,20 @@ end
 
 
 function init!(tracker::PathTracker, x)
-    copy!(tracker.core_tracker.options, tracker.default_ct_options)
-    init!(tracker.core_tracker, x, 0.0, tracker.options.endgame_start)
+    options, ct_options = tracker.options, tracker.core_tracker.options
+    copy!(ct_options, tracker.default_ct_options)
+    init!(tracker.core_tracker, x, 0.0, options.endgame_start)
     init!(tracker.state, 0.0)
 
-    if tracker.options.precision_strategy == PREC_STRATEGY_ALWAYS ||
-       tracker.options.precision_strategy == PREC_STRATEGY_FINITE
-        tracker.core_tracker.options.precision = PRECISION_ADAPTIVE
+    if options.precision_strategy == PREC_STRATEGY_ALWAYS ||
+       options.precision_strategy == PREC_STRATEGY_FINITE
+        ct_options.precision = PRECISION_ADAPTIVE
     end
     # before endgame don't track the condition number
     # and we only update the limiting accuracy etc after a step failed
-    tracker.core_tracker.options.track_cond = false
-    tracker.core_tracker.options.steps_jacobian_info_update = -1
+    ct_options.track_cond = false
+    ct_options.steps_jacobian_info_update = -1
+    ct_options.min_step_size = options.min_step_size_before_eg
 
     tracker
 end
@@ -278,7 +289,7 @@ function step!(tracker::PathTracker)
     @unpack core_tracker, state, options, endgame = tracker
     step!(core_tracker)
 
-    state.s = real(current_t(core_tracker))
+    state.s = s = real(current_t(core_tracker))
     ct_status = status(core_tracker)
     if is_tracking(ct_status)
         state.eg_started || return state.status
@@ -288,19 +299,23 @@ function step!(tracker::PathTracker)
         # update the valuation
         update!(state.valuation, core_tracker)
 
-        # We only care about the valuation judgement if the path is starting to get worse
-        sign_of_ill_conditioning(
-            core_tracker;
-            min_cond = 1e3,
-            accuracy_safety_factor = 1e4,
-        ) || return state.status
+        # We only care about the valuation if the path is starting to get worse
+        # or we passed a certain threshold.
+        cond_bad = cond(core_tracker) > 1e4
+        near_accuracy_limit = 1e4 * core_tracker.state.limit_accuracy > core_tracker.options.accuracy
+        consider_always = s > options.s_always_consider_valuation
+        if !(consider_always || cond_bad || near_accuracy_limit)
+            return state.status
+        end
 
         # Judge the current valuation to determine how to proceed
         verdict = judge(state.valuation; tol = 1e-3, tol_at_infinity = 1e-4)
-        if options.at_infinity_check && verdict == VAL_AT_INFINITY
+        if verdict == VAL_AT_INFINITY &&
+           (consider_always || cond_bad) && options.at_infinity_check
             state.status = PT_AT_INFINITY
-        # If we expect a finite value let's do the cauchy endgame
-        elseif verdict == VAL_FINITE
+        # If we expect a finite value and there is some ill conditioning let's do the
+        # Cauchy endgame
+        elseif verdict == VAL_FINITE && (cond_bad || near_accuracy_limit)
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
             retcode, m = predict!(state.prediction, core_tracker, endgame)
@@ -336,7 +351,11 @@ function step!(tracker::PathTracker)
     elseif is_success(ct_status) && !state.eg_started
         # make callback, returns true if we can continue with the tracking
         if tracker.eg_start_callback(current_x(core_tracker))
-            t₀ = -log(10 * core_tracker.options.min_step_size)
+            state.eg_started = true
+            # set min_step size
+            core_tracker.options.min_step_size = options.min_step_size_eg
+            # setup path tracker to continue tracking
+            t₀ = -log(4 * options.min_step_size_eg)
             init!(
                 tracker.core_tracker,
                 current_x(core_tracker),
@@ -344,7 +363,6 @@ function step!(tracker::PathTracker)
                 t₀;
                 loop = true,
             )
-            state.eg_started = true
             # start keeping track of the condition number during the endgame
             tracker.core_tracker.options.track_cond = true
             # update the limiting accuracy and cond every other step
@@ -386,20 +404,19 @@ function step!(tracker::PathTracker)
         # 3) We are already at minimal accuracy and don't allow adaptive precision
         #     -> terminate
         # 1)
+        elseif minimum(state.valuation.ν) < -1
+            state.status = PT_AT_INFINITY
         elseif core_tracker.options.accuracy > options.min_accuracy
             # TODO: Currently we never increase this again
             core_tracker.options.accuracy = options.min_accuracy
             core_tracker.state.status = CT_TRACKING
-
         # 2)
         elseif options.precision_strategy == PREC_STRATEGY_FINITE
             # 2.a) We say that a path could still become finite if it is not classified
             #      as going to infinity for a loose tolerance
             #      Also if the current valuation is less than -1 (so significantly less than 0)
             #      we do not continue the tracking
-            if minimum(state.valuation.ν) < -1
-                state.status = PT_AT_INFINITY
-            elseif verdict == VAL_FINITE ||
+            if verdict == VAL_FINITE ||
                    judge(
                 state.valuation;
                 tol = 1e-2,
@@ -424,6 +441,8 @@ function step!(tracker::PathTracker)
     elseif ct_status == CT_TERMINATED_ILL_CONDITIONED
         state.status = PT_TERMINATED_ILL_CONDITIONED
 
+    elseif ct_status == CT_TERMINATED_STEP_SIZE_TOO_SMALL
+        status.status = PT_TERMINATED_STEP_SIZE_TOO_SMALL
     else
         @warn("unhandled case ", ct_status)
         state.status = PT_TERMINATED_INVALID_STARTVALUE
@@ -500,8 +519,8 @@ winding_number(state::PathTrackerState) = state.winding_number
 ###############################
 
 const pathtracker_startsolutions_supported_keywords = [
-    problem_startsolutions_supported_keywords;
-    coretracker_supported_keywords;
+    problem_startsolutions_supported_keywords
+    coretracker_supported_keywords
     pathtracker_supported_keywords
 ]
 
