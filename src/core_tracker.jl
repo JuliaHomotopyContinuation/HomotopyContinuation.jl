@@ -206,8 +206,9 @@ mutable struct CoreTrackerOptions
     min_step_size::Float64
     precision::PrecisionOption
     simple_step_size_alg::Bool
+    steps_jacobian_info_update::Int
     terminate_ill_conditioned::Bool
-
+    track_cond::Bool
     update_patch::Bool
     # Not changeable options
     logarithmic_time_scale::Bool
@@ -217,7 +218,6 @@ function CoreTrackerOptions(
     ;
     # internal
     parameter_homotopy = false,
-    # steps_jacobian_info_update::Int = 3,
     update_patch = true,
     logarithmic_time_scale = false,
     # public
@@ -230,7 +230,9 @@ function CoreTrackerOptions(
     min_step_size = 1e-14,
     precision::Union{PrecisionOption,Symbol} = :double,
     simple_step_size_alg = false,
+    steps_jacobian_info_update::Int = 5,
     terminate_ill_conditioned::Bool = true,
+    track_cond::Bool = true,
      # deprecated
     max_lost_digits = nothing,
     max_refinement_iters = nothing,
@@ -259,7 +261,9 @@ function CoreTrackerOptions(
         min_step_size,
         make_precision(precision),
         simple_step_size_alg,
+        steps_jacobian_info_update,
         terminate_ill_conditioned,
+        track_cond,
         update_patch,
         logarithmic_time_scale,
     )
@@ -293,7 +297,9 @@ function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
         max_steps,
         precision,
         simple_step_size_alg,
+        steps_jacobian_info_update,
         terminate_ill_conditioned,
+        track_cond,
         update_patch,
         logarithmic_time_scale = opts2
     @pack! opts = accuracy,
@@ -305,7 +311,9 @@ function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
         max_steps,
         precision,
         simple_step_size_alg,
+        steps_jacobian_info_update,
         terminate_ill_conditioned,
+        track_cond,
         update_patch,
         logarithmic_time_scale
     opts
@@ -370,7 +378,8 @@ function CoreTrackerState(
         min(unpack(options.initial_step_size, Inf), length(segment), options.max_step_size),
     )
     Δs_prev = 0.0
-    norm_Δx₀ = accuracy = limit_accuracy = 0.0
+    norm_Δx₀ = accuracy = 0.0
+    limit_accuracy = eps()
     ω = 1.0
     JM = JacobianMonitor(jacobian(H, x, t₁))
     residual = zeros(first(size(H)))
@@ -725,8 +734,7 @@ end
     tracker::CT,
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state),
-    norm::AbstractNorm = tracker.state.norm;
-    update_jacobian::Bool = false,
+    norm::AbstractNorm = tracker.state.norm,
 )
     @unpack state, options = tracker
 
@@ -744,18 +752,17 @@ end
             tracker.corrector;
             accuracy = options.accuracy,
             x_accuracy = state.accuracy,
-            update_jacobian = i == 1 && update_jacobian,
+            update_jacobian = false,
         )
-
         state.accuracy = min(state.accuracy, limit_acc)
-        state.limit_accuracy = limit_acc
+        state.limit_accuracy = max(state.accuracy, limit_acc)
     end
 
-    cond!(state.jacobian, norm, tracker.state.residual)
-
-    copyto!(state.eval_error, state.residual)
-    apply_row_scaling!(state.eval_error, state.jacobian)
-    state.eval_error .+= eps()
+    if options.track_cond
+        cond!(state.jacobian, norm, tracker.state.residual)
+        copyto!(state.eval_error, state.residual)
+        apply_row_scaling!(state.eval_error, state.jacobian)
+    end
 
     nothing
 end
@@ -812,7 +819,7 @@ function check_start_value!(tracker::CT)
             tracker.state.ω = result.ω₀
             tracker.state.x .= tracker.state.x̄
             tracker.state.accuracy = result.accuracy
-            limit_accuracy!(tracker; update_jacobian = false)
+            limit_accuracy!(tracker)
             return nothing
         elseif i == 1 && tracker.options.precision != PRECISION_FIXED_64
             double_64_evaluation = true
@@ -1046,15 +1053,21 @@ function step!(tracker::CT, debug::Bool = false)
 
         # Compute the new tangent ẋ(t).
         compute_ẋ!(tracker; update_jacobian = true)
+
         # Make an additional newton step to check the limiting accuracy
-        limit_accuracy!(tracker; update_jacobian = false)
+        if state.steps_jacobian_info_update == options.steps_jacobian_info_update ||
+           state.last_step_failed
+            limit_accuracy!(tracker)
+            state.steps_jacobian_info_update = 0
+        else
+            state.steps_jacobian_info_update += 1
+        end
         # tell the predictors about the new derivative if they need to update something
-        Ψ = max(100 * state.limit_accuracy, eps())
+        Ψ = 100 * max(state.limit_accuracy, eps())
         update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, Ψ)
 
         # Update other state
         state.accepted_steps += 1
-        state.steps_jacobian_info_update += 1
         state.last_step_failed = false
     else
         # Step failed, so we have to try with a new (smaller) step size
@@ -1115,8 +1128,8 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     # the accuracy limit. The motivation is that we can run into danger that the computed
     # estimate of ω is too high due to hitting limit accuracy.
     near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 100.0)
-    if options.simple_step_size_alg ||
-       (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
+    if options.simple_step_size_alg
+        # || (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
         Δs = simple_step_size_alg!(state, options, result)
     else
         Δs = adaptive_step_size_alg!(state, options, result, order(tracker.predictor))

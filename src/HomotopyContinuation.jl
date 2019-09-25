@@ -32,6 +32,7 @@ module HomotopyContinuation
     export @polyvar, subs, differentiate
     export mixed_volume
     export cond
+    export PVector
 
     include("progress_meter.jl")
     import .ProgressMeter

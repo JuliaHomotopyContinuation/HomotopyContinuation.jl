@@ -219,7 +219,7 @@ function PathTracker(
     endgame_start::Float64 = 2.0,
     endgame_start_callback = always_true,
     precision_strategy::PrecisionStrategy = PREC_STRATEGY_FINITE,
-    min_accuracy::Float64 = min(core_tracker.options.accuracy, 1e-5),
+    min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
 )
     state = PathTrackerState(current_x(core_tracker); at_infinity_check = at_infinity_check)
     endgame = CauchyEndgame(
@@ -266,6 +266,11 @@ function init!(tracker::PathTracker, x)
        tracker.options.precision_strategy == PREC_STRATEGY_FINITE
         tracker.core_tracker.options.precision = PRECISION_ADAPTIVE
     end
+    # before endgame don't track the condition number
+    # and we only update the limiting accuracy etc after a step failed
+    tracker.core_tracker.options.track_cond = false
+    tracker.core_tracker.options.steps_jacobian_info_update = -1
+
     tracker
 end
 
@@ -340,6 +345,10 @@ function step!(tracker::PathTracker)
                 loop = true,
             )
             state.eg_started = true
+            # start keeping track of the condition number during the endgame
+            tracker.core_tracker.options.track_cond = true
+            # update the limiting accuracy and cond every other step
+            tracker.core_tracker.options.steps_jacobian_info_update = 2
             # update the valuation
             update!(state.valuation, core_tracker)
 
@@ -360,7 +369,12 @@ function step!(tracker::PathTracker)
         state.solution .= current_x(core_tracker)
 
     elseif ct_status == CT_TERMINATED_ACCURACY_LIMIT
-        # We have to differentiate 3 different cases:
+        # First update the valuation  and check whether we are good
+        update!(state.valuation, core_tracker)
+        verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
+        if verdict == VAL_AT_INFINITY
+            state.status = PT_AT_INFINITY
+        # Now, we have to differentiate 3 different cases:
         # 1) Current accuracy is larger than the defined minimal accuracy
         #     -> decrease accuracy to minimal accuracy
         # 2) We are already at minimal accuracy and allow adaptive precision for finite
@@ -371,9 +385,8 @@ function step!(tracker::PathTracker)
         #     -> terminate
         # 3) We are already at minimal accuracy and don't allow adaptive precision
         #     -> terminate
-
         # 1)
-        if core_tracker.options.accuracy > options.min_accuracy
+        elseif core_tracker.options.accuracy > options.min_accuracy
             # TODO: Currently we never increase this again
             core_tracker.options.accuracy = options.min_accuracy
             core_tracker.state.status = CT_TRACKING
@@ -382,11 +395,12 @@ function step!(tracker::PathTracker)
         elseif options.precision_strategy == PREC_STRATEGY_FINITE
             # 2.a) We say that a path could still become finite if it is not classified
             #      as going to infinity for a loose tolerance
-            #      Also if the current valuation is less than -0.5 (so significantly less than 0)
+            #      Also if the current valuation is less than -1 (so significantly less than 0)
             #      we do not continue the tracking
-            if minimum(state.valuation.ν) < -0.5
-                state.status = PT_TERMINATED_ACCURACY_LIMIT
-            elseif judge(
+            if minimum(state.valuation.ν) < -1
+                state.status = PT_AT_INFINITY
+            elseif verdict == VAL_FINITE ||
+                   judge(
                 state.valuation;
                 tol = 1e-2,
                 tol_at_infinity = 1e-2,
@@ -486,8 +500,8 @@ winding_number(state::PathTrackerState) = state.winding_number
 ###############################
 
 const pathtracker_startsolutions_supported_keywords = [
-    problem_startsolutions_supported_keywords
-    coretracker_supported_keywords
+    problem_startsolutions_supported_keywords;
+    coretracker_supported_keywords;
     pathtracker_supported_keywords
 ]
 

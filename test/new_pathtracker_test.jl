@@ -106,7 +106,7 @@ import PolynomialTestSystems
 
     @testset "Non-Singular bad-conditioned" begin
         f = equations(PolynomialTestSystems.bacillus_subtilis())
-        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = SPSystem)
+        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = FPSystem)
         @test count(s -> is_success(track!(tracker, s)), starts) == 44
     end
 end
