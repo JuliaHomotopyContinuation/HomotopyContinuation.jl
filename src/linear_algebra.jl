@@ -62,7 +62,7 @@ function MatrixWorkspace(Â::AbstractMatrix, ::Type{T}) where {T}
     qr_cond_rwork = Vector{T}(undef, n)
     inf_norm_est_work = Vector{Complex{T}}(undef, n)
     inf_norm_est_rwork = Vector{T}(undef, n)
-    row_scaling = Vector{T}(undef, n)
+    row_scaling = ones(m)
     MatrixWorkspace(
         A,
         d,
@@ -278,14 +278,6 @@ function factorize!(WS::MatrixWorkspace)
         lu!(WS.lu.factors, nothing, WS.lu.ipiv)
     elseif WS.fact[] == QR_FACT
         @inbounds copyto!(WS.qr.factors, WS.A)
-        # m, n = size(WS.A)
-        # if m == n
-        #     # only apply row scaling for square matrices since
-        #     # otherwise we change the problem
-        #     row_scaling!(Jac.qr.factors, Jac.D, 1)
-        # end
-        # this computes a pivoted qr factorization, i.e.,
-        # qr!(Jac.qr.factors, Val(true)) but without allocating new memory
         geqp3!(WS.qr.factors, WS.qr.jpvt, WS.qr.τ, WS.qr_work, WS.qr_rwork)
     end
     WS.factorized[] = true
@@ -797,7 +789,7 @@ function row_scaling!(
     r::Union{Nothing,AbstractVector{<:Real}} = nothing,
 ) where T
     d = WS.row_scaling
-    d .= zero(T)
+    d .= one(T)
     m = length(d)
     if isa(norm, WeightedNorm)
         for j = 1:size(WS.A, 2), i = 1:m

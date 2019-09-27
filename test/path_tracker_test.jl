@@ -232,4 +232,27 @@
         @test isa(solution(res), Vector{ComplexF64})
         @test length(solution(res)) == 2
     end
+
+    @testset "Overdetermined" begin
+        @polyvar x y z
+        p₁ = (y - x^2) * (x^2+y^2+z^2 - 1) * (x - 0.5)
+        p₂ = (z - x^3) * (x^2+y^2+z^2 - 1) * (y - 0.5)
+        p₃ = (y - x^2) * (z - x^3) * (x^2+y^2+z^2 - 1) * (z - 0.5)
+        L₁ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
+        L₂ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
+
+        s = let
+            tracker, starts =
+                pathtracker_startsolutions([x^2+y^2+z^2 - 1; L₁]; system=FPSystem)
+            solution(track(tracker, first(starts)))
+        end
+
+        tracker = pathtracker([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s; system=FPSystem)
+        @test is_success(track(tracker, s))
+
+        tracker, starts = pathtracker_startsolutions(
+            [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
+            system = FPSystem, projective_tracking = true)
+        @test is_success(track(tracker, s))
+    end
 end
