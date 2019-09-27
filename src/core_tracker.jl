@@ -1081,6 +1081,12 @@ function step!(tracker::CT, debug::Bool = false)
 
     check_terminated!(state, options)
 
+    # If we terminate, always update the limit accuracy (and by this refine the solution
+    # to maximal accuracy).
+    if is_success(state.status) && state.steps_jacobian_info_update ≠ 0
+        limit_accuracy!(tracker)
+    end
+
     state.last_step_failed
 end
 
