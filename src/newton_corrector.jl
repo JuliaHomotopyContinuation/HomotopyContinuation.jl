@@ -5,7 +5,6 @@ struct NewtonCorrectorCache{HC<:AbstractHomotopyCache,AV<:AbstractVector{Complex
     r::Vector{ComplexF64}
     # D64 evaluation
     x_D64::AV
-    r_D64::Vector{ComplexDF64}
     cache_D64::HC
 end
 
@@ -14,9 +13,8 @@ function NewtonCorrectorCache(H::HomotopyWithCache, x::AbstractVector, t::Number
     Δx = Vector{ComplexF64}(undef, n)
     r = Vector{ComplexF64}(undef, m)
     x_D64 = similar(x, ComplexDF64)
-    r_D64 = Vector{ComplexDF64}(undef, m)
     cache_D64 = cache(H.homotopy, x_D64, t)
-    NewtonCorrectorCache(Δx, r, x_D64, r_D64, cache_D64)
+    NewtonCorrectorCache(Δx, r, x_D64, cache_D64)
 end
 
 cache(::NewtonCorrector, H, x, t) = NewtonCorrectorCache(H, x, t)

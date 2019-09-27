@@ -14,8 +14,9 @@ import PolynomialTestSystems, ProjectiveVectors
         f = [x^2 - 2, x + y - 1]
         tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
         @test tracker isa PathTracker{Vector{ComplexF64}}
-        for x in starts
-            @test is_success(track!(tracker, x))
+
+        for xᵢ in starts
+            @test is_success(track!(tracker, xᵢ))
             s = solution(tracker)
             @test abs(s[1]) ≈ sqrt(2) atol = 1e-8
             @test sum(s) ≈ 1 atol = 1e-8
@@ -23,6 +24,7 @@ import PolynomialTestSystems, ProjectiveVectors
             @test !isnan(tracker.state.solution_cond)
             @test !isnan(tracker.state.solution_accuracy)
             @test tracker.state.solution_accuracy < 1e-12
+            @test tracker.state.solution_residual < 1e-12
         end
 
         tracker, starts = pathtracker_startsolutions(
@@ -39,6 +41,7 @@ import PolynomialTestSystems, ProjectiveVectors
             @test isnothing(winding_number(tracker))
             @test !isnan(tracker.state.solution_cond)
             @test !isnan(tracker.state.solution_accuracy)
+            @test !isnan(tracker.state.solution_residual)
         end
 
         g = equations(katsura(5))
@@ -99,16 +102,14 @@ import PolynomialTestSystems, ProjectiveVectors
         tracker, starts = pathtracker_startsolutions(F; seed = 29831, system = FPSystem)
         @test all(s -> is_success(track!(tracker, s)), starts)
         @test all(starts) do s
-            retcode = track!(tracker, s)
-            is_success(retcode) &&
+            is_success(track!(tracker, s)) &&
             winding_number(tracker) == 3 && tracker.state.solution_cond > 1e10
         end
         # affine
         F̂ = subs.(F, Ref(y => 1))
         tracker, starts = pathtracker_startsolutions(F̂; seed = 29831, system = FPSystem)
         @test all(starts) do s
-            retcode = track!(tracker, s)
-            is_success(retcode) &&
+            is_success(track!(tracker, s)) &&
             winding_number(tracker) == 3 && tracker.state.solution_cond > 1e10
         end
 

@@ -145,6 +145,7 @@ mutable struct PathTrackerState{AV<:AbstractVector}
     solution::AV
     solution_accuracy::Float64
     solution_cond::Float64
+    solution_residual::Float64
     winding_number::Union{Nothing,Int}
     s::Float64
     eg_started::Bool
@@ -157,6 +158,7 @@ function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
     solution = copy(x)
     solution_accuracy = NaN
     solution_cond = NaN
+    solution_residual = NaN
     winding_number = nothing
     s = 0.0
     eg_started = false
@@ -167,6 +169,7 @@ function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
         solution,
         solution_accuracy,
         solution_cond,
+        solution_residual,
         winding_number,
         s,
         eg_started,
@@ -183,6 +186,7 @@ function init!(state::PathTrackerState, s::Float64)
     state.solution .= 0.0
     state.solution_accuracy = NaN
     state.solution_cond = NaN
+    state.solution_residual = NaN
     state.winding_number = nothing
     state.s = s
     state.eg_started = false
@@ -368,7 +372,7 @@ function step!(tracker::PathTracker)
                 state.status = PT_SUCCESS
                 state.solution_accuracy = p_accuracy
 
-                converged, solution_accuracy, solution_cond = check_converged!(
+                converged, s_accuracy, s_cond, s_res = check_converged!(
                     state.solution,
                     core_tracker,
                     state.prediction,
@@ -376,9 +380,10 @@ function step!(tracker::PathTracker)
                     tol = tracker.default_ct_options.accuracy,
                 )
 
-                state.solution_cond = solution_cond
-                if converged && solution_cond < 1e12
-                    state.solution_accuracy = solution_accuracy
+                state.solution_cond = s_cond
+                state.solution_residual = s_res
+                if converged && s_cond < 1e8 && s_accuracy < p_accuracy
+                    state.solution_accuracy = s_accuracy
                 else
                     state.solution .= state.prediction
                 end
@@ -439,7 +444,7 @@ function step!(tracker::PathTracker)
         end
 
     elseif is_success(ct_status)
-        converged, solution_accuracy, solution_cond = check_converged!(
+        converged, s_acc, s_cond, s_res = check_converged!(
             state.solution,
             core_tracker,
             current_x(core_tracker),
@@ -448,8 +453,9 @@ function step!(tracker::PathTracker)
         )
         if converged
             state.status = PT_SUCCESS
-            state.solution_accuracy = solution_accuracy
-            state.solution_cond = solution_cond
+            state.solution_accuracy = s_acc
+            state.solution_cond = s_cond
+            state.solution_residual = s_res
         else
             state.status = PT_POST_CHECK_FAILED
         end
@@ -541,15 +547,32 @@ function check_converged!(
     t::Number;
     tol::Float64 = 1e-6,
 )
+    init!(tracker.state.norm, x)
     # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
     # solutions that we bounce away from a good solution.
     result = correct!(y, tracker, x, t; tol = tol, max_iters = 3, full_steps = 1)
+    if is_converged(result)
+        tracker.state.residual .= abs.(tracker.corrector.r)
+    else
+        evaluate!(tracker.corrector.r, tracker.homotopy, x, t)
+        tracker.state.residual .= abs.(tracker.corrector.r)
+    end
+    res = LA.norm(tracker.state.residual, InfNorm())
+    # Fix the residual to the norm otherwise we can scale away zero rows.
+    tracker.state.residual .= res
+    # If the accuracy is NaN we assume that we dived by 0 -> Jacobian singular
     if isnan(result.accuracy)
         cond_jac = Inf
     else
         cond_jac = cond!(tracker.state.jacobian, tracker.state.norm, tracker.state.residual)
     end
-    (converged = is_converged(result), accuracy = result.accuracy, cond = cond_jac)
+
+    (
+     converged = is_converged(result),
+     accuracy = result.accuracy,
+     cond = cond_jac,
+     res = res,
+    )
 end
 
 function track!(tracker::PathTracker, x)
@@ -675,17 +698,17 @@ Its fields are
 
 Possible `details` values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
 """
-mutable struct PathResult{V<:AbstractVector}
+struct PathResult{V<:AbstractVector}
     return_code::Symbol
     solution::V
     t::Float64
     accuracy::Union{Nothing,Float64}
     residual::Union{Nothing,Float64} # level 1+
-    multiplicity::Union{Nothing,Int} # only assigned by singular(Result)
     condition_jacobian::Union{Nothing,Float64}
     winding_number::Union{Nothing,Int}
     path_number::Union{Nothing,Int}
     start_solution::Union{Nothing,V} # level 1+
+    multiplicity::Base.RefValue{Union{Nothing,Int}} # only assigned by singular(Result)
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
@@ -695,15 +718,16 @@ end
 
 function PathResult(
     tracker::PathTracker,
-    start_solution,
+    start_solution::Union{Nothing,AbstractVector} = nothing,
     path_number::Union{Nothing,Int} = nothing;
     details::Symbol = :default,
 )
-    @unpack state, core_tracker, cache = tracker
+    @unpack state, core_tracker = tracker
     details_level = detailslevel(details)
-    return_code = Symbol(state.status)
+    return_code = symbol(state.status)
     windingnumber = winding_number(tracker)
-    x = solution(tracker)
+    x = copy(solution(tracker))
+
     # accuracy
     if !isnan(state.solution_accuracy)
         accuracy = state.solution_accuracy
