@@ -14,14 +14,7 @@ export norm
     AbstractNorm
 
 An `AbstractNorm` represents any norm of a vector space.
-
-Current implementations are:
-
-* [EuclideanNorm](@ref)
-* [InfNorm](@ref)
-* [WeightedNorm](@ref)
-
-All norms are callable. `norm(x)` computes the norm of `x` and `norm(x,y) computes the distance
+All norms are callable. `norm(x)` computes the norm of `x` and `norm(x,y)` computes the distance
 `norm(x - y).`
 """
 abstract type AbstractNorm end
@@ -29,10 +22,16 @@ abstract type AbstractNorm end
 """
     distance(u, v, norm::AbstractNorm)
 
-Compute the distance ||u-v|| with the given norm `norm`.
+Compute the distance ||u-v|| with respect to the given norm `norm`.
 """
-function distance end
+distance(u, v, norm::AbstractNorm) = MethodError(distance, (u, v, norm))
 
+"""
+    norm(u, norm::AbstractNorm)
+
+Compute the norm ||u|| with respect to the given norm `norm`.
+"""
+LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, norm))
 
 ##################
 ## WeightedNorm ##
@@ -163,7 +162,7 @@ update!(n::AbstractNorm, ::AbstractVector) = n
 ####################
 
 """
-    EuclideanNorm <: AbstractNorm
+    EuclideanNorm
 
 The usual [Euclidean norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm) resp. 2-norm.
 """

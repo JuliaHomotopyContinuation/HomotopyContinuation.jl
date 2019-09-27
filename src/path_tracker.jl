@@ -1003,7 +1003,7 @@ is_at_infinity(r::PathResult) = r.return_code == :at_infinity
 
 
 """
-    is_finite(pathresult)
+    is_finite(r::PathResult)
 
 Checks whether the path result is finite.
 """
@@ -1013,7 +1013,7 @@ is_finite(r::PathResult) = r.return_code == :success
 Base.isfinite(r::PathResult) = is_finite(r)
 
 """
-    is_singular(pathresult; tol=1e10)
+    is_singular(r::PathResult; tol=1e10)
 
 Checks whether the path result is singular. This is true if
 the multiplicity is larger than  1 or if the condition number of the Jacobian
@@ -1026,7 +1026,7 @@ function is_singular(r::PathResult, tol::Real)
 end
 
 """
-    is_nonsingular(pathresult; tol=1e10)
+    is_nonsingular(r::PathResult; tol=1e10)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
@@ -1036,7 +1036,7 @@ is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
 
 
 """
-    is_real(pathresult; tol=1e-6)
+    is_real(r::PathResult; tol=1e-6)
 
 We consider a result as `real` if the 2-norm of the imaginary part of the solution is at most `tol`.
 """
@@ -1047,12 +1047,12 @@ Base.isreal(r::PathResult, tol) = is_real(r, tol)
 Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)
 
 """
-    is_projective(pathresult)
+    is_projective(r::PathResult)
 
 Return`s true if the solution is a projective vector.
 """
-is_projective(r::PathResult{<:PVector}) = true
 is_projective(r::PathResult) = false
+is_projective(r::PathResult{<:PVector}) = true
 
 """
     is_affine(pathresult)

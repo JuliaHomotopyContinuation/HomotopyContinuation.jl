@@ -152,18 +152,18 @@ function CoreTrackerResult(tracker)
 end
 
 """
-    is_success(R::CoreTrackerResult)
+    is_success(result::CoreTrackerResult)
 
 Returns `true` if the path tracking was successfull.
 """
-is_success(R::CoreTrackerResult) = is_success(R.returncode)
+is_success(result::CoreTrackerResult) = is_success(result.returncode)
 
 """
-    solution(R::CoreTrackerResult)
+    solution(result::CoreTrackerResult)
 
 Returns the solutions obtained by the `CoreTracker`.
 """
-solution(R::CoreTrackerResult) = R.x
+solution(result::CoreTrackerResult) = result.x
 
 
 Base.show(io::IO, result::CoreTrackerResult) = print_fieldnames(io, result)
@@ -430,7 +430,7 @@ A `CoreTracker` is the low-level path tracker. Its job is to track an initial so
 `x₁` from `t₁` to `t₀` by following a solution path ``x(t)``. For this a *predictor-corrector* scheme is used.
 See our [introduction guide](https://www.juliahomotopycontinuation.org/guides/introduction/#tracking-solution-paths)
 for a high-level explanation of the predictor corrector scheme.
-The `CoreTracker` accepts for a value `t` a solution ``x̄`` if ``||x(t) - x̄|| < τ`` where ``τ``
+The `CoreTracker` accepts for a value `t` a solution ``x^*`` if ``||x(t) - x^*|| < τ`` where ``τ``
 is controlled by the `accuracy` option.
 
 To interact with a `CoreTracker` take a look at [`track`](@ref) resp. [`track!`](@ref).
@@ -475,7 +475,7 @@ In this case the `min_step_size` criterion is still applied to ``t`` and not ``s
   `auto_scaling` is true, this will automatically be converted to a [`WeightedNorm`](@ref).
 * `patch`: It is possible to perform tracking in projective space. For the actual
   compuations we still need to choose an affine chart. There are multiple charts possible,
-  see [`AbstractAffinePatch`](@ref). The default is [`Random`](@ref).
+  see [`AbstractAffinePatch`](@ref). The default is [`RandomPatch`](@ref).
 * `precision` (default `:double`): This controls the precision used in the computation
   of ``H(x,t)``. If it is set to `:double` only double precision arithmetic is used
   (`Complex{Float64}`).  If it set to `:double_double` double double arithmetic
@@ -838,7 +838,7 @@ Setup `tracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to u
 `tracker` as an iterator.
 """
 function init!(
-    tracker::CT,
+    tracker::CoreTracker,
     x₁::AbstractVector,
     t₁,
     t₀;
@@ -1255,90 +1255,90 @@ affine_tracking(tracker::CT) = !isa(tracker.state.x, ProjectiveVectors.PVector)
 ## Query State ##
 #################
 """
-    current_t(tracker::CT)
+    current_t(tracker::CoreTracker)
 
 Current `t`.
 """
-current_t(tracker::CT) = current_t(tracker.state)
+current_t(tracker::CoreTracker) = current_t(tracker.state)
 current_t(state::CTS) = state.segment[state.s]
 
 """
- current_Δt(tracker::CT)
+    current_Δt(tracker::CoreTracker)
 
 Current step_size `Δt`.
 """
-current_Δt(tracker::CT) = current_Δt(tracker.state)
+current_Δt(tracker::CoreTracker) = current_Δt(tracker.state)
 current_Δt(state::CTS) = state.segment[state.Δs] - state.segment.start
 
 """
-    steps(tracker::CT)
+    steps(tracker::CoreTracker)
 
 Current number of steps.
 """
-steps(tracker::CT) = steps(tracker.state)
+steps(tracker::CoreTracker) = steps(tracker.state)
 steps(state::CTS) = state.accepted_steps + state.rejected_steps
 
-@deprecate iters(tracker::CT) steps(tracker)
+@deprecate iters(tracker::CoreTracker) steps(tracker)
 
 
 """
-    status(tracker::CT)
+    status(tracker::CoreTracker)
 
 Current status.
 """
-status(tracker::CT) = status(tracker.state)
+status(tracker::CoreTracker) = status(tracker.state)
 status(state::CTS) = state.status
 
 """
-    current_x(tracker::CT)
+    current_x(tracker::CoreTracker)
 
 Return the current value of `x`.
 """
-current_x(tracker::CT) = current_x(tracker.state)
+current_x(tracker::CoreTracker) = current_x(tracker.state)
 current_x(state::CTS) = state.x
 
 
 """
-    LinearAlgebra.cond(tracker::CT)
+    LinearAlgebra.cond(tracker::CoreTracker)
 
 Returns the currently computed approximation of the condition number of the
 Jacobian.
 """
-cond(tracker::CT) = LA.cond(tracker.state)
+cond(tracker::CoreTracker) = LA.cond(tracker.state)
 cond(state::CTS) = LA.cond(state.jacobian)
 
 
 """
-    norm(tracker::CT)
+    norm(tracker::CoreTracker)
 
 Returns the norm used to compute distances during the path tracking.
 """
-norm(tracker::CT) = norm(tracker.state)
+norm(tracker::CoreTracker) = norm(tracker.state)
 norm(state::CTS) = state.norm
 
 """
-    options(tracker::CT)
+    options(tracker::CoreTracker)
 
 Returns the options used in the tracker.
 """
-options(tracker::CT) = tracker.options
+options(tracker::CoreTracker) = tracker.options
 
 ##################
 # Modify options #
 ##################
 """
-    accuracy(tracker::CT)
+    accuracy(tracker::CoreTracker)
 
 Current accuracy.
 """
-accuracy(tracker::CT) = tracker.options.accuracy
+accuracy(tracker::CoreTracker) = tracker.options.accuracy
 
 """
-    set_accuracy!(tracker::CT, accuracy)
+    set_accuracy!(tracker::CoreTracker, accuracy)
 
 Set the current accuracy to `accuracy`.
 """
-function set_accuracy!(tracker::CT, accuracy)
+function set_accuracy!(tracker::CoreTracker, accuracy)
     @unpack options = tracker
     options.accuracy = accuracy
     tracker
@@ -1346,28 +1346,28 @@ end
 
 
 """
-    max_corrector_iters(tracker::CT)
+    max_corrector_iters(tracker::CoreTracker)
 
 Current correction max_steps.
 """
 max_corrector_iters(T::CT) = T.options.max_corrector_iters
 
 """
- set_max_corrector_iters!(tracker::CT, n)
+ set_max_corrector_iters!(tracker::CoreTracker, n)
 
 Set the correction max_steps to `n`.
 """
 set_max_corrector_iters!(T::CT, n) = T.options.max_corrector_iters = n
 
 """
-    max_step_size (tracker::CT)
+    max_step_size (tracker::CoreTracker)
 
 Current maximal step size.
 """
 max_step_size(T::CT) = T.options.max_step_size
 
 """
-    set_max_corrector_iters!(tracker::CT, Δs)
+    set_max_corrector_iters!(tracker::CoreTracker, Δs)
 
 Set the maximal step size to `Δs`.
 """
@@ -1375,17 +1375,17 @@ set_max_step_size!(T::CT, Δs) = T.options.max_step_size = Δs
 
 ## Deprecated ##
 """
-    refinement_accuracy(tracker::CT)
+    refinement_accuracy(tracker::CoreTracker)
 
 Current refinement accuracy.
 """
-function refinement_accuracy(tracker::CT)
+function refinement_accuracy(tracker::CoreTracker)
     @warn("Solutions are now automatically refined to maximal achievable accuracy.")
     return tracker.options.accuracy
 end
 
 """
-    set_max_refinement_iters!(tracker::CT, accuracy)
+    set_max_refinement_iters!(tracker::CoreTracker, accuracy)
 
 Set the current refinement accuracy to `accuracy`.
 """
@@ -1396,7 +1396,7 @@ function set_refinement_accuracy!(T::CT, accuracy)
 end
 
 """
-    max_refinement_iters(tracker::CT)
+    max_refinement_iters(tracker::CoreTracker)
 
 Current refinement max_steps.
 """
@@ -1408,7 +1408,7 @@ function max_refinement_iters(T::CT)
 end
 
 """
-    set_max_refinement_iters!(tracker::CT, n)
+    set_max_refinement_iters!(tracker::CoreTracker, n)
 
 Set the current refinement max_steps to `n`.
 """
@@ -1424,7 +1424,7 @@ end
 
 Set the start parameters of the homotopy in in `tracker` to `p`.
 """
-start_parameters!(tracker::CT, p::AbstractVector) =
+start_parameters!(tracker::CoreTracker, p::AbstractVector) =
     (set_start_parameters!(basehomotopy(tracker.homotopy), p); tracker)
 
 """
@@ -1432,7 +1432,7 @@ start_parameters!(tracker::CT, p::AbstractVector) =
 
 Set the target parameters of the homotopy in in `tracker` to `p`.
 """
-target_parameters!(tracker::CT, p::AbstractVector) =
+target_parameters!(tracker::CoreTracker, p::AbstractVector) =
     (set_target_parameters!(basehomotopy(tracker.homotopy), p); tracker)
 
 
@@ -1447,7 +1447,7 @@ Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PathIterator}) = Base.HasEltype()
 
 """
-    iterator(tracker::CT, x₁, t₁=1.0, t₀=0.0; affine=true)
+    iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; affine=true)
 
 Prepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect a specific
 path. In each iteration the tuple `(x,t)` is returned.
@@ -1525,7 +1525,7 @@ This is convenient if you want to investigate single paths.
 We want to construct a path tracker to track a parameterized system `f` with parameters `p`
 from the parameters `a` to `b`.
 ```julia
-tracker = CoreTracker(f, parameters=p, p₁=a, p₀=b)
+tracker = coretracker(f; parameters = p, start_parameters = a, target_parameters = b)
 ```
 You then can obtain a single solution at `b` by using
 ```julia
@@ -1536,21 +1536,19 @@ x_b = track(tracker, x_a).x
 To trace a path you can use the [`iterator`](@ref) method.
 
 ```julia
-tracker = CoreTracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f; parameters = p, start_parameters = a, target_parameters = b)
 for (x, t) in iterator(tracker, x₁)
-@show (x,t)
+    @show (x,t)
 end
 ```
 
 If we want to guarantee smooth traces we can limit the maximal step size.
 ```julia
-tracker = CoreTracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f; parameters = p, max_step_size = 0.01,
+                         start_parameters = a, target_parameters = b)
 for (x, t) in iterator(tracker, x₁)
-@show (x,t)
+    @show (x,t)
 end
 ```
 """
-function coretracker(args...; kwargs...)
-    tracker, _ = coretracker_startsolutions(args...; kwargs...)
-    tracker
-end
+coretracker(args...; kwargs...) = first(coretracker_startsolutions(args...; kwargs...))

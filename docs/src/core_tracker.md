@@ -11,6 +11,7 @@ CoreTracker
 ```
 
 The easiest way to construct a `CoreTracker` is to use `coretracker` and `coretracker_startsolutions`.
+
 ```@docs
 coretracker_startsolutions
 coretracker
@@ -19,19 +20,19 @@ coretracker
 ## Result and Status
 ```@docs
 CoreTrackerResult
-is_success(::CoreTrackerResult)
-solution(::CoreTrackerResult)
-```
-
-```@docs
+is_success(result::CoreTrackerResult)
+solution(result::CoreTrackerResult)
 CoreTrackerStatus
+is_success(::CoreTrackerStatus)
+is_terminated(::CoreTrackerStatus)
+is_tracking(::CoreTrackerStatus)
 ```
 
 ## Methods
 To track from a start to an endpoint with the `CoreTracker` we provide the following
 routines.
 ```@docs
-track(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
+track(tracker::CoreTracker, x₁::AbstractVector, t₁::Number = 1.0, t₀::Number = 0.0)
 track!(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
 init!(tracker::CoreTracker, x₁::AbstractVector, t₁::Number, t₀::Number)
 ```
