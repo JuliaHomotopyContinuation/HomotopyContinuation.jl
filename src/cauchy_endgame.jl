@@ -51,8 +51,8 @@ Try to predict the value of `x(0)` using the [`CauchyEndgame`](@ref).
 For this we track the polygon defined by ``te^{i2πk/n}`` until we end again at ``x``.
 Here ``n`` is the number of samples we take per loop, `samples_per_loop`.
 The computation gives up if we have a winding number larger than `max_winding_number`.
-It returns a tuple denoting the success ([`CauchyEndgameResult`](@ref)) and the computed
-winding number `m`.
+It returns a tuple denoting the success ([`CauchyEndgameResult`](@ref)) the computed
+winding number `m::Int` and th expected accuracy of the solution.
 
 [Cauchy's integral formula]: https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula
 """
@@ -63,13 +63,6 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
 
     s = current_t(tracker)
     s_target = tracker.state.segment.target
-
-    # store initial tracking information
-    initial_segment = tracker.state.segment
-    initial_s = tracker.state.s
-    initial_Δs = tracker.state.Δs
-    initial_step_size = tracker.options.initial_step_size
-
 
     # store the current value in p
     base_point .= current_x(tracker)
@@ -82,6 +75,10 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
     m = k = 1
     Δθ = 2π / samples_per_loop
     result = CAUCHY_TERMINATED_MAX_WINDING_NUMBER
+    # The accuracy of the Cauchy endgame depends on the minimal accuracy
+    # of a sample point. If all sample points are computed with an accuracy τ
+    # we can expect τ as an error of the solution
+    max_acc = tracker.state.accuracy
     while m ≤ max_winding_number
         θⱼ = 0.0
         for j = 1:samples_per_loop
@@ -89,13 +86,14 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
             θⱼ += Δθ
 
             retcode = track!(tracker, x, s + im * θⱼ₋₁, s + im * θⱼ; loop = true)
+            max_acc = max(max_acc, tracker.state.accuracy)
 
             if !is_success(retcode)
                 init!(tracker, base_point, s, s_target; keep_steps = true)
                 if retcode == CT_TERMINATED_ACCURACY_LIMIT
-                    return CAUCHY_TERMINATED_ACCURACY_LIMIT, m
+                    return CAUCHY_TERMINATED_ACCURACY_LIMIT, m, max_acc
                 else
-                    return CAUCHY_TERMINATED, m
+                    return CAUCHY_TERMINATED, m, max_acc
                 end
             end
 
@@ -115,7 +113,7 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
     unfix_patch!(tracker)
     init!(tracker, base_point, s, s_target; loop = true, keep_steps = true)
 
-    result, m
+    result, m, max_acc
 end
 
 fix_patch!(tracker::CoreTracker) = tracker.options.update_patch = false

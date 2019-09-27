@@ -318,7 +318,7 @@ function step!(tracker::PathTracker)
         elseif verdict == VAL_FINITE && (cond_bad || near_accuracy_limit)
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
-            retcode, m = predict!(state.prediction, core_tracker, endgame)
+            retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
 
             if retcode == CAUCHY_SUCCESS
                 state.winding_number = m
