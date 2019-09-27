@@ -146,4 +146,60 @@ import PolynomialTestSystems, ProjectiveVectors
 
         @test all(successfull_paths' .== findall(is_success, results))
     end
+
+    @testset "PathResult" begin
+        # simple affine
+        @polyvar x y
+        f = [x^2 - 2, x + y - 1]
+        tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
+        for (i, sᵢ) in enumerate(starts)
+            result = track(tracker, sᵢ; path_number=i, details=:extensive)
+            @test is_success(result)
+            s = solution(tracker)
+            @test abs(s[1]) ≈ sqrt(2) atol = 1e-8
+            @test sum(s) ≈ 1 atol = 1e-8
+
+            @test accuracy(result) < 1e-8
+            @test residual(result) < 1e-8
+
+            @test isnothing(winding_number(result))
+            @test isnothing(multiplicity(result))
+            @test condition_jacobian(result) < 1e3
+            @test path_number(result) == i
+            @test is_affine(result)
+            @test !is_projective(result)
+            @test is_finite(result)
+            @test !is_singular(result)
+            @test is_real(result)
+
+            test_show_juno(result)
+            @test !isempty(sprint(show, result))
+        end
+
+        # 1 singular solution (multiplicity 3) and 3 paths going to infinity. Checked earlier.
+        f = equations(griewank_osborne())
+        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = FPSystem)
+        for sᵢ in starts
+            result = track(tracker, sᵢ; details=:extensive)
+
+            test_show_juno(result)
+            @test !isempty(sprint(show, result))
+
+            if is_at_infinity(result)
+                @test result.t > 0
+                @test !is_finite(result)
+            elseif is_success(result)
+                @test solution(result) ≈ [0.0, 0.0] atol = 1e-6
+                @test is_real(result)
+                @test winding_number(result) == 3
+                @test accuracy(result) < 1e-6
+                @test condition_jacobian(result) > 1e10
+                @test is_singular(result)
+                @test is_finite(result)
+                @test isnothing(path_number(result))
+            else
+                @test false
+            end
+        end
+    end
 end

@@ -68,7 +68,7 @@ function newton!(
     x̄ .= x₀
     acc = limit_acc = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = Inf
     ω = ω₀ = θ₀ = θ = NaN
-    @unpack Δx, r, x_D64, r_D64, cache_D64 = cache
+    @unpack Δx, r, x_D64, cache_D64 = cache
     # alias to make logic easier
     xᵢ₊₁ = xᵢ = x̄
     for i ∈ 1:max_iters
