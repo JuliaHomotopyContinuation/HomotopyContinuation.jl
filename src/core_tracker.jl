@@ -704,6 +704,10 @@ end
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state);
     simplified_last_step::Bool = true,
+    max_iters::Int = tracker.options.max_corrector_iters + 1,
+    full_steps::Int = max_iters - simplified_last_step,
+    tol::Float64 = tracker.options.accuracy,
+
 )
     if tracker.options.precision == PRECISION_ADAPTIVE
         double_64_evaluation = at_limit_accuracy(
@@ -723,10 +727,10 @@ end
         tracker.state.jacobian,
         tracker.state.norm,
         tracker.corrector;
-        tol = tracker.options.accuracy,
-        max_iters = tracker.options.max_corrector_iters + 1,
+        tol = tol,
+        max_iters = max_iters,
         double_64_evaluation = double_64_evaluation,
-        simplified_last_step = simplified_last_step,
+        full_steps = full_steps,
     )
 end
 
@@ -783,13 +787,6 @@ end
 
 embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
 embed!(x::AbstractVector, y) = x .= y
-
-function check_start_value(tracker::CT, x, t)
-    embed!(tracker.state.x̄, x)
-    init!(tracker.state.norm, tracker.state.x̄)
-    result = correct!(tracker.state.x̄, tracker, x, t)
-    is_converged(result)
-end
 
 function check_start_value!(tracker::CT)
     # We perturb the provided soution by sligthly more than the desired accuracy
@@ -1244,7 +1241,6 @@ function Base.iterate(tracker::CoreTracker, state::Int = 0)
         nothing
     end
 end
-
 
 """
     affine_tracking(tracker)

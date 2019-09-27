@@ -84,6 +84,33 @@ is_at_infinity(status::PathTrackerStatus) = status == PT_AT_INFINITY
 is_tracking(status::PathTrackerStatus) = status == PT_TRACKING
 
 
+function symbol(status::PathTrackerStatus)
+    if status == PT_SUCCESS
+        :success
+    elseif status == PT_AT_INFINITY
+        :at_infinity
+    elseif status == PT_TERMINATED_CALLBACK
+        :terminated_callback
+    elseif status == PT_TERMINATED_MAX_ITERS
+        :terminated_max_iters
+    elseif status == PT_TERMINATED_INVALID_STARTVALUE
+        :terminated_invalid_startvalue
+    elseif status == PT_TERMINATED_STEP_SIZE_TOO_SMALL
+        :terminated_step_size_too_small
+    elseif status == PT_TERMINATED_ACCURACY_LIMIT
+        :terminated_accuracy_limit
+    elseif status == PT_TERMINATED_ILL_CONDITIONED
+        :terminated_ill_conditioned
+    elseif status == PT_POST_CHECK_FAILED
+        :post_check_failed
+    elseif status == PT_EXCESS_SOLUTION
+        :excess_solution
+    else
+        :unknown
+    end
+end
+
+
 #############
 ## Options ##
 #############
@@ -116,6 +143,8 @@ mutable struct PathTrackerState{AV<:AbstractVector}
     valuation::Valuation
     prediction::AV
     solution::AV
+    solution_accuracy::Float64
+    solution_cond::Float64
     winding_number::Union{Nothing,Int}
     s::Float64
     eg_started::Bool
@@ -126,10 +155,22 @@ function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
     valuation = Valuation(x; affine = at_infinity_check)
     prediction = copy(x)
     solution = copy(x)
+    solution_accuracy = NaN
+    solution_cond = NaN
     winding_number = nothing
     s = 0.0
     eg_started = false
-    PathTrackerState(status, valuation, prediction, solution, winding_number, s, eg_started)
+    PathTrackerState(
+        status,
+        valuation,
+        prediction,
+        solution,
+        solution_accuracy,
+        solution_cond,
+        winding_number,
+        s,
+        eg_started,
+    )
 end
 
 Base.show(io::IO, S::PathTrackerState) = print_fieldnames(io, S)
@@ -140,6 +181,8 @@ function init!(state::PathTrackerState, s::Float64)
     init!(state.valuation)
     state.prediction .= 0.0
     state.solution .= 0.0
+    state.solution_accuracy = NaN
+    state.solution_cond = NaN
     state.winding_number = nothing
     state.s = s
     state.eg_started = false
@@ -323,7 +366,22 @@ function step!(tracker::PathTracker)
             if retcode == CAUCHY_SUCCESS
                 state.winding_number = m
                 state.status = PT_SUCCESS
-                state.solution .= state.prediction
+                state.solution_accuracy = p_accuracy
+
+                converged, solution_accuracy, solution_cond = check_converged!(
+                    state.solution,
+                    core_tracker,
+                    state.prediction,
+                    Inf;
+                    tol = tracker.default_ct_options.accuracy,
+                )
+
+                state.solution_cond = solution_cond
+                if converged && solution_cond < 1e12
+                    state.solution_accuracy = solution_accuracy
+                else
+                    state.solution .= state.prediction
+                end
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
                 if options.precision_strategy == PREC_STRATEGY_NEVER
@@ -381,16 +439,28 @@ function step!(tracker::PathTracker)
         end
 
     elseif is_success(ct_status)
-        # TODO: We shouldn't declare immediately success, check that we are actually there
-        # otherwise we the minimal step size is not sufficient
-        state.status = PT_SUCCESS
-        state.solution .= current_x(core_tracker)
+        converged, solution_accuracy, solution_cond = check_converged!(
+            state.solution,
+            core_tracker,
+            current_x(core_tracker),
+            Inf;
+            tol = tracker.default_ct_options.accuracy,
+        )
+        if converged
+            state.status = PT_SUCCESS
+            state.solution_accuracy = solution_accuracy
+            state.solution_cond = solution_cond
+        else
+            state.status = PT_POST_CHECK_FAILED
+        end
 
     elseif ct_status == CT_TERMINATED_ACCURACY_LIMIT
         # First update the valuation  and check whether we are good
         update!(state.valuation, core_tracker)
         verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
-        if verdict == VAL_AT_INFINITY
+        # We also terminate at this point if the valuation indicates that we are substantially
+        # less than 0
+        if verdict == VAL_AT_INFINITY || minimum(state.valuation.ν) < -1
             state.status = PT_AT_INFINITY
         # Now, we have to differentiate 3 different cases:
         # 1) Current accuracy is larger than the defined minimal accuracy
@@ -404,8 +474,6 @@ function step!(tracker::PathTracker)
         # 3) We are already at minimal accuracy and don't allow adaptive precision
         #     -> terminate
         # 1)
-        elseif minimum(state.valuation.ν) < -1
-            state.status = PT_AT_INFINITY
         elseif core_tracker.options.accuracy > options.min_accuracy
             # TODO: Currently we never increase this again
             core_tracker.options.accuracy = options.min_accuracy
@@ -417,7 +485,7 @@ function step!(tracker::PathTracker)
             #      Also if the current valuation is less than -1 (so significantly less than 0)
             #      we do not continue the tracking
             if verdict == VAL_FINITE ||
-                   judge(
+               judge(
                 state.valuation;
                 tol = 1e-2,
                 tol_at_infinity = 1e-2,
@@ -432,20 +500,8 @@ function step!(tracker::PathTracker)
         else
             state.status = PT_TERMINATED_ACCURACY_LIMIT
         end
-    elseif ct_status == CT_TERMINATED_INVALID_STARTVALUE
-        state.status = PT_TERMINATED_INVALID_STARTVALUE
-
-    elseif ct_status == CT_TERMINATED_MAX_ITERS
-        state.status = PT_TERMINATED_MAX_ITERS
-
-    elseif ct_status == CT_TERMINATED_ILL_CONDITIONED
-        state.status = PT_TERMINATED_ILL_CONDITIONED
-
-    elseif ct_status == CT_TERMINATED_STEP_SIZE_TOO_SMALL
-        status.status = PT_TERMINATED_STEP_SIZE_TOO_SMALL
     else
-        @warn("unhandled case ", ct_status)
-        state.status = PT_TERMINATED_INVALID_STARTVALUE
+        state.status = path_tracker_status(ct_status)
     end
 
     state.status
@@ -470,6 +526,30 @@ function sign_of_ill_conditioning(
     # TODO: This yields wrong results if we track with adaptive precision
     # and have a too high accuracy.
     cond(CT) > min_cond || accuracy_safety_factor * CT.state.limit_accuracy > CT.options.accuracy
+end
+
+"""
+    check_converged!(y, tracker::CoreTracker, x::AbstractVector, t)
+
+Check that the CoreTracker is converged also converged at `(x,t)`. Returns a named tuple
+`(converged, accuracy, cond)` and stores a (possibly) refined solution into `y`.
+"""
+function check_converged!(
+    y,
+    tracker::CoreTracker,
+    x::AbstractVector,
+    t::Number;
+    tol::Float64 = 1e-6,
+)
+    # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
+    # solutions that we bounce away from a good solution.
+    result = correct!(y, tracker, x, t; tol = tol, max_iters = 3, full_steps = 1)
+    if isnan(result.accuracy)
+        cond_jac = Inf
+    else
+        cond_jac = cond!(tracker.state.jacobian, tracker.state.norm, tracker.state.residual)
+    end
+    (converged = is_converged(result), accuracy = result.accuracy, cond = cond_jac)
 end
 
 function track!(tracker::PathTracker, x)

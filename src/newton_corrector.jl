@@ -62,7 +62,8 @@ function newton!(
     max_iters::Int = 3,
     debug::Bool = false,
     simplified_last_step::Bool = true,
-    double_64_evaluation::Bool = false,
+    full_steps::Int = max_iters - simplified_last_step,
+    double_64_evaluation::Bool = false
 )
 
     # Setup values
@@ -75,7 +76,7 @@ function newton!(
     for i ∈ 1:max_iters
         debug && println("i = ", i)
 
-        compute_jacobian = !simplified_last_step || i == 1 || i < max_iters
+        compute_jacobian = i == 1 || i ≤ full_steps
 
         if compute_jacobian && double_64_evaluation
             x_D64 .= xᵢ
@@ -93,9 +94,13 @@ function newton!(
         end
 
         LA.ldiv!(Δx, JM, r, norm)
-
         norm_Δxᵢ₋₁ = norm_Δxᵢ
         norm_Δxᵢ = Float64(norm(Δx))
+
+        if isnan(norm_Δxᵢ)
+            acc = norm_Δx₀ = norm_Δxᵢ
+            return NewtonCorrectorResult(NEWT_TERMINATED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
+        end
 
         debug && println("||Δxᵢ|| = ", norm_Δxᵢ)
 

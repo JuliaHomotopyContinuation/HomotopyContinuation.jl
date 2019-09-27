@@ -20,6 +20,9 @@ import PolynomialTestSystems, ProjectiveVectors
             @test abs(s[1]) ≈ sqrt(2) atol = 1e-8
             @test sum(s) ≈ 1 atol = 1e-8
             @test isnothing(winding_number(tracker))
+            @test !isnan(tracker.state.solution_cond)
+            @test !isnan(tracker.state.solution_accuracy)
+            @test tracker.state.solution_accuracy < 1e-12
         end
 
         tracker, starts = pathtracker_startsolutions(
@@ -34,6 +37,8 @@ import PolynomialTestSystems, ProjectiveVectors
             @test abs(s[1]) ≈ sqrt(2) atol = 1e-8
             @test sum(s) ≈ 1 atol = 1e-8
             @test isnothing(winding_number(tracker))
+            @test !isnan(tracker.state.solution_cond)
+            @test !isnan(tracker.state.solution_accuracy)
         end
 
         g = equations(katsura(5))
@@ -53,7 +58,9 @@ import PolynomialTestSystems, ProjectiveVectors
             @test all(S) do s
                 is_success(track!(tracker, s)) &&
                 winding_number(tracker) == n &&
-                isapprox(solution(tracker)[1], 3.0; atol = 1e-6)
+                isapprox(solution(tracker)[1], 3.0; atol = 1e-6) &&
+                !isnan(tracker.state.solution_cond) &&
+                tracker.state.solution_accuracy < 1e-5
             end
         end
     end
@@ -61,7 +68,7 @@ import PolynomialTestSystems, ProjectiveVectors
     # Wilkinson
     @testset "Wilkinson" begin
         @polyvar x
-        for n = 2:18
+        for n = 1:19
             g = [x^n - 1]
             f = [prod(x - i for i = 1:n)]
             S = [[cis(i * 2π / n)] for i = 0:(n-1)]
@@ -93,14 +100,16 @@ import PolynomialTestSystems, ProjectiveVectors
         @test all(s -> is_success(track!(tracker, s)), starts)
         @test all(starts) do s
             retcode = track!(tracker, s)
-            (is_success(retcode) && winding_number(tracker) == 3)
+            is_success(retcode) &&
+            winding_number(tracker) == 3 && tracker.state.solution_cond > 1e10
         end
         # affine
         F̂ = subs.(F, Ref(y => 1))
         tracker, starts = pathtracker_startsolutions(F̂; seed = 29831, system = FPSystem)
         @test all(starts) do s
             retcode = track!(tracker, s)
-            (is_success(retcode) && winding_number(tracker) == 3)
+            is_success(retcode) &&
+            winding_number(tracker) == 3 && tracker.state.solution_cond > 1e10
         end
 
         # Fix z == 1 --> all solutions at infinity
@@ -128,7 +137,7 @@ import PolynomialTestSystems, ProjectiveVectors
 
     @testset "Cyclic 7 correct root count" begin
         f = equations(cyclic(7))
-        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system=FPSystem)
+        tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = FPSystem)
         results = map(s -> track!(tracker, s), starts)
         @test count(is_success, results) == 924
 
