@@ -153,7 +153,7 @@ import PolynomialTestSystems, ProjectiveVectors
         f = [x^2 - 2, x + y - 1]
         tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
         for (i, sᵢ) in enumerate(starts)
-            result = track(tracker, sᵢ; path_number=i, details=:extensive)
+            result = track(tracker, sᵢ; path_number = i, details = :extensive)
             @test is_success(result)
             s = solution(tracker)
             @test abs(s[1]) ≈ sqrt(2) atol = 1e-8
@@ -180,7 +180,7 @@ import PolynomialTestSystems, ProjectiveVectors
         f = equations(griewank_osborne())
         tracker, starts = pathtracker_startsolutions(f; seed = 78373, system = FPSystem)
         for sᵢ in starts
-            result = track(tracker, sᵢ; details=:extensive)
+            result = track(tracker, sᵢ; details = :extensive)
 
             test_show_juno(result)
             @test !isempty(sprint(show, result))
@@ -201,5 +201,32 @@ import PolynomialTestSystems, ProjectiveVectors
                 @test false
             end
         end
+    end
+
+    @testset "track with parameters change" begin
+        @polyvar x a y b
+        F = [x^2 - a, x * y - a + b]
+        p = [a, b]
+
+        tracker, starts = pathtracker_startsolutions(
+            F,
+            [1.0, 1.0 + 0.0 * im],
+            parameters = p,
+            p₁ = [5, 5], # wrong params
+            p₀ = [10, 10],
+            affine_tracking = true,
+        )
+        p₁ = [2, 0]
+        p₀ = [2, 4]
+        res = track(
+            tracker,
+            starts[1];
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+
+        @test is_success(res)
+        @test isa(solution(res), Vector{ComplexF64})
+        @test length(solution(res)) == 2
     end
 end
