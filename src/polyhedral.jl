@@ -359,12 +359,12 @@ seed(PT::PolyhedralTracker) = PT.generic_tracker.problem.seed
 
 function track!(PT::PolyhedralTracker, x∞)
     retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
-    if retcode == CoreTrackerStatus.terminated_invalid_startvalue
+    if is_invalid_startvalue(retcode)
         PT.s₀[] *= 2
         retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
     end
-    if retcode != CoreTrackerStatus.success
-        return PathTrackerStatus.status(retcode)
+    if !is_success(retcode)
+        return path_tracker_status(retcode)
     end
     track!(PT.generic_tracker, current_x(PT.toric_tracker))
 end
@@ -421,11 +421,11 @@ function track_paths(PT::PolyhedralTracker, start_solutions::PolyhedralStartSolu
                 x∞ = @view X[:,i]
 
                 return_code = track!(PT, x∞)
-                if save_all_paths || return_code == PathTrackerStatus.success
+                if save_all_paths || is_success(return_code)
                     R = PathResult(PT, x∞, ntracked; details=path_result_details)
                     push!(results, R)
 
-                    if return_code == PathTrackerStatus.success
+                    if is_success(return_code)
                         update!(stats, R)
                     end
                 end

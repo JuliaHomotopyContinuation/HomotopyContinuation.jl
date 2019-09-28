@@ -230,7 +230,7 @@ function solve(tracker::Union{<:PathTracker,<:PolyhedralTracker}, start_solution
     Result(all_results, ntracked, seed(tracker); multiplicity_tol=100*accuracy(tracker))
 end
 
-accuracy(T::PathTracker) = T.options.accuracy
+accuracy(T::PathTracker) = T.options.min_accuracy
 accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 
 mutable struct SolveStats
@@ -287,13 +287,13 @@ function track_paths(tracker, start_solutions;
             for (k, s) in enumerate(start_solutions)
                 return_code = track!(tracker, s)
                 if save_all_paths ||
-                   return_code == PathTrackerStatus.success ||
-                   return_code == PathTrackerStatus.terminated_invalid_startvalue
+                   is_success(return_code) ||
+                   is_invalid_startvalue(return_code)
 
                     R = PathResult(tracker, s, k; details=path_result_details)
                     push!(results, R)
 
-                    if return_code == PathTrackerStatus.success
+                    if is_success(return_code)
                         update!(stats, R)
                     end
                     ntracked = k
@@ -388,8 +388,8 @@ function track_batch!(results, pathtracker, range, starts, details, all_paths, n
     for k in range
         return_code = track!(pathtracker, starts[k])
         if all_paths ||
-           return_code == PathTrackerStatus.success ||
-           return_code == PathTrackerStatus.terminated_invalid_startvalue
+           is_success(return_code) ||
+           is_invalid_startvalue(return_code)
 
             results[k] = PathResult(pathtracker, starts[k], ntracked+k; details=details)
         else
@@ -420,7 +420,7 @@ function path_jumping_check!(results::Vector{<:PathResult}, tracker, details::Sy
     end
     !isempty(finite_results) || return results
 
-    tol = tracker.core_tracker.options.refinement_accuracy
+    tol = tracker.core_tracker.options.accuracy
     # find cluster of multiple solutions
     clusters = multiplicities(solution, finite_results; tol=tol)
     while true
@@ -534,10 +534,10 @@ Assign the path results their multiplicity according to the multiplicity info `I
 function assign_multiplicities!(path_results::Vector{<:PathResult}, I::MultiplicityInfo)
     #assign multiplicities
     for r in path_results
-        r.multiplicity = 1
+        r.multiplicity[] = 1
     end
     for (k, clusters) in I.multiplicities, cluster in clusters, vᵢ in cluster
-        path_results[vᵢ].multiplicity = k
+        path_results[vᵢ].multiplicity[] = k
     end
     path_results
 end

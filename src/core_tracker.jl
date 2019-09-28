@@ -2,6 +2,7 @@ export CoreTrackerStatus,
        is_success,
        is_terminated,
        is_tracking,
+       is_invalid_startvalue,
        CoreTrackerResult,
        solution,
        CoreTrackerOptions,
@@ -102,6 +103,14 @@ Returns `true` if `S` indicates that the path tracking got terminated. This is n
 if `is_success(S)` is `true`.
 """
 is_terminated(S::CoreTrackerStatus) = S ≠ CT_TRACKING && S ≠ CT_SUCCESS
+
+"""
+    is_invalid_startvalue(S::CoreTrackerStatus)
+
+Returns `true` if `S` indicates that the path tracking got terminated since the start
+value was not a zero.
+"""
+is_invalid_startvalue(S::CoreTrackerStatus) = S ≠ CT_TERMINATED_INVALID_STARTVALUE
 
 """
     is_tracking(S::CoreTrackerStatus)

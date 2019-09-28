@@ -112,7 +112,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) =
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
-    if retcode == PathTrackerStatus.success
+    if is_success(retcode)
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
@@ -250,13 +250,13 @@ in `stats`.
 """
 function track(tracker::PathTracker, x::AbstractVector, loop::MonodromyLoop, stats::MonodromyStatistics)
     H = basehomotopy(tracker.core_tracker.homotopy)
-    local retcode::PathTrackerStatus.states
+    local retcode::PathTrackerStatus
     y = x
     for e in loop.edges
         set_parameters!(H, (e.p₁, e.p₀), e.weights)
         retcode = _track!(tracker, y)
         trackedpath!(stats, retcode)
-        retcode == PathTrackerStatus.success || break
+        is_success(retcode) || break
         y = solution(tracker)
     end
     retcode
@@ -681,9 +681,8 @@ function process!(queue, job::MonodromyJob, MS::MonodromySolver, progress)
     x = solutions(MS)[job.id]
     loop = MS.loops[job.loop_id]
     retcode = track(MS.tracker, x, loop, MS.statistics)
-    if retcode ≠ PathTrackerStatus.success
-        if retcode == PathTrackerStatus.terminated_invalid_startvalue &&
-           MS.statistics.ntrackedpaths == 0
+    if !is_success(retcode)
+        if is_invalid_startvalue(retcode) && MS.statistics.ntrackedpaths == 0
             return :invalid_startvalue
         end
         return :incomplete

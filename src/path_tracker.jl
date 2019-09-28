@@ -94,6 +94,7 @@ end
 is_success(status::PathTrackerStatus) = status == PT_SUCCESS
 is_at_infinity(status::PathTrackerStatus) = status == PT_AT_INFINITY
 is_tracking(status::PathTrackerStatus) = status == PT_TRACKING
+is_invalid_startvalue(status::PathTrackerStatus) = status == PT_TERMINATED_INVALID_STARTVALUE
 
 
 function symbol(status::PathTrackerStatus)
@@ -367,6 +368,8 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", PT::PathTracker) = PT
 function Base.show(io::IO, S::PathTracker{AV}) where {AV}
     println(io, "PathTracker with solution type $AV")
 end
+
+seed(PT::PathTracker) = seed(PT.problem)
 
 """
     init!(tracker::PathTracker, x)

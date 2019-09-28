@@ -35,12 +35,21 @@ struct ProjectiveTracking <: TrackingType end
 
 abstract type AbstractProblem{T<:TrackingType} end
 Base.broadcastable(P::AbstractProblem) = Ref(P)
+
 """
     homotopy(prob::AbstractProblem)
 
 Get the homotopy stored in the problem `prob`.
 """
 homotopy(prob::AbstractProblem) = prob.homotopy
+
+"""
+    seed(prob::AbstractProblem)
+
+Get the random seed used for the problem `prob`.
+"""
+seed(prob::AbstractProblem) = prob.seed
+
 
 """
     Problem(T::TrackingType, H::AbstractHomotopy, homogenization::AbstractHomogenization, seed::Int)

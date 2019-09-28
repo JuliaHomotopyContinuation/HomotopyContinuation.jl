@@ -26,6 +26,7 @@ CoreTrackerStatus
 is_success(::CoreTrackerStatus)
 is_terminated(::CoreTrackerStatus)
 is_tracking(::CoreTrackerStatus)
+is_invalid_startvalue(::CoreTrackerStatus)
 ```
 
 ## Methods
