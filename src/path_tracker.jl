@@ -704,7 +704,11 @@ function pathtracker_startsolutions(args...; kwargs...)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
-    tracker_startsolutions(prob, startsolutions; rest...)
+    construct_tracker(prob, startsolutions; rest...), startsolutions
+end
+
+function construct_tracker(prob::Problem, startsolutions; kwargs...)
+    PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
 end
 
 
@@ -832,7 +836,7 @@ function PathResult(
     multiplicity = Base.RefValue{Union{Nothing,Int}}(nothing)
 
     startsolution = nothing
-    if details_level ≥ 1
+    if details_level ≥ 1 && start_solution !== nothing
         # mimic the behaviour in track! to get a start solution of the same type as x
         embed!(core_tracker.state.x, tracker.problem, start_solution)
         startsolution = pull_back(tracker.problem, core_tracker.state.x; regauge = false)

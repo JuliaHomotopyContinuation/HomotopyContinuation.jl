@@ -43,7 +43,7 @@ function MultiplicityInfo(pathresults::Vector{<:PathResult}; tol = 1e-6)
     multiplicities = compute_multiplicities(pathresults; tol = float(tol))
     for clusters in values(multiplicities), cluster in clusters
         for i = 2:length(cluster)
-            push!(multiple_indicator, pathresults[cluster[i]].path_number)
+            push!(multiple_indicator, path_number(pathresults[cluster[i]]))
         end
     end
     MultiplicityInfo(multiplicities, multiple_indicator)
@@ -85,7 +85,7 @@ function assign_multiplicities!(path_results::Vector{<:PathResult}, I::Multiplic
 end
 
 is_multiple_result(r::PathResult, I::MultiplicityInfo) =
-    r.path_number ∈ I.multiple_indicator
+    path_number(r) ∈ I.multiple_indicator
 
 
 """

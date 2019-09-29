@@ -57,6 +57,7 @@ const coretracker_supported_keywords = [
     :log_homotopy,
     :log_transform,
     :logarithmic_time_scale,
+    :from_infinity,
     # deprecated,
     :max_lost_digits,
     :max_refinement_iters,
@@ -221,6 +222,7 @@ mutable struct CoreTrackerOptions
     update_patch::Bool
     # Not changeable options
     logarithmic_time_scale::Bool
+    from_infinity::Bool
 end
 
 function CoreTrackerOptions(
@@ -229,6 +231,7 @@ function CoreTrackerOptions(
     parameter_homotopy = false,
     update_patch = true,
     logarithmic_time_scale = false,
+    from_infinity = false,
     # public
     accuracy = 1e-7,
     initial_step_size = nothing,
@@ -275,6 +278,7 @@ function CoreTrackerOptions(
         track_cond,
         update_patch,
         logarithmic_time_scale,
+        from_infinity,
     )
 end
 
@@ -310,7 +314,8 @@ function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
         terminate_ill_conditioned,
         track_cond,
         update_patch,
-        logarithmic_time_scale = opts2
+        logarithmic_time_scale,
+        from_infinity = opts2
     @pack! opts = accuracy,
         initial_step_size,
         min_step_size,
@@ -324,7 +329,8 @@ function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
         terminate_ill_conditioned,
         track_cond,
         update_patch,
-        logarithmic_time_scale
+        logarithmic_time_scale,
+        from_infinity
     opts
 end
 
@@ -1140,15 +1146,15 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     # the accuracy limit. The motivation is that we can run into danger that the computed
     # estimate of ω is too high due to hitting limit accuracy.
     near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 100.0)
-    if options.simple_step_size_alg
-        # || (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
+    if options.simple_step_size_alg ||
+       (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
         Δs = simple_step_size_alg!(state, options, result)
     else
         Δs = adaptive_step_size_alg!(state, options, result, order(tracker.predictor))
     end
 
     # Make sure to not overshoot.
-    if !is_min_step_size(Δs, state.s, options)
+    if !is_min_step_size(Δs, state.s, length(state.segment), options)
         state.status = CT_TERMINATED_STEP_SIZE_TOO_SMALL
     else
         state.Δs = min(length(state.segment) - state.s, Δs, options.max_step_size)
@@ -1157,8 +1163,17 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     nothing
 end
 
-function is_min_step_size(Δs, s, options::CTO)
-    if options.logarithmic_time_scale
+function is_min_step_size(Δs, s, length_segment, options::CTO)
+    if options.logarithmic_time_scale && options.from_infinity
+        t = exp(-(length_segment - s))
+        Δ = exp(-(length_segment - (s + Δs))) - t
+        Δ ≥ t || Δ ≥ options.min_step_size
+        if t < options.min_step_size
+            100Δ ≥ t
+        else
+            Δ ≥ options.min_step_size
+        end
+    elseif options.logarithmic_time_scale
         exp(-s) - exp(-(s + Δs)) ≥ options.min_step_size
     else
         Δs ≥ options.min_step_size

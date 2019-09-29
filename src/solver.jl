@@ -141,7 +141,7 @@ end
 ## SOLVER ##
 ############
 
-struct Solver{PT,UP<:UniquePoints}
+struct Solver{PT<:Union{PathTracker,PolyhedralTracker},UP<:UniquePoints}
     trackers::PT
     stats::SolveStats
     path_jumping_check::PathJumpingCheck{UP}
@@ -162,7 +162,7 @@ function Solver(prob::AbstractProblem, start_solutions; kwargs...)
     Solver(tracker, SolveStats(), path_jumping_check)
 end
 
-function Solver(tracker::PathTracker, checkpoint::UniquePoints)
+function Solver(tracker::Union{PathTracker,PolyhedralTracker}, checkpoint::UniquePoints)
     Solver(tracker, SolveStats(), checkpoint)
 end
 
@@ -173,11 +173,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 accuracy(T::PathTracker) = T.options.min_accuracy
-# accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
-
-function construct_tracker(prob::Problem, startsolutions; kwargs...)
-    PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
-end
+accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 
 ############
 ## solve! ##
@@ -215,6 +211,7 @@ function solve!(
 
     init!(stats)
     init!(solver.path_jumping_check, n)
+    prepare!(tracker, start_solutions)
 
     results = Vector{Union{Nothing,result_type(tracker)}}(undef, n)
     results .= nothing
@@ -258,6 +255,7 @@ function solve!(
     )
 end
 
+prepare!(PT::PathTracker, S) = PT
 collect_startsolutions(x::AbstractVector) = x
 collect_startsolutions(x) = collect(x)
 

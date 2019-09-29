@@ -28,4 +28,37 @@
         result2 = solve!(solver, starts)
         @test nsolutions(result2) == 32
     end
+
+    @testset "polyhedral" begin
+        solver, starts = solver_startsolutions(
+            equations(cyclic(5));
+            seed = 32241,
+            start_system = :polyhedral,
+        )
+        result = solve!(solver, starts)
+        @test nsolutions(result) == 70
+        @test ntracked(result) == 70
+        @test nreal(result) == 10
+
+        @polyvar x y
+        solver, starts = solver_startsolutions(
+            [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y];
+            seed = 32241,
+            start_system = :polyhedral,
+            only_torus = true,
+        )
+        result = solve!(solver, starts)
+        @test nsolutions(result) == 3
+        @test ntracked(result) == 3
+
+        solver, starts = solver_startsolutions(
+            [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y];
+            seed = 32241,
+            start_system = :polyhedral,
+            only_torus = false,
+        )
+        result = solve!(solver, starts)
+        @test nsolutions(result) == 6
+        @test ntracked(result) == 8
+    end
 end
