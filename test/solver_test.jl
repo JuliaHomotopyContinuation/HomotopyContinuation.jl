@@ -16,8 +16,16 @@
             max_corrector_iters = 5,
             accuracy = 1e-3,
         )
-        result = solve!(solver, starts, save_all_paths = false)
+        result_jumping = solve!(solver, starts; path_jumping_check = false)
+        @test nsolutions(result_jumping) < 32
+
+        result = solve!(solver, starts; path_jumping_check = true)
+        @test nsolutions(result) == 32
         @test all(is_nonsingular, result)
         @test all(is_success, result)
+
+        # check that path_jumping_check is on by default
+        result2 = solve!(solver, starts)
+        @test nsolutions(result2) == 32
     end
 end

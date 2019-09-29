@@ -119,6 +119,11 @@ function track_with_pathjumping_check!(
                 if !is_terminated_callback(return_code)
                     check.solution_mapping[k] = j
                     break
+                else
+                    # TODO: This currently assumes that we can resolve the jump immediately
+                    # But it can happen that we have to resolve this recursively
+                    # if path j is now on the correct path, but there is a new collision
+                    # from another previous path
                 end
             else
                 check.solution_mapping[k] = length(check.checkpoint)
@@ -127,14 +132,6 @@ function track_with_pathjumping_check!(
         end
     else
         check.solution_mapping[k] = length(check.checkpoint)
-    end
-    if save_all_paths || is_success(return_code) || is_invalid_startvalue(return_code)
-        results[path_number] = PathResult(
-            tracker,
-            S[path_number],
-            path_number;
-            details = path_result_details,
-        )
     end
     return_code, path_number
 end
@@ -217,7 +214,7 @@ function solve!(
     n = length(S)
 
     init!(stats)
-    init!(path_jumping_check, n)
+    init!(solver.path_jumping_check, n)
 
     results = Vector{Union{Nothing,result_type(tracker)}}(undef, n)
     results .= nothing
@@ -237,6 +234,14 @@ function solve!(
         else
             return_code = track!(tracker, S[k])
             path_number = k
+        end
+        if save_all_paths || is_success(return_code) || is_invalid_startvalue(return_code)
+            results[path_number] = PathResult(
+                tracker,
+                S[path_number],
+                path_number;
+                details = path_result_details,
+            )
         end
         is_success(return_code) && update!(stats, results[path_number])
         ntracked = k
