@@ -1,3 +1,26 @@
+export Result,
+       nresults,
+       nsolutions,
+       nfinite,
+       nsingular,
+       nat_infinity,
+       nfailed,
+       nnonsingular,
+       nreal,
+       ntracked,
+       finite,
+       results,
+       mapresults,
+       failed,
+       at_infinity,
+       singular,
+       nonsingular,
+       seed,
+       solutions,
+       real_solutions,
+       multiplicities,
+       statistics,
+       multiplicities!
 
 ######################
 ## MultiplicityInfo ##
@@ -10,7 +33,8 @@ This contains informations about the multiplicities of the solutions.
 """
 struct MultiplicityInfo
     multiplicities::Dict{Int,Vector{Vector{Int}}}
-    # This set stores all path numbers which we want to ignore if we don't show multiple results
+    # This set stores all path numbers which we want to ignore
+    # if we don't show multiple results
     multiple_indicator::Set{Int32}
 end
 
@@ -67,8 +91,9 @@ is_multiple_result(r::PathResult, I::MultiplicityInfo) =
 """
     Result{V<:AbstractVector}
 
-The result of `solve`. This is a wrapper around the results of each single path ([`PathResult`](@ref)) and it contains some additional informations like
-a random seed to replicate the result.
+The result of `solve`. This is a wrapper around the results of each single path
+([`PathResult`](@ref)) and it contains some additional informations like a random seed to
+replicate the result.
 """
 struct Result{V}
     pathresults::Vector{PathResult{V}}
@@ -118,7 +143,14 @@ const Results = Union{Result,Vector{<:PathResult}}
 const ProjectiveResult = Result{<:PVector}
 
 """
-    nresults(result; only_real=false, real_tol=1e-6, only_nonsingular=false, singular_tol=1e10, onlyfinite=true)
+    nresults(
+        result;
+        only_real = false,
+        real_tol = 1e-6,
+        only_nonsingular = false,
+        singular_tol = 1e10,
+        onlyfinite = true,
+    )
 
 The number of solutions which satisfy the corresponding predicates.
 
@@ -149,10 +181,17 @@ function nresults(
 end
 
 """
-    statistics(R::Result; only_real=false, real_tol=1e-6,
-        only_nonsingular=false, only_singular=false, singular_tol=1e10)
+    statistics(
+        R::Result;
+        only_real = false,
+        real_tol = 1e-6,
+        only_nonsingular = false,
+        only_singular = false,
+        singular_tol = 1e10,
+    )
 
-Statistic about the number of (real) singular and non-singular solutions etc. Returns a named tuple with the statistics.
+Statistic about the number of (real) singular and non-singular solutions etc.
+Returns a named tuple with the statistics.
 
 ## Example
 ```julia
@@ -237,8 +276,10 @@ nsolutions(R::Results) = nresults(R)
         kwargs...,
     )
 
-The number of singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than `tol`.
-If `counting_multiplicities=true` the number of singular solutions times their multiplicities is returned.
+The number of singular solutions. A solution is considered singular if its windingnumber is
+larger than 1 or the condition number is larger than `tol`.
+If `counting_multiplicities=true` the number of singular solutions times their
+multiplicities is returned.
 """
 function nsingular(
     R::Results;
@@ -326,8 +367,8 @@ results(f::Function, R::Results; kwargs...) = mapresults(f, R; kwargs...)
 """
     mapresults(f::Function, result; conditions...)
 
-Apply the function `f` to all `PathResult`s for which the given conditions apply. For the possible
-conditions see [`results`](@ref).
+Apply the function `f` to all `PathResult`s for which the given conditions apply. For the
+possible conditions see [`results`](@ref).
 
 ## Example
 ```julia
@@ -395,14 +436,16 @@ end
     nonsingular(result::Results; conditions...)
 
 Return all `PathResult`s for which the solution is non-singular. This is just a shorthand
-for `results(R; only_nonsingular=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+for `results(R; only_nonsingular=true, conditions...)`. For the possible `conditions` see
+[`results`](@ref).
 """
 nonsingular(R::Results; kwargs...) = results(R; only_nonsingular = true, kwargs...)
 
 """
     singular(R::Results; tol=1e10, multiple_results=false, kwargs...)
 
-Return all `PathResult`s for which the solution is singular. A solution is labeled singular if the condition number is greater than `singular_tol`, or if the winding number is > 1.
+Return all `PathResult`s for which the solution is singular. A solution is labeled singular
+if the condition number is greater than `singular_tol`, or if the winding number is > 1.
 If `multiple_results=false` only one point from each cluster of multiple solutions is returned.
 If If `multiple_results=true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
@@ -416,7 +459,8 @@ end
     finite(result::AffineResults; conditions...)
 
 Return all `PathResult`s for which the solution is finite. This is just a shorthand
-for `results(R; onlyfinite=true, conditions...)`. For the possible `conditions` see [`results`](@ref).
+for `results(R; onlyfinite=true, conditions...)`. For the possible `conditions` see
+[`results`](@ref).
 """
 finite(R::Results; kwargs...) = results(R; onlyfinite = true, kwargs...)
 
@@ -445,7 +489,8 @@ at_infinity(R::Results) = [r for r in R if is_at_infinity(r)]
 """
     multiplicities(V::Results; tol=1e-6)
 
-Returns a `Vector` of `Vector{PathResult}`s grouping the `PathResult`s whose solutions appear with multiplicities *greater* 1 in 'V'.
+Returns a `Vector` of `Vector{PathResult}`s grouping the `PathResult`s whose solutions
+appear with multiplicities *greater* 1 in 'V'.
 Two solutions are regarded as equal, when their pairwise distance is less than 'tol'.
 """
 function multiplicities(results::Results; tol = 1e-6)
@@ -507,7 +552,11 @@ TreeViews.hastreeview(::ProjectiveResult) = true
 TreeViews.numberofnodes(::Result) = 8
 TreeViews.numberofnodes(::ProjectiveResult) = 7
 TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") =
-    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">Result{$(solution_type(x))}</span>")
+    print(
+        io,
+        "<span class=\"syntax--support syntax--type syntax--julia\">" *
+        "Result{$(solution_type(x))}" * "</span>",
+    )
 
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
     s = statistics(x)
