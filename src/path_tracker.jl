@@ -94,8 +94,9 @@ end
 is_success(status::PathTrackerStatus) = status == PT_SUCCESS
 is_at_infinity(status::PathTrackerStatus) = status == PT_AT_INFINITY
 is_tracking(status::PathTrackerStatus) = status == PT_TRACKING
-is_invalid_startvalue(status::PathTrackerStatus) = status == PT_TERMINATED_INVALID_STARTVALUE
-
+is_invalid_startvalue(status::PathTrackerStatus) =
+    status == PT_TERMINATED_INVALID_STARTVALUE
+is_terminated_callback(status::PathTrackerStatus) = status == PT_TERMINATED_CALLBACK
 
 function symbol(status::PathTrackerStatus)
     if status == PT_SUCCESS
@@ -269,6 +270,7 @@ struct PathTracker{
     Prob<:AbstractProblem,
     CT<:CoreTracker{Float64,AV},
     F1<:Function,
+    CB_State,
 }
     problem::Prob
     core_tracker::CT
@@ -276,6 +278,7 @@ struct PathTracker{
     state::PathTrackerState{AV}
     options::PathTrackerOptions
     eg_start_callback::F1
+    eg_start_cb_state::CB_State
     # We modify options of the core tracker dynamically. Therefore we need to be able
     # so start fresh for a new path
     default_ct_options::CoreTrackerOptions
@@ -307,6 +310,7 @@ function PathTracker(
     at_infinity_check = default_at_infinity_check(prob),
     endgame_start::Float64 = 2.0,
     endgame_start_callback = always_true,
+    endgame_start_callback_state = nothing,
     max_winding_number::Int = 12,
     min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
     min_step_size_before_eg::Float64 = exp2(-40),
@@ -341,6 +345,7 @@ function PathTracker(
         state,
         options,
         endgame_start_callback,
+        endgame_start_callback_state,
         default_ct_options,
     )
 end
@@ -348,7 +353,7 @@ end
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
 
-always_true(_) = true
+always_true(_, _) = true
 
 function make_precision_strategy(precision_strategy::Symbol)
     if precision_strategy == :adaptive_finite
@@ -376,9 +381,20 @@ seed(PT::PathTracker) = seed(PT.problem)
 
 Prepare the `PathTracker`` `tracker` to track a path with start solution `x`.
 """
-function init!(tracker::PathTracker, x)
+function init!(
+    tracker::PathTracker,
+    x;
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
     options, ct_options = tracker.options, tracker.core_tracker.options
     copy!(ct_options, tracker.default_ct_options)
+    if accuracy !== nothing
+        ct_options.accuracy = accuracy
+    end
+    if max_corrector_iters !== nothing
+        ct_options.max_corrector_iters = max_corrector_iters
+    end
     init!(tracker.core_tracker, x, 0.0, options.endgame_start)
     init!(tracker.state, 0.0)
 
@@ -481,7 +497,7 @@ function step!(tracker::PathTracker)
     # handle the success case twice
     elseif is_success(ct_status) && !state.eg_started
         # make callback, returns true if we can continue with the tracking
-        if tracker.eg_start_callback(current_x(core_tracker))
+        if tracker.eg_start_callback(current_x(core_tracker), tracker.eg_start_cb_state)
             state.eg_started = true
             # set min_step size
             core_tracker.options.min_step_size = options.min_step_size_eg
@@ -577,6 +593,10 @@ function step!(tracker::PathTracker)
         end
     else
         state.status = path_tracker_status(ct_status)
+    end
+
+    if !is_success(state.status) && !is_tracking(state.status)
+        state.solution .= current_x(core_tracker)
     end
 
     state.status
@@ -687,10 +707,7 @@ function pathtracker_startsolutions(args...; kwargs...)
     tracker_startsolutions(prob, startsolutions; rest...)
 end
 
-function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
-    (tracker = tracker, startsolutions = startsolutions)
-end
+
 
 """
     pathtracker(args...; kwargs...)
@@ -785,7 +802,7 @@ struct PathResult{V<:AbstractVector}
     residual::Float64
     condition_jacobian::Float64
     winding_number::Union{Nothing,Int}
-    path_number::Union{Nothing,Int}
+    path_number::Base.RefValue{Union{Nothing,Int}}
     start_solution::Union{Nothing,V} # level 1+
     multiplicity::Base.RefValue{Union{Nothing,Int}} # only assigned by singular(Result)
     # performance stats
@@ -838,7 +855,7 @@ function PathResult(
         residual,
         condition_jac,
         windingnumber,
-        path_number,
+        Base.RefValue{Union{Nothing,Int}}(path_number),
         startsolution,
         multiplicity,
         accepted_steps,
@@ -884,13 +901,13 @@ function Base.show(io::IO, r::PathResult{AV}) where {AV}
         if multiplicity(r) !== nothing
             println(io, " • multiplicity → $(multiplicity(r))")
         end
-        r.path_number !== nothing && println(io, " • path_number: ", r.path_number)
+        path_number(r) !== nothing && println(io, " • path_number: ", path_number(r))
     else
         header = "PathResult{$AV}"
         compact_io = IOContext(io, :compact => true)
         println(io, "PathResult{$AV}")
         println(io, "="^length(header))
-        r.path_number !== nothing && println(io, " • path_number → ", r.path_number)
+        path_number(r) !== nothing && println(io, " • path_number → ", path_number(r))
         println(io, " • return_code → :$(r.return_code)")
         if r.return_code ≠ :success
             println(compact_io, " • t → $(r.t)")
@@ -981,7 +998,7 @@ LA.cond(r::PathResult) = r.condition_jacobian
 
 The number of the path.
 """
-path_number(r::PathResult) = r.path_number
+path_number(r::PathResult) = r.path_number[]
 
 """
     is_success(r::PathResult)
@@ -1128,8 +1145,13 @@ target_parameters!(T::PathTracker, p) = target_parameters!(T.core_tracker, p)
 Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
 Returns a [`PathTrackerStatus`](@ref).
 """
-function track!(tracker::PathTracker, x)
-    init!(tracker, x)
+function track!(
+    tracker::PathTracker,
+    x;
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
+    init!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
     while is_tracking(tracker.state.status)
         step!(tracker)
     end

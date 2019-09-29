@@ -54,8 +54,9 @@ module HomotopyContinuation
     include("valuation.jl")
     include("cauchy_endgame.jl")
     include("path_tracker.jl")
-
-    include("polyhedral.jl")
-    include("solve.jl")
-    include("monodromy.jl")
+    include("result.jl")
+    include("solver.jl")
+    # include("polyhedral.jl")
+    # include("solve.jl")
+    # include("monodromy.jl")
 end

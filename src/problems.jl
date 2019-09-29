@@ -33,7 +33,7 @@ Indicates that paths should be tracked in projective space.
 """
 struct ProjectiveTracking <: TrackingType end
 
-abstract type AbstractProblem{T<:TrackingType} end
+abstract type AbstractProblem{T<:TrackingType, VG<:VariableGroups} end
 Base.broadcastable(P::AbstractProblem) = Ref(P)
 
 """
@@ -56,7 +56,7 @@ seed(prob::AbstractProblem) = prob.seed
 
 Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs to be homogeneous.
 """
-struct Problem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T}
+struct Problem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T, VG}
 	tracking_type::T
     homotopy::AbstractHomotopy
     vargroups::VG
@@ -83,7 +83,7 @@ Problem{T}(args...; kwargs...) where {T<:TrackingType} = Problem(T(), args...; k
 
 Construct a `Problem`. If `T <: ProjectiveTracking` then the homotopy `H` needs to be homogeneous.
 """
-struct PolyhedralProblem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T}
+struct PolyhedralProblem{T<:TrackingType, VG<:VariableGroups} <: AbstractProblem{T, VG}
 	tracking_type::T
     toric_homotopy::AbstractHomotopy
 	generic_homotopy::AbstractHomotopy
@@ -143,6 +143,14 @@ function embed(prob::AbstractProblem{ProjectiveTracking}, v)
 end
 embed(prob::AbstractProblem{ProjectiveTracking}, v::PVector) = v
 embed(prob::AbstractProblem{AffineTracking}, v::AbstractVector) = v
+
+tracking_vector_type(prob::AbstractProblem{AffineTracking}) = Vector{ComplexF64}
+function tracking_vector_type(prob::AbstractProblem{
+    ProjectiveTracking,
+    <:VariableGroups{N},
+}) where {N}
+    PVector{ComplexF64, N}
+end
 
 """
     pull_back(prob::Problem, x)
