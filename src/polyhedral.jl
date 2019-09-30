@@ -455,7 +455,10 @@ function prepare!(PT::PolyhedralTracker, S::PolyhedralStartSolutionsIterator)
 end
 function track!(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}})
     update_cell!(PT, cell)
-    track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
+    retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
+    if is_invalid_startvalue(retcode)
+        track!(PT.toric_tracker, x∞, 2*PT.s₀[], 0.0)
+    end
     track!(PT.generic_tracker, current_x(PT.toric_tracker))
 end
 
