@@ -1,10 +1,30 @@
 @testset "PathTracker" begin
+    @testset "Constructor + Options" begin
+        @polyvar x y z
+        f = [x^2 - 2, x + y - 1]
+        tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
+        @test tracker isa PathTracker{Vector{ComplexF64}}
+        test_show_juno(tracker)
+        @test !isempty(sprint(show, tracker))
+        test_show_juno(tracker.options)
+        @test !isempty(sprint(show, tracker.options))
+
+        tracker = pathtracker(f; system = FPSystem, precision_strategy = :adaptive_never)
+        @test tracker.options.precision_strategy == HC.PREC_STRATEGY_NEVER
+        tracker = pathtracker(f; system = FPSystem, precision_strategy = :adaptive_always)
+        @test tracker.options.precision_strategy == HC.PREC_STRATEGY_ALWAYS
+        @test_throws ArgumentError pathtracker(
+            f;
+            system = FPSystem,
+            precision_strategy = :NOT_AN_OPTION,
+        )
+    end
+
     # Simple
     @testset "Simple" begin
         @polyvar x y z
         f = [x^2 - 2, x + y - 1]
         tracker, starts = pathtracker_startsolutions(f; system = FPSystem)
-        @test tracker isa PathTracker{Vector{ComplexF64}}
 
         for xᵢ in starts
             @test is_success(track!(tracker, xᵢ))
@@ -17,6 +37,11 @@
             @test tracker.state.solution_accuracy < 1e-12
             @test tracker.state.solution_residual < 1e-12
         end
+
+        # test iterator
+        init!(tracker, first(starts))
+        for _ in tracker end
+        @test is_success(status(tracker))
 
         tracker, starts = pathtracker_startsolutions(
             f;
@@ -36,10 +61,7 @@
             @test !isnan(tracker.state.solution_residual)
         end
 
-        tracker, starts = pathtracker_startsolutions(
-            homogenize(f, z);
-            system = FPSystem,
-        )
+        tracker, starts = pathtracker_startsolutions(homogenize(f, z); system = FPSystem,)
         @test tracker isa PathTracker{PVector{ComplexF64,1}}
         for x in starts
             @test is_success(track!(tracker, x))
@@ -168,16 +190,30 @@
             @test isnothing(winding_number(result))
             @test isnothing(multiplicity(result))
             @test condition_jacobian(result) < 1e3
+            @test cond(result) == condition_jacobian(result)
             @test path_number(result) == i
             @test is_affine(result)
             @test !is_projective(result)
             @test is_finite(result)
             @test !is_singular(result)
             @test is_real(result)
+            @test isreal(result)
 
             test_show_juno(result)
             @test !isempty(sprint(show, result))
         end
+
+        # simple projective
+        tracker, starts = pathtracker_startsolutions(homogenize(f); system = FPSystem)
+        @test tracker isa PathTracker{PVector{ComplexF64, 1}}
+        for (i, sᵢ) in enumerate(starts)
+            result = track(tracker, sᵢ; path_number = i, details = :extensive)
+            @test is_success(result)
+            @test is_projective(result)
+            test_show_juno(result)
+            @test !isempty(sprint(show, result))
+        end
+
 
         # 1 singular solution (multiplicity 3) and 3 paths going to infinity. Checked earlier.
         f = equations(griewank_osborne())
@@ -204,6 +240,23 @@
                 @test false
             end
         end
+    end
+
+    @testset "Status codes" begin
+        @test HC.symbol(HC.PT_TERMINATED_CALLBACK) == :terminated_callback
+        @test HC.symbol(HC.PT_TERMINATED_MAX_ITERS) == :terminated_max_iters
+        @test HC.symbol(HC.PT_TERMINATED_INVALID_STARTVALUE) == :terminated_invalid_startvalue
+        @test HC.symbol(HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL) == :terminated_step_size_too_small
+        @test HC.symbol(HC.PT_TERMINATED_ACCURACY_LIMIT) == :terminated_accuracy_limit
+        @test HC.symbol(HC.PT_TERMINATED_ILL_CONDITIONED) == :terminated_ill_conditioned
+        @test HC.symbol(HC.PT_POST_CHECK_FAILED) == :post_check_failed
+
+        @test HC.path_tracker_status(HC.CT_SUCCESS) == HC.PT_SUCCESS
+        @test HC.path_tracker_status(HC.CT_TERMINATED_INVALID_STARTVALUE) == HC.PT_TERMINATED_INVALID_STARTVALUE
+        @test HC.path_tracker_status(HC.CT_TERMINATED_MAX_ITERS) == HC.PT_TERMINATED_MAX_ITERS
+        @test HC.path_tracker_status(HC.CT_TERMINATED_STEP_SIZE_TOO_SMALL) == HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL
+        @test HC.path_tracker_status(HC.CT_TERMINATED_ILL_CONDITIONED) == HC.PT_TERMINATED_ILL_CONDITIONED
+        @test HC.path_tracker_status(HC.CT_TRACKING) == HC.PT_TRACKING
     end
 
     @testset "track with parameters change" begin
@@ -235,24 +288,31 @@
 
     @testset "Overdetermined" begin
         @polyvar x y z
-        p₁ = (y - x^2) * (x^2+y^2+z^2 - 1) * (x - 0.5)
-        p₂ = (z - x^3) * (x^2+y^2+z^2 - 1) * (y - 0.5)
-        p₃ = (y - x^2) * (z - x^3) * (x^2+y^2+z^2 - 1) * (z - 0.5)
+        p₁ = (y - x^2) * (x^2 + y^2 + z^2 - 1) * (x - 0.5)
+        p₂ = (z - x^3) * (x^2 + y^2 + z^2 - 1) * (y - 0.5)
+        p₃ = (y - x^2) * (z - x^3) * (x^2 + y^2 + z^2 - 1) * (z - 0.5)
         L₁ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
         L₂ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
 
-        s = let
-            tracker, starts =
-                pathtracker_startsolutions([x^2+y^2+z^2 - 1; L₁]; system=FPSystem)
-            solution(track(tracker, first(starts)))
-        end
+        s =
+            let
+                tracker, starts = pathtracker_startsolutions(
+                    [x^2 + y^2 + z^2 - 1; L₁];
+                    system = FPSystem,
+                )
+                solution(track(tracker, first(starts)))
+            end
 
-        tracker = pathtracker([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s; system=FPSystem)
+        tracker = pathtracker([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s; system = FPSystem)
         @test is_success(track(tracker, s))
 
         tracker, starts = pathtracker_startsolutions(
-            [[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s;
-            system = FPSystem, projective_tracking = true)
+            [[p₁, p₂, p₃]; L₁],
+            [[p₁, p₂, p₃]; L₂],
+            s;
+            system = FPSystem,
+            projective_tracking = true,
+        )
         @test is_success(track(tracker, s))
     end
 end

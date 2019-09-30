@@ -1,11 +1,21 @@
 @testset "Solver" begin
-    @testset "constructor" begin
+    @testset "simple systems" begin
         @polyvar x y z
         f = [x^2 - 2, x + y - 1]
         solver, starts = solver_startsolutions(f; system = FPSystem)
         @test isa(solver, Solver)
         result = solve!(solver, starts)
         @test all(is_success, result)
+        @test all(!is_failed, result)
+
+        f = equations(griewank_osborne())
+        solver, starts = solver_startsolutions(f; seed = 78373, system = FPSystem)
+        result = solve!(solver, starts)
+        @test nsolutions(result) == 1
+        r = first(results(result))
+        @test multiplicity(r) == 3
+        @test is_singular(r)
+        @test !isempty(sprint(show, r))
     end
 
     @testset "path jumping" begin
