@@ -105,7 +105,13 @@ function track_with_pathjumping_check!(
             if is_terminated_callback(return_code)
                 # If we still have duplicate
                 # we assume that we can take the result of path j
-                results[k] = results[j]
+                Rⱼ = results[j]
+                if Rⱼ === nothing
+                    results[k] = nothing
+                else
+                    Rⱼ.path_number[] = k
+                    results[k] = Rⱼ
+                end
                 # clear the other result
                 results[j] = nothing
                 # rerun other path
