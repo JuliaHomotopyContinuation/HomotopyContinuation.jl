@@ -393,7 +393,7 @@ end
 The polyhedral tracker combines the tracking from toric infinity toward the target system
 by a two-stage approach.
 """
-struct PolyhedralTracker{CT<:CoreTracker,PT<:PathTracker,H<:ToricHomotopy}
+struct PolyhedralTracker{CT<:CoreTracker,PT<:PathTracker,H<:ToricHomotopy} <: AbstractPathTracker
     toric_homotopy::H
     toric_tracker::CT
     generic_tracker::PT
@@ -448,8 +448,13 @@ end
 
 
 result_type(PT::PolyhedralTracker) = result_type(PT.generic_tracker)
+solution(tracker::PolyhedralTracker) = solution(tracker.generic_tracker)
+LA.norm(tracker::PolyhedralTracker) = LA.norm(tracker.generic_tracker)
 
 function prepare!(PT::PolyhedralTracker, S::PolyhedralStartSolutionsIterator)
+    if S.lifting === nothing
+        compute_mixed_cells!(S)
+    end
     update_lifting!(PT.toric_homotopy, S.lifting)
     PT
 end

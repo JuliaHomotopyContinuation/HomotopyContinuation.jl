@@ -681,6 +681,7 @@ Base.show(io::IO, C::CoreTracker) =
     print(io, "CoreTracker tracking a path of type $(typeof(C.state.x))")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::CoreTracker) = x
 
+Base.broadcastable(C::CoreTracker) = Ref(C)
 
 ###########
 ## Alias ##
@@ -1337,8 +1338,8 @@ cond(state::CTS) = LA.cond(state.jacobian)
 
 Returns the norm used to compute distances during the path tracking.
 """
-norm(tracker::CoreTracker) = norm(tracker.state)
-norm(state::CTS) = state.norm
+LA.norm(tracker::CoreTracker) = LA.norm(tracker.state)
+LA.norm(state::CTS) = state.norm
 
 """
     options(tracker::CoreTracker)

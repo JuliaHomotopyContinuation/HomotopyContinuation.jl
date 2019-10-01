@@ -56,6 +56,7 @@ module HomotopyContinuation
     include("path_tracker.jl")
     include("result.jl")
     include("polyhedral.jl")
+    include("overdetermined.jl")
     include("solver.jl")
     # include("solve.jl")
     # include("monodromy.jl")

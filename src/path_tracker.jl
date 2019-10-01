@@ -69,6 +69,7 @@ The possible states a [`PathTracker`](@ref) can be in:
     PT_TERMINATED_ACCURACY_LIMIT
     PT_TERMINATED_ILL_CONDITIONED
     PT_POST_CHECK_FAILED
+    PT_EXCESS_SOLUTION
 end
 
 """
@@ -117,6 +118,8 @@ function symbol(status::PathTrackerStatus)
         :terminated_ill_conditioned
     elseif status == PT_POST_CHECK_FAILED
         :post_check_failed
+    elseif status == PT_EXCESS_SOLUTION
+        :excess_solution
     else
         :unknown
     end
@@ -209,6 +212,8 @@ end
 ## PATH TRACKER ##
 ##################
 
+abstract type AbstractPathTracker end
+Base.broadcastable(T::AbstractPathTracker) = Ref(T)
 
 """
     PathTracker
@@ -271,7 +276,7 @@ struct PathTracker{
     CT<:CoreTracker{Float64,AV},
     F1<:Function,
     CB_State,
-}
+} <: AbstractPathTracker
     problem::Prob
     core_tracker::CT
     endgame::CauchyEndgame{AV}
@@ -540,6 +545,7 @@ function step!(tracker::PathTracker)
             state.solution_accuracy = s_acc
             state.solution_cond = s_cond
             state.solution_residual = s_res
+            state.s = Inf
         else
             state.status = PT_POST_CHECK_FAILED
         end
@@ -639,7 +645,6 @@ function check_converged!(
     else
         cond_jac = cond!(tracker.state.jacobian, tracker.state.norm, tracker.state.residual)
     end
-
     (
      converged = is_converged(result),
      accuracy = result.accuracy,
@@ -670,6 +675,13 @@ status(tracker::PathTracker) = tracker.state.status
 Obtain the solution computed by the `PathTracker`.
 """
 solution(tracker::PathTracker) = pull_back(tracker.problem, tracker.state.solution)
+
+"""
+    norm(tracker::PathTracker)
+
+Obtain the norm used by the `PathTracker`.
+"""
+LA.norm(tracker::PathTracker) = LA.norm(tracker.core_tracker)
 
 
 """
