@@ -30,6 +30,7 @@ const pathtracker_supported_keywords = [
     :endgame_start_callback,
     :max_winding_number,
     :min_accuracy,
+    :min_cond_eg,
     :min_step_size_before_eg,
     :min_step_size_eg,
     :s_always_consider_valuation,
@@ -139,6 +140,7 @@ mutable struct PathTrackerOptions
     endgame_start::Float64
     at_infinity_check::Bool
     min_accuracy::Float64
+    min_cond_eg::Float64
     min_step_size_before_eg::Float64
     min_step_size_eg::Float64
     precision_strategy::PrecisionStrategy
@@ -255,9 +257,11 @@ following options are accepted:
 * `min_accuracy` (default `1e-5`): The `PathTracker` automatically lowers the desired
   accuracy automatically to `min_accuracy` if path tracking would fail othwerwise (since
   the desired cannot be reached)
+* `min_cond_eg` (default `1e5`): The minimal condition number before the Cauchy endgame is
+  started or a path is cut off.
 * `min_step_size_before_eg` (default `exp2(-40)`): The minimal allowed step size before the
   endgame starts.
-* `min_step_size_eg` (default `exp2(-100)`): The minimal allowed step size during the endgame.
+* `min_step_size_eg` (default `exp2(-120)`): The minimal allowed step size during the endgame.
   This is also control what is considered `∞` for the path tracking.
 * `s_always_consider_valuation` (default `-log(1e-16)`) A threshold after which we always consider
   the valuation.
@@ -318,8 +322,9 @@ function PathTracker(
     endgame_start_callback_state = nothing,
     max_winding_number::Int = 12,
     min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
+    min_cond_endgame::Float64 = 1e5,
     min_step_size_before_eg::Float64 = exp2(-40),
-    min_step_size_eg = exp2(-100),
+    min_step_size_eg = exp2(-120),
     s_always_consider_valuation::Float64 = -log(1e-16),
     samples_per_loop::Int = 8,
     precision_strategy::Symbol = :adaptive_finite,
@@ -337,6 +342,7 @@ function PathTracker(
         endgame_start,
         at_infinity_check,
         min_accuracy,
+        min_cond_endgame,
         min_step_size_before_eg,
         min_step_size_eg,
         make_precision_strategy(precision_strategy),
@@ -437,7 +443,7 @@ function step!(tracker::PathTracker)
 
         # We only care about the valuation if the path is starting to get worse
         # or we passed a certain threshold.
-        cond_bad = cond(core_tracker) > 1e4
+        cond_bad = cond(core_tracker) > options.min_cond_eg
         near_accuracy_limit = 1e4 * core_tracker.state.limit_accuracy > core_tracker.options.accuracy
         consider_always = s > options.s_always_consider_valuation
         if !(consider_always || cond_bad || near_accuracy_limit)
@@ -451,30 +457,37 @@ function step!(tracker::PathTracker)
             state.status = PT_AT_INFINITY
         # If we expect a finite value and there is some ill conditioning let's do the
         # Cauchy endgame
-        elseif verdict == VAL_FINITE && (cond_bad || near_accuracy_limit)
+        elseif verdict == VAL_FINITE && cond_bad
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
             retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
-
             if retcode == CAUCHY_SUCCESS
-                state.winding_number = m
-                state.status = PT_SUCCESS
-                state.solution_accuracy = p_accuracy
+                # We only accept a result of the Cauchy endgame only if two consecutive
+                # loops resulted in the same number of loop
+                m′ = state.winding_number
+                if m′ === nothing
+                    state.winding_number = m
+                elseif m′ == m
+                    state.status = PT_SUCCESS
+                    state.solution_accuracy = p_accuracy
 
-                converged, s_accuracy, s_cond, s_res = check_converged!(
-                    state.solution,
-                    core_tracker,
-                    state.prediction,
-                    Inf;
-                    tol = tracker.default_ct_options.accuracy,
-                )
+                    converged, s_accuracy, s_cond, s_res = check_converged!(
+                        state.solution,
+                        core_tracker,
+                        state.prediction,
+                        Inf;
+                        tol = tracker.default_ct_options.accuracy,
+                    )
 
-                state.solution_cond = s_cond
-                state.solution_residual = s_res
-                if converged && s_cond < 1e8 && s_accuracy < p_accuracy
-                    state.solution_accuracy = s_accuracy
+                    state.solution_cond = s_cond
+                    state.solution_residual = s_res
+                    if converged && s_cond < 1e8 && s_accuracy < p_accuracy
+                        state.solution_accuracy = s_accuracy
+                    else
+                        state.solution .= state.prediction
+                    end
                 else
-                    state.solution .= state.prediction
+                    state.winding_number = m
                 end
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT

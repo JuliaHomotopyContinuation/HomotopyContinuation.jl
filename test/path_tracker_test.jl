@@ -96,13 +96,18 @@
     # Wilkinson
     @testset "Wilkinson" begin
         @polyvar x
+        print("Wilkinson: ")
         for n = 1:19
+            print(n, ",")
             g = [x^n - 1]
             f = [prod(x - i for i = 1:n)]
             S = [[cis(i * 2π / n)] for i = 0:(n-1)]
             tracker = pathtracker(g, f, S; seed = 512321, system = FPSystem)
             @test all(s -> is_success(track!(tracker, s)), S)
+            # check that we actually get the correct results
+            @test sort(round.(Int, real.(first.(solution.(track.(tracker, S)))))) == collect(1:n)
         end
+        println("")
     end
 
     # Bivariate singular
