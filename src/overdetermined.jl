@@ -68,17 +68,17 @@ function track!(OT::OverdeterminedTracker, x)
 
     if is_converged(result)
         state.solution .= OT.y
-        state.status = PT_SUCCESS
+        state.status = PathTrackerStatus.success
     else
         if state.solution_cond > 1e8
             evaluate!(OT.newton.r, OT.system, s, t)
             if solution_residual / residual < 1e5
-                state.status = PT_SUCCESS
+                state.status = PathTrackerStatus.success
             else
-                state.status = PT_EXCESS_SOLUTION
+                state.status = PathTrackerStatus.excess_solution
             end
         else
-            state.status = PT_EXCESS_SOLUTION
+            state.status = PathTrackerStatus.excess_solution
         end
     end
 end

@@ -250,7 +250,7 @@ in `stats`.
 """
 function track(tracker::PathTracker, x::AbstractVector, loop::MonodromyLoop, stats::MonodromyStatistics)
     H = basehomotopy(tracker.core_tracker.homotopy)
-    local retcode::PathTrackerStatus
+    local retcode::PathTrackerStatus.states
     y = x
     for e in loop.edges
         set_parameters!(H, (e.p₁, e.p₀), e.weights)

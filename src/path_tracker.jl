@@ -6,6 +6,8 @@ export PathTracker,
        is_success,
        is_tracking,
        is_failed,
+       is_terminated_callback,
+       is_invalid_startvalue,
        pathtracker,
        pathtracker_startsolutions,
        PathResult,
@@ -43,34 +45,36 @@ const pathtracker_supported_keywords = [
 ## STATUS ##
 ############
 
+module PathTrackerStatus
 """
     enum PathTrackerStatus
 
 The possible states a [`PathTracker`](@ref) can be in:
 
-* `PT_TRACKING`
-* `PT_SUCCESS`
-* `PT_AT_INFINITY`
-* `PT_POST_CHECK_FAILED`
-* `PT_TERMINATED_ACCURACY_LIMIT`
-* `PT_TERMINATED_CALLBACK`
-* `PT_TERMINATED_ILL_CONDITIONED`
-* `PT_TERMINATED_INVALID_STARTVALUE`
-* `PT_TERMINATED_MAX_ITERS`
-* `PT_TERMINATED_STEP_SIZE_TOO_SMALL`
+* `PathTrackerStatus.tracking`
+* `PathTrackerStatus.success`
+* `PathTrackerStatus.at_infinity`
+* `PathTrackerStatus.post_check_failed`
+* `PathTrackerStatus.terminated_accuracy_limit`
+* `PathTrackerStatus.terminated_callback`
+* `PathTrackerStatus.terminated_ill_conditioned`
+* `PathTrackerStatus.terminated_invalid_startvalue`
+* `PathTrackerStatus.terminated_max_iters`
+* `PathTrackerStatus.step_size_too_small`
 """
-@enum PathTrackerStatus begin
-    PT_TRACKING
-    PT_SUCCESS
-    PT_AT_INFINITY
-    PT_TERMINATED_CALLBACK
-    PT_TERMINATED_MAX_ITERS
-    PT_TERMINATED_INVALID_STARTVALUE
-    PT_TERMINATED_STEP_SIZE_TOO_SMALL
-    PT_TERMINATED_ACCURACY_LIMIT
-    PT_TERMINATED_ILL_CONDITIONED
-    PT_POST_CHECK_FAILED
-    PT_EXCESS_SOLUTION
+@enum states begin
+    tracking
+    success
+    at_infinity
+    terminated_callback
+    terminated_max_iters
+    terminated_invalid_startvalue
+    step_size_too_small
+    terminated_accuracy_limit
+    terminated_ill_conditioned
+    post_check_failed
+    excess_solution
+end
 end
 
 """
@@ -79,52 +83,27 @@ Construct a [`PathTrackerStatus`](@ref) from a [`CoreTrackerStatus`](@ref).
 """
 function path_tracker_status(code::CoreTrackerStatus.states)
     if code == CoreTrackerStatus.success
-        return PT_SUCCESS
+        return PathTrackerStatus.success
     elseif code == CoreTrackerStatus.terminated_invalid_startvalue
-        return PT_TERMINATED_INVALID_STARTVALUE
+        return PathTrackerStatus.terminated_invalid_startvalue
     elseif code == CoreTrackerStatus.terminated_maximal_iterations
-        return PT_TERMINATED_MAX_ITERS
+        return PathTrackerStatus.terminated_max_iters
     elseif code == CoreTrackerStatus.terminated_step_size_too_small
-        return PT_TERMINATED_STEP_SIZE_TOO_SMALL
+        return PathTrackerStatus.step_size_too_small
     elseif code == CoreTrackerStatus.terminated_ill_conditioned
-        return PT_TERMINATED_ILL_CONDITIONED
+        return PathTrackerStatus.terminated_ill_conditioned
     else
-        return PT_TRACKING
+        return PathTrackerStatus.tracking
     end
 end
 
-is_success(status::PathTrackerStatus) = status == PT_SUCCESS
-is_at_infinity(status::PathTrackerStatus) = status == PT_AT_INFINITY
-is_tracking(status::PathTrackerStatus) = status == PT_TRACKING
-is_invalid_startvalue(status::PathTrackerStatus) =
-    status == PT_TERMINATED_INVALID_STARTVALUE
-is_terminated_callback(status::PathTrackerStatus) = status == PT_TERMINATED_CALLBACK
-
-function symbol(status::PathTrackerStatus)
-    if status == PT_SUCCESS
-        :success
-    elseif status == PT_AT_INFINITY
-        :at_infinity
-    elseif status == PT_TERMINATED_CALLBACK
-        :terminated_callback
-    elseif status == PT_TERMINATED_MAX_ITERS
-        :terminated_max_iters
-    elseif status == PT_TERMINATED_INVALID_STARTVALUE
-        :terminated_invalid_startvalue
-    elseif status == PT_TERMINATED_STEP_SIZE_TOO_SMALL
-        :terminated_step_size_too_small
-    elseif status == PT_TERMINATED_ACCURACY_LIMIT
-        :terminated_accuracy_limit
-    elseif status == PT_TERMINATED_ILL_CONDITIONED
-        :terminated_ill_conditioned
-    elseif status == PT_POST_CHECK_FAILED
-        :post_check_failed
-    elseif status == PT_EXCESS_SOLUTION
-        :excess_solution
-    else
-        :unknown
-    end
-end
+is_success(status::PathTrackerStatus.states) = status == PathTrackerStatus.success
+is_at_infinity(status::PathTrackerStatus.states) = status == PathTrackerStatus.at_infinity
+is_tracking(status::PathTrackerStatus.states) = status == PathTrackerStatus.tracking
+is_invalid_startvalue(status::PathTrackerStatus.states) =
+    status == PathTrackerStatus.terminated_invalid_startvalue
+is_terminated_callback(status::PathTrackerStatus.states) =
+    status == PathTrackerStatus.terminated_callback
 
 
 #############
@@ -156,7 +135,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions)
 ###########
 
 mutable struct PathTrackerState{AV<:AbstractVector}
-    status::PathTrackerStatus
+    status::PathTrackerStatus.states
     valuation::Valuation
     prediction::AV
     solution::AV
@@ -169,7 +148,7 @@ mutable struct PathTrackerState{AV<:AbstractVector}
 end
 
 function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
-    status = PT_TRACKING
+    status = PathTrackerStatus.tracking
     valuation = Valuation(x; affine = at_infinity_check)
     prediction = copy(x)
     solution = copy(x)
@@ -197,7 +176,7 @@ Base.show(io::IO, S::PathTrackerState) = print_fieldnames(io, S)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", S::PathTrackerState) = S
 
 function init!(state::PathTrackerState, s::Float64)
-    state.status = PT_TRACKING
+    state.status = PathTrackerStatus.tracking
     init!(state.valuation)
     state.prediction .= 0.0
     state.solution .= 0.0
@@ -454,7 +433,7 @@ function step!(tracker::PathTracker)
         verdict = judge(state.valuation; tol = 1e-3, tol_at_infinity = 1e-4)
         if verdict == VAL_AT_INFINITY &&
            (consider_always || cond_bad) && options.at_infinity_check
-            state.status = PT_AT_INFINITY
+            state.status = PathTrackerStatus.at_infinity
         # If we expect a finite value and there is some ill conditioning let's do the
         # Cauchy endgame
         elseif verdict == VAL_FINITE && cond_bad
@@ -468,7 +447,7 @@ function step!(tracker::PathTracker)
                 if m′ === nothing
                     state.winding_number = m
                 elseif m′ == m
-                    state.status = PT_SUCCESS
+                    state.status = PathTrackerStatus.success
                     state.solution_accuracy = p_accuracy
 
                     converged, s_accuracy, s_cond, s_res = check_converged!(
@@ -492,7 +471,7 @@ function step!(tracker::PathTracker)
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
                 if options.precision_strategy == PREC_STRATEGY_NEVER
-                    state.status = PT_TERMINATED_ACCURACY_LIMIT
+                    state.status = PathTrackerStatus.terminated_accuracy_limit
                 # If we are here, we have a precision strategy which allows to use
                 # higher precision. Therefore switch to it if this not yet happened
                 # and retry to cauchy eg
@@ -505,9 +484,9 @@ function step!(tracker::PathTracker)
                 # If we hit the max winding number, this is either due to the fact
                 # that we are not yet in the eg zone or that the solution is just too singular
                 # For now we just terminate here
-                state.status = PT_TERMINATED_ILL_CONDITIONED
+                state.status = PathTrackerStatus.terminated_ill_conditioned
             else
-                state.status = PT_TERMINATED_ILL_CONDITIONED
+                state.status = PathTrackerStatus.terminated_ill_conditioned
             end
         end
 
@@ -542,7 +521,7 @@ function step!(tracker::PathTracker)
                 tracker.core_tracker.options.precision = PRECISION_FIXED_64
             end
         else
-            state.status = PT_TERMINATED_CALLBACK
+            state.status = PathTrackerStatus.terminated_callback
         end
 
     elseif is_success(ct_status)
@@ -554,13 +533,13 @@ function step!(tracker::PathTracker)
             tol = tracker.default_ct_options.accuracy,
         )
         if converged
-            state.status = PT_SUCCESS
+            state.status = PathTrackerStatus.success
             state.solution_accuracy = s_acc
             state.solution_cond = s_cond
             state.solution_residual = s_res
             state.s = Inf
         else
-            state.status = PT_POST_CHECK_FAILED
+            state.status = PathTrackerStatus.post_check_failed
         end
 
     elseif ct_status == CoreTrackerStatus.terminated_accuracy_limit
@@ -571,7 +550,7 @@ function step!(tracker::PathTracker)
         # substantially less than 0
         if (verdict == VAL_AT_INFINITY || minimum(state.valuation.ν) < -1) &&
            options.at_infinity_check
-            state.status = PT_AT_INFINITY
+            state.status = PathTrackerStatus.at_infinity
         # Now, we have to differentiate 3 different cases:
         # 1) Current accuracy is larger than the defined minimal accuracy
         #     -> decrease accuracy to minimal accuracy
@@ -604,11 +583,11 @@ function step!(tracker::PathTracker)
                 core_tracker.state.status = CoreTrackerStatus.tracking
             # 2.b)
             else
-                state.status = PT_TERMINATED_ACCURACY_LIMIT
+                state.status = PathTrackerStatus.terminated_accuracy_limit
             end
         # 3)
         else
-            state.status = PT_TERMINATED_ACCURACY_LIMIT
+            state.status = PathTrackerStatus.terminated_accuracy_limit
         end
     else
         state.status = path_tracker_status(ct_status)
@@ -850,7 +829,7 @@ function PathResult(
     @unpack state, core_tracker = tracker
     details_level = detailslevel(details)
 
-    return_code = symbol(state.status)
+    return_code = Symbol(state.status)
     x = solution(tracker)
     t = return_code == :success ? 0.0 : exp(-state.s)
     accuracy = state.solution_accuracy
@@ -1169,7 +1148,7 @@ target_parameters!(T::PathTracker, p) = target_parameters!(T.core_tracker, p)
 
 
 """
-    track!(tracker::PathTracker, x₁)::PathTrackerStatus
+    track!(tracker::PathTracker, x₁)::PathTrackerStatus.states
 
 Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
 Returns a [`PathTrackerStatus`](@ref).

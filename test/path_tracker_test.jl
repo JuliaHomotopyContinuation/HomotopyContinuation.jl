@@ -252,20 +252,12 @@
     end
 
     @testset "Status codes" begin
-        @test HC.symbol(HC.PT_TERMINATED_CALLBACK) == :terminated_callback
-        @test HC.symbol(HC.PT_TERMINATED_MAX_ITERS) == :terminated_max_iters
-        @test HC.symbol(HC.PT_TERMINATED_INVALID_STARTVALUE) == :terminated_invalid_startvalue
-        @test HC.symbol(HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL) == :terminated_step_size_too_small
-        @test HC.symbol(HC.PT_TERMINATED_ACCURACY_LIMIT) == :terminated_accuracy_limit
-        @test HC.symbol(HC.PT_TERMINATED_ILL_CONDITIONED) == :terminated_ill_conditioned
-        @test HC.symbol(HC.PT_POST_CHECK_FAILED) == :post_check_failed
-
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.success) == HC.PT_SUCCESS
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_invalid_startvalue) == HC.PT_TERMINATED_INVALID_STARTVALUE
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_maximal_iterations) == HC.PT_TERMINATED_MAX_ITERS
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_step_size_too_small) == HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_ill_conditioned) == HC.PT_TERMINATED_ILL_CONDITIONED
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.tracking) == HC.PT_TRACKING
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.success) == HC.PathTrackerStatus.success
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_invalid_startvalue) == HC.PathTrackerStatus.terminated_invalid_startvalue
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_maximal_iterations) == HC.PathTrackerStatus.terminated_max_iters
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_step_size_too_small) == HC.PathTrackerStatus.step_size_too_small
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_ill_conditioned) == HC.PathTrackerStatus.terminated_ill_conditioned
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.tracking) == HC.PathTrackerStatus.tracking
     end
 
     @testset "track with parameters change" begin

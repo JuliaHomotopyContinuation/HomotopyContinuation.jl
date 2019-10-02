@@ -60,8 +60,11 @@ target_parameters!(::PathTracker, p)
 
 The return type of [`track!`](@ref) is a [`PathTrackerStatus`](@ref):
 ```@docs
-PathTrackerStatus
-is_at_infinity
+PathTrackerStatus.states
 is_success
+is_at_infinity
+is_invalid_startvalue
+is_failed
+is_terminated_callback
 is_tracking
 ```
