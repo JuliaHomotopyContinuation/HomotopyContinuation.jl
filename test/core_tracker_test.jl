@@ -38,7 +38,7 @@
         @test current_t(t1) == 1.0
 
         setup!(t1, first(start_sols), 0.5, 0.4)
-        @test status(t1) == HC.CT_TERMINATED_INVALID_STARTVALUE
+        @test status(t1) == HC.CoreTrackerStatus.terminated_invalid_startvalue
         @test is_terminated(status(t1))
         @test current_t(t1) == 0.5
         @test real(current_Δt(t1)) < 0
@@ -270,7 +270,7 @@
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(
-            r -> is_success(r) || r.returncode == HC.CT_TERMINATED_ACCURACY_LIMIT,
+            r -> is_success(r) || r.returncode == HC.CoreTrackerStatus.terminated_accuracy_limit,
             results
         )
 

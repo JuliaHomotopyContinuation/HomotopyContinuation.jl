@@ -40,7 +40,8 @@
 
         # test iterator
         init!(tracker, first(starts))
-        for _ in tracker end
+        for _ in tracker
+        end
         @test is_success(status(tracker))
 
         tracker, starts = pathtracker_startsolutions(
@@ -105,7 +106,10 @@
             tracker = pathtracker(g, f, S; seed = 512321, system = FPSystem)
             @test all(s -> is_success(track!(tracker, s)), S)
             # check that we actually get the correct results
-            @test sort(round.(Int, real.(first.(solution.(track.(tracker, S)))))) == collect(1:n)
+            @test sort(round.(
+                Int,
+                real.(first.(solution.(track.(tracker, S)))),
+            )) == collect(1:n)
         end
         println("")
     end
@@ -210,7 +214,7 @@
 
         # simple projective
         tracker, starts = pathtracker_startsolutions(homogenize(f); system = FPSystem)
-        @test tracker isa PathTracker{PVector{ComplexF64, 1}}
+        @test tracker isa PathTracker{PVector{ComplexF64,1}}
         for (i, sᵢ) in enumerate(starts)
             result = track(tracker, sᵢ; path_number = i, details = :extensive)
             @test is_success(result)
@@ -256,12 +260,12 @@
         @test HC.symbol(HC.PT_TERMINATED_ILL_CONDITIONED) == :terminated_ill_conditioned
         @test HC.symbol(HC.PT_POST_CHECK_FAILED) == :post_check_failed
 
-        @test HC.path_tracker_status(HC.CT_SUCCESS) == HC.PT_SUCCESS
-        @test HC.path_tracker_status(HC.CT_TERMINATED_INVALID_STARTVALUE) == HC.PT_TERMINATED_INVALID_STARTVALUE
-        @test HC.path_tracker_status(HC.CT_TERMINATED_MAX_ITERS) == HC.PT_TERMINATED_MAX_ITERS
-        @test HC.path_tracker_status(HC.CT_TERMINATED_STEP_SIZE_TOO_SMALL) == HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL
-        @test HC.path_tracker_status(HC.CT_TERMINATED_ILL_CONDITIONED) == HC.PT_TERMINATED_ILL_CONDITIONED
-        @test HC.path_tracker_status(HC.CT_TRACKING) == HC.PT_TRACKING
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.success) == HC.PT_SUCCESS
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_invalid_startvalue) == HC.PT_TERMINATED_INVALID_STARTVALUE
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_maximal_iterations) == HC.PT_TERMINATED_MAX_ITERS
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_step_size_too_small) == HC.PT_TERMINATED_STEP_SIZE_TOO_SMALL
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_ill_conditioned) == HC.PT_TERMINATED_ILL_CONDITIONED
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.tracking) == HC.PT_TRACKING
     end
 
     @testset "track with parameters change" begin
@@ -299,14 +303,13 @@
         L₁ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
         L₂ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
 
-        s =
-            let
-                tracker, starts = pathtracker_startsolutions(
-                    [x^2 + y^2 + z^2 - 1; L₁];
-                    system = FPSystem,
-                )
-                solution(track(tracker, first(starts)))
-            end
+        s = let
+            tracker, starts = pathtracker_startsolutions(
+                [x^2 + y^2 + z^2 - 1; L₁];
+                system = FPSystem,
+            )
+            solution(track(tracker, first(starts)))
+        end
 
         tracker = pathtracker([[p₁, p₂, p₃]; L₁], [[p₁, p₂, p₃]; L₂], s; system = FPSystem)
         @test is_success(track(tracker, s))

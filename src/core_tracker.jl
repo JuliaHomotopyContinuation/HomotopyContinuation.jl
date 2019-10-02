@@ -69,56 +69,64 @@ const coretracker_supported_keywords = [
 # CoreTrackerState #
 ####################
 
+module CoreTrackerStatus
+
 @doc """
-    enum CoreTrackerStatus
+    CoreTrackerStatus.states
 
-The possible states the `CoreTracker` can achieve are
+The possible states a `CoreTracker` can have are
 
-* `CT_SUCCESS`: Indicates a successfull completed tracking
-* `CT_TRACKING`: The tracking is still in progress
-* `CT_TERMINATED_MAX_ITERS`: Tracking terminated since maximal iterations reached.
-* `CT_TERMINATED_ILL_CONDITIONED`: Tracking terminated since the path was too ill-conditioned.
-* `CT_TERMINATED_INVALID_STARTVALUE`: Tracking terminated since the provided start value was invalid.
-* `CT_TERMINATED_STEP_SIZE_TOO_SMALL`
-""" @enum CoreTrackerStatus begin
-    CT_SUCCESS
-    CT_TRACKING
-    CT_TERMINATED_MAX_ITERS
-    CT_TERMINATED_INVALID_STARTVALUE
-    CT_TERMINATED_STEP_SIZE_TOO_SMALL
-    CT_TERMINATED_ACCURACY_LIMIT
-    CT_TERMINATED_ILL_CONDITIONED
+* `CoreTrackerStatus.success`: Indicates a successfull completed tracking
+* `CoreTrackerStatus.tracking`: The tracking is still in progress
+* `CoreTrackerStatus.terminated_maximal_iterations`: Tracking terminated since maximal iterations reached.
+* `CoreTrackerStatus.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `CoreTrackerStatus.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
+* `CoreTrackerStatus.terminated_step_size_too_small`
+"""
+@enum states begin
+    success
+    tracking
+    terminated_maximal_iterations
+    terminated_accuracy_limit
+    terminated_ill_conditioned
+    terminated_invalid_startvalue
+    terminated_step_size_too_small
+        # no more used
+    terminated_singularity
+end
 end
 
 """
-    is_success(S::CoreTrackerStatus)
+    is_success(S::CoreTrackerStatus.states)
 
 Returns `true` if `S` indicates a success in the path tracking.
 """
-is_success(S::CoreTrackerStatus) = S == CT_SUCCESS
+is_success(S) = S == CoreTrackerStatus.success
 
 """
-    is_terminated(S::CoreTrackerStatus)
+    is_terminated(S::CoreTrackerStatus.states)
 
 Returns `true` if `S` indicates that the path tracking got terminated. This is not `true`
 if `is_success(S)` is `true`.
 """
-is_terminated(S::CoreTrackerStatus) = S ≠ CT_TRACKING && S ≠ CT_SUCCESS
+is_terminated(S::CoreTrackerStatus.states) =
+    S ≠ CoreTrackerStatus.tracking && S ≠ CoreTrackerStatus.success
 
 """
-    is_invalid_startvalue(S::CoreTrackerStatus)
+    is_invalid_startvalue(S::CoreTrackerStatus.states)
 
 Returns `true` if `S` indicates that the path tracking got terminated since the start
 value was not a zero.
 """
-is_invalid_startvalue(S::CoreTrackerStatus) = S ≠ CT_TERMINATED_INVALID_STARTVALUE
+is_invalid_startvalue(S::CoreTrackerStatus.states) =
+    S ≠ CoreTrackerStatus.terminated_invalid_startvalue
 
 """
-    is_tracking(S::CoreTrackerStatus)
+    is_tracking(S::CoreTrackerStatus.states)
 
 Returns `true` if `S` indicates that the path tracking is not yet finished.
 """
-is_tracking(S::CoreTrackerStatus) = S == CT_TRACKING
+is_tracking(S::CoreTrackerStatus.states) = S == CoreTrackerStatus.tracking
 
 ####################
 # CoreTrackerResult #
@@ -141,7 +149,7 @@ to obtain the solution.
 * `rejected_steps::Int`: The number of rejected_steps steps during the tracking.
 """
 struct CoreTrackerResult{V<:AbstractVector}
-    returncode::CoreTrackerStatus
+    returncode::CoreTrackerStatus.states
     x::V
     t::ComplexF64
     accuracy::Float64
@@ -365,7 +373,7 @@ mutable struct CoreTrackerState{
     eval_error::Vector{Float64} # an estimate of evalation error
 
     steps_jacobian_info_update::Int
-    status::CoreTrackerStatus
+    status::CoreTrackerStatus.states
     patch::MaybePatchState
 
     accepted_steps::Int
@@ -401,7 +409,7 @@ function CoreTrackerState(
     eval_error = copy(residual)
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
-    status = CT_TRACKING
+    status = CoreTrackerStatus.tracking
     last_step_failed = true
     consecutive_successfull_steps = 0
     CoreTrackerState(
@@ -837,7 +845,7 @@ function check_start_value!(tracker::CT)
         elseif i == 1 && tracker.options.precision != PRECISION_FIXED_64
             double_64_evaluation = true
         else
-            tracker.state.status = CT_TERMINATED_INVALID_STARTVALUE
+            tracker.state.status = CoreTrackerStatus.terminated_invalid_startvalue
         end
     end
     nothing
@@ -888,7 +896,7 @@ function init!(
     state.segment = ComplexSegment(t₁, t₀)
     state.s = 0.0
     state.Δs_prev = 0.0
-    state.status = CT_TRACKING
+    state.status = CoreTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && init!(state.patch, state.x)
     state.last_step_failed = true
@@ -939,7 +947,7 @@ function track(
 end
 
 """
-    track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus
+    track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus.states
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 Returns one of the enum values of `CoreTrackerStatus` indicating the status.
@@ -948,7 +956,7 @@ Check [`is_success`](@ref) and [`is_terminated`](@ref) to test for the status.
 If `setup_patch` is `true` then [`init!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus
+    track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus.states
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
@@ -994,7 +1002,7 @@ end
     check_start_value::Bool,
     debug::Bool,
 )
-    t₁ == t₀ && return (tracker.state.status = CT_SUCCESS)
+    t₁ == t₀ && return (tracker.state.status = CoreTrackerStatus.success)
 
     init!(
         tracker,
@@ -1156,7 +1164,7 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
 
     # Make sure to not overshoot.
     if !is_min_step_size(Δs, state.s, length(state.segment), options)
-        state.status = CT_TERMINATED_STEP_SIZE_TOO_SMALL
+        state.status = CoreTrackerStatus.terminated_step_size_too_small
     else
         state.Δs = min(length(state.segment) - state.s, Δs, options.max_step_size)
     end
@@ -1168,7 +1176,7 @@ function is_min_step_size(Δs, s, length_segment, options::CTO)
     if options.logarithmic_time_scale && options.from_infinity
         t = exp(-(length_segment - s))
         Δ = exp(-(length_segment - (s + Δs))) - t
-        Δ ≥ t || Δ ≥ options.min_step_size
+        Δ ≥ t || Δ ≥ options.min_step_size
         if t < options.min_step_size
             100Δ ≥ t
         else
@@ -1245,14 +1253,14 @@ end
 function check_terminated!(state::CTS, options::CTO)
     Δs = length(state.segment) - state.s
     if Δs < options.min_step_size
-        state.status = CT_SUCCESS
+        state.status = CoreTrackerStatus.success
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
-        state.status = CT_TERMINATED_MAX_ITERS
+        state.status = CoreTrackerStatus.terminated_maximal_iterations
     elseif options.terminate_ill_conditioned && terminate_limit_accuracy(state, options)
-        state.status = CT_TERMINATED_ACCURACY_LIMIT
+        state.status = CoreTrackerStatus.terminated_accuracy_limit
     elseif options.terminate_ill_conditioned && cond(state) > options.max_cond
-        state.status = CT_TERMINATED_ILL_CONDITIONED
+        state.status = CoreTrackerStatus.terminated_ill_conditioned
     end
     nothing
 end
@@ -1492,7 +1500,7 @@ Note that this is a stateful iterator. You can still introspect the state of the
 For example to check whether the tracker was successfull
 (and did not terminate early due to some problem) you can do
 ```julia
-println("Success: ", status(tracker) == CT_SUCCESS)
+println("Success: ", status(tracker) == CoreTrackerStatus.success)
 ```
 """
 function iterator(tracker::CT, x₁, t₁ = 1.0, t₀ = 0.0; kwargs...)
@@ -1508,7 +1516,7 @@ end
 
 function Base.iterate(iter::PathIterator, state = nothing)
     state === nothing && return current_x_t(iter), 1
-    iter.tracker.state.status != CT_TRACKING && return nothing
+    iter.tracker.state.status != CoreTrackerStatus.tracking && return nothing
 
     t = current_t(iter.tracker)
     step_done = false

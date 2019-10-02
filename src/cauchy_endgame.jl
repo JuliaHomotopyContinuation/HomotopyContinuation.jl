@@ -90,7 +90,7 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
 
             if !is_success(retcode)
                 init!(tracker, base_point, s, s_target; keep_steps = true)
-                if retcode == CT_TERMINATED_ACCURACY_LIMIT
+                if retcode == CoreTrackerStatus.terminated_accuracy_limit
                     return CAUCHY_TERMINATED_ACCURACY_LIMIT, m, max_acc
                 else
                     return CAUCHY_TERMINATED, m, max_acc

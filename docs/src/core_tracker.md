@@ -22,11 +22,11 @@ coretracker
 CoreTrackerResult
 is_success(result::CoreTrackerResult)
 solution(result::CoreTrackerResult)
-CoreTrackerStatus
-is_success(::CoreTrackerStatus)
-is_terminated(::CoreTrackerStatus)
-is_tracking(::CoreTrackerStatus)
-is_invalid_startvalue(::CoreTrackerStatus)
+CoreTrackerStatus.states
+is_success(::CoreTrackerStatus.states)
+is_terminated(::CoreTrackerStatus.states)
+is_tracking(::CoreTrackerStatus.states)
+is_invalid_startvalue(::CoreTrackerStatus.states)
 ```
 
 ## Methods

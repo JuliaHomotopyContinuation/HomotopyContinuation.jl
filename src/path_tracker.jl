@@ -74,19 +74,19 @@ The possible states a [`PathTracker`](@ref) can be in:
 end
 
 """
-    path_tracker_status(code::CoreTrackerStatus)
+    path_tracker_status(code::CoreTrackerStatus.states)
 Construct a [`PathTrackerStatus`](@ref) from a [`CoreTrackerStatus`](@ref).
 """
-function path_tracker_status(code::CoreTrackerStatus)
-    if code == CT_SUCCESS
+function path_tracker_status(code::CoreTrackerStatus.states)
+    if code == CoreTrackerStatus.success
         return PT_SUCCESS
-    elseif code == CT_TERMINATED_INVALID_STARTVALUE
+    elseif code == CoreTrackerStatus.terminated_invalid_startvalue
         return PT_TERMINATED_INVALID_STARTVALUE
-    elseif code == CT_TERMINATED_MAX_ITERS
+    elseif code == CoreTrackerStatus.terminated_maximal_iterations
         return PT_TERMINATED_MAX_ITERS
-    elseif code == CT_TERMINATED_STEP_SIZE_TOO_SMALL
+    elseif code == CoreTrackerStatus.terminated_step_size_too_small
         return PT_TERMINATED_STEP_SIZE_TOO_SMALL
-    elseif code == CT_TERMINATED_ILL_CONDITIONED
+    elseif code == CoreTrackerStatus.terminated_ill_conditioned
         return PT_TERMINATED_ILL_CONDITIONED
     else
         return PT_TRACKING
@@ -563,7 +563,7 @@ function step!(tracker::PathTracker)
             state.status = PT_POST_CHECK_FAILED
         end
 
-    elseif ct_status == CT_TERMINATED_ACCURACY_LIMIT
+    elseif ct_status == CoreTrackerStatus.terminated_accuracy_limit
         # First update the valuation  and check whether we are good
         update!(state.valuation, core_tracker)
         verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
@@ -587,7 +587,7 @@ function step!(tracker::PathTracker)
         elseif core_tracker.options.accuracy > options.min_accuracy
             # TODO: Currently we never increase this again
             core_tracker.options.accuracy = options.min_accuracy
-            core_tracker.state.status = CT_TRACKING
+            core_tracker.state.status = CoreTrackerStatus.tracking
         # 2)
         elseif options.precision_strategy == PREC_STRATEGY_FINITE
             # 2.a) We say that a path could still become finite if it is not classified
@@ -601,7 +601,7 @@ function step!(tracker::PathTracker)
                 tol_at_infinity = 1e-2,
             ) != VAL_AT_INFINITY
                 core_tracker.options.precision = PRECISION_ADAPTIVE
-                core_tracker.state.status = CT_TRACKING
+                core_tracker.state.status = CoreTrackerStatus.tracking
             # 2.b)
             else
                 state.status = PT_TERMINATED_ACCURACY_LIMIT
