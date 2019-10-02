@@ -233,36 +233,42 @@ function solve!(
     results = Vector{Union{Nothing,result_type(tracker)}}(undef, n)
     results .= nothing
 
-    ntracked = 0
-    for k = 1:n
-        if path_jumping_check
-            return_code, path_number = track_with_pathjumping_check!(
-                results,
-                tracker,
-                S,
-                k,
-                solver.path_jumping_check;
-                path_result_details = path_result_details,
-                save_all_paths = save_all_paths,
-            )
-        else
-            return_code = track!(tracker, S[k])
-            path_number = k
+    try
+        ntracked = 0
+        for k = 1:n
+            if path_jumping_check
+                return_code, path_number = track_with_pathjumping_check!(
+                    results,
+                    tracker,
+                    S,
+                    k,
+                    solver.path_jumping_check;
+                    path_result_details = path_result_details,
+                    save_all_paths = save_all_paths,
+                )
+            else
+                return_code = track!(tracker, S[k])
+                path_number = k
+            end
+            if save_all_paths || is_success(return_code) || is_invalid_startvalue(return_code)
+                results[path_number] = PathResult(
+                    tracker,
+                    S[path_number],
+                    path_number;
+                    details = path_result_details,
+                )
+            end
+            is_success(return_code) && update!(stats, results[path_number])
+            ntracked = k
+            k % 32 == 0 && update_progress!(progress, k, stats)
         end
-        if save_all_paths || is_success(return_code) || is_invalid_startvalue(return_code)
-            results[path_number] = PathResult(
-                tracker,
-                S[path_number],
-                path_number;
-                details = path_result_details,
-            )
+        # don't print if it already got printed above
+        n % 32 != 0 && update_progress!(progress, n, stats)
+    catch e
+        if !isa(e, InterruptException)
+            rethrow()
         end
-        is_success(return_code) && update!(stats, results[path_number])
-        ntracked = k
-        k % 32 == 0 && update_progress!(progress, k, stats)
     end
-    # don't print if it already got printed above
-    n % 32 != 0 && update_progress!(progress, n, stats)
 
     Result(
         remove_nothings(results),
