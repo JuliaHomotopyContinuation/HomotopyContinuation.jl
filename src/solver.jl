@@ -147,7 +147,7 @@ end
 ## SOLVER ##
 ############
 
-struct Solver{PT<:Union{PathTracker,PolyhedralTracker},UP<:UniquePoints}
+struct Solver{PT<:AbstractPathTracker, UP<:UniquePoints}
     trackers::PT
     stats::SolveStats
     path_jumping_check::PathJumpingCheck{UP}
@@ -168,7 +168,7 @@ function Solver(prob::AbstractProblem, start_solutions; kwargs...)
     Solver(tracker, SolveStats(), path_jumping_check)
 end
 
-function Solver(tracker::Union{PathTracker,PolyhedralTracker}, checkpoint::UniquePoints)
+function Solver(tracker::AbstractPathTracker, checkpoint::UniquePoints)
     Solver(tracker, SolveStats(), checkpoint)
 end
 
@@ -179,6 +179,7 @@ function solver_startsolutions(args...; kwargs...)
 end
 
 accuracy(T::PathTracker) = T.options.min_accuracy
+accuracy(T::OverdeterminedTracker) = accuracy(T.tracker)
 accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 
 ############
@@ -217,6 +218,7 @@ function solve!(
     path_result_details::Symbol = :default,
     save_all_paths::Bool = false,
     path_jumping_check::Bool = true,
+    threading::Bool = true
 )
     @unpack trackers, stats = solver
     tracker = trackers

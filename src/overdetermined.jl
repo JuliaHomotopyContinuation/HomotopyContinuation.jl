@@ -63,6 +63,7 @@ function track!(OT::OverdeterminedTracker, x)
     # overwrite the solution information used for constructing a `PathResult`
     state = path_tracker_state(OT)
     state.solution_cond = cond!(OT.jacobian, InfNorm())
+    original_residual = state.solution_residual
     state.solution_residual = LA.norm(OT.newton.r, InfNorm())
     state.solution_accuracy = result.accuracy
 
@@ -71,8 +72,9 @@ function track!(OT::OverdeterminedTracker, x)
         state.status = PathTrackerStatus.success
     else
         if state.solution_cond > 1e8
-            evaluate!(OT.newton.r, OT.system, s, t)
-            if solution_residual / residual < 1e5
+            evaluate!(OT.newton.r, OT.system, s, 0.0)
+            state.solution_residual = LA.norm(OT.newton.r, InfNorm())
+            if state.solution_residual / original_residual < 1e5
                 state.status = PathTrackerStatus.success
             else
                 state.status = PathTrackerStatus.excess_solution

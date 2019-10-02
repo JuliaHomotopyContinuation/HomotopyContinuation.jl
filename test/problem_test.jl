@@ -100,6 +100,37 @@
         @test starts isa HC.PolyhedralStartSolutionsIterator
     end
 
+    @testset "multi-homogenous" begin
+        @polyvar z[1:6, 1:3]
+        F = let
+            p = [1, 1, 0]
+            α = randn(5)
+            a = randn(9)
+            ## define the system of polynomials
+            f = [z[i, :] ⋅ z[i, :] for i = 2:5]
+            g = [z[i, :] ⋅ z[i+1, :] for i = 1:5]
+            h = sum(a[i] .* (z[i, :] × z[i+1, :]) for i = 1:3) +
+                sum(a[i+4] .* z[i, :] for i = 2:5)
+            F′ = [f .- 1; g .- cos.(α); h .- p]
+            ## assign values to z₁ and z₆
+            [subs(f, z[1, :] => [1, 0, 0], z[6, :] => [1, 0, 0]) for f in F′]
+        end
+        group1 = [[z[2, :]; z[4, :]], [z[3, :]; z[5, :]]]
+        group2 = [z[2, :], z[4, :], z[3, :], z[5, :]]
+
+        @test bezout_number(F) == 1024
+        @test bezout_number(F; variable_groups = group1) == 320
+        @test bezout_number(F; variable_groups = group2) == 576
+
+        _, starts = problem_startsolutions(F; variable_groups = group1)
+        @test length(starts) == 320
+        @test length(collect(starts)) == 320
+
+        _, starts = problem_startsolutions(F; variable_groups = group2)
+        @test length(starts) == 576
+        @test length(collect(starts)) == 576
+    end
+
     @testset "Overdetermined" begin
         @polyvar x y z
         prob, starts = problem_startsolutions([

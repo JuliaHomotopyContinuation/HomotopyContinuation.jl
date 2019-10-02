@@ -36,6 +36,7 @@ end
     include("polyhedral_test.jl")
     include("overdetermined_test.jl")
     include("solver_test.jl")
+    include("composition_test.jl")
     # include("solve_test.jl")
     # include("result_test.jl")
     # include("root_count_test.jl")

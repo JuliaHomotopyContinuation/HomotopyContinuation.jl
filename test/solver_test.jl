@@ -79,4 +79,27 @@
         @test all(is_success, result)
         @test result isa Result{Vector{ComplexF64}}
     end
+
+    @testset "overdetermined" begin
+        @polyvar x y z
+        f = [x * z - y^2, y - z^2, x - y * z, x + y + z + 1]
+
+        @test nsolutions(solve(f; seed = 213412)) == 3
+        @test nsolutions(solve(f; seed = 213412, start_system = :polyhedral)) == 3
+
+        minors = include(joinpath(@__DIR__, "examples", "3_by_5_minors.jl"))
+        @test nsolutions(solve(minors; seed = 312321, system = FPSystem)) == 80
+
+        # singular solutions
+        @polyvar x y
+        f = [
+            (x - 2)^4 * (x + y + 1),
+            (x^2 + y^2 - 2) * (y - 2),
+            (y - 2) * (x^2 + x * y - 3),
+        ]
+        result = solve(f)
+        @test length(nonsingular(result)) == 1
+        @test length(singular(result)) == 1
+        @test multiplicity(singular(result)[1]) == 4
+    end
 end
