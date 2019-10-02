@@ -8,7 +8,9 @@
         @test !isempty(sprint(show, tracker))
         test_show_juno(tracker.options)
         @test !isempty(sprint(show, tracker.options))
-
+        test_show_juno(tracker.state)
+        @test !isempty(sprint(show, tracker.state))
+        @test Base.broadcastable(tracker) isa Ref{typeof(tracker)}
         tracker = pathtracker(f; system = FPSystem, precision_strategy = :adaptive_never)
         @test tracker.options.precision_strategy == HC.PREC_STRATEGY_NEVER
         tracker = pathtracker(f; system = FPSystem, precision_strategy = :adaptive_always)
@@ -205,8 +207,12 @@
             @test !is_projective(result)
             @test is_finite(result)
             @test !is_singular(result)
+            @test is_nonsingular(result)
+            @test start_solution(result) == sᵢ
+            @test is_nonsingular(result, 1e10)
             @test is_real(result)
             @test isreal(result)
+            @test !is_failed(result)
 
             test_show_juno(result)
             @test !isempty(sprint(show, result))
