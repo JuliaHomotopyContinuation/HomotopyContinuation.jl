@@ -59,6 +59,9 @@ The following norms are implemented:
 EuclideanNorm
 InfNorm
 WeightedNorm
+weights(WN::WeightedNorm)
+init!(w::WeightedNorm, x::AbstractVector)
+update!(w::WeightedNorm, x::AbstractVector)
 ```
 
 ### Deprecated

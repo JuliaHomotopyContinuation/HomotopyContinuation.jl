@@ -5,7 +5,7 @@ makedocs(
     sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
-        # "Solving general systems" => "solving.md",
+        "Solving general systems" => "solving.md",
         # "Solving paremeterized systems with monodromy" => "monodromy.md",
         # "Sorting arrays of solutions" => "sorting.md",
         "PathTracker" => "path_tracker.md",

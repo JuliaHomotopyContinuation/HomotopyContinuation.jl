@@ -141,7 +141,7 @@ to obtain the solution.
 
 # Fields
 
-* `returncode` The [`CoreTrackerStatus`](@ref) enum.
+* `returncode` The [`CoreTrackerStatus.states`](@ref) enum.
 * `x::V` The solution at `t`.
 * `t::ComplexF64` The time `t` when the path tracker stopped.
 * `accuracy::Float64`: The estimated accuracy of `x`.

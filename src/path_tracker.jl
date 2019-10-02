@@ -79,7 +79,8 @@ end
 
 """
     path_tracker_status(code::CoreTrackerStatus.states)
-Construct a [`PathTrackerStatus`](@ref) from a [`CoreTrackerStatus`](@ref).
+
+Construct a [`PathTrackerStatus.states`](@ref) from a [`CoreTrackerStatus.states`](@ref).
 """
 function path_tracker_status(code::CoreTrackerStatus.states)
     if code == CoreTrackerStatus.success
@@ -97,14 +98,42 @@ function path_tracker_status(code::CoreTrackerStatus.states)
     end
 end
 
+"""
+    is_success(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates a success in tracking.
+"""
 is_success(status::PathTrackerStatus.states) = status == PathTrackerStatus.success
+
+"""
+    is_success(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates that a path diverged towards infinity.
+"""
 is_at_infinity(status::PathTrackerStatus.states) = status == PathTrackerStatus.at_infinity
+
+"""
+    is_tracking(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates the tracking is not going on.
+"""
 is_tracking(status::PathTrackerStatus.states) = status == PathTrackerStatus.tracking
+
+"""
+    is_invalid_startvalue(status::PathTrackerStatus.states)
+
+Returns `true` if the provided start value was not valid.
+"""
 is_invalid_startvalue(status::PathTrackerStatus.states) =
     status == PathTrackerStatus.terminated_invalid_startvalue
+
+"""
+    is_terminated_callback(status::PathTrackerStatus.states)
+
+Returns `true` if the provided callback indicated a termination of the path.
+"""
 is_terminated_callback(status::PathTrackerStatus.states) =
     status == PathTrackerStatus.terminated_callback
-
 
 #############
 ## Options ##
@@ -1151,7 +1180,7 @@ target_parameters!(T::PathTracker, p) = target_parameters!(T.core_tracker, p)
     track!(tracker::PathTracker, x₁)::PathTrackerStatus.states
 
 Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
-Returns a [`PathTrackerStatus`](@ref).
+Returns a [`PathTrackerStatus.states`](@ref).
 """
 function track!(
     tracker::PathTracker,

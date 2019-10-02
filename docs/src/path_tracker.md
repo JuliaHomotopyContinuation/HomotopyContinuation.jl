@@ -58,7 +58,7 @@ start_parameters!(::PathTracker, p)
 target_parameters!(::PathTracker, p)
 ```
 
-The return type of [`track!`](@ref) is a [`PathTrackerStatus`](@ref):
+The return type of [`track!`](@ref) is a [`PathTrackerStatus.states`](@ref):
 ```@docs
 PathTrackerStatus.states
 is_success

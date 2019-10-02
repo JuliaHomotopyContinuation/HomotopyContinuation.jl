@@ -3,6 +3,8 @@ export AbstractNorm,
        EuclideanNorm,
        InfNorm,
        distance,
+       update!,
+       weights,
        # deprecated
        euclidean_distance,
        euclidean_norm
