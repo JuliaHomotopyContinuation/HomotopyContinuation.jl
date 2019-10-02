@@ -500,7 +500,7 @@ Compute the minimum and maximum (weighted total) degree of `f` with respect to t
 """
 function minmaxdegree(f::MP.AbstractPolynomialLike, variables)
     d_min, d_max = typemax(Int), 0
-    for term in f
+    for term in MP.terms(f)
         d = degree(term, variables)
         d_min, d_max = min(d, d_min), max(d, d_max)
     end
