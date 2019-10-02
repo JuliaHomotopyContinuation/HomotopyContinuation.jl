@@ -163,7 +163,7 @@ function update!(
                     ν̇[k], ν̈[k] = ν̇_k, ν̈_k
                 end
                 # update ν and shift the previous ones
-                val.ν[k], ν₂[k], ν₁[i] = ν_k, val.ν[k], ν₂[k]
+                val.ν[k], ν₂[k], ν₁[k] = ν_k, val.ν[k], ν₂[k]
                 k += 1
             end
         end

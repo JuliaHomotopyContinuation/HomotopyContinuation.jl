@@ -45,6 +45,38 @@
         @test val.ν ≈ [0.0, 0.0] atol = 1e-8
         @test norm(val.ν̇) < 1e-7
         @test norm(val.ν̈) < 1e-6
+
+        ## Multi-projective tracking
+
+        # affine valuation
+        @polyvar x y v w
+
+        tracker, starts = coretracker_startsolutions([x*y - 6*v*w, x^2 - 5v^2],
+            variable_groups=[(x,v), (y,w)],
+            log_homotopy = true)
+        S = collect(starts)
+        state = tracker.state
+        val = HC.Valuation(S[1]; affine = true)
+        init!(val)
+        init!(tracker, S[1], 0.0, 30.0)
+        for _ in tracker
+            if !state.last_step_failed
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+            end
+        end
+        @test is_success(status(tracker))
+        @test val.ν ≈ [0.0, 0.0] atol = 1e-6
+
+        val = HC.Valuation(S[1]; affine = false)
+        init!(val)
+        init!(tracker, S[1], 0.0, 30.0)
+        for _ in tracker
+            if !state.last_step_failed
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+            end
+        end
+        @test is_success(status(tracker))
+        @test val.ν ≈ [0.0, 0.0, 0.0, 0.0] atol = 1e-6
     end
 
     @testset "Correctness (non-zero valuation)" begin
