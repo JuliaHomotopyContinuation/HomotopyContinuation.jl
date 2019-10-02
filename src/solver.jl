@@ -1,4 +1,4 @@
-export Solver, solver_startsolutions, solve!
+export Solver, solver_startsolutions, solve!, solve
 
 const solve_supported_keywords = [
     :threading,
@@ -185,6 +185,15 @@ accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 ## solve! ##
 ############
 
+"""
+    solve!(solver::Solver, start_solutions;
+        show_progress = true,
+        path_result_details = :default,
+        save_all_paths = false,
+        path_jumping_check = true)
+
+Solve the problem encoded in `solver` for the given start solutions `start_solutions`.
+"""
 function solve!(solver::Solver, start_solutions; show_progress::Bool = true, kwargs...)
     if show_progress
         n = length(start_solutions)
@@ -288,4 +297,229 @@ function remove_nothings(v::Vector{Union{Nothing,T}}) where {T}
         !isnothing(vᵢ) && push!(w, vᵢ)
     end
     w
+end
+
+
+"""
+    solve(args...; options...)::Result
+
+The solve function takes many different arguments and options depending on your specific situation,
+but in the end it always returns a [`Result`](@ref) containing the result of the computations.
+Depending on the prodived arguments different kind of homotopies are constructed. In particular
+it is possible to construct the following homotopies:
+
+* Total degree homotopy
+* Polyhedral homotopy
+* Parameter homotopy
+* Multi-homogenous homotopy
+* Start target homotopy
+
+If the input is a *homogenous* polynomial system, solutions in projective space are computed.
+Otherwise affine solutions are computed.
+
+## Options
+
+The `solve` routines takes many different options. In particular all options to
+[`CoreTracker`](@ref) and [`PathTracker`](@ref) are allowed.
+Additionally the following options are allowed:
+
+* `affine_tracking::Bool=true`: Indicate whether path tracking should happen in affine space.
+* `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) for
+  the totaldegree and start target homotopy. The default is [`StraightLineHomotopy`](@ref).
+  The constructor is called with `homotopy(start, target)` where `start` and `target` are
+  homogeneous [`AbstractSystem`](@ref)s.
+* `homvar::Union{Int,MultivariatePolynomials.AbstractVariable}`: This considers the
+  *homogeneous* system `F` as an affine system which was homogenized by `homvar`.
+  If `F` is an `AbstractSystem` `homvar` is the index (i.e. `Int`) of the homogenization
+  variable. If `F` is an `AbstractVariables` (e.g. created by `@polyvar x`)
+  `homvar` is the actual variable used in the system `F`.
+* `path_jumping_check::Bool=true`: Enable a check whether one of
+  the paths jumped to another one.
+* `path_result_details=:default`: The amount of information computed in each path result.
+  Possible values are `:minimal` (minimal details), `:default` (default) and `:extensive`.
+* `projective_tracking::Bool=false`: Indicate whether path tracking should happen in
+  projective space. The flag `affine_tracking` is dominant.
+* `seed`: The random seed used during the computations. The seed is also reported in the
+  result. For a given random seed the result is always identical.
+* `show_progress` (default `true`): Whether a progress bar should be printed to report the
+  progress of the current computation.
+* `system::AbstractSystem`: A constructor to assemble a [`AbstractSystem`](@ref).
+  The default is [`SPSystem`](@ref). This constructor is only applied to the input of `solve`.
+  The constructor is called with `system(polynomials, variables)` where `polynomials` is a
+  vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the
+  variable ordering. If you experience significant compilation times,
+  consider to change system to `FPSystem`.
+* `threading` (default `true`): Enable or disable multi-threading. The number of threads used
+  is controlled by the environment variable `JULIA_NUM_THREADS`.
+
+# Examples
+
+
+## Total Degree Homotopy
+
+    solve(F; options...)
+
+Solve the system `F` using a start system computed from the degrees of the entries of `F`.
+The number of paths to track is equal to the total degree `d₁⋯dⱼ`, where `dᵢ` is
+the degree of the `i`th entry of `F`. `F` can be
+
+- `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by using the
+  exported `@polyvar`)
+- A composition of polynomial systems constructed by [`compose`](@ref)
+- Any [`AbstractSystem`](@ref)
+
+We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
+
+```julia
+julia> @polyvar x y;
+julia> solve([x^2+y^2+1, 2x+3y-1])
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 661766
+```
+
+
+## Polyhedral Homotopy
+
+    solve(F; start_system = :polyhedral, only_torus=false, options...)
+
+Solve the system `F` using a start system computed from the Newton Polytopes of the
+ntries `F`. The number of paths to track is equal to the mixed volume of the
+Newton Polytopes of the entries of `F`. The mixed volume is at most the total degree of `F`.
+`F` can be
+- `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
+- A composition of polynomial systems constructed by [`compose`](@ref). Note that the
+  composition will not preserved.
+
+If `only_torus == true` then only solutions in the algebraic torus
+``(ℂ\\setminus \\{0\\})^n`` will be computed.
+
+We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way:
+```julia
+julia> @polyvar x y;
+julia> solve([x^2+y^2+1, 2x+3y-1]; start_system = :polyhedral)
+Result with 2 solutions
+==================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 222880
+```
+
+
+## Parameter Homotopy
+
+    solve(F, startsolutions;
+        parameters,
+        start_parameters,
+        target_parameters,
+        start_gamma = nothing,
+        target_gamma = nothing,
+    )
+
+Solve the parameter homotopy
+```math
+H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
+```
+where ``p₁`` (=`start_parameters`) and ``p₀`` (=`target_parameters`) are vectors of
+parameter values for ``F`` and ``γ₁`` (=`start_gamma`) and ``γ₀`` (=`target_gamma`)
+    are complex numbers.
+If `start_parameters` or `target_parameters` is `nothing`, it is assumed that `γ₁` and `γ₀` are ``1``.
+The input `parameters` specifies the variables of `F` which should be considered as parameters.
+Necessarily we have `length(parameters) == length(p₁) == length(p₀)`.
+
+    solve(F, startsolutions; parameters, p₁, p₀, γ₁=nothing, γ₀=nothing)
+
+This is a unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
+    `γ₁=start_gamma`, γ₀=`target_gamma`.
+
+We want to solve a parameter homotopy ``H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])`` where
+```math
+F(x; a) := (x₁^2-a₁, x₁x₂-a₁+a₂)
+```
+and let's say we are only intersted in tracking of ``[1,1]``.
+This can be accomplished as follows
+```julia
+@polyvar x[1:2] a[1:2]
+F = [x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]]
+startsolutions = [[1, 1]]
+p₁ = [1, 0]
+p₀ = [3im, 0.5+2im]
+solve(F, startsolutions; parameters=a, start_parameters=p₁, target_parameters=p₀)
+# If you like unicode this is also possible
+solve(F, startsolutions; parameters=a, p₁=p₁, p₀=p₀)
+```
+
+## Start Target Homotopy
+
+    solve(G, F, start_solutions; options...)
+
+This constructs the homotopy ``H(x,t) = tG(x)+(1-t)F(x)`` to compute solutions of the
+system `F`. `start_solutions` is a list of solutions of `G` which are tracked to solutions
+of `F`.
+
+```julia
+@polyvar x y
+G = [x^2-1,y-1]
+F = [x^2+y^2+z^2, 2x+3y-z]
+solve(G, F, [[1, 1], [-1, 1]])
+```
+
+
+## Abstract Homotopy
+
+    solve(H::AbstractHomotopy, start_solutions; options...)
+
+Solve the homotopy `H` by tracking the each solution of
+``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
+Note that `H` has to be a homotopy between *homogeneous* polynomial systems.
+If it should be considered as an affine system indicate which is the index
+of the homogenization variable, e.g. `solve(H, startsolutions, homvar=3)`
+if the third variable is the homogenization variable.
+
+
+## Homogeneous Systems
+
+If `F` has is homogeneous, we return results in projective space
+
+```julia
+julia> @polyvar x y z;
+julia> solve([x^2+y^2+z^2, 2x+3y-z])
+Result{PVector{Complex{Float64},1}} with 2 solutions
+====================================================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 490575
+```
+
+If your polynomial system is already homogeneous, but you would like to consider it as an affine system
+you can do
+```julia
+@polyvar x y z
+solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)
+```
+This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
+
+
+## Multi-homogeneous Systems
+
+By exploiting the multi-homogenous structure of a polynomial system it is possible
+to decrease the number of paths necessary to track.
+
+```julia
+@polyvar x y
+# Use variable groups to only track 2 paths instead of 4
+solve([x*y - 6, x^2 - 5], variable_groups=[(x,), (y,)])
+```
+To check whether a certain variable grouping is beneficial you can use the [`bezout_number`](@ref)
+function.
+"""
+function solve(args...; kwargs...)
+    solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
+    solver, start_solutions = solver_startsolutions(args...; rest...)
+    solve!(solver, start_solutions; solve_kwargs...)
 end

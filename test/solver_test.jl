@@ -71,4 +71,12 @@
         @test nsolutions(result) == 6
         @test ntracked(result) == 8
     end
+
+    @testset "solve" begin
+        @polyvar x y z
+        f = [x^2 - 2, x + y - 1]
+        result = solve(f; system = FPSystem)
+        @test all(is_success, result)
+        @test result isa Result{Vector{ComplexF64}}
+    end
 end
