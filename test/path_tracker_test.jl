@@ -84,12 +84,19 @@
         g = equations(katsura(5))
         tracker, starts = pathtracker_startsolutions(g; system = FPSystem)
         @test all(s -> is_success(track!(tracker, s)), starts)
+
+        # start solution is also target solution
+        @polyvar x
+        tracker = pathtracker([x - 1]; system = FPSystem)
+        @test is_success(track(tracker, [1]))
     end
 
     # Univariate singular
     @testset "Univariate singular" begin
         @polyvar x
+        print("Univariate singular: ")
         for n = 2:12
+            print(n, ",")
             f = [(x - 3)^n]
             g = [x^n - 1]
             S = [[cis(i * 2π / n)] for i = 0:(n-1)]
@@ -103,6 +110,7 @@
                 tracker.state.solution_accuracy < 1e-5
             end
         end
+        println("")
     end
 
     # Wilkinson

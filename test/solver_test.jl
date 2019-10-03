@@ -84,7 +84,28 @@
         @test nsolutions(solve(f; system = FPSystem, predictor = RK4())) == 2
     end
 
+    @testset "different input" begin
+        F = equations(katsura(5))
+        F_hom = homogenize(F)
+        res = solve(F_hom, threading = false, patch = RandomPatch())
+        @test nfinite(res) == 32
+        @test res isa Result{PVector{ComplexF64,1}}
+        @test nfinite(solve(F_hom, threading = false, patch = EmbeddingPatch())) == 32
+        @test nfinite(solve(F_hom, threading = false, patch = OrthogonalPatch())) == 32
+
+        @polyvar w
+        F = equations(cyclic(5))
+        result = solve(homogenize(F, w), system=FPSystem, threading = false, homvar = w)
+        @test nfinite(result) == 70
+        @test result isa Result{Vector{ComplexF64}}
+        G = FPSystem(homogenize(F))
+        result = solve(G, homvar = 6)
+        @test nnonsingular(result) == 70
+        @test result isa Result{Vector{ComplexF64}}
+    end
+
     @testset "singular" begin
+        # 1 singular solution with multiplicity 3
         @polyvar x y
         z = 1
         F = [
@@ -99,6 +120,33 @@
         @test nsingular(result; counting_multiplicities = true) == 3
         @test length(singular(result)) == 1
         @test all(r -> multiplicity(r) == 3, singular(result; multiple_results = true))
+
+        # 2 solutions with multiplicity 6, projective
+        @polyvar x z y
+        # This has two roots of multiplicity 6 at the hyperplane z=0
+        F = [
+            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
+            0.75 * z^4
+            10 * x^2 * z + 10 * y^2 * z - 6 * z^3
+        ]
+        res = solve(F; system = FPSystem, threading = false, seed = 703127)
+        @test nsingular(res) == 2
+        @test nsingular(res; counting_multiplicities = true) == 12
+        @test multiplicity.(results(res)) == [6, 6]
+
+        # 2 solutions with multiplicity 6, affine
+        @polyvar x z
+        y = 1
+        # This has two roots of multiplicity 6 at the hyperplane z=0
+        F = [
+            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
+            0.75 * z^4
+            10 * x^2 * z + 10 * y^2 * z - 6 * z^3
+        ]
+        res = solve(F; system = FPSystem, threading = false, seed = 412312)
+        @test nsingular(res) == 2
+        @test nsingular(res; counting_multiplicities = true) == 12
+        @test multiplicity.(results(res)) == [6, 6]
     end
 
     @testset "affine and projective solution types" begin
@@ -155,5 +203,35 @@
         @test length(nonsingular(result)) == 1
         @test length(singular(result)) == 1
         @test multiplicity(singular(result)[1]) == 4
+    end
+
+    @testset "Parameter promotion to Float64" begin
+        d = 3
+        k = 1
+
+        R = 1.0
+        r = 0.5
+
+        @polyvar lam[1:k] p[1:6]
+        F = [(R^2 - r^2 + (p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2 +
+              (p[3] + p[6] * lam[1])^2)^2 -
+             4 * R^2 * ((p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2)]
+        #Randomly choose a start system
+        # with only Complex{Float32 parameters
+        p0 = randn(Complex{Float32}, 6)
+        F0 = subs(F, p => p0)
+        res0 = solve(F0)
+        S0 = solutions(res0)
+
+        #Construct the tracker
+        tracker = pathtracker(F; parameters = p, generic_parameters = p0)
+        @test HC.basehomotopy(tracker.core_tracker.homotopy).p isa NTuple{2,Vector{ComplexF64}}
+
+        #Let's solve another system using PathTracking
+        p_current = randn(6)
+        result = track(tracker, S0[1]; target_parameters = p_current)
+        sol = solution(result)
+        F_SP = SPSystem(F; parameters = p)
+        @test residual(result) ≈ euclidean_norm(F_SP(sol, p_current)) atol = 1e-13
     end
 end

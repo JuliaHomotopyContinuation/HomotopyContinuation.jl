@@ -45,7 +45,6 @@ end
     include("result_test.jl")
     include("composition_test.jl")
     include("monodromy_test.jl")
-    # include("solve_test.jl")
-    # include("root_count_test.jl")
+    include("root_count_test.jl")
     # include("nextjournal.jl")
 end

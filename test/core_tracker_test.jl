@@ -125,7 +125,8 @@
         # log homotopy as well
         log_tracker, log_start_sols = coretracker_startsolutions(
             F;
-            seed = 12356, log_homotopy = true,
+            seed = 12356,
+            log_homotopy = true,
         )
         log_s = first(log_start_sols)
         @allocated track!(log_tracker, log_s, 0.0, -log(0.01))
@@ -193,6 +194,13 @@
         tracker, S = coretracker_startsolutions([x^2 + y^2 - 4, x + y - 3])
         result = track(tracker, [1, 1], 1.0, 0.0)
         @test is_success(result)
+
+        tracker, S = coretracker_startsolutions(
+            [x^2 + y^2 - 4, x + y - 3];
+            simple_step_size_alg = true,
+        )
+        result = track(tracker, first(S), 1.0, 0.0)
+        @test is_success(result)
     end
 
     @testset "iterator" begin
@@ -249,7 +257,7 @@
             log_homotopy = true,
             min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision = PRECISION_FIXED_64
+            precision = PRECISION_FIXED_64,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -266,12 +274,12 @@
             log_homotopy = true,
             min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision = :double
+            precision = :double,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(
             r -> is_success(r) || r.returncode == HC.CoreTrackerStatus.terminated_accuracy_limit,
-            results
+            results,
         )
 
 
@@ -282,7 +290,7 @@
             log_homotopy = true,
             min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision = :double_double
+            precision = :double_double,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -294,7 +302,7 @@
             log_homotopy = true,
             min_step_size = eps()^2,
             accuracy = 1e-7,
-            precision = :adaptive
+            precision = :adaptive,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -304,7 +312,8 @@
             g,
             f,
             S;
-            log_homotopy = true, precision = :NOT_A_PRECISION
+            log_homotopy = true,
+            precision = :NOT_A_PRECISION,
         )
     end
 
@@ -315,7 +324,7 @@
         tracker, starts = coretracker_startsolutions(
             F,
             [1.0, 1.0 + 0.0 * im],
-            generic_parameters = [2.2, 3.2]
+            generic_parameters = [2.2, 3.2],
         )
         start_parameters!(tracker, [1, 0])
         target_parameters!(tracker, [2, 4])
@@ -329,7 +338,7 @@
             f,
             variable_groups = [[x], [y]],
             seed = 123456,
-            predictor = Pade21()
+            predictor = Pade21(),
         )
         current_x(tracker) isa ProjectiveVectors.PVector{ComplexF64,2}
         S = collect(starts)

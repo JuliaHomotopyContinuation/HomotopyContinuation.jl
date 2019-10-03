@@ -476,6 +476,7 @@ function step!(tracker::PathTracker)
                 if m′ === nothing
                     state.winding_number = m
                 elseif m′ == m
+                    @label cauchy_eg_success
                     state.status = PathTrackerStatus.success
                     state.solution_accuracy = p_accuracy
 
@@ -486,7 +487,6 @@ function step!(tracker::PathTracker)
                         Inf;
                         tol = tracker.default_ct_options.accuracy,
                     )
-
                     state.solution_cond = s_cond
                     state.solution_residual = s_res
                     if converged && s_cond < 1e8 && s_accuracy < p_accuracy
@@ -500,6 +500,9 @@ function step!(tracker::PathTracker)
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
                 if options.precision_strategy == PREC_STRATEGY_NEVER
+                    if state.winding_number !== nothing
+                        @goto cauchy_eg_success
+                    end
                     state.status = PathTrackerStatus.terminated_accuracy_limit
                 # If we are here, we have a precision strategy which allows to use
                 # higher precision. Therefore switch to it if this not yet happened
@@ -553,7 +556,8 @@ function step!(tracker::PathTracker)
             state.status = PathTrackerStatus.terminated_callback
         end
 
-    elseif is_success(ct_status)
+    elseif is_success(ct_status) ||
+           ct_status == CoreTrackerStatus.terminated_step_size_too_small
         converged, s_acc, s_cond, s_res = check_converged!(
             state.solution,
             core_tracker,
@@ -567,6 +571,8 @@ function step!(tracker::PathTracker)
             state.solution_cond = s_cond
             state.solution_residual = s_res
             state.s = Inf
+        elseif ct_status == CoreTrackerStatus.terminated_step_size_too_small
+            state.status = PathTrackerStatus.step_size_too_small
         else
             state.status = PathTrackerStatus.post_check_failed
         end
@@ -574,11 +580,11 @@ function step!(tracker::PathTracker)
     elseif ct_status == CoreTrackerStatus.terminated_accuracy_limit
         # First update the valuation  and check whether we are good
         update!(state.valuation, core_tracker)
+        # we put less requirement on tol_at_infinity
         verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
         # We also terminate at this point if the valuation indicates that we are
         # substantially less than 0
-        if (verdict == VAL_AT_INFINITY || minimum(state.valuation.ν) < -1) &&
-           options.at_infinity_check
+        if verdict == VAL_AT_INFINITY && options.at_infinity_check
             state.status = PathTrackerStatus.at_infinity
         # Now, we have to differentiate 3 different cases:
         # 1) Current accuracy is larger than the defined minimal accuracy
@@ -602,12 +608,8 @@ function step!(tracker::PathTracker)
             #      as going to infinity for a loose tolerance
             #      Also if the current valuation is less than -1 (so significantly less than 0)
             #      we do not continue the tracking
-            if verdict == VAL_FINITE ||
-               judge(
-                state.valuation;
-                tol = 1e-2,
-                tol_at_infinity = 1e-2,
-            ) != VAL_AT_INFINITY
+            loose_verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-2)
+            if loose_verdict != VAL_AT_INFINITY
                 core_tracker.options.precision = PRECISION_ADAPTIVE
                 core_tracker.state.status = CoreTrackerStatus.tracking
             # 2.b)
@@ -618,6 +620,9 @@ function step!(tracker::PathTracker)
         else
             state.status = PathTrackerStatus.terminated_accuracy_limit
         end
+    elseif state.winding_number !== nothing
+        p_accuracy = 1e-5
+        @goto cauchy_eg_success
     else
         state.status = path_tracker_status(ct_status)
     end
