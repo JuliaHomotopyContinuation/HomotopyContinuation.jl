@@ -312,9 +312,10 @@
 
     @testset "Overdetermined" begin
         @polyvar x y z
-        p₁ = (y - x^2) * (x^2 + y^2 + z^2 - 1) * (x - 0.5)
-        p₂ = (z - x^3) * (x^2 + y^2 + z^2 - 1) * (y - 0.5)
-        p₃ = (y - x^2) * (z - x^3) * (x^2 + y^2 + z^2 - 1) * (z - 0.5)
+
+        p₁ = (x^2 + y^2 + z^2 - 1) * (x - 0.5)
+        p₂ = (x^2 + y^2 + z^2 - 1) * (y - 0.5)
+        p₃ = (z - x^2 - 2) * (x^2 + y^2 + z^2 - 1) * (z - 0.5)
         L₁ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
         L₂ = randn(ComplexF64, 2, 4) * [x, y, z, 1]
 
