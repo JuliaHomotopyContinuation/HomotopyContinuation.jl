@@ -20,6 +20,15 @@
             system = FPSystem,
             precision_strategy = :NOT_AN_OPTION,
         )
+
+        @test_throws ArgumentError pathtracker(
+            f;
+            not_an_option = true,
+            this_option = "nope",
+        )
+
+        @test_throws ArgumentError pathtracker(f, patch = OrthogonalPatch())
+        @test_throws ArgumentError pathtracker(f, system_scaling = :lalala)
     end
 
     # Simple
@@ -320,5 +329,15 @@
             projective_tracking = true,
         )
         @test is_success(track(tracker, s))
+    end
+
+    @testset "Homotopy input" begin
+        @polyvar x a y b
+        E = [[2 1 0; 0 0 0], [1 0; 1 0]]
+        start = [[1.0 + 0im, -3.0, 2.0], [2.0 + 0im, -2.0]]
+        target = [randn(ComplexF64, 3), randn(ComplexF64, 2)]
+        H = CoefficientHomotopy(E, start, target)
+        tracker = pathtracker(H, [[1, 1]])
+        @test is_success(track!(tracker, [1, 1]))
     end
 end

@@ -1,16 +1,5 @@
 export Solver, solver_startsolutions, solve!, solve
 
-const solve_supported_keywords = [
-    :threading,
-    :show_progress,
-    :path_result_details,
-    :save_all_paths,
-    :path_jumping_check,
-            # deprecated
-    :report_progress,
-]
-
-
 ###########
 ## STATS ##
 ###########
@@ -147,7 +136,7 @@ end
 ## SOLVER ##
 ############
 
-struct Solver{PT<:AbstractPathTracker, UP<:UniquePoints}
+struct Solver{PT<:AbstractPathTracker,UP<:UniquePoints}
     trackers::PT
     stats::SolveStats
     path_jumping_check::PathJumpingCheck{UP}
@@ -186,6 +175,16 @@ accuracy(T::PolyhedralTracker) = accuracy(T.generic_tracker)
 ## solve! ##
 ############
 
+const solve_supported_keywords = [
+    :path_result_details,
+    :path_jumping_check,
+    :save_all_paths,
+    :show_progress,
+    :threading,
+            # deprecated
+    :report_progress,
+]
+
 """
     solve!(solver::Solver, start_solutions;
         show_progress = true,
@@ -218,7 +217,7 @@ function solve!(
     path_result_details::Symbol = :default,
     save_all_paths::Bool = false,
     path_jumping_check::Bool = true,
-    threading::Bool = true
+    threading::Bool = true,
 )
     @unpack trackers, stats = solver
     tracker = trackers
@@ -250,7 +249,8 @@ function solve!(
                 return_code = track!(tracker, S[k])
                 path_number = k
             end
-            if save_all_paths || is_success(return_code) || is_invalid_startvalue(return_code)
+            if save_all_paths ||
+               is_success(return_code) || is_invalid_startvalue(return_code)
                 results[path_number] = PathResult(
                     tracker,
                     S[path_number],
