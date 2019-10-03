@@ -683,6 +683,11 @@ function Base.iterate(tracker::PathTracker, state::Int = 0)
     end
 end
 
+function is_valid_start_value(tracker::PathTracker, x::AbstractVector)
+    embed!(tracker.core_tracker.state.x̄, x)
+    check_start_value!(tracker.core_tracker, tracker.core_tracker.state.x̄, 0.0)
+    !is_invalid_startvalue(status(tracker.core_tracker))
+end
 
 ####################
 ## QUERYING STATE ##

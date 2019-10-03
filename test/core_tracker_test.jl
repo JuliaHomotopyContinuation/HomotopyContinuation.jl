@@ -38,7 +38,7 @@
         @test current_t(t1) == 1.0
 
         setup!(t1, first(start_sols), 0.5, 0.4)
-        @test status(t1) == HC.CoreTrackerStatus.terminated_invalid_startvalue
+        @test is_invalid_startvalue(status(t1))
         @test is_terminated(status(t1))
         @test current_t(t1) == 0.5
         @test real(current_Δt(t1)) < 0

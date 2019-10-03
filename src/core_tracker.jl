@@ -119,7 +119,7 @@ Returns `true` if `S` indicates that the path tracking got terminated since the 
 value was not a zero.
 """
 is_invalid_startvalue(S::CoreTrackerStatus.states) =
-    S ≠ CoreTrackerStatus.terminated_invalid_startvalue
+    S == CoreTrackerStatus.terminated_invalid_startvalue
 
 """
     is_tracking(S::CoreTrackerStatus.states)
@@ -812,12 +812,12 @@ end
 embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
 embed!(x::AbstractVector, y) = x .= y
 
-function check_start_value!(tracker::CT)
+function check_start_value!(tracker::CT, x = tracker.state.x, t = current_t(tracker.state))
     # We perturb the provided soution by sligthly more than the desired accuracy
     # to check that the Newton iteration converges properly and to obtain an estimate
     # of ω
     Δ = 10 * tracker.options.accuracy
-    tracker.state.x̄ .= tracker.state.x .+ Δ
+    tracker.state.x̄ .= x .+ Δ
 
     # Solutions could need higher order precision already at the beginning
     # Therefore, if the standard check fails, try again with higher precision (if applicable)
@@ -827,7 +827,7 @@ function check_start_value!(tracker::CT)
             tracker.state.x̄,
             tracker.homotopy,
             tracker.state.x̄,
-            current_t(tracker.state),
+            t,
             tracker.state.jacobian,
             tracker.state.norm,
             tracker.corrector;
@@ -838,7 +838,7 @@ function check_start_value!(tracker::CT)
         )
         if is_converged(result)
             tracker.state.ω = result.ω₀
-            tracker.state.x .= tracker.state.x̄
+            x .= tracker.state.x̄
             tracker.state.accuracy = result.accuracy
             limit_accuracy!(tracker)
             return nothing
