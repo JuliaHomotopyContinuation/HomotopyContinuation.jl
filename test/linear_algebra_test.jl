@@ -52,12 +52,12 @@ import DoubleFloats: Double64, ComplexDF64
         ldiv!(x, WS, b)
         WS.factorized[] = false
         @test (@allocated ldiv!(x, WS, b)) == 0
-        @test (lu(A) \ b) ≈ x atol = 1e-12
+        @test (lu(A) \ b) ≈ x rtol = 1e-12
 
         HC.factorization!(WS, HC.QR_FACT)
         x .= 0
         ldiv!(x, WS, b)
-        @test (qr(A, Val(true)) \ b) ≈ x atol = 1e-12
+        @test (qr(A, Val(true)) \ b) ≈ x rtol = 1e-12
         WS.factorized[] = false
         @test (@allocated ldiv!(x, WS, b)) == 0
 
@@ -72,7 +72,7 @@ import DoubleFloats: Double64, ComplexDF64
         WS.factorized[] = false
         x .= 0
         @test (@allocated ldiv!(x, WS, b)) == 0
-        @test (qr(A, Val(true)) \ b) ≈ x atol = 1e-12
+        @test (qr(A, Val(true)) \ b) ≈ x rtol = 1e-12
     end
 
     @testset "(Mixed precision) residual" begin
