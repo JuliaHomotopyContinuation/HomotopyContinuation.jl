@@ -54,24 +54,27 @@ The possible states a [`PathTracker`](@ref) can be in:
 * `PathTrackerStatus.tracking`
 * `PathTrackerStatus.success`
 * `PathTrackerStatus.at_infinity`
+* `PathTrackerStatus.excess_solution`
 * `PathTrackerStatus.post_check_failed`
 * `PathTrackerStatus.terminated_accuracy_limit`
 * `PathTrackerStatus.terminated_callback`
 * `PathTrackerStatus.terminated_ill_conditioned`
 * `PathTrackerStatus.terminated_invalid_startvalue`
+* `PathTrackerStatus.terminated_max_winding_number`
 * `PathTrackerStatus.terminated_max_iters`
-* `PathTrackerStatus.step_size_too_small`
+* `PathTrackerStatus.terminated_step_size_too_small`
 """
 @enum states begin
     tracking
     success
     at_infinity
     terminated_callback
-    terminated_max_iters
-    terminated_invalid_startvalue
-    step_size_too_small
     terminated_accuracy_limit
+    terminated_invalid_startvalue
     terminated_ill_conditioned
+    terminated_max_iters
+    terminated_max_winding_number
+    terminated_step_size_too_small
     post_check_failed
     excess_solution
 end
@@ -90,7 +93,7 @@ function path_tracker_status(code::CoreTrackerStatus.states)
     elseif code == CoreTrackerStatus.terminated_maximal_iterations
         return PathTrackerStatus.terminated_max_iters
     elseif code == CoreTrackerStatus.terminated_step_size_too_small
-        return PathTrackerStatus.step_size_too_small
+        return PathTrackerStatus.terminated_step_size_too_small
     elseif code == CoreTrackerStatus.terminated_ill_conditioned
         return PathTrackerStatus.terminated_ill_conditioned
     else
@@ -172,6 +175,7 @@ mutable struct PathTrackerState{AV<:AbstractVector}
     solution_cond::Float64
     solution_residual::Float64
     winding_number::Union{Nothing,Int}
+    max_winding_number_hit::Bool
     s::Float64
     eg_started::Bool
 end
@@ -185,6 +189,7 @@ function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
     solution_cond = NaN
     solution_residual = NaN
     winding_number = nothing
+    max_winding_number_hit = false
     s = 0.0
     eg_started = false
     PathTrackerState(
@@ -196,6 +201,7 @@ function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
         solution_cond,
         solution_residual,
         winding_number,
+        max_winding_number_hit,
         s,
         eg_started,
     )
@@ -213,6 +219,7 @@ function init!(state::PathTrackerState, s::Float64)
     state.solution_cond = NaN
     state.solution_residual = NaN
     state.winding_number = nothing
+    state.max_winding_number_hit = false
     state.s = s
     state.eg_started = false
 end
@@ -415,7 +422,7 @@ function init!(
         ct_options.max_corrector_iters = max_corrector_iters
     end
     if options.precision_strategy == PREC_STRATEGY_ALWAYS ||
-        options.precision_strategy == PREC_STRATEGY_FINITE
+       options.precision_strategy == PREC_STRATEGY_FINITE
         ct_options.precision = PRECISION_ADAPTIVE
     end
 
@@ -460,7 +467,7 @@ function step!(tracker::PathTracker)
         end
 
         # Judge the current valuation to determine how to proceed
-        verdict = judge(state.valuation; tol = 1e-3, tol_at_infinity = 1e-4)
+        verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
         if verdict == VAL_AT_INFINITY &&
            (consider_always || cond_bad) && options.at_infinity_check
             state.status = PathTrackerStatus.at_infinity
@@ -476,11 +483,12 @@ function step!(tracker::PathTracker)
                 m′ = state.winding_number
                 if m′ === nothing
                     state.winding_number = m
-                elseif m′ == m
+                    state.solution .= state.prediction
+                elseif m′ == m &&
+                       norm(core_tracker)(state.solution, state.prediction) ≤ p_accuracy
                     @label cauchy_eg_success
                     state.status = PathTrackerStatus.success
                     state.solution_accuracy = p_accuracy
-
                     converged, s_accuracy, s_cond, s_res = check_converged!(
                         state.solution,
                         core_tracker,
@@ -496,6 +504,7 @@ function step!(tracker::PathTracker)
                         state.solution .= state.prediction
                     end
                 else
+                    state.solution .= state.prediction
                     state.winding_number = m
                 end
 
@@ -514,10 +523,12 @@ function step!(tracker::PathTracker)
                 end
 
             elseif retcode == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
-                # If we hit the max winding number, this is either due to the fact
-                # that we are not yet in the eg zone or that the solution is just too singular
-                # For now we just terminate here
-                state.status = PathTrackerStatus.terminated_ill_conditioned
+                # Terminate if we hit twice max winding number and make one step pause
+                if state.max_winding_number_hit
+                    state.status = PathTrackerStatus.terminated_max_winding_number
+                else
+                    state.max_winding_number_hit = true
+                end
             else
                 state.status = PathTrackerStatus.terminated_ill_conditioned
             end
@@ -573,7 +584,7 @@ function step!(tracker::PathTracker)
             state.solution_residual = s_res
             state.s = Inf
         elseif ct_status == CoreTrackerStatus.terminated_step_size_too_small
-            state.status = PathTrackerStatus.step_size_too_small
+            state.status = PathTrackerStatus.terminated_step_size_too_small
         else
             state.status = PathTrackerStatus.post_check_failed
         end
@@ -630,7 +641,9 @@ function step!(tracker::PathTracker)
 
     if !is_success(state.status) && !is_tracking(state.status)
         state.solution .= current_x(core_tracker)
+        state.solution_cond = LA.cond(core_tracker)
     end
+
 
     state.status
 end

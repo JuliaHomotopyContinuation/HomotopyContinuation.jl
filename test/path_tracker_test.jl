@@ -278,7 +278,7 @@
         @test HC.path_tracker_status(HC.CoreTrackerStatus.success) == HC.PathTrackerStatus.success
         @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_invalid_startvalue) == HC.PathTrackerStatus.terminated_invalid_startvalue
         @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_maximal_iterations) == HC.PathTrackerStatus.terminated_max_iters
-        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_step_size_too_small) == HC.PathTrackerStatus.step_size_too_small
+        @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_step_size_too_small) == HC.PathTrackerStatus.terminated_step_size_too_small
         @test HC.path_tracker_status(HC.CoreTrackerStatus.terminated_ill_conditioned) == HC.PathTrackerStatus.terminated_ill_conditioned
         @test HC.path_tracker_status(HC.CoreTrackerStatus.tracking) == HC.PathTrackerStatus.tracking
     end
