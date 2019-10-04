@@ -1088,8 +1088,8 @@ is larger than `tol`.
 """
 is_singular(r::PathResult; tol = 1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
-    (unpack(r.condition_jacobian, 1.0) > tol || unpack(multiplicity(r), 1) > 1) &&
-    is_success(r)
+    (unpack(r.condition_jacobian, 1.0) > tol ||
+     unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1) && is_success(r)
 end
 
 """
