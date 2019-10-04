@@ -180,6 +180,7 @@ const solve_supported_keywords = [
     :path_jumping_check,
     :save_all_paths,
     :show_progress,
+    :stop_early_cb,
     :threading,
             # deprecated
     :report_progress,
@@ -194,7 +195,13 @@ const solve_supported_keywords = [
 
 Solve the problem encoded in `solver` for the given start solutions `start_solutions`.
 """
-function solve!(solver::Solver, start_solutions; show_progress::Bool = true, kwargs...)
+function solve!(
+    solver::Solver,
+    start_solutions;
+    show_progress::Bool = true,
+    stop_early_cb = nothing,
+    kwargs...,
+)
     if show_progress
         n = length(start_solutions)
         progress = ProgressMeter.Progress(
@@ -207,13 +214,14 @@ function solve!(solver::Solver, start_solutions; show_progress::Bool = true, kwa
     else
         progress = nothing
     end
-    solve!(solver, start_solutions, progress; kwargs...)
+    solve!(solver, start_solutions, progress, stop_early_cb; kwargs...)
 end
 
 function solve!(
     solver::Solver,
     start_solutions,
-    progress::Union{Nothing,ProgressMeter.Progress};
+    progress::Union{Nothing,ProgressMeter.Progress},
+    stop_early_cb = nothing;
     path_result_details::Symbol = :default,
     save_all_paths::Bool = false,
     path_jumping_check::Bool = true,
@@ -232,8 +240,8 @@ function solve!(
     results = Vector{Union{Nothing,result_type(tracker)}}(undef, n)
     results .= nothing
 
+    ntracked = 0
     try
-        ntracked = 0
         for k = 1:n
             if path_jumping_check
                 return_code, path_number = track_with_pathjumping_check!(
@@ -249,21 +257,30 @@ function solve!(
                 return_code = track!(tracker, S[k])
                 path_number = k
             end
+
+            ntracked = k
+
             if save_all_paths ||
                is_success(return_code) || is_invalid_startvalue(return_code)
-                results[path_number] = PathResult(
+                result = PathResult(
                     tracker,
                     S[path_number],
                     path_number;
                     details = path_result_details,
                 )
+                results[path_number] = result
+                if stop_early_cb !== nothing
+                    if is_success(result) && stop_early_cb(result)
+                        break
+                    end
+                end
             end
+
+            ntracked % 32 != 0 && update_progress!(progress, ntracked, stats)
             is_success(return_code) && update!(stats, results[path_number])
-            ntracked = k
-            k % 32 == 0 && update_progress!(progress, k, stats)
         end
         # don't print if it already got printed above
-        n % 32 != 0 && update_progress!(progress, n, stats)
+        ntracked % 32 != 0 && update_progress!(progress, ntracked, stats)
     catch e
         if !isa(e, InterruptException)
             rethrow()
@@ -272,7 +289,7 @@ function solve!(
 
     Result(
         remove_nothings(results),
-        n,
+        ntracked,
         seed(tracker);
         multiplicity_tol = 10 * accuracy(tracker),
     )
@@ -332,6 +349,12 @@ The `solve` routines takes many different options. In particular all options to
 Additionally the following options are allowed:
 
 * `affine_tracking::Bool=true`: Indicate whether path tracking should happen in affine space.
+* `early_stop_cb`: Here it is possible to provide a function (or any callable struct) which
+  accepts a `PathResult` `r` as input and returns a `Bool`. If `early_stop_cb(r)` is `true`
+  then no further paths are tracked and the computation is finished. This is only called
+  for successfull paths unless `save_all_paths` is `true`. This is for example useful
+  if you only want to compute one solution of a polynomial system.
+  For this `early_stop_cb = _ -> true` would be sufficient.
 * `homotopy::AbstractHomotopy`: A constructor to construct a [`AbstractHomotopy`](@ref) for
   the totaldegree and start target homotopy. The default is [`StraightLineHomotopy`](@ref).
   The constructor is called with `homotopy(start, target)` where `start` and `target` are

@@ -95,7 +95,7 @@
 
         @polyvar w
         F = equations(cyclic(5))
-        result = solve(homogenize(F, w), system=FPSystem, threading = false, homvar = w)
+        result = solve(homogenize(F, w), system = FPSystem, threading = false, homvar = w)
         @test nfinite(result) == 70
         @test result isa Result{Vector{ComplexF64}}
         G = FPSystem(homogenize(F))
@@ -225,7 +225,10 @@
 
         #Construct the tracker
         tracker = pathtracker(F; parameters = p, generic_parameters = p0)
-        @test HC.basehomotopy(tracker.core_tracker.homotopy).p isa NTuple{2,Vector{ComplexF64}}
+        @test HC.basehomotopy(tracker.core_tracker.homotopy).p isa NTuple{
+            2,
+            Vector{ComplexF64},
+        }
 
         #Let's solve another system using PathTracking
         p_current = randn(6)
@@ -233,5 +236,28 @@
         sol = solution(result)
         F_SP = SPSystem(F; parameters = p)
         @test residual(result) ≈ euclidean_norm(F_SP(sol, p_current)) atol = 1e-13
+    end
+
+    @testset "early stop callback" begin
+        @polyvar x
+        first_result = nothing
+        results = solve(
+            [(x - 3) * (x + 6) * (x + 2)];
+            system = FPSystem,
+            stop_early_cb = r -> begin
+                first_result = r
+                true
+            end
+        )
+        @test length(results) == 1
+        @test first(results) == first_result
+
+        nresults = 0
+        result = solve(
+            [(x - 3) * (x + 6) * (x + 2)];
+            system = FPSystem,
+            stop_early_cb = r -> (nresults += 1) == 2,
+        )
+        @test length(result) == 2
     end
 end
