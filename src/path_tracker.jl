@@ -414,13 +414,14 @@ function init!(
     if max_corrector_iters !== nothing
         ct_options.max_corrector_iters = max_corrector_iters
     end
+    if options.precision_strategy == PREC_STRATEGY_ALWAYS ||
+        options.precision_strategy == PREC_STRATEGY_FINITE
+        ct_options.precision = PRECISION_ADAPTIVE
+    end
+
     init!(tracker.core_tracker, x, 0.0, options.endgame_start)
     init!(tracker.state, 0.0)
 
-    if options.precision_strategy == PREC_STRATEGY_ALWAYS ||
-       options.precision_strategy == PREC_STRATEGY_FINITE
-        ct_options.precision = PRECISION_ADAPTIVE
-    end
     # before endgame don't track the condition number
     # and we only update the limiting accuracy etc after a step failed
     ct_options.track_cond = false

@@ -816,8 +816,7 @@ function check_start_value!(tracker::CT, x = tracker.state.x, t = current_t(trac
     # We perturb the provided soution by sligthly more than the desired accuracy
     # to check that the Newton iteration converges properly and to obtain an estimate
     # of ω
-    Δ = 10 * tracker.options.accuracy
-    tracker.state.x̄ .= x .+ Δ
+    perturb!(tracker.state.x̄, x, 10 * tracker.options.accuracy, tracker.state.norm)
 
     # Solutions could need higher order precision already at the beginning
     # Therefore, if the standard check fails, try again with higher precision (if applicable)
@@ -841,16 +840,19 @@ function check_start_value!(tracker::CT, x = tracker.state.x, t = current_t(trac
             x .= tracker.state.x̄
             tracker.state.accuracy = result.accuracy
             limit_accuracy!(tracker)
-            return nothing
+            break
         elseif i == 1 && tracker.options.precision != PRECISION_FIXED_64
             double_64_evaluation = true
         else
             tracker.state.status = CoreTrackerStatus.terminated_invalid_startvalue
+            break
         end
     end
     nothing
 end
 
+perturb!(y, x, Δ::Real, w::WeightedNorm) = y .= x .+ Δ .* weights(w)
+perturb!(y, x, Δ::Real, norm::AbstractNorm) = y .= x .+ Δ
 
 """
     init!(tracker::CT, x₁, t₁, t₀;
