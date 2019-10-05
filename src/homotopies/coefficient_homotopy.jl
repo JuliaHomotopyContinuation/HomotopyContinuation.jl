@@ -6,13 +6,17 @@ export CoefficientHomotopy, CoefficientHomotopyCache, gamma
 Construct the homotopy ``H(x, t) = ∑_{a ∈ Aᵢ} (c_a t + (1-t)d_a) x^a`` where ``c_a`` are
 the start coefficients and ``d_a`` the target coefficients.
 """
-struct CoefficientHomotopy{S<:AbstractSystem, T1, T2} <: AbstractHomotopy
+struct CoefficientHomotopy{S<:AbstractSystem,T1,T2} <: AbstractHomotopy
     system::S
     start_coeffs::Vector{Vector{T1}}
     target_coeffs::Vector{Vector{T2}}
 end
 
-function CoefficientHomotopy(exponents_polys::Union{<:Vector{<:Matrix}, <:MPPolys}, start::Vector{<:Vector}, target::Vector{<:Vector})
+function CoefficientHomotopy(
+    exponents_polys::Union{<:Vector{<:Matrix},<:MPPolys},
+    start::Vector{<:Vector},
+    target::Vector{<:Vector},
+)
     @assert all(length.(start) .== length.(target) .== _nterms.(exponents_polys))
 
     system = SPSystem(exponents_polys, start)
@@ -31,10 +35,10 @@ function CoefficientHomotopy(exponents_polys::Union{<:Vector{<:Matrix}, <:MPPoly
     CoefficientHomotopy(system, start_coeffs, target_coeffs)
 end
 
-_nterms(A::Matrix) = size(A,2)
+_nterms(A::Matrix) = size(A, 2)
 _nterms(f::MPPoly) = MP.nterms(f)
 
-(H::CoefficientHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::CoefficientHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)
 
 
 """
@@ -43,7 +47,7 @@ _nterms(f::MPPoly) = MP.nterms(f)
 An simple cache for `StartTargetHomotopy`s consisting of the caches for the
 start and target system as well as a `Vector` and a `Matrix`.
 """
-struct CoefficientHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCache
+struct CoefficientHomotopyCache{C<:AbstractSystemCache,T} <: AbstractHomotopyCache
     system::C
     coeffs::Vector{Vector{T}}
     diffs::Vector{Vector{T}}
@@ -73,12 +77,26 @@ function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy,
         return nothing
     end
 
-    @inbounds for k in 1:length(cache.coeffs)
-        c = cache.coeffs[k]
-        start = H.start_coeffs[k]
-        target = H.target_coeffs[k]
-        for i in eachindex(c)
-            c[i] = t * start[i] + (1.0 - t) * target[i]
+    if isreal(t)
+        rt = real(t)
+        rt1 = 1.0 - t
+        @inbounds for k = 1:length(cache.coeffs)
+            c = cache.coeffs[k]
+            start = H.start_coeffs[k]
+            target = H.target_coeffs[k]
+            for i in eachindex(c)
+                c[i] = rt * start[i] + rt1 * target[i]
+            end
+        end
+    else
+        t1 = 1.0 - t
+        @inbounds for k = 1:length(cache.coeffs)
+            c = cache.coeffs[k]
+            start = H.start_coeffs[k]
+            target = H.target_coeffs[k]
+            for i in eachindex(c)
+                c[i] = t * start[i] + t1 * target[i]
+            end
         end
     end
     set_coefficients!(H.system, cache.coeffs)
@@ -110,7 +128,14 @@ function jacobian!(U, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
     @inbounds jacobian!(U, H.system, x, c.system)
 end
 
-function evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t, c::CoefficientHomotopyCache)
+function evaluate_and_jacobian!(
+    u,
+    U,
+    H::CoefficientHomotopy,
+    x,
+    t,
+    c::CoefficientHomotopyCache,
+)
     update_coeffs!(c, H, t)
     @inbounds evaluate_and_jacobian!(u, U, H.system, x, c.system)
     nothing

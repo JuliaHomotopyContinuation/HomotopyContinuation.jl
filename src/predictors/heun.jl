@@ -17,8 +17,8 @@ end
 function cache(::Heun, H, x, ẋ, t)
     HeunCache(dt(H, x, t), copy(ẋ), copy(ẋ))
 end
-#
-function predict!(xnext, ::Heun, cache::HeunCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
+
+function predict!(xnext, cache::HeunCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
     dt, mk₁, mk₂ = cache.dt, cache.mk₁, cache.mk₂
     n = length(xnext)
     @inbounds for i=1:n
@@ -35,4 +35,4 @@ function predict!(xnext, ::Heun, cache::HeunCache, H::HomotopyWithCache, x, t, �
     nothing
 end
 
-order(::Heun) = 3
+order(::HeunCache) = 3

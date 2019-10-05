@@ -1,9 +1,6 @@
 export AbstractPredictor,
     AbstractPredictorCache,
-    cache,
-    setup!,
-    update!,
-    predict!
+    cache
 
 """
     AbstractPredictor
@@ -38,29 +35,21 @@ Perform a prediction step for the value of `x` with step size `Δt`. `ẋ` is th
 function predict! end
 
 """
-    update!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac)
+    update!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, fac, ψ::Float64=eps())
 
 Update the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
-`fac` is a factorization of the Jacobian at `(x,t)`.
+`fac` is a factorization of the Jacobian at `(x,t)`. `ψ` is an estimate of the evaluation error.
 """
-update!(::AbstractPredictorCache, H, x, ẋ, t, fac) = nothing
+update!(::AbstractPredictorCache, H, x, ẋ, t, fac, ψ=eps()) = nothing
 
 """
-    setup!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, Jac)
+    init!(cache::AbstractStatefulPredictorCache, H, x, ẋ, t, Jac::JacobianMonitor)
 
 Setup the cache. `x` is the new path value at `t` and `ẋ` is the derivative at `t`.
 `fac` is a factorization of the Jacobian at `(x,t)`. This falls back to calling `update`.
 """
-setup!(C::AbstractPredictorCache, H, x, ẋ, t, Jac) = update!(C, H, x, ẋ, t, Jac)
+init!(C::AbstractPredictorCache, H, x, ẋ, t, Jac, ψ=eps()) = update!(C, H, x, ẋ, t, Jac, ψ)
 
-"""
-    reset!(cache, x, t)
-
-Reset the cache. `x` is the path value at `t`.
-"""
-function reset!(::AbstractPredictorCache, x, t)
-    nothing
-end
 
 """
     order(::AbstractPredictor)
@@ -69,18 +58,29 @@ The order of a predictor is defined as the order of asymptotic error.
 """
 function order end
 
-# HELPERS
 
+"""
+    highest_derivative(::AbstractPredictorCache)
+
+Optional query for the highest derivative of `x(t)` and available.
+Returns `x^{(k)}(t), k` or `nothing` if none is stored.
+"""
+highest_derivative(::AbstractPredictorCache) = nothing
+
+second_derivative(::AbstractPredictorCache) = nothing
+third_derivative(::AbstractPredictorCache) = nothing
+
+## HELPERS
 """
     minus_ẋ!(out, H, x, t, J, dt)
 
 Evaluate `Hₓ(x(t), t)⁻¹∂H∂t(x(t), t)` and store the result in `out`. `A` needs
 to be able to store the Jacobian of `H`.
 """
-function minus_ẋ!(ẋ, H, x, t, Jac::Jacobian, dt)
-    jacobian_and_dt!(Jac.J, dt, H, x, t)
-    updated_jacobian!(Jac)
-    solve!(ẋ, Jac, dt)
+function minus_ẋ!(ẋ, H, x, t, Jac::JacobianMonitor, dt)
+    jacobian_and_dt!(jacobian(Jac), dt, H, x, t)
+    updated!(Jac)
+    LA.ldiv!(ẋ, Jac, dt)
 end
 
 include("predictors/null_predictor.jl")

@@ -1,16 +1,36 @@
-export monodromy_solve, MonodromyResult, real_solutions, nreal, parameters, verify_solution_completeness, solution_completeness_witnesses
+export monodromy_solve,
+       MonodromyResult,
+       real_solutions,
+       is_success,
+       is_heuristic_stop,
+       nreal,
+       parameters,
+       verify_solution_completeness,
+       solution_completeness_witnesses
 
 
 #####################
 # Monodromy Options #
 #####################
-const monodromy_options_supported_keywords = [:distance, :identical_tol, :done_callback,
-    :group_action,:group_actions, :group_action_on_all_nodes,
-    :parameter_sampler, :equivalence_classes, :complex_conjugation, :check_startsolutions,
-    :target_solutions_count, :timeout,
-    :min_solutions, :max_loops_no_progress, :reuse_loops]
+const monodromy_options_supported_keywords = [
+    :distance,
+    :identical_tol,
+    :done_callback,
+    :group_action,
+    :group_actions,
+    :group_action_on_all_nodes,
+    :parameter_sampler,
+    :equivalence_classes,
+    :complex_conjugation,
+    :check_startsolutions,
+    :target_solutions_count,
+    :timeout,
+    :min_solutions,
+    :max_loops_no_progress,
+    :reuse_loops,
+]
 
-struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
+struct MonodromyOptions{F<:Function,F1<:Function,F2<:Tuple,F3<:Function}
     distance_function::F
     identical_tol::Float64
     done_callback::F1
@@ -28,42 +48,53 @@ struct MonodromyOptions{F<:Function, F1<:Function, F2<:Tuple, F3<:Function}
     reuse_loops::Symbol
 end
 
-function MonodromyOptions(is_real_system::Bool,
-    refinement_accuracy::Float64;
-    distance=euclidean_distance,
-    identical_tol::Float64=sqrt(refinement_accuracy),
-    done_callback=always_false,
-    group_action=nothing,
-    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    group_action_on_all_nodes=false,
-    parameter_sampler=independent_normal,
-    equivalence_classes=true,
-    complex_conjugation=is_real_system,
-    check_startsolutions=true,
+function MonodromyOptions(
+    is_real_system::Bool,
+    accuracy::Float64;
+    distance = euclidean_distance,
+    identical_tol::Float64 = sqrt(accuracy),
+    done_callback = always_false,
+    group_action = nothing,
+    group_actions = group_action === nothing ? nothing : GroupActions(group_action),
+    group_action_on_all_nodes = false,
+    parameter_sampler = independent_normal,
+    equivalence_classes = true,
+    complex_conjugation = is_real_system,
+    check_startsolutions = true,
     # stopping heuristic
-    target_solutions_count=nothing,
-    timeout=float(typemax(Int)),
-    min_solutions::Int=default_min_solutions(target_solutions_count),
-    max_loops_no_progress::Int=10,
-    reuse_loops::Symbol=:all)
+    target_solutions_count = nothing,
+    timeout = float(typemax(Int)),
+    min_solutions::Int = default_min_solutions(target_solutions_count),
+    max_loops_no_progress::Int = 10,
+    reuse_loops::Symbol = :all,
+)
 
     if group_actions isa GroupActions
-       actions = group_actions
+        actions = group_actions
     else
-       if group_actions === nothing
-           equivalence_classes = false
-       end
-       actions = GroupActions(group_actions)
+        if group_actions === nothing
+            equivalence_classes = false
+        end
+        actions = GroupActions(group_actions)
     end
 
 
-    MonodromyOptions(distance,identical_tol, done_callback, actions,
-        group_action_on_all_nodes, parameter_sampler, equivalence_classes, complex_conjugation, check_startsolutions,
+    MonodromyOptions(
+        distance,
+        identical_tol,
+        done_callback,
+        actions,
+        group_action_on_all_nodes,
+        parameter_sampler,
+        equivalence_classes,
+        complex_conjugation,
+        check_startsolutions,
         target_solutions_count === nothing ? typemax(Int) : target_solutions_count,
         float(timeout),
         min_solutions,
         max_loops_no_progress,
-        reuse_loops)
+        reuse_loops,
+    )
 end
 
 default_min_solutions(::Nothing) = 1
@@ -73,7 +104,8 @@ end
 
 always_false(x, sols) = false
 
-has_group_actions(options::MonodromyOptions) = !(options.group_actions isa GroupActions{Tuple{}})
+has_group_actions(options::MonodromyOptions) =
+    !(options.group_actions isa GroupActions{Tuple{}})
 
 
 """
@@ -81,7 +113,7 @@ has_group_actions(options::MonodromyOptions) = !(options.group_actions isa Group
 
 Sample a vector where each entries is drawn independently from the univariate normal distribution.
 """
-independent_normal(p::SVector{N, T}) where {N, T} = @SVector randn(T, N)
+independent_normal(p::SVector{N,T}) where {N,T} = @SVector randn(T, N)
 independent_normal(p::AbstractVector{T}) where {T} = randn(T, length(p))
 
 ##########################
@@ -101,7 +133,7 @@ function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
         if is_real_vector(s)
-            stats.nreal +=1
+            stats.nreal += 1
         end
     end
     stats
@@ -112,7 +144,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) =
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
-    if retcode == PathTrackerStatus.success
+    if is_success(retcode)
         stats.ntrackedpaths += 1
     else
         stats.ntrackingfailures += 1
@@ -130,7 +162,7 @@ end
 
 function n_completed_loops_without_change(stats, nsolutions)
     k = 0
-    for i in length(stats.nsolutions_development):-1:1
+    for i = length(stats.nsolutions_development):-1:1
         if stats.nsolutions_development[i] != nsolutions
             return max(k - 1, 0)
         end
@@ -156,10 +188,10 @@ export Triangle, Petal
 struct LoopEdge
     p₁::Vector{ComplexF64}
     p₀::Vector{ComplexF64}
-    weights::Union{Nothing, NTuple{2, ComplexF64}}
+    weights::Union{Nothing,NTuple{2,ComplexF64}}
 end
 
-function LoopEdge(p₁, p₀; weights=false)
+function LoopEdge(p₁, p₀; weights = false)
     if weights
         γ = (randn(ComplexF64), randn(ComplexF64))
     else
@@ -172,15 +204,15 @@ struct MonodromyLoop
     edges::Vector{LoopEdge}
 end
 
-function MonodromyLoop(base_p, nnodes::Int, options::MonodromyOptions; weights=true)
+function MonodromyLoop(base_p, nnodes::Int, options::MonodromyOptions; weights = true)
     edges = LoopEdge[]
     p₁ = base_p
     for i = 2:nnodes
         p₀ = options.parameter_sampler(p₁)
-        push!(edges, LoopEdge(p₁, p₀; weights=weights))
+        push!(edges, LoopEdge(p₁, p₀; weights = weights))
         p₁ = p₀
     end
-    push!(edges, LoopEdge(p₁, base_p; weights=weights))
+    push!(edges, LoopEdge(p₁, base_p; weights = weights))
     MonodromyLoop(edges)
 end
 
@@ -205,10 +237,10 @@ Note that this is usually only necessary for real parameters.
 struct Triangle <: LoopStyle
     useweights::Bool
 end
-Triangle(;useweights=true) = Triangle(useweights)
+Triangle(; useweights = true) = Triangle(useweights)
 
 function MonodromyLoop(strategy::Triangle, p, options::MonodromyOptions)
-    MonodromyLoop(p, 3, options, weights=strategy.useweights)
+    MonodromyLoop(p, 3, options, weights = strategy.useweights)
 end
 
 """
@@ -219,7 +251,7 @@ by two edges with different random weights.
 """
 struct Petal <: LoopStyle end
 function MonodromyLoop(strategy::Petal, p, options::MonodromyOptions)
-    MonodromyLoop(p, 2, options, weights=true)
+    MonodromyLoop(p, 2, options, weights = true)
 end
 
 
@@ -228,14 +260,23 @@ end
 
 Regenerate all random parameters in the loop in order to introduce a new monodromy action.
 """
-function regenerate!(loop::MonodromyLoop, options::MonodromyOptions, stats::MonodromyStatistics)
+function regenerate!(
+    loop::MonodromyLoop,
+    options::MonodromyOptions,
+    stats::MonodromyStatistics,
+)
     main = mainnode(loop)
 
     # The first node is the main node and doesn't get touched
     store_points = options.group_action_on_all_nodes && has_group_actions(options)
     for i ∈ 2:length(loop.nodes)
-        loop.nodes[i] = Node(options.parameter_sampler(main.p), loop.nodes[i], options;
-                                        store_points=store_points, is_main_node=false)
+        loop.nodes[i] = Node(
+            options.parameter_sampler(main.p),
+            loop.nodes[i],
+            options;
+            store_points = store_points,
+            is_main_node = false,
+        )
     end
     loop.edges .= Edge.(loop.edges)
     generated_parameters!(stats, length(main.points)) # bookkeeping
@@ -243,20 +284,25 @@ end
 
 
 """
-    track(tracker, x::AbstractVector, edge::LoopEdge, loop::MonodromyLoop, stats::MonodromyStatistics)
+    track(tracker, x, edge::LoopEdge, loop::MonodromyLoop, stats::MonodromyStatistics)
 
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(tracker::PathTracker, x::AbstractVector, loop::MonodromyLoop, stats::MonodromyStatistics)
+function track(
+    tracker::PathTracker,
+    x::AbstractVector,
+    loop::MonodromyLoop,
+    stats::MonodromyStatistics,
+)
     H = basehomotopy(tracker.core_tracker.homotopy)
     local retcode::PathTrackerStatus.states
     y = x
     for e in loop.edges
         set_parameters!(H, (e.p₁, e.p₀), e.weights)
-        retcode = _track!(tracker, y)
+        retcode = track!(tracker, y)
         trackedpath!(stats, retcode)
-        retcode == PathTrackerStatus.success || break
+        is_success(retcode) || break
         y = solution(tracker)
     end
     retcode
@@ -271,9 +317,9 @@ end
 
 The monodromy result contains the result of the `monodromy_solve` computation.
 """
-struct MonodromyResult{N, T1, T2}
+struct MonodromyResult{N,T1,T2}
     returncode::Symbol
-    solutions::Vector{SVector{N, T1}}
+    solutions::Vector{SVector{N,T1}}
     parameters::Vector{T2}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
@@ -284,11 +330,18 @@ Base.iterate(R::MonodromyResult) = iterate(R.solutions)
 Base.iterate(R::MonodromyResult, state) = iterate(R.solutions, state)
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
-function Base.show(io::IO, result::MonodromyResult{N, T}) where {N, T}
+function Base.show(io::IO, result::MonodromyResult{N,T}) where {N,T}
     println(io, "MonodromyResult")
     println(io, "==================================")
     if result.equivalence_classes
-        println(io, "• $(nsolutions(result)) classes of solutions (modulo group action) ($(nreal(result)) real)")
+        println(
+            io,
+            "• ",
+            nsolutions(result),
+            " classes of solutions (modulo group action) (",
+            nreal(result),
+            ") real)",
+        )
     else
         println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
     end
@@ -301,9 +354,17 @@ end
 TreeViews.hastreeview(::MonodromyResult) = true
 TreeViews.numberofnodes(::MonodromyResult) = 6
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
-    print(io, "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>")
+    print(
+        io,
+        "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>",
+    )
 
-function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"application/prs.juno.inline")
+function TreeViews.nodelabel(
+    io::IO,
+    x::MonodromyResult,
+    i::Int,
+    ::MIME"application/prs.juno.inline",
+)
     if i == 1
         if x.equivalence_classes
             print(io, "$(nsolutions(x)) classes of solutions (modulo group action)")
@@ -319,7 +380,7 @@ function TreeViews.nodelabel(io::IO, x::MonodromyResult, i::Int, ::MIME"applicat
     elseif i == 3
         print(io, "Return code")
     elseif i == 4
-        print(io, "Tracked paths")
+        print(io, "Statistics")
     elseif i == 5
         print(io, "Parameters")
     elseif i == 6
@@ -334,7 +395,7 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
     elseif i == 3
         return r.returncode
     elseif i == 4
-        return r.statistics.ntrackedpaths
+        return r.statistics
     elseif i == 5
         return r.parameters
     elseif i == 6
@@ -343,6 +404,19 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
     missing
 end
 
+"""
+    is_success(result::MonodromyResult)
+
+Returns true if the monodromy computation achieved its target solution count.
+"""
+is_success(result::MonodromyResult) = result.returncode == :success
+
+"""
+    is_heuristic_stop(result::MonodromyResult)
+
+Returns true if the monodromy computation stopped due to the heuristic.
+"""
+is_heuristic_stop(result::MonodromyResult) = result.returncode == :heuristic_stop
 
 """
     mapresults(f, result::MonodromyResult; only_real=false, real_tol=1e-6)
@@ -355,10 +429,8 @@ Apply the function `f` to all entries of `MonodromyResult` for which the given c
 real_solutions = mapresults(solution, R, only_real=true)
 ```
 """
-function mapresults(f, R::MonodromyResult;
-    only_real=false, real_tol=1e-6)
-    [f(r) for r in R.solutions if
-        (!only_real || is_real_vector(r, real_tol))]
+function mapresults(f, R::MonodromyResult; only_real = false, real_tol = 1e-6)
+    [f(r) for r in R.solutions if (!only_real || is_real_vector(r, real_tol))]
 end
 
 """
@@ -387,7 +459,7 @@ nsolutions(res::MonodromyResult) = length(res.solutions)
 
 Returns the solutions of `res` whose imaginary part has norm less than 1e-6.
 """
-function real_solutions(res::MonodromyResult; tol=1e-6)
+function real_solutions(res::MonodromyResult; tol = 1e-6)
     map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
 end
 
@@ -396,7 +468,7 @@ end
 
 Counts how many solutions of `res` have imaginary part norm less than 1e-6.
 """
-function nreal(res::MonodromyResult; tol=1e-6)
+function nreal(res::MonodromyResult; tol = 1e-6)
     count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
 end
 
@@ -410,7 +482,7 @@ parameters(r::MonodromyResult) = r.parameters
 #####################
 ## monodromy solve ##
 #####################
-struct MonodromySolver{T<:Number, UP<:UniquePoints, MO<:MonodromyOptions, Tracker<:PathTracker}
+struct MonodromySolver{T<:Number,UP<:UniquePoints,MO<:MonodromyOptions,Tracker<:PathTracker}
     parameters::Vector{T}
     solutions::UP
     loops::Vector{MonodromyLoop}
@@ -419,21 +491,33 @@ struct MonodromySolver{T<:Number, UP<:UniquePoints, MO<:MonodromyOptions, Tracke
     tracker::Tracker
 end
 
-function MonodromySolver(F::Inputs, solution::Vector{<:Number}, p₀::AbstractVector{TP}; kwargs...) where {TP}
+function MonodromySolver(
+    F::Inputs,
+    solution::Vector{<:Number},
+    p₀::AbstractVector{TP};
+    kwargs...,
+) where {TP}
     MonodromySolver(F, [solution], p₀; kwargs...)
 end
-function MonodromySolver(F::Inputs, solutions::Vector{<:AbstractVector{<:Number}}, p₀::AbstractVector{TP}; kwargs...) where {TP}
+function MonodromySolver(
+    F::Inputs,
+    solutions::Vector{<:AbstractVector{<:Number}},
+    p₀::AbstractVector{TP};
+    kwargs...,
+) where {TP}
     MonodromySolver(F, static_solutions(solutions), p₀; kwargs...)
 end
-function MonodromySolver(F::Inputs,
-        startsolutions::Vector{<:SVector{NVars, <:Complex}},
-        p::AbstractVector{TP};
-        parameters=nothing,
-        strategy=nothing,
-        show_progress=true,
-        showprogress=nothing, #deprecated
-        refinement_accuracy=1e-10, # set a higher refinement_accuracy than the default
-        kwargs...) where {TP, NVars}
+function MonodromySolver(
+    F::Inputs,
+    startsolutions::Vector{<:SVector{NVars,<:Complex}},
+    p::AbstractVector{TP};
+    parameters = nothing,
+    strategy = nothing,
+    show_progress = true,
+    showprogress = nothing, #deprecated
+    accuracy = 1e-7, # set a higher refinement_accuracy than the default
+    kwargs...,
+) where {TP,NVars}
 
     @deprecatekwarg showprogress show_progress
 
@@ -447,31 +531,43 @@ function MonodromySolver(F::Inputs,
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
 
     # construct tracker
-    tracker = pathtracker(F, startsolutions; refinement_accuracy=refinement_accuracy,
-                        parameters=parameters, generic_parameters=p₀, restkwargs...)
+    tracker = pathtracker(
+        F,
+        startsolutions;
+        accuracy = accuracy,
+        parameters = parameters,
+        generic_parameters = p₀,
+        restkwargs...,
+    )
     # Check whether homotopy is real
     is_real_system = numerically_check_real(tracker.core_tracker.homotopy, x₀)
-    options = MonodromyOptions(is_real_system, refinement_accuracy;
-                    optionskwargs...)
+    options = MonodromyOptions(is_real_system, accuracy; optionskwargs...)
     # construct UniquePoints
     if options.equivalence_classes
-        uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function;
-                                    group_actions = options.group_actions,
-                                    check_real = true)
+        uniquepoints = UniquePoints(
+            eltype(startsolutions),
+            options.distance_function;
+            group_actions = options.group_actions,
+            check_real = true,
+        )
     else
-        uniquepoints = UniquePoints(eltype(startsolutions), options.distance_function; check_real = true)
+        uniquepoints = UniquePoints(
+            eltype(startsolutions),
+            options.distance_function;
+            check_real = true,
+        )
     end
     # add only unique points that are true solutions
     for s in startsolutions
         if !options.check_startsolutions || is_valid_start_value(tracker, s)
-            add!(uniquepoints, s; tol=options.identical_tol)
+            add!(uniquepoints, s; tol = options.identical_tol)
         end
     end
 
     statistics = MonodromyStatistics(uniquepoints)
 
     if strategy === nothing
-        strategy = default_strategy(F, parameters, p; is_real_system=is_real_system)
+        strategy = default_strategy(F, parameters, p; is_real_system = is_real_system)
     end
 
     # construct Loop
@@ -502,46 +598,77 @@ Solve a polynomial system `F(x;p)` with specified parameters and initial solutio
 by monodromy techniques. This makes loops in the parameter space of `F` to find new solutions.
 
 ## Options
-* `target_solutions_count=nothing`: The computations are stopped if this number of solutions is reached.
-* `done_callback=always_false`: A callback to end the computation early. This function takes 2 arguments. The first one is the new solution `x` and the second one are all current solutions (including `x`). Return `true` if the compuation is done.
-* `max_loops_no_progress::Int=10`: The maximal number of iterations (i.e. loops generated) without any progress.
-* `group_action=nothing`: A function taking one solution and returning other solutions if there is a constructive way to obtain them, e.g. by symmetry.
-* `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F` is a real system.
+
+* `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for
+  checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
+* `distance_function=euclidean_distance`: The distance function used for
+  [`UniquePoints`](@ref).
+* `done_callback=always_false`: A callback to end the computation early. This function takes
+  2 arguments. The first one is the new solution `x` and the second one are all current
+  solutions (including `x`). Return `true` if the compuation is done.
+* `equivalence_classes=true`: This only applies if there is at least one group action
+  supplied. We then consider two solutions in the same equivalence class if we can transform
+  one to the other by the supplied group actions. We only track one solution per equivalence
+  class.
+* `identical_tol::Float64=1e-6`: The tolerance with which it is decided whether two
+  solutions are identical.
+* `group_action=nothing`: A function taking one solution and returning other solutions if
+  there is a constructive way to obtain them, e.g. by symmetry.
+* `group_actions=nothing`: If there is more than one group action you can use this to chain
+  the application of them. For example if you have two group actions `foo` and `bar` you can
+  set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the
+  application rules.
+* `max_loops_no_progress::Int=10`: The maximal number of iterations (i.e. loops generated)
+  without any progress.
+* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied.
+  By default this is half of `target_solutions_count` if applicable otherwise 1.
+* `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning
+  a new random parameter `q`. By default each entry of the parameter vector is drawn
+  independently from the univariate normal distribution.
+* `resuse_loops::Symbol=:all`: Strategy to reuse other loops for new found solutions. `:all`
+  propagates a new solution through all other loops, `:random` picks a random loop, `:none`
+  doesn't reuse a loop.
 * `show_progress=true`: Enable a progress meter.
-* `distance_function=euclidean_distance`: The distance function used for [`UniquePoints`](@ref).
-* `identical_tol::Float64=1e-6`: The tolerance with which it is decided whether two solutions are identical.
-* `group_actions=nothing`: If there is more than one group action you can use this to chain the application of them. For example if you have two group actions `foo` and `bar` you can set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the application rules.
-* `group_action_on_all_nodes=false`: By default the group_action(s) are only applied on the solutions with the main parameter `p`. If this is enabled then it is applied for every parameter `q`.
-* `parameter_sampler=independent_normal`: A function taking the parameter `p` and returning a new random parameter `q`. By default each entry of the parameter vector is drawn independently from the univariate normal distribution.
-* `equivalence_classes=true`: This only applies if there is at least one group action supplied. We then consider two solutions in the same equivalence class if we can transform one to the other by the supplied group actions. We only track one solution per equivalence class.
-* `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
-* `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed to run.
-* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied. By default this is half of `target_solutions_count` if applicable otherwise 2.
-* `resuse_loops::Symbol=:all`: Strategy to reuse other loops for new found solutions. `:all` propagates a new solution through all other loops, `:random` picks a random loop, `:none` doesn't reuse a loop.
+* `strategy`: The strategy used to create loops. If `F` only depends linearly on `p` this
+  will be [`Petal`](@ref). Otherwise this will be [`Triangle`](@ref) with weights if `F`
+  is a real system.
+* `target_solutions_count=nothing`: The computations are stopped if this number of
+  solutions is reached.
+* `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed
+  to run.
 """
-function monodromy_solve(args...; seed=randseed(), show_progress=true, kwargs...)
+function monodromy_solve(args...; seed = randseed(), show_progress = true, kwargs...)
     Random.seed!(seed)
-    monodromy_solve!(MonodromySolver(args...; kwargs...), seed; show_progress=show_progress)
+    monodromy_solve!(
+        MonodromySolver(args...; kwargs...),
+        seed;
+        show_progress = show_progress,
+    )
 end
 
-function default_strategy(F::MPPolyInputs, parameters, p₀::AbstractVector{TP}; is_real_system=false) where {TC,TP}
+function default_strategy(
+    F::MPPolyInputs,
+    parameters,
+    p₀::AbstractVector{TP};
+    is_real_system = false,
+) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
-    vars = variables(F; parameters=parameters)
-    if all(d -> d ≤ 1, maxdegrees(F; parameters=vars))
+    vars = variables(F; parameters = parameters)
+    if all(d -> d ≤ 1, maxdegrees(F; parameters = vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
     elseif is_real_system
-        Triangle(useweights=true)
+        Triangle(useweights = true)
     else
-        Triangle(useweights=false)
+        Triangle(useweights = false)
     end
 end
-function default_strategy(F::AbstractSystem, parameters, p₀; is_real_system=false)
+function default_strategy(F::AbstractSystem, parameters, p₀; is_real_system = false)
     # For a real system we should introduce some weights to avoid the discriminant
     if is_real_system
-        Triangle(useweights=true)
+        Triangle(useweights = true)
     else
-        Triangle(useweights=false)
+        Triangle(useweights = false)
     end
 end
 
@@ -550,7 +677,10 @@ static_solutions(V::Vector) = static_solutions(V, Val(length(V[1])))
 function static_solutions(V::Vector, ::Val{N}) where {N}
     map(v -> complex.(float.(SVector{N}(v))), V)
 end
-function static_solutions(V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}}, ::Val{N}) where {N}
+function static_solutions(
+    V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}},
+    ::Val{N},
+) where {N}
     SVector{N}.(V)
 end
 
@@ -563,7 +693,7 @@ function numerically_check_real(H::AbstractHomotopy, x)
     end
     t = rand()
     r = evaluate(H, y, t)
-    isapprox(LinearAlgebra.norm(imag.(r), Inf), 0.0, atol=1e-14)
+    isapprox(LinearAlgebra.norm(imag.(r), Inf), 0.0, atol = 1e-14)
 end
 
 #################
@@ -580,12 +710,17 @@ struct MonodromyJob
     loop_id::Int
 end
 
-function monodromy_solve!(MS::MonodromySolver, seed; show_progress=true)
+function monodromy_solve!(MS::MonodromySolver, seed; show_progress = true)
     if nsolutions(MS) == 0
         @warn "None of the provided solutions is a valid start solution."
-        return MonodromyResult(:invalid_startvalue,
-                similar(MS.solutions.points, 0), MS.parameters, MS.statistics,
-                MS.options.equivalence_classes, seed)
+        return MonodromyResult(
+            :invalid_startvalue,
+            similar(MS.solutions.points, 0),
+            MS.parameters,
+            MS.statistics,
+            MS.options.equivalence_classes,
+            seed,
+        )
     end
     # solve
     retcode = :not_assigned
@@ -595,7 +730,11 @@ function monodromy_solve!(MS::MonodromySolver, seed; show_progress=true)
         else
             desc = "Classes of solutions (modulo group action) found:"
         end
-        progress = ProgressMeter.ProgressUnknown(desc; delay=0.5, clear_output_ijulia=true)
+        progress = ProgressMeter.ProgressUnknown(
+            desc;
+            delay = 0.5,
+            clear_output_ijulia = true,
+        )
     else
         progress = nothing
     end
@@ -612,12 +751,22 @@ function monodromy_solve!(MS::MonodromySolver, seed; show_progress=true)
     end
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
     finished!(MS.statistics, nsolutions(MS))
-    MonodromyResult(retcode, solutions(MS), MS.parameters, MS.statistics,
-        MS.options.equivalence_classes, seed)
+    MonodromyResult(
+        retcode,
+        solutions(MS),
+        MS.parameters,
+        MS.statistics,
+        MS.options.equivalence_classes,
+        seed,
+    )
 end
 
 
-function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,ProgressMeter.ProgressUnknown})
+function monodromy_solve!(
+    MS::MonodromySolver,
+    seed,
+    progress::Union{Nothing,ProgressMeter.ProgressUnknown},
+)
     t₀ = time_ns()
     iterations_without_progress = 0 # stopping heuristic
     # intialize job queue
@@ -631,7 +780,7 @@ function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,Pro
         if retcode == :done
             retcode = :success
             break
-        elseif retcode == :timeout || retcode == :invalid_startvalue
+        elseif retcode == :timeout || retcode == :invalid_startvalue
             break
         end
 
@@ -644,14 +793,14 @@ function monodromy_solve!(MS::MonodromySolver, seed, progress::Union{Nothing,Pro
             n = n_new
         end
         if iterations_without_progress == MS.options.max_loops_no_progress &&
-            n_new ≥ MS.options.min_solutions
+           n_new ≥ MS.options.min_solutions
             retcode = :heuristic_stop
             break
         end
 
         regenerate_loop_and_schedule_jobs!(queue, MS)
     end
-    update_progress!(progress, nsolutions(MS), MS.statistics; finish=true)
+    update_progress!(progress, nsolutions(MS), MS.statistics; finish = true)
 
     retcode
 end
@@ -675,15 +824,14 @@ function empty_queue!(queue, MS::MonodromySolver, t₀::UInt, progress)
 end
 
 affine_chart(x::SVector, y::PVector) = ProjectiveVectors.affine_chart!(x, y)
-affine_chart(x::SVector{N, T}, y::AbstractVector) where {N, T} = SVector{N,T}(y)
+affine_chart(x::SVector{N,T}, y::AbstractVector) where {N,T} = SVector{N,T}(y)
 
 function process!(queue, job::MonodromyJob, MS::MonodromySolver, progress)
     x = solutions(MS)[job.id]
     loop = MS.loops[job.loop_id]
     retcode = track(MS.tracker, x, loop, MS.statistics)
-    if retcode ≠ PathTrackerStatus.success
-        if retcode == PathTrackerStatus.terminated_invalid_startvalue &&
-           MS.statistics.ntrackedpaths == 0
+    if !is_success(retcode)
+        if is_invalid_startvalue(retcode) && MS.statistics.ntrackedpaths == 0
             return :invalid_startvalue
         end
         return :incomplete
@@ -707,12 +855,12 @@ end
 """
     add_and_schedule!(MS, queue, y, job)
 
-Add `y` to the current `node` (if it not already exists) and schedule a new job to the `queue`.
-Returns `true` if we are done. Otherwise `false`.
+Add `y` to the current `node` (if it not already exists) and schedule a new job to the
+`queue`. Returns `true` if we are done. Otherwise `false`.
 """
 function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) where {N,T}
-    k = add!(MS.solutions, y, Val(true); tol=MS.options.identical_tol)
-    if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
+    k = add!(MS.solutions, y, Val(true); tol = MS.options.identical_tol)
+    if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
         # Check if we are done
         isdone(MS.solutions, y, MS.options) && return true
         push!(queue, MonodromyJob(nsolutions(MS), job.loop_id))
@@ -724,8 +872,8 @@ function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) whe
             end
             push!(queue, MonodromyJob(nsolutions(MS), r_loop_id))
         elseif MS.options.reuse_loops == :all
-            for r_loop_id in 1:length(MS.loops)
-                r_loop_id != job.loop_id || continue
+            for r_loop_id = 1:length(MS.loops)
+                r_loop_id != job.loop_id || continue
                 push!(queue, MonodromyJob(nsolutions(MS), r_loop_id))
             end
         end
@@ -734,17 +882,37 @@ function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) whe
     false
 end
 
-function update_progress!(::Nothing, nsolutions, statistics::MonodromyStatistics; finish=false)
+function update_progress!(
+    ::Nothing,
+    nsolutions,
+    statistics::MonodromyStatistics;
+    finish = false,
+)
     nothing
 end
-function update_progress!(progress, nsolutions, statistics::MonodromyStatistics; finish=false)
-    ProgressMeter.update!(progress, nsolutions, showvalues=(
-        ("# paths tracked", statistics.ntrackedpaths),
-        ("# loops generated", statistics.nparametergenerations),
-        ("# completed loops without change", n_completed_loops_without_change(statistics, nsolutions)),
-        ("# solutions in current loop", n_solutions_current_loop(statistics, nsolutions)),
-        ("# real solutions", statistics.nreal),
-    ))
+function update_progress!(
+    progress,
+    nsolutions,
+    statistics::MonodromyStatistics;
+    finish = false,
+)
+    ProgressMeter.update!(
+        progress,
+        nsolutions,
+        showvalues = (
+            ("# paths tracked", statistics.ntrackedpaths),
+            ("# loops generated", statistics.nparametergenerations),
+            (
+             "# completed loops without change",
+             n_completed_loops_without_change(statistics, nsolutions),
+            ),
+            (
+             "# solutions in current loop",
+             n_solutions_current_loop(statistics, nsolutions),
+            ),
+            ("# real solutions", statistics.nreal),
+        ),
+    )
     if finish
         ProgressMeter.finish!(progress)
     end
@@ -752,15 +920,19 @@ function update_progress!(progress, nsolutions, statistics::MonodromyStatistics;
 end
 
 function isdone(solutions::UniquePoints, x, options::MonodromyOptions)
-    options.done_callback(x, solutions.points) ||
-    length(solutions) ≥ options.target_solutions_count
+    options.done_callback(x, solutions.points) || length(solutions) ≥ options.target_solutions_count
 end
 
 function regenerate_loop_and_schedule_jobs!(queue, MS::MonodromySolver)
     es = MS.loops[1].edges
-    loop = MonodromyLoop(MS.parameters, length(es), MS.options, weights=!isnothing(es[1].weights))
+    loop = MonodromyLoop(
+        MS.parameters,
+        length(es),
+        MS.options,
+        weights = !isnothing(es[1].weights),
+    )
     push!(MS.loops, loop)
-    for id in 1:nsolutions(MS)
+    for id = 1:nsolutions(MS)
         push!(queue, MonodromyJob(id, length(MS.loops)))
     end
     generated_parameters!(MS.statistics, nsolutions(MS))
@@ -772,15 +944,18 @@ end
 ## VERIFICATION ##
 ##################
 """
-    verify_solution_completeness(F, res::MonodromyResult; parameters=..., trace_tol=1e-8, options...)
+    verify_solution_completeness(F, res::MonodromyResult;
+                                 parameters=..., trace_tol=1e-6, options...)
 
 Verify that the monodromy computation found all solutions by [`monodromy_solve`](@ref).
 This uses a multi-projective trace test as described in [^LRS18].
-The trace is a numerical value which is 0 if all solutions are found, for this the `trace_tol` keyword argument is used.
-The function returns `nothing` if some computation couldn't be carried out. Otherwise returns a boolean.
-Note that this function requires the computation of solutions to another polynomial system using monodromy.
-This routine can return `false` although all solutions are found if this additional solution set is not complete.
-The `options...` arguments can be everything which is accepted by `solve` and `monodromy_solve`.
+The trace is a numerical value which is 0 if all solutions are found, for this the
+`trace_tol` keyword argument is used. The function returns `nothing` if some computation
+couldn't be carried out. Otherwise returns a boolean. Note that this function requires the
+computation of solutions to another polynomial system using monodromy. This routine can
+return `false` although all solutions are found if this additional solution set is not
+complete. The `options...` arguments can be everything which is accepted by `solve` and
+`monodromy_solve`.
 
 ### Example
 
@@ -799,11 +974,11 @@ MonodromyResult
 • 44 tracked paths
 • seed → 367230
 
-julia> verify_solution_completeness([f,l], res; parameters=[a,b,c])
-Compute additional witnesses for completeness...
-Found 2 additional witnesses
-Found 2 additional witnesses
-Compute trace...
+julia> verify_solution_completeness([f,l], res; parameters=[a,b,c], trace_tol = 1e-8)
+[ Info: Compute additional witnesses for completeness...
+[ Info: Found 2 additional witnesses
+[ Info: Compute trace...
+[ Info: Norm of trace: 1.035918995391323e-15
 true
 ```
 
@@ -818,36 +993,57 @@ Use the already computeded additional witnesses `W₁₀`. You want to obtain
 
 
 [^LRS18]:
-    Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test." Arnold Mathematical Journal 4.1 (2018): 113-125.
+    Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test."
+    Arnold Mathematical Journal 4.1 (2018): 113-125.
 """
 function verify_solution_completeness(F, R::MonodromyResult; kwargs...)
     verify_solution_completeness(F, solutions(R), R.parameters; kwargs...)
 end
 
-function verify_solution_completeness(F, W₀₁::AbstractVector{<:AbstractVector}, p₀::Vector{<:Number}; show_progress=true, parameters=nothing, trace_tol=1e-8, kwargs...)
-	W₁₀, TTS, l₀ = solution_completeness_witnesses(F, W₀₁, p₀; show_progress=show_progress, parameters=parameters, kwargs...)
-	verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress=show_progress)
+function verify_solution_completeness(
+    F,
+    W₀₁::AbstractVector{<:AbstractVector},
+    p₀::Vector{<:Number};
+    show_progress = true,
+    parameters = nothing,
+    trace_tol = 1e-6,
+    kwargs...,
+)
+    W₁₀, TTS, l₀ = solution_completeness_witnesses(
+        F,
+        W₀₁,
+        p₀;
+        show_progress = show_progress,
+        parameters = parameters,
+        kwargs...,
+    )
+    verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress = show_progress)
 end
 
-function verify_solution_completeness(TTS, W₀₁::AbstractVector{<:AbstractVector}, W₁₀::AbstractVector{<:AbstractVector}, p₀::Vector{<:Number}, l₀; show_progress=true, trace_tol=1e-8, kwargs...)
-	if show_progress
-		print("Found $(length(W₁₀)) additional witnesses\n")
-	end
+function verify_solution_completeness(
+    TTS,
+    W₀₁::AbstractVector{<:AbstractVector},
+    W₁₀::AbstractVector{<:AbstractVector},
+    p₀::Vector{<:Number},
+    l₀;
+    show_progress = true,
+    trace_tol = 1e-6,
+    kwargs...,
+)
+    # Combine W₀₁ and W₁₀.
+    S = append!([[x; 0.0] for x in W₀₁], W₁₀)
+    # To verify that we found all solutions we need move in the pencil
+    if show_progress
+        @info("Compute trace...")
+    end
 
-	# Combine W₀₁ and W₁₀.
-	S = append!([[x;0.] for x in W₀₁], W₁₀)
-	# To verify that we found all solutions we need move in the pencil
-	if show_progress
-		print("Compute trace...\n")
-	end
-
-	trace = track_and_compute_trace(TTS, S, l₀; kwargs...)
-	if isnothing(trace)
-		return nothing
-	else
-        show_progress && println("Norm of trace: ", LinearAlgebra.norm(trace))
-		LinearAlgebra.norm(trace) < trace_tol
-	end
+    trace = track_and_compute_trace(TTS, S, l₀; kwargs...)
+    if isnothing(trace)
+        return nothing
+    else
+        show_progress && @info("Norm of trace: $(LinearAlgebra.norm(trace))")
+        LinearAlgebra.norm(trace) < trace_tol
+    end
 end
 
 """
@@ -857,69 +1053,86 @@ Compute the additional necessary witnesses. Returns a triple `(W₁₀, TTS, l)`
 containing the additional witnesses `W₁₀`, a trace test system `TTS` and
 the parameters `l` for `TTS`.
 """
-function solution_completeness_witnesses(F, W₀₁, p₀::Vector{<:Number}; parameters=nothing, show_progress=true, kwargs...)
-	# generate another start pair
-	q₀ = randn(ComplexF64, length(p₀))
-	# Construct the trace test system
-	TTS = TraceTestSystem(SPSystem(F; parameters=parameters), p₀, q₀ - p₀)
+function solution_completeness_witnesses(
+    F,
+    W₀₁,
+    p₀::Vector{<:Number};
+    parameters = nothing,
+    show_progress = true,
+    kwargs...,
+)
+    # generate another start pair
+    q₀ = randn(ComplexF64, length(p₀))
+    # Construct the trace test system
+    TTS = TraceTestSystem(SPSystem(F; parameters = parameters), p₀, q₀ - p₀)
 
-	y₁ = solution(solve(F, W₀₁[1]; p₁=p₀, p₀=q₀, parameters=parameters, kwargs...)[1])
-	# construct an affine hyperplane l(x) going through y₀
-	l₁ = cis.(2π .* rand(length(y₁)))
-	push!(l₁, -sum(l₁ .* y₁))
-	# This is numerically sometimes not so nice. Let's move to a truly generic one.
-	l₀ = randn(ComplexF64, length(l₁))
-	y₀ = solution(solve(TTS, [y₁;1]; p₁=l₁, p₀=l₀)[1])
+    y₁ = solution(solve(F, W₀₁[1]; p₁ = p₀, p₀ = q₀, parameters = parameters, kwargs...)[1])
+    # construct an affine hyperplane l(x) going through y₀
+    l₁ = cis.(2π .* rand(length(y₁)))
+    push!(l₁, -sum(l₁ .* y₁))
+    # This is numerically sometimes not so nice. Let's move to a truly generic one.
+    l₀ = randn(ComplexF64, length(l₁))
+    y₀ = solution(solve(TTS, [y₁; 1]; p₁ = l₁, p₀ = l₀)[1])
 
-	if show_progress
-		print("Compute additional witnesses for completeness...\n")
-	end
+    if show_progress
+        @info("Compute additional witnesses for completeness...")
+    end
 
-    R₁₀ = monodromy_solve(TTS, y₀, l₀; max_loops_no_progress=5, kwargs...)
+    R₁₀ = monodromy_solve(TTS, y₀, l₀; max_loops_no_progress = 5, kwargs...)
     best_result = R₁₀
-	best_params = l₀
+    best_params = l₀
     result_agreed = 0
-    for i in 1:10
+    for i = 1:10
         k₀ = randn(ComplexF64, length(l₀))
-        S_k₀ = solutions(solve(TTS, solutions(R₁₀); start_parameters=l₀, target_parameters=k₀))
-        new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress=5)
+        S_k₀ = solutions(solve(
+            TTS,
+            solutions(R₁₀);
+            start_parameters = l₀,
+            target_parameters = k₀,
+        ))
+        new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress = 5)
         if nsolutions(new_result) == nsolutions(best_result)
             result_agreed += 1
         elseif nsolutions(new_result) > nsolutions(best_result)
             best_result = new_result
-			best_params = k₀
+            best_params = k₀
         end
-		if result_agreed > 2
-			break
-		end
+        if result_agreed > 2
+            break
+        end
     end
 
-	W₁₀ = solutions(best_result)
+    W₁₀ = solutions(best_result)
 
-	if show_progress
-		print("Found $(length(W₁₀)) additional witnesses\n")
-	end
-	W₁₀, TTS, best_params
+    if show_progress
+        @info("Found $(length(W₁₀)) additional witnesses")
+    end
+    W₁₀, TTS, best_params
 end
 
 
 function track_and_compute_trace(TTS::TraceTestSystem, S, l₀; kwargs...)
-	for i in 1:3
-		TTP = TraceTestPencil(TTS, l₀)
-		R₁ = solve(TTP, S, start_parameters=[0.0], target_parameters=[.1], kwargs...)
-		R₂ = solve(TTP, S, start_parameters=[0.0], target_parameters=[-.1], kwargs...)
-		if nsolutions(R₁) ≠ length(S) || nsolutions(R₂) ≠ length(S)
-			if i == 3
-				printstyled("Lost solutions for $i times. Abort.\n", color=:red, bold=true)
-				return nothing
-			end
-			printstyled("Lost solutions, need to recompute trace...\n", color=:yellow, bold=true)
-		end
-		s₁ = sum(solutions(R₁))
-		s = sum(S)
-		s₂ = sum(solutions(R₂))
-		trace = (s₁ - s) - (s - s₂)
-		return trace
-	end
-	nothing
+    for i = 1:3
+        TTP = TraceTestPencil(TTS, l₀)
+        R₁ = solve(TTP, S, start_parameters = [0.0], target_parameters = [.1], kwargs...)
+        R₂ = solve(TTP, S, start_parameters = [0.0], target_parameters = [-.1], kwargs...)
+        if nsolutions(R₁) ≠ length(S) || nsolutions(R₂) ≠ length(S)
+            if i == 3
+                printstyled("Lost solutions $i times. Abort.\n", color = :red, bold = true)
+                return nothing
+            end
+            printstyled(
+                "Lost solutions, need to recompute trace...\n",
+                color = :yellow,
+                bold = true,
+            )
+        end
+        s₁ = sum(solutions(R₁))
+        s = sum(S)
+        s₂ = sum(solutions(R₂))
+        # Due to floating point errors, we compute the RELATIVE trace
+        trace = ((s₁ .- s) .- (s .- s₂)) ./ max.(abs.(s₁ .- s), 1.0)
+        return trace
+    end
+    nothing
 end

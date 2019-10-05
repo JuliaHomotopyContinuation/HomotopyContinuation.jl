@@ -1,6 +1,6 @@
 # Path Tracker
 
-The [`solve`](@ref) routine is only a very thin wrapper around [`PathTracker`](@ref).
+The [`solve`](@ref) routine is only a thin wrapper around [`PathTracker`](@ref).
 Therefore you can also use [`PathTracker`](@ref) directly.
 This is for example a good choice if you have to solve the same problem many times.
 
@@ -13,24 +13,9 @@ The easiest way to construct a `PathTracker`:
 pathtracker_startsolutions
 pathtracker
 ```
-
-
-## Methods
 To track a single path you can use the [`track`](@ref) and [`track!`](@ref) methods.
 ```@docs
-track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, kwargs...)
-track!(tracker::PathTracker, x₁, t₁::Float64=1.0; kwargs...)
-```
-
-The return type of [`track!`](@ref) is
-```@docs
-PathTrackerStatus.states
-```
-
-In the case that you track paths of parameter homotopy you can also change
-the parameters using
-```@docs
-set_parameters!(::PathTracker)
+track(tracker::PathTracker, x₁)
 ```
 
 ## PathResult
@@ -42,17 +27,44 @@ PathResult
 
 The following helper functions are provided
 ```@docs
-solution
+solution(::PathResult)
 accuracy(::PathResult)
-multiplicity
-residual
-start_solution
+residual(::PathResult)
+winding_number(tracker::PathTracker)
+multiplicity(::PathResult)
+condition_jacobian(::PathResult)
+LinearAlgebra.cond(::PathResult)
+start_solution(::PathResult)
 is_real(::PathResult)
 is_success(::PathResult)
-is_failed
-is_affine
-is_projective
+is_failed(::PathResult)
+is_affine(::PathResult)
+is_projective(r::PathResult)
+is_at_infinity(::PathResult)
+is_singular(::PathResult)
+is_nonsingular(::PathResult)
+```
+
+## Low-level API
+
+```@docs
+track!(tracker::PathTracker, x₁)
+```
+
+In the case that you track paths of parameter homotopy you can also change
+the parameters using
+```@docs
+start_parameters!(::PathTracker, p)
+target_parameters!(::PathTracker, p)
+```
+
+The return type of [`track!`](@ref) is a [`PathTrackerStatus.states`](@ref):
+```@docs
+PathTrackerStatus.states
+is_success
 is_at_infinity
-is_singular
-is_nonsingular
+is_invalid_startvalue
+is_failed
+is_terminated_callback
+is_tracking
 ```

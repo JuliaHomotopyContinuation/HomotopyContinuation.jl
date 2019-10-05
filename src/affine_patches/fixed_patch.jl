@@ -2,6 +2,9 @@ export FixedPatch
 
 """
     FixedPatch()
+
+The `FixedPatch` is similar to the [`OrthogonalPatch`](@ref) but it doesn't change during
+the tracking. Instead it only updates at the start of the tracking.
 """
 struct FixedPatch <: AbstractAffinePatch end
 
@@ -15,7 +18,7 @@ function state(::FixedPatch, x::PVector)
     FixedPatchState(v)
 end
 
-function setup!(state::FixedPatchState, x::AbstractVector)
+function init!(state::FixedPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
     LinearAlgebra.normalize!(x)
     @inbounds for i in eachindex(state.v̄)

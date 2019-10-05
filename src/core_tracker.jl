@@ -1,17 +1,68 @@
-export CoreTracker, CoreTrackerResult, CoreTrackerStatus, CoreTrackerOptions,
-        coretracker, coretracker_startsolutions, affine_tracking,
-        track, track!, setup!, iterator,
-        current_x, current_t, current_Δt, iters, status, accuracy, max_corrector_iters,
-        max_step_size , refinement_accuracy, max_refinement_iters,
-        set_accuracy!, set_max_corrector_iters!, set_refinement_accuracy!,
-        set_max_refinement_iters!, set_max_step_size!, digits_lost, options
+export CoreTrackerStatus,
+       is_success,
+       is_terminated,
+       is_tracking,
+       is_invalid_startvalue,
+       CoreTrackerResult,
+       solution,
+       CoreTrackerOptions,
+       CoreTracker,
+       coretracker,
+       coretracker_startsolutions,
+       affine_tracking,
+       track,
+       track!,
+       init!,
+       iterator,
+       current_x,
+       current_t,
+       current_Δt,
+       steps,
+       iters,
+       status,
+       accuracy,
+       max_corrector_iters,
+       max_step_size,
+       set_accuracy!,
+       set_max_corrector_iters!,
+       set_max_step_size!,
+       options,
+       # deprecated
+       digits_lost,
+       setup!,
+       refinement_accuracy,
+       max_refinement_iters,
+       set_max_refinement_iters!,
+       set_refinement_accuracy!,
+       start_parameters!,
+       target_parameters!
 
-const coretracker_supported_keywords = [:corrector, :predictor, :patch,
-    :initial_step_size, :min_step_size , :max_step_size,
-    :accuracy, :refinement_accuracy, :max_corrector_iters, :max_refinement_iters,
-    :max_steps, :simple_step_size_alg, :auto_scaling, :terminate_ill_conditioned,
-    :log_transform, :precision, :steps_jacobian_info_update,
-    :max_lost_digits]
+
+
+const coretracker_supported_keywords = [
+    :accuracy,
+    :auto_scaling,
+    :initial_step_size,
+    :min_step_size,
+    :max_cond,
+    :max_corrector_iters,
+    :max_step_size,
+    :max_steps,
+    :norm,
+    :patch,
+    :precision,
+    :predictor,
+    :simple_step_size_alg,
+    :terminate_ill_conditioned,
+    :log_homotopy,
+    :log_transform,
+    :logarithmic_time_scale,
+    :from_infinity,
+    # deprecated,
+    :max_lost_digits,
+    :max_refinement_iters,
+    :refinement_accuracy,
+]
 
 
 ####################
@@ -20,30 +71,62 @@ const coretracker_supported_keywords = [:corrector, :predictor, :patch,
 
 module CoreTrackerStatus
 
-    @doc """
-        CoreTrackerStatus.states
+@doc """
+    CoreTrackerStatus.states
 
-    The possible states the coretracker can achieve are
+The possible states a `CoreTracker` can have are
 
-    * `CoreTrackerStatus.success`
-    * `CoreTrackerStatus.tracking`
-    * `CoreTrackerStatus.terminated_maximal_iterations`
-    * `CoreTrackerStatus.terminated_invalid_startvalue`
-    * `CoreTrackerStatus.terminated_step_size_too_small`
-    * `CoreTrackerStatus.terminated_singularity`
-    * `CoreTrackerStatus.terminated_ill_conditioned`
-    """
-    @enum states begin
-        success
-        tracking
-        terminated_maximal_iterations
-        terminated_invalid_startvalue
-        terminated_step_size_too_small
-        terminated_singularity
-        terminated_ill_conditioned
-    end
+* `CoreTrackerStatus.success`: Indicates a successfull completed tracking
+* `CoreTrackerStatus.tracking`: The tracking is still in progress
+* `CoreTrackerStatus.terminated_maximal_iterations`: Tracking terminated since maximal iterations reached.
+* `CoreTrackerStatus.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `CoreTrackerStatus.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
+* `CoreTrackerStatus.terminated_step_size_too_small`
+"""
+@enum states begin
+    success
+    tracking
+    terminated_maximal_iterations
+    terminated_accuracy_limit
+    terminated_ill_conditioned
+    terminated_invalid_startvalue
+    terminated_step_size_too_small
+        # no more used
+    terminated_singularity
+end
 end
 
+"""
+    is_success(S::CoreTrackerStatus.states)
+
+Returns `true` if `S` indicates a success in the path tracking.
+"""
+is_success(S) = S == CoreTrackerStatus.success
+
+"""
+    is_terminated(S::CoreTrackerStatus.states)
+
+Returns `true` if `S` indicates that the path tracking got terminated. This is not `true`
+if `is_success(S)` is `true`.
+"""
+is_terminated(S::CoreTrackerStatus.states) =
+    S ≠ CoreTrackerStatus.tracking && S ≠ CoreTrackerStatus.success
+
+"""
+    is_invalid_startvalue(S::CoreTrackerStatus.states)
+
+Returns `true` if `S` indicates that the path tracking got terminated since the start
+value was not a zero.
+"""
+is_invalid_startvalue(S::CoreTrackerStatus.states) =
+    S == CoreTrackerStatus.terminated_invalid_startvalue
+
+"""
+    is_tracking(S::CoreTrackerStatus.states)
+
+Returns `true` if `S` indicates that the path tracking is not yet finished.
+"""
+is_tracking(S::CoreTrackerStatus.states) = S == CoreTrackerStatus.tracking
 
 ####################
 # CoreTrackerResult #
@@ -52,75 +135,78 @@ end
 """
      CoreTrackerResult{V<:AbstractVector}
 
-Containing the result of a tracked path. The fields are
-* `returncode::CoreTrackerStatus.states` If the tracking was successfull then it is `CoreTrackerStatus.success`.
-* `x::V` The result.
-* `t::ComplexF64` The `t` when the path tracker stopped.
+The result of [`track(::CoreTracker, x₁, t₁, t₀)](@ref). You can use
+[`is_success`](@ref) to check whether the tracking was successfull and [`solution`](@ref)
+to obtain the solution.
+
+# Fields
+
+* `returncode` The [`CoreTrackerStatus.states`](@ref) enum.
+* `x::V` The solution at `t`.
+* `t::ComplexF64` The time `t` when the path tracker stopped.
 * `accuracy::Float64`: The estimated accuracy of `x`.
+* `accepted_steps::Int`: The number of accepted steps during the tracking.
+* `rejected_steps::Int`: The number of rejected_steps steps during the tracking.
 """
-struct CoreTrackerResult{V <: AbstractVector}
-     returncode::CoreTrackerStatus.states
-     x::V
-     t::ComplexF64
-     accuracy::Float64
-     accepted_steps::Int
-     rejected_steps::Int
+struct CoreTrackerResult{V<:AbstractVector}
+    returncode::CoreTrackerStatus.states
+    x::V
+    t::ComplexF64
+    accuracy::Float64
+    accepted_steps::Int
+    rejected_steps::Int
 end
 
 function CoreTrackerResult(tracker)
     state = tracker.state
-     CoreTrackerResult(state.status,
-          copy(state.x), state.segment[state.s],
-          state.accuracy,
-          state.accepted_steps,
-          state.rejected_steps)
+    CoreTrackerResult(
+        state.status,
+        copy(state.x),
+        state.segment[state.s],
+        state.accuracy,
+        state.accepted_steps,
+        state.rejected_steps,
+    )
 end
+
+"""
+    is_success(result::CoreTrackerResult)
+
+Returns `true` if the path tracking was successfull.
+"""
+is_success(result::CoreTrackerResult) = is_success(result.returncode)
+
+"""
+    solution(result::CoreTrackerResult)
+
+Returns the solutions obtained by the `CoreTracker`.
+"""
+solution(result::CoreTrackerResult) = result.x
+
 
 Base.show(io::IO, result::CoreTrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::CoreTrackerResult) = result
 
 
-##################
-## PATH TRACKER ##
-##################
-
-"""
-    AutoScalingOptions(;scale_min=0.01,
-                     scale_abs_min=min(scale_min^2, 200 * sqrt(eps()),
-                     scale_max=1.0 / eps() / sqrt(2)
-
-Parameters for the auto scaling of the variables.
-"""
-struct AutoScalingOptions
-    scale_min::Float64
-    scale_abs_min::Float64
-    scale_max::Float64
-end
-function AutoScalingOptions(;scale_min=0.01,
-                             scale_abs_min=min(scale_min^2, 200 * sqrt(eps())),
-                             scale_max=1.0 / eps() / sqrt(2))
-    AutoScalingOptions(scale_min, scale_abs_min, scale_max)
-end
-Base.show(io::IO, opts::AutoScalingOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::AutoScalingOptions) = opts
-
-mutable struct StepSizeModel
-    ω::Float64
-    expected_Δx₀::Float64
-end
-StepSizeModel() = StepSizeModel(NaN, NaN)
-
-function reset!(model::StepSizeModel)
-    model.ω = model.expected_Δx₀ = NaN
-    model
-end
-Base.show(io::IO, opts::StepSizeModel) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::StepSizeModel) = opts
-
 ######################
 # CoreTrackerOptions #
 ######################
+"""
+    PrecisionOption
 
+Controls the used precision for computing the residual in Newton's method.
+See [[Tisseur01]](https://epubs.siam.org/doi/abs/10.1137/S0895479899359837) for the analysis behind this approach.
+
+## Values
+* `PRECISION_FIXED_64`: Only use default 64 bit machine precision
+* `PRECISION_FIXED_128`: Always use emulated 128 bit floating point numbers. These are provided by the [DoubleFloats.jl](https://github.com/JuliaMath/DoubleFloats.jl) package.
+* `PRECISION_ADAPTIVE`: Adaptively switch between 64 and 128 bit floating point numbers.
+"""
+@enum PrecisionOption begin
+    PRECISION_FIXED_64
+    PRECISION_FIXED_128
+    PRECISION_ADAPTIVE
+end
 
 """
     CoreTrackerOptions
@@ -130,304 +216,463 @@ for all possible options.
 """
 mutable struct CoreTrackerOptions
     accuracy::Float64
+    initial_step_size::Union{Nothing,Float64}
+    max_cond::Float64
     max_corrector_iters::Int
-    refinement_accuracy::Float64
-    max_refinement_iters::Int
+    max_step_size::Float64
     max_steps::Int
-    initial_step_size::Float64
-    min_step_size ::Float64
-    max_step_size ::Float64
-    simple_step_size_alg::Bool
-    update_patch::Bool
-    max_lost_digits::Float64
-    auto_scaling::Bool
-    auto_scaling_options::AutoScalingOptions
-    terminate_ill_conditioned::Bool
+    min_step_size::Float64
     precision::PrecisionOption
+    simple_step_size_alg::Bool
     steps_jacobian_info_update::Int
+    terminate_ill_conditioned::Bool
+    track_cond::Bool
+    update_patch::Bool
+    # Not changeable options
+    logarithmic_time_scale::Bool
+    from_infinity::Bool
 end
 
-function CoreTrackerOptions(;
-    accuracy=1e-7,
-    auto_scaling=true,
-    auto_scaling_options=AutoScalingOptions(),
-    initial_step_size=0.1,
-    max_corrector_iters::Int=2,
-    max_refinement_iters=5,
-    max_step_size=Inf,
-    min_step_size=1e-14,
-    parameter_homotopy=false,
-    max_steps=parameter_homotopy ? 10_000 : 1_000,
-    precision::PrecisionOption=PRECISION_FIXED_64,
-    max_lost_digits=default_max_lost_digits(precision, accuracy),
-    refinement_accuracy=1e-8,
-    simple_step_size_alg=false,
-    steps_jacobian_info_update::Int=3,
-    terminate_ill_conditioned::Bool=true,
-    update_patch=true)
+function CoreTrackerOptions(
+    ;
+    # internal
+    parameter_homotopy = false,
+    update_patch = true,
+    logarithmic_time_scale = false,
+    from_infinity = false,
+    # public
+    accuracy = 1e-7,
+    initial_step_size = nothing,
+    max_cond::Float64 = 1e12,
+    max_corrector_iters::Int = 2,
+    max_step_size = Inf,
+    max_steps = parameter_homotopy ? 10_000 : 1_000,
+    min_step_size = 1e-14,
+    precision::Union{PrecisionOption,Symbol} = :double,
+    simple_step_size_alg = false,
+    steps_jacobian_info_update::Int = 5,
+    terminate_ill_conditioned::Bool = true,
+    track_cond::Bool = true,
+     # deprecated
+    max_lost_digits = nothing,
+    max_refinement_iters = nothing,
+    refinement_accuracy = nothing,
+)
 
-    CoreTrackerOptions(accuracy, max_corrector_iters, refinement_accuracy,
-            max_refinement_iters, max_steps, initial_step_size, min_step_size,
-            max_step_size, simple_step_size_alg, update_patch, max_lost_digits,
-            auto_scaling, auto_scaling_options, terminate_ill_conditioned,
-            precision, steps_jacobian_info_update)
+    max_lost_digits !== nothing && @warn(
+        "Passing `max_lost_digits` to `CoreTracker` is deprecated.",
+    )
+    refinement_accuracy !== nothing && @warn(
+        "Passing `refinement_accuracy` to `CoreTracker` is deprecated. " *
+        "Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
+    max_refinement_iters !== nothing && @warn(
+        "Passing `max_refinement_iters` to `CoreTracker` is deprecated. " *
+        "Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
+
+    CoreTrackerOptions(
+        accuracy,
+        initial_step_size,
+        max_cond,
+        max_corrector_iters,
+        max_step_size,
+        max_steps,
+        min_step_size,
+        make_precision(precision),
+        simple_step_size_alg,
+        steps_jacobian_info_update,
+        terminate_ill_conditioned,
+        track_cond,
+        update_patch,
+        logarithmic_time_scale,
+        from_infinity,
+    )
+end
+
+make_precision(p::PrecisionOption) = p
+function make_precision(p::Symbol)
+    if p == :double
+        PRECISION_FIXED_64
+    elseif p == :double_double
+        PRECISION_FIXED_128
+    elseif p == :adaptive
+        PRECISION_ADAPTIVE
+    else
+        throw(ArgumentError("Unsupported argument `precision=$p`. " *
+                            "Possible values are `:double`, `:double_double` and `:adaptive`."))
+    end
 end
 
 Base.show(io::IO, opts::CoreTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions) = opts
 
-const eps_double_64 = Float64(eps(Double64))
-function default_max_lost_digits(prec::PrecisionOption, accuracy::Float64)
-    if prec == PRECISION_FIXED_64
-        # maximal_digits_available - digits necessary - buffer
-        -log10(eps()) + log10(accuracy) + 1
-    else
-        # if higher precision is available we will more like be constrained
-        # by the fact that the jacobian cannot be too ill-conditioned
-        min(-log10(eps()) - 3, -log10(eps_double_64) + log10(accuracy) - 3)
-    end
+Base.copy(opts::CoreTrackerOptions) = copy!(CoreTrackerOptions(), opts)
+function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
+    @unpack accuracy,
+        initial_step_size,
+        min_step_size,
+        max_cond,
+        max_corrector_iters,
+        max_step_size,
+        max_steps,
+        precision,
+        simple_step_size_alg,
+        steps_jacobian_info_update,
+        terminate_ill_conditioned,
+        track_cond,
+        update_patch,
+        logarithmic_time_scale,
+        from_infinity = opts2
+    @pack! opts = accuracy,
+        initial_step_size,
+        min_step_size,
+        max_cond,
+        max_corrector_iters,
+        max_step_size,
+        max_steps,
+        precision,
+        simple_step_size_alg,
+        steps_jacobian_info_update,
+        terminate_ill_conditioned,
+        track_cond,
+        update_patch,
+        logarithmic_time_scale,
+        from_infinity
+    opts
 end
 
 ####################
 # CoreTrackerState #
 ####################
 
-mutable struct CoreTrackerState{T, AV<:AbstractVector{T}, MaybePatchState <: Union{AbstractAffinePatchState, Nothing}, IP}
+mutable struct CoreTrackerState{
+    T,
+    AV<:AbstractVector{Complex{T}},
+    AN<:AbstractNorm,
+    MaybePatchState<:Union{AbstractAffinePatchState,Nothing},
+}
     x::AV # current x
     x̂::AV # last prediction
-    x̄::AV # canidate for new x
-    ẋ::Vector{T} # derivative at current x
-    inner_product::IP
-    step_size::StepSizeModel
+    x̄::AV # candidate for new x
+    ẋ::Vector{Complex{T}} # derivative at current x
+
     segment::ComplexSegment
     s::Float64 # current step length (0 ≤ s ≤ length(segment))
     Δs::Float64 # current step size
     Δs_prev::Float64 # previous step size
-    accuracy::Float64
-    jacobian::Jacobian{T}
+
+    accuracy::Float64 # norm(x - x(t))
+    norm_Δx₀::Float64 # norm of the first newton update
+    ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
+    limit_accuracy::Float64
+
+    norm::AN
+    jacobian::JacobianMonitor{T}
+    residual::Vector{Float64}
+    eval_error::Vector{Float64} # an estimate of evalation error
+
     steps_jacobian_info_update::Int
     status::CoreTrackerStatus.states
     patch::MaybePatchState
+
     accepted_steps::Int
     rejected_steps::Int
     last_step_failed::Bool
     consecutive_successfull_steps::Int
 end
 
-function CoreTrackerState(H, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions,
-                           patch::Union{Nothing, AbstractAffinePatchState}=nothing,
-                           inner_product::AbstractInnerProduct=EuclideanIP())
-    if isa(x₁, SVector)
-        x = Vector(x₁)
-    else
-        x = copy(x₁)
-    end
+function CoreTrackerState(
+    H,
+    x₁::AbstractVector,
+    t₁,
+    t₀,
+    options::CoreTrackerOptions,
+    patch::Union{Nothing,AbstractAffinePatchState},
+    norm::AbstractNorm,
+)
+    x = isa(x₁, SVector) ? Vector(x₁) : copy(x₁)
     x̂, x̄ = copy(x), copy(x)
     ẋ = Vector(x)
-    step_size_model = StepSizeModel()
     segment = ComplexSegment(promote(complex(t₁), complex(t₀))...)
     s = 0.0
-    Δs = convert(Float64, min(options.initial_step_size, length(segment), options.max_step_size ))
+    Δs = convert(
+        Float64,
+        min(unpack(options.initial_step_size, Inf), length(segment), options.max_step_size),
+    )
     Δs_prev = 0.0
-    accuracy = 0.0
-    Jac = Jacobian(jacobian(H, x, t₁))
+    norm_Δx₀ = accuracy = 0.0
+    limit_accuracy = eps()
+    ω = 1.0
+    JM = JacobianMonitor(jacobian(H, x, t₁))
+    residual = zeros(first(size(H)))
+    eval_error = copy(residual)
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CoreTrackerStatus.tracking
-    last_step_failed = false
+    last_step_failed = true
     consecutive_successfull_steps = 0
-    CoreTrackerState(x, x̂, x̄, ẋ, inner_product, step_size_model, segment, s, Δs, Δs_prev, accuracy,
-        Jac, steps_jacobian_info_update, status, patch,
-        accepted_steps, rejected_steps, last_step_failed, consecutive_successfull_steps)
+    CoreTrackerState(
+        x,
+        x̂,
+        x̄,
+        ẋ,
+        segment,
+        s,
+        Δs,
+        Δs_prev,
+        accuracy,
+        norm_Δx₀,
+        ω,
+        limit_accuracy,
+        norm,
+        JM,
+        residual,
+        eval_error,
+        steps_jacobian_info_update,
+        status,
+        patch,
+        accepted_steps,
+        rejected_steps,
+        last_step_failed,
+        consecutive_successfull_steps,
+    )
 end
 
 Base.show(io::IO, state::CoreTrackerState) = print_fieldnames(io, state)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", state::CoreTrackerState) = state
 
-function reset!(state::CoreTrackerState, x₁::AbstractVector, t₁, t₀, options::CoreTrackerOptions, setup_patch::Bool, loop::Bool)
-    state.segment = ComplexSegment(promote(t₁, t₀)...)
-    state.s = 0.0
-    state.Δs = min(options.initial_step_size, length(state.segment), options.max_step_size )
-    state.Δs_prev = 0.0
-    state.status = CoreTrackerStatus.tracking
-    embed!(state.x, x₁)
-    setup_patch && state.patch !== nothing && setup!(state.patch, state.x)
-    state.last_step_failed = false
-    state.consecutive_successfull_steps = 0
-    if !loop
-        state.accuracy = 0.0
-        state.accepted_steps = state.rejected_steps = 0
-        reset!(state.step_size)
 
-        if options.auto_scaling
-            init_auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
-        end
-        reset!(state.jacobian)
-        state.steps_jacobian_info_update = 0
-    end
+##################
+## CoreTracker ##
+##################
+"""
+    CoreTracker
 
-    state
-end
+A `CoreTracker` is the low-level path tracker. Its job is to track an initial solution
+`x₁` from `t₁` to `t₀` by following a solution path ``x(t)``. For this a *predictor-corrector* scheme is used.
+See our [introduction guide](https://www.juliahomotopycontinuation.org/guides/introduction/#tracking-solution-paths)
+for a high-level explanation of the predictor corrector scheme.
+The `CoreTracker` accepts for a value `t` a solution ``x^*`` if ``||x(t) - x^*|| < τ`` where ``τ``
+is controlled by the `accuracy` option.
 
-embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
-embed!(x::AbstractVector, y) = x .= y
+To interact with a `CoreTracker` take a look at [`track`](@ref) resp. [`track!`](@ref).
+You can also use `CoreTracker` as an iterator. For this you need to call
+[`init!(::CoreTracker, x₁, t₁, t₀)`](@ref) first. There is also [`iterator`](@ref) if you
+are only interested in pairs `(x,t)`.
 
-function init_auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptions)
-    point_norm = euclidean_norm(x)
-    w = ip.weight
-    for i in 1:length(w)
-        wᵢ = abs(x[i])
-        if wᵢ < opts.scale_min * point_norm
-            wᵢ = opts.scale_min * point_norm
-        elseif wᵢ > opts.scale_max * point_norm
-            wᵢ = opts.scale_max * point_norm
-        end
-        w[i] = max(wᵢ, opts.scale_abs_min)
-    end
-    nothing
-end
-init_auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = nothing
+The `CoreTracker` **cannot** handle singular solutions or divergent paths. For this you have
+to use a [`PathTracker`](@ref) (which uses internally again a `CoreTracker`).
 
-####################
-# CoreTrackerCache #
-####################
-mutable struct CoreTrackerCache{H<:HomotopyWithCache, P<:AbstractPredictorCache,
-             C<:AbstractCorrectorCache, T}
+The `CoreTracker` can track solutions in projective space if the underlying homotopy is homogenous
+and the provided start solution is a projective vector (with type [`PVector`](https://www.juliahomotopycontinuation.org/ProjectiveVectors.jl/stable/#ProjectiveVectors.PVector))
+from the [`ProjectiveVectors.jl`](https://github.com/JuliaHomotopyContinuation/ProjectiveVectors.jl) package.
+
+The `CoreTracker` can also perform a reparamterization of the parameter ``t`` from ``[0,1]`` towards
+``[0,∞]`` by ``t = e^{-s}``. If the homotopy assumes ``t ∈ [0,1]`` this can be done by
+passing the `log_transform = true` option. If you already have a homotopy which assumes
+``s ∈ [0,∞]`` you can use the `logarithmic_time_scale = true` to tell the core tracker this.
+In this case the `min_step_size` criterion is still applied to ``t`` and not ``s``.
+
+
+## Options
+
+`CoreTracker` accepts many different options. Here are the options in alphabetic order:
+
+* `accuracy` (default `1e-7`): The maximal acceptable distance to the true solution at a
+  time step `t`.
+* `auto_scaling` (default `true`): Enables an automatic scaling of the variables by
+  introducing a *weighted norm*. See also [`WeightedNorm`](@ref).
+* `initial_step_size`: The size of the first step. By default an automatic estimate is
+  computed but this can be overwritten with this option.
+* `max_cond` (default `1e10`): The maximal condition number before a path is terminated due
+  to ill-conditioning. This is only applicable if `terminate_ill_conditioned` is `true`.
+* `max_corrector_iters (default `2`): The maximal number of Newton iteration steps until
+  which the desired accuracy has to be achieved.
+* `max_step_size` (default `Inf`): Limit the path tracker to a maximal step size.
+* `max_steps` (default `1000`): The maximal number of steps the path tracker makes.
+  Note that this changes to `10_000` for parameter homotopies.
+* `min_step_size` (default `1e-14`): The path tracking is terminated if the step size is
+  smaller than this value.
+* `norm` (default [`InfNorm()`](@ref)): The norm used in the computations. Note that if the
+  `auto_scaling` is true, this will automatically be converted to a [`WeightedNorm`](@ref).
+* `patch`: It is possible to perform tracking in projective space. For the actual
+  compuations we still need to choose an affine chart. There are multiple charts possible,
+  see [`AbstractAffinePatch`](@ref). The default is [`RandomPatch`](@ref).
+* `precision` (default `:double`): This controls the precision used in the computation
+  of ``H(x,t)``. If it is set to `:double` only double precision arithmetic is used
+  (`Complex{Float64}`).  If it set to `:double_double` double double arithmetic
+  as implemented by the [`DoubleFloats`](https://github.com/JuliaMath/DoubleFloats.jl)
+  package is **always** used. The option `:adaptive` changes adaptively the precision.
+* `predictor` (default [`Pade21`](@ref)): The predictor used.
+* `simple_step_size_alg` (default `false`): By default the step size algorithm presented in
+  [arXiv:1902.02968](https://arxiv.org/abs/1902.02968) is used. If this option is true
+  a more simple step size algorithm is used which doubles the step size after 5 consecutive
+  successive steps and halfes the step size after a failed step.
+* `terminate_ill_conditioned` (default `true`): Indicates whether the path tracking should be
+  terminated for ill-conditioned paths. A path is considered ill-conditioned if the desirable
+  accuracy is no more achievable or if the condition number of the Jacobian is larger than
+  `1e14`.
+
+"""
+struct CoreTracker{
+    T,
+    AV<:AbstractVector{Complex{T}},
+    AN<:AbstractNorm,
+    P<:AbstractPredictorCache,
+    AP<:Union{Nothing,AbstractAffinePatchState},
+    H<:HomotopyWithCache,
+    NCC<:NewtonCorrectorCache,
+}
     homotopy::H
     predictor::P
-    corrector::C
-    out::Vector{T}
-    r::Vector{T}
-end
-function CoreTrackerCache(H::HomotopyWithCache, predictor, corrector, state::CoreTrackerState)
-    t = state.segment[state.s]
-    pcache = cache(predictor, H, state.x, state.ẋ, t)
-    ccache = cache(corrector, H, state.x, t)
-    out = H(state.x, t)
-    r = copy(out)
-    CoreTrackerCache(H, pcache, ccache, out, r)
-end
-
-
-###############
-# CoreTracker #
-###############
-"""
-    CoreTracker(problem::AbstractProblem, x₁; kwargs...)
-
-Construct a `CoreTracker` from the given `problem` to track elements of type `x₁`.
-The path is tracked using a predictor-corrector scheme. The recommended methods to construct
-a `CoreTracker` are [`coretracker`](@ref) and [`coretracker_startsolutions`](@ref).
-Note that a `CoreTracker` is also a (mutable) iterator.
-
-## Keyword arguments
-* `accuracy=1e-7`: The accuracy required during the path tracking.
-* `corrector::AbstractCorrector`: The corrector used during in the predictor-corrector scheme. The default is [`NewtonCorrector`](@ref).
-* `initial_step_size=0.1`: The size of the first step.
-* `max_corrector_iters=2`: The maximal number of correction steps in a single step.
-* `max_lost_digits::Real`: The tracking is terminated if we estimate that we loose more than `max_lost_digits` in the linear algebra steps. This threshold depends on the `precision` argument.
-* `max_refinement_iters=5`: The maximal number of correction steps used to refine the final value.
-* `max_steps=1_000`: The maximal number of iterations the path tracker has available. Note that this changes to `10_000` for parameter homotopies.
-* `max_step_size=Inf`: The maximal step size.
-* `min_step_size=1e-14`: The minimal step size.
-* `precision::PrecisionOption=PRECISION_FIXED_64`: The precision used for evaluating the residual in Newton's method.
-* `predictor::AbstractPredictor`: The predictor used during in the predictor-corrector scheme. The default is [`Heun`](@ref)()`.
-* `refinement_accuracy=1e-8`: The precision required for the final value.
-* `simple_step_size_alg=false`: Use a more simple step size algorithm.
-* `steps_jacobian_info_update::Int=1`: Every n-th step a linear system will be solved using a QR factorization to obtain an estimate for the condition number of the Jacobian.
-* `terminate_ill_conditioned::Bool=true`: Indicates whether the path tracking should be terminated for ill-conditioned paths. A path is considerd ill-conditioned if the condition number of the Jacobian is larger than ≈1e14 or if it is larger than 1e`max_lost_digits`.
-"""
-struct CoreTracker{H<:AbstractHomotopy,
-    Predictor<:AbstractPredictor,
-    Corrector<:AbstractCorrector,
-    MaybePatch<:Union{Nothing, AbstractAffinePatch},
-    S<:CoreTrackerState,
-    C<:CoreTrackerCache}
-    # these are fixed
-    homotopy::H
-    predictor::Predictor
-    corrector::Corrector
-    affine_patch::MaybePatch
+    corrector::NCC
     # these are mutable
-    state::S
+    state::CoreTrackerState{T,AV,AN,AP}
     options::CoreTrackerOptions
-    cache::C
+    # buffer
+    dt::Vector{Complex{T}}
 end
 
-function CoreTracker(prob::AbstractProblem, x₁; kwargs...)
-    CoreTracker(prob.homotopy, embed(prob, x₁), complex(1.0), complex(0.0), prob; kwargs...)
+function CoreTracker(
+    prob::AbstractProblem,
+    x₁;
+    log_transform::Bool = false,
+    log_homotopy::Bool = log_transform,
+    logarithmic_time_scale = log_transform || log_homotopy,
+    kwargs...,
+)
+    if log_homotopy
+        H = LogHomotopy(prob.homotopy)
+        CoreTracker(
+            H,
+            embed(prob, x₁),
+            complex(0.0),
+            complex(36.0),
+            prob;
+            logarithmic_time_scale = logarithmic_time_scale,
+            kwargs...,
+        )
+    else
+        CoreTracker(
+            prob.homotopy,
+            embed(prob, x₁),
+            complex(1.0),
+            complex(0.0),
+            prob;
+            logarithmic_time_scale = logarithmic_time_scale,
+            kwargs...,
+        )
+    end
 end
+
+# Tracking in affine space
+function CoreTracker(
+    homotopy::AbstractHomotopy,
+    x₁::AbstractVector,
+    t₁::Number,
+    t₀::Number,
+    prob::AbstractProblem;
+    patch = nothing,
+    corrector::NewtonCorrector = NewtonCorrector(),
+    predictor::AbstractPredictor = Pade21(),
+    auto_scaling::Bool = true,
+    norm::AbstractNorm = InfNorm(),
+    kwargs...,
+)
+
+    patch === nothing || throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
+
+    options = CoreTrackerOptions(
+        ;
+        parameter_homotopy = isa(homotopy, ParameterHomotopy),
+        kwargs...,
+    )
+
+    # We close over the homotopy and its cache to be able to pass things around more easily
+    H = HomotopyWithCache(homotopy, Vector(x₁), t₁)
+
+    used_norm = auto_scaling ? WeightedNorm(norm, x₁) : norm
+    # We have to make sure that the element type of x is invariant under evaluation
+    state = CoreTrackerState(
+        H,
+        indempotent_x(H, x₁, t₁),
+        t₁,
+        t₀,
+        options,
+        nothing,
+        used_norm,
+    )
+
+    pred_cache = cache(predictor, H, state.x, state.ẋ, t₁)
+    corr_cache = cache(corrector, H, state.x, t₁)
+    dt = Vector{eltype(state.ẋ)}(undef, first(size(H)))
+
+    CoreTracker(H, pred_cache, corr_cache, state, options, dt)
+end
+
 
 # Tracking in Projective Space
-function CoreTracker(homotopy::AbstractHomotopy, x₁::ProjectiveVectors.PVector, t₁, t₀, prob::AbstractProblem;
-    patch=has_dedicated_homvars(prob.vargroups) ? EmbeddingPatch() : OrthogonalPatch(),
-    corrector::AbstractCorrector=NewtonCorrector(),
-    predictor::AbstractPredictor=default_predictor(x₁),
-    log_transform=false,
-    simple_step_size_alg=!isa(patch, EmbeddingPatch), kwargs...)
+function CoreTracker(
+    homotopy::AbstractHomotopy,
+    x₁::ProjectiveVectors.PVector,
+    t₁::Number,
+    t₀::Number,
+    prob::AbstractProblem;
+    patch = RandomPatch(),
+    corrector::NewtonCorrector = NewtonCorrector(),
+    predictor::AbstractPredictor = Pade21(),
+    auto_scaling::Bool = true,
+    norm::AbstractNorm = InfNorm(),
+    simple_step_size_alg = isa(patch, OrthogonalPatch),
+    kwargs...,
+)
 
-    options = CoreTrackerOptions(;
-                    parameter_homotopy=isa(homotopy, ParameterHomotopy),
-                    kwargs...)
+    options = CoreTrackerOptions(
+        ;
+        parameter_homotopy = isa(homotopy, ParameterHomotopy),
+        kwargs...,
+    )
 
     if homotopy isa PatchedHomotopy
         error("You cannot pass a `PatchedHomotopy` to CoreTracker. Instead pass the homotopy and patch separate.")
     end
 
-    H = log_transform ? LogHomotopy(homotopy) : homotopy
     patch_state = state(patch, x₁)
+
     # We close over the patch state, the homotopy and its cache
     # to be able to pass things around more easily
-    HC = HomotopyWithCache(PatchedHomotopy(H, patch_state), x₁, t₁)
-    if is_global_patch(patch) && options.auto_scaling
-        inner_product = WeightedIP(x₁)
+    H = HomotopyWithCache(PatchedHomotopy(homotopy, patch_state), x₁, t₁)
+
+    if is_global_patch(patch) && auto_scaling
+        used_norm = WeightedNorm(norm, x₁)
     else
-        inner_product = EuclideanIP()
+        used_norm = norm
     end
     # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, patch_state, inner_product)
-    cache = CoreTrackerCache(HC, predictor, corrector, tracker_state)
+    ct_state = CoreTrackerState(
+        H,
+        indempotent_x(H, x₁, t₁),
+        t₁,
+        t₀,
+        options,
+        patch_state,
+        used_norm,
+    )
 
-    CoreTracker(H, predictor, corrector, patch, tracker_state, options, cache)
+    pred_cache = cache(predictor, H, ct_state.x, ct_state.ẋ, t₁)
+    corr_cache = cache(corrector, H, ct_state.x, t₁)
+    dt = Vector{eltype(ct_state.ẋ)}(undef, first(size(H)))
+
+    CoreTracker(H, pred_cache, corr_cache, ct_state, options, dt)
 end
-
-# Tracking in affine space
-function CoreTracker(homotopy::AbstractHomotopy, x₁::AbstractVector, t₁, t₀, prob::AbstractProblem;
-    patch=nothing,
-    corrector::AbstractCorrector=NewtonCorrector(),
-    predictor::AbstractPredictor=default_predictor(x₁),
-    log_transform=false, kwargs...)
-
-    if patch !== nothing
-        throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
-    end
-
-    options = CoreTrackerOptions(;parameter_homotopy=isa(homotopy, ParameterHomotopy), kwargs...)
-
-    H = log_transform ? LogHomotopy(homotopy) : homotopy
-    # We close over the patch state, the homotopy and its cache
-    # to be able to pass things around more easily
-    HC = HomotopyWithCache(H, Vector(x₁), t₁)
-
-    inner_product = options.auto_scaling ? WeightedIP(x₁) : EuclideanIP()
-    # We have to make sure that the element type of x is invariant under evaluation
-    tracker_state = CoreTrackerState(HC, indempotent_x(HC, x₁, t₁), t₁, t₀, options, nothing, inner_product)
-    cache = CoreTrackerCache(HC, predictor, corrector, tracker_state)
-
-    CoreTracker(H, predictor, corrector, nothing, tracker_state, options, cache)
-end
-
-default_predictor(x::AbstractVector) = Heun()
-# Do not really understand this but Heun doesn't work that great for multi-homogeneous tracking
-default_predictor(x::ProjectiveVectors.PVector{T,1}) where {T} = Heun()
-default_predictor(x::ProjectiveVectors.PVector{T,N}) where {T, N} = Euler()
 
 """
     indempotent_x(H, x₁, t₁)
 
 This returns a vector similar to `x₁` but with an element type which is invariant under evaluation.
 """
-function indempotent_x(H, x₁, t₁)
+function indempotent_x(H::AbstractHomotopy, x₁, t₁)
     u = Vector{Any}(undef, size(H)[1])
     evaluate!(u, H, x₁, t₁)
 
@@ -437,374 +682,595 @@ function indempotent_x(H, x₁, t₁)
         indem_x = similar(x₁, promote_type(typeof(u[1]), ComplexF64))
     end
     indem_x .= x₁
+    indem_x
 end
 
-Base.show(io::IO, C::CoreTracker) = print(io, "CoreTracker tracking a path of type $(typeof(C.state.x))")
+Base.show(io::IO, C::CoreTracker) =
+    print(io, "CoreTracker tracking a path of type $(typeof(C.state.x))")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::CoreTracker) = x
+
+Base.broadcastable(C::CoreTracker) = Ref(C)
+
+###########
+## Alias ##
+###########
+const CT = CoreTracker
+const CTS = CoreTrackerState
+const CTO = CoreTrackerOptions
+const CTR = CoreTrackerResult
+
+#######################
+## Correct & Tangent ##
+#######################
+
+function compute_ẋ!(tracker::CT; update_jacobian::Bool = true)
+    @unpack homotopy, state, options, dt = tracker
+
+    if update_jacobian
+        jacobian_and_dt!(jacobian(state.jacobian), dt, homotopy, state.x, current_t(state))
+        updated!(state.jacobian)
+    else
+        dt!(dt, homotopy, state.x, current_t(state))
+    end
+    # flip sign of entries in dt
+    @inbounds for i in eachindex(dt)
+        dt[i] = -dt[i]
+    end
+    # solve the linear system to compute ẋ
+    LA.ldiv!(state.ẋ, state.jacobian, dt)
+    state.ẋ
+end
+
+
+@inline function correct!(
+    x̄::AbstractVector,
+    tracker::CT,
+    x::AbstractVector = tracker.state.x,
+    t::Number = current_t(tracker.state);
+    simplified_last_step::Bool = true,
+    max_iters::Int = tracker.options.max_corrector_iters + 1,
+    full_steps::Int = max_iters - simplified_last_step,
+    tol::Float64 = tracker.options.accuracy,
+
+)
+    if tracker.options.precision == PRECISION_ADAPTIVE
+        double_64_evaluation = at_limit_accuracy(
+            tracker.state,
+            tracker.options;
+            safety_factor = 100.0,
+        )
+    else
+        double_64_evaluation = tracker.options.precision == PRECISION_FIXED_128
+    end
+
+    newton!(
+        x̄,
+        tracker.homotopy,
+        x,
+        t,
+        tracker.state.jacobian,
+        tracker.state.norm,
+        tracker.corrector;
+        tol = tol,
+        max_iters = max_iters,
+        double_64_evaluation = double_64_evaluation,
+        full_steps = full_steps,
+    )
+end
+
+@inline function limit_accuracy!(
+    tracker::CT,
+    x::AbstractVector = tracker.state.x,
+    t::Number = current_t(tracker.state),
+    norm::AbstractNorm = tracker.state.norm,
+)
+    @unpack state, options = tracker
+
+    for i = 1:2
+        # We do a second if we would terminate the path tracking to make sure that this
+        # is not just an artifact
+        i == 2 && !terminate_limit_accuracy(state, options) && continue
+        limit_acc = limit_accuracy!(
+            state.residual,
+            tracker.homotopy,
+            x,
+            t,
+            state.jacobian,
+            norm,
+            tracker.corrector;
+            accuracy = options.accuracy,
+            x_accuracy = state.accuracy,
+            update_jacobian = false,
+        )
+        state.accuracy = min(state.accuracy, limit_acc)
+        state.limit_accuracy = max(state.accuracy, limit_acc)
+    end
+
+    if options.track_cond
+        cond!(state.jacobian, norm, tracker.state.residual)
+        copyto!(state.eval_error, state.residual)
+        apply_row_scaling!(state.eval_error, state.jacobian)
+    end
+
+    nothing
+end
+
+function terminate_limit_accuracy(state, options)
+    (options.precision == PRECISION_FIXED_64) && at_limit_accuracy(
+        state,
+        options;
+        safety_factor = 10.0,
+    )
+end
+function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 10.0)
+    opts.accuracy < safety_factor * state.limit_accuracy
+end
+####################
+## INITIALIZATION ##
+####################
+
+embed!(x::ProjectiveVectors.PVector, y) = ProjectiveVectors.embed!(x, y)
+embed!(x::AbstractVector, y) = x .= y
+
+function check_start_value!(tracker::CT, x = tracker.state.x, t = current_t(tracker.state))
+    # We perturb the provided soution by sligthly more than the desired accuracy
+    # to check that the Newton iteration converges properly and to obtain an estimate
+    # of ω
+    perturb!(tracker.state.x̄, x, 10 * tracker.options.accuracy, tracker.state.norm)
+
+    # Solutions could need higher order precision already at the beginning
+    # Therefore, if the standard check fails, try again with higher precision (if applicable)
+    double_64_evaluation = false
+    for i = 1:2
+        result = newton!(
+            tracker.state.x̄,
+            tracker.homotopy,
+            tracker.state.x̄,
+            t,
+            tracker.state.jacobian,
+            tracker.state.norm,
+            tracker.corrector;
+            tol = tracker.options.accuracy,
+            max_iters = 2,
+            simplified_last_step = false,
+            double_64_evaluation = double_64_evaluation,
+        )
+        if is_converged(result)
+            tracker.state.ω = result.ω₀
+            x .= tracker.state.x̄
+            tracker.state.accuracy = result.accuracy
+            limit_accuracy!(tracker)
+            break
+        elseif i == 1 && tracker.options.precision != PRECISION_FIXED_64
+            double_64_evaluation = true
+        else
+            tracker.state.status = CoreTrackerStatus.terminated_invalid_startvalue
+            break
+        end
+    end
+    nothing
+end
+
+perturb!(y, x, Δ::Real, w::WeightedNorm) = y .= x .+ Δ .* weights(w)
+perturb!(y, x, Δ::Real, norm::AbstractNorm) = y .= x .+ Δ
+
+"""
+    init!(tracker::CT, x₁, t₁, t₀;
+      setup_patch::Bool = tracker.options.update_patch,
+      loop::Bool = false,
+      check_start_value::Bool = !loop)
+
+Setup `tracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
+`tracker` as an iterator.
+"""
+function init!(
+    tracker::CoreTracker,
+    x₁::AbstractVector,
+    t₁,
+    t₀;
+    setup_patch::Bool = tracker.options.update_patch,
+    loop::Bool = false,
+    keep_steps::Bool = false,
+    check_start_value::Bool = !loop,
+)
+    @unpack state, predictor, homotopy = tracker
+
+    init!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop, keep_steps)
+    if !loop
+        check_start_value!(tracker)
+        compute_ẋ!(tracker; update_jacobian = false)
+        init!(predictor, homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
+    end
+    initial_step_size!(state, predictor, tracker.options)
+    tracker
+end
+
+function init!(
+    state::CTS,
+    x₁::AbstractVector,
+    t₁,
+    t₀,
+    options::CTO,
+    setup_patch::Bool,
+    loop::Bool,
+    keep_steps::Bool,
+)
+    state.segment = ComplexSegment(t₁, t₀)
+    state.s = 0.0
+    state.Δs_prev = 0.0
+    state.status = CoreTrackerStatus.tracking
+    embed!(state.x, x₁)
+    setup_patch && state.patch !== nothing && init!(state.patch, state.x)
+    state.last_step_failed = true
+    state.consecutive_successfull_steps = 0
+    if !loop
+        state.accuracy = 0.0
+        state.ω = 1.0
+        if !keep_steps
+            state.accepted_steps = state.rejected_steps = 0
+        end
+        init!(state.norm, state.x)
+        init!(state.jacobian)
+        state.residual .= 0.0
+        state.steps_jacobian_info_update = 0
+    end
+
+    state
+end
+
+@deprecate setup!(tracker::CoreTracker, x₁, t₁, t₀; kwargs...) init!(
+    tracker,
+    x₁,
+    t₁,
+    t₀;
+    kwargs...,
+)
 
 ##############
 ## TRACKING ##
 ##############
 
 """
-    track(tracker, x₁, t₁=1.0, t₀=0.0; options...)::CoreTrackerResult
+    track(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerResult
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 This returns a `CoreTrackerResult`. This modifies `tracker`.
 See [`track!`](@ref) for the possible options.
 """
-function track(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0; kwargs...)
-     track!(tracker, x₁, t₁, t₀; kwargs...)
-     CoreTrackerResult(tracker)
+function track(
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
+    kwargs...,
+)
+    track!(tracker, x₁, t₁, t₀; kwargs...)
+    CoreTrackerResult(tracker)
 end
 
 """
-     track!(tracker, x₁, t₁=1.0, t₀=0.0; setup_patch=true, checkstartvalue=true, loop::Bool=false)::CoreTrackerResult
+    track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus.states
 
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
-Returns one of the enum values of `CoreTrackerStatus.states` indicating the status.
-If the tracking was successfull it is `CoreTrackerStatus.success`.
-If `setup_patch` is `true` then [`setup!`](@ref) is called at the beginning
+Returns one of the enum values of `CoreTrackerStatus` indicating the status.
+Check [`is_success`](@ref) and [`is_terminated`](@ref) to test for the status.
+
+If `setup_patch` is `true` then [`init!`](@ref) is called at the beginning
 of the tracking.
 
-    track!(x₀, tracker, x₁, t₁=1.0, t₀=0.0; options...)::CoreTrackerStatus.states
+    track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)::CoreTrackerStatus.states
 
 Additionally also stores the result in `x₀` if the tracking was successfull.
 """
-function track!(x₀, tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; setup_patch::Bool=tracker.options.update_patch,
-            loop::Bool=false, checkstartvalue::Bool=!loop)
-     _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
-     retcode = status(tracker)
-     if retcode == CoreTrackerStatus.success
-         x₀ .= current_x(tracker)
-     end
-     retcode
-end
-@inline function track!(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0;
-        setup_patch::Bool=tracker.options.update_patch,
-        checkstartvalue::Bool=true,
-        loop::Bool=false)
-    _track!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
+function track!(
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
+    setup_patch::Bool = tracker.options.update_patch,
+    loop::Bool = false,
+    check_start_value::Bool = !loop,
+    debug::Bool = false,
+)
+    _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
 end
 
-function _track!(tracker::CoreTracker, x₁, t₁, t₀,
-                    setup_patch::Bool, checkstartvalue::Bool, loop::Bool)
-    if t₁ == t₀
-        tracker.state.status = CoreTrackerStatus.success
-        return tracker.state.status
-    end
+function track!(
+    x₀::AbstractVector,
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
+    setup_patch::Bool = tracker.options.update_patch,
+    loop::Bool = false,
+    check_start_value::Bool = !loop,
+    debug::Bool = false,
+)
 
-    setup!(tracker, x₁, t₁, t₀, setup_patch, checkstartvalue, loop)
-
-    while tracker.state.status == CoreTrackerStatus.tracking
-        step!(tracker)
-        check_terminated!(tracker)
+    _track!(tracker, x₁, t₁, t₀, setup_patch, loop, check_start_value, debug)
+    retcode = status(tracker)
+    if is_success(status(tracker))
+        x₀ .= current_x(tracker)
     end
-    if tracker.state.status == CoreTrackerStatus.success
-        refine!(tracker)
+    retcode
+end
+@inline function _track!(
+    tracker::CT,
+    x₁::AbstractVector,
+    t₁::Number,
+    t₀::Number,
+    setup_patch::Bool,
+    loop::Bool,
+    check_start_value::Bool,
+    debug::Bool,
+)
+    t₁ == t₀ && return (tracker.state.status = CoreTrackerStatus.success)
+
+    init!(
+        tracker,
+        x₁,
+        t₁,
+        t₀;
+        setup_patch = setup_patch,
+        check_start_value = check_start_value,
+        loop = loop,
+    )
+
+    while is_tracking(tracker.state.status)
+        step!(tracker, debug)
     end
 
     tracker.state.status
 end
 
+
 """
-    setup!(coretracker, x₁, t₁=1.0, t₀=0.0, setup_patch=coretracker.options.update_patch, checkstartvalue=true, compute_ẋ=true)
+    step!(tracker::CT)
 
-Setup `coretracker` to track `x₁` from `t₁` to `t₀`. Use this if you want to use the
-coretracker as an iterator.
+Perform one step of the path tracker. This tries to move forward by `Δt`, i.e.,
+obtaining an approximation of `x(t+Δt)`.
+Returns `true` if the step was successfull.
 """
-function setup!(tracker::CoreTracker, x₁::AbstractVector, t₁=1.0, t₀=0.0, setup_patch=tracker.options.update_patch, checkstartvalue=true, loop::Bool=false)
-    @unpack state, cache = tracker
-
-    try
-        reset!(state, x₁, t₁, t₀, tracker.options, setup_patch, loop)
-        reset!(cache.predictor, state.x, t₁)
-        checkstartvalue && checkstartvalue!(tracker)
-        if !loop
-            compute_ẋ!(state, cache, tracker.options)
-            setup!(cache.predictor, cache.homotopy, state.x, state.ẋ, current_t(state), state.jacobian)
-        end
-    catch err
-        if !(err isa LinearAlgebra.SingularException)
-            rethrow(err)
-        end
-        tracker.state.status = CoreTrackerStatus.terminated_singularity
-    end
-    tracker
-end
-
-function checkstartvalue(tracker::CoreTracker, x, t)
-    embed!(tracker.state.x̄, x)
-    init_auto_scaling!(tracker.state.inner_product, tracker.state.x̄, tracker.options.auto_scaling_options)
-    result = correct!(tracker.state.x̄, tracker, x, t; update_jacobian_infos=true)
-    isconverged(result)
-end
-
-function checkstartvalue!(tracker::CoreTracker)
-    result = correct!(tracker.state.x̄, tracker; update_jacobian_infos=true)
-    if isconverged(result)
-        tracker.state.x .= tracker.state.x̄
-    else
-        tracker.state.status = CoreTrackerStatus.terminated_invalid_startvalue
-    end
-    nothing
-end
-
-function compute_ẋ!(state, cache, options::CoreTrackerOptions)
-    @inbounds jacobian_and_dt!(state.jacobian.J, cache.out, cache.homotopy, state.x, current_t(state))
-    # apply row scaling to J and compute factorization
-    updated_jacobian!(state.jacobian)
-
-    @inbounds for i in eachindex(cache.out)
-        cache.out[i] = -cache.out[i]
-    end
-    solve!(state.ẋ, state.jacobian, cache.out)
-    nothing
-end
-
-
-@inline function correct!(x̄, tracker::CoreTracker,
-        x=tracker.state.x,
-        t=tracker.state.segment[tracker.state.s],
-        norm=tracker.state.inner_product;
-        accuracy::Float64=tracker.options.accuracy,
-        max_iters::Int=tracker.options.max_corrector_iters,
-        precision::PrecisionOption=tracker.options.precision,
-        update_jacobian_infos::Bool=false,
-        use_qr::Bool=false)
-
-    correct!(x̄, tracker.corrector, tracker.cache.corrector,
-             tracker.cache.homotopy, x, t, norm, tracker.state.jacobian,
-             accuracy, max_iters, tracker.state.step_size;
-             precision=precision,
-             update_jacobian_infos=update_jacobian_infos, use_qr=use_qr)
-end
-
-function step!(tracker::CoreTracker)
-    @unpack state, cache, options = tracker
+function step!(tracker::CT, debug::Bool = false)
+    @unpack homotopy, predictor, state, options = tracker
     @unpack x, x̂, x̄, ẋ = state
-    H = cache.homotopy
 
-    try
-        t, Δt = current_t(state), current_Δt(state)
-        predict!(x̂, tracker.predictor, cache.predictor, H, x, t, Δt, ẋ, tracker.state.jacobian)
-        # check if we need to update the jacobian_infos
-        update_jacobian_infos =
-                state.last_step_failed ||
-                state.steps_jacobian_info_update ≥ options.steps_jacobian_info_update
-        # reset counter
-        update_jacobian_infos && (state.steps_jacobian_info_update = 0)
-        result = correct!(x̄, tracker, x̂, t + Δt; update_jacobian_infos=update_jacobian_infos)
-        # println("ω: ", result.ω, " t: ", real(t))
-        if isconverged(result)
-            # Step is accepted, assign values
-            state.accepted_steps += 1
-            x .= x̄
-            state.s += state.Δs
-            state.accuracy = result.accuracy
-            # Step size change
-            state.Δs_prev = state.Δs
-            update_stepsize!(tracker, result)
-            if state.patch !== nothing && options.update_patch
-                changepatch!(state.patch, x)
-            end
-            options.auto_scaling && auto_scaling!(state, options)
-            # update derivative
-            compute_ẋ!(state, cache, options)
-            # tell the predictors about the new derivative if they need to update something
-            update!(cache.predictor, H, x, ẋ, t + Δt, state.jacobian)
-            state.steps_jacobian_info_update += 1
+    # @unpack currently doesn't work with getproperty
+    t, Δt = current_t(state), current_Δt(state)
 
-            # Check termination criterion: we became too ill-conditioned
-            if options.terminate_ill_conditioned && is_ill_conditioned(state, options) && state.last_step_failed
-                state.status = CoreTrackerStatus.terminated_ill_conditioned
-                return nothing
-            end
+    debug && printstyled(
+        "\nt: ",
+        round(t, sigdigits = 5),
+        " Δt: ",
+        round(Δt; sigdigits = 5),
+        "\n";
+        color = :yellow,
+    )
 
-            state.last_step_failed = false
+    # Use the current approximation of x(t) to obtain estimate
+    # x̂ ≈ x(t + Δt) using the provided predictor
+    predict!(x̂, predictor, homotopy, x, t, Δt, ẋ, state.jacobian)
+    # Correct the predicted value x̂ to obtain x̄.
+    # If the correction is successfull we have x̄ ≈ x(t+Δt).
+    result = correct!(x̄, tracker, x̂, t + Δt; simplified_last_step = true)
+
+    debug && show(result)
+
+    if is_converged(result)
+        # move forward
+        x .= x̄
+        state.s += state.Δs
+        state.accuracy = result.accuracy
+
+        # update step size
+        state.Δs_prev = state.Δs
+        update_stepsize!(tracker, result)
+
+        # If we use dynamic affine charts, now we update to a new one
+        if state.patch !== nothing && options.update_patch
+            changepatch!(state.patch, x)
+        end
+
+        # If we use a weighted norm, now we update this
+        update!(state.norm, x)
+
+        # Compute the new tangent ẋ(t).
+        compute_ẋ!(tracker; update_jacobian = true)
+
+        # Make an additional newton step to check the limiting accuracy
+        if state.steps_jacobian_info_update == options.steps_jacobian_info_update ||
+           state.last_step_failed
+            limit_accuracy!(tracker)
+            state.steps_jacobian_info_update = 0
         else
-            # We have to reset the patch
-            state.rejected_steps += 1
-            update_rank!(state.jacobian)
-            # Step failed, so we have to try with a new (smaller) step size
-            update_stepsize!(tracker, result)
-            Δt = current_Δt(state)
-            state.last_step_failed = true
+            state.steps_jacobian_info_update += 1
         end
-    catch err
-        if !(err isa LinearAlgebra.SingularException)
-            rethrow(err)
-        end
-        tracker.state.status = CoreTrackerStatus.terminated_singularity
+        # tell the predictors about the new derivative if they need to update something
+        Ψ = 100 * max(state.limit_accuracy, eps())
+        update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, Ψ)
+
+        # Update other state
+        state.accepted_steps += 1
+        state.last_step_failed = false
+    else
+        # Step failed, so we have to try with a new (smaller) step size
+        update_stepsize!(tracker, result)
+
+        # Update other state
+        state.rejected_steps += 1
+        state.last_step_failed = true
     end
+    state.norm_Δx₀ = result.norm_Δx₀
+
+    check_terminated!(state, options)
+
+    # If we terminate, always update the limit accuracy (and by this refine the solution
+    # to maximal accuracy).
+    if is_success(state.status) && state.steps_jacobian_info_update ≠ 0
+        limit_accuracy!(tracker)
+    end
+
+    state.last_step_failed
+end
+
+###############
+## STEP SIZE ##
+###############
+
+## intial step size
+function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, options::CTO)
+    if options.initial_step_size !== nothing
+        return state.Δs = max(
+            min(options.initial_step_size, length(state.segment), options.max_step_size),
+            options.min_step_size,
+        )
+    end
+    ω = max(state.ω, 1e-8)
+    p = order(predictor)
+    deriv, k = unpack(highest_derivative(predictor), (state.ẋ, 1))
+    η_p = nthroot(state.norm(deriv) / factorial(k), k)
+    δ_N_ω = δ(options, ω, options.max_corrector_iters / 2)
+    Δs = nthroot(g(δ_N_ω) / ω, p) / η_p
+    if isnan(Δs)
+        Δs = 0.05 * length(state.segment)
+    end
+
+    state.Δs = max(
+        min(Δs, length(state.segment), options.max_step_size),
+        options.min_step_size,
+    )
+end
+
+## Step size update
+
+function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
+    @unpack state, options = tracker
+
+    if !isnan(result.ω₀)
+        # Use result.ω₀ in the converged case to avoid wrong values of ω due to
+        # hitting the accuracy limit.
+        # In the divergend case this should not happen
+        state.ω = is_converged(result) ? result.ω₀ : result.ω
+    end
+
+    # Use the simple step size algorithm in the case that we get very close to
+    # the accuracy limit. The motivation is that we can run into danger that the computed
+    # estimate of ω is too high due to hitting limit accuracy.
+    near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 100.0)
+    if options.simple_step_size_alg ||
+       (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
+        Δs = simple_step_size_alg!(state, options, result)
+    else
+        Δs = adaptive_step_size_alg!(state, options, result, order(tracker.predictor))
+    end
+
+    # Make sure to not overshoot.
+    if !is_min_step_size(Δs, state.s, length(state.segment), options)
+        state.status = CoreTrackerStatus.terminated_step_size_too_small
+    else
+        state.Δs = min(length(state.segment) - state.s, Δs, options.max_step_size)
+    end
+
     nothing
 end
 
-function is_ill_conditioned(state::CoreTrackerState, options::CoreTrackerOptions)
-    d = max(log₁₀(cond(state)), digits_lost(state))
-    d > options.max_lost_digits || state.jacobian.corank > 0
-end
-
-function is_overdetermined_tracking(tracker)
-    m, n = size(tracker.cache.homotopy)
-    m > n
-end
-
-function check_min_step_size!(tracker::CoreTracker{<:LogHomotopy})
-    @unpack state, options = tracker
-    if abs((exp(-state.Δs) - 1) * exp(-state.s)) < options.min_step_size
-        state.status = CoreTrackerStatus.terminated_step_size_too_small
-    end
-end
-function check_min_step_size!(tracker::CoreTracker)
-    @unpack state, options = tracker
-    if state.Δs < options.min_step_size
-        state.status = CoreTrackerStatus.terminated_step_size_too_small
-    end
-end
-
-g(Θ) = sqrt(1+4Θ) - 1
-# Choose 0.25 instead of 1.0 due to Newton-Kantorovich theorem
-δ(opts::CoreTrackerOptions, ω, μ) = @fastmath min(√(0.5ω) * τ(opts, μ), 0.25)
-τ(opts::CoreTrackerOptions, μ) = @fastmath opts.accuracy^(1/(2opts.max_corrector_iters - μ))
-
-function update_stepsize!(tracker::CoreTracker, result::CorrectorResult)
-    @unpack state, options = tracker
-    model = state.step_size
-    ord = order(tracker.predictor)
-
-    if options.simple_step_size_alg
-        simple_step_size_alg!(tracker, result)
-        return nothing
-    end
-
-    # The step size control is described in https://arxiv.org/abs/1902.02968
-
-    # we have to handle the special case that there is only 1 iteration
-    # in this case we cannot estimate ω and therefore just assume ω = 2
-    # Also note ||x̂-x|| = ||Δx₀||
-    if result.iters == 1
-        ω = isnan(model.ω) ? 2.0 : 0.5model.ω
-        d_x̂_x̄ = result.norm_Δx₀
+function is_min_step_size(Δs, s, length_segment, options::CTO)
+    if options.logarithmic_time_scale && options.from_infinity
+        t = exp(-(length_segment - s))
+        Δ = exp(-(length_segment - (s + Δs))) - t
+        Δ ≥ t || Δ ≥ options.min_step_size
+        if t < options.min_step_size
+            100Δ ≥ t
+        else
+            Δ ≥ options.min_step_size
+        end
+    elseif options.logarithmic_time_scale
+        exp(-s) - exp(-(s + Δs)) ≥ options.min_step_size
     else
-        ω = result.ω₀
-        d_x̂_x̄ = distance(state.x̂, state.x, state.inner_product)
+        Δs ≥ options.min_step_size
     end
+end
+
+
+## Simple step size algorithm
+
+function simple_step_size_alg!(state::CTS, options::CTO, result::NewtonCorrectorResult)
+
+    if !is_converged(result)
+        state.consecutive_successfull_steps = 0
+        return state.Δs / 2
+    end
+
+    state.consecutive_successfull_steps = (state.consecutive_successfull_steps + 1) % 5
+    state.consecutive_successfull_steps == 0 ? 2 * state.Δs : state.Δs
+end
+
+## Adaptive step size algorithm
+
+"Use the adaptive step size control described in https://arxiv.org/abs/1902.02968"
+function adaptive_step_size_alg!(
+    state::CTS,
+    options::CTO,
+    result::NewtonCorrectorResult,
+    ord::Int,
+)
+    @unpack s, ω = state
+
+    d_x̂_x = result.iters > 1 ? state.norm(state.x̂, state.x) : result.norm_Δx₀
     Δx₀ = result.norm_Δx₀
-    if isconverged(result)
-        δ_N_ω = δ(options, ω, 0.25)
+
+    if is_converged(result)
         # This is to handle the edge case that g(δ_N_ω) >> (ω * d_x̂_x̄) > 0 but
         # at the same time δ_N_ω < eps(). Since then g(δ_N_ω) = 0
-        δ_N_ω = max(δ_N_ω, 1e-15) #
-        λ = g(δ_N_ω) / (ω * d_x̂_x̄)
-        Δs = nthroot(λ, ord) * state.Δs
+        δ_N_ω = max(δ(options, ω, options.max_corrector_iters / 4), 1e-15)
+        Δs = nthroot(g(δ_N_ω) / (ω * d_x̂_x), ord) * state.Δs
         if state.last_step_failed
             Δs = min(Δs, state.Δs)
         end
     else
-        if isfinite(model.ω)
-            ω = max(ω, model.ω)
-        end
-        δ_N_ω = δ(options, ω, 0.25)
+        δ_N_ω = δ(options, ω, options.max_corrector_iters / 4)
         ω_η = 0.5ω * Δx₀
         if δ_N_ω < ω_η
-            λ = g(δ_N_ω) / g(ω_η)
-            Δs = min(nthroot(λ, ord), 0.9) * state.Δs
+            Δs = min(nthroot(g(δ_N_ω) / g(ω_η), ord), 0.9) * state.Δs
         else
             Δs = 0.5 * state.Δs
         end
-        # If we fail consecutively reduce step size more aggressively.
-        if state.last_step_failed
-            Δs = min(Δs, 0.25 * state.Δs)
-        end
     end
-    model.expected_Δx₀ = 2δ_N_ω / ω
-    model.ω = ω
-    Δs = min(Δs, options.max_step_size)
-    if (length(state.segment) - state.s) < Δs
-        state.Δs = length(state.segment) - state.s
+
+    Δs
+end
+
+g(Θ::Real) = sqrt(1.0 + 4Θ) - 1.0
+δ(opts::CTO, ω::Real, μ::Real) = min(√(0.5ω) * τ(opts, μ), 0.25)
+function τ(opts::CTO, μ::Real)
+    # most common case: 2(2 - 0.5) == 3
+    if opts.max_corrector_iters == 2 && μ == 0.5
+        cbrt(opts.accuracy)
     else
-        state.Δs = Δs
-        check_min_step_size!(tracker)
-    end
-
-    nothing
-end
-
-function simple_step_size_alg!(tracker::CoreTracker, result::CorrectorResult)
-    @unpack state, options = tracker
-    if isconverged(result)
-        state.consecutive_successfull_steps += 1
-        if state.consecutive_successfull_steps == 5
-            Δs′ = 2 * state.Δs
-            state.consecutive_successfull_steps = 0
-        else
-            Δs′ = state.Δs
-        end
-    else
-        state.consecutive_successfull_steps = 0
-        Δs′ = 0.5 * state.Δs
-    end
-
-    state.Δs = min(Δs′, length(state.segment) - state.s)
-
-    if !isconverged(result)
-        check_min_step_size!(tracker)
+        opts.accuracy^(1 / (2 * (opts.max_corrector_iters - μ)))
     end
 end
 
-function auto_scaling!(state::CoreTrackerState, options::CoreTrackerOptions)
-    auto_scaling!(state.inner_product, state.x, options.auto_scaling_options)
-end
-function auto_scaling!(ip::WeightedIP, x::AbstractVector, opts::AutoScalingOptions)
-    norm_x = ip(x)
-    for i in 1:length(x)
-        wᵢ = (abs(x[i]) + ip.weight[i]) / 2
-        if wᵢ < opts.scale_min * norm_x
-            wᵢ = opts.scale_min * norm_x
-        elseif wᵢ > opts.scale_max * norm_x
-            wᵢ = opts.scale_max * norm_x
-        end
-        ip.weight[i] = max(wᵢ, opts.scale_abs_min)
-    end
-    nothing
-end
-auto_scaling!(ip::EuclideanIP, x::AbstractVector, opts::AutoScalingOptions) = nothing
 
-function check_terminated!(tracker::CoreTracker)
-    if abs(tracker.state.s - length(tracker.state.segment)) < 2eps(length(tracker.state.segment))
-        tracker.state.status = CoreTrackerStatus.success
-    elseif iters(tracker) ≥ tracker.options.max_steps
-        tracker.state.status = CoreTrackerStatus.terminated_maximal_iterations
+function check_terminated!(state::CTS, options::CTO)
+    Δs = length(state.segment) - state.s
+    if Δs < options.min_step_size
+        state.status = CoreTrackerStatus.success
+        state.s = length(state.segment)
+    elseif steps(state) ≥ options.max_steps
+        state.status = CoreTrackerStatus.terminated_maximal_iterations
+    elseif options.terminate_ill_conditioned && terminate_limit_accuracy(state, options)
+        state.status = CoreTrackerStatus.terminated_accuracy_limit
+    elseif options.terminate_ill_conditioned && cond(state) > options.max_cond
+        state.status = CoreTrackerStatus.terminated_ill_conditioned
     end
     nothing
 end
 
-function refine!(tracker::CoreTracker, accuracy=tracker.options.refinement_accuracy)
-    if tracker.state.accuracy < accuracy
-        return
-    end
-    result = correct!(tracker.state.x̄, tracker;
-        accuracy=accuracy,
-        max_iters=tracker.options.max_refinement_iters)
-    if isconverged(result)
-        tracker.state.x .= tracker.state.x̄
-        tracker.state.accuracy = result.accuracy
-    end
-    nothing
-end
 
-function Base.iterate(tracker::CoreTracker, state=nothing)
-    state === nothing && return tracker, 1
-
-    if tracker.state.status == CoreTrackerStatus.tracking
+function Base.iterate(tracker::CoreTracker, state::Int = 0)
+    if is_tracking(tracker.state.status)
         step!(tracker)
-        check_terminated!(tracker)
-
-        if tracker.state.status == CoreTrackerStatus.success
-            refine!(tracker)
-        end
-
         tracker, state + 1
     else
         nothing
@@ -814,45 +1280,49 @@ end
 """
     affine_tracking(tracker)
 
+
 Returns `true` if the path tracker tracks in affine space. If `false` then then the path tracker
 tracks in some affine chart of the projective space.
 """
-affine_tracking(tracker::CoreTracker) = !isa(tracker.state.x, ProjectiveVectors.PVector)
+affine_tracking(tracker::CT) = !isa(tracker.state.x, ProjectiveVectors.PVector)
 
 #################
 ## Query State ##
 #################
 """
-     current_t(tracker::CoreTracker)
+    current_t(tracker::CoreTracker)
 
 Current `t`.
 """
 current_t(tracker::CoreTracker) = current_t(tracker.state)
-current_t(state::CoreTrackerState) = state.segment[state.s]
+current_t(state::CTS) = state.segment[state.s]
 
 """
-     current_Δt(tracker::CoreTracker)
+    current_Δt(tracker::CoreTracker)
 
 Current step_size `Δt`.
 """
 current_Δt(tracker::CoreTracker) = current_Δt(tracker.state)
-current_Δt(state::CoreTrackerState) = state.segment[state.Δs] - state.segment.start
+current_Δt(state::CTS) = state.segment[state.Δs] - state.segment.start
 
 """
-     iters(tracker::CoreTracker)
+    steps(tracker::CoreTracker)
 
-Current number of iterations.
+Current number of steps.
 """
-iters(tracker::CoreTracker) = iters(tracker.state)
-iters(state::CoreTrackerState) = state.accepted_steps + state.rejected_steps
+steps(tracker::CoreTracker) = steps(tracker.state)
+steps(state::CTS) = state.accepted_steps + state.rejected_steps
+
+@deprecate iters(tracker::CoreTracker) steps(tracker)
+
 
 """
-     status(tracker::CoreTracker)
+    status(tracker::CoreTracker)
 
 Current status.
 """
 status(tracker::CoreTracker) = status(tracker.state)
-status(state::CoreTrackerState) = state.status
+status(state::CTS) = state.status
 
 """
     current_x(tracker::CoreTracker)
@@ -860,7 +1330,7 @@ status(state::CoreTrackerState) = state.status
 Return the current value of `x`.
 """
 current_x(tracker::CoreTracker) = current_x(tracker.state)
-current_x(state::CoreTrackerState) = state.x
+current_x(state::CTS) = state.x
 
 
 """
@@ -869,27 +1339,17 @@ current_x(state::CoreTrackerState) = state.x
 Returns the currently computed approximation of the condition number of the
 Jacobian.
 """
-cond(tracker::CoreTracker) = LinearAlgebra.cond(tracker.state)
-cond(state::CoreTrackerState) = state.jacobian.cond
+cond(tracker::CoreTracker) = LA.cond(tracker.state)
+cond(state::CTS) = LA.cond(state.jacobian)
 
 
 """
-    digits_lost(tracker::CoreTracker)
+    norm(tracker::CoreTracker)
 
-Returns the currently computed approximation of the number of digits lost
-during the linear system solving in Newton's method.
+Returns the norm used to compute distances during the path tracking.
 """
-digits_lost(tracker::CoreTracker) = digits_lost(tracker.state)
-digits_lost(state::CoreTrackerState) = unpack(state.jacobian.digits_lost, 0.0)
-
-
-"""
-    inner(tracker::CoreTracker)
-
-Returns the inner product used to compute distance during the path tracking.
-"""
-inner(tracker::CoreTracker) = inner(tracker.state)
-inner(state::CoreTrackerState) = state.inner_product
+LA.norm(tracker::CoreTracker) = LA.norm(tracker.state)
+LA.norm(state::CTS) = state.norm
 
 """
     options(tracker::CoreTracker)
@@ -902,82 +1362,114 @@ options(tracker::CoreTracker) = tracker.options
 # Modify options #
 ##################
 """
-     accuracy(tracker::CoreTracker)
+    accuracy(tracker::CoreTracker)
 
 Current accuracy.
 """
 accuracy(tracker::CoreTracker) = tracker.options.accuracy
 
 """
-     set_accuracy!(tracker::CoreTracker, accuracy, update_max_lost_digits=true)
+    set_accuracy!(tracker::CoreTracker, accuracy)
 
-Set the current accuracy to `accuracy`. If `update_max_lost_digits` is `true` then
-the setting `max_lost_digits` will be updated to the default setting.
+Set the current accuracy to `accuracy`.
 """
-function set_accuracy!(tracker::CoreTracker, accuracy, update_max_lost_digits::Bool=true)
+function set_accuracy!(tracker::CoreTracker, accuracy)
     @unpack options = tracker
     options.accuracy = accuracy
-    if update_max_lost_digits
-        options.max_lost_digits = default_max_lost_digits(options.precision, accuracy)
-    end
     tracker
 end
 
-"""
-     refinement_accuracy(tracker::CoreTracker)
-
-Current refinement accuracy.
-"""
-refinement_accuracy(tracker::CoreTracker) = tracker.options.refinement_accuracy
 
 """
-     set_max_refinement_iters!(tracker::CoreTracker, accuracy)
-
-Set the current refinement accuracy to `accuracy`.
-"""
-set_refinement_accuracy!(T::CoreTracker, accuracy) = T.options.refinement_accuracy = accuracy
-
-"""
-     max_refinement_iters(tracker::CoreTracker)
-
-Current refinement max_steps.
-"""
-max_refinement_iters(T::CoreTracker) = T.options.max_refinement_iters
-
-"""
-     set_max_refinement_iters!(tracker::CoreTracker, n)
-
-Set the current refinement max_steps to `n`.
-"""
-set_max_refinement_iters!(T::CoreTracker, n) = T.options.max_refinement_iters = n
-
-"""
-     max_corrector_iters(tracker::CoreTracker)
+    max_corrector_iters(tracker::CoreTracker)
 
 Current correction max_steps.
 """
-max_corrector_iters(T::CoreTracker) = T.options.max_corrector_iters
+max_corrector_iters(T::CT) = T.options.max_corrector_iters
 
 """
-     set_max_corrector_iters!(tracker::CoreTracker, n)
+ set_max_corrector_iters!(tracker::CoreTracker, n)
 
 Set the correction max_steps to `n`.
 """
-set_max_corrector_iters!(T::CoreTracker, n) = T.options.max_corrector_iters = n
+set_max_corrector_iters!(T::CT, n) = T.options.max_corrector_iters = n
 
 """
-     max_step_size (tracker::CoreTracker)
+    max_step_size (tracker::CoreTracker)
 
 Current maximal step size.
 """
-max_step_size(T::CoreTracker) = T.options.max_step_size
+max_step_size(T::CT) = T.options.max_step_size
 
 """
-     set_max_corrector_iters!(tracker::CoreTracker, Δs)
+    set_max_corrector_iters!(tracker::CoreTracker, Δs)
 
 Set the maximal step size to `Δs`.
 """
-set_max_step_size!(T::CoreTracker, Δs) = T.options.max_step_size  = Δs
+set_max_step_size!(T::CT, Δs) = T.options.max_step_size = Δs
+
+## Deprecated ##
+"""
+    refinement_accuracy(tracker::CoreTracker)
+
+Current refinement accuracy.
+"""
+function refinement_accuracy(tracker::CoreTracker)
+    @warn("Solutions are now automatically refined to maximal achievable accuracy.")
+    return tracker.options.accuracy
+end
+
+"""
+    set_max_refinement_iters!(tracker::CoreTracker, accuracy)
+
+Set the current refinement accuracy to `accuracy`.
+"""
+function set_refinement_accuracy!(T::CT, accuracy)
+    @warn(
+        "`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.",
+    )
+end
+
+"""
+    max_refinement_iters(tracker::CoreTracker)
+
+Current refinement max_steps.
+"""
+function max_refinement_iters(T::CT)
+    @warn(
+        "`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
+    T.options.max_corrector_iters
+end
+
+"""
+    set_max_refinement_iters!(tracker::CoreTracker, n)
+
+Set the current refinement max_steps to `n`.
+"""
+function set_max_refinement_iters!(T::CT, n)
+    @warn(
+        "`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
+    )
+end
+
+
+"""
+    start_parameters!(tracker::CoreTracker, p)
+
+Set the start parameters of the homotopy in in `tracker` to `p`.
+"""
+start_parameters!(tracker::CoreTracker, p::AbstractVector) =
+    (set_start_parameters!(basehomotopy(tracker.homotopy), p); tracker)
+
+"""
+    target_parameters!(tracker::CoreTracker, p)
+
+Set the target parameters of the homotopy in in `tracker` to `p`.
+"""
+target_parameters!(tracker::CoreTracker, p::AbstractVector) =
+    (set_target_parameters!(basehomotopy(tracker.homotopy), p); tracker)
+
 
 ################
 # PathIterator #
@@ -1001,8 +1493,8 @@ If `affine == true` then `x` is the affine solution (internally we compute in pr
 Assume you have `CoreTracker` `tracker` and you wan to track `x₁` from 1.0 to 0.25:
 ```julia
 for (x,t) in iterator(tracker, x₁, 1.0, 0.25)
-    println("x at t=\$t:")
-    println(x)
+println("x at t=\$t:")
+println(x)
 end
 ```
 
@@ -1013,8 +1505,8 @@ For example to check whether the tracker was successfull
 println("Success: ", status(tracker) == CoreTrackerStatus.success)
 ```
 """
-function iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0; kwargs...)
-    setup!(tracker, x₁, t₁, t₀; kwargs...)
+function iterator(tracker::CT, x₁, t₁ = 1.0, t₀ = 0.0; kwargs...)
+    init!(tracker, x₁, t₁, t₀; kwargs...)
     PathIterator(tracker, typeof(t₁ - t₀) <: Real)
 end
 
@@ -1024,21 +1516,15 @@ function current_x_t(iter::PathIterator)
     (copy(x), iter.t_real ? real(t) : t)
 end
 
-function Base.iterate(iter::PathIterator, state=nothing)
+function Base.iterate(iter::PathIterator, state = nothing)
     state === nothing && return current_x_t(iter), 1
     iter.tracker.state.status != CoreTrackerStatus.tracking && return nothing
 
+    t = current_t(iter.tracker)
     step_done = false
-    while !step_done && (iter.tracker.state.status == CoreTrackerStatus.tracking)
-
+    while !step_done && is_tracking(iter.tracker.state.status)
         step!(iter.tracker)
-        check_terminated!(iter.tracker)
-
-        if iter.tracker.state.status == CoreTrackerStatus.success
-            refine!(iter.tracker)
-        end
-
-        step_done = !iter.tracker.state.last_step_failed
+        step_done = current_t(iter.tracker) != t
     end
     current_x_t(iter), state + 1
 end
@@ -1055,10 +1541,10 @@ does it. This also takes the same input arguments as `solve`. This is convenient
 to investigate single paths.
 """
 function coretracker_startsolutions(args...; kwargs...)
-    supported, rest = splitkwargs(kwargs,problem_startsolutions_supported_keywords)
+    supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
     tracker = CoreTracker(prob, start_solution_sample(startsolutions); rest...)
-    (tracker=tracker, startsolutions=startsolutions)
+    (tracker = tracker, startsolutions = startsolutions)
 end
 
 """
@@ -1074,7 +1560,7 @@ This is convenient if you want to investigate single paths.
 We want to construct a path tracker to track a parameterized system `f` with parameters `p`
 from the parameters `a` to `b`.
 ```julia
-tracker = coretracker(f, parameters=p, p₁=a, p₀=b)
+tracker = coretracker(f; parameters = p, start_parameters = a, target_parameters = b)
 ```
 You then can obtain a single solution at `b` by using
 ```julia
@@ -1085,7 +1571,7 @@ x_b = track(tracker, x_a).x
 To trace a path you can use the [`iterator`](@ref) method.
 
 ```julia
-tracker = coretracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f; parameters = p, start_parameters = a, target_parameters = b)
 for (x, t) in iterator(tracker, x₁)
     @show (x,t)
 end
@@ -1093,13 +1579,11 @@ end
 
 If we want to guarantee smooth traces we can limit the maximal step size.
 ```julia
-tracker = coretracker(f, parameters=p, p₁=a, p₀=b, max_step_size =0.01)
+tracker = coretracker(f; parameters = p, max_step_size = 0.01,
+                         start_parameters = a, target_parameters = b)
 for (x, t) in iterator(tracker, x₁)
     @show (x,t)
 end
 ```
 """
-function coretracker(args...; kwargs...)
-    tracker, _ = coretracker_startsolutions(args...; kwargs...)
-    tracker
-end
+coretracker(args...; kwargs...) = first(coretracker_startsolutions(args...; kwargs...))

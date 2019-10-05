@@ -1,858 +1,753 @@
-export PathResult, PathTrackerStatus, PathTracker,
-       pathtracker, pathtracker_startsolutions, solution,
-       accuracy, residual, start_solution, is_success, is_failed, is_at_infinity,
-       is_singular, is_nonsingular, is_real, is_projective, is_affine,
-       set_parameters!, multiplicity
-
+export PathTracker,
+       track!,
+       track,
+       PathTrackerStatus,
+       is_at_infinity,
+       is_success,
+       is_tracking,
+       is_failed,
+       is_terminated_callback,
+       is_invalid_startvalue,
+       pathtracker,
+       pathtracker_startsolutions,
+       PathResult,
+       solution,
+       start_solution,
+       accuracy,
+       residual,
+       winding_number,
+       multiplicity,
+       condition_jacobian,
+       path_number,
+       is_finite,
+       is_singular,
+       is_nonsingular,
+       is_real,
+       is_projective,
+       is_affine
 
 const pathtracker_supported_keywords = [
-    :at_infinity_check, :samples_per_loop, :max_winding_number,
-    :overdetermined_min_accuracy, :overdetermined_min_residual,
-    :cond_eg_start, :min_cond_at_infinity,
-    :t_eg_start, :tol_val_inf_accurate, :tol_val_finite_accurate, :accuracy, :accuracy_eg]
+    :at_infinity_check,
+    :endgame_start,
+    :endgame_start_callback,
+    :max_winding_number,
+    :min_accuracy,
+    :min_cond_eg,
+    :min_step_size_before_eg,
+    :min_step_size_eg,
+    :s_always_consider_valuation,
+    :samples_per_loop,
+    :precision_strategy,
+]
 
-###############
-## VALUATION ##
-###############
 
-mutable struct Valuation
-    v::Vector{Float64}
-    v̇::Vector{Float64}
-    v̈::Vector{Float64}
-    v_data::Matrix{Float64} # 3 × n matrix
-    s_data::NTuple{3,Float64}
-end
-
-@enum ValuationVerdict begin
-    VALUATION_INDECISIVE
-    VALUATION_FINITE
-    VALUATION_AT_INFINIY
-end
-
-function Valuation(x::ProjectiveVectors.PVector; at_infinity_check::Bool=true)
-    if at_infinity_check
-        Valuation(length(x) - length(ProjectiveVectors.dims(x)))
-    else
-        Valuation(length(x))
-    end
-end
-Valuation(x::Vector; kwargs...) = Valuation(length(x))
-function Valuation(n::Integer)
-    v = zeros(n)
-    v̇ = zeros(n)
-    v̈ = zeros(n)
-    v_data = zeros(3, n)
-    s_data = (NaN, NaN, NaN)
-    Valuation(v, v̇, v̈, v_data, s_data)
-end
-
-function Base.show(io::IO, val::Valuation)
-    println(io, typeof(val), ":")
-    for name in [:v, :v̇, :v̈]
-        println(io, " • ", name, " → ", getfield(val, name))
-    end
-end
-Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
-
-function reset!(val::Valuation)
-    val.v .= NaN
-    val.v̇ .= NaN
-    val.v̈ .= NaN
-    val.s_data = (NaN, NaN, NaN)
-    val.v_data .= NaN
-    val
-end
-
-function update!(val::Valuation, z::Vector, ż, s, Δs::Float64, ::Val)
-    _update!(val, z, ż, s, Δs)
-end
-function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{false})
-    _update!(val, z, ż, s, Δs)
-end
-function update!(val::Valuation, z::PVector, ż, s, Δs::Float64, ::Val{true})
-    _update_affine!(val, z, ż, s, Δs)
-end
-function _update!(val::Valuation, z::AbstractVector, ż, s, Δs::Float64)
-    @unpack v, v_data, s_data = val
-    (s₂, s₁, _) =  s_data
-    @inbounds for i in 1:length(v)
-        (v₂, v₁, v₀), v_data
-        valᵢ = ν(z[i], ż[i])
-        v_data[1, i] = v_data[2, i]
-        v_data[2, i] = v_data[3, i]
-        v_data[3, i] = v[i] = valᵢ
-    end
-    val.s_data = (s, s₂, s₁)
-
-    !isnan(s₁) && finite_differences!(val)
-
-    val
-end
-function _update_affine!(val::Valuation, z::PVector, ż, s, Δs::Float64)
-    @unpack v, v_data, s_data = val
-    (s₂, s₁, _) = s_data
-    k = 1
-    @inbounds for (rⱼ, j) in ProjectiveVectors.dimension_indices_homvars(z)
-        vⱼ = ν(z[j], ż[j])
-        for i in rⱼ
-            valᵢ = ν(z[i], ż[i]) - vⱼ
-            v_data[1, k] = v_data[2, k]
-            v_data[2, k] = v_data[3, k]
-            v_data[3, k] = v[k] = valᵢ
-            k += 1
-        end
-    end
-    # cycle data around
-    val.s_data = (s, s₂, s₁)
-
-    !isnan(s₁) && finite_differences!(val)
-
-    val
-end
-
-@inline function ν(z::Complex, ż::Complex)
-    x, y = reim(z); ẋ, ẏ = reim(ż);
-    -(x * ẋ + y * ẏ) / abs2(z)
-end
-
-"""
-    finite_differences!(val::Valuation)
-
-Use a finite difference scheme to approximate the first and second derivative
-of the valuation map.
-
-Since we have a non-uniform grid, we need a more elaborate difference scheme.
-The implementation follows the formulas derived in [^BS05]
-
-[^BS05]: Bowen, M. K., and Ronald Smith. "Derivative formulae and errors for non-uniformly spaced points." Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences 461.2059 (2005): 1975-1997.
-"""
-function finite_differences!(val::Valuation)
-    @unpack v_data, s_data, v̇, v̈ = val
-    s₃, s₂, s₁ = s_data
-    s₃₁ = s₃ - s₁
-    a₃, a₁ = s₃ - s₂, s₁ - s₂
-    @inbounds for i in eachindex(v̇)
-        v̇[i] = (a₃*v_data[1,i])/(a₁*s₃₁) - ((a₁+a₃)*v_data[2,i])/(a₁*a₃) - (a₁*v_data[3,i])/(s₃₁*a₃)
-        v̈[i] = -2v_data[1,i]/((a₁)*s₃₁) + 2v_data[2,i]/(a₁*a₃) + 2v_data[3,i]/(s₃₁*a₃)
-    end
-    nothing
-end
-
-@inline function update!(val::Valuation, core_tracker::CoreTracker; at_infinity_check::Bool=true)
-    z = core_tracker.state.x
-    ż = core_tracker.state.ẋ
-    Δs = core_tracker.state.Δs_prev
-    s = core_tracker.state.s
-    if at_infinity_check
-        update!(val, z, ż, s, Δs, Val(true))
-    else
-        update!(val, z, ż, s, Δs, Val(false))
-    end
-end
-
-#################
-## PATHTRACKER ##
-#################
+############
+## STATUS ##
+############
 
 module PathTrackerStatus
+"""
+    enum PathTrackerStatus
 
-    import ..CoreTrackerStatus
+The possible states a [`PathTracker`](@ref) can be in:
 
-    @doc """
-        PathTrackerStatus.states
+* `PathTrackerStatus.tracking`
+* `PathTrackerStatus.success`
+* `PathTrackerStatus.at_infinity`
+* `PathTrackerStatus.excess_solution`
+* `PathTrackerStatus.post_check_failed`
+* `PathTrackerStatus.terminated_accuracy_limit`
+* `PathTrackerStatus.terminated_callback`
+* `PathTrackerStatus.terminated_ill_conditioned`
+* `PathTrackerStatus.terminated_invalid_startvalue`
+* `PathTrackerStatus.terminated_max_winding_number`
+* `PathTrackerStatus.terminated_max_iters`
+* `PathTrackerStatus.terminated_step_size_too_small`
+"""
+@enum states begin
+    tracking
+    success
+    at_infinity
+    terminated_callback
+    terminated_accuracy_limit
+    terminated_invalid_startvalue
+    terminated_ill_conditioned
+    terminated_max_iters
+    terminated_max_winding_number
+    terminated_step_size_too_small
+    post_check_failed
+    excess_solution
+end
+end
 
-    The possible return codes the path tracker can return are
+"""
+    path_tracker_status(code::CoreTrackerStatus.states)
 
-    * `PathTrackerStatus.success`
-    * `PathTrackerStatus.at_infinity`
-    * `PathTrackerStatus.terminated_maximal_iterations`
-    * `PathTrackerStatus.terminated_invalid_startvalue`
-    * `PathTrackerStatus.terminated_step_size_too_small`
-    * `PathTrackerStatus.terminated_singularity`
-    * `PathTrackerStatus.terminated_ill_conditioned`
-    * `PathTrackerStatus.terminated`
-    * `PathTrackerStatus.post_check_failed`
-    * `PathTrackerStatus.excess_solution`
-    """
-    @enum states begin
-        tracking
-        success
-        at_infinity
-        terminated_invalid_startvalue
-        terminated_maximal_iterations
-        terminated_step_size_too_small
-        terminated_singularity
-        terminated_ill_conditioned
-        tracker_failed
-        post_check_failed
-        excess_solution
+Construct a [`PathTrackerStatus.states`](@ref) from a [`CoreTrackerStatus.states`](@ref).
+"""
+function path_tracker_status(code::CoreTrackerStatus.states)
+    if code == CoreTrackerStatus.success
+        return PathTrackerStatus.success
+    elseif code == CoreTrackerStatus.terminated_invalid_startvalue
+        return PathTrackerStatus.terminated_invalid_startvalue
+    elseif code == CoreTrackerStatus.terminated_maximal_iterations
+        return PathTrackerStatus.terminated_max_iters
+    elseif code == CoreTrackerStatus.terminated_step_size_too_small
+        return PathTrackerStatus.terminated_step_size_too_small
+    elseif code == CoreTrackerStatus.terminated_ill_conditioned
+        return PathTrackerStatus.terminated_ill_conditioned
+    else
+        return PathTrackerStatus.tracking
     end
+end
 
-    function status(code::CoreTrackerStatus.states)
-        if code == CoreTrackerStatus.success
-            return success
-        elseif code == CoreTrackerStatus.terminated_invalid_startvalue
-            return terminated_invalid_startvalue
-        elseif code == CoreTrackerStatus.terminated_maximal_iterations
-            return terminated_maximal_iterations
-        elseif code == CoreTrackerStatus.terminated_step_size_too_small
-            return terminated_step_size_too_small
-        elseif code == CoreTrackerStatus.terminated_singularity
-            return terminated_singularity
-        elseif code == CoreTrackerStatus.terminated_ill_conditioned
-            return terminated_ill_conditioned
-        else
-            # this shouldn't happen
-            return tracker_failed
-        end
-    end
+"""
+    is_success(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates a success in tracking.
+"""
+is_success(status::PathTrackerStatus.states) = status == PathTrackerStatus.success
+
+"""
+    is_success(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates that a path diverged towards infinity.
+"""
+is_at_infinity(status::PathTrackerStatus.states) = status == PathTrackerStatus.at_infinity
+
+"""
+    is_tracking(status::PathTrackerStatus.states)
+
+Returns `true` if `status` indicates the tracking is not going on.
+"""
+is_tracking(status::PathTrackerStatus.states) = status == PathTrackerStatus.tracking
+
+"""
+    is_invalid_startvalue(status::PathTrackerStatus.states)
+
+Returns `true` if the provided start value was not valid.
+"""
+is_invalid_startvalue(status::PathTrackerStatus.states) =
+    status == PathTrackerStatus.terminated_invalid_startvalue
+
+"""
+    is_terminated_callback(status::PathTrackerStatus.states)
+
+Returns `true` if the provided callback indicated a termination of the path.
+"""
+is_terminated_callback(status::PathTrackerStatus.states) =
+    status == PathTrackerStatus.terminated_callback
+
+#############
+## Options ##
+#############
+@enum PrecisionStrategy begin
+    PREC_STRATEGY_NEVER
+    PREC_STRATEGY_FINITE
+    PREC_STRATEGY_ALWAYS
 end
 
 mutable struct PathTrackerOptions
+    endgame_start::Float64
     at_infinity_check::Bool
-    samples_per_loop::Int
-    max_winding_number::Int
-    # The minimal residual a solution needs to have to be considered
-    # a solution of the original system (only applied for singular solutions)
-    overdetermined_min_residual::Float64
-    overdetermined_min_accuracy::Float64
-    # minimial condition number where the endgame starts
-    cond_eg_start::Float64
-    min_cond_at_infinity::Float64
-    # maximal t where the endgame starts
-    t_eg_start::Float64
-    tol_val_inf_accurate::Float64
-    tol_val_finite_accurate::Float64
-    accuracy::Float64
-    accuracy_eg::Float64
-end
-
-function PathTrackerOptions(prob::Problem;
-            at_infinity_check=true,
-            samples_per_loop::Int=12,
-            max_winding_number::Int=12,
-            overdetermined_min_residual::Float64=1e-3,
-            overdetermined_min_accuracy::Float64=1e-4,
-            cond_eg_start::Float64=1e4,
-            min_cond_at_infinity::Float64=1e7,
-            t_eg_start::Float64=0.1,
-            tol_val_inf_accurate::Float64=1e-4,
-            tol_val_finite_accurate::Float64=1e-3,
-            accuracy::Float64=error("You have to set `accuracy`"),
-            accuracy_eg::Float64=min(accuracy, 1e-5))
-
-    PathTrackerOptions(at_infinity_check, samples_per_loop, max_winding_number,
-                       overdetermined_min_residual,
-                       overdetermined_min_accuracy, cond_eg_start,
-                       min_cond_at_infinity,
-                       t_eg_start,
-                       tol_val_inf_accurate, tol_val_finite_accurate, accuracy, accuracy_eg)
+    min_accuracy::Float64
+    min_cond_eg::Float64
+    min_step_size_before_eg::Float64
+    min_step_size_eg::Float64
+    precision_strategy::PrecisionStrategy
+    s_always_consider_valuation::Float64
 end
 
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
-mutable struct PathTrackerState{V<:AbstractVector}
+
+###########
+## STATE ##
+###########
+
+mutable struct PathTrackerState{AV<:AbstractVector}
     status::PathTrackerStatus.states
-    s::Float64
-    prediction::V
-    solution::V
+    valuation::Valuation
+    prediction::AV
+    solution::AV
     solution_accuracy::Float64
     solution_cond::Float64
-    winding_number::Int
-    val::Valuation
+    solution_residual::Float64
+    winding_number::Union{Nothing,Int}
+    max_winding_number_hit::Bool
+    s::Float64
+    eg_started::Bool
 end
 
-function PathTrackerState(x; at_infinity_check::Bool=true)
+function PathTrackerState(x::AbstractVector; at_infinity_check::Bool = true)
     status = PathTrackerStatus.tracking
-    s = 0.0
+    valuation = Valuation(x; affine = at_infinity_check)
     prediction = copy(x)
     solution = copy(x)
-    solution_accuracy = solution_cond = NaN
-    winding_number = 0
-    val = Valuation(x; at_infinity_check=at_infinity_check)
-
-    PathTrackerState(status, s, prediction, solution,
-                    solution_accuracy, solution_cond,
-                    winding_number, val)
+    solution_accuracy = NaN
+    solution_cond = NaN
+    solution_residual = NaN
+    winding_number = nothing
+    max_winding_number_hit = false
+    s = 0.0
+    eg_started = false
+    PathTrackerState(
+        status,
+        valuation,
+        prediction,
+        solution,
+        solution_accuracy,
+        solution_cond,
+        solution_residual,
+        winding_number,
+        max_winding_number_hit,
+        s,
+        eg_started,
+    )
 end
 
+Base.show(io::IO, S::PathTrackerState) = print_fieldnames(io, S)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", S::PathTrackerState) = S
 
-function reset!(state::PathTrackerState)
+function init!(state::PathTrackerState, s::Float64)
     state.status = PathTrackerStatus.tracking
-    state.s = 0.0
-    state.prediction .= zero(eltype(state.prediction))
-    state.solution .= zero(eltype(state.prediction))
-    state.solution_accuracy = state.solution_cond = NaN
-    state.winding_number = 0
-    reset!(state.val)
-
-    state
+    init!(state.valuation)
+    state.prediction .= 0.0
+    state.solution .= 0.0
+    state.solution_accuracy = NaN
+    state.solution_cond = NaN
+    state.solution_residual = NaN
+    state.winding_number = nothing
+    state.max_winding_number_hit = false
+    state.s = s
+    state.eg_started = false
 end
 
 
-struct PathTrackerCache{T, V<:AbstractVector{Complex{T}}, S<:AbstractSystem, NC<:AbstractNewtonCache}
-    unit_roots::Vector{ComplexF64}
-    base_point::V
-    target_system::S
-    target_residual::Vector{Complex{T}}
-    target_jacobian::Jacobian{Complex{T}}
-    target_newton_cache::NC
-    weighted_ip::WeightedIP{T}
-end
+##################
+## PATH TRACKER ##
+##################
 
-function PathTrackerCache(prob::Problem, core_tracker::CoreTracker)
-    unit_roots = ComplexF64[]
-    base_point = copy(core_tracker.state.x)
-
-    x = current_x(core_tracker)
-    if is_squared_up_system(core_tracker.homotopy)
-        F = squared_up_system(core_tracker.homotopy).F
-    else
-        F = FixedHomotopy(core_tracker.homotopy, Inf)
-    end
-    if affine_tracking(core_tracker)
-        target_system = F
-    elseif pull_back_is_to_affine(prob)
-        target_system = PatchedSystem(F, state(EmbeddingPatch(), x))
-    else # result is projective
-        target_system = PatchedSystem(F, state(OrthogonalPatch(), x))
-    end
-    target_newton_cache = newton_cache(target_system, x)
-
-    res = evaluate(target_system, current_x(core_tracker), target_newton_cache.system_cache)
-    jac = similar(res, size(target_system))
-    weighted_ip = WeightedIP(x)
-    PathTrackerCache(unit_roots, base_point, target_system, res, Jacobian(Random.rand!(jac)), target_newton_cache, weighted_ip)
-end
-
-is_squared_up_system(::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = true
-is_squared_up_system(H::LogHomotopy) = is_squared_up_system(H.homotopy)
-is_squared_up_system(::AbstractHomotopy) = false
-
-squared_up_system(H::StraightLineHomotopy{<:Any,<:SquaredUpSystem}) = H.target
-squared_up_system(H::LogHomotopy) = squared_up_system(H.homotopy)
+abstract type AbstractPathTracker end
+Base.broadcastable(T::AbstractPathTracker) = Ref(T)
 
 """
-     PathTracker{Prob<:AbstractProblem, T, V<:AbstractVector{T}, CT<:CoreTracker}
+    PathTracker
 
-`PathTracker` the way to track single paths. It combines the core path tracking routine
-with an endgame, i.e., it can also deal with singular solutions as well as diverging paths.
-We call a diverged path a path going to infinity.
-By convention a path is always tracked from t₁ > 0 towards 0.
-During the path tracking an approximation of the valuation of a Puiseux series expansion of the solution is computed.
-This is used to decide whether a path is diverging.
-To compute singular solutions Cauchy's integral formula is used. There you have to trace out loops around the solution.
-The number of loops necessary to arrive back at the start point is called the *winding number*.
+The `PathTracker` combines the path tracking (with [`CoreTracker`](@ref)) with an *endgame*
+routine. The *endgame*  is the name for special algorithms the end of the path tracking.
+These enable to detect if a path is diverging or if it ends in a singular solution.
+The `PathTracker` is more opinionated than the `CoreTracker` and implements additional logic
+to handle numerical difficult solutions. In particular it always reparameterizes a solution
+path to use a logarithmic time scale, i.e., ``x(t) → x(e^{-s})`` and we track for ``s`` from
+``0`` to ``∞``.
+
 In order to construct a `PathTracker` it is recommended to use the [`pathtracker`](@ref) and
 [`pathtracker_startsolutions`](@ref) helper functions.
 With a `PathTracker` constructed you can track a single path using the [`track`](@ref) method.
 The result of this will be a [`PathResult`](@ref).
 
-## Keyword arguments
-`PathTracker` is a wrapper around [`CoreTracker`](@ref)
-and thus it is possible to set all options which are available for [`CoreTracker`](@ref).
-There are the following `PathTracker` specific options:
+The `PathTracker` assumes that the provided homotopy `H` is defined in such a way that
+`H(x,1)` is the start system and `H(x,0)` the target system.
+During the path tracking an approximation of the valuation of a Puiseux series expansion of
+the solution is computed. This is used to decide whether a path is diverging.
+Before a certain treshold (`s_always_consider_valuation`) this approximation is only trusted
+if a path gives some sign of ill-conditioning.
+To compute singular solutions the *Cauchy endgame* is used which is based on
+Cauchy's integral formula. For this we have to track solutions along a loop around the origin.
+The number of loops necessary to arrive back at the start point is called the *winding number*.
 
-### General endgame parameters
-* `accuracy_eg::Float64=min(accuracy, 1e-5))`: It is possible to change the accuracy during the path tracking. Usually you want lower the accuracy.
-* `cond_eg_start::Float64=1e4`: The endgame is only started if the condition of the Jacobian is larger than this threshold.
-* `max_winding_number::Int=12`: This limits the maximal number of loops taken in applying Cauchy's formula.
-* `min_cond_at_infinity::Float64=1e7`: A path is declared as going to infinity only if it's Jacobian is also larger than this threshold.
-* `samples_per_loop::Int=12`: To compute singular solutions Cauchy's integral formula is used. The accuracy of the solutions increases with the number of samples per loop.
-* `t_eg_start::Float64=0.1`: The endgame starts only if `t` is smaller than this threshold.
-* `tol_val_inf_accurate::Float64=1e-4`: A valuation which would result in a path declared as going to infinity is only accepted if the estimated accuracy of the valuation is less than this threshold.
-* `tol_val_finite_accurate::Float64=1e-3`: A valuation which would result in a proper solution is only accepted if the estimated accuracy of the valuation is less than this threshold. This is only affects solutions where the path has at some point near 0 a condition number larger than `cond_eg_start`.
+## Options
 
-### Overdetermined system specific
-* `overdetermined_min_accuracy=1e-5`: The minimal accuracy a non-singular solution needs to have to be considered a solution of the original system.
-* `overdetermined_min_residual=1e-3`: The minimal residual a singular solution needs to have to be considered a solution of the original system.
+The path tracker accepts all options which [`CoreTracker`](@ref) accepts. Furthermore the
+following options are accepted:
+
+* `at_infinity_check`: This is true if the provided start system is an affine polynomial system.
+* `endgame_start` (default `2.0`): The value of `s` where the endgame is started earliest.
+* `endgame_start_callback::Function`: A callback that is called if `s=endgame_start` is reached.
+  It takes the current solution as an argument and if it returns `false` the path tracking
+  is **not** continued.
+* `max_winding_number` (default `12`): The maximal winding number tried in the Cauchy endgame.
+* `min_accuracy` (default `1e-5`): The `PathTracker` automatically lowers the desired
+  accuracy automatically to `min_accuracy` if path tracking would fail othwerwise (since
+  the desired cannot be reached)
+* `min_cond_eg` (default `1e5`): The minimal condition number before the Cauchy endgame is
+  started or a path is cut off.
+* `min_step_size_before_eg` (default `exp2(-40)`): The minimal allowed step size before the
+  endgame starts.
+* `min_step_size_eg` (default `exp2(-120)`): The minimal allowed step size during the endgame.
+  This is also control what is considered `∞` for the path tracking.
+* `s_always_consider_valuation` (default `-log(1e-16)`) A threshold after which we always consider
+  the valuation.
+* `samples_per_loop (default `8`): The number of samples used during the endgame.
+* `precision_strategy` (default `:adaptive_finite`): This controls whether `H(x,t)` is
+  possibly evaluated with higher than machine precision during the endgame
+  (the Jacobian is always computed with machine precision). The `:adaptive_finite` allows
+  this only if we are optimistic that we can still obtain a finite solution.
+  Other options are `:adaptive_never` where this is never allowed and `:adaptive_always`
+  where it is always enabled.
+  ``
 """
-struct PathTracker{V<:AbstractVector, Prob<:AbstractProblem, PTC<:PathTrackerCache, CT<:CoreTracker}
+struct PathTracker{
+    AV<:AbstractVector{Complex{Float64}},
+    Prob<:AbstractProblem,
+    CT<:CoreTracker{Float64,AV},
+    F1<:Function,
+    CB_State,
+} <: AbstractPathTracker
     problem::Prob
     core_tracker::CT
-    state::PathTrackerState{V}
+    endgame::CauchyEndgame{AV}
+    state::PathTrackerState{AV}
     options::PathTrackerOptions
-    cache::PTC
+    eg_start_callback::F1
+    eg_start_cb_state::CB_State
+    # We modify options of the core tracker dynamically. Therefore we need to be able
+    # so start fresh for a new path
+    default_ct_options::CoreTrackerOptions
 end
 
-function PathTracker(prob::AbstractProblem, x::AbstractVector{<:Number};
-                at_infinity_check=default_at_infinity_check(prob),
-                accuracy=default_accuracy(prob),
-                min_step_size=1e-30, kwargs...)
+function PathTracker(
+    prob::AbstractProblem,
+    x::AbstractVector{<:Number};
+    min_step_size = 1e-30,
+    kwargs...,
+)
 
-    core_tracker_supported, optionskwargs = splitkwargs(kwargs, coretracker_supported_keywords)
-    core_tracker = CoreTracker(prob, x;
-                        log_transform=true, predictor=Pade21(),
-                        min_step_size=min_step_size,
-                        accuracy=accuracy,
-                        core_tracker_supported...)
-    state = PathTrackerState(core_tracker.state.x; at_infinity_check=at_infinity_check)
-    options = PathTrackerOptions(prob; at_infinity_check=at_infinity_check,
-                                  accuracy=accuracy, optionskwargs...)
-    cache = PathTrackerCache(prob, core_tracker)
-    PathTracker(prob, core_tracker, state, options, cache)
+    core_tracker_kwargs, options = splitkwargs(kwargs, coretracker_supported_keywords)
+    core_tracker = CoreTracker(
+        prob,
+        x;
+        log_transform = true,
+        predictor = Pade21(),
+        min_step_size = min_step_size,
+        core_tracker_kwargs...,
+    )
+    PathTracker(prob, core_tracker; options...)
 end
 
-Base.show(io::IO, tracker::PathTracker) = print(io, "PathTracker")
-Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathTracker) = x
+
+function PathTracker(
+    prob::Problem,
+    core_tracker::CoreTracker;
+    at_infinity_check = default_at_infinity_check(prob),
+    endgame_start::Float64 = 2.0,
+    endgame_start_callback = always_true,
+    endgame_start_callback_state = nothing,
+    max_winding_number::Int = 12,
+    min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
+    min_cond_endgame::Float64 = 1e5,
+    min_step_size_before_eg::Float64 = exp2(-40),
+    min_step_size_eg = exp2(-120),
+    s_always_consider_valuation::Float64 = -log(1e-16),
+    samples_per_loop::Int = 8,
+    precision_strategy::Symbol = :adaptive_finite,
+)
+    state = PathTrackerState(current_x(core_tracker); at_infinity_check = at_infinity_check)
+    endgame = CauchyEndgame(
+        current_x(core_tracker);
+        samples_per_loop = samples_per_loop,
+        max_winding_number = max_winding_number,
+    )
+    default_ct_options = copy(core_tracker.options)
 
 
-seed(PT::PathTracker) = PT.problem.seed
+    options = PathTrackerOptions(
+        endgame_start,
+        at_infinity_check,
+        min_accuracy,
+        min_cond_endgame,
+        min_step_size_before_eg,
+        min_step_size_eg,
+        make_precision_strategy(precision_strategy),
+        s_always_consider_valuation,
+    )
+
+    PathTracker(
+        prob,
+        core_tracker,
+        endgame,
+        state,
+        options,
+        endgame_start_callback,
+        endgame_start_callback_state,
+        default_ct_options,
+    )
+end
+
 default_at_infinity_check(prob::Problem{AffineTracking}) = true
 default_at_infinity_check(prob::Problem{ProjectiveTracking}) = homvars(prob) !== nothing
-default_accuracy(prob::Problem) = pull_back_is_to_affine(prob) ? 1e-6 : 1e-8
 
-"""
-    track!(tracker::PathTracker, x₁, t₁::Float64=1.0; options...)::PathTrackerStatus.states
+always_true(_, _) = true
 
-Track the path with start solution `x₁` from `t₁` towards `t=0`.
-
-Possible values for the options are
-* `accuracy::Float64`
-* `max_corrector_iters::Int`
-* `max_steps::Int`
-* `start_parameters::AbstractVector`
-* `target_parameters::AbstractVector`
-"""
-function track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size);
-        start_parameters::Union{Nothing,<:AbstractVector}=nothing,
-        target_parameters::Union{Nothing,<:AbstractVector}=nothing,
-        kwargs...)
-
-    @unpack core_tracker, state, options, cache = tracker
-    prev_options = set_options!(core_tracker; kwargs...)
-    set_parameters!(tracker; start_parameters=start_parameters, target_parameters=target_parameters)
-
-    _track!(tracker, x₁, s₁, s₀)
-
-    set_options!(core_tracker; prev_options...)
-    state.status
-end
-
-function _track!(tracker::PathTracker, x₁, s₁=0.0, s₀=-log(tracker.core_tracker.options.min_step_size))
-    @unpack core_tracker, state, options, cache = tracker
-    # For performance reasons we single thread blas
-    n_blas_threads = single_thread_blas()
-
-    embed!(core_tracker.state.x, tracker.problem, x₁)
-    setup!(core_tracker, core_tracker.state.x, s₁, s₀)
-    set_accuracy!(core_tracker, options.accuracy)
-    reset!(state)
-    # Handle the case that the start value is already a solution
-    if residual(tracker, core_tracker.state.x) < 1e-14
-        state.status = PathTrackerStatus.success
-        state.prediction .= core_tracker.state.x
-        state.s = Inf
-        # Set winding_number to 1 to get into the possible singular solution case in
-        # `check_and_refine_solution!`
-        state.winding_number = 1
-    end
-
-    s_eg_start = -log(options.t_eg_start)
-    while state.status == PathTrackerStatus.tracking
-        step!(core_tracker)
-        state.s = real(current_t(core_tracker))
-        check_terminated!(core_tracker)
-
-        if core_tracker.state.status == CoreTrackerStatus.success
-            state.status = PathTrackerStatus.success
-            break
-        elseif core_tracker.state.status != CoreTrackerStatus.tracking
-            state.status = PathTrackerStatus.status(core_tracker.state.status)
-            break
-        end
-
-        # We only care if we moved forward
-        core_tracker.state.last_step_failed && continue
-        # update valuation and associated data
-        update!(state.val, core_tracker; at_infinity_check=tracker.options.at_infinity_check)
-        verdict = judge(state.val, options)
-        # If we are too early, we don't work on the endgame
-        state.s > s_eg_start || verdict == VALUATION_FINITE || continue
-        # If the condition number is too low we also do not care
-        start_eg(core_tracker, options) || continue
-        # possibly reduce desired accuracy
-        if tracker.options.at_infinity_check &&
-           verdict == VALUATION_AT_INFINIY &&
-           start_infinity_cutoff(core_tracker, options)
-
-            state.status = PathTrackerStatus.at_infinity
-            break
-        end
-
-        if verdict == VALUATION_FINITE
-            set_accuracy!(core_tracker, options.accuracy_eg)
-            retcode = predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
-            if retcode == :success
-                state.status = PathTrackerStatus.success
-                break
-            elseif retcode == :max_winding_number
-                continue
-            else # path tracker failed during the loops -> break
-                state.status = PathTrackerStatus.tracker_failed
-                break
-            end
-        end
-    end
-
-    check_and_refine_solution!(tracker)
-    # We have to set the number of blas threads to the previous value
-    n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
-    state.status
-end
-
-function start_eg(core_tracker, options)
-    C = max(cond(core_tracker), exp10(digits_lost(core_tracker)))
-    C > options.cond_eg_start
-end
-
-function start_infinity_cutoff(core_tracker, options)
-    C = max(cond(core_tracker), exp10(digits_lost(core_tracker)))
-    C > options.min_cond_at_infinity
-end
-
-function is_valid_start_value(tracker::PathTracker, x)
-    checkstartvalue(tracker.core_tracker, x, 0.0)
-end
-
-"""
-    judge(val::Valuation, J::Jacobian)::ValuationVerdict
-
-Judge the current valuation.
-"""
-function judge(val::Valuation, options::PathTrackerOptions)
-    @unpack v, v̇, v̈ = val
-    finite = true
-    for i in eachindex(v)
-        # A coordinate goes to infinity if its valuation is negative.
-        # We argue that a valuation is "stable" if it's first and second
-        # derivative are "small".
-        if v[i] < -0.1 &&
-            abs(v̇[i]) < options.tol_val_inf_accurate &&
-            abs(v̈[i]) < options.tol_val_inf_accurate
-
-            return VALUATION_AT_INFINIY
-        end
-
-        if v[i] < -options.tol_val_finite_accurate ||
-            !(abs(v̇[i]) < options.tol_val_finite_accurate &&
-              abs(v̈[i]) < options.tol_val_finite_accurate)
-
-            finite = false
-        end
-    end
-    finite && return VALUATION_FINITE
-
-    VALUATION_INDECISIVE
-end
-
-function at_infinity_post_check(val::Valuation, options::PathTrackerOptions)
-    for (vᵢ, v̇ᵢ) in zip(val.v, val.v̇)
-        if vᵢ < -0.1 && abs(v̇ᵢ) < sqrt(options.tol_val_inf_accurate)
-            return true
-        end
-    end
-    false
-end
-
-"""
-    track(tracker::PathTracker, x₁, t₁::Float64=1.0; path_number::Int=1, details::Symbol=:default, options...)::PathResult
-
-Track the path with start solution `x₁` from `t₁` towards `t=0`. The `details` options controls
-the level of details of the informations available in the [`PathResult`](@ref).
-
-Possible values for the options are
-* `accuracy::Float64`
-* `max_corrector_iters::Int`
-* `max_steps::Int`
-* `start_parameters::AbstractVector`
-* `target_parameters::AbstractVector`
-"""
-function track(tracker::PathTracker, x₁, t₁=0.0, t₀=-log(tracker.core_tracker.options.min_step_size); path_number::Int=1, details::Symbol=:default, kwargs...)
-    track!(tracker, x₁, t₁, t₀; kwargs...)
-    PathResult(tracker, x₁, path_number; details=details)
-end
-
-
-function set_options!(core_tracker::CoreTracker;
-                      accuracy::Float64=core_tracker.options.accuracy,
-                      max_corrector_iters::Int=core_tracker.options.max_corrector_iters,
-                      max_steps::Int=core_tracker.options.max_steps)
-    core_tracker.options.accuracy = accuracy
-    core_tracker.options.max_corrector_iters = max_corrector_iters
-    core_tracker.options.max_steps = max_steps
-    (accuracy=accuracy, max_corrector_iters=max_corrector_iters, max_steps=max_steps)
-end
-
-
-"""
-    set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
-
-Set the parameters of a parameter homotopy.
-"""
-@inline function set_parameters!(tracker::PathTracker; start_parameters=nothing, target_parameters=nothing)
-    if start_parameters !== nothing
-        set_start_parameters!(basehomotopy(tracker.core_tracker.homotopy), start_parameters)
-    end
-    if target_parameters !== nothing
-        set_target_parameters!(basehomotopy(tracker.core_tracker.homotopy), target_parameters)
-    end
-    nothing
-end
-
-vector_at_infinity(x::AbstractVector, tol) = false
-vector_at_infinity(x::PVector, tol) = ProjectiveVectors.norm_affine_chart(x) > tol
-
-##########
-# Cauchy #
-##########
-
-function set_eg_accuracy!(core_tracker::CoreTracker, options::PathTrackerOptions)
-    set_accuracy!(core_tracker, options.accuracy_eg)
-end
-
-
-"""
-    predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
-
-Try to predict the value of `x(0)` using [Cauchy's integral formula](https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula)
-At each iteration we are at some point ``(x, t)``. We then track the polygon defined
-by ``te^{i2πk/n}`` until we end again at ``x``. Here ``n`` is the number of samples we take
-per loop.
-Returns a symbol indicating whether the prediction was successfull.
-"""
-function predict_with_cauchy_integral_method!(state, core_tracker, options, cache)
-    @unpack prediction = state
-    @unpack unit_roots, base_point = cache
-    @unpack samples_per_loop, max_winding_number = options
-
-    initial_segment = core_tracker.state.segment
-    initial_s = core_tracker.state.s
-    initial_Δs = core_tracker.state.Δs
-    initial_Δs_prev = core_tracker.state.Δs_prev
-    initial_step_size = core_tracker.options.initial_step_size
-    s = real(current_t(core_tracker))
-
-    base_point .= current_x(core_tracker)
-    prediction .= zero(eltype(state.prediction))
-
-    # during the loop we fix the affine patch
-    fix_patch!(core_tracker)
-
-    m = k = 1
-    ∂θ = 2π / samples_per_loop
-    core_tracker.options.initial_step_size = ∂θ #0.5∂θ
-    while m ≤ max_winding_number
-        θⱼ = 0.0
-        for j=1:samples_per_loop
-            θⱼ₋₁ = θⱼ
-            θⱼ += ∂θ
-
-            retcode = track!(core_tracker, current_x(core_tracker), s + im*θⱼ₋₁, s + im*θⱼ; loop=true)
-            if retcode != CoreTrackerStatus.success
-                # during the loop we fixed the affine patch
-                unfix_patch!(core_tracker)
-                core_tracker.state.segment = initial_segment
-                core_tracker.options.initial_step_size = initial_step_size
-                core_tracker.state.s = initial_s
-                core_tracker.state.Δs = initial_Δs
-                core_tracker.state.Δs_prev = initial_Δs_prev
-                core_tracker.state.status = CoreTrackerStatus.tracking
-                return Symbol(retcode)
-            end
-
-            prediction .+= current_x(core_tracker)
-        end
-
-        if distance(base_point, current_x(core_tracker), inner(core_tracker)) < 4core_tracker.options.accuracy
-            break
-        end
-
-        m += 1
-    end
-    core_tracker.state.segment = initial_segment
-    core_tracker.options.initial_step_size = initial_step_size
-    core_tracker.state.s = initial_s
-    core_tracker.state.Δs = initial_Δs
-    core_tracker.state.Δs_prev = initial_Δs_prev
-    core_tracker.state.status = CoreTrackerStatus.tracking
-    # we have to undo the fixing of the patch
-    unfix_patch!(core_tracker)
-
-    if m > max_winding_number
-        return :max_winding_number
-    end
-    state.winding_number = m
-    prediction ./= m * samples_per_loop
-    :success
-end
-
-fix_patch!(tracker::CoreTracker) = tracker.options.update_patch = false
-unfix_patch!(tracker::CoreTracker) = tracker.options.update_patch = true
-
-"""
-    type_of_x(pathtracker)
-
-Returns the type of `x`.
-"""
-type_of_x(tracker::PathTracker) = typeof(tracker.core_tracker.state.x)
-
-"""
-    check_and_refine_solution!(pathtracker)
-
-In the case of success, we store the solution in `state.solution`
-and try to refine the solution to the desired accuracy.
-This also makes sure that our accuracy is correct after a possible pull back.
-"""
-function check_and_refine_solution!(tracker::PathTracker)
-    @unpack core_tracker, state, options, cache = tracker
-
-    # The tracking failed. Let's look at the last valuation and see whether we can
-    # resonably classify this as going to infinity
-    if (state.status == PathTrackerStatus.terminated_ill_conditioned ||
-        state.status == PathTrackerStatus.terminated_step_size_too_small ||
-        state.status == PathTrackerStatus.terminated_singularity) &&
-        at_infinity_post_check(state.val, options)
-
-       state.status = PathTrackerStatus.at_infinity
-   end
-
-    if state.status ≠ PathTrackerStatus.success
-        state.solution .= current_x(core_tracker)
-        return nothing
-    end
-
-    # We have to differentiate
-
-    # 1.a) Non-singular solution of regular system
-    # 1.b) Singular solution of regular system (Cauchy engame used)
-    # 2.a) Non-singular solution of squared up system
-    # 2.b) Singular solution of squared up system (Cauchy engame used)
-
-    is_singular = state.winding_number > 0
-    if is_singular
-        state.solution .= state.prediction
-        # check that solution is indeed singular
-        if !pull_back_is_to_affine(tracker.problem)
-            LinearAlgebra.normalize!(state.solution)
-        end
-
-        state.solution_cond = condition_jacobian(tracker)
-        # If cond is not so high, maybe we don't have a singular solution in the end?
-        if state.winding_number == 1 && state.solution_cond < 1e10
-            try
-                result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
-                    use_qr=true, max_iters=3,
-                    precision=PRECISION_ADAPTIVE,
-                    accuracy=core_tracker.options.refinement_accuracy)
-            catch e
-                result = correct!(core_tracker.state.x̄, core_tracker, state.solution, Inf;
-                    use_qr=true, max_iters=3,
-                    precision=PRECISION_FIXED_64,
-                    accuracy=core_tracker.options.refinement_accuracy)
-            end
-            if isconverged(result)
-                @goto non_singular_case
-            end
-        elseif state.winding_number > 1 && state.solution_cond < 1e10 && residual(tracker) > 100
-            state.status = PathTrackerStatus.post_check_failed
-        end
-
-        # In the case of a squared up system we now have to get rid of the
-        # excess solutions, but since we don't have Newton's method at hand
-        # we simply rely non the residual.
-        if is_squared_up_system(core_tracker.homotopy) &&
-           residual(tracker) > options.overdetermined_min_residual
-             state.status = PathTrackerStatus.excess_solution
-        end
-    # 1.a) + 2.a)
+function make_precision_strategy(precision_strategy::Symbol)
+    if precision_strategy == :adaptive_finite
+        PREC_STRATEGY_FINITE
+    elseif precision_strategy == :adaptive_never
+        PREC_STRATEGY_NEVER
+    elseif precision_strategy == :adaptive_always
+        PREC_STRATEGY_ALWAYS
     else
-        # First we refine the obtained solution if possible
-        result = correct!(core_tracker.state.x̄, core_tracker, current_x(core_tracker), Inf;
-            use_qr=true, max_iters=3,
-            accuracy=core_tracker.options.refinement_accuracy)
-        @label non_singular_case
-        state.solution_cond = core_tracker.state.jacobian.cond
-
-        if isconverged(result) && core_tracker.state.jacobian.corank_proposal == 0
-            state.solution .= core_tracker.state.x̄
-            state.solution_accuracy = result.accuracy
-        elseif (!isconverged(result) || core_tracker.state.jacobian.corank_proposal > 0) &&
-               at_infinity_post_check(state.val, options)
-
-            state.solution .= current_x(core_tracker)
-            state.status = PathTrackerStatus.at_infinity
-            return nothing
-        else
-            state.solution .= current_x(core_tracker)
-            state.status = PathTrackerStatus.post_check_failed
-            return nothing
-        end
-
-        # We want to check that if we present an affine solution to a user
-        # that this is still in a convergent region of the affine target system
-        # This covers that we have a squared up system and when we tracked in projective space
-        if pull_back_is_to_affine(tracker.problem) &&
-            (is_squared_up_system(core_tracker.homotopy) ||
-             !affine_tracking(core_tracker))
-
-            # We start with bringing it on the affine patch
-            if !affine_tracking(core_tracker)
-                ProjectiveVectors.affine_chart!(state.solution)
-            end
-            init_auto_scaling!(cache.weighted_ip, state.solution, AutoScalingOptions())
-            target_result = newton!(cache.base_point, cache.target_system, state.solution,
-                            cache.weighted_ip, cache.target_newton_cache;
-                            use_qr=true,
-                            tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
-            if isconverged(target_result)
-                state.solution .= cache.base_point
-            elseif is_squared_up_system(core_tracker.homotopy)
-                state.status = PathTrackerStatus.excess_solution
-            else
-                state.status = PathTrackerStatus.post_check_failed
-            end
-
-            if !pull_back_is_to_affine(tracker.problem)
-                LinearAlgebra.normalize!(state.solution)
-                changepatch!(cache.target_system.patch, state.solution)
-                state.solution_accuracy = result.accuracy
-            else
-                state.solution_accuracy = result.accuracy
-            end
-        # We have a purely projective solution. Here we only have to handle the case
-        # of overdetermined systems.
-        elseif !pull_back_is_to_affine(tracker.problem) &&
-                is_squared_up_system(core_tracker.homotopy)
-
-            LinearAlgebra.normalize!(state.solution)
-            changepatch!(cache.target_system.patch, state.solution)
-            target_proj_result = newton!(cache.base_point, cache.target_system, state.solution,
-                            euclidean_norm, cache.target_newton_cache;
-                            use_qr=true,
-                            tol=core_tracker.options.refinement_accuracy, miniters=1, maxiters=2)
-            if isconverged(target_proj_result)
-                state.solution .= cache.base_point
-                state.solution_accuracy = result.accuracy
-                LinearAlgebra.normalize!(state.solution)
-            else
-                state.status = PathTrackerStatus.excess_solution
-            end
-
-        end
+        ArgumentError("Unknown argument `precision_strategy = $(precision_strategy)`." *
+                      "Possible values are `:adaptive_finite`, `:adaptive_never`" *
+                      " or `:adaptive_always`.") |> throw
     end
 end
 
+Base.show(io::IO, ::MIME"application/prs.juno.inline", PT::PathTracker) = PT
+function Base.show(io::IO, S::PathTracker{AV}) where {AV}
+    println(io, "PathTracker with solution type $AV")
+end
 
-#############################
-# Convencience constructors #
-#############################
+seed(PT::PathTracker) = seed(PT.problem)
+
+"""
+    init!(tracker::PathTracker, x)
+
+Prepare the `PathTracker`` `tracker` to track a path with start solution `x`.
+"""
+function init!(
+    tracker::PathTracker,
+    x;
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
+    options, ct_options = tracker.options, tracker.core_tracker.options
+    copy!(ct_options, tracker.default_ct_options)
+    if accuracy !== nothing
+        ct_options.accuracy = accuracy
+    end
+    if max_corrector_iters !== nothing
+        ct_options.max_corrector_iters = max_corrector_iters
+    end
+    if options.precision_strategy == PREC_STRATEGY_ALWAYS ||
+       options.precision_strategy == PREC_STRATEGY_FINITE
+        ct_options.precision = PRECISION_ADAPTIVE
+    end
+
+    init!(tracker.core_tracker, x, 0.0, options.endgame_start)
+    init!(tracker.state, 0.0)
+
+    # before endgame don't track the condition number
+    # and we only update the limiting accuracy etc after a step failed
+    ct_options.track_cond = false
+    ct_options.steps_jacobian_info_update = -1
+    ct_options.min_step_size = options.min_step_size_before_eg
+
+    tracker
+end
+
+"""
+    step!(tracker::PathTracker)
+
+Perform a single step of the `PathTracker`.
+"""
+function step!(tracker::PathTracker)
+    @unpack core_tracker, state, options, endgame = tracker
+    step!(core_tracker)
+
+    state.s = s = real(current_t(core_tracker))
+    ct_status = status(core_tracker)
+    if is_tracking(ct_status)
+        state.eg_started || return state.status
+        # If we didn't move forward there is nothing to do
+        core_tracker.state.last_step_failed && return state.status
+
+        # update the valuation
+        update!(state.valuation, core_tracker)
+
+        # We only care about the valuation if the path is starting to get worse
+        # or we passed a certain threshold.
+        cond_bad = cond(core_tracker) > options.min_cond_eg
+        near_accuracy_limit = 1e4 * core_tracker.state.limit_accuracy > core_tracker.options.accuracy
+        consider_always = s > options.s_always_consider_valuation
+        if !(consider_always || cond_bad || near_accuracy_limit)
+            return state.status
+        end
+
+        # Judge the current valuation to determine how to proceed
+        verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
+        if verdict == VAL_AT_INFINITY &&
+           (consider_always || cond_bad) && options.at_infinity_check
+            state.status = PathTrackerStatus.at_infinity
+        # If we expect a finite value and there is some ill conditioning let's do the
+        # Cauchy endgame
+        elseif verdict == VAL_FINITE && cond_bad
+            # Perform endgame to estimate singular solution
+            @label run_cauchy_eg
+            retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
+            if retcode == CAUCHY_SUCCESS
+                # We only accept a result of the Cauchy endgame only if two consecutive
+                # loops resulted in the same number of loop
+                m′ = state.winding_number
+                if m′ === nothing
+                    state.winding_number = m
+                    state.solution .= state.prediction
+                elseif m′ == m &&
+                       norm(core_tracker)(state.solution, state.prediction) ≤ p_accuracy
+                    @label cauchy_eg_success
+                    state.status = PathTrackerStatus.success
+                    state.solution_accuracy = p_accuracy
+                    converged, s_accuracy, s_cond, s_res = check_converged!(
+                        state.solution,
+                        core_tracker,
+                        state.prediction,
+                        Inf;
+                        tol = tracker.default_ct_options.accuracy,
+                    )
+                    state.solution_cond = s_cond
+                    state.solution_residual = s_res
+                    if converged && s_cond < 1e8 && s_accuracy < p_accuracy
+                        state.solution_accuracy = s_accuracy
+                    else
+                        state.solution .= state.prediction
+                    end
+                else
+                    state.solution .= state.prediction
+                    state.winding_number = m
+                end
+
+            elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
+                if options.precision_strategy == PREC_STRATEGY_NEVER
+                    if state.winding_number !== nothing
+                        @goto cauchy_eg_success
+                    end
+                    state.status = PathTrackerStatus.terminated_accuracy_limit
+                # If we are here, we have a precision strategy which allows to use
+                # higher precision. Therefore switch to it if this not yet happened
+                # and retry to cauchy eg
+                elseif core_tracker.options.precision == PRECISION_FIXED_64
+                    core_tracker.options.precision = PRECISION_ADAPTIVE
+                    @goto run_cauchy_eg
+                end
+
+            elseif retcode == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
+                # Terminate if we hit twice max winding number and make one step pause
+                if state.max_winding_number_hit
+                    state.status = PathTrackerStatus.terminated_max_winding_number
+                else
+                    state.max_winding_number_hit = true
+                end
+            else
+                state.status = PathTrackerStatus.terminated_ill_conditioned
+            end
+        end
+
+    # We split the tracking in two parts. Pre endgame and endgame. Therefore we have to
+    # handle the success case twice
+    elseif is_success(ct_status) && !state.eg_started
+        # make callback, returns true if we can continue with the tracking
+        if tracker.eg_start_callback(current_x(core_tracker), tracker.eg_start_cb_state)
+            state.eg_started = true
+            # set min_step size
+            core_tracker.options.min_step_size = options.min_step_size_eg
+            # setup path tracker to continue tracking
+            t₀ = -log(4 * options.min_step_size_eg)
+            init!(
+                tracker.core_tracker,
+                current_x(core_tracker),
+                options.endgame_start,
+                t₀;
+                loop = true,
+            )
+            # start keeping track of the condition number during the endgame
+            tracker.core_tracker.options.track_cond = true
+            # update the limiting accuracy and cond every other step
+            tracker.core_tracker.options.steps_jacobian_info_update = 2
+            # update the valuation
+            update!(state.valuation, core_tracker)
+
+            # If our strategy is to allow adaptive precision only for finite values
+            # then we start with not allowing adaptive precision during the endgame
+            # and wait to hit the accuracy limit.
+            if options.precision_strategy == PREC_STRATEGY_FINITE
+                tracker.core_tracker.options.precision = PRECISION_FIXED_64
+            end
+        else
+            state.status = PathTrackerStatus.terminated_callback
+        end
+
+    elseif is_success(ct_status) ||
+           ct_status == CoreTrackerStatus.terminated_step_size_too_small
+        converged, s_acc, s_cond, s_res = check_converged!(
+            state.solution,
+            core_tracker,
+            current_x(core_tracker),
+            Inf;
+            tol = tracker.default_ct_options.accuracy,
+        )
+        if converged
+            state.status = PathTrackerStatus.success
+            state.solution_accuracy = s_acc
+            state.solution_cond = s_cond
+            state.solution_residual = s_res
+            state.s = Inf
+        elseif ct_status == CoreTrackerStatus.terminated_step_size_too_small
+            state.status = PathTrackerStatus.terminated_step_size_too_small
+        else
+            state.status = PathTrackerStatus.post_check_failed
+        end
+
+    elseif ct_status == CoreTrackerStatus.terminated_accuracy_limit
+        # First update the valuation  and check whether we are good
+        update!(state.valuation, core_tracker)
+        # we put less requirement on tol_at_infinity
+        verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
+        # We also terminate at this point if the valuation indicates that we are
+        # substantially less than 0
+        if verdict == VAL_AT_INFINITY && options.at_infinity_check
+            state.status = PathTrackerStatus.at_infinity
+        # Now, we have to differentiate 3 different cases:
+        # 1) Current accuracy is larger than the defined minimal accuracy
+        #     -> decrease accuracy to minimal accuracy
+        # 2) We are already at minimal accuracy and allow adaptive precision for finite
+        #    values
+        #  a) it looks like we could end up with something finite
+        #     -> enable adaptive precision
+        #  b) else
+        #     -> terminate
+        # 3) We are already at minimal accuracy and don't allow adaptive precision
+        #     -> terminate
+        # 1)
+        elseif core_tracker.options.accuracy > options.min_accuracy
+            # TODO: Currently we never increase this again
+            core_tracker.options.accuracy = options.min_accuracy
+            core_tracker.state.status = CoreTrackerStatus.tracking
+        # 2)
+        elseif options.precision_strategy == PREC_STRATEGY_FINITE
+            # 2.a) We say that a path could still become finite if it is not classified
+            #      as going to infinity for a loose tolerance
+            #      Also if the current valuation is less than -1 (so significantly less than 0)
+            #      we do not continue the tracking
+            loose_verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-2)
+            if loose_verdict != VAL_AT_INFINITY
+                core_tracker.options.precision = PRECISION_ADAPTIVE
+                core_tracker.state.status = CoreTrackerStatus.tracking
+            # 2.b)
+            else
+                state.status = PathTrackerStatus.terminated_accuracy_limit
+            end
+        # 3)
+        else
+            state.status = PathTrackerStatus.terminated_accuracy_limit
+        end
+    elseif state.winding_number !== nothing
+        p_accuracy = 1e-5
+        @goto cauchy_eg_success
+    else
+        state.status = path_tracker_status(ct_status)
+    end
+
+    if !is_success(state.status) && !is_tracking(state.status)
+        state.solution .= current_x(core_tracker)
+        state.solution_cond = LA.cond(core_tracker)
+    end
+
+
+    state.status
+end
+
+"Update the valuation with the current state."
+update!(val::Valuation, T::CoreTracker) =
+    update!(val, T.state.x, T.state.ẋ, real(current_t(T)), T.predictor)
+
+
+"""
+    check_converged!(y, tracker::CoreTracker, x::AbstractVector, t)
+
+Check that the CoreTracker is converged also converged at `(x,t)`. Returns a named tuple
+`(converged, accuracy, cond)` and stores a (possibly) refined solution into `y`.
+"""
+function check_converged!(
+    y,
+    tracker::CoreTracker,
+    x::AbstractVector,
+    t::Number;
+    tol::Float64 = 1e-6,
+)
+    init!(tracker.state.norm, x)
+    # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
+    # solutions that we bounce away from a good solution.
+    result = correct!(y, tracker, x, t; tol = tol, max_iters = 3, full_steps = 1)
+    if is_converged(result)
+        tracker.state.residual .= abs.(tracker.corrector.r)
+    else
+        evaluate!(tracker.corrector.r, tracker.homotopy, x, t)
+        tracker.state.residual .= abs.(tracker.corrector.r)
+    end
+    res = LA.norm(tracker.state.residual, InfNorm())
+    # Fix the residual to the norm otherwise we can scale away zero rows.
+    tracker.state.residual .= res
+    # If the accuracy is NaN we assume that we dived by 0 -> Jacobian singular
+    if isnan(result.accuracy)
+        cond_jac = Inf
+    else
+        cond_jac = cond!(tracker.state.jacobian, tracker.state.norm, tracker.state.residual)
+    end
+    (
+     converged = is_converged(result),
+     accuracy = result.accuracy,
+     cond = cond_jac,
+     res = res,
+    )
+end
+
+function Base.iterate(tracker::PathTracker, state::Int = 0)
+    if is_tracking(tracker.state.status)
+        step!(tracker)
+        tracker, state + 1
+    else
+        nothing
+    end
+end
+
+function is_valid_start_value(tracker::PathTracker, x::AbstractVector)
+    embed!(tracker.core_tracker.state.x̄, x)
+    check_start_value!(tracker.core_tracker, tracker.core_tracker.state.x̄, 0.0)
+    !is_invalid_startvalue(status(tracker.core_tracker))
+end
+
+####################
+## QUERYING STATE ##
+####################
+
+status(tracker::PathTracker) = tracker.state.status
+
+"""
+    solution(tracker::PathTracker)
+
+Obtain the solution computed by the `PathTracker`.
+"""
+solution(tracker::PathTracker) = pull_back(tracker.problem, tracker.state.solution)
+
+"""
+    norm(tracker::PathTracker)
+
+Obtain the norm used by the `PathTracker`.
+"""
+LA.norm(tracker::PathTracker) = LA.norm(tracker.core_tracker)
+
+
+"""
+    winding_number(tracker::PathTracker)
+
+Obtain the estimate of the winding number computed by the `PathTracker`. Returns `nothing`
+if the Cauchy endgame was not run.
+"""
+winding_number(tracker::PathTracker) = winding_number(tracker.state)
+winding_number(state::PathTrackerState) = state.winding_number
+
+###############################
+## Convencience constructors ##
+###############################
 
 const pathtracker_startsolutions_supported_keywords = [
-    problem_startsolutions_supported_keywords;
-    coretracker_supported_keywords;
-    pathtracker_supported_keywords]
+    problem_startsolutions_supported_keywords
+    coretracker_supported_keywords
+    pathtracker_supported_keywords
+]
+
 
 """
     pathtracker_startsolutions(args...; kwargs...)
@@ -866,19 +761,21 @@ function pathtracker_startsolutions(args...; kwargs...)
     check_kwargs_empty(invalid, pathtracker_startsolutions_supported_keywords)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
     prob, startsolutions = problem_startsolutions(args...; supported...)
-    tracker_startsolutions(prob, startsolutions; rest...)
+    construct_tracker(prob, startsolutions; rest...), startsolutions
 end
 
-function tracker_startsolutions(prob::Problem, startsolutions; kwargs...)
-    tracker = PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
-    (tracker=tracker, startsolutions=startsolutions)
+function construct_tracker(prob::Problem, startsolutions; kwargs...)
+    PathTracker(prob, start_solution_sample(startsolutions); kwargs...)
 end
+
+
 
 """
     pathtracker(args...; kwargs...)
 
 Construct a [`PathTracker`](@ref) in the same way [`solve`](@ref) does it.
-This also takes the same input arguments as `solve` with the exception that you do not need to specify startsolutions.
+This also takes the same input arguments as `solve` with the exception that you do not need
+to specify startsolutions.
 
 ## Examples
 
@@ -895,116 +792,138 @@ x_b = solution(track(tracker, x_a))
 """
 pathtracker(args...; kwargs...) = first(pathtracker_startsolutions(args...; kwargs...))
 
-
-############
-## Result ##
-############
-
-solution(tracker::PathTracker) = pull_back(tracker.problem, tracker.state.solution)
-
-function winding_number(tracker::PathTracker)
-    tracker.state.winding_number == 0 ? nothing : tracker.state.winding_number
-end
+#################
+## PATH RESULT ##
+#################
 
 """
     PathResult{V<:AbstractVector}
 
-A `PathResult` is the result of tracking of a path using [`PathTracker`](@ref).
-Its fields are
+A `PathResult` is the result of tracking of a path with [`track`](@ref) using a
+[`PathTracker`](@ref).
 
-* `return_code`: One of `:success`, `:at_infinity` or any error code in [`PathTrackerStatus.states`](@ref) converted to a `Symbol`.
+# Fields
+* `return_code`: See the list of return codes below.
 * `solution::V`: The solution vector.
-* `t::Float64`: The value of `t` at which `solution` was computed. Note that if `return_code` is `:at_infinity`, then `t` is the value when this was decided.
-* `accuracy::Union{Nothing, Float64}`: An approximation of ``||x-x^*||₂`` where ``x`` is the computed solution and ``x^*`` is the true solution.
-* `residual::Union{Nothing, Float64}`: The value of the 2-norm of `H(solution, 0)`.
-* `multiplicity::Union{Nothing, Int}` is the multiplicity of the `solution`. This is only assigned by. [`singular`](@ref).
-* `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
-* `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound on the multiplicity of the solution.
+* `t::Float64`: The value of `t` at which `solution` was computed. Note that if
+  `return_code` is `:at_infinity`, then `t` is the value when this was decided.
+* `accuracy::Float64`: An approximation of ``||x-x̄||`` where ``x`` is the computed solution
+  and ``x̄`` is the true solution.
+* `residual::Float64`: The value of the infinity-norm of `H(solution, 0)`.
+* `multiplicity::Union{Nothing, Int}` is the multiplicity of the `solution`. This is
+  only assigned by [`singular`](@ref).
+* `condition_jacobian::Union{Nothing, Float64}`: This is the condition number of the
+  row-equilibrated Jacobian at the solution. A high condition number indicates a singularity.
+* `winding_number:Union{Nothing, Int}`: The estimated winding number. This is a lower bound
+  on the multiplicity of the solution.
 * `start_solution::Union{Nothing, Int}`: The start solution of the path.
 * `accepted_steps::Int`: The number of accepted steps during the path tracking.
 * `rejected_steps::Int`: The number of rejected steps during the path tracking.
-* `valuation::Union{Nothing, Vector{Float64}}`: An approximation of the valuation of the Puiseux series expansion of `x(t)`.
-* `valuation_accuracy::Union{Nothing, Vector{Float64}}`: An estimate of the accuracy of the valuation of the Puiseux series expansion of `x(t)`.
+* `valuation::Union{Nothing, Vector{Float64}}`: An approximation of the valuation of the
+  Puiseux series expansion of `x(t)`.
+* `valuation_accuracy::Union{Nothing, Vector{Float64}}`: An estimate of the accuracy of the
+  valuation of the Puiseux series expansion of `x(t)`.
 
-     PathResult(tracker::PathTracker, start_solution=nothing, path_number::Union{Nothing,Int}=nothing; details=:default)
+# Return codes
 
-Possible `details` values are `:minimal` (minimal details), `:default` (default) and `:extensive` (all information possible).
+These is the list of possible return codes:
+
+* `:success`: The `PathTracker` obtained a solution.
+* `:at_infinity`: The `PathTracker` stopped the tracking of the path since it determined
+  that that path is diverging towards infinity.
+* `:terminated_callback`: One of the optional `PathTracker` callbacks terminated the tracking.
+* `:terminated_max_iters`: The `PathTracker` terminated since it reached the limit accuracy.
+* `:terminated_invalid_startvalue`: The `PathTracker` terminated since the provided start
+  value is invalid.
+* `:terminated_step_size_too_small`: The `PathTracker` terminated since the step size
+  became smaller than the provided threshold.
+* `:terminated_accuracy_limit`: The `PathTracker` terminated since the problem was too
+  ill-conditioned to be tracked further with the desired minimal accuracy.
+* `:terminated_ill_conditioned`: The `PathTracker` terminated since the Jacobian of the
+  homotopy was too ill-conditioned.
+* `:post_check_failed`: The verification of a non-singular solution failed.
+
+# Constructors
+
+
+     PathResult(tracker::PathTracker,
+                start_solution=nothing,
+                path_number::Union{Nothing,Int}=nothing;
+                details=:default)
+
+Construct a `PathResult` using the current state of the `PathTracker`.
+Possible values for `details` are `:minimal` (minimal details), `:default` (default) and
+`:extensive` (all information possible).
 """
-mutable struct PathResult{V<:AbstractVector}
+struct PathResult{V<:AbstractVector}
     return_code::Symbol
     solution::V
     t::Float64
-    accuracy::Union{Nothing, Float64}
-    residual::Union{Nothing, Float64} # level 1+
-    multiplicity::Union{Nothing, Int} # only assigned by singular(Result)
-    condition_jacobian::Union{Nothing, Float64}
-    winding_number::Union{Nothing, Int}
-    path_number::Union{Nothing, Int}
-    start_solution::Union{Nothing, V} # level 1+
+    accuracy::Float64
+    residual::Float64
+    condition_jacobian::Float64
+    winding_number::Union{Nothing,Int}
+    path_number::Base.RefValue{Union{Nothing,Int}}
+    start_solution::Union{Nothing,V} # level 1+
+    multiplicity::Base.RefValue{Union{Nothing,Int}} # only assigned by singular(Result)
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
-    valuation::Union{Nothing, Vector{Float64}} # level 2+
-    valuation_accuracy::Union{Nothing, Vector{Float64}} # level 2+
+    valuation::Union{Nothing,Vector{Float64}} # level 2+
+    valuation_accuracy::Union{Nothing,Vector{Float64}} # level 2+
 end
 
-function PathResult(tracker::PathTracker, start_solution, path_number::Union{Nothing,Int}=nothing; details::Symbol=:default)
-    @unpack state, core_tracker, cache = tracker
+function PathResult(
+    tracker::PathTracker,
+    start_solution::Union{Nothing,AbstractVector} = nothing,
+    path_number::Union{Nothing,Int} = nothing;
+    details::Symbol = :default,
+)
+    @unpack state, core_tracker = tracker
     details_level = detailslevel(details)
+
     return_code = Symbol(state.status)
-    windingnumber = winding_number(tracker)
     x = solution(tracker)
-    # accuracy
-    if !isnan(state.solution_accuracy)
-        accuracy = state.solution_accuracy
-    else
-        accuracy = nothing
-    end
+    t = return_code == :success ? 0.0 : exp(-state.s)
+    accuracy = state.solution_accuracy
+    residual = state.solution_residual
+    condition_jac = state.solution_cond
+    windingnumber = state.winding_number
+    # this needs to be assigned manually
+    multiplicity = Base.RefValue{Union{Nothing,Int}}(nothing)
 
-    if return_code == :success
-        t = 0.0
-    else
-        t = exp(-state.s)
-    end
-    # condition
-    if isnan(state.solution_cond)
-        condition_jac = cond(core_tracker)
-    else
-        condition_jac = state.solution_cond
-    end
-    # residual
-    if return_code == :success && details_level ≥ 1
-        res = residual(tracker)
-    else
-        res = nothing
-    end
-
-    if details_level ≥ 1
+    startsolution = nothing
+    if details_level ≥ 1 && start_solution !== nothing
         # mimic the behaviour in track! to get a start solution of the same type as x
-        embed!(cache.base_point, tracker.problem, start_solution)
-        startsolution = pull_back(tracker.problem, cache.base_point; regauge=false)
-    else
-        startsolution = nothing
+        embed!(core_tracker.state.x, tracker.problem, start_solution)
+        startsolution = pull_back(tracker.problem, core_tracker.state.x; regauge = false)
     end
 
     accepted_steps = core_tracker.state.accepted_steps
     rejected_steps = core_tracker.state.rejected_steps
 
+    valuation = valuation_accuracy = nothing
     if details_level == 2
-        valuation = copy(tracker.state.val.v)
-        valuation_accuracy = abs.(tracker.state.val.v̇)
-    else
-        valuation = nothing
-        valuation_accuracy = nothing
+        valuation = copy(tracker.state.valuation.ν)
+        valuation_accuracy = abs.(tracker.state.valuation.ν̇)
     end
 
-    # this is only assigned by using the singular() function
-    multiplicity = nothing
-
-    PathResult(return_code, x, t, accuracy, res, multiplicity, condition_jac,
-               windingnumber, path_number,
-               startsolution, accepted_steps, rejected_steps,
-               valuation, valuation_accuracy)
+    PathResult(
+        return_code,
+        x,
+        t,
+        accuracy,
+        residual,
+        condition_jac,
+        windingnumber,
+        Base.RefValue{Union{Nothing,Int}}(path_number),
+        startsolution,
+        multiplicity,
+        accepted_steps,
+        rejected_steps,
+        valuation,
+        valuation_accuracy,
+    )
 end
 
 function detailslevel(details::Symbol)
@@ -1017,27 +936,6 @@ function detailslevel(details::Symbol)
     end
 end
 
-function residual(tracker::PathTracker, x=tracker.state.solution)
-    evaluate!(tracker.cache.target_residual, tracker.cache.target_system, x,
-              tracker.cache.target_newton_cache.system_cache)
-    euclidean_norm(tracker.cache.target_residual)
-end
-
-function condition_jacobian(tracker::PathTracker, x=tracker.state.solution)
-    jac = tracker.cache.target_jacobian
-    jacobian!(jac.J, tracker.cache.target_system, x,
-              tracker.cache.target_newton_cache.system_cache)
-    updated_jacobian!(jac; update_infos=true)
-    jac.cond
-end
-
-"""
-    multiplicity(P::PathResult{T})
-
-Returns the multiplicity of `P`.
-"""
-multiplicity(P::PathResult{T}) where T = P.multiplicity
-
 """
     result_type(tracker::PathTracker)
 
@@ -1045,44 +943,61 @@ Returns the type of result `track` will return.
 """
 result_type(tracker::PathTracker) = PathResult{typeof(solution(tracker))}
 
-function Base.show(io::IO, r::PathResult)
+function Base.show(io::IO, r::PathResult{AV}) where {AV}
     iscompact = get(io, :compact, false)
-    if iscompact || haskey(io, :typeinfo)
-        println(io, "• return_code: $(r.return_code)")
-        if r.return_code != PathTrackerStatus.success
-            println(io, " • t: $(r.t)")
+    if iscompact || haskey(io, :typeinfo)
+        println(io, "• return_code → :$(r.return_code)")
+        if r.return_code ≠ :success
+            println(io, " • t → $(r.t)")
         end
-        println(io, " • solution: ", r.solution)
-        r.accuracy !== nothing &&
-            println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
-        r.winding_number !== nothing &&
-            println(io, " • winding_number: $(r.winding_number)")
-        r.path_number !== nothing &&
-            println(io, " • path_number: ", r.path_number)
+        println(io, " • solution → ", r.solution)
+        r.accuracy !== nothing && println(
+            io,
+            " • accuracy → $(Printf.@sprintf "%.3e" r.accuracy)",
+        )
+        winding_number(r) !== nothing && println(
+            io,
+            " • winding_number → $(winding_number(r))",
+        )
+        if multiplicity(r) !== nothing
+            println(io, " • multiplicity → $(multiplicity(r))")
+        end
+        path_number(r) !== nothing && println(io, " • path_number: ", path_number(r))
     else
-        println(io, "PathResult")
-        println(io, "=================")
-        println(io, " • return_code: $(r.return_code)")
-        if r.return_code != PathTrackerStatus.success
-            println(io, " • t: $(r.t)")
+        header = "PathResult{$AV}"
+        compact_io = IOContext(io, :compact => true)
+        println(io, "PathResult{$AV}")
+        println(io, "="^length(header))
+        path_number(r) !== nothing && println(io, " • path_number → ", path_number(r))
+        println(io, " • return_code → :$(r.return_code)")
+        if r.return_code ≠ :success
+            println(compact_io, " • t → $(r.t)")
         end
-        println(io, " • solution: ", r.solution)
-        r.accuracy !== nothing &&
-            println(io, " • accuracy: $(Printf.@sprintf "%.3e" r.accuracy)")
-        r.residual !== nothing &&
-            println(io, " • residual: $(Printf.@sprintf "%.3e" r.residual)")
-        r.winding_number !== nothing &&
-            println(io, " • winding_number: $(r.winding_number)")
-        r.condition_jacobian !== nothing &&
-            println(io, " • condition_jacobian: $(Printf.@sprintf "%.3e" r.condition_jacobian)")
-        r.path_number !== nothing &&
-            println(io, " • path_number: ", r.path_number)
+        println(compact_io, " • solution → ", r.solution)
+        r.accuracy !== nothing && println(compact_io, " • accuracy → ", r.accuracy)
+        r.residual !== nothing && println(compact_io, " • residual → ", r.residual)
+        if r.condition_jacobian !== nothing
+            println(compact_io, " • condition_jacobian → ", r.condition_jacobian)
+        end
+
+        if multiplicity(r) !== nothing
+            println(io, " • multiplicity → $(multiplicity(r))")
+        end
+        if winding_number(r) !== nothing
+            println(io, " • winding_number → $(winding_number(r))")
+        end
+        if r.valuation !== nothing
+            println(compact_io, " • valuation → ", r.valuation)
+        end
+        if r.valuation_accuracy !== nothing
+            println(compact_io, " • valuation_accuracy → ", r.valuation_accuracy)
+        end
     end
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::PathResult) = x
 
 """
-    solution(pathresult)
+    solution(r::PathResult)
 
 Get the solution of the path.
 """
@@ -1090,72 +1005,109 @@ solution(r::PathResult) = r.solution
 
 
 """
-    accuracy(pathresult)
+    start_solution(r::PathResult)
 
-Get the accuracy of the solution ``x`` of the path, i.e., ``||H(x, 0)||₂``.
+Get the start solution of the path.
+"""
+start_solution(r::PathResult) = r.start_solution
+
+"""
+    accuracy(r::PathResult)
+
+Get the accuracy of the solution. This is an estimate of the (relative) distance to the
+true solution.
 """
 accuracy(r::PathResult) = r.accuracy
 
-
 """
-    residual(pathresult)
+    residual(r::PathResult)
 
 Get the residual of the solution ``x`` of the path, i.e., ``||H(x, 0)||₂``.
 """
 residual(r::PathResult) = r.residual
 
 """
-    start_solution(pathresult)
+    winding_number(r::PathResult)
 
-Get the start solution of the solution ``x`` of the path.
+Get the winding number of the solution of the path. Returns `nothing` if it wasn't computed.
 """
-start_solution(r::PathResult) = r.start_solution
+winding_number(r::PathResult) = r.winding_number
 
 """
-    is_success(pathresult)
+    multiplicity(P::PathResult)
+
+Returns the multiplicity of `P`.
+"""
+multiplicity(P::PathResult) = P.multiplicity[]
+
+"""
+    condition_jacobian(r::PathResult)
+
+Return the condition number of the Jacobian of the result.
+"""
+condition_jacobian(r::PathResult) = r.condition_jacobian
+
+"""
+    cond(r::PathResult)
+
+Return the condition number of the Jacobian of the result.
+"""
+LA.cond(r::PathResult) = r.condition_jacobian
+
+"""
+    path_number(r::PathResult)
+
+The number of the path.
+"""
+path_number(r::PathResult) = r.path_number[]
+
+"""
+    is_success(r::PathResult)
 
 Checks whether the path is successfull.
 """
 is_success(r::PathResult) = r.return_code == :success
 
 """
-    is_failed(pathresult)
+    is_failed(r::PathResult)
 
 Checks whether the path failed.
 """
-is_failed(r::PathResult) =!(r.return_code == :at_infinity || r.return_code == :success)
-
+is_failed(r::PathResult) = !(r.return_code == :at_infinity || r.return_code == :success)
 
 """
-    is_at_infinity(pathresult)
+    is_at_infinity(r::PathResult)
 
 Checks whether the path goes to infinity.
 """
 is_at_infinity(r::PathResult) = r.return_code == :at_infinity
 
+
 """
-    isfinite(pathresult)
+    is_finite(r::PathResult)
 
 Checks whether the path result is finite.
 """
-Base.isfinite(r::PathResult) = r.return_code == :success # we don't check is_affine to make other code easier
+is_finite(r::PathResult) = r.return_code == :success
+
+# Base fallback
+Base.isfinite(r::PathResult) = is_finite(r)
 
 """
-    is_singular(pathresult; tol=1e10)
+    is_singular(r::PathResult; tol=1e10)
 
 Checks whether the path result is singular. This is true if
 the multiplicity is larger than  1 or if the condition number of the Jacobian
 is larger than `tol`.
 """
-is_singular(r::PathResult; tol=1e10) = is_singular(r, tol)
+is_singular(r::PathResult; tol = 1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
     (unpack(r.condition_jacobian, 1.0) > tol ||
-     unpack(r.multiplicity, 1) > 1) &&
-     is_success(r)
+     unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1) && is_success(r)
 end
 
 """
-    is_nonsingular(pathresult; tol=1e10)
+    is_nonsingular(r::PathResult; tol=1e10)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
@@ -1165,23 +1117,23 @@ is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
 
 
 """
-    is_real(pathresult; tol=1e-6)
+    is_real(r::PathResult; tol=1e-6)
 
 We consider a result as `real` if the 2-norm of the imaginary part of the solution is at most `tol`.
 """
-is_real(r::PathResult; tol=1e-6) = is_real(r, tol)
+is_real(r::PathResult; tol = 1e-6) = is_real(r, tol)
 is_real(r::PathResult, tol::Real) = is_real_vector(r.solution, tol)
 # provide fallback since this in in Base
 Base.isreal(r::PathResult, tol) = is_real(r, tol)
 Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)
 
 """
-    is_projective(pathresult)
+    is_projective(r::PathResult)
 
 Return`s true if the solution is a projective vector.
 """
-is_projective(r::PathResult{<:PVector}) = true
 is_projective(r::PathResult) = false
+is_projective(r::PathResult{<:PVector}) = true
 
 """
     is_affine(pathresult)
@@ -1189,3 +1141,80 @@ is_projective(r::PathResult) = false
 Return`s true if the solution is an affine vector.
 """
 is_affine(r::PathResult) = !is_projective(r)
+
+###########
+## track ##
+###########
+
+"""
+    track(tracker::PathTracker, x₁;
+            path_number=nothing,
+            details::Symbol=:default,
+            start_parameters = nothing,
+            target_parameters = nothing)
+
+Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
+Returns a [`PathResult`](@ref).
+
+The `details` options controls the level of details of the informations available
+in the [`PathResult`](@ref).
+If `tracker` uses a parameter homotopy you can set the start and target parameters
+by setting the corresponding fields.
+"""
+function track(
+    tracker::PathTracker,
+    x,
+    t₁ = nothing,
+    t₀ = nothing;
+    path_number::Union{Int,Nothing} = nothing,
+    details::Symbol = :default,
+    start_parameters = nothing,
+    target_parameters = nothing,
+)
+    if t₁ !== nothing
+        @warn(
+            "track(tracker, x, t₁, t₀) is deprecated. `t₁` is always assumed to be `1` " *
+            " and `t₀` set automatically.",
+        )
+    end
+
+    start_parameters !== nothing && start_parameters!(tracker, start_parameters)
+    target_parameters !== nothing && target_parameters!(tracker, target_parameters)
+
+    track!(tracker, x)
+    PathResult(tracker, x, path_number; details = details)
+end
+
+"""
+    start_parameters!(tracker::PathTracker, p)
+
+Set the start parameters of the homotopy in in `tracker` to `p`.
+"""
+start_parameters!(T::PathTracker, p) = start_parameters!(T.core_tracker, p)
+
+"""
+    target_parameters!(tracker::PathTracker, p)
+
+Set the target parameters of the homotopy in in `tracker` to `p`.
+"""
+target_parameters!(T::PathTracker, p) = target_parameters!(T.core_tracker, p)
+
+
+"""
+    track!(tracker::PathTracker, x₁)::PathTrackerStatus.states
+
+Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
+Returns a [`PathTrackerStatus.states`](@ref).
+"""
+function track!(
+    tracker::PathTracker,
+    x;
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
+    init!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
+    while is_tracking(tracker.state.status)
+        step!(tracker)
+    end
+    tracker.state.status
+end

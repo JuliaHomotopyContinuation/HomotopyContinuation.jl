@@ -20,7 +20,7 @@ function cache(::RK3, H, x, ẋ, t)
     RK3Cache(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))
 end
 #
-function predict!(xnext, ::RK3, cache::RK3Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
+function predict!(xnext, cache::RK3Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
     dt, mk₁, mk₂, mk₃ = cache.dt, cache.k1, cache.k2, cache.k3
     n = length(xnext)
     @inbounds for i=1:n
@@ -44,4 +44,4 @@ function predict!(xnext, ::RK3, cache::RK3Cache, H::HomotopyWithCache, x, t, Δt
     nothing
 end
 
-order(::RK3) = 4
+order(::RK3Cache) = 4

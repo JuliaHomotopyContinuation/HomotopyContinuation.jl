@@ -1,5 +1,17 @@
 # Reference
 
+## AffinePatches
+Affine patches are there to augment projective system such that they can be considered
+as (locally) affine system.
+
+```@docs
+AbstractAffinePatch
+OrthogonalPatch
+EmbeddingPatch
+RandomPatch
+FixedPatch
+```
+
 ## Input
 We support any polynomials which follow the [MultivariatePolynomials](https://github.com/JuliaAlgebra/MultivariatePolynomials.jl)
 interface. By default we export the routines `@polyvar`, `PolyVar`, `differentiate`
@@ -27,22 +39,57 @@ We also provide methods construct compositions of polynomial systems:
 compose
 ```
 
-## Utilities
+## Distances and norms
+
+We provide functions for computing norms and distance.
+These are subtypes of `AbstractNorm`:
 
 ```@docs
+AbstractNorm
+```
+
+They implement
+```@docs
+distance(u, v, norm::AbstractNorm)
+LinearAlgebra.norm(x, ::AbstractNorm)
+```
+
+The following norms are implemented:
+```@docs
+EuclideanNorm
+InfNorm
+WeightedNorm
+weights(WN::WeightedNorm)
+init!(w::WeightedNorm, x::AbstractVector)
+update!(w::WeightedNorm, x::AbstractVector)
+```
+
+### Deprecated
+
+```@docs
+euclidean_distance
+euclidean_norm
+```
+
+## Polynomial Utilities
+
+```@docs
+homogenize
 is_homogeneous
 uniquevar
-homogenize
 linear_system
 ```
 
-## AffinePatches
-Affine patches are there to augment projective system such that they can be considered
-as (locally) affine system. By default the following patches are defined
+## Predictors and Correctors
+
+We use a predictor-corrector scheme to track paths. While we have a fixed implementation of Newton's method as a corrector there multiple predictors available:
 
 ```@docs
-OrthogonalPatch
-EmbeddingPatch
-RandomPatch
-FixedPatch
+Euler
+Heun
+Ralston
+RK3
+RK4
+Pade21
+NullPredictor
 ```

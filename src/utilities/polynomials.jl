@@ -500,7 +500,7 @@ Compute the minimum and maximum (weighted total) degree of `f` with respect to t
 """
 function minmaxdegree(f::MP.AbstractPolynomialLike, variables)
     d_min, d_max = typemax(Int), 0
-    for term in f
+    for term in MP.terms(f)
         d = degree(term, variables)
         d_min, d_max = min(d, d_min), max(d, d_max)
     end
@@ -818,9 +818,12 @@ exponent(term::MP.AbstractTermLike, vars) = [MP.degree(term, v) for v in vars]
 
 """
     weyldot(f::Polynomial, g::Polynomial)
+
 Compute the [Bombieri-Weyl dot product](https://en.wikipedia.org/wiki/Bombieri_norm).
 Note that this is only properly defined if `f` and `g` are homogeneous.
+
     weyldot(f::Vector{Polynomial}, g::Vector{Polynomial})
+
 Compute the dot product for vectors of polynomials.
 """
 function weyldot(f::MP.AbstractPolynomialLike{T}, g::MP.AbstractPolynomialLike{S}, vars=variables([f, g])) where {T,S}
@@ -877,7 +880,6 @@ Returns the scaled system and a vector of scaling factors of the variables.
 [1]: HOM4PS-2.0: a software package for solving polynomial systems by the polyhedral homotopy continuation method,
 	Lee, T.L., Li, T.Y. & Tsai, C.H. Computing (2008) 83: 109.
 	https://doi.org/10.1007/s00607-008-0015-6
-
 """
 function precondition(f::Composition, variables=MP.variables(f))
 	vars, equations = preconditioning_factors(expand(f), variables)

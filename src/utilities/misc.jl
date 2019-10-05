@@ -7,22 +7,6 @@ export SymmetricGroup, infinity_norm, infinity_distance, fubini_study,
     COEFFS_UNKNOWN
 end
 
-"""
-    PrecisionOption
-
-Controls the used precision for computing the residual in Newton's method.
-See [[Tisseur01]](https://epubs.siam.org/doi/abs/10.1137/S0895479899359837) for the analysis behind this approach.
-
-## Values
-* `PRECISION_FIXED_64`: Only use default 64 bit machine precision
-* `PRECISION_FIXED_128`: Always use emulated 128 bit floating point numbers. These are provided by the [DoubleFloats.jl](https://github.com/JuliaMath/DoubleFloats.jl) package.
-* `PRECISION_ADAPTIVE`: Adaptively switch between 64 and 128 bit floating point numbers.
-"""
-@enum PrecisionOption begin
-    PRECISION_FIXED_64
-    PRECISION_FIXED_128
-    PRECISION_ADAPTIVE
-end
 
 """
     unpack(a::Union{Nothing, T}, b::T)
@@ -110,12 +94,12 @@ end
 Compute the `n`-th root of `x`.
 """
 function nthroot(x::Real, N::Integer)
-    if N == 3
-        cbrt(x)
+    if N == 4
+        √(√(x))
     elseif N == 2
         √(x)
-    elseif N == 4
-        √(√(x))
+    elseif N == 3
+        cbrt(x)
     elseif N == 1
         x
     elseif N == 0
@@ -181,7 +165,13 @@ end
      println(io, typeof(obj), ":")
      for name in fieldnames(typeof(obj))
          if getfield(obj, name) !== nothing
-             println(io, " • ", name, " → ", getfield(obj, name))
+             val = getfield(obj, name)
+             print(io, " • ", name, " → ")
+             if val isa AbstractFloat
+                 println(io, round(val; sigdigits=5))
+             else
+                 println(io, val)
+             end
          end
      end
  end
@@ -324,7 +314,7 @@ struct ComplexSegment
     Δ_target_start::ComplexF64
     abs_target_start::Float64
 end
-function ComplexSegment(start, target)
+function ComplexSegment(start::Number, target::Number)
     Δ_target_start = convert(ComplexF64, target) - convert(ComplexF64, start)
     abs_target_start = abs(Δ_target_start)
 
@@ -333,9 +323,6 @@ end
 
 function Base.getindex(segment::ComplexSegment, t::Real)
     Δ = t / segment.abs_target_start
-    if 1.0 - Δ < 2eps()
-        Δ = 1.0
-    end
     segment.start + Δ * segment.Δ_target_start
 end
 Base.length(segment::ComplexSegment) = segment.abs_target_start

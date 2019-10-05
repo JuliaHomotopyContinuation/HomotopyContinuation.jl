@@ -98,12 +98,8 @@ function input_startsolutions(F::MPPolyInputs; parameters=nothing, kwargs...)
     end
 
     remove_zeros!(F)
-    # square system and each polynomial is non-zero
-    if length(F) == nvariables(F) && is_homogeneous(F)
-        throw(ArgumentError("Cannot construct a start system for a square homogeneous system."))
-    end
     if has_constant_polynomial(F)
-        throw(ArgumentError("System contains a non-zero constant term"))
+        throw(ArgumentError("System contains a non-zero constant polynomial."))
     end
 
     (input=TargetSystemInput(F), startsolutions=nothing)

@@ -17,7 +17,7 @@ function cache(::Midpoint, H, x, ẋ, t)
     MidpointCache(dt(H, x, t), copy(ẋ))
 end
 #
-function predict!(xnext, ::Midpoint, cache::MidpointCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::Jacobian)
+function predict!(xnext, cache::MidpointCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
     dt, mk₂ = cache.dt, cache.mk₂
     n = length(xnext)
     @inbounds for i=1:n
@@ -33,4 +33,4 @@ function predict!(xnext, ::Midpoint, cache::MidpointCache, H::HomotopyWithCache,
     nothing
 end
 
-order(::Midpoint) = 3
+order(::MidpointCache) = 3

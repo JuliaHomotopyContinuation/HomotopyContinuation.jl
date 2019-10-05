@@ -11,12 +11,8 @@ Pages = [
   "solving.md",
   "monodromy.md",
   "path_tracker.md",
-  "newton.md",
-  "sorting.md",
-  "norms_distances.md",
-  "systems.md",
-  "homotopies.md",
-  "predictors-correctors.md",
   "core_tracker.md",
+  "homotopies.md",
+  "systems.md",
   "reference.md"]
 ```

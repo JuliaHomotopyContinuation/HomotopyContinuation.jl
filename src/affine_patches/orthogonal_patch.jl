@@ -3,6 +3,10 @@ export OrthogonalPatch
 """
     OrthogonalPatch()
 
+The orthogonal patch is a dynamically changing patch. It computes in such a way that
+`||x||=1` with respect to the 2-norm. See (for example) Section 3.2 in [^HR18].
+
+[^HR18]: https://arxiv.org/pdf/1710.06362.pdf
 """
 struct OrthogonalPatch <: AbstractAffinePatch end
 
@@ -16,7 +20,7 @@ function state(::OrthogonalPatch, x::PVector)
     OrthogonalPatchState(v)
 end
 
-function setup!(state::OrthogonalPatchState, x::AbstractVector)
+function init!(state::OrthogonalPatchState, x::AbstractVector)
     @boundscheck length(x) == length(state.v̄)
     LinearAlgebra.normalize!(x)
     @inbounds for i in eachindex(state.v̄)
@@ -24,7 +28,7 @@ function setup!(state::OrthogonalPatchState, x::AbstractVector)
     end
     state
 end
-Base.@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = setup!(state, x)
+@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = init!(state, x)
 
 onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
 evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)

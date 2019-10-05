@@ -177,38 +177,6 @@ function multi_bezout_coefficients(D::Matrix, k::NTuple{M, Int}) where M
     C
 end
 
-"""
-    totaldegree_polysystem(multidegrees::Matrix, variable_groups::VariableGroups, coeffs)
-
-The multi-homogeneous totaldegree start system described in [Wampler, 93]. Returns a tuple, the system
-and the coefficients``c_{i,j,l}`` described in [Wampler, 93] as a `Matrix{Vector{Float64}}`.
-
-[Wampler, 93]: An efficient start system for multi-homogeneous polynomial continuation (https://link.springer.com/article/10.1007/BF01385710).
-"""
-function totaldegree_polysystem(D::Matrix, vargroups::VariableGroups, C::Matrix)
-    Z = variable_groups(vargroups)
-    m, n = size(D)
-    G = map(1:n) do i
-        s = Ref(1)
-        prod(1:m) do j
-            dᵢⱼ = D[j,i]
-            kⱼ = length(Z[j]) - 1
-            if dᵢⱼ == 0
-                s[] += kⱼ + 1
-                return 1
-            end
-            bᵢⱼ = sum(1:kⱼ) do l
-                cz = C[s[], i] * Z[j][l]
-                s[] += 1
-                cz
-            end
-            s[] += 1
-            bᵢⱼ^dᵢⱼ - Z[j][end]^dᵢⱼ
-        end
-    end
-    G
-end
-
 
 struct MultiBezoutSolutionsIterator{N}
     indices::MultiBezoutIndicesIterator{N}
