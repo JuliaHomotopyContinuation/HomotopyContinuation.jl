@@ -1339,8 +1339,8 @@ current_x(state::CTS) = state.x
 Returns the currently computed approximation of the condition number of the
 Jacobian.
 """
-cond(tracker::CoreTracker) = LA.cond(tracker.state)
-cond(state::CTS) = LA.cond(state.jacobian)
+LA.cond(tracker::CoreTracker) = cond(tracker.state)
+LA.cond(state::CTS) = cond(state.jacobian)
 
 
 """
