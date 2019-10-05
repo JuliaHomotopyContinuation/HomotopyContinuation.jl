@@ -278,8 +278,8 @@ function solve!(
                 end
             end
 
-            ntracked % 32 != 0 && update_progress!(progress, ntracked, stats)
             is_success(return_code) && update!(stats, results[path_number])
+            ntracked % 32 == 0 && update_progress!(progress, ntracked, stats)
         end
         # don't print if it already got printed above
         ntracked % 32 != 0 && update_progress!(progress, ntracked, stats)
