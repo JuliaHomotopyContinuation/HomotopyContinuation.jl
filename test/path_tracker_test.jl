@@ -117,7 +117,7 @@
     @testset "Wilkinson" begin
         @polyvar x
         print("Wilkinson: ")
-        for n = 1:19
+        for n = 1:18
             print(n, ",")
             g = [x^n - 1]
             f = [prod(x - i for i = 1:n)]
