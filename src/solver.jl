@@ -241,6 +241,8 @@ function solve!(
     results .= nothing
 
     ntracked = 0
+    n_blas_threads = single_thread_blas()
+
     try
         for k = 1:n
             if path_jumping_check
@@ -286,6 +288,8 @@ function solve!(
             rethrow()
         end
     end
+
+    n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
 
     Result(
         remove_nothings(results),
