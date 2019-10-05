@@ -32,17 +32,6 @@
         @test_throws OverflowError length(iter)
     end
 
-    function polyhedral_root_count(f; kwargs...)
-        tracker, starts = pathtracker_startsolutions(
-            f;
-            start_system = :polyhedral,
-            kwargs...,
-        )
-        S = collect(starts)
-        HC.prepare!(tracker, starts)
-        count(s -> is_success(track!(tracker, s)), S)
-    end
-
     @testset "Tracking" begin
         tracker, starts = pathtracker_startsolutions(
             equations(cyclic(5));
