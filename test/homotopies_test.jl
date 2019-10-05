@@ -89,4 +89,13 @@
         x = randn(ComplexF64, 2)
         HomotopyContinuation.homotopy_interface_test(H, x)
     end
+
+    @testset "ConstantHomotopy" begin
+        F = SPSystem(equations(katsura(5)))
+        H = ConstantHomotopy(F)
+        @test H isa AbstractHomotopy
+        @test size(H) == (6, 6)
+
+        HomotopyContinuation.homotopy_interface_test(H)
+    end
 end

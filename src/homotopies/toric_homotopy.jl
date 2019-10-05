@@ -1,11 +1,17 @@
 export ToricHomotopy, ToricHomotopyCache
 
+@enum ToricHomotopyActiveCoeffs begin
+    TH_COEFFS_EVAL
+    TH_COEFFS_DS
+    TH_COEFFS_UNKNOWN
+end
+
 """
     ToricHomotopy(support, lifting, coefficients)
 
 Construct the homotopy ``H(x, s) = Σ_α c_α e^{(α̂⋅γ̂) s} x^α``.
 """
-mutable struct ToricHomotopy{S<:SPSystem, T} <: AbstractHomotopy
+mutable struct ToricHomotopy{S<:SPSystem,T} <: AbstractHomotopy
     system::S
     nterms::Vector{Int}
     support::Matrix{Int32}
@@ -15,12 +21,19 @@ mutable struct ToricHomotopy{S<:SPSystem, T} <: AbstractHomotopy
     perms::Vector{Vector{Int}}
 end
 
-function ToricHomotopy(supports::Vector{<:Matrix}, coefficients::Vector{Vector{T}}) where T
+function ToricHomotopy(
+    supports::Vector{<:Matrix},
+    coefficients::Vector{Vector{T}},
+) where {T}
     dummy_lifting = Vector{Int32}[collect(Int32(1):Int32(size(A, 2))) for A in supports]
     ToricHomotopy(supports, dummy_lifting, coefficients)
 end
-function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32}}, coefficients::Vector{Vector{T}}) where T
-    @assert all(length.(coefficients) .== size.(supports,2))
+function ToricHomotopy(
+    supports::Vector{<:Matrix},
+    liftings::Vector{Vector{Int32}},
+    coefficients::Vector{Vector{T}},
+) where {T}
+    @assert all(length.(coefficients) .== size.(supports, 2))
     @assert length(liftings) == length(supports)
 
     system = SPSystem(supports, coefficients)
@@ -40,7 +53,7 @@ function ToricHomotopy(supports::Vector{<:Matrix}, liftings::Vector{Vector{Int32
     for (i, f) in enumerate(system.system.polys)
         p = SP.permutation(f)
         for j in p
-            @. support[:,k] = supports[i][:,j]
+            @. support[:, k] = supports[i][:, j]
             lifting[k] = liftings[i][j]
             coeffs[k] = coefficients[i][j]
             k += 1
@@ -59,10 +72,10 @@ function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
     s_min = Inf
     @inbounds for (i, m) in enumerate(H.nterms)
         βᵢ = cell.β[i]
-        for _ in 1:m
+        for _ = 1:m
             s_k = Float64(H.lifting[k]) - βᵢ
-            for l in 1:n
-                s_k += H.support[l,k] * cell.normal[l]
+            for l = 1:n
+                s_k += H.support[l, k] * cell.normal[l]
             end
             H.s_weights[k] = s_k
 
@@ -76,7 +89,7 @@ function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
         end
     end
     # We normalize such that 5 is the highest power
-    s_max /= 5
+    s_max /= 5.0
     for k in eachindex(H.s_weights)
         H.s_weights[k] /= s_max
     end
@@ -100,77 +113,85 @@ end
 
 An simple cache for `ToricHomotopyCache`.
 """
-mutable struct ToricHomotopyCache{C<:AbstractSystemCache, T} <: AbstractHomotopyCache
+mutable struct ToricHomotopyCache{C<:AbstractSystemCache,T} <: AbstractHomotopyCache
     system::C
     coeffs::Vector{T}
-    coeffs_dt::Vector{T}
-    views_coeffs::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}}, true}}
-    views_coeffs_dt::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}}, true}}
+    coeffs_ds::Vector{T}
+    views_coeffs::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}},true}}
+    views_coeffs_ds::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}},true}}
     s::Float64
     ds::Float64
-    active_coeffs::ActiveCoeffs
+    active_coeffs::ToricHomotopyActiveCoeffs
 end
 
 function cache(H::ToricHomotopy{S,T}, x, s) where {S,T}
     system = cache(H.system, x, s)
     U = promote_type(T, typeof(s))
     coeffs = convert.(U, H.coeffs)
-    coeffs_dt = copy(H.coeffs)
+    coeffs_ds = copy(H.coeffs)
     views_coeffs = [view(coeffs, 1:H.nterms[1])]
-    views_coeffs_dt = [view(coeffs_dt, 1:H.nterms[1])]
+    views_coeffs_ds = [view(coeffs_ds, 1:H.nterms[1])]
     k = H.nterms[1] + 1
-    for i in 2:length(H.nterms)
+    for i = 2:length(H.nterms)
         push!(views_coeffs, view(coeffs, k:k+H.nterms[i]-1))
-        push!(views_coeffs_dt, view(coeffs_dt, k:k+H.nterms[i]-1))
+        push!(views_coeffs_ds, view(coeffs_ds, k:k+H.nterms[i]-1))
         k += H.nterms[i]
     end
     s = ds = NaN
-    active_coeffs = COEFFS_UNKNOWN
-    ToricHomotopyCache(system, coeffs, coeffs_dt, views_coeffs, views_coeffs_dt, s, ds, active_coeffs)
+    active_coeffs = TH_COEFFS_UNKNOWN
+    ToricHomotopyCache(
+        system,
+        coeffs,
+        coeffs_ds,
+        views_coeffs,
+        views_coeffs_ds,
+        s,
+        ds,
+        active_coeffs,
+    )
 end
 
 Base.size(H::ToricHomotopy) = size(H.system)
 
 function update_coeffs!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
     if s == cache.s
-        if cache.active_coeffs != COEFFS_EVAL
+        if cache.active_coeffs != TH_COEFFS_EVAL
             set_coefficients!(H.system, cache.views_coeffs)
-            cache.active_coeffs == COEFFS_EVAL
+            cache.active_coeffs = TH_COEFFS_EVAL
         end
         return nothing
     end
 
-    cache.s = s
     @inbounds for k in eachindex(cache.coeffs)
         cache.coeffs[k] = exp(H.s_weights[k] * s) * H.coeffs[k]
     end
     set_coefficients!(H.system, cache.views_coeffs)
-    cache.active_coeffs == COEFFS_EVAL
+    cache.s = s
+    cache.active_coeffs = TH_COEFFS_EVAL
     nothing
 end
 
-function update_coeffs_dt!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
+function update_coeffs_ds!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
     if s == cache.ds
-        if cache.active_coeffs != COEFFS_DT
-            set_coefficients!(H.system, cache.views_coeffs_dt)
-            cache.active_coeffs == COEFFS_DT
+        if cache.active_coeffs != TH_COEFFS_DS
+            set_coefficients!(H.system, cache.views_coeffs_ds)
+            cache.active_coeffs = TH_COEFFS_DS
         end
         return nothing
     end
 
     if s == cache.s
-        cache.ds = s
         @inbounds for k in eachindex(cache.coeffs)
-            cache.coeffs_dt[k] = H.s_weights[k] * cache.coeffs[k]
+            cache.coeffs_ds[k] = H.s_weights[k] * cache.coeffs[k]
         end
     else
-        cache.ds = s
         @inbounds for k in eachindex(cache.coeffs)
-            cache.coeffs_dt[k] = H.s_weights[k] * exp(H.s_weights[k] * s) * H.coeffs[k]
+            cache.coeffs_ds[k] = H.s_weights[k] * exp(H.s_weights[k] * s) * H.coeffs[k]
         end
     end
-    set_coefficients!(H.system, cache.views_coeffs_dt)
-    cache.active_coeffs == COEFFS_DT
+    set_coefficients!(H.system, cache.views_coeffs_ds)
+    cache.ds = s
+    cache.active_coeffs = TH_COEFFS_DS
     nothing
 end
 
@@ -182,7 +203,7 @@ function evaluate!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
 end
 
 function dt!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs_dt!(c, H, real(s))
+    update_coeffs_ds!(c, H, real(s))
     @inbounds evaluate!(u, H.system, x, c.system)
     u
 end
@@ -204,7 +225,7 @@ function evaluate(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
 end
 
 function dt(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs_dt!(c, H, real(s))
+    update_coeffs_ds!(c, H, real(s))
     evaluate(H.system, x, c.system)
 end
 
@@ -213,4 +234,4 @@ function jacobian(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
     jacobian(H.system, x, c.system)
 end
 
-(H::ToricHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::ToricHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)

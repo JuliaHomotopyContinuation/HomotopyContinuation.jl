@@ -31,7 +31,7 @@ end
 end
 @propagate_inbounds function jacobian_and_dt!(U, u, H::CH, x, t, c::CHC)
     jacobian!(U, H.system, x, c.cache)
-    dt!(u, H.system, x, c.cache)
+    u .= zero(eltype(u))
     nothing
 end
 evaluate(H::CH, x, t, c::CHC) = evaluate(H.system, x, c.cache)

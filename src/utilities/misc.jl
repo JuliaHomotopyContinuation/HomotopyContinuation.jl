@@ -1,12 +1,6 @@
 export SymmetricGroup, infinity_norm, infinity_distance, fubini_study,
     PrecisionOption, PRECISION_ADAPTIVE, PRECISION_FIXED_64, PRECISION_FIXED_128
 
-@enum ActiveCoeffs begin
-    COEFFS_EVAL
-    COEFFS_DT
-    COEFFS_UNKNOWN
-end
-
 
 """
     unpack(a::Union{Nothing, T}, b::T)

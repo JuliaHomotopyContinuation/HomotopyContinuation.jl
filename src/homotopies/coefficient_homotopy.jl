@@ -1,5 +1,12 @@
 export CoefficientHomotopy, CoefficientHomotopyCache, gamma
 
+@enum CoeffHomotopyActiveCoeffs begin
+    CH_COEFFS_EVAL
+    CH_COEFFS_DT
+    CH_COEFFS_UNKNOWN
+end
+
+
 """
     CoefficientHomotopy(support, start_coeffs, target_coeffs)
 
@@ -51,8 +58,8 @@ struct CoefficientHomotopyCache{C<:AbstractSystemCache,T} <: AbstractHomotopyCac
     system::C
     coeffs::Vector{Vector{T}}
     diffs::Vector{Vector{T}}
-    t::ComplexF64
-    active_coeffs::ActiveCoeffs
+    t::Base.RefValue{ComplexF64}
+    active_coeffs::Base.RefValue{CoeffHomotopyActiveCoeffs}
 end
 
 function cache(H::CoefficientHomotopy{S,T1,T2}, x, t) where {S,T1,T2}
@@ -62,17 +69,17 @@ function cache(H::CoefficientHomotopy{S,T1,T2}, x, t) where {S,T1,T2}
     diffs = map(H.start_coeffs, H.target_coeffs) do start, target
         convert(Vector{U}, start - target)
     end
-    active_coeffs = COEFFS_UNKNOWN
-    CoefficientHomotopyCache(system, coeffs, diffs, complex(NaN), active_coeffs)
+    active_coeffs = Ref(CH_COEFFS_UNKNOWN)
+    CoefficientHomotopyCache(system, coeffs, diffs, Ref(complex(NaN)), active_coeffs)
 end
 
 Base.size(H::CoefficientHomotopy) = size(H.system)
 
 function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy, t)
-    if t == cache.t
-        if cache.active_coeffs != COEFFS_EVAL
+    if t == cache.t[]
+        if cache.active_coeffs[] != CH_COEFFS_EVAL
             set_coefficients!(H.system, cache.coeffs)
-            cache.active_coeffs == COEFFS_EVAL
+            cache.active_coeffs[] = CH_COEFFS_EVAL
         end
         return nothing
     end
@@ -100,13 +107,15 @@ function update_coeffs!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy,
         end
     end
     set_coefficients!(H.system, cache.coeffs)
+    cache.active_coeffs[] = CH_COEFFS_EVAL
+    cache.t[] = t
     nothing
 end
 
 function update_coeffs_dt!(cache::CoefficientHomotopyCache, H::CoefficientHomotopy, t)
-    if cache.active_coeffs != COEFFS_DT
+    if cache.active_coeffs[] != CH_COEFFS_DT
         set_coefficients!(H.system, cache.diffs)
-        cache.active_coeffs == COEFFS_DT
+        cache.active_coeffs[] = CH_COEFFS_DT
     end
     nothing
 end
