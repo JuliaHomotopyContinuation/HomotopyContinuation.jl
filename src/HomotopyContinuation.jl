@@ -15,15 +15,15 @@ module HomotopyContinuation
     import StaticPolynomials
     import TreeViews
 
-    import Base: @propagate_inbounds
-    import LinearAlgebra: cond
-    import Parameters: @pack!, @unpack
-    import DoubleFloats: Double64, ComplexDF64
-    import DynamicPolynomials: @polyvar, subs, differentiate
-    import ProjectiveVectors: PVector
-    import StaticArrays: SVector, @SVector
-    import Test: @test
-    import MixedSubdivisions: mixed_volume
+    using Base: @propagate_inbounds
+    using LinearAlgebra: cond
+    using Parameters: @pack!, @unpack
+    using DoubleFloats: Double64, ComplexDF64
+    using DynamicPolynomials: @polyvar, subs, differentiate
+    using ProjectiveVectors: PVector
+    using StaticArrays: SVector, @SVector
+    using Test: @test
+    using MixedSubdivisions: mixed_volume
 
     const FP = FixedPolynomials
     const MP = MultivariatePolynomials
