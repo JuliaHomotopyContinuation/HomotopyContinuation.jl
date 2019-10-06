@@ -93,3 +93,38 @@ RK4
 Pade21
 NullPredictor
 ```
+
+## Unique points and multiplicities
+
+We provide functions for sorting analyzing arrays of vectors.
+
+### Unique points
+
+We provide the [`unique_points`](@ref) methods to sort through solutions.
+```@docs
+unique_points
+```
+
+The [`unique_points`](@ref) method is powered by the [`UniquePoints`](@ref) data structure.
+
+```@docs
+UniquePoints
+```
+
+We provide several helper functions for `UniquePoints`.
+```@docs
+points
+is_contained
+add!
+simple_add!
+empty!
+```
+
+### Multiplicities
+
+If instead of unique points, the user wants to have the information which points in an array of points appear with multiplicity, they should use the next function.
+```@docs
+multiplicities
+```
+The `multiplicities` functions may also be applied to [`Result`](@ref); see here:
+[`multiplicities(::HomotopyContinuation.Results)`](@ref).
