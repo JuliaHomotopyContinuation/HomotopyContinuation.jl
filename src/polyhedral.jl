@@ -393,7 +393,11 @@ end
 The polyhedral tracker combines the tracking from toric infinity toward the target system
 by a two-stage approach.
 """
-struct PolyhedralTracker{CT<:CoreTracker,PT<:PathTracker,H<:ToricHomotopy} <: AbstractPathTracker
+struct PolyhedralTracker{
+    CT<:CoreTracker,
+    PT<:PathTracker,
+    H<:ToricHomotopy,
+} <: AbstractPathTracker
     toric_homotopy::H
     toric_tracker::CT
     generic_tracker::PT
@@ -458,22 +462,34 @@ function prepare!(PT::PolyhedralTracker, S::PolyhedralStartSolutionsIterator)
     update_lifting!(PT.toric_homotopy, S.lifting)
     PT
 end
-function track!(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}})
+function track!(
+    PT::PolyhedralTracker,
+    (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}};
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
     update_cell!(PT, cell)
     retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
     if is_invalid_startvalue(retcode)
-        track!(PT.toric_tracker, x∞, 2*PT.s₀[], 0.0)
+        track!(PT.toric_tracker, x∞, 2 * PT.s₀[], 0.0)
     end
-    track!(PT.generic_tracker, current_x(PT.toric_tracker))
+    track!(
+        PT.generic_tracker,
+        current_x(PT.toric_tracker);
+        accuracy = accuracy,
+        max_corrector_iters = max_corrector_iters,
+    )
 end
 
 function track(
     tracker::PolyhedralTracker,
     cell_x::Tuple{MixedCell,Vector{ComplexF64}};
-    path_number::Union{Int,Nothing} = nothing,
     details::Symbol = :default,
+    path_number::Union{Int,Nothing} = nothing,
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
 )
-    track!(tracker, cell_x)
+    track!(tracker, cell_x; accuracy = accuracy, max_corrector_iters = max_corrector_iters,)
     PathResult(tracker, cell_x, path_number; details = details)
 end
 

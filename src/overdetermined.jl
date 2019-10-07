@@ -37,8 +37,18 @@ end
 
 result_type(OT::OverdeterminedTracker) = result_type(OT.tracker)
 prepare!(OT::OverdeterminedTracker, S) = prepare!(OT.tracker, S)
-function track!(OT::OverdeterminedTracker, x)
-    retcode = track!(OT.tracker, x)
+function track!(
+    OT::OverdeterminedTracker,
+    x;
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
+)
+    retcode = track!(
+        OT.tracker,
+        x;
+        accuracy = accuracy,
+        max_corrector_iters = max_corrector_iters,
+    )
     is_success(retcode) || return retcode
 
     # We take the solution and try an overdetermined Newton method to see whether this also
@@ -52,7 +62,7 @@ function track!(OT::OverdeterminedTracker, x)
         OT.jacobian,
         norm(OT.tracker),
         OT.newton;
-        tol = accuracy(OT.tracker),
+        tol = min_accuracy(OT.tracker),
         # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
         # solutions that we bounce away from a good solution.
         full_steps = 1,
@@ -87,11 +97,13 @@ end
 
 function track(
     tracker::OverdeterminedTracker,
-    x,
+    x;
     path_number::Union{Int,Nothing} = nothing,
+    accuracy::Union{Nothing,Float64} = nothing,
+    max_corrector_iters::Union{Nothing,Int} = nothing,
     details::Symbol = :default,
 )
-    track!(tracker, x)
+    track!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
     PathResult(tracker, x, path_number; details = details)
 end
 

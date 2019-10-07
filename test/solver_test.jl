@@ -29,10 +29,17 @@
         result_jumping = solve!(solver, starts; path_jumping_check = false)
         @test nsolutions(result_jumping) < 32
 
-        result = solve!(solver, starts; path_jumping_check = true)
-        @test nsolutions(result) == 32
-        @test all(is_nonsingular, result)
-        @test all(is_success, result)
+        for threading in [false, true]
+            result = solve!(
+                solver,
+                starts;
+                path_jumping_check = true,
+                threading = threading,
+            )
+            @test nsolutions(result) == 32
+            @test all(is_nonsingular, result)
+            @test all(is_success, result)
+        end
 
         # check that path_jumping_check is on by default
         result2 = solve!(solver, starts)
@@ -57,7 +64,7 @@
             start_system = :polyhedral,
             only_torus = true,
         )
-        result = solve!(solver, starts)
+        result = solve!(solver, starts, threading = false)
         @test nsolutions(result) == 3
         @test ntracked(result) == 3
 
@@ -187,6 +194,12 @@
         f = [x * z - y^2, y - z^2, x - y * z, x + y + z + 1]
 
         @test nsolutions(solve(f; seed = 213412)) == 3
+        @test nsolutions(solve(
+            f;
+            seed = 213412,
+            start_system = :polyhedral,
+            threading = false,
+        )) == 3
         @test nsolutions(solve(f; seed = 213412, start_system = :polyhedral)) == 3
 
         minors = include(joinpath(@__DIR__, "examples", "3_by_5_minors.jl"))
@@ -247,7 +260,8 @@
             stop_early_cb = r -> begin
                 first_result = r
                 true
-            end
+            end,
+            threading = false,
         )
         @test length(results) == 1
         @test first(results) == first_result
@@ -257,7 +271,29 @@
             [(x - 3) * (x + 6) * (x + 2)];
             system = FPSystem,
             stop_early_cb = r -> (nresults += 1) == 2,
+            threading = false,
         )
         @test length(result) == 2
+
+
+        # threading
+        @polyvar x y z
+        first_result = nothing
+        # this has 5^3 = 125 solutions, so we should definitely stop early if we
+        # have less than 64 threads
+        results = solve(
+            [
+             (x - 3) * (x + 6) * (x + 2) * (x - 2) * (x + 2.5),
+             (y + 2) * (y - 2) * (y + 3) * (y + 5) * (y - 1),
+             (z + 2) * (z - 2) * (z + 3) * (z + 5) * (z - 2.1),
+            ];
+            system = FPSystem,
+            stop_early_cb = r -> begin
+                first_result = r
+                true
+            end,
+            threading = true,
+        )
+        @test length(results) < 125
     end
 end
