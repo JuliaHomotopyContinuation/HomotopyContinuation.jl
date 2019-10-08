@@ -350,7 +350,12 @@ is_homogeneous(H::AbstractHomotopy) = is_homogeneous(FixedHomotopy(H, rand()))
 """
 function problem_startsolutions end
 
-function problem_startsolutions(args...; seed = randseed(), variable_ordering = nothing, kwargs...)
+function problem_startsolutions(
+    args...;
+    seed = randseed(),
+    variable_ordering = nothing,
+    kwargs...,
+)
     Random.seed!(seed)
     supported, rest = splitkwargs(kwargs, input_supported_keywords)
     input, startsolutions = input_startsolutions(
@@ -359,7 +364,13 @@ function problem_startsolutions(args...; seed = randseed(), variable_ordering = 
         supported...,
     )
     if variable_ordering !== nothing
-        problem_startsolutions(input, startsolutions, seed; variables = variable_ordering, rest...)
+        problem_startsolutions(
+            input,
+            startsolutions,
+            seed;
+            variables = variable_ordering,
+            rest...,
+        )
     else
         problem_startsolutions(input, startsolutions, seed; rest...)
     end

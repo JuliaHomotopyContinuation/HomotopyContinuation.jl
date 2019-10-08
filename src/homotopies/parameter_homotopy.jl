@@ -29,17 +29,23 @@ are stored as a tuple `γ` or as `γ=nothing`
 This is a non-unicode variant where `γ₁=start_parameters`, `γ₀=target_parameters`,
 `γ₁=start_gamma`, `γ₀=target_gamma`.
 """
-mutable struct ParameterHomotopy{Sys<:AbstractSystem, T<:Number} <: AbstractHomotopy
+mutable struct ParameterHomotopy{Sys<:AbstractSystem,T<:Number} <: AbstractHomotopy
     F::Sys
-    p::NTuple{2, Vector{T}}
-    γ::Union{Nothing, NTuple{2, ComplexF64}}
+    p::NTuple{2,Vector{T}}
+    γ::Union{Nothing,NTuple{2,ComplexF64}}
 end
 
-function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::AbstractVector;
-    start_gamma=nothing, γ₀ = start_gamma,
-    target_gamma=nothing, γ₁ = target_gamma)
+function ParameterHomotopy(
+    F::AbstractSystem,
+    p₁::AbstractVector,
+    p₀::AbstractVector;
+    start_gamma = nothing,
+    γ₀ = start_gamma,
+    target_gamma = nothing,
+    γ₁ = target_gamma,
+)
 
-    length(p₁) == length(p₀) || error("Length of parameters provided doesn't match.")
+    length(p₁) == length(p₀) || error("Length of parameters provided doesn't match.")
 
     γ = (γ₁ === nothing || γ₀ === nothing) ? nothing : (γ₁, γ₀)
     T = promote_type(Float64, eltype(p₁), eltype(p₀))
@@ -48,33 +54,48 @@ function ParameterHomotopy(F::AbstractSystem, p₁::AbstractVector, p₀::Abstra
     ParameterHomotopy(F, p, γ)
 end
 
-function ParameterHomotopy(F::AbstractSystem;
-    start_parameters=nothing, p₁ = start_parameters,
-    target_parameters=nothing, p₀ = target_parameters,
-    kwargs...)
-    (p₁ !== nothing && p₀ !== nothing) || error("Parameters not provided for ParameterHomotopy")
+function ParameterHomotopy(
+    F::AbstractSystem;
+    start_parameters = nothing,
+    p₁ = start_parameters,
+    target_parameters = nothing,
+    p₀ = target_parameters,
+    kwargs...,
+)
+    (p₁ !== nothing && p₀ !== nothing) ||
+    error("Parameters not provided for ParameterHomotopy")
     ParameterHomotopy(F, p₁, p₀; kwargs...)
 end
 
-function ParameterHomotopy(F::Vector{T},
+function ParameterHomotopy(
+    F::Vector{T},
     parameters::AbstractVector{V};
-    variables=setdiff(MP.variables(F), parameters),
-    start_parameters=randn(ComplexF64, length(parameters)),
-    target_parameters=randn(ComplexF64, length(parameters)),
-    kwargs...) where {T<:MP.AbstractPolynomialLike, V<:MP.AbstractVariable}
-    G = SPSystem(F; variables=variables, parameters=parameters)
-    ParameterHomotopy(G; start_parameters=start_parameters,
-        target_parameters=target_parameters, kwargs...)
+    variables = setdiff(MP.variables(F), parameters),
+    start_parameters = randn(ComplexF64, length(parameters)),
+    target_parameters = randn(ComplexF64, length(parameters)),
+    kwargs...,
+) where {T<:MP.AbstractPolynomialLike,V<:MP.AbstractVariable}
+    G = SPSystem(F; variables = variables, parameters = parameters)
+    ParameterHomotopy(
+        G;
+        start_parameters = start_parameters,
+        target_parameters = target_parameters,
+        kwargs...,
+    )
 end
 
-struct ParameterHomotopyCache{C<:AbstractSystemCache, T1<:Number, T2<:Number} <: AbstractHomotopyCache
+struct ParameterHomotopyCache{
+    C<:AbstractSystemCache,
+    T1<:Number,
+    T2<:Number,
+} <: AbstractHomotopyCache
     F_cache::C
     pt::Vector{T1}
     ∂p∂t::Vector{T1}
     J_p::Matrix{T2}
 end
 
-(H::ParameterHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::ParameterHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)
 
 function cache(H::ParameterHomotopy, x, t)
     if H.γ === nothing
@@ -105,7 +126,7 @@ nparameters(H::ParameterHomotopy) = length(H.p[1])
 
 Update the parameters `p` and `γ` of `H`.
 """
-function set_parameters!(H::ParameterHomotopy, p::Tuple, γ=nothing)
+function set_parameters!(H::ParameterHomotopy, p::Tuple, γ = nothing)
     H.p[1] .= p[1]
     H.p[2] .= p[2]
     H.γ = γ
@@ -137,7 +158,12 @@ end
 
 Update the parameters `p` and `γ` of `H`.
 """
-function set_parameters!(H::ParameterHomotopy, p₁::AbstractVector, p₀::AbstractVector, γ=nothing)
+function set_parameters!(
+    H::ParameterHomotopy,
+    p₁::AbstractVector,
+    p₀::AbstractVector,
+    γ = nothing,
+)
     set_parameters!(H, (p₁, p₀), γ)
 end
 
@@ -180,21 +206,40 @@ end
 end
 
 
-@propagate_inbounds function evaluate!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function evaluate!(
+    u,
+    H::ParameterHomotopy,
+    x,
+    t,
+    c::ParameterHomotopyCache,
+)
     evaluate!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function evaluate(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     evaluate(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-@propagate_inbounds function jacobian!(u, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function jacobian!(
+    u,
+    H::ParameterHomotopy,
+    x,
+    t,
+    c::ParameterHomotopyCache,
+)
     jacobian!(u, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 function jacobian(H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
     jacobian(H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 
-@propagate_inbounds function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t, c::ParameterHomotopyCache)
+@propagate_inbounds function evaluate_and_jacobian!(
+    u,
+    U,
+    H::ParameterHomotopy,
+    x,
+    t,
+    c::ParameterHomotopyCache,
+)
     evaluate_and_jacobian!(u, U, H.F, x, p!(c.pt, H, t), c.F_cache)
 end
 

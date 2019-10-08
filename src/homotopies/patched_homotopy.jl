@@ -5,7 +5,7 @@ export PatchedHomotopy, PatchedHomotopyCache
 
 Augment the homotopy `H` with the given patch `v`. This results in the system `[H(x,t); v ⋅ x - 1]`
 """
-struct PatchedHomotopy{H<:AbstractHomotopy, PS<:AbstractAffinePatchState} <: AbstractHomotopy
+struct PatchedHomotopy{H<:AbstractHomotopy,PS<:AbstractAffinePatchState} <: AbstractHomotopy
     homotopy::H
     patch::PS
 end
@@ -19,7 +19,7 @@ function Base.size(H::PatchedHomotopy)
     (m + nequations(H.patch), n)
 end
 
-struct PatchedHomotopyCache{HC, T} <: AbstractHomotopyCache
+struct PatchedHomotopyCache{HC,T} <: AbstractHomotopyCache
     cache::HC
     A::Matrix{T} # intermediate storage of the jacobian
     b::Vector{T} # intermediate storage for the evaluation
@@ -36,7 +36,7 @@ function evaluate!(u, H::PatchedHomotopy, x, t, c::PatchedHomotopyCache)
 
     # H(x, t)
     evaluate!(c.b, H.homotopy, x, t, c.cache)
-    @inbounds for i=1:M
+    @inbounds for i = 1:M
         u[i] = c.b[i]
     end
     evaluate!(u, H.patch, x)
@@ -46,7 +46,7 @@ function jacobian!(U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache
     M, N = size(H.homotopy)
     # J_H(x, t)
     jacobian!(c.A, H.homotopy, x, t, c.cache)
-    @inbounds for j=1:N, i=1:M
+    @inbounds for j = 1:N, i = 1:M
         U[i, j] = c.A[i, j]
     end
     jacobian!(U, H.patch, x)
@@ -57,25 +57,32 @@ function dt!(u, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
     M, N = size(H.homotopy)
     # [H(x,t); v ⋅ x - 1]/∂t = [∂H(x,t)/∂t; 0]
     dt!(c.b, H.homotopy, x, t, c.cache)
-    @inbounds for i=1:M
+    @inbounds for i = 1:M
         u[i] = c.b[i]
     end
-    for i=1:nequations(H.patch)
+    for i = 1:nequations(H.patch)
         u[M+i] = zero(eltype(u))
     end
     u
 end
 
-function evaluate_and_jacobian!(u, U, H::PatchedHomotopy, x::PVector, t, c::PatchedHomotopyCache)
+function evaluate_and_jacobian!(
+    u,
+    U,
+    H::PatchedHomotopy,
+    x::PVector,
+    t,
+    c::PatchedHomotopyCache,
+)
     M, N = size(H.homotopy)
     evaluate_and_jacobian!(c.b, c.A, H.homotopy, x, t, c.cache)
 
-    @inbounds for j=1:N, i=1:M
+    @inbounds for j = 1:N, i = 1:M
         U[i, j] = c.A[i, j]
     end
     jacobian!(U, H.patch, x)
 
-    @inbounds for i=1:M
+    @inbounds for i = 1:M
         u[i] = c.b[i]
     end
     evaluate!(u, H.patch, x)
@@ -88,16 +95,16 @@ function jacobian_and_dt!(U, u, H::PatchedHomotopy, x::PVector, t, c::PatchedHom
     A, b = c.A, c.b
     jacobian_and_dt!(A, b, H.homotopy, x, t, c.cache)
     # jacobian
-    @inbounds for j=1:N, i=1:M
+    @inbounds for j = 1:N, i = 1:M
         U[i, j] = A[i, j]
     end
     jacobian!(U, H.patch, x)
 
     # dt
-    @inbounds for i=1:M
+    @inbounds for i = 1:M
         u[i] = b[i]
     end
-    for i=1:nequations(H.patch)
+    for i = 1:nequations(H.patch)
         u[M+i] = zero(eltype(u))
     end
 

@@ -10,8 +10,11 @@ struct FPSystem{T} <: AbstractSystem
 end
 
 FPSystem(polys::Vector{<:MP.AbstractPolynomial}, vars) = FPSystem(FP.System(polys, vars))
-function FPSystem(polys::Vector{<:MP.AbstractPolynomial};
-    variables=nothing, parameters=nothing)
+function FPSystem(
+    polys::Vector{<:MP.AbstractPolynomial};
+    variables = nothing,
+    parameters = nothing,
+)
 
     parameters === nothing || error("Parameters are not supported by FPSystem")
 
@@ -20,7 +23,7 @@ function FPSystem(polys::Vector{<:MP.AbstractPolynomial};
     else
         FPSystem(FP.System(polys, variables))
     end
- end
+end
 
 struct FPSystemCache{JC<:FP.JacobianConfig} <: AbstractSystemCache
     config::JC
@@ -30,9 +33,11 @@ cache(F::FPSystem, x) = FPSystemCache(FP.config(F.system, x))
 
 Base.size(F::FPSystem) = (length(F.system), FP.nvariables(F.system))
 
-@propagate_inbounds evaluate!(u, F::FPSystem, x, c::FPSystemCache) = FP.evaluate!(u, F.system, x, c.config)
+@propagate_inbounds evaluate!(u, F::FPSystem, x, c::FPSystemCache) =
+    FP.evaluate!(u, F.system, x, c.config)
 evaluate(F::FPSystem, x, c::FPSystemCache) = FP.evaluate(F.system, x, c.config)
-@propagate_inbounds jacobian!(U, F::FPSystem, x, c::FPSystemCache) = FP.jacobian!(U, F.system, x, c.config)
+@propagate_inbounds jacobian!(U, F::FPSystem, x, c::FPSystemCache) =
+    FP.jacobian!(U, F.system, x, c.config)
 jacobian(F::FPSystem, x, c::FPSystemCache) = FP.jacobian(F.system, x, c.config)
 @propagate_inbounds function evaluate_and_jacobian!(u, U, F::FPSystem, x, c::FPSystemCache)
     FP.evaluate_and_jacobian!(u, U, F.system, x, c.config)

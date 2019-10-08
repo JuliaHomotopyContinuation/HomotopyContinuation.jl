@@ -1,4 +1,11 @@
-export UniquePoints, multiplicities, is_contained, add!, simple_add!, empty!, points, unique_points
+export UniquePoints,
+       multiplicities,
+       is_contained,
+       add!,
+       simple_add!,
+       empty!,
+       points,
+       unique_points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1
@@ -9,32 +16,46 @@ const NOT_FOUND_AND_REAL = -2
 #############
 struct SearchBlock{T}
     elements::Vector{Int32}
-    children::Vector{Union{Nothing, SearchBlock{T}}}
+    children::Vector{Union{Nothing,SearchBlock{T}}}
     capacity::Int
-    distances_cache::Vector{Vector{Tuple{T, Int}}} # one per thread
+    distances_cache::Vector{Vector{Tuple{T,Int}}} # one per thread
 end
 
-function SearchBlock(::Type{T}; capacity = DEFAULT_CAPACITY[]) where T
-    children = Vector{Union{Nothing, SearchBlock{T}}}(nothing, capacity)
-    distances_cache = [distance_cache(T, capacity) for _=1:Threads.nthreads()]
+function SearchBlock(::Type{T}; capacity = DEFAULT_CAPACITY[]) where {T}
+    children = Vector{Union{Nothing,SearchBlock{T}}}(nothing, capacity)
+    distances_cache = [distance_cache(T, capacity) for _ = 1:Threads.nthreads()]
     SearchBlock(Int32[], children, capacity, distances_cache)
 end
 
-function distance_cache(::Type{T}, capacity) where T
-    [(typemax(T), i) for i=1:capacity]
+function distance_cache(::Type{T}, capacity) where {T}
+    [(typemax(T), i) for i = 1:capacity]
 end
 
-function SearchBlock(::Type{T}, index::Int; kwargs...) where T
+function SearchBlock(::Type{T}, index::Int; kwargs...) where {T}
     block = SearchBlock(T; kwargs...)
     push!(block.elements, index)
     block
 end
 
-function is_contained(block::SearchBlock{T}, x::NTuple{N,S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, N, S, F<:Function}
+function is_contained(
+    block::SearchBlock{T},
+    x::NTuple{N,S},
+    tol::Real,
+    points::Vector,
+    distance::F,
+    threadid = Threads.threadid(),
+) where {T,N,S,F<:Function}
     is_contained(block, SVector{N,S}(x), tol, points, distance)
 end
 
-function is_contained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, points::Vector, distance::F, threadid=Threads.threadid()) where {T, S, F<:Function}
+function is_contained(
+    block::SearchBlock{T},
+    x::AbstractVector{S},
+    tol::Real,
+    points::Vector,
+    distance::F,
+    threadid = Threads.threadid(),
+) where {T,S,F<:Function}
     if isempty(block.elements)
         return NOT_FOUND
     end
@@ -136,10 +157,15 @@ function is_contained(block::SearchBlock{T}, x::AbstractVector{S}, tol::Real, po
 
     return NOT_FOUND
 end
-is_contained(::Nothing, x::AbstractVector, tol::Real, points::Vector, distance, threadid) = NOT_FOUND
+is_contained(::Nothing, x::AbstractVector, tol::Real, points::Vector, distance, threadid) =
+    NOT_FOUND
 
 # This assumes that distances_cache is filled
-function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.threadid()) where {T, V}
+function _insert!(
+    block::SearchBlock{T},
+    index::Integer,
+    threadid = Threads.threadid(),
+) where {T,V}
     if isempty(block.elements)
         push!(block.elements, index)
         return
@@ -151,7 +177,7 @@ function _insert!(block::SearchBlock{T}, index::Integer, threadid=Threads.thread
         push!(block.elements, index)
     # we have no children so far, so create a new one
     elseif block.children[minᵢ] === nothing
-        block.children[minᵢ] = SearchBlock(T, index; capacity=block.capacity)
+        block.children[minᵢ] = SearchBlock(T, index; capacity = block.capacity)
     else # a block already exists, so recurse
         _insert!(block.children[minᵢ], index, threadid)
     end
@@ -208,7 +234,7 @@ julia> points(UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -
  [1.0, 0.5]
 ```
 """
-struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, GroupActions}}
+struct UniquePoints{V<:AbstractVector,T,F<:Function,MaybeGA<:Union{Nothing,GroupActions}}
     root::SearchBlock{T}
     points::Vector{V}
     distance_function::F
@@ -216,17 +242,20 @@ struct UniquePoints{V<:AbstractVector, T, F<:Function, MaybeGA<:Union{Nothing, G
     check_real::Bool
 end
 
-function UniquePoints(::Type{V}, distance::F;
-    group_action=nothing,
-    group_actions=group_action === nothing ? nothing : GroupActions(group_action),
-    check_real::Bool=true) where {T<:Number, V<:AbstractVector{T}, F<:Function}
+function UniquePoints(
+    ::Type{V},
+    distance::F;
+    group_action = nothing,
+    group_actions = group_action === nothing ? nothing : GroupActions(group_action),
+    check_real::Bool = true,
+) where {T<:Number,V<:AbstractVector{T},F<:Function}
 
     if group_actions isa GroupActions
-       actions = group_actions
-   elseif group_actions === nothing
-       actions = nothing
+        actions = group_actions
+    elseif group_actions === nothing
+        actions = nothing
     else
-       actions = GroupActions(group_actions)
+        actions = GroupActions(group_actions)
     end
 
     root = SearchBlock(real(T))
@@ -240,12 +269,19 @@ function UniquePoints(v::AbstractVector{<:Number}, distance::Function; kwargs...
     data
 end
 
-function UniquePoints(v::AbstractVector{<:AbstractVector}, distance::F; tol::Real=1e-5, kwargs...) where {F<:Function}
+function UniquePoints(
+    v::AbstractVector{<:AbstractVector},
+    distance::F;
+    tol::Real = 1e-5,
+    kwargs...,
+) where {F<:Function}
     data = UniquePoints(eltype(v), distance; kwargs...)
-    add!(data, v; tol=tol)
+    add!(data, v; tol = tol)
 end
-UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V, F<:Function} = UniquePoints(V, distance; kwargs...)
-UniquePoints(v; distance=euclidean_distance, kwargs...) = UniquePoints(v, distance; kwargs...)
+UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V,F<:Function} =
+    UniquePoints(V, distance; kwargs...)
+UniquePoints(v; distance = euclidean_distance, kwargs...) =
+    UniquePoints(v, distance; kwargs...)
 
 function Base.show(io::IO, data::UniquePoints)
     print(io, typeof(data), " with ", length(points(data)), " points")
@@ -274,13 +310,18 @@ If `x` is contained in `data` by using the tolerance `tol` return the index
 of the data point which already exists. If the data point is not existing `-1`
 is returned. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added.
 """
-function is_contained(data::UniquePoints, x, val=Val{false}(); tol::Real=1e-5)
+function is_contained(data::UniquePoints, x, val = Val{false}(); tol::Real = 1e-5)
     is_contained(data, x, val, tol)
 end
-function is_contained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N, T}
+function is_contained(data::UniquePoints, x::NTuple{N,T}, val, tol::Real) where {N,T}
     is_contained(data, SVector{N,T}(x), val, tol)
 end
-function is_contained(data::UniquePoints{T}, x::AbstractVector{S}, ::Val{Index}, tol::Real) where {T,S,Index}
+function is_contained(
+    data::UniquePoints{T},
+    x::AbstractVector{S},
+    ::Val{Index},
+    tol::Real,
+) where {T,S,Index}
     index = is_contained(data.root, x, tol, data.points, data.distance_function)
     if index == NOT_FOUND
         if data.group_actions !== nothing # extra if statement since inference cannot look through &&
@@ -313,7 +354,12 @@ If `x` is contained in `data` by using the tolerance `tol` to decide for duplica
 of the data point which already exists. If the data point is not existing add it to `data` and
 return `-1`. If `data` has the option `check_real` enabled, a `-2` will be returned once a real vector was added. The element will be the last element of `points(data)`.
 """
-function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol::Real=1e-5)
+function add!(
+    data::UniquePoints,
+    x::AbstractVector{<:Number},
+    ::Val{true};
+    tol::Real = 1e-5,
+)
     idx = is_contained(data, x, Val(true), tol)
     idx == NOT_FOUND || return idx
 
@@ -340,13 +386,23 @@ function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{true}; tol:
         return NOT_FOUND
     end
 end
-function add!(data::UniquePoints, x::AbstractVector{<:Number}, ::Val{false}=Val(false); tol::Real=1e-5)
-    idx = add!(data, x, Val(true); tol=tol)
-    idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
+function add!(
+    data::UniquePoints,
+    x::AbstractVector{<:Number},
+    ::Val{false} = Val(false);
+    tol::Real = 1e-5,
+)
+    idx = add!(data, x, Val(true); tol = tol)
+    idx == NOT_FOUND || idx == NOT_FOUND_AND_REAL
 end
-function add!(data::UniquePoints, v::AbstractVector{<:AbstractVector}, val::Val=Val(false); tol::Real=1e-5)
+function add!(
+    data::UniquePoints,
+    v::AbstractVector{<:AbstractVector},
+    val::Val = Val(false);
+    tol::Real = 1e-5,
+)
     for vᵢ in v
-        add!(data, vᵢ; tol=tol)
+        add!(data, vᵢ; tol = tol)
     end
     data
 end
@@ -420,12 +476,19 @@ function multiplicities(f, v; kwargs...) where {F<:Function}
     _multiplicities(f, v; kwargs...)
 end
 default_distance(f, v) = isa(f(first(v)), PVector) ? fubini_study : euclidean_distance
-function _multiplicities(f, v; distance=default_distance(f,v), tol::Float64=1e-5, check_real=false, kwargs...) where {F<:Function}
-    mults = Dict{Int, Vector{Int}}()
+function _multiplicities(
+    f,
+    v;
+    distance = default_distance(f, v),
+    tol::Float64 = 1e-5,
+    check_real = false,
+    kwargs...,
+) where {F<:Function}
+    mults = Dict{Int,Vector{Int}}()
     positions = Vector{Int32}()
     x₀ = f(first(v))
     T = typeof(similar(x₀, promote_type(eltype(x₀), Float64)))
-    data = UniquePoints(T, distance; check_real=check_real, kwargs...)
+    data = UniquePoints(T, distance; check_real = check_real, kwargs...)
     for (i, vᵢ) in enumerate(v)
         k = add!(data, f(vᵢ), Val(true); tol = tol)
         if k > 0
@@ -461,4 +524,5 @@ julia> unique_points(pts; group_action = x -> [x[2],x[1]])
  [1.0, 0.5]
 ```
 """
-unique_points(v::AbstractVector{<:AbstractVector}; kwargs...) = points(UniquePoints(v; kwargs...))
+unique_points(v::AbstractVector{<:AbstractVector}; kwargs...) =
+    points(UniquePoints(v; kwargs...))

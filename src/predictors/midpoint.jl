@@ -17,16 +17,25 @@ function cache(::Midpoint, H, x, ẋ, t)
     MidpointCache(dt(H, x, t), copy(ẋ))
 end
 #
-function predict!(xnext, cache::MidpointCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
+function predict!(
+    xnext,
+    cache::MidpointCache,
+    H::HomotopyWithCache,
+    x,
+    t,
+    Δt,
+    ẋ,
+    Jac::JacobianMonitor,
+)
     dt, mk₂ = cache.dt, cache.mk₂
     n = length(xnext)
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         xnext[i] = x[i] + 0.5Δt * ẋ[i]
     end
 
     minus_ẋ!(mk₂, H, xnext, t + 0.5Δt, Jac, dt)
 
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         xnext[i] = x[i] - Δt * mk₂[i]
     end
 

@@ -11,10 +11,14 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     gamma::Complex{Float64}
 
 end
-function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem; gamma=randomish_gamma())
+function StraightLineHomotopy(
+    start::AbstractSystem,
+    target::AbstractSystem;
+    gamma = randomish_gamma(),
+)
     StraightLineHomotopy(start, target, gamma)
 end
-(H::StraightLineHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::StraightLineHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)
 
 """
     StraightLineHomotopyCache
@@ -22,7 +26,7 @@ end
 An simple cache for `StartTargetHomotopy`s consisting of the caches for the
 start and target system as well as a `Vector` and a `Matrix`.
 """
-struct StraightLineHomotopyCache{SC, TC, T1, T2} <: AbstractHomotopyCache
+struct StraightLineHomotopyCache{SC,TC,T1,T2} <: AbstractHomotopyCache
     start::SC
     target::TC
 
@@ -54,7 +58,13 @@ Obtain the gamma used in the StraightLineHomotopy.
 """
 γ(H::StraightLineHomotopy) = gamma(H)
 
-@propagate_inbounds function evaluate!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function evaluate!(
+    u,
+    H::StraightLineHomotopy,
+    x,
+    t,
+    c::StraightLineHomotopyCache,
+)
     evaluate!(c.u, H.start, x, c.start)
     evaluate!(u, H.target, x, c.target)
 
@@ -66,7 +76,13 @@ Obtain the gamma used in the StraightLineHomotopy.
     u
 end
 
-@propagate_inbounds function dt!(u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function dt!(
+    u,
+    H::StraightLineHomotopy,
+    x,
+    t,
+    c::StraightLineHomotopyCache,
+)
     evaluate!(c.u, H.start, x, c.start)
     evaluate!(u, H.target, x, c.target)
 
@@ -76,7 +92,13 @@ end
     u
 end
 
-@propagate_inbounds function jacobian!(U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function jacobian!(
+    U,
+    H::StraightLineHomotopy,
+    x,
+    t,
+    c::StraightLineHomotopyCache,
+)
     @inbounds jacobian!(c.U, H.start, x, c.start)
     @inbounds jacobian!(U, H.target, x, c.target)
 
@@ -87,7 +109,14 @@ end
     U
 end
 
-@propagate_inbounds function evaluate_and_jacobian!(u, U, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function evaluate_and_jacobian!(
+    u,
+    U,
+    H::StraightLineHomotopy,
+    x,
+    t,
+    c::StraightLineHomotopyCache,
+)
     evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
     evaluate_and_jacobian!(u, U, H.target, x, c.target)
 
@@ -103,7 +132,14 @@ end
 end
 
 
-@propagate_inbounds function jacobian_and_dt!(U, u, H::StraightLineHomotopy, x, t, c::StraightLineHomotopyCache)
+@propagate_inbounds function jacobian_and_dt!(
+    U,
+    u,
+    H::StraightLineHomotopy,
+    x,
+    t,
+    c::StraightLineHomotopyCache,
+)
     evaluate_and_jacobian!(c.u, c.U, H.start, x, c.start)
     evaluate_and_jacobian!(u, U, H.target, x, c.target)
 

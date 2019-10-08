@@ -123,12 +123,11 @@
         )
         @test length(result.solutions) == 2
 
-        roots_of_unity(s) =
-            begin
-                t = cis(π * 2 / 3)
-                t² = t * t
-                (vcat(t * s[1], t * s[2], s[3:end]), vcat(t² * s[1], t² * s[2], s[3:end]))
-            end
+        roots_of_unity(s) = begin
+            t = cis(π * 2 / 3)
+            t² = t * t
+            (vcat(t * s[1], t * s[2], s[3:end]), vcat(t² * s[1], t² * s[2], s[3:end]))
+        end
 
         result = monodromy_solve(
             F,

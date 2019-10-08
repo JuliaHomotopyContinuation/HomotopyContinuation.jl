@@ -350,7 +350,7 @@ function ldiv_adj_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractV
     n = size(A, 1)
     @inbounds for j = n:-1:1
         z = b[j]
-        for i = n:-1:j + 1
+        for i = n:-1:j+1
             z -= conj(A[i, j]) * x[i]
         end
         x[j] = z
@@ -554,7 +554,7 @@ function iterative_refinement_step!(
     b,
     norm::AbstractNorm = InfNorm(),
     ::Type{T} = eltype(x̂),
-) where T
+) where {T}
     iterative_refinement_step!(x̂, WS, x̂, b, norm, T)
 end
 function iterative_refinement_step!(
@@ -564,7 +564,7 @@ function iterative_refinement_step!(
     b,
     norm::AbstractNorm = InfNorm(),
     ::Type{T} = eltype(x̂),
-) where T
+) where {T}
     residual!(WS.ir_r, WS.A, x̂, b, T)
     δx = LA.ldiv!(WS.ir_δx, WS, WS.ir_r)
     for i in eachindex(x)
@@ -787,7 +787,7 @@ function row_scaling!(
     WS::MatrixWorkspace{T},
     norm::Union{InfNorm,WeightedNorm{<:InfNorm}},
     r::Union{Nothing,AbstractVector{<:Real}} = nothing,
-) where T
+) where {T}
     d = WS.row_scaling
     d .= one(T)
     m = length(d)
@@ -816,7 +816,7 @@ function row_scaling!(
         for i = 2:m
             norm_scaled_r = max(norm_scaled_r, r[i] / max(d[i], d̂))
         end
-        for i in 1:length(d)
+        for i = 1:length(d)
             r̂ᵢ = r[i] / norm_scaled_r
             if isfinite(r̂ᵢ)
                 d[i] = max(d[i], r̂ᵢ)
@@ -879,7 +879,7 @@ end
 updated!(JM::JacobianMonitor) = updated!(JM.J)
 jacobian(JM::JacobianMonitor) = JM.J
 
-function Base.show(io::IO, JM::JacobianMonitor{T}) where T
+function Base.show(io::IO, JM::JacobianMonitor{T}) where {T}
     println(io, "JacobianMonitor{$T}:")
     println(io, " • cond → ", round(JM.cond[], sigdigits = 5))
     println(io, " • forward_err → ", round(JM.forward_err[], sigdigits = 5))

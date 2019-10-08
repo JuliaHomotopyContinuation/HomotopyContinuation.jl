@@ -25,9 +25,9 @@ Base.size(H::BinomialHomotopy) = size(H.A)
 function evaluate!(u, H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     @unpack A, b, γ = H
     n = length(b)
-    @inbounds for i in 1:n
+    @inbounds for i = 1:n
         xAᵢ = one(x[1])
-        for j in 1:n
+        for j = 1:n
             if A[j, i] != 0
                 xAᵢ *= x[j]^A[j, i]
             end
@@ -40,7 +40,7 @@ end
 function dt!(u, H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     @unpack b, γ = H
     n = length(b)
-    @inbounds for i in 1:n
+    @inbounds for i = 1:n
         u[i] = b[i] - γ[i]
     end
     u
@@ -49,18 +49,18 @@ end
 function jacobian!(U, H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     @unpack A, b, γ = H
     n = length(b)
-    @inbounds for i in 1:n
+    @inbounds for i = 1:n
         xAᵢ = one(x[1])
-        for j in 1:n
+        for j = 1:n
             if A[j, i] != 0
                 xAᵢ *= x[j]^A[j, i]
             end
         end
-        for j in 1:n
-            if A[j,i] == 0
-                U[i,j] = 0
+        for j = 1:n
+            if A[j, i] == 0
+                U[i, j] = 0
             else
-                U[i,j] = A[j,i] * (@fastmath xAᵢ / x[j])
+                U[i, j] = A[j, i] * (@fastmath xAᵢ / x[j])
             end
         end
     end
@@ -70,20 +70,20 @@ end
 function evaluate_and_jacobian!(u, U, H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     @unpack A, b, γ = H
     n = length(b)
-    @inbounds for i in 1:n
+    @inbounds for i = 1:n
         xAᵢ = one(x[1])
-        for j in 1:n
+        for j = 1:n
             if A[j, i] != 0
                 xAᵢ *= x[j]^A[j, i]
             end
         end
         u[i] = xAᵢ - (t * γ[i] + (1.0 - t) * b[i])
 
-        for j in 1:n
-            if A[j,i] == 0
-                U[i,j] = 0
+        for j = 1:n
+            if A[j, i] == 0
+                U[i, j] = 0
             else
-                U[i,j] = A[j,i] * (@fastmath xAᵢ / x[j])
+                U[i, j] = A[j, i] * (@fastmath xAᵢ / x[j])
             end
         end
     end
@@ -95,7 +95,7 @@ function evaluate(H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     T = promote_type(eltype(x), ComplexF64)
     evaluate!(zeros(T, size(H.A, 1)), H, x, t, c)
 end
-(H::BinomialHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::BinomialHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)
 
 function jacobian(H::BinomialHomotopy, x, t, c::HomotopyNullCache)
     T = promote_type(eltype(x), ComplexF64)

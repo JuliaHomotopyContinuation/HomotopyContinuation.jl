@@ -1179,7 +1179,7 @@ function track(
     start_parameters !== nothing && start_parameters!(tracker, start_parameters)
     target_parameters !== nothing && target_parameters!(tracker, target_parameters)
 
-    track!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters,)
+    track!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
     PathResult(tracker, x, path_number; details = details)
 end
 
@@ -1210,7 +1210,7 @@ function track!(
     accuracy::Union{Nothing,Float64} = nothing,
     max_corrector_iters::Union{Nothing,Int} = nothing,
 )
-    init!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters,)
+    init!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
     while is_tracking(tracker.state.status)
         step!(tracker)
     end

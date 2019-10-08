@@ -553,12 +553,11 @@ TreeViews.hastreeview(::Result) = true
 TreeViews.hastreeview(::ProjectiveResult) = true
 TreeViews.numberofnodes(::Result) = 8
 TreeViews.numberofnodes(::ProjectiveResult) = 7
-TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") =
-    print(
-        io,
-        "<span class=\"syntax--support syntax--type syntax--julia\">" *
-        "Result{$(solution_type(x))}" * "</span>",
-    )
+TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") = print(
+    io,
+    "<span class=\"syntax--support syntax--type syntax--julia\">" *
+    "Result{$(solution_type(x))}" * "</span>",
+)
 
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
     s = statistics(x)

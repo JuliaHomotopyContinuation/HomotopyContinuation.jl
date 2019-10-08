@@ -11,7 +11,11 @@ struct FixedPointHomotopy{S<:AbstractSystem,T<:AbstractVector} <: AbstractHomoto
     gamma::Complex{Float64}
 
 end
-function FixedPointHomotopy(F::AbstractSystem, x₀::AbstractVector; gamma=randomish_gamma())
+function FixedPointHomotopy(
+    F::AbstractSystem,
+    x₀::AbstractVector;
+    gamma = randomish_gamma(),
+)
     FixedPointHomotopy(F, x₀, gamma)
 end
 
@@ -53,7 +57,7 @@ function evaluate!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
 
     u
 end
-(H::FixedPointHomotopy)(x, t, c=cache(H, x, t)) = evaluate(H, x, t, c)
+(H::FixedPointHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)
 
 function dt!(u, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
     evaluate!(u, H.F, x, c.F)
@@ -66,19 +70,26 @@ function jacobian!(U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
 
     U .= (1 - t) .* U
     γt = γ(H) * t
-    for i=1:length(x)
+    for i = 1:length(x)
         U[i, i] += γt
     end
     U
 end
 
-function evaluate_and_jacobian!(u, U, H::FixedPointHomotopy, x, t, c::FixedPointHomotopyCache)
+function evaluate_and_jacobian!(
+    u,
+    U,
+    H::FixedPointHomotopy,
+    x,
+    t,
+    c::FixedPointHomotopyCache,
+)
     evaluate_and_jacobian!(u, U, H.F, x, c.F)
 
     u .= (γ(H) * t) .* (x .- H.x₀) .+ (1 - t) .* u
     U .= (1 - t) .* U
     γt = γ(H) * t
-    for i=1:length(x)
+    for i = 1:length(x)
         U[i, i] += γt
     end
     U
@@ -91,7 +102,7 @@ function jacobian_and_dt!(U, u, H::FixedPointHomotopy, x, t, c::FixedPointHomoto
 
     U .= (1 - t) .* U
     γt = γ(H) * t
-    for i=1:length(x)
+    for i = 1:length(x)
         U[i, i] += γt
     end
     u .= γ(H) .* (x .- H.x₀) .- u

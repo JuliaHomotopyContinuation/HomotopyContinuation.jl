@@ -75,7 +75,7 @@ struct Solver{PT<:AbstractPathTracker}
 end
 
 function Solver(prob::AbstractProblem, start_solutions; kwargs...)
-    tracker = construct_tracker(prob, start_solutions; kwargs...,)
+    tracker = construct_tracker(prob, start_solutions; kwargs...)
 
     Solver([tracker], [SolveStats()])
 end

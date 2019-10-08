@@ -20,25 +20,34 @@ function cache(::RK3, H, x, ẋ, t)
     RK3Cache(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))
 end
 #
-function predict!(xnext, cache::RK3Cache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
+function predict!(
+    xnext,
+    cache::RK3Cache,
+    H::HomotopyWithCache,
+    x,
+    t,
+    Δt,
+    ẋ,
+    Jac::JacobianMonitor,
+)
     dt, mk₁, mk₂, mk₃ = cache.dt, cache.k1, cache.k2, cache.k3
     n = length(xnext)
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         mk₁[i] = -ẋ[i]
         xnext[i] = x[i] - 0.5Δt * mk₁[i]
     end
     minus_ẋ!(mk₂, H, xnext, t + 0.5Δt, Jac, dt)
 
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         xnext[i] = x[i] + Δt * mk₁[i] - 2Δt * mk₂[i]
     end
     minus_ẋ!(mk₃, H, xnext, t + Δt, Jac, dt)
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         xnext[i] = x[i] - Δt * mk₃[i]
     end
 
-    @inbounds for i=1:n
-        xnext[i] = x[i] - Δt/6 * (mk₁[i] + 4mk₂[i] + mk₃[i])
+    @inbounds for i = 1:n
+        xnext[i] = x[i] - Δt / 6 * (mk₁[i] + 4 * mk₂[i] + mk₃[i])
     end
 
     nothing

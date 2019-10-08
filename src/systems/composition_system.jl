@@ -5,7 +5,7 @@ export CompositionSystem
 
 A system representing the composition of polynomial maps.
 """
-struct CompositionSystem{S1<:AbstractSystem, S2<:AbstractSystem} <: AbstractSystem
+struct CompositionSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSystem
     # The system is g ∘ f
     g::S2 # Never a composition system
     f::S1 # Can be a CompositionSystem again
@@ -14,40 +14,57 @@ struct CompositionSystem{S1<:AbstractSystem, S2<:AbstractSystem} <: AbstractSyst
     f_has_parameters::Bool
 end
 
-function CompositionSystem(C::Composition, system_constructor;
-    variables=nothing, parameters=nothing, homvars=nothing)
+function CompositionSystem(
+    C::Composition,
+    system_constructor;
+    variables = nothing,
+    parameters = nothing,
+    homvars = nothing,
+)
     n = length(C.polys)
-    f = CompositionSystem(C.polys[n-1], C.polys[n], system_constructor;
-                    input_variables=variables, parameters=parameters, homvars=homvars)
-    for k in (n-2):-1:1
-        f = CompositionSystem(C.polys[k], f, system_constructor;
-                        parameters=parameters, homvars=homvars)
+    f = CompositionSystem(
+        C.polys[n-1],
+        C.polys[n],
+        system_constructor;
+        input_variables = variables,
+        parameters = parameters,
+        homvars = homvars,
+    )
+    for k = (n - 2):-1:1
+        f = CompositionSystem(
+            C.polys[k],
+            f,
+            system_constructor;
+            parameters = parameters,
+            homvars = homvars,
+        )
     end
     f
 end
 
-function CompositionSystem(g::Vector{<:MP.AbstractPolynomialLike},
-        f::Union{CompositionSystem, Vector{<:MP.AbstractPolynomialLike}},
-        system_constructor;
-        input_variables=nothing, parameters=nothing, homvars=nothing)
+function CompositionSystem(
+    g::Vector{<:MP.AbstractPolynomialLike},
+    f::Union{CompositionSystem,Vector{<:MP.AbstractPolynomialLike}},
+    system_constructor;
+    input_variables = nothing,
+    parameters = nothing,
+    homvars = nothing,
+)
 
-    vars = variables(g; parameters=parameters)
+    vars = variables(g; parameters = parameters)
     homvars_to_end!(vars, homvars)
-    G = system_constructor(g, variables=vars, parameters=parameters)
+    G = system_constructor(g, variables = vars, parameters = parameters)
 
     if isa(f, CompositionSystem)
-        CompositionSystem(G, f,
-            hasparameters(g, parameters), hasparameters(f))
+        CompositionSystem(G, f, hasparameters(g, parameters), hasparameters(f))
     else
-        F = system_constructor(f, variables=input_variables, parameters=parameters)
-        CompositionSystem(G, F,
-            hasparameters(g, parameters),
-            hasparameters(f, parameters))
+        F = system_constructor(f, variables = input_variables, parameters = parameters)
+        CompositionSystem(G, F, hasparameters(g, parameters), hasparameters(f, parameters))
     end
 end
 
 
-hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
+hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
 
 homvars_to_end!(variables, ::Nothing) = variables
 homvars_to_end!(vars, homvars::MP.AbstractVariable) = homvars_to_end!(vars, (homvars,))
@@ -57,22 +74,26 @@ function homvars_to_end!(vars, homvars)
     vars
 end
 
-struct CompositionSystemCache{C1<:AbstractSystemCache, C2<:AbstractSystemCache, T} <: AbstractSystemCache
+struct CompositionSystemCache{
+    C1<:AbstractSystemCache,
+    C2<:AbstractSystemCache,
+    T,
+} <: AbstractSystemCache
     cache_f::C1
     cache_g::C2
 
     eval_f::Vector{T}
     J_f::Matrix{T}
     J_g::Matrix{T}
-    Jp_f::Union{Nothing, Matrix{T}}
-    Jp_g::Union{Nothing, Matrix{T}}
+    Jp_f::Union{Nothing,Matrix{T}}
+    Jp_g::Union{Nothing,Matrix{T}}
 end
 
-function cache(C::CompositionSystem, x, p=nothing)
+function cache(C::CompositionSystem, x, p = nothing)
     f, g = C.f, C.g
     c_f = p === nothing ? cache(f, x) : cache(f, x, p)
     eval_f = p === nothing ? evaluate(f, x, c_f) : evaluate(f, x, p, c_f)
-    c_g =  p === nothing ? cache(g, eval_f) : cache(g, eval_f, p)
+    c_g = p === nothing ? cache(g, eval_f) : cache(g, eval_f, p)
     J_f = p === nothing ? jacobian(f, x, c_f) : jacobian(f, x, p, c_f)
     J_g = p === nothing ? jacobian(g, eval_f, c_g) : jacobian(g, eval_f, p, c_g)
     # need to bring eval_f, J_f, J_g to the same element type

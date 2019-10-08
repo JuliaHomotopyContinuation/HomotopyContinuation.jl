@@ -43,7 +43,7 @@
     @testset "ParameterHomotopy" begin
         F = equations(katsura(5))
         vars = variables(F)
-        H = ParameterHomotopy(F, vars[5:6], p₁=rand(2), p₀=rand(2))
+        H = ParameterHomotopy(F, vars[5:6], p₁ = rand(2), p₀ = rand(2))
         @test H isa AbstractHomotopy
         @test size(H) == (6, 4)
         @test size(H, 1) == 6
@@ -53,8 +53,14 @@
 
         HomotopyContinuation.homotopy_interface_test(H)
 
-        H = ParameterHomotopy(F, vars[5:6], p₁=rand(2), p₀=rand(2),
-            γ₁=randn(ComplexF64), γ₀=randn(ComplexF64))
+        H = ParameterHomotopy(
+            F,
+            vars[5:6],
+            p₁ = rand(2),
+            p₀ = rand(2),
+            γ₁ = randn(ComplexF64),
+            γ₀ = randn(ComplexF64),
+        )
         @test H isa ParameterHomotopy
         HomotopyContinuation.homotopy_interface_test(H)
     end
@@ -72,9 +78,7 @@
         F = SPSystem(equations(katsura(5)))
         G = SPSystem(equations(cyclic(6)))
         x = ProjectiveVectors.embed(rand(Complex{Float64}, 5))
-        H = PatchedHomotopy(StraightLineHomotopy(F, G),
-            OrthogonalPatch(),
-            x)
+        H = PatchedHomotopy(StraightLineHomotopy(F, G), OrthogonalPatch(), x)
         @test H isa AbstractHomotopy
         @test size(H) == (7, 6)
 
@@ -83,8 +87,8 @@
 
     @testset "Coefficient Homotopy" begin
         E = [[2 1 0; 0 0 0], [1 0; 1 0]]
-        start = [[1.0+0im, -3.0, 2.0], [2.0+0im, -2.0]]
-        target = [[2.0+0im, -2.0, 5.0], [3.0+0im, -1.0]]
+        start = [[1.0 + 0im, -3.0, 2.0], [2.0 + 0im, -2.0]]
+        target = [[2.0 + 0im, -2.0, 5.0], [3.0 + 0im, -1.0]]
         H = CoefficientHomotopy(E, start, target)
         x = randn(ComplexF64, 2)
         HomotopyContinuation.homotopy_interface_test(H, x)

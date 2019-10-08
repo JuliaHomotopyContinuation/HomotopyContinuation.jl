@@ -1114,7 +1114,7 @@ end
 function track_and_compute_trace(TTS::TraceTestSystem, S, l₀; kwargs...)
     for i = 1:3
         TTP = TraceTestPencil(TTS, l₀)
-        R₁ = solve(TTP, S, start_parameters = [0.0], target_parameters = [.1], kwargs...)
+        R₁ = solve(TTP, S, start_parameters = [0.0], target_parameters = [0.1], kwargs...)
         R₂ = solve(TTP, S, start_parameters = [0.0], target_parameters = [-.1], kwargs...)
         if nsolutions(R₁) ≠ length(S) || nsolutions(R₂) ≠ length(S)
             if i == 3

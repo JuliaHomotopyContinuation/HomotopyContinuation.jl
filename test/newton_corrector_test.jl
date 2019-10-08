@@ -2,7 +2,7 @@
     @testset "square" begin
         F = equations(griewank_osborne())
 
-        prob, starts = problem_startsolutions(F; seed=12345)
+        prob, starts = problem_startsolutions(F; seed = 12345)
         S = collect(starts)
 
         x₀ = S[1] .+ 1e-4
@@ -13,7 +13,7 @@
         JM = HC.JacobianMonitor(jacobian(H, x₀, t))
         x̄ = similar(x₀)
 
-        R1 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-3)
+        R1 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol = 1e-3)
         @test R1.iters == 1
         @test R1.accuracy ≤ 1e-3
         @test R1.norm_Δx₀ < 1e-1
@@ -21,7 +21,7 @@
         @test norm(x̄ - S[1]) < 1e-6
 
 
-        R2 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-7)
+        R2 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol = 1e-7)
         @test R2.return_code == HC.NEWT_CONVERGED
         @test R2.iters == 2
         @test R2.accuracy < 1e-7
@@ -36,7 +36,7 @@
 
     @testset "overdetermined" begin
         @polyvar x y
-        F = SPSystem([x^2+y^2-1, x-y, (x-y)*(x^2+y^2-1)])
+        F = SPSystem([x^2 + y^2 - 1, x - y, (x - y) * (x^2 + y^2 - 1)])
         t = rand()
         s = [√(0.5), √(0.5)]
         x₀ = s .+ 1e-4 .* rand(ComplexF64, 2)
@@ -46,13 +46,13 @@
         JM = HC.JacobianMonitor(jacobian(H, x₀, t))
         x̄ = similar(x₀)
 
-        R1 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-3)
+        R1 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol = 1e-3)
         @test R1.iters == 1
         @test R1.accuracy ≤ 1e-3
         @test R1.norm_Δx₀ ≤ 1e-3
 
 
-        R2 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol=1e-7)
+        R2 = HC.newton!(x̄, H, x₀, t, JM, HC.InfNorm(), corr_cache; tol = 1e-7)
         @test R2.return_code == HC.NEWT_CONVERGED
         @test R2.iters == 2
         @test R2.accuracy < 1e-7
