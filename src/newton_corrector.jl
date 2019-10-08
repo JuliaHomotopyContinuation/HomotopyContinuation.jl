@@ -61,7 +61,7 @@ function newton!(
     debug::Bool = false,
     simplified_last_step::Bool = true,
     full_steps::Int = max_iters - simplified_last_step,
-    double_64_evaluation::Bool = false
+    double_64_evaluation::Bool = false,
 )
 
     # Setup values

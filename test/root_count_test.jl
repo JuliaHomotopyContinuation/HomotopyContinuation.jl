@@ -98,7 +98,7 @@
                 x[2] * x[3] * p[4] + x[2] * p[4] * p[10],
                 x[2] + x[3] - 1.0,
             ]
-            p_vals = [0.04, 0.04, 1.0, 1.0, 10.0, 0.0, 0.04, 35.0, .1, .04]
+            p_vals = [0.04, 0.04, 1.0, 1.0, 10.0, 0.0, 0.04, 35.0, 0.1, 0.04]
             pol_pars = DynamicPolynomials.subs.(pol, Ref(p => p_vals))
             sol = solutions(HomotopyContinuation.solve(pol_pars, show_progress = false))
             results1_direct[length(sol)+1] += 1

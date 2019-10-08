@@ -1,9 +1,4 @@
-export AbstractAffinePatch,
-    nequations,
-    state,
-    onpatch!,
-    setup!,
-    changepatch!
+export AbstractAffinePatch, nequations, state, onpatch!, setup!, changepatch!
 
 """
     AbstractAffinePatch
@@ -29,14 +24,14 @@ abstract type AbstractAffinePatchState{N} end
 
 Number of equations an affine patch adds.
 """
-nequations(::AbstractAffinePatchState{N}) where N = N
+nequations(::AbstractAffinePatchState{N}) where {N} = N
 
 """
     state(::AbstractAffinePatch, x)::AbstractAffinePatchState
 
 Construct the state of the path from `x`.
 """
-state(p::AbstractAffinePatch, x) = throw(MethodError(state, (p,x)))
+state(p::AbstractAffinePatch, x) = throw(MethodError(state, (p, x)))
 
 """
     onpatch!(x::AbstractVector, ::AbstractAffinePatchState)

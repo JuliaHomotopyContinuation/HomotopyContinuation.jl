@@ -73,7 +73,7 @@
             @test !isnan(tracker.state.solution_residual)
         end
 
-        tracker, starts = pathtracker_startsolutions(homogenize(f, z); system = FPSystem,)
+        tracker, starts = pathtracker_startsolutions(homogenize(f, z); system = FPSystem)
         @test tracker isa PathTracker{PVector{ComplexF64,1}}
         for x in starts
             @test is_success(track!(tracker, x))

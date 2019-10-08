@@ -19,7 +19,7 @@ struct OverdeterminedTracker{
     newton::NC
 end
 
-function construct_tracker(prob::OverdeterminedProblem, start_solutions; kwargs...,)
+function construct_tracker(prob::OverdeterminedProblem, start_solutions; kwargs...)
     tracker = construct_tracker(prob.problem, start_solutions)
     y = copy(path_tracker_state(tracker).solution)
     system = HomotopyWithCache(ConstantHomotopy(prob.target_system), y, 0.0)
@@ -31,7 +31,7 @@ end
 
 
 seed(OT::OverdeterminedTracker) = seed(OT.tracker)
-function PathResult(OT::OverdeterminedTracker, x, path_number = nothing; kwargs...,)
+function PathResult(OT::OverdeterminedTracker, x, path_number = nothing; kwargs...)
     PathResult(OT.tracker, x, path_number; kwargs...)
 end
 

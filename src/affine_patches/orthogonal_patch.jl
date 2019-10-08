@@ -10,8 +10,8 @@ The orthogonal patch is a dynamically changing patch. It computes in such a way 
 """
 struct OrthogonalPatch <: AbstractAffinePatch end
 
-struct OrthogonalPatchState{T, N} <: AbstractAffinePatchState{N}
-    v̄::PVector{T, N} # this is already conjugated
+struct OrthogonalPatchState{T,N} <: AbstractAffinePatchState{N}
+    v̄::PVector{T,N} # this is already conjugated
 end
 
 function state(::OrthogonalPatch, x::PVector)
@@ -28,7 +28,8 @@ function init!(state::OrthogonalPatchState, x::AbstractVector)
     end
     state
 end
-@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) = init!(state, x)
+@propagate_inbounds changepatch!(state::OrthogonalPatchState, x::AbstractVector) =
+    init!(state, x)
 
 onpatch!(x::AbstractVector, state::OrthogonalPatchState) = onpatch!(x, state.v̄)
 evaluate!(u, state::OrthogonalPatchState, x::PVector) = evaluate_patch!(u, state.v̄, x)

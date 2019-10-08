@@ -1,13 +1,17 @@
 export HomotopyNullCache,
-    nvariables,
-    cache,
-    evaluate!,
-    evaluate,
-    jacobian!, jacobian,
-    evaluate_and_jacobian!, evaluate_and_jacobian,
-    dt!, dt,
-    jacobian_and_dt!, jacobian_and_dt,
-    basehomotopy
+       nvariables,
+       cache,
+       evaluate!,
+       evaluate,
+       jacobian!,
+       jacobian,
+       evaluate_and_jacobian!,
+       evaluate_and_jacobian,
+       dt!,
+       dt,
+       jacobian_and_dt!,
+       jacobian_and_dt,
+       basehomotopy
 
 # Cache
 
@@ -36,7 +40,8 @@ cache(H::AbstractHomotopy, x, t) = HomotopyNullCache()
 
 Evaluate the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-evaluate!(u, H::AbstractHomotopy, args...) = error(MethodError(evaluate!, tuple(u, H, args...)))
+evaluate!(u, H::AbstractHomotopy, args...) =
+    error(MethodError(evaluate!, tuple(u, H, args...)))
 
 """
     evaluate(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -74,7 +79,8 @@ end
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)` and store the result in `u`.
 """
-jacobian!(u, H::AbstractHomotopy, args...) = error(MethodError(jacobian!, tuple(u, H, args...)))
+jacobian!(u, H::AbstractHomotopy, args...) =
+    error(MethodError(jacobian!, tuple(u, H, args...)))
 
 """
     jacobian(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -95,7 +101,7 @@ end
 Evaluate the homotopy `H` and its Jacobian at `(x, t)` and store the results in `u` (evalution)
 and `U` (Jacobian).
 """
-function evaluate_and_jacobian!(u, U, H::AbstractHomotopy, x, t, c=cache(H, x, t))
+function evaluate_and_jacobian!(u, U, H::AbstractHomotopy, x, t, c = cache(H, x, t))
     evaluate!(u, H, x, t, c)
     jacobian!(U, H, x, t, c)
     nothing
@@ -106,7 +112,7 @@ end
 
 Evaluate the homotopy `H` and its Jacobian at `(x, t)`.
 """
-function evaluate_and_jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t))
+function evaluate_and_jacobian(H::AbstractHomotopy, x, t, c = cache(H, x, t))
     u = evaluate(H, x, t, c)
     U = jacobian(H, x, t, c)
     u, U
@@ -118,7 +124,7 @@ end
 Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)` and store the results in `u` (evalution)
 and `v` (∂t).
 """
-function jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c=cache(H, x, t))
+function jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c = cache(H, x, t))
     jacobian!(U, H, x, t, c)
     dt!(u, H, x, t, c)
     nothing
@@ -129,7 +135,7 @@ end
 
 Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)`.
 """
-function jacobian_and_dt(H::AbstractHomotopy, x, t, c=cache(H, x, t))
+function jacobian_and_dt(H::AbstractHomotopy, x, t, c = cache(H, x, t))
     U = jacobian(H, x, t, c)
     u = dt(H, x, t, c)
     U, u
@@ -173,7 +179,10 @@ include("homotopies/toric_homotopy.jl")
 include("homotopies/binomial_homotopy.jl")
 include("homotopies/constant_homotopy.jl")
 
-function homotopy_interface_test(H::AbstractHomotopy, x=rand(Complex{Float64}, size(H, 2)) )
+function homotopy_interface_test(
+    H::AbstractHomotopy,
+    x = rand(Complex{Float64}, size(H, 2)),
+)
     m, n = size(H)
     t = rand()
     u = zeros(Complex{Float64}, m)
@@ -182,28 +191,28 @@ function homotopy_interface_test(H::AbstractHomotopy, x=rand(Complex{Float64}, s
     homotopy_cache = cache(H, x, t)
 
     evaluate!(u, H, x, t, homotopy_cache)
-    @test evaluate(H, x, t, homotopy_cache) ≈ u atol=1e-14
-    @test evaluate(H, x, t) ≈ u atol=1e-14
+    @test evaluate(H, x, t, homotopy_cache) ≈ u atol = 1e-14
+    @test evaluate(H, x, t) ≈ u atol = 1e-14
 
     dt!(u, H, x, t, homotopy_cache)
-    @test dt(H, x, t, homotopy_cache) ≈ u atol=1e-14
-    @test dt(H, x, t) ≈ u atol=1e-14
+    @test dt(H, x, t, homotopy_cache) ≈ u atol = 1e-14
+    @test dt(H, x, t) ≈ u atol = 1e-14
 
     jacobian!(U, H, x, t, homotopy_cache)
-    @test jacobian(H, x, t, homotopy_cache) ≈ U atol=1e-14
-    @test jacobian(H, x, t) ≈ U atol=1e-14
+    @test jacobian(H, x, t, homotopy_cache) ≈ U atol = 1e-14
+    @test jacobian(H, x, t) ≈ U atol = 1e-14
 
     evaluate_and_jacobian!(u, U, H, x, t, homotopy_cache)
     (v, V) = evaluate_and_jacobian(H, x, t, homotopy_cache)
     @test v ≈ u
     @test V ≈ U
-    @test evaluate(H, x, t) ≈ u atol=1e-14
-    @test jacobian(H, x, t) ≈ U atol=1e-14
+    @test evaluate(H, x, t) ≈ u atol = 1e-14
+    @test jacobian(H, x, t) ≈ U atol = 1e-14
 
     jacobian_and_dt!(U, u, H, x, t, homotopy_cache)
     (V, v) = jacobian_and_dt(H, x, t, homotopy_cache)
-    @test V ≈ U atol=1e-14
-    @test v ≈ u atol=1e-14
-    @test jacobian(H, x, t) ≈ U atol=1e-14
-    @test dt(H, x, t) ≈ u atol=1e-14
+    @test V ≈ U atol = 1e-14
+    @test v ≈ u atol = 1e-14
+    @test jacobian(H, x, t) ≈ U atol = 1e-14
+    @test dt(H, x, t) ≈ u atol = 1e-14
 end

@@ -51,9 +51,11 @@
         # affine valuation
         @polyvar x y v w
 
-        tracker, starts = coretracker_startsolutions([x*y - 6*v*w, x^2 - 5v^2],
-            variable_groups=[(x,v), (y,w)],
-            log_homotopy = true)
+        tracker, starts = coretracker_startsolutions(
+            [x * y - 6 * v * w, x^2 - 5 * v^2],
+            variable_groups = [(x, v), (y, w)],
+            log_homotopy = true,
+        )
         S = collect(starts)
         state = tracker.state
         val = HC.Valuation(S[1]; affine = true)

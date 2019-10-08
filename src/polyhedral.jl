@@ -489,7 +489,7 @@ function track(
     accuracy::Union{Nothing,Float64} = nothing,
     max_corrector_iters::Union{Nothing,Int} = nothing,
 )
-    track!(tracker, cell_x; accuracy = accuracy, max_corrector_iters = max_corrector_iters,)
+    track!(tracker, cell_x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
     PathResult(tracker, cell_x, path_number; details = details)
 end
 

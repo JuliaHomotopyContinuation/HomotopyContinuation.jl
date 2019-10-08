@@ -26,7 +26,10 @@
 
 
         @polyvar x y a b
-        F = SPSystem([x^2+2y*x+a*x+b+3., b*x*y^3+a+2]; parameters=[a,b])
+        F = SPSystem(
+            [x^2 + 2y * x + a * x + b + 3.0, b * x * y^3 + a + 2];
+            parameters = [a, b],
+        )
         @test size(F) == (2, 2)
         @test length(F) == 2
         x = rand(Complex{Float64}, 2)
@@ -96,10 +99,10 @@
     @testset "TotalDegreeSystem" begin
         @polyvar x y z
 
-        F = SPSystem([x^4-z^4, y^3-z^3])
+        F = SPSystem([x^4 - z^4, y^3 - z^3])
         w = ProjectiveVectors.PVector(rand(ComplexF64, 3))
 
-        G = TotalDegreeSystem([x^4-z^4, y^3-z^3])
+        G = TotalDegreeSystem([x^4 - z^4, y^3 - z^3])
         @test size(G) == (2, 3)
         @test evaluate(F, w) ≈ evaluate(G, w)
         @test jacobian(F, w) ≈ jacobian(G, w)
@@ -109,10 +112,10 @@
 
         @polyvar x y z
 
-        F_affine = SPSystem([x^4-1, y^3-1])
+        F_affine = SPSystem([x^4 - 1, y^3 - 1])
         w = rand(ComplexF64, 3)
 
-        G_affine = TotalDegreeSystem([x^4-1, y^3-1]; affine=true)
+        G_affine = TotalDegreeSystem([x^4 - 1, y^3 - 1]; affine = true)
         @test size(G_affine) == (2, 2)
         @test evaluate(F_affine, w) ≈ evaluate(G_affine, w)
         @test jacobian(F_affine, w) ≈ jacobian(G_affine, w)
@@ -124,7 +127,7 @@
 
     @testset "FixedParameterSystem" begin
         @polyvar x y a b
-        f = SPSystem([x^2+y-a, b*x+y*a^2]; parameters=[a, b])
+        f = SPSystem([x^2 + y - a, b * x + y * a^2]; parameters = [a, b])
         F = FixedParameterSystem(f, [2.0, 3.0])
 
         @test size(F) == (2, 2)
@@ -153,7 +156,7 @@
         # affine
         @polyvar x y z
 
-        F = SPSystem([x^4-1, y^3-1, z^2+x, x+y+z-1, x^2+z^2-3])
+        F = SPSystem([x^4 - 1, y^3 - 1, z^2 + x, x + y + z - 1, x^2 + z^2 - 3])
         w = rand(ComplexF64, 3)
         A = randn(ComplexF64, 3, 2)
         S = SquaredUpSystem(F, A)
@@ -161,8 +164,8 @@
         @test system_cache isa AbstractSystemCache
 
         @test size(S) == (3, 3)
-        @test evaluate(S, w, system_cache) ≈ [LinearAlgebra.I A] * evaluate(F, w) atol=1e-12
-        @test jacobian(S, w, system_cache) ≈ [LinearAlgebra.I A] * jacobian(F, w) atol=1e-12
+        @test evaluate(S, w, system_cache) ≈ [LinearAlgebra.I A] * evaluate(F, w) atol = 1e-12
+        @test jacobian(S, w, system_cache) ≈ [LinearAlgebra.I A] * jacobian(F, w) atol = 1e-12
         u, U = evaluate_and_jacobian(S, w, system_cache)
         @test u ≈ evaluate(S, w)
         @test U ≈ jacobian(S, w)
@@ -172,7 +175,7 @@
         @polyvar x y z w
 
         A = randn(ComplexF64, 3, 2)
-        F = [x^4-1, y^3-1, z^2+x, x^2+z^2-3, x+y+z-1]
+        F = [x^4 - 1, y^3 - 1, z^2 + x, x^2 + z^2 - 3, x + y + z - 1]
         G = SPSystem(homogenize([LinearAlgebra.I A] * F, w))
         F = SPSystem(homogenize(F, w))
         v = ProjectiveVectors.PVector(rand(ComplexF64, 4))
@@ -182,8 +185,8 @@
         @test system_cache isa AbstractSystemCache
 
         @test size(S) == (3, 4)
-        @test evaluate(S, v, system_cache) ≈ evaluate(G, v) atol=1e-12
-        @test jacobian(S, v, system_cache) ≈ jacobian(G, v) atol=1e-12
+        @test evaluate(S, v, system_cache) ≈ evaluate(G, v) atol = 1e-12
+        @test jacobian(S, v, system_cache) ≈ jacobian(G, v) atol = 1e-12
         u, U = evaluate_and_jacobian(S, v, system_cache)
         @test u ≈ evaluate(S, v)
         @test U ≈ jacobian(S, v)

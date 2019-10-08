@@ -8,8 +8,8 @@ the tracking. Instead it only updates at the start of the tracking.
 """
 struct FixedPatch <: AbstractAffinePatch end
 
-struct FixedPatchState{T, N} <: AbstractAffinePatchState{N}
-    v̄::PVector{T, N} # this is already conjugated
+struct FixedPatchState{T,N} <: AbstractAffinePatchState{N}
+    v̄::PVector{T,N} # this is already conjugated
 end
 
 function state(::FixedPatch, x::PVector)

@@ -30,7 +30,7 @@ import DoubleFloats: Double64, ComplexDF64
         WS.factorized[] = false
         @test (@allocated HC.factorize!(WS)) == 0
 
-		# test indexing etc
+# test indexing etc
         @test WS[2, 1] == B[2, 1]
         @test WS[2] == B[2]
         WS[2, 3] = 5.0
@@ -61,7 +61,7 @@ import DoubleFloats: Double64, ComplexDF64
         WS.factorized[] = false
         @test (@allocated ldiv!(x, WS, b)) == 0
 
-		# overdetermined
+# overdetermined
         A = randn(ComplexF64, 13, 8)
         x = randn(ComplexF64, 8)
         b = A * x
@@ -82,7 +82,7 @@ import DoubleFloats: Double64, ComplexDF64
         û = convert.(ComplexF64, ComplexDF64.(A) * ComplexDF64.(x) - ComplexDF64.(b))
 
         u = zeros(ComplexF64, 13)
-		# fixed precision residual should be of order unit roundoff
+# fixed precision residual should be of order unit roundoff
         HC.residual!(u, A, x, b)
         @test maximum(abs, ComplexDF64.(u) - ComplexDF64.(û)) < 1e-14
         @test maximum(abs, ComplexDF64.(u) - ComplexDF64.(û)) > 1e-18
@@ -111,7 +111,7 @@ import DoubleFloats: Double64, ComplexDF64
         δx = HC.iterative_refinement_step!(x, WS, x̂, b)
         @test δx1 / norm(x, Inf) > 1e-14
 
-		# overdetermined
+# overdetermined
         A = randn(ComplexF64, 4, 3)
         x̂ = zeros(ComplexF64, 3)
         x = copy(x̂)
@@ -143,7 +143,7 @@ import DoubleFloats: Double64, ComplexDF64
         @test cond(A2, Inf) ≈ inv(HC.rcond(WS))
         HC.factorization!(WS, HC.QR_FACT)
         @test 0.5 ≤ cond(A2, Inf) / inv(HC.rcond(WS)) ≤ 1.5
-		# @test (@allocated rcond(WS)) == 0
+# @test (@allocated rcond(WS)) == 0
 
         A = randn(ComplexF64, 13, 10)
         WS = HC.MatrixWorkspace(A)
@@ -153,9 +153,9 @@ import DoubleFloats: Double64, ComplexDF64
         HC.update!(WS, A2)
         HC.factorize!(WS)
         @test 1 / HC.rcond(WS) ≈ cond(UpperTriangular(WS.qr.R), Inf) rtol = 1e-14
-		# @test (@allocated rcond(WS)) == 0
+# @test (@allocated rcond(WS)) == 0
 
-		# meddle aroudn with the internals to check dead branch
+# meddle aroudn with the internals to check dead branch
         WS.fact[] = HC.LU_FACT
         @test isnan(HC.rcond(WS))
     end
@@ -199,11 +199,11 @@ import DoubleFloats: Double64, ComplexDF64
     @testset "Forward error" begin
         A = [
             1.81451 + 0.46473im -0.473651 + 0.813117im 0.130822 - 0.254704im -0.203277 +
-                                                                             0.397106im;
+                                                                             0.397106im
             -2.04468 - 1.59228im 0.441157 - 1.39994im -0.0984804 + 1.42619im -0.818292 -
-                                                                             0.487898im;
+                                                                             0.487898im
             0.35501 + 0.0235574im 1.32618 + 0.577264im 1.12561 + 0.43383im 0.579533 +
-                                                                           1.49484im;
+                                                                           1.49484im
             0.144381 + 0.104175im 0.665384 - 1.43389im 0.22097 + 0.258016im 0.374103 -
                                                                             0.635066im
         ]
@@ -211,7 +211,7 @@ import DoubleFloats: Double64, ComplexDF64
             -0.14581 - 0.868847im,
             0.0162454 + 0.91156im,
             -0.133769 + 0.510834im,
-            -0.867022 + 0.752196im
+            -0.867022 + 0.752196im,
         ]
         x̂ = similar(b)
         x = similar(b)
@@ -259,7 +259,7 @@ import DoubleFloats: Double64, ComplexDF64
         @test ferr ≤ strong_ferr ≤ eps() * inv(HC.rcond(jacobian(JM)))
         @test wferr ≤ strong_wferr ≤ eps() * inv(HC.rcond(jacobian(JM)))
 
-		# overdetermined
+# overdetermined
         A = randn(ComplexF64, 3, 2)
         x = randn(ComplexF64, 2)
         b = A * x
@@ -317,17 +317,17 @@ import DoubleFloats: Double64, ComplexDF64
         @test H[1, 1] == 2
         @test U[1, 1] == -1
 
-		# overflow A
+# overflow A
         A = [
-            2 4 4 2 -4 -3 -4 3 0 3;
-            -4 -2 -5 -5 1 0 -3 0 -1 -2;
-            -3 5 -3 1 4 3 -1 -4 -1 0;
-            1 3 3 4 -2 -3 -2 -5 -4 -3;
-            2 2 0 2 -4 4 3 -4 -2 -4;
-            -3 -3 1 1 -4 4 0 4 4 -4;
-            -3 -1 -1 -1 2 -4 -3 -4 4 -4;
-            0 1 -2 4 5 4 3 1 -5 2;
-            -5 -4 -5 3 1 5 0 -3 -3 -1;
+            2 4 4 2 -4 -3 -4 3 0 3
+            -4 -2 -5 -5 1 0 -3 0 -1 -2
+            -3 5 -3 1 4 3 -1 -4 -1 0
+            1 3 3 4 -2 -3 -2 -5 -4 -3
+            2 2 0 2 -4 4 3 -4 -2 -4
+            -3 -3 1 1 -4 4 0 4 4 -4
+            -3 -1 -1 -1 2 -4 -3 -4 4 -4
+            0 1 -2 4 5 4 3 1 -5 2
+            -5 -4 -5 3 1 5 0 -3 -3 -1
             2 -5 -3 -1 -1 5 -4 5 -3 1
         ]
         @test_throws OverflowError HC.hnf(A)

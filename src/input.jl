@@ -131,7 +131,7 @@ function input_startsolutions(
     (input = TargetSystemInput(F), startsolutions = nothing)
 end
 
-function input_startsolutions(F::AbstractSystem; variables = nothing,)
+function input_startsolutions(F::AbstractSystem; variables = nothing)
     (input = TargetSystemInput(F), startsolutions = nothing)
 end
 

@@ -9,8 +9,8 @@ to the 2-norm.
 """
 struct RandomPatch <: AbstractAffinePatch end
 
-struct RandomPatchState{T, N} <: AbstractAffinePatchState{N}
-    v::PVector{T, N}
+struct RandomPatchState{T,N} <: AbstractAffinePatchState{N}
+    v::PVector{T,N}
 end
 
 is_global_patch(::RandomPatch) = true

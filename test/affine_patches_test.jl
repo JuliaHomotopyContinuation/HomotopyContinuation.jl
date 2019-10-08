@@ -1,5 +1,5 @@
 function Base.isapprox(xs::NTuple{N}, ys::NTuple{N}; kwargs...) where {N}
-    for i=1:N
+    for i = 1:N
         if !isapprox(xs[i], ys[i]; kwargs...)
             return false
         end
@@ -15,10 +15,10 @@ end
         @test nequations(patch) == 1
 
         init!(patch, x)
-        @test norm(patch.v̄) ≈ (1.0,) atol=1e-15
+        @test norm(patch.v̄) ≈ (1.0,) atol = 1e-15
         u = [0.0im]
         evaluate!(u, patch, x)
-        @test u[1] ≈ 0.0  atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
 
         U = zeros(Complex{Float64}, 1, 3)
         jacobian!(U, patch, x)
@@ -27,7 +27,7 @@ end
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         onpatch!(y, patch)
         evaluate!(u, patch, y)
-        @test u[1] ≈ 0.0  atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
     end
 
     @testset "EmbeddingPatch" begin
@@ -37,10 +37,10 @@ end
         @test nequations(patch) == 1
 
         init!(patch, x)
-        @test x[3] ≈ 1.0 atol=1e-15
+        @test x[3] ≈ 1.0 atol = 1e-15
         u = [0.0im]
         evaluate!(u, patch, x)
-        @test u[1] ≈ 0.0 atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
 
         U = zeros(Complex{Float64}, 1, 3)
         jacobian!(U, patch, x)
@@ -49,7 +49,7 @@ end
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         onpatch!(y, patch)
         evaluate!(u, patch, y)
-        @test u[1] ≈ 0.0  atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
     end
 
 
@@ -62,7 +62,7 @@ end
         init!(patch, x)
         u = [0.0im]
         evaluate!(u, patch, x)
-        @test u[1] ≈ 0.0 atol=1e-14
+        @test u[1] ≈ 0.0 atol = 1e-14
 
         U = zeros(Complex{Float64}, 1, 3)
         jacobian!(U, patch, x)
@@ -71,7 +71,7 @@ end
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         onpatch!(y, patch)
         evaluate!(u, patch, y)
-        @test u[1] ≈ 0.0  atol=1e-14
+        @test u[1] ≈ 0.0 atol = 1e-14
     end
 
     @testset "FixedPatch" begin
@@ -84,7 +84,7 @@ end
         u = [0.0im]
         evaluate!(u, patch, x)
         u
-        @test u[1] ≈ 0.0 atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
 
         U = zeros(Complex{Float64}, 1, 3)
         jacobian!(U, patch, x)
@@ -93,6 +93,6 @@ end
         y = ProjectiveVectors.embed(rand(ComplexF64, 2))
         onpatch!(y, patch)
         evaluate!(u, patch, y)
-        @test u[1] ≈ 0.0  atol=1e-15
+        @test u[1] ≈ 0.0 atol = 1e-15
     end
 end

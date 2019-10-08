@@ -20,20 +20,20 @@ function onpatch!(x::PVector, state::EmbeddingPatchState)
     ProjectiveVectors.affine_chart!(x)
 end
 
-function evaluate!(u, state::EmbeddingPatchState{N}, x::PVector{T, N}) where {T, N}
+function evaluate!(u, state::EmbeddingPatchState{N}, x::PVector{T,N}) where {T,N}
     homvars = ProjectiveVectors.homvars(x)
     n = length(u) - N
-    for i in 1:N
-        u[n + i] = x[homvars[i]] - one(eltype(x))
+    for i = 1:N
+        u[n+i] = x[homvars[i]] - one(eltype(x))
     end
     nothing
 end
 
-function jacobian!(U, state::EmbeddingPatchState{N}, x::PVector{T, N}) where {T, N}
+function jacobian!(U, state::EmbeddingPatchState{N}, x::PVector{T,N}) where {T,N}
     homvars = ProjectiveVectors.homvars(x)
-    n = size(U,1) - N
-    for j in 1:size(U, 2), i in 1:N
-        U[n + i, j] = j == homvars[i] ? one(eltype(x)) : zero(eltype(x))
+    n = size(U, 1) - N
+    for j = 1:size(U, 2), i = 1:N
+        U[n+i, j] = j == homvars[i] ? one(eltype(x)) : zero(eltype(x))
     end
     nothing
 end

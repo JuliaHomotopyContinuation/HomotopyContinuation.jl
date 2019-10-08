@@ -5,7 +5,7 @@ export TraceTestSystem
 
 The system `G(x,l) := [F(x, p₀+x[end]v); l ⋅[x[1:end-1];1])`.
 """
-struct TraceTestSystem{S<:AbstractSystem, T} <: AbstractSystem
+struct TraceTestSystem{S<:AbstractSystem,T} <: AbstractSystem
     F::S
     p₀::Vector{T}
     v::Vector{T}
@@ -15,7 +15,7 @@ function TraceTestSystem(F, p::AbstractVector, v::AbstractVector)
     TraceTestSystem(F, promote(p, v)...)
 end
 
-struct TraceTestSystemCache{SC<:AbstractSystemCache, T1, T2} <: AbstractSystemCache
+struct TraceTestSystemCache{SC<:AbstractSystemCache,T1,T2} <: AbstractSystemCache
     u::Vector{T1}
     U::Matrix{T1}
     Up::Matrix{T1}
@@ -41,11 +41,11 @@ function evaluate!(u, F::TraceTestSystem, x, l, c::TraceTestSystemCache)
     end
     evaluate!(c.u, F.F, x, c.p, c.cache)
     n = length(x)
-    for i in 1:length(c.u)
+    for i = 1:length(c.u)
         u[i] = c.u[i]
     end
     u[end] = l[n]
-    for i in 1:n-1
+    for i = 1:n-1
         u[end] += l[i] * x[i]
     end
 
@@ -60,18 +60,18 @@ function jacobian!(U, F::TraceTestSystem, x, l, c::TraceTestSystemCache)
     jacobian!(c.U, F.F, x, c.p, c.cache)
     differentiate_parameters!(c.Up, F.F, x, c.p, c.cache)
     n, m = length(x), size(U, 1)
-    for j in 1:n-1, i in 1:m-1
-        U[i,j] = c.U[i,j]
+    for j = 1:n-1, i = 1:m-1
+        U[i, j] = c.U[i, j]
     end
-    for i in 1:m
-        U[i,n] = zero(eltype(U))
+    for i = 1:m
+        U[i, n] = zero(eltype(U))
     end
-    for k in 1:size(c.Up, 2), i in 1:m-1
-        U[i, n] += c.Up[i,k] * F.v[k]
+    for k = 1:size(c.Up, 2), i = 1:m-1
+        U[i, n] += c.Up[i, k] * F.v[k]
     end
 
-    for j in 1:n-1
-        U[m,j] = l[j]
+    for j = 1:n-1
+        U[m, j] = l[j]
     end
     U
 end
@@ -85,28 +85,28 @@ function evaluate_and_jacobian!(u, U, F::TraceTestSystem, x, l, c::TraceTestSyst
     n, m = length(x), size(U, 1)
 
     evaluate_and_jacobian!(c.u, c.U, F.F, x, c.p, c.cache)
-    for i in 1:length(c.u)
+    for i = 1:length(c.u)
         u[i] = c.u[i]
     end
     u[end] = l[n]
-    for i in 1:n-1
+    for i = 1:n-1
         u[end] += l[i] * x[i]
     end
 
     differentiate_parameters!(c.Up, F.F, x, c.p, c.cache)
 
-    for j in 1:n-1, i in 1:m-1
-        U[i,j] = c.U[i,j]
+    for j = 1:n-1, i = 1:m-1
+        U[i, j] = c.U[i, j]
     end
-    for i in 1:m
-        U[i,n] = zero(eltype(U))
+    for i = 1:m
+        U[i, n] = zero(eltype(U))
     end
-    for k in 1:size(c.Up, 2), i in 1:m-1
-        U[i, n] += c.Up[i,k] * F.v[k]
+    for k = 1:size(c.Up, 2), i = 1:m-1
+        U[i, n] += c.Up[i, k] * F.v[k]
     end
 
-    for j in 1:n-1
-        U[m,j] = l[j]
+    for j = 1:n-1
+        U[m, j] = l[j]
     end
 
     nothing
@@ -114,10 +114,10 @@ end
 
 function differentiate_parameters!(U, F::TraceTestSystem, x, l, c::TraceTestSystemCache)
     U .= zero(eltype(U))
-    for i in 1:length(l)-1
+    for i = 1:length(l)-1
         U[end, i] = x[i]
     end
-    U[end,length(l)] = one(eltype(U))
+    U[end, length(l)] = one(eltype(U))
     U
 end
 

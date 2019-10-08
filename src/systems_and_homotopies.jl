@@ -1,5 +1,4 @@
-export AbstractSystem, AbstractSystemCache,
-    AbstractHomotopy, AbstractHomotopyCache
+export AbstractSystem, AbstractSystemCache, AbstractHomotopy, AbstractHomotopyCache
 
 """
     AbstractSystem

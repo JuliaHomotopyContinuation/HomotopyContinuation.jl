@@ -18,17 +18,26 @@ function cache(::Heun, H, x, ẋ, t)
     HeunCache(dt(H, x, t), copy(ẋ), copy(ẋ))
 end
 
-function predict!(xnext, cache::HeunCache, H::HomotopyWithCache, x, t, Δt, ẋ, Jac::JacobianMonitor)
+function predict!(
+    xnext,
+    cache::HeunCache,
+    H::HomotopyWithCache,
+    x,
+    t,
+    Δt,
+    ẋ,
+    Jac::JacobianMonitor,
+)
     dt, mk₁, mk₂ = cache.dt, cache.mk₁, cache.mk₂
     n = length(xnext)
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         mk₁[i] = -ẋ[i]
         xnext[i] = x[i] + Δt * ẋ[i]
     end
 
     minus_ẋ!(mk₂, H, xnext, t + Δt, Jac, dt)
 
-    @inbounds for i=1:n
+    @inbounds for i = 1:n
         xnext[i] = x[i] - 0.5 * Δt * (mk₁[i] + mk₂[i])
     end
 
