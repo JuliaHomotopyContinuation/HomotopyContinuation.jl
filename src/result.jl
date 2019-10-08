@@ -99,6 +99,7 @@ struct Result{V}
     pathresults::Vector{PathResult{V}}
     tracked_paths::Int
     seed::Int
+    retracked_paths::Int
     multiplicity_info::Base.RefValue{MultiplicityInfo}
 end
 
@@ -106,11 +107,12 @@ function Result(
     pathresults::Vector{PathResult{V}},
     tracked_paths::Int,
     seed::Int;
-    multiplicity_tol = 1e-6,
+    retracked_paths::Int = 0,
+    multiplicity_tol::Float64 = 1e-6,
 ) where {V}
     multiplicity_info = MultiplicityInfo(pathresults; tol = multiplicity_tol)
     assign_multiplicities!(pathresults, multiplicity_info)
-    Result(pathresults, tracked_paths, seed, Ref(multiplicity_info))
+    Result(pathresults, tracked_paths, seed, retracked_paths, Ref(multiplicity_info))
 end
 
 Base.length(r::Result) = length(r.pathresults)
