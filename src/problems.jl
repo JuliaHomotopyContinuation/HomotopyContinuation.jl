@@ -16,6 +16,7 @@ const problem_startsolutions_supported_keywords = [
      :homvar,
      :homvars,
      :variable_groups,
+     :variable_ordering,
      :homotopy,
      :system,
      :system_scaling,
@@ -23,7 +24,7 @@ const problem_startsolutions_supported_keywords = [
      :projective_tracking,
      :start_system,
      :only_torus,
-    ];
+    ]
     input_supported_keywords
 ]
 
@@ -349,11 +350,19 @@ is_homogeneous(H::AbstractHomotopy) = is_homogeneous(FixedHomotopy(H, rand()))
 """
 function problem_startsolutions end
 
-function problem_startsolutions(args...; seed = randseed(), kwargs...)
+function problem_startsolutions(args...; seed = randseed(), variable_ordering = nothing, kwargs...)
     Random.seed!(seed)
     supported, rest = splitkwargs(kwargs, input_supported_keywords)
-    input, startsolutions = input_startsolutions(args...; supported...)
-    problem_startsolutions(input, startsolutions, seed; rest...)
+    input, startsolutions = input_startsolutions(
+        args...;
+        variables = variable_ordering,
+        supported...,
+    )
+    if variable_ordering !== nothing
+        problem_startsolutions(input, startsolutions, seed; variables = variable_ordering, rest...)
+    else
+        problem_startsolutions(input, startsolutions, seed; rest...)
+    end
 end
 
 function problem_startsolutions(
@@ -417,6 +426,7 @@ function problem_startsolutions(
     seed;
     affine_tracking = default_affine_tracking(input, homvar_info),
     system_scaling = nothing,
+    variables = nothing,
     kwargs...,
 )
     if !affine_tracking
@@ -455,15 +465,20 @@ function problem_startsolutions(
     system_scaling = DEFAULT_SYSTEM_SCALING,
     system = DEFAULT_SYSTEM,
     only_torus = false,
+    variables = variables(input.system),
     kwargs...,
 )
     if affine_tracking
-        vargroups = VariableGroups(variables(input.system))
+        vargroups = VariableGroups(variables)
         homvars = nothing
         F = input.system
         tracking_type = AffineTracking()
     else
-        F, vargroups, homvars = homogenize_if_necessary(input.system, homvar_info)
+        F, vargroups, homvars = homogenize_if_necessary(
+            input.system,
+            homvar_info;
+            vars = variables,
+        )
         tracking_type = ProjectiveTracking()
     end
 
@@ -625,6 +640,7 @@ function problem_startsolutions(
     seed;
     system = DEFAULT_SYSTEM,
     system_scaling = nothing,
+    variables = nothing,
     kwargs...,
 )
     n, N = size(input.system)
@@ -698,11 +714,12 @@ function problem_startsolutions(
     affine_tracking = default_affine_tracking(input, homvar),
     system_scaling = DEFAULT_SYSTEM_SCALING,
     system = DEFAULT_SYSTEM,
+    variables = variables(input.target),
     kwargs...,
 )
+    vars = variables
     F, G = input.target, input.start
     F_ishom, G_ishom = is_homogeneous.((F, G))
-    vars = variables(F)
     if !affine_tracking && F_ishom && G_ishom
         f, regauging_factors = apply_system_scaling(F, vars, system_scaling)
         vargroups = VariableGroups(vars, homvar)
@@ -769,20 +786,19 @@ function problem_startsolutions(
     affine_tracking = default_affine_tracking(input, hominfo),
     system = SPSystem,
     system_scaling = nothing,
+    variables = variables(input.system; parameters = input.parameters),
     kwargs...,
 )
     Prob = affine_tracking ? Problem{AffineTracking} : Problem{ProjectiveTracking}
     if affine_tracking
-        variable_groups = VariableGroups(variables(
-            input.system;
-            parameters = input.parameters,
-        ))
+        variable_groups = VariableGroups(variables)
         homvars = nothing
         F = input.system
     else
         F, variable_groups, homvars = homogenize_if_necessary(
             input.system,
             hominfo;
+            variables = variables,
             parameters = input.parameters,
         )
     end

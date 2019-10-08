@@ -420,6 +420,7 @@ Additionally the following options are allowed:
   consider to change system to `FPSystem`.
 * `threading` (default `true`): Enable or disable multi-threading. The number of threads used
   is controlled by the environment variable `JULIA_NUM_THREADS`.
+* `variable_ordering`: Provide a custom ordering of the variables.
 
 # Examples
 

@@ -461,7 +461,7 @@ function step!(tracker::PathTracker)
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
             retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
-            # @show retcode
+
             if retcode == CAUCHY_SUCCESS
                 # We only accept a result of the Cauchy endgame only if two consecutive
                 # loops resulted in the same number of loop

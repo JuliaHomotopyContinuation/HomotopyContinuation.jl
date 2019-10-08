@@ -296,4 +296,52 @@
         )
         @test length(results) < 125
     end
+
+    @testset "variable ordering" begin
+        # total degree
+        @polyvar x y z
+        f = [x + 1, y + 2, z + 3]
+        @test solution(first(solve(f))) ≈ [-1, -2, -3]
+        @test solution(first(solve(f; variable_ordering = [z, y, x]))) ≈ [-3, -2, -1]
+        @test_throws ArgumentError solve(f; variable_ordering = [z, y])
+
+        # parameter
+        @polyvar x a y b
+        F = [x^2 - a, x * y - a + b]
+        p = [a, b]
+
+        r1 = solve(F, [√2, √2]; parameters = p, p₁ = [2, 0], p₀ = [2, 4])
+        @test is_success(first(r1))
+        s1 = solution(first(r1))
+
+        r2 = solve(
+            F,
+            [√2, √2];
+            variable_ordering = [y, x],
+            parameters = p,
+            p₁ = [2, 0],
+            p₀ = [2, 4],
+        )
+        s2 = solution(first(r2))
+
+        @test s1 ≈ s2[[2, 1]]
+        @test_throws ArgumentError solve(
+            F,
+            [√2, √2];
+            variable_ordering = [y],
+            parameters = p,
+            p₁ = [2, 0],
+            p₀ = [2, 4],
+        )
+
+        # start target
+        @polyvar x y
+        G = [x^2 - 2, x * y - 2]
+        F = [x^2 - 2, x * y + 2]
+        r3 = solve(G, F, [√2, √2]; variable_ordering = [y, x])
+        s3 = solution(first(r3))
+        @test s1 ≈ s3[[2, 1]]
+
+        @test_throws ArgumentError solve(G, F, [√2, √2]; variable_ordering = [x])
+    end
 end

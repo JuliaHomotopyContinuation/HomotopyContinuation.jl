@@ -823,11 +823,14 @@ If it was homogenized and no then the new variable is the **first one**.
 function homogenize_if_necessary(
     F::Union{MPPolys,Composition},
     hominfo::Union{Nothing,HomogenizationInformation};
+    vars = nothing,
     parameters = nothing,
 )
-    vars = variables(F, parameters = parameters)
+    if vars === nothing
+        vars = variables(F, parameters = parameters)
+    end
 
-# This fills in the simple variable group (allvars,)
+    # This fills in the simple variable group (allvars,)
     hominfo = add_variable_groups(hominfo, F; parameters = parameters)
 
     if is_homogeneous(F, hominfo; parameters = parameters)
@@ -846,7 +849,7 @@ function homogenize_if_necessary(
             error("Input system is not homogeneous although `homvars=$(hominfo.homvars)` was passed.")
         end
 
-# We create a new variable for each variable group to homogenize the system
+        # We create a new variable for each variable group to homogenize the system
         new_homvars = map(_ -> uniquevar(F), hominfo.vargroups)
         push!(vars, new_homvars...)
         new_vargroups = map(hominfo.vargroups, new_homvars) do group, v
