@@ -655,6 +655,7 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
   is a real system.
 * `target_solutions_count=nothing`: The computations are stopped if this number of
   solutions is reached.
+* `threading = true`: Enable multithreading of the path tracking.
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed
   to run.
 """
