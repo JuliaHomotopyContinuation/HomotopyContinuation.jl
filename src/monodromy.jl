@@ -823,9 +823,6 @@ function empty_queue!(queue, MS::MonodromySolver, t₀::UInt, progress)
     :incomplete
 end
 
-affine_chart(x::SVector, y::PVector) = ProjectiveVectors.affine_chart!(x, y)
-affine_chart(x::SVector{N,T}, y::AbstractVector) where {N,T} = SVector{N,T}(y)
-
 function process!(queue, job::MonodromyJob, MS::MonodromySolver, progress)
     x = solutions(MS)[job.id]
     loop = MS.loops[job.loop_id]
