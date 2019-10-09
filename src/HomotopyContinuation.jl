@@ -39,14 +39,7 @@ const SP = StaticPolynomials
 export @polyvar, subs, differentiate
 export mixed_volume
 export cond
-export PVector,
-       dims,
-       dimension_indices,
-       affine_chart,
-       ×,
-       component,
-       components,
-       combine
+export PVector, dims, dimension_indices, affine_chart, ×, component, components, combine
 
 include("progress_meter.jl")
 import .ProgressMeter
