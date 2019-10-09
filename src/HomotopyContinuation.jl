@@ -66,4 +66,6 @@ include("polyhedral.jl")
 include("overdetermined.jl")
 include("solver.jl")
 include("monodromy.jl")
+include("path_info.jl")
+
 end

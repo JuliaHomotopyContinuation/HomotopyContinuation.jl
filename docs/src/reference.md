@@ -71,6 +71,12 @@ euclidean_distance
 euclidean_norm
 ```
 
+## Path informations
+
+```@docs
+path_info
+```
+
 ## Polynomial Utilities
 
 ```@docs
