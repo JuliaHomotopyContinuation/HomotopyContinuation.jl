@@ -124,4 +124,10 @@
         @test length(multiplicities(S.pathresults, tol = 1e-5)) == 0
         @test norm(solution(S[1]) - solution(S[2])) < 1e-1
     end
+
+    @testset "real projective solutions" begin
+        @polyvar x y v w
+        res = solve([x*y - 6*v*w, x^2 - 5v^2], variable_groups=[(x,v), (y,w)])
+        @test all(is_real, res)
+    end
 end
