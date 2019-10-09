@@ -246,62 +246,101 @@ function track_parallel!(
     accuracy::Union{Nothing,Float64} = nothing,
 )
     if threading && Threads.nthreads() > 1
-        # create jobs channel
-        jobs = Channel{Int}(length(range))
-        for i in range
-            put!(jobs, i)
-        end
-        close(jobs)
-
-        ntrackeds = fill(0, Threads.nthreads())
-
-        # spawn workers which will track the paths
-        interrupted = Ref(false)
-        last_printed = 0
         nthreads = Threads.nthreads()
-        @sync for _ = 1:nthreads
-            Threads.@spawn begin
-                try
-                    tid = Threads.threadid()
-                    for i in jobs
-                        results[i] = track(
-                            trackers[tid],
-                            S[i];
-                            path_number = i,
-                            max_corrector_iters = max_corrector_iters,
-                            accuracy = accuracy,
-                        )
-                        if is_success(results[i]) && stop_early_cb !== nothing
-                            interrupted[] = stop_early_cb(results[i])
-                        end
+        ntrackeds = fill(0, nthreads)
+        interrupted = Ref(false)
+        last_printed = Ref(0)
 
-                        stats !== nothing && update!(stats[tid], results[i])
-                        ntrackeds[tid] += 1
+        @static if VERSION > v"1.3-"
+            # create jobs channel
+            jobs = Channel{Int}(length(range))
+            for i in range
+                put!(jobs, i)
+            end
+            close(jobs)
 
-                        if progress !== nothing
-                            ntracked = sum(ntrackeds)
-                            if tid == 1 && ntracked - last_printed - 32nthreads > 0
-                                last_printed = ntracked
-                                update_progress!(
-                                    progress,
-                                    ntracked,
-                                    consolidated_stats(stats),
-                                )
+            # spawn workers which will track the paths
+            @sync for _ = 1:nthreads
+                Threads.@spawn begin
+                    try
+                        tid = Threads.threadid()
+                        for i in jobs
+                            results[i] = track(
+                                trackers[tid],
+                                S[i];
+                                path_number = i,
+                                max_corrector_iters = max_corrector_iters,
+                                accuracy = accuracy,
+                            )
+                            if is_success(results[i]) && stop_early_cb !== nothing
+                                interrupted[] = stop_early_cb(results[i])
+                            end
+
+                            stats !== nothing && update!(stats[tid], results[i])
+                            ntrackeds[tid] += 1
+
+                            if progress !== nothing
+                                ntracked = sum(ntrackeds)
+                                if tid == 1 && ntracked - last_printed[] - 32nthreads > 0
+                                    last_printed[] = ntracked
+                                    update_progress!(
+                                        progress,
+                                        ntracked,
+                                        consolidated_stats(stats),
+                                    )
+                                end
+                            end
+                            if interrupted[]
+                                break
                             end
                         end
-                        if interrupted[]
-                            break
+                    catch e
+                        if isa(e, InterruptException)
+                            interrupted[] = true
+                        else
+                            rethrow()
                         end
-                    end
-                catch e
-                    if isa(e, InterruptException)
-                        interrupted[] = true
-                    else
-                        rethrow()
                     end
                 end
             end
+        else
+            try
+                Threads.@threads for i in range
+                    tid = Threads.threadid()
+                    results[i] = track(
+                        trackers[tid],
+                        S[i];
+                        path_number = i,
+                        max_corrector_iters = max_corrector_iters,
+                        accuracy = accuracy,
+                    )
+                    if is_success(results[i]) && stop_early_cb !== nothing
+                        interrupted[] = stop_early_cb(results[i])
+                    end
+
+                    stats !== nothing && update!(stats[tid], results[i])
+                    ntrackeds[tid] += 1
+
+                    if progress !== nothing
+                        ntracked = sum(ntrackeds)
+                        if tid == 1 && ntracked - last_printed[] - 32nthreads > 0
+                            last_printed[] = ntracked
+                            update_progress!(progress, ntracked, consolidated_stats(stats))
+                        end
+                    end
+                    if interrupted[]
+                        break
+                    end
+                end
+            catch e
+                if isa(e, InterruptException)
+                    interrupted[] = true
+                else
+                    rethrow()
+                end
+            end
         end
+
         if progress !== nothing && last_printed != sum(ntrackeds)
             update_progress!(progress, sum(ntrackeds), consolidated_stats(stats))
         end

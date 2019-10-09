@@ -157,7 +157,7 @@
     end
 
     @testset "affine and projective solution types" begin
-        @polyvar x y
+        @polyvar x y z
         result = solve([x - 2y, y - 2z])
         @test result isa Result{PVector{ComplexF64,1}}
         @test first(solutions(result)) isa PVector{ComplexF64,1}
