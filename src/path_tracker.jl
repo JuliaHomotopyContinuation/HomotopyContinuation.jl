@@ -1150,6 +1150,7 @@ The `details` options controls the level of details of the informations availabl
 in the [`PathResult`](@ref).
 If `tracker` uses a parameter homotopy you can set the start and target parameters
 by setting the corresponding fields.
+To investigate the behaviour of a particular take a look at [`path_info`](@ref).
 """
 function track(
     tracker::PathTracker,

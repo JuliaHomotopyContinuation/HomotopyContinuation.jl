@@ -936,6 +936,7 @@ end
 Track a value `x₁` from `t₁` to `t₀` using the given `CoreTracker` `tracker`.
 This returns a `CoreTrackerResult`. This modifies `tracker`.
 See [`track!`](@ref) for the possible options.
+To investigate the behaviour of a particular take a look at [`path_info`](@ref).
 """
 function track(
     tracker::CT,
