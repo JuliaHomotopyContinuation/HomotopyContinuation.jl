@@ -218,6 +218,7 @@ function is_real_vector(z::AbstractVector{<:Complex}, tol = 1e-6)
     sqrt(total) < tol
 end
 is_real_vector(z::NTuple{N,T}, tol = 1e-6) where {N,T} = is_real_vector(SVector{N}(z), tol)
+is_real_vector(v::PVector, tol = 1e-6) = isreal(v, tol)
 
 """
     randseed(range=1_000:1_000_000)

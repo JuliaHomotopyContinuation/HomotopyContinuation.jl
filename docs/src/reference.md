@@ -94,6 +94,23 @@ Pade21
 NullPredictor
 ```
 
+## Projective vectors
+
+To represent solutions in projective spaces we use the
+[ProjectiveVectors.jl](https://github.com/JuliaHomotopyContinuation/ProjectiveVectors.jl)
+package. The following methods are re-exported from the package.
+
+```@docs
+PVector
+dims
+dimension_indices
+affine_chart
+×
+component
+components
+combine
+```
+
 ## Unique points and multiplicities
 
 We provide functions for sorting analyzing arrays of vectors.
