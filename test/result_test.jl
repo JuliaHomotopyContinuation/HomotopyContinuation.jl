@@ -127,7 +127,7 @@
 
     @testset "real projective solutions" begin
         @polyvar x y v w
-        res = solve([x*y - 6*v*w, x^2 - 5v^2], variable_groups=[(x,v), (y,w)])
+        res = solve([x * y - 6 * v * w, x^2 - 5 * v^2], variable_groups = [(x, v), (y, w)])
         @test all(is_real, res)
     end
 end
