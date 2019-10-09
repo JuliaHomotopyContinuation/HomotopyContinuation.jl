@@ -290,20 +290,25 @@ Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record stati
 in `stats`.
 """
 function track(
-    tracker::PathTracker,
+    tracker::CoreTracker,
     x::AbstractVector,
     loop::MonodromyLoop,
-    stats::MonodromyStatistics,
+    ntrackedpaths::Base.RefValue{Int},
+    ntrackingfailures::Base.RefValue{Int},
 )
-    H = basehomotopy(tracker.core_tracker.homotopy)
-    local retcode::PathTrackerStatus.states
+    H = basehomotopy(tracker.homotopy)
+    local retcode::CoreTrackerStatus.states
     y = x
     for e in loop.edges
         set_parameters!(H, (e.p₁, e.p₀), e.weights)
         retcode = track!(tracker, y)
-        trackedpath!(stats, retcode)
+        if is_success(retcode)
+            ntrackedpaths[] += 1
+        else
+            ntrackingfailures[] += 1
+        end
         is_success(retcode) || break
-        y = solution(tracker)
+        y = current_x(tracker)
     end
     retcode
 end
@@ -317,10 +322,10 @@ end
 
 The monodromy result contains the result of the `monodromy_solve` computation.
 """
-struct MonodromyResult{N,T1,T2}
+struct MonodromyResult{AV<:AbstractVector,T}
     returncode::Symbol
-    solutions::Vector{SVector{N,T1}}
-    parameters::Vector{T2}
+    solutions::Vector{AV}
+    parameters::Vector{T}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
     seed::Int
@@ -482,13 +487,21 @@ parameters(r::MonodromyResult) = r.parameters
 #####################
 ## monodromy solve ##
 #####################
-struct MonodromySolver{T<:Number,UP<:UniquePoints,MO<:MonodromyOptions,Tracker<:PathTracker}
+struct MonodromySolver{
+    T<:Number,
+    UP<:UniquePoints,
+    MO<:MonodromyOptions,
+    Tracker<:CoreTracker,
+    Prob<:Problem,
+}
     parameters::Vector{T}
     solutions::UP
+    solutions_lock::Threads.SpinLock
     loops::Vector{MonodromyLoop}
     options::MO
     statistics::MonodromyStatistics
-    tracker::Tracker
+    trackers::Vector{Tracker}
+    problem::Prob
 end
 
 function MonodromySolver(
@@ -501,21 +514,14 @@ function MonodromySolver(
 end
 function MonodromySolver(
     F::Inputs,
-    solutions::Vector{<:AbstractVector{<:Number}},
-    p₀::AbstractVector{TP};
-    kwargs...,
-) where {TP}
-    MonodromySolver(F, static_solutions(solutions), p₀; kwargs...)
-end
-function MonodromySolver(
-    F::Inputs,
-    startsolutions::Vector{<:SVector{NVars,<:Complex}},
+    startsolutions::Vector{<:AbstractVector{<:Number}},
     p::AbstractVector{TP};
     parameters = nothing,
     strategy = nothing,
     show_progress = true,
     showprogress = nothing, #deprecated
-    accuracy = 1e-7, # set a higher refinement_accuracy than the default
+    accuracy = 1e-6, # set a higher refinement_accuracy than the default
+    precision = PRECISION_ADAPTIVE,
     kwargs...,
 ) where {TP,NVars}
 
@@ -525,41 +531,47 @@ function MonodromySolver(
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
-    x₀ = Vector(first(startsolutions))
+    x₀ = complex.(first(startsolutions))
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
 
-    # construct tracker
-    tracker = pathtracker(
+    supported, rest = splitkwargs(restkwargs, problem_startsolutions_supported_keywords)
+    prob, _ = problem_startsolutions(
         F,
-        startsolutions;
-        accuracy = accuracy,
+        [x₀];
         parameters = parameters,
         generic_parameters = p₀,
-        restkwargs...,
+        supported...,
+    )
+    tracker = CoreTracker(
+        prob,
+        x₀;
+        accuracy = accuracy,
+        precision = PRECISION_ADAPTIVE,
+        rest...,
     )
     # Check whether homotopy is real
-    is_real_system = numerically_check_real(tracker.core_tracker.homotopy, x₀)
+    is_real_system = numerically_check_real(tracker.homotopy, x₀)
     options = MonodromyOptions(is_real_system, accuracy; optionskwargs...)
     # construct UniquePoints
     if options.equivalence_classes
         uniquepoints = UniquePoints(
-            eltype(startsolutions),
+            typeof(x₀),
             options.distance_function;
             group_actions = options.group_actions,
             check_real = true,
         )
     else
         uniquepoints = UniquePoints(
-            eltype(startsolutions),
+            typeof(x₀),
             options.distance_function;
             check_real = true,
         )
     end
     # add only unique points that are true solutions
     for s in startsolutions
-        if !options.check_startsolutions || is_valid_start_value(tracker, s)
+        if !options.check_startsolutions || is_valid_start_value(tracker, s, 0.0)
             add!(uniquepoints, s; tol = options.identical_tol)
         end
     end
@@ -573,7 +585,16 @@ function MonodromySolver(
     # construct Loop
     loops = [MonodromyLoop(strategy, p₀, options)]
 
-    MonodromySolver(p₀, uniquepoints, loops, options, statistics, tracker)
+    MonodromySolver(
+        p₀,
+        uniquepoints,
+        Threads.SpinLock(),
+        loops,
+        options,
+        statistics,
+        [tracker],
+        prob,
+    )
 end
 
 """
@@ -637,12 +658,19 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed
   to run.
 """
-function monodromy_solve(args...; seed = randseed(), show_progress = true, kwargs...)
+function monodromy_solve(
+    args...;
+    seed = randseed(),
+    show_progress = true,
+    threading::Bool = true,
+    kwargs...,
+)
     Random.seed!(seed)
     monodromy_solve!(
         MonodromySolver(args...; kwargs...),
         seed;
         show_progress = show_progress,
+        threading = threading,
     )
 end
 
@@ -672,19 +700,6 @@ function default_strategy(F::AbstractSystem, parameters, p₀; is_real_system = 
     end
 end
 
-# convert vector of vectors to vector of svectors
-static_solutions(V::Vector) = static_solutions(V, Val(length(V[1])))
-function static_solutions(V::Vector, ::Val{N}) where {N}
-    map(v -> complex.(float.(SVector{N}(v))), V)
-end
-function static_solutions(
-    V::Vector{<:AbstractVector{<:Complex{<:AbstractFloat}}},
-    ::Val{N},
-) where {N}
-    SVector{N}.(V)
-end
-
-
 function numerically_check_real(H::AbstractHomotopy, x)
     y = copy(x)
     Random.randn!(y)
@@ -710,7 +725,12 @@ struct MonodromyJob
     loop_id::Int
 end
 
-function monodromy_solve!(MS::MonodromySolver, seed; show_progress = true)
+function monodromy_solve!(
+    MS::MonodromySolver,
+    seed;
+    show_progress::Bool = true,
+    threading::Bool = true,
+)
     if nsolutions(MS) == 0
         @warn "None of the provided solutions is a valid start solution."
         return MonodromyResult(
@@ -741,7 +761,7 @@ function monodromy_solve!(MS::MonodromySolver, seed; show_progress = true)
 
     n_blas_threads = single_thread_blas()
     try
-        retcode = monodromy_solve!(MS, seed, progress)
+        retcode = monodromy_solve!(MS, seed, progress; threading = threading)
     catch e
         if (e isa InterruptException)
             retcode = :interrupt
@@ -765,17 +785,27 @@ end
 function monodromy_solve!(
     MS::MonodromySolver,
     seed,
-    progress::Union{Nothing,ProgressMeter.ProgressUnknown},
+    progress::Union{Nothing,ProgressMeter.ProgressUnknown};
+    threading::Bool = true,
 )
+    Threads.resize_nthreads!(MS.trackers)
     t₀ = time_ns()
     iterations_without_progress = 0 # stopping heuristic
     # intialize job queue
     queue = MonodromyJob.(1:nsolutions(MS), 1)
+    thread_queues = [MonodromyJob[] for _ = 1:Threads.nthreads()]
 
     n = nsolutions(MS)
     retcode = :none
     while n < MS.options.target_solutions_count
-        retcode = empty_queue!(queue, MS, t₀, progress)
+        retcode = empty_queue!(
+            queue,
+            thread_queues,
+            MS,
+            t₀,
+            progress;
+            threading = threading,
+        )
 
         if retcode == :done
             retcode = :success
@@ -783,6 +813,12 @@ function monodromy_solve!(
         elseif retcode == :timeout || retcode == :invalid_startvalue
             break
         end
+
+        for q in thread_queues
+            append!(queue, q)
+            empty!(q)
+        end
+        isempty(queue) || continue
 
         # Iterations heuristic
         n_new = nsolutions(MS)
@@ -805,36 +841,103 @@ function monodromy_solve!(
     retcode
 end
 
-function empty_queue!(queue, MS::MonodromySolver, t₀::UInt, progress)
-    while !isempty(queue)
-        job = pop!(queue)
-        status = process!(queue, job, MS, progress)
-        if status == :done
-            return :done
-        elseif status == :invalid_startvalue
-            return :invalid_startvalue
+function empty_queue!(
+    queue,
+    thread_queues,
+    MS::MonodromySolver,
+    t₀::UInt,
+    progress;
+    threading::Bool = true,
+)
+    if !threading
+        ntracked = Ref(0)
+        nfailures = Ref(0)
+        while !isempty(queue)
+            job = pop!(queue)
+            status = process!(queue, job, MS, progress, ntracked, nfailures, 1)
+            if status == :done
+                return :done
+            elseif status == :invalid_startvalue
+                return :invalid_startvalue
+            end
+
+            MS.statistics.ntrackedpaths += ntracked[]
+            MS.statistics.ntrackingfailures += nfailures[]
+            ntracked[] = nfailures[] = 0
+            update_progress!(progress, nsolutions(MS), MS.statistics)
+            # check timeout
+            if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
+                return :timeout
+            end
         end
+        :incomplete
+    else
+        stop = Ref(false)
+        return_status = Ref(:incomplete)
+        start_ntrackedpaths = MS.statistics.ntrackedpaths
+        start_ntrackingfailures = MS.statistics.ntrackingfailures
+        ntrackedpaths = [Ref(0) for _ = 1:Threads.nthreads()]
+        ntrackingfailures = [Ref(0) for _ = 1:Threads.nthreads()]
+        Threads.@threads for job in queue
+            tid = Threads.threadid()
+            status = process!(
+                thread_queues[tid],
+                job,
+                MS,
+                progress,
+                ntrackedpaths[tid],
+                ntrackingfailures[tid],
+                tid,
+            )
+            if status == :done
+                return_status[] = :done
+                stop[] = true
+            elseif status == :invalid_startvalue
+                return_status[] = :invalid_startvalue
+                stop[] = true
+            end
+            if tid == 1
+                n_tracked = start_ntrackedpaths + sum(getindex, ntrackedpaths)
+                n_failures = start_ntrackingfailures + sum(getindex, ntrackingfailures)
+                MS.statistics.ntrackedpaths = n_tracked
+                MS.statistics.ntrackingfailures = n_failures
+                update_progress!(progress, nsolutions(MS), MS.statistics)
+            end
+            # check timeout
+            if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
+                return_status[] = :invalid_startvalue
+                stop[] = true
+            end
+            if stop[]
+                break
+            end
+        end
+        empty!(queue)
+        n_tracked = start_ntrackedpaths + sum(getindex, ntrackedpaths)
+        n_failures = start_ntrackingfailures + sum(getindex, ntrackingfailures)
+        MS.statistics.ntrackedpaths = n_tracked
+        MS.statistics.ntrackingfailures = n_failures
         update_progress!(progress, nsolutions(MS), MS.statistics)
-        # check timeout
-        if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
-            return :timeout
-        end
+
+        return_status[]
     end
-    :incomplete
 end
 
-function process!(queue, job::MonodromyJob, MS::MonodromySolver, progress)
+function process!(
+    queue,
+    job::MonodromyJob,
+    MS::MonodromySolver,
+    progress,
+    ntrackedpaths::Base.RefValue{Int},
+    ntrackingfailures::Base.RefValue{Int},
+    tid::Integer,
+)
     x = solutions(MS)[job.id]
     loop = MS.loops[job.loop_id]
-    retcode = track(MS.tracker, x, loop, MS.statistics)
-    if !is_success(retcode)
-        if is_invalid_startvalue(retcode) && MS.statistics.ntrackedpaths == 0
-            return :invalid_startvalue
-        end
-        return :incomplete
-    end
+    retcode = track(MS.trackers[tid], x, loop, ntrackedpaths, ntrackingfailures)
+    is_success(retcode) || return :incomplete
 
-    y = solution(MS.tracker)
+    y = pull_back(MS.problem, current_x(MS.trackers[tid]))
     add_and_schedule!(MS, queue, y, job) && return :done
 
     if MS.options.complex_conjugation
@@ -856,7 +959,9 @@ Add `y` to the current `node` (if it not already exists) and schedule a new job 
 `queue`. Returns `true` if we are done. Otherwise `false`.
 """
 function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) where {N,T}
+    lock(MS.solutions_lock)
     k = add!(MS.solutions, y, Val(true); tol = MS.options.identical_tol)
+    unlock(MS.solutions_lock)
     if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
         # Check if we are done
         isdone(MS.solutions, y, MS.options) && return true
