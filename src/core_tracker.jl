@@ -1277,6 +1277,12 @@ function Base.iterate(tracker::CoreTracker, state::Int = 0)
     end
 end
 
+function is_valid_start_value(tracker::CoreTracker, x::AbstractVector, t::Number)
+    embed!(tracker.state.x̄, x)
+    check_start_value!(tracker, tracker.state.x̄, t)
+    !is_invalid_startvalue(status(tracker))
+end
+
 """
     affine_tracking(tracker)
 

@@ -30,6 +30,7 @@
             parameters = p,
             target_solutions_count = 21,
             max_loops_no_progress = 20,
+            threading = false,
         )
         @test is_success(result)
         @test length(solutions(result)) == 21
@@ -47,9 +48,22 @@
             parameters = p,
             target_solutions_count = 21,
             max_loops_no_progress = 20,
+            threading = false,
             seed = result.seed,
         )
         @test result2.statistics.ntrackedpaths == result.statistics.ntrackedpaths
+
+        result = monodromy_solve(
+            F,
+            x₀,
+            p₀,
+            parameters = p,
+            target_solutions_count = 21,
+            max_loops_no_progress = 20,
+            threading = true,
+        )
+        @test is_success(result)
+        @test length(solutions(result)) == 21
 
         # test that timeout works
         result_timeout = monodromy_solve(
@@ -71,14 +85,6 @@
         @test result.returncode == :invalid_startvalue
         result = monodromy_solve(F, [x₀, rand(6)], p₀, parameters = p)
         @test length(solutions(result)) == 21
-        result = monodromy_solve(
-            F,
-            [x₀, rand(6)],
-            p₀,
-            parameters = p,
-            check_startsolutions = false,
-        )
-        @test result.returncode == :invalid_startvalue
 
         # different distance function
         result = monodromy_solve(F, x₀, p₀, parameters = p, distance = (x, y) -> 0.0)
