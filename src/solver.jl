@@ -304,8 +304,8 @@ function track_parallel!(
                 end
             end
         else
-            try
-                Threads.@threads for i in range
+            Threads.@threads for i in range
+                try
                     tid = Threads.threadid()
                     results[i] = track(
                         trackers[tid],
@@ -331,12 +331,12 @@ function track_parallel!(
                     if interrupted[]
                         break
                     end
-                end
-            catch e
-                if isa(e, InterruptException)
-                    interrupted[] = true
-                else
-                    rethrow()
+                catch e
+                    if isa(e, InterruptException)
+                        interrupted[] = true
+                    else
+                        rethrow()
+                    end
                 end
             end
         end
