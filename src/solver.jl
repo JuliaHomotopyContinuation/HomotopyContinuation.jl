@@ -187,6 +187,7 @@ function solve!(
             stop_early_cb,
             stats,
             progress;
+            path_result_details = path_result_details,
             threading = threading,
         )
 
@@ -244,6 +245,7 @@ function track_parallel!(
     threading::Bool = true,
     max_corrector_iters::Union{Nothing,Int} = nothing,
     accuracy::Union{Nothing,Float64} = nothing,
+    path_result_details::Symbol = :default,
 )
     if threading && Threads.nthreads() > 1
         nthreads = Threads.nthreads()
@@ -269,6 +271,7 @@ function track_parallel!(
                                 trackers[tid],
                                 S[i];
                                 path_number = i,
+                                details = path_result_details,
                                 max_corrector_iters = max_corrector_iters,
                                 accuracy = accuracy,
                             )
@@ -304,14 +307,15 @@ function track_parallel!(
                 end
             end
         else
-            try
-                Threads.@threads for i in range
+            Threads.@threads for i in range
+                try
                     tid = Threads.threadid()
                     results[i] = track(
                         trackers[tid],
                         S[i];
                         path_number = i,
                         max_corrector_iters = max_corrector_iters,
+                        details = path_result_details,
                         accuracy = accuracy,
                     )
                     if is_success(results[i]) && stop_early_cb !== nothing
@@ -331,12 +335,12 @@ function track_parallel!(
                     if interrupted[]
                         break
                     end
-                end
-            catch e
-                if isa(e, InterruptException)
-                    interrupted[] = true
-                else
-                    rethrow()
+                catch e
+                    if isa(e, InterruptException)
+                        interrupted[] = true
+                    else
+                        rethrow()
+                    end
                 end
             end
         end
@@ -352,6 +356,7 @@ function track_parallel!(
                 S[i];
                 path_number = i,
                 max_corrector_iters = max_corrector_iters,
+                details = path_result_details,
                 accuracy = accuracy,
             )
             stats !== nothing && update!(stats[1], results[i])

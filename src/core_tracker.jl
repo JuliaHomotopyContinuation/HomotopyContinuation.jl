@@ -1123,7 +1123,7 @@ function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, optio
     if options.initial_step_size !== nothing
         return state.Δs = max(
             min(options.initial_step_size, length(state.segment), options.max_step_size),
-            options.min_step_size,
+            sqrt(options.min_step_size),
         )
     end
     ω = max(state.ω, 1e-8)
@@ -1166,7 +1166,7 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     end
 
     # Make sure to not overshoot.
-    if !is_min_step_size(Δs, state.s, length(state.segment), options)
+    if !is_min_step_size(Δs, state.s, length(state.segment), options) && steps(state) > 5
         state.status = CoreTrackerStatus.terminated_step_size_too_small
     else
         state.Δs = min(length(state.segment) - state.s, Δs, options.max_step_size)
@@ -1279,8 +1279,10 @@ function Base.iterate(tracker::CoreTracker, state::Int = 0)
 end
 
 function is_valid_start_value(tracker::CoreTracker, x::AbstractVector, t::Number)
-    embed!(tracker.state.x̄, x)
-    check_start_value!(tracker, tracker.state.x̄, t)
+    @unpack state = tracker
+    embed!(state.x̄, x)
+    state.patch !== nothing && init!(state.patch, state.x̄)
+    check_start_value!(tracker, state.x̄, t)
     !is_invalid_startvalue(status(tracker))
 end
 

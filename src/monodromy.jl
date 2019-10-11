@@ -506,7 +506,7 @@ end
 
 function MonodromySolver(
     F::Inputs,
-    solution::Vector{<:Number},
+    solution::AbstractVector{<:Number},
     p₀::AbstractVector{TP};
     kwargs...,
 ) where {TP}
@@ -761,15 +761,9 @@ function monodromy_solve!(
     end
 
     n_blas_threads = single_thread_blas()
-    try
-        retcode = monodromy_solve!(MS, seed, progress; threading = threading)
-    catch e
-        if (e isa InterruptException)
-            retcode = :interrupt
-        else
-            rethrow(e)
-        end
-    end
+
+    retcode = monodromy_solve!(MS, seed, progress; threading = threading)
+
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
     finished!(MS.statistics, nsolutions(MS))
     MonodromyResult(
@@ -811,7 +805,8 @@ function monodromy_solve!(
         if retcode == :done
             retcode = :success
             break
-        elseif retcode == :timeout || retcode == :invalid_startvalue
+        elseif retcode == :timeout ||
+               retcode == :invalid_startvalue || retcode == :interrupt
             break
         end
 
@@ -853,25 +848,40 @@ function empty_queue!(
     if !threading
         ntracked = Ref(0)
         nfailures = Ref(0)
-        while !isempty(queue)
-            job = pop!(queue)
-            status = process!(queue, job, MS, progress, ntracked, nfailures, 1)
-            if status == :done
-                return :done
-            elseif status == :invalid_startvalue
-                return :invalid_startvalue
-            end
+        n_since_update = 0
+        retcode = :incomplete
+        try
+            while !isempty(queue)
+                job = pop!(queue)
+                status = process!(queue, job, MS, progress, ntracked, nfailures, 1)
+                if status == :done || status == :invalid_startvalue || status == :interrupt
+                    retcode = status
+                    break
+                end
+                n_since_update += 1
 
-            MS.statistics.ntrackedpaths += ntracked[]
-            MS.statistics.ntrackingfailures += nfailures[]
-            ntracked[] = nfailures[] = 0
-            update_progress!(progress, nsolutions(MS), MS.statistics)
-            # check timeout
-            if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
-                return :timeout
+                MS.statistics.ntrackedpaths += ntracked[]
+                MS.statistics.ntrackingfailures += nfailures[]
+                ntracked[] = nfailures[] = 0
+                if n_since_update ≥ 4
+                    n_since_update = 0
+                    update_progress!(progress, nsolutions(MS), MS.statistics)
+                end
+                # check timeout
+                if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
+                    retcode = :timeout
+                    break
+                end
+            end
+        catch e
+            if isa(e, InterruptException)
+                return :interrupt
+            else
+                rethrow()
             end
         end
-        :incomplete
+        n_since_update > 0 && update_progress!(progress, nsolutions(MS), MS.statistics)
+        retcode
     else
         stop = Ref(false)
         return_status = Ref(:incomplete)
@@ -880,37 +890,48 @@ function empty_queue!(
         ntrackedpaths = [Ref(0) for _ = 1:Threads.nthreads()]
         ntrackingfailures = [Ref(0) for _ = 1:Threads.nthreads()]
         Threads.@threads for job in queue
-            tid = Threads.threadid()
-            status = process!(
-                thread_queues[tid],
-                job,
-                MS,
-                progress,
-                ntrackedpaths[tid],
-                ntrackingfailures[tid],
-                tid,
-            )
-            if status == :done
-                return_status[] = :done
-                stop[] = true
-            elseif status == :invalid_startvalue
-                return_status[] = :invalid_startvalue
-                stop[] = true
-            end
-            if tid == 1
-                n_tracked = start_ntrackedpaths + sum(getindex, ntrackedpaths)
-                n_failures = start_ntrackingfailures + sum(getindex, ntrackingfailures)
-                MS.statistics.ntrackedpaths = n_tracked
-                MS.statistics.ntrackingfailures = n_failures
-                update_progress!(progress, nsolutions(MS), MS.statistics)
-            end
+            try
+                !stop[] || continue
+                tid = Threads.threadid()
+                status = process!(
+                    thread_queues[tid],
+                    job,
+                    MS,
+                    progress,
+                    ntrackedpaths[tid],
+                    ntrackingfailures[tid],
+                    tid,
+                )
+                if status == :done
+                    return_status[] = :done
+                    stop[] = true
+                elseif status == :invalid_startvalue
+                    return_status[] = :invalid_startvalue
+                    stop[] = true
+                end
+                if tid == 1
+                    n_tracked = start_ntrackedpaths + sum(getindex, ntrackedpaths)
+                    n_failures = start_ntrackingfailures + sum(getindex, ntrackingfailures)
+                    MS.statistics.ntrackedpaths = n_tracked
+                    MS.statistics.ntrackingfailures = n_failures
+                    update_progress!(progress, nsolutions(MS), MS.statistics)
+                end
             # check timeout
-            if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
-                return_status[] = :invalid_startvalue
-                stop[] = true
-            end
-            if stop[]
-                break
+                if (time_ns() - t₀) > MS.options.timeout * 1e9 # convert s to ns
+                    return_status[] = :invalid_startvalue
+                    stop[] = true
+                end
+                if stop[]
+                    break
+                end
+            catch e
+                if isa(e, InterruptException)
+                    return_status[] = :interrupt
+                    stop[] = true
+                    break
+                else
+                    rethrow()
+                end
             end
         end
         empty!(queue)
