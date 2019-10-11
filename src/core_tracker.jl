@@ -1279,8 +1279,10 @@ function Base.iterate(tracker::CoreTracker, state::Int = 0)
 end
 
 function is_valid_start_value(tracker::CoreTracker, x::AbstractVector, t::Number)
-    embed!(tracker.state.x̄, x)
-    check_start_value!(tracker, tracker.state.x̄, t)
+    @unpack state = tracker
+    embed!(state.x̄, x)
+    state.patch !== nothing && init!(state.patch, state.x̄)
+    check_start_value!(tracker, state.x̄, t)
     !is_invalid_startvalue(status(tracker))
 end
 
