@@ -1123,7 +1123,7 @@ function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, optio
     if options.initial_step_size !== nothing
         return state.Δs = max(
             min(options.initial_step_size, length(state.segment), options.max_step_size),
-            options.min_step_size,
+            sqrt(options.min_step_size),
         )
     end
     ω = max(state.ω, 1e-8)
@@ -1166,7 +1166,7 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     end
 
     # Make sure to not overshoot.
-    if !is_min_step_size(Δs, state.s, length(state.segment), options)
+    if !is_min_step_size(Δs, state.s, length(state.segment), options) && steps(state) > 5
         state.status = CoreTrackerStatus.terminated_step_size_too_small
     else
         state.Δs = min(length(state.segment) - state.s, Δs, options.max_step_size)
