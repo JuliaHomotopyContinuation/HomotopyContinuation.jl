@@ -613,10 +613,14 @@ nsolutions(MS::MonodromySolver) = length(solutions(MS))
 
 
 """
-    monodromy_solve(F, sols, p; parameters=..., options..., pathtrackerkwargs...)
+    monodromy_solve(F, [sols, p]; parameters=..., options..., pathtrackerkwargs...)
 
 Solve a polynomial system `F(x;p)` with specified parameters and initial solutions `sols`
 by monodromy techniques. This makes loops in the parameter space of `F` to find new solutions.
+If `F` the parameters `p` only occur *linearly* in `F` it is eventually possible to compute
+a *start pair* ``(x₀, p₀)`` automatically. In this case `sols` and `p` can be omitted and
+the automatically generated parameters can be obtained with the [`parameters`](@ref) function
+from the [`MonodromyResult`](@ref).
 
 ## Options
 
@@ -659,6 +663,65 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 * `timeout=float(typemax(Int))`: The maximal number of *seconds* the computation is allowed
   to run.
 """
+function monodromy_solve(
+    F::MPPolys;
+    parameters = throw(ArgumentError("Necessary to provide `parameters` as a keyword argument.")),
+    variable_ordering = nothing,
+    seed = randseed(),
+    show_progress = true,
+    threading::Bool = true,
+    kwargs...,
+)
+    Random.seed!(seed)
+    x₀ = p₀ = nothing
+    try
+        x₀, p₀ = find_start_pair(F, parameters; variable_ordering = variable_ordering)
+    catch
+        throw(ArgumentError("Cannot compute a start pair (x, p) automatically."))
+    end
+    monodromy_solve!(
+        MonodromySolver(
+            F,
+            [x₀],
+            p₀;
+            parameters = parameters,
+            variable_ordering = variable_ordering,
+            kwargs...,
+        ),
+        seed;
+        show_progress = show_progress,
+        threading = threading,
+    )
+end
+
+function find_start_pair(F::MPPolys, parameters; variable_ordering = nothing)
+    if variable_ordering !== nothing
+        vars = variable_ordering
+    else
+        vars = variables(F; parameters = parameters)
+    end
+    x₀ = randn(ComplexF64, length(vars))
+    if F isa Composition
+        F = expand(F)
+    end
+    F_x₀ = [subs(f, vars => x₀) for f in F]
+    # let's use the helper function above to get the matrix form
+    A, b = linear_system(F_x₀)
+    if iszero(b)
+        p_end = randn(ComplexF64)
+        p₀ = [LA.qr(A[:, 1:end-1], Val(true)) \ ((-p_end) .* A[:, end]); p_end]
+    else
+        p₀ = LA.qr(A, Val(true)) \ b
+    end
+
+    all(
+        f -> abs(f(parameters => p₀)) < 1e-8,
+        F_x₀,
+    ) || throw(ArgumentError("Cannot compute start pair."))
+
+    (x₀, p₀)
+end
+
 function monodromy_solve(
     args...;
     seed = randseed(),

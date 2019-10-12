@@ -168,7 +168,7 @@
         S = collect(starts)
         state = tracker.state
         val = HC.Valuation(state.x; affine = true)
-        init!(tracker, S[1], 0.0, 20.0)
+        init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
                 HC.update!(val, state.x, state.ẋ, state.s)
@@ -197,7 +197,7 @@
         # PROJECTIVE VALUATIONS
 
         val = HC.Valuation(state.x; affine = false)
-        init!(tracker, S[1], 0.0, 20.0)
+        init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
                 HC.update!(val, state.x, state.ẋ, state.s)
@@ -211,7 +211,7 @@
         # Use analytic estimates for ν̇ and ν̈
         init!(val)
         @test all(isnan, val.ν)
-        init!(tracker, S[1], 0.0, 20.0)
+        init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
                 HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)

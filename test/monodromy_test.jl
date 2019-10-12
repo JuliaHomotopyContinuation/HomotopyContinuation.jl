@@ -391,4 +391,50 @@
             @test is_complete
         end
     end
+
+
+    @testset "monodromy - automatic start pair" begin
+        @polyvar x[1:4]
+        # declare the variables for the 3 points
+        @polyvar p[1:3, 1:3]
+        p₁, p₂, p₃ = p[:, 1], p[:, 2], p[:, 3]
+        quartic_monomials = monomials(sum(x)^4)
+        @polyvar c[1:35]
+        f = sum(c .* quartic_monomials)
+        ∇f = differentiate(f, x)
+        @polyvar u v
+        F = [
+            subs(f, x => [p₁; 1])
+            subs(f, x => [p₂; 1])
+            subs(f, x => [p₃; 1])
+            (subs(∇f, x => [p₁; 1]) - u * subs(∇f, x => [p₂; 1]))
+            (subs(∇f, x => [p₁; 1]) - v * subs(∇f, x => [p₃; 1]))
+        ]
+
+        x₀, c₀ = HC.find_start_pair(F, c)
+        @test norm([f([p₁; p₂; p₃; u; v] => x₀, c => c₀) for f in F]) < 1e-8
+
+        F1 = [subs(f, c[1] => 0.232) for f in F]
+        x₀, c₀ = HC.find_start_pair(F1, c[2:end])
+        @test norm([f([p₁; p₂; p₃; u; v] => x₀, c[2:end] => c₀) for f in F1]) < 1e-8
+
+        # only use a small target_solutions_count, this is just to test that we actually
+        # compute something
+        res = monodromy_solve(F; parameters = c, target_solutions_count = 50)
+        @test is_success(res)
+
+        # Example where we cannot compute a start pair naively.
+        @polyvar x y
+        f = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        # define new variables u₁, u₂ and λ₁
+        @polyvar u[1:2] λ[1:1]
+        # define the jacobian of F
+        J = differentiate([f], [x, y])
+        # J' defines the transpose of J
+        C = [[x, y] - u - J' * λ; f]
+
+        @test_throws ArgumentError monodromy_solve(C; parameters = u)
+        @test_throws ArgumentError HC.find_start_pair(C, u)
+    end
+
 end
