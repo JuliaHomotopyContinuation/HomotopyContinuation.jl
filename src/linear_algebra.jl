@@ -493,7 +493,7 @@ function qr_ldiv!(
     return x
 end
 
-function LA.ldiv!(x, WS::MatrixWorkspace, b)
+function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     WS.factorized[] || factorize!(WS)
     if WS.fact[] == LU_FACT
         lu = WS.lu
