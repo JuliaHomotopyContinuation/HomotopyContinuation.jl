@@ -430,7 +430,7 @@ julia> real_solutions(result)
 ```
 """
 function real_solutions(result::Results; only_real = true, tol = 1e-6, kwargs...)
-    mapresults(r -> real.(solution(r)), result; only_real = true, real_tol = tol, kwargs...)
+    mapresults(real_vector ∘ solution, result; only_real = true, real_tol = tol, kwargs...)
 end
 @deprecate realsolutions(result; kwargs...) real_solutions(result; kwargs...)
 

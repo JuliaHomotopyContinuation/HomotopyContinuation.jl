@@ -809,7 +809,7 @@ function problem_startsolutions(
         F, variable_groups, homvars = homogenize_if_necessary(
             input.system,
             hominfo;
-            variables = variables,
+            vars = variables,
             parameters = input.parameters,
         )
     end

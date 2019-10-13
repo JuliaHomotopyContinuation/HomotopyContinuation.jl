@@ -234,7 +234,12 @@ julia> points(UniquePoints([[1.0,0.5], [1.0,0.5], [0.5,1.0]], group_action = x -
  [1.0, 0.5]
 ```
 """
-struct UniquePoints{V<:AbstractVector,T,F<:Function,MaybeGA<:Union{Nothing,GroupActions}}
+struct UniquePoints{
+    V<:AbstractVector,
+    T,
+    F<:Union{AbstractNorm,Function},
+    MaybeGA<:Union{Nothing,GroupActions},
+}
     root::SearchBlock{T}
     points::Vector{V}
     distance_function::F
@@ -248,7 +253,7 @@ function UniquePoints(
     group_action = nothing,
     group_actions = group_action === nothing ? nothing : GroupActions(group_action),
     check_real::Bool = true,
-) where {T<:Number,V<:AbstractVector{T},F<:Function}
+) where {T<:Number,V<:AbstractVector{T},F<:Union{AbstractNorm,Function}}
 
     if group_actions isa GroupActions
         actions = group_actions
@@ -263,7 +268,11 @@ function UniquePoints(
     UniquePoints(root, points, distance, actions, check_real)
 end
 
-function UniquePoints(v::AbstractVector{<:Number}, distance::Function; kwargs...)
+function UniquePoints(
+    v::AbstractVector{<:Number},
+    distance::Union{AbstractNorm,Function};
+    kwargs...,
+)
     data = UniquePoints(typeof(v), distance; kwargs...)
     add!(data, v)
     data
@@ -271,17 +280,25 @@ end
 
 function UniquePoints(
     v::AbstractVector{<:AbstractVector},
-    distance::F;
+    distance::Union{AbstractNorm,Function};
     tol::Real = 1e-5,
     kwargs...,
-) where {F<:Function}
+)
     data = UniquePoints(eltype(v), distance; kwargs...)
     add!(data, v; tol = tol)
 end
-UniquePoints(v::Type{<:UniquePoints{V}}, distance::F; kwargs...) where {V,F<:Function} =
-    UniquePoints(V, distance; kwargs...)
-UniquePoints(v; distance = euclidean_distance, kwargs...) =
+UniquePoints(
+    v::Type{<:UniquePoints{V}},
+    distance::Union{AbstractNorm,Function};
+    kwargs...,
+) where {V} = UniquePoints(V, distance; kwargs...)
+UniquePoints(v::Type; distance = default_distance(v), kwargs...) =
     UniquePoints(v, distance; kwargs...)
+UniquePoints(v::AbstractVector; distance = default_distance(typeof(v)), kwargs...) =
+    UniquePoints(v, distance; kwargs...)
+
+default_distance(v::Type{<:PVector}) = fubini_study
+default_distance(v::Type{<:AbstractVector}) = euclidean_distance
 
 function Base.show(io::IO, data::UniquePoints)
     print(io, typeof(data), " with ", length(points(data)), " points")

@@ -221,6 +221,30 @@ is_real_vector(z::NTuple{N,T}, tol = 1e-6) where {N,T} = is_real_vector(SVector{
 is_real_vector(v::PVector, tol = 1e-6) = isreal(v, tol)
 
 """
+    real_vector(v)
+
+Obtain the real part of a vector.
+"""
+function real_vector(v::PVector{T}) where {T}
+    w = LA.normalize(v)
+    λ = map(dimension_indices(w)) do rᵢ
+        maxᵢ = zero(real(T))
+        max_ind = 0
+        for i in rᵢ
+            wᵢ = abs(w[i])
+            if wᵢ > maxᵢ
+                max_ind = i
+                maxᵢ = wᵢ
+            end
+        end
+        cis(-angle(w[max_ind]))
+    end
+    LA.rmul!(w, λ)
+    real.(w)
+end
+real_vector(v::AbstractVector) = real.(v)
+
+"""
     randseed(range=1_000:1_000_000)
 
 Return a random seed in the range `range`.
@@ -254,17 +278,6 @@ than `norm(z, Inf)`.
 """
 infinity_norm(z::AbstractVector{<:Complex}) = sqrt(maximum(abs2, z))
 
-"""
-    fubini_study(x::PVector, y::PVector)
-
-Computes the Fubini-Study distance between `x` and `y`.
-"""
-function fubini_study(x::PVector{<:Number,1}, y::PVector{<:Number,1})
-    acos(min(1.0, abs(first(LinearAlgebra.dot(x, y)))))
-end
-function fubini_study(x::PVector{<:Number,M}, y::PVector{<:Number,M}) where {M}
-    sqrt(sum(abs2.(acos.(min.(1.0, abs.(LinearAlgebra.dot(x, y)))))))
-end
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization

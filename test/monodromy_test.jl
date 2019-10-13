@@ -437,4 +437,29 @@
         @test_throws ArgumentError HC.find_start_pair(C, u)
     end
 
+    @testset "projective" begin
+        @polyvar x y z a b c
+        f = x^2 + y^2 - z^2
+        l = a * x + b * y + c * z
+
+        v = PVector([-0.6 - 0.8im, -1.2 + 0.4im, 1])
+        res = monodromy_solve([f, l], v, [1, 2, 3]; parameters = [a, b, c])
+        @test is_heuristic_stop(res)
+        @test nsolutions(res) == 2
+        @test isempty(real_solutions(res))
+
+        @polyvar x y u v a b
+        f = [x * y - a * u * v, x^2 - b * u^2]
+        res = monodromy_solve(
+            f,
+            PVector([√2, 1], [√2, 1]),
+            [2, 2];
+            variable_groups = [[x, u], [y, v]],
+            parameters = [a, b],
+        )
+        @test is_heuristic_stop(res)
+        @test nsolutions(res) == 2
+        @test nreal(res) == 2
+        @test sum(fubini_study.(real_solutions(res), solutions(res))) ≈ 0.0 atol = 1e-6
+    end
 end

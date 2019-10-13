@@ -23,6 +23,7 @@ using DynamicPolynomials: @polyvar, subs, differentiate
 using ProjectiveVectors: PVector,
                          dims,
                          dimension_indices,
+                         fubini_study,
                          affine_chart,
                          ×,
                          component,
@@ -39,13 +40,21 @@ const SP = StaticPolynomials
 export @polyvar, subs, differentiate
 export mixed_volume
 export cond
-export PVector, dims, dimension_indices, affine_chart, ×, component, components, combine
+export PVector,
+       dims,
+       dimension_indices,
+       affine_chart,
+       fubini_study,
+       ×,
+       component,
+       components,
+       combine
 
 include("progress_meter.jl")
 import .ProgressMeter
 
-include("utilities.jl")
 include("norms.jl")
+include("utilities.jl")
 include("linear_algebra.jl")
 include("affine_patches.jl")
 
