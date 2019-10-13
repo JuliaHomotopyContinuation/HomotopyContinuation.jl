@@ -129,5 +129,6 @@
         @polyvar x y v w
         res = solve([x * y - 6 * v * w, x^2 - 5 * v^2], variable_groups = [(x, v), (y, w)])
         @test all(is_real, res)
+        @test sum(fubini_study.(real_solutions(res), solutions(res))) ≈ 0.0
     end
 end

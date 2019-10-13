@@ -221,6 +221,30 @@ is_real_vector(z::NTuple{N,T}, tol = 1e-6) where {N,T} = is_real_vector(SVector{
 is_real_vector(v::PVector, tol = 1e-6) = isreal(v, tol)
 
 """
+    real_vector(v)
+
+Obtain the real part of a vector.
+"""
+function real_vector(v::PVector{T}) where {T}
+    w = LA.normalize(v)
+    λ = map(dimension_indices(w)) do rᵢ
+        maxᵢ = zero(real(T))
+        max_ind = 0
+        for i in rᵢ
+            wᵢ = abs(w[i])
+            if wᵢ > maxᵢ
+                max_ind = i
+                maxᵢ = wᵢ
+            end
+        end
+        cis(-angle(w[max_ind]))
+    end
+    LA.rmul!(w, λ)
+    real.(w)
+end
+real_vector(v::AbstractVector) = real.(v)
+
+"""
     randseed(range=1_000:1_000_000)
 
 Return a random seed in the range `range`.

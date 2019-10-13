@@ -465,7 +465,7 @@ nsolutions(res::MonodromyResult) = length(res.solutions)
 Returns the solutions of `res` whose imaginary part has norm less than 1e-6.
 """
 function real_solutions(res::MonodromyResult; tol = 1e-6)
-    map(r -> real.(r), filter(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions))
+    map(r -> real_vector(r), filter(r -> is_real_vector(r, tol), res.solutions))
 end
 
 """
@@ -474,7 +474,7 @@ end
 Counts how many solutions of `res` have imaginary part norm less than 1e-6.
 """
 function nreal(res::MonodromyResult; tol = 1e-6)
-    count(r -> LinearAlgebra.norm(imag.(r)) < tol, res.solutions)
+    count(r -> is_real_vector(r, tol), res.solutions)
 end
 
 """
