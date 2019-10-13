@@ -50,8 +50,8 @@ end
 
 function MonodromyOptions(
     is_real_system::Bool,
-    accuracy::Float64;
-    distance = euclidean_distance,
+    accuracy::Float64,
+    distance;
     identical_tol::Float64 = sqrt(accuracy),
     done_callback = always_false,
     group_action = nothing,
@@ -516,6 +516,7 @@ function MonodromySolver(
     F::Inputs,
     startsolutions::Vector{<:AbstractVector{<:Number}},
     p::AbstractVector{TP};
+    distance = default_distance(eltype(startsolutions)),
     parameters = nothing,
     strategy = nothing,
     show_progress = true,
@@ -553,22 +554,16 @@ function MonodromySolver(
     )
     # Check whether homotopy is real
     is_real_system = numerically_check_real(tracker.homotopy, x₀)
-    options = MonodromyOptions(is_real_system, accuracy; optionskwargs...)
+    options = MonodromyOptions(is_real_system, accuracy, distance; optionskwargs...)
     # construct UniquePoints
-    if options.equivalence_classes
-        uniquepoints = UniquePoints(
-            typeof(x₀),
-            options.distance_function;
-            group_actions = options.group_actions,
-            check_real = true,
-        )
-    else
-        uniquepoints = UniquePoints(
-            typeof(x₀),
-            options.distance_function;
-            check_real = true,
-        )
-    end
+
+    uniquepoints = UniquePoints(
+        typeof(x₀),
+        distance;
+        group_actions = options.equivalence_classes ? options.group_actions : nothing,
+        check_real = true,
+    )
+
     # add only unique points that are true solutions
     for s in startsolutions
         if !options.check_startsolutions || is_valid_start_value(tracker, s, 0.0)
