@@ -254,17 +254,6 @@ than `norm(z, Inf)`.
 """
 infinity_norm(z::AbstractVector{<:Complex}) = sqrt(maximum(abs2, z))
 
-"""
-    fubini_study(x::PVector, y::PVector)
-
-Computes the Fubini-Study distance between `x` and `y`.
-"""
-function fubini_study(x::PVector{<:Number,1}, y::PVector{<:Number,1})
-    acos(min(1.0, abs(first(LinearAlgebra.dot(x, y)))))
-end
-function fubini_study(x::PVector{<:Number,M}, y::PVector{<:Number,M}) where {M}
-    sqrt(sum(abs2.(acos.(min.(1.0, abs.(LinearAlgebra.dot(x, y)))))))
-end
 
 function randomish_gamma()
     # Usually values near 1, i, -i, -1 are not good randomization
