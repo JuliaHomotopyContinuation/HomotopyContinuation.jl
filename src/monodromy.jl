@@ -496,7 +496,7 @@ struct MonodromySolver{
 }
     parameters::Vector{T}
     solutions::UP
-    solutions_lock::Threads.SpinLock
+    solutions_lock::ReentrantLock
     loops::Vector{MonodromyLoop}
     options::MO
     statistics::MonodromyStatistics
@@ -588,7 +588,7 @@ function MonodromySolver(
     MonodromySolver(
         p₀,
         uniquepoints,
-        Threads.SpinLock(),
+        ReentrantLock(),
         loops,
         options,
         statistics,
