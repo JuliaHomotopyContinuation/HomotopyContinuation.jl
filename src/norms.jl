@@ -69,8 +69,8 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::WeightedNormOptions
 A `WeightedNorm` represents a weighted variant of norm `norm` of a `n`-dimensional vector space.`
 A norm ``||x||`` is weighted by introducing a vector of additional weights `d` such that
 the new norm is ``||D⁻¹x||`` where ``D`` is the diagonal matrix with diagonal ``d`.
-The `WeightedNorm` is desigened to change the weights dynamically by using [`init(::WeightedNorm, x)`](@ref)
-and [`update(::WeightedNorm, x)`](@ref). The weights are there constructed such that
+The `WeightedNorm` is desigened to change the weights dynamically by using [`init!(::WeightedNorm, x)`](@ref)
+and [`update!(::WeightedNorm, x)`](@ref). The weights are there constructed such that
 ``||D⁻¹x|| ≈ 1.0``.
 The weights can be accessed and changed by indexing.
 
