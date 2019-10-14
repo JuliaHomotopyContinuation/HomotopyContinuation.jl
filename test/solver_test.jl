@@ -4,13 +4,13 @@
         f = [x^2 - 2, x + y - 1]
         solver, starts = solver_startsolutions(f; system = FPSystem)
         @test isa(solver, Solver)
-        result = solve!(solver, starts)
+        result = solve(solver, starts)
         @test all(is_success, result)
         @test all(!is_failed, result)
 
         f = equations(griewank_osborne())
         solver, starts = solver_startsolutions(f; seed = 78373, system = FPSystem)
-        result = solve!(solver, starts)
+        result = solve(solver, starts)
         @test nsolutions(result) == 1
         r = first(results(result))
         @test multiplicity(r) == 3
@@ -26,23 +26,18 @@
             max_corrector_iters = 5,
             accuracy = 1e-3,
         )
-        result_jumping = solve!(solver, starts; path_jumping_check = false)
+        result_jumping = solve(solver, starts; path_jumping_check = false)
         @test nsolutions(result_jumping) < 32
 
         for threading in [false, true]
-            result = solve!(
-                solver,
-                starts;
-                path_jumping_check = true,
-                threading = threading,
-            )
+            result = solve(solver, starts; path_jumping_check = true, threading = threading)
             @test nsolutions(result) == 32
             @test all(is_nonsingular, result)
             @test all(is_success, result)
         end
 
         # check that path_jumping_check is on by default
-        result2 = solve!(solver, starts)
+        result2 = solve(solver, starts)
         @test nsolutions(result2) == 32
     end
 
@@ -52,7 +47,7 @@
             seed = 32241,
             start_system = :polyhedral,
         )
-        result = solve!(solver, starts)
+        result = solve(solver, starts)
         @test nsolutions(result) == 70
         @test ntracked(result) == 70
         @test nreal(result) == 10
@@ -64,7 +59,7 @@
             start_system = :polyhedral,
             only_torus = true,
         )
-        result = solve!(solver, starts, threading = false)
+        result = solve(solver, starts, threading = false)
         @test nsolutions(result) == 3
         @test ntracked(result) == 3
 
@@ -74,7 +69,7 @@
             start_system = :polyhedral,
             only_torus = false,
         )
-        result = solve!(solver, starts)
+        result = solve(solver, starts)
         @test nsolutions(result) == 6
         @test ntracked(result) == 8
     end
@@ -343,5 +338,36 @@
         @test s1 ≈ s3[[2, 1]]
 
         @test_throws ArgumentError solve(G, F, [√2, √2]; variable_ordering = [x])
+    end
+
+    @testset "parameter change" begin
+        @polyvar x y z p[1:3]
+        F = [
+            x + 3 + 2y + 2 * y^2 - p[1],
+            (x - 2 + 5y) * z + 4 - p[2] * z,
+            (x + 2 + 4y) * z + 5 - p[3] * z,
+        ]
+        q = randn(ComplexF64, 3)
+        S = solutions(solve(subs(F, p => q)))
+        # create some fake parameter values
+        params = [
+            [1.3440639843905677, -2.5074017514201343, -0.39441026816083785],
+            [-0.5905470689391262, 0.662942297773609, -0.4383381251082712],
+            [-0.07181848550172094, -0.9892961521599329, 0.3648603261873276],
+            [2.37916274514681, -0.4796116819359556, 1.4850511902292287],
+            [1.0080243329063356, 0.1156613479279384, -0.4496252569645542],
+            [0.5658877469626858, 0.2383098725793224, -0.13845976523959966],
+            [-0.22823657335108488, -0.7111958812641874, -0.7478056668942166],
+            [-0.255059563703982, -0.9004822204456397, -0.3389293738788412],
+            [0.3392911355486216, 0.05817061767333153, 0.33923705766735207],
+            [1.0861653811709309, -0.31406883615041653, -0.17861101511219216],
+        ]
+        # create a `Solver` to reuse for the path tracking
+        F_solver = solver(F; parameters = p, generic_parameters = q)
+        # solve the system F for all paramaters p in params
+        params_solutions = map(params) do p
+            solutions(solve(F_solver, S; target_parameters = p))
+        end
+        @test sum(length, params_solutions) == 20
     end
 end
