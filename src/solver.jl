@@ -210,6 +210,9 @@ Additionally the following options are allowed:
   vector of `MultivariatePolynomials.AbstractPolynomial`s and `variables` determines the
   variable ordering. If you experience significant compilation times,
   consider to change system to `FPSystem`.
+* `system_scaling` (default `:equations`) Whether to apply an automatic scaling of
+  the equations (:equations), of the equations and variables (`:equations_and_variables`) or
+  no scaling at all (`nothing`).
 * `threading` (default `true`): Enable or disable multi-threading. The number of threads used
   is controlled by the environment variable `JULIA_NUM_THREADS`.
 * `variable_ordering`: Provide a custom ordering of the variables.

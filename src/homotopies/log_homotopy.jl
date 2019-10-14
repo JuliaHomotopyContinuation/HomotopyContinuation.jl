@@ -3,7 +3,7 @@ export LogHomotopy
 """
     LogHomotopy(H::AbstractHomotopy)
 
-Reparameterizes the homotopy ``H(x,t)`` as ``Ĥ(x,s) := H(x,e^{-s})``.
+Reparametrizes the homotopy ``H(x,t)`` as ``Ĥ(x,s) := H(x,e^{-s})``.
 """
 struct LogHomotopy{H<:AbstractHomotopy} <: AbstractHomotopy
     homotopy::H
