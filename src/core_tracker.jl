@@ -1566,7 +1566,7 @@ This is convenient if you want to investigate single paths.
 ## Examples
 
 ### Obtain single solution
-We want to construct a path tracker to track a parameterized system `f` with parameters `p`
+We want to construct a path tracker to track a parametrized system `f` with parameters `p`
 from the parameters `a` to `b`.
 ```julia
 tracker = coretracker(f; parameters = p, start_parameters = a, target_parameters = b)

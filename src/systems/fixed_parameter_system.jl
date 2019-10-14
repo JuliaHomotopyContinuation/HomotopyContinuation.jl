@@ -3,7 +3,7 @@ export FixedParameterSystem
 """
     FixedParameterSystem(F, p) <: AbstractSystem
 
-Fix a parameterized system `F(x; p)` at `p`, i.e., it is treated as a system without parameters.
+Fix a parametrized system `F(x; p)` at `p`, i.e., it is treated as a system without parameters.
 """
 mutable struct FixedParameterSystem{S<:AbstractSystem,P<:AbstractVector} <: AbstractSystem
     F::S

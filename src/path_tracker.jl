@@ -241,7 +241,7 @@ The `PathTracker` combines the path tracking (with [`CoreTracker`](@ref)) with a
 routine. The *endgame*  is the name for special algorithms the end of the path tracking.
 These enable to detect if a path is diverging or if it ends in a singular solution.
 The `PathTracker` is more opinionated than the `CoreTracker` and implements additional logic
-to handle numerical difficult solutions. In particular it always reparameterizes a solution
+to handle numerical difficult solutions. In particular it always reparametrizes a solution
 path to use a logarithmic time scale, i.e., ``x(t) → x(e^{-s})`` and we track for ``s`` from
 ``0`` to ``∞``.
 
@@ -764,7 +764,7 @@ to specify startsolutions.
 ## Examples
 
 ### Obtain single solution
-We want to construct a path tracker to track a parameterized system `f` with parameters `p`
+We want to construct a path tracker to track a parametrized system `f` with parameters `p`
 from the parameters `a` to `b`.
 ```julia
 tracker = pathtracker(f, parameters=p, p₁=a, p₀=b)
