@@ -5,8 +5,9 @@ makedocs(
     sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
-        "Solving general systems" => "solving.md",
+        "The solve function" => "solving.md",
         "Solving parametrized systems with monodromy" => "monodromy.md",
+        "The solver struct" => "solver.md",
         "PathTracker" => "path_tracker.md",
         "CoreTracker" => "core_tracker.md",
         "Homotopies" => "homotopies.md",

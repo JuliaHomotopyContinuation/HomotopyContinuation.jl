@@ -4,6 +4,7 @@ The [`solve`](@ref) routine is only a thin wrapper around [`PathTracker`](@ref).
 Therefore you can also use [`PathTracker`](@ref) directly.
 This is for example a good choice if you have to solve the same problem many times.
 
+## Basic usage
 ```@docs
 PathTracker
 ```

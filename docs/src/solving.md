@@ -1,14 +1,11 @@
-# Solving general polynomial systems
+# The solve function
 
 The [`solve`](@ref) function is the most convenient way to solve general polynomial systems.
 For the mathematical background take a look at our [introduction](https://www.juliahomotopycontinuation.org/guides/introduction/) guide.
 
-## Solve
+## Basic usage
 ```@docs
 solve
-Solver
-solver
-solver_startsolutions
 ```
 
 ## Result
@@ -18,6 +15,8 @@ A call to [`solve`](@ref) returns a [`Result`](@ref):
 Result
 seed
 ```
+
+## Analyse a Result
 
 The nonsingular solutions are obtained as follows.
 ```@docs
@@ -57,9 +56,15 @@ nfailed
 
 Also make sure to check the documentation for [`PathResult`](@ref).
 
-## Estimate the complexity
-We provide methods to compute the maximal number of solutions of polynomial systems.
+## Estimate the computational complexity
+We provide methods to compute the number of paths that needs to be tracked.
+
+For the totaldegree homotopy:
 ```@docs
 bezout_number
+```
+
+For the polyhedral homotopy:
+```@docs
 mixed_volume
 ```
