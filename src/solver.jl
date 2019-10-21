@@ -469,19 +469,25 @@ function solve(
         if path_jumping_check
             tol = accuracy(trackers[1])
             indices = path_jumping_candidates(results, tol)
-            max_correctors = max_corrector_iters(trackers[1])
-            acc = min(accuracy(trackers[1]), 1e-7)
-            retracked_paths = length(indices)
-            if !isempty(indices) && max_correctors > 1
+            max_correctors = min(max_corrector_iters(trackers[1]) - 1, 2)
+            retracked_paths = 0
+            while !isempty(indices) && max_correctors > 1
+                acc = min(accuracy(trackers[1]), 1e-6)
                 track_parallel!(
                     results,
                     trackers,
                     S,
                     indices;
                     threading = threading,
-                    max_corrector_iters = max_correctors - 1,
+                    max_corrector_iters = min(max_correctors - 1, 2),
                     accuracy = acc,
                 )
+                retracked_paths += length(indices)
+                new_indices = path_jumping_candidates(results, tol)
+                if isempty(new_indices) || new_indices ⊆ indices
+                    break
+                end
+                indices = new_indices
             end
         end
     catch e
