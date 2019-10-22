@@ -315,7 +315,7 @@ function PathTracker(
         prob,
         x;
         log_transform = true,
-        predictor = Pade21(),
+        predictor = MixPredictor(Pade21(), Heun()),
         min_step_size = min_step_size,
         core_tracker_kwargs...,
     )
@@ -327,10 +327,10 @@ function PathTracker(
     prob::Problem,
     core_tracker::CoreTracker;
     at_infinity_check = default_at_infinity_check(prob),
-    endgame_start::Float64 = 2.0,
+    endgame_start::Float64 = -log(0.1),
     max_winding_number::Int = 12,
     min_accuracy::Float64 = max(core_tracker.options.accuracy, 1e-5),
-    min_cond_endgame::Float64 = 1e5,
+    min_cond_endgame::Float64 = 1e4,
     min_step_size_before_eg::Float64 = exp2(-40),
     min_step_size_eg = exp2(-120),
     s_always_consider_valuation::Float64 = -log(1e-16),
@@ -344,7 +344,6 @@ function PathTracker(
         max_winding_number = max_winding_number,
     )
     default_ct_options = copy(core_tracker.options)
-
 
     options = PathTrackerOptions(
         endgame_start,
@@ -409,9 +408,13 @@ function init!(
        options.precision_strategy == PREC_STRATEGY_FINITE
         ct_options.precision = PRECISION_ADAPTIVE
     end
+    if tracker.core_tracker.predictor isa MixPredictorCache
+        tracker.core_tracker.predictor.predictor1_active[] = true
+    end
 
     init!(tracker.core_tracker, x, 0.0, options.endgame_start)
     init!(tracker.state, 0.0)
+
 
     # before endgame don't track the condition number
     # and we only update the limiting accuracy etc after a step failed
@@ -433,6 +436,14 @@ function step!(tracker::PathTracker)
 
     state.s = s = real(current_t(core_tracker))
     ct_status = status(core_tracker)
+
+    # If s > 20 we have exp(-20) ≈ 2.06e-9 and we get to the range where numerical
+    # differentation with the Padè predictor can become tricky.
+    # Therefore we switch to the other predictor
+    if s > 20 && core_tracker.predictor isa MixPredictorCache
+        core_tracker.predictor.predictor1_active[] = false
+    end
+
     if is_tracking(ct_status)
         state.eg_started || return state.status
         # If we didn't move forward there is nothing to do
@@ -444,9 +455,8 @@ function step!(tracker::PathTracker)
         # We only care about the valuation if the path is starting to get worse
         # or we passed a certain threshold.
         cond_bad = cond(core_tracker) > options.min_cond_eg
-        near_accuracy_limit = 1e4 * core_tracker.state.limit_accuracy > core_tracker.options.accuracy
         consider_always = s > options.s_always_consider_valuation
-        if !(consider_always || cond_bad || near_accuracy_limit)
+        if !(consider_always || cond_bad)
             return state.status
         end
 
@@ -533,9 +543,9 @@ function step!(tracker::PathTracker)
     elseif is_success(ct_status) && !state.eg_started
         state.intermediate_solution .= current_x(core_tracker)
         state.eg_started = true
-            # set min_step size
+        # set min_step size
         core_tracker.options.min_step_size = options.min_step_size_eg
-            # setup path tracker to continue tracking
+        # setup path tracker to continue tracking
         t₀ = -log(4 * options.min_step_size_eg)
         init!(
             tracker.core_tracker,
@@ -544,16 +554,16 @@ function step!(tracker::PathTracker)
             t₀;
             loop = true,
         )
-            # start keeping track of the condition number during the endgame
+        # start keeping track of the condition number during the endgame
         tracker.core_tracker.options.track_cond = true
-            # update the limiting accuracy and cond every other step
+        # update the limiting accuracy and cond every other step
         tracker.core_tracker.options.steps_jacobian_info_update = 2
-            # update the valuation
+        # update the valuation
         update!(state.valuation, core_tracker)
 
-            # If our strategy is to allow adaptive precision only for finite values
-            # then we start with not allowing adaptive precision during the endgame
-            # and wait to hit the accuracy limit.
+        # If our strategy is to allow adaptive precision only for finite values
+        # then we start with not allowing adaptive precision during the endgame
+        # and wait to hit the accuracy limit.
         if options.precision_strategy == PREC_STRATEGY_FINITE
             tracker.core_tracker.options.precision = PRECISION_FIXED_64
         end
@@ -572,6 +582,7 @@ function step!(tracker::PathTracker)
             state.solution_accuracy = s_acc
             state.solution_cond = s_cond
             state.solution_residual = s_res
+            state.winding_number = nothing
             state.s = Inf
         elseif ct_status == CoreTrackerStatus.terminated_step_size_too_small
             state.status = PathTrackerStatus.terminated_step_size_too_small
@@ -583,7 +594,7 @@ function step!(tracker::PathTracker)
         # First update the valuation  and check whether we are good
         update!(state.valuation, core_tracker)
         # we put less requirement on tol_at_infinity
-        verdict = judge(state.valuation; tol = 1e-2, tol_at_infinity = 1e-4)
+        verdict = judge(state.valuation; tol = 1e-3, tol_at_infinity = 1e-4)
         # We also terminate at this point if the valuation indicates that we are
         # substantially less than 0
         if verdict == VAL_AT_INFINITY && options.at_infinity_check
@@ -659,7 +670,16 @@ function check_converged!(
     init!(tracker.state.norm, x)
     # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
     # solutions that we bounce away from a good solution.
-    result = correct!(y, tracker, x, t; tol = tol, max_iters = 3, full_steps = 1)
+    result = correct!(
+        y,
+        tracker,
+        x,
+        t;
+        tol = tol,
+        min_iters = 2,
+        max_iters = 3,
+        full_steps = 1,
+    )
     if is_converged(result)
         tracker.state.residual .= abs.(tracker.corrector.r)
     else
