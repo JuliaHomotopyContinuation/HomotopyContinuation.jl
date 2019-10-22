@@ -38,11 +38,11 @@ end
     evaluate!(u, H, x_h, t + h)
 end
 
-function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Float64)
+function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, eval_err::Float64)
     # unpack stuff to make the rest easier to read
     @unpack u, u₁, u₂, x_h, x², x³ = cache
-
-    h₂ = nthroot(10ψ, 4)
+    ψ = 10eval_err
+    h₂ = nthroot(ψ, 4)
     g!(u₁, H, x, ẋ, t, h₂, x_h)
     g!(u₂, H, x, ẋ, t, -h₂, x_h)
 
@@ -52,7 +52,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, Jac::JacobianMonitor, ψ::Flo
     end
     LA.ldiv!(x², Jac, u)
 
-    h₃ = nthroot(10ψ, 5)
+    h₃ = nthroot(ψ, 5)
     g!(u₁, H, x, ẋ, x², t, h₃, x_h)
     g!(u₂, H, x, ẋ, x², t, -h₃, x_h)
 

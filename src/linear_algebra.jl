@@ -788,8 +788,15 @@ function row_scaling!(
     norm::Union{InfNorm,WeightedNorm{<:InfNorm}},
     r::Union{Nothing,AbstractVector{<:Real}} = nothing,
 ) where {T}
-    d = WS.row_scaling
-    d .= one(T)
+    row_scaling!(WS.row_scaling, WS, norm, r)
+end
+function row_scaling!(
+    d::AbstractVector,
+    WS::MatrixWorkspace{T},
+    norm::Union{InfNorm,WeightedNorm{<:InfNorm}},
+    r::Union{Nothing,AbstractVector{<:Real}} = nothing,
+) where {T}
+    d .= 1e-3
     m = length(d)
     if isa(norm, WeightedNorm)
         for j = 1:size(WS.A, 2), i = 1:m
@@ -801,14 +808,13 @@ function row_scaling!(
         end
     end
 
-    if r !== nothing
-        # d̂ = clamp(maximum(d), 1e-4, 1.0)
-        d̂ = 1e-4
-        for dᵢ in d
-            dᵢ ≥ 1.0 && (d̂ = 1.0; break)
-            d̂ = max(d̂, dᵢ)
-        end
+    if size(WS, 1) == 1
+        d[1] = max(1, d[1])
+        return d
+    end
 
+    if r !== nothing
+        d̂ = min(maximum(d), 1.0)
         # compute the norm of r under the scaling of all rows whose norm is larger
         # than d̂, i.e. all rows that either decrease the value of |rᵢ| or
         # or increase it by the minimal abount to still have opnorm 1.
@@ -824,8 +830,8 @@ function row_scaling!(
         end
     else
         # Don't scale zero rows -> set dᵢ = 1 if too small
-        d_max_eps = sqrt(eps(min(maximum(d), one(T))))
-        @inbounds for i = 1:m
+        d_max_eps = sqrt(eps())
+        for i = 1:m
             if d[i] < d_max_eps
                 d[i] = one(T)
             end

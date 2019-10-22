@@ -45,8 +45,8 @@
             @test isnothing(winding_number(tracker))
             @test !isnan(tracker.state.solution_cond)
             @test !isnan(tracker.state.solution_accuracy)
-            @test tracker.state.solution_accuracy < 1e-12
-            @test tracker.state.solution_residual < 1e-12
+            @test tracker.state.solution_accuracy < 1e-14
+            @test tracker.state.solution_residual < 1e-14
         end
 
         # test iterator
@@ -104,7 +104,7 @@
             tracker = pathtracker(g, f, S; seed = 842121, system = FPSystem)
             @test all(S) do s
                 is_success(track!(tracker, s)) &&
-                winding_number(tracker) == n &&
+                (winding_number(tracker) == n || isnothing(winding_number(tracker))) &&
                 isapprox(solution(tracker)[1], 3.0; atol = 1e-6) &&
                 !isnan(tracker.state.solution_cond) &&
                 tracker.state.solution_accuracy < 1e-5

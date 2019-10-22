@@ -23,8 +23,8 @@
             equations(katsura(5));
             system = FPSystem,
             seed = 124232,
-            max_corrector_iters = 5,
-            accuracy = 1e-3,
+            max_corrector_iters = 6,
+            accuracy = 1e-5,
         )
         result_jumping = solve(solver, starts; path_jumping_check = false)
         @test nsolutions(result_jumping) < 32

@@ -113,8 +113,8 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
     push!(cond, state.jacobian.cond[])
     push!(accuracy, state.accuracy)
     push!(limit_accuracy, state.limit_accuracy)
-    push!(residual, maximum(state.residual))
-    push!(eval_err, maximum(state.eval_error))
+    push!(residual, maximum(tracker.corrector.abs_r))
+    push!(eval_err, state.eval_err)
 
     first = true
     for _ in tracker
@@ -127,8 +127,8 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
         push!(cond, state.jacobian.cond[])
         push!(accuracy, state.accuracy)
         push!(limit_accuracy, state.limit_accuracy)
-        push!(residual, maximum(state.residual))
-        push!(eval_err, maximum(state.eval_error))
+        push!(residual, maximum(tracker.corrector.abs_r))
+        push!(eval_err, state.eval_err)
         first = false
     end
     push!(accepted_rejected, !state.last_step_failed)

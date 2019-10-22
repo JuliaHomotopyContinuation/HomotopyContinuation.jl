@@ -366,11 +366,11 @@ mutable struct CoreTrackerState{
     norm_Δx₀::Float64 # norm of the first newton update
     ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
     limit_accuracy::Float64
+    eval_err::Float64
 
     norm::AN
     jacobian::JacobianMonitor{T}
     residual::Vector{Float64}
-    eval_error::Vector{Float64} # an estimate of evalation error
 
     steps_jacobian_info_update::Int
     status::CoreTrackerStatus.states
@@ -402,11 +402,10 @@ function CoreTrackerState(
     )
     Δs_prev = 0.0
     norm_Δx₀ = accuracy = 0.0
-    limit_accuracy = eps()
+    limit_accuracy = eval_err = eps()
     ω = 1.0
     JM = JacobianMonitor(jacobian(H, x, t₁))
     residual = zeros(first(size(H)))
-    eval_error = copy(residual)
     steps_jacobian_info_update = 0
     accepted_steps = rejected_steps = 0
     status = CoreTrackerStatus.tracking
@@ -425,10 +424,10 @@ function CoreTrackerState(
         norm_Δx₀,
         ω,
         limit_accuracy,
+        eval_err,
         norm,
         JM,
         residual,
-        eval_error,
         steps_jacobian_info_update,
         status,
         patch,
@@ -728,6 +727,7 @@ end
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state);
     simplified_last_step::Bool = true,
+    min_iters::Int = 1,
     max_iters::Int = tracker.options.max_corrector_iters + 1,
     full_steps::Int = max_iters - simplified_last_step,
     tol::Float64 = tracker.options.accuracy,
@@ -753,43 +753,43 @@ end
         tracker.corrector;
         tol = tol,
         max_iters = max_iters,
+        min_iters = min_iters,
         double_64_evaluation = double_64_evaluation,
         full_steps = full_steps,
     )
 end
 
-@inline function limit_accuracy!(
+function limit_accuracy!(
     tracker::CT,
     x::AbstractVector = tracker.state.x,
     t::Number = current_t(tracker.state),
-    norm::AbstractNorm = tracker.state.norm,
+    norm::AbstractNorm = tracker.state.norm;
+    update_cond::Bool = tracker.options.track_cond,
+    update_eval_err::Bool = true,
 )
     @unpack state, options = tracker
 
     for i = 1:2
-        # We do a second if we would terminate the path tracking to make sure that this
-        # is not just an artifact
+        # We do a second iteration if we would terminate the path tracking to make sure
+        # that this is not just an artifact
         i == 2 && !terminate_limit_accuracy(state, options) && continue
-        limit_acc = limit_accuracy!(
-            state.residual,
+        limit_acc, eval_err = limit_accuracy!(
             tracker.homotopy,
             x,
             t,
             state.jacobian,
             norm,
             tracker.corrector;
-            accuracy = options.accuracy,
             x_accuracy = state.accuracy,
             update_jacobian = false,
+            compute_cond = update_cond,
+            compute_eval_err = update_eval_err,
         )
         state.accuracy = min(state.accuracy, limit_acc)
         state.limit_accuracy = max(state.accuracy, limit_acc)
-    end
-
-    if options.track_cond
-        cond!(state.jacobian, norm, tracker.state.residual)
-        copyto!(state.eval_error, state.residual)
-        apply_row_scaling!(state.eval_error, state.jacobian)
+        if update_eval_err
+            state.eval_err = exp((log(state.eval_err) + log(eval_err)) / 2)
+        end
     end
 
     nothing
@@ -901,11 +901,12 @@ function init!(
     state.status = CoreTrackerStatus.tracking
     embed!(state.x, x₁)
     setup_patch && state.patch !== nothing && init!(state.patch, state.x)
-    state.last_step_failed = true
-    state.consecutive_successfull_steps = 0
     if !loop
+        state.consecutive_successfull_steps = 0
+        state.last_step_failed = true
         state.accuracy = 0.0
         state.ω = 1.0
+        state.eval_err = state.limit_accuracy = eps()
         if !keep_steps
             state.accepted_steps = state.rejected_steps = 0
         end
@@ -914,7 +915,6 @@ function init!(
         state.residual .= 0.0
         state.steps_jacobian_info_update = 0
     end
-
     state
 end
 
@@ -1056,7 +1056,6 @@ function step!(tracker::CT, debug::Bool = false)
     result = correct!(x̄, tracker, x̂, t + Δt; simplified_last_step = true)
 
     debug && show(result)
-
     if is_converged(result)
         # move forward
         x .= x̄
@@ -1079,16 +1078,13 @@ function step!(tracker::CT, debug::Bool = false)
         compute_ẋ!(tracker; update_jacobian = true)
 
         # Make an additional newton step to check the limiting accuracy
-        if state.steps_jacobian_info_update == options.steps_jacobian_info_update ||
+        if (state.steps_jacobian_info_update += 1) ≥ options.steps_jacobian_info_update ||
            state.last_step_failed
             limit_accuracy!(tracker)
             state.steps_jacobian_info_update = 0
-        else
-            state.steps_jacobian_info_update += 1
         end
         # tell the predictors about the new derivative if they need to update something
-        Ψ = 100 * max(state.limit_accuracy, eps())
-        update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, Ψ)
+        update!(predictor, homotopy, x, ẋ, t + Δt, state.jacobian, state.eval_err)
 
         # Update other state
         state.accepted_steps += 1
@@ -1150,8 +1146,11 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     if !isnan(result.ω₀)
         # Use result.ω₀ in the converged case to avoid wrong values of ω due to
         # hitting the accuracy limit.
-        # In the divergend case this should not happen
-        state.ω = is_converged(result) ? result.ω₀ : result.ω
+        if is_converged(result) || isnan(state.ω)
+            state.ω = result.ω₀
+        else
+            state.ω = max(result.ω₀, state.ω)
+        end
     end
 
     # Use the simple step size algorithm in the case that we get very close to

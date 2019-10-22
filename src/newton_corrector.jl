@@ -3,6 +3,7 @@ struct NewtonCorrector end
 struct NewtonCorrectorCache{HC<:AbstractHomotopyCache,AV<:AbstractVector{ComplexDF64}}
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
+    abs_r::Vector{Float64}
     # D64 evaluation
     x_D64::AV
     cache_D64::HC
@@ -12,9 +13,10 @@ function NewtonCorrectorCache(H::HomotopyWithCache, x::AbstractVector, t::Number
     m, n = size(H)
     Δx = Vector{ComplexF64}(undef, n)
     r = Vector{ComplexF64}(undef, m)
+    abs_r = Vector{Float64}(undef, m)
     x_D64 = similar(x, ComplexDF64)
     cache_D64 = cache(H.homotopy, x_D64, t)
-    NewtonCorrectorCache(Δx, r, x_D64, cache_D64)
+    NewtonCorrectorCache(Δx, r, abs_r, x_D64, cache_D64)
 end
 
 cache(::NewtonCorrector, H, x, t) = NewtonCorrectorCache(H, x, t)
@@ -57,6 +59,7 @@ function newton!(
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
     tol::Float64 = 1e-6,
+    min_iters::Int = 1,
     max_iters::Int = 3,
     debug::Bool = false,
     simplified_last_step::Bool = true,
@@ -71,6 +74,7 @@ function newton!(
     @unpack Δx, r, x_D64, cache_D64 = cache
     # alias to make logic easier
     xᵢ₊₁ = xᵢ = x̄
+    is_converged = false
     for i ∈ 1:max_iters
         debug && println("i = ", i)
 
@@ -102,16 +106,15 @@ function newton!(
 
         debug && println("||Δxᵢ|| = ", norm_Δxᵢ)
 
-        xᵢ₊₁ .= xᵢ .- Δx
-
         if i == 1
+            xᵢ₊₁ .= xᵢ .- Δx
             acc = norm_Δx₀ = norm_Δxᵢ
-            if acc ≤ tol
+            is_converged = acc ≤ tol
+            if is_converged && i ≥ min_iters
                 return NewtonCorrectorResult(NEWT_CONVERGED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
             end
             continue
         end
-
         if i == 2
             θ = θ₀ = norm_Δxᵢ / norm_Δxᵢ₋₁
             ω = ω₀ = 2θ / norm_Δxᵢ₋₁
@@ -119,12 +122,16 @@ function newton!(
             θ = norm_Δxᵢ / norm_Δxᵢ₋₁
             ω = max(ω, 2θ / norm_Δxᵢ₋₁)
         end
-        acc = norm_Δxᵢ / (1.0 - min(0.5, 2 * θ^2))
-        if acc ≤ tol
-            return NewtonCorrectorResult(NEWT_CONVERGED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
+        if isnan(θ) || θ ≥ 0.5
+            code = is_converged ? NEWT_CONVERGED : NEWT_TERMINATED
+            return NewtonCorrectorResult(code, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
         end
-        if θ ≥ 0.5
-            return NewtonCorrectorResult(NEWT_TERMINATED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
+
+        xᵢ₊₁ .= xᵢ .- Δx
+        acc = norm_Δxᵢ / (1.0 - min(0.5, 2 * θ^2))
+        is_converged = acc ≤ tol
+        if is_converged && i ≥ min_iters
+            return NewtonCorrectorResult(NEWT_CONVERGED, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
         end
     end
 
@@ -143,35 +150,34 @@ end
 
 """
     limit_accuracy!(
-        res::AbstractVector{<:Real},
-        H::HomotopyWithCache, x t,
-        JM::JacobianMonitor, norm, cache::NewtonCorrectorCache;
-        accuracy::Float64 = 1e-6,
-        safety_factor::Float64 = 1e2,
-        update_jacobian::Bool = false)
+        H::HomotopyWithCache,
+        x::AbstractVector,
+        t::Number,
+        JM::JacobianMonitor,
+        norm::AbstractNorm,
+        cache::NewtonCorrectorCache;
+        update_jacobian::Bool = false,
+        compute_cond::Bool = false,
+        compute_eval_err::Bool = false,
+        x_accuracy::Float64 = 1e-8,
+    )
 
 Obtain an estimate of the limiting accuracy of Newton's method
 and of the limiting residual.
 If `update_jacobian == true` a new Jacobian is computed, otherwise the currently stored
 Jacobian is used.
-The method first produces a single (simplified) Newton update `Δx`.
-If `accuracy / norm(Δx) > safety_factor` then `norm(Δx)` is obtained.
-Otherwise a second simplified Newton update is produced and the norm of this is returned.
-The reason for the two step procedure is that the first update does not necessarily yield
-the limiting accuracy, but if it is sufficiently good then there is no need to obtain the
-actual limiting accuracy.
 """
 function limit_accuracy!(
-    limit_res::AbstractVector{<:Real},
     H::HomotopyWithCache,
     x::AbstractVector,
     t::Number,
     JM::JacobianMonitor,
     norm::AbstractNorm,
     cache::NewtonCorrectorCache;
-    x_accuracy::Float64 = 1e-8,
-    accuracy::Float64 = 1e-6,
     update_jacobian::Bool = false,
+    compute_cond::Bool = false,
+    compute_eval_err::Bool = false,
+    x_accuracy::Float64 = 1e-8,
 )
     @unpack Δx, r = cache
 
@@ -181,15 +187,21 @@ function limit_accuracy!(
     else
         evaluate!(r, H, x, t)
     end
-
     LA.ldiv!(Δx, JM, r, norm)
-
     limit_acc = Float64(norm(Δx))
-    if limit_acc < x_accuracy
-        x .-= Δx
+
+    if compute_cond || compute_eval_err
+        cache.abs_r .= abs.(r)
     end
 
-    limit_res .= abs.(r)
+    compute_cond && cond!(JM, norm, cache.abs_r)
 
-    return limit_acc
+    eval_err = eps()
+    if compute_eval_err
+        row_scaling!(jacobian(JM), norm, cache.abs_r)
+        apply_row_scaling!(cache.abs_r, JM)
+        eval_err = max(eps(), maximum(cache.abs_r))
+    end
+
+    return (limit_acc = limit_acc, eval_err = eval_err)
 end
