@@ -114,7 +114,7 @@
         )
         S = collect(starts)
         tracker.options.precision = PRECISION_ADAPTIVE
-        track(tracker, S[3], 0.0, 40.0)
+        track(tracker, S[3], 0.0, 30.0)
         tracker.options.precision = PRECISION_FIXED_64
         s = copy(tracker.state.x)
         eg = HC.CauchyEndgame(s)

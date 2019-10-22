@@ -437,10 +437,10 @@ function step!(tracker::PathTracker)
     state.s = s = real(current_t(core_tracker))
     ct_status = status(core_tracker)
 
-    # If s > 20 we have exp(-20) ≈ 2.06e-9 and we get to the range where numerical
+    # If s > 18.42 we have exp(-18.42) ≈ 1e-8 and we get to the range where numerical
     # differentation with the Padè predictor can become tricky.
     # Therefore we switch to the other predictor
-    if s > 20 && core_tracker.predictor isa MixPredictorCache
+    if s > 18.42 && core_tracker.predictor isa MixPredictorCache
         core_tracker.predictor.predictor1_active[] = false
     end
 

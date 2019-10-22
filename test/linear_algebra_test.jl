@@ -270,7 +270,7 @@ import DoubleFloats: Double64, ComplexDF64
 
         ferr = HC.forward_err!(x, JM, x̂, b, HC.InfNorm())
         strong_ferr = HC.strong_forward_err!(x, JM, x̂, b, HC.InfNorm())
-        @test ferr < 1e-15
+        @test ferr < 1e-13
         @test ferr == strong_ferr # test fallback to ferr for qr
     end
 
