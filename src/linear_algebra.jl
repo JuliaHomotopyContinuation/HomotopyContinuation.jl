@@ -809,9 +809,9 @@ function row_scaling!(
     end
 
     if size(WS, 1) == 1
-         d[1] = max(1, d[1])
-         return d
-     end
+        d[1] = max(1, d[1])
+        return d
+    end
 
     if r !== nothing
         d̂ = min(maximum(d), 1.0)

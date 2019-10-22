@@ -104,7 +104,7 @@
             tracker = pathtracker(g, f, S; seed = 842121, system = FPSystem)
             @test all(S) do s
                 is_success(track!(tracker, s)) &&
-                (winding_number(tracker) == n || isnothing(winding_number(tracker))) &&
+                (winding_number(tracker) == n || isnothing(winding_number(tracker))) &&
                 isapprox(solution(tracker)[1], 3.0; atol = 1e-6) &&
                 !isnan(tracker.state.solution_cond) &&
                 tracker.state.solution_accuracy < 1e-5

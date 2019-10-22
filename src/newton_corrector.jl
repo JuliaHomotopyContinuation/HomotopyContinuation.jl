@@ -122,7 +122,7 @@ function newton!(
             θ = norm_Δxᵢ / norm_Δxᵢ₋₁
             ω = max(ω, 2θ / norm_Δxᵢ₋₁)
         end
-        if isnan(θ) || θ ≥ 0.5
+        if isnan(θ) || θ ≥ 0.5
             code = is_converged ? NEWT_CONVERGED : NEWT_TERMINATED
             return NewtonCorrectorResult(code, acc, i, ω₀, ω, θ₀, θ, norm_Δx₀)
         end
@@ -190,7 +190,7 @@ function limit_accuracy!(
     LA.ldiv!(Δx, JM, r, norm)
     limit_acc = Float64(norm(Δx))
 
-    if compute_cond || compute_eval_err
+    if compute_cond || compute_eval_err
         cache.abs_r .= abs.(r)
     end
 
