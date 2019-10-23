@@ -117,7 +117,7 @@ end
 """
     solver_startsolutions(args...; kwargs...)
 
-Create a [`Solver`] and start solutions. Takes almost the same arguments as [`solve`].
+Create a [`Solver`](@ref) and start solutions. Takes almost the same arguments as [`solve`](@ref).
 """
 function solver_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
@@ -128,7 +128,7 @@ end
 """
     solver(args...; kwargs...)
 
-Create a [`Solver`]. Takes almost the same arguments as [`solve`].
+Create a [`Solver`](@ref). Takes almost the same arguments as [`solve`](@ref).
 """
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 

@@ -1,4 +1,4 @@
-# The solver struct
+# The Solver struct
 
 ```@docs
 Solver

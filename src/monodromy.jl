@@ -1130,7 +1130,7 @@ end
                                  parameters=..., trace_tol=1e-6, options...)
 
 Verify that the monodromy computation found all solutions by [`monodromy_solve`](@ref).
-This uses a multi-projective trace test as described in [^LRS18].
+This uses a trace test as described in [^LRS18].
 The trace is a numerical value which is 0 if all solutions are found, for this the
 `trace_tol` keyword argument is used. The function returns `nothing` if some computation
 couldn't be carried out. Otherwise returns a boolean. Note that this function requires the

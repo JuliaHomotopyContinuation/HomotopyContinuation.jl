@@ -49,7 +49,7 @@ module PathTrackerStatus
 """
     enum PathTrackerStatus
 
-The possible states a [`PathTracker`](@ref) can be in:
+The possible states a `PathTracker` can be in:
 
 * `PathTrackerStatus.tracking`
 * `PathTrackerStatus.success`

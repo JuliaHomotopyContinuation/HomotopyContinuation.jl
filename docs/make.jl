@@ -5,11 +5,15 @@ makedocs(
     sitename = "Homotopy Continuation",
     pages = [
         "Introduction" => "index.md",
-        "The solve function" => "solving.md",
+        "Solving polynomial systems" => [
+            "solving.md",
+            "solver.md"
+        ],
         "Solving parametrized systems with monodromy" => "monodromy.md",
-        "The solver struct" => "solver.md",
-        "PathTracker" => "path_tracker.md",
-        "CoreTracker" => "core_tracker.md",
+        "Tracking paths" => [
+            "path_tracker.md",
+            "core_tracker.md",
+        ],
         "Homotopies" => "homotopies.md",
         "Polynomial systems" => "systems.md",
         "Reference" => "reference.md"
