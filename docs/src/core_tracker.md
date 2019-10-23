@@ -5,7 +5,7 @@ A [`CoreTracker`](@ref) is the low-level path tracker. Its job is to track an in
 See our [introduction guide](https://www.juliahomotopycontinuation.org/guides/introduction/#tracking-solution-paths)
 for a high-level explanation of the predictor corrector scheme
 
-
+## Basic usage
 ```@docs
 CoreTracker
 ```

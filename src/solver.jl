@@ -117,7 +117,7 @@ end
 """
     solver_startsolutions(args...; kwargs...)
 
-Create a [`Solver`] and start solutions. Takes almost the same arguments as [`solve`].
+Create a [`Solver`](@ref) and start solutions. Takes almost the same arguments as [`solve`](@ref).
 """
 function solver_startsolutions(args...; kwargs...)
     supported, rest = splitkwargs(kwargs, problem_startsolutions_supported_keywords)
@@ -128,7 +128,7 @@ end
 """
     solver(args...; kwargs...)
 
-Create a [`Solver`]. Takes almost the same arguments as [`solve`].
+Create a [`Solver`](@ref). Takes almost the same arguments as [`solve`](@ref).
 """
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 
@@ -166,10 +166,10 @@ it is possible to construct the following homotopies:
 * Total degree homotopy
 * Polyhedral homotopy
 * Parameter homotopy
-* Multi-homogenous homotopy
+* Multi-homogeneous homotopy
 * Start target homotopy
 
-If the input is a *homogenous* polynomial system, solutions in projective space are computed.
+If the input is a *homogeneous* polynomial system, solutions in projective space are computed.
 Otherwise affine solutions are computed.
 
 ## Options
@@ -287,12 +287,12 @@ Result with 2 solutions
 
 Solve the parameter homotopy
 ```math
-H(x, t) = F(x, (tγ₁p₁+(1-t)γ₀p₀) / (tγ₁+(1-t)γ₀)),
+H(x, t) = F(x, \\frac{tγ₁p₁+(1-t)γ₀p₀}{tγ₁+(1-t)γ₀}),
 ```
 where ``p₁`` (=`start_parameters`) and ``p₀`` (=`target_parameters`) are vectors of
 parameter values for ``F`` and ``γ₁`` (=`start_gamma`) and ``γ₀`` (=`target_gamma`)
     are complex numbers.
-If `start_parameters` or `target_parameters` is `nothing`, it is assumed that `γ₁` and `γ₀` are ``1``.
+If `start_parameters` or `target_parameters` is `nothing`, it is assumed that `γ₀=γ₁=1`.
 The input `parameters` specifies the variables of `F` which should be considered as parameters.
 Necessarily we have `length(parameters) == length(p₁) == length(p₀)`.
 
@@ -334,18 +334,6 @@ solve(G, F, [[1, 1], [-1, 1]])
 ```
 
 
-## Abstract Homotopy
-
-    solve(H::AbstractHomotopy, start_solutions; options...)
-
-Solve the homotopy `H` by tracking the each solution of
-``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
-Note that `H` has to be a homotopy between *homogeneous* polynomial systems.
-If it should be considered as an affine system indicate which is the index
-of the homogenization variable, e.g. `solve(H, startsolutions, homvar=3)`
-if the third variable is the homogenization variable.
-
-
 ## Homogeneous Systems
 
 If `F` has is homogeneous, we return results in projective space
@@ -361,6 +349,19 @@ Result{PVector{Complex{Float64},1}} with 2 solutions
 • random seed: 490575
 ```
 
+It your polynomial system is not homogeneous, you can homogenize it as follows
+```julia
+@polyvar x y
+g = [x^2+y^2+1, 2x+3y-1]
+f = homogenize(g)
+```
+It is also possible to specify the homogenizing variable.
+```julia
+@polyvar x y z
+g = [x^2+y^2+1, 2x+3y-1]
+f = homogenize(g, z)
+```
+
 If your polynomial system is already homogeneous, but you would like to consider it as an affine system
 you can do
 ```julia
@@ -372,7 +373,7 @@ This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
 
 ## Multi-homogeneous Systems
 
-By exploiting the multi-homogenous structure of a polynomial system it is possible
+By exploiting the multi-homogeneous structure of a polynomial system it is possible
 to decrease the number of paths necessary to track.
 
 ```julia
@@ -382,6 +383,14 @@ solve([x*y - 6, x^2 - 5], variable_groups=[(x,), (y,)])
 ```
 To check whether a certain variable grouping is beneficial you can use the [`bezout_number`](@ref)
 function.
+
+
+## Abstract Homotopy
+
+    solve(H::AbstractHomotopy, start_solutions; options...)
+
+Solve the homotopy `H` by tracking the each solution of
+``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
 """
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)

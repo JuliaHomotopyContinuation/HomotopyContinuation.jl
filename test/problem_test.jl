@@ -100,7 +100,7 @@
         @test starts isa HC.PolyhedralStartSolutionsIterator
     end
 
-    @testset "multi-homogenous" begin
+    @testset "multi-homogeneous" begin
         @polyvar z[1:6, 1:3]
         F = let
             p = [1, 1, 0]
@@ -143,7 +143,7 @@
         @test starts isa HC.TotalDegreeSolutionIterator
         @test starts.degrees == [3, 2, 2]
 
-        # overdetermined, homogenous
+        # overdetermined, homogeneous
         prob, starts = problem_startsolutions([x - 2y, y^2 + 3 * x^2])
         @test prob isa HC.OverdeterminedProblem
         @test starts isa HC.TotalDegreeSolutionIterator

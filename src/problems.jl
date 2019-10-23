@@ -500,7 +500,7 @@ function problem_startsolutions(
                             " to a zero dimensional system."))
 # The following case is too annoying right now
     elseif classifcation == :overdetermined && ngroups(vargroups) > 1
-        error(ArgumentError("Overdetermined polynomial systems with a multi-homogenous" *
+        error(ArgumentError("Overdetermined polynomial systems with a multi-homogeneous" *
                             " structure are currently not supported."))
     end
 

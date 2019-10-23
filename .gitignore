@@ -5,5 +5,4 @@
 *.jld
 tst.jl
 
-docs/Manifest.toml
-Manifest.toml
+/Manifest.toml
