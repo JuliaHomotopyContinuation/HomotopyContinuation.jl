@@ -166,10 +166,10 @@ it is possible to construct the following homotopies:
 * Total degree homotopy
 * Polyhedral homotopy
 * Parameter homotopy
-* Multi-homogenous homotopy
+* Multi-homogeneous homotopy
 * Start target homotopy
 
-If the input is a *homogenous* polynomial system, solutions in projective space are computed.
+If the input is a *homogeneous* polynomial system, solutions in projective space are computed.
 Otherwise affine solutions are computed.
 
 ## Options
@@ -373,7 +373,7 @@ This yields the same result as `solve([x^2+y^2+1, 2x+3y-1])`.
 
 ## Multi-homogeneous Systems
 
-By exploiting the multi-homogenous structure of a polynomial system it is possible
+By exploiting the multi-homogeneous structure of a polynomial system it is possible
 to decrease the number of paths necessary to track.
 
 ```julia
@@ -391,10 +391,6 @@ function.
 
 Solve the homotopy `H` by tracking the each solution of
 ``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
-Note that `H` has to be a homotopy between *homogeneous* polynomial systems.
-If it should be considered as an affine system indicate which is the index
-of the homogenization variable, e.g. `solve(H, startsolutions, homvar=3)`
-if the third variable is the homogenization variable.
 """
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)

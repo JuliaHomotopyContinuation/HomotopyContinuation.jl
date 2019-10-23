@@ -463,7 +463,7 @@ are only interested in pairs `(x,t)`.
 The `CoreTracker` **cannot** handle singular solutions or divergent paths. For this you have
 to use a [`PathTracker`](@ref) (which uses internally again a `CoreTracker`).
 
-The `CoreTracker` can track solutions in projective space if the underlying homotopy is homogenous
+The `CoreTracker` can track solutions in projective space if the underlying homotopy is homogeneous
 and the provided start solution is a projective vector (with type [`PVector`](https://www.juliahomotopycontinuation.org/ProjectiveVectors.jl/stable/#ProjectiveVectors.PVector))
 from the [`ProjectiveVectors.jl`](https://github.com/JuliaHomotopyContinuation/ProjectiveVectors.jl) package.
 

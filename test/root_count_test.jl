@@ -18,7 +18,7 @@
         @test ntracked(cyclic7) == 5040
     end
 
-    @testset "Multi-homogenous" begin
+    @testset "Multi-homogeneous" begin
         ## initialize the variables
         @polyvar z[1:6, 1:3]
         F = let
