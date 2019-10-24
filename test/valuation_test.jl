@@ -17,7 +17,7 @@
         init!(tracker, S[1], 0.0, 28.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
         @test val.ν ≈ [0.0, 0.0] atol = 1e-8
@@ -28,7 +28,7 @@
         init!(tracker, S[1], 0.0, 28.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test val.ν ≈ [0.0, 0.0] atol = 1e-8
@@ -39,7 +39,7 @@
         init!(tracker, S[2], 0.0, 28.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test val.ν ≈ [0.0, 0.0] atol = 1e-8
@@ -63,7 +63,7 @@
         init!(tracker, S[1], 0.0, 30.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test is_success(status(tracker))
@@ -74,7 +74,7 @@
         init!(tracker, S[1], 0.0, 30.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test is_success(status(tracker))
@@ -97,12 +97,12 @@
         init!(tracker, S[1], 0.0, 20.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-5
-        @test norm(val.ν̇) < 1e-5
-        @test norm(val.ν̈) < 1e-5
+        @test val.ν ≈ [-0.5, -1] atol = 1e-4
+        @test norm(val.ν̇) < 1e-4
+        @test norm(val.ν̈) < 1e-4
 
         # Use analytic estimates for ν̇ and ν̈
         init!(val)
@@ -110,7 +110,7 @@
         init!(tracker, S[1], 0.0, 20.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test val.ν ≈ [-0.5, -1] atol = 1e-4
@@ -122,7 +122,7 @@
         init!(tracker, S[2], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
@@ -134,7 +134,7 @@
         init!(tracker, S[2], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
         @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
@@ -147,7 +147,7 @@
         init!(tracker, S[3], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
         @test val.ν ≈ [2, -1] atol = 1e-5
@@ -171,13 +171,13 @@
         init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-5
-        @test norm(val.ν̇) < 1e-5
-        @test norm(val.ν̈) < 1e-5
-        @test HC.judge(val; tol_at_infinity = 1e-5) == HC.VAL_AT_INFINITY
+        @test val.ν ≈ [-0.5, -1] atol = 1e-4
+        @test norm(val.ν̇) < 1e-4
+        @test norm(val.ν̈) < 1e-4
+        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
 
         # Use analytic estimates for ν̇ and ν̈
         init!(val)
@@ -185,12 +185,12 @@
         init!(tracker, S[1], 0.0, 20.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-5
-        @test norm(val.ν̇) < 1e-5
-        @test norm(val.ν̈) < 1e-5
+        @test val.ν ≈ [-0.5, -1] atol = 1e-4
+        @test norm(val.ν̇) < 1e-4
+        @test norm(val.ν̈) < 1e-4
         @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
         @test HC.judge(val; tol_at_infinity = 1e-10) == HC.VAL_INDECISIVE
 
@@ -200,7 +200,7 @@
         init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
+                HC.update!(val, state.x, state.ẋ, state.s)
             end
         end
         @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
@@ -214,7 +214,7 @@
         init!(tracker, S[1], 0.0, 25.0)
         for _ in tracker
             if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
+                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
             end
         end
         @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
