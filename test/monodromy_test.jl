@@ -443,7 +443,13 @@
         l = a * x + b * y + c * z
 
         v = PVector([-0.6 - 0.8im, -1.2 + 0.4im, 1])
-        res = monodromy_solve([f, l], v, [1, 2, 3]; parameters = [a, b, c])
+        res = monodromy_solve(
+            [f, l],
+            v,
+            [1, 2, 3];
+            parameters = [a, b, c],
+            max_loops_no_progress = 20,
+        )
         @test is_heuristic_stop(res)
         @test nsolutions(res) == 2
         @test isempty(real_solutions(res))
@@ -456,6 +462,7 @@
             [2, 2];
             variable_groups = [[x, u], [y, v]],
             parameters = [a, b],
+            max_loops_no_progress = 20,
         )
         @test is_heuristic_stop(res)
         @test nsolutions(res) == 2
