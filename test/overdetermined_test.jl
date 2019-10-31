@@ -33,7 +33,6 @@
          x[2] * p[4] * p[10],
          x[2] + x[3] - 1.0,
         ]
-
     end
 
     tracker, starts = pathtracker_startsolutions(g; seed = 213412)

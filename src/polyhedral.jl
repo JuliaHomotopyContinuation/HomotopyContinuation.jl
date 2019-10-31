@@ -125,7 +125,7 @@ lifting_sampler(nterms) = rand(Int32(-2^12):Int32(2^12), nterms)
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isnothing(iter.mixed_cells) || isnothing(iter.lifting)
         res = MixedSubdivisions.fine_mixed_cells(iter.support, lifting_sampler)
-        if isnothing(res) || isempty(res[1])
+        if isnothing(res) || isempty(res[1])
             throw(OverflowError("Cannot compute a start system due."))
         end
         mixed_cells, lifting = res
