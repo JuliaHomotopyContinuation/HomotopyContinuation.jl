@@ -241,7 +241,7 @@ function judge(val::Valuation; tol::Float64 = 1e-3, tol_at_infinity::Float64 = 1
             return VAL_AT_INFINITY
         end
 
-        if abs(ν̇[i]) > tol || abs(ν̈[i]) > tol
+        if abs(ν̇[i]) > tol
             indecisive = true
         end
     end
