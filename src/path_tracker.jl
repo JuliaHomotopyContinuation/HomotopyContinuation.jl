@@ -479,7 +479,7 @@ function step!(tracker::PathTracker)
                     state.winding_number = m
                     state.solution .= state.prediction
                 elseif m′ == m &&
-                       norm(core_tracker)(state.solution, state.prediction) ≤ p_accuracy
+                       norm(core_tracker)(state.solution, state.prediction) ≤ 4p_accuracy
                     @label cauchy_eg_success
                     state.status = PathTrackerStatus.success
                     state.solution_accuracy = p_accuracy
@@ -508,9 +508,6 @@ function step!(tracker::PathTracker)
                     @goto run_cauchy_eg
                 end
 
-            elseif state.winding_number !== nothing
-                @goto cauchy_eg_success
-
             elseif options.precision_strategy == PREC_STRATEGY_NEVER
                 state.status = PathTrackerStatus.terminated_accuracy_limit
                 # If we are here, we have a precision strategy which allows to use
@@ -524,10 +521,6 @@ function step!(tracker::PathTracker)
                 else
                     state.max_winding_number_hit = true
                 end
-
-            elseif state.winding_number !== nothing
-                @goto cauchy_eg_success
-
             elseif retcode == CAUCHY_TERMINATED_MAX_ITERS
                 state.status = PathTrackerStatus.terminated_max_iters
             else
