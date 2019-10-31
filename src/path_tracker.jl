@@ -440,9 +440,7 @@ function step!(tracker::PathTracker)
     # If s > 18.42 we have exp(-18.42) ≈ 1e-8 and we get to the range where numerical
     # differentation with the Padè predictor can become tricky.
     # Therefore we switch to the other predictor
-    if s > 18.42 && core_tracker.predictor isa MixPredictorCache
-        core_tracker.predictor.predictor1_active[] = false
-    end
+    s > 18.42 && activate_predictor2!(core_tracker)
 
     if is_tracking(ct_status)
         state.eg_started || return state.status
@@ -470,6 +468,7 @@ function step!(tracker::PathTracker)
         elseif verdict == VAL_FINITE && cond_bad
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
+            activate_predictor2!(core_tracker)
             retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
 
             if retcode == CAUCHY_SUCCESS
@@ -655,6 +654,12 @@ end
 update!(val::Valuation, T::CoreTracker) =
     update!(val, T.state.x, T.state.ẋ, real(current_t(T)), T.predictor)
 
+function activate_predictor2!(core_tracker::CoreTracker)
+    if core_tracker.predictor isa MixPredictorCache
+        core_tracker.predictor.predictor1_active[] = false
+    end
+    nothing
+end
 
 """
     check_converged!(y, tracker::CoreTracker, x::AbstractVector, t)
