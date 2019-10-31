@@ -1176,14 +1176,10 @@ end
 
 function is_min_step_size(Δs, s, length_segment, options::CTO)
     if options.logarithmic_time_scale && options.from_infinity
-        t = exp(-(length_segment - s))
-        Δ = exp(-(length_segment - (s + Δs))) - t
-        Δ ≥ t || Δ ≥ options.min_step_size
-        if t < options.min_step_size
-            100Δ ≥ t
-        else
-            Δ ≥ options.min_step_size
-        end
+        ŝ = length_segment - s
+        t = exp(-ŝ)
+        Δt = exp(-ŝ + Δs) - t
+        Δt ≥ min(options.min_step_size, t / 100)
     elseif options.logarithmic_time_scale
         exp(-s) - exp(-(s + Δs)) ≥ options.min_step_size
     else
