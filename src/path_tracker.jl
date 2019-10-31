@@ -503,11 +503,7 @@ function step!(tracker::PathTracker)
                 end
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
-                if core_tracker.options.accuracy > options.min_accuracy
-                    core_tracker.options.accuracy = options.min_accuracy
-                    core_tracker.state.status = CoreTrackerStatus.tracking
-                    @goto run_cauchy_eg
-                elseif core_tracker.options.precision == PRECISION_FIXED_64
+                if core_tracker.options.precision == PRECISION_FIXED_64
                     core_tracker.options.precision = PRECISION_ADAPTIVE
                     @goto run_cauchy_eg
                 end
