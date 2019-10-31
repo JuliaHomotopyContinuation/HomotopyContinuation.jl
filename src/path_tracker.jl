@@ -533,6 +533,8 @@ function step!(tracker::PathTracker)
             elseif state.winding_number !== nothing
                 @goto cauchy_eg_success
 
+            elseif retcode == CAUCHY_TERMINATED_MAX_ITERS
+                state.status = PathTrackerStatus.terminated_max_iters
             else
                 state.status = PathTrackerStatus.terminated_ill_conditioned
             end
