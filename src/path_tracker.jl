@@ -440,9 +440,7 @@ function step!(tracker::PathTracker)
     # If s > 18.42 we have exp(-18.42) ≈ 1e-8 and we get to the range where numerical
     # differentation with the Padè predictor can become tricky.
     # Therefore we switch to the other predictor
-    if s > 18.42 && core_tracker.predictor isa MixPredictorCache
-        core_tracker.predictor.predictor1_active[] = false
-    end
+    s > 18.42 && activate_predictor2!(core_tracker)
 
     if is_tracking(ct_status)
         state.eg_started || return state.status
@@ -470,6 +468,7 @@ function step!(tracker::PathTracker)
         elseif verdict == VAL_FINITE && cond_bad
             # Perform endgame to estimate singular solution
             @label run_cauchy_eg
+            activate_predictor2!(core_tracker)
             retcode, m, p_accuracy = predict!(state.prediction, core_tracker, endgame)
 
             if retcode == CAUCHY_SUCCESS
@@ -480,7 +479,7 @@ function step!(tracker::PathTracker)
                     state.winding_number = m
                     state.solution .= state.prediction
                 elseif m′ == m &&
-                       norm(core_tracker)(state.solution, state.prediction) ≤ p_accuracy
+                       norm(core_tracker)(state.solution, state.prediction) ≤ 4p_accuracy
                     @label cauchy_eg_success
                     state.status = PathTrackerStatus.success
                     state.solution_accuracy = p_accuracy
@@ -504,17 +503,10 @@ function step!(tracker::PathTracker)
                 end
 
             elseif retcode == CAUCHY_TERMINATED_ACCURACY_LIMIT
-                if core_tracker.options.accuracy > options.min_accuracy
-                    core_tracker.options.accuracy = options.min_accuracy
-                    core_tracker.state.status = CoreTrackerStatus.tracking
-                    @goto run_cauchy_eg
-                elseif core_tracker.options.precision == PRECISION_FIXED_64
+                if core_tracker.options.precision == PRECISION_FIXED_64
                     core_tracker.options.precision = PRECISION_ADAPTIVE
                     @goto run_cauchy_eg
                 end
-
-            elseif state.winding_number !== nothing
-                @goto cauchy_eg_success
 
             elseif options.precision_strategy == PREC_STRATEGY_NEVER
                 state.status = PathTrackerStatus.terminated_accuracy_limit
@@ -529,10 +521,8 @@ function step!(tracker::PathTracker)
                 else
                     state.max_winding_number_hit = true
                 end
-
-            elseif state.winding_number !== nothing
-                @goto cauchy_eg_success
-
+            elseif retcode == CAUCHY_TERMINATED_MAX_ITERS
+                state.status = PathTrackerStatus.terminated_max_iters
             else
                 state.status = PathTrackerStatus.terminated_ill_conditioned
             end
@@ -653,6 +643,12 @@ end
 update!(val::Valuation, T::CoreTracker) =
     update!(val, T.state.x, T.state.ẋ, real(current_t(T)), T.predictor)
 
+function activate_predictor2!(core_tracker::CoreTracker)
+    if core_tracker.predictor isa MixPredictorCache
+        core_tracker.predictor.predictor1_active[] = false
+    end
+    nothing
+end
 
 """
     check_converged!(y, tracker::CoreTracker, x::AbstractVector, t)

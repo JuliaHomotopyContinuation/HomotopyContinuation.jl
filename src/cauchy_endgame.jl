@@ -41,6 +41,7 @@ An enum indicating the result of the [`predict!`](@ref) computation.
     CAUCHY_SUCCESS
     CAUCHY_TERMINATED_MAX_WINDING_NUMBER
     CAUCHY_TERMINATED_ACCURACY_LIMIT
+    CAUCHY_TERMINATED_MAX_ITERS
     CAUCHY_TERMINATED
 end
 
@@ -92,6 +93,8 @@ function predict!(p, tracker::CoreTracker, cauchy::CauchyEndgame)
                 init!(tracker, base_point, s, s_target; keep_steps = true)
                 if retcode == CoreTrackerStatus.terminated_accuracy_limit
                     return CAUCHY_TERMINATED_ACCURACY_LIMIT, m, max_acc
+                elseif retcode == CoreTrackerStatus.terminated_maximal_iterations
+                    return CAUCHY_TERMINATED_MAX_ITERS, m, max_acc
                 else
                     return CAUCHY_TERMINATED, m, max_acc
                 end
