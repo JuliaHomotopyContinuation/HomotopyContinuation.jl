@@ -10,7 +10,7 @@ makedocs(
             "solver.md"
         ],
         "Solving parametrized systems with monodromy" => "monodromy.md",
-        "Solving many parameterized systems" => "many_parameters_solve.md"
+        "Solving many parameterized systems" => "many_parameters_solve.md",
         "Tracking paths" => [
             "path_tracker.md",
             "core_tracker.md",
