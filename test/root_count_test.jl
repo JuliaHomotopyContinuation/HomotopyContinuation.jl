@@ -201,9 +201,9 @@
             results4_template[length(sol4_again)+1] += 1
         end
 
-        @test results1_template[4] == 100
-        @test 98 <= results1_direct[4] <= 100
-        @test 98 <= results2_direct[7] <= 100
+        @test 98 ≤ results1_template[4] ≤ 100
+        @test 98 ≤ results1_direct[4] ≤ 100
+        @test 98 ≤ results2_direct[7] ≤ 100
         @test 98 ≤ results2_template[7] ≤ 100
         @test 98 ≤ results3_direct[7] ≤ 100
         @test 98 ≤ results3_template[7] ≤ 100
