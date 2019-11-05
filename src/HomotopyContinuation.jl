@@ -74,6 +74,7 @@ include("result.jl")
 include("polyhedral.jl")
 include("overdetermined.jl")
 include("solver.jl")
+include("many_parameters_solver.jl")
 include("monodromy.jl")
 include("path_info.jl")
 

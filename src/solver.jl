@@ -132,6 +132,8 @@ Create a [`Solver`](@ref). Takes almost the same arguments as [`solve`](@ref).
 """
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 
+result_type(solver::Solver) = Result{typeof(solution(solver.trackers[1]))}
+
 min_accuracy(T::PathTracker) = T.options.min_accuracy
 min_accuracy(T::OverdeterminedTracker) = min_accuracy(T.tracker)
 min_accuracy(T::PolyhedralTracker) = min_accuracy(T.generic_tracker)
@@ -438,16 +440,8 @@ function solve(
     Threads.resize_nthreads!(trackers)
     Threads.resize_nthreads!(stats)
 
-    if start_parameters !== nothing
-        for tracker in trackers
-            start_parameters!(tracker, start_parameters)
-        end
-    end
-    if target_parameters !== nothing
-        for tracker in trackers
-            target_parameters!(tracker, target_parameters)
-        end
-    end
+    start_parameters !== nothing && start_parameters!(solver, start_parameters)
+    target_parameters !== nothing && target_parameters!(solver, target_parameters)
 
     S = collect_startsolutions(start_solutions)
     n = length(S)
@@ -523,6 +517,10 @@ function solve(
     )
 end
 
+start_parameters!(solver::Solver, p::AbstractVector) =
+    start_parameters!.(solver.trackers, Ref(p))
+target_parameters!(solver::Solver, p::AbstractVector) =
+    target_parameters!.(solver.trackers, Ref(p))
 
 function track_parallel!(
     results,

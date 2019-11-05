@@ -47,6 +47,7 @@ end
     include("monodromy_test.jl")
     include("root_count_test.jl")
     include("path_info_test.jl")
+    include("many_parameters_solver_test.jl")
 
     # include("nextjournal.jl")
 end
