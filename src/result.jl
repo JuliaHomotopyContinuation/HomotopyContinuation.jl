@@ -389,11 +389,12 @@ function mapresults(
     onlyfinite = true,
     multiple_results = false,
 )
-    [f(r) for r in R if (!only_real || is_real(r, real_tol)) &&
-                        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-                        (!only_singular || is_singular(r, singular_tol)) &&
-                        (!onlyfinite || isfinite(r) || is_projective(r)) &&
-                        (multiple_results || !is_multiple_result(r, R))]
+    [f(r)
+        for r in R if (!only_real || is_real(r, real_tol)) &&
+                      (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
+                      (!only_singular || is_singular(r, singular_tol)) &&
+                      (!onlyfinite || isfinite(r) || is_projective(r)) &&
+                      (multiple_results || !is_multiple_result(r, R))]
 end
 
 """

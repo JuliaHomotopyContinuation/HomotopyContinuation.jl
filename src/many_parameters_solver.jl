@@ -32,9 +32,9 @@ function many_parameters_solver(
     starts::Vector{<:AbstractVector},
     start_params::AbstractVector{<:Number},
     parameters::AbstractVector;
-    kwargs...
+    kwargs...,
 )
-    ManyParametersSolver(solver(F, starts; generic_parameters=start_params, kwargs...))
+    ManyParametersSolver(solver(F, starts; generic_parameters = start_params, kwargs...))
 end
 
 """
@@ -176,7 +176,7 @@ function many_parameters_solve(
     starts::Vector{<:AbstractVector},
     start_params::AbstractVector{<:Number},
     parameters::AbstractVector;
-    kwargs...
+    kwargs...,
 )
     solve_kwargs, rest = splitkwargs(kwargs, many_parameters_solve_supported_keywords)
     solver = many_parameters_solver(F, starts, start_params, parameters; rest...)
@@ -193,7 +193,7 @@ function many_parameters_solve(
     transform_parameters::Function = identity,
     flatten::Bool = false,
     path_jumping_check::Bool = true,
-    threading::Bool = true
+    threading::Bool = true,
 )
     Threads.resize_nthreads!(MPS.solvers)
 
@@ -205,7 +205,7 @@ function many_parameters_solve(
         target_parameters = transform_parameters(parameters[1]),
         threading = false,
         show_progress = false,
-        path_jumping_check = path_jumping_check
+        path_jumping_check = path_jumping_check,
     )
 
     if flatten
