@@ -1030,7 +1030,9 @@ function many_parameters_solve(
         parameters,
         transform_result,
         transform_parameters,
-        Val(flatten),
+        Val(flatten);
+        path_jumping_check = path_jumping_check,
+        threading = threading,
     )
     results
 end
