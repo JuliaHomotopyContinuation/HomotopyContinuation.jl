@@ -43,7 +43,107 @@ g = [x^2+y^2+1, 2x+3y-1]
 f = homogenize(g, z)</code></pre><p>If your polynomial system is already homogeneous, but you would like to consider it as an affine system you can do</p><pre><code class="language-julia">@polyvar x y z
 solve([x^2+y^2+z^2, 2x+3y-z], homvar=z)</code></pre><p>This yields the same result as <code>solve([x^2+y^2+1, 2x+3y-1])</code>.</p><p><strong>Multi-homogeneous Systems</strong></p><p>By exploiting the multi-homogeneous structure of a polynomial system it is possible to decrease the number of paths necessary to track.</p><pre><code class="language-julia">@polyvar x y
 # Use variable groups to only track 2 paths instead of 4
-solve([x*y - 6, x^2 - 5], variable_groups=[(x,), (y,)])</code></pre><p>To check whether a certain variable grouping is beneficial you can use the <a href="#HomotopyContinuation.bezout_number"><code>bezout_number</code></a> function.</p><p><strong>Abstract Homotopy</strong></p><pre><code class="language-none">solve(H::AbstractHomotopy, start_solutions; options...)</code></pre><p>Solve the homotopy <code>H</code> by tracking the each solution of <span>$H(⋅, t)$</span> (as provided by <code>start_solutions</code>) from <span>$t=1$</span> to <span>$t=0$</span>.</p></div></section></article><h2 id="Result-1">Result<a class="docs-heading-anchor" href="#Result-1" title="Permalink"></a></h2><p>A call to <a href="#HomotopyContinuation.solve"><code>solve</code></a> returns a <a href="#HomotopyContinuation.Result"><code>Result</code></a>:</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.Result" href="#HomotopyContinuation.Result"><code>HomotopyContinuation.Result</code></a> — <span class="docstring-category">Type</span>.</header><section><div><pre><code class="language-julia">Result{V&lt;:AbstractVector}</code></pre><p>The result of <code>solve</code>. This is a wrapper around the results of each single path (<a href="../path_tracker/#HomotopyContinuation.PathResult"><code>PathResult</code></a>) and it contains some additional informations like a random seed to replicate the result.</p></div></section></article><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.seed" href="#HomotopyContinuation.seed"><code>HomotopyContinuation.seed</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">seed(prob::AbstractProblem)</code></pre><p>Get the random seed used for the problem <code>prob</code>.</p></div></section><section><div><pre><code class="language-none">seed(result)</code></pre><p>The random seed used in the computation.</p></div></section></article><h2 id="Analyse-a-Result-1">Analyse a Result<a class="docs-heading-anchor" href="#Analyse-a-Result-1" title="Permalink"></a></h2><p>The nonsingular solutions are obtained as follows.</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.nonsingular" href="#HomotopyContinuation.nonsingular"><code>HomotopyContinuation.nonsingular</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">nonsingular(result::Results; conditions...)</code></pre><p>Return all <code>PathResult</code>s for which the solution is non-singular. This is just a shorthand for <code>results(R; only_nonsingular=true, conditions...)</code>. For the possible <code>conditions</code> see <a href="#HomotopyContinuation.results"><code>results</code></a>.</p></div></section></article><p>The singular solutions are returned by using the following.</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.singular" href="#HomotopyContinuation.singular"><code>HomotopyContinuation.singular</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">singular(R::Results; tol=1e10, multiple_results=false, kwargs...)</code></pre><p>Return all <code>PathResult</code>s for which the solution is singular. A solution is labeled singular if the condition number is greater than <code>singular_tol</code>, or if the winding number is &gt; 1. If <code>multiple_results=false</code> only one point from each cluster of multiple solutions is returned. If If <code>multiple_results=true</code> all singular solutions in <code>R</code> are returned. For the possible <code>kwargs</code> see <a href="#HomotopyContinuation.results"><code>results</code></a>.</p></div></section></article><p>In order to analyse a <code>Result</code> we provide the following additional helper functions</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.results" href="#HomotopyContinuation.results"><code>HomotopyContinuation.results</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">results(result; only_real=false, real_tol=1e-6, only_nonsingular=false,
+solve([x*y - 6, x^2 - 5], variable_groups=[(x,), (y,)])</code></pre><p>To check whether a certain variable grouping is beneficial you can use the <a href="#HomotopyContinuation.bezout_number"><code>bezout_number</code></a> function.</p><p><strong>Abstract Homotopy</strong></p><pre><code class="language-none">solve(H::AbstractHomotopy, start_solutions; options...)</code></pre><p>Solve the homotopy <code>H</code> by tracking the each solution of <span>$H(⋅, t)$</span> (as provided by <code>start_solutions</code>) from <span>$t=1$</span> to <span>$t=0$</span>.</p><p><strong>Many parameters</strong></p><pre><code class="language-none">solve(
+    F, start_solutions;
+    start_parameters = ...,
+    target_parameters = ..., # multiple parameters
+    options...,
+    many_parameters_options...
+)</code></pre><p>Solve the system paramterized system <code>F</code> for many different target parameters. If no further options are specified (resp. only those which are explained above) then the result of this funciton is similar to</p><pre><code class="language-none">map(params) do p
+    res = solve(F, S; start_parameters = start_params, target_parameters = p, options...)
+    (res, p)
+end</code></pre><p>Note if <code>threading = true</code> then the parallelization is done on a parameter by parameter basis (and not as above on a path by path basis). Note that order of the results is not guaranteed. The <code>many_parameters_options</code> allow to apply transformations on the results</p><p><strong>Many parameter options</strong></p><ul><li><code>flatten::Bool</code>: Flatten the output of <code>transform_result</code>. This is useful for example if <code>transform_result</code> returns a vector of solutions, and you only want a single vector of solutions as the result (instead of a vector of vector of solutions).</li><li><code>transform_parameters::Function</code>: Transform a parameters values <code>p</code> before passing it to <code>target_parameters = ...</code>. By default this <code>identity</code>.</li><li><code>transform_result::Function</code>: A function taking two arguments, the <code>result</code> and the parameters <code>p</code>. By default this returns the tuple <code>(result, p)</code>.</li></ul><p><strong>Many parameter examples</strong></p><p>We start with some setup. We intersect a circle with a many different lines.</p><pre><code class="language-julia">@polyvar x y
+f = x^2 + y^2 - 1
+
+@polyvar a b c
+l = a * x + b * y + c
+F = [f, l]
+
+# Compute start solutions S₀ for given start parameters p₀
+p₀ = randn(ComplexF64, 3)
+S₀ = solutions(solve(subs(F, [a, b, c] =&gt; p₀)))
+# The parameters we are intersted in
+params = [rand(3) for i = 1:100]</code></pre><p>Here are the some examples of the different options.</p><pre><code class="language-julia-repl">julia&gt; result1 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+       );
+
+julia&gt; typeof(result1)
+Array{Tuple{Result{Array{Complex{Float64},1}},Array{Float64,1}},1}
+
+julia&gt; result1[1]
+(Result{Array{Complex{Float64},1}} with 2 solutions
+==================================================
+• 2 non-singular solutions (2 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 814544
+, [0.6323567622396351, 0.15381245892007867, 0.44070720179305134])
+
+julia&gt; # Only keep real solutions
+       result2 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+           transform_result = (r, p) -&gt; real_solutions(r),
+       );
+
+julia&gt; typeof(result2)
+Array{Array{Array{Float64,1},1},1}
+
+julia&gt; result2[1:3]
+3-element Array{Array{Array{Float64,1},1},1}:
+ [[-0.4840916699908168, -0.8750172884266356], [-0.831904725657279, 0.554918487193468]]
+ [[-0.9979849536743425, 0.06345102236859917], [0.5252178600449688, -0.8509678016762935]]
+ [[-0.8602211106475295, 0.5099212103809087], [0.7844127443972155, -0.6202391848530926]]
+
+julia&gt; # Now instead of an Array{Array{Array{Float64,1},1},1} we want to have an
+       # Array{Array{Float64,1},1}
+       result3 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+           transform_result = (r, p) -&gt; real_solutions(r),
+           flatten = true
+       );
+
+julia&gt; typeof(result3)
+Array{Array{Float64,1},1}
+
+julia&gt; result3[1:3]
+3-element Array{Array{Float64,1},1}:
+ [-0.4840916699908168, -0.8750172884266356]
+ [-0.831904725657279, 0.554918487193468]
+ [-0.9979849536743425, 0.06345102236859917]
+
+julia&gt; # The passed `params` do not directly need to be the target parameters.
+       # Instead they can be some more concrete informations (e.g. an index)
+       # and we can them by using the `transform_parameters` method
+       result4 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = 1:100,
+           transform_result = (r, p) -&gt; (real_solutions(r), p),
+           transform_parameters = _ -&gt; rand(3)
+       );
+
+julia&gt; typeof(result4)
+Array{Tuple{Array{Array{Float64,1},1},Int64},1}
+
+julia&gt; result4[1:3]
+3-element Array{Tuple{Array{Array{Float64,1},1},Int64},1}:
+ ([[-0.9459225556889465, -0.3243925378902725], [0.39166252055983675, -0.9201089446303168]], 1)
+ ([[-0.838341089344409, 0.5451460519134572], [0.4299213699880814, -0.9028663332008627]], 68)
+ ([[-0.8261686468010706, -0.5634229024834612], [-0.19003485030903675, -0.9817773452611452]], 69)</code></pre></div></section></article><h2 id="Result-1">Result<a class="docs-heading-anchor" href="#Result-1" title="Permalink"></a></h2><p>A call to <a href="#HomotopyContinuation.solve"><code>solve</code></a> returns a <a href="#HomotopyContinuation.Result"><code>Result</code></a>:</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.Result" href="#HomotopyContinuation.Result"><code>HomotopyContinuation.Result</code></a> — <span class="docstring-category">Type</span>.</header><section><div><pre><code class="language-julia">Result{V&lt;:AbstractVector}</code></pre><p>The result of <code>solve</code>. This is a wrapper around the results of each single path (<a href="../path_tracker/#HomotopyContinuation.PathResult"><code>PathResult</code></a>) and it contains some additional informations like a random seed to replicate the result.</p></div></section></article><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.seed" href="#HomotopyContinuation.seed"><code>HomotopyContinuation.seed</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">seed(prob::AbstractProblem)</code></pre><p>Get the random seed used for the problem <code>prob</code>.</p></div></section><section><div><pre><code class="language-none">seed(result)</code></pre><p>The random seed used in the computation.</p></div></section></article><h2 id="Analyse-a-Result-1">Analyse a Result<a class="docs-heading-anchor" href="#Analyse-a-Result-1" title="Permalink"></a></h2><p>The nonsingular solutions are obtained as follows.</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.nonsingular" href="#HomotopyContinuation.nonsingular"><code>HomotopyContinuation.nonsingular</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">nonsingular(result::Results; conditions...)</code></pre><p>Return all <code>PathResult</code>s for which the solution is non-singular. This is just a shorthand for <code>results(R; only_nonsingular=true, conditions...)</code>. For the possible <code>conditions</code> see <a href="#HomotopyContinuation.results"><code>results</code></a>.</p></div></section></article><p>The singular solutions are returned by using the following.</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.singular" href="#HomotopyContinuation.singular"><code>HomotopyContinuation.singular</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">singular(R::Results; tol=1e10, multiple_results=false, kwargs...)</code></pre><p>Return all <code>PathResult</code>s for which the solution is singular. A solution is labeled singular if the condition number is greater than <code>singular_tol</code>, or if the winding number is &gt; 1. If <code>multiple_results=false</code> only one point from each cluster of multiple solutions is returned. If If <code>multiple_results=true</code> all singular solutions in <code>R</code> are returned. For the possible <code>kwargs</code> see <a href="#HomotopyContinuation.results"><code>results</code></a>.</p></div></section></article><p>In order to analyse a <code>Result</code> we provide the following additional helper functions</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.results" href="#HomotopyContinuation.results"><code>HomotopyContinuation.results</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">results(result; only_real=false, real_tol=1e-6, only_nonsingular=false,
             onlysigular=false, singular_tol=1e10, onlyfinite=true, multiple_results=false)</code></pre><p>Return all <code>PathResult</code>s for which the given conditions apply.</p><p><strong>Example</strong></p><pre><code class="language-julia">R = solve(F)
 
 # This gives us all PathResults considered non-singular and real (but still as a complex vector).
@@ -72,4 +172,4 @@ nresults(result, only_real=true, real_tol=1e-8, only_nonsingular=true)</code></p
     kwargs...,
 )</code></pre><p>The number of singular solutions. A solution is considered singular if its windingnumber is larger than 1 or the condition number is larger than <code>tol</code>. If <code>counting_multiplicities=true</code> the number of singular solutions times their multiplicities is returned.</p></div></section></article><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.nnonsingular" href="#HomotopyContinuation.nnonsingular"><code>HomotopyContinuation.nnonsingular</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">nnonsingular(result; tol=1e-10)</code></pre><p>The number of non-singular solutions.</p></div></section></article><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.nat_infinity" href="#HomotopyContinuation.nat_infinity"><code>HomotopyContinuation.nat_infinity</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">nat_infinity(result)</code></pre><p>The number of solutions at infinity.</p></div></section></article><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.nfailed" href="#HomotopyContinuation.nfailed"><code>HomotopyContinuation.nfailed</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">nafailed(result)</code></pre><p>The number of failed paths.</p></div></section></article><p>Also make sure to check the documentation for <a href="../path_tracker/#HomotopyContinuation.PathResult"><code>PathResult</code></a>.</p><h2 id="Estimate-the-computational-complexity-1">Estimate the computational complexity<a class="docs-heading-anchor" href="#Estimate-the-computational-complexity-1" title="Permalink"></a></h2><p>We provide methods to compute the number of paths that needs to be tracked.</p><p>For the totaldegree homotopy:</p><article class="docstring"><header><a class="docstring-binding" id="HomotopyContinuation.bezout_number" href="#HomotopyContinuation.bezout_number"><code>HomotopyContinuation.bezout_number</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)
 bezout_number(multidegrees, groups::VariableGroups)</code></pre><p>Compute the multi-homogeneous bezout number associated to the given system and variable groups.</p></div></section></article><p>For the polyhedral homotopy:</p><article class="docstring"><header><a class="docstring-binding" id="MixedSubdivisions.mixed_volume" href="#MixedSubdivisions.mixed_volume"><code>MixedSubdivisions.mixed_volume</code></a> — <span class="docstring-category">Function</span>.</header><section><div><pre><code class="language-julia">mixed_volume(F::Vector{&lt;:MP.AbstractPolynomialLike}; show_progress=true, algorithm=:regeneration)
-mixed_volume(𝑨::Vector{&lt;:Matrix}; show_progress=true, algorithm=:regeneration)</code></pre><p>Compute the mixed volume of the given polynomial system <code>F</code> resp. represented by the support <code>𝑨</code>. There are two possible values for <code>algorithm</code>:</p><ul><li><code>:total_degree</code>: Use the total degree homotopy algorithm described in Section 7.1</li><li><code>:regeneration</code>: Use the tropical regeneration algorithm described in Section 7.2</li></ul></div></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Introduction</a><a class="docs-footer-nextpage" href="../solver/">The Solver struct »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 5 November 2019 07:07">Tuesday 5 November 2019</span>. Using Julia version 1.3.0-rc4.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+mixed_volume(𝑨::Vector{&lt;:Matrix}; show_progress=true, algorithm=:regeneration)</code></pre><p>Compute the mixed volume of the given polynomial system <code>F</code> resp. represented by the support <code>𝑨</code>. There are two possible values for <code>algorithm</code>:</p><ul><li><code>:total_degree</code>: Use the total degree homotopy algorithm described in Section 7.1</li><li><code>:regeneration</code>: Use the tropical regeneration algorithm described in Section 7.2</li></ul></div></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Introduction</a><a class="docs-footer-nextpage" href="../solver/">The Solver struct »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 8 November 2019 08:40">Friday 8 November 2019</span>. Using Julia version 1.3.0-rc4.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
