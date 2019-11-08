@@ -132,6 +132,8 @@ Create a [`Solver`](@ref). Takes almost the same arguments as [`solve`](@ref).
 """
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 
+result_type(solver::Solver) = Result{typeof(solution(solver.trackers[1]))}
+
 min_accuracy(T::PathTracker) = T.options.min_accuracy
 min_accuracy(T::OverdeterminedTracker) = min_accuracy(T.tracker)
 min_accuracy(T::PolyhedralTracker) = min_accuracy(T.generic_tracker)
@@ -391,12 +393,184 @@ function.
 
 Solve the homotopy `H` by tracking the each solution of
 ``H(⋅, t)`` (as provided by `start_solutions`) from ``t=1`` to ``t=0``.
+
+## Many parameters
+
+    solve(
+        F, start_solutions;
+        start_parameters = ...,
+        target_parameters = ..., # multiple parameters
+        options...,
+        many_parameters_options...
+    )
+
+Solve the system paramterized system `F` for many different target parameters.
+If no further options are specified (resp. only those which are explained above)
+then the result of this funciton is similar to
+```
+map(params) do p
+    res = solve(F, S; start_parameters = start_params, target_parameters = p, options...)
+    (res, p)
+end
+```
+
+Note if `threading = true` then the parallelization
+is done on a parameter by parameter basis (and not as above on a path by path basis).
+Note that order of the results is not guaranteed.
+The `many_parameters_options` allow to apply transformations on the results
+
+### Many parameter options
+
+* `flatten::Bool`: Flatten the output of `transform_result`. This is useful for example if
+  `transform_result` returns a vector of solutions, and you only want a single vector of
+  solutions as the result (instead of a vector of vector of solutions).
+* `transform_parameters::Function`: Transform a parameters values `p` before passing it to
+  `target_parameters = ...`. By default this `identity`.
+* `transform_result::Function`: A function taking two arguments, the `result` and the
+  parameters `p`. By default this returns the tuple `(result, p)`.
+
+### Many parameter examples
+
+We start with some setup. We intersect a circle with a many different lines.
+
+```julia
+@polyvar x y
+f = x^2 + y^2 - 1
+
+@polyvar a b c
+l = a * x + b * y + c
+F = [f, l]
+
+# Compute start solutions S₀ for given start parameters p₀
+p₀ = randn(ComplexF64, 3)
+S₀ = solutions(solve(subs(F, [a, b, c] => p₀)))
+# The parameters we are intersted in
+params = [rand(3) for i = 1:100]
+```
+
+Here are the some examples of the different options.
+```julia-repl
+julia> result1 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+       );
+
+julia> typeof(result1)
+Array{Tuple{Result{Array{Complex{Float64},1}},Array{Float64,1}},1}
+
+julia> result1[1]
+(Result{Array{Complex{Float64},1}} with 2 solutions
+==================================================
+• 2 non-singular solutions (2 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 814544
+, [0.6323567622396351, 0.15381245892007867, 0.44070720179305134])
+
+julia> # Only keep real solutions
+       result2 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+           transform_result = (r, p) -> real_solutions(r),
+       );
+
+julia> typeof(result2)
+Array{Array{Array{Float64,1},1},1}
+
+julia> result2[1:3]
+3-element Array{Array{Array{Float64,1},1},1}:
+ [[-0.4840916699908168, -0.8750172884266356], [-0.831904725657279, 0.554918487193468]]
+ [[-0.9979849536743425, 0.06345102236859917], [0.5252178600449688, -0.8509678016762935]]
+ [[-0.8602211106475295, 0.5099212103809087], [0.7844127443972155, -0.6202391848530926]]
+
+julia> # Now instead of an Array{Array{Array{Float64,1},1},1} we want to have an
+       # Array{Array{Float64,1},1}
+       result3 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = params,
+           transform_result = (r, p) -> real_solutions(r),
+           flatten = true
+       );
+
+julia> typeof(result3)
+Array{Array{Float64,1},1}
+
+julia> result3[1:3]
+3-element Array{Array{Float64,1},1}:
+ [-0.4840916699908168, -0.8750172884266356]
+ [-0.831904725657279, 0.554918487193468]
+ [-0.9979849536743425, 0.06345102236859917]
+
+julia> # The passed `params` do not directly need to be the target parameters.
+       # Instead they can be some more concrete informations (e.g. an index)
+       # and we can them by using the `transform_parameters` method
+       result4 = solve(
+           F,
+           S₀;
+           parameters = [a, b, c],
+           start_parameters = p₀,
+           target_parameters = 1:100,
+           transform_result = (r, p) -> (real_solutions(r), p),
+           transform_parameters = _ -> rand(3)
+       );
+
+julia> typeof(result4)
+Array{Tuple{Array{Array{Float64,1},1},Int64},1}
+
+julia> result4[1:3]
+3-element Array{Tuple{Array{Array{Float64,1},1},Int64},1}:
+ ([[-0.9459225556889465, -0.3243925378902725], [0.39166252055983675, -0.9201089446303168]], 1)
+ ([[-0.838341089344409, 0.5451460519134572], [0.4299213699880814, -0.9028663332008627]], 68)
+ ([[-0.8261686468010706, -0.5634229024834612], [-0.19003485030903675, -0.9817773452611452]], 69)
+```
 """
 function solve(args...; kwargs...)
     solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
     solver, start_solutions = solver_startsolutions(args...; rest...)
     solve(solver, start_solutions; solve_kwargs...)
 end
+function solve(
+    F::Union{MPPolyInputs,AbstractHomotopy,AbstractSystem},
+    starts;
+    target_parameters = nothing,
+    transform_parameters = nothing,
+    kwargs...,
+)
+    if target_parameters === nothing ||
+       (target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing)
+        solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
+        if target_parameters !== nothing
+            solver, start_solutions = solver_startsolutions(
+                F,
+                starts;
+                target_parameters = target_parameters,
+                rest...,
+            )
+        else
+            solver, start_solutions = solver_startsolutions(F, starts; rest...)
+        end
+        solve(solver, start_solutions; solve_kwargs...)
+    else
+        many_parameters_solve(
+            F,
+            starts;
+            target_parameters = target_parameters,
+            transform_parameters = transform_parameters === nothing ? identity :
+                                   transform_parameters,
+            kwargs...,
+        )
+    end
+end
+
 
 function solve(
     solver::Solver,
@@ -438,16 +612,8 @@ function solve(
     Threads.resize_nthreads!(trackers)
     Threads.resize_nthreads!(stats)
 
-    if start_parameters !== nothing
-        for tracker in trackers
-            start_parameters!(tracker, start_parameters)
-        end
-    end
-    if target_parameters !== nothing
-        for tracker in trackers
-            target_parameters!(tracker, target_parameters)
-        end
-    end
+    start_parameters !== nothing && start_parameters!(solver, start_parameters)
+    target_parameters !== nothing && target_parameters!(solver, target_parameters)
 
     S = collect_startsolutions(start_solutions)
     n = length(S)
@@ -523,6 +689,10 @@ function solve(
     )
 end
 
+start_parameters!(solver::Solver, p::AbstractVector) =
+    start_parameters!.(solver.trackers, Ref(p))
+target_parameters!(solver::Solver, p::AbstractVector) =
+    target_parameters!.(solver.trackers, Ref(p))
 
 function track_parallel!(
     results,
@@ -694,4 +864,241 @@ function remove_nothings(v::Vector{Union{Nothing,T}}) where {T}
         !isnothing(vᵢ) && push!(w, vᵢ)
     end
     w
+end
+
+#####################
+## Many parameters ##
+#####################
+
+export ManyParametersSolver, many_parameters_solver, many_parameters_solve
+
+"""
+    ManyParametersSolver(solver)
+
+A wrapper around a solver to prepare it for [`many_parameters_solve`](@ref).
+"""
+struct ManyParametersSolver{S<:Solver}
+    solvers::Vector{S}
+end
+ManyParametersSolver(S::Solver) = ManyParametersSolver([S])
+
+
+const many_parameters_solve_supported_keywords = [
+    :transform_result,
+    :transform_parameters,
+    :flatten,
+    :path_jumping_check,
+    :threading,
+]
+
+# dispatch for the many parameters case
+function solver(
+    F::Union{MPPolyInputs,AbstractHomotopy,AbstractSystem},
+    starts;
+    target_parameters = nothing,
+    transform_parameters = nothing,
+    kwargs...,
+)
+    if target_parameters === nothing ||
+       (target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing)
+        solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
+        if target_parameters !== nothing
+            solver, _ = solver_startsolutions(
+                F,
+                starts;
+                target_parameters = target_parameters,
+                rest...,
+            )
+        else
+            solver, _ = solver_startsolutions(F, starts; rest...)
+        end
+    else
+        solver = many_parameters_solver(
+            F,
+            starts;
+            target_parameters = target_parameters,
+            transform_parameters = transform_parameters === nothing ? identity :
+                                   transform_parameters,
+            kwargs...,
+        )
+    end
+    solver
+end
+
+
+"""
+    many_parameters_solver( F,
+         S::Vector{<:AbstractVector},
+         start_params::AbstractVector{<:Number},
+         params::AbstractVector; options...)
+
+Construct a `ManyParametersSolver` by reusing the [`solver`](@ref) function.
+"""
+function many_parameters_solver(
+    F,
+    starts::Vector{<:AbstractVector};
+    generic_parameters = nothing,
+    start_parameters = generic_parameters,
+    target_parameters = throw(ArgumentError("`target_parameters = ...` needs to be specified")),
+    kwargs...,
+)
+    if start_parameters === nothing
+        throw(ArgumentError("`start_parameters = ...` needs to be provided."))
+    end
+    ManyParametersSolver(solver(
+        F,
+        starts;
+        generic_parameters = start_parameters,
+        kwargs...,
+    ))
+end
+
+function many_parameters_solve(
+    F,
+    starts::Vector{<:AbstractVector};
+    generic_parameters = nothing,
+    start_parameters = generic_parameters,
+    target_parameters = throw(ArgumentError("`target_parameters = ...` needs to be specified")),
+    kwargs...,
+)
+    solve_kwargs, rest = splitkwargs(kwargs, many_parameters_solve_supported_keywords)
+    solver = many_parameters_solver(
+        F,
+        starts;
+        start_parameters = start_parameters,
+        target_parameters = target_parameters,
+        rest...,
+    )
+    many_parameters_solve(
+        solver,
+        starts,
+        start_parameters,
+        target_parameters;
+        solve_kwargs...,
+    )
+end
+
+function solve(
+    MPS::ManyParametersSolver,
+    starts;
+    generic_parameters = nothing,
+    start_parameters = generic_parameters,
+    target_parameters = throw(ArgumentError("`target_parameters = ...` needs to be specified")),
+    kwargs...,
+)
+    many_parameters_solve(MPS, starts, start_parameters, target_parameters; kwargs...)
+end
+
+function many_parameters_solve(
+    MPS::ManyParametersSolver,
+    starts::Vector{<:AbstractVector},
+    start_params::Union{Nothing,AbstractVector{<:Number}},
+    parameters::AbstractVector;
+    transform_result::Function = tuple,
+    transform_parameters::Function = identity,
+    flatten::Bool = false,
+    path_jumping_check::Bool = true,
+    threading::Bool = true,
+)
+    Threads.resize_nthreads!(MPS.solvers)
+
+    if !isnothing(start_params)
+        start_parameters!.(MPS.solvers, Ref(start_params))
+    end
+
+    first_result = solve(
+        MPS.solvers[1],
+        starts;
+        target_parameters = transform_parameters(parameters[1]),
+        threading = false,
+        show_progress = false,
+        path_jumping_check = path_jumping_check,
+    )
+
+    if flatten
+        results = transform_result(first_result, parameters[1])
+        if !(results isa AbstractArray)
+            throw(ArgumentError("Cannot flatten arguments of type `$(typeof(results))`"))
+        end
+    else
+        results = [transform_result(first_result, parameters[1])]
+    end
+    many_parameters_solve_barrier!(
+        results,
+        MPS,
+        starts,
+        parameters,
+        transform_result,
+        transform_parameters,
+        Val(flatten);
+        path_jumping_check = path_jumping_check,
+        threading = threading,
+    )
+    results
+end
+
+function many_parameters_solve_barrier!(
+    results,
+    MPS::ManyParametersSolver,
+    starts::Vector{<:AbstractVector},
+    parameters::AbstractVector,
+    transform_result::Function,
+    transform_parameters::Function,
+    ::Val{Flatten};
+    path_jumping_check::Bool = false,
+    threading::Bool = true,
+) where {Flatten}
+    N = length(parameters)
+
+    if threading && Threads.nthreads() > 1
+        thread_results = [similar(results, 0) for _ = 2:Threads.nthreads()]
+        push!(thread_results, results)
+
+        Threads.@threads for i = 2:N
+            tid = Threads.threadid()
+            rᵢ = transform_result(
+                solve(
+                    MPS.solvers[tid],
+                    starts;
+                    target_parameters = transform_parameters(parameters[i]),
+                    path_jumping_check = path_jumping_check,
+                    threading = false,
+                    show_progress = false,
+                ),
+                parameters[i],
+            )
+
+            if Flatten
+                append!(thread_results[tid], rᵢ)
+            else
+                push!(thread_results[tid], rᵢ)
+            end
+        end
+
+        for i = 1:(Threads.nthreads()-1)
+            append!(results, thread_results[i])
+        end
+    else
+        for i = 2:N
+            rᵢ = transform_result(
+                solve(
+                    MPS.solvers[1],
+                    starts;
+                    target_parameters = transform_parameters(parameters[i]),
+                    path_jumping_check = path_jumping_check,
+                    threading = false,
+                    show_progress = false,
+                ),
+                parameters[i],
+            )
+
+            if Flatten
+                append!(results, rᵢ)
+            else
+                push!(results, rᵢ)
+            end
+        end
+    end
+
+    results
 end
