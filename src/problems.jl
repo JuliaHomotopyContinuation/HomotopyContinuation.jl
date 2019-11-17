@@ -662,7 +662,7 @@ function problem_startsolutions(
             seed;
             start_system = :polyhedral,
             variable_ordering = vars,
-            kwargs...
+            kwargs...,
         )
     else
         problem_startsolutions(
@@ -672,7 +672,7 @@ function problem_startsolutions(
             seed;
             start_system = :total_degree,
             variable_ordering = variable_ordering,
-            kwargs...
+            kwargs...,
         )
     end
 end
@@ -688,24 +688,22 @@ function problem_startsolutions(
     variable_ordering = nothing,
     kwargs...,
 )
-    start_system == :total_degree || throw(ArgumentError("`start_system = :total_degree` is the only possibility with `AbstractSystem`s."))
+    start_system == :total_degree || throw(ArgumentError("`start_system = :total_degree` is the only possibility with `AbstractSystem`s."))
     n, N = size(input.system)
 
     degrees, is_homogeneous = degrees_ishomogeneous(input.system)
-    G = TotalDegreeSystem(degrees; affine = !is_homogeneous)
     variable_groups = VariableGroups(N, hominfo)
     classification =
         classify_system(input.system, variable_groups; affine_tracking = !is_homogeneous)
 
     # overdetermined
     if classification == :overdetermined
-        m = N - !is_homogeneous
+        m = N - is_homogeneous
         A = randn(ComplexF64, m, n - m)
-        f = SquaredUpSystem(input.system, A, degrees)
         problem = OverdeterminedProblem(
             Problem{is_homogeneous ? ProjectiveTracking : AffineTracking}(
-                G,
-                f,
+                TotalDegreeSystem(degrees[1:m]; affine = !is_homogeneous),
+                SquaredUpSystem(input.system, A, degrees),
                 variable_groups,
                 seed;
                 kwargs...,
@@ -721,6 +719,8 @@ function problem_startsolutions(
             " to a zero dimensional system.",
         ))
     else # square
+        G = TotalDegreeSystem(degrees; affine = !is_homogeneous)
+
         problem = Problem{is_homogeneous ? ProjectiveTracking : AffineTracking}(
             G,
             input.system,
