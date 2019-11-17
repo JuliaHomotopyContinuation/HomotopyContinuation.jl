@@ -67,7 +67,7 @@ Scale a composition by λ.
 """
 scale(C::Composition, λ) = Composition([[C.polys[1] .* λ]; C.polys[2:end]])
 
-function subs_into_composition(C::Composition, args...)
+function MP.subs(C::Composition, args...)
     p = map(pᵢ -> MP.subs(pᵢ, args...), C.polys[end])
     Composition([C.polys[1:end-1]; [p]])
 end
@@ -937,7 +937,7 @@ Returns the scaled system and a vector of scaling factors of the variables.
 function precondition(f::Composition, variables = variables(f))
     vars, equations = preconditioning_factors(expand(f), variables)
     y = vars .* variables
-    scale(subs_into_composition(f, variables => y), equations), vars
+    scale(subs(f, variables => y), equations), vars
 end
 
 function precondition(f::MPPolys, variables = variables(f))

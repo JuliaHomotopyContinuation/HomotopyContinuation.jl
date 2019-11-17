@@ -16,12 +16,13 @@ import StaticPolynomials
 import TreeViews
 
 import MultivariatePolynomials: variables, nvariables
+using MultivariatePolynomials: subs, differentiate, monomials
 
 using Base: @propagate_inbounds
 using LinearAlgebra: cond
 using Parameters: @pack!, @unpack
 using DoubleFloats: Double64, ComplexDF64
-using DynamicPolynomials: @polyvar, subs, differentiate
+using DynamicPolynomials: @polyvar
 using ProjectiveVectors: PVector,
                          dims,
                          dimension_indices,
@@ -39,8 +40,8 @@ const FP = FixedPolynomials
 const MP = MultivariatePolynomials
 const SP = StaticPolynomials
 
-export variables, nvariables
-export @polyvar, subs, differentiate
+export @polyvar
+export variables, nvariables, subs, differentiate, monomials
 export mixed_volume
 export cond
 export PVector,
@@ -58,7 +59,8 @@ import .ProgressMeter
 
 include("model_kit.jl")
 import .ModelKit
-export ModelKit
+using .ModelKit: @var, @unique_var, System, Homotopy, compile, interpreted
+export ModelKit, @var, @unique_var, System, Homotopy, compile, interpreted
 
 include("norms.jl")
 include("utilities.jl")
