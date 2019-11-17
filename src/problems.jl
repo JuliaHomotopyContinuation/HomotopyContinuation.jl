@@ -644,15 +644,51 @@ function problem_startsolutions(
 end
 
 function problem_startsolutions(
+    input::TargetSystemInput{<:ModelKit.System},
+    ::Nothing,
+    hominfo::Union{Nothing,HomogenizationInformation},
+    seed;
+    start_system = :total_degree,
+    variable_ordering = nothing,
+    kwargs...,
+)
+    if start_system == :polyhedral
+        vars = polyvar.(input.system.variables)
+        F = evaluate(input.system.expressions, input.system.variables => vars)
+        problem_startsolutions(
+            TargetSystemInput(F),
+            nothing,
+            hominfo,
+            seed;
+            start_system = :polyhedral,
+            variable_ordering = vars,
+            kwargs...
+        )
+    else
+        problem_startsolutions(
+            TargetSystemInput(ModelKitSystem(input.system)),
+            nothing,
+            hominfo,
+            seed;
+            start_system = :total_degree,
+            variable_ordering = variable_ordering,
+            kwargs...
+        )
+    end
+end
+
+function problem_startsolutions(
     input::TargetSystemInput{<:AbstractSystem},
     ::Nothing,
     hominfo::Union{Nothing,HomogenizationInformation},
     seed;
+    start_system = :total_degree,
     system = DEFAULT_SYSTEM,
     system_scaling = nothing,
     variable_ordering = nothing,
     kwargs...,
 )
+    start_system == :total_degree || throw(ArgumentError("`start_system = :total_degree` is the only possibility with `AbstractSystem`s."))
     n, N = size(input.system)
 
     degrees, is_homogeneous = degrees_ishomogeneous(input.system)

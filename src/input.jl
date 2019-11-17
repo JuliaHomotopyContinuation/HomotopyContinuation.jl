@@ -4,7 +4,7 @@ export AbstractInput,
        HomotopyInput,
        ParameterSystemInput
 
-const Inputs = Union{<:AbstractSystem,<:MPPolys,<:Composition}
+const Inputs = Union{<:AbstractSystem,<:MPPolys,<:Composition, <:ModelKit.System}
 const MPPolyInputs = Union{<:MPPolys,<:Composition}
 
 const input_supported_keywords = [
@@ -137,13 +137,16 @@ function input_startsolutions(F::AbstractSystem; variable_ordering = nothing)
 end
 function input_startsolutions(
     F::Vector{<:ModelKit.Expression};
-    variable_ordering::Vector{ModelKit.Variable} = error("`variable_ordering = ...` needs to be passed as a keyword argument."),
+    variable_ordering::Union{Nothing,Vector{ModelKit.Variable}} = nothing,
 )
+    if variable_ordering === nothing
+        throw(ArgumentError("`variable_ordering = ...` needs to be passed as a keyword argument to indicate the order of the variables."))
+    end
     input_startsolutions(ModelKit.System(F, variable_ordering))
 end
 
 function input_startsolutions(F::ModelKit.System; variable_ordering = nothing)
-    (input = TargetSystemInput(ModelKitSystem(F)), startsolutions = nothing)
+    (input = TargetSystemInput(F), startsolutions = nothing)
 end
 
 function input_startsolutions(
