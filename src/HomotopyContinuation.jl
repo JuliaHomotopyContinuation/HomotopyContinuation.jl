@@ -53,6 +53,10 @@ export PVector,
 include("progress_meter.jl")
 import .ProgressMeter
 
+include("model_kit.jl")
+import .ModelKit
+export ModelKit
+
 include("norms.jl")
 include("utilities.jl")
 include("linear_algebra.jl")

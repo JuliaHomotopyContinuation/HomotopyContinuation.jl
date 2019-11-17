@@ -1,6 +1,8 @@
 using Test, LinearAlgebra, Random
 using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
+import FiniteDifferences
+const FD = FiniteDifferences
 
 import PolynomialTestSystems: cyclic,
                               cyclooctane,
@@ -26,6 +28,7 @@ end
 
 # We order the tests such that isolated things are tested first
 @testset "HomotopyContinuation" begin
+    include("model_kit_test.jl")
     include("utilities_test.jl")
     include("norms_test.jl")
     include("linear_algebra_test.jl")
