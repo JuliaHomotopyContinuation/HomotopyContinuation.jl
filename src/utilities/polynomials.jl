@@ -10,7 +10,7 @@ export is_homogeneous,
        linear_system
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
-const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
+const MPPolys = Vector{<:MP.AbstractPolynomialLike}
 const WeightedVariable = Tuple{<:MP.AbstractVariable,Int}
 
 ##############
@@ -1074,4 +1074,17 @@ function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = MP.variabl
         end
     end
     A, b
+end
+
+
+################
+## ModelKit ##
+################
+
+polyvar(v::ModelKit.Variable) = DynamicPolynomials.PolyVar{true}(string(v.name))
+function maxdegrees(F::ModelKit.System)
+    vars = polyvar.(F.variables)
+    params = polyvar.(F.parameters)
+    P = evaluate(F.expressions, F.variables => vars, F.parameters => params)
+    maxdegrees(P; parameters = params)
 end

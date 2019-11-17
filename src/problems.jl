@@ -16,7 +16,6 @@ const problem_startsolutions_supported_keywords = [
      :homvar,
      :homvars,
      :variable_groups,
-     :variable_ordering,
      :homotopy,
      :system,
      :system_scaling,
