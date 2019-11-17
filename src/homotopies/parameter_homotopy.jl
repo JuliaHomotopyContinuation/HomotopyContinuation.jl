@@ -2,7 +2,7 @@ export ParameterHomotopy, nparameters, set_parameters!
 
 """
     ParameterHomotopy(F, parameters;
-        variables=setdiff(MP.variables(F), parameters),
+        variables=setdiff(variables(F), parameters),
         p₁=randn(ComplexF64, length(parameters)),
         p₀=randn(ComplexF64, length(parameters)),
         γ₁=nothing, γ₀=nothing)
@@ -21,7 +21,7 @@ Note that `p₁` and `p₀` are stored as a tuple `p` of `SVectors` and `γ₁` 
 are stored as a tuple `γ` or as `γ=nothing`
 
     ParameterHomotopy(F, parameters;
-        variables=setdiff(MP.variables(F), parameters),
+        variables=setdiff(variables(F), parameters),
         start_parameters=randn(ComplexF64, length(parameters)),
         target_parameters=randn(ComplexF64, length(parameters)),
         start_gamma=nothing, target_gamma=nothing)
@@ -69,13 +69,13 @@ function ParameterHomotopy(
 end
 
 function ParameterHomotopy(
-    F::Vector{T},
-    parameters::AbstractVector{V};
-    variables = setdiff(MP.variables(F), parameters),
+    F::Vector{<:MP.AbstractPolynomialLike},
+    parameters::AbstractVector{<:MP.AbstractVariable};
+    variables = variables(F, parameters),
     start_parameters = randn(ComplexF64, length(parameters)),
     target_parameters = randn(ComplexF64, length(parameters)),
     kwargs...,
-) where {T<:MP.AbstractPolynomialLike,V<:MP.AbstractVariable}
+)
     G = SPSystem(F; variables = variables, parameters = parameters)
     ParameterHomotopy(
         G;

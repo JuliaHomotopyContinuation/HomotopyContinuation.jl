@@ -15,6 +15,8 @@ import StaticArrays
 import StaticPolynomials
 import TreeViews
 
+import MultivariatePolynomials: variables, nvariables
+
 using Base: @propagate_inbounds
 using LinearAlgebra: cond
 using Parameters: @pack!, @unpack
@@ -37,6 +39,7 @@ const FP = FixedPolynomials
 const MP = MultivariatePolynomials
 const SP = StaticPolynomials
 
+export variables, nvariables
 export @polyvar, subs, differentiate
 export mixed_volume
 export cond

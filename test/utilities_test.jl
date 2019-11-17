@@ -503,8 +503,8 @@
         @test validate(f ∘ g, parameters = [c]) == false
         @test validate(g ∘ f) == false
 
-        @test HC.nvariables(f ∘ g) == 3
-        @test HC.nvariables(f ∘ g, parameters = [z]) == 2
+        @test nvariables(f ∘ g) == 3
+        @test nvariables(f ∘ g, [z]) == 2
 
         @polyvar x y z
         @test is_homogeneous([x^2 + y^2 + x * y, x^5])

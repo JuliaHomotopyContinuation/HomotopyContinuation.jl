@@ -110,7 +110,7 @@ function input_startsolutions(
     # input constructor for a parameter homotopy, but no startsolutions
     # are provided
     if parameters !== nothing
-        startsolutions = [randn(ComplexF64, nvariables(F, parameters = parameters))]
+        startsolutions = [randn(ComplexF64, nvariables(F, parameters))]
         return input_startsolutions(
             F,
             startsolutions;
@@ -233,13 +233,13 @@ function parameter_homotopy(
         error("Number of parameters doesn't match!")
     end
     if startsolutions === nothing && parameters !== nothing
-        startsolutions = [randn(ComplexF64, nvariables(F, parameters = parameters))]
+        startsolutions = [randn(ComplexF64, nvariables(F, parameters))]
     elseif isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
 
     if variable_ordering !== nothing &&
-       nvariables(F; parameters = parameters) != length(variable_ordering)
+       nvariables(F, parameters) != length(variable_ordering)
         throw(ArgumentError("Number of assigned variables is too small."))
     end
 

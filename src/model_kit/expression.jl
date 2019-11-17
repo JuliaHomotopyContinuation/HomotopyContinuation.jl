@@ -656,13 +656,13 @@ function Base.show(io::IO, F::System)
             print(io, "\n parameters: ", join(name.(F.parameters), ", "))
         end
         print(io, "\n\n")
-        for i in 1:length(F)
+        for i = 1:length(F)
             print(io, " ", F.expressions[i])
             i < length(F) && print(io, "\n")
         end
     else
         print(io, "[")
-        for i in 1:length(F)
+        for i = 1:length(F)
             print(io, F.expressions[i])
             i < length(F) && print(io, ", ")
         end
@@ -766,13 +766,13 @@ function Base.show(io::IO, H::Homotopy)
             print(io, "\n parameters: ", join(name.(H.parameters), ", "))
         end
         print(io, "\n\n")
-        for i in 1:length(H)
+        for i = 1:length(H)
             print(io, " ", H.expressions[i])
             i < length(H) && print(io, "\n")
         end
     else
         print(io, "[")
-        for i in 1:length(H)
+        for i = 1:length(H)
             print(io, H.expressions[i])
             i < length(H) && print(io, ", ")
         end

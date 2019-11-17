@@ -358,7 +358,8 @@ function problem_startsolutions(
 )
     Random.seed!(seed)
     supported, rest = splitkwargs(kwargs, input_supported_keywords)
-    input, startsolutions = input_startsolutions(
+    input,
+    startsolutions = input_startsolutions(
         args...;
         variable_ordering = variable_ordering,
         supported...,
@@ -541,7 +542,7 @@ function problem_startsolutions(
         g = TotalDegreeSystem(degrees[1:n]; affine = affine_tracking)
 
         if classifcation == :overdetermined
-            A = randn(ComplexF64, n, npolynomials(f) - n)
+            A = randn(ComplexF64, n, length(f) - n)
             f̄ = target_constructor(f)
             problem = OverdeterminedProblem(
                 Problem(

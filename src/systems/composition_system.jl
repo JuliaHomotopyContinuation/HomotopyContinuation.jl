@@ -51,7 +51,7 @@ function CompositionSystem(
     homvars = nothing,
 )
 
-    vars = variables(g; parameters = parameters)
+    vars = variables(g, parameters)
     homvars_to_end!(vars, homvars)
     G = system_constructor(g, variables = vars, parameters = parameters)
 

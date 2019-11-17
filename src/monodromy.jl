@@ -688,7 +688,7 @@ function find_start_pair(F::MPPolys, parameters; variable_ordering = nothing)
     if variable_ordering !== nothing
         vars = variable_ordering
     else
-        vars = variables(F; parameters = parameters)
+        vars = variables(F, parameters)
     end
     x₀ = randn(ComplexF64, length(vars))
     if F isa Composition
@@ -735,7 +735,7 @@ function default_strategy(
     is_real_system = false,
 ) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
-    vars = variables(F; parameters = parameters)
+    vars = variables(F, parameters)
     if all(d -> d ≤ 1, maxdegrees(F; parameters = vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant

@@ -230,7 +230,7 @@ compile(H::Homotopy) = Compiled(H)
 
 interpreted(C::Compiled) = C.obj
 
-function Base.show(io::IO, C::Compiled{T}) where T
+function Base.show(io::IO, C::Compiled{T}) where {T}
     println(io, "Compiled{", T, "}:")
     show(io, C.obj)
 end
@@ -509,6 +509,11 @@ end
     _jacobian_and_dt!_impl(T)
 end
 
-function jacobian_and_dt(H::CompiledHomotopy{T}, x::AbstractVector, t, p = nothing) where {T}
+function jacobian_and_dt(
+    H::CompiledHomotopy{T},
+    x::AbstractVector,
+    t,
+    p = nothing,
+) where {T}
     dt(H, x, t, p), jacobian(H, x, t, p)
 end

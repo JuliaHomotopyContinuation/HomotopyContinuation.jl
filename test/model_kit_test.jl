@@ -82,10 +82,7 @@
          (a * c * -z) / (x + y)"""
 
         F = ModelKit.compile(f)
-        @test startswith(
-            sprint(show, F),
-            "Compiled{TSystem{3,3,3,#",
-        )
+        @test startswith(sprint(show, F), "Compiled{TSystem{3,3,3,#")
 
         @test size(F) == (3, 3)
         @test length(F) == 3
@@ -202,10 +199,7 @@
          (4 * x ^ 2 * z ^ 2 * a * b * y + c * 4 * z) - 6 * x * y * z ^ 2"""
 
         H = ModelKit.compile(h)
-        @test startswith(
-            sprint(show, H),
-            "Compiled{THomotopy{2,3,3,#",
-        )
+        @test startswith(sprint(show, H), "Compiled{THomotopy{2,3,3,#")
 
         @test size(H) == (2, 3)
         @test size(H, 1) == 2
