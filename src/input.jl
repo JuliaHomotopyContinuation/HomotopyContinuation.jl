@@ -18,6 +18,7 @@ const input_supported_keywords = [
     :p₀,
     :γ₁,
     :γ₀,
+    :variable_ordering,
     # deprecated
     :startparameters,
     :targetparameters,
@@ -101,7 +102,7 @@ Returns a named tuple `(input=..., startsolutions=...)`.
 """
 function input_startsolutions(
     F::MPPolyInputs;
-    variables = nothing,
+    variable_ordering = nothing,
     parameters = nothing,
     kwargs...,
 )
@@ -113,13 +114,13 @@ function input_startsolutions(
         return input_startsolutions(
             F,
             startsolutions;
-            variables = variables,
+            variable_ordering = variable_ordering,
             parameters = parameters,
             kwargs...,
         )
     end
 
-    if variables !== nothing && nvariables(F) != length(variables)
+    if variable_ordering !== nothing && nvariables(F) != length(variable_ordering)
         throw(ArgumentError("Number of assigned variables is too small."))
     end
 
@@ -131,21 +132,31 @@ function input_startsolutions(
     (input = TargetSystemInput(F), startsolutions = nothing)
 end
 
-function input_startsolutions(F::AbstractSystem; variables = nothing)
+function input_startsolutions(F::AbstractSystem; variable_ordering = nothing)
     (input = TargetSystemInput(F), startsolutions = nothing)
+end
+function input_startsolutions(
+    F::Vector{<:ModelKit.Expression};
+    variable_ordering::Vector{ModelKit.Variable} = error("`variable_ordering = ...` needs to be passed as a keyword argument."),
+)
+    input_startsolutions(ModelKit.System(F, variable_ordering))
+end
+
+function input_startsolutions(F::ModelKit.System; variable_ordering = nothing)
+    (input = TargetSystemInput(ModelKitSystem(F)), startsolutions = nothing)
 end
 
 function input_startsolutions(
     G::MPPolyInputs,
     F::MPPolyInputs,
     startsolutions = nothing;
-    variables = nothing,
+    variable_ordering = nothing,
 )
     if length(G) ≠ length(F)
         throw(ArgumentError("Start and target system don't have the same length"))
     end
-    if variables !== nothing && (
-        nvariables(F) != length(variables) || nvariables(G) != length(variables)
+    if variable_ordering !== nothing && (
+    	nvariables(F) != length(variable_ordering) || nvariables(G) != length(variable_ordering)
     )
         throw(ArgumentError("Number of assigned variables is too small."))
     end
@@ -163,15 +174,15 @@ end
 # need
 input_startsolutions(F::MPPolyInputs, starts; kwargs...) =
     parameter_homotopy(F, starts; kwargs...)
-input_startsolutions(F::AbstractSystem, starts; variables = nothing, kwargs...) =
+input_startsolutions(F::AbstractSystem, starts; variable_ordering = nothing, kwargs...) =
     parameter_homotopy(F, starts; kwargs...)
 
 function parameter_homotopy(
     F::Inputs,
     startsolutions;
-    variables = nothing,
+    variable_ordering = nothing,
     parameters = (
-        isa(F, AbstractSystem) ? nothing :
+    	isa(F, AbstractSystem) ? nothing :
         error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))
     ),
     generic_parameters = nothing,
@@ -227,7 +238,8 @@ function parameter_homotopy(
         startsolutions = [startsolutions]
     end
 
-    if variables !== nothing && nvariables(F; parameters = parameters) != length(variables)
+    if variable_ordering !== nothing &&
+       nvariables(F; parameters = parameters) != length(variable_ordering)
         throw(ArgumentError("Number of assigned variables is too small."))
     end
 
@@ -237,7 +249,11 @@ function parameter_homotopy(
     )
 end
 
-function input_startsolutions(H::AbstractHomotopy, startsolutions; variables = nothing)
+function input_startsolutions(
+    H::AbstractHomotopy,
+    startsolutions;
+    variable_ordering = nothing,
+)
     if isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
