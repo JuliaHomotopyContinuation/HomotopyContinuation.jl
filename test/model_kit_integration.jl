@@ -38,22 +38,34 @@
     @testset "parameter homotopy" begin
         @var x y z a b
 
-        f = System([x^2 - a, y^2 - b], [x, y, z], [a, b])
+        f = System([x^2 - a, y^2 - b], [x, y], [a, b])
         res = solve(
             f,
             [[1, -1], [1, 1], [-1, 1], [-1, -1]];
             start_parameters = [1, 1],
             target_parameters = [3, 4],
         )
-        @test nonsingular(res) == 4
+        @test nnonsingular(res) == 4
 
         f = System([x^2 - z^2 * a, y^2 - z^2 * b], [x, y, z], [a, b])
         res = solve(
             f,
             [[1, -1], [1, 1], [-1, 1], [-1, -1]];
             start_parameters = [1, 1],
-            target_parameters = [3, 4],
+            target_parameters = [3,  4],
         )
-        @test nonsingular(res) == 4
+        @test nnonsingular(res) == 4
+
+
+        f = System([x^2 - a, y^2 - b], [x, y], [a, b])
+        res = solve(
+            f,
+            [[1, -1], [1, 1], [-1, 1], [-1, -1]];
+            start_parameters = [1, 1],
+            target_parameters = [3, 4],
+            γ₁ = cis(2.132im),
+            γ₀ = cis(0.412im)
+        )
+        @test nnonsingular(res) == 4
     end
 end

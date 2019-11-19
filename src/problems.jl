@@ -902,15 +902,13 @@ function problem_startsolutions(
     n, N = size(input.system)
 
     # construct parameter homotopy
-    # TODO: Doesn't work with γ
+    has_gamma = input.γ₁ !== nothing && input.γ₀ !== nothing
+    params = ComplexF64[input.p₁; input.p₀]
+    has_gamma && push!(params, input.γ₁, input.γ₀)
     H = ModelKitHomotopy(
-        build_parameter_homotopy(input.system);
-        parameters = [input.p₁; input.p₀],
+        build_parameter_homotopy(input.system; gamma = has_gamma);
+        parameters = params
     )
-    if input.γ₁ !== nothing || input.γ₂ !== nothing
-        error("Not supported")
-    end
-
     variable_groups = VariableGroups(N, hominfo)
     if affine_tracking === nothing
         affine_tracking = default_affine_tracking(H, hominfo)
@@ -928,12 +926,23 @@ function problem_startsolutions(
     startsolutions
 end
 
-function build_parameter_homotopy(F::ModelKit.System)
+function build_parameter_homotopy(F::ModelKit.System; gamma = false)
     p = F.parameters
-    @var __start_params__[1:length(p)] __target_params__[1:length(p)] __t__
-    h = subs(
-        F.expressions,
-        p => __t__ .* __start_params__ .+ (1 - __t__) .* __target_params__,
-    )
-    Homotopy(h, F.variables, __t__, [__start_params__; __target_params__])
+    if gamma
+        @var __start_params__[1:length(p)] __target_params__[1:length(p)] __t__ __γ__[1:2]
+        a = __γ__[1] * __t__
+        b = (1 - __t__) * __γ__[2]
+        h = subs(
+            F.expressions,
+            p => (a .* __start_params__ .+ b .* __target_params__) ./ (a + b),
+        )
+        Homotopy(h, F.variables, __t__, [__start_params__; __target_params__; __γ__])
+    else
+        @var __start_params__[1:length(p)] __target_params__[1:length(p)] __t__
+        h = subs(
+            F.expressions,
+            p => __t__ .* __start_params__ .+ (1 - __t__) .* __target_params__,
+        )
+        Homotopy(h, F.variables, __t__, [__start_params__; __target_params__])
+    end
 end
