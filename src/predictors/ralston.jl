@@ -15,7 +15,7 @@ struct RalstonCache{T} <: AbstractPredictorCache
 end
 
 function cache(::Ralston, H, x, ẋ, t)
-    RalstonCache(dt(H, x, t), copy(ẋ), copy(ẋ))
+    RalstonCache(promote(dt(H, x, t), copy(ẋ), copy(ẋ))...)
 end
 #
 function predict!(
