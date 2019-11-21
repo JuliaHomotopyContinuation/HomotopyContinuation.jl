@@ -24,12 +24,6 @@
         iter = HC.PolyhedralStartSolutionsIterator(f)
         @test length(iter) == 12636
         @test length(collect(iter)) == 12636
-
-        # Catch overflow in mixed_volume
-        f = equations(PolynomialTestSystems.cyclooctane())
-        F = [f; randn(2, 18) * [HC.variables(f); 1]]
-        iter = HC.PolyhedralStartSolutionsIterator(F)
-        @test_throws OverflowError length(iter)
     end
 
     @testset "Tracking" begin
