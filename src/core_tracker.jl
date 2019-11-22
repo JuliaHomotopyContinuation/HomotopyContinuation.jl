@@ -233,8 +233,7 @@ mutable struct CoreTrackerOptions
     from_infinity::Bool
 end
 
-function CoreTrackerOptions(
-    ;
+function CoreTrackerOptions(;
     # internal
     parameter_homotopy = false,
     update_patch = true,
@@ -259,9 +258,7 @@ function CoreTrackerOptions(
     refinement_accuracy = nothing,
 )
 
-    max_lost_digits !== nothing && @warn(
-        "Passing `max_lost_digits` to `CoreTracker` is deprecated.",
-    )
+    max_lost_digits !== nothing && @warn( "Passing `max_lost_digits` to `CoreTracker` is deprecated.",)
     refinement_accuracy !== nothing && @warn(
         "Passing `refinement_accuracy` to `CoreTracker` is deprecated. " *
         "Solutions are now automatically refined to the maximal achievable accuracy.",
@@ -299,8 +296,10 @@ function make_precision(p::Symbol)
     elseif p == :adaptive
         PRECISION_ADAPTIVE
     else
-        throw(ArgumentError("Unsupported argument `precision=$p`. " *
-                            "Possible values are `:double`, `:double_double` and `:adaptive`."))
+        throw(ArgumentError(
+            "Unsupported argument `precision=$p`. " *
+            "Possible values are `:double`, `:double_double` and `:adaptive`.",
+        ))
     end
 end
 
@@ -398,7 +397,11 @@ function CoreTrackerState(
     s = 0.0
     Δs = convert(
         Float64,
-        min(unpack(options.initial_step_size, Inf), length(segment), options.max_step_size),
+        min(
+            unpack(options.initial_step_size, Inf),
+            length(segment),
+            options.max_step_size,
+        ),
     )
     Δs_prev = 0.0
     norm_Δx₀ = accuracy = 0.0
@@ -582,8 +585,7 @@ function CoreTracker(
 
     patch === nothing || throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
 
-    options = CoreTrackerOptions(
-        ;
+    options = CoreTrackerOptions(;
         parameter_homotopy = isa(homotopy, ParameterHomotopy),
         kwargs...,
     )
@@ -593,15 +595,8 @@ function CoreTracker(
 
     used_norm = auto_scaling ? WeightedNorm(norm, x₁) : norm
     # We have to make sure that the element type of x is invariant under evaluation
-    state = CoreTrackerState(
-        H,
-        indempotent_x(H, x₁, t₁),
-        t₁,
-        t₀,
-        options,
-        nothing,
-        used_norm,
-    )
+    state =
+        CoreTrackerState(H, indempotent_x(H, x₁, t₁), t₁, t₀, options, nothing, used_norm)
 
     pred_cache = cache(predictor, H, state.x, state.ẋ, t₁)
     corr_cache = cache(corrector, H, state.x, t₁)
@@ -627,8 +622,7 @@ function CoreTracker(
     kwargs...,
 )
 
-    options = CoreTrackerOptions(
-        ;
+    options = CoreTrackerOptions(;
         parameter_homotopy = isa(homotopy, ParameterHomotopy),
         kwargs...,
     )
@@ -734,11 +728,8 @@ end
 
 )
     if tracker.options.precision == PRECISION_ADAPTIVE
-        double_64_evaluation = at_limit_accuracy(
-            tracker.state,
-            tracker.options;
-            safety_factor = 100.0,
-        )
+        double_64_evaluation =
+            at_limit_accuracy(tracker.state, tracker.options; safety_factor = 100.0)
     else
         double_64_evaluation = tracker.options.precision == PRECISION_FIXED_128
     end
@@ -796,11 +787,9 @@ function limit_accuracy!(
 end
 
 function terminate_limit_accuracy(state, options)
-    (options.precision == PRECISION_FIXED_64) && at_limit_accuracy(
-        state,
-        options;
-        safety_factor = 10.0,
-    )
+    (
+     options.precision == PRECISION_FIXED_64
+    ) && at_limit_accuracy(state, options; safety_factor = 10.0)
 end
 function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 10.0)
     opts.accuracy < safety_factor * state.limit_accuracy
@@ -1118,7 +1107,11 @@ end
 function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, options::CTO)
     if options.initial_step_size !== nothing
         return state.Δs = max(
-            min(options.initial_step_size, length(state.segment), options.max_step_size),
+            min(
+                options.initial_step_size,
+                length(state.segment),
+                options.max_step_size,
+            ),
             sqrt(options.min_step_size),
         )
     end
@@ -1132,10 +1125,8 @@ function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, optio
         Δs = 0.05 * length(state.segment)
     end
 
-    state.Δs = max(
-        min(Δs, length(state.segment), options.max_step_size),
-        options.min_step_size,
-    )
+    state.Δs =
+        max(min(Δs, length(state.segment), options.max_step_size), options.min_step_size)
 end
 
 ## Step size update
@@ -1157,8 +1148,9 @@ function update_stepsize!(tracker::CT, result::NewtonCorrectorResult)
     # the accuracy limit. The motivation is that we can run into danger that the computed
     # estimate of ω is too high due to hitting limit accuracy.
     near_accuracy_limit = at_limit_accuracy(state, options; safety_factor = 100.0)
-    if options.simple_step_size_alg ||
-       (near_accuracy_limit && options.precision == PRECISION_FIXED_64)
+    if options.simple_step_size_alg || (
+        near_accuracy_limit && options.precision == PRECISION_FIXED_64
+    )
         Δs = simple_step_size_alg!(state, options, result)
     else
         Δs = adaptive_step_size_alg!(state, options, result, order(tracker.predictor))
@@ -1429,9 +1421,7 @@ end
 Set the current refinement accuracy to `accuracy`.
 """
 function set_refinement_accuracy!(T::CT, accuracy)
-    @warn(
-        "`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.",
-    )
+    @warn( "`set_refinement_accuracy!` is deprecated. Solutions are now automatically refined to maximal achievable accuracy.",)
 end
 
 """
@@ -1440,9 +1430,7 @@ end
 Current refinement max_steps.
 """
 function max_refinement_iters(T::CT)
-    @warn(
-        "`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
-    )
+    @warn( "`max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",)
     T.options.max_corrector_iters
 end
 
@@ -1452,9 +1440,7 @@ end
 Set the current refinement max_steps to `n`.
 """
 function set_max_refinement_iters!(T::CT, n)
-    @warn(
-        "`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",
-    )
+    @warn( "`set_max_refinement_iters` is deprecated. Solutions are now automatically refined to the maximal achievable accuracy.",)
 end
 
 

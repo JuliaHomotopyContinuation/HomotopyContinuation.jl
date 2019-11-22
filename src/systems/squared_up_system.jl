@@ -88,8 +88,10 @@ function jacobian!(U, F::SquaredUpSystem, x::PVector{<:Number,1}, c::SquaredUpSy
         if c.degree_diffs[i, k] == 1
             U[i, n+1] += F.A[i, k] * c.u[n+k]
         elseif c.degree_diffs[i, k] > 1
-            U[i, n+1] += c.degree_diffs[i, k] * F.A[i, k] * c.u[n+k] *
-                         x[n+1]^(c.degree_diffs[i, k] - 1)
+            U[i, n+1] += c.degree_diffs[i, k] *
+                F.A[i, k] *
+                c.u[n+k] *
+                x[n+1]^(c.degree_diffs[i, k] - 1)
         end
     end
     U
@@ -145,8 +147,10 @@ function evaluate_and_jacobian!(
         if c.degree_diffs[i, k] == 1
             U[i, n+1] += F.A[i, k] * c.u[n+k]
         elseif c.degree_diffs[i, k] > 1
-            U[i, n+1] += c.degree_diffs[i, k] * F.A[i, k] * c.u[n+k] *
-                         x[n+1]^(c.degree_diffs[i, k] - 1)
+            U[i, n+1] += c.degree_diffs[i, k] *
+                F.A[i, k] *
+                c.u[n+k] *
+                x[n+1]^(c.degree_diffs[i, k] - 1)
         end
     end
 

@@ -66,7 +66,9 @@
         data = HC.UniquePoints(X)
 
         test_show_juno(data)
-        @test string(data) == "UniquePoints{Array{Complex{Float64},1},Float64,typeof(euclidean_distance),Nothing} with 2000 points"
+        @test string(
+            data,
+        ) == "UniquePoints{Array{Complex{Float64},1},Float64,typeof(euclidean_distance),Nothing} with 2000 points"
 
         @test length(data) == 2_000
 
@@ -482,14 +484,18 @@
         e = [p + 1]
         f = [a * b * c]
         g = [x + y, y + z, x + z]
-        @test expand(f ∘ g) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 +
-                                y^2 * z + y * z^2]
-        @test expand(e ∘ f ∘ g) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 +
-                                    y^2 * z + y * z^2 + 1]
-        @test expand(e ∘ (f ∘ g)) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z +
-                                      x * z^2 + y^2 * z + y * z^2 + 1]
-        @test expand((e ∘ f) ∘ g) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z +
-                                      x * z^2 + y^2 * z + y * z^2 + 1]
+        @test expand(
+            f ∘ g,
+        ) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 + y^2 * z + y * z^2]
+        @test expand(
+            e ∘ f ∘ g,
+        ) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 + y^2 * z + y * z^2 + 1]
+        @test expand(
+            e ∘ (f ∘ g),
+        ) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 + y^2 * z + y * z^2 + 1]
+        @test expand(
+            (e ∘ f) ∘ g,
+        ) == [x^2 * y + x^2 * z + x * y^2 + 2 * x * y * z + x * z^2 + y^2 * z + y * z^2 + 1]
         @test e ∘ f == e ∘ f
 
         @test validate(f ∘ g) == true

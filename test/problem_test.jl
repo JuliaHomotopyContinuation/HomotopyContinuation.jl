@@ -4,10 +4,8 @@
         G = equations(cyclic(6))
 
         P1 = StartTargetInput(G, F)
-        (PP1, start1) = problem_startsolutions(
-            P1,
-            [rand(ComplexF64, 6), rand(ComplexF64, 6)],
-        )
+        (PP1, start1) =
+            problem_startsolutions(P1, [rand(ComplexF64, 6), rand(ComplexF64, 6)])
         @test PP1 isa Problem{AffineTracking}
         @test length(start1) == 2
 
@@ -33,14 +31,20 @@
         )
 
         P, _ = problem_startsolutions(
-            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^4], [x^3 + z^3, y^3 - z^3]),
+            StartTargetInput(
+                [x^2 + y^2 + z^2, x^4 + y^4 + z^4],
+                [x^3 + z^3, y^3 - z^3],
+            ),
             [rand(ComplexF64, 3)],
         )
         @test P isa Problem{ProjectiveTracking}
         @test homvars(P) === nothing
 
         P, _ = problem_startsolutions(
-            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^2], [x^3 + z^3, y^3 - z^2]),
+            StartTargetInput(
+                [x^2 + y^2 + z^2, x^4 + y^4 + z^2],
+                [x^3 + z^3, y^3 - z^2],
+            ),
             [rand(ComplexF64, 3)],
         )
         @test P isa Problem{AffineTracking}
@@ -55,15 +59,18 @@
         )
 
         P, starts = problem_startsolutions(HC.input_startsolutions(
-            [x^2 + y^2 + 1, x^4 + y^4 + 1],
-            [x^3 + 1, y^3 - 1],
-            rand(ComplexF64, 3),
-        )...)
+                [x^2 + y^2 + 1, x^4 + y^4 + 1],
+                [x^3 + 1, y^3 - 1],
+                rand(ComplexF64, 3),
+            )...)
         @test P isa Problem{AffineTracking}
         @test length(starts) == 1
 
         P, _ = problem_startsolutions(
-            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^4], [x^3 + z^3, y^3 - z^3]),
+            StartTargetInput(
+                [x^2 + y^2 + z^2, x^4 + y^4 + z^4],
+                [x^3 + z^3, y^3 - z^3],
+            ),
             [rand(ComplexF64, 3)],
             homvar = z,
         )
@@ -109,7 +116,8 @@
             ## define the system of polynomials
             f = [z[i, :] ⋅ z[i, :] for i = 2:5]
             g = [z[i, :] ⋅ z[i+1, :] for i = 1:5]
-            h = sum(a[i] .* (z[i, :] × z[i+1, :]) for i = 1:3) +
+            h =
+                sum(a[i] .* (z[i, :] × z[i+1, :]) for i = 1:3) +
                 sum(a[i+4] .* z[i, :] for i = 2:5)
             F′ = [f .- 1; g .- cos.(α); h .- p]
             ## assign values to z₁ and z₆
@@ -133,12 +141,8 @@
 
     @testset "Overdetermined" begin
         @polyvar x y z
-        prob, starts = problem_startsolutions([
-            x - 2,
-            y^2 + 3 * z^2,
-            z^3 + x^3,
-            z + x^2 + 3,
-        ])
+        prob, starts =
+            problem_startsolutions([x - 2, y^2 + 3 * z^2, z^3 + x^3, z + x^2 + 3])
         @test prob isa HC.OverdeterminedProblem
         @test starts isa HC.TotalDegreeSolutionIterator
         @test starts.degrees == [3, 2, 2]
@@ -174,12 +178,8 @@
         @test starts isa HC.PolyhedralStartSolutionsIterator
 
         # Abstract Systems
-        prob, starts = problem_startsolutions(FPSystem([
-            x - 2z,
-            y^2 + 3 * z^2,
-            z^3 + x^3,
-            z + x,
-        ]))
+        prob, starts =
+            problem_startsolutions(FPSystem([x - 2z, y^2 + 3 * z^2, z^3 + x^3, z + x]))
         @test prob isa HC.OverdeterminedProblem{HC.ProjectiveTracking}
         @test starts isa HC.TotalDegreeSolutionIterator
         @test starts.degrees == [1, 2, 3]
@@ -201,8 +201,9 @@
         # constant term
         @test_throws ArgumentError problem_startsolutions([subs(x + 2, x => 2), y^2 + 3x])
         @polyvar u v
-        @test_throws ArgumentError problem_startsolutions([subs(x + 2, x => 2), y^2 + 3x] ∘
-                                                          [u, v])
+        @test_throws ArgumentError problem_startsolutions(
+            [subs(x + 2, x => 2), y^2 + 3x] ∘ [u, v],
+        )
         @test_throws ArgumentError problem_startsolutions([x - 2z, y^2 + 3z], homvar = z)
         # test numerical homogeneous check fails
         @polyvar x y z

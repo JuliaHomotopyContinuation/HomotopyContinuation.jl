@@ -174,11 +174,15 @@ function nresults(
     multiple_results = false,
 )
     count(R) do r
-        (!only_real || is_real(r, real_tol)) &&
-        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-        (!only_singular || is_singular(r, singular_tol)) &&
-        (!onlyfinite || isfinite(r) || is_projective(r)) &&
-        (multiple_results || !is_multiple_result(r, R))
+        (
+         !only_real || is_real(r, real_tol)
+        ) && (
+            !only_nonsingular || is_nonsingular(r, singular_tol)
+        ) && (
+            !only_singular || is_singular(r, singular_tol)
+        ) && (
+            !onlyfinite || isfinite(r) || is_projective(r)
+        ) && (multiple_results || !is_multiple_result(r, R))
     end
 end
 
@@ -389,12 +393,21 @@ function mapresults(
     onlyfinite = true,
     multiple_results = false,
 )
-    [f(r)
-        for r in R if (!only_real || is_real(r, real_tol)) &&
-                      (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-                      (!only_singular || is_singular(r, singular_tol)) &&
-                      (!onlyfinite || isfinite(r) || is_projective(r)) &&
-                      (multiple_results || !is_multiple_result(r, R))]
+    [
+     f(r)
+     for r in R if (!only_real || is_real(
+         r,
+         real_tol,
+     )) && (!only_nonsingular || is_nonsingular(
+         r,
+         singular_tol,
+     )) && (!only_singular || is_singular(
+         r,
+         singular_tol,
+     )) && (!onlyfinite || isfinite(r) || is_projective(
+         r,
+     )) && (multiple_results || !is_multiple_result(r, R))
+    ]
 end
 
 """
@@ -557,7 +570,8 @@ TreeViews.numberofnodes(::ProjectiveResult) = 7
 TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") = print(
     io,
     "<span class=\"syntax--support syntax--type syntax--julia\">" *
-    "Result{$(solution_type(x))}" * "</span>",
+    "Result{$(solution_type(x))}" *
+    "</span>",
 )
 
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")

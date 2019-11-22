@@ -165,8 +165,7 @@ mutable struct ProgressUnknown <: AbstractProgress
     clear_output_ijulia::Bool      # flush current display in IJulia possibly overwriting other printed things
 end
 
-function ProgressUnknown(
-    ;
+function ProgressUnknown(;
     dt::Real = 0.1,
     desc::AbstractString = "Progress: ",
     color::Symbol = :green,
@@ -223,7 +222,8 @@ function updateProgress!(
             percentage_complete = 100.0 * p.counter / p.n
             bar = barstring(p.barlen, percentage_complete, barglyphs = p.barglyphs)
             dur = durationstring(t - p.tfirst)
-            msg = @sprintf "%s%3u%%%s Time: %s" p.desc round(Int, percentage_complete) bar dur
+            msg =
+                @sprintf "%s%3u%%%s Time: %s" p.desc round(Int, percentage_complete) bar dur
             !flush_display(p) && print(p.output, "\n"^(p.offset + p.numprintedvalues))
             move_cursor_up_while_clearing_lines(
                 p.output,
@@ -235,10 +235,9 @@ function updateProgress!(
             if keep
                 println(p.output)
             else
-                !flush_display(p) && print(
-                    p.output,
-                    "\r\u1b[A"^(p.offset + p.numprintedvalues),
-                )
+                !flush_display(
+                    p,
+                ) && print(p.output, "\r\u1b[A"^(p.offset + p.numprintedvalues))
             end
             flush(p.output)
         end

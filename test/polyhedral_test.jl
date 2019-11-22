@@ -12,8 +12,9 @@
         @test all(starts) do (cell, x)
             all(1:length(cell.indices)) do i
                 a, b = cell.indices[i]
-                v_i = iter.start_coefficients[i][a] * prod(x .^ iter.support[i][:, a]) +
-                      iter.start_coefficients[i][b] * prod(x .^ iter.support[i][:, b])
+                v_i =
+                    iter.start_coefficients[i][a] * prod(x .^ iter.support[i][:, a]) +
+                    iter.start_coefficients[i][b] * prod(x .^ iter.support[i][:, b])
                 abs(v_i) < 1e-12
             end
         end
@@ -61,22 +62,16 @@
     @testset "All affine solutions" begin
         @polyvar x y
         f = [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y]
-        tracker, starts = pathtracker_startsolutions(
-            f,
-            start_system = :polyhedral,
-            only_torus = true,
-        )
+        tracker, starts =
+            pathtracker_startsolutions(f, start_system = :polyhedral, only_torus = true)
         S = collect(starts)
         HC.prepare!(tracker, starts)
         results = map(s -> track(tracker, s), S)
         @test count(is_success, results) == 3
         @test length(results) == 3
 
-        tracker, starts = pathtracker_startsolutions(
-            f,
-            start_system = :polyhedral,
-            only_torus = false,
-        )
+        tracker, starts =
+            pathtracker_startsolutions(f, start_system = :polyhedral, only_torus = false)
         S = collect(starts)
         HC.prepare!(tracker, starts)
         results = map(s -> track(tracker, s), S)
