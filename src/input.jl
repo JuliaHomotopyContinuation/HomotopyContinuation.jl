@@ -144,8 +144,9 @@ function input_startsolutions(
     if length(G) ≠ length(F)
         throw(ArgumentError("Start and target system don't have the same length"))
     end
-    if variables !== nothing &&
-       (nvariables(F) != length(variables) || nvariables(G) != length(variables))
+    if variables !== nothing && (
+        nvariables(F) != length(variables) || nvariables(G) != length(variables)
+    )
         throw(ArgumentError("Number of assigned variables is too small."))
     end
 
@@ -169,8 +170,10 @@ function parameter_homotopy(
     F::Inputs,
     startsolutions;
     variables = nothing,
-    parameters = (isa(F, AbstractSystem) ? nothing :
-                  error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))),
+    parameters = (
+        isa(F, AbstractSystem) ? nothing :
+        error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))
+    ),
     generic_parameters = nothing,
     start_parameters = generic_parameters,
     p₁ = start_parameters,
@@ -213,8 +216,9 @@ function parameter_homotopy(
         error("`target_parameters=` or `p₀=` need to be passed as a keyword argument.")
     end
 
-    if length(p₁) != length(p₀) ||
-       (parameters !== nothing && length(parameters) != length(p₀))
+    if length(p₁) != length(
+        p₀,
+    ) || (parameters !== nothing && length(parameters) != length(p₀))
         error("Number of parameters doesn't match!")
     end
     if startsolutions === nothing && parameters !== nothing

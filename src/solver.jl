@@ -545,8 +545,9 @@ function solve(
     transform_parameters = nothing,
     kwargs...,
 )
-    if target_parameters === nothing ||
-       (target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing)
+    if target_parameters === nothing || (
+        target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing
+    )
         solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
         if target_parameters !== nothing
             solver, start_solutions = solver_startsolutions(
@@ -883,13 +884,8 @@ end
 ManyParametersSolver(S::Solver) = ManyParametersSolver([S])
 
 
-const many_parameters_solve_supported_keywords = [
-    :transform_result,
-    :transform_parameters,
-    :flatten,
-    :path_jumping_check,
-    :threading,
-]
+const many_parameters_solve_supported_keywords =
+    [:transform_result, :transform_parameters, :flatten, :path_jumping_check, :threading]
 
 # dispatch for the many parameters case
 function solver(
@@ -899,8 +895,9 @@ function solver(
     transform_parameters = nothing,
     kwargs...,
 )
-    if target_parameters === nothing ||
-       (target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing)
+    if target_parameters === nothing || (
+        target_parameters isa AbstractVector{<:Number} && transform_parameters === nothing
+    )
         solve_kwargs, rest = splitkwargs(kwargs, solve_supported_keywords)
         if target_parameters !== nothing
             solver, _ = solver_startsolutions(

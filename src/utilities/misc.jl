@@ -65,9 +65,7 @@ macro deprecatekwarg(oldkw, newkw)
         if $(esc(oldkw)) !== nothing
             old = $(Expr(:quote, oldkw))
             new = $(Expr(:quote, newkw))
-            @warn(
-                "`$(old)=$($(esc(oldkw)))` is deprecated, use `$(new)=$($(esc(oldkw)))` instead.",
-            )
+            @warn( "`$(old)=$($(esc(oldkw)))` is deprecated, use `$(new)=$($(esc(oldkw)))` instead.",)
             $(esc(newkw)) = $(esc(oldkw))
         end
     end

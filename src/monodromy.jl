@@ -545,13 +545,8 @@ function MonodromySolver(
         generic_parameters = p₀,
         supported...,
     )
-    tracker = CoreTracker(
-        prob,
-        x₀;
-        accuracy = accuracy,
-        precision = PRECISION_ADAPTIVE,
-        rest...,
-    )
+    tracker =
+        CoreTracker(prob, x₀; accuracy = accuracy, precision = PRECISION_ADAPTIVE, rest...)
     # Check whether homotopy is real
     is_real_system = numerically_check_real(tracker.homotopy, x₀)
     options = MonodromyOptions(is_real_system, accuracy, distance; optionskwargs...)
@@ -809,11 +804,8 @@ function monodromy_solve!(
         else
             desc = "Classes of solutions (modulo group action) found:"
         end
-        progress = ProgressMeter.ProgressUnknown(
-            desc;
-            delay = 0.5,
-            clear_output_ijulia = true,
-        )
+        progress =
+            ProgressMeter.ProgressUnknown(desc; delay = 0.5, clear_output_ijulia = true)
     else
         progress = nothing
     end
@@ -851,14 +843,8 @@ function monodromy_solve!(
     n = nsolutions(MS)
     retcode = :none
     while n < MS.options.target_solutions_count
-        retcode = empty_queue!(
-            queue,
-            thread_queues,
-            MS,
-            t₀,
-            progress;
-            threading = threading,
-        )
+        retcode =
+            empty_queue!(queue, thread_queues, MS, t₀, progress; threading = threading)
 
         if retcode == :done
             retcode = :success
@@ -1102,7 +1088,10 @@ function update_progress!(
 end
 
 function isdone(solutions::UniquePoints, x, options::MonodromyOptions)
-    options.done_callback(x, solutions.points) || length(solutions) ≥ options.target_solutions_count
+    options.done_callback(
+        x,
+        solutions.points,
+    ) || length(solutions) ≥ options.target_solutions_count
 end
 
 function regenerate_loop_and_schedule_jobs!(queue, MS::MonodromySolver)

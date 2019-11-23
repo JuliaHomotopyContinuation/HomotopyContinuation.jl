@@ -164,8 +164,10 @@
         @test system_cache isa AbstractSystemCache
 
         @test size(S) == (3, 3)
-        @test evaluate(S, w, system_cache) ≈ [LinearAlgebra.I A] * evaluate(F, w) atol = 1e-12
-        @test jacobian(S, w, system_cache) ≈ [LinearAlgebra.I A] * jacobian(F, w) atol = 1e-12
+        @test evaluate(S, w, system_cache) ≈ [LinearAlgebra.I A] * evaluate(F, w) atol =
+            1e-12
+        @test jacobian(S, w, system_cache) ≈ [LinearAlgebra.I A] * jacobian(F, w) atol =
+            1e-12
         u, U = evaluate_and_jacobian(S, w, system_cache)
         @test u ≈ evaluate(S, w)
         @test U ≈ jacobian(S, w)

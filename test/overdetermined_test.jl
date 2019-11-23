@@ -7,11 +7,8 @@
     @test count(r -> r.return_code == :excess_solution, track.(tracker, starts)) == 2
 
         # check that it also works with polyhedral homotopy
-    tracker, starts = pathtracker_startsolutions(
-        f;
-        seed = 213412,
-        start_system = :polyhedral,
-    )
+    tracker, starts =
+        pathtracker_startsolutions(f; seed = 213412, start_system = :polyhedral)
     HC.prepare!(tracker, starts)
     @test count(is_success, track.(tracker, starts)) == 3
 
@@ -29,7 +26,9 @@
          x[2] * x[3] * p[5] * p[6] - x[2] * p[5] * p[6] * p[10] - x[2] * x[3] * p[4] -
          x[2] * p[4] * p[10],
          -x[1] * x[2] * x[3] * p[8] * p[9] - x[1] * x[3] * p[7] * p[8] * p[9] +
-         x[2] * x[3] * p[5] * p[6] + x[2] * p[5] * p[6] * p[10] + x[2] * x[3] * p[4] +
+         x[2] * x[3] * p[5] * p[6] +
+         x[2] * p[5] * p[6] * p[10] +
+         x[2] * x[3] * p[4] +
          x[2] * p[4] * p[10],
          x[2] + x[3] - 1.0,
         ]

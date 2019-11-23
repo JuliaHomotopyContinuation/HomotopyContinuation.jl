@@ -50,8 +50,7 @@ struct WeightedNormOptions
     scale_abs_min::Float64
     scale_max::Float64
 end
-function WeightedNormOptions(
-    ;
+function WeightedNormOptions(;
     scale_min = 0.001,
     scale_abs_min = min(scale_min^2, 200 * sqrt(eps())),
     scale_max = 1.0 / eps() / sqrt(2),

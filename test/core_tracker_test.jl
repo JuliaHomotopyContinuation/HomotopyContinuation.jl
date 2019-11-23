@@ -123,11 +123,8 @@
         @test (@allocated track!(tracker, s, 1.0, 0.01)) == 0
 
         # log homotopy as well
-        log_tracker, log_start_sols = coretracker_startsolutions(
-            F;
-            seed = 12356,
-            log_homotopy = true,
-        )
+        log_tracker, log_start_sols =
+            coretracker_startsolutions(F; seed = 12356, log_homotopy = true)
         log_s = first(log_start_sols)
         @allocated track!(log_tracker, log_s, 0.0, -log(0.01))
         # The path tracker should not allocate after the first tracked path
@@ -278,7 +275,9 @@
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(
-            r -> is_success(r) || r.returncode == HC.CoreTrackerStatus.terminated_accuracy_limit,
+            r -> is_success(
+                r,
+            ) || r.returncode == HC.CoreTrackerStatus.terminated_accuracy_limit,
             results,
         )
 

@@ -49,8 +49,8 @@ function predict!(
 
     minus_ẋ!(mk₄, H, xnext, t + Δt, Jac, dt)
     @inbounds for i = 1:n
-        xnext[i] = x[i] -
-                   0.16666666666666666Δt * (mk₁[i] + 2 * mk₂[i] + 2 * mk₃[i] + mk₄[i])
+        xnext[i] =
+            x[i] - 0.16666666666666666Δt * (mk₁[i] + 2 * mk₂[i] + 2 * mk₃[i] + mk₄[i])
     end
 
     nothing

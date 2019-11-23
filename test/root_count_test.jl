@@ -44,7 +44,8 @@
             ## define the system of polynomials
             f = [z[i, :] ⋅ z[i, :] for i = 2:5]
             g = [z[i, :] ⋅ z[i+1, :] for i = 1:5]
-            h = sum(a[i] .* (z[i, :] × z[i+1, :]) for i = 1:3) +
+            h =
+                sum(a[i] .* (z[i, :] × z[i+1, :]) for i = 1:3) +
                 sum(a[i+4] .* z[i, :] for i = 2:5)
             F′ = [f .- 1; g .- cos.(α); h .- p]
             ## assign values to z₁ and z₆
@@ -94,8 +95,10 @@
                 x[2] * x[3] * p[5] * p[6] - x[2] * p[5] * p[6] * p[10] -
                 x[2] * x[3] * p[4] - x[2] * p[4] * p[10],
                 -x[1] * x[2] * x[3] * p[8] * p[9] - x[1] * x[3] * p[7] * p[8] * p[9] +
-                x[2] * x[3] * p[5] * p[6] + x[2] * p[5] * p[6] * p[10] +
-                x[2] * x[3] * p[4] + x[2] * p[4] * p[10],
+                x[2] * x[3] * p[5] * p[6] +
+                x[2] * p[5] * p[6] * p[10] +
+                x[2] * x[3] * p[4] +
+                x[2] * p[4] * p[10],
                 x[2] + x[3] - 1.0,
             ]
             p_vals = [0.04, 0.04, 1.0, 1.0, 10.0, 0.0, 0.04, 35.0, 0.1, 0.04]
@@ -105,18 +108,20 @@
 
             p_template = randn(ComplexF64, 10)
             f_template = DynamicPolynomials.subs.(pol, Ref(p => p_template))
-            result_template = solutions(HomotopyContinuation.solve(
-                f_template,
-                show_progress = false,
-            ))
-            (length(result_template) > 0) && (sol_again = solutions(HomotopyContinuation.solve(
-                pol,
-                result_template,
-                parameters = p,
-                p₁ = p_template,
-                p₀ = ComplexF64.(p_vals),
-                show_progress = false,
-            )))
+            result_template =
+                solutions(HomotopyContinuation.solve(f_template, show_progress = false))
+            (
+             length(result_template) > 0
+            ) && (
+                sol_again = solutions(HomotopyContinuation.solve(
+                    pol,
+                    result_template,
+                    parameters = p,
+                    p₁ = p_template,
+                    p₀ = ComplexF64.(p_vals),
+                    show_progress = false,
+                ))
+            )
             (length(result_template) > 0) ? (results1_template[length(sol_again)+1] += 1) :
             (results1_template[1] += 1)
 
@@ -124,10 +129,16 @@
                 -x[1]^5 * x[2] * p[5] + x[1]^4 * x[3] * p[6] * p[8] -
                 x[1] * x[2] * p[3]^4 * p[5] + x[3] * p[3]^4 * p[6] * p[8] - x[1]^5 * p[7] +
                 x[1]^4 * x[3] * p[4] - x[1] * p[3]^4 * p[7] +
-                x[3] * p[3]^4 * p[4] + x[1]^4 * p[1] + x[1]^4 * p[2] + p[1] * p[3]^4,
-                -x[1]^5 * x[2] * p[5] - x[1] * x[2] * p[3]^4 * p[5] - x[1]^4 * x[2] * p[7] +
-                x[1]^4 * x[3] * p[4] - x[2] * p[3]^4 * p[7] +
-                x[3] * p[3]^4 * p[4] + x[1]^4 * p[1] + x[1]^4 * p[2] + p[1] * p[3]^4,
+                x[3] * p[3]^4 * p[4] +
+                x[1]^4 * p[1] +
+                x[1]^4 * p[2] +
+                p[1] * p[3]^4,
+                -x[1]^5 * x[2] * p[5] - x[1] * x[2] * p[3]^4 * p[5] -
+                x[1]^4 * x[2] * p[7] + x[1]^4 * x[3] * p[4] - x[2] * p[3]^4 * p[7] +
+                x[3] * p[3]^4 * p[4] +
+                x[1]^4 * p[1] +
+                x[1]^4 * p[2] +
+                p[1] * p[3]^4,
                 x[1] * x[2] * p[5] - x[3] * p[6] * p[8] - x[3] * p[4] - x[3] * p[7],
             ]
             p2_vals = [0.005, 0.1, 2.8, 10, 100, 0.1, 0.01, 0.0]
@@ -159,10 +170,8 @@
 
             p3_template = randn(ComplexF64, 8)
             f3_template = DynamicPolynomials.subs.(pol3, Ref(p => p3_template))
-            result3_template = solutions(HomotopyContinuation.solve(
-                f3_template,
-                show_progress = false,
-            ))
+            result3_template =
+                solutions(HomotopyContinuation.solve(f3_template, show_progress = false))
             sol3_again = solutions(HomotopyContinuation.solve(
                 pol3,
                 result3_template,
@@ -184,10 +193,8 @@
 
             p4_template = randn(ComplexF64, 3)
             f4_template = DynamicPolynomials.subs.(pol4, Ref(p => p4_template))
-            result4_template = solutions(HomotopyContinuation.solve(
-                f4_template,
-                show_progress = false,
-            ))
+            result4_template =
+                solutions(HomotopyContinuation.solve(f4_template, show_progress = false))
             sol4_again = solutions(HomotopyContinuation.solve(
                 pol4,
                 result4_template,

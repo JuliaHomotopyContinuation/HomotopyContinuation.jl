@@ -143,8 +143,7 @@ struct HomogenizationInformation{N,T}
     vargroups::Union{Nothing,NTuple{N,Vector{T}}}
 end
 
-function HomogenizationInformation(
-    ;
+function HomogenizationInformation(;
     homvar = nothing,
     homvars = nothing,
     variable_groups = nothing,
@@ -706,19 +705,20 @@ function homogenize(
     parameters = nothing,
     weights = nothing,
 )
-    polys = map(length(C.polys):-1:1) do k
-        f̄, weights = homogenize_degrees(
-            C.polys[k],
-            var;
-            parameters = parameters,
-            weights = weights,
-        )
-        if k > 1
-            push!(f̄, var)
-            push!(weights, 1)
+    polys =
+        map(length(C.polys):-1:1) do k
+            f̄, weights = homogenize_degrees(
+                C.polys[k],
+                var;
+                parameters = parameters,
+                weights = weights,
+            )
+            if k > 1
+                push!(f̄, var)
+                push!(weights, 1)
+            end
+            f̄
         end
-        f̄
-    end
     Composition(reverse!(polys))
 end
 

@@ -113,12 +113,8 @@ function evaluate_and_jacobian!(
     end
 
     D, C = F.D, F.C
-    B, Ĝ, R, S, ranges, homvars = cache.B,
-        cache.Ĝ,
-        cache.R,
-        cache.S,
-        cache.ranges,
-        cache.homvars
+    B, Ĝ, R, S, ranges, homvars =
+        cache.B, cache.Ĝ, cache.R, cache.S, cache.ranges, cache.homvars
 
     n = size(B, 2)
 

@@ -372,9 +372,11 @@ function make_precision_strategy(precision_strategy::Symbol)
     elseif precision_strategy == :adaptive_always
         PREC_STRATEGY_ALWAYS
     else
-        ArgumentError("Unknown argument `precision_strategy = $(precision_strategy)`." *
-                      "Possible values are `:adaptive_finite`, `:adaptive_never`" *
-                      " or `:adaptive_always`.") |> throw
+        ArgumentError(
+            "Unknown argument `precision_strategy = $(precision_strategy)`." *
+            "Possible values are `:adaptive_finite`, `:adaptive_never`" *
+            " or `:adaptive_always`.",
+        ) |> throw
     end
 end
 
@@ -666,16 +668,8 @@ function check_converged!(
     init!(tracker.state.norm, x)
     # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
     # solutions that we bounce away from a good solution.
-    result = correct!(
-        y,
-        tracker,
-        x,
-        t;
-        tol = tol,
-        min_iters = 2,
-        max_iters = 3,
-        full_steps = 1,
-    )
+    result =
+        correct!(y, tracker, x, t; tol = tol, min_iters = 2, max_iters = 3, full_steps = 1)
     if is_converged(result)
         tracker.state.residual .= abs.(tracker.corrector.r)
     else
@@ -1108,8 +1102,10 @@ is larger than `tol`.
 """
 is_singular(r::PathResult; tol = 1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
-    (unpack(r.condition_jacobian, 1.0) > tol ||
-     unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1) && is_success(r)
+    (
+     unpack(r.condition_jacobian, 1.0) > tol ||
+     unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1
+    ) && is_success(r)
 end
 
 """

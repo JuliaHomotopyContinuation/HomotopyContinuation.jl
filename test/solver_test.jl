@@ -221,9 +221,14 @@
         r = 0.5
 
         @polyvar lam[1:k] p[1:6]
-        F = [(R^2 - r^2 + (p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2 +
-              (p[3] + p[6] * lam[1])^2)^2 -
-             4 * R^2 * ((p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2)]
+        F = [
+            (
+             R^2 - r^2 +
+             (p[1] + p[4] * lam[1])^2 +
+             (p[2] + p[5] * lam[1])^2 +
+             (p[3] + p[6] * lam[1])^2
+            )^2 - 4 * R^2 * ((p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2),
+        ]
         #Randomly choose a start system
         # with only Complex{Float32 parameters
         p0 = randn(Complex{Float32}, 6)
