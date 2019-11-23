@@ -499,8 +499,8 @@ function _jacobian_and_dt!_impl(::Type{T}) where {T<:THomotopy}
 end
 
 @generated function jacobian_and_dt!(
-    u::AbstractVector,
     U::AbstractMatrix,
+    u::AbstractVector,
     H::CompiledHomotopy{T},
     x::AbstractVector,
     t,

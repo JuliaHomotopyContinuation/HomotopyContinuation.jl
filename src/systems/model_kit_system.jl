@@ -17,20 +17,21 @@ end
 Base.size(F::ModelKitSystem) = size(F.system)
 
 cache(F::ModelKitSystem, x, p = nothing) = SystemNullCache()
+
 @propagate_inbounds evaluate!(u, F::ModelKitSystem, x, ::SystemNullCache) =
     ModelKit.evaluate!(u, F.system, x)
 evaluate(F::ModelKitSystem, x, ::SystemNullCache) = ModelKit.evaluate(F.system, x)
+(F::ModelKitSystem)(x...) = evaluate(F, x...)
+
 @propagate_inbounds jacobian!(U, F::ModelKitSystem, x, ::SystemNullCache) =
     ModelKit.jacobian!(U, F.system, x)
 jacobian(F::ModelKitSystem, x, ::SystemNullCache) = ModelKit.jacobian(F.system, x)
-@propagate_inbounds evaluate_jacobian!(u, U, F::ModelKitSystem, x, ::SystemNullCache) =
-    ModelKit.evaluate_jacobian!(u, U, F.system, x)
-evaluate_jacobian(F::ModelKitSystem, x, ::SystemNullCache) =
-    ModelKit.evaluate_jacobian(F.system, x)
+
+@propagate_inbounds evaluate_and_jacobian!(u, U, F::ModelKitSystem, x, ::SystemNullCache) =
+    ModelKit.evaluate_and_jacobian!(u, U, F.system, x)
 
 degrees(F::ModelKitSystem) = F.degrees
 
-(F::ModelKitSystem)(x...) = evaluate(F, x...)
 
 # # parameter version
 # @propagate_inbounds evaluate!(u, F::ModelKitSystem, x, p, ::SystemNullCache) =

@@ -15,7 +15,7 @@ struct HeunCache{T} <: AbstractPredictorCache
 end
 
 function cache(::Heun, H, x, ẋ, t)
-    HeunCache(dt(H, x, t), copy(ẋ), copy(ẋ))
+    HeunCache(promote(dt(H, x, t), copy(ẋ), copy(ẋ))...)
 end
 
 function predict!(
