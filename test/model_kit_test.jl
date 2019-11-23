@@ -249,8 +249,10 @@
     @testset "Modeling" begin
         @testset "Bottleneck" begin
             @var x y z
-            f = [(0.3 * x^2 + 0.5z + 0.3x + 1.2 * y^2 - 1.1)^2 +
-                 (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3]
+            f = [
+                (0.3 * x^2 + 0.5z + 0.3x + 1.2 * y^2 - 1.1)^2 +
+                (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3,
+            ]
 
             I = let
                 x = variables(f)

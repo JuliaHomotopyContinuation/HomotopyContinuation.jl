@@ -52,7 +52,7 @@
             f,
             [[1, -1], [1, 1], [-1, 1], [-1, -1]];
             start_parameters = [1, 1],
-            target_parameters = [3,  4],
+            target_parameters = [3, 4],
         )
         @test nnonsingular(res) == 4
 
@@ -64,7 +64,7 @@
             start_parameters = [1, 1],
             target_parameters = [3, 4],
             γ₁ = cis(2.132im),
-            γ₀ = cis(0.412im)
+            γ₀ = cis(0.412im),
         )
         @test nnonsingular(res) == 4
     end

@@ -194,7 +194,6 @@ function parameter_homotopy(
     F::Inputs,
     startsolutions;
     variable_ordering = nothing,
-
     generic_parameters = nothing,
     start_parameters = generic_parameters,
     p₁ = start_parameters,

@@ -344,26 +344,30 @@ function _evaluate_and_jacobian!_impl(::Type{T}) where {T<:TExpr}
     quote
         let ($u, $U) = (u, U)
             let $(make_indexing(I))
-                $(begin
-                    list = InstructionList()
-                    eval_ids = Vector{Any}(undef, n)
-                    jac_ids = Matrix{Any}(undef, n, m)
-                    for i = 1:n
-                        fᵢ = I.expressions[i]
-                        eval_ids[i] = convert(Expr, push!(list, fᵢ))
-                        for j = 1:m
-                            jac_ids[i, j] = convert(Expr, push!(list, I.jacobian[i, j]))
-                        end
-                    end
-                    quote
-                        $(convert(Expr, list))
-                        if !($u isa Nothing)
-                            $(map(i -> :($u[$i] = $(eval_ids[i])), 1:n)...)
-                        end
-                        $(vec([:($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m])...)
-                        nothing
-                    end
-                end)
+                $(
+                  begin
+                      list = InstructionList()
+                      eval_ids = Vector{Any}(undef, n)
+                      jac_ids = Matrix{Any}(undef, n, m)
+                      for i = 1:n
+                          fᵢ = I.expressions[i]
+                          eval_ids[i] = convert(Expr, push!(list, fᵢ))
+                          for j = 1:m
+                              jac_ids[i, j] = convert(Expr, push!(list, I.jacobian[i, j]))
+                          end
+                      end
+                      quote
+                          $(convert(Expr, list))
+                          if !($u isa Nothing)
+                              $(map(i -> :($u[$i] = $(eval_ids[i])), 1:n)...)
+                          end
+                          $(
+                            vec([:($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m])...
+                          )
+                          nothing
+                      end
+                  end
+                )
             end
         end
     end
@@ -394,14 +398,19 @@ function _jacobian_impl(::Type{T}) where {T<:TExpr}
     n, m = size(I)
     quote
         let $(make_indexing(I))
-            $(begin
-                list = InstructionList()
-                jac_ids = map(e -> convert(Expr, push!(list, e)), I.jacobian)
-                quote
-                    $(convert(Expr, list))
-                    @SMatrix $(Expr(:vcat, (Expr(:row, jac_ids[i, :]...) for i = 1:n)...))
-                end
-            end)
+            $(
+              begin
+                  list = InstructionList()
+                  jac_ids = map(e -> convert(Expr, push!(list, e)), I.jacobian)
+                  quote
+                      $(convert(Expr, list))
+                      @SMatrix $(Expr(
+                          :vcat,
+                          (Expr(:row, jac_ids[i, :]...) for i = 1:n)...,
+                      ))
+                  end
+              end
+            )
         end
     end
 end
@@ -473,26 +482,30 @@ function _jacobian_and_dt!_impl(::Type{T}) where {T<:THomotopy}
     quote
         let ($u, $U) = (u, U)
             let $(make_indexing(I))
-                $(begin
-                    list = InstructionList()
-                    dt_ids = Vector{Any}(undef, n)
-                    jac_ids = Matrix{Any}(undef, n, m)
-                    for i = 1:n
-                        fᵢ = I.expressions[i]
-                        dt_ids[i] = convert(Expr, push!(list, I.dt[i]))
-                        for j = 1:m
-                            jac_ids[i, j] = convert(Expr, push!(list, I.jacobian[i, j]))
-                        end
-                    end
-                    quote
-                        $(convert(Expr, list))
-                        if !($u isa Nothing)
-                            $(map(i -> :($u[$i] = $(dt_ids[i])), 1:n)...)
-                        end
-                        $(vec([:($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m])...)
-                        nothing
-                    end
-                end)
+                $(
+                  begin
+                      list = InstructionList()
+                      dt_ids = Vector{Any}(undef, n)
+                      jac_ids = Matrix{Any}(undef, n, m)
+                      for i = 1:n
+                          fᵢ = I.expressions[i]
+                          dt_ids[i] = convert(Expr, push!(list, I.dt[i]))
+                          for j = 1:m
+                              jac_ids[i, j] = convert(Expr, push!(list, I.jacobian[i, j]))
+                          end
+                      end
+                      quote
+                          $(convert(Expr, list))
+                          if !($u isa Nothing)
+                              $(map(i -> :($u[$i] = $(dt_ids[i])), 1:n)...)
+                          end
+                          $(
+                            vec([:($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m])...
+                          )
+                          nothing
+                      end
+                  end
+                )
             end
         end
     end

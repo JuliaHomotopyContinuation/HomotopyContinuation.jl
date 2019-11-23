@@ -303,7 +303,9 @@ function subs(
     expr::Union{Expression,AbstractArray{<:Expression}},
     sub_pairs::Pair{<:AbstractArray{Variable},<:AbstractArray{<:Expression}},
 )
-    length(first(sub_pairs)) == length(last(sub_pairs)) || error(ArgumentError("Substitution arguments don't have the same length."))
+    length(first(sub_pairs)) == length(last(
+        sub_pairs,
+    )) || error(ArgumentError("Substitution arguments don't have the same length."))
 
     list_of_pairs = map((k, v) -> k => v, first(sub_pairs), last(sub_pairs))
     subs(expr, list_of_pairs...)
@@ -328,10 +330,12 @@ julia> evaluate(x * y, [x,y] => [2, 3])
 """
 function evaluate(
     expr::Union{Expression,AbstractArray{<:Expression}},
-    @nospecialize(args::Union{
-        Pair{Variable,<:Any},
-        Pair{<:AbstractArray{Variable},<:AbstractArray{<:Any}},
-    }...),
+    @nospecialize(
+        args::Union{
+            Pair{Variable,<:Any},
+            Pair{<:AbstractArray{Variable},<:AbstractArray{<:Any}},
+        }...
+    ),
 ) where {N}
     D = Dict{Variable,Any}()
     for arg in args
@@ -383,7 +387,9 @@ end
 (op::Operation)(args...) = evaluate(op, args...)
 
 function det(A::AbstractMatrix{<:Expression})
-    isequal(size(A)...) || throw(ArgumentError("Cannot compute `det` of a non-square matrix."))
+    isequal(size(
+        A,
+    )...) || throw(ArgumentError("Cannot compute `det` of a non-square matrix."))
     n = size(A, 1)
     n < 4 || throw(ArgumentError("`det` only supported for at most 3 by 3 matrices of `Expression`s."))
 
@@ -445,12 +451,8 @@ function simplify(op::Operation)
             elseif u.args[2] isa Constant
                 return Operation(:*, Constant(v.value * u.args[2].value), u.args[1])
             end
-        elseif u isa Operation &&
-               u.func == :* &&
-               u.args[1] isa Constant &&
-               v isa Operation &&
-               v.func == :* &&
-               v.args[1] isa Constant &&
+        elseif u isa Operation && u.func == :* && u.args[1] isa Constant &&
+               v isa Operation && v.func == :* && v.args[1] isa Constant &&
                length(u.args) == length(v.args) == 2 && u.args[2] == v.args[2]
             return Operation(:*, Constant(u.args[1].value * v.args[1].value), u.args[2])
         elseif v isa Constant && !(u isa Constant)
@@ -465,12 +467,8 @@ function simplify(op::Operation)
             return u
         elseif u == v
             return Operation(:*, Constant(2), v)
-        elseif u isa Operation &&
-               u.func == :* &&
-               u.args[1] isa Constant &&
-               v isa Operation &&
-               v.func == :* &&
-               v.args[1] isa Constant &&
+        elseif u isa Operation && u.func == :* && u.args[1] isa Constant &&
+               v isa Operation && v.func == :* && v.args[1] isa Constant &&
                length(u.args) == length(v.args) == 2 && u.args[2] == v.args[2]
             return Operation(:*, Constant(u.args[1].value + v.args[1].value), u.args[2])
         end
@@ -591,8 +589,12 @@ end
 function check_vars_params(f, vars, params)
     vars_params = params === nothing ? vars : [vars; params]
     Δ = setdiff(variables(f), vars_params)
-    isempty(Δ) || throw(ArgumentError("Not all variables or parameters of the system are given. Missing: " *
-                                      join(Δ, ", ")))
+    isempty(
+        Δ,
+    ) || throw(ArgumentError(
+        "Not all variables or parameters of the system are given. Missing: " *
+        join(Δ, ", "),
+    ))
     nothing
 end
 
