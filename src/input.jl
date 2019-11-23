@@ -227,6 +227,11 @@ function parameter_homotopy(
         throw(ArgumentError("Number of assigned variables is too small."))
     end
 
+    if F isa MPPolyInputs && variable_ordering !== nothing &&
+       nvariables(F, parameters) != length(variable_ordering)
+        throw(ArgumentError("Number of assigned variables is too small."))
+    end
+
     if isnothing(startsolutions)
         startsolutions = [randn(ComplexF64, nvariables(F, parameters))]
     elseif isa(startsolutions, AbstractVector{<:Number})
