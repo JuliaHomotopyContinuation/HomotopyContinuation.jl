@@ -23,7 +23,7 @@ F(x,y) = \begin{bmatrix}
  \end{bmatrix} = 0
 ```
 
-Using the `@polyvar` macro from [`DynamicPolynomials`] we can do
+Using the `@polyvar` macro from `DynamicPolynomials` we can do
 ```julia
 @polyvar x y
 F = [
@@ -73,7 +73,11 @@ of helpful functions for modeling problems:
 * `monomials(vars, d; homogenous = false)` create all monomials of degree up to `d`
   (resp. exactly degree `d` if `homogenous` = true)
 
-## ModelKit reference
+!!! warning "Variable ordering"
+    While `MultivariatePolynomials` orders variables in the order of creation, `ModelKit` orders them *alphabetically*. Also in `ModelKit` two variables with the same name are always identical.
+
+
+## ModelKit
 
 ```@docs
 ModelKit.@var
