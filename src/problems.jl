@@ -364,8 +364,12 @@ function problem_startsolutions(
 )
     Random.seed!(seed)
     supported, rest = splitkwargs(kwargs, input_supported_keywords)
-    input, startsolutions =
-        input_startsolutions(args...; variable_ordering = variable_ordering, supported...)
+    input,
+    startsolutions = input_startsolutions(
+        args...;
+        variable_ordering = variable_ordering,
+        supported...,
+    )
     if variable_ordering !== nothing
         problem_startsolutions(
             input,
@@ -482,21 +486,26 @@ function problem_startsolutions(
         F = input.system
         tracking_type = AffineTracking()
     else
-        F, vargroups, homvars =
-            homogenize_if_necessary(input.system, homvar_info; vars = variable_ordering)
+        F,
+        vargroups,
+        homvars = homogenize_if_necessary(
+            input.system,
+            homvar_info;
+            vars = variable_ordering,
+        )
         tracking_type = ProjectiveTracking()
     end
 
-    classifcation = classify_system(F, vargroups; affine_tracking = affine_tracking)
-    if classifcation == :underdetermined
+    classification = classify_system(F, vargroups; affine_tracking = affine_tracking)
+    if classification == :underdetermined
         throw(ArgumentError(
             "Underdetermined polynomial systems are currently not supported." *
             " Consider adding linear polynomials to your system in order to reduce your system" *
             " to a zero dimensional system.",
         ))
 # The following case is too annoying right now
-    elseif classifcation == :overdetermined && ngroups(vargroups) > 1
-        error(ArgumentError(
+    elseif classification == :overdetermined && ngroups(vargroups) > 1
+        throw(ArgumentError(
             "Overdetermined polynomial systems with a multi-homogeneous" *
             " structure are currently not supported.",
         ))
@@ -527,19 +536,24 @@ function problem_startsolutions(
         startsolutions = totaldegree_solutions(g, vargroups)
     # We have ngroups(vargroups) == 1
     elseif start_system == :total_degree
-        n = affine_tracking ? length(vars) : length(vars) - 1
         degrees = maxdegrees(F)
 
-        if classifcation == :overdetermined
+        if classification == :overdetermined
+            # We need to square up the system. This will only be a homogenous system if
+            # all the degrees are identical
+            if !affine_tracking && !all(d -> d == degrees[1], degrees)
+                throw(ArgumentError("Cannot square up a homogenous system where not all polynomial systems have a the same degree. Consider starting with an affine system."))
+            end
             perm = sortperm(degrees; rev = true)
             # reorder polynomials by minimal degree
             f = permute(f, perm)
             degrees = degrees[perm]
         end
+        n = affine_tracking ? length(vars) : length(vars) - 1
 
         g = TotalDegreeSystem(degrees[1:n]; affine = affine_tracking)
 
-        if classifcation == :overdetermined
+        if classification == :overdetermined
             A = randn(ComplexF64, n, length(f) - n)
             f̄ = target_constructor(f)
             problem = OverdeterminedProblem(
@@ -574,7 +588,7 @@ function problem_startsolutions(
             f = expand(f)
         end
 
-        if classifcation == :overdetermined
+        if classification == :overdetermined
             # square the system up
             # We do not automatically sort the polynomials by degree since it is not
             # clear that this is actually always advantagous
@@ -602,10 +616,13 @@ function problem_startsolutions(
         end
         cell_iter = PolyhedralStartSolutionsIterator(affine_support)
         toric_homotopy = ToricHomotopy(affine_support, cell_iter.start_coefficients)
-        generic_homotopy =
-            CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
+        generic_homotopy = CoefficientHomotopy(
+            support,
+            cell_iter.start_coefficients,
+            coeffs,
+        )
 
-        if classifcation == :overdetermined
+        if classification == :overdetermined
             # always use fp system for the target system since
             problem = OverdeterminedProblem(
                 PolyhedralProblem(
@@ -695,11 +712,25 @@ end
 
     degrees, is_homogeneous = degrees_ishomogeneous(input.system)
     variable_groups = VariableGroups(N, hominfo)
-    classification =
-        classify_system(input.system, variable_groups; affine_tracking = !is_homogeneous)
+    classification = classify_system(
+        input.system,
+        variable_groups;
+        affine_tracking = !is_homogeneous,
+    )
 
     # overdetermined
     if classification == :overdetermined
+        if is_homogeneous && !all(d -> d == degrees[1], degrees)
+            throw(ArgumentError("Cannot square up a homogenous system where not all polynomial systems have a the same degree. Consider starting with an affine system."))
+        end
+        if ngroups(variable_groups) > 1
+            throw(ArgumentError(
+                "Overdetermined polynomial systems with a multi-homogeneous" *
+                " structure are currently not supported.",
+            ))
+        end
+
+
         m = N - is_homogeneous
         A = randn(ComplexF64, m, n - m)
         problem = OverdeterminedProblem(
@@ -844,7 +875,9 @@ function problem_startsolutions(
         homvars = nothing
         F = input.system
     else
-        F, variable_groups, homvars = homogenize_if_necessary(
+        F,
+        variable_groups,
+        homvars = homogenize_if_necessary(
             input.system,
             hominfo;
             vars = variable_ordering,

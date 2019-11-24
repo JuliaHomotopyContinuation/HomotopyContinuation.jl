@@ -241,12 +241,13 @@ Base.promote_rule(::Type{<:Expression}, ::Type{Operation}) = Expression
 
 Obtain all variables used in the given expression.
 """
-variables(op::Expression) = sort!(collect(variables!(Set{Variable}(), op)))
-function variables(exprs::AbstractVector{<:Expression})
+variables(op::Expression, params = Variable[]) = variables([op], params)
+function variables(exprs::AbstractVector{<:Expression}, params = Variable[])
     S = Set{Variable}()
     for expr in exprs
         variables!(S, expr)
     end
+    setdiff!(S, params)
     sort!(collect(S))
 end
 
@@ -693,6 +694,11 @@ end
 Base.size(F::System) = (length(F.expressions), length(F.variables))
 Base.size(F::System, i::Integer) = size(F)[i]
 Base.length(F::System) = length(F.expressions)
+
+variables(F::System, parameters = nothing) = variables(F.variables)
+
+Base.iterate(F::System) = iterate(F.expressions)
+Base.iterate(F::System, state) = iterate(F.expressions, state)
 
 ##############
 ## Homotopy ##

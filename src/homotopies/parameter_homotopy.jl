@@ -47,7 +47,8 @@ function ParameterHomotopy(
 
     length(p₁) == length(p₀) || error("Length of parameters provided doesn't match.")
 
-    γ = (γ₁ === nothing || γ₀ === nothing) ? nothing : (γ₁, γ₀)
+    γ = (γ₁ === nothing || γ₀ === nothing) ? nothing :
+        (convert(ComplexF64, γ₁), convert(ComplexF64, γ₀))
     T = promote_type(Float64, eltype(p₁), eltype(p₀))
     p = Vector{T}.((p₁, p₀))
 

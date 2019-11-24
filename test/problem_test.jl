@@ -4,8 +4,10 @@
         G = equations(cyclic(6))
 
         P1 = StartTargetInput(G, F)
-        (PP1, start1) =
-            problem_startsolutions(P1, [rand(ComplexF64, 6), rand(ComplexF64, 6)])
+        (
+         PP1,
+         start1,
+        ) = problem_startsolutions(P1, [rand(ComplexF64, 6), rand(ComplexF64, 6)])
         @test PP1 isa Problem{AffineTracking}
         @test length(start1) == 2
 
@@ -30,21 +32,17 @@
             [rand(ComplexF64, 3)],
         )
 
-        P, _ = problem_startsolutions(
-            StartTargetInput(
-                [x^2 + y^2 + z^2, x^4 + y^4 + z^4],
-                [x^3 + z^3, y^3 - z^3],
-            ),
+        P,
+        _ = problem_startsolutions(
+            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^4], [x^3 + z^3, y^3 - z^3]),
             [rand(ComplexF64, 3)],
         )
         @test P isa Problem{ProjectiveTracking}
         @test homvars(P) === nothing
 
-        P, _ = problem_startsolutions(
-            StartTargetInput(
-                [x^2 + y^2 + z^2, x^4 + y^4 + z^2],
-                [x^3 + z^3, y^3 - z^2],
-            ),
+        P,
+        _ = problem_startsolutions(
+            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^2], [x^3 + z^3, y^3 - z^2]),
             [rand(ComplexF64, 3)],
         )
         @test P isa Problem{AffineTracking}
@@ -58,19 +56,18 @@
             [rand(ComplexF64, 3)],
         )
 
-        P, starts = problem_startsolutions(HC.input_startsolutions(
-                [x^2 + y^2 + 1, x^4 + y^4 + 1],
-                [x^3 + 1, y^3 - 1],
-                rand(ComplexF64, 3),
-            )...)
+        P,
+        starts = problem_startsolutions(HC.input_startsolutions(
+            [x^2 + y^2 + 1, x^4 + y^4 + 1],
+            [x^3 + 1, y^3 - 1],
+            rand(ComplexF64, 3),
+        )...)
         @test P isa Problem{AffineTracking}
         @test length(starts) == 1
 
-        P, _ = problem_startsolutions(
-            StartTargetInput(
-                [x^2 + y^2 + z^2, x^4 + y^4 + z^4],
-                [x^3 + z^3, y^3 - z^3],
-            ),
+        P,
+        _ = problem_startsolutions(
+            StartTargetInput([x^2 + y^2 + z^2, x^4 + y^4 + z^4], [x^3 + z^3, y^3 - z^3]),
             [rand(ComplexF64, 3)],
             homvar = z,
         )
@@ -141,25 +138,36 @@
 
     @testset "Overdetermined" begin
         @polyvar x y z
-        prob, starts =
-            problem_startsolutions([x - 2, y^2 + 3 * z^2, z^3 + x^3, z + x^2 + 3])
+        prob,
+        starts = problem_startsolutions([x - 2, y^2 + 3 * z^2, z^3 + x^3, z + x^2 + 3])
         @test prob isa HC.OverdeterminedProblem
         @test starts isa HC.TotalDegreeSolutionIterator
         @test starts.degrees == [3, 2, 2]
+        @test prob.problem.tracking_type == AffineTracking()
 
         # overdetermined, homogeneous
-        prob, starts = problem_startsolutions([x - 2y, y^2 + 3 * x^2])
+        prob,
+        starts = problem_startsolutions([
+            x^2 - 2 * z^2,
+            y^2 + 3 * z^2,
+            z^2 + x^2,
+            y * z + x^2,
+        ])
         @test prob isa HC.OverdeterminedProblem
         @test starts isa HC.TotalDegreeSolutionIterator
-        @test starts.degrees == [2]
+        @test starts.degrees == [2, 2]
+        @test prob.problem.tracking_type == ProjectiveTracking()
 
-        prob, starts = problem_startsolutions([x - 2y, y^2 + 3 * x^2, x^3 + y^3])
-        @test prob isa HC.OverdeterminedProblem
-        @test starts isa HC.TotalDegreeSolutionIterator
-        @test starts.degrees == [3]
+        # squaring a homogenous system with different degrees errors
+        @test_throws ArgumentError problem_startsolutions([
+            x - 2y,
+            y^2 + 3 * x^2,
+            x^3 + y^3,
+        ])
 
         # Overdetermined, polyhedral
-        prob, starts = problem_startsolutions(
+        prob,
+        starts = problem_startsolutions(
             [x - 2, y^2 + 3 * z^2, z^3 + x^3, z + x^2 + 3];
             start_system = :polyhedral,
         )
@@ -169,7 +177,8 @@
 
         # polyhedral needs to expand Composition
         @polyvar u v w
-        prob, starts = problem_startsolutions(
+        prob,
+        starts = problem_startsolutions(
             [x - 2, y^2 + 3 * z^2, z^3 + x^3, z + x^2 + 3] ∘ [u, v, w];
             start_system = :polyhedral,
         )
@@ -178,11 +187,24 @@
         @test starts isa HC.PolyhedralStartSolutionsIterator
 
         # Abstract Systems
-        prob, starts =
-            problem_startsolutions(FPSystem([x - 2z, y^2 + 3 * z^2, z^3 + x^3, z + x]))
+
+        # squaring a homogenous system with different degrees errors
+        @test_throws ArgumentError problem_startsolutions(FPSystem([
+            x - 2y,
+            y^2 + 3 * x^2,
+            x^3 + y^3,
+        ]))
+
+        prob,
+        starts = problem_startsolutions(FPSystem([
+            x^2 - 2 * z^2,
+            y^2 + 3 * z^2,
+            z^2 + x^2,
+            y * z + x^2,
+        ]))
         @test prob isa HC.OverdeterminedProblem{HC.ProjectiveTracking}
         @test starts isa HC.TotalDegreeSolutionIterator
-        @test starts.degrees == [1, 2, 3]
+        @test starts.degrees == [2, 2]
     end
 
     @testset "Invalid input" begin

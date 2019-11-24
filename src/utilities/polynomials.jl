@@ -67,7 +67,7 @@ Scale a composition by λ.
 """
 scale(C::Composition, λ) = Composition([[C.polys[1] .* λ]; C.polys[2:end]])
 
-function MP.subs(C::Composition, args...)
+function MP.subs(C::Composition, args::MP.AbstractSubstitution...)
     p = map(pᵢ -> MP.subs(pᵢ, args...), C.polys[end])
     Composition([C.polys[1:end-1]; [p]])
 end
@@ -1061,9 +1061,10 @@ end
 ################
 
 polyvar(v::ModelKit.Variable) = DynamicPolynomials.PolyVar{true}(string(v.name))
-function maxdegrees(F::ModelKit.System)
-    vars = polyvar.(F.variables)
-    params = polyvar.(F.parameters)
-    P = evaluate(F.expressions, F.variables => vars, F.parameters => params)
+function maxdegrees(F::ModelKit.System; parameters = F.parameters)
+    variables = setdiff!([F.variables; F.parameters], parameters)
+    vars = polyvar.(variables)
+    params = polyvar.(parameters)
+    P = evaluate(F.expressions, variables => vars, parameters => params)
     maxdegrees(P; parameters = params)
 end

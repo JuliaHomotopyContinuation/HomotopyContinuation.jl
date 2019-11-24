@@ -47,6 +47,7 @@ end
     include("solver_test.jl")
     include("result_test.jl")
     include("composition_test.jl")
+    include("model_kit_integration.jl")
     include("monodromy_test.jl")
     include("root_count_test.jl")
     include("path_info_test.jl")

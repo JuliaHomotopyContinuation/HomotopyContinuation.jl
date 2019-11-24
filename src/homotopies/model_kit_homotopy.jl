@@ -14,16 +14,8 @@ end
 
 Base.size(H::ModelKitHomotopy) = size(H.homotopy)
 
-"""
-    set_parameters!(H::ModelKitHomotopy, p::Tuple, γ = nothing)
-
-Update the parameters of `H`.
-"""
-function set_parameters!(H::ModelKitHomotopy, p::Tuple, ::Nothing = nothing)
+function set_parameters!(H::ModelKitHomotopy, p::Tuple, γ::Union{Nothing,Tuple} = nothing)
     p1, p2 = p
-    set_start_parameters!(H, p1)
-    set_target_parameters!(H, p2)
-
     n = length(p1)
     for i = 1:n
         H.parameters[i] = p1[i]
@@ -31,24 +23,12 @@ function set_parameters!(H::ModelKitHomotopy, p::Tuple, ::Nothing = nothing)
     for i = 1:n
         H.parameters[i+n] = p2[i]
     end
-    H.p[1] .= p[1]
-    H.p[2] .= p[2]
-    H.γ = γ
-    H
-end
 
-function set_parameters!(H::ModelKitHomotopy, p::Tuple, γ::Tuple)
-    p1, p2 = p
-    for i = 1:n
-        H.parameters[i] = p1[i]
+    if γ !== nothing
+        γ₁, γ₂ = γ
+        H.parameters[2n+1] = γ₁
+        H.parameters[2n+2] = γ₂
     end
-    for i = 1:n
-        H.parameters[i+n] = p2[i]
-    end
-
-    γ₁, γ₂ = γ
-    H.parameters[2n+1] = γ₁
-    H.parameters[2n+2] = γ₂
 
     H
 end

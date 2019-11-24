@@ -505,7 +505,7 @@ struct MonodromySolver{
 end
 
 function MonodromySolver(
-    F::Inputs,
+    F,
     solution::AbstractVector{<:Number},
     p₀::AbstractVector{TP};
     kwargs...,
@@ -513,7 +513,7 @@ function MonodromySolver(
     MonodromySolver(F, [solution], p₀; kwargs...)
 end
 function MonodromySolver(
-    F::Inputs,
+    F,
     startsolutions::Vector{<:AbstractVector{<:Number}},
     p::AbstractVector{TP};
     distance = default_distance(eltype(startsolutions)),
@@ -543,6 +543,8 @@ function MonodromySolver(
         [x₀];
         parameters = parameters,
         generic_parameters = p₀,
+        γ₁ = 1,
+        γ₀ = 1,
         supported...,
     )
     tracker =
@@ -654,8 +656,10 @@ from the [`MonodromyResult`](@ref).
   to run.
 """
 function monodromy_solve(
-    F::MPPolys;
-    parameters = throw(ArgumentError("Necessary to provide `parameters` as a keyword argument.")),
+    F::Union{MPPolys,System};
+    parameters = F isa MPPolys ?
+                 throw(ArgumentError("Necessary to set `parameters = ...`.")) :
+                 nothing,
     variable_ordering = nothing,
     seed = randseed(),
     show_progress = true,
@@ -682,6 +686,32 @@ function monodromy_solve(
         show_progress = show_progress,
         threading = threading,
     )
+end
+
+function monodromy_solve(
+    F::Vector{<:ModelKit.Expression};
+    parameters = throw(ArgumentError("Necessary to set `parameters = ...`.")),
+    variable_ordering = throw(ArgumentError("Necessary to set `variable_ordering = ...`.")),
+    kwargs...,
+)
+    monodromy_solve(System(F, variable_ordering, parameters))
+end
+function monodromy_solve(
+    F::Vector{<:ModelKit.Expression},
+    S,
+    p;
+    parameters = throw(ArgumentError("Necessary to set `parameters = ...`.")),
+    variable_ordering = throw(ArgumentError("Necessary to set `variable_ordering = ...`.")),
+    kwargs...,
+)
+    monodromy_solve(System(F, variable_ordering, parameters), S, p)
+end
+
+function find_start_pair(F::System, ::Nothing; variable_ordering = nothing)
+    vars = polyvar.(F.variables)
+    params = polyvar.(F.parameters)
+    P = evaluate(F.expressions, F.variables => vars, F.parameters => params)
+    find_start_pair(P, params; variable_ordering = vars)
 end
 
 function find_start_pair(F::MPPolys, parameters; variable_ordering = nothing)
@@ -729,7 +759,7 @@ function monodromy_solve(
 end
 
 function default_strategy(
-    F::MPPolyInputs,
+    F::Union{System,MPPolyInputs},
     parameters,
     p₀::AbstractVector{TP};
     is_real_system = false,

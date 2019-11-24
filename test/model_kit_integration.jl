@@ -13,6 +13,20 @@
         g = [f; sum(f)]
         res = solve(System(g, [x, y]))
         @test nnonsingular(res) == 4
+
+        @var x y z
+        @test_throws ArgumentError problem_startsolutions(
+            [x - 2y, y^2 + 3 * x^2, x^3 + y^3],
+            variable_ordering = [x, y],
+        )
+
+        prob, starts = problem_startsolutions(
+            [x^2 - 2 * z^2, y^2 + 3 * z^2, z^2 + x^2, y * z + x^2],
+            variable_ordering = [x, y, z],
+        )
+        @test prob isa HC.OverdeterminedProblem{HC.ProjectiveTracking}
+        @test starts isa HC.TotalDegreeSolutionIterator
+        @test starts.degrees == [2, 2]
     end
 
     @testset "polyhedral" begin
@@ -67,5 +81,59 @@
             γ₀ = cis(0.412im),
         )
         @test nnonsingular(res) == 4
+    end
+
+    @testset "Monodromy" begin
+        @var x y
+        f = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        # define new variables u₁, u₂ and λ₁
+        @var u[1:2] λ[1:1]
+        # define the jacobian of F
+        J = differentiate([f], [x, y])
+        # J' defines the transpose of J
+        C = [[x, y] - u - J' * λ; f]
+        F = System(C, [x; y; λ], u)
+
+        s₀ = [
+            0.3785092033935262 + 0.20148856470590054im,
+            0.008762115289894847 + 1.0025348274195496im,
+            -0.08344446740253277 + 0.01612603621102832im,
+        ]
+        u₀ = [
+            0.3373116901371924 + 0.12535355543080084im,
+            0.27964298581644154 + 1.9612473908330865im,
+        ]
+        @test_throws ArgumentError monodromy_solve(C, s₀, u₀)
+        @test_throws ArgumentError monodromy_solve(C, s₀, u₀; variable_ordering = [x; y; λ])
+
+        res = monodromy_solve(
+            C,
+            s₀,
+            u₀;
+            variable_ordering = [x; y; λ],
+            parameters = u,
+            seed = 1312,
+            target_solutions_count = 36,
+        )
+        @test nsolutions(res) == 36
+        res = monodromy_solve(
+            F,
+            s₀,
+            u₀;
+            threading = false,
+            target_solutions_count = 36,
+            seed = 1312,
+        )
+        @test nsolutions(res) == 36
+
+        # automatic start pair
+        @var x y a b
+        f = [x^2 - a, y^2 - b]
+        res =
+            monodromy_solve(f; parameters = [a, b], variable_ordering = [x, y], seed = 1312)
+        @test nsolutions(res) == 4
+        F = System(f, [x, y], [a, b])
+        res = monodromy_solve(F; seed = 1312)
+        @test nsolutions(res) == 4
     end
 end

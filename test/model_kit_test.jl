@@ -172,7 +172,7 @@
         @test dt!(u, H, v, s) ≈ û
         u .= 0
         U .= 0
-        @test jacobian_and_dt!(u, U, H, v, s) === nothing
+        @test jacobian_and_dt!(U, u, H, v, s) === nothing
         @test u ≈ û
         @test U ≈ Û
     end
@@ -237,7 +237,7 @@
         @test dt!(u, H, v, s, p) ≈ û
         u .= 0
         U .= 0
-        @test jacobian_and_dt!(u, U, H, v, s, p) === nothing
+        @test jacobian_and_dt!(U, u, H, v, s, p) === nothing
         @test u ≈ û
         @test U ≈ Û
 

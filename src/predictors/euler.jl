@@ -9,7 +9,7 @@ tangent predictor.
 struct Euler <: AbstractPredictor end
 struct EulerCache <: AbstractPredictorCache end
 
-cache(::Euler, H, x, ẋ, t) = EulerCache(j)
+cache(::Euler, H, x, ẋ, t) = EulerCache()
 
 function predict!(
     xnext,

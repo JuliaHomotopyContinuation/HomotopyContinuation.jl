@@ -86,8 +86,8 @@ struct ParameterSystemInput{S<:Inputs} <: AbstractInput
     parameters::Union{Nothing,Vector{<:MP.AbstractVariable}}
     p₁::AbstractVector
     p₀::AbstractVector
-    γ₁::Union{Nothing,ComplexF64}
-    γ₀::Union{Nothing,ComplexF64}
+    γ₁
+    γ₀
 end
 
 """
@@ -193,6 +193,9 @@ input_startsolutions(F::Inputs, starts; kwargs...) =
 function parameter_homotopy(
     F::Inputs,
     startsolutions;
+    parameters = F isa MPPolyInputs ?
+                 throw(ArgumentError("Argument `parameters = ...` needs to be provided.")) :
+                 nothing,
     variable_ordering = nothing,
     generic_parameters = nothing,
     start_parameters = generic_parameters,
@@ -222,7 +225,7 @@ function parameter_homotopy(
     if F isa MPPolyInputs && length(parameters) != length(p₀)
         throw(ArgumentError("Number of parameters doesn't match!"))
     end
-    if F isa MPPolyInputs && !isnothing(variable_ordering)g &&
+    if F isa MPPolyInputs && !isnothing(variable_ordering) &&
        nvariables(F, parameters) != length(variable_ordering)
         throw(ArgumentError("Number of assigned variables is too small."))
     end
