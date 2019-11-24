@@ -135,7 +135,7 @@ is_tracking(S::CoreTrackerStatus.states) = S == CoreTrackerStatus.tracking
 """
      CoreTrackerResult{V<:AbstractVector}
 
-The result of [`track(::CoreTracker, x₁, t₁, t₀)](@ref). You can use
+The result of [`track(::CoreTracker, x₁, t₁, t₀)`](@ref). You can use
 [`is_success`](@ref) to check whether the tracking was successfull and [`solution`](@ref)
 to obtain the solution.
 

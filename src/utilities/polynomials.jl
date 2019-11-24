@@ -1056,6 +1056,55 @@ function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = variables(
 end
 
 
+
+"""
+    monomials(vars::Vector{<:PolyVar}, d; homogeneous::Bool = false)
+
+Create all monomials of a given degree.
+
+```
+julia> @polyvar x y
+(x, y)
+
+julia> monomials([x,y], 2)
+6-element Array{Monomial{true},1}:
+ x²
+ xy
+ y²
+ x
+ y
+ 1
+
+julia> monomials([x,y], 2; homogeneous = true)
+3-element Array{Monomial{true},1}:
+ x²
+ xy
+ y²
+```
+"""
+function monomials(
+    vars::AbstractVector{<:DynamicPolynomials.PolyVar},
+    d::Int;
+    homogeneous::Bool = false,
+)
+    n = length(vars)
+    if homogeneous
+        pred = x -> sum(x) == d
+    else
+        pred = x -> sum(x) ≤ d
+    end
+    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
+    sort!(exps, lt = td_order, rev = true)
+    map(exps) do exp
+        prod(i -> vars[i]^exp[i], 1:n)
+    end
+end
+function td_order(x, y)
+    sx = sum(x)
+    sy = sum(y)
+    sx == sy ? x < y : sx < sy
+end
+
 ################
 ## ModelKit ##
 ################

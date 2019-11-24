@@ -225,6 +225,12 @@ Base.length(C::Compiled) = length(C.obj)
 const CompiledSystem{T<:TSystem} = Compiled{T,System}
 const CompiledHomotopy{T<:THomotopy} = Compiled{T,Homotopy}
 
+"""
+    compile(F::System)
+    compile(H::Homotopy)
+
+Compile the given object to a straight line program.
+"""
 compile(F::System) = Compiled(F)
 compile(H::Homotopy) = Compiled(H)
 

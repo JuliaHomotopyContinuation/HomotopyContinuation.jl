@@ -20,7 +20,7 @@ using StaticArrays: @SVector, @SMatrix
 import LinearAlgebra: det, dot
 import Latexify
 # Overload these functions vom MP to be able to export this without any name clashes
-import MultivariatePolynomials: variables, differentiate, subs, monomials
+import MultivariatePolynomials: variables, nvariables, differentiate, subs, monomials
 
 export Expression, Constant, Variable, Operation
 import ..HomotopyContinuation: evaluate,
@@ -38,6 +38,7 @@ export @var,
        @unique_var,
        subs,
        variables,
+       nvariables,
        differentiate,
        monomials,
        Compiled,

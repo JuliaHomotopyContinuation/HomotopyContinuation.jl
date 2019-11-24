@@ -14,7 +14,7 @@ FixedPatch
 
 ## Input
 We support any polynomials which follow the [MultivariatePolynomials](https://github.com/JuliaAlgebra/MultivariatePolynomials.jl)
-interface. By default we export the routines `@polyvar`, `PolyVar`, `differentiate`
+interface. By default we export the routines `@polyvar`, `differentiate`
 and `variables`
 from the [DynamicPolynomials](https://github.com/JuliaAlgebra/DynamicPolynomials.jl)
 implementation.
@@ -111,6 +111,7 @@ PVector
 dims
 dimension_indices
 affine_chart
+ProjectiveVectors.embed
 ×
 component
 components

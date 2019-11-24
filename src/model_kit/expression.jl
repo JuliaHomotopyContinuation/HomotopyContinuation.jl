@@ -236,8 +236,8 @@ Base.promote_rule(::Type{<:Expression}, ::Type{<:Number}) = Expression
 Base.promote_rule(::Type{<:Expression}, ::Type{Symbol}) = Expression
 Base.promote_rule(::Type{<:Expression}, ::Type{Operation}) = Expression
 """
-    variables(expr::Expression)
-    variables(exprs::AbstractVector{<:Expression})
+    variables(expr::Expression, parameters = Variable[])
+    variables(exprs::AbstractVector{<:Expression}, parameters = Variable[])
 
 Obtain all variables used in the given expression.
 """
@@ -257,6 +257,9 @@ function variables!(vars::Set{Variable}, op::Operation)
 end
 variables!(vars::Set{Variable}, var::Variable) = (push!(vars, var); vars)
 variables!(vars::Set{Variable}, ::Constant) = vars
+
+nvariables(expr::Expression, p = Variable[]) = length(variables(expr, p))
+nvariables(E::AbstractVector{<:Expression}, p = Variable[]) = length(variables(E, p))
 
 """
     subs(expr::Expression, subs::Pair{Variable,<:Expression}...)
@@ -540,7 +543,7 @@ function differentiate(exprs::AbstractVector{<:Expression}, vars::AbstractVector
 end
 
 """
-    monomials(vars, d; homogeneous::Bool = false)
+    monomials(vars::Vector{<:Variable}, d; homogeneous::Bool = false)
 
 Create all monomials of a given degree.
 

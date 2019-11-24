@@ -15,8 +15,8 @@ import StaticArrays
 import StaticPolynomials
 import TreeViews
 
-import MultivariatePolynomials: variables, nvariables
-using MultivariatePolynomials: subs, differentiate, monomials
+import MultivariatePolynomials: variables, nvariables, monomials
+using MultivariatePolynomials: subs, differentiate
 
 using Base: @propagate_inbounds
 using LinearAlgebra: cond
@@ -44,7 +44,8 @@ export @polyvar
 export variables, nvariables, subs, differentiate, monomials
 export mixed_volume
 export cond
-export PVector,
+export ProjectiveVectors,
+       PVector,
        dims,
        dimension_indices,
        affine_chart,
