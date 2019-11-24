@@ -4,8 +4,8 @@ export AbstractInput,
        HomotopyInput,
        ParameterSystemInput
 
-const Inputs = Union{<:AbstractSystem,<:MPPolys,<:Composition,<:ModelKit.System}
-const MPPolyInputs = Union{<:MPPolys,<:Composition}
+const Inputs = Union{AbstractSystem,MPPolys,Composition,ModelKit.System}
+const MPPolyInputs = Union{MPPolys,Composition}
 
 const input_supported_keywords = [
     :parameters,

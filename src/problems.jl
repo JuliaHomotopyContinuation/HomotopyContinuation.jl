@@ -288,6 +288,8 @@ function apply_system_scaling(F, vars, system_scaling::Union{Nothing,Symbol,Bool
     end
 end
 
+@nospecialize
+
 function default_affine_tracking(F::TargetSystemInput{<:MPPolyInputs}, hominfo)
     !(is_homogeneous(F.system, hominfo))
 end
@@ -352,6 +354,7 @@ is_homogeneous(H::AbstractHomotopy) = is_homogeneous(FixedHomotopy(H, rand()))
 """
 function problem_startsolutions end
 
+
 function problem_startsolutions(
     args...;
     seed = randseed(),
@@ -398,28 +401,28 @@ function problem_startsolutions(
     kwargs...,
 )
 
-    homvar_info = HomogenizationInformation(
-        ;
-        homvar = homvar,
-        homvars = homvars,
-        variable_groups = variable_groups,
-    )
+
+homvar_info = HomogenizationInformation(
+;
+homvar = homvar,
+homvars = homvars,
+variable_groups = variable_groups,
+)
 
     #projective_tracking is for the frontend
     #internally, we use affine_tracking
+    if isnothing(affine_tracking) && !isnothing(projective_tracking)
+        affine_tracking = !projective_tracking
+    end
+
     if isnothing(affine_tracking)
-        if isnothing(projective_tracking)
-            problem_startsolutions(input, startsolutions, homvar_info, seed; kwargs...)
-        else
-            problem_startsolutions(
-                input,
-                startsolutions,
-                homvar_info,
-                seed;
-                affine_tracking = !projective_tracking,
-                kwargs...,
-            )
-        end
+        problem_startsolutions(
+            input,
+            startsolutions,
+            homvar_info,
+            seed;
+            kwargs...,
+        )
     else
         problem_startsolutions(
             input,
@@ -430,6 +433,7 @@ function problem_startsolutions(
             kwargs...,
         )
     end
+
 end
 
 function problem_startsolutions(
@@ -643,27 +647,17 @@ function problem_startsolutions(
     problem, startsolutions
 end
 
-function problem_startsolutions(
-    input::TargetSystemInput{<:ModelKit.System},
+@noinline function problem_startsolutions(
+    input::TargetSystemInput{ModelKit.System},
     ::Nothing,
     hominfo::Union{Nothing,HomogenizationInformation},
     seed;
-    start_system = :total_degree,
+    start_system::Symbol = :total_degree,
     variable_ordering = nothing,
     kwargs...,
 )
-    if start_system == :polyhedral
-        vars = polyvar.(input.system.variables)
-        F = evaluate(input.system.expressions, input.system.variables => vars)
-        problem_startsolutions(
-            TargetSystemInput(F),
-            nothing,
-            hominfo,
-            seed;
-            start_system = :polyhedral,
-            variable_ordering = vars,
-            kwargs...,
-        )
+    if start_system === :polyhedral
+        a::Tuple{Any,Any} = modelkit_polyhedral(input.system, hominfo, seed; kwargs...)
     else
         problem_startsolutions(
             TargetSystemInput(ModelKitSystem(input.system)),
@@ -671,19 +665,33 @@ function problem_startsolutions(
             hominfo,
             seed;
             start_system = :total_degree,
-            variable_ordering = variable_ordering,
+            variable_ordering = nothing, #variable_ordering,
             kwargs...,
         )
     end
 end
 
-function problem_startsolutions(
+@noinline function modelkit_polyhedral(system, hominfo, seed; kwargs...)
+    vars = polyvar.(system.variables)
+    F = evaluate(system.expressions, system.variables => vars)::Any
+    problem_startsolutions(
+        TargetSystemInput(F),
+        nothing,
+        hominfo,
+        seed;
+        start_system = :polyhedral,
+        variable_ordering = vars,
+    )::Tuple{Any,Any}
+end
+
+@noinline function problem_startsolutions(
     input::TargetSystemInput{<:AbstractSystem},
     ::Nothing,
     hominfo::Union{Nothing,HomogenizationInformation},
     seed;
     start_system = :total_degree,
     system = DEFAULT_SYSTEM,
+    affine_tracking = nothing,
     system_scaling = nothing,
     variable_ordering = nothing,
     kwargs...,
@@ -860,7 +868,7 @@ end
 
 
 function problem_startsolutions(
-    input::ParameterSystemInput{<:AbstractSystem},
+    @nospecialize(input::ParameterSystemInput{<:AbstractSystem}),
     startsolutions,
     hominfo,
     seed;
@@ -890,7 +898,7 @@ function problem_startsolutions(
 end
 
 function problem_startsolutions(
-    input::ParameterSystemInput{<:ModelKit.System},
+    input::ParameterSystemInput{ModelKit.System},
     startsolutions,
     hominfo,
     seed;
@@ -907,7 +915,7 @@ function problem_startsolutions(
     has_gamma && push!(params, input.γ₁, input.γ₀)
     H = ModelKitHomotopy(
         build_parameter_homotopy(input.system; gamma = has_gamma);
-        parameters = params
+        parameters = params,
     )
     variable_groups = VariableGroups(N, hominfo)
     if affine_tracking === nothing
@@ -946,3 +954,5 @@ function build_parameter_homotopy(F::ModelKit.System; gamma = false)
         Homotopy(h, F.variables, __t__, [__start_params__; __target_params__])
     end
 end
+
+@specialize

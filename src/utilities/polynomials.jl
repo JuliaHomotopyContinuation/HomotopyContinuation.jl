@@ -10,7 +10,7 @@ export is_homogeneous,
        linear_system
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
-const MPPolys = Vector{<:MP.AbstractPolynomialLike}
+const MPPolys = AbstractVector{<:MP.AbstractPolynomialLike}
 const WeightedVariable = Tuple{<:MP.AbstractVariable,Int}
 
 ##############

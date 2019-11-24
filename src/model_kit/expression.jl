@@ -328,10 +328,10 @@ julia> evaluate(x * y, [x,y] => [2, 3])
 """
 function evaluate(
     expr::Union{Expression,AbstractArray{<:Expression}},
-    args::Union{
+    @nospecialize(args::Union{
         Pair{Variable,<:Any},
         Pair{<:AbstractArray{Variable},<:AbstractArray{<:Any}},
-    }...,
+    }...),
 ) where {N}
     D = Dict{Variable,Any}()
     for arg in args
@@ -347,7 +347,7 @@ function evaluate(
 end
 evaluate(op::Constant, args::Dict{Variable,<:Any}) = op.value
 evaluate(op::Variable, args::Dict{Variable,<:Any}) = args[op]
-function evaluate(op::Operation, args::Dict{Variable,<:Any})
+function evaluate(op::Operation, @nospecialize(args::Dict{Variable,<:Any}))
     if length(op.args) == 2
         a, b = evaluate(op.args[1], args), evaluate(op.args[2], args)
 
