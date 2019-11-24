@@ -307,7 +307,9 @@ function subs(
     expr::Union{Expression,AbstractArray{<:Expression}},
     sub_pairs::Pair{<:AbstractArray{Variable},<:AbstractArray{<:Expression}},
 )
-    length(first(sub_pairs)) == length(last(
+    length(first(
+        sub_pairs,
+    )) == length(last(
         sub_pairs,
     )) || error(ArgumentError("Substitution arguments don't have the same length."))
 

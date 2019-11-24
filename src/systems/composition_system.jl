@@ -26,17 +26,14 @@ function CompositionSystem(
         C.polys[n-1],
         C.polys[n],
         system_constructor;
-        input_variables = variables,
-        parameters = parameters,
-        homvars = homvars,
+        input_variables = variables, parameters = parameters, homvars = homvars,
     )
     for k = (n - 2):-1:1
         f = CompositionSystem(
             C.polys[k],
             f,
             system_constructor;
-            parameters = parameters,
-            homvars = homvars,
+            parameters = parameters, homvars = homvars,
         )
     end
     f

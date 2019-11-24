@@ -4,9 +4,9 @@
         function F_test(x)
             let (x, y, z) = (x[1], x[2], x[3])
                 [
-                 (x^2 + y + z + 2)^2 - 3,
-                 4 * x^2 * z^2 * y + 4z - 6x * y * z^7,
-                 (-z) / (x + y),
+                    (x^2 + y + z + 2)^2 - 3,
+                    4 * x^2 * z^2 * y + 4z - 6x * y * z^7,
+                    (-z) / (x + y),
                 ]
             end
         end
@@ -56,18 +56,18 @@
         function F_test(x, p)
             let (x, y, z, b, c, a) = (x[1], x[2], x[3], p[1], p[2], p[3])
                 [
-                 (x^2 + y + z * a^2 + 2)^2 - 3,
-                 4 * x^2 * z^2 * y + b + 4z - 6x * y * z^2,
-                 a * c * (-z) / (x + y),
+                    (x^2 + y + z * a^2 + 2)^2 - 3,
+                    4 * x^2 * z^2 * y + b + 4z - 6x * y * z^2,
+                    a * c * (-z) / (x + y),
                 ]
             end
         end
 
         f = System(
             [
-             (x^2 + y + z * a^2 + 2)^2 - 3,
-             4 * x^2 * z^2 * y + b + 4z - 6x * y * z^2,
-             a * c * (-z) / (x + y),
+                (x^2 + y + z * a^2 + 2)^2 - 3,
+                4 * x^2 * z^2 * y + b + 4z - 6x * y * z^2,
+                a * c * (-z) / (x + y),
             ],
             [x, y, z],
             [b, c, a],
@@ -183,8 +183,8 @@
         function H_test(x, s, p)
             let (x, y, z, t, a, b, c) = (x[1], x[2], x[3], s, p[1], p[2], p[3])
                 [
-                 x^2 + y + z + a^2 - b + 2t,
-                 4 * x^2 * z^2 * a * b * y + c * 4z - 6x * y * z^2,
+                    x^2 + y + z + a^2 - b + 2t,
+                    4 * x^2 * z^2 * a * b * y + c * 4z - 6x * y * z^2,
                 ]
             end
         end
@@ -251,7 +251,7 @@
             @var x y z
             f = [
                 (0.3 * x^2 + 0.5z + 0.3x + 1.2 * y^2 - 1.1)^2 +
-                (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3,
+                    (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3,
             ]
 
             I = let

@@ -64,7 +64,7 @@ function ParameterHomotopy(
     kwargs...,
 )
     (
-     p₁ !== nothing && p₀ !== nothing
+        p₁ !== nothing && p₀ !== nothing
     ) || error("Parameters not provided for ParameterHomotopy")
     ParameterHomotopy(F, p₁, p₀; kwargs...)
 end

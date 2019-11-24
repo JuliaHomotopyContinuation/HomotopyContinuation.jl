@@ -1,13 +1,13 @@
 export is_homogeneous,
-       homogenize,
-       uniquevar,
-       Composition,
-       expand,
-       compose,
-       validate,
-       precondition,
-       normalize_coefficients,
-       linear_system
+    homogenize,
+    uniquevar,
+    Composition,
+    expand,
+    compose,
+    validate,
+    precondition,
+    normalize_coefficients,
+    linear_system
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
 const MPPolys = AbstractVector{<:MP.AbstractPolynomialLike}
@@ -684,20 +684,18 @@ function homogenize(
     parameters = nothing,
     weights = nothing,
 )
-    polys =
-        map(length(C.polys):-1:1) do k
-            f̄, weights = homogenize_degrees(
-                C.polys[k],
-                var;
-                parameters = parameters,
-                weights = weights,
-            )
-            if k > 1
-                push!(f̄, var)
-                push!(weights, 1)
-            end
-            f̄
+    polys = map(length(C.polys):-1:1) do k
+        f̄, weights = homogenize_degrees(
+            C.polys[k],
+            var;
+            parameters = parameters, weights = weights,
+        )
+        if k > 1
+            push!(f̄, var)
+            push!(weights, 1)
         end
+        f̄
+    end
     Composition(reverse!(polys))
 end
 

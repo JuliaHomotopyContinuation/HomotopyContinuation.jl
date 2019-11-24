@@ -46,8 +46,7 @@ function track!(
     retcode = track!(
         OT.tracker,
         x;
-        accuracy = accuracy,
-        max_corrector_iters = max_corrector_iters,
+        accuracy = accuracy, max_corrector_iters = max_corrector_iters,
     )
     is_success(retcode) || return retcode
 

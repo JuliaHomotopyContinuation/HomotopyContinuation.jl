@@ -1,28 +1,28 @@
 export AbstractProblem,
-       Problem,
-       TrackingType,
-       AffineTracking,
-       ProjectiveTracking,
-       homotopy,
-       homogenization,
-       embed,
-       homvars,
-       problem_startsolutions
+    Problem,
+    TrackingType,
+    AffineTracking,
+    ProjectiveTracking,
+    homotopy,
+    homogenization,
+    embed,
+    homvars,
+    problem_startsolutions
 
 
 const problem_startsolutions_supported_keywords = [
     [
-     :seed,
-     :homvar,
-     :homvars,
-     :variable_groups,
-     :homotopy,
-     :system,
-     :system_scaling,
-     :affine_tracking,
-     :projective_tracking,
-     :start_system,
-     :only_torus,
+        :seed,
+        :homvar,
+        :homvars,
+        :variable_groups,
+        :homotopy,
+        :system,
+        :system_scaling,
+        :affine_tracking,
+        :projective_tracking,
+        :start_system,
+        :only_torus,
     ]
     input_supported_keywords
 ]
@@ -364,12 +364,8 @@ function problem_startsolutions(
 )
     Random.seed!(seed)
     supported, rest = splitkwargs(kwargs, input_supported_keywords)
-    input,
-    startsolutions = input_startsolutions(
-        args...;
-        variable_ordering = variable_ordering,
-        supported...,
-    )
+    input, startsolutions =
+        input_startsolutions(args...; variable_ordering = variable_ordering, supported...)
     if variable_ordering !== nothing
         problem_startsolutions(
             input,
@@ -405,9 +401,7 @@ function problem_startsolutions(
 
 
     homvar_info = HomogenizationInformation(;
-        homvar = homvar,
-        homvars = homvars,
-        variable_groups = variable_groups,
+        homvar = homvar, homvars = homvars, variable_groups = variable_groups,
     )
 
     #projective_tracking is for the frontend
@@ -486,13 +480,8 @@ function problem_startsolutions(
         F = input.system
         tracking_type = AffineTracking()
     else
-        F,
-        vargroups,
-        homvars = homogenize_if_necessary(
-            input.system,
-            homvar_info;
-            vars = variable_ordering,
-        )
+        F, vargroups, homvars =
+            homogenize_if_necessary(input.system, homvar_info; vars = variable_ordering)
         tracking_type = ProjectiveTracking()
     end
 
@@ -530,8 +519,7 @@ function problem_startsolutions(
             target_constructor(f),
             vargroups,
             seed;
-            regauging_factors = regauging_factors,
-            kwargs...,
+            regauging_factors = regauging_factors, kwargs...,
         )
         startsolutions = totaldegree_solutions(g, vargroups)
     # We have ngroups(vargroups) == 1
@@ -576,8 +564,7 @@ function problem_startsolutions(
                 target_constructor(f),
                 vargroups,
                 seed;
-                regauging_factors = regauging_factors,
-                kwargs...,
+                regauging_factors = regauging_factors, kwargs...,
             )
         end
         startsolutions = totaldegree_solutions(g, vargroups)
@@ -616,11 +603,8 @@ function problem_startsolutions(
         end
         cell_iter = PolyhedralStartSolutionsIterator(affine_support)
         toric_homotopy = ToricHomotopy(affine_support, cell_iter.start_coefficients)
-        generic_homotopy = CoefficientHomotopy(
-            support,
-            cell_iter.start_coefficients,
-            coeffs,
-        )
+        generic_homotopy =
+            CoefficientHomotopy(support, cell_iter.start_coefficients, coeffs)
 
         if classification == :overdetermined
             # always use fp system for the target system since
@@ -643,8 +627,7 @@ function problem_startsolutions(
                 generic_homotopy,
                 vargroups,
                 seed;
-                regauging_factors = regauging_factors,
-                kwargs...,
+                regauging_factors = regauging_factors, kwargs...,
             )
         end
         startsolutions = cell_iter
@@ -712,11 +695,8 @@ end
 
     degrees, is_homogeneous = degrees_ishomogeneous(input.system)
     variable_groups = VariableGroups(N, hominfo)
-    classification = classify_system(
-        input.system,
-        variable_groups;
-        affine_tracking = !is_homogeneous,
-    )
+    classification =
+        classify_system(input.system, variable_groups; affine_tracking = !is_homogeneous)
 
     # overdetermined
     if classification == :overdetermined
@@ -847,8 +827,7 @@ function problem_startsolutions(
             F̂,
             VariableGroups(vars),
             seed;
-            regauging_factors = regauging_factors,
-            kwargs...,
+            regauging_factors = regauging_factors, kwargs...,
         )
         prob, startsolutions
     end
@@ -875,22 +854,17 @@ function problem_startsolutions(
         homvars = nothing
         F = input.system
     else
-        F,
-        variable_groups,
-        homvars = homogenize_if_necessary(
+        F, variable_groups, homvars = homogenize_if_necessary(
             input.system,
             hominfo;
-            vars = variable_ordering,
-            parameters = input.parameters,
+            vars = variable_ordering, parameters = input.parameters,
         )
     end
     vars = flattened_variable_groups(variable_groups)
     F̂ = construct_system(
         F,
         system;
-        homvars = homvars,
-        variables = vars,
-        parameters = input.parameters,
+        homvars = homvars, variables = vars, parameters = input.parameters,
     )
     H = ParameterHomotopy(F̂, p₁ = input.p₁, p₀ = input.p₀, γ₁ = input.γ₁, γ₀ = input.γ₀)
     Prob(H, variable_groups, seed; startsolutions_need_reordering = !affine_tracking),

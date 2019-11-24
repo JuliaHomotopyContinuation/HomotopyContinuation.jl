@@ -23,15 +23,16 @@ using LinearAlgebra: cond
 using Parameters: @pack!, @unpack
 using DoubleFloats: Double64, ComplexDF64
 using DynamicPolynomials: @polyvar
-using ProjectiveVectors: PVector,
-                         dims,
-                         dimension_indices,
-                         fubini_study,
-                         affine_chart,
-                         ×,
-                         component,
-                         components,
-                         combine
+using ProjectiveVectors:
+    PVector,
+    dims,
+    dimension_indices,
+    fubini_study,
+    affine_chart,
+    ×,
+    component,
+    components,
+    combine
 using StaticArrays: SVector, @SVector
 using Test: @test
 using MixedSubdivisions: mixed_volume
@@ -45,15 +46,15 @@ export variables, nvariables, subs, differentiate, monomials
 export mixed_volume
 export cond
 export ProjectiveVectors,
-       PVector,
-       dims,
-       dimension_indices,
-       affine_chart,
-       fubini_study,
-       ×,
-       component,
-       components,
-       combine
+    PVector,
+    dims,
+    dimension_indices,
+    affine_chart,
+    fubini_study,
+    ×,
+    component,
+    components,
+    combine
 
 include("progress_meter.jl")
 import .ProgressMeter

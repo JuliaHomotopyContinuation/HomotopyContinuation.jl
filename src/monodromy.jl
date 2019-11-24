@@ -1,12 +1,12 @@
 export monodromy_solve,
-       MonodromyResult,
-       real_solutions,
-       is_success,
-       is_heuristic_stop,
-       nreal,
-       parameters,
-       verify_solution_completeness,
-       solution_completeness_witnesses
+    MonodromyResult,
+    real_solutions,
+    is_success,
+    is_heuristic_stop,
+    nreal,
+    parameters,
+    verify_solution_completeness,
+    solution_completeness_witnesses
 
 
 #####################
@@ -274,8 +274,7 @@ function regenerate!(
             options.parameter_sampler(main.p),
             loop.nodes[i],
             options;
-            store_points = store_points,
-            is_main_node = false,
+            store_points = store_points, is_main_node = false,
         )
     end
     loop.edges .= Edge.(loop.edges)
@@ -541,11 +540,7 @@ function MonodromySolver(
     prob, _ = problem_startsolutions(
         F,
         [x₀];
-        parameters = parameters,
-        generic_parameters = p₀,
-        γ₁ = 1,
-        γ₀ = 1,
-        supported...,
+        parameters = parameters, generic_parameters = p₀, γ₁ = 1, γ₀ = 1, supported...,
     )
     tracker =
         CoreTracker(prob, x₀; accuracy = accuracy, precision = PRECISION_ADAPTIVE, rest...)
@@ -658,8 +653,7 @@ from the [`MonodromyResult`](@ref).
 function monodromy_solve(
     F::Union{MPPolys,System};
     parameters = F isa MPPolys ?
-                 throw(ArgumentError("Necessary to set `parameters = ...`.")) :
-                 nothing,
+                 throw(ArgumentError("Necessary to set `parameters = ...`.")) : nothing,
     variable_ordering = nothing,
     seed = randseed(),
     show_progress = true,
@@ -1101,12 +1095,12 @@ function update_progress!(
             ("# paths tracked", statistics.ntrackedpaths),
             ("# loops generated", statistics.nparametergenerations),
             (
-             "# completed loops without change",
-             n_completed_loops_without_change(statistics, nsolutions),
+                "# completed loops without change",
+                n_completed_loops_without_change(statistics, nsolutions),
             ),
             (
-             "# solutions in current loop",
-             n_solutions_current_loop(statistics, nsolutions),
+                "# solutions in current loop",
+                n_solutions_current_loop(statistics, nsolutions),
             ),
             ("# real solutions", statistics.nreal),
         ),
@@ -1214,9 +1208,7 @@ function verify_solution_completeness(
         F,
         W₀₁,
         p₀;
-        show_progress = show_progress,
-        parameters = parameters,
-        kwargs...,
+        show_progress = show_progress, parameters = parameters, kwargs...,
     )
     verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress = show_progress)
 end
@@ -1288,8 +1280,7 @@ function solution_completeness_witnesses(
         S_k₀ = solutions(solve(
             TTS,
             solutions(R₁₀);
-            start_parameters = l₀,
-            target_parameters = k₀,
+            start_parameters = l₀, target_parameters = k₀,
         ))
         new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress = 5)
         if nsolutions(new_result) == nsolutions(best_result)

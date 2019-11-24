@@ -21,10 +21,7 @@
     @testset "path jumping" begin
         solver, starts = solver_startsolutions(
             equations(katsura(5));
-            system = FPSystem,
-            seed = 124232,
-            max_corrector_iters = 6,
-            accuracy = 1e-5,
+            system = FPSystem, seed = 124232, max_corrector_iters = 6, accuracy = 1e-5,
         )
         result_jumping = solve(solver, starts; path_jumping_check = false)
         @test nsolutions(result_jumping) < 32
@@ -44,8 +41,7 @@
     @testset "polyhedral" begin
         solver, starts = solver_startsolutions(
             equations(cyclic(5));
-            seed = 32241,
-            start_system = :polyhedral,
+            seed = 32241, start_system = :polyhedral,
         )
         result = solve(solver, starts)
         @test nsolutions(result) == 70
@@ -55,9 +51,7 @@
         @polyvar x y
         solver, starts = solver_startsolutions(
             [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y];
-            seed = 32241,
-            start_system = :polyhedral,
-            only_torus = true,
+            seed = 32241, start_system = :polyhedral, only_torus = true,
         )
         result = solve(solver, starts, threading = false)
         @test nsolutions(result) == 3
@@ -65,9 +59,7 @@
 
         solver, starts = solver_startsolutions(
             [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y];
-            seed = 32241,
-            start_system = :polyhedral,
-            only_torus = false,
+            seed = 32241, start_system = :polyhedral, only_torus = false,
         )
         result = solve(solver, starts)
         @test nsolutions(result) == 6
@@ -113,7 +105,7 @@
         F = [
             x^2 + 2 * y^2 + 2 * im * y * z,
             (18 + 3 * im) * x * y + 7 * im * y^2 - (3 - 18 * im) * x * z - 14 * y * z -
-            7 * im * z^2,
+                7 * im * z^2,
         ]
         result = solve(F; system = FPSystem)
         @test multiplicity(first(nonsingular(result))) == 1
@@ -127,8 +119,8 @@
         @polyvar x z y
         # This has two roots of multiplicity 6 at the hyperplane z=0
         F = [
-            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
-            0.75 * z^4
+            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 -
+                2.5 * y^2 * z^2 + 0.75 * z^4
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3
         ]
         res = solve(F; system = FPSystem, threading = false, seed = 703127)
@@ -141,8 +133,8 @@
         y = 1
         # This has two roots of multiplicity 6 at the hyperplane z=0
         F = [
-            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
-            0.75 * z^4
+            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 -
+                2.5 * y^2 * z^2 + 0.75 * z^4
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3
         ]
         res = solve(F; system = FPSystem, threading = false, seed = 412312)
@@ -176,9 +168,7 @@
         res = solve(
             F,
             startsolutions;
-            parameters = a,
-            start_parameters = p₁,
-            target_parameters = p₀,
+            parameters = a, start_parameters = p₁, target_parameters = p₀,
         )
         @test nfailed(res) == 1
         @test res[1].return_code == :terminated_invalid_startvalue
@@ -223,10 +213,10 @@
         @polyvar lam[1:k] p[1:6]
         F = [
             (
-             R^2 - r^2 +
-             (p[1] + p[4] * lam[1])^2 +
-             (p[2] + p[5] * lam[1])^2 +
-             (p[3] + p[6] * lam[1])^2
+                R^2 - r^2 +
+                    (p[1] + p[4] * lam[1])^2 +
+                    (p[2] + p[5] * lam[1])^2 +
+                    (p[3] + p[6] * lam[1])^2
             )^2 - 4 * R^2 * ((p[1] + p[4] * lam[1])^2 + (p[2] + p[5] * lam[1])^2),
         ]
         #Randomly choose a start system
@@ -256,12 +246,10 @@
         first_result = nothing
         results = solve(
             [(x - 3) * (x + 6) * (x + 2)];
-            system = FPSystem,
-            stop_early_cb = r -> begin
+            system = FPSystem, stop_early_cb = r -> begin
                 first_result = r
                 true
-            end,
-            threading = false,
+            end, threading = false,
         )
         @test length(results) == 1
         @test first(results) == first_result
@@ -269,9 +257,7 @@
         nresults = 0
         result = solve(
             [(x - 3) * (x + 6) * (x + 2)];
-            system = FPSystem,
-            stop_early_cb = r -> (nresults += 1) == 2,
-            threading = false,
+            system = FPSystem, stop_early_cb = r -> (nresults += 1) == 2, threading = false,
         )
         @test length(result) == 2
 
@@ -283,16 +269,14 @@
         # have less than 64 threads
         results = solve(
             [
-             (x - 3) * (x + 6) * (x + 2) * (x - 2) * (x + 2.5),
-             (y + 2) * (y - 2) * (y + 3) * (y + 5) * (y - 1),
-             (z + 2) * (z - 2) * (z + 3) * (z + 5) * (z - 2.1),
+                (x - 3) * (x + 6) * (x + 2) * (x - 2) * (x + 2.5),
+                (y + 2) * (y - 2) * (y + 3) * (y + 5) * (y - 1),
+                (z + 2) * (z - 2) * (z + 3) * (z + 5) * (z - 2.1),
             ];
-            system = FPSystem,
-            stop_early_cb = r -> begin
+            system = FPSystem, stop_early_cb = r -> begin
                 first_result = r
                 true
-            end,
-            threading = true,
+            end, threading = true,
         )
         @test length(results) < 125
     end
@@ -317,10 +301,7 @@
         r2 = solve(
             F,
             [√2, √2];
-            variable_ordering = [y, x],
-            parameters = p,
-            p₁ = [2, 0],
-            p₀ = [2, 4],
+            variable_ordering = [y, x], parameters = p, p₁ = [2, 0], p₀ = [2, 4],
         )
         s2 = solution(first(r2))
 

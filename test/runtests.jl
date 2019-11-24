@@ -4,13 +4,8 @@ import TreeViews, ProjectiveVectors, PolynomialTestSystems
 import FiniteDifferences
 const FD = FiniteDifferences
 
-import PolynomialTestSystems: cyclic,
-                              cyclooctane,
-                              katsura,
-                              equations,
-                              ipp2,
-                              heart,
-                              griewank_osborne
+import PolynomialTestSystems:
+    cyclic, cyclooctane, katsura, equations, ipp2, heart, griewank_osborne
 const HC = HomotopyContinuation
 
 function test_treeviews(x)

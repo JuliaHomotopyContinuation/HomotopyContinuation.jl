@@ -108,9 +108,7 @@
         f = [(x - 3)^5]
         tracker, starts = coretracker_startsolutions(
             f;
-            seed = 1234,
-            min_step_size = eps()^2,
-            log_homotopy = true,
+            seed = 1234, min_step_size = eps()^2, log_homotopy = true,
         )
         S = collect(starts)
         tracker.options.precision = PRECISION_ADAPTIVE

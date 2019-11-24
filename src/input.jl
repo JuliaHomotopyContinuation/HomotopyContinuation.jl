@@ -1,8 +1,5 @@
 export AbstractInput,
-       StartTargetInput,
-       TargetSystemInput,
-       HomotopyInput,
-       ParameterSystemInput
+    StartTargetInput, TargetSystemInput, HomotopyInput, ParameterSystemInput
 
 const Inputs = Union{AbstractSystem,MPPolys,Composition,ModelKit.System}
 const MPPolyInputs = Union{MPPolys,Composition}
@@ -242,8 +239,8 @@ function parameter_homotopy(
     end
 
     (
-     input = ParameterSystemInput(F, parameters, p₁, p₀, γ₁, γ₀),
-     startsolutions = startsolutions,
+        input = ParameterSystemInput(F, parameters, p₁, p₀, γ₁, γ₀),
+        startsolutions = startsolutions,
     )
 end
 

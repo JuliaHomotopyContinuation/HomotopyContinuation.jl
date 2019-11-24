@@ -34,9 +34,7 @@
         @var x y
         result = solve(
             [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y];
-            variable_ordering = [x, y],
-            seed = 32241,
-            start_system = :polyhedral,
+            variable_ordering = [x, y], seed = 32241, start_system = :polyhedral,
         )
         @test nsolutions(result) == 6
 
@@ -56,8 +54,7 @@
         res = solve(
             f,
             [[1, -1], [1, 1], [-1, 1], [-1, -1]];
-            start_parameters = [1, 1],
-            target_parameters = [3, 4],
+            start_parameters = [1, 1], target_parameters = [3, 4],
         )
         @test nnonsingular(res) == 4
 
@@ -65,8 +62,7 @@
         res = solve(
             f,
             [[1, -1], [1, 1], [-1, 1], [-1, -1]];
-            start_parameters = [1, 1],
-            target_parameters = [3, 4],
+            start_parameters = [1, 1], target_parameters = [3, 4],
         )
         @test nnonsingular(res) == 4
 
@@ -120,9 +116,7 @@
             F,
             s₀,
             u₀;
-            threading = false,
-            target_solutions_count = 36,
-            seed = 1312,
+            threading = false, target_solutions_count = 36, seed = 1312,
         )
         @test nsolutions(res) == 36
 
