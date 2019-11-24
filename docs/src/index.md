@@ -11,6 +11,7 @@ Pages = [
     "solving.md",
     "solver.md",
     "monodromy.md",
+    "input.md",
     "path_tracker.md",
     "core_tracker.md",
     "homotopies.md",
