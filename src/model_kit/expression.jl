@@ -161,6 +161,7 @@ Operation(func::Symbol, a::Expression, b::Expression) = Operation(func, Expressi
 Base.:(==)(x::Operation, y::Operation) = (x.func === y.func) && (x.args == y.args)
 Base.hash(I::Operation, h::UInt) = foldr(hash, I.args, init = hash(I.func, h))
 Base.convert(::Type{Operation}, c::Constant) = Operation(:identity, c)
+Base.convert(::Type{Operation}, v::Variable) = Operation(:identity, v)
 Base.convert(::Type{Expr}, op::Operation) = Expr(:call, op.func, convert.(Expr, op.args)...)
 
 Base.show(io::IO, op::Operation) = print(io, flattened_expr(op))
