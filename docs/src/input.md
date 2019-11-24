@@ -6,8 +6,8 @@ accept multiple input formats for polynomial systems. These are
 * Arrays of polynomials following the [`MultivariatePolynomials`](https://github.com/JuliaAlgebra/MultivariatePolynomials.jl) interface. We export the `@polyvar` macro from the
   [`DynamicPolynomials`](https://github.com/JuliaAlgebra/DynamicPolynomials.jl) package to
   create polynomials with the `DynamicPolynomials` implementation.
-* Systems constructed with our own symbolic modelling language as implemented in the `ModelKit` module.
-  We export the `@var` macro to create variables in this modelling language.
+* Systems constructed with our own symbolic modeling language as implemented in the `ModelKit` module.
+  We export the `@var` macro to create variables in this modeling language.
 * Systems (resp. homotopies) following the [`AbstractSystem`](@ref) (resp. [`AbstractHomotopy`](@ref))
   interface.
 
@@ -64,7 +64,7 @@ In this case the polynomial input will generate more efficient code since it is 
 optimized for this case.
 
 Besides the different macros to generate variables both packages provide a common set
-of helpful functions for modelling problems:
+of helpful functions for modeling problems:
 
 * `variables(f, parameters = [])` to obtain a list of all variables.
 * `nvariables(f, parameters = [])` to obtain the number of variables.
