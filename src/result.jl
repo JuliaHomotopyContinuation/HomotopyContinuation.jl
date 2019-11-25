@@ -1,26 +1,26 @@
 export Result,
-       nresults,
-       nsolutions,
-       nfinite,
-       nsingular,
-       nat_infinity,
-       nfailed,
-       nnonsingular,
-       nreal,
-       ntracked,
-       finite,
-       results,
-       mapresults,
-       failed,
-       at_infinity,
-       singular,
-       nonsingular,
-       seed,
-       solutions,
-       real_solutions,
-       multiplicities,
-       statistics,
-       multiplicities!
+    nresults,
+    nsolutions,
+    nfinite,
+    nsingular,
+    nat_infinity,
+    nfailed,
+    nnonsingular,
+    nreal,
+    ntracked,
+    finite,
+    results,
+    mapresults,
+    failed,
+    at_infinity,
+    singular,
+    nonsingular,
+    seed,
+    solutions,
+    real_solutions,
+    multiplicities,
+    statistics,
+    multiplicities!
 
 ######################
 ## MultiplicityInfo ##
@@ -175,7 +175,7 @@ function nresults(
 )
     count(R) do r
         (
-         !only_real || is_real(r, real_tol)
+            !only_real || is_real(r, real_tol)
         ) && (
             !only_nonsingular || is_nonsingular(r, singular_tol)
         ) && (
@@ -246,16 +246,16 @@ function statistics(
         end
     end
     (
-     nonsingular = nonsingular,
-     singular = singular,
-     singular_with_multiplicity = singular_with_multiplicity,
-     real_nonsingular = real_nonsingular,
-     real_singular = real_singular,
-     real_singular_with_multiplicity = real_singular_with_multiplicity,
-     real = real_nonsingular + real_singular,
-     at_infinity = at_infinity,
-     failed = failed,
-     total = R.tracked_paths,
+        nonsingular = nonsingular,
+        singular = singular,
+        singular_with_multiplicity = singular_with_multiplicity,
+        real_nonsingular = real_nonsingular,
+        real_singular = real_singular,
+        real_singular_with_multiplicity = real_singular_with_multiplicity,
+        real = real_nonsingular + real_singular,
+        at_infinity = at_infinity,
+        failed = failed,
+        total = R.tracked_paths,
     )
 end
 
@@ -394,19 +394,19 @@ function mapresults(
     multiple_results = false,
 )
     [
-     f(r)
-     for r in R if (!only_real || is_real(
-         r,
-         real_tol,
-     )) && (!only_nonsingular || is_nonsingular(
-         r,
-         singular_tol,
-     )) && (!only_singular || is_singular(
-         r,
-         singular_tol,
-     )) && (!onlyfinite || isfinite(r) || is_projective(
-         r,
-     )) && (multiple_results || !is_multiple_result(r, R))
+        f(r)
+        for r in R if (!only_real || is_real(
+            r,
+            real_tol,
+        )) && (!only_nonsingular || is_nonsingular(
+            r,
+            singular_tol,
+        )) && (!only_singular || is_singular(
+            r,
+            singular_tol,
+        )) && (!onlyfinite || isfinite(
+            r,
+        ) || is_projective(r)) && (multiple_results || !is_multiple_result(r, R))
     ]
 end
 
@@ -570,8 +570,8 @@ TreeViews.numberofnodes(::ProjectiveResult) = 7
 TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline") = print(
     io,
     "<span class=\"syntax--support syntax--type syntax--julia\">" *
-    "Result{$(solution_type(x))}" *
-    "</span>",
+        "Result{$(solution_type(x))}" *
+        "</span>",
 )
 
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")

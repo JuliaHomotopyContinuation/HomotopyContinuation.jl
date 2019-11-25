@@ -1,16 +1,16 @@
 export is_homogeneous,
-       homogenize,
-       uniquevar,
-       Composition,
-       expand,
-       compose,
-       validate,
-       precondition,
-       normalize_coefficients,
-       linear_system
+    homogenize,
+    uniquevar,
+    Composition,
+    expand,
+    compose,
+    validate,
+    precondition,
+    normalize_coefficients,
+    linear_system
 
 const MPPoly{T} = MP.AbstractPolynomialLike{T}
-const MPPolys{T} = Vector{<:MP.AbstractPolynomialLike{T}}
+const MPPolys = AbstractVector{<:MP.AbstractPolynomialLike}
 const WeightedVariable = Tuple{<:MP.AbstractVariable,Int}
 
 ##############
@@ -28,7 +28,7 @@ mutable struct Composition{T<:MP.AbstractPolynomialLike} <: AbstractComposition
     polys::Vector{Vector{T}} # polys = [f1, f2, f3] -> f1 ∘ f2 ∘ f3
 end
 
-Base.length(C::Composition) = length(C.polys)
+Base.length(C::Composition) = length(C.polys[1])
 Base.:(==)(C::Composition, D::Composition) = C.polys == D.polys
 
 """
@@ -67,7 +67,7 @@ Scale a composition by λ.
 """
 scale(C::Composition, λ) = Composition([[C.polys[1] .* λ]; C.polys[2:end]])
 
-function subs_into_composition(C::Composition, args...)
+function MP.subs(C::Composition, args::MP.AbstractSubstitution...)
     p = map(pᵢ -> MP.subs(pᵢ, args...), C.polys[end])
     Composition([C.polys[1:end-1]; [p]])
 end
@@ -94,7 +94,7 @@ function expand(C::Composition; parameters = nothing)
             g = f
             continue
         end
-        vars = variables(f, parameters = parameters)
+        vars = variables(f, parameters)
         g = map(fᵢ -> MP.subs(fᵢ, vars => g), f)
     end
     g
@@ -112,7 +112,7 @@ function validate(C::Composition; parameters = nothing)
             g = f
             continue
         end
-        nvars = length(variables(f, parameters = parameters))
+        nvars = length(variables(f, parameters))
         if nvars !== length(g)
             return false
         end
@@ -173,7 +173,7 @@ function add_variable_groups(
 )
     if HI.vargroups === nothing
         if length(HI.homvars) == 1
-            vargroups = (variables(F; parameters = parameters),)
+            vargroups = (variables(F, parameters),)
             return HomogenizationInformation(HI.homvars, vargroups)
         else
             error("Cannot add variable groups")
@@ -385,58 +385,36 @@ end
 ##############
 # POLYNOMIALS
 #############
-"""
-    variables(F; parameters=nothing)
-
-Returns the variables occuring in `F`.
-"""
-function variables(polys::Union{MPPoly,MPPolys}; parameters = nothing, weights = nothing)
-    variables = MP.variables(polys)
-    if parameters !== nothing
-        setdiff!(variables, parameters)
-    end
-    if weights === nothing
-        variables
-    else
-        zip(variables, weights)
-    end
+function variables(
+    polys::Union{MPPoly,MPPolys},
+    params::AbstractVector{<:MP.AbstractVariable},
+)
+    setdiff!(variables(polys), params)
 end
-variables(C::Composition; kwargs...) = variables(C.polys[end]; kwargs...)
+variables(C::Composition) = variables(C.polys[end])
+variables(C::Composition, p::AbstractVector{<:MP.AbstractVariable}) =
+    variables(C.polys[end], p)
+variables(p::Union{MPPoly,MPPolys,Composition}, ::Nothing) = variables(p)
 
 
 """
-    hasparameters(F, parameters=nothing)
+    hasparameters(F, parameters)
 
 Returns `true` if the parameters occur in F.
 """
 function hasparameters(polys::Union{MPPoly,MPPolys}, parameters = nothing)
-    parameters === nothing && return false
-
-    variables = MP.variables(polys)
-    for p in parameters
-        if p in variables
-            return true
-        end
-    end
-    false
+    isnothing(parameters) && return false
+    vars = variables(polys)
+    any(p -> p in vars, parameters)
 end
 
 """
-    nvariables(polys; parameters=nothing)
+    nvariables(polys, parameters)
 
 Returns the number of variables occuring in `polys`.
 """
-function nvariables(F::Union{Composition,MPPolys}; parameters = nothing)
-    length(variables(F, parameters = parameters))
-end
-
-"""
-    npolynomials(F)
-
-Returns the number of polynomials occuring in `F`.
-"""
-npolynomials(F::MPPolys) = length(F)
-npolynomials(F::Composition) = length(F.polys[1])
+nvariables(F::MPPolys, p::AbstractVector{<:MP.AbstractVariable}) = length(variables(F, p))
+nvariables(C::Composition, p = nothing) = length(variables(C, p))
 
 
 """
@@ -464,7 +442,7 @@ function is_homogeneous(F::MPPolys, variables)
 end
 function is_homogeneous(F::MPPolys, ::Nothing = nothing; parameters = nothing)
     if parameters !== nothing
-        is_homogeneous(F, variables(F, parameters = parameters))
+        is_homogeneous(F, variables(F, parameters))
     else
         all(is_homogeneous, F)
     end
@@ -477,7 +455,7 @@ function is_homogeneous(
     if hominfo.vargroups !== nothing
         all(vars -> is_homogeneous(F, vars), hominfo.vargroups)
     elseif parameters !== nothing
-        is_homogeneous(F, variables(F, parameters = parameters))
+        is_homogeneous(F, variables(F, parameters))
     else
         all(is_homogeneous, F)
     end
@@ -501,7 +479,10 @@ function homogeneous_degrees_helper(C::Composition; parameters = nothing, weight
     weights
 end
 function homogeneous_degrees_helper(F::MPPolys; parameters = nothing, weights = nothing)
-    vars = variables(F, parameters = parameters, weights = weights)
+    vars = variables(F, parameters)
+    if !isnothing(weights)
+        vars = zip(vars, weights)
+    end
     degrees = Int[]
     for f in F
         mindeg, maxdeg = minmaxdegree(f, vars)
@@ -556,7 +537,10 @@ end
 Computes the degrees of the polynomials of `F`.
 """
 function maxdegrees(F::MPPolys; parameters = nothing, weights = nothing)
-    vars = variables(F, parameters = parameters, weights = weights)
+    vars = variables(F, parameters)
+    if !isnothing(weights)
+        vars = zip(vars, weights)
+    end
     last.(minmaxdegree.(F, Ref(vars)))
 end
 function maxdegrees(C::Composition; parameters = nothing)
@@ -668,17 +652,12 @@ Homogenize the variables `v` in the polynomial `f` by using the given variable `
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """
 function homogenize(f::MP.AbstractPolynomialLike, var = uniquevar(f); parameters = nothing)
-    vars = variables(f; parameters = parameters)
-    homogenize(f, vars, var)
+    homogenize(f, variables(f, parameters), var)
 end
-function homogenize(
-    f::MP.AbstractPolynomialLike,
-    variables::Vector,
-    var::MP.AbstractVariable = uniquevar(f),
-)
-    _, d_max = minmaxdegree(f, variables)
+function homogenize(f::MP.AbstractPolynomialLike, vars::Vector, var = uniquevar(f))
+    _, d_max = minmaxdegree(f, vars)
     MP.polynomial(map(f) do t
-        d = degree(t, variables)
+        d = degree(t, vars)
         var^(d_max - d) * t
     end)
 end
@@ -691,7 +670,7 @@ function homogenize(f::MP.AbstractPolynomialLike, hominfo::HomogenizationInforma
 end
 
 function homogenize(F::MPPolys, var = uniquevar(F); parameters = nothing)
-    homogenize(F, variables(F, parameters = parameters), var)
+    homogenize(F, variables(F, parameters), var)
 end
 function homogenize(F::MPPolys, variables::Vector, var::MP.AbstractVariable = uniquevar(F))
     map(f -> homogenize(f, variables, var), F)
@@ -701,24 +680,22 @@ function homogenize(F::MPPolys, hominfo::HomogenizationInformation)
 end
 function homogenize(
     C::Composition,
-    var::MP.AbstractVariable = uniquevar(C.polys[1]);
+    var = uniquevar(C.polys[1]);
     parameters = nothing,
     weights = nothing,
 )
-    polys =
-        map(length(C.polys):-1:1) do k
-            f̄, weights = homogenize_degrees(
-                C.polys[k],
-                var;
-                parameters = parameters,
-                weights = weights,
-            )
-            if k > 1
-                push!(f̄, var)
-                push!(weights, 1)
-            end
-            f̄
+    polys = map(length(C.polys):-1:1) do k
+        f̄, weights = homogenize_degrees(
+            C.polys[k],
+            var;
+            parameters = parameters, weights = weights,
+        )
+        if k > 1
+            push!(f̄, var)
+            push!(weights, 1)
         end
+        f̄
+    end
     Composition(reverse!(polys))
 end
 
@@ -759,7 +736,7 @@ function homogenize_degrees(
     parameters = nothing,
     weights = nothing,
 )
-    allvars = variables(F, parameters = parameters)
+    allvars = variables(F, parameters)
     if weights !== nothing
         homogenize_degrees(F, zip(allvars, weights), var)
     else
@@ -805,7 +782,7 @@ Check that the given polynomial system can have zero dimensional components.
 """
 function check_zero_dimensional(F::Union{MPPolys,Composition})
     N = nvariables(F)
-    n = npolynomials(F)
+    n = length(F)
 
     if n ≥ N || (n == N - 1 && is_homogeneous(F))
         return nothing
@@ -827,7 +804,7 @@ function homogenize_if_necessary(
     parameters = nothing,
 )
     if vars === nothing
-        vars = variables(F, parameters = parameters)
+        vars = variables(F, parameters)
     end
 
     # This fills in the simple variable group (allvars,)
@@ -870,7 +847,7 @@ end
 Returns a symbol indicating whether `F` is `:square`, `:overdetermined` or `:underdetermined`.
 """
 function classify_system(F, vargroups::VariableGroups; affine_tracking = false)
-    n = npolynomials(F) - nvariables(vargroups)
+    n = length(F) - nvariables(vargroups)
     if !affine_tracking
         n += ngroups(vargroups)
     end
@@ -946,7 +923,7 @@ function multinomial(k::Vector{Int})
 end
 
 """
-	precondition(f::Union{MPPolys,Composition}, variables=MP.variables(f))
+	precondition(f::Union{MPPolys,Composition}, variables=variables(f))
 
 Rescale the equations and variables of `f` following the heuristic described in [1].
 Returns the scaled system and a vector of scaling factors of the variables.
@@ -955,13 +932,13 @@ Returns the scaled system and a vector of scaling factors of the variables.
 	Lee, T.L., Li, T.Y. & Tsai, C.H. Computing (2008) 83: 109.
 	https://doi.org/10.1007/s00607-008-0015-6
 """
-function precondition(f::Composition, variables = MP.variables(f))
+function precondition(f::Composition, variables = variables(f))
     vars, equations = preconditioning_factors(expand(f), variables)
     y = vars .* variables
-    scale(subs_into_composition(f, variables => y), equations), vars
+    scale(subs(f, variables => y), equations), vars
 end
 
-function precondition(f::MPPolys, variables = MP.variables(f))
+function precondition(f::MPPolys, variables = variables(f))
     vars, equations = preconditioning_factors(f, variables)
     y = vars .* variables
     map(equations, f) do c, fᵢ
@@ -1051,7 +1028,7 @@ julia> b
   2
 ```
 """
-function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = MP.variables(f))
+function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = variables(f))
     n = length(vars)
     A = zeros(MP.coefficienttype(f[1]), length(f), n)
     b = zeros(eltype(A), length(f))
@@ -1074,4 +1051,67 @@ function linear_system(f::Vector{<:MP.AbstractPolynomialLike}, vars = MP.variabl
         end
     end
     A, b
+end
+
+
+
+"""
+    monomials(vars::Vector{<:PolyVar}, d; homogeneous::Bool = false)
+
+Create all monomials of a given degree.
+
+```
+julia> @polyvar x y
+(x, y)
+
+julia> monomials([x,y], 2)
+6-element Array{Monomial{true},1}:
+ x²
+ xy
+ y²
+ x
+ y
+ 1
+
+julia> monomials([x,y], 2; homogeneous = true)
+3-element Array{Monomial{true},1}:
+ x²
+ xy
+ y²
+```
+"""
+function monomials(
+    vars::AbstractVector{<:DynamicPolynomials.PolyVar},
+    d::Int;
+    homogeneous::Bool = false,
+)
+    n = length(vars)
+    if homogeneous
+        pred = x -> sum(x) == d
+    else
+        pred = x -> sum(x) ≤ d
+    end
+    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
+    sort!(exps, lt = td_order, rev = true)
+    map(exps) do exp
+        prod(i -> vars[i]^exp[i], 1:n)
+    end
+end
+function td_order(x, y)
+    sx = sum(x)
+    sy = sum(y)
+    sx == sy ? x < y : sx < sy
+end
+
+################
+## ModelKit ##
+################
+
+polyvar(v::ModelKit.Variable) = DynamicPolynomials.PolyVar{true}(string(v.name))
+function maxdegrees(F::ModelKit.System; parameters = F.parameters)
+    variables = setdiff!([F.variables; F.parameters], parameters)
+    vars = polyvar.(variables)
+    params = polyvar.(parameters)
+    P = evaluate(F.expressions, variables => vars, parameters => params)
+    maxdegrees(P; parameters = params)
 end

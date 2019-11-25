@@ -1,14 +1,11 @@
 using Test, LinearAlgebra, Random
 using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
+import FiniteDifferences
+const FD = FiniteDifferences
 
-import PolynomialTestSystems: cyclic,
-                              cyclooctane,
-                              katsura,
-                              equations,
-                              ipp2,
-                              heart,
-                              griewank_osborne
+import PolynomialTestSystems:
+    cyclic, cyclooctane, katsura, equations, ipp2, heart, griewank_osborne
 const HC = HomotopyContinuation
 
 function test_treeviews(x)
@@ -26,6 +23,7 @@ end
 
 # We order the tests such that isolated things are tested first
 @testset "HomotopyContinuation" begin
+    include("model_kit_test.jl")
     include("utilities_test.jl")
     include("norms_test.jl")
     include("linear_algebra_test.jl")
@@ -44,6 +42,7 @@ end
     include("solver_test.jl")
     include("result_test.jl")
     include("composition_test.jl")
+    include("model_kit_integration.jl")
     include("monodromy_test.jl")
     include("root_count_test.jl")
     include("path_info_test.jl")

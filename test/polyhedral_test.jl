@@ -30,8 +30,7 @@
     @testset "Tracking" begin
         tracker, starts = pathtracker_startsolutions(
             equations(cyclic(5));
-            start_system = :polyhedral,
-            seed = 123122,
+            start_system = :polyhedral, seed = 123122,
         )
         S = collect(starts)
         HC.prepare!(tracker, starts)
@@ -40,9 +39,7 @@
         @polyvar x y
         tracker, starts = pathtracker_startsolutions(
             [(x - 3), (y - 2)];
-            start_system = :polyhedral,
-            system_scaling = nothing,
-            seed = 23121,
+            start_system = :polyhedral, system_scaling = nothing, seed = 23121,
         )
         S = collect(starts)
         HC.prepare!(tracker, starts)

@@ -255,6 +255,7 @@
             min_step_size = eps()^2,
             accuracy = 1e-7,
             precision = PRECISION_FIXED_64,
+            seed = 131232,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -272,6 +273,7 @@
             min_step_size = eps()^2,
             accuracy = 1e-7,
             precision = :double,
+            seed = 131232,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(
@@ -290,6 +292,7 @@
             min_step_size = eps()^2,
             accuracy = 1e-7,
             precision = :double_double,
+            seed = 131232,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -302,6 +305,7 @@
             min_step_size = eps()^2,
             accuracy = 1e-7,
             precision = :adaptive,
+            seed = 131232,
         )
         results = map(s -> track(tracker, s, 0.0, 70), S)
         @test all(is_success, results)
@@ -313,6 +317,7 @@
             S;
             log_homotopy = true,
             precision = :NOT_A_PRECISION,
+            seed = 131232,
         )
     end
 

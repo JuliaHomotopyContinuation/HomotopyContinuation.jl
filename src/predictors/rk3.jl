@@ -17,7 +17,7 @@ struct RK3Cache{T} <: AbstractPredictorCache
 end
 
 function cache(::RK3, H, x, ẋ, t)
-    RK3Cache(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))
+    RK3Cache(promote(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))...)
 end
 #
 function predict!(

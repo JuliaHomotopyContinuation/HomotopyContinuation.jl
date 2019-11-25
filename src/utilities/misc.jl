@@ -1,11 +1,11 @@
 export SymmetricGroup,
-       infinity_norm,
-       infinity_distance,
-       fubini_study,
-       PrecisionOption,
-       PRECISION_ADAPTIVE,
-       PRECISION_FIXED_64,
-       PRECISION_FIXED_128
+    infinity_norm,
+    infinity_distance,
+    fubini_study,
+    PrecisionOption,
+    PRECISION_ADAPTIVE,
+    PRECISION_FIXED_64,
+    PRECISION_FIXED_128
 
 
 """

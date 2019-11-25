@@ -1,11 +1,8 @@
 export AbstractInput,
-       StartTargetInput,
-       TargetSystemInput,
-       HomotopyInput,
-       ParameterSystemInput
+    StartTargetInput, TargetSystemInput, HomotopyInput, ParameterSystemInput
 
-const Inputs = Union{<:AbstractSystem,<:MPPolys,<:Composition}
-const MPPolyInputs = Union{<:MPPolys,<:Composition}
+const Inputs = Union{AbstractSystem,MPPolys,Composition,ModelKit.System}
+const MPPolyInputs = Union{MPPolys,Composition}
 
 const input_supported_keywords = [
     :parameters,
@@ -18,6 +15,7 @@ const input_supported_keywords = [
     :p₀,
     :γ₁,
     :γ₀,
+    :variable_ordering,
     # deprecated
     :startparameters,
     :targetparameters,
@@ -85,8 +83,8 @@ struct ParameterSystemInput{S<:Inputs} <: AbstractInput
     parameters::Union{Nothing,Vector{<:MP.AbstractVariable}}
     p₁::AbstractVector
     p₀::AbstractVector
-    γ₁::Union{Nothing,ComplexF64}
-    γ₀::Union{Nothing,ComplexF64}
+    γ₁
+    γ₀
 end
 
 """
@@ -100,52 +98,77 @@ Construct an `AbstractInput` and pass through startsolutions if provided.
 Returns a named tuple `(input=..., startsolutions=...)`.
 """
 function input_startsolutions(
-    F::MPPolyInputs;
-    variables = nothing,
-    parameters = nothing,
+    F::Union{MPPolyInputs,ModelKit.System};
+    variable_ordering = nothing,
+    # parameter homotopy indication,
+    generic_parameters = nothing,
+    start_parameters = generic_parameters,
+    p₁ = start_parameters,
+    target_parameters = generic_parameters,
+    p₀ = target_parameters,
     kwargs...,
 )
-    # if parameters !== nothing this is actually the
-    # input constructor for a parameter homotopy, but no startsolutions
-    # are provided
-    if parameters !== nothing
-        startsolutions = [randn(ComplexF64, nvariables(F, parameters = parameters))]
-        return input_startsolutions(
+    # if p₀ or p₁ is provided this is actually the input constructor
+    # for a parameter homotopy, but no startsolutions are provided
+    if !isnothing(p₁) || !isnothing(p₀)
+        return parameter_homotopy(
             F,
-            startsolutions;
-            variables = variables,
-            parameters = parameters,
+            nothing;
+            variable_ordering = variable_ordering,
+            p₁ = p₁,
+            p₀ = p₀,
             kwargs...,
         )
     end
 
-    if variables !== nothing && nvariables(F) != length(variables)
-        throw(ArgumentError("Number of assigned variables is too small."))
-    end
-
-    remove_zeros!(F)
-    if has_constant_polynomial(F)
-        throw(ArgumentError("System contains a non-zero constant polynomial."))
+    if isa(F, MPPolyInputs)
+        if variable_ordering !== nothing && nvariables(F) != length(variable_ordering)
+            throw(ArgumentError("Number of assigned variables is too small."))
+        end
+        remove_zeros!(F)
+        if has_constant_polynomial(F)
+            throw(ArgumentError("System contains a non-zero constant polynomial."))
+        end
     end
 
     (input = TargetSystemInput(F), startsolutions = nothing)
 end
 
-function input_startsolutions(F::AbstractSystem; variables = nothing)
+function input_startsolutions(F::AbstractSystem; variable_ordering = nothing)
     (input = TargetSystemInput(F), startsolutions = nothing)
+end
+
+# create ModelKit.System and use this case
+function input_startsolutions(
+    F::Vector{<:ModelKit.Expression},
+    args...;
+    variable_ordering::Union{Nothing,Vector{ModelKit.Variable}} = nothing,
+    parameters::Union{Nothing,Vector{ModelKit.Variable}} = nothing,
+    kwargs...,
+)
+    if variable_ordering === nothing
+        throw(ArgumentError("`variable_ordering = ...` needs to be passed as a keyword argument to indicate the order of the variables."))
+    end
+    if isnothing(parameters)
+        system = ModelKit.System(F, variable_ordering)
+    else
+        system = ModelKit.System(F, variable_ordering, parameters)
+    end
+    input_startsolutions(system, args...; kwargs...)
 end
 
 function input_startsolutions(
     G::MPPolyInputs,
     F::MPPolyInputs,
     startsolutions = nothing;
-    variables = nothing,
+    variable_ordering = nothing,
 )
     if length(G) ≠ length(F)
         throw(ArgumentError("Start and target system don't have the same length"))
     end
-    if variables !== nothing && (
-        nvariables(F) != length(variables) || nvariables(G) != length(variables)
+    if variable_ordering !== nothing && (
+        nvariables(F) != length(variable_ordering) ||
+        nvariables(G) != length(variable_ordering)
     )
         throw(ArgumentError("Number of assigned variables is too small."))
     end
@@ -161,19 +184,16 @@ end
 
 
 # need
-input_startsolutions(F::MPPolyInputs, starts; kwargs...) =
-    parameter_homotopy(F, starts; kwargs...)
-input_startsolutions(F::AbstractSystem, starts; variables = nothing, kwargs...) =
+input_startsolutions(F::Inputs, starts; kwargs...) =
     parameter_homotopy(F, starts; kwargs...)
 
 function parameter_homotopy(
     F::Inputs,
     startsolutions;
-    variables = nothing,
-    parameters = (
-        isa(F, AbstractSystem) ? nothing :
-        error(ArgumentError("You need to pass `parameters=...` as a keyword argument."))
-    ),
+    parameters = F isa MPPolyInputs ?
+                 throw(ArgumentError("Argument `parameters = ...` needs to be provided.")) :
+                 nothing,
+    variable_ordering = nothing,
     generic_parameters = nothing,
     start_parameters = generic_parameters,
     p₁ = start_parameters,
@@ -183,61 +203,52 @@ function parameter_homotopy(
     γ₁ = start_gamma,
     target_gamma = nothing,
     γ₀ = target_gamma,
-    # deprecated in 0.7
-    startparameters = nothing,
-    targetparameters = nothing,
-    startgamma = nothing,
-    targetgamma = nothing,
 )
-
-    # deprecation handling
-    @deprecatekwarg startparameters start_parameters
-    @deprecatekwarg targetparameters target_parameters
-    @deprecatekwarg startgamma start_gamma
-    @deprecatekwarg targetgamma target_gamma
-
-    if γ₁ === nothing
-        γ₁ = start_gamma
+    if isnothing(p₁)
+        throw(ArgumentError(
+            "You need to pass `generic_parameters = ...`, " *
+            "`start_parameters = ...` or `p₁ = ...` as a keyword argument",
+        ))
     end
-    if γ₀ === nothing
-        γ₀ = target_gamma
+    if isnothing(p₀)
+        throw(ArgumentError(
+            "`target_parameters = ...` or `p₀ = ...` need " *
+            "to be passed as a keyword argument.",
+        ))
     end
-    if p₁ === nothing
-        p₁ = start_parameters
+    if length(p₁) != length(p₀)
+        throw(ArgumentError("Number of parameters doesn't match!"))
     end
-    if p₀ === nothing
-        p₀ = target_parameters
+    if F isa MPPolyInputs && length(parameters) != length(p₀)
+        throw(ArgumentError("Number of parameters doesn't match!"))
     end
-
-
-    if p₁ === nothing
-        error("You need to pass `generic_parameters=`, `start_parameters=` or `p₁=` as a keyword argument")
-    elseif p₀ === nothing
-        error("`target_parameters=` or `p₀=` need to be passed as a keyword argument.")
+    if F isa MPPolyInputs && !isnothing(variable_ordering) &&
+       nvariables(F, parameters) != length(variable_ordering)
+        throw(ArgumentError("Number of assigned variables is too small."))
     end
 
-    if length(p₁) != length(
-        p₀,
-    ) || (parameters !== nothing && length(parameters) != length(p₀))
-        error("Number of parameters doesn't match!")
+    if F isa MPPolyInputs && variable_ordering !== nothing &&
+       nvariables(F, parameters) != length(variable_ordering)
+        throw(ArgumentError("Number of assigned variables is too small."))
     end
-    if startsolutions === nothing && parameters !== nothing
-        startsolutions = [randn(ComplexF64, nvariables(F, parameters = parameters))]
+
+    if isnothing(startsolutions)
+        startsolutions = [randn(ComplexF64, nvariables(F, parameters))]
     elseif isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end
 
-    if variables !== nothing && nvariables(F; parameters = parameters) != length(variables)
-        throw(ArgumentError("Number of assigned variables is too small."))
-    end
-
     (
-     input = ParameterSystemInput(F, parameters, p₁, p₀, γ₁, γ₀),
-     startsolutions = startsolutions,
+        input = ParameterSystemInput(F, parameters, p₁, p₀, γ₁, γ₀),
+        startsolutions = startsolutions,
     )
 end
 
-function input_startsolutions(H::AbstractHomotopy, startsolutions; variables = nothing)
+function input_startsolutions(
+    H::AbstractHomotopy,
+    startsolutions;
+    variable_ordering = nothing,
+)
     if isa(startsolutions, AbstractVector{<:Number})
         startsolutions = [startsolutions]
     end

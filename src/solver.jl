@@ -31,10 +31,10 @@ end
 
 function consolidated_stats(stats::Vector{SolveStats})
     (
-     regular = sum(s.regular for s in stats),
-     regular_real = sum(s.regular_real for s in stats),
-     singular = sum(s.singular for s in stats),
-     singular_real = sum(s.singular_real for s in stats),
+        regular = sum(s.regular for s in stats),
+        regular_real = sum(s.regular_real for s in stats),
+        singular = sum(s.singular for s in stats),
+        singular_real = sum(s.singular_real for s in stats),
     )
 end
 
@@ -553,8 +553,7 @@ function solve(
             solver, start_solutions = solver_startsolutions(
                 F,
                 starts;
-                target_parameters = target_parameters,
-                rest...,
+                target_parameters = target_parameters, rest...,
             )
         else
             solver, start_solutions = solver_startsolutions(F, starts; rest...)
@@ -903,8 +902,7 @@ function solver(
             solver, _ = solver_startsolutions(
                 F,
                 starts;
-                target_parameters = target_parameters,
-                rest...,
+                target_parameters = target_parameters, rest...,
             )
         else
             solver, _ = solver_startsolutions(F, starts; rest...)
@@ -915,7 +913,7 @@ function solver(
             starts;
             target_parameters = target_parameters,
             transform_parameters = transform_parameters === nothing ? identity :
-                                   transform_parameters,
+                                       transform_parameters,
             kwargs...,
         )
     end
@@ -962,9 +960,7 @@ function many_parameters_solve(
     solver = many_parameters_solver(
         F,
         starts;
-        start_parameters = start_parameters,
-        target_parameters = target_parameters,
-        rest...,
+        start_parameters = start_parameters, target_parameters = target_parameters, rest...,
     )
     many_parameters_solve(
         solver,

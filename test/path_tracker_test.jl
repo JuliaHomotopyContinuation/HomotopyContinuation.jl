@@ -101,7 +101,7 @@
             tracker = pathtracker(g, f, S; seed = 842121, system = FPSystem)
             @test all(S) do s
                 is_success(track!(tracker, s)) && (
-                 winding_number(tracker) == n || isnothing(winding_number(tracker))
+                    winding_number(tracker) == n || isnothing(winding_number(tracker))
                 ) && isapprox(solution(tracker)[1], 3.0; atol = 1e-6) &&
                      !isnan(tracker.state.solution_cond) &&
                      tracker.state.solution_accuracy < 1e-5
@@ -144,8 +144,8 @@
         # This has two roots of multiplicity 6 at the hyperplane z=0.
         # But the winding numbers are only 3 at each singularity
         F = [
-            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
-            0.75 * z^4,
+            0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 -
+                2.5 * y^2 * z^2 + 0.75 * z^4,
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3,
         ]
         @test pathtracker(F) isa PathTracker{PVector{ComplexF64,1}}
@@ -315,7 +315,7 @@
 
         s = let
             tracker, starts =
-                pathtracker_startsolutions([x^2 + y^2 + z^2 - 1; L₁]; system = FPSystem)
+                    pathtracker_startsolutions([x^2 + y^2 + z^2 - 1; L₁]; system = FPSystem)
             solution(track(tracker, first(starts)))
         end
 
@@ -326,8 +326,7 @@
             [[p₁, p₂, p₃]; L₁],
             [[p₁, p₂, p₃]; L₂],
             s;
-            system = FPSystem,
-            projective_tracking = true,
+            system = FPSystem, projective_tracking = true,
         )
         @test is_success(track(tracker, s))
     end

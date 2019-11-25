@@ -1,30 +1,30 @@
 export PathTracker,
-       track!,
-       track,
-       PathTrackerStatus,
-       is_at_infinity,
-       is_success,
-       is_tracking,
-       is_failed,
-       is_terminated_callback,
-       is_invalid_startvalue,
-       pathtracker,
-       pathtracker_startsolutions,
-       PathResult,
-       solution,
-       start_solution,
-       accuracy,
-       residual,
-       winding_number,
-       multiplicity,
-       condition_jacobian,
-       path_number,
-       is_finite,
-       is_singular,
-       is_nonsingular,
-       is_real,
-       is_projective,
-       is_affine
+    track!,
+    track,
+    PathTrackerStatus,
+    is_at_infinity,
+    is_success,
+    is_tracking,
+    is_failed,
+    is_terminated_callback,
+    is_invalid_startvalue,
+    pathtracker,
+    pathtracker_startsolutions,
+    PathResult,
+    solution,
+    start_solution,
+    accuracy,
+    residual,
+    winding_number,
+    multiplicity,
+    condition_jacobian,
+    path_number,
+    is_finite,
+    is_singular,
+    is_nonsingular,
+    is_real,
+    is_projective,
+    is_affine
 
 const pathtracker_supported_keywords = [
     :at_infinity_check,
@@ -340,8 +340,7 @@ function PathTracker(
     state = PathTrackerState(current_x(core_tracker); at_infinity_check = at_infinity_check)
     endgame = CauchyEndgame(
         current_x(core_tracker);
-        samples_per_loop = samples_per_loop,
-        max_winding_number = max_winding_number,
+        samples_per_loop = samples_per_loop, max_winding_number = max_winding_number,
     )
     default_ct_options = copy(core_tracker.options)
 
@@ -686,10 +685,10 @@ function check_converged!(
         cond_jac = cond!(tracker.state.jacobian, tracker.state.norm, tracker.state.residual)
     end
     (
-     converged = is_converged(result),
-     accuracy = result.accuracy,
-     cond = cond_jac,
-     res = res,
+        converged = is_converged(result),
+        accuracy = result.accuracy,
+        cond = cond_jac,
+        res = res,
     )
 end
 
@@ -955,10 +954,9 @@ function Base.show(io::IO, r::PathResult{AV}) where {AV}
             io,
             " • accuracy → $(Printf.@sprintf "%.3e" r.accuracy)",
         )
-        winding_number(r) !== nothing && println(
-            io,
-            " • winding_number → $(winding_number(r))",
-        )
+        winding_number(
+            r,
+        ) !== nothing && println(io, " • winding_number → $(winding_number(r))")
         if multiplicity(r) !== nothing
             println(io, " • multiplicity → $(multiplicity(r))")
         end
@@ -1103,8 +1101,8 @@ is larger than `tol`.
 is_singular(r::PathResult; tol = 1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
     (
-     unpack(r.condition_jacobian, 1.0) > tol ||
-     unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1
+        unpack(r.condition_jacobian, 1.0) > tol ||
+        unpack(multiplicity(r), 1) > 1 || unpack(winding_number(r), 1) > 1
     ) && is_success(r)
 end
 

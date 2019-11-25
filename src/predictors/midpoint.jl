@@ -14,7 +14,7 @@ struct MidpointCache{T} <: AbstractPredictorCache
 end
 
 function cache(::Midpoint, H, x, ẋ, t)
-    MidpointCache(dt(H, x, t), copy(ẋ))
+    MidpointCache(promote(dt(H, x, t), copy(ẋ))...)
 end
 #
 function predict!(

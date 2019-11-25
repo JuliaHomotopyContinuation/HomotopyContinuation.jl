@@ -1,13 +1,13 @@
 export AbstractNorm,
-       WeightedNorm,
-       EuclideanNorm,
-       InfNorm,
-       distance,
-       update!,
-       weights,
+    WeightedNorm,
+    EuclideanNorm,
+    InfNorm,
+    distance,
+    update!,
+    weights,
        # deprecated
-       euclidean_distance,
-       euclidean_norm
+    euclidean_distance,
+    euclidean_norm
 
 import LinearAlgebra: norm
 export norm

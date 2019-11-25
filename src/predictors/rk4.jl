@@ -17,7 +17,7 @@ struct RK4Cache{T} <: AbstractPredictorCache
 end
 
 function cache(::RK4, H, x, ẋ, t)
-    RK4Cache(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))
+    RK4Cache(promote(dt(H, x, t), copy(ẋ), copy(ẋ), copy(ẋ), copy(ẋ))...)
 end
 #
 function predict!(

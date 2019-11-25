@@ -1,15 +1,15 @@
 export AbstractSystem,
-       AbstractSystemCache,
-       SystemNullCache,
-       cache,
-       evaluate,
-       evaluate!,
-       jacobian,
-       jacobian!,
-       differentiate_parameters!,
-       differentiate_parameters,
-       evaluate_and_jacobian,
-       evaluate_and_jacobian!
+    AbstractSystemCache,
+    SystemNullCache,
+    cache,
+    evaluate,
+    evaluate!,
+    jacobian,
+    jacobian!,
+    differentiate_parameters!,
+    differentiate_parameters,
+    evaluate_and_jacobian,
+    evaluate_and_jacobian!
 
 
 """
@@ -161,7 +161,6 @@ Returns a tuple `(m, n)` indicating that `F` is a system of `m` polynomials `m` 
 Base.size(::AbstractSystem) = error("Mandatory to define `Base.size` for `AbstractSystem`s")
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
 Base.length(F::AbstractSystem) = size(F, 1)
-npolynomials(F::AbstractSystem) = length(F)
 
 """
     degrees(F::AbstractSystem)
@@ -180,3 +179,4 @@ include("systems/fixed_parameter_system.jl")
 include("systems/squared_up_system.jl")
 include("systems/trace_test_system.jl")
 include("systems/trace_test_pencil.jl")
+include("systems/model_kit_system.jl")

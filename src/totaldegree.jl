@@ -142,7 +142,7 @@ function bezout_number(
         return prod(maxdegrees(F; parameters = parameters))
     end
 
-    vars = variables(F; parameters = parameters)
+    vars = variables(F, parameters)
     hominfo =
         HomogenizationInformation(variable_groups = variable_groups, homvars = homvars)
     D = multidegrees(F, variable_groups)

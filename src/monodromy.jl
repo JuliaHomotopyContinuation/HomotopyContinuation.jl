@@ -1,12 +1,12 @@
 export monodromy_solve,
-       MonodromyResult,
-       real_solutions,
-       is_success,
-       is_heuristic_stop,
-       nreal,
-       parameters,
-       verify_solution_completeness,
-       solution_completeness_witnesses
+    MonodromyResult,
+    real_solutions,
+    is_success,
+    is_heuristic_stop,
+    nreal,
+    parameters,
+    verify_solution_completeness,
+    solution_completeness_witnesses
 
 
 #####################
@@ -274,8 +274,7 @@ function regenerate!(
             options.parameter_sampler(main.p),
             loop.nodes[i],
             options;
-            store_points = store_points,
-            is_main_node = false,
+            store_points = store_points, is_main_node = false,
         )
     end
     loop.edges .= Edge.(loop.edges)
@@ -505,7 +504,7 @@ struct MonodromySolver{
 end
 
 function MonodromySolver(
-    F::Inputs,
+    F,
     solution::AbstractVector{<:Number},
     p₀::AbstractVector{TP};
     kwargs...,
@@ -513,7 +512,7 @@ function MonodromySolver(
     MonodromySolver(F, [solution], p₀; kwargs...)
 end
 function MonodromySolver(
-    F::Inputs,
+    F,
     startsolutions::Vector{<:AbstractVector{<:Number}},
     p::AbstractVector{TP};
     distance = default_distance(eltype(startsolutions)),
@@ -541,9 +540,7 @@ function MonodromySolver(
     prob, _ = problem_startsolutions(
         F,
         [x₀];
-        parameters = parameters,
-        generic_parameters = p₀,
-        supported...,
+        parameters = parameters, generic_parameters = p₀, γ₁ = 1, γ₀ = 1, supported...,
     )
     tracker =
         CoreTracker(prob, x₀; accuracy = accuracy, precision = PRECISION_ADAPTIVE, rest...)
@@ -654,8 +651,9 @@ from the [`MonodromyResult`](@ref).
   to run.
 """
 function monodromy_solve(
-    F::MPPolys;
-    parameters = throw(ArgumentError("Necessary to provide `parameters` as a keyword argument.")),
+    F::Union{MPPolys,System};
+    parameters = F isa MPPolys ?
+                 throw(ArgumentError("Necessary to set `parameters = ...`.")) : nothing,
     variable_ordering = nothing,
     seed = randseed(),
     show_progress = true,
@@ -684,11 +682,37 @@ function monodromy_solve(
     )
 end
 
+function monodromy_solve(
+    F::Vector{<:ModelKit.Expression};
+    parameters = throw(ArgumentError("Necessary to set `parameters = ...`.")),
+    variable_ordering = throw(ArgumentError("Necessary to set `variable_ordering = ...`.")),
+    kwargs...,
+)
+    monodromy_solve(System(F, variable_ordering, parameters))
+end
+function monodromy_solve(
+    F::Vector{<:ModelKit.Expression},
+    S,
+    p;
+    parameters = throw(ArgumentError("Necessary to set `parameters = ...`.")),
+    variable_ordering = throw(ArgumentError("Necessary to set `variable_ordering = ...`.")),
+    kwargs...,
+)
+    monodromy_solve(System(F, variable_ordering, parameters), S, p)
+end
+
+function find_start_pair(F::System, ::Nothing; variable_ordering = nothing)
+    vars = polyvar.(F.variables)
+    params = polyvar.(F.parameters)
+    P = evaluate(F.expressions, F.variables => vars, F.parameters => params)
+    find_start_pair(P, params; variable_ordering = vars)
+end
+
 function find_start_pair(F::MPPolys, parameters; variable_ordering = nothing)
     if variable_ordering !== nothing
         vars = variable_ordering
     else
-        vars = variables(F; parameters = parameters)
+        vars = variables(F, parameters)
     end
     x₀ = randn(ComplexF64, length(vars))
     if F isa Composition
@@ -729,13 +753,13 @@ function monodromy_solve(
 end
 
 function default_strategy(
-    F::MPPolyInputs,
+    F::Union{System,MPPolyInputs},
     parameters,
     p₀::AbstractVector{TP};
     is_real_system = false,
 ) where {TC,TP}
     # If F depends only linearly on the parameters a petal is sufficient
-    vars = variables(F; parameters = parameters)
+    vars = variables(F, parameters)
     if all(d -> d ≤ 1, maxdegrees(F; parameters = vars))
         Petal()
     # For a real system we should introduce some weights to avoid the discriminant
@@ -1071,12 +1095,12 @@ function update_progress!(
             ("# paths tracked", statistics.ntrackedpaths),
             ("# loops generated", statistics.nparametergenerations),
             (
-             "# completed loops without change",
-             n_completed_loops_without_change(statistics, nsolutions),
+                "# completed loops without change",
+                n_completed_loops_without_change(statistics, nsolutions),
             ),
             (
-             "# solutions in current loop",
-             n_solutions_current_loop(statistics, nsolutions),
+                "# solutions in current loop",
+                n_solutions_current_loop(statistics, nsolutions),
             ),
             ("# real solutions", statistics.nreal),
         ),
@@ -1184,9 +1208,7 @@ function verify_solution_completeness(
         F,
         W₀₁,
         p₀;
-        show_progress = show_progress,
-        parameters = parameters,
-        kwargs...,
+        show_progress = show_progress, parameters = parameters, kwargs...,
     )
     verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress = show_progress)
 end
@@ -1258,8 +1280,7 @@ function solution_completeness_witnesses(
         S_k₀ = solutions(solve(
             TTS,
             solutions(R₁₀);
-            start_parameters = l₀,
-            target_parameters = k₀,
+            start_parameters = l₀, target_parameters = k₀,
         ))
         new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress = 5)
         if nsolutions(new_result) == nsolutions(best_result)

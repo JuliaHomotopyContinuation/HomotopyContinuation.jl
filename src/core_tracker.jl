@@ -1,41 +1,41 @@
 export CoreTrackerStatus,
-       is_success,
-       is_terminated,
-       is_tracking,
-       is_invalid_startvalue,
-       CoreTrackerResult,
-       solution,
-       CoreTrackerOptions,
-       CoreTracker,
-       coretracker,
-       coretracker_startsolutions,
-       affine_tracking,
-       track,
-       track!,
-       init!,
-       iterator,
-       current_x,
-       current_t,
-       current_Δt,
-       steps,
-       iters,
-       status,
-       accuracy,
-       max_corrector_iters,
-       max_step_size,
-       set_accuracy!,
-       set_max_corrector_iters!,
-       set_max_step_size!,
-       options,
+    is_success,
+    is_terminated,
+    is_tracking,
+    is_invalid_startvalue,
+    CoreTrackerResult,
+    solution,
+    CoreTrackerOptions,
+    CoreTracker,
+    coretracker,
+    coretracker_startsolutions,
+    affine_tracking,
+    track,
+    track!,
+    init!,
+    iterator,
+    current_x,
+    current_t,
+    current_Δt,
+    steps,
+    iters,
+    status,
+    accuracy,
+    max_corrector_iters,
+    max_step_size,
+    set_accuracy!,
+    set_max_corrector_iters!,
+    set_max_step_size!,
+    options,
        # deprecated
-       digits_lost,
-       setup!,
-       refinement_accuracy,
-       max_refinement_iters,
-       set_max_refinement_iters!,
-       set_refinement_accuracy!,
-       start_parameters!,
-       target_parameters!
+    digits_lost,
+    setup!,
+    refinement_accuracy,
+    max_refinement_iters,
+    set_max_refinement_iters!,
+    set_refinement_accuracy!,
+    start_parameters!,
+    target_parameters!
 
 
 
@@ -135,7 +135,7 @@ is_tracking(S::CoreTrackerStatus.states) = S == CoreTrackerStatus.tracking
 """
      CoreTrackerResult{V<:AbstractVector}
 
-The result of [`track(::CoreTracker, x₁, t₁, t₀)](@ref). You can use
+The result of [`track(::CoreTracker, x₁, t₁, t₀)`](@ref). You can use
 [`is_success`](@ref) to check whether the tracking was successfull and [`solution`](@ref)
 to obtain the solution.
 
@@ -309,35 +309,35 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::CoreTrackerOptions)
 Base.copy(opts::CoreTrackerOptions) = copy!(CoreTrackerOptions(), opts)
 function Base.copy!(opts::CoreTrackerOptions, opts2::CoreTrackerOptions)
     @unpack accuracy,
-        initial_step_size,
-        min_step_size,
-        max_cond,
-        max_corrector_iters,
-        max_step_size,
-        max_steps,
-        precision,
-        simple_step_size_alg,
-        steps_jacobian_info_update,
-        terminate_ill_conditioned,
-        track_cond,
-        update_patch,
-        logarithmic_time_scale,
-        from_infinity = opts2
+    initial_step_size,
+    min_step_size,
+    max_cond,
+    max_corrector_iters,
+    max_step_size,
+    max_steps,
+    precision,
+    simple_step_size_alg,
+    steps_jacobian_info_update,
+    terminate_ill_conditioned,
+    track_cond,
+    update_patch,
+    logarithmic_time_scale,
+    from_infinity = opts2
     @pack! opts = accuracy,
-        initial_step_size,
-        min_step_size,
-        max_cond,
-        max_corrector_iters,
-        max_step_size,
-        max_steps,
-        precision,
-        simple_step_size_alg,
-        steps_jacobian_info_update,
-        terminate_ill_conditioned,
-        track_cond,
-        update_patch,
-        logarithmic_time_scale,
-        from_infinity
+    initial_step_size,
+    min_step_size,
+    max_cond,
+    max_corrector_iters,
+    max_step_size,
+    max_steps,
+    precision,
+    simple_step_size_alg,
+    steps_jacobian_info_update,
+    terminate_ill_conditioned,
+    track_cond,
+    update_patch,
+    logarithmic_time_scale,
+    from_infinity
     opts
 end
 
@@ -397,11 +397,7 @@ function CoreTrackerState(
     s = 0.0
     Δs = convert(
         Float64,
-        min(
-            unpack(options.initial_step_size, Inf),
-            length(segment),
-            options.max_step_size,
-        ),
+        min(unpack(options.initial_step_size, Inf), length(segment), options.max_step_size),
     )
     Δs_prev = 0.0
     norm_Δx₀ = accuracy = 0.0
@@ -586,8 +582,7 @@ function CoreTracker(
     patch === nothing || throw(ArgumentError("You can only pass `patch=$(patch)` if `affine_tracking=false`."))
 
     options = CoreTrackerOptions(;
-        parameter_homotopy = isa(homotopy, ParameterHomotopy),
-        kwargs...,
+        parameter_homotopy = isa(homotopy, ParameterHomotopy), kwargs...,
     )
 
     # We close over the homotopy and its cache to be able to pass things around more easily
@@ -623,8 +618,7 @@ function CoreTracker(
 )
 
     options = CoreTrackerOptions(;
-        parameter_homotopy = isa(homotopy, ParameterHomotopy),
-        kwargs...,
+        parameter_homotopy = isa(homotopy, ParameterHomotopy), kwargs...,
     )
 
     if homotopy isa PatchedHomotopy
@@ -788,7 +782,7 @@ end
 
 function terminate_limit_accuracy(state, options)
     (
-     options.precision == PRECISION_FIXED_64
+        options.precision == PRECISION_FIXED_64
     ) && at_limit_accuracy(state, options; safety_factor = 10.0)
 end
 function at_limit_accuracy(state::CTS, opts::CTO; safety_factor::Float64 = 10.0)
@@ -1112,11 +1106,7 @@ end
 function initial_step_size!(state::CTS, predictor::AbstractPredictorCache, options::CTO)
     if options.initial_step_size !== nothing
         return state.Δs = max(
-            min(
-                options.initial_step_size,
-                length(state.segment),
-                options.max_step_size,
-            ),
+            min(options.initial_step_size, length(state.segment), options.max_step_size),
             sqrt(options.min_step_size),
         )
     end

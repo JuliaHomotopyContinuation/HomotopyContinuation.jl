@@ -17,8 +17,7 @@
         @polyvar x y u v
         result = solve(
             [2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y] ∘ [u, v];
-            seed = 32241,
-            start_system = :polyhedral,
+            seed = 32241, start_system = :polyhedral,
         )
         @test nsolutions(result) == 6
     end
@@ -36,10 +35,7 @@
         r = solve(
             f2 ∘ g,
             solutions(res);
-            parameters = [p, q],
-            p₁ = [1, 2],
-            p₀ = [2, 3],
-            threading = false,
+            parameters = [p, q], p₁ = [1, 2], p₀ = [2, 3], threading = false,
         )
         @test nnonsingular(r) == 2
 
@@ -49,10 +45,7 @@
         r = solve(
             f ∘ g2,
             solutions(res);
-            parameters = [u, v],
-            p₁ = [3, 2],
-            p₀ = [-2, 3],
-            threading = false,
+            parameters = [u, v], p₁ = [3, 2], p₀ = [-2, 3], threading = false,
         )
         @test nnonsingular(r) == 2
 
@@ -63,10 +56,7 @@
         r = solve(
             e ∘ f2 ∘ g,
             solutions(res2);
-            parameters = [p, q],
-            p₁ = [1, 2],
-            p₀ = [2, 3],
-            threading = false,
+            parameters = [p, q], p₁ = [1, 2], p₀ = [2, 3], threading = false,
         )
         @test nnonsingular(r) == 2
     end

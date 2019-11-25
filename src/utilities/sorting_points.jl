@@ -1,11 +1,5 @@
 export UniquePoints,
-       multiplicities,
-       is_contained,
-       add!,
-       simple_add!,
-       empty!,
-       points,
-       unique_points
+    multiplicities, is_contained, add!, simple_add!, empty!, points, unique_points
 
 const DEFAULT_CAPACITY = Ref(7) # Determined by testing a couple of different values
 const NOT_FOUND = -1

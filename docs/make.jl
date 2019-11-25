@@ -2,7 +2,7 @@ using Documenter, HomotopyContinuation
 import LinearAlgebra
 
 makedocs(
-    sitename = "Homotopy Continuation",
+    sitename = "HomotopyContinuation.jl",
     pages = [
         "Introduction" => "index.md",
         "Solving polynomial systems" => [
@@ -10,6 +10,7 @@ makedocs(
             "solver.md"
         ],
         "Solving parametrized systems with monodromy" => "monodromy.md",
+        "Input" => "input.md",
         "Tracking paths" => [
             "path_tracker.md",
             "core_tracker.md",

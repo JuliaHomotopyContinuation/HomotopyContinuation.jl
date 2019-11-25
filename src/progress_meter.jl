@@ -130,12 +130,7 @@ Progress(
     kwargs...,
 ) = Progress(
     n;
-    dt = dt,
-    desc = desc,
-    barlen = barlen,
-    color = color,
-    output = output,
-    kwargs...,
+    dt = dt, desc = desc, barlen = barlen, color = color, output = output, kwargs...,
 )
 
 Progress(n::Integer, desc::AbstractString, offset::Integer = 0) =

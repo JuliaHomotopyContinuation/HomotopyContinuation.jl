@@ -25,7 +25,7 @@ end
 
 function cache(F::SquaredUpSystem, x)
     c = cache(F.F, x)
-    u = evaluate(F.F, x, c)
+    u = Vector(evaluate(F.F, x, c))
     U = similar(u, size(F.F))
     n = size(F.A, 1)
     degree_diffs = [F.degrees[i] - F.degrees[n+j] for i = 1:n, j = 1:size(F.A, 2)]
