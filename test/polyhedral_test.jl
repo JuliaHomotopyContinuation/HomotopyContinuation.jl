@@ -79,4 +79,8 @@
         @test length(results) == 8
     end
 
+    @testset "binomial system" begin
+        @polyvar x y
+        @test nsolutions(solve([x^2 - 0.1, y^2 - 2]; start_system = :polyhedral)) == 4
+    end
 end
