@@ -994,7 +994,12 @@ end
     check_start_value::Bool,
     debug::Bool,
 )
-    t₁ == t₀ && return (tracker.state.status = CoreTrackerStatus.success)
+
+    # no need to track, so just assign solution and we are done
+    if t₁ == t₀
+        embed!(tracker.state.x, x₁)
+        return (tracker.state.status = CoreTrackerStatus.success)
+    end
 
     init!(
         tracker,
