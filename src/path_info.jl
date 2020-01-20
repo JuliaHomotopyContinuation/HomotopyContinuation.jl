@@ -107,20 +107,14 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
     init!(tracker, x₀, t₁, t₀)
     push!(s, state.s)
     push!(Δs, state.Δs)
-    push!(ω, state.ω)
-    push!(Δx₀, state.norm_Δx₀)
-    push!(norm_x, maximum(abs, state.x))
-    push!(cond, state.jacobian.cond[])
-    push!(accuracy, state.accuracy)
-    push!(limit_accuracy, state.limit_accuracy)
-    push!(residual, maximum(tracker.corrector.abs_r))
-    push!(eval_err, state.eval_err)
-
     first = true
-    for _ in tracker
+    while is_tracking(tracker.state.status)
+        step!(tracker, debug)
+        if !first
+            push!(s, state.s)
+            push!(Δs, state.Δs)
+        end
         push!(accepted_rejected, !state.last_step_failed)
-        push!(s, state.s)
-        push!(Δs, state.Δs)
         push!(ω, state.ω)
         push!(Δx₀, state.norm_Δx₀)
         push!(norm_x, maximum(abs, state.x))
@@ -131,7 +125,7 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
         push!(eval_err, state.eval_err)
         first = false
     end
-    push!(accepted_rejected, !state.last_step_failed)
+    # push!(accepted_rejected, !state.last_step_failed)
 
     CTPathInfo(
         s,
