@@ -183,6 +183,7 @@ Returns the solutions obtained by the `CoreTracker`.
 """
 solution(result::CoreTrackerResult) = result.x
 
+steps(result::CoreTrackerResult) = result.accepted_steps + result.rejected_steps
 
 Base.show(io::IO, result::CoreTrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::CoreTrackerResult) = result
