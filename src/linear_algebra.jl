@@ -882,7 +882,7 @@ function JacobianMonitor(A::AbstractMatrix)
     JacobianMonitor(J, cond, forward_err, Ref(0), Ref(0))
 end
 
-updated!(JM::JacobianMonitor) = updated!(JM.J)
+updated!(JM::JacobianMonitor) = (updated!(JM.J); JM)
 jacobian(JM::JacobianMonitor) = JM.J
 
 function Base.show(io::IO, JM::JacobianMonitor{T}) where {T}
