@@ -8,7 +8,7 @@ const TSYSTEM_TABLE = Dict{
     Vector{Tuple{Vector{Expression},Vector{Variable},Vector{Variable}}},
 }()
 
-struct CompiledSystem{H,I}
+struct CompiledSystem{HI}
     nexpressions::Int
     variables::Vector{Symbol}
     parameters::Vector{Symbol}
@@ -30,14 +30,14 @@ function CompiledSystem(
         # check that it is identical
         for (i, vi) in enumerate(TSYSTEM_TABLE[h])
             if vi == val
-                return CompiledSystem{h,i}(n, vars, params)
+                return CompiledSystem{(h,i)}(n, vars, params)
             end
         end
         push!(TSYSTEM_TABLE[h], val)
-        return CompiledSystem{h,length(TSYSTEM_TABLE[h])}(n, vars, params)
+        return CompiledSystem{(h,length(TSYSTEM_TABLE[h]))}(n, vars, params)
     else
         TSYSTEM_TABLE[h] = [val]
-        return CompiledSystem{h,1}(n, vars, params)
+        return CompiledSystem{(h,1)}(n, vars, params)
     end
 end
 
@@ -47,8 +47,8 @@ function Base.show(io::IO, TS::CompiledSystem)
 end
 
 interpret(TS::CompiledSystem) = interpret(typeof(TS))
-interpret(::Type{CompiledSystem{H,I}}) where {H,I} =
-    System(TSYSTEM_TABLE[H][I]...)
+interpret(::Type{CompiledSystem{HI}}) where {HI} =
+    System(TSYSTEM_TABLE[first(HI)][last(HI)]...)
 
 Base.size(CS::CompiledSystem) = (CS.nexpressions, length(CS.variables))
 Base.size(CS::CompiledSystem, i::Integer) = size(CS)[i]
@@ -66,7 +66,7 @@ const THOMOTOPY_TABLE = Dict{
     },
 }()
 
-struct CompiledHomotopy{H,I}
+struct CompiledHomotopy{HI}
     nexpressions::Int
     variables::Vector{Symbol}
     parameters::Vector{Symbol}
@@ -89,14 +89,14 @@ function CompiledHomotopy(
     # check that it is identical
         for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
             if vi == val
-                return CompiledHomotopy{h,i}(n, vars, params)
+                return CompiledHomotopy{(h,i)}(n, vars, params)
             end
         end
         push!(THOMOTOPY_TABLE[h], val)
-        return CompiledHomotopy{h,length(TSYSTEM_TABLE[h])}(n, vars, params)
+        return CompiledHomotopy{(h,length(TSYSTEM_TABLE[h]))}(n, vars, params)
     else
         THOMOTOPY_TABLE[h] = [val]
-        return CompiledHomotopy{h,1}(n, vars, params)
+        return CompiledHomotopy{(h,1)}(n, vars, params)
     end
 end
 
@@ -110,8 +110,8 @@ function Base.show(io::IO, TH::CompiledHomotopy)
 end
 
 interpret(TH::CompiledHomotopy) = interpret(typeof(TH))
-interpret(::Type{CompiledHomotopy{H,I}}) where {H,I} =
-    Homotopy(THOMOTOPY_TABLE[H][I]...)
+interpret(::Type{CompiledHomotopy{HI}}) where {HI} =
+    Homotopy(THOMOTOPY_TABLE[first(HI)][last(HI)]...)
 
 """
     compile(F::System)
