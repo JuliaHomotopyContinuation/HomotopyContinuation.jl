@@ -3,6 +3,7 @@ module HomotopyContinuation2
 export ModelKit
 
 import LinearAlgebra
+using Parameters: @unpack
 import StructArrays
 
 const LA = LinearAlgebra
@@ -42,5 +43,6 @@ export @var,
 
 include("linear_algebra.jl")
 include("homotopies.jl")
+include("predictors.jl")
 
 end

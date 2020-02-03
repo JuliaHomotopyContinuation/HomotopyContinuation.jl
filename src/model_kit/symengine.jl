@@ -566,7 +566,7 @@ function Base.imag(x::Basic)
     if class(x) ∈ COMPLEX_NUMBER_TYPES
         a = Expression()
         ccall(
-            (:complex_base_imag_part, libsymengine),
+            (:complex_base_imaginary_part, libsymengine),
             Nothing,
             (Ref{Expression}, Ref{ExpressionRef}),
             a,

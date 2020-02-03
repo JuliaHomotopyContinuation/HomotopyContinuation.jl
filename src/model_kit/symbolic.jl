@@ -169,8 +169,8 @@ function subs(ex::Basic, D::ExpressionMap, (xs,ys)::Pair{<:AbstractArray{<:Basic
     end
     subs(ex, D, args...)
 end
-function subs(ex::Basic, D::ExpressionMap, (x,y)::Pair{<:Basic, <:Number}, args...)
-    D[x] = y
+function subs(ex::Basic, D::ExpressionMap, (x,y), args...)
+    D[Expression(x)] = Expression(y)
     subs(ex, D, args...)
 end
 subs(exs::AbstractArray{<:Basic}, args...) = map(ex -> subs(ex, args...), exs)
