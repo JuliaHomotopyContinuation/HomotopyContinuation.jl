@@ -262,7 +262,7 @@ function _evaluate_and_jacobian!_impl(
     end
 end
 
-function _diff_t!_impl(T::Type{<:CompiledHomotopy}, d, DP)
+function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     H = interpret(T)
     checks, var_map = boundscheck_var_map(H)
 
@@ -270,7 +270,7 @@ function _diff_t!_impl(T::Type{<:CompiledHomotopy}, d, DP)
 
     vars = Symbol.(H.variables)
     params = Symbol.(H.parameters)
-    t = Symbol(H.t)
+
 
     diff_map = Dict{Tuple{Symbol,Int},Any}()
     for (i, v) in enumerate(vars)
@@ -284,8 +284,10 @@ function _diff_t!_impl(T::Type{<:CompiledHomotopy}, d, DP)
             diff_map[(v, k)] = :(dp[$k][$i])
         end
     end
-    diff_map[(t, 1)] = 1
 
+    if H isa Homotopy
+        diff_map[(Symbol(H.t), 1)] = 1
+    end
     dlist = univariate_diff!(list, d, diff_map)
 
     assignements = Dict{Symbol,Expr}()
@@ -388,6 +390,27 @@ store result in `u`.
 end
 
 """
+    diff_t!(u, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
+
+Evaluate the expression
+```math
+(1 / r!) dʳ/dλʳ \\, F(x + ∑_{k=1}^{r-1} xᵢλⁱ, p(t + λ))
+```
+at ``λ = 0``.
+If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
+"""
+@generated function diff_t!(
+    u,
+    T::CompiledSystem,
+    x::AbstractVector,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {D,DP}
+    _diff_t!_impl(T, D + 1, DP)
+end
+
+"""
     diff_t!(u, H::CompiledHomotopy, x, t, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
 
 Evaluate the expression
@@ -402,11 +425,11 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     T::CompiledHomotopy,
     x::AbstractVector,
     t,
-    dx::NTuple{D,<:AbstractVector} = Tuple{}(),
+    dx::NTuple{D,<:AbstractVector} = (),
     p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = Tuple{}(),
+    dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D, DP)
+    _diff_t!_impl(T, D+1, DP)
 end
 
 # non-inplace

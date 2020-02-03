@@ -266,17 +266,17 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
     v = InstructionList(n = Ref(n))
     for (id, el) in list.instructions
         (op, arg1, arg2) = el
-
         if op == :^
             r::Int = arg2
             if haskey(diff_map, (arg1, 1)) && r == 2
                 push!(v, id => el)
-                for k = 2:K
+                for k = 1:K
                     w_k = nothing
                     for j = 0:k
                         u_j = j == 0 ? arg1 : get(diff_map, (arg1, j), nothing)
                         u_kj = j == k ? arg1 :
                                get(diff_map, (arg1, k - j), nothing)
+
                         if j < k - j && u_j !== nothing && u_kj !== nothing
                             s = push!(v, (:*, u_j, u_kj))
                             if w_k === nothing
@@ -374,14 +374,13 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
             end
         elseif op == :*
             push!(v, id => el)
-
             for k = 1:K
                 c_k = nothing
                 for j = 0:k
                     if j == 0
                         a = arg1
                         b = get(diff_map, (arg2, k - j), nothing)
-                    elseif j == k
+                    elseif k == j
                         a = get(diff_map, (arg1, k), nothing)
                         b = arg2
                     else
@@ -398,6 +397,23 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
                     else
                         c_k = push!(v, (:+, c_k, push!(v, (:*, a, b))))
                     end
+                    # if a === nothing && b === nothing
+                    #     continue
+                    # end
+                    #
+                    # if a == nothing
+                    #     dab = b
+                    # elseif b == nothing
+                    #     dab = a
+                    # else
+                    #     dab = push!(v, (:*, a, b))
+                    # end
+                    #
+                    # if c_k === nothing
+                    #     c_k = dab
+                    # else
+                    #     c_k = push!(v, (:+, c_k, dab))
+                    # end
                 end
 
                 if c_k === nothing

@@ -492,7 +492,7 @@ function Base.push!(v::ExprVec, x::Basic)
     v
 end
 
-args(ex::Expression) = args!(ExprVec(), ex)
+args(ex::Basic) = args!(ExprVec(), ex)
 function args!(vec::ExprVec, ex::Basic)
     ccall(
         (:basic_get_args, libsymengine),
