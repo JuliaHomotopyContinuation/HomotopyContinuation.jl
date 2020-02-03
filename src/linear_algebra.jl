@@ -215,7 +215,7 @@ end
 @inline function ldiv_upper!(
     A::AbstractMatrix,
     b::AbstractVector,
-    x::AbstractVector = b
+    x::AbstractVector = b,
 )
     n = size(A, 2)
     @inbounds for j = n:-1:1
@@ -351,7 +351,7 @@ function apply_row_scaling!(W::MatrixWorkspace)
     A, d = W.A, W.row_scaling
     m, n = size(A)
     @inbounds for j = 1:n, i = 1:m
-        A[i, j] = d[i] * A[i, j]
+        A[i, j] = A[i, j] * d[i]
     end
     W.scaled[] = true
     W
@@ -382,7 +382,30 @@ end
 
 solve the linear system `jacobian(JM)x̂=b`.
 """
-function LA.ldiv!(x̂::AbstractVector, JM::Jacobian, b::AbstractVector)
+function LA.ldiv!(
+    x̂::AbstractVector,
+    JM::Jacobian,
+    b::AbstractVector,
+    norm = nothing;
+    row_scaling::Bool = true,
+)
+    # stats update
+    JM.factorizations[] += !jacobian(JM).factorized[]
+    JM.ldivs[] += 1
+    LA.ldiv!(x̂, jacobian(JM), b)
+    x̂
+end
+function LA.ldiv!(
+    x̂::AbstractVector,
+    JM::Jacobian,
+    b::AbstractVector,
+    norm::WeightedNorm;
+    row_scaling::Bool = false,
+)
+    if !jacobian(JM).factorized[] && row_scaling
+        skeel_row_scaling!(jacobian(JM), weights(norm))
+        apply_row_scaling!(jacobian(JM))
+    end
     # stats update
     JM.factorizations[] += !jacobian(JM).factorized[]
     JM.ldivs[] += 1

@@ -2,6 +2,7 @@ module HomotopyContinuation2
 
 export ModelKit
 
+using DoubleFloats: Double64
 import LinearAlgebra
 using Parameters: @unpack
 import StructArrays
@@ -41,8 +42,11 @@ export @var,
        System,
        Homotopy
 
+include("norm.jl")
 include("linear_algebra.jl")
 include("homotopies.jl")
 include("predictors.jl")
+include("newton_corrector.jl")
+include("tracker.jl")
 
 end

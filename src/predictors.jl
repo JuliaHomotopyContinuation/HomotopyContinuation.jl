@@ -11,6 +11,7 @@ This uses a Padé-approximation of type (2,1) for prediction.
 struct Pade21 <: AbstractPredictor end
 
 struct Pade21Cache <: AbstractPredictorCache
+    x¹::Vector{ComplexF64}
     x²::Vector{ComplexF64}
     x³::Vector{ComplexF64}
     x⁴::Vector{ComplexF64}
@@ -24,27 +25,30 @@ struct Pade21Cache <: AbstractPredictorCache
 end
 
 function cache(::Pade21, n::Int)
+    x¹ = zeros(ComplexF64, n)
     x² = zeros(ComplexF64, n)
     x³ = zero(x²)
     x⁴ = zero(x²)
     u = zero(x²)
     err = zero(u)
-    Pade21Cache(x², x³, x⁴, u, Ref(false), Ref(4), Ref(NaN), err)
+    Pade21Cache(x¹, x², x³, x⁴, u, Ref(false), Ref(4), Ref(NaN), err)
 end
 
-function update!(cache::Pade21Cache, H, x, ẋ, t, J::Jacobian)
+function update!(cache::Pade21Cache, H, x, t, J::Jacobian)
     # unpack stuff to make the rest easier to read
-    @unpack u, x², x³, x⁴ = cache
+    @unpack u, x¹, x², x³, x⁴ = cache
 
-    diff_t!(u, H, x, t, (ẋ,))
-    @show u
+    diff_t!(u, H, x, t)
+    u .= .-u
+    LA.ldiv!(x¹, J, u)
+
+    diff_t!(u, H, x, t, (x¹,))
     u .= .-u
     LA.ldiv!(x², J, u)
 
-    diff_t!(u, H, x, t, (ẋ, x²))
+    diff_t!(u, H, x, t, (x¹, x²))
     u .= .-u
     LA.ldiv!(x³, J, u)
-
 
     trust_region = Inf
     for i in eachindex(x²)
@@ -58,7 +62,7 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, J::Jacobian)
         cache.order[] = 3
     else
         cache.taylor[] = false
-        diff_t!(u, H, x, t, (ẋ, x², x³))
+        diff_t!(u, H, x, t, (x¹, x², x³))
         u .= .-u
         LA.ldiv!(x⁴, J, u)
 
@@ -73,17 +77,17 @@ function update!(cache::Pade21Cache, H, x, ẋ, t, J::Jacobian)
 end
 
 
-function predict!(x̂, cache::Pade21Cache, H, x, t, Δt, ẋ, J)
-    @unpack x², x³ = cache
+function predict!(x̂, cache::Pade21Cache, H, x, t, Δt)
+    @unpack x¹, x², x³ = cache
 
     if cache.taylor[]
         @inbounds for i in eachindex(x)
-            x̂[i] = x[i] + Δt * (ẋ[i] + Δt * x²[i])
+            x̂[i] = x[i] + Δt * (x¹[i] + Δt * x²[i])
         end
     else
         @inbounds for i in eachindex(x)
             δᵢ = 1 - Δt * x³[i] / x²[i]
-            x̂[i] = x[i] + Δt * ẋ[i] + Base.FastMath.div_fast(Δt^2 * x²[i], δᵢ)
+            x̂[i] = x[i] + Δt * x¹[i] + Base.FastMath.div_fast(Δt^2 * x²[i], δᵢ)
         end
     end
 
