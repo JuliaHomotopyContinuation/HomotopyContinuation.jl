@@ -307,7 +307,6 @@ function initial_step_size(
 )
     a = options.β_a * options.a
     e = state.norm(local_error(predictor))
-    @show a, e, state.ω
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * e), order(predictor))
     Δs₂ = options.β_τ * trust_region(predictor)
     min(Δs₁, Δs₂, length(state.segment))
@@ -323,15 +322,12 @@ function update_stepsize!(
     a = options.β_a * options.a
     p = order(predictor)
     Δs = state.Δs_prev
-    @show Δs
     if is_converged(result)
         e = state.norm(local_error(predictor))
         e2 = state.norm(state.x̂, state.x) / Δs^p
         ē = max(e, e2)
-        @show e, e2
         Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * ē), p)
         Δs₂ = options.β_τ * trust_region(predictor)
-        @show Δs₁, Δs₂
         s′ = min(state.s + min(Δs₁, Δs₂), Double64(length(state.segment)))
 
         if state.last_step_failed
@@ -436,12 +432,9 @@ function step!(tracker::Tracker, debug::Bool = false)
 
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the provided predictor
-    @show x, t, Δt
     predict!(x̂, predictor, homotopy, x, t, Δt)
-    @show x̂
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
-    @show x̂
     result = newton!(
         x̄,
         corrector,
@@ -453,7 +446,6 @@ function step!(tracker::Tracker, debug::Bool = false)
         ω = state.ω,
         μ = state.μ,
     )
-    @show x̄
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
     end
@@ -469,7 +461,6 @@ function step!(tracker::Tracker, debug::Bool = false)
         # If we use a weighted norm, now we update this
         update!(state.norm, x)
         # tell the predictors about the new derivative if they need to update something
-        @show x, t + Δt
         update!(predictor, homotopy, x, t + Δt, jacobian)
 
         # Update other state
