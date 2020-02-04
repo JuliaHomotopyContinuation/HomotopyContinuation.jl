@@ -400,7 +400,7 @@ function LA.ldiv!(
     JM::Jacobian,
     b::AbstractVector,
     norm::WeightedNorm;
-    row_scaling::Bool = false,
+    row_scaling::Bool = true,
 )
     if !jacobian(JM).factorized[] && row_scaling
         skeel_row_scaling!(jacobian(JM), weights(norm))
