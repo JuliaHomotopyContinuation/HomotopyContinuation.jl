@@ -5,6 +5,7 @@ export ModelKit
 using DoubleFloats: Double64
 import LinearAlgebra
 using Parameters: @unpack
+import PrettyTables
 import StructArrays
 
 const LA = LinearAlgebra
@@ -48,5 +49,6 @@ include("homotopies.jl")
 include("predictors.jl")
 include("newton_corrector.jl")
 include("tracker.jl")
+include("path_info.jl")
 
 end

@@ -61,9 +61,9 @@ function update!(cache::Pade21Cache, H, x, t, J::Jacobian)
         trust_region = min(trust_region, abs(x²[i]) / abs(x³[i]))
     end
 
-    if trust_region < eps()
+    if isnan(trust_region)
         cache.trust_region[] = Inf
-        cache.err .= x³ ./ 6
+        cache.err .= x³
         cache.taylor[] = true
         cache.order[] = 3
     else

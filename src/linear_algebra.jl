@@ -329,7 +329,6 @@ function skeel_row_scaling!(
             d[i] += fast_abs(A[i, j]) * cj
         end
     end
-
     @inbounds for i = 1:n
         d[i] = exp2(-last(frexp(d[i])))
     end

@@ -1,3 +1,5 @@
+export Tracker, TrackerResult, track, track!
+
 ###########
 # Options #
 ###########
@@ -360,6 +362,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.condition = TrackerCondition.terminated_maximal_iterations
     elseif state.ω * state.μ > options.a * _h(options.a)
         state.condition = TrackerCondition.terminated_accuracy_limit
+    elseif isnan(state.s′) # catch any NaNs produced somewhere
+        state.condition = TrackerCondition.terminated_ill_conditioned
     end
     nothing
 end

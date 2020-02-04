@@ -1,3 +1,5 @@
+export total_degree_homotopy
+
 abstract type AbstractHomotopy end
 
 Base.size(H::AbstractHomotopy, i::Integer) = size(H)[i]
