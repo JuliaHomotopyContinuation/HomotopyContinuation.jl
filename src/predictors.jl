@@ -17,6 +17,9 @@ struct Pade21Cache <: AbstractPredictorCache
     x⁴::Vector{ComplexF64}
 
     u::Vector{ComplexF64}
+    dx¹::NTuple{1,Vector{ComplexF64}}
+    dx²::NTuple{2,Vector{ComplexF64}}
+    dx³::NTuple{3,Vector{ComplexF64}}
 
     taylor::Base.RefValue{Bool}
     order::Base.RefValue{Int}
@@ -30,23 +33,26 @@ function cache(::Pade21, n::Int)
     x³ = zero(x²)
     x⁴ = zero(x²)
     u = zero(x²)
+    dx¹ = (x¹,)
+    dx² = (x¹,x²)
+    dx³ = (x¹,x²,x³)
     err = zero(u)
-    Pade21Cache(x¹, x², x³, x⁴, u, Ref(false), Ref(4), Ref(NaN), err)
+    Pade21Cache(x¹, x², x³, x⁴, u, dx¹, dx², dx³, Ref(false), Ref(4), Ref(NaN), err)
 end
 
 function update!(cache::Pade21Cache, H, x, t, J::Jacobian)
     # unpack stuff to make the rest easier to read
-    @unpack u, x¹, x², x³, x⁴ = cache
+    @unpack u, x¹, x², x³, x⁴, dx¹, dx², dx³ = cache
 
     diff_t!(u, H, x, t)
     u .= .-u
     LA.ldiv!(x¹, J, u)
 
-    diff_t!(u, H, x, t, (x¹,))
+    diff_t!(u, H, x, t, dx¹)
     u .= .-u
     LA.ldiv!(x², J, u)
 
-    diff_t!(u, H, x, t, (x¹, x²))
+    diff_t!(u, H, x, t, dx²)
     u .= .-u
     LA.ldiv!(x³, J, u)
 
@@ -62,7 +68,7 @@ function update!(cache::Pade21Cache, H, x, t, J::Jacobian)
         cache.order[] = 3
     else
         cache.taylor[] = false
-        diff_t!(u, H, x, t, (x¹, x², x³))
+        diff_t!(u, H, x, t, dx³)
         u .= .-u
         LA.ldiv!(x⁴, J, u)
 

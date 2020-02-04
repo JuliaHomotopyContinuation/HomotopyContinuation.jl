@@ -163,6 +163,19 @@ end
 Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
     state
+function Base.getproperty(state::TrackerState, sym::Symbol)
+    if sym === :t
+        return getfield(state, :segment)[getfield(state, :s)]
+    elseif sym == :Δt
+        segment = getfield(state, :segment)
+        s′ = getfield(state, :s′)
+        s = getfield(state, :s)
+        segment[s′] - segment[s]
+    else # fallback to getfield
+        return getfield(state, sym)
+    end
+end
+
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
 struct TrackerResult{V<:AbstractVector}
@@ -269,20 +282,11 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::Tracker) = x
 Base.broadcastable(C::Tracker) = Ref(C)
 
 """
-    current_t(tracker::Tracker)
+    state(tracker::Tracker)
 
-Current `t`.
+Return the state of the tracker.
 """
-current_t(tracker::Tracker) = current_t(tracker.state)
-current_t(state::TrackerState) = state.segment[state.s]
-
-"""
-    current_Δt(tracker::Tracker)
-
-Current step_size `Δt`.
-"""
-current_Δt(tracker::Tracker) = current_Δt(tracker.state)
-current_Δt(state::TrackerState) = state.segment[state.s′] - state.segment[state.s]
+state(tracker::Tracker) = tracker.state
 
 #
 # function tracker_startsolutions(args...; kwargs...)
@@ -338,7 +342,8 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        state.s′ = state.s + nthroot(
+        state.s′ = state.s +
+                   nthroot(
             (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
             p,
         ) * (state.s′ - state.s)
@@ -365,7 +370,16 @@ end
 
 Setup `tracker` to track `x₁` from `t₁` to `t₀`.
 """
-function init!(tracker::Tracker, x₁::AbstractVector, t₁, t₀)
+init!(tracker::Tracker, r::TrackerResult, t₁, t₀) =
+    init!(tracker, r.x, t₁, t₀, r.ω, r.μ)
+function init!(
+    tracker::Tracker,
+    x₁::AbstractVector,
+    t₁,
+    t₀,
+    ω::Float64 = NaN,
+    μ::Float64 = NaN,
+)
     @unpack state, predictor, corrector, homotopy, options = tracker
     @unpack x, x̄, norm, jacobian = state
 
@@ -383,16 +397,20 @@ function init!(tracker::Tracker, x₁::AbstractVector, t₁, t₀)
 
     # compute ω and limit accuracy μ for the start value
     t = state.segment[state.s]
-    valid, ω, μ = init_newton!(
-        x̄,
-        corrector,
-        homotopy,
-        x,
-        t,
-        jacobian,
-        norm;
-        a = options.a,
-    )
+    if isnan(ω) || isnan(μ)
+        valid, ω, μ = init_newton!(
+            x̄,
+            corrector,
+            homotopy,
+            x,
+            t,
+            jacobian,
+            norm;
+            a = options.a,
+        )
+    else
+        valid = true
+    end
     if !isnan(ω)
         state.ω = ω
     end
@@ -417,9 +435,7 @@ end
 
 function step!(tracker::Tracker, debug::Bool = false)
     @unpack homotopy, corrector, predictor, state, options = tracker
-    @unpack x, x̂, x̄, jacobian, norm = state
-
-    t, Δt = current_t(state), current_Δt(state)
+    @unpack t, Δt, x, x̂, x̄, jacobian, norm = state
 
     debug && printstyled(
         "\nt: ",
@@ -484,6 +500,8 @@ function track!(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
     while is_tracking(tracker.state.condition)
         step!(tracker, debug)
     end
+
+    tracker.state.condition
 end
 
 function track(tracker::Tracker, x, t₁ = 0.0, t₀ = 1.0; debug::Bool = false)
