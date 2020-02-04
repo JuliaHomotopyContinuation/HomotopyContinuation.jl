@@ -334,9 +334,7 @@ function update_stepsize!(
     Δs = state.Δs_prev
     if is_converged(result)
         e = state.norm(local_error(predictor))
-        e2 = state.norm(state.x̂, state.x) / Δs^p
-        ē = max(e, e2)
-        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * ē), p)
+        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * e), p)
         Δs₂ = options.β_τ * trust_region(predictor)
         s′ = min(state.s + min(Δs₁, Δs₂), Double64(length(state.segment)))
 
@@ -350,7 +348,7 @@ function update_stepsize!(
         Θ_j = nthroot(result.θ, 1 << j)
         state.s′ = state.s +
                    nthroot(
-            (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
+            (√(1 + 2 * _h(a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
             p,
         ) * (state.s′ - state.s)
     end
@@ -442,8 +440,9 @@ function init!(
     tracker
 end
 
-function update_high_prec_residual!(state, μ_low, options::TrackerOptions)
-    @unpack μ, ω = state
+function update_precision!(tracker::Tracker, μ_low)
+    @unpack homotopy, corrector, state, options = tracker
+    @unpack μ, ω, x, t, jacobian, norm = state
     @unpack a = options
 
     options.high_precision || return false
@@ -456,6 +455,17 @@ function update_high_prec_residual!(state, μ_low, options::TrackerOptions)
         end
     elseif μ * ω > a^3 * _h(a)
         state.high_prec_residual = true
+        # do one refinement step
+        μ = high_prec_refinement_step!(
+            x,
+            corrector,
+            homotopy,
+            x,
+            t,
+            jacobian,
+            norm;
+        )
+        state.μ = max(μ, eps())
     end
     state.high_prec_residual
 end
@@ -488,7 +498,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        high_precision = state.high_prec_residual
+        high_precision = state.high_prec_residual,
     )
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
@@ -499,14 +509,14 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.Δs_prev = state.s′ - state.s
         state.s = state.s′
         state.accuracy = result.accuracy
-        state.μ = result.accuracy #max(result.accuracy, eps())
+        state.μ = max(result.accuracy, eps())
         state.ω = result.ω
 
         # If we use a weighted norm, now we update this
         update!(state.norm, x)
+        update_precision!(tracker, result.μ_low)
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, t + Δt, jacobian)
-        update_high_prec_residual!(state, result.μ_low, options)
         # Update other state
         state.τ = trust_region(predictor)
         state.accepted_steps += 1

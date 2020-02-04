@@ -49,6 +49,29 @@ function NewtonCorrector(a::Float64, (m, n)::NTuple{2,Int})
     NewtonCorrector(a, h_a, Δx, r, r̄, x_high)
 end
 
+function high_prec_refinement_step!(
+    x̄::AbstractVector,
+    NC::NewtonCorrector,
+    H::AbstractHomotopy,
+    x::AbstractVector,
+    t::Number,
+    JM::Jacobian,
+    norm::AbstractNorm;
+    high_precision::Bool = false,
+)
+    @unpack Δx, r, x_high = NC
+    evaluate_and_jacobian!(r, jacobian(JM), H, x, t)
+    x_high .= x
+    evaluate!(r, H, x_high, ComplexDF64(t))
+    LA.ldiv!(Δx, updated!(JM), r, norm)
+    x̄ .= x .- Δx
+    x_high .= x̄
+    evaluate!(r, H, x_high, ComplexDF64(t))
+    LA.ldiv!(Δx, JM, r, norm)
+
+    norm(Δx)
+end
+
 function newton!(
     x̄::AbstractVector,
     NC::NewtonCorrector,

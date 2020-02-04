@@ -13,6 +13,7 @@ struct PathInfo
     τ::Vector{Float64}
     Δx_t::Vector{Float64}
     Δx̂x::Vector{Float64}
+    high_prec::Vector{Bool}
     # total info
     return_code::TrackerCondition.conditions
     n_factorizations::Int
@@ -40,6 +41,7 @@ function path_info(
     τ = Float64[]
     Δx_t = Float64[]
     Δx̂x = Float64[]
+    high_prec = Bool[]
 
     p = order(tracker.predictor)
 
@@ -53,7 +55,7 @@ function path_info(
         push!(ω, state.ω)
         push!(accuracy, state.accuracy)
         push!(μ, state.μ)
-
+        push!(high_prec, state.high_prec_residual)
         step!(tracker, debug)
 
         push!(accepted_rejected, !state.last_step_failed)
@@ -74,6 +76,7 @@ function path_info(
         τ,
         Δx_t,
         Δx̂x,
+        high_prec,
         tracker.state.condition,
         state.jacobian.factorizations[],
         state.jacobian.ldivs[],
@@ -105,7 +108,11 @@ function path_table(io::IO, info::PathInfo)
         crayon = PrettyTables.crayon"green",
     )
     h3 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 3 && data[i, 3] == data[i, 9],
+        f = (data, i, j) -> j == 3 && data[i, 3] ≈ -data[i, 9],
+        crayon = PrettyTables.crayon"blue",
+    )
+    h4 = PrettyTables.Highlighter(
+        f = (data, i, j) -> j == 8 && info.high_prec[i],
         crayon = PrettyTables.crayon"blue",
     )
 
@@ -136,7 +143,7 @@ function path_table(io::IO, info::PathInfo)
         header,
         crop = :none,
         formatter = ft,
-        highlighters = (h1, h2, h3),
+        highlighters = (h1, h2, h3, h4),
     )
 end
 

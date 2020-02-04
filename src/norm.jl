@@ -111,7 +111,6 @@ Setup the weighted norm `w` for `x`.
 function init!(w::WeightedNorm, x::AbstractVector)
     point_norm = w.norm(x)
     for i = 1:length(w)
-
         wᵢ = fast_abs(x[i])
         if wᵢ < w.options.scale_min * point_norm
             wᵢ = w.options.scale_min * point_norm
@@ -133,7 +132,8 @@ and the norm of `x`.
 function update!(w::WeightedNorm, x::AbstractVector)
     norm_x = w(x)
     for i = 1:length(x)
-        wᵢ = fast_abs(x[i])#(fast_abs(x[i]) + w[i]) / 2
+        # wᵢ = fast_abs(x[i])#
+        wᵢ = (fast_abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
         elseif wᵢ > w.options.scale_max * norm_x
