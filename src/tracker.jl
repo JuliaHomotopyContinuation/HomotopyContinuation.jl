@@ -15,6 +15,7 @@ Base.@kwdef struct TrackerOptions
     a::Float64 = 0.2
     β_a::Float64 = 0.1
     β_τ::Float64 = 0.7
+    high_precision::Bool = true
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -100,6 +101,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     μ::Float64 # limit accuracy
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
+    high_prec_residual::Bool
 
     norm::WeightedNorm{InfNorm}
     jacobian::Jacobian{Float64,M}
@@ -132,6 +134,7 @@ function TrackerState(
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
+    high_prec_residual = false
 
     JM = Jacobian(zeros(ComplexF64, size(H)))
 
@@ -153,6 +156,7 @@ function TrackerState(
         μ,
         τ,
         norm_Δx₀,
+        high_prec_residual,
         norm,
         JM,
         condition,
@@ -393,6 +397,7 @@ function init!(
     state.s = state.s′ = state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
+    state.high_prec_residual = false
     init!(norm, x)
     init!(jacobian)
     state.condition = TrackerCondition.tracking
@@ -428,13 +433,31 @@ function init!(
     end
 
     # initialize the predictor
-    jacobian!(jacobian.J, homotopy, state.x, t)
+    evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
     update!(predictor, homotopy, state.x, t, jacobian)
     state.τ = trust_region(predictor)
     # compute initial step size
     state.s′ = initial_step_size(state, predictor, tracker.options)
 
     tracker
+end
+
+function update_high_prec_residual!(state, μ_low, options::TrackerOptions)
+    @unpack μ, ω = state
+    @unpack a = options
+
+    options.high_precision || return false
+
+    if state.high_prec_residual && !isnan(μ_low)
+        # check if we can go low again
+        if μ_low * ω < a^3 * _h(a)
+            state.high_prec_residual = false
+            state.μ = μ_low
+        end
+    elseif μ * ω > a^3 * _h(a)
+        state.high_prec_residual = true
+    end
+    state.high_prec_residual
 end
 
 function step!(tracker::Tracker, debug::Bool = false)
@@ -465,6 +488,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
+        high_precision = state.high_prec_residual
     )
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
@@ -475,14 +499,14 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.Δs_prev = state.s′ - state.s
         state.s = state.s′
         state.accuracy = result.accuracy
-        state.μ = max(result.accuracy, eps())
+        state.μ = result.accuracy #max(result.accuracy, eps())
         state.ω = result.ω
 
         # If we use a weighted norm, now we update this
         update!(state.norm, x)
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, t + Δt, jacobian)
-
+        update_high_prec_residual!(state, result.μ_low, options)
         # Update other state
         state.τ = trust_region(predictor)
         state.accepted_steps += 1

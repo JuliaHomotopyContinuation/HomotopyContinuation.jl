@@ -18,6 +18,7 @@ struct NewtonCorrectorResult
     iters::Int
     ω::Float64
     θ::Float64
+    μ_low::Float64
     norm_Δx₀::Float64
 end
 
@@ -35,13 +36,17 @@ struct NewtonCorrector
     h_a::Float64
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
+    r̄::Vector{ComplexF64}
+    x_high::Vector{ComplexDF64}
 end
 
 function NewtonCorrector(a::Float64, (m, n)::NTuple{2,Int})
     h_a = 2a * (√(4 * a^2 + 1) - 2a)
     Δx = zeros(ComplexF64, n)
     r = zeros(ComplexF64, m)
-    NewtonCorrector(a, h_a, Δx, r)
+    r̄ = zero(r)
+    x_high = zeros(ComplexDF64, n)
+    NewtonCorrector(a, h_a, Δx, r, r̄, x_high)
 end
 
 function newton!(
@@ -54,17 +59,23 @@ function newton!(
     norm::AbstractNorm;
     μ::Float64 = throw(UndefKeywordError(:μ)),
     ω::Float64 = throw(UndefKeywordError(:ω)),
+    high_precision::Bool = false,
 )
-    @unpack a, h_a, Δx, r = NC
+    @unpack a, h_a, Δx, r, r̄, x_high = NC
 
     x̄ .= x₀
     xᵢ₊₃ = xᵢ₊₂ = xᵢ₊₁ = xᵢ = x̄
     Δxᵢ = Δx
-    θ = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = NaN
+    μ_low = θ = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = NaN
     ā = a
     for i = 0:10
         evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
+        if high_precision
+            x_high .= xᵢ
+            evaluate!(r, H, x_high, ComplexDF64(t))
+        end
         LA.ldiv!(Δxᵢ, updated!(JM), r, norm)
+
         xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
 
@@ -79,27 +90,34 @@ function newton!(
                 i + 1,
                 ω,
                 θ,
+                μ_low,
                 norm_Δx₀,
             )
         elseif ω * norm_Δxᵢ^2 < 2 * μ * sqrt(1 - 2 * h_a)
-            # TODO: Can we sometimes skip this?
-
             evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
-            LA.ldiv!(Δxᵢ, updated!(JM), r)
+            updated!(JM)
+            if high_precision
+                LA.ldiv!(Δxᵢ, JM, r)
+                μ_low = norm(Δxᵢ)
+                x_high .= xᵢ
+                evaluate!(r, H, x_high, ComplexDF64(t))
+            end
+            LA.ldiv!(Δxᵢ, JM, r)
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
-            norm_Δxᵢ₊₁ = norm(Δxᵢ)
+            μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
 
             # TODO: Sometimes a second iteration?
-            xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
-            μ = norm(Δxᵢ)
+            if i == 0 && !high_precision
+                evaluate!(r, H, xᵢ, t)
+                LA.ldiv!(Δxᵢ, JM, r)
+                μ = norm(Δxᵢ)
+            end
 
             # TODO: NOT IN PAPER SO FAR
             if i == 0
-                ω̄ = 2norm_Δxᵢ / norm_Δxᵢ₊₁^2
-                if !isnan(ω̄) && ω̄ < ω
+                ω̄ = 2 * norm_Δxᵢ / norm_Δxᵢ₊₁^2
+                if ω̄ < ω
                     ω = ω̄
-                else
-                    ω = 0.5 * ω
                 end
             end
 
@@ -109,6 +127,7 @@ function newton!(
                 i + 2,
                 ω,
                 θ,
+                μ_low,
                 norm_Δx₀,
             )
         end
@@ -117,7 +136,7 @@ function newton!(
         i >= 1 && (ā *= ā)
     end
 
-    return NewtonCorrectorResult(NEWT_MAX_ITERS, μ, 11, ω, θ, norm_Δx₀)
+    return NewtonCorrectorResult(NEWT_MAX_ITERS, μ, 11, ω, θ, μ_low, norm_Δx₀)
 end
 
 function init_newton!(

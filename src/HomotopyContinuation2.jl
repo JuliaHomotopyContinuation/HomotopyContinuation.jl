@@ -2,7 +2,7 @@ module HomotopyContinuation2
 
 export ModelKit
 
-using DoubleFloats: Double64
+using DoubleFloats: Double64, ComplexDF64
 import LinearAlgebra
 using Parameters: @unpack
 import PrettyTables

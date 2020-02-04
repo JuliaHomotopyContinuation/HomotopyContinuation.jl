@@ -133,7 +133,7 @@ and the norm of `x`.
 function update!(w::WeightedNorm, x::AbstractVector)
     norm_x = w(x)
     for i = 1:length(x)
-        wᵢ = sqrt(fast_abs(x[i]) * w[i])
+        wᵢ = fast_abs(x[i])#(fast_abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
         elseif wᵢ > w.options.scale_max * norm_x
