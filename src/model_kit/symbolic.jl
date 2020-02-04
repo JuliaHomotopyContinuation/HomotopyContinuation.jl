@@ -4,7 +4,7 @@ Variable(name::Union{Symbol,AbstractString}, indices::Int...) =
     Variable("$(name)$(join(map_subscripts.(indices), "₋"))")
 
 const SUBSCRIPTS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
-const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i+1] for i in 0:9])
+const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i+1] for i = 0:9])
 map_subscripts(indices) = join(SUBSCRIPT_MAP[c] for c in string(indices))
 
 Base.isless(a::Variable, b::Variable) = isless(name(a), name(b))
@@ -88,7 +88,8 @@ function buildvar(var; unique::Bool = false)
         (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
         varname = var.args[1]
         prefix = unique ? string(gensym(varname)) : string(varname)
-        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname,
+        :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
@@ -111,6 +112,29 @@ function buildvars(args; unique::Bool = false)
     vars, exprs
 end
 
+"""
+    unique_variable(var::Symbol, variables, parameters)
+
+Create a variable with a unique name which doesn't clash with `variables` or
+`parameters`.
+If `var` is not possible the names `var##k` for `k=0,1,...` are tried until
+one is possible,
+"""
+function unique_variable(
+    var::Symbol,
+    vars::Vector{Variable},
+    params::Vector{Variable},
+)
+    v = Variable(var)
+    k = 0
+    while (v in vars || v in params)
+        v = Variable("$var##$k")
+        k += 1
+    end
+    v
+end
+
+
 Base.adjoint(expr::Basic) = expr
 Base.conj(expr::Basic) = expr
 Base.transpose(expr::Basic) = expr
@@ -129,7 +153,7 @@ function variables(exprs::AbstractVector{<:Basic})
     end
     S
 end
-function variables(exprs::Union{Basic, AbstractVector{<:Basic}}, params)
+function variables(exprs::Union{Basic,AbstractVector{<:Basic}}, params)
     setdiff!(variables(exprs), params)
 end
 
@@ -162,14 +186,19 @@ julia> subs(x * y, [x,y] => [x+2,y+2])
 ```
 """
 subs(ex::Basic, args...) = subs(ex, ExpressionMap(), args...)
-function subs(ex::Basic, D::ExpressionMap, (xs,ys)::Pair{<:AbstractArray{<:Basic}, <:AbstractArray}, args...)
+function subs(
+    ex::Basic,
+    D::ExpressionMap,
+    (xs, ys)::Pair{<:AbstractArray{<:Basic},<:AbstractArray},
+    args...,
+)
     size(xs) == size(ys) || throw(ArgumentError("Substitution arguments don't have the same size."))
-    for (x,y) in zip(xs, ys)
+    for (x, y) in zip(xs, ys)
         D[x] = y
     end
     subs(ex, D, args...)
 end
-function subs(ex::Basic, D::ExpressionMap, (x,y), args...)
+function subs(ex::Basic, D::ExpressionMap, (x, y), args...)
     D[Expression(x)] = Expression(y)
     subs(ex, D, args...)
 end
@@ -192,10 +221,7 @@ julia> evaluate(x^2, x => 2)
 julia> evaluate(x * y, [x,y] => [2, 3])
 6
 """
-function evaluate(
-    expr::Union{Basic,AbstractArray{<:Basic}},
-    args...
-)
+function evaluate(expr::Union{Basic,AbstractArray{<:Basic}}, args...)
     to_number.(subs(expr, args...))
 end
 (f::Union{Basic,AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
@@ -215,7 +241,10 @@ end
 function differentiate(exprs::AbstractVector{<:Basic}, var::Variable)
     [differentiate(e, var) for e in exprs]
 end
-function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
+function differentiate(
+    exprs::AbstractVector{<:Basic},
+    vars::AbstractVector{Variable},
+)
     [differentiate(e, v) for e in exprs, v in vars]
 end
 
@@ -244,7 +273,11 @@ julia> monomials([x,y], 2; homogeneous = true)
  y ^ 2
  ```
 """
-function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+function monomials(
+    vars::AbstractVector{Variable},
+    d::Integer;
+    homogeneous::Bool = false,
+)
     n = length(vars)
     if homogeneous
         pred = x -> sum(x) == d
@@ -391,7 +424,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         end
     elseif cls == :Symbol
         for (i, v) in enumerate(vars)
-            if v == arg
+            if v == op
                 d[i] = 1
                 break
             end
@@ -407,7 +440,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         end
     elseif cls == :Div
         div!(coeff, coeff, op)
-    elseif cls ∈ SE.number_types
+    elseif cls ∈ NUMBER_TYPES
         coeff = copy(op)
     end
 
@@ -419,6 +452,42 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
     dict
 end
 
+
+"""
+    degrees(f::AbstractVector{Expression}, vars = collect(variables(f); expanded = false)
+
+Compute the degrees of the expressions `f` in `vars`.
+Unless `expanded` is `true` the expressions are first expanded.
+"""
+function degrees(
+    f::AbstractVector{Expression},
+    vars::AbstractVector{Variable} = collect(variables(f));
+    expanded::Bool = false,
+)
+    if !expanded
+        f = ModelKit.expand.(f)
+    end
+    dicts = ModelKit.to_dict.(f, Ref(vars))
+    maximum.(sum, keys.(dicts))
+end
+
+"""
+    degrees(f::Expression, vars = collect(variables(f); expanded = false)
+
+Compute the degree of the expression `f`  in `vars`.
+Unless `expanded` is `true` the expression is first expanded.
+"""
+function degree(
+    f::Expression,
+    vars::AbstractVector{Variable} = collect(variables(f));
+    expanded::Bool = false,
+)
+    if !expanded
+        f = ModelKit.expand(f)
+    end
+    dicts = ModelKit.to_dict(f, vars)
+    maximum(sum, keys(dicts))
+end
 
 #########################
 ## System and Homotopy ##
@@ -492,9 +561,17 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
+        print(
+            io,
+            " $(length(F.variables)) variables: ",
+            join(F.variables, ", "),
+        )
         if !isempty(F.parameters)
-            print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
+            print(
+                io,
+                "\n $(length(F.parameters)) parameters: ",
+                join(F.parameters, ", "),
+            )
         end
         print(io, "\n\n")
         for i = 1:length(F)
@@ -511,7 +588,8 @@ function Base.show(io::IO, F::System)
     end
 end
 
-evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
+evaluate(F::System, x::AbstractVector) =
+    evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
@@ -596,9 +674,17 @@ end
 function Base.show(io::IO, H::Homotopy)
     if !get(io, :compact, false)
         println(io, "Homotopy in ", H.t, " of length ", length(H.expressions))
-        print(io, " $(length(H.variables)) variables: ", join(H.variables, ", "))
+        print(
+            io,
+            " $(length(H.variables)) variables: ",
+            join(H.variables, ", "),
+        )
         if !isempty(H.parameters)
-            print(io, "\n $(length(H.parameters)) parameters: ", join(H.parameters, ", "))
+            print(
+                io,
+                "\n $(length(H.parameters)) parameters: ",
+                join(H.parameters, ", "),
+            )
         end
         print(io, "\n\n")
         for i = 1:length(H)
