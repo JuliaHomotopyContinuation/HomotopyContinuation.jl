@@ -202,6 +202,7 @@ function _jacobian!_impl(
     slp = let
         list, ids = instruction_list(I.expressions)
         vars = Symbol.(I.variables)
+        params = Symbol.(I.parameters)
         dlist, J = diff(list, vars, ids)
 
         assignements = Dict{Symbol,Expr}()
@@ -209,8 +210,12 @@ function _jacobian!_impl(
         U_constants = Expr[]
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
-                push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
-            elseif J[i, j] isa Number
+                if J[i,j] ∉ vars && J[i,j] ∉ params
+                    push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
+                else
+                    push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
+                end
+            elseif J[i, j] !== nothing
                 push!(U_constants, :(U[$i, $j] = $(J[i, j])))
             end
         end
@@ -235,6 +240,7 @@ function _evaluate_and_jacobian!_impl(
     slp = let
         list, ids = instruction_list(I.expressions)
         vars = Symbol.(I.variables)
+        params = Symbol.(I.parameters)
         dlist, J = diff(list, vars, ids)
 
         assignements = Dict{Symbol,Expr}()
@@ -245,8 +251,12 @@ function _evaluate_and_jacobian!_impl(
         U_constants = Expr[]
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
-                push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
-            elseif J[i, j] isa Number
+                if J[i,j] ∉ vars && J[i,j] ∉ params
+                    push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
+                else
+                    push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
+                end
+            elseif J[i, j] !== nothing
                 push!(U_constants, :(U[$i, $j] = $(J[i, j])))
             end
         end
@@ -295,7 +305,11 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     for (i, id) in enumerate(ids)
         d_id = get(diff_map, (id, d), nothing)
         if d_id isa Symbol
-            push!(assignements, d_id => :(u[$i] = $d_id))
+            if d_id ∉ vars && d_id ∉ params
+                push!(assignements, d_id => :(u[$i] = $d_id))
+            else
+                push!(U_constants, :(u[$i] = $(var_map[d_id])))
+            end
         elseif d_id isa Nothing
             push!(u_constants, :(u[$i] = zero(eltype(x))))
         else
