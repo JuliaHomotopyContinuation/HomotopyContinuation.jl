@@ -10,7 +10,7 @@ export Tracker, TrackerResult, track, track!
 The set of options set for a [`Tracker`](@ref). See the description of [`Tracker`](@ref)
 for all possible options.
 """
-Base.@kwdef struct TrackerOptions
+Base.@kwdef mutable struct TrackerOptions
     max_steps::Int = 1_000
     a::Float64 = 0.2
     β_a::Float64 = 0.1
@@ -102,6 +102,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
     high_prec_residual::Bool
+    used_high_prec::Bool
 
     norm::WeightedNorm{InfNorm}
     jacobian::Jacobian{Float64,M}
@@ -134,7 +135,7 @@ function TrackerState(
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
-    high_prec_residual = false
+    used_high_prec = high_prec_residual = false
 
     JM = Jacobian(zeros(ComplexF64, size(H)))
 
@@ -157,6 +158,7 @@ function TrackerState(
         τ,
         norm_Δx₀,
         high_prec_residual,
+        used_high_prec,
         norm,
         JM,
         condition,
@@ -193,6 +195,7 @@ struct TrackerResult{V<:AbstractVector}
     μ::Float64
     accepted_steps::Int
     rejected_steps::Int
+    high_precision_used::Bool
 end
 
 function TrackerResult(state::TrackerState)
@@ -205,6 +208,7 @@ function TrackerResult(state::TrackerState)
         state.μ,
         state.accepted_steps,
         state.rejected_steps,
+        state.used_high_prec
     )
 end
 
@@ -293,18 +297,6 @@ Base.broadcastable(C::Tracker) = Ref(C)
 Return the state of the tracker.
 """
 state(tracker::Tracker) = tracker.state
-
-#
-# function tracker_startsolutions(args...; kwargs...)
-#     supported, rest = splitkwargs(
-#         kwargs,
-#         problem_startsolutions_supported_keywords,
-#     )
-#     prob, startsolutions = problem_startsolutions(args...; supported...)
-#     tracker = Tracker(prob, start_solution_sample(startsolutions); rest...)
-#     (tracker = tracker, startsolutions = startsolutions)
-# end
-
 
 # Step Size
 
@@ -395,7 +387,7 @@ function init!(
     state.s = state.s′ = state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
-    state.high_prec_residual = false
+    state.used_high_prec = state.high_prec_residual = false
     init!(norm, x)
     init!(jacobian)
     state.condition = TrackerCondition.tracking
@@ -455,6 +447,7 @@ function update_precision!(tracker::Tracker, μ_low)
         end
     elseif μ * ω > a^3 * _h(a)
         state.high_prec_residual = true
+        state.used_high_prec = true
         # do one refinement step
         μ = high_prec_refinement_step!(
             x,
@@ -463,10 +456,11 @@ function update_precision!(tracker::Tracker, μ_low)
             x,
             t,
             jacobian,
-            norm;
+            norm,
         )
         state.μ = max(μ, eps())
     end
+
     state.high_prec_residual
 end
 

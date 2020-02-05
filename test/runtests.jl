@@ -5,4 +5,5 @@ const HC2 = HomotopyContinuation2
     include("model_kit_test.jl")
     include("linear_algebra_test.jl")
     include("homotopies_test.jl")
+    include("tracker_test.jl")
 end

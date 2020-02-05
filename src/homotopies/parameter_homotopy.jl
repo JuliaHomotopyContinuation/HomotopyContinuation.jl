@@ -31,9 +31,9 @@ end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
 
-p!(H::ParameterHomotopy, t::ComplexF64) =
+p!(H::ParameterHomotopy, t::Union{Float64,ComplexF64}) =
     (H.pt .= t .* H.p .+ (1.0 .- t) .* H.q; H.pt)
-p!(H::ParameterHomotopy, t::ComplexDF64) =
+p!(H::ParameterHomotopy, t::Union{Double64,ComplexDF64}) =
     (H.pt_high .= t .* H.p .+ (1.0 .- t) .* H.q; H.pt_high)
 
 ṗ!(H::ParameterHomotopy, t) = (ṗt = first(H.ṗt); ṗt .= H.p .- H.q; H.ṗt)
