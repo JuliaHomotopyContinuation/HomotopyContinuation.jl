@@ -174,22 +174,9 @@ for (op, inplace, libnm) in [
     (:+, :add!, :add),
     (:-, :sub!, :sub),
     (:*, :mul!, :mul),
-    (:/, :div!, :div),
 ]
+    # $(Expr(:., :Base, QuoteNode(op)))
     @eval begin
-        function $(Expr(:., :Base, QuoteNode(op)))(b1::Basic, b2::Basic)
-            a = Expression()
-            ccall(
-                $((Symbol("basic_", libnm), libsymengine)),
-                Nothing,
-                (Ref{Expression}, Ref{ExpressionRef}, Ref{ExpressionRef}),
-                a,
-                b1,
-                b2,
-            )
-            return a
-        end
-
         function $(inplace)(a::Expression, b1::Basic, b2::Basic)
             ccall(
                 $((Symbol("basic_", libnm), libsymengine)),
@@ -201,8 +188,25 @@ for (op, inplace, libnm) in [
             )
             return a
         end
+        function Base.$op(b1::Basic, b2::Basic)
+            $inplace(Expression(), b1, b2)
+        end
     end
 end
+
+function div!(a::Expression, b1::Basic, b2::Basic)
+    class(b2) ∈ NUMBER_TYPES || throw(ArgumentError("Cannot divide by " * string(b2)))
+    ccall(
+        (:basic_div, libsymengine),
+        Nothing,
+        (Ref{Expression}, Ref{ExpressionRef}, Ref{ExpressionRef}),
+        a,
+        b1,
+        b2,
+    )
+    return a
+end
+Base.:(/)(b1::Basic, b2::Basic) = div!(Expression(), b1, b2)
 
 Base.:(//)(x::Basic, y::Basic) = x / y
 function Base.:(^)(x::Basic, k::Integer)
