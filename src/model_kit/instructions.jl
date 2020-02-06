@@ -465,19 +465,20 @@ function unroll_pow(var, n)
 
     # base to expansion shows up which power it is needed to compute
     d = digits(n, base = 2)
+    x = :x
     exprs = map(2:length(d)) do i
-        :($(Symbol(:x, 1 << (i - 1))) = sqr($(Symbol(:x, 1 << (i - 2)))))
+        :(local $(Symbol(x, 1 << (i - 1))) = sqr($(Symbol(x, 1 << (i - 2)))))
     end
     prods = Symbol[]
     for (i, di) in enumerate(d)
         if !iszero(di)
-            push!(prods, Symbol(:x, 1 << (i - 1)))
+            push!(prods, Symbol(x, 1 << (i - 1)))
         end
     end
     if length(prods) > 1
         push!(exprs, Expr(:call, :*, prods...))
     end
-    Expr(:let, :(x1 = $var), Expr(:block, exprs...))
+    Expr(:let, :($(Symbol(x,1)) = $var), Expr(:block, exprs...))
 end
 
 
