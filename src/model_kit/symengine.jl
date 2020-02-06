@@ -267,7 +267,6 @@ Base.convert(::Type{Expression}, x::Irrational{:catalan}) = __catalan
 for (f, T) in [
     (:integer_set_si, Int),
     (:integer_set_ui, UInt),
-    (:integer_set_mpz, BigInt),
     (:real_double_set_d, Float64),
 ]
     @eval begin
@@ -283,6 +282,12 @@ for (f, T) in [
             return a
         end
     end
+end
+
+function Base.convert(::Type{Expression}, x::BigInt)
+    a = Expression()
+    ccall((:integer_set_mpz, libsymengine), Nothing, (Ref{Expression}, Ref{BigInt}), a, x)
+    return a
 end
 
 
