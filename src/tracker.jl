@@ -12,9 +12,10 @@ for all possible options.
 """
 Base.@kwdef mutable struct TrackerOptions
     max_steps::Int = 1_000
-    a::Float64 = 0.2
-    β_a::Float64 = 0.1
-    β_τ::Float64 = 0.7
+    a::Float64 = 0.125
+    β_a::Float64 = 1
+    β_ω::Float64 = 8.0
+    β_τ::Float64 = 0.75
     high_precision::Bool = true
 end
 
@@ -308,8 +309,9 @@ function initial_step_size(
     options::TrackerOptions,
 )
     a = options.β_a * options.a
+    ω = options.β_ω * state.ω
     e = state.norm(local_error(predictor))
-    Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * e), order(predictor))
+    Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.β_τ * trust_region(predictor)
     min(Δs₁, Δs₂, length(state.segment))
 end
@@ -322,11 +324,12 @@ function update_stepsize!(
 )
 
     a = options.β_a * options.a
+    ω = options.β_ω * state.ω
     p = order(predictor)
     Δs = state.Δs_prev
     if is_converged(result)
         e = state.norm(local_error(predictor))
-        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (state.ω * e), p)
+        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         Δs₂ = options.β_τ * trust_region(predictor)
         s′ = min(state.s + min(Δs₁, Δs₂), Double64(length(state.segment)))
 
@@ -340,7 +343,7 @@ function update_stepsize!(
         Θ_j = nthroot(result.θ, 1 << j)
         state.s′ = state.s +
                    nthroot(
-            (√(1 + 2 * _h(a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
+            (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
             p,
         ) * (state.s′ - state.s)
     end
