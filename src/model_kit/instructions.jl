@@ -41,6 +41,60 @@ function Base.push!(v::InstructionList, x::Pair{Symbol,<:Tuple{Symbol,Any,Any}})
     first(x)
 end
 
+function add!(list::InstructionList, @nospecialize(a), @nospecialize(b))
+    if a === nothing
+        b === nothing && return nothing
+        return b
+    else
+        b === nothing && return a
+        return push!(list, (:+, a, b))
+    end
+end
+function sub!(list::InstructionList, @nospecialize(a), @nospecialize(b))
+    if a === nothing
+        b === nothing && return nothing
+        return push!(list, (:-, b, nothing))
+    else
+        b === nothing && return a
+        return push!(list, (:-, a, b))
+    end
+end
+
+function mul!(list::InstructionList, @nospecialize(a), @nospecialize(b))
+    (a === nothing || b === nothing) && return nothing
+    if a == 1
+        b == 1 && return a
+        return b
+    else
+        b == 1 && return a
+        return push!(list, (:*, a, b))
+    end
+end
+
+function muladd!(
+    list::InstructionList,
+    @nospecialize(a),
+    @nospecialize(b),
+    @nospecialize(c),
+)
+    add!(list, c, mul!(list, a, b))
+end
+
+function div!(list::InstructionList, @nospecialize(a), @nospecialize(b))
+    a === nothing && return nothing
+    b == 1 && return a
+    push!(list, (:/, a, b))
+end
+
+function pow!(list, @nospecialize(a), b::Int)
+    @assert b ≥ 0
+    b == 1 && return a
+    b == 0 && return 1
+    a == 1 && return a
+    a === nothing && return nothing
+    push!(list, (:^, a, b))
+end
+
 function flat_expr!(
     v,
     ex::Basic,
@@ -85,24 +139,35 @@ function flat_expr!(
 end
 
 
+struct DiffMap
+    D::Dict{Tuple{Symbol,Int},Any}
+end
+DiffMap() = DiffMap(Dict{Tuple{Symbol,Int},Any}())
+function Base.getindex(D::DiffMap, s::Symbol, i::Int)
+    i == 0 && return s
+    get(D.D, (s, i), nothing)
+end
+function Base.getindex(D::DiffMap, s, i)
+    i == 0 && return s
+    nothing
+end
+Base.setindex!(D::DiffMap, v::Any, s::Symbol, i::Int) = D.D[(s, i)] = v
+Base.setindex!(D::DiffMap, v::Nothing, s::Symbol, i::Int) = nothing
+
 function Base.diff(
     list::InstructionList,
     vars::Vector{Symbol},
     f::Vector{Symbol},
 )
-    seed = Dict{Tuple{Symbol,Int},Any}()
+    diff_map = DiffMap()
     for (i, v) in enumerate(vars)
-        seed[(v, i)] = 1
+        diff_map[v, i] = 1
     end
-    dlist = diff!(list, length(vars), seed)
+    dlist = diff!(list, length(vars), diff_map)
 
     J = Matrix{Union{Nothing,Symbol,Number}}(undef, length(f), length(vars))
     for (j, v) in enumerate(vars), (i, fi) in enumerate(f)
-        if haskey(seed, (fi, j))
-            J[i, j] = seed[(fi, j)]
-        else
-            J[i, j] = nothing
-        end
+        J[i, j] = diff_map[fi, j]
     end
     dlist, J
 end
@@ -113,141 +178,65 @@ end
 Returns an `InstructionList` list computing the derivatives of `N` variables.
 The derivatives of the instructions are stored in `diff_map`.
 """
-function diff!(list::InstructionList, N::Int, diff_map)
+function diff!(list::InstructionList, N::Int, D::DiffMap)
     n = length(list)
     v = InstructionList(n = Ref(n))
     for (id, el) in list.instructions
         (op, arg1, arg2) = el
-
         if op == :^
-            let
-                p1 = p2 = :NONE
-                instr_added = false
-                for ∂i = 1:N
-                    exp::Int = arg2
-                    if haskey(diff_map, (arg1, ∂i))
-                        if p2 == :NONE
-                            if exp == 2
-                                p2 = push!(v, (:*, 2, arg1))
-                            else
-                                p1 = push!(v, (:^, arg1, exp - 1))
-                                p2 = push!(v, (:*, exp, p1))
-                            end
-                        end
-                        if !instr_added
-                            if exp == 2
-                                push!(v, id => (:^, arg1, 2))
-                            else
-                                push!(v, id => (:*, p1, arg1))
-                            end
-                            instr_added = true
-                        end
-                        ∂el = diff_map[(arg1, ∂i)]
-                        if ∂el != 1
-                            diff_map[(id, ∂i)] = push!(v, (:*, p2, ∂el))
+            p2 = :NONE
+            instr_added = false
+            for ∂i = 1:N
+                exp::Int = arg2
+                arg1_∂i = D[arg1, ∂i]
+                if arg1_∂i !== nothing
+                    if p2 == :NONE
+                        p1 = pow!(v, arg1, exp - 1)
+                        p2 = mul!(v, exp, p1)
+                    end
+                    if !instr_added
+                        if exp == 2
+                            push!(v, id => (:^, arg1, 2))
                         else
-                            diff_map[(id, ∂i)] = p2
+                            push!(v, id => (:*, p1, arg1))
                         end
-                    elseif p2 != :NONE && !instr_added
-                        push!(v, id => el)
                         instr_added = true
                     end
-
-                end
-                if !instr_added
+                    D[id, ∂i] = mul!(v, p2, arg1_∂i)
+                elseif p2 != :NONE && !instr_added
                     push!(v, id => el)
+                    instr_added = true
                 end
+
+            end
+            if !instr_added
+                push!(v, id => el)
             end
         elseif op == :*
-            let
-                for ∂i = 1:N
-                    ∂i == 1 && push!(v, id => el)
-
-                    has_∂1 = haskey(diff_map, (arg1, ∂i))
-                    has_∂2 = haskey(diff_map, (arg2, ∂i))
-
-                    if has_∂2
-                        a2::Symbol = arg2
-                        ∂arg2 = diff_map[(a2, ∂i)]
-                        if ∂arg2 != 1
-                            e1 = push!(v, (:*, arg1, ∂arg2))
-                        else
-                            e1 = arg1
-                        end
-                    end
-
-                    if has_∂1
-                        a1::Symbol = arg1
-                        ∂arg1 = diff_map[(a1, ∂i)]
-                        if ∂arg1 != 1
-                            e2 = push!(v, (:*, ∂arg1, arg2))
-                        else
-                            e2 = arg2
-                        end
-                    end
-
-                    if has_∂1 && has_∂2
-                        diff_map[(id, ∂i)] = push!(v, (:+, e1, e2))
-                    elseif has_∂1
-                        diff_map[(id, ∂i)] = e2
-                    elseif has_∂2
-                        diff_map[(id, ∂i)] = e1
-                    end
-                end
+            for ∂i = 1:N
+                ∂i == 1 && push!(v, id => el)
+                a = mul!(v, D[arg1, ∂i], arg2)
+                b = mul!(v, arg1, D[arg2, ∂i])
+                D[id, ∂i] = add!(v, a, b)
             end
         elseif op == :/
-            let
-                a1::Symbol
-                a2::Symbol
-                for ∂i = 1:N
-                    ∂i == 1 && push!(v, id => el)
+            for ∂i = 1:N
+                ∂i == 1 && push!(v, id => el)
 
-                    has_∂1 = haskey(diff_map, (arg1, ∂i))
-                    has_∂2 = haskey(diff_map, (arg2, ∂i))
-
-                    if has_∂1 && has_∂2
-                        a1 = arg1
-                        a2 = arg2
-                        ∂arg1 = diff_map[(a1, ∂i)]
-                        ∂arg2 = diff_map[(a2, ∂i)]
-                        e1 = push!(v, (:*, ∂arg1, a2))
-                        e2 = push!(v, (:*, a1, ∂arg2))
-                        e3 = push!(v, (:-, e1, e2))
-                        e4 = push!(v, :(:^, arg2, 2))
-                        diff_map[(id, ∂i)] = push!(v, :(:/, e3, e4))
-                    elseif has_∂1
-                        a1 = arg1
-                        ∂arg1 = diff_map[(a1, ∂i)]
-                        diff_map[(id, ∂i)] = push!(v, (:/, ∂arg1, arg2))
-                    elseif has_∂2
-                        a2 = arg2
-                        ∂arg2 = diff_map[(a2, ∂i)]
-                        e1 = push!(v, (:*, arg1, ∂arg2))
-                        e2 = push!(v, (:*, -1, e1))
-                        e3 = push!(v, :(:^, arg2, 2))
-                        diff_map[(id, ∂i)] = push!(v, :(:/, e2, e3))
-                    end
-                end
+                D[id, ∂i] = div!(
+                    v,
+                    sub!(
+                        v,
+                        mul!(v, D[arg1, ∂i], arg2),
+                        mul!(v, arg1, D[arg2, ∂i]),
+                    ),
+                    pow!(v, arg2, 2),
+                )
             end
         elseif op == :+
-            let
-                for ∂i = 1:N
-                    ∂i == 1 && push!(v, id => el)
-
-                    has_∂1 = haskey(diff_map, (arg1, ∂i))
-                    has_∂2 = haskey(diff_map, (arg2, ∂i))
-
-                    if has_∂1 && has_∂2
-                        diff_map[(id, ∂i)] = push!(
-                            v,
-                            (:+, diff_map[(arg1, ∂i)], diff_map[(arg2, ∂i)]),
-                        )
-                    elseif has_∂1
-                        diff_map[(id, ∂i)] = diff_map[(arg1, ∂i)]
-                    elseif has_∂2
-                        diff_map[(id, ∂i)] = diff_map[(arg2, ∂i)]
-                    end
-                end
+            for ∂i = 1:N
+                ∂i == 1 && push!(v, id => el)
+                D[id, ∂i] = add!(v, D[arg1, ∂i], D[arg2, ∂i])
             end
         end
     end
@@ -261,14 +250,15 @@ end
 Returns an `InstructionList` list computing the first `K` derivatives.
 The derivatives of the instructions are stored in `diff_map`.
 """
-function univariate_diff!(list::InstructionList, K::Int, diff_map)
+function univariate_diff!(list::InstructionList, K::Int, D::DiffMap)
     n = length(list)
     v = InstructionList(n = Ref(n))
     for (id, el) in list.instructions
         (op, arg1, arg2) = el
         if op == :^
             r::Int = arg2
-            if haskey(diff_map, (arg1, 1)) && r == 2
+            arg1_1 = D[arg1, 1]
+            if arg1_1 !== nothing && r == 2
                 push!(v, id => el)
                 for k = 1:K
                     w_k = nothing
@@ -276,47 +266,15 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
                     #         2(∑_{j=0}^div(k - 1,2) u_j U_{k - j}) +
                     #         iseven(k) * u_{k-1}^2
                     for j = 0:div(k - 1, 2)
-                        u_j = j == 0 ? arg1 : get(diff_map, (arg1, j), nothing)
-                        u_kj = j == k ? arg1 :
-                               get(diff_map, (arg1, k - j), nothing)
-                        if j < k - j && u_j !== nothing && u_kj !== nothing
-                            if u_j == 1
-                                s = u_kj
-                            elseif u_kj == 1
-                                s = u_j
-                            else
-                                s = push!(v, (:*, u_j, u_kj))
-                            end
-                            if w_k === nothing
-                                w_k = s
-                            else
-                                w_k = push!(v, (:+, w_k, s))
-                            end
-                        end
+                        w_k = muladd!(v, D[arg1, j], D[arg1, k-j], w_k)
                     end
-                    if w_k !== nothing
-                        w_k = push!(v, (:*, 2, w_k))
-                    end
+                    w_k = mul!(v, 2, w_k)
                     if iseven(k)
-                        u = get(diff_map, (arg1, div(k, 2)), nothing)
-                        if u !== nothing
-                            if u == 1
-                                s = 1
-                            else
-                                s = push!(v, (:^, u, 2))
-                            end
-                            if w_k === nothing
-                                w_k = s
-                            else
-                                w_k = push!(v, (:+, w_k, s))
-                            end
-                        end
+                        w_k = add!(v, w_k, pow!(v, D[arg1, div(k, 2)], 2))
                     end
-                    if w_k !== nothing
-                        diff_map[(id, k)] = w_k
-                    end
+                    D[id, k] = w_k
                 end
-            elseif haskey(diff_map, (arg1, 1)) && r > 2
+            elseif arg1_1 !== nothing && r > 2
                 w_0 = push!(v, id => (:^, arg1, r))
                 u_0_inv = push!(v, (:inv_not_zero, arg1, nothing))
                 # w_k is v_k in Griewank
@@ -324,62 +282,22 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
                 for k = 1:K
                     s = nothing
                     for j = 1:k
-                        u_j = get(diff_map, (arg1, j), nothing)
-                        if u_j !== nothing
-                            ũ_j = j == 1 ? u_j : push!(v, (:*, j, u_j))
-                        else
-                            ũ_j = nothing
-                        end
-
+                        ũ_j = mul!(v, j, D[arg1, j])
                         w_kj = k == j ? w_0 : w[k-j]
-                        if ũ_j == 1
-                            s_j = w_kj
-                        elseif ũ_j !== nothing
-                            s_j = push!(v, (:*, w_kj, ũ_j))
-                        else
-                            s_j = nothing
-                        end
-                        if s_j !== nothing
-                            s = isnothing(s) ? s_j : push!(v, (:+, s, s_j))
-                        end
+                        s = muladd!(v, w_kj, ũ_j, s)
                     end
-                    if s !== nothing
-                        s = push!(v, (:*, r, s))
-                    end
+                    s = mul!(v, r, s)
 
                     t = nothing
                     for j = 1:k-1
-                        u_kj = get(diff_map, (arg1, k - j), nothing)
-                        w̃_j = j == 1 ? w[1] : push!(v, (:*, j, w[j]))
-
-                        if u_kj == 1
-                            t_j = w̃_j
-                        elseif u_kj !== nothing
-                            t_j = push!(v, (:*, u_kj, w̃_j))
-                        else
-                            t_j = nothing
-                        end
-
-                        if t_j !== nothing
-                            t = isnothing(t) ? t_j : push!(v, (:+, t, t_j))
-                        end
+                        u_kj = D[arg1, k-j]
+                        w̃_j = mul!(v, j, w[j])
+                        t = muladd!(v, u_kj, w̃_j, t)
                     end
-                    if t == nothing && s == nothing
-                        continue
-                    elseif t == nothing
-                        w̃_k = push!(v, (:*, u_0_inv, s))
-                    else # s cannot be nothing
-                        w̃_k = push!(v, (:*, u_0_inv, push!(v, (:-, s, t))))
-                    end
-
-                    if k == 1
-                        w_k = w̃_k
-                    else
-                        w_k = push!(v, (:/, w̃_k, k))
-                    end
-
+                    w̃_k = mul!(v, u_0_inv, sub!(v, s, t))
+                    w_k = div!(v, w̃_k, k)
                     push!(w, w_k)
-                    diff_map[(id, k)] = w_k
+                    D[id, k] = w_k
                 end
             else
                 push!(v, id => el)
@@ -389,49 +307,25 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
             for k = 1:K
                 c_k = nothing
                 for j = 0:k
-                    if j == 0
-                        a = arg1
-                        b = get(diff_map, (arg2, k - j), nothing)
-                    elseif k == j
-                        a = get(diff_map, (arg1, k), nothing)
-                        b = arg2
-                    else
-                        a = get(diff_map, (arg1, j), nothing)
-                        b = get(diff_map, (arg2, k - j), nothing)
-                    end
-
-                    if a === nothing || b === nothing
-                        continue
-                    end
-
-                    if c_k === nothing
-                        c_k = push!(v, (:*, a, b))
-                    else
-                        c_k = push!(v, (:+, c_k, push!(v, (:*, a, b))))
-                    end
+                    c_k = muladd!(v, D[arg1, j], D[arg2, k-j], c_k)
                 end
-
-                if c_k === nothing
-                    break
-                else
-                    diff_map[(id, k)] = c_k
-                end
+                c_k === nothing && break
+                D[id, k] = c_k
             end
         elseif op == :+
             push!(v, id => el)
             for k = 1:K
-                a = get(diff_map, (arg1, k), nothing)
-                b = get(diff_map, (arg2, k), nothing)
-                if a !== nothing && b !== nothing
-                    diff_map[(id, k)] = push!(v, (:+, a, b))
-                elseif a !== nothing
-                    diff_map[(id, k)] = a
-                elseif b !== nothing
-                    diff_map[(id, k)] = b
-                end
+                D[id, k] = add!(v, D[arg1, k], D[arg2, k])
             end
         elseif op == :/
-            error("Not implemented")
+            push!(v, id => el)
+            for k = 1:K
+                s = nothing
+                for j = 0:(k-1)
+                    s = muladd!(v, D[id, j], D[arg2, k-j], s)
+                end
+                D[id, k] = div!(v, sub!(v, D[arg1, k], s), arg2)
+            end
         end
     end
     v

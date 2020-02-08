@@ -187,23 +187,40 @@ using HomotopyContinuation2.ModelKit
 
     @testset "Instructions" begin
 
+        @testset "Simple dt" begin
+            @var x a b
+            a = 0.5
+            b = 0.1
+            h = (x - (t - (a + im * b))^2) * (x + (t - (a + im * b))^2)
+            list, _ = ModelKit.instruction_list([h])
+            D = ModelKit.DiffMap()
+            D[:t, 1] = 1
+            slp = @eval ModelKit begin
+                function dt_test1(x, t)
+                    $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 1, D)))
+                end
+            end
+            expr1 = ModelKit.expand(ModelKit.dt_test1(x, t))
+            expr2 = ModelKit.expand(ModelKit.differentiate(h, t))
+            @test expr1 == expr2
+        end
         @testset "Higher order pow diff" begin
             for d in [2, 5]
                 @var x
                 f = x^d
                 list, _ = ModelKit.instruction_list([f])
 
-                diff_map = Dict()
-                diff_map[(:x, 1)] = :x1
-                diff_map[(:x, 2)] = :x2
-                diff_map[(:x, 3)] = :x3
+                D = ModelKit.DiffMap()
+                D[:x, 1] = :x1
+                D[:x, 2] = :x2
+                D[:x, 3] = :x3
 
                 @eval ModelKit begin
                     function __diff_4_pow(x, x1, x2, x3, t)
                         $(ModelKit.to_expr(ModelKit.univariate_diff!(
                             list,
                             4,
-                            diff_map,
+                            D,
                         )))
                     end
                 end
@@ -229,13 +246,13 @@ using HomotopyContinuation2.ModelKit
             f = x * y
             list, _ = ModelKit.instruction_list([f])
 
-            diff_map = Dict()
-            diff_map[(:x, 1)] = :x1
-            diff_map[(:x, 2)] = :x2
-            diff_map[(:x, 3)] = :x3
-            diff_map[(:y, 1)] = :y1
-            diff_map[(:y, 2)] = :y2
-            diff_map[(:y, 3)] = :y3
+            D = ModelKit.DiffMap()
+            D[:x, 1] = :x1
+            D[:x, 2] = :x2
+            D[:x, 3] = :x3
+            D[:y, 1] = :y1
+            D[:y, 2] = :y2
+            D[:y, 3] = :y3
 
             @eval ModelKit begin
                 function __diff_4_mul__(x, y, t)
@@ -248,7 +265,7 @@ using HomotopyContinuation2.ModelKit
                     $(ModelKit.to_expr(ModelKit.univariate_diff!(
                         list,
                         4,
-                        diff_map,
+                        D,
                     )))
                 end
             end
@@ -270,13 +287,13 @@ using HomotopyContinuation2.ModelKit
             f = x + y
             list, _ = ModelKit.instruction_list([f])
 
-            diff_map = Dict()
-            diff_map[(:x, 1)] = :x1
-            diff_map[(:x, 2)] = :x2
-            diff_map[(:x, 3)] = :x3
-            diff_map[(:y, 1)] = :y1
-            diff_map[(:y, 2)] = :y2
-            diff_map[(:y, 3)] = :y3
+            D = ModelKit.DiffMap()
+            D[:x, 1] = :x1
+            D[:x, 2] = :x2
+            D[:x, 3] = :x3
+            D[:y, 1] = :y1
+            D[:y, 2] = :y2
+            D[:y, 3] = :y3
 
             @eval ModelKit begin
                 function __diff_3_plus__(x, y, t)
@@ -289,7 +306,7 @@ using HomotopyContinuation2.ModelKit
                     $(ModelKit.to_expr(ModelKit.univariate_diff!(
                         list,
                         3,
-                        diff_map,
+                        D,
                     )))
                 end
             end
