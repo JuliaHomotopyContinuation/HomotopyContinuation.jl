@@ -272,32 +272,44 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
                 push!(v, id => el)
                 for k = 1:K
                     w_k = nothing
-                    for j = 0:k
+                    # Compute ∑_{j=0}^k u_j U_{k - j} =
+                    #         2(∑_{j=0}^div(k - 1,2) u_j U_{k - j}) +
+                    #         iseven(k) * u_{k-1}^2
+                    for j = 0:div(k - 1, 2)
                         u_j = j == 0 ? arg1 : get(diff_map, (arg1, j), nothing)
                         u_kj = j == k ? arg1 :
                                get(diff_map, (arg1, k - j), nothing)
-
                         if j < k - j && u_j !== nothing && u_kj !== nothing
-                            s = push!(v, (:*, u_j, u_kj))
+                            if u_j == 1
+                                s = u_kj
+                            elseif u_kj == 1
+                                s = u_j
+                            else
+                                s = push!(v, (:*, u_j, u_kj))
+                            end
                             if w_k === nothing
                                 w_k = s
                             else
                                 w_k = push!(v, (:+, w_k, s))
                             end
                         end
-                        if j ≥ k - j && w_k !== nothing
-                            w_k = push!(v, (:*, 2, w_k))
-                        end
-                        if j == k - j
-                            s = push!(v, (:*, u_j, u_kj))
+                    end
+                    if w_k !== nothing
+                        w_k = push!(v, (:*, 2, w_k))
+                    end
+                    if iseven(k)
+                        u = get(diff_map, (arg1, div(k, 2)), nothing)
+                        if u !== nothing
+                            if u == 1
+                                s = 1
+                            else
+                                s = push!(v, (:^, u, 2))
+                            end
                             if w_k === nothing
                                 w_k = s
                             else
                                 w_k = push!(v, (:+, w_k, s))
                             end
-                        end
-                        if j ≥ k - j
-                            break
                         end
                     end
                     if w_k !== nothing
@@ -397,23 +409,6 @@ function univariate_diff!(list::InstructionList, K::Int, diff_map)
                     else
                         c_k = push!(v, (:+, c_k, push!(v, (:*, a, b))))
                     end
-                    # if a === nothing && b === nothing
-                    #     continue
-                    # end
-                    #
-                    # if a == nothing
-                    #     dab = b
-                    # elseif b == nothing
-                    #     dab = a
-                    # else
-                    #     dab = push!(v, (:*, a, b))
-                    # end
-                    #
-                    # if c_k === nothing
-                    #     c_k = dab
-                    # else
-                    #     c_k = push!(v, (:+, c_k, dab))
-                    # end
                 end
 
                 if c_k === nothing
@@ -467,7 +462,8 @@ function unroll_pow(var, n)
     d = digits(n, base = 2)
     x = :x
     exprs = map(2:length(d)) do i
-        :(local $(Symbol(x, 1 << (i - 1))) = sqr($(Symbol(x, 1 << (i - 2)))))
+        :(local $(Symbol(x, 1 << (i - 1))) =
+            sqr($(Symbol(x, 1 << (i - 2)))))
     end
     prods = Symbol[]
     for (i, di) in enumerate(d)
@@ -478,7 +474,7 @@ function unroll_pow(var, n)
     if length(prods) > 1
         push!(exprs, Expr(:call, :*, prods...))
     end
-    Expr(:let, :($(Symbol(x,1)) = $var), Expr(:block, exprs...))
+    Expr(:let, :($(Symbol(x, 1)) = $var), Expr(:block, exprs...))
 end
 
 
