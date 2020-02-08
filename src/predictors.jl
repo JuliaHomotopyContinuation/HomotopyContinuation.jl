@@ -34,8 +34,8 @@ function cache(::Pade21, n::Int)
 
     u = zero(x²)
     dx¹ = (x¹,)
-    dx² = (x¹,x²)
-    dx³ = (x¹,x²,x³)
+    dx² = (x¹, x²)
+    dx³ = (x¹, x², x³)
 
     taylor = falses(n)
     τ = Ref(Inf)

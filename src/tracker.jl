@@ -1,4 +1,12 @@
-export Tracker, TrackerResult, track, track!
+export Tracker,
+       TrackerResult,
+       track,
+       track!,
+       is_success,
+       solution,
+       steps,
+       accepted_steps,
+       rejected_steps
 
 ###########
 # Options #
@@ -209,7 +217,7 @@ function TrackerResult(state::TrackerState)
         state.μ,
         state.accepted_steps,
         state.rejected_steps,
-        state.used_high_prec
+        state.used_high_prec,
     )
 end
 
@@ -483,6 +491,9 @@ function step!(tracker::Tracker, debug::Bool = false)
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the provided predictor
     predict!(x̂, predictor, homotopy, x, t, Δt)
+
+    update!(state.norm, x̂)
+
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
     result = newton!(
@@ -509,8 +520,6 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.μ = max(result.accuracy, eps())
         state.ω = result.ω
 
-        # If we use a weighted norm, now we update this
-        update!(state.norm, x)
         update_precision!(tracker, result.μ_low)
         # tell the predictors about the new derivative if they need to update something
         update!(predictor, homotopy, x, t + Δt, jacobian)

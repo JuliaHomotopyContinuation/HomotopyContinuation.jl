@@ -189,12 +189,10 @@ function init_newton!(
         LA.ldiv!(Δx, updated!(JM), r, norm)
         x₁ .= x̄ .- Δx
         norm_Δx₀ = norm(Δx)
-
         evaluate!(r, H, x₁, t)
         LA.ldiv!(Δx, JM, r, norm)
         x₂ .= x₁ .- Δx
-        norm_Δx₁ = norm(Δx)
-
+        norm_Δx₁ = norm(Δx) + eps()
         if norm_Δx₁ < a * norm_Δx₀
             ω = 2 * norm_Δx₁ / norm_Δx₀^2
             μ = norm_Δx₁
