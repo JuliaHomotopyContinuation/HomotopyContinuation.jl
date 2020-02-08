@@ -1,4 +1,4 @@
-export total_degree_homotopy
+export ParameterHomotopy, ModelKitHomotopy, total_degree_homotopy
 
 abstract type AbstractHomotopy end
 
