@@ -22,11 +22,7 @@ struct NewtonCorrectorResult
     norm_Δx₀::Float64
 end
 
-Base.show(
-    io::IO,
-    ::MIME"application/prs.juno.inline",
-    r::NewtonCorrectorResult,
-) = r
+Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonCorrectorResult) = r
 Base.show(io::IO, result::NewtonCorrectorResult) = print_fieldnames(io, result)
 is_converged(R::NewtonCorrectorResult) = R.return_code == NEWT_CONVERGED
 
@@ -68,7 +64,6 @@ function high_prec_refinement_step!(
     x_high .= x̄
     evaluate!(r, H, x_high, ComplexDF64(t))
     LA.ldiv!(Δx, JM, r, norm)
-
     norm(Δx)
 end
 
@@ -98,7 +93,9 @@ function newton!(
             evaluate!(r, H, x_high, ComplexDF64(t))
         end
         LA.ldiv!(Δxᵢ, updated!(JM), r, norm)
-
+        if i > 0 && high_precision
+            mixed_precision_iterative_refinement!(Δxᵢ, JM, r, norm)
+        end
         xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
 
@@ -126,6 +123,9 @@ function newton!(
                 evaluate!(r, H, x_high, ComplexDF64(t))
             end
             LA.ldiv!(Δxᵢ, JM, r)
+            if high_precision
+                mixed_precision_iterative_refinement!(Δxᵢ, JM, r)
+            end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
 
@@ -144,15 +144,7 @@ function newton!(
                 end
             end
 
-            return NewtonCorrectorResult(
-                NEWT_CONVERGED,
-                μ,
-                i + 2,
-                ω,
-                θ,
-                μ_low,
-                norm_Δx₀,
-            )
+            return NewtonCorrectorResult(NEWT_CONVERGED, μ, i + 2, ω, θ, μ_low, norm_Δx₀)
         end
 
         norm_Δxᵢ₋₁ = norm_Δxᵢ

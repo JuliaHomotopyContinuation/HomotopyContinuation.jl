@@ -7,12 +7,10 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
     x̄::Vector{ComplexDF64}
+    r::Vector{ComplexF64}
     r̄::Vector{ComplexDF64}
     δx::Vector{ComplexF64}
 end
-
-MatrixWorkspace(Â::AbstractMatrix) =
-    MatrixWorkspace(Â, promote_type(real(eltype(Â)), Float64))
 
 function MatrixWorkspace(Â::AbstractMatrix)
     m, n = size(Â)
@@ -30,11 +28,12 @@ function MatrixWorkspace(Â::AbstractMatrix)
     scaled = Ref(false)
 
     lu = LinearAlgebra.LU{eltype(A),typeof(A)}(copy(A), zeros(Int, m), 0)
+    r = zeros(ComplexF64, m)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)
     δx = zeros(ComplexF64, n)
 
-    MatrixWorkspace(A, d, factorized, lu, row_scaling, scaled, x̄, r̄, δx)
+    MatrixWorkspace(A, d, factorized, lu, row_scaling, scaled, x̄, r, r̄, δx)
 end
 
 Base.size(MW::MatrixWorkspace) = size(MW.A)
@@ -337,7 +336,8 @@ end
 Compute the residual `Ax-b` and store it in `r`
 """
 function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
-    @boundscheck size(A, 1) == length(b) == length(r) && size(A, 2) == length(x)
+    m, n = size(A)
+    @boundscheck m == length(b) == length(r) && n == length(x)
     r .= 0
     @inbounds for j = 1:m
         x_j = x[j]
@@ -363,9 +363,9 @@ function mixed_precision_iterative_refinement!(
     norm::Union{AbstractNorm,Nothing} = nothing,
 )
     M.x̄ .= x
-    residual!(M.r̄, M.A, M.x̄, x)
+    residual!(M.r̄, M.A, M.x̄, b)
     M.r .= M.r̄
-    LA.ldiv!(M.δx, r)
+    LA.ldiv!(M.δx, M, M.r)
     x .-= M.δx
     if norm isa Nothing
         x
