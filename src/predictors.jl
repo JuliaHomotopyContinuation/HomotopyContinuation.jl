@@ -53,29 +53,32 @@ function update!(cache::Pade21Cache, H, x, t, J::Jacobian, norm)
     u .= .-u
     LA.ldiv!(x¹, J, u)
 
-    δ = mixed_precision_iterative_refinement!(x¹, J, u, norm)
     # Check if we have to do iterative refinment for all the others as well
+    δ = iterative_refinement!(x¹, J, u, norm; fixed_precision = true)
     iterative_refinement = δ > sqrt(eps())
+    if iterative_refinement
+        iterative_refinement!(x², J, u)
+    end
 
     diff_t!(u, H, x, t, dx¹)
     u .= .-u
     LA.ldiv!(x², J, u)
     if iterative_refinement
-        mixed_precision_iterative_refinement!(x², J, u)
+        iterative_refinement!(x², J, u)
     end
 
     diff_t!(u, H, x, t, dx²)
     u .= .-u
     LA.ldiv!(x³, J, u)
     if iterative_refinement
-        mixed_precision_iterative_refinement!(x³, J, u)
+        iterative_refinement!(x³, J, u)
     end
 
     diff_t!(u, H, x, t, dx³)
     u .= .-u
     LA.ldiv!(x⁴, J, u)
     if iterative_refinement
-        mixed_precision_iterative_refinement!(x⁴, J, u)
+        iterative_refinement!(x⁴, J, u)
     end
 
     # This is an adaption of the algorithm outlined in

@@ -374,6 +374,28 @@ function mixed_precision_iterative_refinement!(
     end
 end
 
+"""
+    fixed_precision_iterative_refinement!(x, A, b, norm = nothing)
+
+Perform one step of mixed precision iterative refinement.
+If `norm` is an `AbstractNorm` then the normwise relative error before
+the refinement step is returned otherwise `x` is returned.
+"""
+function fixed_precision_iterative_refinement!(
+    x::AbstractVector,
+    M::MatrixWorkspace,
+    b::AbstractVector,
+    norm::Union{AbstractNorm,Nothing} = nothing,
+)
+    residual!(M.r, M.A, x, b)
+    LA.ldiv!(M.δx, M, M.r)
+    x .-= M.δx
+    if norm isa Nothing
+        x
+    else
+        norm(M.δx) / norm(x)
+    end
+end
 
 #####################
 ## Jacobian ##
@@ -431,15 +453,20 @@ function LA.ldiv!(
     x̂
 end
 
-function mixed_precision_iterative_refinement!(
+function iterative_refinement!(
     x::AbstractVector,
     JM::Jacobian,
     b::AbstractVector,
     norm = nothing;
     row_scaling::Bool = true,
+    fixed_precision::Bool = false
 )
     JM.ldivs[] += 1
-    mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+    if fixed_precision
+        fixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+    else
+        mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+    end
 end
 
 
