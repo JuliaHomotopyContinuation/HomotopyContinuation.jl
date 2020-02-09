@@ -114,7 +114,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     used_high_prec::Bool
 
     norm::WeightedNorm{InfNorm}
-    jacobian::Jacobian{Float64,M}
+    jacobian::Jacobian{M}
 
     condition::TrackerCondition.conditions
 
