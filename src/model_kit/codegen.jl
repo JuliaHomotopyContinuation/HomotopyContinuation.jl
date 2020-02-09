@@ -282,28 +282,28 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     params = Symbol.(H.parameters)
 
 
-    diff_map = Dict{Tuple{Symbol,Int},Any}()
+    diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         for k = 1:(d-1)
-            diff_map[(v, k)] = :(dx[$k][$i])
+            diff_map[v, k] = :(dx[$k][$i])
         end
     end
 
     for (i, v) in enumerate(params)
         for k = 1:DP
-            diff_map[(v, k)] = :(dp[$k][$i])
+            diff_map[v, k] = :(dp[$k][$i])
         end
     end
 
     if H isa Homotopy
-        diff_map[(Symbol(H.t), 1)] = 1
+        diff_map[Symbol(H.t), 1] = 1
     end
     dlist = univariate_diff!(list, d, diff_map)
 
     assignements = Dict{Symbol,Expr}()
     u_constants = Expr[]
     for (i, id) in enumerate(ids)
-        d_id = get(diff_map, (id, d), nothing)
+        d_id = diff_map[id, d]
         if d_id isa Symbol
             if d_id ∉ vars && d_id ∉ params
                 push!(assignements, d_id => :(u[$i] = $d_id))
