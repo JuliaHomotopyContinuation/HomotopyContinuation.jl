@@ -89,6 +89,7 @@ Indicate that the matrix `MW` got updated.
 function updated!(MW::MatrixWorkspace)
     MW.factorized[] = false
     MW.scaled[] = false
+    @inbounds copyto!(MW.lu.factors, MW.A)
     MW
 end
 
@@ -182,7 +183,6 @@ function lu!(
 end
 
 function factorize!(WS::MatrixWorkspace)
-    @inbounds copyto!(WS.lu.factors, WS.A)
     lu!(WS.lu.factors, nothing, WS.lu.ipiv)
     WS.factorized[] = true
     WS
@@ -347,7 +347,7 @@ end
 Apply the computed row scaling.
 """
 function apply_row_scaling!(W::MatrixWorkspace)
-    A, d = W.A, W.row_scaling
+    A, d = W.lu.factors, W.row_scaling
     m, n = size(A)
     @inbounds for j = 1:n, i = 1:m
         A[i, j] = A[i, j] * d[i]
