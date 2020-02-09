@@ -1,66 +1,40 @@
-struct MatrixWorkspace{
-    T,
-    M<:AbstractMatrix{Complex{T}},
-} <: AbstractMatrix{Complex{T}}
+struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M # Matrix
-    d::Vector{T} # Inverse of scaling factors
+    d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
-    lu::LA.LU{Complex{T},M} # LU Factorization of D * J
-    row_scaling::Vector{T}
+    lu::LA.LU{ComplexF64,M} # LU Factorization of D * J
+    row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
-    # iterative refinement
-    ir_r::Vector{Complex{T}}
-    ir_δx::Vector{Complex{T}}
-    residual_abs::Vector{T}
-    # cond estimators
-    lu_cond_work::Vector{Complex{T}}
-    lu_cond_rwork::Vector{T}
-    # inf_norm_est
-    inf_norm_est_work::Vector{Complex{T}}
-    inf_norm_est_rwork::Vector{T}
+    # mixed precision iterative refinement
+    x̄::Vector{ComplexDF64}
+    r̄::Vector{ComplexDF64}
+    δx::Vector{ComplexF64}
 end
 
 MatrixWorkspace(Â::AbstractMatrix) =
     MatrixWorkspace(Â, promote_type(real(eltype(Â)), Float64))
 
-function MatrixWorkspace(Â::AbstractMatrix, ::Type{T}) where {T}
+function MatrixWorkspace(Â::AbstractMatrix)
     m, n = size(Â)
     m == n || throw(ArgumentError("Input is not a square matrix"))
 
-    A = Matrix{Complex{T}}(Â)
+    A = Matrix{ComplexF64}(Â)
+    d = ones(m)
+    factorized = Ref(false)
     # experiments show that for m > 25 the data layout as a
     # struct array is beneficial
     if m > 25
         A = StructArrays.StructArray(A)
     end
-
-    d = ones(m)
-    # lu
-    lu = LinearAlgebra.LU{eltype(A),typeof(A)}(copy(A), zeros(Int, m), 0)
-    ir_r = Vector{Complex{T}}(undef, m)
-    ir_δx = Vector{Complex{T}}(undef, n)
-    residual_abs = Vector{T}(undef, m)
-
-    lu_cond_work = Vector{Complex{T}}(undef, 2n)
-    lu_cond_rwork = Vector{T}(undef, 2n)
-    inf_norm_est_work = Vector{Complex{T}}(undef, n)
-    inf_norm_est_rwork = Vector{T}(undef, n)
     row_scaling = ones(m)
-    MatrixWorkspace(
-        A,
-        d,
-        Ref(true),
-        lu,
-        row_scaling,
-        Ref(false),
-        ir_r,
-        ir_δx,
-        residual_abs,
-        lu_cond_work,
-        lu_cond_rwork,
-        inf_norm_est_work,
-        inf_norm_est_rwork,
-    )
+    scaled = Ref(false)
+
+    lu = LinearAlgebra.LU{eltype(A),typeof(A)}(copy(A), zeros(Int, m), 0)
+    r̄ = zeros(ComplexDF64, m)
+    x̄ = zeros(ComplexDF64, n)
+    δx = zeros(ComplexF64, n)
+
+    MatrixWorkspace(A, d, factorized, lu, row_scaling, scaled, x̄, r̄, δx)
 end
 
 Base.size(MW::MatrixWorkspace) = size(MW.A)
@@ -356,11 +330,56 @@ function apply_row_scaling!(W::MatrixWorkspace)
     W
 end
 
+## Iterative Refinement
+"""
+    residual!(r, A, x, b)
+
+Compute the residual `Ax-b` and store it in `r`
+"""
+function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
+    @boundscheck size(A, 1) == length(b) == length(r) && size(A, 2) == length(x)
+    r .= 0
+    @inbounds for j = 1:m
+        x_j = x[j]
+        for i = 1:n
+            r[i] += A[i, j] * x_j
+        end
+    end
+    r .-= b
+    r
+end
+
+"""
+    mixed_precision_iterative_refinement!(x, A, b, norm = nothing)
+
+Perform one step of mixed precision iterative refinement.
+If `norm` is an `AbstractNorm` then the normwise relative error before
+the refinement step is returned otherwise `x` is returned.
+"""
+function mixed_precision_iterative_refinement!(
+    x::AbstractVector,
+    M::MatrixWorkspace,
+    b::AbstractVector,
+    norm::Union{AbstractNorm,Nothing} = nothing,
+)
+    M.x̄ .= x
+    residual!(M.r̄, M.A, M.x̄, x)
+    M.r .= M.r̄
+    LA.ldiv!(M.δx, r)
+    x .-= M.δx
+    if norm isa Nothing
+        x
+    else
+        norm(M.δx) / norm(x)
+    end
+end
+
+
 #####################
 ## Jacobian ##
 #####################
-struct Jacobian{T,M}
-    J::MatrixWorkspace{T,M}
+struct Jacobian{M}
+    J::MatrixWorkspace{M}
     # stats
     factorizations::Base.RefValue{Int}
     ldivs::Base.RefValue{Int}
@@ -410,6 +429,17 @@ function LA.ldiv!(
     JM.ldivs[] += 1
     LA.ldiv!(x̂, jacobian(JM), b)
     x̂
+end
+
+function mixed_precision_iterative_refinement!(
+    x::AbstractVector,
+    JM::Jacobian,
+    b::AbstractVector,
+    norm = nothing;
+    row_scaling::Bool = true,
+)
+    JM.ldivs[] += 1
+    mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
 end
 
 

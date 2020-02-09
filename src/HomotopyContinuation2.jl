@@ -2,7 +2,6 @@ module HomotopyContinuation2
 
 export ModelKit
 
-using DoubleFloats: Double64, ComplexDF64
 import LinearAlgebra
 using Parameters: @unpack
 import PrettyTables
@@ -14,6 +13,8 @@ include("utils.jl")
 
 include("ModelKit.jl")
 import .ModelKit
+include("DoubleDouble.jl")
+using .DoubleDouble
 
 using .ModelKit: @var,
                  @unique_var,
