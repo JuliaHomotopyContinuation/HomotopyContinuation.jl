@@ -101,8 +101,8 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     x̄::Vector{ComplexF64} # candidate for new x
 
     segment::ComplexLineSegment
-    s::Double64 # current step length (0 ≤ s ≤ length(segment))
-    s′::Double64 # proposed s (0 ≤ s ≤ length(segment))
+    s::DoubleF64 # current step length (0 ≤ s ≤ length(segment))
+    s′::DoubleF64 # proposed s (0 ≤ s ≤ length(segment))
     Δs_prev::Float64 # previous step size
 
     accuracy::Float64 # norm(x - x(t))
@@ -135,7 +135,7 @@ function TrackerState(
     x̄ = zero(x)
 
     segment = ComplexLineSegment(t₁, t₀)
-    s = s′ = Double64(0.0)
+    s = s′ = DoubleF64(0.0)
 
     Δs_prev = 0.0
 
@@ -339,7 +339,7 @@ function update_stepsize!(
         e = state.norm(local_error(predictor))
         Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         Δs₂ = options.β_τ * trust_region(predictor)
-        s′ = min(state.s + min(Δs₁, Δs₂), Double64(length(state.segment)))
+        s′ = min(state.s + min(Δs₁, Δs₂), DoubleF64(length(state.segment)))
 
         if state.last_step_failed
             state.s′ = min(state.s + Δs, s′)

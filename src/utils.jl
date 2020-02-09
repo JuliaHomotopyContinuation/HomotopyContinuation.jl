@@ -50,7 +50,7 @@ function Base.getindex(segment::ComplexLineSegment, t::Real)
     elseif iszero(t)
         return segment.a
     else
-        Δ = Double64(t) / segment.abs_b_a
+        Δ = DoubleF64(t) / segment.abs_b_a
         ComplexF64(segment.a + Δ * segment.Δ_b_a)
     end
 end
