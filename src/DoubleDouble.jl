@@ -471,13 +471,13 @@ Base.isfinite(a::DoubleF64) = isfinite(a.hi)
     #
     # ROUNDING
     #
-@inline function Base.round(a::DoubleF64)
-    hi = round(a.hi)
+@inline function Base.round(a::DoubleF64, r::RoundingMode = RoundNearest())
+    hi = round(a.hi, r)
     lo = 0.0
 
     if hi == a.hi
             # High word is an integer already.  Round the low word.
-        lo = round(a.lo)
+        lo = round(a.lo, r)
 
             # Renormalize. This is needed if hi = some integer, lo = 1/2.
         hi, lo = quick_two_sum(hi, lo)
@@ -504,6 +504,18 @@ end
     DoubleF64(hi, lo)
 end
 
+@inline function Base.floor(::Type{I}, a::DoubleF64)  where {I<:Integer}
+    hi = floor(I, a.hi)
+    lo = zero(I)
+
+    if hi == a.hi
+        lo = floor(I, a.lo)
+    end
+
+    hi + lo
+end
+
+
 @inline function Base.ceil(a::DoubleF64)
     hi = ceil(a.hi)
     lo = 0.0
@@ -516,7 +528,20 @@ end
     DoubleF64(hi, lo)
 end
 
+@inline function Base.ceil(::Type{I}, a::DoubleF64)  where {I<:Integer}
+    hi = ceil(I, a.hi)
+    lo = zero(I)
+
+    if hi == a.hi
+        lo = ceil(I, a.lo)
+    end
+
+    hi + lo
+end
+
 Base.trunc(a::DoubleF64) = a.hi ≥ 0.0 ? floor(a) : ceil(a)
+Base.trunc(::Type{I}, a::DoubleF64) where {I<:Integer} =
+    a.hi ≥ 0.0 ? floor(I, a) : ceil(I, a)
 Base.isinteger(x::DoubleF64) = iszero(x - trunc(x))
 
     # import Random: AbstractRNG, GLOBAL_RNG
@@ -642,7 +667,8 @@ function Base.exp(a::DoubleF64)
     return ldexp(s, convert(Int, m))
 end
 
-
+Base.log10(a::DoubleF64) = log(a) / double_log10
+Base.log2(a::DoubleF64) = log(a) / double_log2
 function Base.log(a::DoubleF64)
      # Strategy.  The Taylor series for log converges much more
      # slowly than that of exp, due to the lack of the factorial

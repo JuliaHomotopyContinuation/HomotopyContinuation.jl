@@ -83,10 +83,10 @@ function update!(cache::Pade21Cache, H, x, t, J::Jacobian, norm)
 
     # This is an adaption of the algorithm outlined in
     τ = Inf
-    λ_min = exp2(-18)
+    λ_min = 3.814697265625e-6 # exp2(-18)
     for i in eachindex(x)
         c¹ = fast_abs(x¹[i])
-        λ = min(λ_min, c¹)
+        λ = max(λ_min, c¹)
         c¹ /= λ
         c² = fast_abs(x²[i]) / λ^2
         c³ = fast_abs(x³[i]) / λ^3
