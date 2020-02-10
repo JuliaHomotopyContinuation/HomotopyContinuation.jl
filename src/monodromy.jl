@@ -126,9 +126,14 @@ mutable struct MonodromyStatistics
     nreal::Int
     nparametergenerations::Int
     nsolutions_development::Vector{Int}
+    permutations::Dict{Int, Dict{Int,Int}}
 end
 
-MonodromyStatistics(nsolutions::Int) = MonodromyStatistics(0, 0, 0, 1, [nsolutions])
+function MonodromyStatistics(nsolutions::Int)
+    D = Dict{Int, Dict{Int,Int}}()
+    D[1] = Dict{Int,Int}()
+    MonodromyStatistics(0, 0, 0, 1, [nsolutions], D)
+end
 function MonodromyStatistics(solutions)
     stats = MonodromyStatistics(length(solutions))
     for s in solutions
@@ -840,6 +845,8 @@ function monodromy_solve!(
 
     n_blas_threads > 1 && set_num_BLAS_threads(n_blas_threads)
     finished!(MS.statistics, nsolutions(MS))
+
+
     MonodromyResult(
         retcode,
         solutions(MS),
@@ -1052,6 +1059,20 @@ function add_and_schedule!(MS::MonodromySolver, queue, y, job::MonodromyJob) whe
     lock(MS.solutions_lock)
     k = add!(MS.solutions, y, Val(true); tol = MS.options.identical_tol)
     unlock(MS.solutions_lock)
+
+    loop_id = job.loop_id
+    start_sol_id = job.id
+
+
+    if !haskey(MS.statistics.permutations, loop_id)
+        MS.statistics.permutations[loop_id] = Dict{Int,Int}()
+    end
+    if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
+        push!(MS.statistics.permutations[loop_id], start_sol_id => length(MS.solutions))
+    else
+        push!(MS.statistics.permutations[loop_id], start_sol_id => k)
+    end
+
     if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
         # Check if we are done
         isdone(MS.solutions, y, MS.options) && return true
@@ -1134,7 +1155,22 @@ function regenerate_loop_and_schedule_jobs!(queue, MS::MonodromySolver)
     nothing
 end
 
+function update_permutations!(MS::MonodromySolver, job::MonodromyJob, k::Int)
 
+    loop_id = job.loop_id
+    start_sol_id = job.id
+
+
+    # if !haskey(MS.statistics.permutations, loop_id)
+    #     MS.statistics.permutations[loop_id] = Dict{Int,Int}()
+    # end
+    # if k == NOT_FOUND || k == NOT_FOUND_AND_REAL
+    #     push!(MS.statistics.permutations[loop_id], start_sol_id => length(MS.solutions))
+    # else
+    #     push!(MS.statistics.permutations[loop_id], start_sol_id => k)
+    # end
+    nothing
+end
 ##################
 ## VERIFICATION ##
 ##################
