@@ -38,8 +38,7 @@ using HomotopyContinuation2.ModelKit
         @test subs(f, x => z) == z^2 * (z + w * y)
         @test subs([f], x => z) == [z^2 * (z + w * y)]
         @test subs(f, [x, y] => [z^2, z + 2]) == z^4 * (w * (2 + z) + z^2)
-        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 *
-                                                         (u * (2 + z) + z^2)
+        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 * (u * (2 + z) + z^2)
         @test subs(f, x => z^2, y => 3, w => u) == z^4 * (3 * u + z^2)
     end
 
@@ -217,21 +216,15 @@ using HomotopyContinuation2.ModelKit
 
                 @eval ModelKit begin
                     function __diff_4_pow(x, x1, x2, x3, t)
-                        $(ModelKit.to_expr(ModelKit.univariate_diff!(
-                            list,
-                            4,
-                            D,
-                        )))
+                        $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 4, D)))
                     end
                 end
 
                 SE.@vars x t
                 SE.@funs u
 
-                exp1 = SE.expand(SE.subs(
-                    SE.diff(u(t)^d, t, 4),
-                    SE.diff(u(t), t, 4) => 0,
-                ) / factorial(4),)
+                exp1 = SE.expand(SE.subs(SE.diff(u(t)^d, t, 4), SE.diff(u(t), t, 4) => 0) /
+                                 factorial(4),)
 
                 u1 = SE.diff(u(t), t)
                 u2 = SE.diff(u(t), t, 2) / 2
@@ -262,11 +255,7 @@ using HomotopyContinuation2.ModelKit
                     y1 = Main.SE.diff(y, t)
                     y2 = Main.SE.diff(y, t, 2) / 2
                     y3 = Main.SE.diff(y, t, 3) / 6
-                    $(ModelKit.to_expr(ModelKit.univariate_diff!(
-                        list,
-                        4,
-                        D,
-                    )))
+                    $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 4, D)))
                 end
             end
 
@@ -303,11 +292,7 @@ using HomotopyContinuation2.ModelKit
                     y1 = Main.SE.diff(y, t)
                     y2 = Main.SE.diff(y, t, 2) / 2
                     y3 = Main.SE.diff(y, t, 3) / 6
-                    $(ModelKit.to_expr(ModelKit.univariate_diff!(
-                        list,
-                        3,
-                        D,
-                    )))
+                    $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 3, D)))
                 end
             end
 
@@ -318,6 +303,47 @@ using HomotopyContinuation2.ModelKit
             exp2 = SE.expand(ModelKit.__diff_3_plus__(u(t), v(t), t))
             @test exp1 == exp2
         end
+    end
+
+
+    @testset "Homotopy codegen (Katsura(3))" begin
+        n = 3
+        @var x[0:n] ẋ[0:n] ẍ[0:n] x3[0:n] t γ
+        K = [
+            (sum(x[abs(l)+1] * x[abs(m - l)+1] for l = -n:n if abs(m - l) <= n) -
+             x[m+1] for m = 0:n-1)...,
+            x[1] + 2 * sum(x[i+1] for i = 1:n) - 1,
+        ]
+
+        h = γ .* t .* [x[1:n] .^ 2 .- 1; x[n+1] - 1] + (1 - t) .* K
+        H = ModelKit.Homotopy(h, x, t, [γ])
+        TH = ModelKit.compile(H)
+
+
+        dt1 = ModelKit.diff_t(TH, x, t, (), [γ])
+        dt2 = ModelKit.diff_t(TH, x, t, (ẋ,), [γ])
+        dt3 = ModelKit.diff_t(TH, x, t, (ẋ, ẍ), [γ])
+        dt4 = ModelKit.diff_t(TH, x, t, (ẋ, ẍ, x3), [γ])
+
+        @var λ
+        Hd1 = subs(H.expressions, t => t + λ)
+        true_dt1 = subs(differentiate(Hd1, λ, 1), λ => 0)
+
+        Hd2 = subs(H.expressions, x => x .+ λ .* ẋ, t => t + λ)
+        true_dt2 = subs(differentiate(Hd2, λ, 2), λ => 0) / 2
+
+        Hd3 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ, t => t + λ)
+        true_dt3 = subs(differentiate(Hd3, λ, 3), λ => 0) / 6
+
+        Hd4 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3, t => t + λ)
+        true_dt4 = subs(differentiate(Hd4, λ, 4), λ => 0) / 24
+
+        @test expand.(ModelKit.evaluate(TH, x, t, [γ])) == expand.(h)
+        @test expand.(ModelKit.jacobian(TH, x, t, [γ])) == expand.(differentiate(h, x))
+        @test expand.(dt1) == expand.(true_dt1)
+        @test expand.(dt2) == expand.(true_dt2)
+        @test expand.(dt3) == expand.(true_dt3)
+        @test expand.(dt4) == expand.(true_dt4)
     end
 
 end

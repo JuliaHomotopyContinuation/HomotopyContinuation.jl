@@ -95,6 +95,7 @@ function update!(cache::Pade21Cache, H, x, t, J::Jacobian, norm)
             cache.taylor[i] = true
             cache.local_err[i] = x⁴[i]
         else
+            cache.taylor[i] = false
             τᵢ = (c² / c³) / λ
             τᵢ < τ && (τ = τᵢ)
             cache.local_err[i] = x⁴[i] - Base.FastMath.div_fast(x³[i]^2, x²[i])

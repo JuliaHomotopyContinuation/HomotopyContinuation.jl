@@ -331,7 +331,7 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
             if d_id ∉ vars && d_id ∉ params
                 add_assignement!(assignements, d_id, :(u[$i] = $d_id))
             else
-                push!(U_constants, :(u[$i] = $(var_map[d_id])))
+                push!(u_constants, :(u[$i] = $(var_map[d_id])))
             end
         elseif d_id isa Nothing
             push!(u_constants, :(u[$i] = zero(eltype(x))))
@@ -506,7 +506,7 @@ function jacobian(T::CompiledSystem, x, p = nothing)
 end
 function jacobian(T::CompiledHomotopy, x, t, p = nothing)
     n, m = size(T)
-    U = Vector{Any}(undef, n, m)
+    U = Matrix{Any}(undef, n, m)
     to_smallest_eltype(jacobian!(U, T, x, t, p))
 end
 
@@ -525,6 +525,10 @@ function evaluate_and_jacobian(T::CompiledHomotopy, x, t, p = nothing)
     to_smallest_eltype(u), to_smallest_eltype(U)
 end
 
+function diff_t(H::CompiledSystem, x::AbstractVector, args...)
+    u = Vector{Any}(undef, size(H, 1))
+    to_smallest_eltype(diff_t!(u, H, x, args...))
+end
 function diff_t(H::CompiledHomotopy, x::AbstractVector, t, args...)
     u = Vector{Any}(undef, size(H, 1))
     to_smallest_eltype(diff_t!(u, H, x, t, args...))

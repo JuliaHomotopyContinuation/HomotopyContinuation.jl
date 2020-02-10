@@ -238,8 +238,8 @@ Compute the derivative of `expr` with respect to the given variable `var`.
 function differentiate(expr::Basic, vars::AbstractVector{Variable})
     [differentiate(expr, v) for v in vars]
 end
-function differentiate(exprs::AbstractVector{<:Basic}, var::Variable)
-    [differentiate(e, var) for e in exprs]
+function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
+    [differentiate(e, var, k) for e in exprs]
 end
 function differentiate(
     exprs::AbstractVector{<:Basic},

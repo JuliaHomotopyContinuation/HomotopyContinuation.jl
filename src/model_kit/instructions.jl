@@ -309,7 +309,7 @@ function univariate_diff!(list::InstructionList, K::Int, D::DiffMap)
                 for j = 0:k
                     c_k = muladd!(v, D[arg1, j], D[arg2, k-j], c_k)
                 end
-                c_k === nothing && break
+                # c_k === nothing && break
                 D[id, k] = c_k
             end
         elseif op == :+

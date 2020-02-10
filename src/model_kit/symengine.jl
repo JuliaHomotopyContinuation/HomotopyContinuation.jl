@@ -397,6 +397,12 @@ function differentiate(f::Basic, v::Variable)
     )
     return a
 end
+function differentiate(f::Basic, v::Variable, n::Integer)
+    n < 0 && throw(DomainError("n must be non-negative integer"))
+    n == 0 && return f
+    n == 1 && return differentiate(f, v)
+    n > 1 && return differentiate(differentiate(f, v), v, n - 1)
+end
 
 # Get class of an Expression
 
