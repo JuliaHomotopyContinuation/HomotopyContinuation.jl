@@ -35,7 +35,10 @@ function TotalDegreeStarts(degrees::Vector{Int})
     TotalDegreeStarts(degrees, iterator)
 end
 function Base.show(io::IO, iter::TotalDegreeStarts)
-    print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
+    print(
+        io,
+        "$(length(iter)) total degree start solutions for degrees $(iter.degrees)",
+    )
 end
 
 function Base.iterate(iter::TotalDegreeStarts)
@@ -56,16 +59,15 @@ Base.length(iter::TotalDegreeStarts) = length(iter.iterator)
 Base.eltype(iter::Type{<:TotalDegreeStarts}) = Vector{Complex{Float64}}
 
 """
-    total_degree_homotopy(
-        f::Vector{Expression},
-        vars::Vector{Variable},
-        params = Variable[];
-        parameters = ComplexF64[],
-        gamma = cis(2π * rand()))
+    total_degree_homotopy(F::System; parameters = ComplexF64[], gamma = cis(2π * rand()))
 
-Construct a total degree homotopy using the 'γ-trick'.
+Construct a total degree homotopy ``H`` using the 'γ-trick' such that ``H(x,0) = F(x)``
+and ``H(x,1)`` is the generated start system.
 Returns a `ModelKitHomotopy` and the start solutions as an interator.
 """
+total_degree_homotopy(F::System; kwargs...) =
+    total_degree_homotopy(F.expressions, F.variables, F.parameters; kwargs...)
+
 function total_degree_homotopy(
     f::Vector{Expression},
     vars::Vector{Variable},
@@ -74,6 +76,7 @@ function total_degree_homotopy(
     gamma = cis(2π * rand()),
 )
     length(f) == length(vars) || throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
+    length(params) == length(parameters) || throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
     D = ModelKit.degrees(f, vars)
 
@@ -83,5 +86,5 @@ function total_degree_homotopy(
 
     H = ModelKitHomotopy(Homotopy(h, vars, t, [params; γ]), [parameters; gamma])
     S = TotalDegreeStarts(D)
-    H, S
+    (homotopy = H, start_solutions = S)
 end

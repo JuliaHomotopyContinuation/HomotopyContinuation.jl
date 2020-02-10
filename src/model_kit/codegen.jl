@@ -30,14 +30,14 @@ function CompiledSystem(
         # check that it is identical
         for (i, vi) in enumerate(TSYSTEM_TABLE[h])
             if vi == val
-                return CompiledSystem{(h,i)}(n, vars, params)
+                return CompiledSystem{(h, i)}(n, vars, params)
             end
         end
         push!(TSYSTEM_TABLE[h], val)
-        return CompiledSystem{(h,length(TSYSTEM_TABLE[h]))}(n, vars, params)
+        return CompiledSystem{(h, length(TSYSTEM_TABLE[h]))}(n, vars, params)
     else
         TSYSTEM_TABLE[h] = [val]
-        return CompiledSystem{(h,1)}(n, vars, params)
+        return CompiledSystem{(h, 1)}(n, vars, params)
     end
 end
 
@@ -61,9 +61,12 @@ Base.length(CS::CompiledSystem) = CS.nexpressions
 
 const THOMOTOPY_TABLE = Dict{
     UInt,
-    Vector{
-        Tuple{Vector{Expression},Vector{Variable},Variable,Vector{Variable}},
-    },
+    Vector{Tuple{
+        Vector{Expression},
+        Vector{Variable},
+        Variable,
+        Vector{Variable},
+    },},
 }()
 
 struct CompiledHomotopy{HI}
@@ -89,14 +92,14 @@ function CompiledHomotopy(
     # check that it is identical
         for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
             if vi == val
-                return CompiledHomotopy{(h,i)}(n, vars, params)
+                return CompiledHomotopy{(h, i)}(n, vars, params)
             end
         end
         push!(THOMOTOPY_TABLE[h], val)
-        return CompiledHomotopy{(h,length(TSYSTEM_TABLE[h]))}(n, vars, params)
+        return CompiledHomotopy{(h, length(TSYSTEM_TABLE[h]))}(n, vars, params)
     else
         THOMOTOPY_TABLE[h] = [val]
-        return CompiledHomotopy{(h,1)}(n, vars, params)
+        return CompiledHomotopy{(h, 1)}(n, vars, params)
     end
 end
 
@@ -172,16 +175,26 @@ function boundscheck_var_map(
     Expr(:block, checks...), var_map
 end
 
-function _evaluate!_impl(
-    ::Type{T},
-) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+function add_assignement!(D::Dict{Symbol,Vector{Expr}}, id::Symbol, e::Expr)
+    if haskey(D, id)
+        push!(D[id], e)
+    else
+        D[id] = [e]
+    end
+    D
+end
+
+function _evaluate!_impl(::Type{T},) where {T<:Union{
+    CompiledSystem,
+    CompiledHomotopy,
+}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I)
     slp = let
         list, ids = instruction_list(I.expressions)
-        assignements = Dict{Symbol,Expr}()
+        assignements = Dict{Symbol,Vector{Expr}}()
         for (i, id) in enumerate(ids)
-            push!(assignements, id => :(u[$i] = $id))
+            add_assignement!(assignements, id, :(u[$i] = $id))
         end
         to_expr(list, var_map, assignements)
     end
@@ -193,9 +206,10 @@ function _evaluate!_impl(
     end
 end
 
-function _jacobian!_impl(
-    ::Type{T},
-) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+function _jacobian!_impl(::Type{T},) where {T<:Union{
+    CompiledSystem,
+    CompiledHomotopy,
+}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I; jacobian = true)
 
@@ -205,13 +219,17 @@ function _jacobian!_impl(
         params = Symbol.(I.parameters)
         dlist, J = diff(list, vars, ids)
 
-        assignements = Dict{Symbol,Expr}()
+        assignements = Dict{Symbol,Vector{Expr}}()
 
         U_constants = Expr[]
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
-                if J[i,j] ∉ vars && J[i,j] ∉ params
-                    push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
+                if J[i, j] ∉ vars && J[i, j] ∉ params
+                    add_assignement!(
+                        assignements,
+                        J[i, j],
+                        :(U[$i, $j] = $(J[i, j])),
+                    )
                 else
                     push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
                 end
@@ -231,9 +249,10 @@ function _jacobian!_impl(
     end
 end
 
-function _evaluate_and_jacobian!_impl(
-    ::Type{T},
-) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+function _evaluate_and_jacobian!_impl(::Type{T},) where {T<:Union{
+    CompiledSystem,
+    CompiledHomotopy,
+}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I; jacobian = true)
 
@@ -243,16 +262,20 @@ function _evaluate_and_jacobian!_impl(
         params = Symbol.(I.parameters)
         dlist, J = diff(list, vars, ids)
 
-        assignements = Dict{Symbol,Expr}()
+        assignements = Dict{Symbol,Vector{Expr}}()
         for (i, id) in enumerate(ids)
-            push!(assignements, id => :(u[$i] = $id))
+            add_assignement!(assignements, id, :(u[$i] = $id))
         end
 
         U_constants = Expr[]
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
-                if J[i,j] ∉ vars && J[i,j] ∉ params
-                    push!(assignements, J[i, j] => :(U[$i, $j] = $(J[i, j])))
+                if J[i, j] ∉ vars && J[i, j] ∉ params
+                    add_assignement!(
+                        assignements,
+                        J[i, j],
+                        :(U[$i, $j] = $(J[i, j])),
+                    )
                 else
                     push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
                 end
@@ -300,13 +323,13 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     end
     dlist = univariate_diff!(list, d, diff_map)
 
-    assignements = Dict{Symbol,Expr}()
+    assignements = Dict{Symbol,Vector{Expr}}()
     u_constants = Expr[]
     for (i, id) in enumerate(ids)
         d_id = diff_map[id, d]
         if d_id isa Symbol
             if d_id ∉ vars && d_id ∉ params
-                push!(assignements, d_id => :(u[$i] = $d_id))
+                add_assignement!(assignements, d_id, :(u[$i] = $d_id))
             else
                 push!(U_constants, :(u[$i] = $(var_map[d_id])))
             end
@@ -443,7 +466,7 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D+1, DP)
+    _diff_t!_impl(T, D + 1, DP)
 end
 
 # non-inplace

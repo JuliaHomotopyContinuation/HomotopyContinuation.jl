@@ -524,7 +524,7 @@ function track!(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
     tracker.state.condition
 end
 
-function track(tracker::Tracker, x, t₁ = 0.0, t₀ = 1.0; debug::Bool = false)
+function track(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
     track!(tracker, x, t₁, t₀; debug = debug)
     TrackerResult(tracker.state)
 end

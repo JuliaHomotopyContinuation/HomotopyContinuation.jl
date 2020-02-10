@@ -375,12 +375,12 @@ end
 function to_expr(
     list::InstructionList,
     var_map = Dict{Symbol,Union{Expr,Symbol}}(),
-    assignements = Dict{Symbol,Expr}(),
+    assignements = Dict{Symbol,Vector{Expr}}(),
 )
     exprs = Expr[]
     for (id, (op, arg1, arg2)) in list.instructions
         if op == :^
-            x::Symbol = arg1
+            x::Union{Symbol,Expr} = arg1
             k::Int = arg2
             if k < 0
                 push!(
@@ -401,7 +401,7 @@ function to_expr(
         end
 
         if haskey(assignements, id)
-            push!(exprs, assignements[id])
+            append!(exprs, assignements[id])
         end
     end
     Expr(:block, exprs...)
