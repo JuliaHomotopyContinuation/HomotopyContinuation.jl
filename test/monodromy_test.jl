@@ -485,7 +485,6 @@
         @test sum(fubini_study.(real_solutions(res), solutions(res))) ≈ 0.0 atol = 1e-6
     end
 
-
     @testset "monodromy group" begin
         @polyvar x[1:2]  a b c
         p₁ = x - [2;0]
@@ -510,8 +509,4 @@
 
         @test size(C, 1) == 4
     end
-
-
-
-
 end
