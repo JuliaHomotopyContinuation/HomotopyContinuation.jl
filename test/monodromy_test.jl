@@ -484,4 +484,34 @@
         @test nreal(res) == 2
         @test sum(fubini_study.(real_solutions(res), solutions(res))) ≈ 0.0 atol = 1e-6
     end
+
+
+    @testset "monodromy group" begin
+        @polyvar x[1:2]  a b c
+        p₁ = x - [2;0]
+        p₂ = x - [-2;0]
+        c₁ = p₁[1]^2 + p₁[2]^2 - 1
+        c₂ = p₂[1]^2 + p₂[2]^2 - 1
+
+        F = [c₁ * c₂; a * x[1] + b * x[2] - c]
+        S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], parameters = [a;b;c])
+        A = permutations(S)
+        B = permutations(S, reduced = false)
+
+        @test size(A) == (2,2)
+        @test A == [1 2; 2 1] || A == [2 1; 1 2]
+        @test size(B, 1) == 2
+        @test size(B, 2) > 2
+
+        F₀ = [c₁ * c₂; x[1] + x[2] - 1]
+        start_sols=solutions(solve(F₀))
+        S = monodromy_solve(F, start_sols, [1, 1, 1], parameters = [a;b;c])
+        C = permutations(S)
+
+        @test size(C, 1) == 4
+    end
+
+
+
+
 end
