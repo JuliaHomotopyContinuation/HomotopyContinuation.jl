@@ -21,8 +21,8 @@ for all possible options.
 Base.@kwdef mutable struct TrackerOptions
     max_steps::Int = 1_000
     a::Float64 = 0.125
-    β_a::Float64 = 1
-    β_ω::Float64 = 8.0
+    β_a::Float64 = 1.0
+    β_ω::Float64 = 10.0
     β_τ::Float64 = 0.75
     high_precision::Bool = true
 end
