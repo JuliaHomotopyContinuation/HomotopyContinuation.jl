@@ -6,7 +6,8 @@ export monodromy_solve,
     nreal,
     parameters,
     verify_solution_completeness,
-    solution_completeness_witnesses
+    solution_completeness_witnesses,
+    permutations
 
 
 #####################
@@ -116,6 +117,7 @@ Sample a vector where each entries is drawn independently from the univariate no
 independent_normal(p::SVector{N,T}) where {N,T} = @SVector randn(T, N)
 independent_normal(p::AbstractVector{T}) where {T} = randn(T, length(p))
 
+
 ##########################
 ## Monodromy Statistics ##
 ##########################
@@ -146,6 +148,7 @@ end
 
 Base.show(io::IO, S::MonodromyStatistics) = print_fieldnames(io, S)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) = S
+permutations(S::MonodromyStatistics) = S.permutations
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
@@ -487,6 +490,13 @@ end
 Return the parameters corresponding to the given result `r`.
 """
 parameters(r::MonodromyResult) = r.parameters
+
+"""
+    permutations(r::MonodromyResult)
+
+Return the permutations on the solution that are induced by tracking over the loops.
+"""
+permutations(r::MonodromyResult) = permutations(r.statistics)
 
 #####################
 ## monodromy solve ##
