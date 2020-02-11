@@ -133,7 +133,6 @@ end
 
 function MonodromyStatistics(nsolutions::Int)
     D = Dict{Int, Dict{Int,Int}}()
-    D[1] = Dict{Int,Int}()
     MonodromyStatistics(0, 0, 0, 1, [nsolutions], D)
 end
 function MonodromyStatistics(solutions)
@@ -148,7 +147,6 @@ end
 
 Base.show(io::IO, S::MonodromyStatistics) = print_fieldnames(io, S)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", S::MonodromyStatistics) = S
-permutations(S::MonodromyStatistics) = S.permutations
 
 # update routines
 function trackedpath!(stats::MonodromyStatistics, retcode)
@@ -492,11 +490,58 @@ Return the parameters corresponding to the given result `r`.
 parameters(r::MonodromyResult) = r.parameters
 
 """
-    permutations(r::MonodromyResult)
+    permutations(r::MonodromyResult; reduced=true)
 
-Return the permutations on the solution that are induced by tracking over the loops.
+Return the permutations of the solutions that are induced by tracking over the loops. If `reduced=false`, then all permutations are returned. If `reduced=true` then permutations without repetitions are returned.
+
+Example: monodromy loop for a varying line that intersects two circles.
+```julia
+using LinearAlgebra
+@polyvar x[1:2] a b c
+c1 = (x-[2;0]) ⋅ (x-[2;0]) - 1
+c2 = (x-[-2;0]) ⋅ (x-[-2;0]) - 1
+F = [c1 * c2; a * x[1] + b * x[2] - c]
+S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], parameters = [a;b;c])
+
+permutations(S)
+```
+
+will return
+
+```julia
+2×2 Array{Int64,2}:
+ 1  2
+ 2  1
+```
+
+and `permutations(S, reduced = false)` returns
+
+```julia
+2×12 Array{Int64,2}:
+ 1  2  2  1  1  …  1  2  1  1  1
+ 2  1  1  2  2     2  1  2  2  2
+```
+
 """
-permutations(r::MonodromyResult) = permutations(r.statistics)
+function permutations(r::MonodromyResult; reduced=true)
+
+    π = sort!(collect(r.statistics.permutations), by = first)
+    n = maximum(length ∘ last, π)
+    filter!(πᵢ -> length(last(πᵢ)) == n, π)
+    if reduced
+        π = unique(map(last, π))
+    else
+        π = map(last, π)
+    end
+    A = zeros(Int, n, length(π))
+    for (j, πᵢ) in enumerate(π)
+        for i in 1:n
+            A[i,j] = πᵢ[i]
+        end
+    end
+
+    A
+end
 
 #####################
 ## monodromy solve ##
