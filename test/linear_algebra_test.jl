@@ -2,7 +2,7 @@
     @testset "Constructor + basics" begin
         A = rand(ComplexF32, 12, 12)
         WS = HC2.MatrixWorkspace(A)
-        @test WS isa HC2.MatrixWorkspace{Float64}
+        @test WS isa HC2.MatrixWorkspace
 
         WS.factorized[] = true
         B = randn(ComplexF64, 12, 12)

@@ -187,7 +187,7 @@ using HomotopyContinuation2.ModelKit
     @testset "Instructions" begin
 
         @testset "Simple dt" begin
-            @var x a b
+            @var x a b t
             a = 0.5
             b = 0.1
             h = (x - (t - (a + im * b))^2) * (x + (t - (a + im * b))^2)
