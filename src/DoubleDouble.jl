@@ -117,6 +117,7 @@ hi(x::DoubleF64) = x.hi
 lo(x::DoubleF64) = x.lo
 
 Base.isbits(::DoubleF64) = true
+Base.isbitstype(::Type{DoubleF64}) = true
 
 Base.zero(::DoubleF64) = DoubleF64(0.0, 0.0)
 Base.zero(::Type{DoubleF64}) = DoubleF64(0.0, 0.0)
@@ -126,6 +127,7 @@ Base.one(::Type{DoubleF64}) = DoubleF64(1.0, 0.0)
 
 Base.convert(::Type{T}, a::DoubleF64) where {T<:AbstractFloat} = convert(T, a.hi)
 Base.convert(::Type{BigFloat}, a::DoubleF64) = big(a.hi) + big(a.lo)
+Base.BigFloat(a::DoubleF64) = convert(BigFloat, a)
 Base.convert(::Type{T}, a::DoubleF64) where {T<:Integer} = convert(T, a.hi)
 Base.convert(::Type{Integer}, a::DoubleF64) = convert(Int64, a.hi)
 Base.convert(::Type{BigInt}, a::DoubleF64) =
@@ -471,7 +473,7 @@ Base.isfinite(a::DoubleF64) = isfinite(a.hi)
     #
     # ROUNDING
     #
-@inline function Base.round(a::DoubleF64, r::RoundingMode = RoundNearest())
+@inline function Base.round(a::DoubleF64, r::RoundingMode = RoundNearest)
     hi = round(a.hi, r)
     lo = 0.0
 
@@ -955,7 +957,7 @@ function Base.sincos(a::DoubleF64)
     end
 end
 
-Base.atan(a::DoubleF64) = atan2(a, one(a))
+Base.atan(a::DoubleF64) = atan(a, one(a))
 
 function Base.atan(y::DoubleF64, x::DoubleF64)
      # Strategy: Instead of using Taylor series to compute
@@ -996,7 +998,7 @@ function Base.atan(y::DoubleF64, x::DoubleF64)
     yy = y / r
 
     # Compute double precision approximation to atan.
-    z = DoubleF64(atan2(convert(Float64, y), convert(Float64, x)))
+    z = DoubleF64(atan(convert(Float64, y), convert(Float64, x)))
 
     if abs(xx.hi) > abs(yy.hi)
     # Use Newton iteration 1.  z' = z + (y - sin(z)) / cos(z)
@@ -1027,7 +1029,7 @@ function Base.asin(a::DoubleF64)
         return a.hi > 0.0 ? double_pi2 : -double_pi2
     end
 
-    atan2(a, sqrt(1.0 - square(a)))
+    atan(a, sqrt(1.0 - square(a)))
 end
 
 function Base.acos(a::DoubleF64)
@@ -1041,7 +1043,7 @@ function Base.acos(a::DoubleF64)
         return a.hi > 0.0 ? zero(a) : -double_pi
     end
 
-    atan2(sqrt(1.0 - square(a)), a)
+    atan(sqrt(1.0 - square(a)), a)
 end
 
 

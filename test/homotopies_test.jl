@@ -51,6 +51,7 @@
         q = [2.6, 3.3, 2.3]
 
         H = HC2.ModelKitHomotopy(H, [p; q])
+        @test size(H) == (2, 2)
 
         v = [0.192, 2.21]
         t = 0.232
@@ -78,5 +79,37 @@
             [x, y] => v,
             [a, b, c] => t * p + (1 - t) * q,
         )
+
+        H = ModelKit.Homotopy(
+            [(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2],
+            [x, y],
+            a,
+        )
+        @test ModelKitHomotopy(ModelKit.compile(H)) isa ModelKitHomotopy
+    end
+
+    @testset "total degree" begin
+        @test length(collect(HC2.TotalDegreeStarts([2, 4]))) == 8
+        @test length(HC2.TotalDegreeStarts([2, 4])) == 8
+        @test eltype(HC2.TotalDegreeStarts([2, 4])) == Vector{ComplexF64}
+
+        @var x y
+        F = System([x^2, y^3], [x, y])
+        H, starts = total_degree_homotopy(F)
+        @test length(starts) == 6
+        @var t γ
+        @test H isa ModelKitHomotopy
+        @test ModelKit.interpret(H.homotopy) == Homotopy(
+            [
+             x^2 * (1 - t) + t * γ * (-1 + x^2),
+             y^3 * (1 - t) + t * γ * (-1 + y^3),
+            ],
+            [x, y],
+            t,
+            [γ],
+        )
+
+        @test_throws ArgumentError total_degree_homotopy(System([x+y], [x]))
+        @test_throws ArgumentError total_degree_homotopy(System([x+y], [x, y], [t]))
     end
 end

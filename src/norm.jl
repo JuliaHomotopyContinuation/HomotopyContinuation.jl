@@ -1,14 +1,5 @@
-export AbstractNorm,
-    WeightedNorm,
-    EuclideanNorm,
-    InfNorm,
-    distance,
-    update!,
-    weights
-
 using Base: @propagate_inbounds
 import LinearAlgebra: norm
-export norm
 
 """
     AbstractNorm
@@ -149,55 +140,10 @@ update!(n::AbstractNorm, ::AbstractVector) = n
 ####################
 ## Specific norms ##
 ####################
-
-"""
-    EuclideanNorm
-
-The usual [Euclidean norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm) resp. 2-norm.
-"""
-struct EuclideanNorm <: AbstractNorm end
-
-function distance(x::AbstractVector, y::AbstractVector, ::EuclideanNorm)
-    n = length(x)
-    @boundscheck n == length(y)
-    @inbounds d = abs2(x[1] - y[1])
-    for i = 2:n
-        @inbounds d += abs2(x[i] - y[i])
-    end
-    sqrt(d)
-end
-function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{EuclideanNorm})
-    @boundscheck length(w) == length(x) == length(y)
-    @inbounds d = abs2(x[1] - y[1]) / (w[1]^2)
-    for i = 2:length(x)
-        @inbounds d += abs2(x[i] - y[i]) / (w[i]^2)
-    end
-    sqrt(d)
-end
-
-function norm(x::AbstractVector, ::EuclideanNorm)
-    n = length(x)
-    @inbounds d = abs2(x[1])
-    for i = 2:n
-        @inbounds d += abs2(x[i])
-    end
-    sqrt(d)
-end
-function norm(x::AbstractVector, w::WeightedNorm{EuclideanNorm})
-    @boundscheck length(w) == length(x)
-    @inbounds out = abs2(x[1]) / (w[1]^2)
-    for i = 2:length(x)
-        @inbounds out += abs2(x[i]) / (w[i]^2)
-    end
-    sqrt(out)
-end
-(N::EuclideanNorm)(x::AbstractVector) = norm(x, N)
-(N::EuclideanNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
-
 """
     InfNorm <: AbstractNorm
 
-The infinity or [maximum norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Maximum_norm_.28special_case_of:_infinity_norm.2C_uniform_norm.2C_or_supremum_norm.29).
+The infinity or [maximum norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Maximum_norm).
 """
 struct InfNorm <: AbstractNorm end
 
@@ -243,17 +189,3 @@ function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
 end
 (N::InfNorm)(x::AbstractVector) = norm(x, N)
 (N::InfNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
-
-"""
-    euclidean_distance(u, v)
-
-Compute ||u-v||₂.
-"""
-euclidean_distance(u, v) = distance(u, v, EuclideanNorm())
-
-"""
-    euclidean_norm(u)
-
-Compute ||u||₂.
-"""
-euclidean_norm(x::AbstractVector) = norm(x, EuclideanNorm())
