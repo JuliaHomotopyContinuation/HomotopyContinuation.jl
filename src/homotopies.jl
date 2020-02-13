@@ -78,7 +78,7 @@ function total_degree_homotopy(
     length(f) == length(vars) || throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
     length(params) == length(parameters) || throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
-    D = ModelKit.degrees(f, vars)
+    D = ModelKit.degree(f, vars)
 
     t = ModelKit.unique_variable(:t, vars, params)
     γ = ModelKit.unique_variable(:γ, vars, params)

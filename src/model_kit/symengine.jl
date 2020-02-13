@@ -195,7 +195,7 @@ for (op, inplace, libnm) in [
 end
 
 function div!(a::Expression, b1::Basic, b2::Basic)
-    class(b2) ∈ NUMBER_TYPES || throw(ArgumentError("Cannot divide by " * string(b2)))
+    # class(b2) ∈ NUMBER_TYPES || throw(ArgumentError("Cannot divide by " * string(b2)))
     ccall(
         (:basic_div, libsymengine),
         Nothing,

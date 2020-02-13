@@ -1,6 +1,3 @@
-import SymEngine
-const SE = SymEngine
-
 using HomotopyContinuation2.ModelKit
 
 @testset "ModelKit" begin
@@ -13,6 +10,7 @@ using HomotopyContinuation2.ModelKit
         @test length(x) == 2
         @test y isa Matrix{Variable}
         @test size(y) == (2, 3)
+        @test join(x, " ") == "x₁ x₂"
 
         @var c, d
         @test c isa Variable
@@ -38,7 +36,8 @@ using HomotopyContinuation2.ModelKit
         @test subs(f, x => z) == z^2 * (z + w * y)
         @test subs([f], x => z) == [z^2 * (z + w * y)]
         @test subs(f, [x, y] => [z^2, z + 2]) == z^4 * (w * (2 + z) + z^2)
-        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 * (u * (2 + z) + z^2)
+        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 *
+                                                         (u * (2 + z) + z^2)
         @test subs(f, x => z^2, y => 3, w => u) == z^4 * (3 * u + z^2)
     end
 
@@ -52,6 +51,8 @@ using HomotopyContinuation2.ModelKit
     @testset "Linear Algebra" begin
         @var x[1:2, 1:2]
         @test det(x) == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
+        @test det(x') == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
+        @test det(transpose(x)) == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
     end
 
     @testset "Differentation" begin
@@ -70,6 +71,15 @@ using HomotopyContinuation2.ModelKit
     @testset "Expand" begin
         @var x y
         @test expand((x + y)^2) == 2 * x * y + x^2 + y^2
+    end
+
+    @testset "to_dict" begin
+        @var x y a
+        @test ModelKit.to_dict(x^2 + y * x * a + y * x, [x, y]) == Dict(
+            [2, 0] => Expression(1),
+            [1, 1] => a + 1,
+        )
+        @test ModelKit.degree(x * y^5 + y^2, [x, y]) == 6
     end
 
     @testset "Modeling" begin
@@ -149,8 +159,8 @@ using HomotopyContinuation2.ModelKit
          3*a + x + 5*y + x^2 + (x + y)^3
          b + 2*x^2"""
         @test sprint(show, F) == show_F
-
-        T = compile(F)
+        @test ModelKit.degree(F) == [3, 2]
+        T = ModelKit.compile(F)
         F2 = ModelKit.interpret(T)
         @test F == F2
         @test sprint(show, T) == "Compiled: $show_F"
@@ -172,12 +182,13 @@ using HomotopyContinuation2.ModelKit
 
         @test sprint(show, H) == show_H
 
-        T = compile(H)
+        T = ModelKit.compile(H)
         H2 = ModelKit.interpret(T)
         @test H == H2
         @test sprint(show, T) == "Compiled: $show_H"
         @test size(T) == size(H) == (2, 3)
     end
+
 
     @testset "Codegen helpers" begin
         @test ModelKit.sqr(3 + 2im) == (3 + 2im)^2
@@ -204,7 +215,7 @@ using HomotopyContinuation2.ModelKit
             @test expr1 == expr2
         end
         @testset "Higher order pow diff" begin
-            for d in [2, 5]
+            for d = 2:10
                 @var x
                 f = x^d
                 list, _ = ModelKit.instruction_list([f])
@@ -215,22 +226,25 @@ using HomotopyContinuation2.ModelKit
                 D[:x, 3] = :x3
 
                 @eval ModelKit begin
-                    function __diff_4_pow(x, x1, x2, x3, t)
-                        $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 4, D)))
+                    function __diff_4_pow(x, x1, x2, x3)
+                        $(ModelKit.to_expr(ModelKit.univariate_diff!(
+                            list,
+                            4,
+                            D,
+                        )))
                     end
                 end
 
-                SE.@vars x t
-                SE.@funs u
+                @var x1 x2 x3 λ
 
-                exp1 = SE.expand(SE.subs(SE.diff(u(t)^d, t, 4), SE.diff(u(t), t, 4) => 0) /
-                                 factorial(4),)
-
-                u1 = SE.diff(u(t), t)
-                u2 = SE.diff(u(t), t, 2) / 2
-                u3 = SE.diff(u(t), t, 3) / 6
-                exp2 = SE.expand(ModelKit.__diff_4_pow(u(t), u1, u2, u3, t))
-                @test exp1 == exp2
+                @test expand(subs(
+                    differentiate(
+                        subs(f, x => x .+ λ .* x1 .+ λ^2 .* x2 + λ^3 .* x3),
+                        λ,
+                        4,
+                    ),
+                    λ => 0,
+                ) / 24) == expand(ModelKit.__diff_4_pow(x, x1, x2, x3))
             end
         end
 
@@ -238,7 +252,6 @@ using HomotopyContinuation2.ModelKit
             @var x y
             f = x * y
             list, _ = ModelKit.instruction_list([f])
-
             D = ModelKit.DiffMap()
             D[:x, 1] = :x1
             D[:x, 2] = :x2
@@ -248,27 +261,29 @@ using HomotopyContinuation2.ModelKit
             D[:y, 3] = :y3
 
             @eval ModelKit begin
-                function __diff_4_mul__(x, y, t)
-                    x1 = Main.SE.diff(x, t)
-                    x2 = Main.SE.diff(x, t, 2) / 2
-                    x3 = Main.SE.diff(x, t, 3) / 6
-                    y1 = Main.SE.diff(y, t)
-                    y2 = Main.SE.diff(y, t, 2) / 2
-                    y3 = Main.SE.diff(y, t, 3) / 6
+                function __diff_4_mul__(x, y, (x1, x2, x3), (y1, y2, y3))
                     $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 4, D)))
                 end
             end
+            @var x1 x2 x3 y1 y2 y3 λ
 
-            SE.@funs u v
-            SE.@vars t
-
-            exp1 = SE.expand(SE.subs(
-                SE.diff(u(t) * v(t), t, 4),
-                SE.diff(u(t), t, 4) => 0,
-                SE.diff(v(t), t, 4) => 0,
-            ) / factorial(4),)
-            exp2 = SE.expand(ModelKit.__diff_4_mul__(u(t), v(t), t))
-            @test exp1 == exp2
+            @test expand(subs(
+                differentiate(
+                    subs(
+                        f,
+                        x => x .+ λ .* x1 .+ λ^2 .* x2 + λ^3 .* x3,
+                        y => y .+ λ .* y1 .+ λ^2 .* y2 + λ^3 .* y3,
+                    ),
+                    λ,
+                    4,
+                ),
+                λ => 0,
+            ) / 24) == expand(ModelKit.__diff_4_mul__(
+                x,
+                y,
+                (x1, x2, x3),
+                (y1, y2, y3),
+            ))
         end
 
         @testset "Higher order plus" begin
@@ -285,23 +300,30 @@ using HomotopyContinuation2.ModelKit
             D[:y, 3] = :y3
 
             @eval ModelKit begin
-                function __diff_3_plus__(x, y, t)
-                    x1 = Main.SE.diff(x, t)
-                    x2 = Main.SE.diff(x, t, 2) / 2
-                    x3 = Main.SE.diff(x, t, 3) / 6
-                    y1 = Main.SE.diff(y, t)
-                    y2 = Main.SE.diff(y, t, 2) / 2
-                    y3 = Main.SE.diff(y, t, 3) / 6
+                function __diff_3_plus__(x, y, (x1, x2, x3), (y1, y2, y3))
                     $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 3, D)))
                 end
             end
 
-            SE.@funs u v
-            SE.@vars t
+            @var x1 x2 x3 y1 y2 y3 λ
 
-            exp1 = SE.expand(diff(u(t) + v(t), t, 3) / factorial(3))
-            exp2 = SE.expand(ModelKit.__diff_3_plus__(u(t), v(t), t))
-            @test exp1 == exp2
+            @test expand(subs(
+                differentiate(
+                    subs(
+                        f,
+                        x => x .+ λ .* x1 .+ λ^2 .* x2 + λ^3 .* x3,
+                        y => y .+ λ .* y1 .+ λ^2 .* y2 + λ^3 .* y3,
+                    ),
+                    λ,
+                    3,
+                ),
+                λ => 0,
+            ) / 6) == expand(ModelKit.__diff_3_plus__(
+                x,
+                y,
+                (x1, x2, x3),
+                (y1, y2, y3),
+            ))
         end
     end
 
@@ -335,15 +357,21 @@ using HomotopyContinuation2.ModelKit
         Hd3 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ, t => t + λ)
         true_dt3 = subs(differentiate(Hd3, λ, 3), λ => 0) / 6
 
-        Hd4 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3, t => t + λ)
+        Hd4 = subs(
+            H.expressions,
+            x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3,
+            t => t + λ,
+        )
         true_dt4 = subs(differentiate(Hd4, λ, 4), λ => 0) / 24
 
         @test expand.(ModelKit.evaluate(TH, x, t, [γ])) == expand.(h)
-        @test expand.(ModelKit.jacobian(TH, x, t, [γ])) == expand.(differentiate(h, x))
+        @test expand.(ModelKit.jacobian(TH, x, t, [γ])) == expand.(differentiate(
+            h,
+            x,
+        ))
         @test expand.(dt1) == expand.(true_dt1)
         @test expand.(dt2) == expand.(true_dt2)
         @test expand.(dt3) == expand.(true_dt3)
         @test expand.(dt4) == expand.(true_dt4)
     end
-
 end

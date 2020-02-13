@@ -315,66 +315,6 @@ julia> expand((x + y) ^ 2)
 """
 expand(e::Basic) = symengine_expand(e)
 
-#
-#
-# degrees(expr::SE.Basic, vars::Vector{Variable}) = degrees(SE.BasicType(expr), vars)
-# function degrees(expr::SE.BasicType{Val{:Add}}, vars::Vector{Variable})
-#     ops = UnsafeVecBasicIterator(args(SE.Basic(expr)))
-#     D = zeros(Int32, length(vars), length(ops))
-#
-#     b1, b2 = SE.Basic(), SE.Basic()
-#     mul_args, pow_args = VecBasic(), VecBasic()
-#
-#     for (j, op) in enumerate(ops)
-#         op_cls = ModelKit.type(op)
-#         if op_cls == :Mul
-#             op_args = UnsafeVecBasicIterator(args!(mul_args, op), b1)
-#             for arg in op_args
-#                 arg_cls = ModelKit.type(arg)
-#                 if arg_cls == :Symbol
-#                     for (i, v) in enumerate(vars)
-#                         if v == arg
-#                             D[i, j] = 1
-#                             break
-#                         end
-#                     end
-#                 elseif arg_cls == :Pow
-#                     vec = args!(pow_args, arg)
-#                     x = vec[1]
-#                     for (i, v) in enumerate(vars)
-#                         if x == v
-#                             D[i, j] = convert(Int, vec[2])
-#                             break
-#                         end
-#                     end
-#                 end
-#             end
-#         elseif op_cls == :Symbol
-#             for (i, v) in enumerate(vars)
-#                 if v == op
-#                     D[i, j] = 1
-#                     break
-#                 end
-#             end
-#         elseif op_cls == :Pow
-#             vec = args!(pow_args, op)
-#             x = vec[1]
-#             for (i, v) in enumerate(vars)
-#                 if x == v
-#                     D[i, j] = convert(Int, vec[2])
-#                     break
-#                 end
-#             end
-#         end
-#     end
-#     D
-# end
-# degrees(expr::SE.BasicType, vars::Vector{Variable}) = zeros(Int32, length(vars), 0)
-#
-#
-
-
-
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
     dict = Dict{Vector{Int},Expression}()
@@ -454,12 +394,12 @@ end
 
 
 """
-    degrees(f::AbstractVector{Expression}, vars = collect(variables(f); expanded = false)
+    degree(f::AbstractVector{Expression}, vars = collect(variables(f); expanded = false)
 
 Compute the degrees of the expressions `f` in `vars`.
 Unless `expanded` is `true` the expressions are first expanded.
 """
-function degrees(
+function degree(
     f::AbstractVector{Expression},
     vars::AbstractVector{Variable} = collect(variables(f));
     expanded::Bool = false,
@@ -472,7 +412,7 @@ function degrees(
 end
 
 """
-    degrees(f::Expression, vars = collect(variables(f); expanded = false)
+    degree(f::Expression, vars = collect(variables(f); expanded = false)
 
 Compute the degree of the expression `f`  in `vars`.
 Unless `expanded` is `true` the expression is first expanded.
@@ -606,7 +546,7 @@ Base.size(F::System, i::Integer) = size(F)[i]
 Base.length(F::System) = length(F.expressions)
 
 variables(F::System, parameters = nothing) = variables(F.variables)
-
+degree(F::System) = degree(F.expressions, F.variables)
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
 
