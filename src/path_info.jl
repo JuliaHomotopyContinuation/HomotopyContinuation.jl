@@ -89,7 +89,7 @@ struct CTPathInfo
     n_ldivs::Int
 end
 
-function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
+function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
     state = tracker.state
 
     s = Float64[]
@@ -147,7 +147,7 @@ end
 
 path_table(info::CTPathInfo) = path_table(stdout, info)
 function path_table(io::IO, info::CTPathInfo)
-    header = ["", "s", "Δs", "ω", "|Δx₀|", "acc", "κ", "ψ", "limit_acc", "|x|", "|r|"]
+    header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "κ", "ψ", "limit_acc", "|x|", "|r|"]
     h1 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
         crayon = PrettyTables.crayon"red",
@@ -163,6 +163,7 @@ function path_table(io::IO, info::CTPathInfo)
         _sigdigits3.(info.Δs),
         _sigdigits3.(info.ω),
         _sigdigits2.(info.Δx₀),
+        _sigdigits3.(info.ω .* info.Δx₀),
         _sigdigits2.(info.accuracy),
         _sigdigits3.(info.cond),
         _sigdigits2.(info.eval_err),
