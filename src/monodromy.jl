@@ -591,7 +591,7 @@ function MonodromySolver(
         throw(ArgumentError("Number of provided parameters doesn't match the length of initially provided parameter `p₀`."))
     end
 
-    x₀ = complex.(first(startsolutions))
+    x₀ = ComplexF64.(first(startsolutions))
     p₀ = Vector{promote_type(Float64, TP)}(p)
 
     optionskwargs, restkwargs = splitkwargs(kwargs, monodromy_options_supported_keywords)
