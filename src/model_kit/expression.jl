@@ -418,9 +418,9 @@ julia> @var x;
 julia> simplify(x + 0)
 x
 """
-simplify(expr::Expression) = expr
-function simplify(op::Operation)
-    if op.args[1] isa Operation
+simplify(expr::Expression; recursive::Bool = true) = expr
+function simplify(op::Operation; recursive::Bool = true)
+    if op.args[1] isa Operation && recursive
         u = simplify(op.args[1])
     else
         u = op.args[1]
@@ -432,7 +432,7 @@ function simplify(op::Operation)
         return Operation(op.func, u)
     end
 
-    if op.args[2] isa Operation
+    if op.args[2] isa Operation && recursive
         v = simplify(op.args[2])
     else
         v = op.args[2]
@@ -465,6 +465,14 @@ function simplify(op::Operation)
         elseif v isa Constant && !(u isa Constant)
             return Operation(:*, v, u)
         end
+    elseif op.func == :/
+        if iszero(u)
+            return u
+        elseif isone(v)
+            return v
+        elseif u == v
+            return Constant(1)
+        end
     elseif op.func == :+
         if u isa Constant && v isa Constant
             return Constant(u.value + v.value)
@@ -484,10 +492,16 @@ function simplify(op::Operation)
             return Constant(u.value - v.value)
         elseif iszero(v)
             return u
+        elseif iszero(u)
+            return -v
         end
     elseif op.func == :^
         if iszero(v)
             return Constant(1)
+        elseif iszero(u)
+            return Constant(0)
+        elseif isone(u)
+            return Constant(0)
         elseif isone(v)
             return u
         end
@@ -534,7 +548,7 @@ function differentiate(op::Operation, var::Variable)
             d = u′ / v - (u * v′) / (v^2)
         end
     end
-    simplify(d)
+    simplify(d; recursive = false)
 end
 
 differentiate(arg::Variable, var::Variable) = arg == var ? Constant(1) : Constant(0)
@@ -543,6 +557,9 @@ differentiate(arg::Constant, var::Variable) = Constant(0)
 differentiate(expr::Expression, vars::AbstractVector{Variable}) = differentiate.(expr, vars)
 function differentiate(exprs::AbstractVector{<:Expression}, vars::AbstractVector{Variable})
     [differentiate(expr, v) for expr in exprs, v in vars]
+end
+function differentiate(exprs::AbstractVector{<:Expression}, v::Variable)
+    [differentiate(expr, v) for expr in exprs]
 end
 
 """

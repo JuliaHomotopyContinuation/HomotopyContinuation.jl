@@ -89,7 +89,7 @@ struct CTPathInfo
     n_ldivs::Int
 end
 
-function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
+function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
     state = tracker.state
 
     s = Float64[]
@@ -107,20 +107,14 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
     init!(tracker, x₀, t₁, t₀)
     push!(s, state.s)
     push!(Δs, state.Δs)
-    push!(ω, state.ω)
-    push!(Δx₀, state.norm_Δx₀)
-    push!(norm_x, maximum(abs, state.x))
-    push!(cond, state.jacobian.cond[])
-    push!(accuracy, state.accuracy)
-    push!(limit_accuracy, state.limit_accuracy)
-    push!(residual, maximum(tracker.corrector.abs_r))
-    push!(eval_err, state.eval_err)
-
     first = true
-    for _ in tracker
+    while is_tracking(tracker.state.status)
+        step!(tracker, debug)
+        if !first
+            push!(s, state.s)
+            push!(Δs, state.Δs)
+        end
         push!(accepted_rejected, !state.last_step_failed)
-        push!(s, state.s)
-        push!(Δs, state.Δs)
         push!(ω, state.ω)
         push!(Δx₀, state.norm_Δx₀)
         push!(norm_x, maximum(abs, state.x))
@@ -131,7 +125,7 @@ function path_info(tracker::CoreTracker, x₀, t₁ = 1.0, t₀ = 0.0)
         push!(eval_err, state.eval_err)
         first = false
     end
-    push!(accepted_rejected, !state.last_step_failed)
+    # push!(accepted_rejected, !state.last_step_failed)
 
     CTPathInfo(
         s,
@@ -153,7 +147,7 @@ end
 
 path_table(info::CTPathInfo) = path_table(stdout, info)
 function path_table(io::IO, info::CTPathInfo)
-    header = ["", "s", "Δs", "ω", "|Δx₀|", "acc", "κ", "ψ", "limit_acc", "|x|", "|r|"]
+    header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "κ", "ψ", "limit_acc", "|x|", "|r|"]
     h1 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
         crayon = PrettyTables.crayon"red",
@@ -169,6 +163,7 @@ function path_table(io::IO, info::CTPathInfo)
         _sigdigits3.(info.Δs),
         _sigdigits3.(info.ω),
         _sigdigits2.(info.Δx₀),
+        _sigdigits3.(info.ω .* info.Δx₀),
         _sigdigits2.(info.accuracy),
         _sigdigits3.(info.cond),
         _sigdigits2.(info.eval_err),

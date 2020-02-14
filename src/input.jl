@@ -254,3 +254,14 @@ function input_startsolutions(
     end
     (input = HomotopyInput(H), startsolutions = startsolutions)
 end
+
+function input_startsolutions(
+    H::ModelKit.Homotopy,
+    startsolutions;
+    variable_ordering = nothing,
+)
+    if isa(startsolutions, AbstractVector{<:Number})
+        startsolutions = [startsolutions]
+    end
+    (input = HomotopyInput(ModelKitHomotopy(H)), startsolutions = startsolutions)
+end
