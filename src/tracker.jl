@@ -1,12 +1,12 @@
 export Tracker,
-       TrackerResult,
-       track,
-       track!,
-       is_success,
-       solution,
-       steps,
-       accepted_steps,
-       rejected_steps
+    TrackerResult,
+    track,
+    track!,
+    is_success,
+    solution,
+    steps,
+    accepted_steps,
+    rejected_steps
 
 ###########
 # Options #
@@ -28,8 +28,7 @@ Base.@kwdef mutable struct TrackerOptions
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) =
-    opts
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
 
 #########
@@ -124,13 +123,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     last_step_failed::Bool
 end
 
-function TrackerState(
-    H,
-    x₁::AbstractVector,
-    t₁,
-    t₀,
-    norm::WeightedNorm{InfNorm},
-)
+function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
     x = Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
@@ -179,8 +172,7 @@ function TrackerState(
 end
 
 Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
-    state
+Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) = state
 function Base.getproperty(state::TrackerState, sym::Symbol)
     if sym === :t
         return getfield(state, :segment)[getfield(state, :s)]
@@ -258,15 +250,10 @@ Returns the number of rejected_steps steps.
 rejected_steps(result::TrackerResult) = result.rejected_steps
 
 Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) =
-    result
+Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
 
 
-struct Tracker{
-    H<:AbstractHomotopy,
-    P<:AbstractPredictorCache,
-    M<:AbstractMatrix{ComplexF64},
-}
+struct Tracker{H<:AbstractHomotopy,P<:AbstractPredictorCache,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
     predictor::P
     corrector::NewtonCorrector
@@ -349,11 +336,10 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        state.s′ = state.s +
-                   nthroot(
-            (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
-            p,
-        ) * (state.s′ - state.s)
+        state.s′ =
+            state.s +
+            nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
+            (state.s′ - state.s)
     end
     nothing
 end
@@ -381,8 +367,7 @@ end
 
 Setup `tracker` to track `x₁` from `t₁` to `t₀`.
 """
-init!(tracker::Tracker, r::TrackerResult, t₁, t₀) =
-    init!(tracker, r.x, t₁, t₀, r.ω, r.μ)
+init!(tracker::Tracker, r::TrackerResult, t₁, t₀) = init!(tracker, r.x, t₁, t₀, r.ω, r.μ)
 function init!(
     tracker::Tracker,
     x₁::AbstractVector,
@@ -410,16 +395,8 @@ function init!(
     # compute ω and limit accuracy μ for the start value
     t = state.segment[state.s]
     if isnan(ω) || isnan(μ)
-        valid, ω, μ = init_newton!(
-            x̄,
-            corrector,
-            homotopy,
-            x,
-            t,
-            jacobian,
-            norm;
-            a = options.a,
-        )
+        valid, ω, μ =
+            init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = options.a)
     else
         valid = true
     end
@@ -462,15 +439,7 @@ function update_precision!(tracker::Tracker, μ_low)
         state.high_prec_residual = true
         state.used_high_prec = true
         # do one refinement step
-        μ = high_prec_refinement_step!(
-            x,
-            corrector,
-            homotopy,
-            x,
-            t,
-            jacobian,
-            norm,
-        )
+        μ = high_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
         state.μ = max(μ, eps())
     end
 

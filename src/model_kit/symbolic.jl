@@ -81,15 +81,12 @@ function buildvar(var; unique::Bool = false)
         var, :($(esc(var)) = Variable($"$varname"))
     else
         isa(var, Expr) || error("Expected $var to be a variable name")
-        Base.Meta.isexpr(
-            var,
-            :ref,
-        ) || error("Expected $var to be of the form varname[idxset]")
+        Base.Meta.isexpr(var, :ref) ||
+        error("Expected $var to be of the form varname[idxset]")
         (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
         varname = var.args[1]
         prefix = unique ? string(gensym(varname)) : string(varname)
-        varname,
-        :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
@@ -120,11 +117,7 @@ Create a variable with a unique name which doesn't clash with `variables` or
 If `var` is not possible the names `var##k` for `k=0,1,...` are tried until
 one is possible,
 """
-function unique_variable(
-    var::Symbol,
-    vars::Vector{Variable},
-    params::Vector{Variable},
-)
+function unique_variable(var::Symbol, vars::Vector{Variable}, params::Vector{Variable})
     v = Variable(var)
     k = 0
     while (v in vars || v in params)
@@ -192,7 +185,8 @@ function subs(
     (xs, ys)::Pair{<:AbstractArray{<:Basic},<:AbstractArray},
     args...,
 )
-    size(xs) == size(ys) || throw(ArgumentError("Substitution arguments don't have the same size."))
+    size(xs) == size(ys) ||
+    throw(ArgumentError("Substitution arguments don't have the same size."))
     for (x, y) in zip(xs, ys)
         D[x] = y
     end
@@ -241,10 +235,7 @@ end
 function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
     [differentiate(e, var, k) for e in exprs]
 end
-function differentiate(
-    exprs::AbstractVector{<:Basic},
-    vars::AbstractVector{Variable},
-)
+function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
     [differentiate(e, v) for e in exprs, v in vars]
 end
 
@@ -273,21 +264,14 @@ julia> monomials([x,y], 2; homogeneous = true)
  y ^ 2
  ```
 """
-function monomials(
-    vars::AbstractVector{Variable},
-    d::Integer;
-    homogeneous::Bool = false,
-)
+function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
     n = length(vars)
     if homogeneous
         pred = x -> sum(x) == d
     else
         pred = x -> sum(x) ≤ d
     end
-    exps = collect(Iterators.filter(
-        pred,
-        Iterators.product(Iterators.repeated(0:d, n)...),
-    ))
+    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
     sort!(exps, lt = td_order)
     map(exps) do exp
         prod(i -> vars[i]^exp[i], 1:n)
@@ -441,8 +425,10 @@ end
 function check_vars_params(f, vars, params)
     vars_params = params === nothing ? vars : [vars; params]
     Δ = setdiff(variables(f), vars_params)
-    isempty(Δ) || throw(ArgumentError("Not all variables or parameters of the system are given. Missing: " *
-                                      join(Δ, ", "),))
+    isempty(Δ) || throw(ArgumentError(
+        "Not all variables or parameters of the system are given. Missing: " *
+        join(Δ, ", "),
+    ))
     nothing
 end
 
@@ -501,17 +487,9 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        print(
-            io,
-            " $(length(F.variables)) variables: ",
-            join(F.variables, ", "),
-        )
+        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
         if !isempty(F.parameters)
-            print(
-                io,
-                "\n $(length(F.parameters)) parameters: ",
-                join(F.parameters, ", "),
-            )
+            print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
         end
         print(io, "\n\n")
         for i = 1:length(F)
@@ -528,8 +506,7 @@ function Base.show(io::IO, F::System)
     end
 end
 
-evaluate(F::System, x::AbstractVector) =
-    evaluate(F.expressions, F.variables => x)
+evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
@@ -614,17 +591,9 @@ end
 function Base.show(io::IO, H::Homotopy)
     if !get(io, :compact, false)
         println(io, "Homotopy in ", H.t, " of length ", length(H.expressions))
-        print(
-            io,
-            " $(length(H.variables)) variables: ",
-            join(H.variables, ", "),
-        )
+        print(io, " $(length(H.variables)) variables: ", join(H.variables, ", "))
         if !isempty(H.parameters)
-            print(
-                io,
-                "\n $(length(H.parameters)) parameters: ",
-                join(H.parameters, ", "),
-            )
+            print(io, "\n $(length(H.parameters)) parameters: ", join(H.parameters, ", "))
         end
         print(io, "\n\n")
         for i = 1:length(H)

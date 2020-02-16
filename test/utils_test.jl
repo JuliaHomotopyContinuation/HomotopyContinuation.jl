@@ -20,8 +20,6 @@
         b::Float64
     end
 
-    @test sprint(
-        HC2.print_fieldnames,
-        Foo_print_fieldnames(2, 2.2),
-    ) == "Foo_print_fieldnames:\n • a → 2\n • b → 2.2\n"
+    @test sprint(HC2.print_fieldnames, Foo_print_fieldnames(2, 2.2)) ==
+          "Foo_print_fieldnames:\n • a → 2\n • b → 2.2\n"
 end

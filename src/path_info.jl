@@ -20,13 +20,7 @@ struct PathInfo
     n_ldivs::Int
 end
 
-function path_info(
-    tracker::Tracker,
-    x₀,
-    t₁ = 0.0,
-    t₀ = 1.0;
-    debug::Bool = false,
-)
+function path_info(tracker::Tracker, x₀, t₁ = 0.0, t₀ = 1.0; debug::Bool = false)
     state = tracker.state
 
     s = Float64[]
@@ -85,20 +79,7 @@ end
 
 path_table(info::PathInfo) = path_table(stdout, info)
 function path_table(io::IO, info::PathInfo)
-    header = [
-        "",
-        "s",
-        "Δs",
-        "ω",
-        "|Δx₀|",
-        "h₀",
-        "acc",
-        "μ",
-        "τ",
-        "Δx_t",
-        "Δpred ",
-        "|x|",
-    ]
+    header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "μ", "τ", "Δx_t", "Δpred ", "|x|"]
     h1 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
         crayon = PrettyTables.crayon"red",

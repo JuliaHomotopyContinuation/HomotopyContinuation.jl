@@ -129,10 +129,7 @@ function flat_expr!(
         return op_arg
     elseif t == :Div
         x, y = ModelKit.args(ex)
-        return push!(
-            v,
-            (:/, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE)),
-        )
+        return push!(v, (:/, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE)))
     else
         return to_number(ex)
     end
@@ -154,11 +151,7 @@ end
 Base.setindex!(D::DiffMap, v::Any, s::Symbol, i::Int) = D.D[(s, i)] = v
 Base.setindex!(D::DiffMap, v::Nothing, s::Symbol, i::Int) = nothing
 
-function Base.diff(
-    list::InstructionList,
-    vars::Vector{Symbol},
-    f::Vector{Symbol},
-)
+function Base.diff(list::InstructionList, vars::Vector{Symbol}, f::Vector{Symbol})
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         diff_map[v, i] = 1
@@ -225,11 +218,7 @@ function diff!(list::InstructionList, N::Int, D::DiffMap)
 
                 D[id, ∂i] = div!(
                     v,
-                    sub!(
-                        v,
-                        mul!(v, D[arg1, ∂i], arg2),
-                        mul!(v, arg1, D[arg2, ∂i]),
-                    ),
+                    sub!(v, mul!(v, D[arg1, ∂i], arg2), mul!(v, arg1, D[arg2, ∂i])),
                     pow!(v, arg2, 2),
                 )
             end
@@ -356,8 +345,7 @@ function unroll_pow(var, n)
     d = digits(n, base = 2)
     x = :x
     exprs = map(2:length(d)) do i
-        :(local $(Symbol(x, 1 << (i - 1))) =
-            sqr($(Symbol(x, 1 << (i - 2)))))
+        :(local $(Symbol(x, 1 << (i - 1))) = sqr($(Symbol(x, 1 << (i - 2)))))
     end
     prods = Symbol[]
     for (i, di) in enumerate(d)
@@ -383,10 +371,7 @@ function to_expr(
             x::Union{Symbol,Expr} = arg1
             k::Int = arg2
             if k < 0
-                push!(
-                    exprs,
-                    :($id = inv($(unroll_pow(get(var_map, x, x), -k)))),
-                )
+                push!(exprs, :($id = inv($(unroll_pow(get(var_map, x, x), -k)))))
             else
                 push!(exprs, :($id = $(unroll_pow(get(var_map, x, x), k))))
             end

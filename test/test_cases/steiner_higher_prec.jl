@@ -106,16 +106,26 @@
     F = let
         @var x[1:2] a[1:5] c[1:6] y[1:2, 1:5]
 
-       #tangential conics
-        f = a[1] * x[1]^2 + a[2] * x[1] * x[2] + a[3] * x[2]^2 + a[4] * x[1] +
-            a[5] * x[2] + 1
+        #tangential conics
+        f =
+                a[1] * x[1]^2 +
+            a[2] * x[1] * x[2] +
+            a[3] * x[2]^2 +
+            a[4] * x[1] +
+            a[5] * x[2] +
+            1
         ∇ = differentiate(f, x)
-       #5 conics
-        g = c[1] * x[1]^2 + c[2] * x[1] * x[2] + c[3] * x[2]^2 + c[4] * x[1] +
-            c[5] * x[2] + c[6]
+        #5 conics
+        g =
+                c[1] * x[1]^2 +
+            c[2] * x[1] * x[2] +
+            c[3] * x[2]^2 +
+            c[4] * x[1] +
+            c[5] * x[2] +
+            c[6]
         ∇_2 = differentiate(g, x)
-       #the general system
-       #f_a_0 is tangent to g_b₀ at x₀
+        #the general system
+        #f_a_0 is tangent to g_b₀ at x₀
         function Incidence(f, a₀, g, b₀, x₀)
             fᵢ = f(x => x₀, a => a₀)
             ∇ᵢ = ∇(x => x₀, a => a₀)
@@ -128,11 +138,7 @@
         System(F, [a; vec(y)], vec(v))
     end
 
-    tracker = Tracker(
-        HC2.ParameterHomotopy(F, p, q),
-        a = 0.05,
-        high_precision = false,
-    )
+    tracker = Tracker(HC2.ParameterHomotopy(F, p, q), a = 0.05, high_precision = false)
     failed_res = track(tracker, s_p, 1, 0)
     @test HC2.is_terminated(failed_res.returncode)
     @test !failed_res.high_precision_used

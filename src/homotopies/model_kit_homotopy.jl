@@ -10,8 +10,7 @@ end
 
 ModelKitHomotopy(H::ModelKit.Homotopy, parameters = ComplexF64[]) =
     ModelKitHomotopy(ModelKit.compile(H), parameters)
-ModelKitHomotopy(H::ModelKit.CompiledHomotopy) =
-    ModelKitHomotopy(H, ComplexF64[])
+ModelKitHomotopy(H::ModelKit.CompiledHomotopy) = ModelKitHomotopy(H, ComplexF64[])
 
 Base.size(H::ModelKitHomotopy) = size(H.homotopy)
 

@@ -130,8 +130,7 @@ Base.convert(::Type{BigFloat}, a::DoubleF64) = big(a.hi) + big(a.lo)
 Base.BigFloat(a::DoubleF64) = convert(BigFloat, a)
 Base.convert(::Type{T}, a::DoubleF64) where {T<:Integer} = convert(T, a.hi)
 Base.convert(::Type{Integer}, a::DoubleF64) = convert(Int64, a.hi)
-Base.convert(::Type{BigInt}, a::DoubleF64) =
-    convert(BigInt, big(a.hi) + big(a.lo))
+Base.convert(::Type{BigInt}, a::DoubleF64) = convert(BigInt, big(a.hi) + big(a.lo))
 
 Base.convert(::Type{DoubleF64}, x::DoubleF64) = x
 Base.convert(::Type{DoubleF64}, x::AbstractFloat) = DoubleF64(x)
@@ -282,12 +281,12 @@ Divide two `Float64`s with `DoubleF64` precision.
 """
 @inline function wide_div(a::Float64, b::Float64)
     q1 = a / b
-        # Compute a - q1 * b
+    # Compute a - q1 * b
     p1, p2 = two_prod(q1, b)
     s, e = two_diff(a, p1)
     e -= p2
 
-        # get next approximation
+    # get next approximation
     q2 = (s + e) / b
 
     s, e = quick_two_sum(q1, q2)
@@ -298,16 +297,16 @@ end
 @inline function /(a::DoubleF64, b::Float64)
     q1 = a.hi / b
 
-        # Compute  this - q1 * d
+    # Compute  this - q1 * d
     p1, p2 = two_prod(q1, b)
     s, e = two_diff(a.hi, p1)
     e += a.lo
     e -= p2
 
-        # get next approximation.
+    # get next approximation.
     q2 = (s + e) / b
 
-        # renormalize
+    # renormalize
     hi, lo = quick_two_sum(q1, q2)
 
     DoubleF64(hi, lo)
@@ -317,16 +316,16 @@ end
 @inline function /(a::DoubleF64, b::DoubleF64)
     q1 = a.hi / b.hi  # approximate quotient
 
-        # compute  this - q1 * dd
+    # compute  this - q1 * dd
     r = b * q1
     s1, s2 = two_diff(a.hi, r.hi)
     s2 -= r.lo
     s2 += a.lo
 
-        # get next approximation
+    # get next approximation
     q2 = (s1 + s2) / b.hi
 
-        # renormalize
+    # renormalize
     hi, lo = quick_two_sum(q1, q2)
 
     DoubleF64(hi, lo)
@@ -376,7 +375,7 @@ Convert `x` to a DoubleF64 and then compute `x*x`.
     hi, lo = two_square(a)
     return DoubleF64(hi, lo)
 end
-    # Implementation adapted from Base
+# Implementation adapted from Base
 @inline function power_by_squaring(x::DoubleF64, p::Integer)
     if p == 1
         return copy(x)
@@ -439,7 +438,7 @@ Convert `x` to a DoubleF64 and then compute `sqrt(x)`.
 wide_sqrt(a::Float64) = sqrt(DoubleF64(a))
 
 
-    # COMPARISON & EQUALITY
+# COMPARISON & EQUALITY
 <(a::DoubleF64, b::DoubleF64) = a.hi + a.lo < b.hi + b.lo
 <(a::DoubleF64, b::Float64) = a.hi < b || (a.hi == b) && a.lo < 0.0
 <(a::Float64, b::DoubleF64) = a < b.hi || (a == b.hi) && b.lo > 0.0
@@ -461,32 +460,32 @@ Base.abs(a::DoubleF64) = a.hi < 0.0 ? -a : a
 Base.eps(::DoubleF64) = 4.93038065763132e-32 # 2^-104
 Base.eps(::Type{DoubleF64}) = 4.93038065763132e-32 # 2^-104
 
-    # Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
-    # Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
-    # Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
-    # Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
+# Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
+# Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
+# Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
+# Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
 
 Base.isnan(a::DoubleF64) = isnan(a.hi) || isnan(a.lo)
 Base.isinf(a::DoubleF64) = isinf(a.hi)
 Base.isfinite(a::DoubleF64) = isfinite(a.hi)
 
-    #
-    # ROUNDING
-    #
+#
+# ROUNDING
+#
 @inline function Base.round(a::DoubleF64, r::RoundingMode = RoundNearest)
     hi = round(a.hi, r)
     lo = 0.0
 
     if hi == a.hi
-            # High word is an integer already.  Round the low word.
+        # High word is an integer already.  Round the low word.
         lo = round(a.lo, r)
 
-            # Renormalize. This is needed if hi = some integer, lo = 1/2.
+        # Renormalize. This is needed if hi = some integer, lo = 1/2.
         hi, lo = quick_two_sum(hi, lo)
     else
-            # High word is not an integer.
+        # High word is not an integer.
         if abs(hi - a.hi) == 0.5 && a.lo < 0.0
-                # There is a tie in the high word, consult the low word to break the tie.
+            # There is a tie in the high word, consult the low word to break the tie.
             hi -= 1.0
         end
     end
@@ -506,7 +505,7 @@ end
     DoubleF64(hi, lo)
 end
 
-@inline function Base.floor(::Type{I}, a::DoubleF64)  where {I<:Integer}
+@inline function Base.floor(::Type{I}, a::DoubleF64) where {I<:Integer}
     hi = floor(I, a.hi)
     lo = zero(I)
 
@@ -530,7 +529,7 @@ end
     DoubleF64(hi, lo)
 end
 
-@inline function Base.ceil(::Type{I}, a::DoubleF64)  where {I<:Integer}
+@inline function Base.ceil(::Type{I}, a::DoubleF64) where {I<:Integer}
     hi = ceil(I, a.hi)
     lo = zero(I)
 
@@ -546,29 +545,29 @@ Base.trunc(::Type{I}, a::DoubleF64) where {I<:Integer} =
     a.hi ≥ 0.0 ? floor(I, a) : ceil(I, a)
 Base.isinteger(x::DoubleF64) = iszero(x - trunc(x))
 
-    # import Random: AbstractRNG, GLOBAL_RNG
-    # function Base.rand(rng::AbstractRNG, S::Type{DoubleF64})
-    #     u = rand(rng, UInt64)
-    #     f = Float64(u)
-    #     uf = UInt64(f)
-    #     ur = uf > u ? uf - u : u - uf
-    #     DoubleF64(5.421010862427522e-20 * f, 5.421010862427522e-20 * Float64(ur))
-    # end
-    # Base.rand(::Type{DoubleF64}) = rand(GLOBAL_RNG, DoubleF64)
-    #
-    # function Base.rand(rng::AbstractRNG, T::Type{<:DoubleF64}, dims::Vararg{Int, N}) where N
-    #     rands = Array{T}(dims)
-    #     for l in eachindex(rands)
-    #         rands[l] = rand(rng, T)
-    #     end
-    #     rands
-    # end
-    # Base.rand(T::Type{<:DoubleF64}, dims::Vararg{Int, N}) where N = rand(GLOBAL_RNG, T, dims)
-    #
-    # Base.rand(::Type{Complex{DoubleF64}}) = rand(Complex{DoubleF64})
-    # Base.rand(::Type{Complex{DoubleF64}}, dims::Vararg{Int, N}) where N = rand(Complex{DoubleF64}, dims)
-    # Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}) = rand(rng, Complex{DoubleF64})
-    # Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}, dims::Vararg{Int, N}) where N = rand(rng, Complex{DoubleF64}, dims)
+# import Random: AbstractRNG, GLOBAL_RNG
+# function Base.rand(rng::AbstractRNG, S::Type{DoubleF64})
+#     u = rand(rng, UInt64)
+#     f = Float64(u)
+#     uf = UInt64(f)
+#     ur = uf > u ? uf - u : u - uf
+#     DoubleF64(5.421010862427522e-20 * f, 5.421010862427522e-20 * Float64(ur))
+# end
+# Base.rand(::Type{DoubleF64}) = rand(GLOBAL_RNG, DoubleF64)
+#
+# function Base.rand(rng::AbstractRNG, T::Type{<:DoubleF64}, dims::Vararg{Int, N}) where N
+#     rands = Array{T}(dims)
+#     for l in eachindex(rands)
+#         rands[l] = rand(rng, T)
+#     end
+#     rands
+# end
+# Base.rand(T::Type{<:DoubleF64}, dims::Vararg{Int, N}) where N = rand(GLOBAL_RNG, T, dims)
+#
+# Base.rand(::Type{Complex{DoubleF64}}) = rand(Complex{DoubleF64})
+# Base.rand(::Type{Complex{DoubleF64}}, dims::Vararg{Int, N}) where N = rand(Complex{DoubleF64}, dims)
+# Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}) = rand(rng, Complex{DoubleF64})
+# Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}, dims::Vararg{Int, N}) where N = rand(rng, Complex{DoubleF64}, dims)
 
 function Base.decompose(a::DoubleF64)::Tuple{Int128,Int,Int}
     hi, lo = a.hi, a.lo
@@ -672,21 +671,21 @@ end
 Base.log10(a::DoubleF64) = log(a) / double_log10
 Base.log2(a::DoubleF64) = log(a) / double_log2
 function Base.log(a::DoubleF64)
-     # Strategy.  The Taylor series for log converges much more
-     # slowly than that of exp, due to the lack of the factorial
-     # term in the denominator.  Hence this routine instead tries
-     # to determine the root of the function
-         #
-     #     f(x) = exp(x) - a
-         #
-     # using Newton iteration.  The iteration is given by
-         #
-     #     x' = x - f(x)/f'(x)
-     #        = x - (1 - a * exp(-x))
-     #        = x + a * exp(-x) - 1.
-         #
-     # Only one iteration is needed, since Newton's iteration
-     # approximately doubles the number of digits per iteration.
+    # Strategy.  The Taylor series for log converges much more
+    # slowly than that of exp, due to the lack of the factorial
+    # term in the denominator.  Hence this routine instead tries
+    # to determine the root of the function
+    #
+    #     f(x) = exp(x) - a
+    #
+    # using Newton iteration.  The iteration is given by
+    #
+    #     x' = x - f(x)/f'(x)
+    #        = x - (1 - a * exp(-x))
+    #        = x + a * exp(-x) - 1.
+    #
+    # Only one iteration is needed, since Newton's iteration
+    # approximately doubles the number of digits per iteration.
 
     if isone(a)
         return zero(DoubleF64)
@@ -777,16 +776,16 @@ function sincos_taylor(a::DoubleF64)
 end
 
 function Base.sin(a::DoubleF64)
-        # Strategy.  To compute sin(x), we choose integers a, b so that
-        #
-        #    x = s + a * (pi/2) + b * (pi/16)
-        #
-        #  and |s| <= pi/32.  Using the fact that
-        #
-        #    sin(pi/16) = 0.5 * sqrt(2 - sqrt(2 + sqrt(2)))
-        #
-        #  we can compute sin(x) from sin(s), cos(s).  This greatly
-        #  increases the convergence of the sine Taylor series.
+    # Strategy.  To compute sin(x), we choose integers a, b so that
+    #
+    #    x = s + a * (pi/2) + b * (pi/16)
+    #
+    #  and |s| <= pi/32.  Using the fact that
+    #
+    #    sin(pi/16) = 0.5 * sqrt(2 - sqrt(2 + sqrt(2)))
+    #
+    #  we can compute sin(x) from sin(s), cos(s).  This greatly
+    #  increases the convergence of the sine Taylor series.
 
     if iszero(a)
         return zero(a)
@@ -807,12 +806,12 @@ function Base.sin(a::DoubleF64)
     abs_k = abs(k)
 
     if j < -2 || j > 2
-    # Cannot reduce modulo pi/2.
+        # Cannot reduce modulo pi/2.
         return double_nan
     end
 
     if (abs_k > 4)
-    # Cannot reduce modulo pi/16.
+        # Cannot reduce modulo pi/16.
         return double_nan
     end
 
@@ -865,12 +864,12 @@ function Base.cos(a::DoubleF64)
     abs_k = abs(k)
 
     if j < -2 || j > 2
-    # Cannot reduce modulo pi/2.
+        # Cannot reduce modulo pi/2.
         return double_nan
     end
 
     if (abs_k > 4)
-    # Cannot reduce modulo pi/16.
+        # Cannot reduce modulo pi/16.
         return double_nan
     end
 
@@ -924,12 +923,12 @@ function Base.sincos(a::DoubleF64)
     abs_k = abs(k)
 
     if abs_j > 2
-    # Cannot reduce modulo pi/2.
+        # Cannot reduce modulo pi/2.
         return double_nan, double_nan
     end
 
     if abs_k > 4
-    # Cannot reduce modulo pi/16.
+        # Cannot reduce modulo pi/16.
         return double_nan, double_nan
     end
 
@@ -960,21 +959,21 @@ end
 Base.atan(a::DoubleF64) = atan(a, one(a))
 
 function Base.atan(y::DoubleF64, x::DoubleF64)
-     # Strategy: Instead of using Taylor series to compute
-         # arctan, we instead use Newton's iteration to solve
-         # the equation
-         #
-         #    sin(z) = y/r    or    cos(z) = x/r
-         #
-         # where r = sqrt(x^2 + y^2).
-         # The iteration is given by
-         #
-         #    z' = z + (y - sin(z)) / cos(z)          (for equation 1)
-         #    z' = z - (x - cos(z)) / sin(z)          (for equation 2)
-         #
-         # Here, x and y are normalized so that x^2 + y^2 = 1.
-         # If |x| > |y|, then first iteration is used since the
-         # denominator is larger.  Otherwise, the second is used.
+    # Strategy: Instead of using Taylor series to compute
+    # arctan, we instead use Newton's iteration to solve
+    # the equation
+    #
+    #    sin(z) = y/r    or    cos(z) = x/r
+    #
+    # where r = sqrt(x^2 + y^2).
+    # The iteration is given by
+    #
+    #    z' = z + (y - sin(z)) / cos(z)          (for equation 1)
+    #    z' = z - (x - cos(z)) / sin(z)          (for equation 2)
+    #
+    # Here, x and y are normalized so that x^2 + y^2 = 1.
+    # If |x| > |y|, then first iteration is used since the
+    # denominator is larger.  Otherwise, the second is used.
     if iszero(x)
         if iszero(y)
             double_nan
@@ -1001,11 +1000,11 @@ function Base.atan(y::DoubleF64, x::DoubleF64)
     z = DoubleF64(atan(convert(Float64, y), convert(Float64, x)))
 
     if abs(xx.hi) > abs(yy.hi)
-    # Use Newton iteration 1.  z' = z + (y - sin(z)) / cos(z)
+        # Use Newton iteration 1.  z' = z + (y - sin(z)) / cos(z)
         sin_z, cos_z = sincos(z)
         z += (yy - sin_z) / cos_z
     else
-    # Use Newton iteration 2.  z' = z - (x - cos(z)) / sin(z)
+        # Use Newton iteration 2.  z' = z - (x - cos(z)) / sin(z)
         sin_z, cos_z = sincos(z)
         z -= (xx - cos_z) / sin_z
     end

@@ -35,10 +35,7 @@ function TotalDegreeStarts(degrees::Vector{Int})
     TotalDegreeStarts(degrees, iterator)
 end
 function Base.show(io::IO, iter::TotalDegreeStarts)
-    print(
-        io,
-        "$(length(iter)) total degree start solutions for degrees $(iter.degrees)",
-    )
+    print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
 end
 
 function Base.iterate(iter::TotalDegreeStarts)
@@ -75,8 +72,10 @@ function total_degree_homotopy(
     parameters::AbstractVector = ComplexF64[],
     gamma = cis(2π * rand()),
 )
-    length(f) == length(vars) || throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
-    length(params) == length(parameters) || throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
+    length(f) == length(vars) ||
+    throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
+    length(params) == length(parameters) ||
+    throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
     D = ModelKit.degree(f, vars)
 

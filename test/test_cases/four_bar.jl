@@ -5,14 +5,18 @@
     gamma_hat = [Variable(Symbol(:gamma_hat, i)) for i = 1:8]
     delta_hat = [Variable(Symbol(:delta_hat, i)) for i = 1:8]
     #system of polynomials
-    D1 = [(a_hat * x - delta_hat[i] * x) * gamma[i] +
-          (a * x_hat - delta[i] * x_hat) * gamma_hat[i] +
-          (a_hat - x_hat) * delta[i] + (a - x) * delta_hat[i] -
-          delta[i] * delta_hat[i] for i = 1:8]
-    D2 = [(b_hat * y - delta_hat[i] * y) * gamma[i] +
-          (b * y_hat - delta[i] * y_hat) * gamma_hat[i] +
-          (b_hat - y_hat) * delta[i] + (b - y) * delta_hat[i] -
-          delta[i] * delta_hat[i] for i = 1:8]
+    D1 = map(1:8) do i
+        (a_hat * x - delta_hat[i] * x) * gamma[i] +
+        (a * x_hat - delta[i] * x_hat) * gamma_hat[i] +
+        (a_hat - x_hat) * delta[i] +
+        (a - x) * delta_hat[i] - delta[i] * delta_hat[i]
+    end
+    D2 = map(1:8) do i
+        (b_hat * y - delta_hat[i] * y) * gamma[i] +
+        (b * y_hat - delta[i] * y_hat) * gamma_hat[i] +
+        (b_hat - y_hat) * delta[i] +
+        (b - y) * delta_hat[i] - delta[i] * delta_hat[i]
+    end
     D3 = [gamma[i] * gamma_hat[i] + gamma[i] + gamma_hat[i] for i = 1:8]
     F = System(
         [D1; D2; D3],

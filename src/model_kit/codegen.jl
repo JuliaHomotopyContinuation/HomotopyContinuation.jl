@@ -3,10 +3,8 @@ export compile
 #####################
 ## CompiledSystem  ##
 #####################
-const TSYSTEM_TABLE = Dict{
-    UInt,
-    Vector{Tuple{Vector{Expression},Vector{Variable},Vector{Variable}}},
-}()
+const TSYSTEM_TABLE =
+    Dict{UInt,Vector{Tuple{Vector{Expression},Vector{Variable},Vector{Variable}}}}()
 
 struct CompiledSystem{HI}
     nexpressions::Int
@@ -59,15 +57,8 @@ Base.length(CS::CompiledSystem) = CS.nexpressions
 ## CompiledHomotopy ##
 ######################
 
-const THOMOTOPY_TABLE = Dict{
-    UInt,
-    Vector{Tuple{
-        Vector{Expression},
-        Vector{Variable},
-        Variable,
-        Vector{Variable},
-    },},
-}()
+const THOMOTOPY_TABLE =
+    Dict{UInt,Vector{Tuple{Vector{Expression},Vector{Variable},Variable,Vector{Variable}}}}()
 
 struct CompiledHomotopy{HI}
     nexpressions::Int
@@ -89,7 +80,7 @@ function CompiledHomotopy(
     params = Symbol.(param_order)
 
     if haskey(THOMOTOPY_TABLE, h)
-    # check that it is identical
+        # check that it is identical
         for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
             if vi == val
                 return CompiledHomotopy{(h, i)}(n, vars, params)
@@ -125,8 +116,7 @@ Compile the given system. Returns a `CompiledSystem`.
 Compile the given homotopy. Returns a `CompiledHomotopy`.
 """
 compile(F::System) = CompiledSystem(F.expressions, F.variables, F.parameters)
-compile(H::Homotopy) =
-    CompiledHomotopy(H.expressions, H.variables, H.t, H.parameters)
+compile(H::Homotopy) = CompiledHomotopy(H.expressions, H.variables, H.t, H.parameters)
 
 #############
 ## CODEGEN ##
@@ -134,21 +124,10 @@ compile(H::Homotopy) =
 
 boundscheck_var_map(F::System; kwargs...) =
     boundscheck_var_map(F.expressions, F.variables, F.parameters; kwargs...)
-boundscheck_var_map(H::Homotopy; kwargs...) = boundscheck_var_map(
-    H.expressions,
-    H.variables,
-    H.parameters,
-    H.t;
-    kwargs...,
-)
+boundscheck_var_map(H::Homotopy; kwargs...) =
+    boundscheck_var_map(H.expressions, H.variables, H.parameters, H.t; kwargs...)
 
-function boundscheck_var_map(
-    exprs,
-    vars,
-    params,
-    t = nothing;
-    jacobian::Bool = false,
-)
+function boundscheck_var_map(exprs, vars, params, t = nothing; jacobian::Bool = false)
     n = length(exprs)
     m = length(vars)
     l = length(params)
@@ -184,10 +163,7 @@ function add_assignement!(D::Dict{Symbol,Vector{Expr}}, id::Symbol, e::Expr)
     D
 end
 
-function _evaluate!_impl(::Type{T},) where {T<:Union{
-    CompiledSystem,
-    CompiledHomotopy,
-}}
+function _evaluate!_impl(::Type{T}) where {T<:Union{CompiledSystem,CompiledHomotopy}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I)
     slp = let
@@ -206,10 +182,7 @@ function _evaluate!_impl(::Type{T},) where {T<:Union{
     end
 end
 
-function _jacobian!_impl(::Type{T},) where {T<:Union{
-    CompiledSystem,
-    CompiledHomotopy,
-}}
+function _jacobian!_impl(::Type{T}) where {T<:Union{CompiledSystem,CompiledHomotopy}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I; jacobian = true)
 
@@ -225,11 +198,7 @@ function _jacobian!_impl(::Type{T},) where {T<:Union{
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
                 if J[i, j] ∉ vars && J[i, j] ∉ params
-                    add_assignement!(
-                        assignements,
-                        J[i, j],
-                        :(U[$i, $j] = $(J[i, j])),
-                    )
+                    add_assignement!(assignements, J[i, j], :(U[$i, $j] = $(J[i, j])))
                 else
                     push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
                 end
@@ -249,10 +218,9 @@ function _jacobian!_impl(::Type{T},) where {T<:Union{
     end
 end
 
-function _evaluate_and_jacobian!_impl(::Type{T},) where {T<:Union{
-    CompiledSystem,
-    CompiledHomotopy,
-}}
+function _evaluate_and_jacobian!_impl(
+    ::Type{T},
+) where {T<:Union{CompiledSystem,CompiledHomotopy}}
     I = interpret(T)
     checks, var_map = boundscheck_var_map(I; jacobian = true)
 
@@ -271,11 +239,7 @@ function _evaluate_and_jacobian!_impl(::Type{T},) where {T<:Union{
         for j = 1:size(J, 2), i = 1:size(J, 1)
             if J[i, j] isa Symbol
                 if J[i, j] ∉ vars && J[i, j] ∉ params
-                    add_assignement!(
-                        assignements,
-                        J[i, j],
-                        :(U[$i, $j] = $(J[i, j])),
-                    )
+                    add_assignement!(assignements, J[i, j], :(U[$i, $j] = $(J[i, j])))
                 else
                     push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
                 end
@@ -399,13 +363,7 @@ end
 Evaluate `T` and its Jacobian for variables `x` and parameters `p` and
 store result in `u`.
 """
-@generated function evaluate_and_jacobian!(
-    u,
-    U,
-    T::CompiledSystem,
-    x,
-    p = nothing,
-)
+@generated function evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
     _evaluate_and_jacobian!_impl(T)
 end
 
@@ -415,14 +373,7 @@ end
 Evaluate `T` and its Jacobian for variables `x`, `t` and parameters `p` and
 store result in `u`.
 """
-@generated function evaluate_and_jacobian!(
-    u,
-    U,
-    T::CompiledHomotopy,
-    x,
-    t,
-    p = nothing,
-)
+@generated function evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, t, p = nothing)
     _evaluate_and_jacobian!_impl(T)
 end
 

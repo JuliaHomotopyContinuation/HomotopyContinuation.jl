@@ -39,20 +39,14 @@ end
 Base.size(MW::MatrixWorkspace) = size(MW.A)
 
 import Base: @propagate_inbounds
-@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer) =
-    getindex(MW.A, i)
+@propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer) = getindex(MW.A, i)
 @propagate_inbounds Base.getindex(MW::MatrixWorkspace, i::Integer, j::Integer) =
     getindex(MW.A, i, j)
 @propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer) =
     setindex!(MW.A, x, i)
-@propagate_inbounds Base.setindex!(
-    MW::MatrixWorkspace,
-    x,
-    i::Integer,
-    j::Integer,
-) = setindex!(MW.A, x, i, j)
-@propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) =
-    copyto!(MW.A, A)
+@propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) =
+    setindex!(MW.A, x, i, j)
+@propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
 
 """
     updated!(MW::MatrixWorkspace)
@@ -164,8 +158,7 @@ end
 ##########
 ## ldiv ##
 ##########
-@inline _ipiv!(A::LA.LU, b::AbstractVector) =
-    apply_ipiv!(b, 1:length(A.ipiv), A.ipiv)
+@inline _ipiv!(A::LA.LU, b::AbstractVector) = apply_ipiv!(b, 1:length(A.ipiv), A.ipiv)
 @inline _inverse_ipiv!(A::LA.LU, b::StridedVecOrMat) =
     apply_ipiv!(b, length(A.ipiv):-1:1, A.ipiv)
 @inline function apply_ipiv!(b::AbstractVector, range::OrdinalRange, ipiv)
@@ -176,20 +169,12 @@ end
     end
     b
 end
-@propagate_inbounds function _swap_rows!(
-    B::StridedVector,
-    i::Integer,
-    j::Integer,
-)
+@propagate_inbounds function _swap_rows!(B::StridedVector, i::Integer, j::Integer)
     B[i], B[j] = B[j], B[i]
     B
 end
 
-@inline function ldiv_upper!(
-    A::AbstractMatrix,
-    b::AbstractVector,
-    x::AbstractVector = b,
-)
+@inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 2)
     @inbounds for j = n:-1:1
         # singular_exception && iszero(A[j, j]) && throw(LA.SingularException(j))
@@ -223,11 +208,7 @@ function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
     x
 end
 
-function ldiv_adj_unit_lower!(
-    A::AbstractMatrix,
-    b::AbstractVector,
-    x::AbstractVector = b,
-)
+function ldiv_adj_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 1)
     @inbounds for j = n:-1:1
         z = b[j]
@@ -459,7 +440,7 @@ function iterative_refinement!(
     b::AbstractVector,
     norm = nothing;
     row_scaling::Bool = true,
-    fixed_precision::Bool = false
+    fixed_precision::Bool = false,
 )
     JM.ldivs[] += 1
     if fixed_precision

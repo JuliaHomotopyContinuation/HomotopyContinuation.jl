@@ -16,33 +16,34 @@ import .ModelKit
 include("DoubleDouble.jl")
 using .DoubleDouble
 
-using .ModelKit: @var,
-                 @unique_var,
-                 Variable,
-                 Expression,
-                 variables,
-                 nvariables,
-                 subs,
-                 evaluate,
-                 differentiate,
-                 monomials,
-                 expand,
-                 System,
-                 Homotopy
+using .ModelKit:
+    @var,
+    @unique_var,
+    Variable,
+    Expression,
+    variables,
+    nvariables,
+    subs,
+    evaluate,
+    differentiate,
+    monomials,
+    expand,
+    System,
+    Homotopy
 
 export @var,
-       @unique_var,
-       Variable,
-       Expression,
-       variables,
-       nvariables,
-       subs,
-       evaluate,
-       differentiate,
-       monomials,
-       expand,
-       System,
-       Homotopy
+    @unique_var,
+    Variable,
+    Expression,
+    variables,
+    nvariables,
+    subs,
+    evaluate,
+    differentiate,
+    monomials,
+    expand,
+    System,
+    Homotopy
 
 include("norm.jl")
 include("linear_algebra.jl")

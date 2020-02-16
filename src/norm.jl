@@ -66,8 +66,8 @@ function WeightedNorm(
     weights::Vector{Float64},
     norm::AbstractNorm;
     scale_min = sqrt(eps()),
-    scale_abs_min = min(scale_min^2,  sqrt(eps())),
-    scale_max = exp2(div(1023,2)),
+    scale_abs_min = min(scale_min^2, sqrt(eps())),
+    scale_max = exp2(div(1023, 2)),
 )
     opts = WeightedNormOptions(scale_min, scale_abs_min, scale_max)
     WeightedNorm(weights, norm, opts)
