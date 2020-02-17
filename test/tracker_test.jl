@@ -45,6 +45,14 @@
         @test round.(Int, real.(first.(Xs)) .* 10) == collect(10:20)
     end
 
+    @testset "path info" begin
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
+        tracker = Tracker(ParameterHomotopy(F, [1, 0], [2, 4]))
+        info = path_info(tracker, [1,1], 1, 0)
+        @test !isempty(sprint(show, info))
+    end
+
     include("test_cases/steiner_higher_prec.jl")
     include("test_cases/four_bar.jl")
 end

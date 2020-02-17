@@ -40,7 +40,7 @@ function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
     p = order(tracker.predictor)
 
     init!(tracker, x₀, t₁, t₀)
-    while is_tracking(tracker.state.condition)
+    while is_tracking(tracker.state.code)
         push!(s, real(state.t))
         push!(Δs, real(state.Δt))
         e = tracker.state.norm(local_error(tracker.predictor))
@@ -49,7 +49,7 @@ function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
         push!(ω, state.ω)
         push!(accuracy, state.accuracy)
         push!(μ, state.μ)
-        push!(high_prec, state.high_prec_residual)
+        push!(high_prec, state.use_extended_prec)
         step!(tracker, debug)
 
         push!(accepted_rejected, !state.last_step_failed)
@@ -71,7 +71,7 @@ function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
         Δx_t,
         Δx̂x,
         high_prec,
-        tracker.state.condition,
+        tracker.state.code,
         state.jacobian.factorizations[],
         state.jacobian.ldivs[],
     )
