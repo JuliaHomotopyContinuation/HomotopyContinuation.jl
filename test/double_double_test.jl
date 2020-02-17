@@ -64,7 +64,7 @@ const DD = HomotopyContinuation2.DoubleDouble
 
     @test DoubleF64(0.0)^0.14 == 1.0
 
-    for k = 1:200
+    for k = 1:10
         x = DoubleF64(rand()) * 20 - 10
         y = DoubleF64(rand()) * 20 - 10
         @test x * y ≈ big(x) * big(y) atol = 1e-29

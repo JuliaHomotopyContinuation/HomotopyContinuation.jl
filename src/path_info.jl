@@ -15,12 +15,12 @@ struct PathInfo
     Δx̂x::Vector{Float64}
     high_prec::Vector{Bool}
     # total info
-    return_code::TrackerCondition.conditions
+    return_code::TrackerReturnCode.codes
     n_factorizations::Int
     n_ldivs::Int
 end
 
-function path_info(tracker::Tracker, x₀, t₁ = 0.0, t₀ = 1.0; debug::Bool = false)
+function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
     state = tracker.state
 
     s = Float64[]

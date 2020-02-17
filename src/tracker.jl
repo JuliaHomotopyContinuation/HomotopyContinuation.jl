@@ -8,10 +8,6 @@ export Tracker,
     accepted_steps,
     rejected_steps
 
-###########
-# Options #
-###########
-
 """
     TrackerOptions
 
@@ -24,34 +20,29 @@ Base.@kwdef mutable struct TrackerOptions
     β_a::Float64 = 1.0
     β_ω::Float64 = 10.0
     β_τ::Float64 = 0.75
-    high_precision::Bool = true
+    extended_precision::Bool = true
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
-
-#########
-# State #
-#########
-
-module TrackerCondition
+module TrackerReturnCode
 
 @doc """
-    TrackerCondition.conditions
+    TrackerReturnCode.codes
 
 The possible states a `CoreTracker` can have are
 
-* `TrackerCondition.success`: Indicates a successfull completed tracking
-* `TrackerCondition.tracking`: The tracking is still in progress
-* `TrackerCondition.terminated_maximal_iterations`: Tracking terminated since maximal iterations reached.
-* `TrackerCondition.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
-* `TrackerCondition.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
-* `TrackerCondition.terminated_step_size_too_small`
+* `TrackerReturnCode.tracking`: The tracking is still in progress
+* `TrackerReturnCode.success`: Indicates a successfull completed tracking
+* `TrackerReturnCode.terminated_maximal_iterations`: Tracking terminated since maximal iterations reached.
+* `TrackerReturnCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerReturnCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
+* `TrackerReturnCode.terminated_step_size_too_small`
 """
-@enum conditions begin
-    success
+@enum codes begin
     tracking
+    success
     terminated_maximal_iterations
     terminated_accuracy_limit
     terminated_ill_conditioned
@@ -64,36 +55,39 @@ end
 
 
 """
-    is_success(S::TrackerCondition.conditions)
+    is_success(S::TrackerReturnCode.codes)
 
 Returns `true` if `S` indicates a success in the path tracking.
 """
-is_success(S) = S == TrackerCondition.success
+is_success(S) = S == TrackerReturnCode.success
 
 """
-    is_terminated(S::TrackerCondition.conditions)
+    is_terminated(S::TrackerReturnCode.codes)
 
 Returns `true` if `S` indicates that the path tracking got terminated. This is not `true`
 if `is_success(S)` is `true`.
 """
-is_terminated(S::TrackerCondition.conditions) =
-    S ≠ TrackerCondition.tracking && S ≠ TrackerCondition.success
+is_terminated(S::TrackerReturnCode.codes) =
+    S ≠ TrackerReturnCode.tracking && S ≠ TrackerReturnCode.success
 
 """
-    is_invalid_startvalue(S::TrackerCondition.conditions)
+    is_invalid_startvalue(S::TrackerReturnCode.codes)
 
 Returns `true` if `S` indicates that the path tracking got terminated since the start
 value was not a zero.
 """
-is_invalid_startvalue(S::TrackerCondition.conditions) =
-    S == TrackerCondition.terminated_invalid_startvalue
+is_invalid_startvalue(S::TrackerReturnCode.codes) =
+    S == TrackerReturnCode.terminated_invalid_startvalue
 
 """
-    is_tracking(S::TrackerCondition.conditions)
+    is_tracking(S::TrackerReturnCode.codes)
 
 Returns `true` if `S` indicates that the path tracking is not yet finished.
 """
-is_tracking(S::TrackerCondition.conditions) = S == TrackerCondition.tracking
+is_tracking(S::TrackerReturnCode.codes) = S == TrackerReturnCode.tracking
+
+
+# STATE
 
 mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     x::Vector{ComplexF64} # current x
@@ -110,13 +104,13 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     μ::Float64 # limit accuracy
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
-    high_prec_residual::Bool
-    used_high_prec::Bool
+    use_extended_prec::Bool
+    used_extended_prec::Bool
 
     norm::WeightedNorm{InfNorm}
     jacobian::Jacobian{M}
 
-    condition::TrackerCondition.conditions
+    code::TrackerReturnCode.codes
 
     accepted_steps::Int
     rejected_steps::Int
@@ -127,23 +121,17 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     x = Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
-
     segment = ComplexLineSegment(t₁, t₀)
     s = s′ = DoubleF64(0.0)
-
     Δs_prev = 0.0
-
     accuracy = 0.0
     μ = eps()
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
-    used_high_prec = high_prec_residual = false
-
+    used_extended_prec = use_extended_prec = false
     JM = Jacobian(zeros(ComplexF64, size(H)))
-
-    condition = TrackerCondition.tracking
-
+    condition = TrackerReturnCode.tracking
     accepted_steps = rejected_steps = 0
     last_step_failed = true
 
@@ -160,8 +148,8 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
         μ,
         τ,
         norm_Δx₀,
-        high_prec_residual,
-        used_high_prec,
+        use_extended_prec,
+        used_extended_prec,
         norm,
         JM,
         condition,
@@ -188,8 +176,10 @@ end
 
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
+# RESULT
+
 struct TrackerResult{V<:AbstractVector}
-    returncode::TrackerCondition.conditions
+    returncode::TrackerReturnCode.codes
     x::V
     t::ComplexF64
     accuracy::Float64
@@ -197,20 +187,20 @@ struct TrackerResult{V<:AbstractVector}
     μ::Float64
     accepted_steps::Int
     rejected_steps::Int
-    high_precision_used::Bool
+    extended_precision_used::Bool
 end
 
 function TrackerResult(state::TrackerState)
     TrackerResult(
-        state.condition,
+        state.code,
         copy(state.x),
-        state.segment[state.s],
+        state.t,
         state.accuracy,
         state.ω,
         state.μ,
         state.accepted_steps,
         state.rejected_steps,
-        state.used_high_prec,
+        state.used_extended_prec,
     )
 end
 
@@ -252,6 +242,8 @@ rejected_steps(result::TrackerResult) = result.rejected_steps
 Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
 
+
+# TRACKER
 
 struct Tracker{H<:AbstractHomotopy,P<:AbstractPredictorCache,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
@@ -298,7 +290,7 @@ state(tracker::Tracker) = tracker.state
 # Step Size
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
-## intial step size
+# intial step size
 function initial_step_size(
     state::TrackerState,
     predictor::AbstractPredictorCache,
@@ -347,16 +339,16 @@ end
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
     if state.s ≥ length(state.segment)
-        state.condition = TrackerCondition.success
+        state.code = TrackerReturnCode.success
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
-        state.condition = TrackerCondition.terminated_maximal_iterations
+        state.code = TrackerReturnCode.terminated_maximal_iterations
     elseif state.ω * state.μ > options.a * _h(options.a)
-        state.condition = TrackerCondition.terminated_accuracy_limit
+        state.code = TrackerReturnCode.terminated_accuracy_limit
     elseif state.s′ == state.s || fast_abs(state.Δt) < eps(fast_abs(state.t))
-        state.condition = TrackerCondition.terminated_step_size_too_small
+        state.code = TrackerReturnCode.terminated_step_size_too_small
     elseif isnan(state.s′) # catch any NaNs produced somewhere
-        state.condition = TrackerCondition.terminated_unknown
+        state.code = TrackerReturnCode.terminated_unknown
     end
     nothing
 end
@@ -385,10 +377,10 @@ function init!(
     state.s = state.s′ = state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
-    state.used_high_prec = state.high_prec_residual = false
+    state.used_extended_prec = state.use_extended_prec = false
     init!(norm, x)
     init!(jacobian)
-    state.condition = TrackerCondition.tracking
+    state.code = TrackerReturnCode.tracking
     state.accepted_steps = state.rejected_steps = 0
     state.last_step_failed = true
 
@@ -409,7 +401,7 @@ function init!(
     end
 
     if !valid
-        state.condition = TrackerCondition.terminated_invalid_startvalue
+        state.code = TrackerReturnCode.terminated_invalid_startvalue
     end
 
     # initialize the predictor
@@ -427,23 +419,23 @@ function update_precision!(tracker::Tracker, μ_low)
     @unpack μ, ω, x, t, jacobian, norm = state
     @unpack a = options
 
-    options.high_precision || return false
+    options.extended_precision || return false
 
-    if state.high_prec_residual && !isnan(μ_low)
+    if state.use_extended_prec && !isnan(μ_low)
         # check if we can go low again
-        if μ_low * ω < a^7 * _h(a)
-            state.high_prec_residual = false
+        if μ_low * ω < a * (a^3)^2 * _h(a)
+            state.use_extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a^5 * _h(a)
-        state.high_prec_residual = true
-        state.used_high_prec = true
+    elseif μ * ω > a * (a^2)^2 * _h(a)
+        state.use_extended_prec = true
+        state.used_extended_prec = true
         # do one refinement step
-        μ = high_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+        μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
         state.μ = max(μ, eps())
     end
 
-    state.high_prec_residual
+    state.use_extended_prec
 end
 
 function step!(tracker::Tracker, debug::Bool = false)
@@ -477,7 +469,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        high_precision = state.high_prec_residual,
+        extended_precision = state.use_extended_prec,
     )
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
@@ -512,11 +504,11 @@ end
 function track!(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
     init!(tracker, x, t₁, t₀)
 
-    while is_tracking(tracker.state.condition)
+    while is_tracking(tracker.state.code)
         step!(tracker, debug)
     end
 
-    tracker.state.condition
+    tracker.state.code
 end
 
 function track(tracker::Tracker, x, t₁, t₀; debug::Bool = false)

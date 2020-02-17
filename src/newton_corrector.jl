@@ -33,7 +33,7 @@ struct NewtonCorrector
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
     r̄::Vector{ComplexF64}
-    x_high::Vector{ComplexDF64}
+    x_extended::Vector{ComplexDF64}
 end
 
 function NewtonCorrector(a::Float64, (m, n)::NTuple{2,Int})
@@ -41,11 +41,11 @@ function NewtonCorrector(a::Float64, (m, n)::NTuple{2,Int})
     Δx = zeros(ComplexF64, n)
     r = zeros(ComplexF64, m)
     r̄ = zero(r)
-    x_high = zeros(ComplexDF64, n)
-    NewtonCorrector(a, h_a, Δx, r, r̄, x_high)
+    x_extended = zeros(ComplexDF64, n)
+    NewtonCorrector(a, h_a, Δx, r, r̄, x_extended)
 end
 
-function high_prec_refinement_step!(
+function extended_prec_refinement_step!(
     x̄::AbstractVector,
     NC::NewtonCorrector,
     H::AbstractHomotopy,
@@ -53,16 +53,16 @@ function high_prec_refinement_step!(
     t::Number,
     JM::Jacobian,
     norm::AbstractNorm;
-    high_precision::Bool = false,
+    extended_precision::Bool = false,
 )
-    @unpack Δx, r, x_high = NC
+    @unpack Δx, r, x_extended = NC
     evaluate_and_jacobian!(r, jacobian(JM), H, x, t)
-    x_high .= x
-    evaluate!(r, H, x_high, ComplexDF64(t))
+    x_extended .= x
+    evaluate!(r, H, x_extended, ComplexDF64(t))
     LA.ldiv!(Δx, updated!(JM), r, norm)
     x̄ .= x .- Δx
-    x_high .= x̄
-    evaluate!(r, H, x_high, ComplexDF64(t))
+    x_extended .= x̄
+    evaluate!(r, H, x_extended, ComplexDF64(t))
     LA.ldiv!(Δx, JM, r, norm)
     norm(Δx)
 end
@@ -77,9 +77,9 @@ function newton!(
     norm::AbstractNorm;
     μ::Float64 = throw(UndefKeywordError(:μ)),
     ω::Float64 = throw(UndefKeywordError(:ω)),
-    high_precision::Bool = false,
+    extended_precision::Bool = false,
 )
-    @unpack a, h_a, Δx, r, r̄, x_high = NC
+    @unpack a, h_a, Δx, r, r̄, x_extended = NC
 
     x̄ .= x₀
     xᵢ₊₃ = xᵢ₊₂ = xᵢ₊₁ = xᵢ = x̄
@@ -88,12 +88,12 @@ function newton!(
     ā = a
     for i = 0:10
         evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
-        if high_precision
-            x_high .= xᵢ
-            evaluate!(r, H, x_high, ComplexDF64(t))
+        if extended_precision
+            x_extended .= xᵢ
+            evaluate!(r, H, x_extended, ComplexDF64(t))
         end
         LA.ldiv!(Δxᵢ, updated!(JM), r, norm)
-        if i > 0 && high_precision
+        if i > 0 && extended_precision
             iterative_refinement!(Δxᵢ, JM, r, norm)
         end
         xᵢ₊₁ .= xᵢ .- Δxᵢ
@@ -116,21 +116,21 @@ function newton!(
         elseif ω * norm_Δxᵢ^2 < 2 * μ * sqrt(1 - 2 * h_a)
             evaluate_and_jacobian!(r, jacobian(JM), H, xᵢ, t)
             updated!(JM)
-            if high_precision
+            if extended_precision
                 LA.ldiv!(Δxᵢ, JM, r)
                 μ_low = norm(Δxᵢ)
-                x_high .= xᵢ
-                evaluate!(r, H, x_high, ComplexDF64(t))
+                x_extended .= xᵢ
+                evaluate!(r, H, x_extended, ComplexDF64(t))
             end
             LA.ldiv!(Δxᵢ, JM, r)
-            if high_precision
+            if extended_precision
                 iterative_refinement!(Δxᵢ, JM, r)
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
 
             # TODO: Sometimes a second iteration?
-            if i == 0 && !high_precision
+            if i == 0 && !extended_precision
                 evaluate!(r, H, xᵢ, t)
                 LA.ldiv!(Δxᵢ, JM, r)
                 μ = norm(Δxᵢ)

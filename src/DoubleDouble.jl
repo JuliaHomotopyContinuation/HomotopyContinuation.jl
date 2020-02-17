@@ -1,9 +1,8 @@
 module DoubleDouble
 
-import Printf
-
 export DoubleF64, ComplexDF64
 
+import Printf
 import Base: +, -, *, /, ^, <, ==, <=
 
 # Basic building blocks
