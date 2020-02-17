@@ -6,7 +6,8 @@ export Tracker,
     solution,
     steps,
     accepted_steps,
-    rejected_steps
+    rejected_steps,
+    iterator
 
 """
     TrackerOptions
@@ -16,6 +17,7 @@ for all possible options.
 """
 Base.@kwdef mutable struct TrackerOptions
     max_steps::Int = 1_000
+    max_step_size::Float64 = Inf
     a::Float64 = 0.125
     β_a::Float64 = 1.0
     β_ω::Float64 = 10.0
@@ -180,7 +182,7 @@ steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
 struct TrackerResult{V<:AbstractVector}
     returncode::TrackerReturnCode.codes
-    x::V
+    solution::V
     t::ComplexF64
     accuracy::Float64
     ω::Float64
@@ -216,7 +218,7 @@ is_success(result::TrackerResult) = is_success(result.returncode)
 
 Returns the solutions obtained by the `Tracker`.
 """
-solution(result::TrackerResult) = result.x
+solution(result::TrackerResult) = result.solution
 
 """
     steps(result::TrackerResult)
@@ -301,7 +303,7 @@ function initial_step_size(
     e = state.norm(local_error(predictor))
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.β_τ * trust_region(predictor)
-    min(Δs₁, Δs₂, length(state.segment))
+    min(Δs₁, Δs₂, length(state.segment), options.max_step_size)
 end
 
 function update_stepsize!(
@@ -314,17 +316,24 @@ function update_stepsize!(
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     p = order(predictor)
-    Δs = state.Δs_prev
     if is_converged(result)
         e = state.norm(local_error(predictor))
         Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         Δs₂ = options.β_τ * trust_region(predictor)
-        s′ = min(state.s + min(Δs₁, Δs₂), DoubleF64(length(state.segment)))
-        if state.last_step_failed
-            state.s′ = min(state.s + Δs, s′)
-        else
-            state.s′ = s′
+        Δs =  min(Δs₁, Δs₂)
+        # In the double double arithmetic implementation 1 + Inf = NaN, so we have
+        # to be careful here to not add Inf
+        s′ = DoubleF64(length(state.segment))
+        if !isinf(Δs)
+            s′ = min(s′, state.s + Δs)
         end
+        if !isinf(options.max_step_size)
+            s′ = min(s′, state.s + options.max_step_size)
+        end
+        if state.last_step_failed
+            s′ = min(state.s + state.Δs_prev, s′)
+        end
+        state.s′ = s′
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
@@ -501,17 +510,80 @@ function step!(tracker::Tracker, debug::Bool = false)
     state.last_step_failed
 end
 
-function track!(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
-    init!(tracker, x, t₁, t₀)
+function track!(
+    tracker::Tracker,
+    x::AbstractVector,
+    t₁,
+    t₀;
+    ω::Float64 = NaN,
+    μ::Float64 = NaN,
+    debug::Bool = false,
+)
+    init!(tracker, x, t₁, t₀, ω, μ)
 
     while is_tracking(tracker.state.code)
         step!(tracker, debug)
     end
 
-    tracker.state.code
+    (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
+end
+function track!(tracker::Tracker, r::TrackerResult, t₁, t₀; debug::Bool = false)
+    track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ)
 end
 
-function track(tracker::Tracker, x, t₁, t₀; debug::Bool = false)
-    track!(tracker, x, t₁, t₀; debug = debug)
+@inline function track(tracker::Tracker, x, t₁, t₀; kwargs...)
+    track!(tracker, x, t₁, t₀; kwargs...)
     TrackerResult(tracker.state)
+end
+
+# PathIterator #
+struct PathIterator{H,P,M}
+    tracker::Tracker{H,P,M}
+    t_real::Bool
+end
+Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()
+Base.IteratorEltype(::Type{<:PathIterator}) = Base.HasEltype()
+
+"""
+    iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)
+
+Prepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect a specific
+path. In each iteration the tuple `(x,t)` is returned.
+
+## Example
+
+Assume you have `CoreTracker` `tracker` and you wan to track `x₁` from 1.0 to 0.25:
+```julia
+for (x,t) in iterator(tracker, x₁, 1.0, 0.25)
+println("x at t=\$t:")
+println(x)
+end
+```
+
+Note that this is a stateful iterator. You can still introspect the state of the tracker.
+For example to check whether the tracker was successfull
+(and did not terminate early due to some problem) you can do
+```julia
+println("Success: ", status(tracker) == CoreTrackerStatus.success)
+```
+"""
+function iterator(tracker::Tracker, x₁, t₁ = 1.0, t₀ = 0.0; kwargs...)
+    init!(tracker, x₁, t₁, t₀; kwargs...)
+    PathIterator(tracker, typeof(t₁ - t₀) <: Real)
+end
+
+function current_x_t(iter::PathIterator)
+    @unpack x, t = iter.tracker.state
+    (copy(x), iter.t_real ? real(t) : t)
+end
+
+function Base.iterate(iter::PathIterator, state = nothing)
+    state === nothing && return current_x_t(iter), 1
+    iter.tracker.state.code != TrackerReturnCode.tracking && return nothing
+
+    while is_tracking(iter.tracker.state.code)
+        step_failed = step!(iter.tracker)
+        step_failed || break
+    end
+    current_x_t(iter), state + 1
 end
