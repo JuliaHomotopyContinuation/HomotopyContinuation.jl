@@ -72,6 +72,7 @@ include("homotopies.jl")
 include("predictor.jl")
 include("newton_corrector.jl")
 include("tracker.jl")
+include("valuation.jl")
 include("path_info.jl")
 
 
