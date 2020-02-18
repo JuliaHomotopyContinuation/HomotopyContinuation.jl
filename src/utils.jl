@@ -31,14 +31,14 @@ struct ComplexLineSegment
     a::ComplexF64
     b::ComplexF64
     # derived
-    Δ_b_a::ComplexF64
-    abs_b_a::Float64
+    Δ_b_a::ComplexDF64
+    abs_b_a::DoubleF64
 end
 
 function ComplexLineSegment(start::Number, target::Number)
     a = ComplexF64(start)
     b = ComplexF64(target)
-    Δ_b_a = b - a
+    Δ_b_a = ComplexDF64(b) - a
     abs_b_a = abs(Δ_b_a)
 
     ComplexLineSegment(start, target, Δ_b_a, abs_b_a)
