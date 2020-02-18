@@ -119,7 +119,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
 end
 
 function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
-    x = Vector{ComplexF64}(x₁)
+    x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
     segment = ComplexLineSegment(t₁, t₀)
@@ -264,6 +264,11 @@ end
 
 function Tracker(H::AbstractHomotopy; kwargs...)
     x = zeros(ComplexF64, size(H, 2))
+    Tracker(H, x, 1.0, 0.0; kwargs...)
+end
+function Tracker(H::AffineChartHomotopy; kwargs...)
+    d = dims(H.chart)
+    x = PVector(randn(ComplexF64, sum(d) + length(d)), d)
     Tracker(H, x, 1.0, 0.0; kwargs...)
 end
 

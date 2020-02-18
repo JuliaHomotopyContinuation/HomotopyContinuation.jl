@@ -91,7 +91,7 @@ end
 
 function diff_t!(u, H::AffineChartHomotopy, x::PVector{<:Any,N}, t, dx = ()) where {N}
     u .= zero(eltype(u))
-    diff_t!(u, H.homotopy, x, dx)
+    diff_t!(u, H.homotopy, x, t, dx)
     # affine chart part is always zero since it is a affine linear form
     u
 end
