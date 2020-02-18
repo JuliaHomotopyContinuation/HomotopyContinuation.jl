@@ -45,6 +45,28 @@ export @var,
     System,
     Homotopy
 
+using ProjectiveVectors:
+    PVector,
+    dims,
+    dimension_indices,
+    fubini_study,
+    affine_chart,
+    ×,
+    component,
+    components,
+    combine
+
+    export ProjectiveVectors,
+        PVector,
+        dims,
+        dimension_indices,
+        affine_chart,
+        fubini_study,
+        ×,
+        component,
+        components,
+        combine
+
 include("norm.jl")
 include("linear_algebra.jl")
 include("homotopies.jl")
