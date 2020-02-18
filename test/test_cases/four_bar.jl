@@ -88,6 +88,6 @@
     ]
 
     tracker = Tracker(ParameterHomotopy(F, p, q))
-
-    @test is_success(track(tracker, s, 1, 0))
+    res = track(tracker, s, 1, 0)
+    @test is_success(res)
 end
