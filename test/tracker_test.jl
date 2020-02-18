@@ -9,6 +9,7 @@
         res = track(tracker, s, 1, 0)
         @test is_success(res)
         @test isa(solution(res), Vector{ComplexF64})
+        @test solution(res) ≈ [sqrt(2), -sqrt(2)]
         @test length(solution(res)) == 2
         @test is_success(track(tracker, res, 0, 1))
 
@@ -22,6 +23,18 @@
 
         s = @SVector [1, 1]
         @test is_success(track(tracker, s, 1, 0))
+    end
+
+    @testset "projective tracking" begin
+        @var x a y b z
+        F = System([x^2 - a*z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
+        H = ParameterHomotopy(F, [1, 0], [2, 4])
+        tracker = Tracker(on_affine_chart(H, (2,)))
+        s = PVector([1, 1, 1])
+        res = track(tracker, s, 1, 0)
+        @test is_success(res)
+        @test isa(solution(res), PVector{ComplexF64,1})
+        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol=1e-2
     end
 
     @testset "iterator" begin

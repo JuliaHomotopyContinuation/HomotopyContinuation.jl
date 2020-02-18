@@ -90,11 +90,10 @@ is_tracking(S::TrackerReturnCode.codes) = S == TrackerReturnCode.tracking
 
 
 # STATE
-
-mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
-    x::Vector{ComplexF64} # current x
-    x̂::Vector{ComplexF64} # last prediction
-    x̄::Vector{ComplexF64} # candidate for new x
+mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{ComplexF64}}
+    x::V # current x
+    x̂::V # last prediction
+    x̄::V # candidate for new x
 
     segment::ComplexLineSegment
     s::DoubleF64 # current step length (0 ≤ s ≤ length(segment))
@@ -120,7 +119,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
 end
 
 function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
-    x = Vector{ComplexF64}(x₁)
+    x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
     segment = ComplexLineSegment(t₁, t₀)
@@ -180,7 +179,7 @@ steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
 # RESULT
 
-struct TrackerResult{V<:AbstractVector}
+struct TrackerResult{V<:AbstractVector{ComplexF64}}
     returncode::TrackerReturnCode.codes
     solution::V
     t::ComplexF64
@@ -247,17 +246,29 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = 
 
 # TRACKER
 
-struct Tracker{H<:AbstractHomotopy,P<:AbstractPredictorCache,M<:AbstractMatrix{ComplexF64}}
+struct Tracker{
+    H<:AbstractHomotopy,
+    P<:AbstractPredictorCache,
+    # V and V̄ need to have the same container type
+    V<:AbstractVector{ComplexF64},
+    V̄<:AbstractVector{ComplexDF64},
+    M<:AbstractMatrix{ComplexF64},
+}
     homotopy::H
     predictor::P
-    corrector::NewtonCorrector
+    corrector::NewtonCorrector{V̄}
     # these are mutable
-    state::TrackerState{M}
+    state::TrackerState{V,M}
     options::TrackerOptions
 end
 
 function Tracker(H::AbstractHomotopy; kwargs...)
     x = zeros(ComplexF64, size(H, 2))
+    Tracker(H, x, 1.0, 0.0; kwargs...)
+end
+function Tracker(H::AffineChartHomotopy; kwargs...)
+    d = dims(H.chart)
+    x = PVector(randn(ComplexF64, sum(d) + length(d)), d)
     Tracker(H, x, 1.0, 0.0; kwargs...)
 end
 
@@ -271,9 +282,9 @@ function Tracker(
     kwargs...,
 )
     options = TrackerOptions(; kwargs...)
-    state = TrackerState(H, Vector{ComplexF64}(x₁), t₁, t₀, norm)
+    state = TrackerState(H, x₁, t₁, t₀, norm)
     pred_cache = cache(predictor, size(H, 2))
-    corrector = NewtonCorrector(options.a, size(H))
+    corrector = NewtonCorrector(options.a, state.x, size(H, 1))
 
     Tracker(H, pred_cache, corrector, state, options)
 end
@@ -320,7 +331,7 @@ function update_stepsize!(
         e = state.norm(local_error(predictor))
         Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         Δs₂ = options.β_τ * trust_region(predictor)
-        Δs =  min(Δs₁, Δs₂)
+        Δs = min(Δs₁, Δs₂)
         # In the double double arithmetic implementation 1 + Inf = NaN, so we have
         # to be careful here to not add Inf
         s′ = DoubleF64(length(state.segment))
