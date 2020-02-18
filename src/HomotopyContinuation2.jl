@@ -9,8 +9,6 @@ import StructArrays
 
 const LA = LinearAlgebra
 
-include("utils.jl")
-
 include("ModelKit.jl")
 import .ModelKit
 include("DoubleDouble.jl")
@@ -56,23 +54,25 @@ using ProjectiveVectors:
     components,
     combine
 
-    export ProjectiveVectors,
-        PVector,
-        dims,
-        dimension_indices,
-        affine_chart,
-        fubini_study,
-        ×,
-        component,
-        components,
-        combine
+export ProjectiveVectors,
+    PVector,
+    dims,
+    dimension_indices,
+    affine_chart,
+    fubini_study,
+    ×,
+    component,
+    components,
+    combine
 
+include("utils.jl")
 include("norm.jl")
 include("linear_algebra.jl")
 include("homotopies.jl")
-include("predictors.jl")
+include("predictor.jl")
 include("newton_corrector.jl")
 include("tracker.jl")
 include("path_info.jl")
+
 
 end
