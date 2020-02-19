@@ -5,7 +5,7 @@ struct Pade21
 end
 Pade21(n::Int) = Pade21(falses(n), Ref(Inf), zeros(ComplexF64, n))
 
-function update!(cache::Pade21, H, x, x¹, x², x³, x⁴)
+function update!(cache::Pade21, x, x¹, x², x³, x⁴)
     # This is an adaption of the algorithm outlined in
     # Robust Pad{\'e} approximation via SVD (Trefethen et al)
     τ = Inf

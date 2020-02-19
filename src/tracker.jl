@@ -56,7 +56,6 @@ end
 
 end
 
-
 """
     is_success(S::TrackerReturnCode.codes)
 
@@ -90,172 +89,12 @@ Returns `true` if `S` indicates that the path tracking is not yet finished.
 is_tracking(S::TrackerReturnCode.codes) = S == TrackerReturnCode.tracking
 
 
-# STATE
-struct Derivatives
-    # first four derivatives of x(t)
-    x¹::Vector{ComplexF64}
-    x²::Vector{ComplexF64}
-    x³::Vector{ComplexF64}
-    x⁴::Vector{ComplexF64}
-
-    # derivatives of y(s) = x(e^s) if requested
-    y¹::Vector{ComplexF64}
-    y²::Vector{ComplexF64}
-    y³::Vector{ComplexF64}
-    y⁴::Vector{ComplexF64}
-
-    # these are just tuples containing the derivative vectors
-    # we have to preallocate them since otherwise this would result in dynamic dispatch
-    dx¹::NTuple{1,Vector{ComplexF64}}
-    dx²::NTuple{2,Vector{ComplexF64}}
-    dx³::NTuple{3,Vector{ComplexF64}}
-
-    u::Vector{ComplexF64}
-end
-function Derivatives(n::Int)
-    x¹, x², x³, x⁴, y¹, y², y³, y⁴ = [zeros(ComplexF64, n) for _ = 1:8]
-    dx¹ = (x¹,)
-    dx² = (x¹, x²)
-    dx³ = (x¹, x², x³)
-    u = zero(x²)
-
-    Derivatives(x¹, x², x³, x⁴, y¹, y², y³, y⁴, dx¹, dx², dx³, u)
-end
-
-function compute!(D::Derivatives, H, x, t, J::Jacobian, norm)
-    # unpack stuff to make the rest easier to read
-    @unpack u, x¹, x², x³, x⁴, dx¹, dx², dx³ = D
-
-    # compute all taylor coefficients x¹, x², x³, x⁴
-    diff_t!(u, H, x, t)
-    u .= .-u
-    LA.ldiv!(x¹, J, u)
-
-    # Check if we have to do iterative refinment for all the others as well
-    δ = iterative_refinement!(x¹, J, u, norm; fixed_precision = true)
-    iterative_refinement = δ > sqrt(eps())
-    iterative_refinement && iterative_refinement!(x², J, u)
-
-    diff_t!(u, H, x, t, dx¹)
-    u .= .-u
-    LA.ldiv!(x², J, u)
-    iterative_refinement && iterative_refinement!(x², J, u)
-
-    diff_t!(u, H, x, t, dx²)
-    u .= .-u
-    LA.ldiv!(x³, J, u)
-    iterative_refinement && iterative_refinement!(x³, J, u)
-
-    diff_t!(u, H, x, t, dx³)
-    u .= .-u
-    LA.ldiv!(x⁴, J, u)
-    iterative_refinement && iterative_refinement!(x⁴, J, u)
-end
-
-mutable struct TrackerState{
-    V<:AbstractVector{ComplexF64},
-    M<:AbstractMatrix{ComplexF64},
-}
-    x::V # current x
-    x̂::V # last prediction
-    x̄::V # candidate for new x
-
-    derivatives::Derivatives
-
-    segment::ComplexLineSegment
-    s::DoubleF64 # current step length (0 ≤ s ≤ length(segment))
-    s′::DoubleF64 # proposed s (0 ≤ s ≤ length(segment))
-    Δs_prev::Float64 # previous step size
-
-    accuracy::Float64 # norm(x - x(t))
-    ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
-    μ::Float64 # limit accuracy
-    τ::Float64 # trust region size
-    norm_Δx₀::Float64 # debug info only
-    use_extended_prec::Bool
-    used_extended_prec::Bool
-
-    norm::WeightedNorm{InfNorm}
-    jacobian::Jacobian{M}
-
-    code::TrackerReturnCode.codes
-
-    accepted_steps::Int
-    rejected_steps::Int
-    last_step_failed::Bool
-end
-
-function TrackerState(
-    H,
-    x₁::AbstractVector,
-    t₁,
-    t₀,
-    norm::WeightedNorm{InfNorm},
-)
-    x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
-    x̂ = zero(x)
-    x̄ = zero(x)
-    derivatives = Derivatives(length(x))
-    segment = ComplexLineSegment(t₁, t₀)
-    s = s′ = DoubleF64(0.0)
-    Δs_prev = 0.0
-    accuracy = 0.0
-    μ = eps()
-    ω = 1.0
-    τ = Inf
-    norm_Δx₀ = NaN
-    used_extended_prec = use_extended_prec = false
-    JM = Jacobian(zeros(ComplexF64, size(H)))
-    condition = TrackerReturnCode.tracking
-    accepted_steps = rejected_steps = 0
-    last_step_failed = true
-
-    TrackerState(
-        x,
-        x̂,
-        x̄,
-        derivatives,
-        segment,
-        s,
-        s′,
-        Δs_prev,
-        accuracy,
-        ω,
-        μ,
-        τ,
-        norm_Δx₀,
-        use_extended_prec,
-        used_extended_prec,
-        norm,
-        JM,
-        condition,
-        accepted_steps,
-        rejected_steps,
-        last_step_failed,
-    )
-end
-
-Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
-    state
-function Base.getproperty(state::TrackerState, sym::Symbol)
-    if sym === :t
-        t = getfield(state, :segment)[getfield(state, :s)]
-        return t
-    elseif sym == :Δt
-        segment = getfield(state, :segment)
-        s′ = getfield(state, :s′)
-        s = getfield(state, :s)
-        segment[s′] - segment[s]
-    else # fallback to getfield
-        return getfield(state, sym)
-    end
-end
-
-steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
-
 # RESULT
+"""
+    TrackerResult
 
+Containing the result of tracking a path with `Tracker`.
+"""
 struct TrackerResult{V<:AbstractVector{ComplexF64}}
     returncode::TrackerReturnCode.codes
     solution::V
@@ -266,20 +105,6 @@ struct TrackerResult{V<:AbstractVector{ComplexF64}}
     accepted_steps::Int
     rejected_steps::Int
     extended_precision_used::Bool
-end
-
-function TrackerResult(state::TrackerState)
-    TrackerResult(
-        state.code,
-        copy(state.x),
-        state.t,
-        state.accuracy,
-        state.ω,
-        state.μ,
-        state.accepted_steps,
-        state.rejected_steps,
-        state.used_extended_prec,
-    )
 end
 
 """
@@ -320,6 +145,169 @@ rejected_steps(result::TrackerResult) = result.rejected_steps
 Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) =
     result
+
+mutable struct TrackerState{
+    V<:AbstractVector{ComplexF64},
+    M<:AbstractMatrix{ComplexF64},
+}
+    x::V # current x
+    x̂::V # last prediction
+    x̄::V # candidate for new x
+    # internal step size
+    segment::ComplexLineSegment
+    s::DoubleF64 # current step length (0 ≤ s ≤ length(segment))
+    s′::DoubleF64 # proposed s (0 ≤ s ≤ length(segment))
+    Δs_prev::Float64 # previous step size
+    # path tracking algorithm
+    accuracy::Float64 # norm(x - x(t))
+    ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
+    μ::Float64 # limit accuracy
+    τ::Float64 # trust region size
+    norm_Δx₀::Float64 # debug info only
+    use_extended_prec::Bool
+    used_extended_prec::Bool
+    norm::WeightedNorm{InfNorm}
+
+    jacobian::Jacobian{M}
+    code::TrackerReturnCode.codes
+    # first four derivatives of x(t)
+    x¹::Vector{ComplexF64}
+    x²::Vector{ComplexF64}
+    x³::Vector{ComplexF64}
+    x⁴::Vector{ComplexF64}
+    # these are just tuples containing the derivative vectors
+    # we have to preallocate them since otherwise this would result
+    # in dynamic dispatch (at least Julia ≤ 1.3)
+    dx¹::NTuple{1,Vector{ComplexF64}}
+    dx²::NTuple{2,Vector{ComplexF64}}
+    dx³::NTuple{3,Vector{ComplexF64}}
+    # buffer for the computation of derivatives
+    u::Vector{ComplexF64}
+
+    # statistics
+    accepted_steps::Int
+    rejected_steps::Int
+    last_step_failed::Bool
+end
+
+function TrackerState(
+    H,
+    x₁::AbstractVector,
+    t₁,
+    t₀,
+    norm::WeightedNorm{InfNorm},
+)
+    x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
+    x̂ = zero(x)
+    x̄ = zero(x)
+    x¹, x², x³, x⁴ = [zeros(ComplexF64, length(x)) for _ = 1:4]
+    dx¹ = (x¹,)
+    dx² = (x¹, x²)
+    dx³ = (x¹, x², x³)
+    segment = ComplexLineSegment(t₁, t₀)
+    s = s′ = DoubleF64(0.0)
+    Δs_prev = 0.0
+    accuracy = 0.0
+    μ = eps()
+    ω = 1.0
+    τ = Inf
+    norm_Δx₀ = NaN
+    used_extended_prec = use_extended_prec = false
+    jacobian = Jacobian(zeros(ComplexF64, size(H)))
+    code = TrackerReturnCode.tracking
+    u = zeros(ComplexF64, size(H, 1))
+    accepted_steps = rejected_steps = 0
+    last_step_failed = true
+
+    TrackerState(
+        x,
+        x̂,
+        x̄,
+        segment,
+        s,
+        s′,
+        Δs_prev,
+        accuracy,
+        ω,
+        μ,
+        τ,
+        norm_Δx₀,
+        use_extended_prec,
+        used_extended_prec,
+        norm,
+        jacobian,
+        code,
+        x¹,
+        x²,
+        x³,
+        x⁴,
+        dx¹,
+        dx²,
+        dx³,
+        u,
+        accepted_steps,
+        rejected_steps,
+        last_step_failed,
+    )
+end
+
+Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
+    state
+function Base.getproperty(state::TrackerState, sym::Symbol)
+    if sym === :t
+        return getfield(state, :segment)[getfield(state, :s)]
+    elseif sym == :Δt
+        segment = getfield(state, :segment)
+        return step_size(segment, getfield(state, :s′) - getfield(state, :s))
+    elseif sym == :t′
+        return getfield(state, :segment)[getfield(state, :s′)]
+    else # fallback to getfield
+        return getfield(state, sym)
+    end
+end
+
+steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
+
+
+function compute_derivatives!(
+    state::TrackerState,
+    H::AbstractHomotopy,
+    x,
+    t;
+    log_scale::Bool = false,
+    refine_always::Bool = false,
+)
+    # unpack stuff to make the rest easier to read
+    @unpack u, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm = state
+
+    # compute all taylor coefficients x¹, x², x³, x⁴
+    diff_t!(u, H, x, t)
+    u .= .-u
+    LA.ldiv!(x¹, jacobian, u)
+
+    # Check if we have to do iterative refinment for all the others as well
+    δ = iterative_refinement!(x¹, jacobian, u, norm; fixed_precision = true)
+    iterative_refinement = refine_always || (δ > sqrt(eps()))
+    iterative_refinement && iterative_refinement!(x¹, jacobian, u)
+
+    diff_t!(u, H, x, t, dx¹)
+    u .= .-u
+    LA.ldiv!(x², jacobian, u)
+    iterative_refinement && iterative_refinement!(x², jacobian, u)
+
+    diff_t!(u, H, x, t, dx²)
+    u .= .-u
+    LA.ldiv!(x³, jacobian, u)
+    iterative_refinement && iterative_refinement!(x³, jacobian, u)
+
+    diff_t!(u, H, x, t, dx³)
+    u .= .-u
+    LA.ldiv!(x⁴, jacobian, u)
+    iterative_refinement && iterative_refinement!(x⁴, jacobian, u)
+
+    state
+end
 
 
 # TRACKER
@@ -399,7 +387,6 @@ function update_stepsize!(
     options::TrackerOptions,
     predictor::Pade21,
 )
-
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     p = order(predictor)
@@ -449,6 +436,11 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
     nothing
 end
 
+function compute_derivatives_and_update_predictor!(tracker::Tracker)
+    @unpack x, t, x¹, x², x³, x⁴ = tracker.state
+    compute_derivatives!(tracker.state, tracker.homotopy, x, t)
+    update!(tracker.predictor, x, x¹, x², x³, x⁴)
+end
 
 """
     init!(tracker::NCT, x₁, t₁, t₀)
@@ -482,7 +474,7 @@ function init!(
     state.last_step_failed = true
 
     # compute ω and limit accuracy μ for the start value
-    t = state.segment[state.s]
+    t = state.t
     if isnan(ω) || isnan(μ)
         valid, ω, μ = init_newton!(
             x̄,
@@ -511,9 +503,7 @@ function init!(
 
     # initialize the predictor
     evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
-    compute!(state.derivatives, homotopy, state.x, t, jacobian, norm)
-    @unpack x¹, x², x³, x⁴ = state.derivatives
-    update!(predictor, homotopy, state.x, x¹, x², x³, x⁴)
+    compute_derivatives_and_update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
     state.s′ = initial_step_size(state, predictor, tracker.options)
@@ -555,7 +545,7 @@ end
 
 function step!(tracker::Tracker, debug::Bool = false)
     @unpack homotopy, corrector, predictor, state, options = tracker
-    @unpack t, Δt, x, x̂, x̄, jacobian, norm = state
+    @unpack t, Δt, t′, x, x̂, x̄, jacobian, norm = state
 
     debug && printstyled(
         "\nt: ",
@@ -565,10 +555,9 @@ function step!(tracker::Tracker, debug::Bool = false)
         "\n";
         color = :yellow,
     )
-
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
-    @unpack x¹, x², x³ = state.derivatives
+    @unpack x¹, x², x³ = state
     predict!(x̂, predictor, homotopy, state.x, x¹, x², x³, Δt)
 
     update!(state.norm, x̂)
@@ -580,7 +569,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         corrector,
         homotopy,
         x̂,
-        t + Δt,
+        t′,
         jacobian,
         norm;
         ω = state.ω,
@@ -600,11 +589,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.ω = result.ω
 
         update_precision!(tracker, result.μ_low)
-
-        compute!(state.derivatives, homotopy, state.x, t + Δt, jacobian, norm)
-        # tell the predictor about the new derivatives
-        @unpack x¹, x², x³, x⁴ = state.derivatives
-        update!(predictor, homotopy, state.x, x¹, x², x³, x⁴)
+        compute_derivatives_and_update_predictor!(tracker)
         # Update other state
         state.τ = trust_region(predictor)
         state.accepted_steps += 1
@@ -640,6 +625,22 @@ end
 function track!(tracker::Tracker, r::TrackerResult, t₁, t₀; debug::Bool = false)
     track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ)
 end
+
+
+function TrackerResult(state::TrackerState)
+    TrackerResult(
+        state.code,
+        copy(state.x),
+        state.t,
+        state.accuracy,
+        state.ω,
+        state.μ,
+        state.accepted_steps,
+        state.rejected_steps,
+        state.used_extended_prec,
+    )
+end
+
 
 @inline function track(tracker::Tracker, x, t₁, t₀; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
