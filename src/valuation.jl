@@ -10,14 +10,15 @@ to the affine space.
 The valuation is estimated continously along a solution path. For this it is assumed that
 the path is tracked in a **logarithmic time scale**.
 """
-struct Valuation
+mutable struct Valuation
     w::Vector{Float64}
     ẇ::Vector{Float64}
     δ::Vector{Float64}
     δ̇::Vector{Float64}
+    t::Float64
 end
 
-Valuation(n::Integer) = Valuation(zeros(n), zeros(n), zeros(n), zeros(n))
+Valuation(n::Integer) = Valuation(zeros(n), zeros(n), zeros(n), zeros(n), NaN)
 Valuation(x::AbstractVector) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
@@ -42,6 +43,9 @@ Initialize the valuation estimator to start from scratch.
 function init!(val::Valuation)
     val.w .= NaN
     val.ẇ .= NaN
+    val.δ .= NaN
+    val.δ̇ .= NaN
+    val.t = NaN
     val
 end
 
@@ -51,22 +55,16 @@ end
 Computes the function ``ν(x) = (uu̇ + vv̇) / |x|²`` where `u,v = reim(x)`.
 This is equivalent to computing ``d/dt log|x(t)|``.
 """
-function ν(x::Complex, ẋ::Complex)
+function ν_ν̇(x::Number, ẋ::Number, ẍ::Number)
     u, v = reim(x)
     u̇, v̇ = reim(ẋ)
-    (u * u̇ + v * v̇) / abs2(x)
-end
-
-function ν_ν̇(x::Complex, ẋ::Complex, ẍ::Complex)
-    u, v = reim(x)
-    u̇, v̇ = reim(ẋ)
-    ü, v̈ = reim(ẋ)
+    ü, v̈ = reim(ẍ)
 
     x² = abs2(x)
     μ = u * u̇ + v * v̇
     μ̇ = u * ü + u̇^2 + v * v̈ + v̇^2
     ν = μ / x²
-    # ν̇ = μ̇ / x² - 2μ²/(x²)² and  μ²/(x²)² = ν^2
+    # ν̇ = μ̇ / x² - 2(μ/x²)² and  μ/x² = ν
     ν̇ = μ̇ / x² - 2 * ν^2
     ν, ν̇
 end
@@ -77,27 +75,19 @@ function update!(
     ẋ::AbstractVector,
     ẍ::AbstractVector,
     x3::AbstractVector,
-    t::Real;
-    logarithmic_scale::Bool = false,
+    t::Real,
 )
     for i in eachindex(x)
-        νᵢ, ν̇ᵢ = ν_ν̇(x[i], ẋ[i], 2ẍ[i])
-        if logarithmic_scale
-            val.w[i] = νᵢ
-            val.ẇ[i] = ν̇ᵢ
-        else
-            val.w[i] = νᵢ * t
-            val.ẇ[i] = ν̇ᵢ * t^2 / (2 - 2log(t))
-        end
+        νᵢ, ν̇ᵢ = ν_ν̇(x[i], ẋ[i], 2 * ẍ[i])
+        val.w[i] = νᵢ * t
 
-        if logarithmic_scale
-            val.δ[i] = νᵢ
-            val.δ̇[i] = ν̇ᵢ
-        else
-            ν_δᵢ, ν̇_δᵢ = ν_ν̇(ẋ[i], 2ẍ[i], 6x3[i])
-            val.δ[i] = ν_δᵢ * t + 1
-            val.δ̇[i] = ν̇_δᵢ * t^2 / (2 - 2log(t))
-        end
+        ν_δᵢ, ν̇_δᵢ = ν_ν̇(ẋ[i], 2 * ẍ[i], 6 * x3[i])
+        val.δ[i] = ν_δᵢ * t + 1
+
+        wᵢ, ẇᵢ = val.w[i], val.ẇ[i]
+        val.ẇ[i] = abs((ν̇ᵢ * t + νᵢ) * t) / abs(val.δ[i])
+        val.δ̇[i] = abs((ν̇_δᵢ * t + ν_δᵢ) * t) / abs(val.δ[i])
     end
+    val.t = t
     val
 end
