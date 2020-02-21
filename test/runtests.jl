@@ -1,4 +1,4 @@
-using HomotopyContinuation2, LinearAlgebra, Test, StaticArrays
+using HomotopyContinuation2, LinearAlgebra, Test, StaticArrays, Parameters
 const HC2 = HomotopyContinuation2
 
 @testset "HomotopyContinuation2" begin
