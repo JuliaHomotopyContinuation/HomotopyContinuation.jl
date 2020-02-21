@@ -1,0 +1,7 @@
+coverage:
+  status:
+    project:
+      default:
+        threshold: 1%
+        informational: true
+        only_pulls: true
