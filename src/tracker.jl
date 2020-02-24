@@ -38,7 +38,7 @@ The possible states a `CoreTracker` can have are
 
 * `TrackerReturnCode.tracking`: The tracking is still in progress
 * `TrackerReturnCode.success`: Indicates a successfull completed tracking
-* `TrackerReturnCode.terminated_maximal_iterations`: Tracking terminated since maximal iterations reached.
+* `TrackerReturnCode.terminated_max_iters`: Tracking terminated since maximal iterations reached.
 * `TrackerReturnCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
 * `TrackerReturnCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
 * `TrackerReturnCode.terminated_step_size_too_small`
@@ -46,7 +46,7 @@ The possible states a `CoreTracker` can have are
 @enum codes begin
     tracking
     success
-    terminated_maximal_iterations
+    terminated_max_iters
     terminated_accuracy_limit
     terminated_ill_conditioned
     terminated_invalid_startvalue
@@ -169,6 +169,7 @@ mutable struct TrackerState{
     norm::WeightedNorm{InfNorm}
 
     jacobian::Jacobian{M}
+    cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
     code::TrackerReturnCode.codes
     # first four derivatives of x(t)
     x¹::Vector{ComplexF64}
@@ -214,6 +215,7 @@ function TrackerState(
     norm_Δx₀ = NaN
     used_extended_prec = use_extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
+    cond_J_ẋ = NaN
     code = TrackerReturnCode.tracking
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = 0
@@ -236,6 +238,7 @@ function TrackerState(
         used_extended_prec,
         norm,
         jacobian,
+        cond_J_ẋ,
         code,
         x¹,
         x²,
@@ -288,6 +291,7 @@ function compute_derivatives!(
 
     # Check if we have to do iterative refinment for all the others as well
     δ = iterative_refinement!(x¹, jacobian, u, norm; fixed_precision = true)
+    state.cond_J_ẋ = δ / eps()
     iterative_refinement = refine_always || (δ > sqrt(eps()))
     iterative_refinement && iterative_refinement!(x¹, jacobian, u)
 
@@ -363,7 +367,8 @@ Base.broadcastable(C::Tracker) = Ref(C)
 Return the state of the tracker.
 """
 state(tracker::Tracker) = tracker.state
-
+status(tracker::Tracker) = tracker.state.code
+LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 # Step Size
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
@@ -425,7 +430,7 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerReturnCode.success
         state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
-        state.code = TrackerReturnCode.terminated_maximal_iterations
+        state.code = TrackerReturnCode.terminated_max_iters
     elseif state.ω * state.μ > options.a * _h(options.a)
         state.code = TrackerReturnCode.terminated_accuracy_limit
     elseif state.s′ == state.s || fast_abs(state.Δt) < eps(fast_abs(state.t))
@@ -446,16 +451,22 @@ end
     init!(tracker::NCT, x₁, t₁, t₀)
 
 Setup `tracker` to track `x₁` from `t₁` to `t₀`.
+
+    init!(tracker::NCT, t₀)
+
+Setup `tracker` to continue tracking the current solution to `t₀`.
 """
-init!(tracker::Tracker, r::TrackerResult, t₁, t₀) =
-    init!(tracker, r.x, t₁, t₀, r.ω, r.μ)
+init!(tracker::Tracker, r::TrackerResult, t₁, t₀; continuation::Bool = false) =
+    init!(tracker, r.x, t₁, t₀, r.ω, r.μ; continuation = continuation)
+
 function init!(
     tracker::Tracker,
     x₁::AbstractVector,
     t₁,
     t₀,
     ω::Float64 = NaN,
-    μ::Float64 = NaN,
+    μ::Float64 = NaN;
+    keep_steps::Bool = false,
 )
     @unpack state, predictor, corrector, homotopy, options = tracker
     @unpack x, x̄, norm, jacobian = state
@@ -470,7 +481,9 @@ function init!(
     init!(norm, x)
     init!(jacobian)
     state.code = TrackerReturnCode.tracking
-    state.accepted_steps = state.rejected_steps = 0
+    if !keep_steps
+        state.accepted_steps = state.rejected_steps = 0
+    end
     state.last_step_failed = true
 
     # compute ω and limit accuracy μ for the start value
@@ -506,6 +519,16 @@ function init!(
     compute_derivatives_and_update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
+    state.s′ = initial_step_size(state, predictor, tracker.options)
+
+    tracker
+end
+
+function init!(tracker::Tracker, t₀)
+    @unpack state, predictor, options = tracker
+    state.segment = ComplexLineSegment(state.t, t₀)
+    state.s = state.s′ = state.Δs_prev = 0.0
+    state.code = TrackerReturnCode.tracking
     state.s′ = initial_step_size(state, predictor, tracker.options)
 
     tracker
@@ -612,9 +635,10 @@ function track!(
     t₀;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    keep_steps::Bool = false,
     debug::Bool = false,
 )
-    init!(tracker, x, t₁, t₀, ω, μ)
+    init!(tracker, x, t₁, t₀, ω, μ; keep_steps = keep_steps)
 
     while is_tracking(tracker.state.code)
         step!(tracker, debug)
@@ -625,7 +649,15 @@ end
 function track!(tracker::Tracker, r::TrackerResult, t₁, t₀; debug::Bool = false)
     track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ)
 end
+function track!(tracker::Tracker, t₀; debug::Bool = false)
+    init!(tracker, t₀)
 
+    while is_tracking(tracker.state.code)
+        step!(tracker, debug)
+    end
+
+    (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
+end
 
 function TrackerResult(state::TrackerState)
     TrackerResult(
