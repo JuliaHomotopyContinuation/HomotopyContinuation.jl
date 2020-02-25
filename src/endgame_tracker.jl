@@ -1,6 +1,7 @@
 Base.@kwdef mutable struct EndgameTrackerOptions
     endgame_start::Float64 = 0.1
     min_cond_at_infinity::Float64 = 1e4
+    cond_cauchy::Float64 = 1e8
     max_winding_number::Int = 12
 end
 
@@ -121,6 +122,7 @@ mutable struct EndgameTrackerState{V<:AbstractVector}
     prediction::V
     last_point::V
     last_t::Float64
+    max_winding_number_hit::Bool
 end
 
 function EndgameTrackerState(x::AbstractVector)
@@ -132,6 +134,7 @@ function EndgameTrackerState(x::AbstractVector)
     prediction = copy(x)
     last_point = copy(x)
     last_t = NaN
+    max_winding_number_hit = false
     EndgameTrackerState(
         code,
         val,
@@ -141,6 +144,7 @@ function EndgameTrackerState(x::AbstractVector)
         prediction,
         last_point,
         last_t,
+        max_winding_number_hit
     )
 end
 
@@ -276,28 +280,31 @@ function step!(eg_tracker::EndgameTracker)
     state.code = status(tracker)
 
     is_tracking(state.code) || return state.code
-    t < options.endgame_start || return state.code
+    # t < options.endgame_start || return state.code
     !tracker.state.last_step_failed || return state.code
 
     # update valution
     @unpack x, x¹, x², x³, x⁴ = tracker.state
     update!(state.val, x, x¹, x², x³, x⁴, t)
 
-    println(state.val)
-
-    verdict = judge(state.val, 1e-2)
-    @show t verdict LA.cond(tracker)
+    verdict = judge(
+        state.val,
+        1e-2;
+        at_infinity_tol = 1e-2,
+        max_winding_number = options.max_winding_number,
+    )
 
     if verdict == VAL_AT_INFINITY
-        # && LA.cond(tracker) > options.min_cond_at_infinity
         return (state.code = EGTrackerReturnCode.at_infinity)
     end
 
     # if valuation indicates singular solution
     # or finite but bad conditioned, start cauchy endgame
     if verdict == VAL_FINITE_SINGULAR || (
-        verdict == VAL_FINITE &&
-        (LA.cond(tracker) > 1e6 || tracker.state.use_extended_prec)
+        verdict == VAL_FINITE && (
+            LA.cond(tracker) > options.cond_cauchy ||
+            tracker.state.use_extended_prec
+        )
     )
         res, m, acc_est = cauchy!(state, tracker, options)
         if res == CAUCHY_SUCCESS
@@ -305,6 +312,14 @@ function step!(eg_tracker::EndgameTracker)
             state.solution .= state.prediction
             state.accuracy = acc_est
             state.code = EGTrackerReturnCode.success
+        elseif res == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
+            if state.max_winding_number_hit
+                state.code = EGTrackerReturnCode.terminated_max_winding_number
+            else
+                state.max_winding_number_hit = true
+            end
+        elseif res == CAUCHY_TERMINATED
+            state.code = tracker.state.code
         end
     end
 

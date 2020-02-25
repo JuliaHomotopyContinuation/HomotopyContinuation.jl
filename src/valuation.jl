@@ -27,11 +27,11 @@ end
 Valuation(x::AbstractVector) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
-    println(io, "Valuation :")
+    print(io, "Valuation :")
     for name in [:val_x, :val_x¹, :val_x², :val_x³, :Δval_x, :Δval_x¹, :Δval_x²]
-        println(
+        print(
             io,
-            " • ",
+            "\n • ",
             name == :val_x ? "val_x " : name,
             " → ",
             "[",
@@ -141,34 +141,48 @@ The `tol` is used to estimate whether a finite valuation is trustworthy.
 """
 function judge(
     val::Valuation,
-    tol::Float64,
-    # at_infinity_tol::Float64 = throw(UndefKeywordError(:tol)),
+    tol::Float64;
+    at_infinity_tol::Float64 = throw(UndefKeywordError(:at_infinity_tol)),
+    max_winding_number::Int = throw(UndefKeywordError(:max_winding_number)),
 )
-
-    w, Δω, σ, Δσ = val.val_x, val.Δval_x, val.val_x¹, val.Δval_x¹
-
     singular = false
     at_infinity = false
     indecisive = false
 
-    for (wᵢ, Δωᵢ, σᵢ, Δσᵢ) in zip(w, Δω, σ, Δσ)
+    @unpack val_x, Δval_x, val_x¹, Δval_x¹, val_x², Δval_x², val_x³ = val
+
+    ε = 1 / max_winding_number
+
+    for i = 1:length(val_x)
         # if one coordinate seems to diverge ignore all others
         # in particular don't care about indecisive results on other
         # coordinates
-        if wᵢ + Δωᵢ < -tol && Δωᵢ < tol && Δσᵢ < tol && abs(wᵢ - σᵢ) < tol
+
+        # At infinity check
+        # Idea: If val ≠ 0 then then all val_x values coincide. We consider
+        #       to have correct
+        #
+        val_mean = (val_x[i] + val_x¹[i] + val_x²[i] + val_x³[i]) / 4
+        if val_mean < -ε && abs(val_x[i] - val_mean) < at_infinity_tol &&
+           abs(val_x¹[i] - val_mean) < at_infinity_tol &&
+           abs(val_x²[i] - val_mean) < at_infinity_tol &&
+           abs(val_x³[i] - val_mean) < at_infinity_tol &&
+           min(Δval_x[i], Δval_x¹[i], Δval_x²[i]) < at_infinity_tol
             return VAL_AT_INFINITY
         end
 
-        if Δωᵢ > tol
+        # If we have a finite value then val_x[i] ≈ 0 and
+        # the others have to conincide
+        if max(Δval_x[i], Δval_x¹[i], Δval_x²[i]) > tol
             indecisive = true
         else
-            # check singular
-            # assume m < 20, otherwise we probably cannot get a
-            # solution anyway due to accuracy limits
-            if wᵢ ≥ 0.05 ||
-               (-0.05 < wᵢ < 0.05 && abs(round(Int, σᵢ) - σᵢ) - Δσᵢ > 0.05)
-                # test if σᵢ is fractional
-                singular = true
+            # check solution in torus
+            if val_x[i] > -ε + tol
+                if val_x³[i] > ε + tol &&
+                   # check whether val is fraction
+                   abs(round(Int, val_x³[i]) - val_x³[i]) > ε
+                    singular = true
+                end
             else
                 # probably diverging but not yet sure
                 indecisive = true
