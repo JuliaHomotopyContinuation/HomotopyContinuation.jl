@@ -23,6 +23,7 @@ Base.@kwdef mutable struct TrackerOptions
     β_ω::Float64 = 10.0
     β_τ::Float64 = 0.75
     extended_precision::Bool = true
+    min_step_size::Float64 = exp2(-80)
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -206,7 +207,7 @@ function TrackerState(
     dx² = (x¹, x²)
     dx³ = (x¹, x², x³)
     segment = ComplexLineSegment(t₁, t₀)
-    s = s′ = DoubleF64(0.0)
+    s = s′ = length(segment)
     Δs_prev = 0.0
     accuracy = 0.0
     μ = eps()
@@ -383,7 +384,7 @@ function initial_step_size(
     e = state.norm(local_error(predictor))
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.β_τ * trust_region(predictor)
-    min(Δs₁, Δs₂, length(state.segment), options.max_step_size)
+    min(Δs₁, Δs₂, options.max_step_size)
 end
 
 function update_stepsize!(
@@ -402,15 +403,15 @@ function update_stepsize!(
         Δs = min(Δs₁, Δs₂)
         # In the double double arithmetic implementation 1 + Inf = NaN, so we have
         # to be careful here to not add Inf
-        s′ = DoubleF64(length(state.segment))
+        s′ = DoubleF64(0.0)
         if !isinf(Δs)
-            s′ = min(s′, state.s + Δs)
+            s′ = max(s′, state.s - Δs)
         end
         if !isinf(options.max_step_size)
-            s′ = min(s′, state.s + options.max_step_size)
+            s′ = max(s′, state.s - options.max_step_size)
         end
         if state.last_step_failed
-            s′ = min(state.s + state.Δs_prev, s′)
+            s′ = max(state.s + state.Δs_prev, s′)
         end
         state.s′ = s′
     else
@@ -426,14 +427,14 @@ end
 
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
-    if state.s ≥ length(state.segment)
+    if state.s == 0.0
         state.code = TrackerReturnCode.success
-        state.s = length(state.segment)
     elseif steps(state) ≥ options.max_steps
         state.code = TrackerReturnCode.terminated_max_iters
     elseif state.ω * state.μ > options.a * _h(options.a)
         state.code = TrackerReturnCode.terminated_accuracy_limit
-    elseif state.s′ == state.s || fast_abs(state.Δt) < eps(fast_abs(state.t))
+    elseif state.s′ == state.s || fast_abs(state.Δt) < eps(fast_abs(state.t)) ||
+           (state.s - state.s′) < options.min_step_size
         state.code = TrackerReturnCode.terminated_step_size_too_small
     elseif isnan(state.s′) # catch any NaNs produced somewhere
         state.code = TrackerReturnCode.terminated_unknown
@@ -474,7 +475,8 @@ function init!(
     # intialize state
     x .= x₁
     state.segment = ComplexLineSegment(t₁, t₀)
-    state.s = state.s′ = state.Δs_prev = 0.0
+    state.s = state.s′ = length(state.segment)
+    state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
     state.used_extended_prec = state.use_extended_prec = false
@@ -519,8 +521,8 @@ function init!(
     compute_derivatives_and_update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
-    state.s′ = initial_step_size(state, predictor, tracker.options)
-
+    state.s′ =
+        max(0.0, state.s - initial_step_size(state, predictor, tracker.options))
     tracker
 end
 

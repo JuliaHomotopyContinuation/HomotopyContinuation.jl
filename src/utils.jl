@@ -26,6 +26,7 @@ end
     ComplexLineSegment(a, b)
 
 Models a straight line between two points `a` and `b` in the complex plane.
+Returns for `s = |b - a|` `a` and for `s=0` `b`.
 """
 struct ComplexLineSegment
     a::ComplexF64
@@ -46,18 +47,18 @@ end
 
 function Base.getindex(segment::ComplexLineSegment, t::Real)
     if t == segment.abs_b_a
-        return segment.b
-    elseif iszero(t)
         return segment.a
+    elseif iszero(t)
+        return segment.b
     else
         Δ = DoubleF64(t) / segment.abs_b_a
-        ComplexF64(segment.a + Δ * segment.Δ_b_a)
+        ComplexF64(segment.b - Δ * segment.Δ_b_a)
     end
 end
 Base.length(segment::ComplexLineSegment) = segment.abs_b_a
 
 function step_size(segment::ComplexLineSegment, Δs::Real)
-    (Δs / segment.abs_b_a) * segment.Δ_b_a
+    (-Δs / segment.abs_b_a) * segment.Δ_b_a
 end
 
 function Base.show(io::IO, segment::ComplexLineSegment)
