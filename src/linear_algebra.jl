@@ -438,18 +438,26 @@ function iterative_refinement!(
     x::AbstractVector,
     JM::Jacobian,
     b::AbstractVector,
-    norm = nothing;
-    row_scaling::Bool = true,
+    norm::AbstractNorm;
     fixed_precision::Bool = false,
+    max_iters::Int = 2,
+    tol::Float64 = sqrt(eps())
 )
     JM.ldivs[] += 1
+    δ = NaN
     if fixed_precision
-        fixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+        δ = fixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
     else
-        mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
-    end
-end
+        for i in 1:max_iters
+            δ = mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+            if δ < tol
+                break
+            end
+        end
 
+    end
+    δ
+end
 
 """
     init!(JM::Jacobian)

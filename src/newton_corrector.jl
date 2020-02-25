@@ -95,7 +95,7 @@ function newton!(
         end
         LA.ldiv!(Δxᵢ, updated!(JM), r, norm)
         if i > 0 && extended_precision
-            iterative_refinement!(Δxᵢ, JM, r, norm)
+            mixed_precision_iterative_refinement!(Δxᵢ, jacobian(JM), r)
         end
         xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
@@ -125,7 +125,7 @@ function newton!(
             end
             LA.ldiv!(Δxᵢ, JM, r)
             if extended_precision
-                iterative_refinement!(Δxᵢ, JM, r)
+                mixed_precision_iterative_refinement!(Δxᵢ, jacobian(JM), r)
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
