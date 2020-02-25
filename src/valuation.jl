@@ -17,25 +17,26 @@ mutable struct Valuation
     Δval_x¹::Vector{Float64}
     val_x²::Vector{Float64}
     Δval_x²::Vector{Float64}
+    val_x³::Vector{Float64}
     t::Float64
 end
 
 function Valuation(n::Integer)
-    Valuation(zeros(n), zeros(n), zeros(n), zeros(n), zeros(n), zeros(n), NaN)
+    Valuation((zeros(n) for i = 1:7)..., NaN)
 end
 Valuation(x::AbstractVector) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
     println(io, "Valuation :")
-    for name in [:val_x, :Δval_x, :val_x¹, :Δval_x¹, :val_x², :Δval_x²]
+    for name in [:val_x, :val_x¹, :val_x², :val_x³, :Δval_x, :Δval_x¹, :Δval_x²]
         println(
             io,
             " • ",
-            name,
+            name == :val_x ? "val_x " : name,
             " → ",
             "[",
             join(
-                [Printf.@sprintf("%.4g", v) for v in getfield(val, name)],
+                [Printf.@sprintf("%#.5g", v) for v in getfield(val, name)],
                 ", ",
             ),
             "]",
@@ -60,12 +61,14 @@ function init!(val::Valuation)
     val
 end
 
-"""
-    ν(x, ẋ)
+function ν(x::Number, ẋ::Number, t)
+    u, v = reim(x)
+    u¹, v¹ = reim(ẋ)
+    x² = abs2(x)
+    μ = u * u¹ + v * v¹
+    t * μ / x²
+end
 
-Computes the function ``ν(x) = (uu¹ + vv¹) / |x|²`` where `u,v = reim(x)`.
-This is equivalent to computing ``d/dt log|x(t)|``.
-"""
 function ν_Δν(x::Number, ẋ::Number, ẍ::Number, t)
     u, v = reim(x)
     u¹, v¹ = reim(ẋ)
@@ -102,6 +105,8 @@ function update!(
         val_x²ᵢ, Δval_x²ᵢ = ν_Δν(2 * x²[i], 6 * x³[i], 24 * x⁴[i], t)
         val.val_x²[i] = val_x²ᵢ + 2
         val.Δval_x²[i] = abs(Δval_x²ᵢ)
+
+        val.val_x³[i] = ν(6 * x³[i], 24 * x⁴[i], t) + 3
     end
     val.t = t
 
