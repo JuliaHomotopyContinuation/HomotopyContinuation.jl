@@ -10,13 +10,13 @@
         HC2.init!(val)
         track!(tracker, S[1], 1, 1e-13)
 
-        @unpack x, t, x¹, x², x³ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, real(t))
+        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
 
-        @test val.w[1] ≈ 0 atol = (1e-13)^(1/5)
-        @test val.Δω[1] ≈ abs(val.w[1]) rtol = 0.5
-        @test val.σ[1] ≈ 1/5 atol = (1e-13)^(1/5)
-        @test val.Δσ[1] ≈ abs(1/5 - val.σ[1]) rtol = 0.5
+        @test val.val_x[1] ≈ 0 atol = (1e-13)^(1/5)
+        @test val.Δval_x[1] < abs(val.val_x[1])
+        @test val.val_x¹[1] ≈ 1/5 atol = (1e-13)^(1/5)
+        @test val.Δval_x¹[1] < abs(1/5 - val.val_x¹[1])
     end
 
     @testset "Example 2" begin
@@ -32,17 +32,17 @@
         tf = 1e-10
         track!(tracker, S[3], 1, tf)
 
-        @unpack x, t, x¹, x², x³ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, real(t))
+        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
 
-        @test val.w[1] ≈ -1 atol = tf^(1/2)
-        @test val.w[2] ≈ -1 atol = tf^(1/2)
-        @test val.Δω[1] ≈ abs(-1 - val.w[1]) rtol = 0.5
-        @test val.Δω[2] ≈ abs(-1 - val.w[2]) rtol = 0.5
-        @test val.σ[1] ≈ -1 atol = tf
-        @test val.σ[2] ≈ -1 atol = tf
-        @test val.Δσ[1] ≈ abs(-1 - val.σ[1]) rtol = 2
-        @test val.Δσ[2] ≈ abs(-1 - val.σ[2]) rtol = 2
+        @test val.val_x[1] ≈ -1 atol = tf^(1/2)
+        @test val.val_x[2] ≈ -1 atol = tf^(1/2)
+        @test val.Δval_x[1] < 10abs(-1 - val.val_x[1])
+        @test val.Δval_x[2] < 10abs(-1 - val.val_x[2])
+        @test val.val_x¹[1] ≈ -1 atol = tf
+        @test val.val_x¹[2] ≈ -1 atol = tf
+        @test val.Δval_x¹[1] < 10abs(-1 - val.val_x¹[1])
+        @test val.Δval_x¹[2] < 10abs(-1 - val.val_x¹[2])
     end
 
     @testset "Example 3" begin
@@ -57,17 +57,17 @@
         tf = 1e-10
         HC2.track!(tracker, S[3], 1, tf)
 
-        @unpack x, t, x¹, x², x³ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, real(t))
+        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
 
-        @test val.w[1] ≈ -1/6 atol = tf^(1/6)
-        @test val.w[2] ≈ -2/6 atol = tf^(1/6)
-        @test val.Δω[1] ≈ abs(-1/6 - val.w[1]) rtol = 1
-        @test val.Δω[2] ≈ abs(-2/6 - val.w[2]) rtol = 1
-        @test val.σ[1] ≈ -1/6 atol = tf^(1/6)
-        @test val.σ[2] ≈ -2/6 atol = tf^(1/6)
-        @test val.Δσ[1] ≈ abs(-1 - val.σ[1]) rtol = 2
-        @test val.Δσ[2] ≈ abs(-1 - val.σ[2]) rtol = 2
+        @test val.val_x[1] ≈ -1/6 atol = tf^(1/6)
+        @test val.val_x[2] ≈ -2/6 atol = tf^(1/6)
+        @test val.Δval_x[1] ≈ abs(-1/6 - val.val_x[1]) rtol = 1
+        @test val.Δval_x[2] ≈ abs(-2/6 - val.val_x[2]) rtol = 1
+        @test val.val_x¹[1] ≈ -1/6 atol = tf^(1/6)
+        @test val.val_x¹[2] ≈ -2/6 atol = tf^(1/6)
+        @test val.Δval_x¹[1] ≈ abs(-1 - val.val_x¹[1]) rtol = 2
+        @test val.Δval_x¹[2] ≈ abs(-1 - val.val_x¹[2]) rtol = 2
 
         @test !isempty(sprint(show, val))
     end

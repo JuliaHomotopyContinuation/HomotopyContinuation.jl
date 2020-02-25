@@ -4,6 +4,7 @@ export ModelKit
 
 import LinearAlgebra
 using Parameters: @unpack
+import Printf
 import PrettyTables
 import StructArrays
 

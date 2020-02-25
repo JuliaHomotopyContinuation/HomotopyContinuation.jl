@@ -11,25 +11,34 @@ The valuation is estimated continously along a solution path. For this it is ass
 the path is tracked in a **logarithmic time scale**.
 """
 mutable struct Valuation
-    w::Vector{Float64}
-    Δω::Vector{Float64}
-    σ::Vector{Float64}
-    Δσ::Vector{Float64}
+    val_x::Vector{Float64}
+    Δval_x::Vector{Float64}
+    val_x¹::Vector{Float64}
+    Δval_x¹::Vector{Float64}
+    val_x²::Vector{Float64}
+    Δval_x²::Vector{Float64}
     t::Float64
 end
 
-Valuation(n::Integer) = Valuation(zeros(n), zeros(n), zeros(n), zeros(n), NaN)
+function Valuation(n::Integer)
+    Valuation(zeros(n), zeros(n), zeros(n), zeros(n), zeros(n), zeros(n), NaN)
+end
 Valuation(x::AbstractVector) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
     println(io, "Valuation :")
-    for name in [:w, :Δω, :σ, :Δσ]
+    for name in [:val_x, :Δval_x, :val_x¹, :Δval_x¹, :val_x², :Δval_x²]
         println(
             io,
             " • ",
             name,
             " → ",
-            round.(getfield(val, name); sigdigits = 8),
+            "[",
+            join(
+                [Printf.@sprintf("%.4g", v) for v in getfield(val, name)],
+                ", ",
+            ),
+            "]",
         )
     end
 end
@@ -41,10 +50,12 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 Initialize the valuation estimator to start from scratch.
 """
 function init!(val::Valuation)
-    val.w .= 0
-    val.Δω .= 0
-    val.σ .= 0
-    val.Δσ .= 0
+    val.val_x .= 0
+    val.Δval_x .= 0
+    val.val_x¹ .= 0
+    val.Δval_x¹ .= 0
+    val.val_x² .= 0
+    val.Δval_x² .= 0
     val.t = NaN
     val
 end
@@ -55,7 +66,7 @@ end
 Computes the function ``ν(x) = (uu¹ + vv¹) / |x|²`` where `u,v = reim(x)`.
 This is equivalent to computing ``d/dt log|x(t)|``.
 """
-function ν_ν̇(x::Number, ẋ::Number, ẍ::Number)
+function ν_Δν(x::Number, ẋ::Number, ẍ::Number, t)
     u, v = reim(x)
     u¹, v¹ = reim(ẋ)
     u², v² = reim(ẍ)
@@ -66,30 +77,34 @@ function ν_ν̇(x::Number, ẋ::Number, ẍ::Number)
     ν = μ / x²
     # ν̇ = μ̇ / x² - 2(μ/x²)² and  μ/x² = ν
     ν̇ = μ̇ / x² - 2 * ν^2
-    ν, ν̇
+
+    ν * t, (ν̇ * t + ν) * t
 end
 
 function update!(
     val::Valuation,
     x::AbstractVector,
-    ẋ::AbstractVector,
-    ẍ::AbstractVector,
-    x3::AbstractVector,
+    x¹::AbstractVector,
+    x²::AbstractVector,
+    x³::AbstractVector,
+    x⁴::AbstractVector,
     t::Real,
 )
     for i in eachindex(x)
-        νᵢ, ν̇ᵢ = ν_ν̇(x[i], ẋ[i], 2 * ẍ[i])
-        wᵢ = νᵢ * t
-        val.w[i] = wᵢ
+        val_xᵢ, Δval_xᵢ = ν_Δν(x[i], x¹[i], 2 * x²[i], t)
+        val.val_x[i] = val_xᵢ
+        val.Δval_x[i] = abs(Δval_xᵢ)
 
-        ν_σᵢ, ν̇_σᵢ = ν_ν̇(ẋ[i], 2 * ẍ[i], 6 * x3[i])
-        val.σ[i] = ν_σᵢ * t + 1
+        val_x¹ᵢ, Δval_x¹ᵢ = ν_Δν(x¹[i], 2 * x²[i], 6 * x³[i], t)
+        val.val_x¹[i] = val_x¹ᵢ + 1
+        val.Δval_x¹[i] = abs(Δval_x¹ᵢ)
 
-        wᵢ, Δωᵢ = val.w[i], val.Δω[i]
-        val.Δω[i] = abs((ν̇ᵢ * t + νᵢ) * t) / abs(val.σ[i])
-        val.Δσ[i] = abs((ν̇_σᵢ * t + ν_σᵢ) * t) / abs(val.σ[i])
+        val_x²ᵢ, Δval_x²ᵢ = ν_Δν(2 * x²[i], 6 * x³[i], 24 * x⁴[i], t)
+        val.val_x²[i] = val_x²ᵢ + 2
+        val.Δval_x²[i] = abs(Δval_x²ᵢ)
     end
     val.t = t
+
     val
 end
 
@@ -125,7 +140,7 @@ function judge(
     # at_infinity_tol::Float64 = throw(UndefKeywordError(:tol)),
 )
 
-    @unpack w, Δω, σ, Δσ = val
+    w, Δω, σ, Δσ = val.val_x, val.Δval_x, val.val_x¹, val.Δval_x¹
 
     singular = false
     at_infinity = false
@@ -135,7 +150,7 @@ function judge(
         # if one coordinate seems to diverge ignore all others
         # in particular don't care about indecisive results on other
         # coordinates
-        if wᵢ + Δωᵢ < -tol && Δωᵢ < tol && abs(wᵢ - σᵢ) < tol
+        if wᵢ + Δωᵢ < -tol && Δωᵢ < tol && Δσᵢ < tol && abs(wᵢ - σᵢ) < tol
             return VAL_AT_INFINITY
         end
 

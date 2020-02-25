@@ -282,11 +282,14 @@ function step!(eg_tracker::EndgameTracker)
     # update valution
     @unpack x, x¹, x², x³, x⁴ = tracker.state
     update!(state.val, x, x¹, x², x³, x⁴, t)
-    println(state.val)
-    verdict = judge(state.val, 5e-2)
 
-    if verdict == VAL_AT_INFINITY &&
-       LA.cond(tracker) > options.min_cond_at_infinity
+    println(state.val)
+
+    verdict = judge(state.val, 1e-2)
+    @show t verdict LA.cond(tracker)
+
+    if verdict == VAL_AT_INFINITY
+        # && LA.cond(tracker) > options.min_cond_at_infinity
         return (state.code = EGTrackerReturnCode.at_infinity)
     end
 
@@ -303,10 +306,6 @@ function step!(eg_tracker::EndgameTracker)
             state.accuracy = acc_est
             state.code = EGTrackerReturnCode.success
         end
-    end
-
-    if t < 1e-12
-        state.code = EGTrackerReturnCode.terminated_unknown
     end
 
     state.code
