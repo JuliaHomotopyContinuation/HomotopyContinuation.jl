@@ -160,9 +160,9 @@ end
 function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
-    @inbounds dmax = abs2(x[1] - y[1]) / (w[1]^2)
+    @inbounds dmax = abs2((x[1] - y[1]) / w[1])
     for i = 2:n
-        @inbounds dᵢ = abs2(x[i] - y[i]) / (w[i]^2)
+        @inbounds dᵢ = abs2((x[i] - y[i]) / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
     sqrt(dmax)
@@ -180,9 +180,9 @@ end
 function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
-    @inbounds dmax = abs2(x[1]) / (w[1]^2)
+    @inbounds dmax = abs2(x[1] / w[1])
     for i = 2:n
-        @inbounds dᵢ = abs2(x[i]) / (w[i]^2)
+        @inbounds dᵢ = abs2(x[i] / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
     sqrt(dmax)

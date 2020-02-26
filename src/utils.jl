@@ -32,14 +32,14 @@ struct ComplexLineSegment
     a::ComplexF64
     b::ComplexF64
     # derived
-    Δ_b_a::ComplexDF64
-    abs_b_a::DoubleF64
+    Δ_b_a::ComplexF64
+    abs_b_a::Float64
 end
 
 function ComplexLineSegment(start::Number, target::Number)
     a = ComplexF64(start)
     b = ComplexF64(target)
-    Δ_b_a = ComplexDF64(b) - a
+    Δ_b_a = b - a
     abs_b_a = fast_abs(Δ_b_a)
 
     ComplexLineSegment(start, target, Δ_b_a, abs_b_a)
@@ -47,12 +47,11 @@ end
 
 function Base.getindex(segment::ComplexLineSegment, t::Real)
     if t == segment.abs_b_a
-        return segment.a
+        segment.a
     elseif iszero(t)
-        return segment.b
+        segment.b
     else
-        Δ = DoubleF64(t) / segment.abs_b_a
-        ComplexF64(segment.b - Δ * segment.Δ_b_a)
+        segment.b - (t / segment.abs_b_a) * segment.Δ_b_a
     end
 end
 Base.length(segment::ComplexLineSegment) = segment.abs_b_a

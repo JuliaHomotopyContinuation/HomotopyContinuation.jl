@@ -24,7 +24,7 @@ function update!(cache::Pade21, x, x¹, x², x³, x⁴)
             cache.taylor[i] = false
             τᵢ = (c² / c³) / λ
             τᵢ < τ && (τ = τᵢ)
-            cache.local_err[i] = x⁴[i] - Base.FastMath.div_fast(x³[i]^2, x²[i])
+            cache.local_err[i] = x⁴[i] - x³[i] * (x³[i] / x²[i])
         end
     end
     cache.τ[] = τ

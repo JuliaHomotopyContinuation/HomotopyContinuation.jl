@@ -248,6 +248,10 @@ end
 
 
 function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
+    if size(WS) == (1, 1)
+        x[1] = b[1] / WS[1,1]
+        return x
+    end
     WS.factorized[] || factorize!(WS)
     if WS.scaled[]
         x .= WS.row_scaling .* b
@@ -458,6 +462,7 @@ function iterative_refinement!(
     end
     δ
 end
+
 
 """
     init!(JM::Jacobian)
