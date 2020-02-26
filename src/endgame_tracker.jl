@@ -335,3 +335,96 @@ function track!(eg_tracker::EndgameTracker, x, t₁::Real)
 
     eg_tracker.state.code
 end
+
+struct EGTrackerResult{V<:AbstractVector}
+    return_code::EGTrackerReturnCode.codes
+    solution::V
+    t::Float64
+    accuracy::Float64
+    winding_number::Union{Nothing,Int}
+    # performance stats
+    accepted_steps::Int
+    rejected_steps::Int
+    valuation::Vector{Float64}
+end
+
+function EGTrackerResult(egtracker::EndgameTracker)
+    @unpack tracker, state = egtracker
+    t = real(tracker.state.t)
+    EGTrackerResult(
+        state.code,
+        copy(state.solution),
+        t,
+        state.accuracy,
+        state.winding_number,
+        tracker.state.accepted_steps,
+        tracker.state.rejected_steps,
+        copy(state.val.val_x),
+    )
+end
+
+
+function track(
+    eg_tracker::EndgameTracker,
+    x,
+    t₁::Real = 1.0;
+    debug::Bool = false,
+)
+    track!(eg_tracker, x, t₁; debug = debug)
+    EGTrackerResult(eg_tracker)
+end
+
+
+
+"""
+    solution(r::EGTrackerResult)
+
+Get the solution of the path.
+"""
+solution(r::EGTrackerResult) = r.solution
+
+
+"""
+    accuracy(r::EGTrackerResult)
+
+Get the accuracy of the solution. This is an estimate of the (relative) distance to the
+true solution.
+"""
+accuracy(r::EGTrackerResult) = r.accuracy
+
+
+"""
+    winding_number(r::EGTrackerResult)
+
+Get the winding number of the solution of the path. Returns `nothing` if it wasn't computed.
+"""
+winding_number(r::EGTrackerResult) = r.winding_number
+
+"""
+    is_success(r::EGTrackerResult)
+
+Checks whether the path is successfull.
+"""
+is_success(r::EGTrackerResult) = is_success(r.return_code)
+
+"""
+    is_failed(r::EGTrackerResult)
+
+Checks whether the path failed.
+"""
+is_failed(r::EGTrackerResult) = !(is_at_infinity(r) || is_success(r))
+
+"""
+    is_at_infinity(r::EGTrackerResult)
+
+Checks whether the path goes to infinity.
+"""
+is_at_infinity(r::EGTrackerResult) = is_at_infinity(r.return_code)
+
+
+"""
+    is_finite(r::EGTrackerResult)
+
+Checks whether the path result is finite.
+"""
+is_finite(r::EGTrackerResult) = is_success(r.return_code)
