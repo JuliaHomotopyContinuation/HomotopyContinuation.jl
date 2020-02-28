@@ -700,8 +700,8 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
     PrettyTables.pretty_table(
         io,
         data,
-        headers,
-        PrettyTables.unicode;
+        headers;
+        tf = PrettyTables.unicode,
         alignment = :c,
         header_crayon = PrettyTables.Crayon(bold = false),
         border_crayon = PrettyTables.Crayon(faint = true),
