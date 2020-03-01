@@ -61,6 +61,7 @@ function extended_prec_refinement_step!(
     x_extended .= x
     evaluate!(r, H, x_extended, ComplexDF64(t))
     LA.ldiv!(Δx, updated!(JM), r, norm)
+    iterative_refinement!(Δx, JM, r, norm; tol = 1e-8, max_iters = 3)
     x̄ .= x .- Δx
     x_extended .= x̄
     evaluate!(r, H, x_extended, ComplexDF64(t))
@@ -94,8 +95,8 @@ function newton!(
             evaluate!(r, H, x_extended, ComplexDF64(t))
         end
         LA.ldiv!(Δxᵢ, updated!(JM), r, norm)
-        if i > 0 && extended_precision
-            mixed_precision_iterative_refinement!(Δxᵢ, jacobian(JM), r)
+        if extended_precision
+            iterative_refinement!(Δxᵢ, JM, r, norm; tol = ā^2, max_iters = 3)
         end
         xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
@@ -125,7 +126,14 @@ function newton!(
             end
             LA.ldiv!(Δxᵢ, JM, r)
             if extended_precision
-                mixed_precision_iterative_refinement!(Δxᵢ, jacobian(JM), r)
+                iterative_refinement!(
+                    Δxᵢ,
+                    JM,
+                    r,
+                    norm;
+                    tol = ā^2,
+                    max_iters = 3,
+                )
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
@@ -137,6 +145,13 @@ function newton!(
                 μ = norm(Δxᵢ)
             end
 
+            if extended_precision
+                x_extended .= xᵢ
+                evaluate!(r, H, x_extended, ComplexDF64(t))
+                LA.ldiv!(Δxᵢ, JM, r)
+                norm_Δxᵢ = norm_Δxᵢ₊₁
+                μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
+            end
             # TODO: NOT IN PAPER SO FAR
             if i == 0
                 ω̄ = 2 * norm_Δxᵢ / norm_Δxᵢ₊₁^2
