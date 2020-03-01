@@ -1,8 +1,12 @@
+export is_at_infinity, is_failed
+
 Base.@kwdef mutable struct EndgameTrackerOptions
     endgame_start::Float64 = 0.1
-    min_cond_at_infinity::Float64 = 1e4
+    min_cond_at_infinity::Float64 = 1e10
     cond_cauchy::Float64 = 1e8
-    max_winding_number::Int = 12
+    max_winding_number::Int = 20
+    at_zero_check::Bool = false
+    at_infinity_check::Bool = true
 end
 
 
@@ -29,6 +33,7 @@ The possible states a `PathTracker` can be in:
     tracking
     success
     at_infinity
+    at_zero
     terminated_accuracy_limit
     terminated_invalid_startvalue
     terminated_ill_conditioned
@@ -123,6 +128,7 @@ mutable struct EndgameTrackerState{V<:AbstractVector}
     last_point::V
     last_t::Float64
     max_winding_number_hit::Bool
+    last_val_singular::Bool
 end
 
 function EndgameTrackerState(x::AbstractVector)
@@ -135,6 +141,7 @@ function EndgameTrackerState(x::AbstractVector)
     last_point = copy(x)
     last_t = NaN
     max_winding_number_hit = false
+    last_val_singular = false
     EndgameTrackerState(
         code,
         val,
@@ -144,7 +151,8 @@ function EndgameTrackerState(x::AbstractVector)
         prediction,
         last_point,
         last_t,
-        max_winding_number_hit
+        max_winding_number_hit,
+        last_val_singular,
     )
 end
 
@@ -167,6 +175,8 @@ function EndgameTracker(tracker::Tracker; kwargs...)
     EndgameTracker(tracker, state, options)
 end
 
+Base.broadcastable(T::EndgameTracker) = Ref(T)
+
 function init!(eg_tracker::EndgameTracker, x, t₁::Real)
     @unpack tracker, state, options = eg_tracker
 
@@ -177,6 +187,7 @@ function init!(eg_tracker::EndgameTracker, x, t₁::Real)
     state.solution .= NaN
     state.accuracy = NaN
     state.winding_number = nothing
+    state.last_val_singular = false
 
     eg_tracker
 end
@@ -263,7 +274,7 @@ function cauchy!(
     @label _return
 
     if result == CAUCHY_TERMINATED
-        init!(tracker, base_point, t, 0.0, ω, μ; keep_steps = true)
+        init!(tracker, last_point, t, 0.0, ω, μ; keep_steps = true)
     else
         init!(tracker, 0.0)
     end
@@ -272,40 +283,71 @@ function cauchy!(
 end
 
 
-function step!(eg_tracker::EndgameTracker)
+function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     @unpack tracker, state, options = eg_tracker
 
     step!(tracker)
     t = real(tracker.state.t)
     state.code = status(tracker)
 
+    if is_success(state.code)
+        state.accuracy = tracker.state.accuracy
+        state.solution .= tracker.state.x
+        return state.code
+    end
     is_tracking(state.code) || return state.code
-    # t < options.endgame_start || return state.code
+    t < options.endgame_start || return state.code
     !tracker.state.last_step_failed || return state.code
 
     # update valution
     @unpack x, x¹, x², x³, x⁴ = tracker.state
     update!(state.val, x, x¹, x², x³, x⁴, t)
-
+    at_infinity_tol = begin
+        if tracker.state.use_extended_prec
+            1e-4
+        elseif LA.cond(tracker) > options.min_cond_at_infinity
+            1e-3
+        else
+            1e-5
+        end
+    end
+    singular_tol = begin
+        if LA.cond(tracker) > options.cond_cauchy
+            1e-4
+        else
+            1e-4
+        end
+    end
     verdict = judge(
-        state.val,
-        1e-2;
-        at_infinity_tol = 1e-2,
+        state.val;
+        in_torus_tol = 1e-2,
+        singular_tol = singular_tol,
+        at_infinity_tol = at_infinity_tol,
         max_winding_number = options.max_winding_number,
     )
+    if debug
+        printstyled("t = ", t, "\n", color = :yellow)
+        println("cond = ", LA.cond(tracker))
+        println(state.val)
+        println(verdict)
+        println()
+    end
 
-    if verdict == VAL_AT_INFINITY
+    if options.at_infinity_check && verdict.at_infinity
         return (state.code = EGTrackerReturnCode.at_infinity)
+    elseif options.at_zero_check && verdict.at_zero
+        return (state.code = EGTrackerReturnCode.at_zero)
+    elseif LA.cond(tracker) > 1e13
+        return (state.code = EGTrackerReturnCode.terminated_ill_conditioned)
     end
 
     # if valuation indicates singular solution
     # or finite but bad conditioned, start cauchy endgame
-    if verdict == VAL_FINITE_SINGULAR || (
-        verdict == VAL_FINITE && (
-            LA.cond(tracker) > options.cond_cauchy ||
-            tracker.state.use_extended_prec
-        )
-    )
+    singular =
+        verdict.finite &&
+        (verdict.singular || LA.cond(tracker) > options.cond_cauchy)
+    # TODO: Check consistency of result -> second eg round
+    if singular && state.last_val_singular
         res, m, acc_est = cauchy!(state, tracker, options)
         if res == CAUCHY_SUCCESS
             state.winding_number = m
@@ -321,16 +363,20 @@ function step!(eg_tracker::EndgameTracker)
         elseif res == CAUCHY_TERMINATED
             state.code = tracker.state.code
         end
+    elseif verdict.singular
+        state.last_val_singular = true
+    else
+        state.last_val_singular = false
     end
 
     state.code
 end
 
-function track!(eg_tracker::EndgameTracker, x, t₁::Real)
+function track!(eg_tracker::EndgameTracker, x, t₁::Real; debug::Bool = false)
     init!(eg_tracker, x, t₁)
 
     while is_tracking(eg_tracker.state.code)
-        step!(eg_tracker)
+        step!(eg_tracker, debug)
     end
 
     eg_tracker.state.code

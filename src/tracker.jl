@@ -23,7 +23,7 @@ Base.@kwdef mutable struct TrackerOptions
     β_ω::Float64 = 10.0
     β_τ::Float64 = 0.75
     extended_precision::Bool = true
-    min_step_size::Float64 = exp2(-3*53)
+    min_step_size::Float64 = exp2(-3 * 53)
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -292,7 +292,7 @@ function compute_derivatives!(
     # Check if we have to do iterative refinment for all the others as well
     δ = iterative_refinement!(x¹, jacobian, u, norm; fixed_precision = true)
     state.cond_J_ẋ = δ / eps()
-    iterative_refinement = δ > sqrt(eps())
+    iterative_refinement = δ > 1e-10
     if iterative_refinement
         if !derivative_refinement!(x¹, jacobian, u, norm)
             state.code = TrackerReturnCode.terminated_ill_conditioned
@@ -323,10 +323,10 @@ function derivative_refinement!(x, jacobian, u, norm)
         jacobian,
         u,
         norm;
-        tol = sqrt(eps()),
+        tol = 1e-10,
         max_iters = 3,
     )
-    δ̂ < sqrt(eps())
+    δ̂ < 1e-10
 end
 
 # TRACKER
@@ -563,16 +563,18 @@ function update_precision!(tracker::Tracker, μ_low)
     elseif μ * ω > a * (a^2)^2 * _h(a)
         state.use_extended_prec = true
         state.used_extended_prec = true
-        # do one refinement step
-        μ = extended_prec_refinement_step!(
-            x,
-            corrector,
-            homotopy,
-            x,
-            t,
-            jacobian,
-            norm,
-        )
+        # do two refinement steps
+        for i = 1:2
+            μ = extended_prec_refinement_step!(
+                x,
+                corrector,
+                homotopy,
+                x,
+                t,
+                jacobian,
+                norm,
+            )
+        end
         state.μ = max(μ, eps())
     end
 

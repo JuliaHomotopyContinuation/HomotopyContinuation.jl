@@ -12,31 +12,32 @@ the path is tracked in a **logarithmic time scale**.
 """
 mutable struct Valuation
     val_x::Vector{Float64}
-    Δval_x::Vector{Float64}
     val_x¹::Vector{Float64}
-    Δval_x¹::Vector{Float64}
     val_x²::Vector{Float64}
+    Δval_x::Vector{Float64}
+    Δval_x¹::Vector{Float64}
     Δval_x²::Vector{Float64}
-    val_x³::Vector{Float64}
-    t::Float64
+    δ_x::Vector{Float64}
+    δ_x¹::Vector{Float64}
 end
 
 function Valuation(n::Integer)
-    Valuation((zeros(n) for i = 1:7)..., NaN)
+    Valuation((zeros(n) for i = 1:8)...)
 end
 Valuation(x::AbstractVector) = Valuation(length(x))
 
 function Base.show(io::IO, val::Valuation)
     print(io, "Valuation :")
-    for name in [:val_x, :val_x¹, :val_x², :val_x³, :Δval_x, :Δval_x¹, :Δval_x²]
+    fs = [:val_x, :val_x¹, :val_x², :Δval_x, :Δval_x¹, :Δval_x², :δ_x, :δ_x¹]
+    for field in fs
         print(
             io,
             "\n • ",
-            name == :val_x ? "val_x " : name,
+            field == :val_x ? "val_x " : field,
             " → ",
             "[",
             join(
-                [Printf.@sprintf("%#.5g", v) for v in getfield(val, name)],
+                [Printf.@sprintf("%#.4g", v) for v in getfield(val, field)],
                 ", ",
             ),
             "]",
@@ -52,12 +53,13 @@ Initialize the valuation estimator to start from scratch.
 """
 function init!(val::Valuation)
     val.val_x .= 0
-    val.Δval_x .= 0
     val.val_x¹ .= 0
-    val.Δval_x¹ .= 0
     val.val_x² .= 0
+    val.Δval_x .= 0
+    val.Δval_x¹ .= 0
     val.Δval_x² .= 0
-    val.t = NaN
+    val.δ_x .= 0
+    val.δ_x¹ .= 0
     val
 end
 
@@ -69,20 +71,42 @@ function ν(x::Number, ẋ::Number, t)
     t * μ / x²
 end
 
-function ν_Δν(x::Number, ẋ::Number, ẍ::Number, t)
+function ν_ν¹(x, x¹, x², t)
     u, v = reim(x)
-    u¹, v¹ = reim(ẋ)
-    u², v² = reim(ẍ)
+    u¹, v¹ = reim(x¹)
+    u², v² = reim(x²)
 
-    x² = abs2(x)
+    xx = abs2(x)
+
     μ = u * u¹ + v * v¹
-    μ̇ = u * u² + u¹^2 + v * v² + v¹^2
-    ν = μ / x²
-    # ν̇ = μ̇ / x² - 2(μ/x²)² and  μ/x² = ν
-    ν̇ = μ̇ / x² - 2 * ν^2
+    l = μ / xx
 
-    ν * t, (ν̇ * t + ν) * t
+    μ¹ = u * u² + u¹^2 + v * v² + v¹^2
+    l¹ = μ¹ / xx - 2 * l^2
+
+    t * l, t * l¹ + l
 end
+
+function ν_ν¹_ν²(x, x¹, x², x³, t)
+    u, v = reim(x)
+    u¹, v¹ = reim(x¹)
+    u², v² = reim(x²)
+    u³, v³ = reim(x³)
+
+    xx = abs2(x)
+
+    μ = u * u¹ + v * v¹
+    l = μ / xx
+
+    μ¹ = u * u² + u¹^2 + v * v² + v¹^2
+    l¹ = μ¹ / xx - 2 * l^2
+
+    μ² = u * u³ + 3u¹ * u² + v * v³ + 3v¹ * v²
+    l² = μ² / xx - 2 * μ * μ¹ / xx^2 - 4l * l¹
+
+    t * l, t * l¹ + l, t * l² + 2l¹
+end
+
 
 function update!(
     val::Valuation,
@@ -94,21 +118,40 @@ function update!(
     t::Real,
 )
     for i in eachindex(x)
-        val_xᵢ, Δval_xᵢ = ν_Δν(x[i], x¹[i], 2 * x²[i], t)
-        val.val_x[i] = val_xᵢ
-        val.Δval_x[i] = abs(Δval_xᵢ)
+        xᵢ, x¹ᵢ, x²ᵢ, x³ᵢ, x⁴ᵢ = x[i], x¹[i], 2 * x²[i], 6 * x³[i], 24 * x⁴[i]
+        ν, ν¹, ν² = ν_ν¹_ν²(xᵢ, x¹ᵢ, x²ᵢ, x³ᵢ, t)
+        ν_t = t * ν¹
+        ν_t¹ = t * ν² + ν¹
 
-        val_x¹ᵢ, Δval_x¹ᵢ = ν_Δν(x¹[i], 2 * x²[i], 6 * x³[i], t)
-        val.val_x¹[i] = val_x¹ᵢ + 1
-        val.Δval_x¹[i] = abs(Δval_x¹ᵢ)
+        δ_x = t * ν_t¹ / ν_t
+        Δx = ν_t / δ_x
+        val_x = ν - Δx
 
-        val_x²ᵢ, Δval_x²ᵢ = ν_Δν(2 * x²[i], 6 * x³[i], 24 * x⁴[i], t)
-        val.val_x²[i] = val_x²ᵢ + 2
-        val.Δval_x²[i] = abs(Δval_x²ᵢ)
+        val.val_x[i] = val_x
+        val.Δval_x[i] = Δx
+        val.δ_x[i] = δ_x
 
-        val.val_x³[i] = ν(6 * x³[i], 24 * x⁴[i], t) + 3
+        # valuation of t x¹
+        ν, ν¹, ν² = ν_ν¹_ν²(x¹ᵢ, x²ᵢ, x³ᵢ, x⁴ᵢ, t)
+        ν_t = t * ν¹
+        ν_t¹ = t * ν² + ν¹
+
+        δ_x¹ = t * ν_t¹ / ν_t
+        Δx¹ = ν_t / δ_x¹
+        val_x¹ = ν + 1 - Δx¹
+
+        val.val_x¹[i] = val_x¹
+        val.Δval_x¹[i] = Δx¹
+        val.δ_x¹[i] = δ_x¹
+        # valuation of t^2 x²
+        ν, ν¹ = ν_ν¹(x²ᵢ, x³ᵢ, x⁴ᵢ, t)
+        ν_t = t * ν¹
+        Δx² = ν_t / δ_x¹
+        # reuse δ_x¹ from tx¹
+        val_x² = ν + 2 - Δx²
+        val.val_x²[i] = val_x²
+        val.Δval_x²[i] = Δx²
     end
-    val.t = t
 
     val
 end
@@ -129,6 +172,12 @@ The possible states the [`judge`](@ref) function returns:
     VAL_AT_INFINITY
 end
 
+function mean_dev(a::Vararg{T,N}) where {T,N}
+    m = sum(a) / N
+    σ = sqrt(sum((a .- m) .^ 2)) / abs(m)
+    m, σ
+end
+
 """
     judge(val::Valuation; tol, tol_at_infinity)::ValuationVerdict
 
@@ -140,57 +189,85 @@ of [`ν``](@ref) is smaller than `tol_at_infinity`.
 The `tol` is used to estimate whether a finite valuation is trustworthy.
 """
 function judge(
-    val::Valuation,
-    tol::Float64;
+    val::Valuation;
+    in_torus_tol::Float64 = throw(UndefKeywordError(:in_torus_tol)),
     at_infinity_tol::Float64 = throw(UndefKeywordError(:at_infinity_tol)),
+    singular_tol::Float64 = throw(UndefKeywordError(:singular_tol)),
     max_winding_number::Int = throw(UndefKeywordError(:max_winding_number)),
 )
-    singular = false
+    in_torus = true
+    at_zero = false
     at_infinity = false
+    singular = false
     indecisive = false
 
-    @unpack val_x, Δval_x, val_x¹, Δval_x¹, val_x², Δval_x², val_x³ = val
+    @unpack val_x, val_x¹, val_x², Δval_x, Δval_x¹, Δval_x², δ_x, δ_x¹ = val
 
     ε = 1 / max_winding_number
 
-    for i = 1:length(val_x)
-        # if one coordinate seems to diverge ignore all others
-        # in particular don't care about indecisive results on other
-        # coordinates
+    for (i, val_xᵢ) in enumerate(val_x)
 
-        # At infinity check
-        # Idea: If val ≠ 0 then then all val_x values coincide. We consider
-        #       to have correct
+        # at infinity check (val(x) < 0)
         #
-        val_mean = (val_x[i] + val_x¹[i] + val_x²[i] + val_x³[i]) / 4
-        if val_mean < -ε && abs(val_x[i] - val_mean) < at_infinity_tol &&
-           abs(val_x¹[i] - val_mean) < at_infinity_tol &&
-           abs(val_x²[i] - val_mean) < at_infinity_tol &&
-           abs(val_x³[i] - val_mean) < at_infinity_tol &&
-           min(Δval_x[i], Δval_x¹[i], Δval_x²[i]) < at_infinity_tol
-            return VAL_AT_INFINITY
+        # -->  val_xᵢ, val_x¹[i], val_x²[i] coincide
+
+        # check that they coincide by computing relative std. derivation
+        m, σ = mean_dev(val_xᵢ, val_x¹[i], val_x²[i])
+        if m < -in_torus_tol && σ < at_infinity_tol
+            at_infinity = true
+            in_torus = false
         end
 
-        # If we have a finite value then val_x[i] ≈ 0 and
-        # the others have to conincide
-        if max(Δval_x[i], Δval_x¹[i], Δval_x²[i]) > tol
+        # zero check (val(x) > 0)
+
+        # possible cases
+        # 1) 0 < val(x) && val(x) ∉ ℕ₊
+        #   -->  val_xᵢ, val_x¹[i], val_x²[i] coincide
+        # 2) val(x) ∈ ℕ₊
+        #   -->
+        #   a) val_xᵢ = 1 : val_x¹[i]  -> 1, val_x²[i] -> 2
+        #   b) val_xᵢ ≥ 2 : val_xᵢ, val_x¹[i], val_x²[i] coincide
+
+        # Case 1) and 2)b
+        if (m > in_torus_tol && σ < at_infinity_tol) ||
+           # Case 2b)
+           at_infinity_tol >
+           √((1 - val_xᵢ)^2 + (1 - val_x¹[i])^2 + (1 - 0.5 * val_x²[i])^2)
+            at_zero = true
+            in_torus = false
+        # torus check
+
+        # val(x) = 0
+        elseif abs(val_xᵢ) > in_torus_tol
+            in_torus = false
             indecisive = true
-        else
-            # check solution in torus
-            if val_x[i] > -ε + tol
-                if val_x³[i] > ε + tol &&
-                   # check whether val is fraction
-                   abs(round(Int, val_x³[i]) - val_x³[i]) > ε
-                    singular = true
-                end
-            else
-                # probably diverging but not yet sure
-                indecisive = true
+        end
+
+
+        # torus singular check (val(x) = 0, m > 1)
+        #  the case if val_x¹[i], val_x²[i] coincide and val_x¹[i] ∉ ℕ₊
+        if in_torus
+            m₃, σ₃ = mean_dev(val_x¹[i], val_x²[i])
+            is_fractional = abs(round(Int, m₃) - m₃) ≥ ε - singular_tol
+            if m₃ > in_torus_tol && is_fractional && σ₃ < singular_tol
+                singular = true
             end
         end
-    end
-    indecisive && return VAL_INDECISIVE
-    singular && return VAL_FINITE_SINGULAR
 
-    VAL_FINITE
+        # zero singular check (val(x) > 0, m > 1)
+        #  the case if
+        #    val_xᵢ > 0, val_xᵢ ∉ ℕ₊, and val_xᵢ, val_x¹[i], val_x²[i] coincide
+        is_fractional = abs(round(Int, m) - m) ≥ ε - singular_tol
+        if m > in_torus_tol && is_fractional && σ < singular_tol
+            singular = true
+        end
+    end
+
+    return (
+        in_torus = in_torus,
+        at_zero = at_zero,
+        finite = !(at_infinity || indecisive),
+        at_infinity = at_infinity,
+        singular = singular,
+    )
 end
