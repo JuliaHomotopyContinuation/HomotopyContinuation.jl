@@ -24,6 +24,7 @@ Base.@kwdef mutable struct TrackerOptions
     β_τ::Float64 = 0.75
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
+    use_strict_trust_region::Bool = false
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -396,8 +397,13 @@ function initial_step_size(
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     e = state.norm(local_error(predictor))
+    if options.use_strict_trust_region
+        τ = strict_trust_region(predictor)
+    else
+        τ = trust_region(predictor)
+    end
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
-    Δs₂ = options.β_τ * trust_region(predictor)
+    Δs₂ = options.β_τ * τ
     min(Δs₁, Δs₂, options.max_step_size)
 end
 
@@ -410,6 +416,11 @@ function update_stepsize!(
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     p = order(predictor)
+    if options.use_strict_trust_region
+        τ = strict_trust_region(predictor)
+    else
+        τ = trust_region(predictor)
+    end
     if is_converged(result)
         e = state.norm(local_error(predictor))
         if isinf(e)
@@ -417,7 +428,7 @@ function update_stepsize!(
         else
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         end
-        Δs₂ = options.β_τ * trust_region(predictor)
+        Δs₂ = options.β_τ * τ
         Δs = min(Δs₁, Δs₂, options.max_step_size)
         s′ = max(0.0, state.s - Δs)
         if state.last_step_failed
