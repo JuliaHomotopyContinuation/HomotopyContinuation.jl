@@ -347,11 +347,16 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
             end
         end
     elseif cls == :Symbol
+        is_in_vars = false
         for (i, v) in enumerate(vars)
             if v == op
                 d[i] = 1
+                is_in_vars = true
                 break
             end
+        end
+        if !is_in_vars
+            coeff = copy(op)
         end
     elseif cls == :Pow
         vec = args!(pow_args, op)
@@ -376,6 +381,26 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
     dict
 end
 
+"""
+    exponents_coefficients(f::Expression, vars::AbstractVector{Variable})
+
+Return a matrix `M` containing the exponents for all occuring terms
+(one term per column) and a vector `c` containing the corresponding coefficients.
+"""
+function exponents_coefficients(f::Expression, vars::AbstractVector{Variable})
+    D = ModelKit.to_dict(f, vars)
+    # make exponents to matrix
+    m = length(D)
+    n = length(vars)
+    M = zeros(Int, n, m)
+    for (j, E) in enumerate(keys(D))
+        for (i, dᵢ) in enumerate(E)
+            M[i, j] = dᵢ
+        end
+    end
+    coeffs = collect(values(D))
+    M, coeffs
+end
 
 """
     degree(f::AbstractVector{Expression}, vars = collect(variables(f); expanded = false)
@@ -412,6 +437,127 @@ function degree(
     dicts = ModelKit.to_dict(f, vars)
     maximum(sum, keys(dicts))
 end
+
+################
+# Optimization #
+################
+
+"""
+    horner(f::Expression, vars = collect(variables(f)))
+
+Rewrite `f` using a multi-variate horner schema.
+
+### Example
+```julia
+julia> @var u v c[1:3]
+(u, v, Variable[c₁, c₂, c₃])
+
+julia> f = c[1] + c[2] * v + c[3] * u^2 * v^2 + c[3]u^3 * v
+c₁ + v*c₂ + u^2*v^2*c₃ + u^3*v*c₃
+
+julia> ModelKit.horner(f)
+c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
+```
+"""
+function horner(f::Expression, vars = collect(variables(f)))
+    M, coeffs = ModelKit.exponents_coefficients(f, vars)
+    multivariate_horner(M, coeffs, vars)
+end
+
+function horner(coeffs::AbstractVector{Expression}, var::Variable)
+    d = length(coeffs) - 1
+    h = copy(coeffs[d+1])
+    @inbounds for k in d:-1:1
+        ModelKit.mul!(h, h, var)
+        ModelKit.add!(h, h, coeffs[k])
+    end
+    h
+end
+
+function multivariate_horner(M::AbstractMatrix{Int}, coeffs::AbstractVector{Expression}, vars::AbstractVector{Variable})
+    n, m = size(M)
+    if m == 1
+        fast_c = coeffs[1]
+        for (i, var) in enumerate(vars)
+            if M[i, 1] != 0
+                if M[i,1] == 1
+                    fast_c *= var
+                else
+                    fast_c *= var^M[i,1]
+                end
+            end
+        end
+        return fast_c::Expression
+    elseif n == 1
+        d = maximum(M)
+        uni_coeff_indices = Union{Nothing,Int}[nothing for _ in 0:d]
+        for j in 1:size(M, 2)
+            uni_coeff_indices[M[1,j] + 1] = j
+        end
+
+        var_coeffs = map(uni_coeff_indices) do ind
+            if isnothing(ind)
+                return zero(vars[1])
+            else
+                coeffs[ind]
+            end
+        end
+
+        horner(var_coeffs, vars[1])
+    else
+        counts = zeros(Int, n)
+        @inbounds for j in 1:size(M, 2), i in 1:size(M,1)
+            counts[i] += M[i,j] > 0
+        end
+
+        _, var_ind = findmax(counts)
+        var = vars[var_ind]
+
+        # compute degree in vars[var_ind]
+        d = 0
+        for j in 1:size(M, 2)
+            d = max(d, M[var_ind,j])
+        end
+
+        # find coefficients
+        coeff_indices = [Int[] for _ in 0:d]
+        for j in 1:size(M, 2)
+            push!(coeff_indices[M[var_ind,j] + 1], j)
+        end
+
+        reduced_vars_ind = Int[]
+        for i in 1:n
+            if counts[i] > 0 && i != var_ind
+                push!(reduced_vars_ind, i)
+            end
+        end
+        reduced_vars = view(vars, reduced_vars_ind)
+
+        var_coeffs = map(coeff_indices) do ind
+            isempty(ind) && return zero(var)
+            if length(ind) == 1
+                j = first(ind)
+                c = coeffs[j]
+                for i in reduced_vars_ind
+                    if M[i, j] != 0
+                        if M[i,j] == 1
+                            c *= vars[i]
+                        else
+                            c *= vars[i]^M[i,j]
+                        end
+                    end
+                end
+                return c::Expression
+            end
+            M_ind = view(M, reduced_vars_ind, ind)
+            coeffs_ind = view(coeffs, ind)
+            multivariate_horner(M_ind, coeffs_ind, reduced_vars)::Expression
+        end
+        horner(var_coeffs, var)
+    end
+end
+
+
 
 #########################
 ## System and Homotopy ##
