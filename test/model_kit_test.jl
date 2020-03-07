@@ -36,7 +36,8 @@ using HomotopyContinuation2.ModelKit
         @test subs(f, x => z) == z^2 * (z + w * y)
         @test subs([f], x => z) == [z^2 * (z + w * y)]
         @test subs(f, [x, y] => [z^2, z + 2]) == z^4 * (w * (2 + z) + z^2)
-        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 * (u * (2 + z) + z^2)
+        @test subs(f, [x, y] => [z^2, z + 2], w => u) ==
+              z^4 * (u * (2 + z) + z^2)
         @test subs(f, x => z^2, y => 3, w => u) == z^4 * (3 * u + z^2)
     end
 

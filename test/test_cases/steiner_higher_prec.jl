@@ -138,18 +138,18 @@
         System(F, [a; vec(y)], vec(v))
     end
 
-    tracker = Tracker(HC2.ParameterHomotopy(F, p, q), a = 0.05, extended_precision = false)
+    tracker = Tracker(ParameterHomotopy(F, p, q), a = 0.05, extended_precision = false)
     failed_res = track(tracker, s_p, 1, 0)
-    @test HC2.is_terminated(failed_res.returncode)
+    @test is_terminated(failed_res.returncode)
     @test !failed_res.extended_precision_used
     tracker.options.extended_precision = true
     # check that we can track back and forth
     r_q = track(tracker, s_p, 1, 0)
-    @test HC2.is_success(r_q)
+    @test is_success(r_q)
     @test r_q.extended_precision_used
-    @test HC2.solution(r_q) ≈ s_q
+    @test solution(r_q) ≈ s_q
     r_p = track(tracker, r_q, 0, 1)
-    @test HC2.is_success(r_p)
+    @test is_success(r_p)
     @test r_p.extended_precision_used
-    @test HC2.solution(r_p) ≈ s_p
+    @test solution(r_p) ≈ s_p
 end

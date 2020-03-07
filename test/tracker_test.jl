@@ -50,12 +50,13 @@
         @test length(collect(iterator(tracker, s, 1.0, 0.0))) == 101
 
         F = System([x - a], [x], [a])
-        ct = Tracker(ParameterHomotopy(F, [1], [2]), max_step_size = 0.1)
+        ct = Tracker(ParameterHomotopy(F, [1], [2]), max_step_size = 0.125)
         Xs = Vector{ComplexF64}[]
         for (x, t) in iterator(ct, [1.0], 1.0, 0.0)
             push!(Xs, x)
         end
-        @test round.(Int, real.(first.(Xs)) .* 10) == collect(10:20)
+
+        @test round.(real.(first.(Xs)), digits=4) == collect(1:0.125:2)
     end
 
     @testset "path info" begin

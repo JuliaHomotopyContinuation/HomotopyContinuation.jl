@@ -32,7 +32,10 @@
         end
 
         HC2.evaluate_and_jacobian!(u, U, H, v, t)
-        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
+        @test U ≈ differentiate(f, [x, y])(
+            [x, y] => v,
+            [a, b, c] => t * p + (1 - t) * q,
+        )
     end
 
     @testset "ModelKitHomotopy" begin
@@ -72,9 +75,16 @@
         end
 
         HC2.evaluate_and_jacobian!(u, U, H, v, t)
-        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
+        @test U ≈ differentiate(f, [x, y])(
+            [x, y] => v,
+            [a, b, c] => t * p + (1 - t) * q,
+        )
 
-        H = ModelKit.Homotopy([(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2], [x, y], a)
+        H = ModelKit.Homotopy(
+            [(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2],
+            [x, y],
+            a,
+        )
         @test ModelKitHomotopy(ModelKit.compile(H)) isa ModelKitHomotopy
     end
 
@@ -87,16 +97,23 @@
         F = System([x^2, y^3], [x, y])
         H, starts = total_degree_homotopy(F)
         @test length(starts) == 6
-        @var t γ
+        @var t γ _s_1 _s_2
         @test H isa ModelKitHomotopy
         @test ModelKit.interpret(H.homotopy) == Homotopy(
-            [x^2 * (1 - t) + t * γ * (-1 + x^2), y^3 * (1 - t) + t * γ * (-1 + y^3)],
+            [
+                x^2 * (1 - t) + t * _s_1 * γ * (-1 + x^2),
+                y^3 * (1 - t) + t * _s_2 * γ * (-1 + y^3),
+            ],
             [x, y],
             t,
-            [γ],
+            [γ, _s_1, _s_2],
         )
 
         @test_throws ArgumentError total_degree_homotopy(System([x + y], [x]))
-        @test_throws ArgumentError total_degree_homotopy(System([x + y], [x, y], [t]))
+        @test_throws ArgumentError total_degree_homotopy(System(
+            [x + y],
+            [x, y],
+            [t],
+        ))
     end
 end

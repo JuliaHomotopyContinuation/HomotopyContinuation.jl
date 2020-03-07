@@ -12,7 +12,7 @@
     line = HC2.ComplexLineSegment(1.0, 1.0 + 1im)
     @test line isa HC2.ComplexLineSegment
     @test length(line) ≈ 1
-    @test HC2.step_size(line, 0.5) ≈ 0.5im
+    @test HC2.step_size(line, -0.5) ≈ 0.5im
     @test sprint(show, line) == "ComplexLineSegment(1.0 + 0.0im, 1.0 + 1.0im)"
 
     struct Foo_print_fieldnames

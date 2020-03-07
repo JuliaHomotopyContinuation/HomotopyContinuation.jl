@@ -14,9 +14,7 @@
         HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
 
         @test val.val_x[1] ≈ 0 atol = (1e-13)^(1/5)
-        @test val.Δval_x[1] < abs(val.val_x[1])
         @test val.val_x¹[1] ≈ 1/5 atol = (1e-13)^(1/5)
-        @test val.Δval_x¹[1] < abs(1/5 - val.val_x¹[1])
     end
 
     @testset "Example 2" begin
@@ -37,12 +35,8 @@
 
         @test val.val_x[1] ≈ -1 atol = tf^(1/2)
         @test val.val_x[2] ≈ -1 atol = tf^(1/2)
-        @test val.Δval_x[1] < 10abs(-1 - val.val_x[1])
-        @test val.Δval_x[2] < 10abs(-1 - val.val_x[2])
         @test val.val_x¹[1] ≈ -1 atol = tf
         @test val.val_x¹[2] ≈ -1 atol = tf
-        @test val.Δval_x¹[1] < 10abs(-1 - val.val_x¹[1])
-        @test val.Δval_x¹[2] < 10abs(-1 - val.val_x¹[2])
     end
 
     @testset "Example 3" begin
@@ -62,13 +56,8 @@
 
         @test val.val_x[1] ≈ -1/6 atol = tf^(1/6)
         @test val.val_x[2] ≈ -2/6 atol = tf^(1/6)
-        @test val.Δval_x[1] ≈ abs(-1/6 - val.val_x[1]) rtol = 1
-        @test val.Δval_x[2] ≈ abs(-2/6 - val.val_x[2]) rtol = 1
         @test val.val_x¹[1] ≈ -1/6 atol = tf^(1/6)
         @test val.val_x¹[2] ≈ -2/6 atol = tf^(1/6)
-        @test val.Δval_x¹[1] ≈ abs(-1 - val.val_x¹[1]) rtol = 2
-        @test val.Δval_x¹[2] ≈ abs(-1 - val.val_x¹[2]) rtol = 2
-
         @test !isempty(sprint(show, val))
     end
 end

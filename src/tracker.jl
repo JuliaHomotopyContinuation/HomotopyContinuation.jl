@@ -3,6 +3,9 @@ export Tracker,
     track,
     track!,
     is_success,
+    is_terminated,
+    is_invalid_startvalue,
+    is_tracking,
     solution,
     steps,
     accepted_steps,
@@ -20,8 +23,8 @@ Base.@kwdef mutable struct TrackerOptions
     max_step_size::Float64 = Inf
     a::Float64 = 0.125
     β_a::Float64 = 1.0
-    β_ω::Float64 = 10.0
-    β_τ::Float64 = 0.75
+    β_ω::Float64 = 20.0
+    β_τ::Float64 = 0.7
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
@@ -538,6 +541,7 @@ function init!(
 
     # initialize the predictor
     evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
+    updated!(jacobian)
     compute_derivatives_and_update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
