@@ -498,6 +498,7 @@ function init!(
 
     # intialize state
     x .= x₁
+    on_chart!(x, homotopy)
     state.segment = ComplexLineSegment(t₁, t₀)
     state.s = state.s′ = length(state.segment)
     state.Δs_prev = 0.0
@@ -551,7 +552,7 @@ function init!(
     tracker
 end
 
-function init!(tracker::Tracker, t₀)
+function init!(tracker::Tracker, t₀::Number)
     @unpack state, predictor, options = tracker
     state.segment = ComplexLineSegment(state.t, t₀)
     state.s = state.s′ = length(state.segment)

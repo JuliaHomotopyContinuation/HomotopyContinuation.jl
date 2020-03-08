@@ -3,6 +3,7 @@ export ParameterHomotopy, ModelKitHomotopy, total_degree_homotopy
 abstract type AbstractHomotopy end
 
 Base.size(H::AbstractHomotopy, i::Integer) = size(H)[i]
+on_chart!(x::Vector, H::AbstractHomotopy) = x
 
 include("homotopies/model_kit_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")

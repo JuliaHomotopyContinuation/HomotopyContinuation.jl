@@ -30,11 +30,13 @@
         F = System([x^2 - a*z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
         H = ParameterHomotopy(F, [1, 0], [2, 4])
         tracker = Tracker(on_affine_chart(H, (2,)))
+
         s = PVector([1, 1, 1])
         res = track(tracker, s, 1, 0)
         @test is_success(res)
         @test isa(solution(res), PVector{ComplexF64,1})
-        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol=1e-2
+        x₀ = abs(solution(res)[end])
+        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
     end
 
     @testset "iterator" begin
