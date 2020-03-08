@@ -73,14 +73,14 @@ function total_degree_homotopy(
     f::Vector{Expression},
     vars::Vector{Variable},
     params::Vector{Variable} = Variable[];
-    parameters::AbstractVector = ComplexF64[],
+    target_parameters::AbstractVector = ComplexF64[],
     gamma = cis(2π * rand()),
     scaling = nothing,
 )
     n = length(f)
     length(f) == length(vars) ||
     throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
-    length(params) == length(parameters) ||
+    length(params) == length(target_parameters) ||
     throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
     D = ModelKit.degree(f, vars)
@@ -100,7 +100,7 @@ function total_degree_homotopy(
         s = ones(n)
         H = ModelKitHomotopy(
             Homotopy(h, vars, t, all_params),
-            [parameters; gamma; s],
+            [target_parameters; gamma; s],
         )
         u = zeros(ComplexF64, n)
         for i in 1:3
@@ -111,7 +111,7 @@ function total_degree_homotopy(
     else
         H = ModelKitHomotopy(
             Homotopy(h, vars, t, all_params),
-            [parameters; gamma; scaling],
+            [target_parameters; gamma; scaling],
         )
     end
 

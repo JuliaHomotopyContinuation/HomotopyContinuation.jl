@@ -2,13 +2,24 @@ export is_at_infinity, is_failed
 
 Base.@kwdef mutable struct EndgameTrackerOptions
     endgame_start::Float64 = 0.1
-    min_cond_at_infinity::Float64 = 1e10
-    cond_cauchy::Float64 = 1e8
+    terminate_ill_conditioned::Float64 = 1e12
+    val_trust_tol::Float64 = 1e-3
+    # singular solutions parameters
+    val_singular_tol::Float64 = 1e-3
+    min_cond_singular::Float64 = 1e8
     max_winding_number::Int = 20
+    # at infinity parameters
+    val_at_infinity_tol::Float64 = 1e-3
+    strict_val_at_infinity_tol::Float64 = 1e-8
+    min_cond_at_infinity::Float64 = 1e10
+    max_t_at_infinity_without_cond::Float64 = 1e-14
     at_zero_check::Bool = false
     at_infinity_check::Bool = true
 end
 
+Base.show(io::IO, opts::EndgameTrackerOptions) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::EndgameTrackerOptions) =
+    opts
 
 module EGTrackerReturnCode
 import ..TrackerReturnCode
@@ -20,6 +31,7 @@ The possible states a `PathTracker` can be in:
 * `EGTrackerReturnCode.tracking`
 * `EGTrackerReturnCode.success`
 * `EGTrackerReturnCode.at_infinity`
+* `EGTrackerReturnCode.at_zero`
 * `EGTrackerReturnCode.excess_solution`
 * `EGTrackerReturnCode.post_check_failed`
 * `EGTrackerReturnCode.terminated_accuracy_limit`
@@ -67,37 +79,27 @@ end
 
 end
 
-# """
-#     endgame_tracker_code(code::TrackerReturnCode.codes)
-#
-# Construct a [`EGTrackerReturnCode.codes`](@ref) from a [`TrackerReturnCode.codes`](@ref).
-# """
-# endgame_tracker_code(code::TrackerReturnCode.codes) =
-#     EGTrackerReturnCode.code(code)
 
 """
     is_success(code::EGTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates a success in tracking.
 """
-is_success(code::EGTrackerReturnCode.codes) =
-    code == EGTrackerReturnCode.success
+is_success(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.success
 
 """
     is_success(code::EGTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates that a path diverged towards infinity.
 """
-is_at_infinity(code::EGTrackerReturnCode.codes) =
-    code == EGTrackerReturnCode.at_infinity
+is_at_infinity(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.at_infinity
 
 """
     is_tracking(code::EGTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates the tracking is not going on.
 """
-is_tracking(code::EGTrackerReturnCode.codes) =
-    code == EGTrackerReturnCode.tracking
+is_tracking(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.tracking
 
 """
     is_invalid_startvalue(code::EGTrackerReturnCode.codes)
@@ -165,7 +167,7 @@ struct EndgameTracker{
     M<:AbstractMatrix{ComplexF64},
 }
     tracker::Tracker{H,V,V̄,M}
-    state::EndgameTrackerState
+    state::EndgameTrackerState{V}
     options::EndgameTrackerOptions
 end
 
@@ -259,8 +261,7 @@ function cauchy!(
             prediction .+= x
         end
         # Check that loop is closed
-        if tracker.state.norm(last_point, x) <
-           4 * max(point_acc, tracker.state.accuracy)
+        if tracker.state.norm(last_point, x) < 4 * max(point_acc, tracker.state.accuracy)
             n = n₀ * m
             prediction .= prediction ./ n
 
@@ -282,6 +283,11 @@ function cauchy!(
     result, m, point_acc
 end
 
+function update_valuation!(state, tracker_state, t)
+    @unpack x, x¹, x², x³, x⁴ = tracker_state
+    update!(state.val, x, x¹, x², x³, x⁴, t)
+end
+
 
 function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     @unpack tracker, state, options = eg_tracker
@@ -290,62 +296,70 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     t = real(tracker.state.t)
     state.code = status(tracker)
 
-    if is_success(state.code)
+    if !is_tracking(state.code)
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         return state.code
     end
-    is_tracking(state.code) || return state.code
+
     t < options.endgame_start || return state.code
     !tracker.state.last_step_failed || return state.code
 
-    # update valution
-    @unpack x, x¹, x², x³, x⁴ = tracker.state
-    update!(state.val, x, x¹, x², x³, x⁴, t)
-    at_infinity_tol = begin
-        if tracker.state.use_extended_prec
-            1e-4
-        elseif LA.cond(tracker) > options.min_cond_at_infinity
-            1e-3
-        else
-            1e-5
-        end
+    cond = LA.cond(tracker)
+
+    # update valution if not too bad conditioned
+    # this is mainly to not label more paths as at_infinity than terminated
+    if cond < options.terminate_ill_conditioned
+        update_valuation!(state, tracker.state, t)
     end
-    singular_tol = begin
-        if LA.cond(tracker) > options.cond_cauchy
-            1e-4
-        else
-            1e-4
-        end
-    end
-    verdict = judge(
-        state.val;
-        in_torus_tol = 1e-2,
-        singular_tol = singular_tol,
-        at_infinity_tol = at_infinity_tol,
-        max_winding_number = options.max_winding_number,
-    )
+
     if debug
         printstyled("t = ", t, "\n", color = :yellow)
         println("cond = ", LA.cond(tracker))
         println(state.val)
+    end
+
+    # judge valuation
+    verdict = judge(
+        state.val;
+        in_torus_tol = options.val_trust_tol,
+        singular_tol = options.val_singular_tol,
+        at_infinity_tol = options.val_at_infinity_tol,
+        strict_at_infinity_tol = options.strict_val_at_infinity_tol,
+        max_winding_number = options.max_winding_number,
+    )
+
+    if debug
         println(verdict)
         println()
     end
 
-    if options.at_infinity_check && verdict.at_infinity
+    at_infinity =
+        options.at_infinity_check && (
+            verdict.strict_at_infinity || (
+                verdict.at_infinity && (
+                    cond > options.min_cond_at_infinity ||
+                    tracker.state.use_extended_prec ||
+                    t < options.max_t_at_infinity_without_cond
+                )
+            )
+        )
+    at_zero =
+        options.at_zero_check && verdict.at_zero &&
+        (cond > options.min_cond_at_infinity || tracker.state.use_extended_prec)
+
+    if at_infinity
         return (state.code = EGTrackerReturnCode.at_infinity)
-    elseif options.at_zero_check && verdict.at_zero
+    elseif at_zero
         return (state.code = EGTrackerReturnCode.at_zero)
-    elseif LA.cond(tracker) > 1e13
+    elseif cond > options.terminate_ill_conditioned
         return (state.code = EGTrackerReturnCode.terminated_ill_conditioned)
     end
 
     # if valuation indicates singular solution
     # or finite but bad conditioned, start cauchy endgame
     singular =
-        verdict.finite &&
-        (verdict.singular || LA.cond(tracker) > options.cond_cauchy)
+        verdict.finite && (verdict.singular || LA.cond(tracker) > options.min_cond_singular)
     # TODO: Check consistency of result -> second eg round
     if singular && state.last_val_singular
         res, m, acc_est = cauchy!(state, tracker, options)
@@ -410,12 +424,7 @@ function EGTrackerResult(egtracker::EndgameTracker)
 end
 
 
-function track(
-    eg_tracker::EndgameTracker,
-    x,
-    t₁::Real = 1.0;
-    debug::Bool = false,
-)
+function track(eg_tracker::EndgameTracker, x, t₁::Real = 1.0; debug::Bool = false)
     track!(eg_tracker, x, t₁; debug = debug)
     EGTrackerResult(eg_tracker)
 end

@@ -284,6 +284,7 @@ function compute_derivatives!(
     x,
     t;
     log_scale::Bool = false,
+    min_acc::Float64 = sqrt(eps())
 )
     # unpack stuff to make the rest easier to read
     @unpack u, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm = state
@@ -296,41 +297,41 @@ function compute_derivatives!(
     # Check if we have to do iterative refinment for all the others as well
     δ = iterative_refinement!(x¹, jacobian, u, norm; fixed_precision = true)
     state.cond_J_ẋ = δ / eps()
-    iterative_refinement = δ > 1e-10
+    iterative_refinement = δ > min_acc
     if iterative_refinement
-        if !derivative_refinement!(x¹, jacobian, u, norm)
-            state.code = TrackerReturnCode.terminated_ill_conditioned
-        end
+        δ′ = derivative_refinement!(x¹, jacobian, u, norm, min_acc)
+        # if δ′
+        #     state.code = TrackerReturnCode.terminated_ill_conditioned
+        # end
     end
 
     diff_t!(u, H, x, t, dx¹)
     u .= .-u
     LA.ldiv!(x², jacobian, u)
-    iterative_refinement && derivative_refinement!(x², jacobian, u, norm)
+    iterative_refinement && derivative_refinement!(x², jacobian, u, norm, min_acc)
 
     diff_t!(u, H, x, t, dx²)
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
-    iterative_refinement && derivative_refinement!(x³, jacobian, u, norm)
+    iterative_refinement && derivative_refinement!(x³, jacobian, u, norm, min_acc)
 
     diff_t!(u, H, x, t, dx³)
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
-    iterative_refinement && derivative_refinement!(x⁴, jacobian, u, norm)
+    iterative_refinement && derivative_refinement!(x⁴, jacobian, u, norm, min_acc)
 
     state
 end
 
-function derivative_refinement!(x, jacobian, u, norm)
+function derivative_refinement!(x, jacobian, u, norm, tol)
     δ̂ = iterative_refinement!(
         x,
         jacobian,
         u,
         norm;
-        tol = 1e-10,
+        tol = tol,
         max_iters = 3,
     )
-    δ̂ < 1e-10
 end
 
 # TRACKER
