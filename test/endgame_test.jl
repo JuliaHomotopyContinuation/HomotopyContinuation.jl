@@ -65,14 +65,15 @@ end
         @test count(r -> isnothing(r.winding_number), res) == 19
     end
 
-    @testset "(x-10)^20" begin
+    @testset "(x-10)^16" begin
+        d = 16
         @var x
-        f = [(x - 10)^20]
+        f = [(x - 10)^d]
         H, starts = total_degree_homotopy(f, [x])
         S = collect(starts)
         tracker = HC2.EndgameTracker(Tracker(H))
         res = track.(tracker, S)
-        @test count(r -> r.winding_number == 20, res) == 20
+        @test count(r -> r.winding_number == d, res) == d
     end
 
     @testset "Beyond Polyhedral Homotopy Example" begin
