@@ -18,8 +18,7 @@ Base.@kwdef mutable struct EndgameTrackerOptions
 end
 
 Base.show(io::IO, opts::EndgameTrackerOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::EndgameTrackerOptions) =
-    opts
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::EndgameTrackerOptions) = opts
 
 module EGTrackerReturnCode
 import ..TrackerReturnCode
@@ -359,7 +358,10 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     # if valuation indicates singular solution
     # or finite but bad conditioned, start cauchy endgame
     singular =
-        verdict.finite && (verdict.singular || LA.cond(tracker) > options.min_cond_singular)
+        verdict.finite && (
+            (verdict.singular && t < 1e-12) ||
+            LA.cond(tracker) > options.min_cond_singular
+        )
     # TODO: Check consistency of result -> second eg round
     if singular && state.last_val_singular
         res, m, acc_est = cauchy!(state, tracker, options)

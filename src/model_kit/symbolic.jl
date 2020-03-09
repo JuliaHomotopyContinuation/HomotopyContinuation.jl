@@ -83,10 +83,12 @@ function buildvar(var; unique::Bool = false)
         isa(var, Expr) || error("Expected $var to be a variable name")
         Base.Meta.isexpr(var, :ref) ||
         error("Expected $var to be of the form varname[idxset]")
-        (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
+        (2 ≤ length(var.args)) ||
+        error("Expected $var to have at least one index set")
         varname = var.args[1]
         prefix = unique ? string(gensym(varname)) : string(varname)
-        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname,
+        :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
@@ -117,7 +119,11 @@ Create a variable with a unique name which doesn't clash with `variables` or
 If `var` is not possible the names `var##k` for `k=0,1,...` are tried until
 one is possible,
 """
-function unique_variable(var::Symbol, vars::Vector{Variable}, params::Vector{Variable})
+function unique_variable(
+    var::Symbol,
+    vars::Vector{Variable},
+    params::Vector{Variable},
+)
     v = Variable(var)
     k = 0
     while (v in vars || v in params)
@@ -235,7 +241,10 @@ end
 function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
     [differentiate(e, var, k) for e in exprs]
 end
-function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
+function differentiate(
+    exprs::AbstractVector{<:Basic},
+    vars::AbstractVector{Variable},
+)
     [differentiate(e, v) for e in exprs, v in vars]
 end
 
@@ -264,14 +273,21 @@ julia> monomials([x,y], 2; homogeneous = true)
  y ^ 2
  ```
 """
-function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+function monomials(
+    vars::AbstractVector{Variable},
+    d::Integer;
+    homogeneous::Bool = false,
+)
     n = length(vars)
     if homogeneous
         pred = x -> sum(x) == d
     else
         pred = x -> sum(x) ≤ d
     end
-    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
+    exps = collect(Iterators.filter(
+        pred,
+        Iterators.product(Iterators.repeated(0:d, n)...),
+    ))
     sort!(exps, lt = td_order)
     map(exps) do exp
         prod(i -> vars[i]^exp[i], 1:n)
@@ -382,12 +398,18 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
 end
 
 """
-    exponents_coefficients(f::Expression, vars::AbstractVector{Variable})
+    exponents_coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
 
 Return a matrix `M` containing the exponents for all occuring terms
 (one term per column) and a vector `c` containing the corresponding coefficients.
+Expands the given expression `f` unless `expanded = true`.
 """
-function exponents_coefficients(f::Expression, vars::AbstractVector{Variable})
+function exponents_coefficients(
+    f::Expression,
+    vars::AbstractVector{Variable};
+    expanded::Bool = false,
+)
+    expanded || (f = expand(f))
     D = ModelKit.to_dict(f, vars)
     # make exponents to matrix
     m = length(D)
@@ -467,32 +489,36 @@ end
 function horner(coeffs::AbstractVector{Expression}, var::Variable)
     d = length(coeffs) - 1
     h = copy(coeffs[d+1])
-    @inbounds for k in d:-1:1
+    @inbounds for k = d:-1:1
         ModelKit.mul!(h, h, var)
         ModelKit.add!(h, h, coeffs[k])
     end
     h
 end
 
-function multivariate_horner(M::AbstractMatrix{Int}, coeffs::AbstractVector{Expression}, vars::AbstractVector{Variable})
+function multivariate_horner(
+    M::AbstractMatrix{Int},
+    coeffs::AbstractVector{Expression},
+    vars::AbstractVector{Variable},
+)
     n, m = size(M)
     if m == 1
         fast_c = coeffs[1]
         for (i, var) in enumerate(vars)
             if M[i, 1] != 0
-                if M[i,1] == 1
+                if M[i, 1] == 1
                     fast_c *= var
                 else
-                    fast_c *= var^M[i,1]
+                    fast_c *= var^M[i, 1]
                 end
             end
         end
         return fast_c::Expression
     elseif n == 1
         d = maximum(M)
-        uni_coeff_indices = Union{Nothing,Int}[nothing for _ in 0:d]
-        for j in 1:size(M, 2)
-            uni_coeff_indices[M[1,j] + 1] = j
+        uni_coeff_indices = Union{Nothing,Int}[nothing for _ = 0:d]
+        for j = 1:size(M, 2)
+            uni_coeff_indices[M[1, j]+1] = j
         end
 
         var_coeffs = map(uni_coeff_indices) do ind
@@ -506,8 +532,8 @@ function multivariate_horner(M::AbstractMatrix{Int}, coeffs::AbstractVector{Expr
         horner(var_coeffs, vars[1])
     else
         counts = zeros(Int, n)
-        @inbounds for j in 1:size(M, 2), i in 1:size(M,1)
-            counts[i] += M[i,j] > 0
+        @inbounds for j = 1:size(M, 2), i = 1:size(M, 1)
+            counts[i] += M[i, j] > 0
         end
 
         _, var_ind = findmax(counts)
@@ -515,18 +541,18 @@ function multivariate_horner(M::AbstractMatrix{Int}, coeffs::AbstractVector{Expr
 
         # compute degree in vars[var_ind]
         d = 0
-        for j in 1:size(M, 2)
-            d = max(d, M[var_ind,j])
+        for j = 1:size(M, 2)
+            d = max(d, M[var_ind, j])
         end
 
         # find coefficients
-        coeff_indices = [Int[] for _ in 0:d]
-        for j in 1:size(M, 2)
-            push!(coeff_indices[M[var_ind,j] + 1], j)
+        coeff_indices = [Int[] for _ = 0:d]
+        for j = 1:size(M, 2)
+            push!(coeff_indices[M[var_ind, j]+1], j)
         end
 
         reduced_vars_ind = Int[]
-        for i in 1:n
+        for i = 1:n
             if counts[i] > 0 && i != var_ind
                 push!(reduced_vars_ind, i)
             end
@@ -540,10 +566,10 @@ function multivariate_horner(M::AbstractMatrix{Int}, coeffs::AbstractVector{Expr
                 c = coeffs[j]
                 for i in reduced_vars_ind
                     if M[i, j] != 0
-                        if M[i,j] == 1
+                        if M[i, j] == 1
                             c *= vars[i]
                         else
-                            c *= vars[i]^M[i,j]
+                            c *= vars[i]^M[i, j]
                         end
                     end
                 end
@@ -633,9 +659,17 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
+        print(
+            io,
+            " $(length(F.variables)) variables: ",
+            join(F.variables, ", "),
+        )
         if !isempty(F.parameters)
-            print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
+            print(
+                io,
+                "\n $(length(F.parameters)) parameters: ",
+                join(F.parameters, ", "),
+            )
         end
         print(io, "\n\n")
         for i = 1:length(F)
@@ -652,7 +686,8 @@ function Base.show(io::IO, F::System)
     end
 end
 
-evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
+evaluate(F::System, x::AbstractVector) =
+    evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
@@ -737,9 +772,17 @@ end
 function Base.show(io::IO, H::Homotopy)
     if !get(io, :compact, false)
         println(io, "Homotopy in ", H.t, " of length ", length(H.expressions))
-        print(io, " $(length(H.variables)) variables: ", join(H.variables, ", "))
+        print(
+            io,
+            " $(length(H.variables)) variables: ",
+            join(H.variables, ", "),
+        )
         if !isempty(H.parameters)
-            print(io, "\n $(length(H.parameters)) parameters: ", join(H.parameters, ", "))
+            print(
+                io,
+                "\n $(length(H.parameters)) parameters: ",
+                join(H.parameters, ", "),
+            )
         end
         print(io, "\n\n")
         for i = 1:length(H)

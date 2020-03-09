@@ -11,4 +11,8 @@ const HC2 = HomotopyContinuation2
     include("tracker_test.jl")
     include("valuation_test.jl")
     include("endgame_test.jl")
+
+    if "extensive" in ARGS
+        include("extensive/extensive_test.jl")
+    end
 end

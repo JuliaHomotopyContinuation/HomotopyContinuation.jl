@@ -125,7 +125,7 @@ function update!(
         δ_x = t * ν_t¹ / ν_t
         Δx = ν_t / δ_x
         val_x = ν
-        if !isnan(Δx)
+        if !isnan(Δx) && δ_x > 0
             val_x -= Δx
         end
 
@@ -141,7 +141,7 @@ function update!(
         δ_x¹ = t * ν_t¹ / ν_t
         Δx¹ = ν_t / δ_x¹
         val_x¹ = ν + 1
-        if !isnan(Δx¹)
+        if !isnan(Δx¹) && δ_x¹ > 0
             val_x¹ -= Δx¹
         end
 
@@ -154,7 +154,7 @@ function update!(
         Δx² = ν_t / δ_x¹
         # reuse δ_x¹ from tx¹
         val_x² = ν + 2
-        if !isnan(Δx²)
+        if !isnan(Δx²) && δ_x¹ > 0
             val_x² -= Δx²
         end
         val.val_x²[i] = val_x²
@@ -200,7 +200,9 @@ function judge(
     val::Valuation;
     in_torus_tol::Float64 = throw(UndefKeywordError(:in_torus_tol)),
     at_infinity_tol::Float64 = throw(UndefKeywordError(:at_infinity_tol)),
-    strict_at_infinity_tol::Float64 = throw(UndefKeywordError(:strict_at_infinity_tol)),
+    strict_at_infinity_tol::Float64 = throw(UndefKeywordError(
+        :strict_at_infinity_tol,
+    )),
     singular_tol::Float64 = throw(UndefKeywordError(:singular_tol)),
     max_winding_number::Int = throw(UndefKeywordError(:max_winding_number)),
 )
@@ -217,6 +219,10 @@ function judge(
     ε = 1 / max_winding_number
 
     for (i, val_xᵢ) in enumerate(val_x)
+        if abs(val_xᵢ) < in_torus_tol &&
+           (val_x¹[i] < -in_torus_tol || val_x²[i] < -in_torus_tol)
+            indecisive = true
+        end
 
         # at infinity check (val(x) < 0)
         #
@@ -224,11 +230,12 @@ function judge(
 
         # check that they coincide by computing relative std. derivation
         m, σ = mean_dev(val_xᵢ, val_x¹[i], val_x²[i])
-        if m < -in_torus_tol && σ < at_infinity_tol
+        if m < -in_torus_tol && σ < at_infinity_tol && δ_x[i] > 0 && δ_x¹[i] > 0
             at_infinity = true
             in_torus = false
         end
-        if m < -in_torus_tol && σ < strict_at_infinity_tol
+        if m < -in_torus_tol &&
+           σ < strict_at_infinity_tol && δ_x[i] > 0 && δ_x¹[i] > 0
             strict_at_infinity = true
             in_torus = false
         end
@@ -244,24 +251,29 @@ function judge(
         #   b) val_xᵢ ≥ 2 : val_xᵢ, val_x¹[i], val_x²[i] coincide
 
         # Case 1) and 2)b
-        if (m > in_torus_tol && σ < at_infinity_tol) ||
-           # Case 2b)
-           at_infinity_tol >
-           √((1 - val_xᵢ)^2 + (1 - val_x¹[i])^2 + (1 - 0.5 * val_x²[i])^2)
+        if m > in_torus_tol && (
+            σ < at_infinity_tol ||
+            # Case 2b)
+            at_infinity_tol >
+            √((1 - val_xᵢ)^2 + (1 - val_x¹[i])^2 + (1 - 0.5 * val_x²[i])^2)
+        ) && δ_x[i] > 0 && δ_x¹[i] > 0
             at_zero = true
             in_torus = false
-        # torus check
+            # torus check
 
-        # val(x) = 0
+            # val(x) = 0
         elseif abs(val_xᵢ) > in_torus_tol
             in_torus = false
             indecisive = true
         end
 
-        if (m > in_torus_tol && σ < strict_at_infinity_tol) ||
-           # Case 2b)
-           strict_at_infinity_tol >
-           √((1 - val_xᵢ)^2 + (1 - val_x¹[i])^2 + (1 - 0.5 * val_x²[i])^2)
+        if m > in_torus_tol && (
+            σ < strict_at_infinity_tol || (
+                # Case 2b)
+                strict_at_infinity_tol >
+                √((1 - val_xᵢ)^2 + (1 - val_x¹[i])^2 + (1 - 0.5 * val_x²[i])^2)
+            )
+        ) && δ_x[i] > 0 && δ_x¹[i] > 0
             strict_at_zero = true
             in_torus = false
         end
@@ -271,8 +283,10 @@ function judge(
         #  the case if val_x¹[i], val_x²[i] coincide and val_x¹[i] ∉ ℕ₊
         if in_torus
             m₃, σ₃ = mean_dev(val_x¹[i], val_x²[i])
-            is_fractional = !isnan(m₃) && abs(round(Int, m₃) - m₃) ≥ ε - singular_tol
-            if m₃ > in_torus_tol && is_fractional && σ₃ < singular_tol
+            is_fractional =
+                !isnan(m₃) && abs(round(Int, m₃) - m₃) ≥ ε - singular_tol
+            if m₃ > in_torus_tol &&
+               is_fractional && σ₃ < singular_tol && δ_x[i] > 0 && δ_x¹[i] > 0
                 singular = true
             end
         end
@@ -281,7 +295,8 @@ function judge(
         #  the case if
         #    val_xᵢ > 0, val_xᵢ ∉ ℕ₊, and val_xᵢ, val_x¹[i], val_x²[i] coincide
         is_fractional = !isnan(m) && abs(round(Int, m) - m) ≥ ε - singular_tol
-        if m > in_torus_tol && is_fractional && σ < singular_tol
+        if m > in_torus_tol &&
+           is_fractional && σ < singular_tol && δ_x[i] > 0 && δ_x¹[i] > 0
             singular = true
         end
     end

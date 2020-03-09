@@ -110,7 +110,29 @@ end
     @testset "Bacillus Subtilis" begin
         H, starts = total_degree_homotopy(bacillus())
         tracker = HC2.EndgameTracker(Tracker(H))
-        @time res = track.(tracker, starts)
+        res = track.(tracker, starts)
         @test count(is_success, res) == 44
+    end
+
+    @testset "Mohab" begin
+        # Communicated by Mohab Safey El Din
+        @var x y z
+
+        F = ModelKit.horner.([
+            -9091098778555951517 * x^3 * y^4 * z^2 + 5958442613080401626 * y^2 * z^7 +
+            17596733865548170996 * x^2 * z^6 - 17979170986378486474 * x * y * z^6 -
+            2382961149475678300 * x^4 * y^3 - 15412758154771986214 * x * y^3 * z^3 + 133,
+            -10798198881812549632 * x^6 * y^3 * z - 11318272225454111450 * x * y^9 -
+            14291416869306766841 * y^9 * z - 5851790090514210599 * y^2 * z^8 +
+            15067068695242799727 * x^2 * y^3 * z^4 + 7716112995720175148 * x^3 * y * z^3 + 171,
+            13005416239846485183 * x^7 * y^3 + 4144861898662531651 * x^5 * z^4 -
+            8026818640767362673 * x^6 - 6882178109031199747 * x^2 * y^4 +
+            7240929562177127812 * x^2 * y^3 * z + 5384944853425480296 * x * y * z^4 + 88,
+        ])
+
+        H, starts = total_degree_homotopy(System(F, [x,z,y]); gamma = 0.2 + 0.4im)
+        egtracker = HC2.EndgameTracker(Tracker(H))
+        @time egres = HC2.track.(egtracker, starts)
+        count(is_success, egres) == 693
     end
 end
