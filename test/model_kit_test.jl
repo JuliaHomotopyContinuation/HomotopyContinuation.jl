@@ -1,6 +1,26 @@
 using HomotopyContinuation2.ModelKit
 
 @testset "ModelKit" begin
+
+    @testset "SymEngine" begin
+        @test Expression(MathConstants.catalan) isa Expression
+        @test Expression(MathConstants.e) isa Expression
+        @test Expression(MathConstants.pi) isa Expression
+        @test Expression(MathConstants.γ) isa Expression
+        @test Expression(Float16(2.1)) isa Expression
+        @test Expression(Float32(2.1)) isa Expression
+        @test Expression(big(2.1)) isa Expression
+        @test Expression(Int32(2)) isa Expression
+        @test Expression(Int16(2)) isa Expression
+        @test Expression(Int128(2)) isa Expression
+        @test convert(BigFloat, Expression(big(2.1))) == big(2.1)
+        @test ModelKit.is_number(Expression(2))
+        @test ModelKit.to_number(Expression(big(2.1))) isa BigFloat
+
+        @test complex(Expression(1), Expression(2)) == Expression(1) + im * 2
+        @test complex(Expression(1), 2) == Expression(1) + im * 2
+        @test complex(1, Expression(2)) == Expression(1) + im * 2
+    end
     @testset "Variables" begin
         @var a b x[1:2] y[1:2, 1:3]
 
@@ -15,6 +35,7 @@ using HomotopyContinuation2.ModelKit
         @var c, d
         @test c isa Variable
         @test d isa Variable
+        @test variables(c) == Set(c)
 
         let
             c2 = @unique_var c
@@ -27,6 +48,7 @@ using HomotopyContinuation2.ModelKit
         g = x[1]
         @test variables([f, g]) == Set([a, b, x[1]])
         @test nvariables([f, g]) == 3
+
     end
 
     @testset "Subs" begin
