@@ -185,6 +185,7 @@ julia> subs(x * y, [x,y] => [x+2,y+2])
 ```
 """
 subs(ex::Basic, args...) = subs(ex, ExpressionMap(), args...)
+subs(ex::Basic, D::Dict) = subs(ex, ExpressionMap(D))
 function subs(
     ex::Basic,
     D::ExpressionMap,
