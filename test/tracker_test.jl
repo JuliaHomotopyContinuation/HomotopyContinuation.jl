@@ -8,6 +8,7 @@
         s = [1, 1]
         res = track(tracker, s, 1, 0)
         @test is_success(res)
+        @test steps(res) == 3
         @test isa(solution(res), Vector{ComplexF64})
         @test solution(res) ≈ [sqrt(2), -sqrt(2)]
         @test length(solution(res)) == 2

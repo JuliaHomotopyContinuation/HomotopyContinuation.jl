@@ -22,48 +22,107 @@ function print_fieldnames(io::IO, obj)
 end
 
 
-"""
-    ComplexLineSegment(a, b)
+mutable struct SegmentStepper
+    start::ComplexF64
+    target::ComplexF64
+    abs_Δ::Float64
+    forward::Bool
+    # current
+    s::Float64
+    # proposed
+    s′::Float64
+end
+SegmentStepper(start::Number, target::Number) =
+    SegmentStepper(ComplexF64(start), ComplexF64(target))
+SegmentStepper(start::ComplexF64, target::ComplexF64) =
+    init!(SegmentStepper(start, target, 0.0, true, 0.0, 0.0), start, target)
 
-Models a straight line between two points `a` and `b` in the complex plane.
-Returns for `s = |b - a|` `a` and for `s=0` `b`.
-"""
-struct ComplexLineSegment
-    a::ComplexF64
-    b::ComplexF64
-    # derived
-    Δ_b_a::ComplexF64
-    abs_b_a::Float64
+init!(S::SegmentStepper, start::Number, target::Number) =
+    init!(S, ComplexF64(start), ComplexF64(target))
+function init!(S::SegmentStepper, start::ComplexF64, target::ComplexF64)
+    S.start = start
+    S.target = target
+    S.abs_Δ = abs(target - start)
+    S.forward = abs(start) < abs(target)
+    S.s = S.s′ = S.forward ? 0.0 : S.abs_Δ
+    S
 end
 
-function ComplexLineSegment(start::Number, target::Number)
-    a = ComplexF64(start)
-    b = ComplexF64(target)
-    Δ_b_a = b - a
-    abs_b_a = fast_abs(Δ_b_a)
+is_done(S::SegmentStepper) = S.forward ? S.s == S.abs_Δ : S.s == 0.0
 
-    ComplexLineSegment(start, target, Δ_b_a, abs_b_a)
-end
-
-function Base.getindex(segment::ComplexLineSegment, t::Real)
-    if t == segment.abs_b_a
-        segment.a
-    elseif iszero(t)
-        segment.b
+step_success!(S::SegmentStepper) = (S.s = S.s′; S)
+function propose_step!(S::SegmentStepper, Δs::Real)
+    if S.forward
+        S.s′ = min(S.s + Δs, S.abs_Δ)
     else
-        segment.b - (t / segment.abs_b_a) * segment.Δ_b_a
+        S.s′ = max(S.s - Δs, 0.0)
+    end
+    S
+end
+
+function Base.getproperty(S::SegmentStepper, sym::Symbol)
+    if sym == :Δs
+        s = getfield(S, :s)
+        s′ = getfield(S, :s′)
+        Δs = getfield(S, :forward) ? s′ - s : s - s′
+        return Δs
+    elseif sym === :t
+        s = getfield(S, :s)
+        start = getfield(S, :start)
+        target = getfield(S, :target)
+        abs_Δ = getfield(S, :abs_Δ)
+        forward = getfield(S, :forward)
+        return _t_helper(start, target, s, abs_Δ, forward)
+    elseif sym == :t′
+        s′ = getfield(S, :s′)
+        start = getfield(S, :start)
+        target = getfield(S, :target)
+        abs_Δ = getfield(S, :abs_Δ)
+        forward = getfield(S, :forward)
+        return _t_helper(start, target, s′, abs_Δ, forward)
+    elseif sym == :Δt
+        s = getfield(S, :s)
+        s′ = getfield(S, :s′)
+        start = getfield(S, :start)
+        target = getfield(S, :target)
+        abs_Δ = getfield(S, :abs_Δ)
+        forward = getfield(S, :forward)
+        if forward
+            Δt = ((s′ - s) / abs_Δ) * (target - start)
+        else
+            Δt = ((s - s′) / abs_Δ) * (target - start)
+        end
+        return Δt
+    else # fallback to getfield
+        return getfield(S, sym)
     end
 end
-Base.length(segment::ComplexLineSegment) = segment.abs_b_a
-
-function step_size(segment::ComplexLineSegment, Δs::Real)
-    (-Δs / segment.abs_b_a) * segment.Δ_b_a
+function _t_helper(start, target, s, Δ, forward)
+    if forward
+        if s == 0.0
+            return start
+        elseif s == Δ
+            return target
+        else
+            return start + (s / Δ) * (target - start)
+        end
+    else
+        if s == Δ
+            return start
+        elseif s == 0.0
+            return target
+        else
+            return target + (s / Δ) * (start - target)
+        end
+    end
 end
 
-function Base.show(io::IO, segment::ComplexLineSegment)
-    print(io, "ComplexLineSegment($(segment.a), $(segment.b))")
+function Base.show(io::IO, val::SegmentStepper)
+    print(io, "SegmentStepper:")
+    for field in [:start, :target, :t, :Δt]
+        print(io, "\n • ", field, " → ", getproperty(val, field))
+    end
 end
-
 
 """
     nthroot(x, n)
