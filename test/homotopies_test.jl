@@ -19,7 +19,7 @@
         HC2.evaluate!(u, H, v, t)
         @test u ≈ f([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
-        HC2.diff_t!(u, H, v, t)
+        HC2.diff_t!(u, H, v, t, (), HC2.AutomaticDifferentiation(), Inf)
         @test u ≈ let
             @var s sp[1:3] sq[1:3]
             pt = s .* sp .+ (1 .- s) .* sq
@@ -62,7 +62,7 @@
         HC2.evaluate!(u, H, v, t)
         @test u ≈ f([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
-        HC2.diff_t!(u, H, v, t)
+        HC2.diff_t!(u, H, v, t, (), HC2.AutomaticDifferentiation(), Inf)
         @test u ≈ let
             @var s sp[1:3] sq[1:3]
             pt = s .* sp .+ (1 .- s) .* sq

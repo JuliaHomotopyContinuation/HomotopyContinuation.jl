@@ -28,6 +28,7 @@ Base.@kwdef mutable struct TrackerOptions
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
+    automatic_differentiation::NTuple{4,Bool} = (true, true, true, true)
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -271,83 +272,6 @@ end
 
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
-
-function compute_derivatives!(
-    state::TrackerState,
-    H::AbstractHomotopy,
-    x,
-    t;
-    log_scale::Bool = false,
-    min_acc::Float64 = sqrt(eps()),
-    max_iters::Int = 7,
-)
-    # unpack stuff to make the rest easier to read
-    @unpack u, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm = state
-
-    # compute all taylor coefficients x¹, x², x³, x⁴
-    diff_t!(u, H, x, t)
-    u .= .-u
-    LA.ldiv!(x¹, jacobian, u)
-
-    # Check if we have to do iterative refinment for all the others as well
-    δ = fixed_precision_iterative_refinement!(x¹, jacobian.J, u, norm)
-    state.cond_J_ẋ = δ / eps()
-    iterative_refinement = δ > min_acc
-    if iterative_refinement
-        (acc, diverged) = iterative_refinement!(
-            x¹,
-            jacobian,
-            u,
-            norm;
-            tol = min_acc,
-            max_iters = max_iters,
-        )
-        if diverged
-            state.code = TrackerReturnCode.terminated_ill_conditioned
-        end
-    end
-
-    diff_t!(u, H, x, t, dx¹)
-    u .= .-u
-    LA.ldiv!(x², jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x²,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
-
-    diff_t!(u, H, x, t, dx²)
-    u .= .-u
-    LA.ldiv!(x³, jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x³,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
-
-    diff_t!(u, H, x, t, dx³)
-    u .= .-u
-    LA.ldiv!(x⁴, jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x⁴,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
-
-    state
-end
-
-
-
 # TRACKER
 
 struct Tracker{
@@ -363,6 +287,7 @@ struct Tracker{
     # these are mutable
     state::TrackerState{V,M}
     options::TrackerOptions
+    ND::NumericalDifferentiation{V}
 end
 
 function Tracker(H::AbstractHomotopy; kwargs...)
@@ -396,8 +321,8 @@ function Tracker(
     state = TrackerState(H, x₁, t₁, t₀, norm)
     predictor = Pade21(size(H, 2))
     corrector = NewtonCorrector(options.a, state.x, size(H, 1))
-
-    Tracker(H, predictor, corrector, state, options)
+    ND = NumericalDifferentiation(state.x, size(H, 1))
+    Tracker(H, predictor, corrector, state, options, ND)
 end
 
 Base.show(io::IO, C::Tracker) = print(io, "Tracker")
@@ -449,7 +374,16 @@ function update_stepsize!(
         τ = trust_region(predictor)
     end
     if is_converged(result)
-        e = state.norm(local_error(predictor))
+        e₁ = state.norm(local_error(predictor))
+        # If we don't use automatic_differentiation for the 4th derivative
+        # this can be completely of. So check against the actual error of the
+        # last step
+        if !last(options.automatic_differentiation)
+            e₂ = state.norm(state.x, state.x̂) / state.Δs_prev^p
+        else
+            e₂ = Inf
+        end
+        e = min(e₁, e₂)
         if isinf(e)
             Δs₁ = Inf
         else
@@ -489,9 +423,98 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
 end
 
 function compute_derivatives_and_update_predictor!(tracker::Tracker)
-    @unpack x, t, x¹, x², x³, x⁴ = tracker.state
-    compute_derivatives!(tracker.state, tracker.homotopy, x, t)
+    @unpack x, x¹, x², x³, x⁴ = tracker.state
+    compute_derivatives!(tracker)
     update!(tracker.predictor, x, x¹, x², x³, x⁴)
+end
+
+function compute_derivatives!(
+    tracker::Tracker;
+    min_acc::Float64 = sqrt(eps()),
+    max_iters::Int = 5,
+)
+    @unpack homotopy, state, options, ND = tracker
+    # unpack stuff to make the rest easier to read
+    @unpack u, x, t, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm, τ = state
+
+    # compute all taylor coefficients x¹, x², x³, x⁴
+    AD1, AD2, AD3, AD4 = options.automatic_differentiation
+    if AD1
+        diff_t!(u, homotopy, x, t, (), AutomaticDifferentiation(), τ)
+    else
+        diff_t!(u, homotopy, x, t, (), ND, τ)
+    end
+    u .= .-u
+    LA.ldiv!(x¹, jacobian, u)
+
+    # Check if we have to do iterative refinment for all the others as well
+    δ = fixed_precision_iterative_refinement!(x¹, jacobian.J, u, norm)
+    state.cond_J_ẋ = δ / eps()
+    iterative_refinement = δ > min_acc
+    if iterative_refinement
+        (acc, diverged) = iterative_refinement!(
+            x¹,
+            jacobian,
+            u,
+            norm;
+            tol = min_acc,
+            max_iters = max_iters,
+        )
+        if diverged
+            state.code = TrackerReturnCode.terminated_ill_conditioned
+        end
+    end
+
+    if AD2
+        diff_t!(u, homotopy, x, t, dx¹, AutomaticDifferentiation(), τ)
+    else
+        diff_t!(u, homotopy, x, t, dx¹, ND, τ)
+    end
+    u .= .-u
+    LA.ldiv!(x², jacobian, u)
+    iterative_refinement && iterative_refinement!(
+        x²,
+        jacobian,
+        u,
+        norm;
+        tol = min_acc,
+        max_iters = max_iters,
+    )
+
+    if AD3
+        diff_t!(u, homotopy, x, t, dx², AutomaticDifferentiation(), τ)
+    else
+        diff_t!(u, homotopy, x, t, dx², ND, τ)
+    end
+    u .= .-u
+    LA.ldiv!(x³, jacobian, u)
+    iterative_refinement && iterative_refinement!(
+        x³,
+        jacobian,
+        u,
+        norm;
+        tol = min_acc,
+        max_iters = max_iters,
+    )
+
+    if AD4
+        diff_t!(u, homotopy, x, t, dx³, AutomaticDifferentiation(), τ)
+    else
+        diff_t!(u, homotopy, x, t, dx³, ND, τ)
+    end
+    u .= .-u
+    LA.ldiv!(x⁴, jacobian, u)
+
+    iterative_refinement && iterative_refinement!(
+        x⁴,
+        jacobian,
+        u,
+        norm;
+        tol = min_acc,
+        max_iters = max_iters,
+    )
+
+    state
 end
 
 """
@@ -563,6 +586,7 @@ function init!(
     end
 
     # initialize the predictor
+    state.τ = Inf
     evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
     updated!(jacobian)
     compute_derivatives_and_update_predictor!(tracker)
