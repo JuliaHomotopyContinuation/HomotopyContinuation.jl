@@ -94,4 +94,9 @@
     tracker.options.automatic_differentiation = (true, true, true, false)
     res = track(tracker, s, 1, 0)
     @test is_success(res)
+
+    tracker.options.max_steps = 10_000
+    tracker.options.automatic_differentiation = (true, true, false, false)
+    res = track(tracker, s, 1, 0)
+    @test is_success(res)
 end
