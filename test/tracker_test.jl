@@ -1,10 +1,20 @@
 @testset "Tracker" begin
+    AD_CASES = [
+        (true, true, true, true),
+        (true, true, true, false),
+        (true, true, false, false),
+        (true, false, false, false),
+        (false, false, false, false),
+    ]
 
-    @testset "tracking" begin
+    @testset "tracking - AD : $AD" for AD in AD_CASES
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
 
-        tracker = Tracker(ParameterHomotopy(F, [1, 0], [2, 4]))
+        tracker = Tracker(
+            ParameterHomotopy(F, [1, 0], [2, 4]),
+            automatic_differentiation = AD,
+        )
         s = [1, 1]
         res = track(tracker, s, 1, 0)
         @test is_success(res)
@@ -26,18 +36,20 @@
         @test is_success(track(tracker, s, 1, 0))
     end
 
-    @testset "projective tracking" begin
+    @testset "projective tracking- AD: $AD" for AD in AD_CASES
         @var x a y b z
-        F = System([x^2 - a*z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
+        F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
         H = ParameterHomotopy(F, [1, 0], [2, 4])
-        tracker = Tracker(on_affine_chart(H, (2,)))
+        tracker =
+            Tracker(on_affine_chart(H, (2,)), automatic_differentiation = AD)
 
         s = PVector([1, 1, 1])
         res = track(tracker, s, 1, 0)
         @test is_success(res)
         @test isa(solution(res), PVector{ComplexF64,1})
         x₀ = abs(solution(res)[end])
-        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
+        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol =
+            1e-12 / x₀
     end
 
     @testset "iterator" begin
@@ -47,7 +59,8 @@
         s = [1, 1]
 
         # path iterator
-        typeof(first(iterator(tracker, s, 1.0, 0.0))) == Tuple{Vector{ComplexF64},Float64}
+        typeof(first(iterator(tracker, s, 1.0, 0.0))) ==
+        Tuple{Vector{ComplexF64},Float64}
 
         tracker.options.max_step_size = 0.01
         @test length(collect(iterator(tracker, s, 1.0, 0.0))) == 101
@@ -59,14 +72,14 @@
             push!(Xs, x)
         end
 
-        @test round.(real.(first.(Xs)), digits=4) == collect(1:0.125:2)
+        @test round.(real.(first.(Xs)), digits = 4) == collect(1:0.125:2)
     end
 
     @testset "path info" begin
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
         tracker = Tracker(ParameterHomotopy(F, [1, 0], [2, 4]))
-        info = path_info(tracker, [1,1], 1, 0)
+        info = path_info(tracker, [1, 1], 1, 0)
         @test !isempty(sprint(show, info))
     end
 

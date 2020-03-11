@@ -90,4 +90,8 @@
     tracker = Tracker(ParameterHomotopy(F, p, q))
     res = track(tracker, s, 1, 0)
     @test is_success(res)
+
+    tracker.options.automatic_differentiation = (true, true, true, false)
+    res = track(tracker, s, 1, 0)
+    @test is_success(res)
 end

@@ -43,5 +43,6 @@ evaluate!(u, H::ParameterHomotopy, x, t) = ModelKit.evaluate!(u, H.F, x, p!(H, t
 #     ModelKit.jacobian!(U, H.F, x, p!(H, t))
 evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t) =
     ModelKit.evaluate_and_jacobian!(u, U, H.F, x, p!(H, t))
-diff_t!(u, H::ParameterHomotopy, x, t, dx = ()) =
+
+diff_t!(u, H::ParameterHomotopy, x, t, dx::Tuple, ::AutomaticDifferentiation, τ::Float64 = Inf) =
     ModelKit.diff_t!(u, H.F, x, dx, p!(H, t), ṗ!(H, t))

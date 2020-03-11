@@ -87,7 +87,7 @@ using HomotopyContinuation2.ModelKit
         @test det(transpose(x)) == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
     end
 
-    @testset "Differentation" begin
+    @testset "Differentiation" begin
         @var x y
 
         f = x^2 + y^2
