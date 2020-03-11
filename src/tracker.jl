@@ -287,7 +287,7 @@ struct Tracker{
     # these are mutable
     state::TrackerState{V,M}
     options::TrackerOptions
-    ND::NumericalDifferentiation{V}
+    ND::NumericalDifferentiation{V,V̄}
 end
 
 function Tracker(H::AbstractHomotopy; kwargs...)
