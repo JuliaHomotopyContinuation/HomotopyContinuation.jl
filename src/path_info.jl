@@ -49,7 +49,7 @@ function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
         push!(ω, state.ω)
         push!(accuracy, state.accuracy)
         push!(μ, state.μ)
-        push!(high_prec, state.use_extended_prec)
+        push!(high_prec, state.extended_prec)
         step!(tracker, debug)
 
         push!(accepted_rejected, !state.last_step_failed)
