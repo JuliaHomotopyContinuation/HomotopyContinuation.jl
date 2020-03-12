@@ -63,7 +63,7 @@ function bacillus()
     System(poly, [w, w2, w2v, v, w2v2, vP, sigmaB, w2sigmaB, vPp, phos])
 end
 
-@testset "Endgame AD4: $AD4" for AD4 in [true]
+@testset "Endgame AD4: $AD4" for AD4 in [true, false]
     @testset "Cyclic 7" begin
         f = cyclic(7)
         H, starts = total_degree_homotopy(f; gamma = 0.2 + 0.4im)
@@ -116,8 +116,7 @@ end
         @test count(r -> isnothing(r.winding_number), res) == 19
     end
 
-    @testset "(x-10)^16" begin
-        d = 16
+    @testset "(x-10)^$d" for d in [2, 8, 16]
         @var x
         f = [(x - 10)^d]
         H, starts = total_degree_homotopy(f, [x])
@@ -147,24 +146,21 @@ end
         @test count(is_at_infinity, res) == 2
     end
 
-    @testset "Winding Number Family" begin
-        for d = 2:6
-            d = 6
-            @var x y
-            a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
-            f1 = (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1
-            f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
-            H, starts =
-                total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
-            S = collect(starts)
-            tracker = HC2.EndgameTracker(Tracker(
-                H,
-                automatic_differentiation = (true, true, true, AD4),
-            ))
-            res = track.(tracker, S)
-            @test count(is_success, res) == d + 1
-            @test count(is_at_infinity, res) == (d + 1)^2 - d - 1
-        end
+    @testset "Winding Number Family d=$d" for d = 2:2:6
+        @var x y
+        a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        f1 = (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1
+        f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
+        H, starts =
+            total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
+        S = collect(starts)
+        tracker = HC2.EndgameTracker(Tracker(
+            H,
+            automatic_differentiation = (true, true, true, AD4),
+        ))
+        res = track.(tracker, S)
+        @test count(is_success, res) == d + 1
+        @test count(is_at_infinity, res) == (d + 1)^2 - d - 1
     end
 
     @testset "Bacillus Subtilis" begin

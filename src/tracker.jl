@@ -583,11 +583,11 @@ function update_precision!(tracker::Tracker, μ_low)
 
     if state.extended_prec && !isnan(μ_low)
         # check if we can go low again
-        if μ_low * ω < a * (a^3)^2 * _h(a)
+        if μ_low * ω < a^9 * _h(a)
             state.extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a * (a^2)^2 * _h(a)
+    elseif μ * ω > a^7 * _h(a)
         state.extended_prec = true
         state.used_extended_prec = true
         # do two refinement steps
@@ -616,7 +616,9 @@ function step!(tracker::Tracker, debug::Bool = false)
     # x̂ ≈ x(t + Δt) using the predictor
     @unpack x¹, x², x³ = state
     predict!(x̂, predictor, homotopy, state.x, x¹, x², x³, Δt)
-
+    # if t′ == 0
+    #     e = state.norm(local_error(predictor)) * state.segment_stepper.Δs^4
+    # end
     update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
