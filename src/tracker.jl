@@ -397,9 +397,15 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        Δs =
-            nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
-            state.segment_stepper.Δs
+        if isnan(Θ_j)
+            Δs = 0.25 * state.segment_stepper.Δs
+        else
+            Δs =
+                nthroot(
+                    (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
+                    p,
+                ) * state.segment_stepper.Δs
+        end
     end
     propose_step!(state.segment_stepper, Δs)
     nothing
