@@ -28,12 +28,13 @@ Base.@kwdef mutable struct TrackerOptions
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
+    terminate_cond::Float64 = 1e13
+    min_newton_iters::Int = 2
     automatic_differentiation::NTuple{4,Bool} = (true, true, true, true)
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) =
-    opts
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
 module TrackerReturnCode
 
@@ -149,13 +150,9 @@ Returns the number of rejected_steps steps.
 rejected_steps(result::TrackerResult) = result.rejected_steps
 
 Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) =
-    result
+Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
 
-mutable struct TrackerState{
-    V<:AbstractVector{ComplexF64},
-    M<:AbstractMatrix{ComplexF64},
-}
+mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{ComplexF64}}
     x::V # current x
     x̂::V # last prediction
     x̄::V # candidate for new x
@@ -168,7 +165,7 @@ mutable struct TrackerState{
     μ::Float64 # limit accuracy
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
-    use_extended_prec::Bool
+    extended_prec::Bool
     used_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
 
@@ -192,16 +189,10 @@ mutable struct TrackerState{
     # statistics
     accepted_steps::Int
     rejected_steps::Int
-    last_step_failed::Bool
+    last_steps_failed::Int
 end
 
-function TrackerState(
-    H,
-    x₁::AbstractVector,
-    t₁,
-    t₀,
-    norm::WeightedNorm{InfNorm},
-)
+function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
     x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
@@ -216,13 +207,13 @@ function TrackerState(
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
-    used_extended_prec = use_extended_prec = false
+    used_extended_prec = extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
     code = TrackerReturnCode.tracking
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = 0
-    last_step_failed = true
+    last_steps_failed = 0
 
     TrackerState(
         x,
@@ -235,7 +226,7 @@ function TrackerState(
         μ,
         τ,
         norm_Δx₀,
-        use_extended_prec,
+        extended_prec,
         used_extended_prec,
         norm,
         jacobian,
@@ -251,13 +242,12 @@ function TrackerState(
         u,
         accepted_steps,
         rejected_steps,
-        last_step_failed,
+        last_steps_failed,
     )
 end
 
 Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
-    state
+Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) = state
 function Base.getproperty(state::TrackerState, sym::Symbol)
     if sym === :t
         return getfield(state, :segment_stepper).t
@@ -265,6 +255,8 @@ function Base.getproperty(state::TrackerState, sym::Symbol)
         return getfield(state, :segment_stepper).Δt
     elseif sym == :t′
         return getfield(state, :segment_stepper).t′
+    elseif sym == :last_step_failed
+        return getfield(state, :last_steps_failed) > 0
     else # fallback to getfield
         return getfield(state, sym)
     end
@@ -341,11 +333,7 @@ LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 # intial step size
-function initial_step_size(
-    state::TrackerState,
-    predictor::Pade21,
-    options::TrackerOptions,
-)
+function initial_step_size(state::TrackerState, predictor::Pade21, options::TrackerOptions)
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     e = state.norm(local_error(predictor))
@@ -397,9 +385,13 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        Δs =
-            nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
-            state.segment_stepper.Δs
+        if isnan(Θ_j)
+            Δs = 0.25 * state.segment_stepper.Δs
+        else
+            Δs =
+                nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
+                state.segment_stepper.Δs
+        end
     end
     propose_step!(state.segment_stepper, Δs)
     nothing
@@ -407,17 +399,22 @@ end
 
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
+    if state.extended_prec || !options.extended_precision
+        tol_acc = options.a^(2^options.min_newton_iters - 1) * _h(options.a)
+    else
+        tol_acc = Inf
+    end
+
     if is_done(state.segment_stepper)
         state.code = TrackerReturnCode.success
     elseif steps(state) ≥ options.max_steps
         state.code = TrackerReturnCode.terminated_max_iters
-    elseif state.ω * state.μ > options.a * _h(options.a)
+    elseif state.ω * state.μ > tol_acc
         state.code = TrackerReturnCode.terminated_accuracy_limit
-    elseif state.segment_stepper.s′ == state.segment_stepper.s ||
-           state.segment_stepper.Δs < options.min_step_size
+    elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
+        state.code = TrackerReturnCode.terminated_accuracy_limit
+    elseif state.segment_stepper.Δs < options.min_step_size
         state.code = TrackerReturnCode.terminated_step_size_too_small
-    elseif isnan(state.segment_stepper.s′) # catch any NaNs produced somewhere
-        state.code = TrackerReturnCode.terminated_unknown
     end
     nothing
 end
@@ -472,14 +469,8 @@ function compute_derivatives!(
     end
     u .= .-u
     LA.ldiv!(x², jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x²,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     if AD3
         diff_t!(u, homotopy, x, t, dx², AutomaticDifferentiation(), τ)
@@ -488,14 +479,8 @@ function compute_derivatives!(
     end
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x³,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     if AD4
         diff_t!(u, homotopy, x, t, dx³, AutomaticDifferentiation(), τ)
@@ -505,14 +490,8 @@ function compute_derivatives!(
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
 
-    iterative_refinement && iterative_refinement!(
-        x⁴,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x⁴, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     state
 end
@@ -548,28 +527,20 @@ function init!(
     state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
-    state.used_extended_prec = state.use_extended_prec = false
+    state.used_extended_prec = state.extended_prec = false
     init!(norm, x)
     init!(jacobian)
     state.code = TrackerReturnCode.tracking
     if !keep_steps
         state.accepted_steps = state.rejected_steps = 0
     end
-    state.last_step_failed = true
+    state.last_steps_failed = 0
 
     # compute ω and limit accuracy μ for the start value
     t = state.t
     if isnan(ω) || isnan(μ)
-        valid, ω, μ = init_newton!(
-            x̄,
-            corrector,
-            homotopy,
-            x,
-            t,
-            jacobian,
-            norm;
-            a = options.a,
-        )
+        valid, ω, μ =
+            init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = options.a)
     else
         valid = true
     end
@@ -615,31 +586,23 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    if state.use_extended_prec && !isnan(μ_low)
+    if state.extended_prec && !isnan(μ_low)
         # check if we can go low again
-        if μ_low * ω < a * (a^3)^2 * _h(a)
-            state.use_extended_prec = false
+        if μ_low * ω < a^9 * _h(a)
+            state.extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a * (a^2)^2 * _h(a)
-        state.use_extended_prec = true
+    elseif μ * ω > a^7 * _h(a)
+        state.extended_prec = true
         state.used_extended_prec = true
         # do two refinement steps
         for i = 1:2
-            μ = extended_prec_refinement_step!(
-                x,
-                corrector,
-                homotopy,
-                x,
-                t,
-                jacobian,
-                norm,
-            )
+            μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
         end
         state.μ = max(μ, eps())
     end
 
-    state.use_extended_prec
+    state.extended_prec
 end
 
 function step!(tracker::Tracker, debug::Bool = false)
@@ -658,7 +621,9 @@ function step!(tracker::Tracker, debug::Bool = false)
     # x̂ ≈ x(t + Δt) using the predictor
     @unpack x¹, x², x³ = state
     predict!(x̂, predictor, homotopy, state.x, x¹, x², x³, Δt)
-
+    # if t′ == 0
+    #     e = state.norm(local_error(predictor)) * state.segment_stepper.Δs^4
+    # end
     update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
@@ -673,7 +638,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        extended_precision = state.use_extended_prec,
+        extended_precision = state.extended_prec,
     )
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
@@ -692,13 +657,14 @@ function step!(tracker::Tracker, debug::Bool = false)
         # Update other state
         state.τ = trust_region(predictor)
         state.accepted_steps += 1
+        state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
         state.rejected_steps += 1
+        state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
     update_stepsize!(state, result, options, predictor)
-    state.last_step_failed = !is_converged(result)
 
     check_terminated!(state, options)
     state.last_step_failed

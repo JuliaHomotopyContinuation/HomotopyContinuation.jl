@@ -10,6 +10,7 @@ The possible return codes of Newton's method
     NEWT_CONVERGED
     NEWT_TERMINATED
     NEWT_MAX_ITERS
+    NEWT_SINGULARITY
 end
 
 struct NewtonCorrectorResult
@@ -101,6 +102,18 @@ function newton!(
         xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
 
+        if isnan(norm_Δxᵢ)
+            @label return_singular
+            return NewtonCorrectorResult(
+                NEWT_SINGULARITY,
+                norm(Δxᵢ),
+                i + 1,
+                ω,
+                θ,
+                μ_low,
+                norm_Δx₀,
+            )
+        end
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         i >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)
@@ -126,33 +139,30 @@ function newton!(
             end
             LA.ldiv!(Δxᵢ, JM, r)
             if extended_precision
-                iterative_refinement!(
-                    Δxᵢ,
-                    JM,
-                    r,
-                    norm;
-                    tol = ā^2,
-                    max_iters = 3,
-                )
+                iterative_refinement!(Δxᵢ, JM, r, norm; tol = ā^2, max_iters = 3)
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
-            μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
-
-            # TODO: Sometimes a second iteration?
-            if i == 0 && !extended_precision
-                evaluate!(r, H, xᵢ, t)
-                LA.ldiv!(Δxᵢ, JM, r)
-                μ = norm(Δxᵢ)
+            norm_Δxᵢ₊₁ = norm(Δxᵢ)
+            if isnan(norm_Δxᵢ₊₁)
+                @goto return_singular
             end
 
-            if extended_precision
-                x_extended .= xᵢ
-                evaluate!(r, H, x_extended, ComplexDF64(t))
-                LA.ldiv!(Δxᵢ, JM, r)
-                norm_Δxᵢ = norm_Δxᵢ₊₁
-                μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
+            if norm_Δxᵢ₊₁ > 2μ
+                if extended_precision
+                    x_extended .= xᵢ
+                    evaluate!(r, H, x_extended, ComplexDF64(t))
+                    LA.ldiv!(Δxᵢ, JM, r)
+                    norm_Δxᵢ = norm_Δxᵢ₊₁
+                    μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
+                else
+                    evaluate!(r, H, xᵢ, t)
+                    LA.ldiv!(Δxᵢ, JM, r)
+                    μ = norm(Δxᵢ)
+                end
+            else
+                μ = norm_Δxᵢ₊₁
             end
-            # TODO: NOT IN PAPER SO FAR
+
             if i == 0
                 ω̄ = 2 * norm_Δxᵢ / norm_Δxᵢ₊₁^2
                 if ω̄ < ω
