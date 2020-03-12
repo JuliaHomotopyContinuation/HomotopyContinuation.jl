@@ -163,7 +163,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
     μ::Float64 # limit accuracy
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
-    use_extended_prec::Bool
+    extended_prec::Bool
     used_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
 
@@ -205,7 +205,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
-    used_extended_prec = use_extended_prec = false
+    used_extended_prec = extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
     code = TrackerReturnCode.tracking
@@ -224,7 +224,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
         μ,
         τ,
         norm_Δx₀,
-        use_extended_prec,
+        extended_prec,
         used_extended_prec,
         norm,
         jacobian,
@@ -518,7 +518,7 @@ function init!(
     state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
-    state.used_extended_prec = state.use_extended_prec = false
+    state.used_extended_prec = state.extended_prec = false
     init!(norm, x)
     init!(jacobian)
     state.code = TrackerReturnCode.tracking
@@ -577,14 +577,14 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    if state.use_extended_prec && !isnan(μ_low)
+    if state.extended_prec && !isnan(μ_low)
         # check if we can go low again
         if μ_low * ω < a * (a^3)^2 * _h(a)
-            state.use_extended_prec = false
+            state.extended_prec = false
             state.μ = μ_low
         end
     elseif μ * ω > a * (a^2)^2 * _h(a)
-        state.use_extended_prec = true
+        state.extended_prec = true
         state.used_extended_prec = true
         # do two refinement steps
         for i = 1:2
@@ -593,7 +593,7 @@ function update_precision!(tracker::Tracker, μ_low)
         state.μ = max(μ, eps())
     end
 
-    state.use_extended_prec
+    state.extended_prec
 end
 
 function step!(tracker::Tracker, debug::Bool = false)
@@ -627,7 +627,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
-        extended_precision = state.use_extended_prec,
+        extended_precision = state.extended_prec,
     )
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)

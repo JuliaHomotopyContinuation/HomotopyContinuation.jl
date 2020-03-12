@@ -326,6 +326,7 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
         at_infinity_tol = options.val_at_infinity_tol,
         strict_at_infinity_tol = options.strict_val_at_infinity_tol,
         max_winding_number = options.max_winding_number,
+        zero_is_finite = !options.at_zero_check
     )
 
     if debug
@@ -338,14 +339,14 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
             verdict.strict_at_infinity || (
                 verdict.at_infinity && (
                     cond > options.min_cond_at_infinity ||
-                    tracker.state.use_extended_prec ||
+                    tracker.state.extended_prec ||
                     t < options.max_t_at_infinity_without_cond
                 )
             )
         )
     at_zero =
         options.at_zero_check && verdict.at_zero &&
-        (cond > options.min_cond_at_infinity || tracker.state.use_extended_prec)
+        (cond > options.min_cond_at_infinity || tracker.state.extended_prec)
 
     if at_infinity
         return (state.code = EGTrackerReturnCode.at_infinity)
