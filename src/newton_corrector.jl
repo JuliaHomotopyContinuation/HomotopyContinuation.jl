@@ -143,28 +143,26 @@ function newton!(
             end
             xᵢ₊₂ .= xᵢ₊₁ .- Δxᵢ
             norm_Δxᵢ₊₁ = norm(Δxᵢ)
-
             if isnan(norm_Δxᵢ₊₁)
                 @goto return_singular
             end
 
-            μ = norm_Δxᵢ₊₁
-
-            # TODO: Sometimes a second iteration?
-            if i == 0 && !extended_precision
-                evaluate!(r, H, xᵢ, t)
-                LA.ldiv!(Δxᵢ, JM, r)
-                μ = norm(Δxᵢ)
+            if norm_Δxᵢ₊₁ > 2μ
+                if extended_precision
+                    x_extended .= xᵢ
+                    evaluate!(r, H, x_extended, ComplexDF64(t))
+                    LA.ldiv!(Δxᵢ, JM, r)
+                    norm_Δxᵢ = norm_Δxᵢ₊₁
+                    μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
+                else
+                    evaluate!(r, H, xᵢ, t)
+                    LA.ldiv!(Δxᵢ, JM, r)
+                    μ = norm(Δxᵢ)
+                end
+            else
+                μ = norm_Δxᵢ₊₁
             end
 
-            if extended_precision
-                x_extended .= xᵢ
-                evaluate!(r, H, x_extended, ComplexDF64(t))
-                LA.ldiv!(Δxᵢ, JM, r)
-                norm_Δxᵢ = norm_Δxᵢ₊₁
-                μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
-            end
-            # TODO: NOT IN PAPER SO FAR
             if i == 0
                 ω̄ = 2 * norm_Δxᵢ / norm_Δxᵢ₊₁^2
                 if ω̄ < ω
