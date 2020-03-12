@@ -28,6 +28,7 @@ Base.@kwdef mutable struct TrackerOptions
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
+    terminate_cond::Float64 = 1e13
     min_newton_iters::Int = 2
     automatic_differentiation::NTuple{4,Bool} = (true, true, true, true)
 end
@@ -188,7 +189,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
     # statistics
     accepted_steps::Int
     rejected_steps::Int
-    last_step_failed::Bool
+    last_steps_failed::Int
 end
 
 function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
@@ -212,7 +213,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     code = TrackerReturnCode.tracking
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = 0
-    last_step_failed = true
+    last_steps_failed = 0
 
     TrackerState(
         x,
@@ -241,7 +242,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
         u,
         accepted_steps,
         rejected_steps,
-        last_step_failed,
+        last_steps_failed,
     )
 end
 
@@ -254,6 +255,8 @@ function Base.getproperty(state::TrackerState, sym::Symbol)
         return getfield(state, :segment_stepper).Δt
     elseif sym == :t′
         return getfield(state, :segment_stepper).t′
+    elseif sym == :last_step_failed
+        return getfield(state, :last_steps_failed) > 0
     else # fallback to getfield
         return getfield(state, sym)
     end
@@ -408,6 +411,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerReturnCode.terminated_max_iters
     elseif state.ω * state.μ > tol_acc
         state.code = TrackerReturnCode.terminated_accuracy_limit
+    elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
+        state.code = TrackerReturnCode.terminated_accuracy_limit
     elseif state.segment_stepper.Δs < options.min_step_size
         state.code = TrackerReturnCode.terminated_step_size_too_small
     end
@@ -529,7 +534,7 @@ function init!(
     if !keep_steps
         state.accepted_steps = state.rejected_steps = 0
     end
-    state.last_step_failed = true
+    state.last_steps_failed = 0
 
     # compute ω and limit accuracy μ for the start value
     t = state.t
@@ -652,13 +657,14 @@ function step!(tracker::Tracker, debug::Bool = false)
         # Update other state
         state.τ = trust_region(predictor)
         state.accepted_steps += 1
+        state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
         state.rejected_steps += 1
+        state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
     update_stepsize!(state, result, options, predictor)
-    state.last_step_failed = !is_converged(result)
 
     check_terminated!(state, options)
     state.last_step_failed

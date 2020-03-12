@@ -443,6 +443,9 @@ function EGTrackerResult(egtracker::EndgameTracker)
     )
 end
 
+Base.show(io::IO, r::EGTrackerResult) = print_fieldnames(io, r)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", r::EGTrackerResult) = r
+
 
 function track(eg_tracker::EndgameTracker, x, t₁::Real = 1.0; debug::Bool = false)
     track!(eg_tracker, x, t₁; debug = debug)
