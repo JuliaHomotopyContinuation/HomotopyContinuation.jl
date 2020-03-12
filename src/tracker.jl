@@ -28,6 +28,7 @@ Base.@kwdef mutable struct TrackerOptions
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
+    min_newton_iters::Int = 2
     automatic_differentiation::NTuple{4,Bool} = (true, true, true, true)
 end
 
@@ -395,17 +396,20 @@ end
 
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
+    if state.extended_prec || !options.extended_precision
+        tol_acc = options.a^(2^options.min_newton_iters - 1) * _h(options.a)
+    else
+        tol_acc = Inf
+    end
+
     if is_done(state.segment_stepper)
         state.code = TrackerReturnCode.success
     elseif steps(state) ≥ options.max_steps
         state.code = TrackerReturnCode.terminated_max_iters
-    elseif state.ω * state.μ > options.a * _h(options.a)
+    elseif state.ω * state.μ > tol_acc
         state.code = TrackerReturnCode.terminated_accuracy_limit
-    elseif state.segment_stepper.s′ == state.segment_stepper.s ||
-           state.segment_stepper.Δs < options.min_step_size
+    elseif state.segment_stepper.Δs < options.min_step_size
         state.code = TrackerReturnCode.terminated_step_size_too_small
-    elseif isnan(state.segment_stepper.s′) # catch any NaNs produced somewhere
-        state.code = TrackerReturnCode.terminated_unknown
     end
     nothing
 end
