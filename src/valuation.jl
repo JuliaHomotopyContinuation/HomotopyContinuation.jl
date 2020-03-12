@@ -183,20 +183,20 @@ function analyze(
 
         # ∞ check
         if m + 2 * Δ < -finite_tol && δ_x[i] > 0
-            if σ < at_infinity_tol
+            if Δ < at_infinity_tol
                 at_infinity = true
             end
-            if σ < strict_at_infinity_tol
+            if Δ < strict_at_infinity_tol
                 strict_at_infinity = true
             end
         end
 
         # 0 check
         if m - 2 * Δ > finite_tol && δ_x[i] > 0
-            if σ < at_infinity_tol
+            if Δ < at_infinity_tol
                 at_zero = true
             end
-            if σ < strict_at_infinity_tol
+            if Δ < strict_at_infinity_tol
                 strict_at_zero = true
             end
         end

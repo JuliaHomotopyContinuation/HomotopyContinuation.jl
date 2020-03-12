@@ -11,7 +11,7 @@ Base.@kwdef mutable struct EndgameTrackerOptions
     # at infinity parameters
     val_at_infinity_tol::Float64 = 1e-4
     strict_val_at_infinity_tol::Float64 = 1e-8
-    min_cond_at_infinity::Float64 = 1e8
+    min_cond_at_infinity::Float64 = 1e6
     max_t_at_infinity_without_cond::Float64 = 1e-14
     at_zero_check::Bool = false
     at_infinity_check::Bool = true
@@ -361,8 +361,12 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
         (verdict.strict_at_zero || (verdict.at_zero && verify_condition))
 
     if at_infinity
+        state.accuracy = tracker.state.accuracy
+        state.solution .= tracker.state.x
         return (state.code = EGTrackerReturnCode.at_infinity)
     elseif at_zero
+        state.accuracy = tracker.state.accuracy
+        state.solution .= tracker.state.x
         return (state.code = EGTrackerReturnCode.at_zero)
     end
 
