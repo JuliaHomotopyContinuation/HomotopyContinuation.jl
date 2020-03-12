@@ -32,8 +32,7 @@ Base.@kwdef mutable struct TrackerOptions
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) =
-    opts
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
 module TrackerReturnCode
 
@@ -149,13 +148,9 @@ Returns the number of rejected_steps steps.
 rejected_steps(result::TrackerResult) = result.rejected_steps
 
 Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) =
-    result
+Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
 
-mutable struct TrackerState{
-    V<:AbstractVector{ComplexF64},
-    M<:AbstractMatrix{ComplexF64},
-}
+mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{ComplexF64}}
     x::V # current x
     x̂::V # last prediction
     x̄::V # candidate for new x
@@ -195,13 +190,7 @@ mutable struct TrackerState{
     last_step_failed::Bool
 end
 
-function TrackerState(
-    H,
-    x₁::AbstractVector,
-    t₁,
-    t₀,
-    norm::WeightedNorm{InfNorm},
-)
+function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
     x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
@@ -256,8 +245,7 @@ function TrackerState(
 end
 
 Base.show(io::IO, state::TrackerState) = print_fieldnames(io, state)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) =
-    state
+Base.show(io::IO, ::MIME"application/prs.juno.inline", state::TrackerState) = state
 function Base.getproperty(state::TrackerState, sym::Symbol)
     if sym === :t
         return getfield(state, :segment_stepper).t
@@ -341,11 +329,7 @@ LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 # intial step size
-function initial_step_size(
-    state::TrackerState,
-    predictor::Pade21,
-    options::TrackerOptions,
-)
+function initial_step_size(state::TrackerState, predictor::Pade21, options::TrackerOptions)
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
     e = state.norm(local_error(predictor))
@@ -401,10 +385,8 @@ function update_stepsize!(
             Δs = 0.25 * state.segment_stepper.Δs
         else
             Δs =
-                nthroot(
-                    (√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1),
-                    p,
-                ) * state.segment_stepper.Δs
+                nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
+                state.segment_stepper.Δs
         end
     end
     propose_step!(state.segment_stepper, Δs)
@@ -478,14 +460,8 @@ function compute_derivatives!(
     end
     u .= .-u
     LA.ldiv!(x², jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x²,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     if AD3
         diff_t!(u, homotopy, x, t, dx², AutomaticDifferentiation(), τ)
@@ -494,14 +470,8 @@ function compute_derivatives!(
     end
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
-    iterative_refinement && iterative_refinement!(
-        x³,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     if AD4
         diff_t!(u, homotopy, x, t, dx³, AutomaticDifferentiation(), τ)
@@ -511,14 +481,8 @@ function compute_derivatives!(
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
 
-    iterative_refinement && iterative_refinement!(
-        x⁴,
-        jacobian,
-        u,
-        norm;
-        tol = min_acc,
-        max_iters = max_iters,
-    )
+    iterative_refinement &&
+    iterative_refinement!(x⁴, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     state
 end
@@ -566,16 +530,8 @@ function init!(
     # compute ω and limit accuracy μ for the start value
     t = state.t
     if isnan(ω) || isnan(μ)
-        valid, ω, μ = init_newton!(
-            x̄,
-            corrector,
-            homotopy,
-            x,
-            t,
-            jacobian,
-            norm;
-            a = options.a,
-        )
+        valid, ω, μ =
+            init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = options.a)
     else
         valid = true
     end
@@ -632,15 +588,7 @@ function update_precision!(tracker::Tracker, μ_low)
         state.used_extended_prec = true
         # do two refinement steps
         for i = 1:2
-            μ = extended_prec_refinement_step!(
-                x,
-                corrector,
-                homotopy,
-                x,
-                t,
-                jacobian,
-                norm,
-            )
+            μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
         end
         state.μ = max(μ, eps())
     end
