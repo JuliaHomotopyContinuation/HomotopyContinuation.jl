@@ -10,11 +10,11 @@
         HC2.init!(val)
         track!(tracker, S[1], 1, 1e-13)
 
-        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
+        @unpack x, t, x¹, x², x³ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, real(t))
 
         @test val.val_x[1] ≈ 0 atol = (1e-13)^(1/5)
-        @test val.val_x¹[1] ≈ 1/5 atol = (1e-13)^(1/5)
+        @test val.val_tx¹[1] ≈ 1/5 atol = (1e-13)^(1/5)
     end
 
     @testset "Example 2" begin
@@ -30,13 +30,13 @@
         tf = 1e-10
         track!(tracker, S[3], 1, tf)
 
-        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
+        @unpack x, t, x¹, x², x³ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, real(t))
 
         @test val.val_x[1] ≈ -1 atol = tf^(1/2)
         @test val.val_x[2] ≈ -1 atol = tf^(1/2)
-        @test val.val_x¹[1] ≈ -1 atol = tf
-        @test val.val_x¹[2] ≈ -1 atol = tf
+        @test val.val_tx¹[1] ≈ -1 atol = tf
+        @test val.val_tx¹[2] ≈ -1 atol = tf
     end
 
     @testset "Example 3" begin
@@ -51,13 +51,13 @@
         tf = 1e-10
         HC2.track!(tracker, S[3], 1, tf)
 
-        @unpack x, t, x¹, x², x³, x⁴ = tracker.state
-        HC2.update!(val, x, x¹, x², x³, x⁴, real(t))
+        @unpack x, t, x¹, x², x³ = tracker.state
+        HC2.update!(val, x, x¹, x², x³, real(t))
 
         @test val.val_x[1] ≈ -1/6 atol = tf^(1/6)
         @test val.val_x[2] ≈ -2/6 atol = tf^(1/6)
-        @test val.val_x¹[1] ≈ -1/6 atol = tf^(1/6)
-        @test val.val_x¹[2] ≈ -2/6 atol = tf^(1/6)
+        @test val.val_tx¹[1] ≈ -1/6 atol = tf^(1/6)
+        @test val.val_tx¹[2] ≈ -2/6 atol = tf^(1/6)
         @test !isempty(sprint(show, val))
     end
 end

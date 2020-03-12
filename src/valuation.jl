@@ -103,7 +103,6 @@ function update!(
     x¹::AbstractVector,
     x²::AbstractVector,
     x³::AbstractVector,
-    x⁴::AbstractVector,
     t::Real,
 )
     for i in eachindex(x)
