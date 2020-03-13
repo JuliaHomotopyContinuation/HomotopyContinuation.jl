@@ -372,7 +372,7 @@ function update_stepsize!(
             e₂ = Inf
         end
         e = min(e₁, e₂)
-        if isinf(e)
+        if !isfinite(e)
             Δs₁ = Inf
         else
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)

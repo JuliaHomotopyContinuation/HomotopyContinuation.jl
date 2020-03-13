@@ -155,7 +155,17 @@ function distance(x::AbstractVector, y::AbstractVector, ::InfNorm)
         @inbounds dᵢ = abs2(x[i] - y[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
-    sqrt(dmax)
+    d = sqrt(dmax)
+    if isinf(d)
+        @inbounds dmax = abs(x[1] - y[1])
+        for i = 2:n
+            @inbounds dᵢ = abs2(x[i] - y[i])
+            dmax = max(dmax, dᵢ)
+        end
+        return dmax
+    else
+        return d
+    end
 end
 function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
@@ -165,7 +175,17 @@ function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm}
         @inbounds dᵢ = abs2((x[i] - y[i]) / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
-    sqrt(dmax)
+    d = sqrt(dmax)
+    if isinf(d)
+        @inbounds dmax = abs((x[1] - y[1]) / w[1])
+        for i = 2:n
+            @inbounds dᵢ = abs((x[i] - y[i]) / w[i])
+            dmax = max(dmax, dᵢ)
+        end
+        return dmax
+    else
+        return d
+    end
 end
 
 function norm(x::AbstractVector, ::InfNorm)
@@ -175,7 +195,18 @@ function norm(x::AbstractVector, ::InfNorm)
         @inbounds dᵢ = abs2(x[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
-    sqrt(dmax)
+    d = sqrt(dmax)
+
+    if isinf(d)
+        @inbounds dmax = abs(x[1])
+        for i = 2:n
+            @inbounds dᵢ = abs(x[i])
+            dmax = max(dmax, dᵢ)
+        end
+        return dmax
+    else
+        return d
+    end
 end
 function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
     n = length(x)
@@ -185,7 +216,18 @@ function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
         @inbounds dᵢ = abs2(x[i] / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
-    sqrt(dmax)
+    d = sqrt(dmax)
+
+    if isinf(d)
+        @inbounds dmax = abs(x[1] / w[1])
+        for i = 2:n
+            @inbounds dᵢ = abs(x[i] / w[i])
+            dmax = max(dmax, dᵢ)
+        end
+        return dmax
+    else
+        return d
+    end
 end
 (N::InfNorm)(x::AbstractVector) = norm(x, N)
 (N::InfNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)

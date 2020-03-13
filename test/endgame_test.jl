@@ -110,13 +110,13 @@ end
             automatic_differentiation = (true, true, true, AD4),
         ))
         res = track.(tracker, S)
-
+        @test all(is_success, res)
         @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:19
         @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-8
         @test count(r -> isnothing(r.winding_number), res) == 19
     end
 
-    @testset "(x-10)^$d" for d in [2, 8, 16]
+    @testset "(x-10)^$d" for d in [2, 8, 12, 16]
         @var x
         f = [(x - 10)^d]
         H, starts = total_degree_homotopy(f, [x])

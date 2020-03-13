@@ -186,7 +186,7 @@ function analyze(
             if Δ < at_infinity_tol
                 at_infinity = true
             end
-            if Δ < strict_at_infinity_tol
+            if σ < strict_at_infinity_tol
                 strict_at_infinity = true
             end
         end
@@ -196,7 +196,7 @@ function analyze(
             if Δ < at_infinity_tol
                 at_zero = true
             end
-            if Δ < strict_at_infinity_tol
+            if σ < strict_at_infinity_tol
                 strict_at_zero = true
             end
         end
@@ -204,13 +204,12 @@ function analyze(
         # finite
         # Case a: val(x) = 0
         if abs(val_xᵢ) < finite_tol
-            if δ_x[i] ≤ 0 || val_tx¹[i] < 0
+            if abs(Δval_x[i]) > finite_tol || δ_x[i] ≤ 0 || val_tx¹[i] < 0
                 finite = false
             end
             # Case b: val(x) = val(tẋ) > 0
         elseif zero_is_finite && val_xᵢ > finite_tol
-            # Δ = max(abs(Δval_x[i]), abs(Δval_tx¹[i]), abs(1 - val_xᵢ / m), abs(1 - val_tx¹[i] / m))
-            if σ > finite_tol
+            if σ > finite_tol || abs(Δval_tx¹[i]) > finite_tol
                 finite = false
             end
         else
@@ -235,7 +234,16 @@ function analyze(
         end
 
         singular =
-            d < winding_number_candidate * singular_tol && winding_number_candidate > 1
+            d < winding_number_candidate * singular_tol &&
+                winding_number_candidate > 1
+        if singular
+            for (i, val_xᵢ) in enumerate(val_x)
+                if abs(val_xᵢ) < finite_tol && !(0.25 ≤ δ_x[i] / val_tx¹[i] ≤ 4)
+                    singular = false
+                    break
+                end
+            end
+        end
     else
         singular = false
     end

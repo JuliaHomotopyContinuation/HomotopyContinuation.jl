@@ -2,8 +2,13 @@ export is_at_infinity, is_failed
 
 Base.@kwdef mutable struct EndgameTrackerOptions
     endgame_start::Float64 = 0.1
-    terminate_ill_conditioned::Float64 = 1e12
+    # tracker parameters during eg
+    β_τ::Float64
+    eg_β_τ::Float64 = min(0.5, β_τ)
+    # valuation etc
     val_trust_tol::Float64 = 1e-3
+    at_zero_check::Bool = false
+    at_infinity_check::Bool = true
     # singular solutions parameters
     val_singular_tol::Float64 = 1e-2
     min_cond_singular::Float64 = 1e6
@@ -12,9 +17,7 @@ Base.@kwdef mutable struct EndgameTrackerOptions
     val_at_infinity_tol::Float64 = 1e-4
     strict_val_at_infinity_tol::Float64 = 1e-8
     min_cond_at_infinity::Float64 = 1e6
-    max_t_at_infinity_without_cond::Float64 = 1e-14
-    at_zero_check::Bool = false
-    at_infinity_check::Bool = true
+    t_trust_valuation::Float64 = 1e-14
 end
 
 Base.show(io::IO, opts::EndgameTrackerOptions) = print_fieldnames(io, opts)
@@ -153,7 +156,7 @@ struct EndgameTracker{
 end
 
 function EndgameTracker(tracker::Tracker; kwargs...)
-    options = EndgameTrackerOptions(; kwargs...)
+    options = EndgameTrackerOptions(; β_τ = tracker.options.β_τ, kwargs...)
     state = EndgameTrackerState(tracker.state.x)
     EndgameTracker(tracker, state, options)
 end
@@ -173,6 +176,7 @@ function init!(eg_tracker::EndgameTracker, x, t₁::Real)
     state.last_val_singular = false
     state.max_winding_number_hit = false
     state.jump_to_zero_failed = (false, false)
+    tracker.options.β_τ = options.β_τ
 
     eg_tracker
 end
@@ -308,13 +312,14 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     t = real(tracker.state.t)
     t < options.endgame_start || return state.code
 
+    tracker.options.β_τ = options.eg_β_τ
+
     if tracker.state.last_step_failed
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), iszero(proposed_t′))
         return state.code
     else
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), false)
     end
-
 
     update_valuation!(state, tracker.state, t)
 
@@ -351,7 +356,7 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
 
     verify_condition =
         cond > options.min_cond_at_infinity ||
-        tracker.state.extended_prec || t < options.max_t_at_infinity_without_cond
+        tracker.state.extended_prec || t < options.t_trust_valuation
 
     at_infinity =
         options.at_infinity_check &&
@@ -381,6 +386,9 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     # TODO: Check consistency of result -> second eg round
     if use_cauchy_eg # && state.last_val_singular
         res, m, acc_est = cauchy!(state, tracker, options)
+        if debug
+            printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
+        end
         if res == CAUCHY_SUCCESS
             if m == verdict.winding_number_candidate
                 state.winding_number = m
