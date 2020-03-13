@@ -108,7 +108,7 @@
 
         #tangential conics
         f =
-                a[1] * x[1]^2 +
+            a[1] * x[1]^2 +
             a[2] * x[1] * x[2] +
             a[3] * x[2]^2 +
             a[4] * x[1] +
@@ -117,7 +117,7 @@
         ∇ = differentiate(f, x)
         #5 conics
         g =
-                c[1] * x[1]^2 +
+            c[1] * x[1]^2 +
             c[2] * x[1] * x[2] +
             c[3] * x[2]^2 +
             c[4] * x[1] +
@@ -138,18 +138,25 @@
         System(F, [a; vec(y)], vec(v))
     end
 
-    tracker = Tracker(ParameterHomotopy(F, p, q), a = 0.05, extended_precision = false)
-    failed_res = track(tracker, s_p, 1, 0)
-    @test is_terminated(failed_res.returncode)
-    @test !failed_res.extended_precision_used
-    tracker.options.extended_precision = true
-    # check that we can track back and forth
-    r_q = track(tracker, s_p, 1, 0)
-    @test is_success(r_q)
-    @test r_q.extended_precision_used
-    @test solution(r_q) ≈ s_q
-    r_p = track(tracker, r_q, 0, 1)
-    @test is_success(r_p)
-    @test r_p.extended_precision_used
-    @test solution(r_p) ≈ s_p
+    @testset "Steiner - AD: $AD" for AD = 3:4
+        tracker = Tracker(
+            ParameterHomotopy(F, p, q),
+            a = 0.05,
+            extended_precision = false,
+            automatic_differentiation = AD,
+        )
+        failed_res = track(tracker, s_p, 1, 0)
+        @test is_terminated(failed_res.returncode)
+        @test !failed_res.extended_precision_used
+        tracker.options.extended_precision = true
+        # check that we can track back and forth
+        r_q = track(tracker, s_p, 1, 0)
+        @test is_success(r_q)
+        @test r_q.extended_precision_used
+        @test solution(r_q) ≈ s_q
+        r_p = track(tracker, r_q, 0, 1)
+        @test is_success(r_p)
+        @test r_p.extended_precision_used
+        @test solution(r_p) ≈ s_p
+    end
 end

@@ -128,7 +128,7 @@
     ]
     gamma = 0.63 - 0.52im
 
-    @testset "Lines on a Quintic surface in 3-space - AD4=$AD4" for AD4 in [false, true]
+    @testset "Lines on a Quintic surface in 3-space - AD=$AD" for AD in [3, 4]
         n = 4
         @var x[1:n]
 
@@ -145,7 +145,7 @@
         H, starts = total_degree_homotopy(sys; gamma = gamma, target_parameters = q₀)
         tracker = HC2.EndgameTracker(Tracker(
             H;
-            automatic_differentiation = (true, true, true, AD4),
+            automatic_differentiation = AD,
         ))
         @time res = track.(tracker, starts)
         @test count(is_success, res) == 2875

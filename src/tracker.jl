@@ -30,7 +30,6 @@ Base.@kwdef mutable struct TrackerOptions
     use_strict_trust_region::Bool = false
     terminate_cond::Float64 = 1e13
     min_newton_iters::Int = 2
-    automatic_differentiation::NTuple{4,Bool} = (true, true, true, true)
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -265,9 +264,9 @@ end
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
 # TRACKER
-
 struct Tracker{
     H<:AbstractHomotopy,
+    N,
     # V and V̄ need to have the same container type
     V<:AbstractVector{ComplexF64},
     V̄<:AbstractVector{ComplexDF64},
@@ -279,6 +278,7 @@ struct Tracker{
     # these are mutable
     state::TrackerState{V,M}
     options::TrackerOptions
+    AD::Val{N}
     ND::NumericalDifferentiation{V,V̄}
 end
 
@@ -300,6 +300,7 @@ function Tracker(
     norm_scale_min = sqrt(eps()),
     norm_scale_abs_min = min(norm_scale_min^2, sqrt(eps())),
     norm_scale_max = exp2(div(1023, 2)),
+    automatic_differentiation::Int = 4,
     kwargs...,
 )
     norm = WeightedNorm(
@@ -313,8 +314,13 @@ function Tracker(
     state = TrackerState(H, x₁, t₁, t₀, norm)
     predictor = Pade21(size(H, 2))
     corrector = NewtonCorrector(options.a, state.x, size(H, 1))
+
+    if !(0 ≤ automatic_differentiation ≤ 4)
+        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
+    end
+    AD = Val(automatic_differentiation)
     ND = NumericalDifferentiation(state.x, size(H, 1))
-    Tracker(H, predictor, corrector, state, options, ND)
+    Tracker(H, predictor, corrector, state, options, AD, ND)
 end
 
 Base.show(io::IO, C::Tracker) = print(io, "Tracker")
@@ -351,7 +357,8 @@ function update_stepsize!(
     state::TrackerState,
     result::NewtonCorrectorResult,
     options::TrackerOptions,
-    predictor::Pade21,
+    predictor::Pade21;
+    ad_for_error_estimate::Bool = true,
 )
     a = options.β_a * options.a
     ω = options.β_ω * state.ω
@@ -366,7 +373,7 @@ function update_stepsize!(
         # If we don't use automatic_differentiation for the 4th derivative
         # this can be completely of. So check against the actual error of the
         # last step
-        if !last(options.automatic_differentiation)
+        if !ad_for_error_estimate
             e₂ = state.norm(state.x, state.x̂) / state.Δs_prev^p
         else
             e₂ = Inf
@@ -430,17 +437,12 @@ function compute_derivatives!(
     min_acc::Float64 = sqrt(eps()),
     max_iters::Int = 5,
 )
-    @unpack homotopy, state, options, ND = tracker
+    @unpack homotopy, state, options, AD, ND = tracker
     # unpack stuff to make the rest easier to read
     @unpack u, x, t, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm, τ = state
 
     # compute all taylor coefficients x¹, x², x³, x⁴
-    AD1, AD2, AD3, AD4 = options.automatic_differentiation
-    if AD1
-        diff_t!(u, homotopy, x, t, (), AutomaticDifferentiation(), τ)
-    else
-        diff_t!(u, homotopy, x, t, (), ND, τ)
-    end
+    diff_t!(u, homotopy, x, t, (), AD, ND, τ)
     u .= .-u
     LA.ldiv!(x¹, jacobian, u)
 
@@ -462,31 +464,19 @@ function compute_derivatives!(
         end
     end
 
-    if AD2
-        diff_t!(u, homotopy, x, t, dx¹, AutomaticDifferentiation(), τ)
-    else
-        diff_t!(u, homotopy, x, t, dx¹, ND, τ)
-    end
+    diff_t!(u, homotopy, x, t, dx¹, AD, ND, τ)
     u .= .-u
     LA.ldiv!(x², jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    if AD3
-        diff_t!(u, homotopy, x, t, dx², AutomaticDifferentiation(), τ)
-    else
-        diff_t!(u, homotopy, x, t, dx², ND, τ)
-    end
+    diff_t!(u, homotopy, x, t, dx², AD, ND, τ)
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    if AD4
-        diff_t!(u, homotopy, x, t, dx³, AutomaticDifferentiation(), τ)
-    else
-        diff_t!(u, homotopy, x, t, dx³, ND, τ)
-    end
+    diff_t!(u, homotopy, x, t, dx³, AD, ND, τ)
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
 
@@ -664,7 +654,13 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
-    update_stepsize!(state, result, options, predictor)
+    update_stepsize!(
+        state,
+        result,
+        options,
+        predictor;
+        ad_for_error_estimate = tracker.AD isa Val{4},
+    )
 
     check_terminated!(state, options)
     state.last_step_failed

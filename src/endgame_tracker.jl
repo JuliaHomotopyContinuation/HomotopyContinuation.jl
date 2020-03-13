@@ -145,12 +145,13 @@ EndgameTrackerState(x::AbstractVector) = EndgameTrackerState(;
 
 struct EndgameTracker{
     H<:AbstractHomotopy,
+    N, # AutomaticDifferentiation
     # V and V̄ need to have the same container type
     V<:AbstractVector{ComplexF64},
     V̄<:AbstractVector{ComplexDF64},
     M<:AbstractMatrix{ComplexF64},
 }
-    tracker::Tracker{H,V,V̄,M}
+    tracker::Tracker{H,N,V,V̄,M}
     state::EndgameTrackerState{V}
     options::EndgameTrackerOptions
 end
