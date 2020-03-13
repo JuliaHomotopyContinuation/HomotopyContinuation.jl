@@ -216,12 +216,13 @@ function diff_t!(
 end
 
 ## Default handling
-diff_t!(
-    u,
-    H::AbstractHomotopy,
-    x,
-    t,
-    dx::Tuple,
-    DS::AutomaticDifferentiation,
-    τ,
-) = diff_t!(u, H, x, t, dx)
+diff_t!(u, H::AbstractHomotopy, x, t, dx::Tuple, DS::AutomaticDifferentiation, τ) =
+    diff_t!(u, H, x, t, dx)
+
+@generated function diff_t!(u, H, x, t, dx::NTuple{M}, AD::Val{N}, ND, τ) where {M,N}
+    if M < N
+        :(diff_t!(u, H, x, t, dx, AutomaticDifferentiation(), τ))
+    else
+        :(diff_t!(u, H, x, t, dx, ND, τ))
+    end
+end

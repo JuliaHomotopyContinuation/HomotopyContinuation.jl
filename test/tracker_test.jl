@@ -1,13 +1,5 @@
 @testset "Tracker" begin
-    AD_CASES = [
-        (true, true, true, true),
-        (true, true, true, false),
-        (true, true, false, false),
-        (true, false, false, false),
-        (false, false, false, false),
-    ]
-
-    @testset "tracking - AD : $AD" for AD in AD_CASES
+    @testset "tracking - AD : $AD" for AD in 0:4
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
 
@@ -36,7 +28,7 @@
         @test is_success(track(tracker, s, 1, 0))
     end
 
-    @testset "projective tracking- AD: $AD" for AD in AD_CASES
+    @testset "projective tracking- AD: $AD" for AD in 0:4
         @var x a y b z
         F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
         H = ParameterHomotopy(F, [1, 0], [2, 4])
