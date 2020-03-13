@@ -46,20 +46,6 @@ function init!(val::Valuation)
     val
 end
 
-function func_ν(u::Real, u¹::Real, t)
-    x² = u^2
-    μ = u * u¹
-    t * μ / x²
-end
-
-function ν(x::Number, ẋ::Number, t)
-    u, v = reim(x)
-    u¹, v¹ = reim(ẋ)
-    x² = abs2(x)
-    μ = u * u¹ + v * v¹
-    t * μ / x²
-end
-
 function ν_ν¹(x, x¹, x², t)
     u, v = reim(x)
     u¹, v¹ = reim(x¹)
@@ -95,7 +81,6 @@ function ν_ν¹_ν²(x, x¹, x², x³, t)
 
     t * l, t * l¹ + l, t * l² + 2l¹
 end
-
 
 function update!(
     val::Valuation,
@@ -134,13 +119,6 @@ function update!(
     end
 
     val
-end
-
-
-function mean_dev(a::Vararg{T,N}) where {T,N}
-    m = sum(a) / N
-    σ = sqrt(sum((a .- m) .^ 2)) / abs(m)
-    m, σ
 end
 
 """
@@ -234,8 +212,7 @@ function analyze(
         end
 
         singular =
-            d < winding_number_candidate * singular_tol &&
-                winding_number_candidate > 1
+            d < winding_number_candidate * singular_tol && winding_number_candidate > 1
         if singular
             for (i, val_xᵢ) in enumerate(val_x)
                 if abs(val_xᵢ) < finite_tol && !(0.25 ≤ δ_x[i] / val_tx¹[i] ≤ 4)
