@@ -7,15 +7,17 @@ export PathTracker,
     is_failed,
     is_finite,
     winding_number,
+    last_path_point,
     steps,
     accepted_steps,
-    rejected_steps
+    rejected_steps,
+    valuation
 
 Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
     # tracker parameters during eg
     β_τ::Float64
-    eg_β_τ::Float64 = min(0.5, β_τ)
+    eg_β_τ::Float64 = min(0.45, β_τ)
     # valuation etc
     val_trust_tol::Float64 = 1e-3
     at_zero_check::Bool = false
@@ -435,6 +437,7 @@ struct PathResult{V<:AbstractVector}
     t::Float64
     accuracy::Float64
     winding_number::Union{Nothing,Int}
+    last_path_point::Union{Nothing,Tuple{V,Float64}}
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
@@ -443,13 +446,13 @@ end
 
 function PathResult(egtracker::PathTracker)
     @unpack tracker, state = egtracker
-    t = real(tracker.state.t)
     PathResult(
         state.code,
-        copy(state.solution),
-        t,
+        is_success(state.code) ? copy(state.solution) : copy(tracker.state.x),
+        is_success(state.code) ? 0.0 : real(tracker.state.t),
         state.accuracy,
         state.winding_number,
+        state.winding_number == nothing ? nothing : (copy(state.last_point), state.last_t),
         tracker.state.accepted_steps,
         tracker.state.rejected_steps,
         copy(state.val.val_x),
@@ -464,7 +467,6 @@ function track(eg_tracker::PathTracker, x, t₁::Real = 1.0; debug::Bool = false
     track!(eg_tracker, x, t₁; debug = debug)
     PathResult(eg_tracker)
 end
-
 
 
 """
@@ -514,6 +516,14 @@ Get the winding number of the solution of the path. Returns `nothing` if it wasn
 winding_number(r::PathResult) = r.winding_number
 
 """
+    last_path_point(r::PathResult)
+
+Returns a tuple `(x,t)` containing the last zero of `H(x, t)` before the Cauchy endgame was used.
+Returns `nothing` if the endgame strategy was not invoked.
+"""
+last_path_point(r::PathResult) = r.last_path_point
+
+"""
     is_success(r::PathResult)
 
 Checks whether the path is successfull.
@@ -541,3 +551,10 @@ is_at_infinity(r::PathResult) = is_at_infinity(r.return_code)
 Checks whether the path result is finite.
 """
 is_finite(r::PathResult) = is_success(r.return_code)
+
+"""
+    valuation(r::PathResult)
+
+Get the computed valuation of the path.
+"""
+valuation(r::PathResult) = r.valuation

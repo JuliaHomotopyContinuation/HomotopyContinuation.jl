@@ -17,8 +17,21 @@
     @test steps(res[1]) < 10
     @test accepted_steps(res[1]) < 10
     @test rejected_steps(res[1]) == 0
+    @test last_path_point(res[1]) == nothing
     @test is_success(res[2])
     @test is_at_infinity(res[3])
     @test is_at_infinity(res[4])
     @test !isempty(sprint(show, res[1]))
+    @test valuation(res[3]) ≈ [-1,-1] rtol = 1e-3
+
+    # singular stuff
+    @var x
+    f = [(x - 10)^2]
+    H, starts = total_degree_homotopy(f, [x])
+    tracker = PathTracker(Tracker(H), eg_β_τ = 0.45)
+    res = track.(tracker, starts)
+
+    @test winding_number(res[1]) == 2
+    @test last_path_point(res[1]) isa Tuple{Vector{ComplexF64}, Float64}
+    @test 0 < last(last_path_point(res[1])) < 0.1
 end
