@@ -1,6 +1,17 @@
-export is_at_infinity, is_failed
+export PathTracker,
+    PathResult,
+    solution,
+    accuracy,
+    is_success,
+    is_at_infinity,
+    is_failed,
+    is_finite,
+    winding_number,
+    steps,
+    accepted_steps,
+    rejected_steps
 
-Base.@kwdef mutable struct EndgameTrackerOptions
+Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
     # tracker parameters during eg
     β_τ::Float64
@@ -20,28 +31,28 @@ Base.@kwdef mutable struct EndgameTrackerOptions
     t_trust_valuation::Float64 = 1e-14
 end
 
-Base.show(io::IO, opts::EndgameTrackerOptions) = print_fieldnames(io, opts)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::EndgameTrackerOptions) = opts
+Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
-module EGTrackerReturnCode
+module PathTrackerReturnCode
 import ..TrackerReturnCode
 """
-    enum EGTrackerReturnCode
+    enum PathTrackerReturnCode
 
 The possible states a `PathTracker` can be in:
 
-* `EGTrackerReturnCode.tracking`
-* `EGTrackerReturnCode.success`
-* `EGTrackerReturnCode.at_infinity`
-* `EGTrackerReturnCode.at_zero`
-* `EGTrackerReturnCode.excess_solution`
-* `EGTrackerReturnCode.post_check_failed`
-* `EGTrackerReturnCode.terminated_accuracy_limit`
-* `EGTrackerReturnCode.terminated_ill_conditioned`
-* `EGTrackerReturnCode.terminated_invalid_startvalue`
-* `EGTrackerReturnCode.terminated_max_winding_number`
-* `EGTrackerReturnCode.terminated_max_iters`
-* `EGTrackerReturnCode.terminated_step_size_too_small`
+* `PathTrackerReturnCode.tracking`
+* `PathTrackerReturnCode.success`
+* `PathTrackerReturnCode.at_infinity`
+* `PathTrackerReturnCode.at_zero`
+* `PathTrackerReturnCode.excess_solution`
+* `PathTrackerReturnCode.post_check_failed`
+* `PathTrackerReturnCode.terminated_accuracy_limit`
+* `PathTrackerReturnCode.terminated_ill_conditioned`
+* `PathTrackerReturnCode.terminated_invalid_startvalue`
+* `PathTrackerReturnCode.terminated_max_winding_number`
+* `PathTrackerReturnCode.terminated_max_iters`
+* `PathTrackerReturnCode.terminated_step_size_too_small`
 """
 @enum codes begin
     tracking
@@ -83,46 +94,47 @@ end
 
 
 """
-    is_success(code::EGTrackerReturnCode.codes)
+    is_success(code::PathTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates a success in tracking.
 """
-is_success(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.success
+is_success(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.success
 
 """
-    is_success(code::EGTrackerReturnCode.codes)
+    is_success(code::PathTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates that a path diverged towards infinity.
 """
-is_at_infinity(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.at_infinity
+is_at_infinity(code::PathTrackerReturnCode.codes) =
+    code == PathTrackerReturnCode.at_infinity
 
 """
-    is_tracking(code::EGTrackerReturnCode.codes)
+    is_tracking(code::PathTrackerReturnCode.codes)
 
 Returns `true` if `status` indicates the tracking is not going on.
 """
-is_tracking(code::EGTrackerReturnCode.codes) = code == EGTrackerReturnCode.tracking
+is_tracking(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.tracking
 
 """
-    is_invalid_startvalue(code::EGTrackerReturnCode.codes)
+    is_invalid_startvalue(code::PathTrackerReturnCode.codes)
 
 Returns `true` if the provided start value was not valid.
 """
-is_invalid_startvalue(code::EGTrackerReturnCode.codes) =
-    code == EGTrackerReturnCode.terminated_invalid_startvalue
+is_invalid_startvalue(code::PathTrackerReturnCode.codes) =
+    code == PathTrackerReturnCode.terminated_invalid_startvalue
 
 """
-    is_terminated_callback(code::EGTrackerReturnCode.codes)
+    is_terminated_callback(code::PathTrackerReturnCode.codes)
 
 Returns `true` if the provided callback indicated a termination of the path.
 """
-is_terminated_callback(code::EGTrackerReturnCode.codes) =
-    code == EGTrackerReturnCode.terminated_callback
+is_terminated_callback(code::PathTrackerReturnCode.codes) =
+    code == PathTrackerReturnCode.terminated_callback
 
 
 # State
-Base.@kwdef mutable struct EndgameTrackerState{V<:AbstractVector}
-    code::EGTrackerReturnCode.codes = EGTrackerReturnCode.tracking
+Base.@kwdef mutable struct PathTrackerState{V<:AbstractVector}
+    code::PathTrackerReturnCode.codes = PathTrackerReturnCode.tracking
     val::Valuation
     solution::V
     winding_number::Union{Nothing,Int} = nothing
@@ -131,11 +143,10 @@ Base.@kwdef mutable struct EndgameTrackerState{V<:AbstractVector}
     last_point::V
     last_t::Float64 = NaN
     max_winding_number_hit::Bool = false
-    last_val_singular::Bool = false
     jump_to_zero_failed::Tuple{Bool,Bool} = (false, false)
 end
 
-EndgameTrackerState(x::AbstractVector) = EndgameTrackerState(;
+PathTrackerState(x::AbstractVector) = PathTrackerState(;
     val = Valuation(length(x)),
     solution = copy(x),
     prediction = copy(x),
@@ -143,7 +154,7 @@ EndgameTrackerState(x::AbstractVector) = EndgameTrackerState(;
 )
 
 
-struct EndgameTracker{
+struct PathTracker{
     H<:AbstractHomotopy,
     N, # AutomaticDifferentiation
     # V and V̄ need to have the same container type
@@ -152,19 +163,19 @@ struct EndgameTracker{
     M<:AbstractMatrix{ComplexF64},
 }
     tracker::Tracker{H,N,V,V̄,M}
-    state::EndgameTrackerState{V}
-    options::EndgameTrackerOptions
+    state::PathTrackerState{V}
+    options::PathTrackerOptions
 end
 
-function EndgameTracker(tracker::Tracker; kwargs...)
-    options = EndgameTrackerOptions(; β_τ = tracker.options.β_τ, kwargs...)
-    state = EndgameTrackerState(tracker.state.x)
-    EndgameTracker(tracker, state, options)
+function PathTracker(tracker::Tracker; kwargs...)
+    options = PathTrackerOptions(; β_τ = tracker.options.β_τ, kwargs...)
+    state = PathTrackerState(tracker.state.x)
+    PathTracker(tracker, state, options)
 end
 
-Base.broadcastable(T::EndgameTracker) = Ref(T)
+Base.broadcastable(T::PathTracker) = Ref(T)
 
-function init!(eg_tracker::EndgameTracker, x, t₁::Real)
+function init!(eg_tracker::PathTracker, x, t₁::Real)
     @unpack tracker, state, options = eg_tracker
 
     init!(tracker, x, t₁, 0.0)
@@ -174,7 +185,6 @@ function init!(eg_tracker::EndgameTracker, x, t₁::Real)
     state.solution .= NaN
     state.accuracy = NaN
     state.winding_number = nothing
-    state.last_val_singular = false
     state.max_winding_number_hit = false
     state.jump_to_zero_failed = (false, false)
     tracker.options.β_τ = options.β_τ
@@ -212,11 +222,7 @@ winding number `m::Int` and th expected accuracy of the solution.
 
 [Cauchy's integral formula]: https://en.wikipedia.org/wiki/Cauchy%27s_integral_formula
 """
-function cauchy!(
-    state::EndgameTrackerState,
-    tracker::Tracker,
-    options::EndgameTrackerOptions,
-)
+function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTrackerOptions)
     @unpack last_point, prediction = state
 
     t = real(tracker.state.t)
@@ -277,7 +283,7 @@ function update_valuation!(state, tracker_state, t)
 end
 
 
-function step!(eg_tracker::EndgameTracker, debug::Bool = false)
+function step!(eg_tracker::PathTracker, debug::Bool = false)
     @unpack tracker, state, options = eg_tracker
 
     proposed_t′ = real(tracker.state.t′)
@@ -290,8 +296,8 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
 
-        if state.code == EGTrackerReturnCode.terminated_accuracy_limit ||
-           state.code == EGTrackerReturnCode.terminated_ill_conditioned
+        if state.code == PathTrackerReturnCode.terminated_accuracy_limit ||
+           state.code == PathTrackerReturnCode.terminated_ill_conditioned
 
             verdict = analyze(
                 state.val;
@@ -303,7 +309,7 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
             )
 
             if verdict.at_infinity
-                return (state.code = EGTrackerReturnCode.at_infinity)
+                return (state.code = PathTrackerReturnCode.at_infinity)
             end
         end
         return state.code
@@ -369,11 +375,11 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
     if at_infinity
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = EGTrackerReturnCode.at_infinity)
+        return (state.code = PathTrackerReturnCode.at_infinity)
     elseif at_zero
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = EGTrackerReturnCode.at_zero)
+        return (state.code = PathTrackerReturnCode.at_zero)
     end
 
     # if valuation indicates singular solution
@@ -385,7 +391,7 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
         )
 
     # TODO: Check consistency of result -> second eg round
-    if use_cauchy_eg # && state.last_val_singular
+    if use_cauchy_eg
         res, m, acc_est = cauchy!(state, tracker, options)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
@@ -395,31 +401,25 @@ function step!(eg_tracker::EndgameTracker, debug::Bool = false)
                 state.winding_number = m
                 state.solution .= state.prediction
                 state.accuracy = acc_est
-                state.code = EGTrackerReturnCode.success
+                state.code = PathTrackerReturnCode.success
             else
                 state.max_winding_number_hit = true
-                state.last_val_singular = false
             end
         elseif res == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
             if state.max_winding_number_hit
-                state.code = EGTrackerReturnCode.terminated_max_winding_number
+                state.code = PathTrackerReturnCode.terminated_max_winding_number
             else
                 state.max_winding_number_hit = true
-                state.last_val_singular = false
             end
         elseif res == CAUCHY_TERMINATED
             state.code = tracker.state.code
         end
-    elseif use_cauchy_eg
-        state.last_val_singular = true
-    else
-        state.last_val_singular = false
     end
 
     state.code
 end
 
-function track!(eg_tracker::EndgameTracker, x, t₁::Real; debug::Bool = false)
+function track!(eg_tracker::PathTracker, x, t₁::Real; debug::Bool = false)
     init!(eg_tracker, x, t₁)
 
     while is_tracking(eg_tracker.state.code)
@@ -429,8 +429,8 @@ function track!(eg_tracker::EndgameTracker, x, t₁::Real; debug::Bool = false)
     eg_tracker.state.code
 end
 
-struct EGTrackerResult{V<:AbstractVector}
-    return_code::EGTrackerReturnCode.codes
+struct PathResult{V<:AbstractVector}
+    return_code::PathTrackerReturnCode.codes
     solution::V
     t::Float64
     accuracy::Float64
@@ -441,10 +441,10 @@ struct EGTrackerResult{V<:AbstractVector}
     valuation::Vector{Float64}
 end
 
-function EGTrackerResult(egtracker::EndgameTracker)
+function PathResult(egtracker::PathTracker)
     @unpack tracker, state = egtracker
     t = real(tracker.state.t)
-    EGTrackerResult(
+    PathResult(
         state.code,
         copy(state.solution),
         t,
@@ -456,66 +456,88 @@ function EGTrackerResult(egtracker::EndgameTracker)
     )
 end
 
-Base.show(io::IO, r::EGTrackerResult) = print_fieldnames(io, r)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", r::EGTrackerResult) = r
+Base.show(io::IO, r::PathResult) = print_fieldnames(io, r)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
 
 
-function track(eg_tracker::EndgameTracker, x, t₁::Real = 1.0; debug::Bool = false)
+function track(eg_tracker::PathTracker, x, t₁::Real = 1.0; debug::Bool = false)
     track!(eg_tracker, x, t₁; debug = debug)
-    EGTrackerResult(eg_tracker)
+    PathResult(eg_tracker)
 end
 
 
 
 """
-    solution(r::EGTrackerResult)
+    solution(r::PathResult)
 
 Get the solution of the path.
 """
-solution(r::EGTrackerResult) = r.solution
+solution(r::PathResult) = r.solution
 
 
 """
-    accuracy(r::EGTrackerResult)
+    accuracy(r::PathResult)
 
 Get the accuracy of the solution. This is an estimate of the (relative) distance to the
 true solution.
 """
-accuracy(r::EGTrackerResult) = r.accuracy
+accuracy(r::PathResult) = r.accuracy
+
+"""
+    steps(r::PathResult)
+
+Total number of steps the path tracker performed.
+"""
+steps(r::PathResult) = accepted_steps(r) + rejected_steps(r)
+
+"""
+    accepted_steps(r::PathResult)
+
+Total number of steps the path tracker accepted.
+"""
+accepted_steps(r::PathResult) = r.accepted_steps
 
 
 """
-    winding_number(r::EGTrackerResult)
+    rejected_steps(r::PathResult)
+
+Total number of steps the path tracker rejected.
+"""
+rejected_steps(r::PathResult) = r.rejected_steps
+
+
+"""
+    winding_number(r::PathResult)
 
 Get the winding number of the solution of the path. Returns `nothing` if it wasn't computed.
 """
-winding_number(r::EGTrackerResult) = r.winding_number
+winding_number(r::PathResult) = r.winding_number
 
 """
-    is_success(r::EGTrackerResult)
+    is_success(r::PathResult)
 
 Checks whether the path is successfull.
 """
-is_success(r::EGTrackerResult) = is_success(r.return_code)
+is_success(r::PathResult) = is_success(r.return_code)
 
 """
-    is_failed(r::EGTrackerResult)
+    is_failed(r::PathResult)
 
 Checks whether the path failed.
 """
-is_failed(r::EGTrackerResult) = !(is_at_infinity(r) || is_success(r))
+is_failed(r::PathResult) = !(is_at_infinity(r) || is_success(r))
 
 """
-    is_at_infinity(r::EGTrackerResult)
+    is_at_infinity(r::PathResult)
 
 Checks whether the path goes to infinity.
 """
-is_at_infinity(r::EGTrackerResult) = is_at_infinity(r.return_code)
+is_at_infinity(r::PathResult) = is_at_infinity(r.return_code)
 
 
 """
-    is_finite(r::EGTrackerResult)
+    is_finite(r::PathResult)
 
 Checks whether the path result is finite.
 """
-is_finite(r::EGTrackerResult) = is_success(r.return_code)
+is_finite(r::PathResult) = is_success(r.return_code)

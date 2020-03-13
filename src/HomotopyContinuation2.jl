@@ -74,7 +74,7 @@ include("predictor.jl")
 include("newton_corrector.jl")
 include("tracker.jl")
 include("valuation.jl")
-include("endgame_tracker.jl")
+include("path_tracker.jl")
 include("path_info.jl")
 
 

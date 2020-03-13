@@ -143,7 +143,7 @@
         FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))
         sys = System(ModelKit.horner.(FcapL), [a; b], q)
         H, starts = total_degree_homotopy(sys; gamma = gamma, target_parameters = q₀)
-        tracker = HC2.EndgameTracker(Tracker(
+        tracker = PathTracker(Tracker(
             H;
             automatic_differentiation = AD,
         ))

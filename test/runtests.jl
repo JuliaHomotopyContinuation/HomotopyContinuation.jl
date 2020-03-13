@@ -10,6 +10,7 @@ const HC2 = HomotopyContinuation2
     include("homotopies_test.jl")
     include("tracker_test.jl")
     include("valuation_test.jl")
+    include("path_tracker_test.jl")
     include("endgame_test.jl")
 
     if "extensive" in ARGS

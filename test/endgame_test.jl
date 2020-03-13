@@ -62,7 +62,7 @@ end
         f = cyclic(7)
         H, starts = total_degree_homotopy(f; gamma = 0.2 + 0.4im)
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
 
         @test count(is_success, res) == 924
@@ -81,7 +81,7 @@ end
         ]
         H, starts = total_degree_homotopy(F, [x, z])
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
         @test count(r -> r.winding_number == 3, res) == 12
     end
@@ -92,7 +92,7 @@ end
         f = expand(prod(x - i for i = 1:d))
         H, starts = total_degree_homotopy([f], [x], gamma = 0.4 + 1.3im)
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
         @test all(is_success, res)
         @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:19
@@ -105,7 +105,7 @@ end
         f = [(x - 10)^d]
         H, starts = total_degree_homotopy(f, [x])
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
         @test count(r -> r.winding_number == d, res) == d
     end
@@ -115,7 +115,7 @@ end
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
         H, starts = total_degree_homotopy(f, [x, y]; gamma = 1.3im + 0.4)
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
         @test count(is_success, res) == 2
         @test count(is_at_infinity, res) == 2
@@ -128,7 +128,7 @@ end
         f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
         H, starts = total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
         S = collect(starts)
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
         @test count(is_success, res) == d + 1
         @test count(is_at_infinity, res) == (d + 1)^2 - d - 1
@@ -136,8 +136,8 @@ end
 
     @testset "Bacillus Subtilis" begin
         H, starts = total_degree_homotopy(bacillus())
-        tracker = HC2.EndgameTracker(Tracker(H))
-        tracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        tracker = PathTracker(Tracker(H))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, starts)
         @test count(is_success, res) == 44
     end
@@ -166,7 +166,7 @@ end
             ])
 
         H, starts = total_degree_homotopy(System(F, [x, z, y]); gamma = 0.2 + 0.4im)
-        egtracker = HC2.EndgameTracker(Tracker(H, automatic_differentiation = AD))
+        egtracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         egres = HC2.track.(egtracker, starts)
         @test count(is_success, egres) == 693
     end
