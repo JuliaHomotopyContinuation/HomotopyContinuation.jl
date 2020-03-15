@@ -39,6 +39,10 @@ using HomotopyContinuation2.ModelKit
         @test size(y) == (2, 3)
         @test join(x, " ") == "x₁ x₂"
 
+        @test reshape(sort(vec(y)), 2, 3) == y
+        @var x[9:11]
+        @test sort(x) == x
+
         @var c, d
         @test c isa Variable
         @test d isa Variable

@@ -5,9 +5,27 @@ Variable(name::Union{Symbol,AbstractString}, indices::Int...) =
 
 const SUBSCRIPTS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
 const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i+1] for i = 0:9])
-map_subscripts(indices) = join(SUBSCRIPT_MAP[c] for c in string(indices))
+const SUBSCRIPT_TO_INT_MAP = Dict([SUBSCRIPTS[i+1] => i for i = 0:9])
+map_subscripts(index) = join(SUBSCRIPT_MAP[c] for c in string(index))
 
-Base.isless(a::Variable, b::Variable) = isless(name(a), name(b))
+function sort_key(v::Variable)
+    name = string(ModelKit.name(v))
+    sub_start = findnext(c -> c in ModelKit.SUBSCRIPTS, name, 1)
+    if isnothing(sub_start)
+        return name, Int[]
+    end
+    var_base = name[1:sub_start-1]
+    str_indices = split(name[sub_start:end], "₋")
+    indices = map(str_indices) do str_index
+        digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
+        n = length(digits)
+        sum([digits[n-k+1] * 10^(k - 1) for k = 1:n])
+    end
+    var_base, reverse(indices)
+end
+Base.isless(a::Variable, b::Variable) = isless(sort_key(a), sort_key(b))
+Base.sort!(vs::AbstractVector{Variable}; kwargs...) =
+    permute!(vs, sortperm(sort_key.(vs); kwargs...))
 
 Symbol(v::Variable) = name(v)
 
@@ -83,12 +101,10 @@ function buildvar(var; unique::Bool = false)
         isa(var, Expr) || error("Expected $var to be a variable name")
         Base.Meta.isexpr(var, :ref) ||
         error("Expected $var to be of the form varname[idxset]")
-        (2 ≤ length(var.args)) ||
-        error("Expected $var to have at least one index set")
+        (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
         varname = var.args[1]
         prefix = unique ? string(gensym(varname)) : string(varname)
-        varname,
-        :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
