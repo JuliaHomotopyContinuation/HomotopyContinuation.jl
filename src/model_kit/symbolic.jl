@@ -731,8 +731,12 @@ end
 Base.size(F::System) = (length(F.expressions), length(F.variables))
 Base.size(F::System, i::Integer) = size(F)[i]
 Base.length(F::System) = length(F.expressions)
+nvariables(F::System) = length(F.variables)
+nparameters(F::System) = length(F.parameters)
 
-variables(F::System, parameters = nothing) = variables(F.variables)
+variables(F::System) = F.variables
+parameters(F::System) = F.parameters
+
 degree(F::System) = degree(F.expressions, F.variables)
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
