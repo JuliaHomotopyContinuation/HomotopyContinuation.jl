@@ -461,6 +461,17 @@ function degree(
     maximum(sum, keys(dicts))
 end
 
+function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
+    m = size(M)[1]
+    if m > 2
+        return sum(
+            (-1)^(i - 1) * M[i, 1] * LinearAlgebra.det(M[1:end.!=i, 2:end]) for i = 1:m
+        )
+    else
+        return M[1, 1] * M[2, 2] - M[2, 1] * M[1, 2]
+    end
+end
+
 ################
 # Optimization #
 ################
