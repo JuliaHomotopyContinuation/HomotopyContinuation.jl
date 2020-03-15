@@ -75,6 +75,18 @@
         @test !isempty(sprint(show, info))
     end
 
+    @testset "Straight Line Homotopy" begin
+        @var x y
+        F = System([x^2 + y^2 - 2.3, 2x + 3y - 4], [x,y])
+        G = System((0.2+0.4im) .* [x^2  - 1, y - 1], [x,y])
+        H = StraightLineHomotopy(ModelKit.compile(G), ModelKit.compile(F))
+        S = [[1,1], [-1, 1]]
+        tracker = Tracker(H, automatic_differentiation = 4)
+
+        @test is_success(track(tracker, S[1], 1, 0))
+        @test is_success(track(tracker, S[2], 1, 0))
+    end
+
     include("test_cases/steiner_higher_prec.jl")
     include("test_cases/four_bar.jl")
 end

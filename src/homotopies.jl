@@ -10,6 +10,7 @@ include("homotopies/differentiation.jl")
 include("homotopies/model_kit_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/affine_chart_homotopy.jl")
+include("homotopies/straight_line_homotopy.jl")
 
 
 ##################
@@ -39,10 +40,7 @@ function TotalDegreeStarts(degrees::Vector{Int})
     TotalDegreeStarts(degrees, iterator)
 end
 function Base.show(io::IO, iter::TotalDegreeStarts)
-    print(
-        io,
-        "$(length(iter)) total degree start solutions for degrees $(iter.degrees)",
-    )
+    print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
 end
 
 function Base.iterate(iter::TotalDegreeStarts)
@@ -69,24 +67,24 @@ Construct a total degree homotopy ``H`` using the 'γ-trick' such that ``H(x,0) 
 and ``H(x,1)`` is the generated start system.
 Returns a `ModelKitHomotopy` and the start solutions as an interator.
 """
-total_degree_homotopy(F::System; kwargs...) =
-    total_degree_homotopy(F.expressions, F.variables, F.parameters; kwargs...)
+total_degree_homotopy(f::AbstractVector{Expression}, vars::AbstractVector{Variable}, params::AbstractVector{Variable} = Variable[]; kwargs...) =
+    total_degree_homotopy(System(f, vars, params); kwargs...)
 
 function total_degree_homotopy(
-    f::Vector{Expression},
-    vars::Vector{Variable},
-    params::Vector{Variable} = Variable[];
+    F::System;
     target_parameters::AbstractVector = ComplexF64[],
     gamma = cis(2π * rand()),
     scaling = nothing,
 )
-    n = length(f)
-    length(f) == length(vars) ||
+    n = length(F)
+    n == ModelKit.nvariables(F) ||
     throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
-    length(params) == length(target_parameters) ||
+    ModelKit.nparameters(F) == length(target_parameters) ||
     throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
-    D = ModelKit.degree(f, vars)
+    vars = variables(F)
+    params = ModelKit.parameters(F)
+    D = ModelKit.degree(F.expressions, vars)
 
     t = ModelKit.unique_variable(:t, vars, params)
 
@@ -98,6 +96,8 @@ function total_degree_homotopy(
         push!(_s_, _s_i)
         push!(all_params, _s_i)
     end
+
+    f = F.expressions
     h = γ .* t .* _s_ .* (vars .^ D .- 1) .+ (1 .- t) .* f
     if scaling == nothing
         s = ones(n)
