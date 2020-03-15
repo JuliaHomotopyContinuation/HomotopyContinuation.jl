@@ -268,7 +268,6 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     vars = Symbol.(H.variables)
     params = Symbol.(H.parameters)
 
-
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         for k = 1:(d-1)
@@ -313,6 +312,66 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     end
 end
 
+function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
+    H = interpret(T)
+    checks, var_map = boundscheck_var_map(H)
+
+    list, ids = instruction_list(H.expressions)
+
+    vars = Symbol.(H.variables)
+    params = Symbol.(H.parameters)
+
+    diff_map = DiffMap()
+    for (i, v) in enumerate(vars)
+        for k = 1:(d-1)
+            diff_map[v, k] = :($(Symbol(:dx,k))[$i])
+        end
+    end
+
+    for (i, v) in enumerate(params)
+        for k = 1:DP
+            diff_map[v, k] = :($(Symbol(:dp,k))[$i])
+        end
+    end
+
+    if H isa Homotopy
+        diff_map[Symbol(H.t), 1] = 1
+    end
+    dlist = univariate_diff!(list, d, diff_map)
+
+    assignements = Dict{Symbol,Vector{Expr}}()
+    u_constants = Expr[]
+
+    for (i, id) in enumerate(ids)
+        add_assignement!(assignements, id, :(v[$i] = $id))
+        for k = 1:d
+            k_id = diff_map[id, k]
+            vk = Symbol(:v, k)
+            if k_id isa Symbol
+                if k_id ∉ vars && k_id ∉ params
+                    add_assignement!(assignements, k_id, :($vk[$i] = $k_id))
+                else
+                    push!(u_constants, :($vk[$i] = $(var_map[k_id])))
+                end
+            elseif k_id isa Nothing
+                push!(u_constants, :($vk[$i] = zero(eltype(x))))
+            else
+                push!(u_constants, :($vk[$i] = $k_id))
+            end
+        end
+    end
+
+    slp = to_expr(dlist, var_map, assignements)
+    append!(slp.args, u_constants)
+
+    quote
+        $(Expr(:tuple, :v, (Symbol(:v,k) for k in 1:d)...)) = u
+        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:(d-1))...)) = dx
+        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:(DP-1))...)) = dp
+        @inbounds $slp
+        nothing
+    end
+end
 
 ################
 ## EVALUATION ##
@@ -418,6 +477,49 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
     _diff_t!_impl(T, D + 1, DP)
+end
+
+"""
+    taylor!(u::Tuple, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
+
+Evaluate the expression
+```math
+(1 / r!) dʳ/dλʳ \\, F(x + ∑_{k=1}^{r-1} xᵢλⁱ, p(t + λ))
+```
+at ``λ = 0``.
+If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
+"""
+@generated function taylor!(
+    u,
+    T::CompiledSystem,
+    x::AbstractVector,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {D,DP}
+    _taylor!_impl(T, D + 1, DP)
+end
+
+"""
+    taylor!(u, H::CompiledHomotopy, x, t, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
+
+Evaluate the expression
+```math
+(1 / r!) dʳ/dλʳ \\, H(x + ∑_{k=1}^{r-1} xᵢλⁱ,t + λ)
+```
+at ``λ = 0``.
+If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
+"""
+@generated function taylor!(
+    u,
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {D,DP}
+    _taylor!_impl(T, D + 1, DP)
 end
 
 # non-inplace

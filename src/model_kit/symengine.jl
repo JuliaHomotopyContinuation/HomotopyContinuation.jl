@@ -375,7 +375,7 @@ function Base.getindex(s::ExpressionSet, n::Int)
     result
 end
 
-variables(ex::Variable) = Set(ex)
+variables(ex::Variable) = [ex]
 function variables(ex::Basic)
     syms = ExpressionSet()
     ccall(
@@ -385,11 +385,7 @@ function variables(ex::Basic)
         ex,
         syms.ptr,
     )
-    S = Set{Variable}()
-    for i = 1:length(syms)
-        push!(S, Variable(syms[i]))
-    end
-    S
+    sort!([Variable(syms[i]) for i = 1:length(syms)])
 end
 
 function differentiate(f::Basic, v::Variable)
@@ -754,66 +750,3 @@ function cse(exprs::Vector{Expression})
     end
     map(Expression, reduced_exprs), subs
 end
-
-############
-## Matrix ##
-############
-mutable struct ExpressionMatrix
-    ptr::Ptr{Cvoid}
-
-    function ExpressionMatrix(r::Int, c::Int)
-        m = new(ccall(
-            (:dense_matrix_new_rows_cols, libsymengine),
-            Ptr{Cvoid},
-            (Int, Int),
-            r,
-            c,
-        ))
-        finalizer(free!, m)
-        m
-    end
-end
-
-function ExpressionMatrix(A::AbstractMatrix{<:Basic})
-    m, n = size(A)
-    B = ExpressionMatrix(m, n)
-    for j = 1:m, i = 1:n
-        B[i, j] = A[i, j]
-    end
-    B
-end
-
-function free!(x::ExpressionMatrix)
-    if x.ptr != C_NULL
-        ccall((:dense_matrix_free, libsymengine), Nothing, (Ptr{Cvoid},), x.ptr)
-        x.ptr = C_NULL
-    end
-    nothing
-end
-
-function Base.setindex!(A::ExpressionMatrix, x::Basic, i::Int, j::Int)
-    ccall(
-        (:dense_matrix_set_basic, libsymengine),
-        Nothing,
-        (Ptr{Cvoid}, UInt, UInt, Ref{ExpressionRef}),
-        A.ptr,
-        UInt(i - 1),
-        UInt(j - 1),
-        x,
-    )
-    A
-end
-
-function LinearAlgebra.det(A::ExpressionMatrix)
-    result = Expression()
-    ccall(
-        (:dense_matrix_det, libsymengine),
-        Nothing,
-        (Ref{Expression}, Ptr{Cvoid}),
-        result,
-        A.ptr,
-    )
-    result
-end
-LinearAlgebra.det(A::AbstractMatrix{<:Basic}) =
-    LinearAlgebra.det(ExpressionMatrix(A))
