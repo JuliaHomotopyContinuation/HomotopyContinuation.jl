@@ -135,11 +135,7 @@ Create a variable with a unique name which doesn't clash with `variables` or
 If `var` is not possible the names `var##k` for `k=0,1,...` are tried until
 one is possible,
 """
-function unique_variable(
-    var::Symbol,
-    vars::Vector{Variable},
-    params::Vector{Variable},
-)
+function unique_variable(var::Symbol, vars::Vector{Variable}, params::Vector{Variable})
     v = Variable(var)
     k = 0
     while (v in vars || v in params)
@@ -166,7 +162,7 @@ function variables(exprs::AbstractVector{<:Basic})
     for expr in exprs
         union!(S, variables(expr))
     end
-    S
+    sort!(collect(S))
 end
 function variables(exprs::Union{Basic,AbstractVector{<:Basic}}, params)
     setdiff!(variables(exprs), params)
@@ -258,10 +254,7 @@ end
 function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
     [differentiate(e, var, k) for e in exprs]
 end
-function differentiate(
-    exprs::AbstractVector{<:Basic},
-    vars::AbstractVector{Variable},
-)
+function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
     [differentiate(e, v) for e in exprs, v in vars]
 end
 
@@ -290,21 +283,14 @@ julia> monomials([x,y], 2; homogeneous = true)
  y ^ 2
  ```
 """
-function monomials(
-    vars::AbstractVector{Variable},
-    d::Integer;
-    homogeneous::Bool = false,
-)
+function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
     n = length(vars)
     if homogeneous
         pred = x -> sum(x) == d
     else
         pred = x -> sum(x) ≤ d
     end
-    exps = collect(Iterators.filter(
-        pred,
-        Iterators.product(Iterators.repeated(0:d, n)...),
-    ))
+    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
     sort!(exps, lt = td_order)
     map(exps) do exp
         prod(i -> vars[i]^exp[i], 1:n)
@@ -427,7 +413,7 @@ function exponents_coefficients(
     expanded::Bool = false,
 )
     expanded || (f = expand(f))
-    D = ModelKit.to_dict(f, vars)
+    D = to_dict(f, vars)
     # make exponents to matrix
     m = length(D)
     n = length(vars)
@@ -442,14 +428,24 @@ function exponents_coefficients(
 end
 
 """
-    degree(f::AbstractVector{Expression}, vars = collect(variables(f); expanded = false)
+    coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
+
+Return all coefficients of the given polynomial `f` for the given variables `vars`.
+"""
+function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::Bool = false)
+    expanded || (f = expand(f))
+    collect(values(to_dict(f, vars)))
+end
+
+"""
+    degree(f::AbstractVector{Expression}, vars = variables(f); expanded = false)
 
 Compute the degrees of the expressions `f` in `vars`.
 Unless `expanded` is `true` the expressions are first expanded.
 """
 function degree(
     f::AbstractVector{Expression},
-    vars::AbstractVector{Variable} = collect(variables(f));
+    vars::AbstractVector{Variable} = variables(f);
     expanded::Bool = false,
 )
     if !expanded
@@ -460,14 +456,14 @@ function degree(
 end
 
 """
-    degree(f::Expression, vars = collect(variables(f); expanded = false)
+    degree(f::Expression, vars = variables(f); expanded = false)
 
 Compute the degree of the expression `f`  in `vars`.
 Unless `expanded` is `true` the expression is first expanded.
 """
 function degree(
     f::Expression,
-    vars::AbstractVector{Variable} = collect(variables(f));
+    vars::AbstractVector{Variable} = variables(f);
     expanded::Bool = false,
 )
     if !expanded
@@ -493,7 +489,7 @@ end
 ################
 
 """
-    horner(f::Expression, vars = collect(variables(f)))
+    horner(f::Expression, vars = variables(f))
 
 Rewrite `f` using a multi-variate horner schema.
 
@@ -509,7 +505,7 @@ julia> ModelKit.horner(f)
 c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
-function horner(f::Expression, vars = collect(variables(f)))
+function horner(f::Expression, vars = variables(f))
     M, coeffs = ModelKit.exponents_coefficients(f, vars)
     multivariate_horner(M, coeffs, vars)
 end
@@ -687,17 +683,9 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        print(
-            io,
-            " $(length(F.variables)) variables: ",
-            join(F.variables, ", "),
-        )
+        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
         if !isempty(F.parameters)
-            print(
-                io,
-                "\n $(length(F.parameters)) parameters: ",
-                join(F.parameters, ", "),
-            )
+            print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
         end
         print(io, "\n\n")
         for i = 1:length(F)
@@ -714,8 +702,7 @@ function Base.show(io::IO, F::System)
     end
 end
 
-evaluate(F::System, x::AbstractVector) =
-    evaluate(F.expressions, F.variables => x)
+evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
@@ -800,17 +787,9 @@ end
 function Base.show(io::IO, H::Homotopy)
     if !get(io, :compact, false)
         println(io, "Homotopy in ", H.t, " of length ", length(H.expressions))
-        print(
-            io,
-            " $(length(H.variables)) variables: ",
-            join(H.variables, ", "),
-        )
+        print(io, " $(length(H.variables)) variables: ", join(H.variables, ", "))
         if !isempty(H.parameters)
-            print(
-                io,
-                "\n $(length(H.parameters)) parameters: ",
-                join(H.parameters, ", "),
-            )
+            print(io, "\n $(length(H.parameters)) parameters: ", join(H.parameters, ", "))
         end
         print(io, "\n\n")
         for i = 1:length(H)

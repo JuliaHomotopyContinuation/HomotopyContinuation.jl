@@ -375,7 +375,7 @@ function Base.getindex(s::ExpressionSet, n::Int)
     result
 end
 
-variables(ex::Variable) = Set(ex)
+variables(ex::Variable) = [ex]
 function variables(ex::Basic)
     syms = ExpressionSet()
     ccall(
@@ -385,11 +385,7 @@ function variables(ex::Basic)
         ex,
         syms.ptr,
     )
-    S = Set{Variable}()
-    for i = 1:length(syms)
-        push!(S, Variable(syms[i]))
-    end
-    S
+    sort!([Variable(syms[i]) for i = 1:length(syms)])
 end
 
 function differentiate(f::Basic, v::Variable)
