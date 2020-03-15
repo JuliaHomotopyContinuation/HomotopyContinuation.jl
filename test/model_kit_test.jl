@@ -67,8 +67,7 @@ using HomotopyContinuation2.ModelKit
         @test subs(f, x => z) == z^2 * (z + w * y)
         @test subs([f], x => z) == [z^2 * (z + w * y)]
         @test subs(f, [x, y] => [z^2, z + 2]) == z^4 * (w * (2 + z) + z^2)
-        @test subs(f, [x, y] => [z^2, z + 2], w => u) ==
-              z^4 * (u * (2 + z) + z^2)
+        @test subs(f, [x, y] => [z^2, z + 2], w => u) == z^4 * (u * (2 + z) + z^2)
         @test subs(f, x => z^2, y => 3, w => u) == z^4 * (3 * u + z^2)
         @test subs(f, Dict(x => z^2, y => 3, w => u)) == z^4 * (3 * u + z^2)
     end
@@ -117,7 +116,7 @@ using HomotopyContinuation2.ModelKit
             @var x y z
             f = [
                 (0.3 * x^2 + 0.5z + 0.3x + 1.2 * y^2 - 1.1)^2 +
-                    (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3,
+                (0.7 * (y - 0.5x)^2 + y + 1.2 * z^2 - 1)^2 - 0.3,
             ]
 
             I = let x = [x, y, z]
@@ -288,11 +287,7 @@ using HomotopyContinuation2.ModelKit
 
                 @eval ModelKit begin
                     function __diff_4_pow(x, x1, x2, x3)
-                        $(ModelKit.to_expr(ModelKit.univariate_diff!(
-                            list,
-                            4,
-                            D,
-                        )))
+                        $(ModelKit.to_expr(ModelKit.univariate_diff!(list, 4, D)))
                     end
                 end
 
@@ -343,12 +338,7 @@ using HomotopyContinuation2.ModelKit
                     ),
                     λ => 0,
                 ) / 24,
-            ) == expand(ModelKit.__diff_4_mul__(
-                x,
-                y,
-                (x1, x2, x3),
-                (y1, y2, y3),
-            ))
+            ) == expand(ModelKit.__diff_4_mul__(x, y, (x1, x2, x3), (y1, y2, y3)))
         end
 
         @testset "Higher order plus" begin
@@ -385,12 +375,7 @@ using HomotopyContinuation2.ModelKit
                     ),
                     λ => 0,
                 ) / 6,
-            ) == expand(ModelKit.__diff_3_plus__(
-                x,
-                y,
-                (x1, x2, x3),
-                (y1, y2, y3),
-            ))
+            ) == expand(ModelKit.__diff_3_plus__(x, y, (x1, x2, x3), (y1, y2, y3)))
         end
     end
 
@@ -400,10 +385,7 @@ using HomotopyContinuation2.ModelKit
         @var x[0:n] ẋ[0:n] ẍ[0:n] x3[0:n] t γ
         K = [
             (
-                sum(
-                    x[abs(l)+1] * x[abs(m - l)+1]
-                    for l = -n:n if abs(m - l) <= n
-                ) - x[m+1] for m = 0:n-1
+                sum(x[abs(l)+1] * x[abs(m - l)+1] for l = -n:n if abs(m - l) <= n) - x[m+1] for m = 0:n-1
             )...,
             x[1] + 2 * sum(x[i+1] for i = 1:n) - 1,
         ]
@@ -411,7 +393,6 @@ using HomotopyContinuation2.ModelKit
         h = γ .* t .* [x[1:n] .^ 2 .- 1; x[n+1] - 1] + (1 - t) .* K
         H = ModelKit.Homotopy(h, x, t, [γ])
         TH = ModelKit.compile(H)
-
 
         dt1 = ModelKit.diff_t(TH, x, t, (), [γ])
         dt2 = ModelKit.diff_t(TH, x, t, (ẋ,), [γ])
@@ -428,16 +409,11 @@ using HomotopyContinuation2.ModelKit
         Hd3 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ, t => t + λ)
         true_dt3 = subs(differentiate(Hd3, λ, 3), λ => 0) / 6
 
-        Hd4 = subs(
-            H.expressions,
-            x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3,
-            t => t + λ,
-        )
+        Hd4 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3, t => t + λ)
         true_dt4 = subs(differentiate(Hd4, λ, 4), λ => 0) / 24
 
         @test expand.(ModelKit.evaluate(TH, x, t, [γ])) == expand.(h)
-        @test expand.(ModelKit.jacobian(TH, x, t, [γ])) ==
-              expand.(differentiate(h, x))
+        @test expand.(ModelKit.jacobian(TH, x, t, [γ])) == expand.(differentiate(h, x))
         @test expand.(dt1) == expand.(true_dt1)
         @test expand.(dt2) == expand.(true_dt2)
         @test expand.(dt3) == expand.(true_dt3)
