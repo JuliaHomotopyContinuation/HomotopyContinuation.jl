@@ -218,8 +218,8 @@ end
 subs(exs::AbstractArray{<:Basic}, args...) = map(ex -> subs(ex, args...), exs)
 
 """
-    evaluate(expr::Expression, subs::Pair{Variable,<:Any}...)
-    evaluate(expr::Expression, subs::Pair{AbstractArray{<:Variable},AbstractArray{<:Any}}...)
+    evaluate(expr::Expression, subs...)
+    evaluate(expr::AbstractArray{<:Expression}, subs...)
 
 Evaluate the given expression.
 
@@ -234,11 +234,25 @@ julia> evaluate(x^2, x => 2)
 julia> evaluate(x * y, [x,y] => [2, 3])
 6
 """
-function evaluate(expr::Union{Basic,AbstractArray{<:Basic}}, args...)
-    to_number.(subs(expr, args...))
+function evaluate(expr::AbstractArray{<:Basic}, args...)
+    out = map(to_number, subs(expr, args...))
+    if eltype(out) in (Number, Any)
+        return to_smallest_eltype(out)
+    else
+        out
+    end
 end
+evaluate(expr::Basic, args...) = to_number(subs(expr, args...))
 (f::Union{Basic,AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
 
+"""
+    evaluate!(u, expr::AbstractArray{<:Expression}, subs...)
+
+Inplace for of [`evaluate`](@ref).
+"""
+function evaluate!(u::AbstractArray, expr::AbstractArray{<:Basic}, args...)
+    map!(to_number, u, subs(expr, args...))
+end
 
 """
     differentiate(expr::Expression, var::Variable)
