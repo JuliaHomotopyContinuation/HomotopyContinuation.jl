@@ -144,3 +144,181 @@ function nthroot(x::Real, N::Integer)
         x^(1 / N)
     end
 end
+
+
+import Base: MPFR
+import Base.MPFR: MPFRRoundingMode
+
+
+function set!(x::BigFloat, y::BigFloat, r::MPFRRoundingMode = MPFR.ROUNDING_MODE[])
+    ccall(
+        (:mpfr_set, :libmpfr),
+        Int32,
+        (Ref{BigFloat}, Ref{BigFloat}, MPFRRoundingMode),
+        x,
+        y,
+        r,
+    )
+    x
+end
+
+
+function set!(x::BigFloat, d::Float64, r::MPFRRoundingMode = MPFR.ROUNDING_MODE[])
+    ccall(
+        (:mpfr_set_d, :libmpfr),
+        Int32,
+        (Ref{BigFloat}, Float64, MPFRRoundingMode),
+        x,
+        d,
+        r,
+    )
+    x
+end
+
+
+# Basic arithmetic without promotion
+for (fJ, fC) in ((:add!, :add), (:mul!, :mul))
+    @eval begin
+        # BigFloat
+        function ($fJ)(z::BigFloat, x::BigFloat, y::BigFloat)
+            ccall(
+                ($(string(:mpfr_, fC)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Ref{BigFloat}, MPFRRoundingMode),
+                z,
+                x,
+                y,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+
+        function ($fJ)(z::BigFloat, x::BigFloat, c::Float64)
+            ccall(
+                ($(string(:mpfr_, fC, :_d)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Cdouble, MPFRRoundingMode),
+                z,
+                x,
+                c,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+        ($fJ)(c::Float64, x::BigFloat) = ($fJ)(x, c)
+
+        function ($fJ)(z::BigFloat, x::BigFloat, c::Int64)
+            ccall(
+                ($(string(:mpfr_, fC, :_si)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Cdouble, MPFRRoundingMode),
+                z,
+                x,
+                c,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+        ($fJ)(c::Int64, x::BigFloat) = ($fJ)(x, c)
+
+        # BigInt
+        function ($fJ)(z::BigFloat, x::BigFloat, c::BigInt)
+            ccall(
+                ($(string(:mpfr_, fC, :_z)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Ref{BigInt}, MPFRRoundingMode),
+                z,
+                x,
+                c,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+        ($fJ)(c::BigInt, x::BigFloat) = ($fJ)(x, c)
+    end
+end
+
+for (fJ, fC) in ((:sub!, :sub), (:div!, :div))
+    @eval begin
+        # BigFloat
+        function ($fJ)(z::BigFloat, x::BigFloat, y::BigFloat)
+            ccall(
+                ($(string(:mpfr_, fC)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Ref{BigFloat}, MPFRRoundingMode),
+                z,
+                x,
+                y,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+
+        # Float32/Float64
+        function ($fJ)(z::BigFloat, x::BigFloat, c::Float64)
+            ccall(
+                ($(string(:mpfr_, fC, :_d)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Cdouble, MPFRRoundingMode),
+                z,
+                x,
+                c,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+        function ($fJ)(z::BigFloat, c::Float64, x::BigFloat)
+            ccall(
+                ($(string(:mpfr_, :d_, fC)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Cdouble, Ref{BigFloat}, MPFRRoundingMode),
+                z,
+                c,
+                x,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+
+        # BigInt
+        function ($fJ)(z::BigFloat, x::BigFloat, c::BigInt)
+            ccall(
+                ($(string(:mpfr_, fC, :_z)), :libmpfr),
+                Int32,
+                (Ref{BigFloat}, Ref{BigFloat}, Ref{BigInt}, MPFRRoundingMode),
+                z,
+                x,
+                c,
+                MPFR.ROUNDING_MODE[],
+            )
+            return z
+        end
+        # no :mpfr_z_div function
+    end
+end
+
+function sub!(z::BigFloat, c::BigInt, x::BigFloat)
+    ccall(
+        (:mpfr_z_sub, :libmpfr),
+        Int32,
+        (Ref{BigFloat}, Ref{BigInt}, Ref{BigFloat}, MPFRRoundingMode),
+        z,
+        c,
+        x,
+        MPFR.ROUNDING_MODE[],
+    )
+    return z
+end
+
+function rem!(z::BigFloat, x::BigFloat, y::BigFloat, ::RoundingMode{:Nearest})
+    ccall(
+        (:mpfr_remainder, :libmpfr),
+        Int32,
+        (Ref{BigFloat}, Ref{BigFloat}, Ref{BigFloat}, MPFRRoundingMode),
+        z,
+        x,
+        y,
+        MPFR.ROUNDING_MODE[],
+    )
+    return z
+end

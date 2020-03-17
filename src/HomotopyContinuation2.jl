@@ -2,6 +2,7 @@ module HomotopyContinuation2
 
 export ModelKit
 
+import ElasticArrays: ElasticArray
 import LinearAlgebra
 using Parameters: @unpack
 import Printf
@@ -76,6 +77,6 @@ include("tracker.jl")
 include("valuation.jl")
 include("path_tracker.jl")
 include("path_info.jl")
-
+include("binomial_system.jl")
 
 end
