@@ -177,10 +177,10 @@ end
 
 Base.broadcastable(T::PathTracker) = Ref(T)
 
-function init!(eg_tracker::PathTracker, x, t₁::Real)
+function init!(eg_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::Float64 = NaN)
     @unpack tracker, state, options = eg_tracker
 
-    init!(tracker, x, t₁, 0.0)
+    init!(tracker, x, t₁, 0.0; ω = ω, μ = μ)
 
     state.code = status(tracker)
     init!(state.val)
@@ -271,7 +271,7 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     @label _return
 
     if result == CAUCHY_TERMINATED
-        init!(tracker, last_point, t, 0.0, ω, μ; keep_steps = true)
+        init!(tracker, last_point, t, 0.0; ω = ω, μ = μ, keep_steps = true)
     else
         init!(tracker, 0.0)
     end
@@ -421,8 +421,15 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
     state.code
 end
 
-function track!(eg_tracker::PathTracker, x, t₁::Real; debug::Bool = false)
-    init!(eg_tracker, x, t₁)
+function track!(
+    eg_tracker::PathTracker,
+    x,
+    t₁::Real;
+    ω::Float64 = NaN,
+    μ::Float64 = NaN,
+    debug::Bool = false,
+)
+    init!(eg_tracker, x, t₁; ω = ω, μ = μ)
 
     while is_tracking(eg_tracker.state.code)
         step!(eg_tracker, debug)
@@ -431,17 +438,21 @@ function track!(eg_tracker::PathTracker, x, t₁::Real; debug::Bool = false)
     eg_tracker.state.code
 end
 
-struct PathResult{V<:AbstractVector}
+mutable struct PathResult{V<:AbstractVector}
     return_code::PathTrackerReturnCode.codes
     solution::V
     t::Float64
     accuracy::Float64
     winding_number::Union{Nothing,Int}
     last_path_point::Union{Nothing,Tuple{V,Float64}}
+    valuation::Vector{Float64}
+    ω::Float64
+    μ::Float64
+    extended_precision::Bool
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
-    valuation::Vector{Float64}
+    extended_precision_used::Bool
 end
 
 function PathResult(egtracker::PathTracker)
@@ -453,9 +464,13 @@ function PathResult(egtracker::PathTracker)
         state.accuracy,
         state.winding_number,
         state.winding_number == nothing ? nothing : (copy(state.last_point), state.last_t),
+        copy(state.val.val_x),
+        tracker.state.ω,
+        tracker.state.μ,
+        tracker.state.extended_prec,
         tracker.state.accepted_steps,
         tracker.state.rejected_steps,
-        copy(state.val.val_x),
+        tracker.state.used_extended_prec,
     )
 end
 
@@ -463,8 +478,8 @@ Base.show(io::IO, r::PathResult) = print_fieldnames(io, r)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
 
 
-function track(eg_tracker::PathTracker, x, t₁::Real = 1.0; debug::Bool = false)
-    track!(eg_tracker, x, t₁; debug = debug)
+function track(eg_tracker::PathTracker, x, t₁::Real = 1.0; kwargs...)
+    track!(eg_tracker, x, t₁; kwargs...)
     PathResult(eg_tracker)
 end
 

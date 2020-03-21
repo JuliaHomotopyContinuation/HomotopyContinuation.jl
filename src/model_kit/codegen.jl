@@ -51,7 +51,8 @@ interpret(::Type{CompiledSystem{HI}}) where {HI} =
 Base.size(CS::CompiledSystem) = (CS.nexpressions, length(CS.variables))
 Base.size(CS::CompiledSystem, i::Integer) = size(CS)[i]
 Base.length(CS::CompiledSystem) = CS.nexpressions
-
+nparameters(CS::CompiledSystem) = length(CS.parameters)
+nvariables(CS::CompiledSystem) = length(CS.variables)
 
 ######################
 ## CompiledHomotopy ##
@@ -97,6 +98,8 @@ end
 Base.size(CH::CompiledHomotopy) = (CH.nexpressions, length(CH.variables))
 Base.size(CS::CompiledHomotopy, i::Integer) = size(CS)[i]
 Base.length(CH::CompiledHomotopy) = CH.nexpressions
+nparameters(CH::CompiledHomotopy) = length(CH.parameters)
+nvariables(CH::CompiledHomotopy) = length(CH.variables)
 
 function Base.show(io::IO, TH::CompiledHomotopy)
     print(io, "Compiled: ")

@@ -15,6 +15,7 @@ include("test_systems.jl")
     include("valuation_test.jl")
     include("path_tracker_test.jl")
     include("endgame_test.jl")
+    include("polyhedral_test.jl")
 
     if "extensive" in ARGS
         include("extensive/extensive_test.jl")

@@ -20,7 +20,7 @@ struct PathInfo
     n_ldivs::Int
 end
 
-function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
+function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false, kwargs...)
     state = tracker.state
 
     s = Float64[]
@@ -39,7 +39,7 @@ function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false)
 
     p = order(tracker.predictor)
 
-    init!(tracker, x₀, t₁, t₀)
+    init!(tracker, x₀, t₁, t₀; kwargs...)
     while is_tracking(tracker.state.code)
         push!(s, real(state.t))
         push!(Δs, real(state.Δt))

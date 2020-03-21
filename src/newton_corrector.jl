@@ -81,6 +81,7 @@ function newton!(
     μ::Float64 = throw(UndefKeywordError(:μ)),
     ω::Float64 = throw(UndefKeywordError(:ω)),
     extended_precision::Bool = false,
+    accurate_μ::Bool = false,
 )
     @unpack a, h_a, Δx, r, r̄, x_extended = NC
 
@@ -147,18 +148,16 @@ function newton!(
                 @goto return_singular
             end
 
-            if norm_Δxᵢ₊₁ > 2μ
-                if extended_precision
-                    x_extended .= xᵢ
-                    evaluate!(r, H, x_extended, ComplexDF64(t))
-                    LA.ldiv!(Δxᵢ, JM, r)
-                    norm_Δxᵢ = norm_Δxᵢ₊₁
-                    μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
-                else
-                    evaluate!(r, H, xᵢ, t)
-                    LA.ldiv!(Δxᵢ, JM, r)
-                    μ = norm(Δxᵢ)
-                end
+            if norm_Δxᵢ₊₁ > 2μ && extended_precision
+                x_extended .= xᵢ
+                evaluate!(r, H, x_extended, ComplexDF64(t))
+                LA.ldiv!(Δxᵢ, JM, r)
+                norm_Δxᵢ = norm_Δxᵢ₊₁
+                μ = norm_Δxᵢ₊₁ = norm(Δxᵢ)
+            elseif norm_Δxᵢ₊₁ > 2μ || accurate_μ
+                evaluate!(r, H, xᵢ, t)
+                LA.ldiv!(Δxᵢ, JM, r)
+                μ = norm(Δxᵢ)
             else
                 μ = norm_Δxᵢ₊₁
             end
@@ -214,8 +213,30 @@ function init_newton!(
         if norm_Δx₁ < a * norm_Δx₀
             ω = 2 * norm_Δx₁ / norm_Δx₀^2
             μ = norm_Δx₁
-            valid = true
-            break
+            if ω * μ > a^7
+                refined_res = newton!(
+                    x̄,
+                    NC,
+                    H,
+                    x̄,
+                    t,
+                    JM,
+                    norm;
+                    ω = ω,
+                    μ = a^7 / ω,
+                    accurate_μ = true,
+                )
+                if is_converged(refined_res)
+                    valid = true
+                    ω = refined_res.ω
+                    μ = refined_res.accuracy
+                else
+                    valid = false
+                end
+            else
+                valid = true
+                break
+            end
         else
             ε *= sqrt(ε)
         end
