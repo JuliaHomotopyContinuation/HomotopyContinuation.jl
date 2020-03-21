@@ -21,6 +21,7 @@ for all possible options.
 Base.@kwdef mutable struct TrackerOptions
     max_steps::Int = 1_000
     max_step_size::Float64 = Inf
+    max_initial_step_size::Float64 = Inf
     a::Float64 = 0.125
     β_a::Float64 = 1.0
     β_ω::Float64 = 20.0
@@ -108,6 +109,7 @@ struct TrackerResult{V<:AbstractVector{ComplexF64}}
     accuracy::Float64
     ω::Float64
     μ::Float64
+    extended_precision::Bool
     accepted_steps::Int
     rejected_steps::Int
     extended_precision_used::Bool
@@ -350,7 +352,7 @@ function initial_step_size(state::TrackerState, predictor::Pade21, options::Trac
     end
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.β_τ * τ
-    min(Δs₁, Δs₂, options.max_step_size)
+    min(Δs₁, Δs₂, options.max_step_size, options.max_initial_step_size)
 end
 
 function update_stepsize!(
@@ -495,16 +497,17 @@ Setup `tracker` to track `x₁` from `t₁` to `t₀`.
 
 Setup `tracker` to continue tracking the current solution to `t₀`.
 """
-init!(tracker::Tracker, r::TrackerResult, t₁, t₀; continuation::Bool = false) =
-    init!(tracker, r.x, t₁, t₀, r.ω, r.μ; continuation = continuation)
+init!(tracker::Tracker, r::TrackerResult, t₁, t₀) =
+    init!(tracker, solution(r), t₁, t₀; ω = r.ω, μ = r.μ)
 
 function init!(
     tracker::Tracker,
     x₁::AbstractVector,
     t₁,
-    t₀,
+    t₀;
     ω::Float64 = NaN,
-    μ::Float64 = NaN;
+    μ::Float64 = NaN,
+    max_initial_step_size::Float64 = Inf,
     keep_steps::Bool = false,
 )
     @unpack state, predictor, corrector, homotopy, options = tracker
@@ -544,6 +547,7 @@ function init!(
 
     if !valid
         state.code = TrackerReturnCode.terminated_invalid_startvalue
+        return false
     end
 
     # initialize the predictor
@@ -554,8 +558,10 @@ function init!(
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
+    Δs = min(Δs, max_initial_step_size)
     propose_step!(state.segment_stepper, Δs)
-    tracker
+
+    is_tracking(state.code)
 end
 
 function init!(tracker::Tracker, t₀::Number)
@@ -663,7 +669,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
 
     check_terminated!(state, options)
-    state.last_step_failed
+    !state.last_step_failed
 end
 
 function track!(
@@ -674,9 +680,19 @@ function track!(
     ω::Float64 = NaN,
     μ::Float64 = NaN,
     keep_steps::Bool = false,
+    max_initial_step_size::Float64 = Inf,
     debug::Bool = false,
 )
-    init!(tracker, x, t₁, t₀, ω, μ; keep_steps = keep_steps)
+    init!(
+        tracker,
+        x,
+        t₁,
+        t₀;
+        ω = ω,
+        μ = μ,
+        keep_steps = keep_steps,
+        max_initial_step_size = max_initial_step_size,
+    )
 
     while is_tracking(tracker.state.code)
         step!(tracker, debug)
@@ -684,6 +700,7 @@ function track!(
 
     (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
 end
+
 function track!(tracker::Tracker, r::TrackerResult, t₁, t₀; debug::Bool = false)
     track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ)
 end
@@ -705,6 +722,7 @@ function TrackerResult(state::TrackerState)
         state.accuracy,
         state.ω,
         state.μ,
+        state.extended_prec,
         state.accepted_steps,
         state.rejected_steps,
         state.used_extended_prec,
@@ -763,7 +781,7 @@ function Base.iterate(iter::PathIterator, state = nothing)
     iter.tracker.state.code != TrackerReturnCode.tracking && return nothing
 
     while is_tracking(iter.tracker.state.code)
-        step_failed = step!(iter.tracker)
+        step_failed = !step!(iter.tracker)
         step_failed || break
     end
     current_x_t(iter), state + 1
