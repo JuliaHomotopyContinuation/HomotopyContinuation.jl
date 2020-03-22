@@ -43,7 +43,7 @@ const MS = MixedSubdivisions
         X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
-        end < 1e-14
+        end < 1e-12
 
         A = [
             3 2 3 4 2 5
@@ -67,7 +67,7 @@ const MS = MixedSubdivisions
         X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
-        end < 1e-14
+        end < 1e-12
 
         A = [
             3 2 3 4 2 5
