@@ -70,6 +70,7 @@ The possible states a `PathTracker` can be in:
     terminated_unknown
     post_check_failed
     excess_solution
+    polyhedral_failed
 end
 
 function Base.convert(::Type{codes}, code::TrackerReturnCode.codes)
@@ -438,14 +439,14 @@ function track!(
     eg_tracker.state.code
 end
 
-mutable struct PathResult{V<:AbstractVector}
+Base.@kwdef mutable struct PathResult{V<:AbstractVector}
     return_code::PathTrackerReturnCode.codes
     solution::V
     t::Float64
     accuracy::Float64
     winding_number::Union{Nothing,Int}
     last_path_point::Union{Nothing,Tuple{V,Float64}}
-    valuation::Vector{Float64}
+    valuation::Union{Nothing,Vector{Float64}}
     ω::Float64
     μ::Float64
     extended_precision::Bool
@@ -456,21 +457,23 @@ mutable struct PathResult{V<:AbstractVector}
 end
 
 function PathResult(egtracker::PathTracker)
-    @unpack tracker, state = egtracker
+    @unpack tracker, state, options = egtracker
+    t = real(tracker.state.t)
     PathResult(
-        state.code,
-        is_success(state.code) ? copy(state.solution) : copy(tracker.state.x),
-        is_success(state.code) ? 0.0 : real(tracker.state.t),
-        state.accuracy,
-        state.winding_number,
-        state.winding_number == nothing ? nothing : (copy(state.last_point), state.last_t),
-        copy(state.val.val_x),
-        tracker.state.ω,
-        tracker.state.μ,
-        tracker.state.extended_prec,
-        tracker.state.accepted_steps,
-        tracker.state.rejected_steps,
-        tracker.state.used_extended_prec,
+        return_code = state.code,
+        solution = is_success(state.code) ? copy(state.solution) : copy(tracker.state.x),
+        t = is_success(state.code) ? 0.0 : t,
+        accuracy = state.accuracy,
+        winding_number = state.winding_number,
+        last_path_point = isnothing(state.winding_number) ? nothing :
+                          (copy(state.last_point), state.last_t),
+        valuation = t > options.endgame_start ? nothing : copy(state.val.val_x),
+        ω = tracker.state.ω,
+        μ = tracker.state.μ,
+        extended_precision = tracker.state.extended_prec,
+        accepted_steps = tracker.state.accepted_steps,
+        rejected_steps = tracker.state.rejected_steps,
+        extended_precision_used = tracker.state.used_extended_prec,
     )
 end
 

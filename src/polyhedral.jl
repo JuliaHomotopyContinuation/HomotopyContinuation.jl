@@ -164,16 +164,44 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         # TODO: check retcode?
         min_weight, max_weight =
             update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
-        (retcode, μ, ω) = track!(
-            PT.toric_tracker,
-            PT.toric_tracker.state.x,
-            0.9^(1 / min_weight),
-            1.0;
-            ω = ω,
-            μ = μ,
-            keep_steps = true,
+
+        if is_success(retcode)
+            t_restart = 0.9^(1 / min_weight)
+            # set min_step_size to t_restart to not accidentally loose a solution
+            min_step_size = PT.toric_tracker.options.min_step_size
+            PT.toric_tracker.options.min_step_size = 0.01 * t_restart
+
+            (retcode, μ, ω) = track!(
+                PT.toric_tracker,
+                PT.toric_tracker.state.x,
+                t_restart,
+                1.0;
+                ω = ω,
+                μ = μ,
+                keep_steps = true,
+            )
+            PT.toric_tracker.options.min_step_size = min_step_size
+        end
+    end
+    if !is_success(retcode)
+        state = PT.toric_tracker.state
+        return PathResult(
+            return_code = PathTrackerReturnCode.polyhedral_failed,
+            solution = copy(state.x),
+            t = real(state.t),
+            accuracy = state.accuracy,
+            winding_number = nothing,
+            last_path_point = nothing,
+            valuation = nothing,
+            ω = state.ω,
+            μ = state.μ,
+            extended_precision = state.extended_prec,
+            accepted_steps = state.accepted_steps,
+            rejected_steps = state.rejected_steps,
+            extended_precision_used = state.used_extended_prec,
         )
     end
+
     r = track(PT.generic_tracker, PT.toric_tracker.state.x; ω = ω, μ = μ)
     # report accurate steps
     r.accepted_steps += PT.toric_tracker.state.accepted_steps
