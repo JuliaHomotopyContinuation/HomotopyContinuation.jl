@@ -111,7 +111,7 @@ function polyhedral(f::ModelKit.System)
     F = polyehdral_system(support)
 
     H₁ = PolyhedralHomotopy(ModelKit.compile(F), start_coeffs)
-    toric_tracker = Tracker(H₁, min_step_size = 0.0)
+    toric_tracker = Tracker(H₁)
 
     H₂ = CoefficientHomotopy(ModelKit.compile(F), start_coeffs, target_coeffs)
     generic_tracker = PathTracker(Tracker(H₂))
@@ -167,9 +167,9 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
 
         if is_success(retcode)
             t_restart = 0.9^(1 / min_weight)
-            # set min_step_size to t_restart to not accidentally loose a solution
+            # set min_step_size to 0.0 to not accidentally loose a solution
             min_step_size = PT.toric_tracker.options.min_step_size
-            PT.toric_tracker.options.min_step_size = 0.01 * t_restart
+            PT.toric_tracker.options.min_step_size = 0.0
 
             (retcode, μ, ω) = track!(
                 PT.toric_tracker,
