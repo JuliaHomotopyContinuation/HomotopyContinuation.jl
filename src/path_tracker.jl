@@ -1156,7 +1156,7 @@ is_affine(r::PathResult) = !is_projective(r)
 Track the path `x(t)` with start solution `x₁` from ``1`` towards ``0``.
 Returns a [`PathResult`](@ref).
 
-The `details` options controls the level of details of the informations available
+The `details` options controls the level of details of the information available
 in the [`PathResult`](@ref).
 If `tracker` uses a parameter homotopy you can set the start and target parameters
 by setting the corresponding fields.

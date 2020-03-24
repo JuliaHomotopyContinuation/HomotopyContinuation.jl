@@ -5,7 +5,7 @@ export path_info
     path_info(tracker::PathTracker, x)
 
 Track a path using the given `tracker` and start value `x`. This returns a struct containing
-detailed informations about the tracked path.
+detailed information about the tracked path.
 
 # Example
 ```julia

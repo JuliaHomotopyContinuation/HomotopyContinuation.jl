@@ -29,7 +29,7 @@ export Result,
 """
     MultiplicityInfo
 
-This contains informations about the multiplicities of the solutions.
+This contains information about the multiplicities of the solutions.
 """
 struct MultiplicityInfo
     multiplicities::Dict{Int,Vector{Vector{Int}}}
@@ -92,7 +92,7 @@ is_multiple_result(r::PathResult, I::MultiplicityInfo) =
     Result{V<:AbstractVector}
 
 The result of `solve`. This is a wrapper around the results of each single path
-([`PathResult`](@ref)) and it contains some additional informations like a random seed to
+([`PathResult`](@ref)) and it contains some additional information like a random seed to
 replicate the result.
 """
 struct Result{V}
