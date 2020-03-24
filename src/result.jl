@@ -282,7 +282,7 @@ nsolutions(R::Results) = nresults(R)
         kwargs...,
     )
 
-The number of singular solutions. A solution is considered singular if its windingnumber is
+The number of singular solutions. A solution is considered singular if its winding number is
 larger than 1 or the condition number is larger than `tol`.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
@@ -313,7 +313,7 @@ The number of solutions at infinity.
 nat_infinity(R::Results) = count(is_at_infinity, R)
 
 """
-    nafailed(result)
+    nfailed(result)
 
 The number of failed paths.
 """
