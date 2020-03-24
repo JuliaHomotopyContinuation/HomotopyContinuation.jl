@@ -125,7 +125,9 @@ function nextpermutation(m, state)
 end
 
 """
-    bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)
+    bezout_number(F::MPPolys; variable_groups=[variables(F)],
+                              homvars=nothing,
+                              parameters=nothing)
     bezout_number(multidegrees, groups::VariableGroups)
 
 Compute the multi-homogeneous bezout number associated to the given system and variable groups.

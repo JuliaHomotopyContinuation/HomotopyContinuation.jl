@@ -635,19 +635,25 @@ uniquevar(C::Composition, tag = :x0) = uniquevar(C.polys[1][1], tag)
 
 
 """
-    homogenize(f::MP.AbstractPolynomial, variable=uniquevar(f))
+    homogenize(f::MP.AbstractPolynomial,
+               variable=uniquevar(f))
 
 Homogenize the polynomial `f` by using the given variable `variable`.
 
-    homogenize(F::Vector{<:MP.AbstractPolynomial}, variable=uniquevar(F))
+    homogenize(F::Vector{<:MP.AbstractPolynomial},
+               variable=uniquevar(F))
 
 Homogenize each polynomial in `F` by using the given variable `variable`.
 
-    homogenize(f::MP.AbstractPolynomial, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(f))
+    homogenize(f::MP.AbstractPolynomial,
+               v::Vector{<:MP.AbstractVariable},
+               variable=uniquevar(f))
 
 Homogenize the variables `v` in the polynomial `f` by using the given variable `variable`.
 
-    homogenize(F::Vector{<:MP.AbstractPolynomial}, v::Vector{<:MP.AbstractVariable}, variable=uniquevar(F))
+    homogenize(F::Vector{<:MP.AbstractPolynomial},
+               v::Vector{<:MP.AbstractVariable},
+               variable=uniquevar(F))
 
 Homogenize the variables `v` in each polynomial in `F` by using the given variable `variable`.
 """

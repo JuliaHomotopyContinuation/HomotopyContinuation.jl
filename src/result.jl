@@ -353,8 +353,16 @@ seed(result::Result) = result.seed
 
 # Filtering
 """
-    results(result; only_real=false, real_tol=1e-6, only_nonsingular=false,
-                onlysigular=false, singular_tol=1e10, onlyfinite=true, multiple_results=false)
+    results(
+        result;
+        only_real=false,
+        real_tol=1e-6,
+        only_nonsingular=false,
+        onlysigular=false,
+        singular_tol=1e10,
+        onlyfinite=true,
+        multiple_results=false,
+    )
 
 Return all `PathResult`s for which the given conditions apply.
 
