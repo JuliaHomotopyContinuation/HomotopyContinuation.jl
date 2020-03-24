@@ -511,7 +511,7 @@ julia> result3[1:3]
  [-0.9979849536743425, 0.06345102236859917]
 
 julia> # The passed `params` do not directly need to be the target parameters.
-       # Instead they can be some more concrete informations (e.g. an index)
+       # Instead they can be some more concrete information (e.g. an index)
        # and we can them by using the `transform_parameters` method
        result4 = solve(
            F,

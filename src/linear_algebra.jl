@@ -1047,7 +1047,7 @@ end
                   update::JacobianMonitorUpdates=JAC_MONITOR_UPDATE_NOTHING)
 
 solve the linear system `jacobian(JM)x̂=b`. `update` controls the computation of additional
-informations, see [`JacobianMonitorUpdates`](@ref).
+information, see [`JacobianMonitorUpdates`](@ref).
 """
 function LA.ldiv!(
     x̂::AbstractVector,

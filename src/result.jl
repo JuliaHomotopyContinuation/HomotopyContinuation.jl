@@ -29,7 +29,7 @@ export Result,
 """
     MultiplicityInfo
 
-This contains informations about the multiplicities of the solutions.
+This contains information about the multiplicities of the solutions.
 """
 struct MultiplicityInfo
     multiplicities::Dict{Int,Vector{Vector{Int}}}
@@ -92,7 +92,7 @@ is_multiple_result(r::PathResult, I::MultiplicityInfo) =
     Result{V<:AbstractVector}
 
 The result of `solve`. This is a wrapper around the results of each single path
-([`PathResult`](@ref)) and it contains some additional informations like a random seed to
+([`PathResult`](@ref)) and it contains some additional information like a random seed to
 replicate the result.
 """
 struct Result{V}
@@ -282,7 +282,7 @@ nsolutions(R::Results) = nresults(R)
         kwargs...,
     )
 
-The number of singular solutions. A solution is considered singular if its windingnumber is
+The number of singular solutions. A solution is considered singular if its winding number is
 larger than 1 or the condition number is larger than `tol`.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
@@ -313,7 +313,7 @@ The number of solutions at infinity.
 nat_infinity(R::Results) = count(is_at_infinity, R)
 
 """
-    nafailed(result)
+    nfailed(result)
 
 The number of failed paths.
 """
@@ -353,8 +353,16 @@ seed(result::Result) = result.seed
 
 # Filtering
 """
-    results(result; only_real=false, real_tol=1e-6, only_nonsingular=false,
-                onlysigular=false, singular_tol=1e10, onlyfinite=true, multiple_results=false)
+    results(
+        result;
+        only_real=false,
+        real_tol=1e-6,
+        only_nonsingular=false,
+        onlysigular=false,
+        singular_tol=1e10,
+        onlyfinite=true,
+        multiple_results=false,
+    )
 
 Return all `PathResult`s for which the given conditions apply.
 
