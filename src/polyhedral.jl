@@ -178,6 +178,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
                 1.0;
                 ω = ω,
                 μ = μ,
+                τ = 0.1 * t_restart,
                 keep_steps = true,
             )
             PT.toric_tracker.options.min_step_size = min_step_size

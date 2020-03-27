@@ -1,5 +1,12 @@
 export PolyhedralHomotopy
 
+const StructVectorComplexF64 = StructArrays.StructArray{
+    Complex{Float64},
+    1,
+    NamedTuple{(:re, :im),Tuple{Vector{Float64},Vector{Float64}}},
+    Int64,
+}
+
 """
     PolyhedralHomotopy(G, F; gamma=exp(i * 2π*rand()))
 Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
@@ -10,6 +17,7 @@ struct PolyhedralHomotopy{S} <: AbstractHomotopy
     weights::Vector{Float64}
 
     t_weights::Vector{Float64}
+    complex_t_weights::StructVectorComplexF64
     t_coeffs::Base.RefValue{Float64}
     taylor_coeffs::NTuple{5,Vector{ComplexF64}}
     # these are just here to avoid unnecessary allocations
@@ -33,6 +41,7 @@ function PolyhedralHomotopy(
     weights = zeros(m)
 
     t_weights = zeros(m)
+    complex_t_weights = StructArrays.StructArray(zeros(ComplexF64, m))
     t_coeffs = Ref(0.0)
     taylor_coeffs = tuple((zeros(ComplexF64, m) for i = 0:4)...)
     dc1 = (taylor_coeffs[2],)
@@ -46,6 +55,7 @@ function PolyhedralHomotopy(
         reduce(vcat, system_coeffs),
         weights,
         t_weights,
+        complex_t_weights,
         t_coeffs,
         taylor_coeffs,
         dc1,
@@ -63,7 +73,7 @@ function update_weights!(
     lifting::AbstractVector{<:AbstractVector},
     cell::MixedSubdivisions.MixedCell;
     min_weight::Union{Nothing,Float64} = nothing,
-    max_weight::Union{Nothing,Float64} = nothing
+    max_weight::Union{Nothing,Float64} = nothing,
 )
     l = 1
     s_max, s_min = 0.0, Inf
@@ -90,14 +100,14 @@ function update_weights!(
     end
 
     if min_weight !== nothing
-       λ = s_min / min_weight
-       H.weights ./= λ
-       s_min, s_max = min_weight, s_max / λ
-   elseif max_weight !== nothing
-      λ = s_max / max_weight
-      H.weights ./= λ
-      s_min, s_max = s_min / λ, max_weight
-   end
+        λ = s_min / min_weight
+        H.weights ./= λ
+        s_min, s_max = min_weight, s_max / λ
+    elseif max_weight !== nothing
+        λ = s_max / max_weight
+        H.weights ./= λ
+        s_min, s_max = s_min / λ, max_weight
+    end
 
     H.t_coeffs[] = NaN
 
@@ -181,6 +191,7 @@ function taylor_coeffs!(H::PolyhedralHomotopy, t::Real)
             tw4 = 0.25 * (wᵢ - 3) * tw3 * t⁻¹
             c⁴[i] = uᵢ * tw4
         end
+
     end
 
     H.t_coeffs[] = t
@@ -188,13 +199,35 @@ function taylor_coeffs!(H::PolyhedralHomotopy, t::Real)
     H.taylor_coeffs
 end
 
+function coeffs!(H::PolyhedralHomotopy, t::Real)
+    if t < 0
+        c, _ = H.taylor_coeffs
+        evaluate_weights!(
+            H.complex_t_weights.re,
+            H.complex_t_weights.im,
+            H.weights,
+            complex(t),
+        )
+        for i = 1:length(c)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            twᵢ = H.complex_t_weights[i]
+            c[i] = uᵢ * twᵢ
+        end
+        return c
+    else
+        c, _ = taylor_coeffs!(H, t)
+        return c
+    end
+end
+
 function evaluate!(u, H::PolyhedralHomotopy, x::AbstractVector, t)
-    c, _ = taylor_coeffs!(H::PolyhedralHomotopy, real(t))
+    c = coeffs!(H::PolyhedralHomotopy, real(t))
     ModelKit.evaluate!(u, H.system, x, c)
 end
 
 function evaluate_and_jacobian!(u, U, H::PolyhedralHomotopy, x::AbstractVector, t)
-    c, _ = taylor_coeffs!(H::PolyhedralHomotopy, real(t))
+    c = coeffs!(H::PolyhedralHomotopy, real(t))
     ModelKit.evaluate_and_jacobian!(u, U, H.system, x, c)
     nothing
 end

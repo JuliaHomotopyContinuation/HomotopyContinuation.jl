@@ -302,7 +302,7 @@ function Tracker(
     norm_scale_min = sqrt(eps()),
     norm_scale_abs_min = min(norm_scale_min^2, sqrt(eps())),
     norm_scale_max = exp2(div(1023, 2)),
-    automatic_differentiation::Int = 4,
+    automatic_differentiation::Int = 3,
     kwargs...,
 )
     norm = WeightedNorm(
@@ -340,6 +340,10 @@ LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 # Step Size
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
+
+"Like `min(a,b)`` but ignoring any `NaN` values."
+nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
+
 # intial step size
 function initial_step_size(state::TrackerState, predictor::Pade21, options::TrackerOptions)
     a = options.β_a * options.a
@@ -352,7 +356,8 @@ function initial_step_size(state::TrackerState, predictor::Pade21, options::Trac
     end
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.β_τ * τ
-    min(Δs₁, Δs₂, options.max_step_size, options.max_initial_step_size)
+    Δs = nanmin(Δs₁, Δs₂)
+    min(Δs, options.max_step_size, options.max_initial_step_size)
 end
 
 function update_stepsize!(
@@ -371,23 +376,21 @@ function update_stepsize!(
         τ = trust_region(predictor)
     end
     if is_converged(result)
-        e₁ = state.norm(local_error(predictor))
+        # e₁ = state.norm(local_error(predictor))
         # If we don't use automatic_differentiation for the 4th derivative
         # this can be completely of. So check against the actual error of the
         # last step
-        if !ad_for_error_estimate
-            e₂ = state.norm(state.x, state.x̂) / state.Δs_prev^p
-        else
-            e₂ = Inf
-        end
-        e = min(e₁, e₂)
-        if !isfinite(e)
-            Δs₁ = Inf
-        else
+        if ad_for_error_estimate
+            e = state.norm(local_error(predictor))
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
+        else
+            e₁ = nthroot(state.norm(local_error(predictor)), p)
+            e₂ = nthroot(state.norm(state.x, state.x̂), p) / state.Δs_prev
+            e = nanmin(e₁, e₂)
+            Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
         end
         Δs₂ = options.β_τ * τ
-        Δs = min(Δs₁, Δs₂, options.max_step_size)
+        Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
         if state.last_step_failed
             Δs = min(Δs, state.Δs_prev)
         end
@@ -478,7 +481,9 @@ function compute_derivatives!(
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    diff_t!(u, homotopy, x, t, dx³, AD, ND, τ)
+    # Here we fix τ to min(0.0025, τ) since this gives us a cheap approximation of x⁴
+    # if AD isa AD{3} which should be sufficient.
+    diff_t!(u, homotopy, x, t, dx³, AD, ND, min(0.0025, τ); use_extended_precision = false)
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
 
@@ -507,6 +512,7 @@ function init!(
     t₀;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    τ::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
     keep_steps::Bool = false,
 )
@@ -551,7 +557,7 @@ function init!(
     end
 
     # initialize the predictor
-    state.τ = Inf
+    state.τ = τ
     evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
     updated!(jacobian)
     compute_derivatives_and_update_predictor!(tracker)
@@ -679,6 +685,7 @@ function track!(
     t₀;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    τ::Float64 = Inf,
     keep_steps::Bool = false,
     max_initial_step_size::Float64 = Inf,
     debug::Bool = false,
@@ -690,6 +697,7 @@ function track!(
         t₀;
         ω = ω,
         μ = μ,
+        τ = τ,
         keep_steps = keep_steps,
         max_initial_step_size = max_initial_step_size,
     )
