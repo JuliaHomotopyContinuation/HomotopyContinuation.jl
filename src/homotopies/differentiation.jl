@@ -50,6 +50,7 @@ function diff_t!(
     dx::Tuple{},
     ND::NumericalDifferentiation,
     τ::Float64 = Inf,
+    use_extended_precision::Bool = true
 )
     @unpack u₁, u₂, u₃, u₄, xh = ND
 
@@ -64,9 +65,9 @@ function diff_t!(
         evaluate!(u₃, H, x, t + 2h)
         evaluate!(u₄, H, x, t - 2h)
         u .= (2.0 .* (u₁ .- u₂) ./ 3.0 .- (u₃ .- u₄) ./ 12.0) ./ h
-    elseif τ > h_1_3
+    elseif τ > h_1_3  || !use_extended_precision
         # apply S^{1,1,2} formula
-        h = h_1_3
+        h = min(τ, h_1_3)
         evaluate!(u₁, H, x, t + h)
         evaluate!(u₂, H, x, t - h)
         u .= 0.5 .* (u₁ .- u₂) ./ h
@@ -91,13 +92,14 @@ function diff_t!(
     dx::NTuple{1},
     ND::NumericalDifferentiation,
     τ::Float64 = Inf,
+    use_extended_precision::Bool = true
 )
     @unpack u₁, u₂, u₃, u₄, xh = ND
 
     h_1_4 = 0.0001220703125 # eps()^(1/(2+2))
     h_1_6 = 0.002460783300575925 # eps()^(1/(2+4))
 
-    if 2τ > h_1_6
+    if 0.5τ > h_1_6
         h = h_1_6
         # apply S^{2,2,4} formula
         g!(u₁, H, x, t, dx, h, xh)
@@ -106,8 +108,8 @@ function diff_t!(
         g!(u₄, H, x, t, dx, -2h, xh)
         h2 = h^2
         u .= (2.0 .* (u₁ .+ u₂) ./ 3.0 .- (u₃ .+ u₄) ./ 24.0) ./ h2
-    elseif τ > h_1_4
-        h = h_1_4
+    elseif τ > h_1_4  || !use_extended_precision
+        h = min(τ, h_1_4)
         # apply S^{2,2,2} formula
         g!(u₁, H, x, t, dx, h, xh)
         g!(u₂, H, x, t, dx, -h, xh)
@@ -135,12 +137,13 @@ function diff_t!(
     dx::NTuple{2},
     ND::NumericalDifferentiation,
     τ::Float64 = Inf,
+    use_extended_precision::Bool = true
 )
     @unpack u₁, u₂, u₃, u₄, xh = ND
 
     h_1_5 = 0.000740095979741405 # eps^(1/(3+2))
     h_1_7 = 0.0058046651919412065 # eps()^(1/(3+4))
-    if 2τ > h_1_7
+    if 0.5τ > h_1_7
         # apply S^{3,3,4} formula
         h = h_1_7
         g!(u₁, H, x, t, dx, h, xh)
@@ -150,8 +153,8 @@ function diff_t!(
         # divide by 6 since we compute taylor series
         h3 = 6 * h^3
         u .= (4.0 .* (u₁ .- u₂) .- 0.125 .* (u₃ .- u₄)) ./ h3
-    elseif τ > h_1_5
-        h = h_1_5
+    elseif τ > h_1_5 || !use_extended_precision
+        h = min(τ, h_1_5)
         g!(u₁, H, x, t, dx, h, xh)
         g!(u₂, H, x, t, dx, -h, xh)
         h3 = h^3
@@ -178,12 +181,13 @@ function diff_t!(
     dx::NTuple{3},
     ND::NumericalDifferentiation,
     τ::Float64 = Inf,
+    use_extended_precision::Bool = true
 )
     @unpack u₁, u₂, u₃, u₄, xh = ND
 
     h_1_6 = 0.002460783300575925
     h_1_8 = 0.011048543456039806
-    if 2τ > h_1_8
+    if 0.5τ > h_1_8
         # apply S^{4,4,4} formula
         h = h_1_8
         g!(u₁, H, x, t, dx, h, xh)
@@ -194,8 +198,8 @@ function diff_t!(
         h4 = 24 * h2^2
         # divide by 4! since we compute taylor series
         u .= (16.0 .* (u₁ .+ u₂) .- 0.25 .* (u₃ .+ u₄)) ./ h4
-    elseif τ > h_1_6
-        h = h_1_6
+    elseif τ > h_1_6 || !use_extended_precision
+        h = min(τ, h_1_6)
         g!(u₁, H, x, t, dx, h, xh)
         g!(u₂, H, x, t, dx, -h, xh)
         h2 = h^2
@@ -206,8 +210,8 @@ function diff_t!(
         @unpack u₁_extended, u₂_extended, xh_extended = ND
         # apply S^{4,4,2} formula
         h = min(τ, 4.806217383937355e-6) #eps(DoubleF64)^(1/6)
-        g!(u₁_extended, H, x, t, dx, DoubleF64(h), xh_extended)
-        g!(u₂_extended, H, x, t, dx, DoubleF64(-h), xh_extended)
+        g!(u₁_extended, H, x, t, dx, h, xh_extended)
+        g!(u₂_extended, H, x, t, dx, -h, xh_extended)
         h2 = h^2
         h4 = h2^2
         u .= 0.5 .* (u₁_extended .+ u₂_extended) ./ h4
@@ -219,10 +223,10 @@ end
 diff_t!(u, H::AbstractHomotopy, x, t, dx::Tuple, DS::AutomaticDifferentiation, τ) =
     diff_t!(u, H, x, t, dx)
 
-@generated function diff_t!(u, H, x, t, dx::NTuple{M}, AD::Val{N}, ND, τ) where {M,N}
+@generated function diff_t!(u, H, x, t, dx::NTuple{M}, AD::Val{N}, ND, τ; use_extended_precision::Bool = true) where {M,N}
     if M < N
         :(diff_t!(u, H, x, t, dx, AutomaticDifferentiation(), τ))
     else
-        :(diff_t!(u, H, x, t, dx, ND, τ))
+        :(diff_t!(u, H, x, t, dx, ND, τ, use_extended_precision))
     end
 end
