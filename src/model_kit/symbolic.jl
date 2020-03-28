@@ -311,6 +311,14 @@ function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool
     end
 end
 
+function rand_poly(vars::AbstractVector{Variable}, d::Integer; kwargs...)
+    rand_poly(ComplexF64, vars, d; kwargs...)
+end
+function rand_poly(T, vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+    M = monomials(vars, d; homogeneous = homogeneous)
+    sum(randn(T, length(M)) .* M)
+end
+
 function td_order(x, y)
     sx = sum(x)
     sy = sum(y)
@@ -740,6 +748,28 @@ parameters(F::System) = F.parameters
 degree(F::System) = degree(F.expressions, F.variables)
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
+
+
+Base.push!(F::System, f::Expression) = (push!(F.expressions, f); F)
+Base.append!(F::System, f::AbstractVector{Expression}) = (append!(F.expressions, f); F)
+
+function Base.intersect(F::System, G::System)
+    exprs = [F.expressions; G.expressions]
+    vars = [F.variables; setdiff(G.variables, F.variables)]
+    params = [F.parameters; setdiff(G.parameters, F.parameters)]
+    System(exprs, vars, params)
+end
+function Base.intersect(F::System, G::AbstractVector{<:Expression})
+    exprs = [F.expressions; G]
+    vars = [F.variables; setdiff(variables(G), F.variables)]
+    params = F.parameters
+    System(exprs, vars, params)
+end
+Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
+
+Base.copy(F::System) = Base.deepcopy(F)
+
+
 
 ##############
 ## Homotopy ##

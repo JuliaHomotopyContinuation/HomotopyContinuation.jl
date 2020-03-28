@@ -3,7 +3,10 @@ export ParameterHomotopy, ModelKitHomotopy, total_degree_homotopy
 abstract type AbstractHomotopy end
 
 Base.size(H::AbstractHomotopy, i::Integer) = size(H)[i]
-on_chart!(x::Vector, H::AbstractHomotopy) = x
+function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector, t)
+    x .= y
+end
+get_solution(H::AbstractHomotopy, x::AbstractVector, t) = copy(x)
 
 include("homotopies/differentiation.jl")
 
@@ -13,6 +16,7 @@ include("homotopies/affine_chart_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
 include("homotopies/coefficient_homotopy.jl")
 include("homotopies/polyhedral_homotopy.jl")
+include("homotopies/affine_subspace_homotopy.jl")
 
 
 ##################

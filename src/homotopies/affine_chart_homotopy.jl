@@ -54,7 +54,10 @@ function jacobian_chart!(U, v::PVector{<:Any,N}, x::PVector{<:Any,N}) where {N}
     nothing
 end
 
-on_chart!(x::PVector, H::AffineChartHomotopy) = on_chart!(x, H.chart)
+function set_solution!(x::PVector, H::AffineChartHomotopy, y::PVector, t)
+    x .= y
+    on_chart!(x, H.chart)
+end
 function on_chart!(x::PVector{<:Any,N}, v::PVector{<:Any,N}) where {N}
     ranges = dimension_indices(v)
     for range in ranges
@@ -70,12 +73,7 @@ function on_chart!(x::PVector{<:Any,N}, v::PVector{<:Any,N}) where {N}
     x
 end
 
-function evaluate!(
-    u,
-    H::AffineChartHomotopy{<:Any,N},
-    x::PVector{<:Any,N},
-    t,
-) where {N}
+function evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::PVector{<:Any,N}, t) where {N}
     evaluate!(u, H.homotopy, x, t)
     evaluate_chart!(u, H.chart, x)
     u
@@ -94,20 +92,9 @@ function evaluate_and_jacobian!(
     nothing
 end
 
-# define all combinations to avoid ambiguity errors...
-for DST in [:NumericalDifferentiation, :AutomaticDifferentiation], N = 0:3
-    @eval function diff_t!(
-        u,
-        H::AffineChartHomotopy,
-        x,
-        t,
-        dx::NTuple{$N},
-        DS::$DST,
-        τ::Float64 = Inf,
-    )
-        u .= zero(eltype(u))
-        diff_t!(u, H.homotopy, x, t, dx, DS, τ)
-        # affine chart part is always zero since it is an affine linear form
-        u
-    end
+function diff_t!(u, H::AffineChartHomotopy, x, t, dx::NTuple)
+    u .= zero(eltype(u))
+    diff_t!(u, H.homotopy, x, t, dx)
+    # affine chart part is always zero since it is an affine linear form
+    u
 end

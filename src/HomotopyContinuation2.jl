@@ -29,6 +29,7 @@ using .ModelKit:
     evaluate,
     differentiate,
     monomials,
+    rand_poly,
     expand,
     System,
     Homotopy
@@ -43,6 +44,7 @@ export @var,
     evaluate,
     differentiate,
     monomials,
+    rand_poly,
     expand,
     System,
     Homotopy
@@ -72,6 +74,7 @@ export ProjectiveVectors,
 include("utils.jl")
 include("norm.jl")
 include("linear_algebra.jl")
+include("linear.jl")
 include("homotopies.jl")
 include("predictor.jl")
 include("newton_corrector.jl")
@@ -81,5 +84,6 @@ include("path_tracker.jl")
 include("path_info.jl")
 include("binomial_system.jl")
 include("polyhedral.jl")
+
 
 end

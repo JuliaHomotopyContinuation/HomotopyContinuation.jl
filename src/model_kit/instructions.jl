@@ -359,6 +359,8 @@ function unroll_pow(var, n)
     Expr(:let, :($(Symbol(x, 1)) = $var), Expr(:block, exprs...))
 end
 
+quick_div(a, b::Complex) = Base.FastMath.div_fast(a, b)
+quick_div(a, b) = a / b
 
 function to_expr(
     list::InstructionList,
@@ -375,6 +377,10 @@ function to_expr(
             else
                 push!(exprs, :($id = $(unroll_pow(get(var_map, x, x), k))))
             end
+        elseif op == :/
+            a = get(var_map, arg1, arg1)
+            b = get(var_map, arg2, arg2)
+            push!(exprs, :($id = quick_div($a, $b)))
         else
             a = get(var_map, arg1, arg1)
             if arg2 !== nothing

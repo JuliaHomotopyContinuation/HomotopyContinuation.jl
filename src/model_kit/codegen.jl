@@ -262,7 +262,10 @@ function _evaluate_and_jacobian!_impl(
     end
 end
 
-function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
+function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, dx, dp)
+    _diff_t!_impl(T, dx + 1, dx, dp)
+end
+function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx, dp)
     H = interpret(T)
     checks, var_map = boundscheck_var_map(H)
 
@@ -273,26 +276,26 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
 
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
-        for k = 1:(d-1)
-            diff_map[v, k] = :(dx[$k][$i])
+        for k = 1:dx
+            diff_map[v, k] = :($(Symbol(:dx,k))[$i])
         end
     end
 
     for (i, v) in enumerate(params)
-        for k = 1:DP
-            diff_map[v, k] = :(dp[$k][$i])
+        for k = 1:dp
+            diff_map[v, k] = :($(Symbol(:dp,k))[$i])
         end
     end
 
     if H isa Homotopy
         diff_map[Symbol(H.t), 1] = 1
     end
-    dlist = univariate_diff!(list, d, diff_map)
+    dlist = univariate_diff!(list, M, diff_map)
 
     assignements = Dict{Symbol,Vector{Expr}}()
     u_constants = Expr[]
     for (i, id) in enumerate(ids)
-        d_id = diff_map[id, d]
+        d_id = diff_map[id, M]
         if d_id isa Symbol
             if d_id ∉ vars && d_id ∉ params
                 add_assignement!(assignements, d_id, :(u[$i] = $d_id))
@@ -310,12 +313,18 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
 
     quote
         $checks
+        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:(dx))...)) = dx
+        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:(dp))...)) = dp
+
         @inbounds $slp
         u
     end
 end
 
-function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
+function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, dx, dp)
+    _taylor!_impl(T, dx + 1, dx, dp)
+end
+function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx, dp)
     H = interpret(T)
     checks, var_map = boundscheck_var_map(H)
 
@@ -326,13 +335,13 @@ function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
 
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
-        for k = 1:(d-1)
+        for k = 1:dx
             diff_map[v, k] = :($(Symbol(:dx,k))[$i])
         end
     end
 
     for (i, v) in enumerate(params)
-        for k = 1:DP
+        for k = 1:dp
             diff_map[v, k] = :($(Symbol(:dp,k))[$i])
         end
     end
@@ -340,14 +349,14 @@ function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     if H isa Homotopy
         diff_map[Symbol(H.t), 1] = 1
     end
-    dlist = univariate_diff!(list, d, diff_map)
+    dlist = univariate_diff!(list, M, diff_map)
 
     assignements = Dict{Symbol,Vector{Expr}}()
     u_constants = Expr[]
 
     for (i, id) in enumerate(ids)
         add_assignement!(assignements, id, :(v[$i] = $id))
-        for k = 1:d
+        for k = 1:M
             k_id = diff_map[id, k]
             vk = Symbol(:v, k)
             if k_id isa Symbol
@@ -368,9 +377,9 @@ function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, d, DP)
     append!(slp.args, u_constants)
 
     quote
-        $(Expr(:tuple, :v, (Symbol(:v,k) for k in 1:d)...)) = u
-        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:(d-1))...)) = dx
-        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:(DP-1))...)) = dp
+        $(Expr(:tuple, :v, (Symbol(:v,k) for k in 1:M)...)) = u
+        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:dx)...)) = dx
+        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:dp)...)) = dp
         @inbounds $slp
         nothing
     end
@@ -457,8 +466,20 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D + 1, DP)
+    _diff_t!_impl(T, D, DP)
 end
+@generated function diff_t!(
+    u,
+    T::CompiledSystem,
+    x::AbstractVector,
+    dx::NTuple{D,<:AbstractVector},
+    ::Val{M},
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {M, D,DP}
+    _diff_t!_impl(T, M, D, DP)
+end
+
 
 """
     diff_t!(u, H::CompiledHomotopy, x, t, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
@@ -479,7 +500,7 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D + 1, DP)
+    _diff_t!_impl(T, D, DP)
 end
 
 """
@@ -500,7 +521,7 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _taylor!_impl(T, D + 1, DP)
+    _taylor!_impl(T, D, DP)
 end
 
 """
@@ -522,7 +543,7 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _taylor!_impl(T, D + 1, DP)
+    _taylor!_impl(T, D, DP)
 end
 
 # non-inplace
@@ -588,4 +609,43 @@ end
 function diff_t(H::CompiledHomotopy, x::AbstractVector, t, args...)
     u = Vector{Any}(undef, size(H, 1))
     to_smallest_eltype(diff_t!(u, H, x, t, args...))
+end
+
+# Helper codegen
+function _div_taylor_vec_impl(N, M)
+    list = ModelKit.InstructionList()
+    id = push!(list, (:/, :a, :b))
+    diff_map = ModelKit.DiffMap()
+    for i in 1:N
+        diff_map[:a, i] = :($(Symbol(:a,i)))
+    end
+    for i in 1:M
+        diff_map[:b, i] = :($(Symbol(:b,i)))
+    end
+
+    k = max(N,M)
+    dlist = ModelKit.univariate_diff!(list, k, diff_map)
+    ids = [id]
+    for i in 1:(k)
+        push!(ids, diff_map[id, i])
+    end
+
+    quote
+        $(Expr(:tuple, :A, (Symbol(:A,k) for k in 1:N)...)) = AS
+        $(Expr(:tuple, :B, (Symbol(:B,k) for k in 1:M)...)) = BS
+        $(Expr(:tuple, :u, (Symbol(:u,k) for k in 1:max(N,M))...)) = us
+        for i in 1:length(A)
+            $([:(a = A[i]), (:($(Symbol(:a,k)) = $(Symbol(:A,k))[i]) for k in 1:N)...]...)
+            $([:(b = B[i]), (:($(Symbol(:b,k)) = $(Symbol(:B,k))[i]) for k in 1:M)...]...)
+            $(ModelKit.to_expr(dlist))
+
+            $(Expr(:tuple, :(u[i]), (:($(Symbol(:u,k))[i]) for k in 1:max(N,M))...)) =
+             $(Expr(:tuple, ids...))
+        end
+        u
+    end
+end
+
+@generated function div_taylor_vec!(us::NTuple, AS::NTuple{N}, BS::NTuple{M}) where {N,M}
+    _div_taylor_vec_impl(N - 1, M - 1)
 end

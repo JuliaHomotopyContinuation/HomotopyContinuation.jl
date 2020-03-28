@@ -284,6 +284,7 @@ struct Tracker{
     ND::NumericalDifferentiation{V,V̄}
 end
 
+Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(ModelKitHomotopy(H); kwargs...)
 function Tracker(H::AbstractHomotopy; kwargs...)
     x = zeros(ComplexF64, size(H, 2))
     Tracker(H, x, 1.0, 0.0; kwargs...)
@@ -469,21 +470,19 @@ function compute_derivatives!(
         end
     end
 
-    diff_t!(u, homotopy, x, t, dx¹, AD, ND, τ)
+    diff_t!(u, homotopy, x, t, dx¹, AD, ND, τ; incremental = true)
     u .= .-u
     LA.ldiv!(x², jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    diff_t!(u, homotopy, x, t, dx², AD, ND, τ)
+    diff_t!(u, homotopy, x, t, dx², AD, ND, τ; incremental = true)
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    # Here we fix τ to min(0.0025, τ) since this gives us a cheap approximation of x⁴
-    # if AD isa AD{3} which should be sufficient.
-    diff_t!(u, homotopy, x, t, dx³, AD, ND, min(0.0025, τ); use_extended_precision = false)
+
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
 
@@ -520,8 +519,7 @@ function init!(
     @unpack x, x̄, norm, jacobian = state
 
     # intialize state
-    x .= x₁
-    on_chart!(x, homotopy)
+    set_solution!(x, homotopy, x₁, t₁)
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
     state.accuracy = eps()
@@ -652,7 +650,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         step_success!(state.segment_stepper)
         state.accuracy = result.accuracy
         state.μ = max(result.accuracy, eps())
-        state.ω = result.ω
+        state.ω = max(result.ω, 0.5 * state.ω)
 
         update_precision!(tracker, result.μ_low)
         compute_derivatives_and_update_predictor!(tracker)
@@ -722,10 +720,10 @@ function track!(tracker::Tracker, t₀; debug::Bool = false)
     (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
 end
 
-function TrackerResult(state::TrackerState)
+function TrackerResult(H::AbstractHomotopy, state::TrackerState)
     TrackerResult(
         state.code,
-        copy(state.x),
+        get_solution(H, state.x, state.t),
         state.t,
         state.accuracy,
         state.ω,
@@ -737,10 +735,9 @@ function TrackerResult(state::TrackerState)
     )
 end
 
-
-@inline function track(tracker::Tracker, x, t₁, t₀; kwargs...)
+@inline function track(tracker::Tracker, x, t₁=1.0, t₀=0.0; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
-    TrackerResult(tracker.state)
+    TrackerResult(tracker.homotopy, tracker.state)
 end
 
 # PathIterator #

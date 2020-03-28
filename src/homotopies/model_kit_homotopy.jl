@@ -27,6 +27,4 @@ diff_t!(
     x,
     t,
     dx::Tuple,
-    ::AutomaticDifferentiation,
-    τ::Float64 = Inf,
 ) = ModelKit.diff_t!(u, H.homotopy, x, t, dx, H.parameters)

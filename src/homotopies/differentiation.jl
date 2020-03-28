@@ -76,8 +76,8 @@ function diff_t!(
         #use extended precision
         # apply S^{1,1,2} formula
         h = min(τ, 2.3099725541661633e-11) #eps(DoubleF64)^(1/3)
-        evaluate!(u₁_extended, H, xh_extended, ComplexDF64(t + h))
-        evaluate!(u₂_extended, H, xh_extended, ComplexDF64(t - h))
+        evaluate!(u₁_extended, H, xh_extended, t + h)
+        evaluate!(u₂_extended, H, xh_extended, t - h)
         u .= 0.5 .* (u₁_extended .- u₂_extended) ./ h
     end
 
@@ -219,13 +219,12 @@ function diff_t!(
     u
 end
 
-## Default handling
-diff_t!(u, H::AbstractHomotopy, x, t, dx::Tuple, DS::AutomaticDifferentiation, τ) =
-    diff_t!(u, H, x, t, dx)
+## Default handling ignores incremental
+diff_t!(u, H::AbstractHomotopy, x, t, dx::Tuple, incremental::Bool) = diff_t!(u, H, x, t, dx)
 
-@generated function diff_t!(u, H, x, t, dx::NTuple{M}, AD::Val{N}, ND, τ; use_extended_precision::Bool = true) where {M,N}
+@generated function diff_t!(u, H, x, t, dx::NTuple{M}, AD::Val{N}, ND, τ; use_extended_precision::Bool = true, incremental::Bool = false) where {M,N}
     if M < N
-        :(diff_t!(u, H, x, t, dx, AutomaticDifferentiation(), τ))
+        :(diff_t!(u, H, x, t, dx, incremental))
     else
         :(diff_t!(u, H, x, t, dx, ND, τ, use_extended_precision))
     end

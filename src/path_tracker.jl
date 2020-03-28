@@ -170,6 +170,7 @@ struct PathTracker{
     options::PathTrackerOptions
 end
 
+PathTracker(H::AbstractHomotopy; kwargs...) = PathTracker(Tracker(H); kwargs...)
 function PathTracker(tracker::Tracker; kwargs...)
     options = PathTrackerOptions(; β_τ = tracker.options.β_τ, kwargs...)
     state = PathTrackerState(tracker.state.x)
