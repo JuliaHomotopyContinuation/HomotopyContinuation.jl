@@ -325,7 +325,9 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
 
     tracker.options.β_τ = options.eg_β_τ
 
-    if tracker.state.last_step_failed
+    if tracker.state.last_steps_failed ≥ 3 && tracker.state.extended_prec
+        return (state.code = PathTrackerReturnCode.terminated_ill_conditioned)
+    elseif tracker.state.last_step_failed
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), iszero(proposed_t′))
         return state.code
     else
