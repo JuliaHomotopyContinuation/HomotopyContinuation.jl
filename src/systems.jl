@@ -60,16 +60,16 @@ evaluate(F::AbstractSystem, x, p, c::AbstractSystemCache = cache(F, x, p)) =
 
 
 """
-    jacobian!(u, F::AbstractSystem, x , cache::AbstractSystemCache)
+    jacobian!(U, F::AbstractSystem, x , cache::AbstractSystemCache)
 
-Evaluate the Jacobian of the system `F` at `x` and store the result in `u`.
+Evaluate the Jacobian of the system `F` at `x` and store the result in `U`.
 
-    jacobian!(u, F::AbstractSystem, x , p, cache::AbstractSystemCache)
+    jacobian!(U, F::AbstractSystem, x , p, cache::AbstractSystemCache)
 
-Evaluate the Jacobian of the system `F` at `x` and parameters `p` and store the result in `u`.
+Evaluate the Jacobian of the system `F` at `x` and parameters `p` and store the result in `U`.
 """
-jacobian!(u, F::AbstractSystem, args...) =
-    error(MethodError(jacobian!, tuple(u, F, args...)))
+jacobian!(U, F::AbstractSystem, args...) =
+    error(MethodError(jacobian!, tuple(U, F, args...)))
 
 """
     jacobian(F::AbstractSystem, x, cache=cache(F, x))
