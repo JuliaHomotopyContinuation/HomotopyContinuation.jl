@@ -58,14 +58,14 @@ end
 """
     dt!(u, H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
-Evaluate the homotopy `H` at `(x, t)` and store the result in `u`.
+Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)` and store the result in `u`.
 """
 function dt! end
 
 """
     dt(H::AbstractHomotopy, x::AbstractVector, cache::AbstractHomotopyCache)
 
-Evaluate the homotopy `H` at `(x, t)`.
+Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)`.
 """
 dt(H::AbstractHomotopy, x, t) = dt(H, x, t, cache(H, x, t))
 function dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
@@ -121,7 +121,7 @@ end
 """
     jacobian_and_dt!(U, u, H, x, t, cache::AbstractHomotopyCache)
 
-Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)` and store the results in `U` (Jacobian)
+Evaluate the Jacobian of the homotopy `H` and its derivative w.r.t. `t` at `(x, t)` and store the results in `U` (Jacobian)
 and `u` (∂t).
 """
 function jacobian_and_dt!(U, u, H::AbstractHomotopy, x, t, c = cache(H, x, t))
@@ -133,7 +133,7 @@ end
 """
     jacobian_and_dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
-Evaluate the homotopy `H` and its derivative w.r.t. `t` at `(x, t)`.
+Evaluate the Jacobian of the homotopy `H` and its derivative w.r.t. `t` at `(x, t)`.
 """
 function jacobian_and_dt(H::AbstractHomotopy, x, t, c = cache(H, x, t))
     U = jacobian(H, x, t, c)

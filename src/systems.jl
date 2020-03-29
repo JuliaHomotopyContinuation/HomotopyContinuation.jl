@@ -96,7 +96,7 @@ function differentiate_parameters! end
 """
     differentiate_parameters(F::AbstractSystem, x, p, cache=cache(F, x))
 
-Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters
+Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters.
 """
 differentiate_parameters(F::AbstractSystem, x, p, c::AbstractSystemCache = cache(F, x, p)) =
     differentiate_parameters(F, x, p, c)
@@ -165,7 +165,7 @@ Base.length(F::AbstractSystem) = size(F, 1)
 """
     degrees(F::AbstractSystem)
 
-Returns a the degrees of the polynomials.
+Returns the degrees of the polynomials.
 """
 degrees(F::AbstractSystem) = nothing
 
