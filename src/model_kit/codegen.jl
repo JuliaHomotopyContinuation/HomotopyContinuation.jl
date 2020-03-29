@@ -460,24 +460,24 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
 """
 @generated function diff_t!(
     u,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {M,D,DP}
+    _diff_t!_impl(T, M, D, DP)
+end
+function diff_t!(
+    u,
     T::CompiledSystem,
     x::AbstractVector,
     dx::NTuple{D,<:AbstractVector} = (),
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D, DP)
-end
-@generated function diff_t!(
-    u,
-    T::CompiledSystem,
-    x::AbstractVector,
-    dx::NTuple{D,<:AbstractVector},
-    ::Val{M},
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {M, D,DP}
-    _diff_t!_impl(T, M, D, DP)
+    diff_t!(u, Val(D+1), T, x, dx, p, dp)
 end
 
 
@@ -493,6 +493,18 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
 """
 @generated function diff_t!(
     u,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {M,D,DP}
+    _diff_t!_impl(T, M, D, DP)
+end
+function diff_t!(
+    u,
     T::CompiledHomotopy,
     x::AbstractVector,
     t,
@@ -500,9 +512,8 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    _diff_t!_impl(T, D, DP)
+    diff_t!(u, Val(D+1), T, x, t, dx, p, dp)
 end
-
 """
     taylor!(u::Tuple, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
 
@@ -515,13 +526,24 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
 """
 @generated function taylor!(
     u,
+    ::Val{M},
     T::CompiledSystem,
     x::AbstractVector,
     dx::NTuple{D,<:AbstractVector} = (),
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
-) where {D,DP}
-    _taylor!_impl(T, D, DP)
+) where {M,D,DP}
+    _taylor!_impl(T, M,D, DP)
+end
+function taylor!(
+    u,
+    T::CompiledSystem,
+    x::AbstractVector,
+    dx::NTuple{D,<:AbstractVector} = (),
+    p::Union{Nothing,AbstractVector} = nothing,
+    dp::NTuple{DP,<:AbstractVector} = (),
+) where {M,D,DP}
+    diff_t!(u, Val(D+1), T, x, dx, p, dp)
 end
 
 """

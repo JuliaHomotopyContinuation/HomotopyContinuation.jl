@@ -1,8 +1,7 @@
 export AffineSubspaceHomotopy
 
-
-struct AffineSubspaceHomotopy{S} <: AbstractHomotopy
-    system::ModelKit.CompiledSystem{S}
+struct AffineSubspaceHomotopy{S,T} <: AbstractHomotopy
+    system::ModelKitSystem{S,T}
 
     start::AffineSubspace{ComplexF64}
     target::AffineSubspace{ComplexF64}
@@ -22,10 +21,10 @@ struct AffineSubspaceHomotopy{S} <: AbstractHomotopy
 end
 
 AffineSubspaceHomotopy(F::ModelKit.System, start::AffineSubspace, target::AffineSubspace) =
-    AffineSubspaceHomotopy(ModelKit.compile(F), start, target)
+    AffineSubspaceHomotopy(ModelKitSystem(F), start, target)
 
 function AffineSubspaceHomotopy(
-    system::ModelKit.CompiledSystem,
+    system::ModelKitSystem,
     start::AffineSubspace,
     target::AffineSubspace,
 )
@@ -106,7 +105,7 @@ function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
 
     γ, γ¹, γ², γ³, γ⁴ = taylor_γ
     n, k = size(γ)
-    for j = 1:k
+    @inbounds for j = 1:k
         Θⱼ = Θ[j]
         s, c = sincos(t * Θⱼ)
         s¹ = c * Θⱼ
@@ -137,11 +136,11 @@ function evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     n = first(size(H.system))
     if eltype(v) isa ComplexDF64
         LA.mul!(H.x_high, γ, v)
-        ModelKit.evaluate!(u, H.system, H.x_high)
+        evaluate!(u, H.system, H.x_high)
         u[n+1] = H.x_high[end] - 1
     else
         LA.mul!(x, γ, v)
-        ModelKit.evaluate!(u, H.system, x)
+        evaluate!(u, H.system, x)
         u[n+1] = x[end] - 1
     end
     u
@@ -152,7 +151,7 @@ function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVect
     x, _ = H.taylor_x
 
     LA.mul!(x, γ, v)
-    ModelKit.evaluate_and_jacobian!(u, H.J, H.system, x)
+    evaluate_and_jacobian!(u, H.J, H.system, x)
     LA.mul!(U, H.J, γ)
 
     n = first(size(H.system))
@@ -174,7 +173,7 @@ function diff_t!(u, H::AffineSubspaceHomotopy, v, t, dv::Tuple, incremental::Boo
     if length(dv) == 0
         LA.mul!(x, γ, v)
         LA.mul!(x¹, γ¹, v)
-        ModelKit.diff_t!(u, H.system, x, (x¹,), Val(1))
+        diff_t!(u, Val(1), H.system, x, (x¹,))
         u[n+1] = x¹[end]
     elseif length(dv) == 1
         v¹, = dv
@@ -188,7 +187,7 @@ function diff_t!(u, H::AffineSubspaceHomotopy, v, t, dv::Tuple, incremental::Boo
         LA.mul!(x², γ², v)
         LA.mul!(x², γ¹, v¹, true, true)
 
-        ModelKit.diff_t!(u, H.system, x, (x¹, x²), Val(2))
+        diff_t!(u, Val(2), H.system, x, (x¹, x²))
         u[n+1] = x²[end]
     elseif length(dv) == 2
         v¹, v² = dv
@@ -205,7 +204,7 @@ function diff_t!(u, H::AffineSubspaceHomotopy, v, t, dv::Tuple, incremental::Boo
         LA.mul!(x³, γ², v¹, true, true)
         LA.mul!(x³, γ¹, v², true, true)
 
-        ModelKit.diff_t!(u, H.system, x, (x¹, x², x³), Val(3))
+        diff_t!(u, Val(3), H.system, x, (x¹, x², x³))
         u[n+1] = x³[end]
     elseif length(dv) == 3
         v¹, v², v³ = dv
@@ -226,7 +225,7 @@ function diff_t!(u, H::AffineSubspaceHomotopy, v, t, dv::Tuple, incremental::Boo
         LA.mul!(x⁴, γ², v², true, true)
         LA.mul!(x⁴, γ¹, v³, true, true)
 
-        ModelKit.diff_t!(u, H.system, x, (x¹, x², x³, x⁴), Val(4))
+        diff_t!(u, Val(4), H.system, x, (x¹, x², x³, x⁴))
         u[n+1] = x⁴[end]
     end
     u

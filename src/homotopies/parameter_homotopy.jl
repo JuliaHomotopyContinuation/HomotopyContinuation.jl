@@ -39,8 +39,7 @@ p!(H::ParameterHomotopy, t::Union{DoubleF64,ComplexDF64}) =
 ṗ!(H::ParameterHomotopy, t) = (ṗt = first(H.ṗt); ṗt .= H.p .- H.q; H.ṗt)
 
 evaluate!(u, H::ParameterHomotopy, x, t) = ModelKit.evaluate!(u, H.F, x, p!(H, t))
-# jacobian!(U, H::ParameterHomotopy, x, t) =
-#     ModelKit.jacobian!(U, H.F, x, p!(H, t))
+
 evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t) =
     ModelKit.evaluate_and_jacobian!(u, U, H.F, x, p!(H, t))
 
