@@ -279,14 +279,13 @@ following options are accepted:
   This is also control what is considered `∞` for the path tracking.
 * `s_always_consider_valuation` (default `-log(1e-16)`) A threshold after which we always consider
   the valuation.
-* `samples_per_loop (default `8`): The number of samples used during the endgame.
+* `samples_per_loop` (default `8`): The number of samples used during the endgame.
 * `precision_strategy` (default `:adaptive_finite`): This controls whether `H(x,t)` is
   possibly evaluated with higher than machine precision during the endgame
   (the Jacobian is always computed with machine precision). The `:adaptive_finite` allows
   this only if we are optimistic that we can still obtain a finite solution.
   Other options are `:adaptive_never` where this is never allowed and `:adaptive_always`
   where it is always enabled.
-  ``
 """
 struct PathTracker{
     AV<:AbstractVector{Complex{Float64}},
