@@ -42,6 +42,51 @@
         end
     end
 
+    @testset "Inf-norm estimator / cond" begin
+        d_r = rand() * exp10.(range(-6, stop = 6, length = 6))
+        D_R = diagm(d_r)
+        d_l = rand() * exp10.(range(6, stop = -6, length = 6))
+        D_L = diagm(d_l)
+
+        A = randn(6, 6)
+
+        B = A * inv(D_R)
+        WB = HC2.MatrixWorkspace(B)
+        @test 0.1 ≤ opnorm(inv(B), Inf) / HC2.inverse_inf_norm_est(WB) ≤ 10
+        @test 0.1 ≤
+              opnorm(inv(B * D_R), Inf) / HC2.inverse_inf_norm_est(WB, nothing, d_r) ≤
+              10
+        @test 0.1 ≤ opnorm(inv(D_R * B), Inf) / HC2.inverse_inf_norm_est(WB, d_r) ≤ 10
+
+        @test 0.1 ≤ cond(B, Inf) / cond(WB) ≤ 10
+        @test 0.1 ≤ cond(B * D_R, Inf) / cond(WB, nothing, d_r) ≤ 10
+        @test 0.1 ≤ cond(D_R * B, Inf) / cond(WB, d_r, nothing) ≤ 10
+
+
+        C = inv(D_L) * A
+        WC = HC2.MatrixWorkspace(C)
+        @test 0.1 ≤ opnorm(inv(C), Inf) / HC2.inverse_inf_norm_est(WC) ≤ 10
+        @test 0.1 ≤ opnorm(inv(D_L * C), Inf) / HC2.inverse_inf_norm_est(WC, d_l) ≤ 10
+        @test 0.1 ≤
+              opnorm(inv(C * D_L), Inf) / HC2.inverse_inf_norm_est(WC, nothing, d_l) ≤
+              10
+        @test 0.1 ≤ cond(C, Inf) / cond(WC) ≤ 10
+        @test 0.1 ≤ cond(C * D_L, Inf) / cond(WC, nothing, d_l) ≤ 10
+        @test 0.1 ≤ cond(D_L * C, Inf) / cond(WC, d_l, nothing) ≤ 10
+
+
+        D = inv(D_L) * A * inv(D_R)
+        WD = HC2.MatrixWorkspace(D)
+        @test 0.1 ≤ opnorm(inv(D), Inf) / HC2.inverse_inf_norm_est(WD) ≤ 10
+        @test 0.1 ≤
+              opnorm(inv(D_L * D * D_R), Inf) / HC2.inverse_inf_norm_est(WD, d_l, d_r) ≤
+              10
+        @test HC2.inverse_inf_norm_est(WD, d_r, d_l) >
+              100 * HC2.inverse_inf_norm_est(WD, d_l, d_r)
+        @test 0.1 ≤ cond(D, Inf) / cond(WD) ≤ 10
+        @test 0.1 ≤ cond(D_L * D * D_R, Inf) / cond(WD, d_l, d_r) ≤ 10
+    end
+
     @testset "Jacobian" begin
         A = randn(ComplexF64, 6, 6)
         b = randn(ComplexF64, 6)
