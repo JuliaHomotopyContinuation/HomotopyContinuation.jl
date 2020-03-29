@@ -44,6 +44,7 @@ evaluate!(u, H::AbstractHomotopy, args...) =
     error(MethodError(evaluate!, tuple(u, H, args...)))
 
 """
+    evaluate(H::AbstractHomotopy, x, t)
     evaluate(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the homotopy `H` at `(x, t)`.
@@ -63,6 +64,7 @@ Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)` and store the
 function dt! end
 
 """
+    dt(H::AbstractHomotopy, x::AbstractVector
     dt(H::AbstractHomotopy, x::AbstractVector, cache::AbstractHomotopyCache)
 
 Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)`.
@@ -83,6 +85,7 @@ jacobian!(u, H::AbstractHomotopy, args...) =
     error(MethodError(jacobian!, tuple(u, H, args...)))
 
 """
+    jacobian(H::AbstractHomotopy, x, t)
     jacobian(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the Jacobian of the homotopy `H` at `(x, t)`.
