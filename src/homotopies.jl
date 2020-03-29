@@ -73,8 +73,12 @@ Construct a total degree homotopy ``H`` using the 'γ-trick' such that ``H(x,0) 
 and ``H(x,1)`` is the generated start system.
 Returns a `ModelKitHomotopy` and the start solutions as an interator.
 """
-total_degree_homotopy(f::AbstractVector{Expression}, vars::AbstractVector{Variable}, params::AbstractVector{Variable} = Variable[]; kwargs...) =
-    total_degree_homotopy(System(f, vars, params); kwargs...)
+total_degree_homotopy(
+    f::AbstractVector{Expression},
+    vars::AbstractVector{Variable},
+    params::AbstractVector{Variable} = Variable[];
+    kwargs...,
+) = total_degree_homotopy(System(f, vars, params); kwargs...)
 
 function total_degree_homotopy(
     F::System;
@@ -106,17 +110,17 @@ function total_degree_homotopy(
     f = F.expressions
     h = γ .* t .* _s_ .* (vars .^ D .- 1) .+ (1 .- t) .* f
     if scaling == nothing
-        s = ones(n)
+        s = map(f) do fi
+            g = isempty(params) ? fi : subs(fi, params => target_parameters)
+            maximum(
+                ci -> float(abs(ModelKit.to_number(ci))),
+                ModelKit.coefficients(g, vars),
+            )
+        end
         H = ModelKitHomotopy(
             Homotopy(h, vars, t, all_params),
             [target_parameters; gamma; s],
         )
-        u = zeros(ComplexF64, n)
-        for i in 1:3
-            evaluate!(u, H, LA.normalize!(randn(ComplexF64, n)), 0.0)
-            s .= max.(s, exp2.(last.(frexp.(fast_abs.(u)))))
-        end
-        H.parameters[end-n+1:end] .= s
     else
         H = ModelKitHomotopy(
             Homotopy(h, vars, t, all_params),
