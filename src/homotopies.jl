@@ -64,8 +64,8 @@ Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)` and store the
 function dt! end
 
 """
-    dt(H::AbstractHomotopy, x::AbstractVector
-    dt(H::AbstractHomotopy, x::AbstractVector, cache::AbstractHomotopyCache)
+    dt(H::AbstractHomotopy, x, t)
+    dt(H::AbstractHomotopy, x, t, cache::AbstractHomotopyCache)
 
 Evaluate the derivative of the homotopy `H` w.r.t. `t` at `(x, t)`.
 """
