@@ -1,4 +1,4 @@
-module ModelKit
+@reexport module ModelKit
 
 export @var,
     @unique_var,
@@ -15,15 +15,7 @@ export @var,
     exponents_coefficients,
     expand,
     System,
-    Homotopy,
-    evaluate!,
-    jacobian!,
-    evaluate_and_jacobian!,
-    diff_t!,
-    evaluate,
-    jacobian,
-    evaluate_and_jacobian,
-    diff_t
+    Homotopy
 
 import LinearAlgebra
 

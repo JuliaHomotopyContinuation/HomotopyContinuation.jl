@@ -31,9 +31,10 @@ Symbol(v::Variable) = name(v)
 
 
 """
-    @var(args...)
+    @var variable1 variable2 ...
 
-Declare variables with the given and automatically create the variable bindings.
+Declare variables with the given names and automatically create the variable bindings.
+The macro supports indexing notation to create `Array`s of variables.
 
 ## Examples
 

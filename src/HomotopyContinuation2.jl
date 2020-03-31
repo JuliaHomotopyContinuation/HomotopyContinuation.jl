@@ -9,45 +9,14 @@ import MixedSubdivisions
 using Parameters: @unpack
 import Printf
 import PrettyTables
+using Reexport: @reexport
 import StructArrays
 
 const LA = LinearAlgebra
 
 include("ModelKit.jl")
-import .ModelKit
 include("DoubleDouble.jl")
 using .DoubleDouble
-
-using .ModelKit:
-    @var,
-    @unique_var,
-    Variable,
-    Expression,
-    variables,
-    nvariables,
-    subs,
-    evaluate,
-    differentiate,
-    monomials,
-    rand_poly,
-    expand,
-    System,
-    Homotopy
-
-export @var,
-    @unique_var,
-    Variable,
-    Expression,
-    variables,
-    nvariables,
-    subs,
-    evaluate,
-    differentiate,
-    monomials,
-    rand_poly,
-    expand,
-    System,
-    Homotopy
 
 using ProjectiveVectors:
     PVector,
