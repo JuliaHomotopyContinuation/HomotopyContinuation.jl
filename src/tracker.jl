@@ -599,11 +599,11 @@ function update_precision!(tracker::Tracker, μ_low)
 
     if state.extended_prec && !isnan(μ_low)
         # check if we can go low again
-        if μ_low * ω < a^9 * _h(a)
+        if μ_low * ω < a^7 * _h(a)
             state.extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a^7 * _h(a)
+    elseif μ * ω > a^5 * _h(a)
         state.extended_prec = true
         state.used_extended_prec = true
         # do two refinement steps
