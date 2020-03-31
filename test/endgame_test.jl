@@ -31,7 +31,7 @@
         @var x
         d = 19
         f = expand(prod(x - i for i = 1:d))
-        H, starts = total_degree_homotopy([f], [x], gamma = 0.4 + 1.3im)
+        H, starts = total_degree_homotopy([f], [x])
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -54,7 +54,7 @@
     @testset "Beyond Polyhedral Homotopy Example" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
-        H, starts = total_degree_homotopy(f, [x, y]; gamma = 1.3im + 0.4)
+        H, starts = total_degree_homotopy(f, [x, y])
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -67,7 +67,7 @@
         a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         f1 = (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1
         f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
-        H, starts = total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
+        H, starts = total_degree_homotopy([f1, f2], [x, y])
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)

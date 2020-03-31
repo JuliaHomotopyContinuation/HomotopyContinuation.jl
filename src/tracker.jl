@@ -616,6 +616,14 @@ function update_precision!(tracker::Tracker, μ_low)
     state.extended_prec
 end
 
+function refine_current_solution!(tracker)
+    @unpack homotopy, corrector, state, options = tracker
+    @unpack x, t, jacobian, norm = state
+    
+    extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+    extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+end
+
 function step!(tracker::Tracker, debug::Bool = false)
     @unpack homotopy, corrector, predictor, state, options = tracker
     @unpack t, Δt, t′, x, x̂, x̄, jacobian, norm = state

@@ -239,13 +239,13 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     n₀ = max(ceil(Int, log(eps()) / log(t)), 3)
     @unpack x, μ, ω = tracker.state
 
+    point_acc = refine_current_solution!(tracker)
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     prediction .= 0.0
 
     m = 1
     Δθ = 2π / n₀
-    point_acc = tracker.state.accuracy
     result = CAUCHY_TERMINATED_MAX_WINDING_NUMBER
     while m ≤ options.max_winding_number
         θⱼ = 0.0
@@ -265,14 +265,14 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
             prediction .+= x
         end
         # Check that loop is closed
-        if tracker.state.norm(last_point, x) < 4 * max(point_acc, tracker.state.accuracy)
+        d = tracker.state.norm(last_point, x)
+        if d < 10 * max(point_acc, tracker.state.accuracy)
             n = n₀ * m
             prediction .= prediction ./ n
 
             result = CAUCHY_SUCCESS
             break
         end
-
         m += 1
     end
 
@@ -321,9 +321,9 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
                 zero_is_finite = !options.at_zero_check,
             )
 
-            if verdict.at_infinity
+            if options.at_infinity_check && verdict.at_infinity
                 return (state.code = PathTrackerReturnCode.at_infinity)
-            elseif verdict.at_zero
+            elseif options.at_zero_check && verdict.at_zero
                 return (state.code = PathTrackerReturnCode.at_zero)
             end
         end
@@ -339,8 +339,6 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
          We enter the endgame.
          We monitor the condition number with a fixed scaling of the columns and rows,
          which is recorded now.
-         We reduce the safety factor for the trust region to be more pessimistic.
-         TODO: Can we only apply the stricter safety factor when t′ = 0?
         =#
         state.col_scaling .= weights(tracker.state.norm)
         skeel_row_scaling!(
@@ -405,7 +403,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         state.solution .= tracker.state.x
         return (state.code = PathTrackerReturnCode.at_zero)
 
-    elseif finite && !state.max_winding_number_hit && state.cond > options.min_cond_eg
+    elseif finite && state.cond > options.min_cond_eg
         res, m, acc_est = cauchy!(state, tracker, options)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
@@ -441,6 +439,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
             if state.max_winding_number_hit
                 state.code = PathTrackerReturnCode.terminated_max_winding_number
             else
+                state.cauchy_failures += 1
                 state.max_winding_number_hit = true
             end
         elseif res == CAUCHY_TERMINATED
