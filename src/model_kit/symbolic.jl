@@ -692,6 +692,14 @@ struct System
 end
 
 function System(
+    exprs::Vector{<:Expression};
+    variables::Vector{Variable} = variables(exprs),
+    parameters::Vector{Variable} = Variable[],
+)
+    System(convert(Vector{Expression}, exprs), variables, parameters)
+end
+
+function System(
     exprs::Vector{<:Expression},
     variables::Vector{Variable},
     parameters::Vector{Variable} = Variable[],
