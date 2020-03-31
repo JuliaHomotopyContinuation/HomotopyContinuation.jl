@@ -75,7 +75,7 @@ Returns a `ModelKitHomotopy` and the start solutions as an interator.
 """
 total_degree_homotopy(
     f::AbstractVector{Expression},
-    vars::AbstractVector{Variable},
+    vars::AbstractVector{Variable} = variables(f),
     params::AbstractVector{Variable} = Variable[];
     kwargs...,
 ) = total_degree_homotopy(System(f, vars, params); kwargs...)
