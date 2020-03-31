@@ -13,8 +13,8 @@
         @unpack x, t, x¹, x², x³ = tracker.state
         HC2.update!(val, x, x¹, x², x³, real(t))
 
-        @test val.val_x[1] ≈ 0 atol = (1e-13)^(1/5)
-        @test val.val_tx¹[1] ≈ 1/5 atol = (1e-13)^(1/5)
+        @test val.val_x[1] ≈ 0 atol = 10(1e-13)^(1/5)
+        @test val.val_tx¹[1] ≈ 1/5 atol = 10(1e-13)^(1/5)
     end
 
     @testset "Example 2" begin

@@ -26,6 +26,7 @@ Base.@kwdef mutable struct TrackerOptions
     β_a::Float64 = 1.0
     β_ω::Float64 = 20.0
     β_τ::Float64 = 0.7
+    strict_β_τ::Float64 = min(β_τ, 0.45)
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
@@ -338,6 +339,13 @@ Return the state of the tracker.
 state(tracker::Tracker) = tracker.state
 status(tracker::Tracker) = tracker.state.code
 LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
+
+function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
+    J = tracker.state.jacobian
+    evaluate_and_jacobian!(tracker.corrector.r, J.J, tracker.homotopy, x, t)
+    updated!(J)
+    LA.cond(J, d_l, d_r)
+end
 # Step Size
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
@@ -391,6 +399,9 @@ function update_stepsize!(
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
         end
         Δs₂ = options.β_τ * τ
+        if dist_to_target(state.segment_stepper) < Δs₂
+            Δs₂ = options.strict_β_τ * τ
+        end
         Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
         if state.last_step_failed
             Δs = min(Δs, state.Δs_prev)
@@ -398,7 +409,7 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        if isnan(Θ_j)
+        if isnan(Θ_j) || result.return_code == NEWT_SINGULARITY || isnan(result.accuracy)
             Δs = 0.25 * state.segment_stepper.Δs
         else
             Δs =
@@ -588,11 +599,11 @@ function update_precision!(tracker::Tracker, μ_low)
 
     if state.extended_prec && !isnan(μ_low)
         # check if we can go low again
-        if μ_low * ω < a^9 * _h(a)
+        if μ_low * ω < a^7 * _h(a)
             state.extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a^7 * _h(a)
+    elseif μ * ω > a^5 * _h(a)
         state.extended_prec = true
         state.used_extended_prec = true
         # do two refinement steps
@@ -603,6 +614,14 @@ function update_precision!(tracker::Tracker, μ_low)
     end
 
     state.extended_prec
+end
+
+function refine_current_solution!(tracker)
+    @unpack homotopy, corrector, state, options = tracker
+    @unpack x, t, jacobian, norm = state
+    
+    extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+    extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
 end
 
 function step!(tracker::Tracker, debug::Bool = false)
@@ -735,7 +754,7 @@ function TrackerResult(H::AbstractHomotopy, state::TrackerState)
     )
 end
 
-@inline function track(tracker::Tracker, x, t₁=1.0, t₀=0.0; kwargs...)
+@inline function track(tracker::Tracker, x, t₁ = 1.0, t₀ = 0.0; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
     TrackerResult(tracker.homotopy, tracker.state)
 end

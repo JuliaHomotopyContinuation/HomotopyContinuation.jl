@@ -17,7 +17,6 @@
     @test steps(res[1]) < 10
     @test accepted_steps(res[1]) < 10
     @test rejected_steps(res[1]) == 0
-    @test last_path_point(res[1]) == nothing
     @test is_success(res[2])
     @test is_at_infinity(res[3])
     @test is_at_infinity(res[4])
@@ -28,7 +27,7 @@
     @var x
     f = [(x - 10)^2]
     H, starts = total_degree_homotopy(f, [x])
-    tracker = PathTracker(Tracker(H), eg_β_τ = 0.45)
+    tracker = PathTracker(Tracker(H))
     res = track.(tracker, starts)
 
     @test winding_number(res[1]) == 2

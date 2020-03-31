@@ -59,6 +59,7 @@ function propose_step!(S::SegmentStepper, Δs::Real)
     end
     S
 end
+dist_to_target(S::SegmentStepper) = S.forward ? S.abs_Δ - S.s : S.s
 
 function Base.getproperty(S::SegmentStepper, sym::Symbol)
     if sym == :Δs

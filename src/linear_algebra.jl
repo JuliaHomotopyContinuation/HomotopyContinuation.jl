@@ -10,6 +10,8 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     r::Vector{ComplexF64}
     r̄::Vector{ComplexDF64}
     δx::Vector{ComplexF64}
+    inf_norm_est_work::Vector{ComplexF64}
+    inf_norm_est_rwork::Vector{Float64}
 end
 
 function MatrixWorkspace(Â::AbstractMatrix)
@@ -32,8 +34,23 @@ function MatrixWorkspace(Â::AbstractMatrix)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)
     δx = zeros(ComplexF64, n)
+    inf_norm_est_work = Vector{ComplexF64}(undef, n)
+    inf_norm_est_rwork = Vector{Float64}(undef, n)
 
-    MatrixWorkspace(A, d, factorized, lu, row_scaling, scaled, x̄, r, r̄, δx)
+    MatrixWorkspace(
+        A,
+        d,
+        factorized,
+        lu,
+        row_scaling,
+        scaled,
+        x̄,
+        r,
+        r̄,
+        δx,
+        inf_norm_est_work,
+        inf_norm_est_rwork,
+    )
 end
 
 Base.size(MW::MatrixWorkspace) = size(MW.A)
@@ -249,7 +266,7 @@ end
 
 function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     if size(WS) == (1, 1)
-        x[1] = b[1] / WS[1,1]
+        x[1] = b[1] / WS[1, 1]
         return x
     end
     WS.factorized[] || factorize!(WS)
@@ -382,6 +399,153 @@ function fixed_precision_iterative_refinement!(
     end
 end
 
+
+
+# CONDITION NUMBERS
+
+"""
+    inverse_inf_norm_est(WS::MatrixWorkspace,
+                         d_l::Union{Nothing,Vector{<:Real}}=nothing
+                         d_r::Union{Nothing,Vector{<:Real}}=nothing)
+
+Estimate of the infinity norm of `diag(d_r)⁻¹A⁻¹diag(d_l)⁻¹` where `d_l` and `d_r` are
+optional positive vectors.
+If `d_l` or `d_r` is `nothing` the all one vector is used.
+This uses the 1-norm lapack condition estimator described by Highahm in [^H88].
+
+[^H88]: Higham, Nicholas J. "FORTRAN codes for estimating the one-norm of a real or complex matrix, with applications to condition estimation." ACM Transactions on Mathematical Software (TOMS) 14.4 (1988): 381-396.
+"""
+function inverse_inf_norm_est(
+    WS::MatrixWorkspace,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    WS.factorized[] || factorize!(WS)
+    inverse_inf_norm_est(WS.lu, d_l, d_r, WS.inf_norm_est_work, WS.inf_norm_est_rwork)
+end
+function inverse_inf_norm_est(
+    lu::LA.LU,
+    g::Union{Nothing,Vector{<:Real}},
+    d::Union{Nothing,Vector{<:Real}},
+    work::Vector{<:Complex},
+    rwork::Vector{<:Real},
+)
+    z = ξ = y = work
+    x = rwork
+
+    n = size(lu.factors, 1)
+    x .= inv(n)
+    if d !== nothing
+        x ./= d
+    end
+    lu_ldiv_adj!(y, lu, x)
+    if g !== nothing
+        y ./= g
+    end
+    γ = sum(fast_abs, y)
+    y ./= fast_abs.(y)
+    if g !== nothing
+        y ./= g
+    end
+    lu_ldiv!(z, lu, ξ)
+    if d !== nothing
+        x .= real.(z) ./ d
+    else
+        x .= real.(z)
+    end
+    k = 2
+    while true
+        j, max_xᵢ = 1, abs(x[1])
+        for i = 2:n
+            abs_xᵢ = abs(x[i])
+            if abs_xᵢ > max_xᵢ
+                j, max_xᵢ = i, abs_xᵢ
+            end
+        end
+        x .= zero(eltype(x))
+        x[j] = one(eltype(x))
+        if d !== nothing
+            x ./= d
+        end
+        lu_ldiv_adj!(y, lu, x)
+        if g !== nothing
+            y ./= g
+        end
+        γ̄ = γ
+        γ = sum(fast_abs, y)
+        γ ≤ γ̄ && break
+        ξ .= y ./ fast_abs.(y)
+        if g !== nothing
+            ξ ./= g
+        end
+        lu_ldiv!(z, lu, ξ)
+        if d !== nothing
+            x .= real.(z) ./ d
+        else
+            x .= real.(z)
+        end
+        k += 1
+        if x[j] == LA.norm(x, Inf) || k > 2
+            break
+        end
+    end
+    γ
+end
+
+function inf_norm(
+    WS::MatrixWorkspace,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    norm = -Inf
+    A = WS.A
+    n, m = size(A)
+    for i = 1:n
+        normᵢ = 0.0
+        for j = 1:m
+            if d_r isa Nothing
+                normᵢ += fast_abs(A[i, j])
+            else
+                normᵢ += fast_abs(A[i, j]) * d_r[j]
+            end
+        end
+        if !(d_l isa Nothing)
+            normᵢ *= d_l[i]
+        end
+        norm = max(norm, normᵢ)
+    end
+    norm
+end
+
+"""
+    cond(A::MatrixWorkspace,
+         d_l::Union{Nothing,Vector{<:Real}} = nothing,
+         d_r::Union{Nothing,Vector{<:Real}} = nothing)
+
+Compute the condition number w.r.t. the infinity-norm of `diag(d_l) * A * diag(d_r)`.
+If `d_l` or `d_r` is `nothing` the all one vector is used.
+If `size(A) == (1,1)` then just the norm of the inverse is returned.
+"""
+function LA.cond(
+    WS::MatrixWorkspace,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    if size(WS) == (1, 1)
+        if isa(d_l, Nothing) && isa(d_r, Nothing)
+            inv(abs(WS.A[1, 1]))
+        elseif isa(d_l, Nothing)
+            inv(abs(WS.A[1, 1]) * d_r[1])
+        elseif isa(d_r, Nothing)
+            inv(d_l[1] * abs(WS.A[1, 1]))
+        else
+            inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
+        end
+    else
+        inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)
+    end
+end
+
 #####################
 ## Jacobian ##
 #####################
@@ -444,11 +608,11 @@ function iterative_refinement!(
     b::AbstractVector,
     norm::AbstractNorm;
     max_iters::Int = 3,
-    tol::Float64 = sqrt(eps())
+    tol::Float64 = sqrt(eps()),
 )
     JM.ldivs[] += 1
     δ = mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
-    for i in 2:max_iters
+    for i = 2:max_iters
         JM.ldivs[] += 1
         δ′ = mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
         if δ′ < tol
@@ -471,4 +635,12 @@ function init!(JM::Jacobian; keep_stats::Bool = false)
     JM.factorizations[] = 0
     JM.ldivs[] = 0
     JM
+end
+
+function LA.cond(
+    J::Jacobian,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    LA.cond(jacobian(J), d_l, d_r)
 end
