@@ -100,7 +100,6 @@ function newton!(
         if extended_precision
             iterative_refinement!(Δxᵢ, JM, r, norm; tol = ā^2, max_iters = 3)
         end
-        xᵢ₊₁ .= xᵢ .- Δxᵢ
         norm_Δxᵢ = norm(Δxᵢ)
 
         if isnan(norm_Δxᵢ)
@@ -115,6 +114,9 @@ function newton!(
                 norm_Δx₀,
             )
         end
+
+        xᵢ₊₁ .= xᵢ .- Δxᵢ
+
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         i >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)

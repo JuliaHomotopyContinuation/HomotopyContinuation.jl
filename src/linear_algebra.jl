@@ -524,13 +524,26 @@ end
 
 Compute the condition number w.r.t. the infinity-norm of `diag(d_l) * A * diag(d_r)`.
 If `d_l` or `d_r` is `nothing` the all one vector is used.
+If `size(A) == (1,1)` then just the norm of the inverse is returned.
 """
 function LA.cond(
     WS::MatrixWorkspace,
     d_l::Union{Nothing,Vector{<:Real}} = nothing,
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
-    inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)
+    if size(WS) == (1, 1)
+        if isa(d_l, Nothing) && isa(d_r, Nothing)
+            inv(abs(WS.A[1, 1]))
+        elseif isa(d_l, Nothing)
+            inv(abs(WS.A[1, 1]) * d_r[1])
+        elseif isa(d_r, Nothing)
+            inv(d_l[1] * abs(WS.A[1, 1]))
+        else
+            inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
+        end
+    else
+        inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)
+    end
 end
 
 #####################

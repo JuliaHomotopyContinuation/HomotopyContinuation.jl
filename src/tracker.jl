@@ -338,6 +338,13 @@ Return the state of the tracker.
 state(tracker::Tracker) = tracker.state
 status(tracker::Tracker) = tracker.state.code
 LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
+
+function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
+    J = tracker.state.jacobian
+    evaluate_and_jacobian!(tracker.corrector.r, J.J, tracker.homotopy, x, t)
+    updated!(J)
+    LA.cond(J, d_l, d_r)
+end
 # Step Size
 
 _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
@@ -398,7 +405,7 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-        if isnan(Θ_j)
+        if isnan(Θ_j) || result.return_code == NEWT_SINGULARITY || isnan(result.accuracy)
             Δs = 0.25 * state.segment_stepper.Δs
         else
             Δs =

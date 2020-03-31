@@ -1,7 +1,7 @@
 @testset "Endgame AD: $AD" for AD = 3:4
     @testset "Cyclic 7" begin
         f = cyclic(7)
-        H, starts = total_degree_homotopy(f; gamma = 0.2 + 0.4im)
+        H, starts = total_degree_homotopy(f)
         S = collect(starts)
         tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, S)
@@ -41,7 +41,7 @@
         @test count(r -> isnothing(r.winding_number), res) == 19
     end
 
-    @testset "(x-10)^$d" for d in [2, 8, 12, 16]
+    @testset "(x-10)^$d" for d in [2, 8, 12, 16, 18 ]
         @var x
         f = [(x - 10)^d]
         H, starts = total_degree_homotopy(f, [x])
@@ -77,7 +77,6 @@
 
     @testset "Bacillus Subtilis" begin
         H, starts = total_degree_homotopy(bacillus())
-        tracker = PathTracker(Tracker(H))
         tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
         res = track.(tracker, starts)
         @test count(is_success, res) == 44
@@ -106,9 +105,9 @@
                 88,
             ])
 
-        H, starts = total_degree_homotopy(System(F, [x, z, y]); gamma = 0.2 + 0.4im)
-        egtracker = PathTracker(Tracker(H, automatic_differentiation = AD))
-        egres = HC2.track.(egtracker, starts)
-        @test count(is_success, egres) == 693
+        H, starts = total_degree_homotopy(System(F, [x, z, y]))
+        tracker = PathTracker(Tracker(H, automatic_differentiation = AD))
+        res = track.(tracker, starts)
+        @test count(is_success, res) == 693
     end
 end
