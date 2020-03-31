@@ -15,9 +15,6 @@ export PathTracker,
 
 Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
-    # tracker parameters during eg
-    β_τ::Float64
-    eg_β_τ::Float64 = min(0.45, β_τ)
     # eg parameter
     min_cond_eg::Float64 = 1e6
     # valuation etc
@@ -176,7 +173,7 @@ end
 
 PathTracker(H::AbstractHomotopy; kwargs...) = PathTracker(Tracker(H); kwargs...)
 function PathTracker(tracker::Tracker; kwargs...)
-    options = PathTrackerOptions(; β_τ = tracker.options.β_τ, kwargs...)
+    options = PathTrackerOptions(; kwargs...)
     state = PathTrackerState(size(tracker.homotopy, 1), tracker.state.x)
     PathTracker(tracker, state, options)
 end
@@ -185,8 +182,6 @@ Base.broadcastable(T::PathTracker) = Ref(T)
 
 function init!(eg_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::Float64 = NaN)
     @unpack tracker, state, options = eg_tracker
-
-    tracker.options.β_τ = options.β_τ
 
     init!(tracker, x, t₁, 0.0; ω = ω, μ = μ)
 
@@ -356,7 +351,6 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
         state.cond_eg_start = κ
 
-        tracker.options.β_τ = options.eg_β_τ
         state.endgame_started = true
     end
 

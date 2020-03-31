@@ -26,6 +26,7 @@ Base.@kwdef mutable struct TrackerOptions
     β_a::Float64 = 1.0
     β_ω::Float64 = 20.0
     β_τ::Float64 = 0.7
+    strict_β_τ::Float64 = min(β_τ, 0.45)
     extended_precision::Bool = true
     min_step_size::Float64 = exp2(-3 * 53)
     use_strict_trust_region::Bool = false
@@ -398,6 +399,9 @@ function update_stepsize!(
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
         end
         Δs₂ = options.β_τ * τ
+        if dist_to_target(state.segment_stepper) < Δs₂
+            Δs₂ = options.strict_β_τ * τ
+        end
         Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
         if state.last_step_failed
             Δs = min(Δs, state.Δs_prev)
@@ -742,7 +746,7 @@ function TrackerResult(H::AbstractHomotopy, state::TrackerState)
     )
 end
 
-@inline function track(tracker::Tracker, x, t₁=1.0, t₀=0.0; kwargs...)
+@inline function track(tracker::Tracker, x, t₁ = 1.0, t₀ = 0.0; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
     TrackerResult(tracker.homotopy, tracker.state)
 end

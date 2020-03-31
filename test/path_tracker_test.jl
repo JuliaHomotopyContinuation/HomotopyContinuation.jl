@@ -28,7 +28,7 @@
     @var x
     f = [(x - 10)^2]
     H, starts = total_degree_homotopy(f, [x])
-    tracker = PathTracker(Tracker(H), eg_β_τ = 0.45)
+    tracker = PathTracker(Tracker(H))
     res = track.(tracker, starts)
 
     @test winding_number(res[1]) == 2
