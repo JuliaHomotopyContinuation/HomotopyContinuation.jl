@@ -75,7 +75,7 @@ Returns a `ModelKitHomotopy` and the start solutions as an interator.
 """
 total_degree_homotopy(
     f::AbstractVector{Expression},
-    vars::AbstractVector{Variable},
+    vars::AbstractVector{Variable} = variables(f),
     params::AbstractVector{Variable} = Variable[];
     kwargs...,
 ) = total_degree_homotopy(System(f, vars, params); kwargs...)
@@ -87,14 +87,14 @@ function total_degree_homotopy(
     scaling = nothing,
 )
     n = length(F)
-    n == ModelKit.nvariables(F) ||
+    n == nvariables(F) ||
     throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
-    ModelKit.nparameters(F) == length(target_parameters) ||
+    nparameters(F) == length(target_parameters) ||
     throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
 
     vars = variables(F)
-    params = ModelKit.parameters(F)
-    D = ModelKit.degree(F.expressions, vars)
+    params = parameters(F)
+    D = degrees(F)
 
     t = ModelKit.unique_variable(:t, vars, params)
 
@@ -107,15 +107,12 @@ function total_degree_homotopy(
         push!(all_params, _s_i)
     end
 
-    f = F.expressions
+    f = expressions(F)
     h = γ .* t .* _s_ .* (vars .^ D .- 1) .+ (1 .- t) .* f
     if scaling == nothing
         s = map(f) do fi
             g = isempty(params) ? fi : subs(fi, params => target_parameters)
-            maximum(
-                ci -> float(abs(ModelKit.to_number(ci))),
-                ModelKit.coefficients(g, vars),
-            )
+            maximum(ci -> float(abs(to_number(ci))), coefficients(expand(g), vars))
         end
         H = ModelKitHomotopy(
             Homotopy(h, vars, t, all_params),

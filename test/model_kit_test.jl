@@ -1,7 +1,6 @@
 using HomotopyContinuation2.ModelKit
 
 @testset "ModelKit" begin
-
     @testset "SymEngine" begin
         @test Expression(MathConstants.catalan) isa Expression
         @test Expression(MathConstants.e) isa Expression
@@ -199,21 +198,33 @@ using HomotopyContinuation2.ModelKit
         FcapL = collect(values(ModelKit.to_dict(expand(G), [t])))
 
         @test all(FcapL) do f
-            g = ModelKit.horner(f)
+            g = horner(f)
             expand(g) == f
         end
         @test all(FcapL) do f
-            g = ModelKit.horner(f, [a; b])
+            g = horner(f, [a; b])
             expand(g) == f
         end
+    end
 
+    @testset "Rand / dense poly" begin
+        @var x y
+        f, c = dense_poly([x, y], 3)
+        @test length(c) == 10
+        g = rand_poly(Float64, [x, y], 3)
+        @test subs(f, c => coefficients(g, [x,y])) == g
+        _, coeffs = exponents_coefficients(g, [x,y])
+        @test subs(f, c => coeffs) == g
     end
 
     @testset "System" begin
         @var x y a b
         f = [(x + y)^3 + x^2 + x + 5y + 3a, 2 * x^2 + b]
         F = System(f, [x, y], [b, a])
-
+        @test nvariables(F) == 2
+        @test nparameters(F) == 2
+        @test variables(F) == [x, y]
+        @test parameters(F) == [b, a]
         show_F = """
         System of length 2
          2 variables: x, y
@@ -222,7 +233,8 @@ using HomotopyContinuation2.ModelKit
          3*a + x + 5*y + x^2 + (x + y)^3
          b + 2*x^2"""
         @test sprint(show, F) == show_F
-        @test ModelKit.degree(F) == [3, 2]
+        @test degrees(F) == [3, 2]
+
         T = ModelKit.compile(F)
         F2 = ModelKit.interpret(T)
         @test F == F2
@@ -236,6 +248,10 @@ using HomotopyContinuation2.ModelKit
         h = [x^2 + y + z + 2t, 4 * x^2 * z^2 * y + 4z - 6x * y * z^2]
         H = Homotopy(h, [x, y, z], t)
 
+        @test nvariables(H) == 3
+        @test nparameters(H) == 0
+        @test variables(H) == [x, y, z]
+        @test parameters(H) == []
         show_H = """
         Homotopy in t of length 2
          3 variables: x, y, z

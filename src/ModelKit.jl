@@ -1,29 +1,32 @@
-module ModelKit
+@reexport module ModelKit
+
+using OrderedCollections: OrderedDict
 
 export @var,
     @unique_var,
     Variable,
     Expression,
-    variables,
-    nvariables,
-    subs,
-    evaluate,
-    differentiate,
-    monomials,
-    rand_poly,
     coefficients,
-    exponents_coefficients,
-    expand,
-    System,
-    Homotopy,
-    evaluate!,
-    jacobian!,
-    evaluate_and_jacobian!,
-    diff_t!,
+    degree,
+    degrees,
+    differentiate,
+    dense_poly,
     evaluate,
-    jacobian,
-    evaluate_and_jacobian,
-    diff_t
+    expand,
+    exponents_coefficients,
+    expressions,
+    horner,
+    parameters,
+    nparameters,
+    nvariables,
+    monomials,
+    parameters,
+    subs,
+    rand_poly,
+    to_number,
+    variables,
+    System,
+    Homotopy
 
 import LinearAlgebra
 

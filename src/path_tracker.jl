@@ -349,6 +349,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
         state.cond_eg_start = κ
 
+        tracker.state.use_strict_β_τ = true
         state.endgame_started = true
     end
 

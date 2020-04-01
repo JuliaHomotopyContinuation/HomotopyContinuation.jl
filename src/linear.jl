@@ -507,9 +507,9 @@ end
 
 Compute the geodesic distance between `A` and `B` in the affine Grassmanian `Graff(k, n)`
 where `k = dim(A)` and `n` is the amebient dimension.
-This follows the derivation in [LKK19].
+This follows the derivation in [^LKK19].
 
-[LKK19]: $_LKK19.
+[^LKK19]: $_LKK19.
 """
 geodesic_distance(A::AffineSubspace, B::AffineSubspace) =
     geodesic_distance(A.intrinsic, B.intrinsic)
@@ -521,10 +521,10 @@ end
 """
     geodesic_svd(A::AffineSubspace, B::AffineSubspace)
 
-Computes the factors ``Q``, ``Θ`` and ``U`` from Corollary 4.3 in [LKK19].
+Computes the factors ``Q``, ``Θ`` and ``U`` from Corollary 4.3 in [^LKK19].
 These values are necessary to construct the geodesic between `A` and `B`.
 
-[LKK19]: $_LKK19
+[^LKK19]: $_LKK19
 """
 geodesic_svd(A::AffineSubspace, B::AffineSubspace) = geodesic_svd(A.intrinsic, B.intrinsic)
 function geodesic_svd(A::AffineIntrinsic, B::AffineIntrinsic)
@@ -563,9 +563,9 @@ end
 
 Returns the geodesic ``γ(t)`` connecting `A` and `B` in the Grassmanian ``Gr(k+1,n+1)``
 where ``k`` is the dimension of ``A`` and ``n`` is the ambient dimension.
-See also Corollary 4.3 in [LKK19].
+See also Corollary 4.3 in [^LKK19].
 
-[LKK19]: $_LKK19
+[^LKK19]: $_LKK19
 """
 geodesic(A::AffineSubspace, B::AffineSubspace) = geodesic(A.intrinsic, B.intrinsic)
 function geodesic(A::AffineIntrinsic, B::AffineIntrinsic)

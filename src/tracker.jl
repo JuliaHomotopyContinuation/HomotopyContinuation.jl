@@ -170,6 +170,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
     extended_prec::Bool
     used_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
+    use_strict_β_τ::Bool
 
     jacobian::Jacobian{M}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
@@ -209,6 +210,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     ω = 1.0
     τ = Inf
     norm_Δx₀ = NaN
+    use_strict_β_τ = false
     used_extended_prec = extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
@@ -231,6 +233,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
         extended_prec,
         used_extended_prec,
         norm,
+        use_strict_β_τ,
         jacobian,
         cond_J_ẋ,
         code,
@@ -399,7 +402,7 @@ function update_stepsize!(
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
         end
         Δs₂ = options.β_τ * τ
-        if dist_to_target(state.segment_stepper) < Δs₂
+        if state.use_strict_β_τ || dist_to_target(state.segment_stepper) < Δs₂
             Δs₂ = options.strict_β_τ * τ
         end
         Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
@@ -536,6 +539,7 @@ function init!(
     state.accuracy = eps()
     state.ω = 1.0
     state.used_extended_prec = state.extended_prec = false
+    state.use_strict_β_τ = false
     init!(norm, x)
     init!(jacobian)
     state.code = TrackerReturnCode.tracking
@@ -619,7 +623,7 @@ end
 function refine_current_solution!(tracker)
     @unpack homotopy, corrector, state, options = tracker
     @unpack x, t, jacobian, norm = state
-    
+
     extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
     extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
 end
