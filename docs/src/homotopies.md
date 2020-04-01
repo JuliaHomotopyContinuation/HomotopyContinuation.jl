@@ -44,6 +44,7 @@ dt!
 Base.size(::AbstractHomotopy)
 ```
 ### Optional
+The following methods provide their obvious fallback implementations.
 ```@docs
 evaluate_and_jacobian!(u, U, H::AbstractHomotopy, x, t, c=cache(H, x, t))
 evaluate_and_jacobian(H::AbstractHomotopy, x, t, c=cache(H, x, t))
