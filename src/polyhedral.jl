@@ -103,7 +103,7 @@ end
 Base.broadcastable(T::PolyhedralTracker) = Ref(T)
 
 function polyhedral(f::ModelKit.System)
-    supp_coeffs = ModelKit.exponents_coefficients.(f, Ref(variables(f)))
+    supp_coeffs = exponents_coefficients.(f, Ref(variables(f)))
     support = first.(supp_coeffs)
     target_coeffs = map(ci -> float.(ModelKit.to_number.(ci)), last.(supp_coeffs))
     start_coeffs =

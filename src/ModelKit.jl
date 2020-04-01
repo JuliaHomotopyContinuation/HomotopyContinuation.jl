@@ -1,19 +1,30 @@
 @reexport module ModelKit
 
+using OrderedCollections: OrderedDict
+
 export @var,
     @unique_var,
     Variable,
     Expression,
-    variables,
-    nvariables,
-    subs,
-    evaluate,
-    differentiate,
-    monomials,
-    rand_poly,
     coefficients,
-    exponents_coefficients,
+    degree,
+    degrees,
+    differentiate,
+    dense_poly,
+    evaluate,
     expand,
+    exponents_coefficients,
+    expressions,
+    horner,
+    parameters,
+    nparameters,
+    nvariables,
+    monomials,
+    parameters,
+    subs,
+    rand_poly,
+    to_number,
+    variables,
     System,
     Homotopy
 

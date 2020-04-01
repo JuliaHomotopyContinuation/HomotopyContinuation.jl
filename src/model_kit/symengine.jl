@@ -14,7 +14,18 @@ end
 """
     Expression <: Number
 
-Structure holdig a symbolic expression.
+A symbolic expression.
+
+```julia-repl
+julia> expr = (Variable(:x) + 1)^2
+(1 + x)^2
+
+julia> Expression(2)
+2
+
+julia> Expression(Variable(:x))
+x
+```
 """
 mutable struct Expression <: Number
     ptr::Ptr{Cvoid}
@@ -55,9 +66,54 @@ ExpressionRef(ex::Expression) = ExpressionRef(ex.ptr)
 ExpressionRef(x) = convert(ExpressionRef, x)
 
 """
-    Variable(s::Union{String,Symbol}) <: Number
+    Variable(name::Union{String,Symbol}, indices...) <: Number
 
-Structur representing a variable.
+A data structure representing a variable.
+
+```julia-repl
+julia> Variable(:a)
+a
+
+julia> Variable(:x, 1)
+x₁
+
+julia> Variable(:x, 10, 5)
+x₁₀₋₅
+```
+
+### Equality and ordering
+
+Variables are identified by their `name` and `indices`.
+That is, two variables are equal if and only if they have the same `name` and `indices`.
+
+```julia-repl
+julia> Variable(:a) == Variable(:a)
+true
+
+julia> Variable(:a, 1) == Variable(:a, 2)
+false
+```
+
+Similarly, variables are first ordered lexicographically by their name and then by their indices.
+```julia-repl
+julia> Variable(:a, 1) < Variable(:a, 2)
+true
+
+julia> Variable(:a, 1) < Variable(:b, 1)
+true
+
+julia> a = [Variable(:a, i, j) for i in 1:2, j in 1:2]
+2×2 Array{Variable,2}:
+ a₁₋₁  a₁₋₂
+ a₂₋₁  a₂₋₂
+
+julia> sort(vec(a))
+4-element Array{Variable,1}:
+ a₁₋₁
+ a₂₋₁
+ a₁₋₂
+ a₂₋₂
+```
 """
 struct Variable <: Number
     ex::Expression
@@ -375,8 +431,8 @@ function Base.getindex(s::ExpressionSet, n::Int)
     result
 end
 
-variables(ex::Variable) = [ex]
-function variables(ex::Basic)
+_variables(ex::Variable) = [ex]
+function _variables(ex::Expression)
     syms = ExpressionSet()
     ccall(
         (:basic_free_symbols, libsymengine),
@@ -610,6 +666,19 @@ function _numer_denom(x::Basic)
 end
 
 is_number(ex::Expression) = class(ex) in NUMBER_TYPES
+
+"""
+    to_number(x::Expression)
+
+Tries to unpack the `Expression` `x` to a native number type.
+
+```julia-repl
+julia> x = to_number(Expression(2))
+2
+
+julia> typeof(x)
+Int64
+"""
 function to_number(x::Basic)
     cls = class(x)
 
@@ -665,6 +734,8 @@ function free!(x::ExpressionMap)
     end
 end
 
+ExpressionMap(args...) = ExpressionMap(ExpressionMap(), args...)
+ExpressionMap(D::ExpressionMap) = D
 function ExpressionMap(dict::Dict)
     c = ExpressionMap()
     for (key, value) in dict
@@ -672,6 +743,23 @@ function ExpressionMap(dict::Dict)
     end
     return c
 end
+function ExpressionMap(
+    D::ExpressionMap,
+    (xs, ys)::Pair{<:AbstractArray{<:Basic},<:AbstractArray},
+    args...,
+)
+    size(xs) == size(ys) ||
+    throw(ArgumentError("Substitution arguments don't have the same size."))
+    for (x, y) in zip(xs, ys)
+        D[x] = y
+    end
+    ExpressionMap(D, args...)
+end
+function ExpressionMap(D::ExpressionMap, (x, y), args...)
+    D[Expression(x)] = Expression(y)
+    ExpressionMap(D, args...)
+end
+
 
 function Base.length(s::ExpressionMap)
     ccall((:mapbasicbasic_size, libsymengine), Int, (Ptr{Cvoid},), s.ptr)
@@ -703,26 +791,26 @@ function subs(ex::Basic, d::ExpressionMap)
     )
     return s
 end
-
-subs(ex::Basic, (k, v)::Pair{<:Basic,<:Number}) = subs(ex, k => Expression(v))
-function subs(ex::Basic, (k, v)::Pair{<:Basic,<:Basic})
-    s = Expression()
-    ccall(
-        (:basic_subs2, libsymengine),
-        Nothing,
-        (
-            Ref{Expression},
-            Ref{ExpressionRef},
-            Ref{ExpressionRef},
-            Ref{ExpressionRef},
-        ),
-        s,
-        ex,
-        k,
-        v,
-    )
-    return s
-end
+#
+# subs(ex::Basic, (k, v)::Pair{<:Basic,<:Number}) = subs(ex, k => Expression(v))
+# function subs(ex::Basic, (k, v)::Pair{<:Basic,<:Basic})
+#     s = Expression()
+#     ccall(
+#         (:basic_subs2, libsymengine),
+#         Nothing,
+#         (
+#             Ref{Expression},
+#             Ref{ExpressionRef},
+#             Ref{ExpressionRef},
+#             Ref{ExpressionRef},
+#         ),
+#         s,
+#         ex,
+#         k,
+#         v,
+#     )
+#     return s
+# end
 
 function cse(exprs::Vector{Expression})
     vec = ExprVec()

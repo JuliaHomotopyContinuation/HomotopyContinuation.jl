@@ -38,7 +38,7 @@ The macro supports indexing notation to create `Array`s of variables.
 
 ## Examples
 
-```julia
+```julia-repl
 julia> @var a b x[1:2] y[1:2,1:3]
 (a, b, Variable[x₁, x₂], Variable[y₁₋₁ y₁₋₂ y₁₋₃; y₂₋₁ y₂₋₂ y₂₋₃])
 
@@ -66,22 +66,24 @@ macro var(args...)
 end
 
 """
-    @unique_var(args...)
+    @unique_var variable1 variable2
 
-Declare variables and automatically create the variable bindings to the given names.
-This will change the names of the variables to ensure uniqueness.
+This is similar to [`@var`](@ref) with the only difference that the macro automatically
+changes the names of the variables to ensure uniqueness. However, the binding is still
+to the declared name.
+This is useful to ensure that there are no name collisions.
 
 ## Examples
 
-```julia
+```julia-repl
 julia> @unique_var a b
-(##a#591, ##b#592)
+(a#591, b#592)
 
 julia> a
-##a#591
+a#591
 
 julia> b
-##b#592
+b#592
 ```
 """
 macro unique_var(args...)
@@ -96,7 +98,12 @@ end
 
 function buildvar(var; unique::Bool = false)
     if isa(var, Symbol)
-        varname = unique ? gensym(var) : var
+        if unique
+            # drop the first two ## from the gensym var
+            varname = Symbol(String(gensym(var))[3:end])
+        else
+            varname = var
+        end
         var, :($(esc(var)) = Variable($"$varname"))
     else
         isa(var, Expr) || error("Expected $var to be a variable name")
@@ -104,7 +111,11 @@ function buildvar(var; unique::Bool = false)
         error("Expected $var to be of the form varname[idxset]")
         (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
         varname = var.args[1]
-        prefix = unique ? string(gensym(varname)) : string(varname)
+        if unique
+            prefix = String(gensym(varname))[3:end]
+        else
+            prefix = string(varname)
+        end
         varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
     end
 end
@@ -153,87 +164,102 @@ Base.transpose(expr::Basic) = expr
 Base.broadcastable(v::Basic) = Ref(v)
 
 """
-    variables(expr::Expression, parameters = Variable[])
-    variables(exprs::AbstractVector{<:Expression}, parameters = Variable[])
+    variables(expr::Expression; parameters = Variable[])
+    variables(exprs::AbstractVector{Expression}; parameters = Variable[])
 
-Obtain all variables used in the given expression as an `Set`.
-"""
-function variables(exprs::AbstractVector{<:Basic})
-    S = Set{Variable}()
-    for expr in exprs
-        union!(S, variables(expr))
-    end
-    sort!(collect(S))
-end
-function variables(exprs::Union{Basic,AbstractVector{<:Basic}}, params)
-    setdiff!(variables(exprs), params)
-end
-
-"""
-    nvariables(expr::Expression, parameters = Variable[])
-    nvariables(exprs::AbstractVector{<:Expression}, parameters = Variable[])
-
-Obtain the number of variables used in the given expression.
-"""
-nvariables(E::Union{Expression,AbstractVector{<:Expression}}, p = Variable[]) =
-    length(variables(E, p))
-
-
-"""
-    subs(expr::Expression, subs::Pair{Variable,<:Expression}...)
-    subs(expr::Expression, subs::Pair{AbstractArray{<:Variable},AbstractArray{<:Expression}}...)
-
-Substitute into the given expression.
+Obtain all variables used in the given expression up to the ones declared in `parameters`.
 
 ## Example
 
+```julia-repl
+julia> @var x y a;
+julia> variables(x^2 + y)
+2-element Array{Variable,1}:
+ x
+ y
+
+julia> variables([x^2 + a, y]; parameters = [a])
+2-element Array{Variable,1}:
+ x
+ y
 ```
-@var x y z
+"""
+variables(expr::Basic; kwargs...) = variables([expr]; kwargs...)
+function variables(exprs::AbstractVector{<:Basic}; parameters = Variable[])
+    S = Set{Variable}()
+    for expr in exprs
+        union!(S, _variables(expr))
+    end
+    setdiff!(sort!(collect(S)), parameters)
+end
+
+"""
+    nvariables(expr::Expression; parameters = Variable[])
+    nvariables(exprs::AbstractVector{Expression}; parameters = Variable[])
+
+Obtain the number of variables used in the given expression not counting the the ones
+declared in `parameters`.
+"""
+nvariables(exprs::Basic; kwargs...) = length(variables(exprs; kwargs...))
+nvariables(exprs::AbstractVector{<:Basic}; kwargs...) = length(variables(exprs; kwargs...))
+
+"""
+    subs(expr::Expression, subsitutions::Pair...)
+    subs(exprs::AbstractVector{<:Expression}, subsitutions::Pair...)
+
+Apply the given substitutions to the given expressions.
+
+## Examples
+```julia-repl
+@var x y
 
 julia> subs(x^2, x => y)
 y ^ 2
 
 julia> subs(x * y, [x,y] => [x+2,y+2])
 (x + 2) * (y + 2)
+
+julia> subs([x + y, x^2], x => y + 2, y => x + 2)
+2-element Array{Expression,1}:
+ 4 + x + y
+ (2 + y)^2
+
+# You can also use the callable syntax
+julia> (x * y)([x,y] => [x+2,y+2])
+ (x + 2) * (y + 2)
 ```
 """
-subs(ex::Basic, args...) = subs(ex, ExpressionMap(), args...)
-subs(ex::Basic, D::Dict) = subs(ex, ExpressionMap(D))
-function subs(
-    ex::Basic,
-    D::ExpressionMap,
-    (xs, ys)::Pair{<:AbstractArray{<:Basic},<:AbstractArray},
-    args...,
-)
-    size(xs) == size(ys) ||
-    throw(ArgumentError("Substitution arguments don't have the same size."))
-    for (x, y) in zip(xs, ys)
-        D[x] = y
-    end
-    subs(ex, D, args...)
-end
-function subs(ex::Basic, D::ExpressionMap, (x, y), args...)
-    D[Expression(x)] = Expression(y)
-    subs(ex, D, args...)
-end
-subs(exs::AbstractArray{<:Basic}, args...) = map(ex -> subs(ex, args...), exs)
+subs(ex::Basic, args...) = subs(ex, ExpressionMap(args...))
+subs(exs::AbstractArray{<:Basic}, args...) = subs.(exs, Ref(ExpressionMap(args...)))
 
 """
     evaluate(expr::Expression, subs...)
-    evaluate(expr::AbstractArray{<:Expression}, subs...)
+    evaluate(expr::AbstractArray{Expression}, subs...)
 
 Evaluate the given expression.
 
 ## Example
 
-```
-@var x y
+```julia-repl
+julia> @var x y;
 
 julia> evaluate(x^2, x => 2)
 4
 
 julia> evaluate(x * y, [x,y] => [2, 3])
 6
+
+julia> evaluate([x^2, x * y], [x,y] => [2, 3])
+2-element Array{Int64,1}:
+ 4
+ 6
+
+# You can also use the callable syntax
+julia> [x^2, x * y]([x,y] => [2, 3])
+2-element Array{Int64,1}:
+ 4
+ 6
+```
 """
 function evaluate(expr::AbstractArray{<:Basic}, args...)
     out = map(to_number, subs(expr, args...))
@@ -247,21 +273,29 @@ evaluate(expr::Basic, args...) = to_number(subs(expr, args...))
 (f::Union{Basic,AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
 
 """
-    evaluate!(u, expr::AbstractArray{<:Expression}, subs...)
+    evaluate!(u, expr::AbstractArray{Expression}, subs...)
 
-Inplace for of [`evaluate`](@ref).
+Inplace form of [`evaluate`](@ref).
 """
 function evaluate!(u::AbstractArray, expr::AbstractArray{<:Basic}, args...)
     map!(to_number, u, subs(expr, args...))
 end
 
 """
-    differentiate(expr::Expression, var::Variable)
-    differentiate(expr::Expression, var::Vector{Variable})
-    differentiate(expr::::Vector{<:Expression}, var::Variable, k = 1)
-    differentiate(expr::Vector{<:Expression}, var::Vector{Variable})
+    differentiate(expr::Expression, var::Variable, k = 1)
+    differentiate(expr::AbstractVector{Expression}, var::Variable, k = 1)
 
-Compute the derivative of `expr` with respect to the given variable `var`.
+Compute the `k`-th derivative of `expr` with respect to the given variable `var`.
+
+    differentiate(expr::Expression, vars::AbstractVector{Variable})
+
+Compute the partial derivatives of `expr` with respect to the given variable variables `vars`.
+Retuns a `Vector` containing the partial derivatives.
+
+    differentiate(exprs::AbstractVector{Expression}, vars::AbstractVector{Variable})
+
+Compute the partial derivatives of `exprs` with respect to the given variable variables `vars`.
+Returns a `Matrix` where the each row contains the partial derivatives for a given expression.
 """
 function differentiate(expr::Basic, vars::AbstractVector{Variable})
     [differentiate(expr, v) for v in vars]
@@ -274,9 +308,9 @@ function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Vari
 end
 
 """
-    monomials(vars::Vector{<:Variable}, d; homogeneous::Bool = false)
+    monomials(variables::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
 
-Create all monomials of a given degree.
+Create all monomials of a given degree in the given `variables`.
 
 ```
 julia> @var x y
@@ -284,19 +318,19 @@ julia> @var x y
 
 julia> monomials([x,y], 2)
 6-element Array{Expression,1}:
-   1
-   x
-   y
- x^2
- x*y
- y^2
+x^2
+x*y
+y^2
+  x
+  y
+  1
 
 julia> monomials([x,y], 2; homogeneous = true)
 3-element Array{Operation,1}:
  x ^ 2
  x * y
  y ^ 2
- ```
+```
 """
 function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
     n = length(vars)
@@ -311,7 +345,58 @@ function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool
         prod(i -> vars[i]^exp[i], 1:n)
     end
 end
+function td_order(x, y)
+    sx = sum(x)
+    sy = sum(y)
+    sx == sy ? x > y : sx > sy
+end
 
+"""
+    dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+
+Create a dense polynomial of degree `d` in the given variables `variables` where
+each coefficient is a parameter. Returns a tuple with the first argument being the polynomial
+and the second the parameters.
+
+```julia-repl
+julia> @var x y;
+
+julia> f, c = dense_poly([x, y], 2);
+
+julia> f
+c#262₁ + x*c#262₂ + x^2*c#262₄ + y*c#262₃ + y^2*c#262₆ + x*y*c#262₅
+
+julia> c
+6-element Array{Variable,1}:
+ c#262₁
+ c#262₂
+ c#262₃
+ c#262₄
+ c#262₅
+ c#262₆
+```
+"""
+function dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+    M = monomials(vars, d; homogeneous = homogeneous)
+    @unique_var c[1:length(M)]
+    sum(c .* M), c
+end
+
+
+"""
+    rand_poly(T = ComplexF64, vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+
+Create a random dense polynomial of degree `d` in the given variables `variables`.
+Each coefficient is sampled independently via `randn(T)`.
+
+```julia-repl
+julia> @var x y;
+
+julia> rand_poly(Float64, [x, y], 2)
+0.788764085756728 - 0.534507647623108*x - 0.778441366874946*y -
+ 0.128891763280247*x*y + 0.878962738754971*x^2 + 0.550480741774464*y^2
+```
+"""
 function rand_poly(vars::AbstractVector{Variable}, d::Integer; kwargs...)
     rand_poly(ComplexF64, vars, d; kwargs...)
 end
@@ -320,11 +405,6 @@ function rand_poly(T, vars::AbstractVector{Variable}, d::Integer; homogeneous::B
     sum(randn(T, length(M)) .* M)
 end
 
-function td_order(x, y)
-    sx = sum(x)
-    sy = sum(y)
-    sx == sy ? x > y : sx < sy
-end
 
 """
     expand(e::Expression)
@@ -343,7 +423,7 @@ expand(e::Basic) = symengine_expand(e)
 
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
-    dict = Dict{Vector{Int},Expression}()
+    dict = OrderedDict{Vector{Int},Expression}()
 
     if class(expr) == :Add
         for op in args(expr)
@@ -439,44 +519,34 @@ function exponents_coefficients(
     D = to_dict(f, vars)
     # make exponents to matrix
     m = length(D)
+    E = collect(keys(D))
+    perm = sortperm(E; lt = td_order)
+    permute!(E, perm)
     n = length(vars)
     M = zeros(Int, n, m)
-    for (j, E) in enumerate(keys(D))
-        for (i, dᵢ) in enumerate(E)
+    for (j, Eⱼ) in enumerate(E)
+        for (i, dᵢ) in enumerate(Eⱼ)
             M[i, j] = dᵢ
         end
     end
-    coeffs = collect(values(D))
+    coeffs = permute!(collect(values(D)), perm)
     M, coeffs
 end
 
 """
-    coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
+    coefficients(f::Expression, vars::AbstractVector{Variable})
 
 Return all coefficients of the given polynomial `f` for the given variables `vars`.
+This assumes that the expression `f` is already expanded, e.g., with [`expand`](@ref).
 """
-function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::Bool = false)
-    expanded || (f = expand(f))
-    collect(values(to_dict(f, vars)))
+function coefficients(f::Expression, vars::AbstractVector{Variable})
+    D = to_dict(f, vars)
+    m = length(D)
+    E = collect(keys(D))
+    perm = sortperm(E; lt = td_order)
+    permute!(collect(values(D)), perm)
 end
 
-"""
-    degree(f::AbstractVector{Expression}, vars = variables(f); expanded = false)
-
-Compute the degrees of the expressions `f` in `vars`.
-Unless `expanded` is `true` the expressions are first expanded.
-"""
-function degree(
-    f::AbstractVector{Expression},
-    vars::AbstractVector{Variable} = variables(f);
-    expanded::Bool = false,
-)
-    if !expanded
-        f = ModelKit.expand.(f)
-    end
-    dicts = ModelKit.to_dict.(f, Ref(vars))
-    maximum.(sum, keys.(dicts))
-end
 
 """
     degree(f::Expression, vars = variables(f); expanded = false)
@@ -495,6 +565,25 @@ function degree(
     dicts = ModelKit.to_dict(f, vars)
     maximum(sum, keys(dicts))
 end
+
+"""
+    degrees(f::AbstractVector{Expression}, vars = variables(f); expanded = false)
+
+Compute the degrees of the expressions `f` in `vars`.
+Unless `expanded` is `true` the expressions are first expanded.
+"""
+function degrees(
+    f::AbstractVector{Expression},
+    vars::AbstractVector{Variable} = variables(f);
+    expanded::Bool = false,
+)
+    if !expanded
+        f = ModelKit.expand.(f)
+    end
+    dicts = ModelKit.to_dict.(f, Ref(vars))
+    maximum.(sum, keys.(dicts))
+end
+
 
 function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
     m = size(M)[1]
@@ -524,12 +613,12 @@ julia> @var u v c[1:3]
 julia> f = c[1] + c[2] * v + c[3] * u^2 * v^2 + c[3]u^3 * v
 c₁ + v*c₂ + u^2*v^2*c₃ + u^3*v*c₃
 
-julia> ModelKit.horner(f)
+julia> horner(f)
 c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
 function horner(f::Expression, vars = variables(f))
-    M, coeffs = ModelKit.exponents_coefficients(f, vars)
+    M, coeffs = exponents_coefficients(f, vars)
     multivariate_horner(M, coeffs, vars)
 end
 
@@ -537,8 +626,8 @@ function horner(coeffs::AbstractVector{Expression}, var::Variable)
     d = length(coeffs) - 1
     h = copy(coeffs[d+1])
     @inbounds for k = d:-1:1
-        ModelKit.mul!(h, h, var)
-        ModelKit.add!(h, h, coeffs[k])
+        mul!(h, h, var)
+        add!(h, h, coeffs[k])
     end
     h
 end
@@ -652,29 +741,48 @@ function check_vars_params(f, vars, params)
 end
 
 """
-    System(exprs, vars, parameters = Variable[])
+    System(exprs::AbstractVector{Expression};
+                variables = variables(exprssion),
+                parameters = Variable[])
+    System(exprs, variables; parameters = Variable[])
 
-Create a system from the given `exprs`. `vars` are the given variables and determines
-the variable ordering.
+Create a system from the given `Expression`s `exprs`.
+The `variables` determine also the variable ordering.
+The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 
-## Example
-```julia
+## Examples
+```julia-repl
 julia> @var x y;
-julia> H = System([x^2, y^2], [y, x]);
-julia> H([2, 3], 0)
+julia> F = System([x^2, y^2]; variables = [y, x])
+System of length 2
+ 2 variables: y, x
+
+ x^2
+ y^2
+
+# Systems are callable.
+# This evaluates F at y=2 and x=3
+julia> F([2, 3])
 2-element Array{Int64,1}:
- 4
  9
+ 4
 ```
 
-It is also possible to declare additional variables.
-```julia
-julia> @var x y t a b;
-julia> H = Homotopy([x^2 + a, y^2 + b^2], [x, y], [a, b]);
-julia> H([2, 3], [5, 2])
-2-element Array{Int64,1}:
- 9
- 13
+It is also possible to declare parameters.
+```julia-repl
+julia> @var x y a b;
+julia> F = System([x^2 + a, y^2 + b]; variables = [y, x], parameters = [a, b])
+System of length 2
+ 2 variables: y, x
+ 2 parameters: a, b
+
+ a + x^2
+ b + y^2
+
+julia> F([2, 3], [5, -2])
+ 2-element Array{Int64,1}:
+  14
+   2
 ```
 """
 struct System
@@ -693,7 +801,7 @@ struct System
 end
 
 function System(
-    exprs::Vector{<:Expression};
+    exprs::AbstractVector{Expression};
     variables::Vector{Variable} = variables(exprs),
     parameters::Vector{Variable} = Variable[],
 )
@@ -701,9 +809,16 @@ function System(
 end
 
 function System(
-    exprs::Vector{<:Expression},
-    variables::Vector{Variable},
+    exprs::AbstractVector{Expression},
+    variables::Vector{Variable};
     parameters::Vector{Variable} = Variable[],
+)
+    System(convert(Vector{Expression}, exprs), variables, parameters)
+end
+function System(
+    exprs::AbstractVector{Expression},
+    variables::Vector{Variable},
+    parameters::Vector{Variable},
 )
     System(convert(Vector{Expression}, exprs), variables, parameters)
 end
@@ -742,19 +857,55 @@ end
 
 function Base.:(==)(F::System, G::System)
     F.expressions == G.expressions &&
-    F.variables == G.variables && F.parameters == G.parameters
+    F.variables == G.variables &&
+    F.parameters == G.parameters
 end
 
 Base.size(F::System) = (length(F.expressions), length(F.variables))
 Base.size(F::System, i::Integer) = size(F)[i]
 Base.length(F::System) = length(F.expressions)
+
+"""
+    nvariables(F::System)
+
+Returns the number of variables of the given system `F`.
+"""
 nvariables(F::System) = length(F.variables)
+
+"""
+    nparameters(F::System)
+
+Returns the number of parameters of the given system `F`.
+"""
 nparameters(F::System) = length(F.parameters)
 
+"""
+    expressions(F::System)
+
+Returns the expressions of the given system `F`.
+"""
+expressions(F::System) = F.expressions
+
+"""
+    variables(F::System)
+
+Returns the variables of the given system `F`.
+"""
 variables(F::System) = F.variables
+
+"""
+    parameters(F::System)
+
+Returns the parameters of the given system `F`.
+"""
 parameters(F::System) = F.parameters
 
-degree(F::System) = degree(F.expressions, F.variables)
+"""
+    degrees(F::System)
+
+Return the degrees of the given system.
+"""
+degrees(F::System) = degrees(F.expressions, F.variables)
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
 
@@ -779,20 +930,27 @@ Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
 Base.copy(F::System) = Base.deepcopy(F)
 
 
-
 ##############
 ## Homotopy ##
 ##############
 """
     Homotopy(exprs, vars, t, parameters = Variable[])
 
-Create a homotopy from the given `exprs`. `vars` are the given variables and determines
-the variable ordering, `t` is the dedicated variable along which is "homotopied".
+Create a homotopy `H(vars,t)` from the given expressions `exprs` where `vars` are the given
+variables and `t` is the dedicated variable parameterizing the family of systems.
+The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 
 ## Example
 ```julia
 julia> @var x y t;
-julia> H = Homotopy([x + t, y + 2t], [y, x], t);
+
+julia> H = Homotopy([x + t, y + 2t], [y, x], t)
+Homotopy in t of length 2
+ 2 variables: y, x
+
+ t + x
+ 2*t + y
+
 julia> H([2, 3], 0)
 2-element Array{Int64,1}:
  3
@@ -808,7 +966,13 @@ julia> H([2, 3], 1)
 It is also possible to declare additional variables.
 ```julia
 julia> @var x y t a b;
-julia> H = Homotopy([x^2 + t*a, y^2 + t*b], [x, y], t, [a, b]);
+julia> H = Homotopy([x^2 + t*a, y^2 + t*b], [x, y], t, [a, b])
+Homotopy in t of length 2
+ 2 variables: x, y
+ 2 parameters: a, b
+
+ a*t + x^2
+ b*t + y^2
 julia> H([2, 3], 1, [5, 2])
 2-element Array{Int64,1}:
  9
@@ -833,9 +997,9 @@ struct Homotopy
 end
 
 function Homotopy(
-    exprs::Vector{<:Expression},
+    exprs::AbstractVector{Expression},
     variables::Vector{Variable},
-    t::Variable,
+    t::Variable;
     parameters::Vector{Variable} = Variable[],
 )
     Homotopy(convert(Vector{Expression}, exprs), variables, t, parameters)
@@ -873,9 +1037,45 @@ end
 
 function Base.:(==)(H::Homotopy, G::Homotopy)
     H.expressions == G.expressions &&
-    H.variables == G.variables && H.parameters == G.parameters
+    H.variables == G.variables &&
+    H.parameters == G.parameters
 end
 
 Base.size(H::Homotopy) = (length(H.expressions), length(H.variables))
 Base.size(H::Homotopy, i::Integer) = size(H)[i]
 Base.length(H::Homotopy) = length(H.expressions)
+
+"""
+    nvariables(H::Homotopy)
+
+Returns the number of variables of the given homotopy `H`.
+"""
+nvariables(H::Homotopy) = length(H.variables)
+
+"""
+    nparameters(H::Homotopy)
+
+Returns the number of parameters of the given homotopy `H`.
+"""
+nparameters(H::Homotopy) = length(H.parameters)
+
+"""
+    expressions(H::Homotopy)
+
+Returns the expressions of the given homotopy `H`.
+"""
+expressions(H::Homotopy) = H.expressions
+
+"""
+    variables(H::Homotopy)
+
+Returns the variables of the given homotopy `H`.
+"""
+variables(H::Homotopy) = H.variables
+
+"""
+    parameters(H::Homotopy)
+
+Returns the parameters of the given homotopy `H`.
+"""
+parameters(H::Homotopy) = H.parameters
