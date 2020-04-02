@@ -1,7 +1,5 @@
 @reexport module ModelKit
 
-using OrderedCollections: OrderedDict
-
 export @var,
     @unique_var,
     Variable,

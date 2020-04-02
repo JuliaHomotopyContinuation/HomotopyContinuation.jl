@@ -423,7 +423,7 @@ expand(e::Basic) = symengine_expand(e)
 
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
-    dict = OrderedDict{Vector{Int},Expression}()
+    dict = Dict{Vector{Int},Expression}()
 
     if class(expr) == :Add
         for op in args(expr)
