@@ -151,7 +151,7 @@ end
 PathTrackerState(npolynomials::Integer, x::AbstractVector) = PathTrackerState(;
     val = Valuation(length(x)),
     row_scaling = zeros(npolynomials),
-    col_scaling = zeros(npolynomials),
+    col_scaling = zeros(length(x)),
     solution = copy(x),
     prediction = copy(x),
     last_point = copy(x),
@@ -341,7 +341,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
          which is recorded now.
         =#
         state.col_scaling .= weights(tracker.state.norm)
-        skeel_row_scaling!(
+        row_scaling!(
             state.row_scaling,
             jacobian(tracker.state.jacobian),
             state.col_scaling,

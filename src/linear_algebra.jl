@@ -192,7 +192,7 @@ end
             normu += abs2(x[i])
         end
         if iszero(normu)
-            return zero(ξ1/normu)
+            return zero(ξ1 / normu)
         end
         normu = sqrt(normu)
         ν = copysign(normu, real(ξ1))
@@ -202,7 +202,7 @@ end
             @fastmath x[i] = x[i] / ξ1
         end
     end
-    ξ1/ν
+    ξ1 / ν
 end
 
 # apply reflector from left
@@ -213,15 +213,15 @@ end
             # dot
             vAj = A[1, j]
             for i = 2:m
-                vAj += x[i]'*A[i, j]
+                vAj += x[i]' * A[i, j]
             end
 
-            vAj = conj(τ)*vAj
+            vAj = conj(τ) * vAj
 
             # ger
             A[1, j] -= vAj
             for i = 2:m
-                A[i, j] -= x[i]*vAj
+                A[i, j] -= x[i] * vAj
             end
         end
     end
@@ -232,11 +232,11 @@ function qr!(qr::LA.QR{T}) where {T}
     A = qr.factors
     τ = qr.τ
     m, n = size(A)
-    for k = 1:min(m - 1 + !(T<:Real), n)
+    for k = 1:min(m - 1 + !(T <: Real), n)
         x = view(A, k:m, k)
         τk = reflector!(x)
         τ[k] = τk
-        reflectorApply!(x, τk, view(A, k:m, k + 1:n))
+        reflectorApply!(x, τk, view(A, k:m, k+1:n))
     end
     qr
 end
@@ -352,25 +352,25 @@ function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
     mB = length(b)
     Afactors = A.factors
     @inbounds begin
-        for k = 1:min(mA,nA)
+        for k = 1:min(mA, nA)
             vBj = b[k]
             for i = k+1:mB
-                vBj += conj(Afactors[i,k])*b[i]
+                vBj += conj(Afactors[i, k]) * b[i]
             end
-            vBj = conj(A.τ[k])*vBj
+            vBj = conj(A.τ[k]) * vBj
             b[k] -= vBj
             for i = k+1:mB
-                b[i] -= Afactors[i,k]*vBj
+                b[i] -= Afactors[i, k] * vBj
             end
         end
     end
     b
 end
-function qr_ldiv!(x, QR::LA.QR, b::AbstractVector) where T
+function qr_ldiv!(x, QR::LA.QR, b::AbstractVector) where {T}
     # overwrites b
     # assumes QR is a tall matrix
     lmul_Q_adj!(QR, b)
-    @inbounds for i in 1:length(x)
+    @inbounds for i = 1:length(x)
         x[i] = b[i]
     end
     ldiv_upper!(QR.factors, x)
@@ -434,6 +434,23 @@ function skeel_row_scaling!(W::MatrixWorkspace, c::AbstractVector{<:Real})
     W
 end
 
+function row_scaling!(
+    d::AbstractVector{<:Real},
+    WS::MatrixWorkspace,
+    c::AbstractVector{<:Real},
+)
+    m, n = size(WS)
+    if m == n
+        skeel_row_scaling!(d, WS.A, d)
+    else
+        d .= 1.0
+    end
+    d
+end
+
+
+
+
 """
     apply_row_scaling!(W::MatrixWorkspace)
 
@@ -459,9 +476,9 @@ function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
     m, n = size(A)
     @boundscheck m == length(b) == length(r) && n == length(x)
     r .= 0
-    @inbounds for j = 1:m
+    @inbounds for j = 1:n
         x_j = x[j]
-        for i = 1:n
+        for i = 1:m
             r[i] += A[i, j] * x_j
         end
     end
@@ -649,7 +666,8 @@ function LA.cond(
     d_l::Union{Nothing,Vector{<:Real}} = nothing,
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
-    if size(WS) == (1, 1)
+    m, n = size(WS)
+    if m == n == 1
         if isa(d_l, Nothing) && isa(d_r, Nothing)
             inv(abs(WS.A[1, 1]))
         elseif isa(d_l, Nothing)
@@ -659,6 +677,15 @@ function LA.cond(
         else
             inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
         end
+    elseif m > n
+        WS.factorized[] || factorize!(WS)
+        rmax, rmin = -Inf, Inf
+        for i = 1:n
+            rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
+            rmax = max(rmax, rᵢ)
+            rmin = min(rmin, rᵢ)
+        end
+        rmax / rmin
     else
         inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)
     end
