@@ -1,5 +1,3 @@
-export Expression, Variable
-
 using SymEngine_jll: libsymengine
 
 function __init__()

@@ -1,125 +1,146 @@
-export compile
-
 #####################
 ## CompiledSystem  ##
 #####################
-const TSYSTEM_TABLE =
-    Dict{UInt,Vector{Tuple{Vector{Expression},Vector{Variable},Vector{Variable}}}}()
+const TSYSTEM_TABLE = Dict{UInt,Vector{System}}()
 
 struct CompiledSystem{HI}
     nexpressions::Int
-    variables::Vector{Symbol}
-    parameters::Vector{Symbol}
+    nvariables::Int
+    nparameters::Int
+    system::System
 end
 
-function CompiledSystem(
-    exprs::Vector{Expression},
-    var_order::Vector{Variable},
-    param_order::Vector{Variable} = Variable[],
-)
-    val = (exprs, var_order, param_order)
-    h = hash(val)
+function CompiledSystem(F::System)
+    n = length(F)
+    nvars = nvariables(F)
+    nparams = nparameters(F)
 
-    n = length(exprs)
-    vars = Symbol.(var_order)
-    params = Symbol.(param_order)
-
+    # We substitute all variable and parameter names away such that two systems
+    # compile to the same code independently of the names
+    @var _x_[1:nvars] _p_[1:nparams]
+    D = ExpressionMap()
+    for (x, y) in zip(variables(F), _x_)
+        D[x] = y
+    end
+    for (x, y) in zip(parameters(F), _p_)
+        D[x] = y
+    end
+    cleard_exprs = subs(expressions(F), D)
+    sys = System(cleard_exprs, _x_, _p_)
+    h = hash(cleard_exprs)
+    k = 0
     if haskey(TSYSTEM_TABLE, h)
         # check that it is identical
         for (i, vi) in enumerate(TSYSTEM_TABLE[h])
-            if vi == val
-                return CompiledSystem{(h, i)}(n, vars, params)
+            if vi == sys
+                k = i
+                break
             end
         end
-        push!(TSYSTEM_TABLE[h], val)
-        return CompiledSystem{(h, length(TSYSTEM_TABLE[h]))}(n, vars, params)
+        if k == 0
+            push!(TSYSTEM_TABLE[h], sys)
+            k = length(TSYSTEM_TABLE[h])
+        end
     else
-        TSYSTEM_TABLE[h] = [val]
-        return CompiledSystem{(h, 1)}(n, vars, params)
+        k = 1
+        TSYSTEM_TABLE[h] = [sys]
     end
+    return CompiledSystem{(h, k)}(n, nvars, nparams, F)
 end
 
 function Base.show(io::IO, TS::CompiledSystem)
     print(io, "Compiled: ")
-    show(io, interpret(TS))
+    show(io, TS.system)
 end
 
-interpret(TS::CompiledSystem) = interpret(typeof(TS))
-interpret(::Type{CompiledSystem{HI}}) where {HI} =
-    System(TSYSTEM_TABLE[first(HI)][last(HI)]...)
+interpret(TS::CompiledSystem) = TS.system
+interpret(::Type{CompiledSystem{HI}}) where {HI} = TSYSTEM_TABLE[first(HI)][last(HI)]
 
-Base.size(CS::CompiledSystem) = (CS.nexpressions, length(CS.variables))
+Base.size(CS::CompiledSystem) = (CS.nexpressions, CS.nvariables)
 Base.size(CS::CompiledSystem, i::Integer) = size(CS)[i]
 Base.length(CS::CompiledSystem) = CS.nexpressions
-nparameters(CS::CompiledSystem) = length(CS.parameters)
-nvariables(CS::CompiledSystem) = length(CS.variables)
+nparameters(CS::CompiledSystem) = CS.nparameters
+nvariables(CS::CompiledSystem) = CS.nvariables
 
 ######################
 ## CompiledHomotopy ##
 ######################
 
-const THOMOTOPY_TABLE =
-    Dict{UInt,Vector{Tuple{Vector{Expression},Vector{Variable},Variable,Vector{Variable}}}}()
+const THOMOTOPY_TABLE = Dict{UInt,Vector{Homotopy}}()
 
 struct CompiledHomotopy{HI}
     nexpressions::Int
-    variables::Vector{Symbol}
-    parameters::Vector{Symbol}
+    nvariables::Int
+    nparameters::Int
+    homotopy::Homotopy
 end
 
-function CompiledHomotopy(
-    exprs::Vector{<:Expression},
-    var_order::AbstractVector{<:Variable},
-    t::Variable,
-    param_order::AbstractVector{<:Variable} = Variable[],
-)
-    val = (exprs, var_order, t, param_order)
-    h = hash(val)
 
-    n = length(exprs)
-    vars = Symbol.(var_order)
-    params = Symbol.(param_order)
+function CompiledHomotopy(H::Homotopy)
+    n = length(H)
+    nvars = nvariables(H)
+    nparams = nparameters(H)
 
+    # We substitute all variable and parameter names away such that two homotopies
+    # compile to the same code independently of the names
+    @var _x_[1:nvars] _t_ _p_[1:nparams]
+    D = ExpressionMap()
+    for (x, y) in zip(variables(H), _x_)
+        D[x] = y
+    end
+    for (x, y) in zip(parameters(H), _p_)
+        D[x] = y
+    end
+    D[H.t] = _t_
+    cleard_exprs = subs(expressions(H), D)
+    homotopy = Homotopy(cleard_exprs, _x_, _t_, _p_)
+    h = hash(cleard_exprs)
+
+    k = 0
     if haskey(THOMOTOPY_TABLE, h)
         # check that it is identical
         for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
-            if vi == val
-                return CompiledHomotopy{(h, i)}(n, vars, params)
+            if vi == homotopy
+                k = 1
+                break
             end
         end
-        push!(THOMOTOPY_TABLE[h], val)
-        return CompiledHomotopy{(h, length(TSYSTEM_TABLE[h]))}(n, vars, params)
+        if k == 0
+            push!(THOMOTOPY_TABLE[h], homotopy)
+            k = 1
+        end
     else
-        THOMOTOPY_TABLE[h] = [val]
-        return CompiledHomotopy{(h, 1)}(n, vars, params)
+        k = 1
+        THOMOTOPY_TABLE[h] = [homotopy]
     end
+    return CompiledHomotopy{(h, 1)}(n, nvars, nparams, H)
 end
 
-Base.size(CH::CompiledHomotopy) = (CH.nexpressions, length(CH.variables))
-Base.size(CS::CompiledHomotopy, i::Integer) = size(CS)[i]
+Base.size(CH::CompiledHomotopy) = (CH.nexpressions, CH.nvariables)
+Base.size(CH::CompiledHomotopy, i::Integer) = size(CH)[i]
 Base.length(CH::CompiledHomotopy) = CH.nexpressions
-nparameters(CH::CompiledHomotopy) = length(CH.parameters)
-nvariables(CH::CompiledHomotopy) = length(CH.variables)
+nparameters(CH::CompiledHomotopy) = CH.nparameters
+nvariables(CH::CompiledHomotopy) = CH.nvariables
 
 function Base.show(io::IO, TH::CompiledHomotopy)
     print(io, "Compiled: ")
-    show(io, interpret(TH))
+    show(io, TH.homotopy)
 end
 
-interpret(TH::CompiledHomotopy) = interpret(typeof(TH))
-interpret(::Type{CompiledHomotopy{HI}}) where {HI} =
-    Homotopy(THOMOTOPY_TABLE[first(HI)][last(HI)]...)
+interpret(CH::CompiledHomotopy) = CH.homotopy
+interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][last(HI)]
 
 """
     compile(F::System)
 
 Compile the given system. Returns a `CompiledSystem`.
+
     compile(H::Homotopy)
 
 Compile the given homotopy. Returns a `CompiledHomotopy`.
 """
-compile(F::System) = CompiledSystem(F.expressions, F.variables, F.parameters)
-compile(H::Homotopy) = CompiledHomotopy(H.expressions, H.variables, H.t, H.parameters)
+compile(F::System) = CompiledSystem(F)
+compile(H::Homotopy) = CompiledHomotopy(H)
 
 #############
 ## CODEGEN ##
@@ -277,13 +298,13 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx,
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         for k = 1:dx
-            diff_map[v, k] = :($(Symbol(:dx,k))[$i])
+            diff_map[v, k] = :($(Symbol(:dx, k))[$i])
         end
     end
 
     for (i, v) in enumerate(params)
         for k = 1:dp
-            diff_map[v, k] = :($(Symbol(:dp,k))[$i])
+            diff_map[v, k] = :($(Symbol(:dp, k))[$i])
         end
     end
 
@@ -313,8 +334,8 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx,
 
     quote
         $checks
-        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:(dx))...)) = dx
-        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:(dp))...)) = dp
+        $(Expr(:tuple, (Symbol(:dx, k) for k = 1:(dx))...)) = dx
+        $(Expr(:tuple, (Symbol(:dp, k) for k = 1:(dp))...)) = dp
 
         @inbounds $slp
         u
@@ -336,13 +357,13 @@ function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx,
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         for k = 1:dx
-            diff_map[v, k] = :($(Symbol(:dx,k))[$i])
+            diff_map[v, k] = :($(Symbol(:dx, k))[$i])
         end
     end
 
     for (i, v) in enumerate(params)
         for k = 1:dp
-            diff_map[v, k] = :($(Symbol(:dp,k))[$i])
+            diff_map[v, k] = :($(Symbol(:dp, k))[$i])
         end
     end
 
@@ -377,9 +398,9 @@ function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx,
     append!(slp.args, u_constants)
 
     quote
-        $(Expr(:tuple, :v, (Symbol(:v,k) for k in 1:M)...)) = u
-        $(Expr(:tuple, (Symbol(:dx,k) for k in 1:dx)...)) = dx
-        $(Expr(:tuple, (Symbol(:dp,k) for k in 1:dp)...)) = dp
+        $(Expr(:tuple, :v, (Symbol(:v, k) for k = 1:M)...)) = u
+        $(Expr(:tuple, (Symbol(:dx, k) for k = 1:dx)...)) = dx
+        $(Expr(:tuple, (Symbol(:dp, k) for k = 1:dp)...)) = dp
         @inbounds $slp
         nothing
     end
@@ -477,7 +498,7 @@ function diff_t!(
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    diff_t!(u, Val(D+1), T, x, dx, p, dp)
+    diff_t!(u, Val(D + 1), T, x, dx, p, dp)
 end
 
 
@@ -512,7 +533,7 @@ function diff_t!(
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {D,DP}
-    diff_t!(u, Val(D+1), T, x, t, dx, p, dp)
+    diff_t!(u, Val(D + 1), T, x, t, dx, p, dp)
 end
 """
     taylor!(u::Tuple, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
@@ -533,7 +554,7 @@ If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {M,D,DP}
-    _taylor!_impl(T, M,D, DP)
+    _taylor!_impl(T, M, D, DP)
 end
 function taylor!(
     u,
@@ -543,7 +564,7 @@ function taylor!(
     p::Union{Nothing,AbstractVector} = nothing,
     dp::NTuple{DP,<:AbstractVector} = (),
 ) where {M,D,DP}
-    diff_t!(u, Val(D+1), T, x, dx, p, dp)
+    diff_t!(u, Val(D + 1), T, x, dx, p, dp)
 end
 
 """
@@ -638,31 +659,31 @@ function _div_taylor_vec_impl(N, M)
     list = ModelKit.InstructionList()
     id = push!(list, (:/, :a, :b))
     diff_map = ModelKit.DiffMap()
-    for i in 1:N
-        diff_map[:a, i] = :($(Symbol(:a,i)))
+    for i = 1:N
+        diff_map[:a, i] = :($(Symbol(:a, i)))
     end
-    for i in 1:M
-        diff_map[:b, i] = :($(Symbol(:b,i)))
+    for i = 1:M
+        diff_map[:b, i] = :($(Symbol(:b, i)))
     end
 
-    k = max(N,M)
+    k = max(N, M)
     dlist = ModelKit.univariate_diff!(list, k, diff_map)
     ids = [id]
-    for i in 1:(k)
+    for i = 1:(k)
         push!(ids, diff_map[id, i])
     end
 
     quote
-        $(Expr(:tuple, :A, (Symbol(:A,k) for k in 1:N)...)) = AS
-        $(Expr(:tuple, :B, (Symbol(:B,k) for k in 1:M)...)) = BS
-        $(Expr(:tuple, :u, (Symbol(:u,k) for k in 1:max(N,M))...)) = us
-        for i in 1:length(A)
-            $([:(a = A[i]), (:($(Symbol(:a,k)) = $(Symbol(:A,k))[i]) for k in 1:N)...]...)
-            $([:(b = B[i]), (:($(Symbol(:b,k)) = $(Symbol(:B,k))[i]) for k in 1:M)...]...)
+        $(Expr(:tuple, :A, (Symbol(:A, k) for k = 1:N)...)) = AS
+        $(Expr(:tuple, :B, (Symbol(:B, k) for k = 1:M)...)) = BS
+        $(Expr(:tuple, :u, (Symbol(:u, k) for k = 1:max(N, M))...)) = us
+        for i = 1:length(A)
+            $([:(a = A[i]), (:($(Symbol(:a, k)) = $(Symbol(:A, k))[i]) for k = 1:N)...]...)
+            $([:(b = B[i]), (:($(Symbol(:b, k)) = $(Symbol(:B, k))[i]) for k = 1:M)...]...)
             $(ModelKit.to_expr(dlist))
 
-            $(Expr(:tuple, :(u[i]), (:($(Symbol(:u,k))[i]) for k in 1:max(N,M))...)) =
-             $(Expr(:tuple, ids...))
+            $(Expr(:tuple, :(u[i]), (:($(Symbol(:u, k))[i]) for k = 1:max(N, M))...)) =
+                $(Expr(:tuple, ids...))
         end
         u
     end
