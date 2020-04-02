@@ -3,6 +3,7 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
     lu::LA.LU{ComplexF64,M} # LU Factorization of D * J
+    qr::LA.QR{ComplexF64,Matrix{ComplexF64}}
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
@@ -16,11 +17,12 @@ end
 
 function MatrixWorkspace(Â::AbstractMatrix)
     m, n = size(Â)
-    m == n || throw(ArgumentError("Input is not a square matrix"))
+    m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
     A = Matrix{ComplexF64}(Â)
     d = ones(m)
     factorized = Ref(false)
+    qr = LA.qrfactUnblocked!(copy(A))
     # experiments show that for m > 25 the data layout as a
     # struct array is beneficial
     if m > 25
@@ -42,6 +44,7 @@ function MatrixWorkspace(Â::AbstractMatrix)
         d,
         factorized,
         lu,
+        qr,
         row_scaling,
         scaled,
         x̄,
@@ -73,7 +76,12 @@ Indicate that the matrix `MW` got updated.
 function updated!(MW::MatrixWorkspace)
     MW.factorized[] = false
     MW.scaled[] = false
-    @inbounds copyto!(MW.lu.factors, MW.A)
+    m, n = size(MW)
+    if m == n
+        @inbounds copyto!(MW.lu.factors, MW.A)
+    else
+        @inbounds copyto!(MW.qr.factors, MW.A)
+    end
     MW
 end
 
@@ -166,8 +174,81 @@ function lu!(
     A
 end
 
+
+####################
+# QR Factorization #
+####################
+# This is the generic base implementation with the small change that we introduce
+# a @fastmath for the division step since results in an approx 50% speedup
+
+# Elementary reflection similar to LAPACK. The reflector is not Hermitian but
+# ensures that tridiagonalization of Hermitian matrices become real. See lawn72
+@inline function reflector!(x::AbstractVector)
+    n = length(x)
+    @inbounds begin
+        ξ1 = x[1]
+        normu = abs2(ξ1)
+        for i = 2:n
+            normu += abs2(x[i])
+        end
+        if iszero(normu)
+            return zero(ξ1 / normu)
+        end
+        normu = sqrt(normu)
+        ν = copysign(normu, real(ξ1))
+        ξ1 += ν
+        x[1] = -ν
+        for i = 2:n
+            @fastmath x[i] = x[i] / ξ1
+        end
+    end
+    ξ1 / ν
+end
+
+# apply reflector from left
+@inline function reflectorApply!(x::AbstractVector, τ::Number, A::StridedMatrix)
+    m, n = size(A)
+    @inbounds begin
+        for j = 1:n
+            # dot
+            vAj = A[1, j]
+            for i = 2:m
+                vAj += x[i]' * A[i, j]
+            end
+
+            vAj = conj(τ) * vAj
+
+            # ger
+            A[1, j] -= vAj
+            for i = 2:m
+                A[i, j] -= x[i] * vAj
+            end
+        end
+    end
+    return A
+end
+
+function qr!(qr::LA.QR{T}) where {T}
+    A = qr.factors
+    τ = qr.τ
+    m, n = size(A)
+    for k = 1:min(m - 1 + !(T <: Real), n)
+        x = view(A, k:m, k)
+        τk = reflector!(x)
+        τ[k] = τk
+        reflectorApply!(x, τk, view(A, k:m, k+1:n))
+    end
+    qr
+end
+
+
 function factorize!(WS::MatrixWorkspace)
-    lu!(WS.lu.factors, nothing, WS.lu.ipiv)
+    m, n = size(WS)
+    if m == n
+        lu!(WS.lu.factors, nothing, WS.lu.ipiv)
+    else
+        qr!(WS.qr)
+    end
     WS.factorized[] = true
     WS
 end
@@ -264,19 +345,56 @@ function lu_ldiv_adj!(x, LU::LA.LU, b::AbstractVector; check::Bool = false)
 end
 
 
+# QR
+# adaption of base implementation
+function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
+    mA, nA = size(A.factors)
+    mB = length(b)
+    Afactors = A.factors
+    @inbounds begin
+        for k = 1:min(mA, nA)
+            vBj = b[k]
+            for i = k+1:mB
+                vBj += conj(Afactors[i, k]) * b[i]
+            end
+            vBj = conj(A.τ[k]) * vBj
+            b[k] -= vBj
+            for i = k+1:mB
+                b[i] -= Afactors[i, k] * vBj
+            end
+        end
+    end
+    b
+end
+function qr_ldiv!(x, QR::LA.QR, b::AbstractVector) where {T}
+    # overwrites b
+    # assumes QR is a tall matrix
+    lmul_Q_adj!(QR, b)
+    @inbounds for i = 1:length(x)
+        x[i] = b[i]
+    end
+    ldiv_upper!(QR.factors, x)
+    return x
+end
+
 function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
-    if size(WS) == (1, 1)
+    m, n = size(WS)
+    if (m, n) == (1, 1)
         x[1] = b[1] / WS[1, 1]
         return x
     end
     WS.factorized[] || factorize!(WS)
-    if WS.scaled[]
-        x .= WS.row_scaling .* b
-        lu_ldiv!(x, WS.lu, x)
+    if m == n
+        if WS.scaled[]
+            x .= WS.row_scaling .* b
+            lu_ldiv!(x, WS.lu, x)
+        else
+            lu_ldiv!(x, WS.lu, b)
+        end
     else
-        lu_ldiv!(x, WS.lu, b)
+        WS.r .= b
+        qr_ldiv!(x, WS.qr, WS.r)
     end
-
     x
 end
 
@@ -316,6 +434,23 @@ function skeel_row_scaling!(W::MatrixWorkspace, c::AbstractVector{<:Real})
     W
 end
 
+function row_scaling!(
+    d::AbstractVector{<:Real},
+    WS::MatrixWorkspace,
+    c::AbstractVector{<:Real},
+)
+    m, n = size(WS)
+    if m == n
+        skeel_row_scaling!(d, WS.A, d)
+    else
+        d .= 1.0
+    end
+    d
+end
+
+
+
+
 """
     apply_row_scaling!(W::MatrixWorkspace)
 
@@ -341,9 +476,9 @@ function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
     m, n = size(A)
     @boundscheck m == length(b) == length(r) && n == length(x)
     r .= 0
-    @inbounds for j = 1:m
+    @inbounds for j = 1:n
         x_j = x[j]
-        for i = 1:n
+        for i = 1:m
             r[i] += A[i, j] * x_j
         end
     end
@@ -531,7 +666,8 @@ function LA.cond(
     d_l::Union{Nothing,Vector{<:Real}} = nothing,
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
-    if size(WS) == (1, 1)
+    m, n = size(WS)
+    if m == n == 1
         if isa(d_l, Nothing) && isa(d_r, Nothing)
             inv(abs(WS.A[1, 1]))
         elseif isa(d_l, Nothing)
@@ -541,6 +677,15 @@ function LA.cond(
         else
             inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
         end
+    elseif m > n
+        WS.factorized[] || factorize!(WS)
+        rmax, rmin = -Inf, Inf
+        for i = 1:n
+            rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
+            rmax = max(rmax, rᵢ)
+            rmin = min(rmin, rᵢ)
+        end
+        rmax / rmin
     else
         inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)
     end

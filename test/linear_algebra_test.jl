@@ -28,6 +28,26 @@
         WS = HC2.MatrixWorkspace(A)
     end
 
+    @testset "QR" begin
+        A = randn(ComplexF64, 12, 7)
+        MW = HC2.MatrixWorkspace(A)
+        B = randn(ComplexF64, 12, 7)
+        true_qr = LinearAlgebra.qrfactUnblocked!(copy(B))
+        MW .= B
+
+        HC2.updated!(MW)
+
+        b = randn(ComplexF64, 12)
+        b2 = copy(b)
+        x = zeros(ComplexF64, 7)
+
+        ldiv!(x, MW, b)
+
+        @test norm(MW.qr.factors - true_qr.factors) /norm(MW.qr.factors) < 1e-14
+        @test norm(b2 - b) == 0
+        @test norm(x - (B \ b2)) / norm(x) < 1e-14
+    end
+
     @testset "ldiv" begin
         for n in [3, 13, 31] # test that struct array also works
             A = randn(ComplexF64, n, n)
