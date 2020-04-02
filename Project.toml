@@ -18,9 +18,11 @@ SymEngine_jll = "3428059b-622b-5399-b16f-d347a77089a4"
 
 [compat]
 ElasticArrays = "1"
+LoopVectorization = "0.9"
 MixedSubdivisions = "1"
 Parameters = "0.10, 0.11, 0.12"
 PrettyTables = "0.6, 0.7, 0.8"
+ProjectiveVectors = "1"
 Reexport = "0.2"
 StructArrays = "0.4"
 SymEngine_jll = "0.6"
