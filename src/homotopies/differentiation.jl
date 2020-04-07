@@ -218,24 +218,12 @@ function taylor!(
     t,
     ND::NumericalDifferentiation,
     τ::Float64 = Inf,
-    use_extended_precision::Bool = true,
+    use_extended_precision::Bool = false,
 )
     @unpack u₁, u₂, u₃, u₄, xh = ND
 
     h_1_6 = 0.002460783300575925
-    h_1_8 = 0.011048543456039806
-    if 0.5τ > h_1_8
-        # apply S^{4,4,4} formula
-        h = h_1_8
-        g!(u₁, H, x, t, h, xh)
-        g!(u₂, H, x, t, -h, xh)
-        g!(u₃, H, x, t, 2h, xh)
-        g!(u₄, H, x, t, -2h, xh)
-        h2 = h^2
-        h4 = 24 * h2^2
-        # divide by 4! since we compute taylor series
-        u .= (16.0 .* (u₁ .+ u₂) .- 0.25 .* (u₃ .+ u₄)) ./ h4
-    elseif τ > h_1_6 || !use_extended_precision
+    if τ > h_1_6 || !use_extended_precision
         h = min(τ, h_1_6)
         g!(u₁, H, x, t, h, xh)
         g!(u₂, H, x, t, -h, xh)

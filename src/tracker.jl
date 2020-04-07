@@ -495,11 +495,21 @@ function compute_derivatives!(
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    taylor!(u, Val(4), homotopy, tx³, t, AD, ND, 0.5τ; incremental = true)
+    # We only need the correct order of magnitude for this one
+    taylor!(
+        u,
+        Val(4),
+        homotopy,
+        tx³,
+        t,
+        AD,
+        ND,
+        0.5τ;
+        incremental = true,
+        use_extended_precision = false,
+    )
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
-    iterative_refinement &&
-    iterative_refinement!(x⁴, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     state
 end
