@@ -14,7 +14,6 @@ include("homotopies/model_kit_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/affine_chart_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
-include("homotopies/coefficient_homotopy.jl")
 include("homotopies/polyhedral_homotopy.jl")
 include("homotopies/affine_subspace_homotopy.jl")
 
@@ -85,6 +84,7 @@ function total_degree_homotopy(
     target_parameters::AbstractVector = ComplexF64[],
     gamma = cis(2π * rand()),
     scaling = nothing,
+    iterator = false
 )
     n = length(F)
     n == nvariables(F) ||
@@ -126,5 +126,5 @@ function total_degree_homotopy(
     end
 
     S = TotalDegreeStarts(D)
-    (homotopy = H, start_solutions = S)
+    (homotopy = H, start_solutions = iterator ? S : collect(S))
 end

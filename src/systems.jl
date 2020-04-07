@@ -19,12 +19,12 @@ evaluate_and_jacobian!(u, U, F::ModelKitSystem, x) =
 evaluate_and_jacobian!(u, U, F::ModelKitSystem{<:Any,Nothing}, x, p = nothing) =
     ModelKit.evaluate_and_jacobian!(u, U, F.system, x, p)
 
-diff_t!(u, v::Val, F::ModelKitSystem, x, dx = ()) =
-    ModelKit.diff_t!(u, v, F.system, x, dx, F.parameters)
-diff_t!(u, v::Val, F::ModelKitSystem{<:Any,Nothing}, x, dx = (), p = nothing, dp = ()) =
-    ModelKit.diff_t!(u, v, F.system, x, dx, p, dp)
+taylor!(u, v::Val, F::ModelKitSystem, tx::TaylorVector) =
+    ModelKit.taylor!(u, v, F.system, tx, F.parameters)
+taylor!(u, v::Val, F::ModelKitSystem{<:Any,Nothing}, tx::TaylorVector, p = nothing) =
+    ModelKit.taylor!(u, v, F.system, tx, p)
 
-taylor!(u, v::Val, F::ModelKitSystem, x, dx = ()) =
-    ModelKit.taylor!(u, v, F.system, x, dx, F.parameters)
-taylor!(u, v::Val, F::ModelKitSystem{<:Any,Nothing}, x, dx = (), p = nothing, dp = ()) =
-    ModelKit.taylor!(u, v, F.system, x, dx, p, dp)
+taylor!(u::TaylorVector, F::ModelKitSystem, tx::TaylorVector) =
+    ModelKit.taylor!(u, F.system, tx, F.parameters)
+taylor!(u::TaylorVector, F::ModelKitSystem{<:Any,Nothing}, tx::TaylorVector, p = nothing) =
+    ModelKit.taylor!(u, F.system, tx, p)

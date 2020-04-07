@@ -16,7 +16,12 @@ struct AffineSubspaceHomotopy{S,T} <: AbstractHomotopy
 
     t_cache::Base.RefValue{ComplexF64}
     taylor_γ::NTuple{5,Matrix{ComplexF64}}
-    taylor_x::NTuple{5,Vector{ComplexF64}}
+    v::Vector{ComplexF64}
+    tx⁴::TaylorVector{5,ComplexF64}
+    tx³::TaylorVector{4,ComplexF64}
+    tx²::TaylorVector{3,ComplexF64}
+    tx¹::TaylorVector{2,ComplexF64}
+    x::Vector{ComplexF64}
     x_high::Vector{ComplexDF64}
 end
 
@@ -35,7 +40,9 @@ function AffineSubspaceHomotopy(
     x_stiefel = zeros(ComplexF64, size(Q, 1))
     t_cache = Ref(Complex(NaN, NaN))
     taylor_γ = tuple((similar(Q) for i = 0:4)...)
-    taylor_x = tuple((zeros(ComplexF64, size(Q, 1)) for i = 0:4)...)
+    v = zeros(ComplexF64, size(Q, 2))
+    tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
+    x = zeros(ComplexF64, size(Q, 1))
     x_high = zeros(ComplexDF64, size(Q, 1))
     AffineSubspaceHomotopy(
         system,
@@ -50,7 +57,12 @@ function AffineSubspaceHomotopy(
         x_stiefel,
         t_cache,
         taylor_γ,
-        taylor_x,
+        v,
+        tx⁴,
+        TaylorVector{4}(tx⁴),
+        TaylorVector{3}(tx⁴),
+        TaylorVector{2}(tx⁴),
+        x,
         x_high,
     )
 end
@@ -98,9 +110,8 @@ function get_solution(H::AffineSubspaceHomotopy, u::AbstractVector, t)
     end
 end
 
-function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
-    H.t_cache[] != t || return H.taylor_γ
 
+function _taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ, U, taylor_γ = H
 
     γ, γ¹, γ², γ³, γ⁴ = taylor_γ
@@ -108,14 +119,17 @@ function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
     @inbounds for j = 1:k
         Θⱼ = Θ[j]
         s, c = sincos(t * Θⱼ)
-        s¹ = c * Θⱼ
-        s² = -s * Θⱼ^2 / 2
-        s³ = -c * Θⱼ^3 / 6
-        s⁴ = s * (Θⱼ^2)^2 / 24
         c¹ = -s * Θⱼ
-        c² = -c * Θⱼ^2 / 2
-        c³ = s * Θⱼ^3 / 6
-        c⁴ = c * (Θⱼ^2)^2 / 24
+        s¹ = c * Θⱼ
+        Θⱼ_2 = 0.5 * Θⱼ^2
+        s² = -s * Θⱼ_2
+        c² = -c * Θⱼ_2
+        Θⱼ_3 = Θⱼ_2 * Θⱼ / 3
+        s³ = -c * Θⱼ_3
+        c³ = s * Θⱼ_3
+        Θⱼ_4 = 0.25 * Θⱼ_3 * Θⱼ
+        s⁴ = s * Θⱼ_4
+        c⁴ = c * Θⱼ_4
         for i = 1:n
             γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
             γ¹[i, j] = Q_cos[i, j] * c¹ + Q[i, j] * s¹
@@ -125,6 +139,17 @@ function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
         end
     end
 
+end
+
+function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
+    H.t_cache[] != t || return H.taylor_γ
+
+    if isreal(t)
+        _taylor_γ!(H, real(t))
+    else
+        _taylor_γ!(H, t)
+    end
+
     H.t_cache[] = t
 
     H.taylor_γ
@@ -132,30 +157,28 @@ end
 
 function evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     γ, _ = taylor_γ!(H, t)
-    x, _ = H.taylor_x
     n = first(size(H.system))
     if eltype(v) isa ComplexDF64
         LA.mul!(H.x_high, γ, v)
         evaluate!(u, H.system, H.x_high)
         u[n+1] = H.x_high[end] - 1
     else
-        LA.mul!(x, γ, v)
-        evaluate!(u, H.system, x)
-        u[n+1] = x[end] - 1
+        LA.mul!(H.x, γ, v)
+        evaluate!(u, H.system, H.x)
+        u[n+1] = H.x[end] - 1
     end
     u
 end
 
 function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     γ, _ = taylor_γ!(H::AffineSubspaceHomotopy, t)
-    x, _ = H.taylor_x
 
-    LA.mul!(x, γ, v)
-    evaluate_and_jacobian!(u, H.J, H.system, x)
+    LA.mul!(H.x, γ, v)
+    evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
 
     n = first(size(H.system))
-    u[n+1] = x[end] - 1
+    u[n+1] = H.x[end] - 1
 
     m = length(v)
     for j = 1:m
@@ -165,68 +188,117 @@ function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVect
     nothing
 end
 
-function diff_t!(u, H::AffineSubspaceHomotopy, v, t, dv::Tuple, incremental::Bool)
-    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
-    x, x¹, x², x³, x⁴ = H.taylor_x
-    n = first(size(H.system))
+function taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+    γ, γ¹ = taylor_γ!(H, t)
+    x, x¹ = vectors(H.tx¹)
+    v, = vectors(tv)
 
-    if length(dv) == 0
+    H.v .= v
+    LA.mul!(H.x, γ, H.v)
+    x .= H.x
+    LA.mul!(H.x, γ¹, H.v)
+    x¹ .= H.x
+    taylor!(u, Val(1), H.system, H.tx¹)
+
+    n = first(size(H.system))
+    u[n+1] = x¹[end]
+
+    u
+end
+
+function taylor!(u, v::Val{2}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    x, x¹, x² = vectors(H.tx²)
+    v, v¹ = vectors(tv)
+
+    if !incr
         LA.mul!(x, γ, v)
         LA.mul!(x¹, γ¹, v)
-        diff_t!(u, Val(1), H.system, x, (x¹,))
-        u[n+1] = x¹[end]
-    elseif length(dv) == 1
-        v¹, = dv
-        if !incremental
-            LA.mul!(x, γ, v)
-            LA.mul!(x¹, γ¹, v)
-        end
+    end
 
+    H.v .= v¹
+    LA.mul!(H.x, γ, v¹)
+    x¹ .+= H.x
+
+    LA.mul!(H.x, γ¹, H.v)
+    H.v .= v
+    LA.mul!(H.x, γ², H.v, true, true)
+    x² .= H.x
+
+    taylor!(u, Val(2), H.system, H.tx²)
+
+    n = first(size(H.system))
+    u[n+1] = x²[end]
+
+    u
+end
+
+function taylor!(u, v::Val{3}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    x, x¹, x², x³ = vectors(H.tx³)
+    v, v¹, v² = vectors(tv)
+
+    if !incr
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
         LA.mul!(x¹, γ, v¹, true, true)
-
         LA.mul!(x², γ², v)
         LA.mul!(x², γ¹, v¹, true, true)
+    end
 
-        diff_t!(u, Val(2), H.system, x, (x¹, x²))
-        u[n+1] = x²[end]
-    elseif length(dv) == 2
-        v¹, v² = dv
-        if !incremental
-            LA.mul!(x, γ, v)
-            LA.mul!(x¹, γ¹, v)
-            LA.mul!(x¹, γ, v¹, true, true)
-            LA.mul!(x², γ², v)
-            LA.mul!(x², γ¹, v¹, true, true)
-        end
+    H.v .= v²
+    LA.mul!(H.x, γ, H.v)
+    x² .+= H.x
 
+    LA.mul!(H.x, γ¹, H.v)
+    H.v .= v
+    LA.mul!(H.x, γ³, H.v, true, true)
+    H.v .= v¹
+    LA.mul!(H.x, γ², H.v, true, true)
+    x³ .= H.x
+
+    taylor!(u, Val(3), H.system, H.tx³)
+
+    n = first(size(H.system))
+    u[n+1] = x³[end]
+
+    u
+end
+
+function taylor!(u, v::Val{4}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    x, x¹, x², x³, x⁴ = vectors(H.tx⁴)
+    v, v¹, v², v³ = vectors(tv)
+
+    if !incr
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
+        LA.mul!(x¹, γ, v¹, true, true)
+        LA.mul!(x², γ², v)
+        LA.mul!(x², γ¹, v¹, true, true)
         LA.mul!(x², γ, v², true, true)
         LA.mul!(x³, γ³, v)
         LA.mul!(x³, γ², v¹, true, true)
         LA.mul!(x³, γ¹, v², true, true)
-
-        diff_t!(u, Val(3), H.system, x, (x¹, x², x³))
-        u[n+1] = x³[end]
-    elseif length(dv) == 3
-        v¹, v², v³ = dv
-        if !incremental
-            LA.mul!(x, γ, v)
-            LA.mul!(x¹, γ¹, v)
-            LA.mul!(x¹, γ, v¹, true, true)
-            LA.mul!(x², γ², v)
-            LA.mul!(x², γ¹, v¹, true, true)
-            LA.mul!(x², γ, v², true, true)
-            LA.mul!(x³, γ³, v)
-            LA.mul!(x³, γ², v¹, true, true)
-            LA.mul!(x³, γ¹, v², true, true)
-        end
-        LA.mul!(x³, γ, v³, true, true)
-        LA.mul!(x⁴, γ⁴, v)
-        LA.mul!(x⁴, γ³, v¹, true, true)
-        LA.mul!(x⁴, γ², v², true, true)
-        LA.mul!(x⁴, γ¹, v³, true, true)
-
-        diff_t!(u, Val(4), H.system, x, (x¹, x², x³, x⁴))
-        u[n+1] = x⁴[end]
     end
+    H.v .= v³
+    LA.mul!(H.x, γ, H.v)
+    x³ .+= H.x
+
+    LA.mul!(H.x, γ¹, v³)
+
+    H.v .= v
+    LA.mul!(H.x, γ⁴, v, true, true)
+    H.v .= v¹
+    LA.mul!(H.x, γ³, H.v, true, true)
+    H.v .= v²
+    LA.mul!(H.x, γ², H.v, true, true)
+    x⁴ .= H.x
+
+    taylor!(u, Val(4), H.system, H.tx⁴)
+
+    n = first(size(H.system))
+    u[n+1] = x⁴[end]
+
     u
 end

@@ -245,7 +245,7 @@ function univariate_diff!(list::InstructionList, K::Int, D::DiffMap)
     for (id, el) in list.instructions
         (op, arg1, arg2) = el
         if op == :^
-            r::Int = arg2
+            r = arg2
             arg1_1 = D[arg1, 1]
             if arg1_1 !== nothing && r == 2
                 push!(v, id => el)
@@ -263,7 +263,7 @@ function univariate_diff!(list::InstructionList, K::Int, D::DiffMap)
                     end
                     D[id, k] = w_k
                 end
-            elseif arg1_1 !== nothing && r > 2
+            elseif arg1_1 !== nothing
                 w_0 = push!(v, id => (:^, arg1, r))
                 u_0_inv = push!(v, (:inv_not_zero, arg1, nothing))
                 # w_k is v_k in Griewank
@@ -367,15 +367,20 @@ function to_expr(
     var_map = Dict{Symbol,Union{Expr,Symbol}}(),
     assignements = Dict{Symbol,Vector{Expr}}(),
 )
-    exprs = Expr[]
+    block = Expr(:block)
+    exprs = block.args
     for (id, (op, arg1, arg2)) in list.instructions
         if op == :^
             x::Union{Symbol,Expr} = arg1
-            k::Int = arg2
-            if k < 0
-                push!(exprs, :($id = inv($(unroll_pow(get(var_map, x, x), -k)))))
+            if arg2 isa Int
+                k::Int = arg2
+                if k < 0
+                    push!(exprs, :($id = inv($(unroll_pow(get(var_map, x, x), -k)))))
+                else
+                    push!(exprs, :($id = $(unroll_pow(get(var_map, x, x), k))))
+                end
             else
-                push!(exprs, :($id = $(unroll_pow(get(var_map, x, x), k))))
+                push!(exprs, :($id = $(get(var_map, x, x))^$arg2))
             end
         elseif op == :/
             a = get(var_map, arg1, arg1)
@@ -395,5 +400,98 @@ function to_expr(
             append!(exprs, assignements[id])
         end
     end
-    Expr(:block, exprs...)
+    block
+end
+
+function untuple(varname, tuplename, M)
+    :($(Expr(:tuple, varname, (Symbol(varname, k) for k = 1:M-1)...)) = $tuplename)
+end
+
+function _impl_taylor_bivariate(K, M, N, op; inline = true)
+    list = ModelKit.InstructionList()
+    id = push!(list, (op, :x, :y))
+    diff_map = ModelKit.DiffMap()
+    for i = 1:M-1
+        diff_map[:x, i] = Symbol(:x, i)
+    end
+    for j = 1:N-1
+        diff_map[:y, j] = Symbol(:y, j)
+    end
+    dlist = ModelKit.univariate_diff!(list, K, diff_map)
+    quote
+        $(inline ? :(Base.@_inline_meta) : :())
+        $(untuple(:x, :tx, M))
+        $(untuple(:y, :ty, N))
+        $(ModelKit.to_expr(dlist))
+        $(Expr(
+            :tuple,
+            id,
+            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
+        ))
+    end
+end
+
+
+@generated function taylor(::Type{Val{op}}, ::Type{Val{K}}, tx::NTuple{M}, ty::NTuple{N}) where {op, K,M,N}
+    _impl_taylor_bivariate(K, M, N, op)
+end
+
+make_ntuple(t) = t
+make_ntuple(t::Number) = (t,)
+make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A,B)}, t)
+make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A,B,C)}, t)
+make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} = convert(NTuple{4,promote_type(A,B,C,D)}, t)
+make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} = convert(NTuple{5,promote_type(A,B,C,D,E)}, t)
+
+taylor(op::Type{T1}, v::Type{T2}, tx, ty) where {T1,T2} =
+    taylor(op::Type{T1}, v::Type{T2}, make_ntuple(tx), make_ntuple(ty))
+function taylor(op::Type{T1}, v::Type{T2}, tx)  where {T1,T2}
+    taylor(op::Type{T1}, v::Type{T2}, make_ntuple(tx))
+end
+
+function _impl_taylor_pow(K, M)
+    list = ModelKit.InstructionList()
+    id = push!(list, (:^, :x, :r))
+    diff_map = ModelKit.DiffMap()
+    for i = 1:M-1
+        diff_map[:x, i] = Symbol(:x, i)
+    end
+    dlist = ModelKit.univariate_diff!(list, K, diff_map)
+    quote
+        $(untuple(:x, :tx, M))
+        $(ModelKit.to_expr(dlist))
+        $(Expr(
+            :tuple,
+            id,
+            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
+        ))
+    end
+end
+
+@generated function taylor(::Type{Val{:^}}, ::Type{Val{K}}, tx::NTuple{M}, r::Integer) where {K,M}
+    _impl_taylor_pow(K, M)
+end
+
+function _impl_taylor_sqr(K, M)
+    list = ModelKit.InstructionList()
+    id = push!(list, (:^, :x, 2))
+    diff_map = ModelKit.DiffMap()
+    for i = 1:M-1
+        diff_map[:x, i] = Symbol(:x, i)
+    end
+    dlist = ModelKit.univariate_diff!(list, K, diff_map)
+    quote
+        $(untuple(:x, :tx, M))
+        $(ModelKit.to_expr(dlist))
+        $(Expr(
+            :tuple,
+            id,
+            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
+        ))
+    end
+end
+
+
+@generated function taylor(::Type{Val{:sqr}}, ::Type{Val{K}}, tx::NTuple{M}) where {K,M}
+    _impl_taylor_sqr(K, M)
 end

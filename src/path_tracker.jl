@@ -287,12 +287,6 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     result, m, point_acc
 end
 
-function update_valuation!(state, tracker_state, t)
-    @unpack x, x¹, x², x³ = tracker_state
-    update!(state.val, x, x¹, x², x³, t)
-end
-
-
 function step!(eg_tracker::PathTracker, debug::Bool = false)
     @unpack tracker, state, options = eg_tracker
 
@@ -361,7 +355,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
     end
 
 
-    update_valuation!(state, tracker.state, t)
+    update!(state.val, tracker.state.tx³, t)
     (finite, at_infinity, at_zero) = analyze(
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),

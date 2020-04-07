@@ -108,12 +108,16 @@ function polyhedral(f::ModelKit.System)
     target_coeffs = map(ci -> float.(ModelKit.to_number.(ci)), last.(supp_coeffs))
     start_coeffs =
         map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
-    F = polyehdral_system(support)
+    F = ModelKit.compile(polyehdral_system(support))
 
-    H₁ = PolyhedralHomotopy(ModelKit.compile(F), start_coeffs)
+    H₁ = PolyhedralHomotopy(F, start_coeffs)
     toric_tracker = Tracker(H₁)
 
-    H₂ = CoefficientHomotopy(ModelKit.compile(F), start_coeffs, target_coeffs)
+    H₂ = begin
+        p = reduce(append!, start_coeffs; init = ComplexF64[])
+        q = reduce(append!, target_coeffs; init = ComplexF64[])
+        ParameterHomotopy(F, p, q)
+    end
     generic_tracker = PathTracker(Tracker(H₂))
 
     S = PolyhedralStartSolutions(support, start_coeffs)

@@ -87,19 +87,11 @@
         1.2021910424897007-1.1148794002014533im,
     ]
 
-    tracker = Tracker(ParameterHomotopy(F, p, q))
+    tracker = Tracker(ParameterHomotopy(F, p, q); automatic_differentiation = 4)
     res = track(tracker, s, 1, 0)
     @test is_success(res)
 
     tracker = Tracker(ParameterHomotopy(F, p, q); automatic_differentiation = 3)
-    res = track(tracker, s, 1, 0)
-    @test is_success(res)
-
-    tracker = Tracker(
-        ParameterHomotopy(F, p, q);
-        automatic_differentiation = 2,
-        max_steps = 10_000,
-    )
     res = track(tracker, s, 1, 0)
     @test is_success(res)
 end
