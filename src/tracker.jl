@@ -175,18 +175,13 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
     jacobian::Jacobian{M}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
     code::TrackerReturnCode.codes
-    # first four derivatives of x(t)
-    x¹::Vector{ComplexF64}
-    x²::Vector{ComplexF64}
-    x³::Vector{ComplexF64}
-    x⁴::Vector{ComplexF64}
-    # these are just tuples containing the derivative vectors
-    # we have to preallocate them since otherwise this would result
-    # in dynamic dispatch (at least Julia ≤ 1.3)
-    dx¹::NTuple{1,Vector{ComplexF64}}
-    dx²::NTuple{2,Vector{ComplexF64}}
-    dx³::NTuple{3,Vector{ComplexF64}}
+
     # buffer for the computation of derivatives
+    tx⁰::TaylorVector{1,ComplexF64}
+    tx¹::TaylorVector{2,ComplexF64}
+    tx²::TaylorVector{3,ComplexF64}
+    tx³::TaylorVector{4,ComplexF64}
+    tx⁴::TaylorVector{5,ComplexF64}
     u::Vector{ComplexF64}
 
     # statistics
@@ -199,10 +194,15 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
-    x¹, x², x³, x⁴ = [zeros(ComplexF64, length(x)) for _ = 1:4]
-    dx¹ = (x¹,)
-    dx² = (x¹, x²)
-    dx³ = (x¹, x², x³)
+
+    m, n = size(H)
+    tx⁴ = TaylorVector{5}(ComplexF64, n)
+    tx⁰ = TaylorVector{1}(tx⁴)
+    tx¹ = TaylorVector{2}(tx⁴)
+    tx² = TaylorVector{3}(tx⁴)
+    tx³ = TaylorVector{4}(tx⁴)
+
+    u = zeros(ComplexF64, m)
     segment_stepper = SegmentStepper(t₁, t₀)
     Δs_prev = 0.0
     accuracy = 0.0
@@ -237,13 +237,11 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
         jacobian,
         cond_J_ẋ,
         code,
-        x¹,
-        x²,
-        x³,
-        x⁴,
-        dx¹,
-        dx²,
-        dx³,
+        tx⁰,
+        tx¹,
+        tx²,
+        tx³,
+        tx⁴,
         u,
         accepted_steps,
         rejected_steps,
@@ -447,9 +445,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
 end
 
 function compute_derivatives_and_update_predictor!(tracker::Tracker)
-    @unpack x, x¹, x², x³, x⁴ = tracker.state
     compute_derivatives!(tracker)
-    update!(tracker.predictor, x, x¹, x², x³, x⁴)
+    update!(tracker.predictor, tracker.state.tx⁴)
 end
 
 function compute_derivatives!(
@@ -459,10 +456,12 @@ function compute_derivatives!(
 )
     @unpack homotopy, state, options, AD, ND = tracker
     # unpack stuff to make the rest easier to read
-    @unpack u, x, t, x¹, x², x³, x⁴, dx¹, dx², dx³, jacobian, norm, τ = state
+    @unpack u, x, t, tx⁰, tx¹, tx², tx³, tx⁴, jacobian, norm, τ = state
+    x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
+    x⁰ .= x
     # compute all taylor coefficients x¹, x², x³, x⁴
-    diff_t!(u, homotopy, x, t, (), AD, ND, τ)
+    taylor!(u, Val(1), homotopy, tx⁰, t, AD, ND, 0.5τ)
     u .= .-u
     LA.ldiv!(x¹, jacobian, u)
 
@@ -484,24 +483,33 @@ function compute_derivatives!(
         end
     end
 
-    diff_t!(u, homotopy, x, t, dx¹, AD, ND, τ; incremental = true)
+    taylor!(u, Val(2), homotopy, tx¹, t, AD, ND, 0.5τ; incremental = true)
     u .= .-u
     LA.ldiv!(x², jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    diff_t!(u, homotopy, x, t, dx², AD, ND, τ; incremental = true)
+    taylor!(u, Val(3), homotopy, tx², t, AD, ND, 0.5τ; incremental = true)
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-
+    # We only need the correct order of magnitude for this one
+    taylor!(
+        u,
+        Val(4),
+        homotopy,
+        tx³,
+        t,
+        AD,
+        ND,
+        0.5τ;
+        incremental = true,
+        use_extended_precision = false,
+    )
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
-
-    iterative_refinement &&
-    iterative_refinement!(x⁴, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
     state
 end
@@ -642,8 +650,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
-    @unpack x¹, x², x³ = state
-    predict!(x̂, predictor, homotopy, state.x, x¹, x², x³, Δt)
+    predict!(x̂, predictor, homotopy, state.tx³, Δt)
     # if t′ == 0
     #     e = state.norm(local_error(predictor)) * state.segment_stepper.Δs^4
     # end

@@ -54,20 +54,17 @@ end
 
 function update!(
     val::Valuation,
-    x::AbstractVector,
-    x¹::AbstractVector,
-    x²::AbstractVector,
-    x³::AbstractVector,
+    tx::TaylorVector,
     t::Real,
 )
-    for i in eachindex(x)
-        xᵢ, x¹ᵢ, x²ᵢ, x³ᵢ = x[i], x¹[i], 2 * x²[i], 6 * x³[i]
+    for i in eachindex(tx)
+        xᵢ, x¹ᵢ, x²ᵢ, x³ᵢ = tx[i]
 
-        ν, ν¹ = ν_ν¹(xᵢ, x¹ᵢ, x²ᵢ, t)
+        ν, ν¹ = ν_ν¹(xᵢ, x¹ᵢ, 2x²ᵢ, t)
         val.val_x[i] = ν
         val.Δval_x[i] = t * ν¹
 
-        ν, ν¹ = ν_ν¹(x¹ᵢ, x²ᵢ, x³ᵢ, t)
+        ν, ν¹ = ν_ν¹(x¹ᵢ, 2x²ᵢ, 6x³ᵢ, t)
         val.val_tx¹[i] = ν + 1
         val.Δval_tx¹[i] = t * ν¹
     end

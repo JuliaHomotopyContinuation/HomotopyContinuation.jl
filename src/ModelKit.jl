@@ -24,7 +24,9 @@ export @var,
     to_number,
     variables,
     System,
-    Homotopy
+    Homotopy,
+    TaylorVector,
+    vectors
 
 import LinearAlgebra
 

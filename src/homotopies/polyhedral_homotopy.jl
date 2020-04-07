@@ -19,12 +19,10 @@ struct PolyhedralHomotopy{S} <: AbstractHomotopy
     t_weights::Vector{Float64}
     complex_t_weights::StructVectorComplexF64
     t_coeffs::Base.RefValue{Float64}
-    taylor_coeffs::NTuple{5,Vector{ComplexF64}}
-    # these are just here to avoid unnecessary allocations
-    dc1::Tuple{Vector{ComplexF64}}
-    dc2::NTuple{2,Vector{ComplexF64}}
-    dc3::NTuple{3,Vector{ComplexF64}}
-    dc4::NTuple{4,Vector{ComplexF64}}
+    taylor_coeffs::TaylorVector{5,ComplexF64}
+    tc3::TaylorVector{4,ComplexF64}
+    tc2::TaylorVector{3,ComplexF64}
+    tc1::TaylorVector{2,ComplexF64}
 end
 
 function PolyhedralHomotopy(
@@ -43,12 +41,7 @@ function PolyhedralHomotopy(
     t_weights = zeros(m)
     complex_t_weights = StructArrays.StructArray(zeros(ComplexF64, m))
     t_coeffs = Ref(0.0)
-    taylor_coeffs = tuple((zeros(ComplexF64, m) for i = 0:4)...)
-    dc1 = (taylor_coeffs[2],)
-    dc2 = (taylor_coeffs[2], taylor_coeffs[3])
-    dc3 = (taylor_coeffs[2], taylor_coeffs[3], taylor_coeffs[4])
-    dc4 = (taylor_coeffs[2], taylor_coeffs[3], taylor_coeffs[4], taylor_coeffs[5])
-
+    taylor_coeffs = TaylorVector{5}(ComplexF64, m)
 
     PolyhedralHomotopy(
         system,
@@ -58,10 +51,9 @@ function PolyhedralHomotopy(
         complex_t_weights,
         t_coeffs,
         taylor_coeffs,
-        dc1,
-        dc2,
-        dc3,
-        dc4,
+        TaylorVector{4}(taylor_coeffs),
+        TaylorVector{3}(taylor_coeffs),
+        TaylorVector{2}(taylor_coeffs),
     )
 end
 
@@ -148,48 +140,56 @@ end
 function taylor_coeffs!(H::PolyhedralHomotopy, t::Real)
     H.t_coeffs[] != t || return H.taylor_coeffs
 
-    c, c¹, c², c³, c⁴ = H.taylor_coeffs
+    tc = H.taylor_coeffs
+    # c, c¹, c², c³, c⁴ = H.taylor_coeffs
 
     if t == 0
-        for i = 1:length(c)
+        for i = 1:length(tc)
             wᵢ = H.weights[i]
             uᵢ = H.system_coeffs[i]
             twᵢ = H.t_weights[i]
             if wᵢ == 0
-                c[i] = uᵢ
-                c¹[i] = c²[i] = c³[i] = c⁴[i] = 0.0
+                tc[i, 1] = uᵢ
+                tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
             elseif wᵢ == 1
-                c¹[i] = uᵢ
-                c[i] = c²[i] = c³[i] = c⁴[i] = 0.0
-            elseif wᵢ == 2
-                c²[i] = 0.5 * uᵢ
-                c[i] = c¹[i] = c³[i] = c⁴[i] = 0.0
-            elseif wᵢ == 3
-                c³[i] = uᵢ / 6
-                c[i] = c¹[i] = c²[i] = c⁴[i] = 0.0
-            elseif wᵢ == 4
-                c⁴[i] = uᵢ / 24
-                c[i] = c¹[i] = c²[i] = c³[i] = 0.0
+                tc[i, 2] = uᵢ
+                tc[i, 1] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
+                # elseif wᵢ == 2
+                #     c²[i] = 0.5 * uᵢ
+                #     c[i] = c¹[i] = c³[i] = c⁴[i] = 0.0
+                #     tc[i,3] =  0.5 * uᵢ
+                #     tc[i,1] = tc[i,2] = tc[i,4] = tc[i,5] = 0.0
+                # elseif wᵢ == 3
+                #     c³[i] = uᵢ / 6
+                #     c[i] = c¹[i] = c²[i] = c⁴[i] = 0.0
+                #     tc[i,4] =  uᵢ / 6
+                #     tc[i,1] = tc[i,2] = tc[i,3] =  tc[i,5] = 0.0
+                # elseif wᵢ == 4
+                #     c⁴[i] = uᵢ / 24
+                #     c[i] = c¹[i] = c²[i] = c³[i] = 0.0
+                #     tc[i,4] =  uᵢ / 6
+                #     tc[i,2] = tc[i,3] = tc[i,4] = tc[i,5] = 0.0
             else
-                c[i] = c¹[i] = c²[i] = c³[i] = c⁴[i] = 0.0
+                # c[i] = c¹[i] = c²[i] = c³[i] = c⁴[i] = 0.0
+                tc[i, 1] = tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
             end
         end
     else
         evaluate_weights!(H.t_weights, H.weights, t)
         t⁻¹ = inv(t)
-        for i = 1:length(c)
+        @inbounds for i = 1:length(tc)
             wᵢ = H.weights[i]
             uᵢ = H.system_coeffs[i]
             twᵢ = H.t_weights[i]
-            c[i] = uᵢ * twᵢ
+            tc[i, 1] = uᵢ * twᵢ
             tw1 = wᵢ * twᵢ * t⁻¹
-            c¹[i] = uᵢ * tw1
+            tc[i, 2] = uᵢ * tw1
             tw2 = 0.5 * (wᵢ - 1) * tw1 * t⁻¹
-            c²[i] = uᵢ * tw2
+            tc[i, 3] = uᵢ * tw2
             tw3 = (wᵢ - 2) * tw2 * t⁻¹ / 3
-            c³[i] = uᵢ * tw3
+            tc[i, 4] = uᵢ * tw3
             tw4 = 0.25 * (wᵢ - 3) * tw3 * t⁻¹
-            c⁴[i] = uᵢ * tw4
+            tc[i, 5] = uᵢ * tw4
         end
 
     end
@@ -201,14 +201,14 @@ end
 
 function coeffs!(H::PolyhedralHomotopy, t::Real)
     if t < 0
-        c, _ = H.taylor_coeffs
+        c, _ = vectors(H.taylor_coeffs)
         evaluate_weights!(
             H.complex_t_weights.re,
             H.complex_t_weights.im,
             H.weights,
             complex(t),
         )
-        for i = 1:length(c)
+        @inbounds for i = 1:length(c)
             wᵢ = H.weights[i]
             uᵢ = H.system_coeffs[i]
             twᵢ = H.complex_t_weights[i]
@@ -216,7 +216,7 @@ function coeffs!(H::PolyhedralHomotopy, t::Real)
         end
         return c
     else
-        c, _ = taylor_coeffs!(H, t)
+        c, _ = vectors(taylor_coeffs!(H, t))
         return c
     end
 end
@@ -232,17 +232,19 @@ function evaluate_and_jacobian!(u, U, H::PolyhedralHomotopy, x::AbstractVector, 
     nothing
 end
 
-function diff_t!(u, H::PolyhedralHomotopy, x, t, dx::Tuple)
-    c, _ = taylor_coeffs!(H::PolyhedralHomotopy, real(t))
-    k = length(dx)
-    if k == 0
-        ModelKit.diff_t!(u, H.system, x, dx, c, H.dc1)
-    elseif k == 1
-        ModelKit.diff_t!(u, H.system, x, dx, c, H.dc2)
-    elseif k == 2
-        ModelKit.diff_t!(u, H.system, x, dx, c, H.dc3)
-    elseif k == 3
-        ModelKit.diff_t!(u, H.system, x, dx, c, H.dc4)
-    end
-    u
+function taylor!(u, v::Val{1}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.tc1)
+end
+function taylor!(u, v::Val{2}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.tc2)
+end
+function taylor!(u, v::Val{3}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.tc3)
+end
+function taylor!(u, v::Val{4}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.taylor_coeffs)
 end

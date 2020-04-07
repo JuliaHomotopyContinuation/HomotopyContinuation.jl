@@ -14,7 +14,7 @@ function sort_key(v::Variable)
     if isnothing(sub_start)
         return name, Int[]
     end
-    var_base = name[1:sub_start-1]
+    var_base = name[1:prevind(name, sub_start)]
     str_indices = split(name[sub_start:end], "₋")
     indices = map(str_indices) do str_index
         digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
@@ -852,7 +852,7 @@ evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => 
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
-(F::System)(x::AbstractVector) = evaluate(F, x)
+(F::System)(x::AbstractVector, p::Nothing) = evaluate(F, x)
 (F::System)(x::AbstractVector, p::AbstractVector) = evaluate(F, x, p)
 
 function Base.:(==)(F::System, G::System)

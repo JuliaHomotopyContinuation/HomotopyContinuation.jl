@@ -1,3 +1,72 @@
+"""
+    TaylorVector{N,T}
+
+A data structure representing a vector of Taylor series with `N` terms.
+Each element is an `NTuple{N,T}`.
+
+    TaylorVector(T, N::Integer, n::Integer)
+
+Create a vector of `n` `NTuple{N,T}`s.
+"""
+struct TaylorVector{N,T} <: AbstractVector{NTuple{N,T}}
+    data::LinearAlgebra.Transpose{T,Matrix{T}}
+    views::NTuple{N,SubArray{T,1,Matrix{T},Tuple{Int,UnitRange{Int}},true}}
+end
+TaylorVector{N}(TV::TaylorVector{M,T}) where {N,M,T} =
+    TaylorVector{N,T}(TV.data, TV.views[1:N])
+function TaylorVector{N}(data::Matrix) where {N}
+    views = tuple((view(data, i, 1:size(data, 2)) for i = 1:N)...)
+    TaylorVector(LinearAlgebra.transpose(data), views)
+end
+function TaylorVector{N}(T, n::Integer) where {N}
+    TaylorVector{N}(zeros(T, N, n))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", X::TaylorVector)
+    summary(io, X)
+    isempty(X) && return
+    println(io, ":")
+    Base.print_array(io, map(i -> X[i], 1:length(X)))
+end
+
+Base.length(TV::TaylorVector) = size(TV.data, 1)
+Base.size(TV::TaylorVector) = (length(TV),)
+Base.eltype(::Type{TaylorVector{N,T}}) where {N,T} = NTuple{N,T}
+Base.IndexStyle(::TaylorVector) = Base.IndexLinear()
+
+"""
+    vectors(TV::TaylorVec{N})
+
+Return the Taylor series as `N` seperate vectors.
+"""
+vectors(TV::TaylorVector) = TV.views
+
+@generated function Base.getindex(TV::TaylorVector{N}, i::Integer) where {N}
+    quote
+        Base.@_propagate_inbounds_meta
+        x = TV.data
+        $(Expr(:tuple, (:(x[i, $k]) for k = 1:N)...))
+    end
+end
+Base.getindex(TV::TaylorVector, i::Integer, j::Integer) = getindex(TV.data, i, j)
+
+function Base.setindex!(TV::TaylorVector{N,T}, x, i::Integer) where {N,T}
+    setindex!(TV, convert(NTuple{N,T}, x), i)
+end
+@generated function Base.setindex!(
+    TV::TaylorVector{N,T},
+    x::NTuple{N,T},
+    i::Integer,
+) where {N,T}
+    quote
+        Base.@_propagate_inbounds_meta
+        d = TV.data
+        $(Expr(:tuple, (:(d[i, $k]) for k = 1:N)...)) = x
+        x
+    end
+end
+Base.setindex!(TV::TaylorVector, x, i::Integer, j::Integer) = setindex!(TV.data, x, i, j)
+
 #####################
 ## CompiledSystem  ##
 #####################
@@ -75,7 +144,6 @@ struct CompiledHomotopy{HI}
     homotopy::Homotopy
 end
 
-
 function CompiledHomotopy(H::Homotopy)
     n = length(H)
     nvars = nvariables(H)
@@ -150,17 +218,31 @@ boundscheck_var_map(F::System; kwargs...) =
     boundscheck_var_map(F.expressions, F.variables, F.parameters; kwargs...)
 boundscheck_var_map(H::Homotopy; kwargs...) =
     boundscheck_var_map(H.expressions, H.variables, H.parameters, H.t; kwargs...)
-
-function boundscheck_var_map(exprs, vars, params, t = nothing; jacobian::Bool = false)
+function boundscheck_var_map(
+    exprs,
+    vars,
+    params,
+    t = nothing;
+    taylor = false,
+    jacobian::Bool = false,
+)
     n = length(exprs)
     m = length(vars)
     l = length(params)
     var_map = Dict{Symbol,Union{Symbol,Expr}}()
     for i = 1:m
-        var_map[Symbol(vars[i])] = :(x[$i])
+        if taylor
+            var_map[Symbol(vars[i])] = :(x[$i, 1])
+        else
+            var_map[Symbol(vars[i])] = :(x[$i])
+        end
     end
     for i = 1:l
-        var_map[Symbol(params[i])] = :(p[$i])
+        if taylor
+            var_map[Symbol(params[i])] = :(p[$i, 1])
+        else
+            var_map[Symbol(params[i])] = :(p[$i])
+        end
     end
     if t !== nothing
         var_map[Symbol(t)] = :(t)
@@ -283,50 +365,176 @@ function _evaluate_and_jacobian!_impl(
     end
 end
 
-function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, dx, dp)
-    _diff_t!_impl(T, dx + 1, dx, dp)
+Base.@propagate_inbounds function set_row!(u::AbstractMatrix, t::Tuple{A}, i) where {A}
+    u[i, 1] = first(t)
 end
-function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx, dp)
+Base.@propagate_inbounds function set_row!(u::AbstractMatrix, t::Tuple{A,B}, i) where {A,B}
+    a, b = t
+    u[i, 1] = a
+    u[i, 2] = b
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C},
+    i,
+) where {A,B,C}
+    a, b, c = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C,D},
+    i,
+) where {A,B,C,D}
+    a, b, c, d = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+    u[i, 4] = d
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C,D,E},
+    i,
+) where {A,B,C,D,E}
+    a, b, c, d, e = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+    u[i, 4] = d
+    u[i, 5] = e
+end
+
+function _functions_taylor!_impl(
+    ::Type{T},
+    K::Int;
+    highest_order_only::Bool,
+) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+    I = interpret(T)
+    checks, var_map = boundscheck_var_map(I)
+    list, ids = instruction_list(I.expressions)
+    assignements = Dict{Symbol,Vector{Expr}}()
+    for (i, id) in enumerate(ids)
+        if highest_order_only
+            add_assignement!(assignements, id, :(u[$i] = last($id)))
+        else
+            add_assignement!(assignements, id, :(set_row!(u, $id, $i)))
+        end
+    end
+
+    block = Expr(:block)
+    exprs = block.args
+    for (id, (op, arg1, arg2)) in list.instructions
+        a = get(var_map, arg1, arg1)
+        if op == :^
+            r::Int = arg2
+            if r == 2
+                push!(exprs, :($id = taylor(Val{:sqr}, Val{$K}, $a)))
+            else
+                push!(exprs, :($id = taylor(Val{:^}, Val{$K}, $a, $r)))
+            end
+        elseif arg2 !== nothing
+            b = get(var_map, arg2, arg2)
+            push!(exprs, :($id = taylor(Val{$(QuoteNode(op))}, Val{$K}, $a, $b)))
+        else
+            push!(exprs, :($id = taylor(Val{$(QuoteNode(op))}, Val{$K}, $a)))
+        end
+        if haskey(assignements, id)
+            append!(exprs, assignements[id])
+        end
+    end
+    # TODO: let block only if homotopy....
+    if I isa Homotopy
+        quote
+            $checks
+            let t = (t, one(t))
+                @inbounds $block
+            end
+            u
+        end
+    else
+        quote
+            $checks
+            @inbounds $block
+            u
+        end
+    end
+end
+
+function _inline_taylor!_impl(
+    T::Type{<:Union{CompiledHomotopy,CompiledSystem}},
+    K,
+    dx,
+    dp;
+    highest_order_only::Bool,
+)
     H = interpret(T)
-    checks, var_map = boundscheck_var_map(H)
+    # @show H
+    checks, var_map = boundscheck_var_map(H; taylor = true)
 
     list, ids = instruction_list(H.expressions)
 
     vars = Symbol.(H.variables)
     params = Symbol.(H.parameters)
-
+    # @show vars, dx, dp
+    # @show params
     diff_map = DiffMap()
     for (i, v) in enumerate(vars)
         for k = 1:dx
-            diff_map[v, k] = :($(Symbol(:dx, k))[$i])
+            diff_map[v, k] = :(x[$i, $(k + 1)])
         end
     end
 
     for (i, v) in enumerate(params)
         for k = 1:dp
-            diff_map[v, k] = :($(Symbol(:dp, k))[$i])
+            diff_map[v, k] = :(p[$i, $(k + 1)])
         end
     end
 
     if H isa Homotopy
         diff_map[Symbol(H.t), 1] = 1
     end
-    dlist = univariate_diff!(list, M, diff_map)
+    # @show diff_map
+    dlist = univariate_diff!(list, K, diff_map)
 
     assignements = Dict{Symbol,Vector{Expr}}()
     u_constants = Expr[]
-    for (i, id) in enumerate(ids)
-        d_id = diff_map[id, M]
-        if d_id isa Symbol
-            if d_id ∉ vars && d_id ∉ params
-                add_assignement!(assignements, d_id, :(u[$i] = $d_id))
+
+    if highest_order_only
+        for (i, id) in enumerate(ids)
+            k = K
+            k_id = diff_map[id, k]
+            if k_id isa Symbol
+                if k_id ∉ vars && k_id ∉ params
+                    add_assignement!(assignements, k_id, :(u[$i] = $k_id))
+                else
+                    push!(u_constants, :(u[$i] = $(var_map[k_id])))
+                end
+            elseif k_id isa Nothing
+                push!(u_constants, :(u[$i] = zero(eltype(u))))
             else
-                push!(u_constants, :(u[$i] = $(var_map[d_id])))
+                push!(u_constants, :(u[$i] = $k_id))
             end
-        elseif d_id isa Nothing
-            push!(u_constants, :(u[$i] = zero(eltype(x))))
-        else
-            push!(u_constants, :(u[$i] = $d_id))
+        end
+    else
+        for (i, id) in enumerate(ids)
+            add_assignement!(assignements, id, :(u[$i, 1] = $id))
+            for k = 1:K
+                k_id = diff_map[id, k]
+                if k_id isa Symbol
+                    if k_id ∉ vars && k_id ∉ params
+                        add_assignement!(assignements, k_id, :(u[$i, $(k + 1)] = $k_id))
+                    else
+                        push!(u_constants, :(u[$i, $(k + 1)] = $(var_map[k_id])))
+                    end
+                elseif k_id isa Nothing
+                    push!(u_constants, :(u[$i, $(k + 1)] = zero(u[$i, $(k + 1)])))
+                else
+                    push!(u_constants, :(u[$i, $(k + 1)] = $k_id))
+                end
+            end
         end
     end
     slp = to_expr(dlist, var_map, assignements)
@@ -334,75 +542,19 @@ function _diff_t!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx,
 
     quote
         $checks
-        $(Expr(:tuple, (Symbol(:dx, k) for k = 1:(dx))...)) = dx
-        $(Expr(:tuple, (Symbol(:dp, k) for k = 1:(dp))...)) = dp
-
         @inbounds $slp
         u
     end
 end
 
-function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, dx, dp)
-    _taylor!_impl(T, dx + 1, dx, dp)
-end
-function _taylor!_impl(T::Type{<:Union{CompiledHomotopy,CompiledSystem}}, M, dx, dp)
-    H = interpret(T)
-    checks, var_map = boundscheck_var_map(H)
-
-    list, ids = instruction_list(H.expressions)
-
-    vars = Symbol.(H.variables)
-    params = Symbol.(H.parameters)
-
-    diff_map = DiffMap()
-    for (i, v) in enumerate(vars)
-        for k = 1:dx
-            diff_map[v, k] = :($(Symbol(:dx, k))[$i])
-        end
-    end
-
-    for (i, v) in enumerate(params)
-        for k = 1:dp
-            diff_map[v, k] = :($(Symbol(:dp, k))[$i])
-        end
-    end
-
-    if H isa Homotopy
-        diff_map[Symbol(H.t), 1] = 1
-    end
-    dlist = univariate_diff!(list, M, diff_map)
-
-    assignements = Dict{Symbol,Vector{Expr}}()
-    u_constants = Expr[]
-
-    for (i, id) in enumerate(ids)
-        add_assignement!(assignements, id, :(v[$i] = $id))
-        for k = 1:M
-            k_id = diff_map[id, k]
-            vk = Symbol(:v, k)
-            if k_id isa Symbol
-                if k_id ∉ vars && k_id ∉ params
-                    add_assignement!(assignements, k_id, :($vk[$i] = $k_id))
-                else
-                    push!(u_constants, :($vk[$i] = $(var_map[k_id])))
-                end
-            elseif k_id isa Nothing
-                push!(u_constants, :($vk[$i] = zero(eltype(x))))
-            else
-                push!(u_constants, :($vk[$i] = $k_id))
-            end
-        end
-    end
-
-    slp = to_expr(dlist, var_map, assignements)
-    append!(slp.args, u_constants)
-
-    quote
-        $(Expr(:tuple, :v, (Symbol(:v, k) for k = 1:M)...)) = u
-        $(Expr(:tuple, (Symbol(:dx, k) for k = 1:dx)...)) = dx
-        $(Expr(:tuple, (Symbol(:dp, k) for k = 1:dp)...)) = dp
-        @inbounds $slp
-        nothing
+function _taylor!_impl(T, K, D, DP; kwargs...)
+    # Experiments show that for K < 2 (i.e. u and u̇) the fully inlined version has better
+    # compilation times, for K ≥ 2 the function version starts to become
+    # significantly faster
+    if K ≤ 1
+        _inline_taylor!_impl(T, K, D, DP; kwargs...)
+    else
+        _functions_taylor!_impl(T, K; kwargs...)
     end
 end
 
@@ -470,123 +622,131 @@ store result in `u`.
 end
 
 """
-    diff_t!(u, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
+    taylor!(
+        u::AbstractMatrix,
+        v::Val{M}
+        F::CompiledSystem,
+        x::TaylorVector{D},
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
+    taylor!(
+        u::TaylorVector{M},
+        v::Val{M}
+        F::CompiledSystem,
+        x::TaylorVector{D},
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
 
-Evaluate the expression
-```math
-(1 / r!) dʳ/dλʳ \\, F(x + ∑_{k=1}^{r-1} xᵢλⁱ, p(t + λ))
-```
-at ``λ = 0``.
-If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
-"""
-@generated function diff_t!(
-    u,
-    ::Val{M},
-    T::CompiledSystem,
-    x::AbstractVector,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {M,D,DP}
-    _diff_t!_impl(T, M, D, DP)
-end
-function diff_t!(
-    u,
-    T::CompiledSystem,
-    x::AbstractVector,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {D,DP}
-    diff_t!(u, Val(D + 1), T, x, dx, p, dp)
-end
-
-
-"""
-    diff_t!(u, H::CompiledHomotopy, x, t, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
-
-Evaluate the expression
-```math
-(1 / r!) dʳ/dλʳ \\, H(x + ∑_{k=1}^{r-1} xᵢλⁱ,t + λ)
-```
-at ``λ = 0``.
-If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
-"""
-@generated function diff_t!(
-    u,
-    ::Val{M},
-    T::CompiledHomotopy,
-    x::AbstractVector,
-    t,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {M,D,DP}
-    _diff_t!_impl(T, M, D, DP)
-end
-function diff_t!(
-    u,
-    T::CompiledHomotopy,
-    x::AbstractVector,
-    t,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {D,DP}
-    diff_t!(u, Val(D + 1), T, x, t, dx, p, dp)
-end
-"""
-    taylor!(u::Tuple, F::CompiledSystem, x, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
-
-Evaluate the expression
-```math
-(1 / r!) dʳ/dλʳ \\, F(x + ∑_{k=1}^{r-1} xᵢλⁱ, p(t + λ))
-```
-at ``λ = 0``.
-If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
+Compute the Taylor series of ``u = F(x,p)`` given the Taylor series `x` and `p`.
 """
 @generated function taylor!(
-    u,
-    ::Val{M},
+    u::AbstractMatrix,
+    v::Val{M},
     T::CompiledSystem,
-    x::AbstractVector,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {M,D,DP}
-    _taylor!_impl(T, M, D, DP)
+    x::TaylorVector{D},
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = false)
 end
+@generated function taylor!(
+    u::AbstractMatrix,
+    v::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = false)
+end
+@generated function taylor!(
+    u::AbstractMatrix,
+    v::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::TaylorVector{DP},
+) where {M,D,DP}
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = false)
+end
+
 function taylor!(
-    u,
+    u::TaylorVector{M},
     T::CompiledSystem,
-    x::AbstractVector,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
+    x::TaylorVector{D},
+    p = nothing,
+) where {M,D}
+    taylor!(u.data, Val(M - 1), T, x, p)
+    u
+end
+
+
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::TaylorVector{DP},
 ) where {M,D,DP}
-    diff_t!(u, Val(D + 1), T, x, dx, p, dp)
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
 end
 
 """
-    taylor!(u, H::CompiledHomotopy, x, t, (x₁,…,xᵣ₋₁) = (), p = nothing, (p₁,…,pⱼ) = ())
+    taylor!(
+        u::AbstractVector,
+        ::Val{M}
+        H::Homotopy,
+        x::TaylorVector{D},
+        t::Number,
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
 
-Evaluate the expression
-```math
-(1 / r!) dʳ/dλʳ \\, H(x + ∑_{k=1}^{r-1} xᵢλⁱ,t + λ)
-```
-at ``λ = 0``.
-If ``j < r-1`` then ``pₐ = 0`` for ``a > j``.
+Compute the `M`-th derivative of ``u=H(x,t,p)`` given the taylor series `x` and `p`.
 """
 @generated function taylor!(
-    u,
+    u::AbstractVector,
+    ::Val{M},
     T::CompiledHomotopy,
-    x::AbstractVector,
-    t,
-    dx::NTuple{D,<:AbstractVector} = (),
-    p::Union{Nothing,AbstractVector} = nothing,
-    dp::NTuple{DP,<:AbstractVector} = (),
-) where {D,DP}
-    _taylor!_impl(T, D, DP)
+    x::TaylorVector{D},
+    t::Number,
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::TaylorVector{D},
+    t::Number,
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::TaylorVector{D},
+    t::Number,
+    p::TaylorVector{DP},
+) where {M,D,DP}
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
 end
 
 # non-inplace
@@ -643,52 +803,4 @@ function evaluate_and_jacobian(T::CompiledHomotopy, x, t, p = nothing)
     U = Matrix{Any}(undef, n, m)
     evaluate_and_jacobian!(u, U, T, x, t, p)
     to_smallest_eltype(u), to_smallest_eltype(U)
-end
-
-function diff_t(H::CompiledSystem, x::AbstractVector, args...)
-    u = Vector{Any}(undef, size(H, 1))
-    to_smallest_eltype(diff_t!(u, H, x, args...))
-end
-function diff_t(H::CompiledHomotopy, x::AbstractVector, t, args...)
-    u = Vector{Any}(undef, size(H, 1))
-    to_smallest_eltype(diff_t!(u, H, x, t, args...))
-end
-
-# Helper codegen
-function _div_taylor_vec_impl(N, M)
-    list = ModelKit.InstructionList()
-    id = push!(list, (:/, :a, :b))
-    diff_map = ModelKit.DiffMap()
-    for i = 1:N
-        diff_map[:a, i] = :($(Symbol(:a, i)))
-    end
-    for i = 1:M
-        diff_map[:b, i] = :($(Symbol(:b, i)))
-    end
-
-    k = max(N, M)
-    dlist = ModelKit.univariate_diff!(list, k, diff_map)
-    ids = [id]
-    for i = 1:(k)
-        push!(ids, diff_map[id, i])
-    end
-
-    quote
-        $(Expr(:tuple, :A, (Symbol(:A, k) for k = 1:N)...)) = AS
-        $(Expr(:tuple, :B, (Symbol(:B, k) for k = 1:M)...)) = BS
-        $(Expr(:tuple, :u, (Symbol(:u, k) for k = 1:max(N, M))...)) = us
-        for i = 1:length(A)
-            $([:(a = A[i]), (:($(Symbol(:a, k)) = $(Symbol(:A, k))[i]) for k = 1:N)...]...)
-            $([:(b = B[i]), (:($(Symbol(:b, k)) = $(Symbol(:B, k))[i]) for k = 1:M)...]...)
-            $(ModelKit.to_expr(dlist))
-
-            $(Expr(:tuple, :(u[i]), (:($(Symbol(:u, k))[i]) for k = 1:max(N, M))...)) =
-                $(Expr(:tuple, ids...))
-        end
-        u
-    end
-end
-
-@generated function div_taylor_vec!(us::NTuple, AS::NTuple{N}, BS::NTuple{M}) where {N,M}
-    _div_taylor_vec_impl(N - 1, M - 1)
 end

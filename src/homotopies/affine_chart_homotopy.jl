@@ -92,9 +92,9 @@ function evaluate_and_jacobian!(
     nothing
 end
 
-function diff_t!(u, H::AffineChartHomotopy, x, t, dx::NTuple)
+function taylor!(u, v::Val{N}, H::AffineChartHomotopy, tx::TaylorVector{N}, t) where {N}
     u .= zero(eltype(u))
-    diff_t!(u, H.homotopy, x, t, dx)
+    taylor!(u, v, H.homotopy, tx, t)
     # affine chart part is always zero since it is an affine linear form
     u
 end

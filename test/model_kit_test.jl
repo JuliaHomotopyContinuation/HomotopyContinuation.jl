@@ -413,10 +413,17 @@ using HomotopyContinuation2.ModelKit
         H = ModelKit.Homotopy(h, x, t, [γ])
         TH = ModelKit.compile(H)
 
-        dt1 = ModelKit.diff_t(TH, x, t, (), [γ])
-        dt2 = ModelKit.diff_t(TH, x, t, (ẋ,), [γ])
-        dt3 = ModelKit.diff_t(TH, x, t, (ẋ, ẍ), [γ])
-        dt4 = ModelKit.diff_t(TH, x, t, (ẋ, ẍ, x3), [γ])
+        tx3 = TaylorVector{4}(zeros(Expression, 4, 4))
+        y, y1, y2, y3 = vectors(tx3)
+        y .= x
+        y1 .= ẋ
+        y2 .= ẍ
+        y3 .= x3
+
+        dt1 = ModelKit.taylor!(zeros(Expression, 4), Val(1), TH, TaylorVector{1}(tx3), t, [γ])
+        dt2 = ModelKit.taylor!(zeros(Expression, 4), Val(2), TH, TaylorVector{2}(tx3), t, [γ])
+        dt3 = ModelKit.taylor!(zeros(Expression, 4), Val(3), TH, TaylorVector{3}(tx3), t, [γ])
+        dt4 = ModelKit.taylor!(zeros(Expression, 4), Val(4), TH, TaylorVector{4}(tx3), t, [γ])
 
         @var λ
         Hd1 = subs(H.expressions, t => t + λ)
@@ -439,65 +446,34 @@ using HomotopyContinuation2.ModelKit
         @test expand.(dt4) == expand.(true_dt4)
     end
 
-    @testset "taylor! - homotopy" begin
-        n = 3
-        @var x[0:n] ẋ[0:n] ẍ[0:n] x3[0:n] t γ
-        K = [
-            (
-                sum(x[abs(l)+1] * x[abs(m - l)+1] for l = -n:n if abs(m - l) <= n) - x[m+1] for m = 0:n-1
-            )...,
-            x[1] + 2 * sum(x[i+1] for i = 1:n) - 1,
-        ]
+    @testset "taylor! - system" begin
+        @var x[1:2] ẋ[1:2] ẍ[1:2] x3[1:2] p[1:2] ṗ[1:2]
+        f = [(x[1] + x[2])^3 + x[1]^2 + x[1] + 5x[2] + 3p[1], 2 * x[1]^2 + p[2]]
+        F = System(f, x, p)
+        TF = ModelKit.compile(F)
 
-        h = γ .* t .* [x[1:n] .^ 2 .- 1; x[n+1] - 1] + (1 - t) .* K
-        H = ModelKit.Homotopy(h, x, t, [γ])
-        TH = ModelKit.compile(H)
-
-        v = zeros(Expression, 4)
-        v1 = zeros(Expression, 4)
-        v2 = zeros(Expression, 4)
-        v3 = zeros(Expression, 4)
-        v4 = zeros(Expression, 4)
-
-        ModelKit.taylor!((v, v1), TH, x, t, (), [γ])
-
+        tx = TaylorVector{4}([x' ; ẋ' ; ẍ' ; x3'])
+        tv = TaylorVector{5}(Expression, 2)
+        v, v1, v2, v3, v4 = vectors(tv)
         @var λ
-        Hd1 = subs(H.expressions, t => t + λ)
-        true_v1 = subs(differentiate(Hd1, λ, 1), λ => 0)
-        @test expand.(v) == expand.(h)
-        @test expand.(v1) == expand.(true_v1)
 
-
-        ModelKit.taylor!((v, v1, v2), TH, x, t, (ẋ,), [γ])
-        Hd2 = subs(H.expressions, x => x .+ λ .* ẋ, t => t + λ)
-        true_v1 = subs(differentiate(Hd2, λ, 1), λ => 0)
-        true_v2 = subs(differentiate(Hd2, λ, 2), λ => 0) / 2
-        @test expand.(v) == expand.(h)
+        ModelKit.taylor!(TaylorVector{3}(tv), TF, TaylorVector{2}(tx), p)
+        Fd2 = subs(F.expressions, x => x .+ λ .* ẋ)
+        true_v1 = subs(differentiate(Fd2, λ, 1), λ => 0)
+        true_v2 = subs(differentiate(Fd2, λ, 2), λ => 0) / 2
+        @test expand.(v) == expand.(f)
         @test expand.(v1) == expand.(true_v1)
         @test expand.(v2) == expand.(true_v2)
 
-        ModelKit.taylor!((v, v1, v2, v3), TH, x, t, (ẋ, ẍ), [γ])
-        Hd3 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ, t => t + λ)
-        true_v1 = subs(differentiate(Hd3, λ, 1), λ => 0)
-        true_v2 = subs(differentiate(Hd3, λ, 2), λ => 0) / 2
-        true_v3 = subs(differentiate(Hd3, λ, 3), λ => 0) / 6
-
-        @test expand.(v) == expand.(h)
+        ModelKit.taylor!(TaylorVector{4}(tv), TF, TaylorVector{3}(tx), p)
+        Fd3 = subs(F.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ)
+        true_v1 = subs(differentiate(Fd3, λ, 1), λ => 0)
+        true_v2 = subs(differentiate(Fd3, λ, 2), λ => 0) / 2
+        true_v3 = subs(differentiate(Fd3, λ, 3), λ => 0) / 6
+        @test expand.(v) == expand.(f)
         @test expand.(v1) == expand.(true_v1)
-        @test expand.(v2) == expand.(true_v2)
-        @test expand.(v3) == expand.(true_v3)
-
-        ModelKit.taylor!((v, v1, v2, v3, v4), TH, x, t, (ẋ, ẍ, x3), [γ])
-        Hd4 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3, t => t + λ)
-        true_v1 = subs(differentiate(Hd4, λ, 1), λ => 0)
-        true_v2 = subs(differentiate(Hd4, λ, 2), λ => 0) / 2
-        true_v3 = subs(differentiate(Hd4, λ, 3), λ => 0) / 6
-        true_v4 = subs(differentiate(Hd4, λ, 4), λ => 0) / 24
-
-        @test expand.(v) == expand.(h)
-        @test expand.(v1) == expand.(true_v1)
-        @test expand.(v2) == expand.(true_v2)
-        @test expand.(v3) == expand.(true_v3)
-        @test expand.(v4) == expand.(true_v4)
+        sub = variables(v2) => rand(1:10_000, 6)
+        @test v2(sub) == true_v2(sub)
+        @test v3(sub) == true_v3(sub)
     end
 end

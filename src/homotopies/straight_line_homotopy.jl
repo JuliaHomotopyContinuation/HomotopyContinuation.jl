@@ -12,8 +12,8 @@ struct StraightLineHomotopy{S,T,P1,P2} <: AbstractHomotopy
     ū::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
-    dv_start::NTuple{5,Vector{ComplexF64}}
-    dv_target::NTuple{5,Vector{ComplexF64}}
+    dv_start::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
+    dv_target::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
 end
 
 function StraightLineHomotopy(start::ModelKit.System, target::ModelKit.System)
@@ -28,8 +28,9 @@ function StraightLineHomotopy(start::ModelKitSystem, target::ModelKitSystem)
     ū = zeros(ComplexDF64, m)
     U = zeros(ComplexF64, m, n)
 
-    dv_start = tuple((zeros(ComplexF64, m) for i = 0:4)...)
-    dv_target = tuple((zeros(ComplexF64, m) for i = 0:4)...)
+
+    dv_start = LA.transpose(zeros(ComplexF64, 5, m))
+    dv_target = LA.transpose(zeros(ComplexF64, 5, m))
 
     StraightLineHomotopy(start, target, u, ū, U, dv_start, dv_target)
 end
@@ -62,20 +63,20 @@ function evaluate_and_jacobian!(
     @inbounds U .= t .* U .+ (1.0 .- t) .* H.U
     nothing
 end
-function diff_t!(u, H::StraightLineHomotopy, x, t, ::Tuple{})
+function taylor!(u, ::Val{1}, H::StraightLineHomotopy, tx::TaylorVector{1}, t)
+    x = first(vectors(tx))
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     @inbounds u .= u .- H.u
 end
-function diff_t!(u, H::StraightLineHomotopy, x, t, dx::NTuple{N}) where {N}
-    taylor!(H.dv_start, Val(N + 1), H.start, x, dx)
-    taylor!(H.dv_target, Val(N + 1), H.target, x, dx)
+function taylor!(u, v::Val{K}, H::StraightLineHomotopy, tx::TaylorVector, t) where {K}
+    taylor!(H.dv_start, v, H.start, tx)
+    taylor!(H.dv_target, v, H.target, tx)
 
-    k = length(dx) + 1
-    @inbounds v_start, v_start′ = H.dv_start[k], H.dv_start[k+1]
-    @inbounds v_target, v_target′ = H.dv_target[k], H.dv_target[k+1]
-    @inbounds for i = 1:size(H, 1)
-        u[i] = t * v_start′[i] + v_start[i] + (1 - t) * v_target′[i] - v_target[i]
+    for i = 1:size(H, 1)
+        start = H.dv_start[i, K] + t * H.dv_start[i, K+1]
+        target = (1 - t) * H.dv_target[i, K+1] - H.dv_target[i, K]
+        u[i] = start + target
     end
     u
 end

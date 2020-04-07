@@ -8,9 +8,8 @@ struct ParameterHomotopy{T} <: AbstractHomotopy
     p::Vector{ComplexF64}
     q::Vector{ComplexF64}
     #cache
-    pt::Vector{ComplexF64}
-    pt_high::Vector{ComplexDF64}
-    ṗt::Tuple{Vector{ComplexF64}}
+    t_cache::Base.RefValue{ComplexF64}
+    taylor_pt::TaylorVector{2,ComplexF64}
 end
 
 function ParameterHomotopy(F::ModelKit.System, p, q)
@@ -22,26 +21,40 @@ function ParameterHomotopy(F::ModelKit.CompiledSystem, p, q)
 
     p̂ = Vector{ComplexF64}(p)
     q̂ = Vector{ComplexF64}(q)
-    pt = zero(p̂)
-    ṗt = (zero(p̂),)
-    pt_high = zeros(ComplexDF64, length(p))
+    taylor_pt = TaylorVector{2}(ComplexF64, length(q))
 
-    ParameterHomotopy(F, p̂, q̂, pt, pt_high, ṗt)
+    ParameterHomotopy(F, p̂, q̂, Ref(complex(NaN)), taylor_pt)
 end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
 
-p!(H::ParameterHomotopy, t::Union{Float64,ComplexF64}) =
-    (H.pt .= t .* H.p .+ (1.0 .- t) .* H.q; H.pt)
-p!(H::ParameterHomotopy, t::Union{DoubleF64,ComplexDF64}) =
-    (H.pt_high .= t .* H.p .+ (1.0 .- t) .* H.q; H.pt_high)
+function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
+    t == H.t_cache[] && return H.taylor_pt
 
-ṗ!(H::ParameterHomotopy, t) = (ṗt = first(H.ṗt); ṗt .= H.p .- H.q; H.ṗt)
+    if imag(t) == 0
+        let t = real(t)
+            @inbounds for i in 1:length(H.taylor_pt)
+                H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
+            end
+        end
+    else
+        @inbounds for i in 1:length(H.taylor_pt)
+            H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
+        end
+    end
+    H.t_cache[] = t
 
-evaluate!(u, H::ParameterHomotopy, x, t) = ModelKit.evaluate!(u, H.F, x, p!(H, t))
+    H.taylor_pt
+end
 
-evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t) =
-    ModelKit.evaluate_and_jacobian!(u, U, H.F, x, p!(H, t))
+function evaluate!(u, H::ParameterHomotopy, x, t)
+    ModelKit.evaluate!(u, H.F, x, first(vectors(tp!(H, t))))
+end
 
-diff_t!(u, H::ParameterHomotopy, x, t, dx::Tuple) =
-    ModelKit.diff_t!(u, H.F, x, dx, p!(H, t), ṗ!(H, t))
+function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
+    ModelKit.evaluate_and_jacobian!(u, U, H.F, x, first(vectors(tp!(H, t))))
+end
+
+function taylor!(u, v::Val, H::ParameterHomotopy, tx::TaylorVector, t)
+    ModelKit.taylor!(u, v, H.F, tx, tp!(H, t))
+end

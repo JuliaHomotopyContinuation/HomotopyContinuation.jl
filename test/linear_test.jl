@@ -15,7 +15,8 @@
 
         B = rand_affine_subspace(4, codim = 2)
 
-        graff_tracker = Tracker(AffineSubspaceHomotopy(F, A, B))
+        graff_tracker =
+            Tracker(AffineSubspaceHomotopy(F, A, B), automatic_differentiation = 4)
         graff_result = track.(graff_tracker, W)
         @test all(is_success, graff_result)
     end
