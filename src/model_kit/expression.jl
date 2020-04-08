@@ -629,22 +629,26 @@ Create a system from the given `exprs`. `vars` are the given variables and deter
 the variable ordering.
 
 ## Example
-```julia
+```jldoctest
 julia> @var x y;
-julia> H = System([x^2, y^2], [y, x]);
-julia> H([2, 3], 0)
+
+julia> F = System([x^2, y^2], [y, x]);
+
+julia> F([2, 3])
 2-element Array{Int64,1}:
- 4
  9
+ 4
 ```
 
 It is also possible to declare additional variables.
-```julia
+```jldoctest
 julia> @var x y t a b;
-julia> H = Homotopy([x^2 + a, y^2 + b^2], [x, y], [a, b]);
-julia> H([2, 3], [5, 2])
+
+julia> F = System([x^2 + a, y^2 + b^2], [x, y], [a, b]);
+
+julia> F([2, 3], [5, 2])
 2-element Array{Int64,1}:
- 9
+  9
  13
 ```
 """
