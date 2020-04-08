@@ -737,14 +737,15 @@ Create a homotopy from the given `exprs`. `vars` are the given variables and det
 the variable ordering, `t` is the dedicated variable along which is "homotopied".
 
 ## Example
-```julia
+```jldoctest
 julia> @var x y t;
+
 julia> H = Homotopy([x + t, y + 2t], [y, x], t);
+
 julia> H([2, 3], 0)
 2-element Array{Int64,1}:
  3
  2
-
 
 julia> H([2, 3], 1)
 2-element Array{Int64,1}:
@@ -753,12 +754,14 @@ julia> H([2, 3], 1)
 ```
 
 It is also possible to declare additional variables.
-```julia
+```jldoctest
 julia> @var x y t a b;
+
 julia> H = Homotopy([x^2 + t*a, y^2 + t*b], [x, y], t, [a, b]);
+
 julia> H([2, 3], 1, [5, 2])
 2-element Array{Int64,1}:
- 9
+  9
  11
 ```
 """
