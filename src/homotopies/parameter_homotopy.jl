@@ -1,10 +1,10 @@
 """
-    ParameterHomotopy(F::ModelKit.System, p, q)
+    ParameterHomotopy(F::AbstractSystem, p, q)
 
 Construct the `ParameterHomotopy` ``F(x; t p + (1 - t) q)``.
 """
-struct ParameterHomotopy{T} <: AbstractHomotopy
-    F::ModelKit.CompiledSystem{T}
+struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
+    F::T
     p::Vector{ComplexF64}
     q::Vector{ComplexF64}
     #cache
@@ -14,9 +14,9 @@ end
 
 function ParameterHomotopy(F::ModelKit.System, p, q)
     @assert length(p) == length(q) == length(F.parameters)
-    ParameterHomotopy(ModelKit.compile(F), p, q)
+    ParameterHomotopy(ModelKitSystem(F), p, q)
 end
-function ParameterHomotopy(F::ModelKit.CompiledSystem, p, q)
+function ParameterHomotopy(F::AbstractSystem, p, q)
     @assert length(p) == length(q)
 
     p̂ = Vector{ComplexF64}(p)
@@ -48,13 +48,13 @@ function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
 end
 
 function evaluate!(u, H::ParameterHomotopy, x, t)
-    ModelKit.evaluate!(u, H.F, x, first(vectors(tp!(H, t))))
+    evaluate!(u, H.F, x, first(vectors(tp!(H, t))))
 end
 
 function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
-    ModelKit.evaluate_and_jacobian!(u, U, H.F, x, first(vectors(tp!(H, t))))
+    evaluate_and_jacobian!(u, U, H.F, x, first(vectors(tp!(H, t))))
 end
 
 function taylor!(u, v::Val, H::ParameterHomotopy, tx::TaylorVector, t)
-    ModelKit.taylor!(u, v, H.F, tx, tp!(H, t))
+    taylor!(u, v, H.F, tx, tp!(H, t))
 end
