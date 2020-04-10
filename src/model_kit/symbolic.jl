@@ -852,7 +852,7 @@ evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => 
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
-(F::System)(x::AbstractVector, p::Nothing) = evaluate(F, x)
+(F::System)(x::AbstractVector, p::Nothing = nothing) = evaluate(F, x)
 (F::System)(x::AbstractVector, p::AbstractVector) = evaluate(F, x, p)
 
 function Base.:(==)(F::System, G::System)
