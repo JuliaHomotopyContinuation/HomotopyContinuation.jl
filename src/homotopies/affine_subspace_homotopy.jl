@@ -1,7 +1,7 @@
 export AffineSubspaceHomotopy
 
-struct AffineSubspaceHomotopy{S,T} <: AbstractHomotopy
-    system::ModelKitSystem{S,T}
+struct AffineSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+    system::S
 
     start::AffineSubspace{ComplexF64}
     target::AffineSubspace{ComplexF64}
@@ -29,7 +29,7 @@ AffineSubspaceHomotopy(F::ModelKit.System, start::AffineSubspace, target::Affine
     AffineSubspaceHomotopy(ModelKitSystem(F), start, target)
 
 function AffineSubspaceHomotopy(
-    system::ModelKitSystem,
+    system::AbstractSystem,
     start::AffineSubspace,
     target::AffineSubspace,
 )

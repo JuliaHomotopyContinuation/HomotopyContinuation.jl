@@ -4,9 +4,9 @@ export StraightLineHomotopy
     StraightLineHomotopy(G, F; gamma=exp(i * 2π*rand()))
 Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
 """
-struct StraightLineHomotopy{S,T,P1,P2} <: AbstractHomotopy
-    start::ModelKitSystem{S,P1}
-    target::ModelKitSystem{T,P2}
+struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomotopy
+    start::S
+    target::T
 
     u::Vector{ComplexF64}
     ū::Vector{ComplexDF64}
@@ -19,7 +19,7 @@ end
 function StraightLineHomotopy(start::ModelKit.System, target::ModelKit.System)
     StraightLineHomotopy(ModelKitSystem(start), ModelKitSystem(target))
 end
-function StraightLineHomotopy(start::ModelKitSystem, target::ModelKitSystem)
+function StraightLineHomotopy(start::AbstractSystem, target::AbstractSystem)
     size(start) == size(target) ||
     throw(ArgumentError("Start and target do not have the same size, got $(size(start)) and $(size(target))"))
 
