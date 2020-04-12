@@ -114,10 +114,10 @@
         x = similar(b)
         JM = HC2.Jacobian(zeros(ComplexF64, 6, 6))
         @test JM isa HC2.Jacobian
-        HC2.jacobian(JM) .= A
+        HC2.matrix(JM) .= A
         HC2.updated!(JM)
         ldiv!(x̂, JM, b)
-        ldiv!(x, HC2.jacobian(JM), b)
+        ldiv!(x, HC2.workspace(JM), b)
         @test x == x̂
     end
 end
