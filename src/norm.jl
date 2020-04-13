@@ -1,3 +1,5 @@
+export AbstractNorm, InfNorm, WeightedNorm, distance, norm, init!, update!
+
 using Base: @propagate_inbounds
 import LinearAlgebra: norm
 

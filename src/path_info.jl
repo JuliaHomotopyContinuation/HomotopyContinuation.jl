@@ -20,7 +20,13 @@ struct PathInfo
     n_ldivs::Int
 end
 
-function path_info(tracker::Tracker, x₀, t₁, t₀; debug::Bool = false, kwargs...)
+"""
+    path_info(tracker::Tracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool = false, kwargs...)
+
+Track a path using the given `tracker` and start value `x₀`.
+This returns a struct containing detailed information about the tracked path.
+"""
+function path_info(tracker::Tracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool = false, kwargs...)
     state = tracker.state
 
     s = Float64[]

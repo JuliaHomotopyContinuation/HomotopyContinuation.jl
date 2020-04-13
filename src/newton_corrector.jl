@@ -1,3 +1,8 @@
+# This file contains the Newton corrector used for the path tracking in tracker.jl
+# For a derivation see:
+# Mixed Precision Path Tracking for Polynomial Homotopy Continuation,
+# Sascha Timme (2020), arXiv:1902.02968
+
 @doc """
     NewtonCorrectorReturnCode
 
