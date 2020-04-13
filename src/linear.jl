@@ -79,12 +79,12 @@ function Base.copy!(A::AffineExtrinsic, B::AffineExtrinsic)
     A
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineExtrinsic{T}) where {T}
+function Base.show(io::IO, A::AffineExtrinsic{T}) where {T}
     println(io, "AffineExtrinsic{$T}:")
     println(io, "A:")
-    show(io, mime, A.A)
+    show(io, A.A)
     println(io, "\nb:")
-    show(io, mime, A.b)
+    show(io, A.b)
 end
 
 Base.broadcastable(A::AffineExtrinsic) = Ref(A)
@@ -136,12 +136,12 @@ function Base.:(==)(A::AffineIntrinsic, B::AffineIntrinsic)
     A.A == B.A && A.b₀ == B.b₀ && A.Y == B.Y
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineIntrinsic{T}) where {T}
+function Base.show(io::IO, A::AffineIntrinsic{T}) where {T}
     println(io, "AffineIntrinsic{$T}:")
     println(io, "A:")
-    show(io, mime, A.A)
+    show(io, A.A)
     println(io, "\nb₀:")
-    show(io, mime, A.b₀)
+    show(io, A.b₀)
 end
 
 function Base.copy!(A::AffineIntrinsic, B::AffineIntrinsic)
@@ -281,12 +281,12 @@ Dimension of ambient space of the affine subspace `A`.
 """
 ambient_dim(A::AffineSubspace) = dim(A) + codim(A)
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineSubspace{T}) where {T}
+function Base.show(io::IO, A::AffineSubspace{T}) where {T}
     println(io, "$(dim(A))-dim. affine subspace {x|Ax=b} with eltype $T:")
     println(io, "A:")
-    show(io, mime, A.extrinsic.A)
+    show(io, A.extrinsic.A)
     println(io, "\nb:")
-    show(io, mime, A.extrinsic.b)
+    show(io, A.extrinsic.b)
 end
 
 """

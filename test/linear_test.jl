@@ -4,7 +4,7 @@
         @test dim(A) == dim(intrinsic(A)) == dim(extrinsic(A)) == 1
         @test codim(A) == codim(intrinsic(A)) == codim(extrinsic(A)) == 2
         @test ambient_dim(A) == 3
-        @test startswith(sprint(show, A), "AffineSubspace")
+        @test startswith(sprint(show, A), "1-dim. affine subspace")
         @test identity.(A) == A
 
         @test intrinsic(A) isa AffineIntrinsic
