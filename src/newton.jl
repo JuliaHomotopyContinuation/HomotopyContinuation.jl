@@ -1,0 +1,139 @@
+export newton, NewtonResult
+
+"""
+    NewtonResult
+
+Result returned by [`newton`](@ref).
+
+## Fields
+
+* `return_code::Symbol`: Can be `:success`, `:rejected` or `:max_iters`.
+* `x::Vector{ComplexF64}`: The last value obtained.
+* `accuracy::Float64`: Estimate of the distance of `x` to a true zero.
+* `iters::Int` Number of iterations performed.
+* `contraction_ratio::Float64`: The value `|xᵢ - xᵢ₋₁| / |xᵢ₋₁ - xᵢ₋₂| `.
+"""
+struct NewtonResult
+    return_code::Symbol
+    x::Vector{ComplexF64}
+    accuracy::Float64
+    iters::Int
+    contraction_ratio::Float64
+end
+
+Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonResult) = r
+Base.show(io::IO, result::NewtonResult) = print_fieldnames(io, result)
+
+
+"""
+    is_success(R::NewtonResult)
+
+Returns `true` if the [`newton`](@ref) was successfull.
+"""
+is_success(R::NewtonResult) = R.return_code == :success
+
+struct NewtonCache{M}
+    x::Vector{ComplexF64}
+    Δx::Vector{ComplexF64}
+    x_ext::Vector{ComplexDF64}
+    J::MatrixWorkspace{M}
+    r::Vector{ComplexF64}
+end
+function NewtonCache(F::AbstractSystem)
+    m, n = size(F)
+    x = zeros(ComplexF64, n)
+    Δx = copy(x)
+    x_ext = zeros(ComplexDF64, n)
+    J = MatrixWorkspace(m, n)
+    r = zeros(ComplexF64, m)
+    NewtonCache(x, Δx, x_ext, J, r)
+end
+
+"""
+    newton(
+        F::AbstractSystem,
+        x₀::AbstractVector,
+        norm::AbstractNorm = InfNorm(),
+        cache::NewtonCache = NewtonCache(F, x₀);
+        options...
+    )
+
+An implemenetation of a local Newton's method with various options to specify
+convergence criteria.
+Returns a [`NewtonResult`](@ref).
+The computations are always performed in complex arithmetic with
+double precision, i.e., using `Complex{Float64}`.
+The optional `cache` argument pre-allocates the necessary memory.
+This is useful if the method is called repeatedly.
+
+### Options
+
+* `abs_tol::Float64 = 1e-8`: The method is declared converged if `norm(xᵢ₊₁ - xᵢ) < abs_tol`.
+* `rel_tol::Float64 = abs_tol`: The method is declared converged if
+  `norm(xᵢ₊₁ - xᵢ) < abs_tol * norm(x₀)`.
+* `max_iters::Int = 20`: The maximal number of iterations.
+* `extended_precision::Bool = false`: An optional use of extended precision for the evaluation
+  of `F(x)`. This can increase the achievable accuracy.
+* `contraction_factor::Float64 = 1.0`: The Newton updates have to satisfy
+  ``|xᵢ₊₁ - xᵢ| < a^{2^(i-1)}|x₁ - x₀|`` for ``i ≥ 1`` where ``a`` is `contraction_factor`.
+* `min_contraction_iters::Int = typemax(Int)`:  The minimal number of iterations the
+  `contraction_factor` has to be satisfied. If after `min_contraction_iters` many
+  iterations the contraction factor is not satisfied the step is accepted anyway.
+* `max_abs_norm_first_update::Float64 = Inf`: The initial guess `x₀` is rejected if
+  `norm(x₁ - x₀) >  max_abs_norm_first_update`
+* `max_rel_norm_first_update::Float64 = max_abs_norm_first_update`: The initial guess `x₀`
+  is rejected if `norm(x₁ - x₀) >  max_rel_norm_first_update * norm(x₀)`
+"""
+newton(f::System, args...; kwargs...) = newton(ModelKitSystem(f), args...; kwargs...)
+function newton(
+    F::AbstractSystem,
+    x₀::AbstractVector,
+    norm::AbstractNorm = InfNorm(),
+    cache::NewtonCache = NewtonCache(F);
+    extended_precision::Bool = false,
+    abs_tol::Float64 = 1e-8,
+    rel_tol::Float64 = abs_tol,
+    max_iters::Int = 20,
+    contraction_factor::Float64 = 1.0,
+    min_contraction_iters::Int = typemax(Int),
+    max_abs_norm_first_update::Float64 = Inf,
+    max_rel_norm_first_update::Float64 = max_abs_norm_first_update,
+)
+    @unpack x, Δx, x_ext, J, r = cache
+    x .= x₀
+    a = contraction_factor
+    norm_x = norm(x)
+    norm_Δxᵢ = norm_Δxᵢ₋₁ = NaN
+    for i = 1:max_iters
+        evaluate_and_jacobian!(r, matrix(J), F, x)
+        if extended_precision
+            x_ext .= x
+            evaluate!(r, F, x_ext)
+        end
+
+        updated!(J)
+        LA.ldiv!(Δx, J, r)
+        norm_Δxᵢ = norm(Δx)
+
+        x .= x .- Δx
+
+        if i > 1
+            if norm_Δxᵢ < a * norm_Δxᵢ₋₁
+                norm_Δxᵢ₋₁ = norm_Δxᵢ
+                a *= a
+            elseif i > min_contraction_iters || norm_Δxᵢ < rel_tol * norm_x || norm_Δxᵢ < abs_tol
+                return NewtonResult(:success, x, norm_Δxᵢ, i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+            else
+                return NewtonResult(:rejected, x, norm_Δxᵢ, i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+            end
+        elseif i == 1 && (
+            norm_Δxᵢ > max_rel_norm_first_update * norm_x ||
+            norm_Δxᵢ > max_abs_norm_first_update
+        )
+            return NewtonResult(:rejected, x, norm_Δxᵢ, i, NaN)
+        else
+            norm_Δxᵢ₋₁ = norm_Δxᵢ
+        end
+    end
+    return NewtonResult(:max_iters, x, norm_Δxᵢ, max_iters, norm_Δxᵢ / norm_Δxᵢ₋₁)
+end
