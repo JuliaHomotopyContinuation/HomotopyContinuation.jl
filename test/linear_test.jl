@@ -1,4 +1,41 @@
 @testset "Linear Spaces" begin
+    @testset "AffineSubspace" begin
+        A = AffineSubspace([1 0 3; 2 1 3], [5, -2])
+        @test dim(A) == dim(intrinsic(A)) == dim(extrinsic(A)) == 1
+        @test codim(A) == codim(intrinsic(A)) == codim(extrinsic(A)) == 2
+        @test ambient_dim(A) == 3
+        @test startswith(sprint(show, A), "AffineSubspace")
+        @test identity.(A) == A
+
+        @test intrinsic(A) isa AffineIntrinsic
+        @test startswith(sprint(show, intrinsic(A)), "AffineIntrinsic")
+        @test extrinsic(A) isa AffineExtrinsic
+        @test startswith(sprint(show, extrinsic(A)), "AffineExtrinsic")
+
+        @test identity.(extrinsic(A)) == extrinsic(A)
+        @test identity.(intrinsic(A)) == intrinsic(A)
+        @test identity.(Intrinsic) == Intrinsic
+
+        u = rand(1)
+        x = A(u, Intrinsic)
+        @test coord_change(A, Extrinsic, Intrinsic, x) ≈ u rtol=1e-14
+        @test coord_change(A, Intrinsic, Extrinsic, u) ≈ x rtol=1e-14
+        @test norm(A(x, Extrinsic)) ≈ 0 atol=1e-14
+        @test norm(AffineExtrinsic(intrinsic(A))(x)) ≈ 0.0 atol=1e-14
+
+        B = rand_affine_subspace(3; codim = 2)
+        @test B != A
+        copy!(B, A)
+        @test extrinsic(B) == extrinsic(A)
+        @test intrinsic(B) == intrinsic(A)
+        @test B == A
+
+        C = rand_affine_subspace(3, dim = 1, real = true)
+        @test geodesic_distance(A, C) > 0
+        γ = geodesic(A, C)
+        @test size(γ(1)) == size(intrinsic(A).Y)
+    end
+
     @testset "AffineSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)

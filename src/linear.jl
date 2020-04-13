@@ -47,20 +47,6 @@ const IntrinsicStiefel = Coordinates{:IntrinsicStiefel}()
 const ExtrinsicStiefel = Coordinates{:ExtrinsicStiefel}()
 
 """
-    rand_unitary_matrix(n::Int, T=ComplexF64)
-
-Samples a `n × n` unitary Matrix uniformly from the space of all unitary n × n matrices.
-
-See https://arxiv.org/abs/math-ph/0609050 for a derivation.
-"""
-function rand_unitary_matrix(n::Int, T::Type = ComplexF64)
-    Z = randn(T, n, n) ./ sqrt(2)
-    Q, R = LA.qr(Z, Val(true))
-    Λ = LA.diagm(0 => [R[i, i] / abs(R[i, i]) for i = 1:n])
-    Q * Λ
-end
-
-"""
     AffineExtrinsic
 
 Extrinsic description of an ``m``-dimensional affine subspace ``L`` in ``n``-dimensional space.
@@ -86,6 +72,7 @@ Codimension of the affine subspace `A`.
 """
 codim(A::AffineExtrinsic) = size(A.A, 1)
 
+Base.:(==)(A::AffineExtrinsic, B::AffineExtrinsic) = A.A == B.A && A.b == B.b
 function Base.copy!(A::AffineExtrinsic, B::AffineExtrinsic)
     copy!(A.A, B.A)
     copy!(A.b, B.b)
@@ -99,6 +86,8 @@ function Base.show(io::IO, mime::MIME"text/plain", A::AffineExtrinsic{T}) where 
     println(io, "\nb:")
     show(io, mime, A.b)
 end
+
+Base.broadcastable(A::AffineExtrinsic) = Ref(A)
 
 """
     AffineIntrinsic
@@ -143,6 +132,10 @@ Codimension of the affine subspace `A`.
 """
 codim(I::AffineIntrinsic) = size(I.A, 1) - size(I.A, 2)
 
+function Base.:(==)(A::AffineIntrinsic, B::AffineIntrinsic)
+    A.A == B.A && A.b₀ == B.b₀ && A.Y == B.Y
+end
+
 function Base.show(io::IO, mime::MIME"text/plain", A::AffineIntrinsic{T}) where {T}
     println(io, "AffineIntrinsic{$T}:")
     println(io, "A:")
@@ -157,6 +150,8 @@ function Base.copy!(A::AffineIntrinsic, B::AffineIntrinsic)
     copy!(A.Y, B.Y)
     A
 end
+
+Base.broadcastable(A::AffineIntrinsic) = Ref(A)
 
 function AffineIntrinsic(E::AffineExtrinsic)
     svd = LA.svd(E.A; full = true)
@@ -312,6 +307,10 @@ function Base.copy!(A::AffineSubspace, B::AffineSubspace)
     copy!(A.intrinsic, B.intrinsic)
     copy!(A.extrinsic, B.extrinsic)
     A
+end
+
+function Base.:(==)(A::AffineSubspace, B::AffineSubspace)
+    intrinsic(A) == intrinsic(B) && extrinsic(A) == extrinsic(B)
 end
 
 function (A::AffineSubspace)(x::AbstractVector, ::Coordinates{:Intrinsic})

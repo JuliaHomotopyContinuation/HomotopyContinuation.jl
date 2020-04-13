@@ -24,6 +24,7 @@ end
 
 function RandomizedSystem(F::AbstractSystem, k::Integer)
     n, N = size(F)
+    #TODO: Should the rows of [I A] be unitary?
     A = randn(ComplexF64, k, n - k)
     RandomizedSystem(F, A)
 end
