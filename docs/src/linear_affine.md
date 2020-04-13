@@ -1,7 +1,12 @@
+# Linear and Affine Subspaces
+
+We provide built-in data structures to work with affine and linear subspaces ``L``.
+``L`` can be represented in either *extrinsic coordinates* ``x`` with
+``L =\{ x | Ax = b \}`` or in *intrinsic coordinates* ``u`` with ``L=\{Bu+p | u\}``.
+
 ## Coordinates
 
-Linear and affine subspaces can be represented in either extrinsic coordinates ``x`` with ``Ax = b`` or in intrinsic coordinates ``u`` with ``Bu+p``.
-To specify which coordinates are given / expected the following singletons can be used:
+To specify which coordinates are given / expected the following can be used:
 ```@docs   
 Coordinates
 Intrinsic

@@ -5,8 +5,8 @@ makedocs(
     pages = [
         "Introduction" => "index.md",
         "ModelKit" => "model_kit.md",
-        "Homotopies" => "homotopies.md",
         "Linear and Affine Subspaces" => "linear_affine.md",
+        "Homotopies" => "homotopies.md",
         ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
 )
