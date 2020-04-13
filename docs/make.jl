@@ -6,7 +6,7 @@ makedocs(
         "Introduction" => "index.md",
         "ModelKit" => "model_kit.md",
         "Linear and Affine Subspaces" => "linear_affine.md",
-        "Homotopies" => "homotopies.md",
+        "Systems and Homotopies" => "systems_homotopies.md",
         ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
 )

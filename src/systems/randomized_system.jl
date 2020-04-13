@@ -1,13 +1,13 @@
 export RandomizedSystem, square_up
 
 """
-    RandomizedSystem(F::AbstractSystem, k::Integer) <: AbstractSystem
+    RandomizedSystem(F::Union{System,AbstractSystem}, k::Integer) <: AbstractSystem
 
 Given a ``n × N`` system `F` with ``n > N`` this constructs the system
-``𝕽(F; k)(x) = [I A]⋅F(x)`` where ``I`` is a ``k × k`` identity matrix and
-``A`` is random complex ``k × n`` matrix. See [^SW05, Ch. 13.5] for more details.
+``\\mathfrak{R}(F; k)(x) = [I A]⋅F(x)`` where ``I`` is a ``k × k`` identity matrix and
+``A`` is random complex ``k × n`` matrix. See Chapter 13.5 in [^SW05] for more details.
 
-    RandomizedSystem(F::AbstractSystem, A::Matrix{ComplexF64}) <: AbstractSystem
+    RandomizedSystem(F::Union{System,AbstractSystem}, A::Matrix{ComplexF64}) <: AbstractSystem
 
 Explicitly provide the used randomization matrix `A`.
 
@@ -22,12 +22,13 @@ struct RandomizedSystem{S<:AbstractSystem} <: AbstractSystem
     taylor_U::Matrix{ComplexF64}
 end
 
-function RandomizedSystem(F::AbstractSystem, k::Integer)
+function RandomizedSystem(F::Union{AbstractSystem,System}, k::Integer)
     n, N = size(F)
     #TODO: Should the rows of [I A] be unitary?
     A = randn(ComplexF64, k, n - k)
     RandomizedSystem(F, A)
 end
+RandomizedSystem(F::System, A::Matrix{ComplexF64}) = RandomizedSystem(ModelKitSystem(F), A)
 function RandomizedSystem(F::AbstractSystem, A::Matrix{ComplexF64})
     n, N = size(F)
     n > N || throw(ArgumentError("Then given system is not overdetermined."))
@@ -40,14 +41,12 @@ end
 
 
 """
-    square_up(F::System)
-    square_up(F::AbstractSystem)
+    square_up(F::Union{System, AbstractSystem})
 
 Creates the [`RandomizedSystem`](@ref) ``𝕽(F(x); N)`` where ``N`` is the number of variables
 of `F`.
 """
-square_up(F::ModelKit.System) = square_up(ModelKitSystem(F))
-square_up(F::AbstractSystem) = RandomizedSystem(F, last(size(F)))
+square_up(F::Union{AbstractSystem,System}) = RandomizedSystem(F, last(size(F)))
 
 Base.size(F::RandomizedSystem) = (size(F.A, 1), last(size(F.system)))
 

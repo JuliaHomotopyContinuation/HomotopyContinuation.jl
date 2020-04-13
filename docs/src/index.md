@@ -11,7 +11,7 @@ You can find tutorials, examples, how-to guides and explanations on our homepage
 Pages = [
     "model_kit.md",
     "linear_affine.md",
-    "homotopies.md"
+    "systems_homotopies.md"
 ]
 Depth = 2
 ```
