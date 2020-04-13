@@ -312,7 +312,7 @@ end
 
 Create all monomials of a given degree in the given `variables`.
 
-```
+```julia-repl
 julia> @var x y
 (x, y)
 
@@ -411,7 +411,7 @@ end
 
 Expand a given expression.
 
-```julia
+```julia-repl
 julia> @var x y
 (x, y)
 
@@ -606,7 +606,7 @@ end
 Rewrite `f` using a multi-variate horner schema.
 
 ### Example
-```julia
+```julia-repl
 julia> @var u v c[1:3]
 (u, v, Variable[c₁, c₂, c₃])
 
@@ -746,7 +746,7 @@ end
                 parameters = Variable[])
     System(exprs, variables; parameters = Variable[])
 
-Create a system from the given `Expression`s `exprs`.
+Create a system from the given [`Expression`](@ref)s `exprs`.
 The `variables` determine also the variable ordering.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 
@@ -936,12 +936,12 @@ Base.copy(F::System) = Base.deepcopy(F)
 """
     Homotopy(exprs, vars, t, parameters = Variable[])
 
-Create a homotopy `H(vars,t)` from the given expressions `exprs` where `vars` are the given
+Create a homotopy `H(vars,t)` from the given [`Expression`](@ref)s `exprs` where `vars` are the given
 variables and `t` is the dedicated variable parameterizing the family of systems.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 
 ## Example
-```julia
+```julia-repl
 julia> @var x y t;
 
 julia> H = Homotopy([x + t, y + 2t], [y, x], t)
@@ -964,7 +964,7 @@ julia> H([2, 3], 1)
 ```
 
 It is also possible to declare additional variables.
-```julia
+```julia-repl
 julia> @var x y t a b;
 julia> H = Homotopy([x^2 + t*a, y^2 + t*b], [x, y], t, [a, b])
 Homotopy in t of length 2

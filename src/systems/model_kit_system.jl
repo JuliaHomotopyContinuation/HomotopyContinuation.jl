@@ -1,5 +1,12 @@
 export ModelKitSystem
 
+"""
+    ModelKitSystem(F:System, parameters = nothing)
+
+Construct a system from the given [`System`](@ref) `F` with the given `parameters` fixed.
+The difference to `F` is that this compiles a straight line programm for the fast
+evaluation of `F` and that `ModelKitSystem <: AbstractSystem`.
+"""
 struct ModelKitSystem{S,T<:Union{Nothing,AbstractVector}} <: AbstractSystem
     system::ModelKit.CompiledSystem{S}
     parameters::T

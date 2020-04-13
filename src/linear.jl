@@ -1,6 +1,7 @@
 export AffineSubspace,
     AffineExtrinsic,
     AffineIntrinsic,
+    Coordinates,
     Intrinsic,
     Extrinsic,
     intrinsic,
@@ -46,24 +47,10 @@ const IntrinsicStiefel = Coordinates{:IntrinsicStiefel}()
 const ExtrinsicStiefel = Coordinates{:ExtrinsicStiefel}()
 
 """
-    rand_unitary_matrix(n::Int, T=ComplexF64)
-
-Samples a `n × n` unitary Matrix uniformly from the space of all unitary n × n matrices.
-
-See https://arxiv.org/abs/math-ph/0609050 for a derivation.
-"""
-function rand_unitary_matrix(n::Int, T::Type = ComplexF64)
-    Z = randn(T, n, n) ./ sqrt(2)
-    Q, R = LA.qr(Z, Val(true))
-    Λ = LA.diagm(0 => [R[i, i] / abs(R[i, i]) for i = 1:n])
-    Q * Λ
-end
-
-"""
     AffineExtrinsic
 
 Extrinsic description of an ``m``-dimensional affine subspace ``L`` in ``n``-dimensional space.
-That is ``L = { x | A x = b }``.
+That is ``L = \\{ x | A x = b \\}``.
 """
 struct AffineExtrinsic{T}
     A::Matrix{T}
@@ -85,25 +72,28 @@ Codimension of the affine subspace `A`.
 """
 codim(A::AffineExtrinsic) = size(A.A, 1)
 
+Base.:(==)(A::AffineExtrinsic, B::AffineExtrinsic) = A.A == B.A && A.b == B.b
 function Base.copy!(A::AffineExtrinsic, B::AffineExtrinsic)
     copy!(A.A, B.A)
     copy!(A.b, B.b)
     A
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineExtrinsic{T}) where {T}
+function Base.show(io::IO, A::AffineExtrinsic{T}) where {T}
     println(io, "AffineExtrinsic{$T}:")
     println(io, "A:")
-    show(io, mime, A.A)
+    show(io, A.A)
     println(io, "\nb:")
-    show(io, mime, A.b)
+    show(io, A.b)
 end
+
+Base.broadcastable(A::AffineExtrinsic) = Ref(A)
 
 """
     AffineIntrinsic
 
 Intrinsic description of an ``m``-dimensional affine subspace ``L`` in ``n``-dimensional space.
-That is ``L = { u | A u + b₀ }``. Here, ``A`` and ``b₀`` are in orthogonal coordinates.
+That is ``L = \\{ u | A u + b₀ \\}``. Here, ``A`` and ``b₀`` are in orthogonal coordinates.
 That is, the columns of ``A`` are orthonormal and ``A' b₀ = 0``.
 """
 struct AffineIntrinsic{T}
@@ -142,12 +132,16 @@ Codimension of the affine subspace `A`.
 """
 codim(I::AffineIntrinsic) = size(I.A, 1) - size(I.A, 2)
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineIntrinsic{T}) where {T}
+function Base.:(==)(A::AffineIntrinsic, B::AffineIntrinsic)
+    A.A == B.A && A.b₀ == B.b₀ && A.Y == B.Y
+end
+
+function Base.show(io::IO, A::AffineIntrinsic{T}) where {T}
     println(io, "AffineIntrinsic{$T}:")
     println(io, "A:")
-    show(io, mime, A.A)
+    show(io, A.A)
     println(io, "\nb₀:")
-    show(io, mime, A.b₀)
+    show(io, A.b₀)
 end
 
 function Base.copy!(A::AffineIntrinsic, B::AffineIntrinsic)
@@ -156,6 +150,8 @@ function Base.copy!(A::AffineIntrinsic, B::AffineIntrinsic)
     copy!(A.Y, B.Y)
     A
 end
+
+Base.broadcastable(A::AffineIntrinsic) = Ref(A)
 
 function AffineIntrinsic(E::AffineExtrinsic)
     svd = LA.svd(E.A; full = true)
@@ -177,9 +173,9 @@ end
     AffineSubspace(A, b)
 
 An ``m``-dimensional affine subspace ``L`` in ``n``-dimensional space given by
-the extrinsic description ``L = { x | A x = b }``.
+the extrinsic description ``L = \\{ x | A x = b \\}``.
 
-```
+```julia-repl
 julia> A = AffineSubspace([1 0 3; 2 1 3], [5, -2])
 1-dim. affine subspace {x|Ax=b} with eltype Float64:
 A:
@@ -204,7 +200,7 @@ julia> ambient_dim(A)
 An `AffineSubspace` holds always its [`extrinsic`](@ref) description, see also [`AffineIntrinsic`](@ref),
 as well as its [`intrinsic`](@ref) description, see [`AffineExtrinsic`](@ref).
 
-```
+```julia-repl
 julia> intrinsic(A)
 AffineIntrinsic{Float64}:
 A:
@@ -222,7 +218,7 @@ b₀:
 An `AffineSubspace` can be evaluated with either using [`Intrinsic`](@ref)
 or [`Extrinsic`](@ref) coordinates.
 
-```
+```julia-repl
 julia> u = [0.5]
 1-element Array{Float64,1}:
  0.5
@@ -240,7 +236,7 @@ julia> A(x, Extrinsic)
 ```
 
 To change the used coordinates you can use [`coord_change`](@ref).
-```
+```julia-repl
 julia> coord_change(A, Extrinsic, Intrinsic, x)
 1-element Array{Float64,1}:
  0.49999999999999994
@@ -285,12 +281,12 @@ Dimension of ambient space of the affine subspace `A`.
 """
 ambient_dim(A::AffineSubspace) = dim(A) + codim(A)
 
-function Base.show(io::IO, mime::MIME"text/plain", A::AffineSubspace{T}) where {T}
+function Base.show(io::IO, A::AffineSubspace{T}) where {T}
     println(io, "$(dim(A))-dim. affine subspace {x|Ax=b} with eltype $T:")
     println(io, "A:")
-    show(io, mime, A.extrinsic.A)
+    show(io, A.extrinsic.A)
     println(io, "\nb:")
-    show(io, mime, A.extrinsic.b)
+    show(io, A.extrinsic.b)
 end
 
 """
@@ -313,6 +309,10 @@ function Base.copy!(A::AffineSubspace, B::AffineSubspace)
     A
 end
 
+function Base.:(==)(A::AffineSubspace, B::AffineSubspace)
+    intrinsic(A) == intrinsic(B) && extrinsic(A) == extrinsic(B)
+end
+
 function (A::AffineSubspace)(x::AbstractVector, ::Coordinates{:Intrinsic})
     intrinsic(A)(x, Intrinsic)
 end
@@ -330,10 +330,10 @@ Generate a random [`AffineSubspace`](@ref) with given dimension `dim` or codimen
 (one of them has to be provided) in ambient space of dimension `n`.
 If `real` is `true`, then the extrinsic description is real.
 The subspace is generated by drawing each entry of the extrinsic description indepdently
-from a normal distribuation using [`randn`](@ref).
+from a normal distribuation using `randn`.
 
 ## Example
-```
+```julia-repl
 julia> rand_affine_subspace(3; dim = 1)
 1-dim. affine subspace {x|Ax=b} with eltype Complex{Float64}:
 A:
@@ -387,7 +387,7 @@ Given an affine subspace `A` and a point `p` in coordinates `C₁` compute the p
 `x` describing p in coordinates `C₂`.
 
 ## Example
-```
+```julia-repl
 julia> A = AffineSubspace([1 0 3; 2 1 3], [5, -2]);
 
 julia> u = [1.25];

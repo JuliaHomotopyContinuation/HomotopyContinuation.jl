@@ -1,3 +1,8 @@
+# This file contains a Padé predictor of order (2,1) used for the tracking in tracker.jl
+# For a motivation of this see:
+# Mixed Precision Path Tracking for Polynomial Homotopy Continuation,
+# Sascha Timme (2020), arXiv:1902.02968
+
 struct Pade21
     taylor::BitVector
     τ::Base.RefValue{Float64}

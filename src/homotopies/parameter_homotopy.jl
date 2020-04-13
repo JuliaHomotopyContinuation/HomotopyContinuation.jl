@@ -1,7 +1,11 @@
-"""
-    ParameterHomotopy(F::AbstractSystem, p, q)
+export ParameterHomotopy
 
-Construct the `ParameterHomotopy` ``F(x; t p + (1 - t) q)``.
+"""
+    ParameterHomotopy(F::Union{AbstractSystem,System}; start_parameters, target_parameters)
+    ParameterHomotopy(F::Union{AbstractSystem,System}, start_parameters, target_parameters)
+
+Construct the parameter homotopy ``H(x,t) = F(x; t p + (1 - t) q)`` where ``p`` is
+`start_parameters` and ``q`` is `target_parameters`.
 """
 struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     F::T
@@ -12,11 +16,14 @@ struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     taylor_pt::TaylorVector{2,ComplexF64}
 end
 
-function ParameterHomotopy(F::ModelKit.System, p, q)
+function ParameterHomotopy(F; start_parameters::AbstractVector, target_parameters::AbstractVector)
+    ParameterHomotopy(F, start_parameters, target_parameters)
+end
+function ParameterHomotopy(F::ModelKit.System, p::AbstractVector, q::AbstractVector)
     @assert length(p) == length(q) == length(F.parameters)
     ParameterHomotopy(ModelKitSystem(F), p, q)
 end
-function ParameterHomotopy(F::AbstractSystem, p, q)
+function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVector)
     @assert length(p) == length(q)
 
     p̂ = Vector{ComplexF64}(p)

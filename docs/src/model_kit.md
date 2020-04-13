@@ -1,5 +1,8 @@
 # ModelKit
 
+ModelKit is the symbolic input and modeling language of HomotopyContinuation.jl.
+It is designed such that you can easily create an efficient formulation of your problem.
+
 ## Expressions and Variables
 ```@docs
 Expression
@@ -46,11 +49,4 @@ nparameters(::Homotopy)
 nvariables(::Homotopy)
 parameters(::Homotopy)
 variables(::Homotopy)
-```
-
-## Index
-```@index
-Pages   = ["model_kit.md"]
-Modules = [ModelKit]
-Order   = [:type, :macro, :function]
 ```

@@ -1,4 +1,4 @@
-export newton, NewtonResult
+export newton, is_success, NewtonResult, NewtonCache
 
 """
     NewtonResult
@@ -32,6 +32,11 @@ Returns `true` if the [`newton`](@ref) was successfull.
 """
 is_success(R::NewtonResult) = R.return_code == :success
 
+"""
+    NewtonCache(F::AbstractSystem)
+
+Pre-allocates the necessary memory for [`newton`](@ref).
+"""
 struct NewtonCache{M}
     x::Vector{ComplexF64}
     Δx::Vector{ComplexF64}

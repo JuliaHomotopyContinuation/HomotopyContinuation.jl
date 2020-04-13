@@ -1,3 +1,17 @@
+"""
+    rand_unitary_matrix(n::Int, T=ComplexF64)
+
+Samples a `n × n` unitary Matrix uniformly from the space of all unitary n × n matrices.
+
+See https://arxiv.org/abs/math-ph/0609050 for a derivation.
+"""
+function rand_unitary_matrix(n::Int, T::Type = ComplexF64)
+    Z = randn(T, n, n) ./ sqrt(2)
+    Q, R = LA.qr(Z)
+    Λ = LA.diagm(0 => [R[i, i] / abs(R[i, i]) for i = 1:n])
+    Q * Λ
+end
+
 fast_abs(z::Complex) = sqrt(abs2(z))
 fast_abs(x::Real) = abs(x)
 

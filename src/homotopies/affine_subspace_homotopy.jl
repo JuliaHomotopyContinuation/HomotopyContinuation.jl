@@ -1,5 +1,16 @@
-export AffineSubspaceHomotopy
+export AffineSubspaceHomotopy, set_subspaces!
 
+
+"""
+    AffineSubspaceHomotopy(F::System, V::AffineSubspace, W::AffineSubspace)
+    AffineSubspaceHomotopy(F::AbstractSystem, V::AffineSubspace, W::AffineSubspace)
+
+Creates a homotopy ``H(x,t) = (F ∩ γ(t))(x)`` where ``γ(t)`` is a family of affine subspaces
+such that ``H(x,1) = (F ∩ V)(x)`` and ``H(x,0) = (F ∩ W)(x)``.
+Here ``γ(t)`` is the geodesic between `V` and `W` in the affine Grassmanian, i.e.,
+it is the curve of minimal length connecting `V` and `W`.
+See also [`AffineSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
+"""
 struct AffineSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
 
@@ -68,7 +79,12 @@ function AffineSubspaceHomotopy(
 end
 Base.size(H::AffineSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
 
-function setup!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+"""
+    set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+
+Update the homotopy `H` to track from the affine subspace `start` to `target`.
+"""
+function set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
     Q, Θ, U = geodesic_svd(target, start)
     copy!(H.start, start)
     copy!(H.target, target)

@@ -1,3 +1,9 @@
+"""
+    MatrixWorkspace
+
+This is a data structure for the efficient repeated solution of a square or
+overdetermined linear system `Ax=b`.
+"""
 struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M # Matrix
     d::Vector{Float64} # Inverse of scaling factors

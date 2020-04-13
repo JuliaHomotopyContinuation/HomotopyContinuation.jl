@@ -1,8 +1,10 @@
 export StraightLineHomotopy
 
 """
-    StraightLineHomotopy(G, F; gamma=exp(i * 2π*rand()))
-Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
+    StraightLineHomotopy(G::System, F::System)
+    StraightLineHomotopy(G::AbstractSystem, F::AbstractSystem)
+
+Constructs the straight line homotopy ``H(x, t) = tG(x) + (1-t)F(x)``.
 """
 struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomotopy
     start::S

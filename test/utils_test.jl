@@ -1,4 +1,7 @@
 @testset "utils.jl" begin
+    Q = HC2.rand_unitary_matrix(8, ComplexF64)
+    @test norm(I - Q' * Q, Inf) < 1e-14
+
     @test HC2.fast_abs(-2.0) ≈ abs(-2.0)
     @test HC2.fast_abs(2.0 + 3im) ≈ abs(2.0 + 3im)
 
