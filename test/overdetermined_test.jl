@@ -12,5 +12,14 @@
 
         @test count(is_at_infinity, res) == 4
         @test count(is_success, res) == 5
+
+        count(is_success, map(filter(is_success, res)) do r
+            newton(
+                f,
+                solution(r);
+                extended_precision = true,
+                max_rel_norm_first_update = 100r.accuracy
+            )
+        end)
     end
 end

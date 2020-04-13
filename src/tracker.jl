@@ -343,7 +343,7 @@ LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 
 function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
     J = tracker.state.jacobian
-    evaluate_and_jacobian!(tracker.corrector.r, J.J, tracker.homotopy, x, t)
+    evaluate_and_jacobian!(tracker.corrector.r, matrix(J), tracker.homotopy, x, t)
     updated!(J)
     LA.cond(J, d_l, d_r)
 end
@@ -466,7 +466,7 @@ function compute_derivatives!(
     LA.ldiv!(x¹, jacobian, u)
 
     # Check if we have to do iterative refinment for all the others as well
-    δ = fixed_precision_iterative_refinement!(x¹, jacobian.J, u, norm)
+    δ = fixed_precision_iterative_refinement!(x¹, workspace(jacobian), u, norm)
     state.cond_J_ẋ = δ / eps()
     iterative_refinement = δ > min_acc
     if iterative_refinement
@@ -579,7 +579,7 @@ function init!(
 
     # initialize the predictor
     state.τ = τ
-    evaluate_and_jacobian!(corrector.r, jacobian.J, homotopy, state.x, t)
+    evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, state.x, t)
     updated!(jacobian)
     compute_derivatives_and_update_predictor!(tracker)
     state.τ = trust_region(predictor)

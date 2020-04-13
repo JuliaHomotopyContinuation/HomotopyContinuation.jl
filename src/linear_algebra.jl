@@ -15,6 +15,7 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     inf_norm_est_rwork::Vector{Float64}
 end
 
+MatrixWorkspace(m::Integer, n::Integer) = MatrixWorkspace(zeros(ComplexF64, m, n))
 function MatrixWorkspace(Â::AbstractMatrix)
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
@@ -67,6 +68,8 @@ import Base: @propagate_inbounds
 @propagate_inbounds Base.setindex!(MW::MatrixWorkspace, x, i::Integer, j::Integer) =
     setindex!(MW.A, x, i, j)
 @propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
+
+matrix(M::MatrixWorkspace) = M.A
 
 """
     updated!(MW::MatrixWorkspace)
@@ -695,71 +698,74 @@ end
 ## Jacobian ##
 #####################
 struct Jacobian{M}
-    J::MatrixWorkspace{M}
+    workspace::MatrixWorkspace{M}
     # stats
     factorizations::Base.RefValue{Int}
     ldivs::Base.RefValue{Int}
 end
 Jacobian(A::AbstractMatrix) = Jacobian(MatrixWorkspace(A), Ref(0), Ref(0))
 
-updated!(JM::Jacobian) = (updated!(JM.J); JM)
-jacobian(JM::Jacobian) = JM.J
+updated!(J::Jacobian) = (updated!(J.workspace); J)
+jacobian(J::Jacobian) = J.workspace
 
-function Base.show(io::IO, JM::Jacobian{T}) where {T}
+workspace(J::Jacobian) = J.workspace
+matrix(J::Jacobian) = matrix(workspace(J))
+
+function Base.show(io::IO, J::Jacobian{T}) where {T}
     println(io, "Jacobian{$T}:")
-    println(io, " • # factorizations → ", JM.factorizations[])
-    println(io, " • # ldivs → ", JM.ldivs[])
+    println(io, " • # factorizations → ", J.factorizations[])
+    println(io, " • # ldivs → ", J.ldivs[])
 end
 
 """
-    ldiv!(x̂::AbstractVector, JM::Jacobian, b::AbstractVector)
+    ldiv!(x̂::AbstractVector, J::Jacobian, b::AbstractVector)
 
-solve the linear system `jacobian(JM)x̂=b`.
+solve the linear system `matrix(J)x̂=b`.
 """
 function LA.ldiv!(
     x̂::AbstractVector,
-    JM::Jacobian,
+    J::Jacobian,
     b::AbstractVector,
     norm = nothing;
     row_scaling::Bool = true,
 )
     # stats update
-    JM.factorizations[] += !jacobian(JM).factorized[]
-    JM.ldivs[] += 1
-    LA.ldiv!(x̂, jacobian(JM), b)
+    J.factorizations[] += !workspace(J).factorized[]
+    J.ldivs[] += 1
+    LA.ldiv!(x̂, workspace(J), b)
     x̂
 end
 function LA.ldiv!(
     x̂::AbstractVector,
-    JM::Jacobian,
+    J::Jacobian,
     b::AbstractVector,
     norm::WeightedNorm;
     row_scaling::Bool = true,
 )
-    if !jacobian(JM).factorized[] && row_scaling
-        skeel_row_scaling!(jacobian(JM), weights(norm))
-        apply_row_scaling!(jacobian(JM))
+    if !workspace(J).factorized[] && row_scaling
+        skeel_row_scaling!(workspace(J), weights(norm))
+        apply_row_scaling!(workspace(J))
     end
     # stats update
-    JM.factorizations[] += !jacobian(JM).factorized[]
-    JM.ldivs[] += 1
-    LA.ldiv!(x̂, jacobian(JM), b)
+    J.factorizations[] += !workspace(J).factorized[]
+    J.ldivs[] += 1
+    LA.ldiv!(x̂, workspace(J), b)
     x̂
 end
 
 function iterative_refinement!(
     x::AbstractVector,
-    JM::Jacobian,
+    J::Jacobian,
     b::AbstractVector,
     norm::AbstractNorm;
     max_iters::Int = 3,
     tol::Float64 = sqrt(eps()),
 )
-    JM.ldivs[] += 1
-    δ = mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+    J.ldivs[] += 1
+    δ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
     for i = 2:max_iters
-        JM.ldivs[] += 1
-        δ′ = mixed_precision_iterative_refinement!(x, jacobian(JM), b, norm)
+        J.ldivs[] += 1
+        δ′ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
         if δ′ < tol
             return (accuracy = δ′, diverged = false)
         elseif δ′ > 0.5 * δ
@@ -772,14 +778,14 @@ end
 
 
 """
-    init!(JM::Jacobian)
+    init!(J::Jacobian)
 
 (Re-)initialize the `Jacobian`.
 """
-function init!(JM::Jacobian; keep_stats::Bool = false)
-    JM.factorizations[] = 0
-    JM.ldivs[] = 0
-    JM
+function init!(J::Jacobian; keep_stats::Bool = false)
+    J.factorizations[] = 0
+    J.ldivs[] = 0
+    J
 end
 
 function LA.cond(
@@ -787,5 +793,5 @@ function LA.cond(
     d_l::Union{Nothing,Vector{<:Real}} = nothing,
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
-    LA.cond(jacobian(J), d_l, d_r)
+    LA.cond(workspace(J), d_l, d_r)
 end
