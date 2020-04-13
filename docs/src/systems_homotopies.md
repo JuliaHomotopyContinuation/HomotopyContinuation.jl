@@ -22,6 +22,7 @@ AbstractHomotopy
 AffineChartHomotopy
 on_affine_chart
 AffineSubspaceHomotopy
+set_subspaces!
 ModelKitHomotopy
 ParameterHomotopy
 StraightLineHomotopy

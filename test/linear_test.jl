@@ -56,5 +56,9 @@
             Tracker(AffineSubspaceHomotopy(F, A, B), automatic_differentiation = 4)
         graff_result = track.(graff_tracker, W)
         @test all(is_success, graff_result)
+
+        C = rand_affine_subspace(4, codim = 2)
+        set_subspaces!(graff_tracker.homotopy, B, C)
+        @test all(is_success, track.(graff_tracker, solution.(graff_result)))
     end
 end

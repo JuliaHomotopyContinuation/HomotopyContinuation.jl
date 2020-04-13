@@ -1,4 +1,4 @@
-export AffineSubspaceHomotopy
+export AffineSubspaceHomotopy, set_subspaces!
 
 
 """
@@ -79,7 +79,12 @@ function AffineSubspaceHomotopy(
 end
 Base.size(H::AffineSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
 
-function setup!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+"""
+    set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+
+Update the homotopy `H` to track from the affine subspace `start` to `target`.
+"""
+function set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
     Q, Θ, U = geodesic_svd(target, start)
     copy!(H.start, start)
     copy!(H.target, target)
