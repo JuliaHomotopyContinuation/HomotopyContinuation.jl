@@ -746,7 +746,7 @@ end
                 parameters = Variable[])
     System(exprs, variables; parameters = Variable[])
 
-Create a system from the given `Expression`s `exprs`.
+Create a system from the given [`Expression`](@ref)s `exprs`.
 The `variables` determine also the variable ordering.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 
@@ -936,7 +936,7 @@ Base.copy(F::System) = Base.deepcopy(F)
 """
     Homotopy(exprs, vars, t, parameters = Variable[])
 
-Create a homotopy `H(vars,t)` from the given expressions `exprs` where `vars` are the given
+Create a homotopy `H(vars,t)` from the given [`Expression`](@ref)s `exprs` where `vars` are the given
 variables and `t` is the dedicated variable parameterizing the family of systems.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
 

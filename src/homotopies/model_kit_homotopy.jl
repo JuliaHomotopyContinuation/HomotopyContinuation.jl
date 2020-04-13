@@ -1,7 +1,11 @@
-"""
-    ModelKitHomotopy(H::ModelKit.Homotopy, params = [])
+export ModelKitHomotopy
 
-Construct a `ModelKitHomotopy` with the given parameters fixed.
+"""
+    ModelKitHomotopy(H::Homotopy, parameters = nothing)
+
+Construct a homotopy from the given homotopy `H` with the given `parameters` fixed.
+The difference to `H` is that this compiles a straight line programm for the fast
+evaluation of `H` and that `ModelKitHomotopy <: AbstractHomotopy`.
 """
 struct ModelKitHomotopy{S,P<:Union{Nothing,AbstractVector}} <: AbstractHomotopy
     homotopy::ModelKit.CompiledHomotopy{S}
@@ -10,7 +14,8 @@ end
 
 ModelKitHomotopy(H::ModelKit.Homotopy, parameters = nothing) =
     ModelKitHomotopy(ModelKit.compile(H), parameters)
-ModelKitHomotopy(H::ModelKit.CompiledHomotopy) = ModelKitHomotopy(H, nothing)
+ModelKitHomotopy(H::ModelKit.CompiledHomotopy, parameters = nothing) =
+    ModelKitHomotopy(H, parameters)
 
 Base.size(H::ModelKitHomotopy) = size(H.homotopy)
 

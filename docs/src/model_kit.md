@@ -1,5 +1,3 @@
-# ModelKit
-
 ## Expressions and Variables
 ```@docs
 Expression
