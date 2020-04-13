@@ -1,11 +1,4 @@
-abstract type DifferentiationStrategy end
-
-struct AutomaticDifferentiation <: DifferentiationStrategy end
-
-# Numerical Differentiation
-
-struct NumericalDifferentiation{V<:AbstractVector,V̄<:AbstractVector} <:
-       DifferentiationStrategy
+struct NumericalDifferentiation{V<:AbstractVector,V̄<:AbstractVector}
     xh::V
     u₁::Vector{ComplexF64}
     u₂::Vector{ComplexF64}
@@ -242,27 +235,4 @@ function taylor!(
         u .= 0.5 .* (u₁_extended .+ u₂_extended) ./ h4
     end
     u
-end
-
-## Default handling ignores incremental
-taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
-    taylor!(u, v, H, tx, t)
-
-@generated function taylor!(
-    u,
-    v::Val{M},
-    H,
-    tx,
-    t,
-    AD::Val{N},
-    ND,
-    τ;
-    use_extended_precision::Bool = true,
-    incremental::Bool = false,
-) where {M,N}
-    if M ≤ N
-        :(taylor!(u, v, H, tx, t, incremental))
-    else
-        :(taylor!(u, v, H, tx, t, ND, τ, use_extended_precision))
-    end
 end
