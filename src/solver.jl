@@ -254,7 +254,7 @@ Result with 2 solutions
     solve(F; start_system = :polyhedral, only_torus=false, options...)
 
 Solve the system `F` using a start system computed from the Newton Polytopes of the
-ntries `F`. The number of paths to track is equal to the mixed volume of the
+entries of `F`. The number of paths to track is equal to the mixed volume of the
 Newton Polytopes of the entries of `F`. The mixed volume is at most the total degree of `F`.
 `F` can be
 - `Vector{<:MultivariatePolynomials.AbstractPolynomial}` (e.g. constructed by `@polyvar`)
