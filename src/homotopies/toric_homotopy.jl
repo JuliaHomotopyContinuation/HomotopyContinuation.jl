@@ -1,4 +1,9 @@
-export PolyhedralHomotopy
+###
+### ToricHomotopy
+###
+# This is part of the implementation of polyhedral homotopy, namely to reverse the toric
+# degeneration from 0 to 1.
+# This is only an internal homotopy.
 
 const StructVectorComplexF64 = StructArrays.StructArray{
     Complex{Float64},
@@ -7,11 +12,7 @@ const StructVectorComplexF64 = StructArrays.StructArray{
     Int64,
 }
 
-"""
-    PolyhedralHomotopy(G, F; gamma=exp(i * 2π*rand()))
-Construct the homotopy ``H(x, t) = γtG(x) + (1-t)F(x)``.
-"""
-struct PolyhedralHomotopy{S} <: AbstractHomotopy
+struct ToricHomotopy{S} <: AbstractHomotopy
     system::ModelKit.CompiledSystem{S}
     system_coeffs::Vector{ComplexF64}
     weights::Vector{Float64}
@@ -25,7 +26,7 @@ struct PolyhedralHomotopy{S} <: AbstractHomotopy
     tc1::TaylorVector{2,ComplexF64}
 end
 
-function PolyhedralHomotopy(
+function ToricHomotopy(
     system::ModelKit.CompiledSystem,
     system_coeffs::Vector{Vector{ComplexF64}},
 )
@@ -43,7 +44,7 @@ function PolyhedralHomotopy(
     t_coeffs = Ref(0.0)
     taylor_coeffs = TaylorVector{5}(ComplexF64, m)
 
-    PolyhedralHomotopy(
+    ToricHomotopy(
         system,
         reduce(vcat, system_coeffs),
         weights,
@@ -57,10 +58,10 @@ function PolyhedralHomotopy(
     )
 end
 
-Base.size(H::PolyhedralHomotopy) = size(H.system)
+Base.size(H::ToricHomotopy) = size(H.system)
 
 function update_weights!(
-    H::PolyhedralHomotopy,
+    H::ToricHomotopy,
     support::AbstractVector{<:AbstractMatrix},
     lifting::AbstractVector{<:AbstractVector},
     cell::MixedSubdivisions.MixedCell;
@@ -137,7 +138,7 @@ function evaluate_weights!(
 end
 
 
-function taylor_coeffs!(H::PolyhedralHomotopy, t::Real)
+function taylor_coeffs!(H::ToricHomotopy, t::Real)
     H.t_coeffs[] != t || return H.taylor_coeffs
 
     tc = H.taylor_coeffs
@@ -199,7 +200,7 @@ function taylor_coeffs!(H::PolyhedralHomotopy, t::Real)
     H.taylor_coeffs
 end
 
-function coeffs!(H::PolyhedralHomotopy, t::Real)
+function coeffs!(H::ToricHomotopy, t::Real)
     if t < 0
         c, _ = vectors(H.taylor_coeffs)
         evaluate_weights!(
@@ -221,30 +222,30 @@ function coeffs!(H::PolyhedralHomotopy, t::Real)
     end
 end
 
-function evaluate!(u, H::PolyhedralHomotopy, x::AbstractVector, t)
-    c = coeffs!(H::PolyhedralHomotopy, real(t))
+function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
+    c = coeffs!(H::ToricHomotopy, real(t))
     ModelKit.evaluate!(u, H.system, x, c)
 end
 
-function evaluate_and_jacobian!(u, U, H::PolyhedralHomotopy, x::AbstractVector, t)
-    c = coeffs!(H::PolyhedralHomotopy, real(t))
+function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
+    c = coeffs!(H::ToricHomotopy, real(t))
     ModelKit.evaluate_and_jacobian!(u, U, H.system, x, c)
     nothing
 end
 
-function taylor!(u, v::Val{1}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+function taylor!(u, v::Val{1}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc1)
 end
-function taylor!(u, v::Val{2}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+function taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc2)
 end
-function taylor!(u, v::Val{3}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+function taylor!(u, v::Val{3}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc3)
 end
-function taylor!(u, v::Val{4}, H::PolyhedralHomotopy, tx::TaylorVector, t)
+function taylor!(u, v::Val{4}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.taylor_coeffs)
 end

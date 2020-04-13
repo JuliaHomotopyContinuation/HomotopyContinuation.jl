@@ -93,7 +93,7 @@ end
 The polyhedral tracker combines the tracking from toric infinity toward the target system
 by a two-stage approach.
 """
-struct PolyhedralTracker{H1<:PolyhedralHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}}
     toric_tracker::Tracker{H1,N,Vector{ComplexF64},Vector{ComplexDF64},M}
     generic_tracker::PathTracker{H2,N,Vector{ComplexF64},Vector{ComplexDF64},M}
     support::Vector{Matrix{Int32}}
@@ -110,7 +110,7 @@ function polyhedral(f::ModelKit.System)
         map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
     F = ModelKit.compile(polyehdral_system(support))
 
-    H₁ = PolyhedralHomotopy(F, start_coeffs)
+    H₁ = ToricHomotopy(F, start_coeffs)
     toric_tracker = Tracker(H₁)
 
     H₂ = begin
