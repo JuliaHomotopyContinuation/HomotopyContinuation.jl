@@ -141,8 +141,10 @@
     @testset "Steiner - AD: $AD" for AD = 3:4
         tracker = Tracker(
             ParameterHomotopy(F, p, q),
-            a = 0.05,
-            extended_precision = false,
+            options = TrackerOptions(
+                parameters = TrackerParameters(a = 0.05),
+                extended_precision = false,
+            ),
             automatic_differentiation = AD,
         )
         failed_res = track(tracker, s_p, 1, 0)

@@ -1,5 +1,10 @@
 export Tracker,
     TrackerResult,
+    TrackerOptions,
+    TrackerParameters,
+    DEFAULT_TRACKER_PARAMETERS,
+    FAST_TRACKER_PARAMETERS,
+    CONSERVATIVE_TRACKER_PARAMETERS,
     track,
     track!,
     is_success,
@@ -12,26 +17,103 @@ export Tracker,
     rejected_steps,
     iterator
 
-"""
-    TrackerOptions
 
-The set of options set for a [`Tracker`](@ref). See the description of [`Tracker`](@ref)
-for all possible options.
 """
-Base.@kwdef mutable struct TrackerOptions
-    max_steps::Int = 1_000
-    max_step_size::Float64 = Inf
-    max_initial_step_size::Float64 = Inf
+    TrackerParameters
+
+Parameters that control the performance and robustness characteristics of the path tracking
+algorithm. See [^Tim20] for an explanation and derivation of the parameters.
+We provide three sets of parameters for common use cases:
+
+* [`DEFAULT_TRACKER_PARAMETERS`](@ref)
+* [`FAST_TRACKER_PARAMETERS`](@ref)
+* [`CONSERVATIVE_TRACKER_PARAMETERS`](@ref)
+
+[^Tim20]: Timme, S. "Mixed Precision Path Tracking for Polynomial Homotopy Continuation". arXiv:1902.02968 (2020)
+"""
+Base.@kwdef mutable struct TrackerParameters
     a::Float64 = 0.125
     β_a::Float64 = 1.0
     β_ω::Float64 = 20.0
     β_τ::Float64 = 0.7
     strict_β_τ::Float64 = min(β_τ, 0.45)
-    extended_precision::Bool = true
-    min_step_size::Float64 = exp2(-3 * 53)
-    use_strict_trust_region::Bool = false
-    terminate_cond::Float64 = 1e13
     min_newton_iters::Int = 2
+end
+Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
+
+"The default [TrackerParameters](@ref) which have a good balance between robustness and efficiency."
+const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
+"[TrackerParameters](@ref) which trade speed against a higher chance of path jumping."
+const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.8, β_ω = 10.0)
+"[TrackerParameters](@ref) which trade robustness against some speed."
+const CONSERVATIVE_TRACKER_PARAMETERS =
+    TrackerParameters(β_ω = 100.0, β_τ = 0.45, strict_β_τ = 0.35)
+
+
+"""
+    TrackerOptions(; options...)
+
+The set of options for a [`Tracker`](@ref).
+
+## Options
+
+* `max_steps::Int = 1_000`: The maximal number of steps a tracker attempts
+* `max_step_size::Float64 = Inf`: The maximal size of a step
+* `max_initial_step_size::Float64 = Inf`: The maximal size of the first step
+* `min_step_size::Float64 = 1e-48`: The minimal step size. If a smaller step size would
+  be necessary, then the tracking gets terminated.
+* `extended_precision::Bool = true`: Whether to allow for the use of extended precision,
+  if necessary, in some computations. This can greatly improve the ability to track
+  numerically difficult paths.
+* `terminate_cond::Float64 = 1e13`: If the relative component-wise condition number
+  `cond(H_x, ẋ)` is larger than `terminate_cond` then the path is terminated as too
+  ill-conditioned.
+* `parameters::Union{Symbol,TrackerParameters} = :default` Set the
+  [`TrackerParameters`](@ref) to control the performance of the path tracking algorithm.
+  The values `:default`, `:conservative` and `:fast` are shorthands for using
+  [`DEFAULT_TRACKER_PARAMETERS`](@ref), [`CONSERVATIVE_TRACKER_PARAMETERS`](@ref) resp.
+  [`FAST_TRACKER_PARAMETERS`](@ref).
+"""
+mutable struct TrackerOptions
+    max_steps::Int
+    max_step_size::Float64
+    max_initial_step_size::Float64
+    extended_precision::Bool
+    min_step_size::Float64
+    terminate_cond::Float64
+    parameters::TrackerParameters
+end
+function TrackerOptions(;
+    max_steps::Int = 1_000,
+    max_step_size::Float64 = Inf,
+    max_initial_step_size::Float64 = Inf,
+    extended_precision::Bool = true,
+    min_step_size::Float64 = 1e-48,
+    terminate_cond::Float64 = 1e13,
+    parameters::Union{Symbol,TrackerParameters} = :default,
+)
+
+    if parameters isa Symbol
+        if parameters == :default
+            parameters = DEFAULT_TRACKER_PARAMETERS
+        elseif parameters == :fast
+            parameters = FAST_TRACKER_PARAMETERS
+        elseif parameters == :conservative
+            parameters = CONSERVATIVE_TRACKER_PARAMETERS
+        else
+            throw(ArgumentError("Unsupported `parameters` value $parameters"))
+        end
+    end
+
+    TrackerOptions(
+        max_steps,
+        max_step_size,
+        max_initial_step_size,
+        extended_precision,
+        min_step_size,
+        terminate_cond,
+        parameters,
+    )
 end
 
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
@@ -190,7 +272,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
     last_steps_failed::Int
 end
 
-function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{InfNorm})
+function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
     x̂ = zero(x)
     x̄ = zero(x)
@@ -203,7 +285,7 @@ function TrackerState(H, x₁::AbstractVector, t₁, t₀, norm::WeightedNorm{In
     tx³ = TaylorVector{4}(tx⁴)
 
     u = zeros(ComplexF64, m)
-    segment_stepper = SegmentStepper(t₁, t₀)
+    segment_stepper = SegmentStepper(1.0, 0.0)
     Δs_prev = 0.0
     accuracy = 0.0
     μ = eps()
@@ -287,38 +369,22 @@ struct Tracker{
 end
 
 Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(ModelKitHomotopy(H); kwargs...)
-function Tracker(H::AbstractHomotopy; kwargs...)
-    x = zeros(ComplexF64, size(H, 2))
-    Tracker(H, x, 1.0, 0.0; kwargs...)
-end
 function Tracker(H::AffineChartHomotopy; kwargs...)
     d = dims(H.chart)
     x = PVector(randn(ComplexF64, sum(d) + length(d)), d)
-    Tracker(H, x, 1.0, 0.0; kwargs...)
+    Tracker(H, x; kwargs...)
 end
-
 function Tracker(
     H::AbstractHomotopy,
-    x₁::AbstractVector,
-    t₁::Number,
-    t₀::Number;
-    norm_scale_min = sqrt(eps()),
-    norm_scale_abs_min = min(norm_scale_min^2, sqrt(eps())),
-    norm_scale_max = exp2(div(1023, 2)),
+    x::AbstractVector = zeros(size(H, 2));
+    weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
+    options::TrackerOptions = TrackerOptions(),
     automatic_differentiation::Int = 3,
-    kwargs...,
 )
-    norm = WeightedNorm(
-        InfNorm(),
-        size(H, 2);
-        scale_min = norm_scale_min,
-        scale_abs_min = norm_scale_abs_min,
-        scale_max = norm_scale_max,
-    )
-    options = TrackerOptions(; kwargs...)
-    state = TrackerState(H, x₁, t₁, t₀, norm)
+    norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
+    state = TrackerState(H, x, norm)
     predictor = Pade21(size(H, 2))
-    corrector = NewtonCorrector(options.a, state.x, size(H, 1))
+    corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
 
     if !(0 ≤ automatic_differentiation ≤ 4)
         throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
@@ -328,7 +394,9 @@ function Tracker(
     Tracker(H, predictor, corrector, state, options, AD, ND)
 end
 
-Base.show(io::IO, C::Tracker) = print(io, "Tracker")
+function Base.show(io::IO, C::Tracker{<:Any,N}) where {N}
+    print(io, "Tracker with automatic_differentiation=$N")
+end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::Tracker) = x
 Base.broadcastable(C::Tracker) = Ref(C)
 
@@ -356,16 +424,12 @@ nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
 
 # intial step size
 function initial_step_size(state::TrackerState, predictor::Pade21, options::TrackerOptions)
-    a = options.β_a * options.a
-    ω = options.β_ω * state.ω
+    a = options.parameters.β_a * options.parameters.a
+    ω = options.parameters.β_ω * state.ω
     e = state.norm(local_error(predictor))
-    if options.use_strict_trust_region
-        τ = strict_trust_region(predictor)
-    else
-        τ = trust_region(predictor)
-    end
+    τ = trust_region(predictor)
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
-    Δs₂ = options.β_τ * τ
+    Δs₂ = options.parameters.β_τ * τ
     Δs = nanmin(Δs₁, Δs₂)
     min(Δs, options.max_step_size, options.max_initial_step_size)
 end
@@ -377,14 +441,10 @@ function update_stepsize!(
     predictor::Pade21;
     ad_for_error_estimate::Bool = true,
 )
-    a = options.β_a * options.a
-    ω = options.β_ω * state.ω
+    a = options.parameters.β_a * options.parameters.a
+    ω = options.parameters.β_ω * state.ω
     p = order(predictor)
-    if options.use_strict_trust_region
-        τ = strict_trust_region(predictor)
-    else
-        τ = trust_region(predictor)
-    end
+    τ = trust_region(predictor)
     if is_converged(result)
         # e₁ = state.norm(local_error(predictor))
         # If we don't use automatic_differentiation for the 4th derivative
@@ -399,9 +459,9 @@ function update_stepsize!(
             e = nanmin(e₁, e₂)
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
         end
-        Δs₂ = options.β_τ * τ
+        Δs₂ = options.parameters.β_τ * τ
         if state.use_strict_β_τ || dist_to_target(state.segment_stepper) < Δs₂
-            Δs₂ = options.strict_β_τ * τ
+            Δs₂ = options.parameters.strict_β_τ * τ
         end
         Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
         if state.last_step_failed
@@ -425,7 +485,8 @@ end
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
     if state.extended_prec || !options.extended_precision
-        tol_acc = options.a^(2^options.min_newton_iters - 1) * _h(options.a)
+        @unpack a, min_newton_iters = options.parameters
+        tol_acc = a^(2^min_newton_iters - 1) * _h(a)
     else
         tol_acc = Inf
     end
@@ -559,8 +620,8 @@ function init!(
     # compute ω and limit accuracy μ for the start value
     t = state.t
     if isnan(ω) || isnan(μ)
-        valid, ω, μ =
-            init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = options.a)
+        a = options.parameters.a
+        valid, ω, μ = init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = a)
     else
         valid = true
     end
@@ -605,7 +666,7 @@ end
 function update_precision!(tracker::Tracker, μ_low)
     @unpack homotopy, corrector, state, options = tracker
     @unpack μ, ω, x, t, jacobian, norm = state
-    @unpack a = options
+    @unpack a = options.parameters
 
     options.extended_precision || return false
 

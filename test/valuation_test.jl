@@ -25,7 +25,7 @@
         ]
         H, starts = total_degree_homotopy(f, [x, y]; gamma = 1.3im + 0.4)
         S = collect(starts)
-        tracker = Tracker(H, β_τ = 0.5)
+        tracker = Tracker(H, options = TrackerOptions(parameters = :conservative))
         val = HC2.Valuation(2)
         tf = 1e-10
         track!(tracker, S[3], 1, tf)
@@ -46,7 +46,7 @@
         f2 = (a[1] * x^2 + a[2] * y) * (a[5] * x + a[6] * y) + 1
         H, starts = total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
         S = collect(starts)
-        tracker = Tracker(H, β_τ = 0.5)
+        tracker = Tracker(H, options = TrackerOptions(parameters = :conservative))
         val = HC2.Valuation(2)
         tf = 1e-10
         HC2.track!(tracker, S[3], 1, tf)
