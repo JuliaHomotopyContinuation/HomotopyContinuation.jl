@@ -29,25 +29,25 @@ end
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
-module PathTrackerReturnCode
-import ..TrackerReturnCode
+module PathTrackerCode
+import ..TrackerCode
 """
-    enum PathTrackerReturnCode
+    enum PathTrackerCode
 
 The possible states a `PathTracker` can be in:
 
-* `PathTrackerReturnCode.tracking`
-* `PathTrackerReturnCode.success`
-* `PathTrackerReturnCode.at_infinity`
-* `PathTrackerReturnCode.at_zero`
-* `PathTrackerReturnCode.excess_solution`
-* `PathTrackerReturnCode.post_check_failed`
-* `PathTrackerReturnCode.terminated_accuracy_limit`
-* `PathTrackerReturnCode.terminated_ill_conditioned`
-* `PathTrackerReturnCode.terminated_invalid_startvalue`
-* `PathTrackerReturnCode.terminated_max_winding_number`
-* `PathTrackerReturnCode.terminated_max_iters`
-* `PathTrackerReturnCode.terminated_step_size_too_small`
+* `PathTrackerCode.tracking`
+* `PathTrackerCode.success`
+* `PathTrackerCode.at_infinity`
+* `PathTrackerCode.at_zero`
+* `PathTrackerCode.excess_solution`
+* `PathTrackerCode.post_check_failed`
+* `PathTrackerCode.terminated_accuracy_limit`
+* `PathTrackerCode.terminated_ill_conditioned`
+* `PathTrackerCode.terminated_invalid_startvalue`
+* `PathTrackerCode.terminated_max_winding_number`
+* `PathTrackerCode.terminated_max_iters`
+* `PathTrackerCode.terminated_step_size_too_small`
 """
 @enum codes begin
     tracking
@@ -66,20 +66,20 @@ The possible states a `PathTracker` can be in:
     polyhedral_failed
 end
 
-function Base.convert(::Type{codes}, code::TrackerReturnCode.codes)
-    if code == TrackerReturnCode.success
+function Base.convert(::Type{codes}, code::TrackerCode.codes)
+    if code == TrackerCode.success
         return success
-    elseif code == TrackerReturnCode.terminated_max_iters
+    elseif code == TrackerCode.terminated_max_iters
         return terminated_max_iters
-    elseif code == TrackerReturnCode.terminated_accuracy_limit
+    elseif code == TrackerCode.terminated_accuracy_limit
         return terminated_accuracy_limit
-    elseif code == TrackerReturnCode.terminated_ill_conditioned
+    elseif code == TrackerCode.terminated_ill_conditioned
         return terminated_ill_conditioned
-    elseif code == TrackerReturnCode.terminated_invalid_startvalue
+    elseif code == TrackerCode.terminated_invalid_startvalue
         return terminated_invalid_startvalue
-    elseif code == TrackerReturnCode.terminated_step_size_too_small
+    elseif code == TrackerCode.terminated_step_size_too_small
         return terminated_step_size_too_small
-    elseif code == TrackerReturnCode.terminated_unknown
+    elseif code == TrackerCode.terminated_unknown
         return terminated_unknown
     else
         return tracking
@@ -90,47 +90,47 @@ end
 
 
 """
-    is_success(code::PathTrackerReturnCode.codes)
+    is_success(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates a success in tracking.
 """
-is_success(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.success
+is_success(code::PathTrackerCode.codes) = code == PathTrackerCode.success
 
 """
-    is_success(code::PathTrackerReturnCode.codes)
+    is_success(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates that a path diverged towards infinity.
 """
-is_at_infinity(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.at_infinity
+is_at_infinity(code::PathTrackerCode.codes) =
+    code == PathTrackerCode.at_infinity
 
 """
-    is_tracking(code::PathTrackerReturnCode.codes)
+    is_tracking(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates the tracking is not going on.
 """
-is_tracking(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.tracking
+is_tracking(code::PathTrackerCode.codes) = code == PathTrackerCode.tracking
 
 """
-    is_invalid_startvalue(code::PathTrackerReturnCode.codes)
+    is_invalid_startvalue(code::PathTrackerCode.codes)
 
 Returns `true` if the provided start value was not valid.
 """
-is_invalid_startvalue(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.terminated_invalid_startvalue
+is_invalid_startvalue(code::PathTrackerCode.codes) =
+    code == PathTrackerCode.terminated_invalid_startvalue
 
 """
-    is_terminated_callback(code::PathTrackerReturnCode.codes)
+    is_terminated_callback(code::PathTrackerCode.codes)
 
 Returns `true` if the provided callback indicated a termination of the path.
 """
-is_terminated_callback(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.terminated_callback
+is_terminated_callback(code::PathTrackerCode.codes) =
+    code == PathTrackerCode.terminated_callback
 
 
 # State
 Base.@kwdef mutable struct PathTrackerState{V<:AbstractVector}
-    code::PathTrackerReturnCode.codes = PathTrackerReturnCode.tracking
+    code::PathTrackerCode.codes = PathTrackerCode.tracking
     val::Valuation
     endgame_started::Bool = false
     row_scaling::Vector{Float64}
@@ -305,8 +305,8 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         state.cond = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
 
         # If a path got terminated, let's be more generous to classify them as at_infinity
-        if state.code == PathTrackerReturnCode.terminated_accuracy_limit ||
-           state.code == PathTrackerReturnCode.terminated_ill_conditioned
+        if state.code == PathTrackerCode.terminated_accuracy_limit ||
+           state.code == PathTrackerCode.terminated_ill_conditioned
 
             verdict = analyze(
                 state.val;
@@ -316,9 +316,9 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
             )
 
             if options.at_infinity_check && verdict.at_infinity
-                return (state.code = PathTrackerReturnCode.at_infinity)
+                return (state.code = PathTrackerCode.at_infinity)
             elseif options.at_zero_check && verdict.at_zero
-                return (state.code = PathTrackerReturnCode.at_zero)
+                return (state.code = PathTrackerCode.at_zero)
             end
         end
         return state.code
@@ -391,12 +391,12 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
     if options.at_infinity_check && at_infinity && state.cond > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = PathTrackerReturnCode.at_infinity)
+        return (state.code = PathTrackerCode.at_infinity)
 
     elseif options.at_zero_check && at_zero && state.cond > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = PathTrackerReturnCode.at_zero)
+        return (state.code = PathTrackerCode.at_zero)
 
     elseif finite && state.cond > options.min_cond_eg
         res, m, acc_est = cauchy!(state, tracker, options)
@@ -424,7 +424,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
                         state.row_scaling,
                         state.col_scaling,
                     )
-                    return (state.code = PathTrackerReturnCode.success)
+                    return (state.code = PathTrackerCode.success)
                 else
                     state.cauchy_failures += 1
                     @goto save_cauchy_result
@@ -432,7 +432,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
             end
         elseif res == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
             if state.max_winding_number_hit
-                state.code = PathTrackerReturnCode.terminated_max_winding_number
+                state.code = PathTrackerCode.terminated_max_winding_number
             else
                 state.cauchy_failures += 1
                 state.max_winding_number_hit = true
@@ -463,7 +463,7 @@ function track!(
 end
 
 Base.@kwdef mutable struct PathResult{V<:AbstractVector}
-    return_code::PathTrackerReturnCode.codes
+    return_code::PathTrackerCode.codes
     solution::V
     t::Float64
     accuracy::Float64

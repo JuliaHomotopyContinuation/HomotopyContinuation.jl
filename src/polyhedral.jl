@@ -191,7 +191,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
     if !is_success(retcode)
         state = PT.toric_tracker.state
         return PathResult(
-            return_code = PathTrackerReturnCode.polyhedral_failed,
+            return_code = PathTrackerCode.polyhedral_failed,
             solution = copy(state.x),
             t = real(state.t),
             accuracy = state.accuracy,

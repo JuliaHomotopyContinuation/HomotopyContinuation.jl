@@ -119,19 +119,19 @@ end
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
-module TrackerReturnCode
+module TrackerCode
 
 @doc """
-    TrackerReturnCode.codes
+    TrackerCode.codes
 
 The possible states a `CoreTracker` can have are
 
-* `TrackerReturnCode.tracking`: The tracking is still in progress
-* `TrackerReturnCode.success`: Indicates a successfull completed tracking
-* `TrackerReturnCode.terminated_max_iters`: Tracking terminated since maximal iterations reached.
-* `TrackerReturnCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
-* `TrackerReturnCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
-* `TrackerReturnCode.terminated_step_size_too_small`
+* `TrackerCode.tracking`: The tracking is still in progress
+* `TrackerCode.success`: Indicates a successfull completed tracking
+* `TrackerCode.terminated_max_iters`: Tracking terminated since maximal iterations reached.
+* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
+* `TrackerCode.terminated_step_size_too_small`
 """
 @enum codes begin
     tracking
@@ -147,36 +147,36 @@ end
 end
 
 """
-    is_success(S::TrackerReturnCode.codes)
+    is_success(S::TrackerCode.codes)
 
 Returns `true` if `S` indicates a success in the path tracking.
 """
-is_success(S) = S == TrackerReturnCode.success
+is_success(S) = S == TrackerCode.success
 
 """
-    is_terminated(S::TrackerReturnCode.codes)
+    is_terminated(S::TrackerCode.codes)
 
 Returns `true` if `S` indicates that the path tracking got terminated. This is not `true`
 if `is_success(S)` is `true`.
 """
-is_terminated(S::TrackerReturnCode.codes) =
-    S ≠ TrackerReturnCode.tracking && S ≠ TrackerReturnCode.success
+is_terminated(S::TrackerCode.codes) =
+    S ≠ TrackerCode.tracking && S ≠ TrackerCode.success
 
 """
-    is_invalid_startvalue(S::TrackerReturnCode.codes)
+    is_invalid_startvalue(S::TrackerCode.codes)
 
 Returns `true` if `S` indicates that the path tracking got terminated since the start
 value was not a zero.
 """
-is_invalid_startvalue(S::TrackerReturnCode.codes) =
-    S == TrackerReturnCode.terminated_invalid_startvalue
+is_invalid_startvalue(S::TrackerCode.codes) =
+    S == TrackerCode.terminated_invalid_startvalue
 
 """
-    is_tracking(S::TrackerReturnCode.codes)
+    is_tracking(S::TrackerCode.codes)
 
 Returns `true` if `S` indicates that the path tracking is not yet finished.
 """
-is_tracking(S::TrackerReturnCode.codes) = S == TrackerReturnCode.tracking
+is_tracking(S::TrackerCode.codes) = S == TrackerCode.tracking
 
 
 # RESULT
@@ -186,7 +186,7 @@ is_tracking(S::TrackerReturnCode.codes) = S == TrackerReturnCode.tracking
 Containing the result of tracking a path with `Tracker`.
 """
 struct TrackerResult{V<:AbstractVector{ComplexF64}}
-    returncode::TrackerReturnCode.codes
+    returncode::TrackerCode.codes
     solution::V
     t::ComplexF64
     accuracy::Float64
@@ -256,7 +256,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
 
     jacobian::Jacobian{M}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
-    code::TrackerReturnCode.codes
+    code::TrackerCode.codes
 
     # buffer for the computation of derivatives
     tx⁰::TaylorVector{1,ComplexF64}
@@ -296,7 +296,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     used_extended_prec = extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
-    code = TrackerReturnCode.tracking
+    code = TrackerCode.tracking
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = 0
     last_steps_failed = 0
@@ -492,15 +492,15 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
     end
 
     if is_done(state.segment_stepper)
-        state.code = TrackerReturnCode.success
+        state.code = TrackerCode.success
     elseif steps(state) ≥ options.max_steps
-        state.code = TrackerReturnCode.terminated_max_iters
+        state.code = TrackerCode.terminated_max_iters
     elseif state.ω * state.μ > tol_acc
-        state.code = TrackerReturnCode.terminated_accuracy_limit
+        state.code = TrackerCode.terminated_accuracy_limit
     elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
-        state.code = TrackerReturnCode.terminated_ill_conditioned
+        state.code = TrackerCode.terminated_ill_conditioned
     elseif state.segment_stepper.Δs < options.min_step_size
-        state.code = TrackerReturnCode.terminated_step_size_too_small
+        state.code = TrackerCode.terminated_step_size_too_small
     end
     nothing
 end
@@ -540,7 +540,7 @@ function compute_derivatives!(
             max_iters = max_iters,
         )
         if diverged
-            state.code = TrackerReturnCode.terminated_ill_conditioned
+            state.code = TrackerCode.terminated_ill_conditioned
         end
     end
 
@@ -611,7 +611,7 @@ function init!(
     state.use_strict_β_τ = false
     init!(norm, x)
     init!(jacobian)
-    state.code = TrackerReturnCode.tracking
+    state.code = TrackerCode.tracking
     if !keep_steps
         state.accepted_steps = state.rejected_steps = 0
     end
@@ -634,7 +634,7 @@ function init!(
     end
 
     if !valid
-        state.code = TrackerReturnCode.terminated_invalid_startvalue
+        state.code = TrackerCode.terminated_invalid_startvalue
         return false
     end
 
@@ -654,7 +654,7 @@ end
 
 function init!(tracker::Tracker, t₀::Number)
     @unpack state, predictor, options = tracker
-    state.code = TrackerReturnCode.tracking
+    state.code = TrackerCode.tracking
     init!(state.segment_stepper, state.t, t₀)
     Δs = initial_step_size(state, predictor, tracker.options)
     propose_step!(state.segment_stepper, Δs)
@@ -874,7 +874,7 @@ end
 
 function Base.iterate(iter::PathIterator, state = nothing)
     state === nothing && return current_x_t(iter), 1
-    iter.tracker.state.code != TrackerReturnCode.tracking && return nothing
+    iter.tracker.state.code != TrackerCode.tracking && return nothing
 
     while is_tracking(iter.tracker.state.code)
         step_failed = !step!(iter.tracker)

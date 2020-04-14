@@ -15,7 +15,7 @@ struct PathInfo
     Δx̂x::Vector{Float64}
     high_prec::Vector{Bool}
     # total info
-    return_code::TrackerReturnCode.codes
+    return_code::TrackerCode.codes
     n_factorizations::Int
     n_ldivs::Int
 end
