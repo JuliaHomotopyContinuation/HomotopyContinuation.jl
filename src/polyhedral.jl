@@ -146,7 +146,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         update_weights!(H, PT.support, PT.lifting, cell, min_weight = 1.0)
 
     if max_weight < 10
-        (retcode, μ, ω) = track!(
+        retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
@@ -155,8 +155,9 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             μ = 1e-12,
             max_initial_step_size = 0.2,
         )
+        @unpack μ, ω = PT.toric_tracker.state
     else
-        (retcode, μ, ω) = track!(
+        retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
@@ -165,6 +166,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             μ = 1e-12,
             max_initial_step_size = 0.2,
         )
+        @unpack μ, ω = PT.toric_tracker.state
         # TODO: check retcode?
         min_weight, max_weight =
             update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
@@ -175,7 +177,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             min_step_size = PT.toric_tracker.options.min_step_size
             PT.toric_tracker.options.min_step_size = 0.0
 
-            (retcode, μ, ω) = track!(
+            retcode = track!(
                 PT.toric_tracker,
                 PT.toric_tracker.state.x,
                 t_restart,
@@ -185,6 +187,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
                 τ = 0.1 * t_restart,
                 keep_steps = true,
             )
+            @unpack μ, ω = PT.toric_tracker.state
             PT.toric_tracker.options.min_step_size = min_step_size
         end
     end

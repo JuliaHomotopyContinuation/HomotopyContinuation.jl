@@ -46,7 +46,7 @@ The possible states a `PathTracker` can be in:
 * `PathTrackerCode.terminated_ill_conditioned`
 * `PathTrackerCode.terminated_invalid_startvalue`
 * `PathTrackerCode.terminated_max_winding_number`
-* `PathTrackerCode.terminated_max_iters`
+* `PathTrackerCode.terminated_max_steps`
 * `PathTrackerCode.terminated_step_size_too_small`
 """
 @enum codes begin
@@ -57,7 +57,7 @@ The possible states a `PathTracker` can be in:
     terminated_accuracy_limit
     terminated_invalid_startvalue
     terminated_ill_conditioned
-    terminated_max_iters
+    terminated_max_steps
     terminated_max_winding_number
     terminated_step_size_too_small
     terminated_unknown
@@ -69,8 +69,8 @@ end
 function Base.convert(::Type{codes}, code::TrackerCode.codes)
     if code == TrackerCode.success
         return success
-    elseif code == TrackerCode.terminated_max_iters
-        return terminated_max_iters
+    elseif code == TrackerCode.terminated_max_steps
+        return terminated_max_steps
     elseif code == TrackerCode.terminated_accuracy_limit
         return terminated_accuracy_limit
     elseif code == TrackerCode.terminated_ill_conditioned

@@ -148,7 +148,7 @@
             automatic_differentiation = AD,
         )
         failed_res = track(tracker, s_p, 1, 0)
-        @test is_terminated(failed_res.returncode)
+        @test !is_success(failed_res)
         @test !failed_res.extended_precision_used
         tracker.options.extended_precision = true
         # check that we can track back and forth

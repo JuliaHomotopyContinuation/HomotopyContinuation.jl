@@ -7,9 +7,12 @@ makedocs(
         "ModelKit" => "model_kit.md",
         "Linear and Affine Subspaces" => "linear_affine.md",
         "Systems and Homotopies" => "systems_homotopies.md",
+        "Tracker" => "tracker.md",
         "Miscellaneous" => "misc.md",
     ],
-    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
+    format = Documenter.HTML(
+        prettyurls = get(ENV, "CI", nothing) == "true",
+    ),
 )
 
 deploydocs(

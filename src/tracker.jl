@@ -2,11 +2,16 @@ export Tracker,
     TrackerResult,
     TrackerOptions,
     TrackerParameters,
+    TrackerCode,
     DEFAULT_TRACKER_PARAMETERS,
     FAST_TRACKER_PARAMETERS,
     CONSERVATIVE_TRACKER_PARAMETERS,
     track,
+    init!,
     track!,
+    step!,
+    status,
+    state,
     is_success,
     is_terminated,
     is_invalid_startvalue,
@@ -17,6 +22,10 @@ export Tracker,
     rejected_steps,
     iterator
 
+
+###
+### Options and Parameters
+###
 
 """
     TrackerParameters
@@ -41,11 +50,11 @@ Base.@kwdef mutable struct TrackerParameters
 end
 Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
 
-"The default [TrackerParameters](@ref) which have a good balance between robustness and efficiency."
+"The default [`TrackerParameters`](@ref) which have a good balance between robustness and efficiency."
 const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
-"[TrackerParameters](@ref) which trade speed against a higher chance of path jumping."
+"[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
 const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.8, β_ω = 10.0)
-"[TrackerParameters](@ref) which trade robustness against some speed."
+"[`TrackerParameters`](@ref) which trade robustness against some speed."
 const CONSERVATIVE_TRACKER_PARAMETERS =
     TrackerParameters(β_ω = 100.0, β_τ = 0.45, strict_β_τ = 0.35)
 
@@ -119,24 +128,31 @@ end
 Base.show(io::IO, opts::TrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::TrackerOptions) = opts
 
-module TrackerCode
+
+###
+### TrackerCode
+###
 
 @doc """
-    TrackerCode.codes
+    TrackerCode
 
-The possible states a `CoreTracker` can have are
+The possible states a `CoreTracker` can have are of type `TrackerCode.codes` and can be
 
-* `TrackerCode.tracking`: The tracking is still in progress
-* `TrackerCode.success`: Indicates a successfull completed tracking
-* `TrackerCode.terminated_max_iters`: Tracking terminated since maximal iterations reached.
-* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerCode.success`: Indicates a successfull tracking.
+* `TrackerCode.tracking`: The tracking is still in progress.
+* `TrackerCode.terminated_accuracy_limit`: Tracking terminaed since the accuracy was insufficient.
 * `TrackerCode.terminated_invalid_startvalue`: Tracking terminated since the provided start value was invalid.
-* `TrackerCode.terminated_step_size_too_small`
+* `TrackerCode.terminated_ill_conditioned`: Tracking terminated since the path was too ill-conditioned.
+* `TrackerCode.terminated_max_steps`: Tracking terminated since maximal number of steps is reached.
+* `TrackerCode.terminated_step_size_too_small`: Trackint terminated since the step size was too small.
+* `TrackerCode.terminated_unknown`: An unintended error occured. Please consider reporting an issue.
 """
+module TrackerCode
+
 @enum codes begin
     tracking
     success
-    terminated_max_iters
+    terminated_max_steps
     terminated_accuracy_limit
     terminated_ill_conditioned
     terminated_invalid_startvalue
@@ -147,63 +163,87 @@ end
 end
 
 """
-    is_success(S::TrackerCode.codes)
+    is_success(code::TrackerCode.codes)
 
-Returns `true` if `S` indicates a success in the path tracking.
+Returns `true` if `code` indicates a success in the path tracking.
 """
-is_success(S) = S == TrackerCode.success
-
-"""
-    is_terminated(S::TrackerCode.codes)
-
-Returns `true` if `S` indicates that the path tracking got terminated. This is not `true`
-if `is_success(S)` is `true`.
-"""
-is_terminated(S::TrackerCode.codes) =
-    S ≠ TrackerCode.tracking && S ≠ TrackerCode.success
+is_success(S::TrackerCode.codes) = S == TrackerCode.success
 
 """
-    is_invalid_startvalue(S::TrackerCode.codes)
+    is_terminated(code::TrackerCode.codes)
 
-Returns `true` if `S` indicates that the path tracking got terminated since the start
+Returns `true` if `code` indicates that the path tracking got terminated.
+"""
+is_terminated(S::TrackerCode.codes) = S ≠ TrackerCode.tracking && S ≠ TrackerCode.success
+
+"""
+    is_invalid_startvalue(code::TrackerCode.codes)
+
+Returns `true` if `code` indicates that the path tracking got terminated since the start
 value was not a zero.
 """
-is_invalid_startvalue(S::TrackerCode.codes) =
-    S == TrackerCode.terminated_invalid_startvalue
+is_invalid_startvalue(S::TrackerCode.codes) = S == TrackerCode.terminated_invalid_startvalue
 
 """
-    is_tracking(S::TrackerCode.codes)
+    is_tracking(code::TrackerCode.codes)
 
-Returns `true` if `S` indicates that the path tracking is not yet finished.
+Returns `true` if `code` indicates that the path tracking is not yet finished.
 """
 is_tracking(S::TrackerCode.codes) = S == TrackerCode.tracking
 
+###
+### RESULT
+###
 
-# RESULT
 """
-    TrackerResult
+    TrackerResult{V<:AbstractVector{ComplexF64}}
 
-Containing the result of tracking a path with `Tracker`.
+Containing the result of tracking a path with a [`Tracker`](@ref).
+
+## Fields
+
+* `return_code::Symbol`: A code indicating whether the tracking was successfull (`:success`).
+  See [`TrackerCode`](@ref) for all possible values.
+* `solution::V`: The solution when the tracking stopped.
+* `t::ComplexF64`: The value of `t` when the tracking stopped.
+* `accuracy::Float64`: Estimate of the relative accuracy of the `solution`.
+* `accepted_steps::Int`: Number of steps that got accepted.
+* `rejected_steps::Int`: Number of steps that got rejected.
+* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve
+  the accuracy of the `solution`.
+* `extended_precision_used::Bool`: This is `true` if during the tracking at any point
+  extended precision was used.
 """
 struct TrackerResult{V<:AbstractVector{ComplexF64}}
-    returncode::TrackerCode.codes
+    return_code::Symbol
     solution::V
     t::ComplexF64
     accuracy::Float64
-    ω::Float64
-    μ::Float64
-    extended_precision::Bool
     accepted_steps::Int
     rejected_steps::Int
+    extended_precision::Bool
     extended_precision_used::Bool
+    ω::Float64
+    μ::Float64
+    τ::Float64
 end
+
+Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
+Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
 
 """
     is_success(result::TrackerResult)
 
 Returns `true` if the path tracking was successfull.
 """
-is_success(result::TrackerResult) = is_success(result.returncode)
+is_success(R::TrackerResult) = R.return_code == :success
+
+"""
+    is_invalid_startvalue(result::TrackerResult)
+
+Returns `true` if the path tracking failed since the start value was invalid.
+"""
+is_invalid_startvalue(R::TrackerResult) = R.return_code == :invalid_startvalue
 
 """
     solution(result::TrackerResult)
@@ -217,7 +257,7 @@ solution(result::TrackerResult) = result.solution
 
 Returns the number of steps done.
 """
-steps(result::TrackerResult) = result.accepted_steps + result.rejected_steps
+steps(result::TrackerResult) = accepted_steps(result) + rejected_steps(result)
 
 """
     accepted_steps(result::TrackerResult)
@@ -233,8 +273,9 @@ Returns the number of rejected_steps steps.
 """
 rejected_steps(result::TrackerResult) = result.rejected_steps
 
-Base.show(io::IO, result::TrackerResult) = print_fieldnames(io, result)
-Base.show(io::IO, ::MIME"application/prs.juno.inline", result::TrackerResult) = result
+###
+### STATE
+###
 
 mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{ComplexF64}}
     x::V # current x
@@ -349,7 +390,53 @@ end
 
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
-# TRACKER
+###
+### TRACKER
+###
+
+"""
+    Tracker(H::AbstractHomotopy;
+            automatic_differentiation = 3,
+            options = TrackerOptions(),
+            weighted_norm_options = WeightedNormOptions())
+
+Construct a tracker for the given homotopy `H`. The algorithm computes along the path ``x(t)``
+the local derivatives up to order 4.
+The value `automatic_differentiation` determines which up to which one teh derivative is computed
+using automatic differentiation. Otherwise numerical differentiation is used.
+The automatic differentiation results in additional compilation time, however for
+numerically challenging paths it is strongly recommended to use `automatic_differentiation = 3`.
+For `options` see also [`TrackerOptions`](@ref).
+The algorithm uses as a weighted infinity norm to measure distances.
+See also [`WeightedNorm`](@ref).
+
+[^Tim20]: Timme, S. "Mixed Precision Path Tracking for Polynomial Homotopy Continuation". arXiv:1902.02968 (2020)
+
+
+## Example
+
+We want to solve the system
+```julia
+@var x y t
+F = System([x^2 + y^2 - 3, 2x^2 + 0.5x*y + 3y^2 - 2])
+```
+using a total degree homotopy and `Tracker`.
+```julia
+# construct start system and homotopy
+G = System(im * [x^2 - 1, y^2 - 1])
+H = StraightLineHomotopy(G, F)
+start_solutions = [[1,1], [-1,1], [1,-1], [-1,-1]]
+# construct tracker
+tracker = Tracker(H)
+# track each start solution separetely
+results = track.(tracker, start_solutions)
+println("# successfull: ", count(is_success, results))
+```
+We see that we tracked all 4 paths successfully.
+```
+# successfull: 4
+```
+"""
 struct Tracker{
     H<:AbstractHomotopy,
     N,
@@ -406,7 +493,14 @@ Base.broadcastable(C::Tracker) = Ref(C)
 Return the state of the tracker.
 """
 state(tracker::Tracker) = tracker.state
+
+"""
+    status(tracker::Tracker)
+
+Get the current [`TrackerCode`](@ref) of `tracker`.
+"""
 status(tracker::Tracker) = tracker.state.code
+
 LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 
 function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
@@ -494,7 +588,7 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
     if is_done(state.segment_stepper)
         state.code = TrackerCode.success
     elseif steps(state) ≥ options.max_steps
-        state.code = TrackerCode.terminated_max_iters
+        state.code = TrackerCode.terminated_max_steps
     elseif state.ω * state.μ > tol_acc
         state.code = TrackerCode.terminated_accuracy_limit
     elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
@@ -576,22 +670,23 @@ function compute_derivatives!(
 end
 
 """
-    init!(tracker::NCT, x₁, t₁, t₀)
+    init!(tracker::Tracker, x₁, t₁, t₀)
 
 Setup `tracker` to track `x₁` from `t₁` to `t₀`.
 
-    init!(tracker::NCT, t₀)
+    init!(tracker::Tracker, t₀)
 
 Setup `tracker` to continue tracking the current solution to `t₀`.
+This keeps the current state.
 """
-init!(tracker::Tracker, r::TrackerResult, t₁, t₀) =
+init!(tracker::Tracker, r::TrackerResult, t₁::Number = 1.0, t₀::Number = 0.0) =
     init!(tracker, solution(r), t₁, t₀; ω = r.ω, μ = r.μ)
 
 function init!(
     tracker::Tracker,
     x₁::AbstractVector,
-    t₁,
-    t₀;
+    t₁::Number = 1.0,
+    t₀::Number = 0.0;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
     τ::Float64 = Inf,
@@ -697,6 +792,11 @@ function refine_current_solution!(tracker)
     extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
 end
 
+"""
+    step!(tracker::Tracker, debug::Bool = false)
+
+Perform a single tracking step. Returns `true` if the step was accepted.
+"""
 function step!(tracker::Tracker, debug::Bool = false)
     @unpack homotopy, corrector, predictor, state, options = tracker
     @unpack t, Δt, t′, x, x̂, x̄, jacobian, norm = state
@@ -767,11 +867,20 @@ function step!(tracker::Tracker, debug::Bool = false)
     !state.last_step_failed
 end
 
+"""
+    track!(tracker::Tracker, x, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
+
+The same as [`track`](@ref) but only returns the final [`TrackerCode`](@ref).
+
+    track!(tracker::Tracker, t₀; debug::Bool = false)
+
+Track with `tracker` the current solution to `t₀`. This keeps the current state.
+"""
 function track!(
     tracker::Tracker,
     x::AbstractVector,
-    t₁,
-    t₀;
+    t₁ = 1.0,
+    t₀ = 0.0;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
     τ::Float64 = Inf,
@@ -795,11 +904,11 @@ function track!(
         step!(tracker, debug)
     end
 
-    (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
+    tracker.state.code
 end
 
-function track!(tracker::Tracker, r::TrackerResult, t₁, t₀; debug::Bool = false)
-    track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ)
+function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
+    track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ, τ = r.τ)
 end
 function track!(tracker::Tracker, t₀; debug::Bool = false)
     init!(tracker, t₀)
@@ -808,28 +917,39 @@ function track!(tracker::Tracker, t₀; debug::Bool = false)
         step!(tracker, debug)
     end
 
-    (code = tracker.state.code, μ = tracker.state.μ, ω = tracker.state.ω)
+    tracker.state.code
 end
 
 function TrackerResult(H::AbstractHomotopy, state::TrackerState)
     TrackerResult(
-        state.code,
+        Symbol(state.code),
         get_solution(H, state.x, state.t),
         state.t,
         state.accuracy,
-        state.ω,
-        state.μ,
-        state.extended_prec,
         state.accepted_steps,
         state.rejected_steps,
+        state.extended_prec,
         state.used_extended_prec,
+        state.ω,
+        state.μ,
+        state.τ,
     )
 end
 
+"""
+     track(tracker::Tracker, x::AbstractVector, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
+
+Track the given solution `x` at `t₁` using `tracker` to a solution at `t₀`.
+
+    track(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
+
+Track the solution of the result `r` from `t₁` to `t₀`.
+"""
 @inline function track(tracker::Tracker, x, t₁ = 1.0, t₀ = 0.0; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
     TrackerResult(tracker.homotopy, tracker.state)
 end
+
 
 # PathIterator #
 struct PathIterator{H,P,M}
@@ -840,18 +960,18 @@ Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PathIterator}) = Base.HasEltype()
 
 """
-    iterator(tracker::CoreTracker, x₁, t₁=1.0, t₀=0.0)
+    iterator(tracker::Tracker, x₁, t₁=1.0, t₀=0.0)
 
 Prepare a tracker to make it usable as a (stateful) iterator. Use this if you want to inspect a specific
 path. In each iteration the tuple `(x,t)` is returned.
 
 ## Example
 
-Assume you have `CoreTracker` `tracker` and you wan to track `x₁` from 1.0 to 0.25:
+Assume you have `Tracker` `tracker` and you wan to track `x₁` from 1.0 to 0.25:
 ```julia
 for (x,t) in iterator(tracker, x₁, 1.0, 0.25)
-println("x at t=\$t:")
-println(x)
+    println("x at t=\$t:")
+    println(x)
 end
 ```
 
@@ -859,7 +979,7 @@ Note that this is a stateful iterator. You can still introspect the state of the
 For example to check whether the tracker was successfull
 (and did not terminate early due to some problem) you can do
 ```julia
-println("Success: ", status(tracker) == CoreTrackerStatus.success)
+println("Success: ", is_success(status(tracker)))
 ```
 """
 function iterator(tracker::Tracker, x₁, t₁ = 1.0, t₀ = 0.0; kwargs...)
