@@ -126,7 +126,12 @@ function polyhedral(f::ModelKit.System)
     tracker, S
 end
 
-function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}})
+function track(
+    PT::PolyhedralTracker,
+    start_solution::Tuple{MixedCell,Vector{ComplexF64}};
+    path_number::Union{Nothing,Int} = nothing,
+)
+    cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
     # The tracker works in two stages
     # 1) Revert the totric degeneration by tracking 0 to 1
@@ -196,6 +201,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         return PathResult(
             return_code = PathTrackerCode.polyhedral_failed,
             solution = copy(state.x),
+            start_solution = start_solution,
             t = real(state.t),
             accuracy = state.accuracy,
             winding_number = nothing,
@@ -203,6 +209,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             valuation = nothing,
             ω = state.ω,
             μ = state.μ,
+            path_number = path_number,
             extended_precision = state.extended_prec,
             accepted_steps = state.accepted_steps,
             rejected_steps = state.rejected_steps,
@@ -210,7 +217,14 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         )
     end
 
-    r = track(PT.generic_tracker, PT.toric_tracker.state.x; ω = ω, μ = μ)
+    r = track(
+        PT.generic_tracker,
+        PT.toric_tracker.state.x;
+        ω = ω,
+        μ = μ,
+        path_number = path_number,
+    )
+    r.start_solution = start_solution
     # report accurate steps
     r.accepted_steps += PT.toric_tracker.state.accepted_steps
     r.rejected_steps += PT.toric_tracker.state.rejected_steps

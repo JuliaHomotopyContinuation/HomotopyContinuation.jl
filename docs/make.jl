@@ -4,15 +4,15 @@ makedocs(
     sitename = "HomotopyContinuation.jl",
     pages = [
         "Introduction" => "index.md",
-        "ModelKit" => "model_kit.md",
-        "Linear and Affine Subspaces" => "linear_affine.md",
-        "Systems and Homotopies" => "systems_homotopies.md",
-        "Tracker" => "tracker.md",
+        "Problem formulation" => [
+            "ModelKit" => "model_kit.md",
+            "Linear and Affine Subspaces" => "linear_affine.md",
+            "Systems and Homotopies" => "systems_homotopies.md",
+        ],
+        "Trackers" => ["PathTracker" => "path_tracker.md", "Trackers" => "tracker.md"],
         "Miscellaneous" => "misc.md",
     ],
-    format = Documenter.HTML(
-        prettyurls = get(ENV, "CI", nothing) == "true",
-    ),
+    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
 )
 
 deploydocs(

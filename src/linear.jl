@@ -78,6 +78,7 @@ function Base.copy!(A::AffineExtrinsic, B::AffineExtrinsic)
     copy!(A.b, B.b)
     A
 end
+Base.copy(A::AffineExtrinsic) = AffineExtrinsic(copy(A.A), copy(A.b))
 
 function Base.show(io::IO, A::AffineExtrinsic{T}) where {T}
     println(io, "AffineExtrinsic{$T}:")
@@ -150,6 +151,7 @@ function Base.copy!(A::AffineIntrinsic, B::AffineIntrinsic)
     copy!(A.Y, B.Y)
     A
 end
+Base.copy(A::AffineIntrinsic) = AffineIntrinsic(copy(A.A), copy(A.b₀), copy(A.Y))
 
 Base.broadcastable(A::AffineIntrinsic) = Ref(A)
 
@@ -308,6 +310,7 @@ function Base.copy!(A::AffineSubspace, B::AffineSubspace)
     copy!(A.extrinsic, B.extrinsic)
     A
 end
+Base.copy(A::AffineSubspace) = AffineSubspace(copy(A.extrinsic), copy(A.intrinsic))
 
 function Base.:(==)(A::AffineSubspace, B::AffineSubspace)
     intrinsic(A) == intrinsic(B) && extrinsic(A) == extrinsic(B)

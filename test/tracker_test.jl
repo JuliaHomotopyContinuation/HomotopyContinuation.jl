@@ -14,11 +14,10 @@
         @test length(solution(res)) == 2
         @test is_success(track(tracker, res, 0, 1))
 
-        code, μ, ω = track!(tracker, s, 1, 0)
+        code = track!(tracker, s, 1, 0)
         @test is_success(code)
-        @test !isnan(μ)
-        @test !isnan(ω)
         s0 = copy(tracker.state.x)
+        @unpack μ, ω = tracker.state
         @test is_success(track(tracker, s0, 0, 1))
         @test is_success(track(tracker, s0, 0, 1, μ = μ, ω = ω))
 
