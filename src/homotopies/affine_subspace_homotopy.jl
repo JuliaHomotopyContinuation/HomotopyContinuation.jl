@@ -57,8 +57,8 @@ function AffineSubspaceHomotopy(
     x_high = zeros(ComplexDF64, size(Q, 1))
     AffineSubspaceHomotopy(
         system,
-        start,
-        target,
+        copy(start),
+        copy(target),
         J,
         Q,
         Q_cos,

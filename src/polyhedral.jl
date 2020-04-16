@@ -126,7 +126,12 @@ function polyhedral(f::ModelKit.System)
     tracker, S
 end
 
-function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}})
+function track(
+    PT::PolyhedralTracker,
+    start_solution::Tuple{MixedCell,Vector{ComplexF64}};
+    path_number::Union{Nothing,Int} = nothing,
+)
+    cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
     # The tracker works in two stages
     # 1) Revert the totric degeneration by tracking 0 to 1
@@ -146,7 +151,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         update_weights!(H, PT.support, PT.lifting, cell, min_weight = 1.0)
 
     if max_weight < 10
-        (retcode, μ, ω) = track!(
+        retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
@@ -155,8 +160,9 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             μ = 1e-12,
             max_initial_step_size = 0.2,
         )
+        @unpack μ, ω = PT.toric_tracker.state
     else
-        (retcode, μ, ω) = track!(
+        retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
@@ -165,6 +171,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             μ = 1e-12,
             max_initial_step_size = 0.2,
         )
+        @unpack μ, ω = PT.toric_tracker.state
         # TODO: check retcode?
         min_weight, max_weight =
             update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
@@ -175,7 +182,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             min_step_size = PT.toric_tracker.options.min_step_size
             PT.toric_tracker.options.min_step_size = 0.0
 
-            (retcode, μ, ω) = track!(
+            retcode = track!(
                 PT.toric_tracker,
                 PT.toric_tracker.state.x,
                 t_restart,
@@ -185,14 +192,16 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
                 τ = 0.1 * t_restart,
                 keep_steps = true,
             )
+            @unpack μ, ω = PT.toric_tracker.state
             PT.toric_tracker.options.min_step_size = min_step_size
         end
     end
     if !is_success(retcode)
         state = PT.toric_tracker.state
         return PathResult(
-            return_code = PathTrackerReturnCode.polyhedral_failed,
+            return_code = PathTrackerCode.polyhedral_failed,
             solution = copy(state.x),
+            start_solution = start_solution,
             t = real(state.t),
             accuracy = state.accuracy,
             winding_number = nothing,
@@ -200,6 +209,7 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
             valuation = nothing,
             ω = state.ω,
             μ = state.μ,
+            path_number = path_number,
             extended_precision = state.extended_prec,
             accepted_steps = state.accepted_steps,
             rejected_steps = state.rejected_steps,
@@ -207,7 +217,14 @@ function track(PT::PolyhedralTracker, (cell, x∞)::Tuple{MixedCell,Vector{Compl
         )
     end
 
-    r = track(PT.generic_tracker, PT.toric_tracker.state.x; ω = ω, μ = μ)
+    r = track(
+        PT.generic_tracker,
+        PT.toric_tracker.state.x;
+        ω = ω,
+        μ = μ,
+        path_number = path_number,
+    )
+    r.start_solution = start_solution
     # report accurate steps
     r.accepted_steps += PT.toric_tracker.state.accepted_steps
     r.rejected_steps += PT.toric_tracker.state.rejected_steps

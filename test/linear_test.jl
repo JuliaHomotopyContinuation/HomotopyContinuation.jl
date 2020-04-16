@@ -18,10 +18,10 @@
 
         u = rand(1)
         x = A(u, Intrinsic)
-        @test coord_change(A, Extrinsic, Intrinsic, x) ≈ u rtol=1e-14
-        @test coord_change(A, Intrinsic, Extrinsic, u) ≈ x rtol=1e-14
-        @test norm(A(x, Extrinsic)) ≈ 0 atol=1e-14
-        @test norm(AffineExtrinsic(intrinsic(A))(x)) ≈ 0.0 atol=1e-14
+        @test coord_change(A, Extrinsic, Intrinsic, x) ≈ u rtol = 1e-14
+        @test coord_change(A, Intrinsic, Extrinsic, u) ≈ x rtol = 1e-14
+        @test norm(A(x, Extrinsic)) ≈ 0 atol = 1e-14
+        @test norm(AffineExtrinsic(intrinsic(A))(x)) ≈ 0.0 atol = 1e-14
 
         B = rand_affine_subspace(3; codim = 2)
         @test B != A
@@ -29,6 +29,8 @@
         @test extrinsic(B) == extrinsic(A)
         @test intrinsic(B) == intrinsic(A)
         @test B == A
+        @test copy(A) == A
+        @test copy(A) !== A
 
         C = rand_affine_subspace(3, dim = 1, real = true)
         @test geodesic_distance(A, C) > 0
@@ -43,7 +45,6 @@
         F = System([f1, f2], x)
 
         A = rand_affine_subspace(4; codim = 2)
-
         # Commpute witness set
         L = A(x, Extrinsic)
         H, S = total_degree_homotopy(F ∩ L)
@@ -58,7 +59,19 @@
         @test all(is_success, graff_result)
 
         C = rand_affine_subspace(4, codim = 2)
+        copy_A = copy(A)
         set_subspaces!(graff_tracker.homotopy, B, C)
+        @test A == copy_A
         @test all(is_success, track.(graff_tracker, solution.(graff_result)))
+
+        graff_path_tracker = PathTracker(AffineSubspaceHomotopy(F, A, B))
+        graff_path_result = track.(graff_path_tracker, W)
+        @test all(is_success, graff_path_result)
+
+        @test all(isapprox.(
+            solution.(graff_path_result),
+            solution.(graff_result),
+            rtol = 1e-12,
+        ))
     end
 end

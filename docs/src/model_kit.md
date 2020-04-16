@@ -11,7 +11,7 @@ Variable
 @unique_var
 ```
 
-## Functions
+## Methods
 ```@docs
 coefficients
 degree

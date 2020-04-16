@@ -30,10 +30,10 @@ LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, 
 ## WeightedNorm ##
 ##################
 
-struct WeightedNormOptions
-    scale_min::Float64
-    scale_abs_min::Float64
-    scale_max::Float64
+Base.@kwdef struct WeightedNormOptions
+    scale_min::Float64 = sqrt(eps())
+    scale_abs_min::Float64 = min(scale_min^2, sqrt(eps()))
+    scale_max::Float64 = exp2(div(1023, 2))
 end
 
 Base.show(io::IO, opts::WeightedNormOptions) = print_fieldnames(io, opts)

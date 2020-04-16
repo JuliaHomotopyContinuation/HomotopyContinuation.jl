@@ -1,12 +1,20 @@
 # Systems and Homotopies
 
+Systems ([`AbstractSystem`](@ref)) and homotopies ([`AbstractHomotopy`](@ref)) are used for the numerical computations.
+
 ## Systems
 
 Systems ([`AbstractSystem`](@ref)) are the basic building blocks of homotopies.
 
 ```@docs
 AbstractSystem
+```
+### ModelKitSystem
+```@docs
 ModelKitSystem
+```
+### RandomizedSystem
+```@docs
 RandomizedSystem
 ```
 
@@ -19,11 +27,31 @@ the *start system* and ``H(x,0)`` is the *target system*.
 
 ```@docs
 AbstractHomotopy
+```
+
+### AffineChartHomotopy
+```@docs
 AffineChartHomotopy
 on_affine_chart
+```
+
+### AffineSubspaceHomotopy
+```@docs
 AffineSubspaceHomotopy
 set_subspaces!
+```
+
+### ModelKitHomotopy
+```@docs
 ModelKitHomotopy
+```
+
+### StraightLineHomotopy
+```@docs
 ParameterHomotopy
+```
+
+### StraightLineHomotopy
+```@docs
 StraightLineHomotopy
 ```

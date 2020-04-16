@@ -1,24 +1,61 @@
 export PathTracker,
+    PathTrackerOptions,
     PathResult,
+    track,
     solution,
     accuracy,
-    is_success,
-    is_at_infinity,
-    is_failed,
-    is_finite,
-    winding_number,
-    last_path_point,
     steps,
     accepted_steps,
     rejected_steps,
-    valuation
+    winding_number,
+    path_number,
+    start_solution,
+    multiplicity,
+    last_path_point,
+    valuation,
+    is_success,
+    is_at_infinity,
+    is_excess_solution,
+    is_failed,
+    is_finite,
+    is_singular,
+    is_nonsingular,
+    is_real
 
+
+
+"""
+    PathTrackerOptions(; options...)
+
+Options controlling the behaviour of a [`PathTracker`](@ref).
+
+## Options
+
+* `endgame_start::Float64 = 0.1`: The point `t` in time where the endgame starts.
+
+### Endgame parameters
+These parameters control the behaviour during the endgame. See [^BT20] for details.
+
+* `min_cond_eg::Float64 = 1e6`: The minimal condition number for which an endgame strategy
+  is applied.
+* `at_infinity_check::Bool = true`: Whether divering paths should be truncated.
+* `zero_is_at_infinity::Bool = false`: Whether paths going to a solution where at least one
+  coordinates is zero should also be considered diverging.
+* `val_finite_tol::Float64 = 1e-2`: Tolerance on the valuation which has to be satisfied
+  before the Cauchy endgame is started.
+* `max_winding_number::Int = 20`: The maximal winding number which is attempted in the
+  Cauchy endgame.
+* `val_at_infinity_tol::Float64 = 1e-3`: Tolerance on the valuation which has to be
+  satisfied before a path is considered to diverge / go to infinity.
+
+[^BT20]: Breiding, P. and Timme, S. "Tropical Endgame", In preparation (2020)
+"""
 Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
     # eg parameter
     min_cond_eg::Float64 = 1e6
     # valuation etc
-    at_zero_check::Bool = false
+    zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
     val_finite_tol::Float64 = 1e-2
     val_at_infinity_tol::Float64 = 1e-3
@@ -29,26 +66,28 @@ end
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", opts::PathTrackerOptions) = opts
 
-module PathTrackerReturnCode
-import ..TrackerReturnCode
 """
-    enum PathTrackerReturnCode
+    PathTrackerCode
 
 The possible states a `PathTracker` can be in:
 
-* `PathTrackerReturnCode.tracking`
-* `PathTrackerReturnCode.success`
-* `PathTrackerReturnCode.at_infinity`
-* `PathTrackerReturnCode.at_zero`
-* `PathTrackerReturnCode.excess_solution`
-* `PathTrackerReturnCode.post_check_failed`
-* `PathTrackerReturnCode.terminated_accuracy_limit`
-* `PathTrackerReturnCode.terminated_ill_conditioned`
-* `PathTrackerReturnCode.terminated_invalid_startvalue`
-* `PathTrackerReturnCode.terminated_max_winding_number`
-* `PathTrackerReturnCode.terminated_max_iters`
-* `PathTrackerReturnCode.terminated_step_size_too_small`
+* `PathTrackerCode.tracking`
+* `PathTrackerCode.success`
+* `PathTrackerCode.at_infinity`
+* `PathTrackerCode.at_zero`
+* `PathTrackerCode.excess_solution`
+* `PathTrackerCode.post_check_failed`
+* `PathTrackerCode.polyhedral_failed`
+* `PathTrackerCode.terminated_accuracy_limit`
+* `PathTrackerCode.terminated_ill_conditioned`
+* `PathTrackerCode.terminated_invalid_startvalue`
+* `PathTrackerCode.terminated_max_winding_number`
+* `PathTrackerCode.terminated_max_steps`
+* `PathTrackerCode.terminated_step_size_too_small`
 """
+module PathTrackerCode
+import ..TrackerCode
+
 @enum codes begin
     tracking
     success
@@ -57,7 +96,7 @@ The possible states a `PathTracker` can be in:
     terminated_accuracy_limit
     terminated_invalid_startvalue
     terminated_ill_conditioned
-    terminated_max_iters
+    terminated_max_steps
     terminated_max_winding_number
     terminated_step_size_too_small
     terminated_unknown
@@ -66,20 +105,20 @@ The possible states a `PathTracker` can be in:
     polyhedral_failed
 end
 
-function Base.convert(::Type{codes}, code::TrackerReturnCode.codes)
-    if code == TrackerReturnCode.success
+function Base.convert(::Type{codes}, code::TrackerCode.codes)
+    if code == TrackerCode.success
         return success
-    elseif code == TrackerReturnCode.terminated_max_iters
-        return terminated_max_iters
-    elseif code == TrackerReturnCode.terminated_accuracy_limit
+    elseif code == TrackerCode.terminated_max_steps
+        return terminated_max_steps
+    elseif code == TrackerCode.terminated_accuracy_limit
         return terminated_accuracy_limit
-    elseif code == TrackerReturnCode.terminated_ill_conditioned
+    elseif code == TrackerCode.terminated_ill_conditioned
         return terminated_ill_conditioned
-    elseif code == TrackerReturnCode.terminated_invalid_startvalue
+    elseif code == TrackerCode.terminated_invalid_startvalue
         return terminated_invalid_startvalue
-    elseif code == TrackerReturnCode.terminated_step_size_too_small
+    elseif code == TrackerCode.terminated_step_size_too_small
         return terminated_step_size_too_small
-    elseif code == TrackerReturnCode.terminated_unknown
+    elseif code == TrackerCode.terminated_unknown
         return terminated_unknown
     else
         return tracking
@@ -90,47 +129,39 @@ end
 
 
 """
-    is_success(code::PathTrackerReturnCode.codes)
+    is_success(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates a success in tracking.
 """
-is_success(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.success
+is_success(code::PathTrackerCode.codes) = code == PathTrackerCode.success
 
 """
-    is_success(code::PathTrackerReturnCode.codes)
+    is_success(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates that a path diverged towards infinity.
 """
-is_at_infinity(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.at_infinity
+is_at_infinity(code::PathTrackerCode.codes) = code == PathTrackerCode.at_infinity
 
 """
-    is_tracking(code::PathTrackerReturnCode.codes)
+    is_tracking(code::PathTrackerCode.codes)
 
 Returns `true` if `status` indicates the tracking is not going on.
 """
-is_tracking(code::PathTrackerReturnCode.codes) = code == PathTrackerReturnCode.tracking
+is_tracking(code::PathTrackerCode.codes) = code == PathTrackerCode.tracking
 
 """
-    is_invalid_startvalue(code::PathTrackerReturnCode.codes)
+    is_invalid_startvalue(code::PathTrackerCode.codes)
 
 Returns `true` if the provided start value was not valid.
 """
-is_invalid_startvalue(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.terminated_invalid_startvalue
+is_invalid_startvalue(code::PathTrackerCode.codes) =
+    code == PathTrackerCode.terminated_invalid_startvalue
 
-"""
-    is_terminated_callback(code::PathTrackerReturnCode.codes)
-
-Returns `true` if the provided callback indicated a termination of the path.
-"""
-is_terminated_callback(code::PathTrackerReturnCode.codes) =
-    code == PathTrackerReturnCode.terminated_callback
-
-
-# State
+###
+### State
+###
 Base.@kwdef mutable struct PathTrackerState{V<:AbstractVector}
-    code::PathTrackerReturnCode.codes = PathTrackerReturnCode.tracking
+    code::PathTrackerCode.codes = PathTrackerCode.tracking
     val::Valuation
     endgame_started::Bool = false
     row_scaling::Vector{Float64}
@@ -157,7 +188,21 @@ PathTrackerState(npolynomials::Integer, x::AbstractVector) = PathTrackerState(;
     last_point = copy(x),
 )
 
+"""
+    PathTracker(tracker::Tracker; options = PathTrackerOptions())
+    PathTracker(H::AbstractHomotopy; options = PathTrackerOptions())
 
+A `PathTracker` combines a [`Tracker`](@ref) with an endgame. That is,
+while a [`Tracker`](@ref) assumes that the solution path is non-singular and convergent, the endgame
+allows to handle singular endpoints as well as diverging paths.
+To compute singular solutions the *Cauchy endgame* used, for divering paths a strategy
+based on the valuation of local Puiseux series expansion of the path is used.
+See [^BT20] for a detailed description.
+By convention, a `PathTracker` always tracks from ``t=1`` to ``t = 0``.
+See [`PathTrackerOptions`](@ref) for the possible options.
+
+[^BT20]: Breiding, P. and Timme, S. "Tropical Endgame", In preparation (2020)
+"""
 struct PathTracker{
     H<:AbstractHomotopy,
     N, # AutomaticDifferentiation
@@ -171,17 +216,17 @@ struct PathTracker{
     options::PathTrackerOptions
 end
 
+PathTracker(H::Homotopy; kwargs...) = PathTracker(Tracker(ModelKitHomotopy(H)); kwargs...)
 PathTracker(H::AbstractHomotopy; kwargs...) = PathTracker(Tracker(H); kwargs...)
-function PathTracker(tracker::Tracker; kwargs...)
-    options = PathTrackerOptions(; kwargs...)
+function PathTracker(tracker::Tracker; options = PathTrackerOptions())
     state = PathTrackerState(size(tracker.homotopy, 1), tracker.state.x)
     PathTracker(tracker, state, options)
 end
 
 Base.broadcastable(T::PathTracker) = Ref(T)
 
-function init!(eg_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::Float64 = NaN)
-    @unpack tracker, state, options = eg_tracker
+function init!(path_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::Float64 = NaN)
+    @unpack tracker, state, options = path_tracker
 
     init!(tracker, x, t₁, 0.0; ω = ω, μ = μ)
 
@@ -199,7 +244,7 @@ function init!(eg_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::Fl
     state.cauchy_failures = 0
     state.jump_to_zero_failed = (false, false)
 
-    eg_tracker
+    path_tracker
 end
 
 """
@@ -221,7 +266,7 @@ An enum indicating the result of the [`cauchy!`](@ref) computation.
 end
 
 """
-    cauchy!(p, tracker::CoreTracker, ::CauchyEndgame)
+    cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTrackerOptions)
 
 Try to predict the value of `x(0)` using the [`CauchyEndgame`](@ref).
 For this we track the polygon defined by ``te^{i2πk/n}`` until we end again at ``x``.
@@ -257,7 +302,7 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
             # TODO: Refine to guarantee high accuracy
             point_acc = max(point_acc, tracker.state.accuracy)
 
-            if !is_success(res.code)
+            if !is_success(res)
                 result = CAUCHY_TERMINATED
                 @goto _return
             end
@@ -287,8 +332,8 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     result, m, point_acc
 end
 
-function step!(eg_tracker::PathTracker, debug::Bool = false)
-    @unpack tracker, state, options = eg_tracker
+function step!(path_tracker::PathTracker, debug::Bool = false)
+    @unpack tracker, state, options = path_tracker
 
     proposed_t′ = real(tracker.state.t′)
     state.last_point .= tracker.state.x
@@ -305,20 +350,20 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         state.cond = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
 
         # If a path got terminated, let's be more generous to classify them as at_infinity
-        if state.code == PathTrackerReturnCode.terminated_accuracy_limit ||
-           state.code == PathTrackerReturnCode.terminated_ill_conditioned
+        if state.code == PathTrackerCode.terminated_accuracy_limit ||
+           state.code == PathTrackerCode.terminated_ill_conditioned
 
             verdict = analyze(
                 state.val;
                 finite_tol = 0.0,
                 at_infinity_tol = sqrt(options.val_at_infinity_tol),
-                zero_is_finite = !options.at_zero_check,
+                zero_is_finite = !options.zero_is_at_infinity,
             )
 
             if options.at_infinity_check && verdict.at_infinity
-                return (state.code = PathTrackerReturnCode.at_infinity)
-            elseif options.at_zero_check && verdict.at_zero
-                return (state.code = PathTrackerReturnCode.at_zero)
+                return (state.code = PathTrackerCode.at_infinity)
+            elseif options.zero_is_at_infinity && verdict.at_zero
+                return (state.code = PathTrackerCode.at_zero)
             end
         end
         return state.code
@@ -335,11 +380,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
          which is recorded now.
         =#
         state.col_scaling .= weights(tracker.state.norm)
-        row_scaling!(
-            state.row_scaling,
-            jacobian(tracker.state.jacobian),
-            state.col_scaling,
-        )
+        row_scaling!(state.row_scaling, jacobian(tracker.state.jacobian), state.col_scaling)
         κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
         state.cond_eg_start = κ
 
@@ -360,7 +401,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
         at_infinity_tol = options.val_at_infinity_tol,
-        zero_is_finite = !options.at_zero_check,
+        zero_is_finite = !options.zero_is_at_infinity,
     )
 
     if debug
@@ -391,12 +432,12 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
     if options.at_infinity_check && at_infinity && state.cond > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = PathTrackerReturnCode.at_infinity)
+        return (state.code = PathTrackerCode.at_infinity)
 
-    elseif options.at_zero_check && at_zero && state.cond > options.min_cond_eg
+    elseif options.zero_is_at_infinity && at_zero && state.cond > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
-        return (state.code = PathTrackerReturnCode.at_zero)
+        return (state.code = PathTrackerCode.at_zero)
 
     elseif finite && state.cond > options.min_cond_eg
         res, m, acc_est = cauchy!(state, tracker, options)
@@ -424,7 +465,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
                         state.row_scaling,
                         state.col_scaling,
                     )
-                    return (state.code = PathTrackerReturnCode.success)
+                    return (state.code = PathTrackerCode.success)
                 else
                     state.cauchy_failures += 1
                     @goto save_cauchy_result
@@ -432,7 +473,7 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
             end
         elseif res == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
             if state.max_winding_number_hit
-                state.code = PathTrackerReturnCode.terminated_max_winding_number
+                state.code = PathTrackerCode.terminated_max_winding_number
             else
                 state.cauchy_failures += 1
                 state.max_winding_number_hit = true
@@ -445,53 +486,127 @@ function step!(eg_tracker::PathTracker, debug::Bool = false)
     state.code
 end
 
+
 function track!(
-    eg_tracker::PathTracker,
+    path_tracker::PathTracker,
     x,
     t₁::Real;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
     debug::Bool = false,
 )
-    init!(eg_tracker, x, t₁; ω = ω, μ = μ)
+    init!(path_tracker, x, t₁; ω = ω, μ = μ)
 
-    while is_tracking(eg_tracker.state.code)
-        step!(eg_tracker, debug)
+    while is_tracking(path_tracker.state.code)
+        step!(path_tracker, debug)
     end
 
-    eg_tracker.state.code
+    path_tracker.state.code
 end
 
+function solution(path_tracker::PathTracker)
+    get_solution(path_tracker.tracker.homotopy, path_tracker.state.solution, 0.0)
+end
+
+"""
+    PathResult{V<:AbstractVector}
+
+A `PathResult` is the result of tracking of a path with [`track`](@ref) using a
+[`PathTracker`](@ref).
+
+## Fields
+
+General solution information:
+* `return_code`: See the list of return codes below.
+* `solution::V`: The solution vector.
+* `t::Float64`: The value of `t` at which `solution` was computed. Note that if
+  `return_code` is `:at_infinity`, then `t` is the value when this was decided.
+* `accuracy::Float64`: An estimate the (relative) accuracy of the computed solution.
+* `condition_jacobian::Float64`: This is the condition number of the Jacobian at the
+  solution. A high condition number indicates a singular solution or a
+  solution on a positive dimensional component.
+* `winding_number:Union{Nothing, Int}`: The computed winding number. This is a lower bound
+  on the multiplicity of the solution. It is ``nothing`` if the Cauchy endgame was not used.
+* `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve
+  the accuracy of the `solution`.
+* `path_number::Union{Nothing,Int}`: The number of the path (optional).
+* `start_solution::Union{Nothing,V}`: The start solution of the path (optional).
+
+Performance information:
+* `accepted_steps::Int`: The number of accepted steps during the path tracking.
+* `rejected_steps::Int`: The number of rejected steps during the path tracking.
+* `extended_precision_used::Bool`: Indicates whether extended precision was
+  necessary to track the path.
+
+Additional path and solution informations
+* `valuation::Vector{Float64}`: An approximation of the valuation of the
+  Puiseux series expansion of ``x(t)``.
+* `last_path_point::Tuple{V,Float64}`: The last pair ``(x,t)`` before the solution was
+  computed. If the solution was computed with the Cauchy endgame, then the pair ``(x,t)``
+  can be used to rerun the endgame.
+
+## Return codes
+
+Possible return codes are:
+* `:success`: The `PathTracker` obtained a solution.
+* `:at_infinity`: The `PathTracker` stopped the tracking of the path since it determined
+  that that path is diverging towards infinity.
+* `:at_zero`: The `PathTracker` stopped the tracking of the path since it determined
+  that that path has a solution where at least one coordinate is 0. This only happens if
+  the option `zero_is_at_infinity` is `true`.
+* `:excess_solution`: For the solution of the system, the system had to be
+  modified which introduced artificial solutions and this solution is one of them.
+* various return codes indicating termination of the tracking
+"""
 Base.@kwdef mutable struct PathResult{V<:AbstractVector}
-    return_code::PathTrackerReturnCode.codes
+    return_code::Symbol
     solution::V
     t::Float64
     accuracy::Float64
-    cond::Float64
+    multiplicity::Union{Nothing,Int}
+    condition_jacobian::Float64
     winding_number::Union{Nothing,Int}
-    last_path_point::Union{Nothing,Tuple{V,Float64}}
+    extended_precision::Bool
+    path_number::Union{Nothing,Int}
+    start_solution
+    last_path_point::Tuple{V,Float64}
     valuation::Union{Nothing,Vector{Float64}}
     ω::Float64
     μ::Float64
-    extended_precision::Bool
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
     extended_precision_used::Bool
 end
 
-function PathResult(egtracker::PathTracker)
-    @unpack tracker, state, options = egtracker
+function PathResult(
+    path_tracker::PathTracker,
+    start_solution = nothing,
+    path_number = nothing,
+)
+    @unpack tracker, state, options = path_tracker
     t = real(tracker.state.t)
+
+    if is_success(state.code)
+        solution = get_solution(tracker.homotopy, state.solution, t)
+    else
+        solution = get_solution(tracker.homotopy, tracker.state.x, t)
+    end
     PathResult(
-        return_code = state.code,
-        solution = is_success(state.code) ? copy(state.solution) : copy(tracker.state.x),
+        return_code = Symbol(state.code),
+        solution = solution,
         t = is_success(state.code) ? 0.0 : t,
         accuracy = state.accuracy,
-        cond = state.cond,
+        condition_jacobian = state.cond,
         winding_number = state.winding_number,
-        last_path_point = (copy(state.last_point), state.last_t),
+        multiplicity = nothing,
+        last_path_point = (
+            get_solution(tracker.homotopy, state.last_point, state.last_t),
+            state.last_t,
+        ),
         valuation = t > options.endgame_start ? nothing : copy(state.val.val_x),
+        start_solution = start_solution,
+        path_number = path_number,
         ω = tracker.state.ω,
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
@@ -504,10 +619,37 @@ end
 Base.show(io::IO, r::PathResult) = print_fieldnames(io, r)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
 
+"""
+    result_type(tracker::PathTracker)
 
-function track(eg_tracker::PathTracker, x, t₁::Real = 1.0; kwargs...)
-    track!(eg_tracker, x, t₁; kwargs...)
-    PathResult(eg_tracker)
+Returns the type of result `track` will return.
+"""
+result_type(tracker::PathTracker) = PathResult{typeof(solution(tracker))}
+
+"""
+    track(path_tracker::PathTracker, x::AbstractVector, t::Real = 1.0;
+          path_number = nothing, debug = false)
+
+Track the given start solution `x` from `t` towards `0` using the given `path_tracker`.
+Returns a [`PathResult`](@ref).
+
+    track(path_tracker::PathTracker, r::PathResult, t::Real = 1.0;
+          path_number = nothing, debug = false)
+
+Track `solution(r)` from `t` towards `0` using the given `path_tracker`.
+"""
+function track(
+    path_tracker::PathTracker,
+    x::AbstractVector,
+    t₁::Real = 1.0;
+    path_number::Union{Nothing,Int} = nothing,
+    kwargs...,
+)
+    track!(path_tracker, x, t₁; kwargs...)
+    PathResult(path_tracker, x, path_number)
+end
+function track(path_tracker::PathTracker, r::PathResult, t₁::Real; kwargs...)
+    track(path_tracker, solution(r), t₁; ω = r.ω, μ = r.μ, kwargs...)
 end
 
 
@@ -558,6 +700,35 @@ Get the winding number of the solution of the path. Returns `nothing` if it wasn
 winding_number(r::PathResult) = r.winding_number
 
 """
+    cond(r::PathResult)
+
+Return the condition number of the Jacobian of the result. A high condition number indicates
+that the solution is singular or on a positive dimensional component.
+"""
+LA.cond(r::PathResult) = r.condition_jacobian
+
+"""
+    path_number(r::PathResult)
+
+Get the number of the path. Returns `nothing` if it wasn't provided.
+"""
+path_number(r::PathResult) = r.path_number
+
+"""
+    start_solution(r::PathResult)
+
+Get the start solution of the path.
+"""
+start_solution(r::PathResult) = r.start_solution
+
+"""
+    multiplicity(r::PathResult)
+
+Get the multiplicity of the solution of the path. Returns `nothing` if it wasn't computed.
+"""
+multiplicity(r::PathResult) = r.multiplicity
+
+"""
     last_path_point(r::PathResult)
 
 Returns a tuple `(x,t)` containing the last zero of `H(x, t)` before the Cauchy endgame was used.
@@ -566,37 +737,79 @@ Returns `nothing` if the endgame strategy was not invoked.
 last_path_point(r::PathResult) = r.last_path_point
 
 """
+    valuation(r::PathResult)
+
+Get the computed valuation of the path.
+"""
+valuation(r::PathResult) = r.valuation
+
+"""
     is_success(r::PathResult)
 
 Checks whether the path is successfull.
 """
-is_success(r::PathResult) = is_success(r.return_code)
-
-"""
-    is_failed(r::PathResult)
-
-Checks whether the path failed.
-"""
-is_failed(r::PathResult) = !(is_at_infinity(r) || is_success(r))
+is_success(r::PathResult) = r.return_code == :success
 
 """
     is_at_infinity(r::PathResult)
 
 Checks whether the path goes to infinity.
 """
-is_at_infinity(r::PathResult) = is_at_infinity(r.return_code)
+is_at_infinity(r::PathResult) = r.return_code == :at_infinity || r.return_code == :at_zero
 
+"""
+    is_excess_solution(r::PathResult)
+
+Checks whether the path is successfull.
+"""
+is_excess_solution(r::PathResult) = r.return_code == :excess_solution
+
+"""
+    is_failed(r::PathResult)
+
+Checks whether the path failed.
+"""
+is_failed(r::PathResult) = !(is_at_infinity(r) || is_success(r) || is_excess_solution(r))
 
 """
     is_finite(r::PathResult)
 
 Checks whether the path result is finite.
 """
-is_finite(r::PathResult) = is_success(r.return_code)
+is_finite(r::PathResult) = is_success(r)
+Base.isfinite(r::PathResult) = is_finite(r)
 
 """
-    valuation(r::PathResult)
+    is_singular(r::PathResult; tol::Float64 = 1e10)
 
-Get the computed valuation of the path.
+Checks whether the path result `r` is singular. This is true if
+the winding number is larger than  1 or if the condition number of the Jacobian
+is larger than `tol`.
 """
-valuation(r::PathResult) = r.valuation
+is_singular(r::PathResult; tol::Float64 = 1e10) = is_singular(r, tol)
+function is_singular(r::PathResult, tol::Real)
+    (unpack(r.condition_jacobian, 1.0) > tol || unpack(winding_number(r), 1) > 1) &&
+    is_success(r)
+end
+
+"""
+    is_nonsingular(r::PathResult; tol::Float64 = 1e10)
+
+Checks whether the path result is non-singular. This is true if
+it is not singular.
+"""
+is_nonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && is_success(r)
+is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
+
+
+"""
+    is_real(r::PathResult; tol::Float64 = 1e-6)
+
+We consider a result as `real` if the infinity-norm of the imaginary part of the solution
+is at most `tol`.
+"""
+is_real(r::PathResult; tol::Float64 = 1e-6) = is_real(r, tol)
+is_real(r::PathResult, tol::Real) = maximum(abs ∘ imag, r.solution) < tol
+# provide fallback since this in in Base
+Base.isreal(r::PathResult, tol) = is_real(r, tol)
+Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)

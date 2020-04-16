@@ -15,7 +15,7 @@ struct PathInfo
     Δx̂x::Vector{Float64}
     high_prec::Vector{Bool}
     # total info
-    return_code::TrackerReturnCode.codes
+    return_code::TrackerCode.codes
     n_factorizations::Int
     n_ldivs::Int
 end
@@ -51,7 +51,7 @@ function path_info(tracker::Tracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool =
         push!(Δs, real(state.Δt))
         e = tracker.state.norm(local_error(tracker.predictor))
         push!(Δx_t, e * abs(state.Δt)^p)
-        push!(τ, tracker.options.β_τ * trust_region(tracker.predictor))
+        push!(τ, tracker.options.parameters.β_τ * trust_region(tracker.predictor))
         push!(ω, state.ω)
         push!(accuracy, state.accuracy)
         push!(μ, state.μ)
