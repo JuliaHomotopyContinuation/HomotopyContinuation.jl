@@ -808,7 +808,7 @@ is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
 We consider a result as `real` if the infinity-norm of the imaginary part of the solution
 is at most `tol`.
 """
-is_real(r::PathResult; tol = 1e-6) = is_real(r, tol)
+is_real(r::PathResult; tol::Float64 = 1e-6) = is_real(r, tol)
 is_real(r::PathResult, tol::Real) = maximum(abs ∘ imag, r.solution) < tol
 # provide fallback since this in in Base
 Base.isreal(r::PathResult, tol) = is_real(r, tol)

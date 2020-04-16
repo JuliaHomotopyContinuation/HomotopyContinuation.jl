@@ -16,6 +16,13 @@ fast_abs(z::Complex) = sqrt(abs2(z))
 fast_abs(x::Real) = abs(x)
 
 """
+    unpack(a::Union{Nothing, T}, b::T)
+
+Returns `a` if it is not `nothing`, otherwise `b`.
+"""
+unpack(a::Union{Nothing,T}, b::T) where {T} = a === nothing ? b : a
+
+"""
      print_fieldnames(io::IO, obj)
 
  A better default printing for structs.
