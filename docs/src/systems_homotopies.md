@@ -16,6 +16,8 @@ ModelKitSystem
 ### RandomizedSystem
 ```@docs
 RandomizedSystem
+excess_solution_check!
+excess_solution_check
 ```
 
 
