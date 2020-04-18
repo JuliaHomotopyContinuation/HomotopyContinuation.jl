@@ -39,6 +39,14 @@ function RandomizedSystem(F::AbstractSystem, A::Matrix{ComplexF64})
     RandomizedSystem(F, A, u, ū, U, taylor_U)
 end
 
+function Base.show(io::IO, mime::MIME"text/plain", F::RandomizedSystem)
+    println(io, typeof(F), ":")
+    println(io, "A:")
+    show(io, mime, F.A)
+    println(io, "\n\nF:")
+    show(io, mime, F.system)
+end
+
 
 """
     square_up(F::Union{System, AbstractSystem})
@@ -75,6 +83,8 @@ function randomize!(U, A, V::AbstractMatrix, ncols = size(A, 1))
     end
     U
 end
+
+(F::RandomizedSystem)(x, p = nothing) = [LA.I F.A] * F.system(x, p)
 
 function evaluate!(u, F::RandomizedSystem, x, p = nothing)
     if eltype(x) isa ComplexDF64

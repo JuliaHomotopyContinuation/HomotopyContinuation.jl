@@ -56,6 +56,7 @@ include("path_tracker.jl")
 include("path_info.jl")
 include("binomial_system.jl")
 include("polyhedral.jl")
+include("overdetermined.jl")
 
 
 end

@@ -17,6 +17,17 @@ ModelKitSystem(F::ModelKit.System, p = nothing) = ModelKitSystem(ModelKit.compil
 
 Base.size(F::ModelKitSystem) = size(F.system)
 
+function Base.show(io::IO, F::ModelKitSystem)
+    println(io, typeof(F), ":")
+    println(io, F.system)
+    if F.parameters !== nothing
+        println(io, "Parameters:")
+        show(io, F.parameters)
+    end
+end
+
+(F::ModelKitSystem{T,Nothing})(x, p = nothing) where {T} = F.system.system(x, p)
+(F::ModelKitSystem{T,<:AbstractVector})(x) where {T} = F.system.system(x, F.parameters)
 evaluate!(u, F::ModelKitSystem{T,<:AbstractVector}, x, p::Nothing = nothing) where {T} =
     ModelKit.evaluate!(u, F.system, x, F.parameters)
 evaluate!(u, F::ModelKitSystem{T,Nothing}, x, p = nothing) where {T} =

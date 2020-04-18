@@ -26,6 +26,7 @@ nvariables(::Expression)
 monomials
 subs
 rand_poly
+to_dict
 to_number
 variables(::Expression)
 ```

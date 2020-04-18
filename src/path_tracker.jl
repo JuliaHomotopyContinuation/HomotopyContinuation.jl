@@ -4,6 +4,7 @@ export PathTracker,
     track,
     solution,
     accuracy,
+    residual,
     steps,
     accepted_steps,
     rejected_steps,
@@ -216,8 +217,20 @@ struct PathTracker{
     options::PathTrackerOptions
 end
 
-PathTracker(H::Homotopy; kwargs...) = PathTracker(Tracker(ModelKitHomotopy(H)); kwargs...)
-PathTracker(H::AbstractHomotopy; kwargs...) = PathTracker(Tracker(H); kwargs...)
+PathTracker(H::Homotopy; kwargs...) = PathTracker(ModelKitHomotopy(H); kwargs...)
+function PathTracker(
+    H::AbstractHomotopy;
+    automatic_differentiation = 3,
+    tracker_options = TrackerOptions(),
+    kwargs...,
+)
+    tracker = Tracker(
+        H;
+        automatic_differentiation = automatic_differentiation,
+        options = tracker_options,
+    )
+    PathTracker(tracker; kwargs...)
+end
 function PathTracker(tracker::Tracker; options = PathTrackerOptions())
     state = PathTrackerState(size(tracker.homotopy, 1), tracker.state.x)
     PathTracker(tracker, state, options)
@@ -339,7 +352,6 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     step!(tracker)
-    # @show tracker.state.t
 
     state.code = status(tracker)
 
@@ -522,6 +534,7 @@ General solution information:
 * `t::Float64`: The value of `t` at which `solution` was computed. Note that if
   `return_code` is `:at_infinity`, then `t` is the value when this was decided.
 * `accuracy::Float64`: An estimate the (relative) accuracy of the computed solution.
+* `residual::Float64`: The infinity norm of `H(solution,t)`.
 * `condition_jacobian::Float64`: This is the condition number of the Jacobian at the
   solution. A high condition number indicates a singular solution or a
   solution on a positive dimensional component.
@@ -563,6 +576,7 @@ Base.@kwdef mutable struct PathResult{V<:AbstractVector}
     solution::V
     t::Float64
     accuracy::Float64
+    residual::Float64
     multiplicity::Union{Nothing,Int}
     condition_jacobian::Float64
     winding_number::Union{Nothing,Int}
@@ -585,25 +599,31 @@ function PathResult(
     path_number = nothing,
 )
     @unpack tracker, state, options = path_tracker
-    t = real(tracker.state.t)
+    H = tracker.homotopy
+
 
     if is_success(state.code)
-        solution = get_solution(tracker.homotopy, state.solution, t)
+        t = 0.0
+        solution = get_solution(H, state.solution, 0.0)
+        evaluate!(tracker.corrector.r, H, state.solution, complex(0.0))
+        residual = LA.norm(tracker.corrector.r, InfNorm())
     else
-        solution = get_solution(tracker.homotopy, tracker.state.x, t)
+        t = real(tracker.state.t)
+        solution = get_solution(H, tracker.state.x, t)
+        evaluate!(tracker.corrector.r, H, tracker.state.x, complex(t))
+        residual = LA.norm(tracker.corrector.r, InfNorm())
     end
+
     PathResult(
         return_code = Symbol(state.code),
         solution = solution,
-        t = is_success(state.code) ? 0.0 : t,
+        t = t,
         accuracy = state.accuracy,
+        residual = residual,
         condition_jacobian = state.cond,
         winding_number = state.winding_number,
         multiplicity = nothing,
-        last_path_point = (
-            get_solution(tracker.homotopy, state.last_point, state.last_t),
-            state.last_t,
-        ),
+        last_path_point = (get_solution(H, state.last_point, state.last_t), state.last_t),
         valuation = t > options.endgame_start ? nothing : copy(state.val.val_x),
         start_solution = start_solution,
         path_number = path_number,
@@ -668,6 +688,13 @@ Get the accuracy of the solution. This is an estimate of the (relative) distance
 true solution.
 """
 accuracy(r::PathResult) = r.accuracy
+
+"""
+    residual(r::PathResult)
+
+Get the residual of the solution.
+"""
+residual(r::PathResult) = r.residual
 
 """
     steps(r::PathResult)
