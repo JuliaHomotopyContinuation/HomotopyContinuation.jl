@@ -107,3 +107,26 @@ function total_degree_homotopy(
     S = TotalDegreeStarts(D)
     (homotopy = H, start_solutions = iterator ? S : collect(S))
 end
+
+function total_degree_homotopy(
+    F::AbstractSystem;
+    gamma = cis(2π * rand()),
+    scaling = nothing,
+    iterator = false
+)
+    m, n = size(F)
+    m == n ||
+    throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
+
+    @unique_var x[1:n] t γ s[1:n]
+    dicts = ModelKit.to_dict.(expand.(F(x)), Ref(x))
+    D = maximum.(sum, keys.(dicts))
+
+    if scaling == nothing
+        scaling = map(C -> maximum(float ∘ abs ∘ to_number, C), values.(dicts))
+    end
+    G = ModelKitSystem(System(γ .* s .* (x.^D .- 1), x, [γ;s]), [gamma; scaling])
+    H = StraightLineHomotopy(G, F)
+    S = TotalDegreeStarts(D)
+    (homotopy = H, start_solutions = iterator ? S : collect(S))
+end

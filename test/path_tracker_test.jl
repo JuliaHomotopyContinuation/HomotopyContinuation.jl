@@ -19,6 +19,7 @@
         @test winding_number(res[1]) == nothing
         @test !is_failed(res[1])
         @test accuracy(res[1]) < 1e-12
+        @test residual(res[1]) < 1e-12
         @test steps(res[1]) < 10
         @test accepted_steps(res[1]) < 10
         @test rejected_steps(res[1]) == 0

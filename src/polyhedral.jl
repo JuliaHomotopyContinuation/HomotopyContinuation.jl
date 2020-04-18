@@ -204,6 +204,7 @@ function track(
             start_solution = start_solution,
             t = real(state.t),
             accuracy = state.accuracy,
+            residual = NaN,
             winding_number = nothing,
             last_path_point = nothing,
             valuation = nothing,

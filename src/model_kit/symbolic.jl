@@ -421,6 +421,12 @@ julia> expand((x + y) ^ 2)
 """
 expand(e::Basic) = symengine_expand(e)
 
+"""
+    to_dict(expr::Expression, vars::AbstractVector{Variable})
+
+Return the coefficients of `expr` w.r.t. the given variables `vars`. Assumes that `expr`
+is expanded.
+"""
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
     dict = Dict{Vector{Int},Expression}()
@@ -578,9 +584,9 @@ function degrees(
     expanded::Bool = false,
 )
     if !expanded
-        f = ModelKit.expand.(f)
+        f = expand.(f)
     end
-    dicts = ModelKit.to_dict.(f, Ref(vars))
+    dicts = to_dict.(f, Ref(vars))
     maximum.(sum, keys.(dicts))
 end
 
