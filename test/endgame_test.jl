@@ -1,7 +1,7 @@
 @testset "Endgame" begin
     @testset "Cyclic 7" begin
         f = cyclic(7)
-        H, starts = total_degree_homotopy(f)
+        H, starts = total_degree(f)
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -20,7 +20,7 @@
             0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 + 0.75 * z^4
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3
         ]
-        H, starts = total_degree_homotopy(F, [x, z])
+        H, starts = total_degree(System(F))
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -31,7 +31,7 @@
         @var x
         d = 19
         f = expand(prod(x - i for i = 1:d))
-        H, starts = total_degree_homotopy([f], [x])
+        H, starts = total_degree(System([f]))
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -44,7 +44,7 @@
     @testset "(x-10)^$d" for d in [2, 8, 12, 16, 18 ]
         @var x
         f = [(x - 10)^d]
-        H, starts = total_degree_homotopy(f, [x])
+        H, starts = total_degree(System(f))
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -54,7 +54,7 @@
     @testset "Beyond Polyhedral Homotopy Example" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
-        H, starts = total_degree_homotopy(f, [x, y])
+        H, starts = total_degree(System(f))
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -67,7 +67,7 @@
         a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         f1 = (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1
         f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
-        H, starts = total_degree_homotopy([f1, f2], [x, y])
+        H, starts = total_degree(System([f1, f2]))
         S = collect(starts)
         tracker = PathTracker(H)
         res = track.(tracker, S)
@@ -76,7 +76,7 @@
     end
 
     @testset "Bacillus Subtilis" begin
-        H, starts = total_degree_homotopy(bacillus())
+        H, starts = total_degree(bacillus())
         tracker = PathTracker(H)
         res = track.(tracker, starts)
         @test count(is_success, res) == 44
@@ -105,7 +105,7 @@
                 88,
             ])
 
-        H, starts = total_degree_homotopy(System(F, [x, z, y]))
+        H, starts = total_degree(System(F, [x, z, y]))
         tracker = PathTracker(H)
         res = track.(tracker, starts)
         @test count(is_success, res) == 693

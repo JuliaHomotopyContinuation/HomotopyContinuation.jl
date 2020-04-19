@@ -2,7 +2,7 @@
     @testset "Tracking and PathResult" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
-        H, starts = total_degree_homotopy(f, [x, y]; gamma = 1.3im + 0.4)
+        H, starts = total_degree(System(f); gamma = 1.3im + 0.4)
         S = collect(starts)
         tracker = PathTracker(H)
         @test !isempty(sprint(show, tracker.options))
@@ -33,7 +33,7 @@
         # singular stuff
         @var x
         f = [(x - 10)^2]
-        H, starts = total_degree_homotopy(f, [x])
+        H, starts = total_degree(System(f))
         tracker = PathTracker(Tracker(H))
         res = track.(tracker, starts)
         @test winding_number(res[1]) == 2
@@ -56,7 +56,7 @@
         L₂ = rand_affine_subspace(3; codim = 2)
 
         H, S =
-            total_degree_homotopy(System([x^2 + y^2 + z^2 - 1]) ∩ extrinsic(L₁)([x, y, z]))
+            total_degree(System([x^2 + y^2 + z^2 - 1]) ∩ extrinsic(L₁)([x, y, z]))
         res = track.(Tracker(H), S)
         @test all(is_success, res)
 

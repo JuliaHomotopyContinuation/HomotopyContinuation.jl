@@ -13,7 +13,12 @@ struct ModelKitSystem{S,T<:Union{Nothing,AbstractVector}} <: AbstractSystem
 end
 
 ModelKitSystem(F::ModelKit.CompiledSystem) = ModelKitSystem(F, nothing)
-ModelKitSystem(F::ModelKit.System, p = nothing) = ModelKitSystem(ModelKit.compile(F), p)
+function ModelKitSystem(F::ModelKit.System, p = nothing)
+    if p !== nothing
+        length(p) === nparameters(F) || throw(ArgumentError("Length of provided parameters doesn't match the number of parameters of the system."))
+    end
+    ModelKitSystem(ModelKit.compile(F), p)
+end
 
 Base.size(F::ModelKitSystem) = size(F.system)
 

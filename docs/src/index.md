@@ -18,6 +18,14 @@ Pages = [
 Depth = 2
 ```
 
+**Start Systems**
+```@contents
+Pages = [
+    "start_systems.md",
+]
+Depth = 2
+```
+
 **Trackers**
 ```@contents
 Pages = [

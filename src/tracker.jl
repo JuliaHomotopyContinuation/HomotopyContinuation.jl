@@ -23,6 +23,13 @@ export Tracker,
     iterator
 
 
+"""
+    AbstractTracker
+
+Supertype for path trackers.
+"""
+abstract type AbstractTracker end
+
 ###
 ### Options and Parameters
 ###
@@ -444,7 +451,7 @@ struct Tracker{
     V<:AbstractVector{ComplexF64},
     V̄<:AbstractVector{ComplexDF64},
     M<:AbstractMatrix{ComplexF64},
-}
+} <: AbstractTracker
     homotopy::H
     predictor::Pade21
     corrector::NewtonCorrector{V̄}
@@ -467,18 +474,18 @@ function Tracker(
     weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
     options::TrackerOptions = TrackerOptions(),
     automatic_differentiation::Int = 3,
+    AD::Int = automatic_differentiation
 )
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
     predictor = Pade21(size(H, 2))
     corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
 
-    if !(0 ≤ automatic_differentiation ≤ 4)
+    if !(0 ≤ AD ≤ 4)
         throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
     end
-    AD = Val(automatic_differentiation)
     ND = NumericalDifferentiation(state.x, size(H, 1))
-    Tracker(H, predictor, corrector, state, options, AD, ND)
+    Tracker(H, predictor, corrector, state, options, Val(AD), ND)
 end
 
 function Base.show(io::IO, C::Tracker{<:Any,N}) where {N}

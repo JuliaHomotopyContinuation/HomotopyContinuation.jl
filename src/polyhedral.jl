@@ -1,7 +1,14 @@
+export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator
+
 # Start Solutions
 import MixedSubdivisions: MixedCell
 
-struct PolyhedralStartSolutions
+"""
+    PolyhedralStartSolutionsIterator
+
+An iterator providing start solutions for the polyhedral homotopy.
+"""
+struct PolyhedralStartSolutionsIterator
     support::Vector{Matrix{Int32}}
     start_coefficients::Vector{Vector{ComplexF64}}
     lifting::Vector{Vector{Int32}}
@@ -9,29 +16,31 @@ struct PolyhedralStartSolutions
     BSS::BinomialSystemSolver
 end
 
-function PolyhedralStartSolutions(
+function PolyhedralStartSolutionsIterator(
     support::AbstractVector{<:AbstractMatrix{<:Integer}},
     coeffs::AbstractVector{<:AbstractVector{<:Number}},
+    lifting = map(c -> zeros(Int32, length(c)), coeffs),
+    mixed_cells = MixedCell[],
 )
     BSS = BinomialSystemSolver(length(support))
-    PolyhedralStartSolutions(
+    PolyhedralStartSolutionsIterator(
         convert(Vector{Matrix{Int32}}, support),
         coeffs,
-        map(c -> zeros(Int32, length(c)), coeffs),
-        MixedCell[],
+        lifting,
+        mixed_cells,
         BSS,
     )
 end
 
-Base.IteratorSize(::Type{<:PolyhedralStartSolutions}) = Base.HasLength()
-Base.IteratorEltype(::Type{<:PolyhedralStartSolutions}) = Base.HasEltype()
-Base.eltype(iter::PolyhedralStartSolutions) = Tuple{MixedCell,Vector{ComplexF64}}
-function Base.length(iter::PolyhedralStartSolutions)
+Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasLength()
+Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
+Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
+function Base.length(iter::PolyhedralStartSolutionsIterator)
     compute_mixed_cells!(iter)
     sum(MixedSubdivisions.volume, iter.mixed_cells)
 end
 
-function compute_mixed_cells!(iter::PolyhedralStartSolutions)
+function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isempty(iter.mixed_cells)
         res = MixedSubdivisions.fine_mixed_cells(iter.support)
         if isnothing(res) || isempty(res[1])
@@ -49,7 +58,7 @@ function compute_mixed_cells!(iter::PolyhedralStartSolutions)
     iter
 end
 
-function Base.iterate(iter::PolyhedralStartSolutions)
+function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     compute_mixed_cells!(iter)
 
     isempty(iter.mixed_cells) && return nothing
@@ -62,7 +71,7 @@ function Base.iterate(iter::PolyhedralStartSolutions)
     el, next_state
 end
 
-function Base.iterate(iter::PolyhedralStartSolutions, (i, j)::Tuple{Int,Int})
+function Base.iterate(iter::PolyhedralStartSolutionsIterator, (i, j)::Tuple{Int,Int})
     i > length(iter.mixed_cells) && return nothing
 
     cell = iter.mixed_cells[i]
@@ -73,7 +82,7 @@ function Base.iterate(iter::PolyhedralStartSolutions, (i, j)::Tuple{Int,Int})
 end
 
 # Tracker
-function polyehdral_system(support)
+function polyhedral_system(support)
     n = length(support)
     m = sum(A -> size(A, 2), support)
     @var x[1:n] c[1:m]
@@ -89,11 +98,13 @@ function polyehdral_system(support)
 end
 
 """
-    PolyhedralTracker
-The polyhedral tracker combines the tracking from toric infinity toward the target system
-by a two-stage approach.
+    PolyhedralTracker <: AbstractTracker
+
+This tracker realises the two step approach of the polyhedral homotopy.
+See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}} <:
+       AbstractTracker
     toric_tracker::Tracker{H1,N,Vector{ComplexF64},Vector{ComplexDF64},M}
     generic_tracker::PathTracker{H2,N,Vector{ComplexF64},Vector{ComplexDF64},M}
     support::Vector{Matrix{Int32}}
@@ -102,25 +113,127 @@ end
 
 Base.broadcastable(T::PolyhedralTracker) = Ref(T)
 
-function polyhedral(f::ModelKit.System)
-    supp_coeffs = exponents_coefficients.(f, Ref(variables(f)))
-    support = first.(supp_coeffs)
-    target_coeffs = map(ci -> float.(ModelKit.to_number.(ci)), last.(supp_coeffs))
+"""
+    polyhedral(F::Union{System, AbstractSystem};
+        only_non_zero = false,
+        path_tracker_options = PathTrackerOptions(),
+        tracker_options = TrackerOptions())
+
+Solve the system `F` in two steps: first solve a generic system derived from the support
+of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
+coefficient-parameter homotopy towards `F`.
+This returns a [`PolyhedralTracker`](@ref) and an iterator to compute the start solutions.
+
+If `only_non_zero` is `true`, then only the solutions with non-zero coordinates are computed.
+In this case the number of paths to track is equal to the
+mixed volume of the Newton polytopes of `F`.
+
+If `only_non_zero` is `false`, then all isolated solutions of `F` are computed.
+In this case the number of paths to track is equal to the
+mixed volume of the convex hulls of ``supp(F_i) ∪ \\{0\\}`` where ``supp(F_i)`` is the support
+of ``F_i``. See also [^LW96].
+
+
+    function polyhedral(
+        support::AbstractVector{<:AbstractMatrix},
+        coefficientss::AbstractVector{<:AbstractVector{<:Number}};
+        kwargs...,
+    )
+
+It is also possible to provide directly the support and coefficients of the system `F` to be solved.
+
+[^HS95]: Birkett Huber and Bernd Sturmfels. “A Polyhedral Method for Solving Sparse Polynomial Systems.” Mathematics of Computation, vol. 64, no. 212, 1995, pp. 1541–1555
+[^LW96]: T.Y. Li and Xiaoshen Wang. "The BKK root count in C^n". Math. Comput. 65, 216 (October 1996), 1477–1484.
+
+### Example
+
+We consider a system `f` which has in total 6 isolated solutions,
+but only 3 where all coordinates are non-zero.
+```julia
+@var x y
+f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
+tracker, starts = polyhedral(f; only_non_zero = false)
+# length(starts) == 8
+count(is_success, track.(tracker, starts)) # 6
+
+tracker, starts = polyhedral(f; only_non_zero = true)
+# length(starts) == 3
+count(is_success, track.(tracker, starts)) # 3
+```
+"""
+function polyhedral(F::AbstractSystem; kwargs...)
+    _, n = size(F)
+    @var x[1:n]
+    polyhedral(System(F(x), x); kwargs...)
+end
+function polyhedral(f::System; kwargs...)
+    support, target_coeffs = support_coefficients(f)
+    polyhedral(support, target_coeffs; kwargs...)
+end
+function polyhedral(
+    support::AbstractVector{<:AbstractMatrix},
+    target_coeffs::AbstractVector{<:AbstractVector{<:Number}};
+    kwargs...,
+)
     start_coeffs =
         map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
-    F = ModelKit.compile(polyehdral_system(support))
+    polyhedral(support, start_coeffs, target_coeffs; kwargs...)
+end
 
+function polyhedral(
+    support::AbstractVector{<:AbstractMatrix},
+    start_coeffs::AbstractVector{<:AbstractVector{<:Number}},
+    target_coeffs::AbstractVector{<:AbstractVector{<:Number}};
+    path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
+    tracker_options::TrackerOptions = TrackerOptions(),
+    automatic_differentiation::Int = 3,
+    only_non_zero = false,
+    only_torus = only_non_zero,
+)
+    size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
+    throw(ArgumentError("Number of terms do not coincide."))
+
+    min_vecs = minimum.(support, dims = 2)
+    if !all(iszero, min_vecs)
+        if only_torus
+            support = map((A, v) -> A .- v, support, min_vecs)
+        else
+            # Add 0 to each support
+            starts = Vector{ComplexF64}[]
+            targets = Vector{ComplexF64}[]
+            supp = eltype(support)[]
+            for (i, A) in enumerate(support)
+                if iszero(min_vecs[i])
+                    push!(starts, start_coeffs[i])
+                    push!(targets, target_coeffs[i])
+                    push!(supp, A)
+                else
+                    push!(starts, [start_coeffs[i]; randn(ComplexF64)])
+                    push!(targets, [target_coeffs[i]; 0.0])
+                    push!(supp, [A zeros(Int32, size(A, 1), 1)])
+                end
+            end
+            support = supp
+            start_coeffs = starts
+            target_coeffs = targets
+        end
+    end
+
+    F = ModelKit.compile(polyhedral_system(support))
     H₁ = ToricHomotopy(F, start_coeffs)
-    toric_tracker = Tracker(H₁)
+    toric_tracker = Tracker(H₁; options = TrackerOptions(), AD = automatic_differentiation)
 
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
         q = reduce(append!, target_coeffs; init = ComplexF64[])
         ParameterHomotopy(ModelKitSystem(F), p, q)
     end
-    generic_tracker = PathTracker(Tracker(H₂))
+    generic_tracker = PathTracker(
+        Tracker(H₂; AD = automatic_differentiation, options = tracker_options),
+        options = path_tracker_options,
+    )
 
-    S = PolyhedralStartSolutions(support, start_coeffs)
+    S = PolyhedralStartSolutionsIterator(support, start_coeffs)
     tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)
 
     tracker, S

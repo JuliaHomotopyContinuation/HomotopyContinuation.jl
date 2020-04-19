@@ -211,7 +211,7 @@ struct PathTracker{
     V<:AbstractVector{ComplexF64},
     V̄<:AbstractVector{ComplexDF64},
     M<:AbstractMatrix{ComplexF64},
-}
+} <: AbstractTracker
     tracker::Tracker{H,N,V,V̄,M}
     state::PathTrackerState{V}
     options::PathTrackerOptions
