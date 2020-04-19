@@ -1,132 +1,92 @@
-export total_degree_homotopy
+export total_degree, total_degree_start_solutions
 
-"""
-    TotalDegreeStarts(degrees)
-
-Given the `Vector`s `degrees` `TotalDegreeStarts` enumerates all solutions
-of the system
-```math
-\\begin{align*}
-    z_1^{d_1} - 1 &= 0 \\\\
-    z_1^{d_2} - 1 &= 0 \\\\
-    &\\vdots \\\\
-    z_n^{d_n} - 1 &= 0 \\\\
-\\end{align*}
-```
-where ``d_i`` is `degrees[i]`.
-"""
-struct TotalDegreeStarts{Iter}
+struct TotalDegreeStartSolutionsIterator{Iter}
     degrees::Vector{Int}
     iterator::Iter
 end
-function TotalDegreeStarts(degrees::Vector{Int})
+function TotalDegreeStartSolutionsIterator(degrees)
     iterator = Iterators.product(map(d -> 0:(d-1), degrees)...)
-    TotalDegreeStarts(degrees, iterator)
+    TotalDegreeStartSolutionsIterator(degrees, iterator)
 end
-function Base.show(io::IO, iter::TotalDegreeStarts)
+function Base.show(io::IO, iter::TotalDegreeStartSolutionsIterator)
     print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
 end
 
-function Base.iterate(iter::TotalDegreeStarts)
+function Base.iterate(iter::TotalDegreeStartSolutionsIterator)
     indices, state = iterate(iter.iterator)
     _value(iter, indices), state
 end
-function Base.iterate(iter::TotalDegreeStarts, state)
+function Base.iterate(iter::TotalDegreeStartSolutionsIterator, state)
     it = iterate(iter.iterator, state)
     it === nothing && return nothing
     _value(iter, first(it)), last(it)
 end
 
-_value(iter::TotalDegreeStarts, indices) =
+_value(iter::TotalDegreeStartSolutionsIterator, indices) =
     map((k, d) -> cis(2π * k / d), indices, iter.degrees)
 
 
-Base.length(iter::TotalDegreeStarts) = length(iter.iterator)
-Base.eltype(iter::Type{<:TotalDegreeStarts}) = Vector{Complex{Float64}}
+Base.length(iter::TotalDegreeStartSolutionsIterator) = length(iter.iterator)
+Base.eltype(iter::Type{<:TotalDegreeStartSolutionsIterator}) = Vector{Complex{Float64}}
 
 """
-    total_degree_homotopy(F::System; parameters = ComplexF64[], gamma = cis(2π * rand()))
+    total_degree_start_solutions(degrees)
+
+Returns an iterator of the start solutions of the system
+```math
+\\begin{array}{rl}
+    z_1^{d_1} - 1 &= 0 \\\\
+    z_2^{d_2} - 1 &= 0 \\\\
+    &\\vdots \\\\
+    z_n^{d_n} - 1 &= 0 \\\\
+\\end{array}
+```
+where ``d_i`` is `degrees[i]`.
+
+## Example
+```julia-repl
+julia> iter = total_degree_start_solutions([2, 2])
+4 total degree start solutions for degrees [2, 2]
+
+julia> collect(iter)
+4-element Array{Array{Complex{Float64},1},1}:
+ [1.0 + 0.0im, 1.0 + 0.0im]
+ [-1.0 + 1.2246467991473532e-16im, 1.0 + 0.0im]
+ [1.0 + 0.0im, -1.0 + 1.2246467991473532e-16im]
+ [-1.0 + 1.2246467991473532e-16im, -1.0 + 1.2246467991473532e-16im]
+```
+"""
+total_degree_start_solutions(degrees) = TotalDegreeStartSolutionsIterator(degrees)
+
+"""
+    total_degree(F::System; parameters = nothing, gamma = cis(2π * rand()))
+    total_degree(F::AbstractSystem; gamma = cis(2π * rand()))
 
 Construct a total degree homotopy ``H`` using the 'γ-trick' such that ``H(x,0) = F(x)``
 and ``H(x,1)`` is the generated start system.
-Returns a `ModelKitHomotopy` and the start solutions as an interator.
+Returns a `StraightLineHomotopy` and the start solutions as an interator.
 """
-total_degree_homotopy(
-    f::AbstractVector{Expression},
-    vars::AbstractVector{Variable} = variables(f),
-    params::AbstractVector{Variable} = Variable[];
-    kwargs...,
-) = total_degree_homotopy(System(f, vars, params); kwargs...)
+total_degree(F::System; target_parameters = nothing, kwargs...) =
+    total_degree(ModelKitSystem(F, target_parameters); kwargs...)
 
-function total_degree_homotopy(
-    F::System;
-    target_parameters::AbstractVector = ComplexF64[],
-    gamma = cis(2π * rand()),
-    scaling = nothing,
-    iterator = false
-)
-    n = length(F)
-    n == nvariables(F) ||
-    throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
-    nparameters(F) == length(target_parameters) ||
-    throw(ArgumentError("Given system does not have the same number of parameter values provided as parameters."))
-
-    vars = variables(F)
-    params = parameters(F)
-    D = degrees(F)
-
-    t = ModelKit.unique_variable(:t, vars, params)
-
-    γ = ModelKit.unique_variable(:γ, vars, params)
-    all_params = [params; γ]
-    _s_ = Variable[]
-    for i = 1:n
-        _s_i = ModelKit.unique_variable(Symbol(:_s_, i), vars, all_params)
-        push!(_s_, _s_i)
-        push!(all_params, _s_i)
-    end
-
-    f = expressions(F)
-    h = γ .* t .* _s_ .* (vars .^ D .- 1) .+ (1 .- t) .* f
-    if scaling == nothing
-        s = map(f) do fi
-            g = isempty(params) ? fi : subs(fi, params => target_parameters)
-            maximum(ci -> float(abs(to_number(ci))), coefficients(expand(g), vars))
-        end
-        H = ModelKitHomotopy(
-            Homotopy(h, vars, t, all_params),
-            [target_parameters; gamma; s],
-        )
-    else
-        H = ModelKitHomotopy(
-            Homotopy(h, vars, t, all_params),
-            [target_parameters; gamma; scaling],
-        )
-    end
-
-    S = TotalDegreeStarts(D)
-    (homotopy = H, start_solutions = iterator ? S : collect(S))
-end
-
-function total_degree_homotopy(
+function total_degree(
     F::AbstractSystem;
-    gamma = cis(2π * rand()),
-    scaling = nothing,
-    iterator = false
+    γ = cis(2π * rand()),
+    gamma = γ,
+    scaling::Union{Nothing,AbstractVector} = nothing,
+    iterator::Bool = true,
 )
     m, n = size(F)
     m == n ||
     throw(ArgumentError("Given system does not have the same number of polynomials as variables."))
 
-    @unique_var x[1:n] t γ s[1:n]
+    @unique_var x[1:n] t s[1:n]
     dicts = ModelKit.to_dict.(expand.(F(x)), Ref(x))
     D = maximum.(sum, keys.(dicts))
 
-    if scaling == nothing
+    if scaling === nothing
         scaling = map(C -> maximum(float ∘ abs ∘ to_number, C), values.(dicts))
     end
-    G = ModelKitSystem(System(γ .* s .* (x.^D .- 1), x, [γ;s]), [gamma; scaling])
-    H = StraightLineHomotopy(G, F)
-    S = TotalDegreeStarts(D)
-    (homotopy = H, start_solutions = iterator ? S : collect(S))
+    G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s), scaling)
+    StraightLineHomotopy(G, F; γ = gamma), total_degree_start_solutions(D)
 end

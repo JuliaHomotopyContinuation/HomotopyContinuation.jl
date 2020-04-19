@@ -520,6 +520,7 @@ function exponents_coefficients(
     f::Expression,
     vars::AbstractVector{Variable};
     expanded::Bool = false,
+    unpack_coeffs::Bool = true
 )
     expanded || (f = expand(f))
     D = to_dict(f, vars)
@@ -529,13 +530,18 @@ function exponents_coefficients(
     perm = sortperm(E; lt = td_order)
     permute!(E, perm)
     n = length(vars)
-    M = zeros(Int, n, m)
+    M = zeros(Int32, n, m)
     for (j, Eⱼ) in enumerate(E)
         for (i, dᵢ) in enumerate(Eⱼ)
             M[i, j] = dᵢ
         end
     end
-    coeffs = permute!(collect(values(D)), perm)
+    if unpack_coeffs
+        coeffs = to_number.(values(D))
+    else
+        coeffs = collect(values(D))
+    end
+    permute!(coeffs, perm)
     M, coeffs
 end
 
@@ -550,9 +556,8 @@ function coefficients(f::Expression, vars::AbstractVector{Variable})
     m = length(D)
     E = collect(keys(D))
     perm = sortperm(E; lt = td_order)
-    permute!(collect(values(D)), perm)
+    permute!(to_number.(values(D)), perm)
 end
-
 
 """
     degree(f::Expression, vars = variables(f); expanded = false)
@@ -624,11 +629,11 @@ c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
 function horner(f::Expression, vars = variables(f))
-    M, coeffs = exponents_coefficients(f, vars)
+    M, coeffs = exponents_coefficients(f, vars; unpack_coeffs = false)
     multivariate_horner(M, coeffs, vars)
 end
 
-function horner(coeffs::AbstractVector{Expression}, var::Variable)
+function horner(coeffs::AbstractVector, var::Variable)
     d = length(coeffs) - 1
     h = copy(coeffs[d+1])
     @inbounds for k = d:-1:1
@@ -639,8 +644,8 @@ function horner(coeffs::AbstractVector{Expression}, var::Variable)
 end
 
 function multivariate_horner(
-    M::AbstractMatrix{Int},
-    coeffs::AbstractVector{Expression},
+    M::AbstractMatrix,
+    coeffs::AbstractVector,
     vars::AbstractVector{Variable},
 )
     n, m = size(M)
@@ -912,6 +917,17 @@ parameters(F::System) = F.parameters
 Return the degrees of the given system.
 """
 degrees(F::System) = degrees(F.expressions, F.variables)
+
+"""
+    support_coefficients(F::System)
+
+Return the support of the system and the corresponding coefficients.
+"""
+function support_coefficients(F::System)
+    supp_coeffs = exponents_coefficients.(F.expressions, Ref(F.variables))
+    first.(supp_coeffs), last.(supp_coeffs)
+end
+
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
 

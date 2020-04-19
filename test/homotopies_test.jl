@@ -89,31 +89,14 @@
     end
 
     @testset "total degree" begin
-        @test length(collect(HC2.TotalDegreeStarts([2, 4]))) == 8
-        @test length(HC2.TotalDegreeStarts([2, 4])) == 8
-        @test eltype(HC2.TotalDegreeStarts([2, 4])) == Vector{ComplexF64}
+        @test length(collect(HC2.TotalDegreeStartSolutionsIterator([2, 4]))) == 8
+        @test length(HC2.TotalDegreeStartSolutionsIterator([2, 4])) == 8
+        @test eltype(HC2.TotalDegreeStartSolutionsIterator([2, 4])) == Vector{ComplexF64}
 
         @var x y
         F = System([x^2, y^3], [x, y])
-        H, starts = total_degree_homotopy(F)
+        H, starts = total_degree(F)
         @test length(starts) == 6
-        @var t γ _s_1 _s_2
-        @test H isa ModelKitHomotopy
-        @test ModelKit.interpret(H.homotopy) == Homotopy(
-            [
-                x^2 * (1 - t) + t * _s_1 * γ * (-1 + x^2),
-                y^3 * (1 - t) + t * _s_2 * γ * (-1 + y^3),
-            ],
-            [x, y],
-            t,
-            [γ, _s_1, _s_2],
-        )
-
-        @test_throws ArgumentError total_degree_homotopy(System([x + y], [x]))
-        @test_throws ArgumentError total_degree_homotopy(System(
-            [x + y],
-            [x, y],
-            [t],
-        ))
+        @test H isa StraightLineHomotopy
     end
 end

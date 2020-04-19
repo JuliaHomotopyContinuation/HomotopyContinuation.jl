@@ -39,6 +39,7 @@ expressions(F::System)
 nparameters(::System)
 nvariables(::System)
 parameters(::System)
+support_coefficients(::System)
 variables(::System)
 ```
 

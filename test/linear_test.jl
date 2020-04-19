@@ -47,7 +47,7 @@
         A = rand_affine_subspace(4; codim = 2)
         # Commpute witness set
         L = A(x, Extrinsic)
-        H, S = total_degree_homotopy(F ∩ L)
+        H, S = total_degree(F ∩ L)
         res = track.(Tracker(H), S)
         W = solution.(res)
 

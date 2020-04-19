@@ -3,7 +3,7 @@
         # setup
         @var x
         f = [(x - 10)^5]
-        H, starts = total_degree_homotopy(f, [x])
+        H, starts = total_degree(System(f))
         S = collect(starts)
         tracker = Tracker(H)
         val = HC2.Valuation(1)
@@ -23,7 +23,7 @@
             2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
             2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
         ]
-        H, starts = total_degree_homotopy(f, [x, y]; gamma = 1.3im + 0.4)
+        H, starts = total_degree(System(f); gamma = 1.3im + 0.4)
         S = collect(starts)
         tracker = Tracker(H, options = TrackerOptions(parameters = :conservative))
         val = HC2.Valuation(2)
@@ -44,7 +44,7 @@
         @var x y
         f1 = (a[1] * x^2 + a[2] * y) * (a[3] * x + a[4] * y) + 1
         f2 = (a[1] * x^2 + a[2] * y) * (a[5] * x + a[6] * y) + 1
-        H, starts = total_degree_homotopy([f1, f2], [x, y]; gamma = 1.3im + 0.4)
+        H, starts = total_degree(System([f1, f2]); gamma = 1.3im + 0.4)
         S = collect(starts)
         tracker = Tracker(H, options = TrackerOptions(parameters = :conservative))
         val = HC2.Valuation(2)

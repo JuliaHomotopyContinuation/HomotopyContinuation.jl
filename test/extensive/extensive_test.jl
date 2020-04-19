@@ -142,7 +142,7 @@
         L = [a; 1] .* t + [b; 0]
         FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))
         sys = System(ModelKit.horner.(FcapL), [a; b], q)
-        H, starts = total_degree_homotopy(sys; gamma = gamma, target_parameters = q₀)
+        H, starts = total_degree(sys; gamma = gamma, target_parameters = q₀)
         tracker = PathTracker(H)
         @time res = track.(tracker, starts)
         @test count(is_success, res) == 2875
