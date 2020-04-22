@@ -218,18 +218,8 @@ struct PathTracker{
 end
 
 PathTracker(H::Homotopy; kwargs...) = PathTracker(ModelKitHomotopy(H); kwargs...)
-function PathTracker(
-    H::AbstractHomotopy;
-    automatic_differentiation = 3,
-    tracker_options = TrackerOptions(),
-    kwargs...,
-)
-    tracker = Tracker(
-        H;
-        automatic_differentiation = automatic_differentiation,
-        options = tracker_options,
-    )
-    PathTracker(tracker; kwargs...)
+function PathTracker(H::AbstractHomotopy; tracker_options = TrackerOptions(), kwargs...)
+    PathTracker(Tracker(H; options = tracker_options); kwargs...)
 end
 function PathTracker(tracker::Tracker; options = PathTrackerOptions())
     state = PathTrackerState(size(tracker.homotopy, 1), tracker.state.x)

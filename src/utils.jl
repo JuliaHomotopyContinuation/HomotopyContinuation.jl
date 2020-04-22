@@ -1,3 +1,31 @@
+###
+### Exceptions
+###
+struct KeywordArgumentException <: Exception
+    key::Symbol
+    given
+    msg::String
+end
+function KeywordArgumentException(key, given)
+    KeywordArgumentException(key, given, "")
+end
+function Base.showerror(io::IO, E::KeywordArgumentException)
+    print(io, "Invalid argument $given for $key. ", msg)
+end
+
+struct FiniteException <: Exception
+    dim::Int
+end
+function Base.showerror(io::IO, E::FiniteException)
+    print(
+        io,
+        "FiniteException: The solution set of the given system has at least dimension " *
+        "$(E.dim) > 0. Consider intersecting with an (affine) subspace of codimension " *
+        "$(E.dim) to reduce to (possibly) finitely many solutions.",
+    )
+end
+
+
 """
     rand_unitary_matrix(n::Int, T=ComplexF64)
 

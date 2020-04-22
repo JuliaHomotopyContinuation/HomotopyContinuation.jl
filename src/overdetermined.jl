@@ -1,6 +1,4 @@
 export excess_solution_check, excess_solution_check!
-
-
 """
     excess_solution_check!(path_result::PathResult,
                            F::RandomizedSystem,
@@ -59,3 +57,14 @@ The call `excess_solution_check(F)(path_result)` is identical to
 `excess_solution_check!(F, path_result)`. See also [`excess_solution_check!`](@ref).
 """
 excess_solution_check(F::RandomizedSystem) = ExcessSolutionCheck(F, NewtonCache(F.system))
+
+
+struct OverdeterminedTracker{T<:AbstractTracker,E<:ExcessSolutionCheck} <: AbstractTracker
+    tracker::T
+    excess_solution_check::E
+end
+OverdeterminedTracker(T::AbstractTracker, F::RandomizedSystem) =
+    OverdeterminedTracker(T, excess_solution_check(F))
+
+track(T::OverdeterminedTracker, x; kwargs...) =
+    T.excess_solution_check(track(T.tracker, x; kwargs...))

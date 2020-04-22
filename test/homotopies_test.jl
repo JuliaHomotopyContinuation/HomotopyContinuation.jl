@@ -87,16 +87,4 @@
         )
         @test ModelKitHomotopy(ModelKit.compile(H)) isa ModelKitHomotopy
     end
-
-    @testset "total degree" begin
-        @test length(collect(HC2.TotalDegreeStartSolutionsIterator([2, 4]))) == 8
-        @test length(HC2.TotalDegreeStartSolutionsIterator([2, 4])) == 8
-        @test eltype(HC2.TotalDegreeStartSolutionsIterator([2, 4])) == Vector{ComplexF64}
-
-        @var x y
-        F = System([x^2, y^3], [x, y])
-        H, starts = total_degree(F)
-        @test length(starts) == 6
-        @test H isa StraightLineHomotopy
-    end
 end

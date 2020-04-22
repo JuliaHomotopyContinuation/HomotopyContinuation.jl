@@ -14,6 +14,8 @@ export @var,
     exponents_coefficients,
     expressions,
     horner,
+    is_homogeneous,
+    multi_degrees,
     parameters,
     nparameters,
     nvariables,
@@ -28,6 +30,7 @@ export @var,
     System,
     Homotopy,
     TaylorVector,
+    variable_groups,
     vectors
 
 import LinearAlgebra

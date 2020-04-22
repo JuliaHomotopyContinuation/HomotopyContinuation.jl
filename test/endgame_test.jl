@@ -1,10 +1,6 @@
 @testset "Endgame" begin
     @testset "Cyclic 7" begin
-        f = cyclic(7)
-        H, starts = total_degree(f)
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        res = track.(total_degree(cyclic(7))...)
 
         @test count(is_success, res) == 924
         @test 4000 ≤ count(is_at_infinity, res) ≤ 4116
@@ -20,44 +16,32 @@
             0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 + 0.75 * z^4
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3
         ]
-        H, starts = total_degree(System(F))
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        res = track.(total_degree(System(F))...)
         @test count(r -> r.winding_number == 3, res) == 12
     end
 
     @testset "Wilkinson 19" begin
         @var x
         d = 19
-        f = expand(prod(x - i for i = 1:d))
-        H, starts = total_degree(System([f]))
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        f = System([expand(prod(x - i for i = 1:d))])
+        res = track.(total_degree(f)...)
         @test all(is_success, res)
         @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:19
         @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-8
         @test count(r -> isnothing(r.winding_number), res) == 19
     end
 
-    @testset "(x-10)^$d" for d in [2, 8, 12, 16, 18 ]
+    @testset "(x-10)^$d" for d in [2, 8, 12, 16, 18]
         @var x
-        f = [(x - 10)^d]
-        H, starts = total_degree(System(f))
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        f = System([(x - 10)^d])
+        res = track.(total_degree(f)...)
         @test count(r -> r.winding_number == d, res) == d
     end
 
     @testset "Beyond Polyhedral Homotopy Example" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
-        H, starts = total_degree(System(f))
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        res = track.(total_degree(System(f))...)
         @test count(is_success, res) == 2
         @test count(is_at_infinity, res) == 2
     end
@@ -67,25 +51,19 @@
         a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         f1 = (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1
         f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
-        H, starts = total_degree(System([f1, f2]))
-        S = collect(starts)
-        tracker = PathTracker(H)
-        res = track.(tracker, S)
+        res = track.(total_degree(System([f1, f2]))...)
         @test count(is_success, res) == d + 1
         @test count(is_at_infinity, res) == (d + 1)^2 - d - 1
     end
 
     @testset "Bacillus Subtilis" begin
-        H, starts = total_degree(bacillus())
-        tracker = PathTracker(H)
-        res = track.(tracker, starts)
+        res = track.(total_degree(bacillus())...)
         @test count(is_success, res) == 44
     end
 
     @testset "Mohab" begin
         # Communicated by Mohab Safey El Din
         @var x y z
-
         F =
             ModelKit.horner.([
                 -9091098778555951517 * x^3 * y^4 * z^2 +
@@ -104,10 +82,7 @@
                 5384944853425480296 * x * y * z^4 +
                 88,
             ])
-
-        H, starts = total_degree(System(F, [x, z, y]))
-        tracker = PathTracker(H)
-        res = track.(tracker, starts)
+        res = track.(total_degree(System(F, [x, z, y]))...)
         @test count(is_success, res) == 693
     end
 end

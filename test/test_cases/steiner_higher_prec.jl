@@ -144,8 +144,8 @@
             options = TrackerOptions(
                 parameters = TrackerParameters(a = 0.05),
                 extended_precision = false,
+                automatic_differentiation = AD,
             ),
-            automatic_differentiation = AD,
         )
         failed_res = track(tracker, s_p, 1, 0)
         @test !is_success(failed_res)

@@ -12,5 +12,8 @@ The following systems are available:
 """
 abstract type AbstractSystem end
 
+Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
+
 include("systems/model_kit_system.jl")
 include("systems/randomized_system.jl")
+include("systems/affine_chart_system.jl")

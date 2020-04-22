@@ -30,6 +30,7 @@ Supertype for path trackers.
 """
 abstract type AbstractTracker end
 
+Base.broadcastable(T::AbstractTracker) = Ref(T)
 ###
 ### Options and Parameters
 ###
@@ -73,6 +74,11 @@ The set of options for a [`Tracker`](@ref).
 
 ## Options
 
+* `automatic_differentiation::Int = 3`: The value `automatic_differentiation` determines
+  up to which order the derivative is computed using automatic differentiation.
+  Otherwise numerical differentiation is used. The automatic differentiation results
+  in additional compilation time, however for numerically challenging paths it is strongly
+  recommended to use `automatic_differentiation = 3`.
 * `max_steps::Int = 1_000`: The maximal number of steps a tracker attempts
 * `max_step_size::Float64 = Inf`: The maximal size of a step
 * `max_initial_step_size::Float64 = Inf`: The maximal size of the first step
@@ -91,6 +97,7 @@ The set of options for a [`Tracker`](@ref).
   [`FAST_TRACKER_PARAMETERS`](@ref).
 """
 mutable struct TrackerOptions
+    automatic_differentiation::Int
     max_steps::Int
     max_step_size::Float64
     max_initial_step_size::Float64
@@ -100,6 +107,7 @@ mutable struct TrackerOptions
     parameters::TrackerParameters
 end
 function TrackerOptions(;
+    automatic_differentiation::Int = 3,
     max_steps::Int = 1_000,
     max_step_size::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
@@ -122,6 +130,7 @@ function TrackerOptions(;
     end
 
     TrackerOptions(
+        automatic_differentiation,
         max_steps,
         max_step_size,
         max_initial_step_size,
@@ -403,16 +412,11 @@ steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
 
 """
     Tracker(H::AbstractHomotopy;
-            automatic_differentiation = 3,
             options = TrackerOptions(),
             weighted_norm_options = WeightedNormOptions())
 
 Construct a tracker for the given homotopy `H`. The algorithm computes along the path ``x(t)``
 the local derivatives up to order 4.
-The value `automatic_differentiation` determines which up to which one teh derivative is computed
-using automatic differentiation. Otherwise numerical differentiation is used.
-The automatic differentiation results in additional compilation time, however for
-numerically challenging paths it is strongly recommended to use `automatic_differentiation = 3`.
 For `options` see also [`TrackerOptions`](@ref).
 The algorithm uses as a weighted infinity norm to measure distances.
 See also [`WeightedNorm`](@ref).
@@ -463,18 +467,12 @@ struct Tracker{
 end
 
 Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(ModelKitHomotopy(H); kwargs...)
-function Tracker(H::AffineChartHomotopy; kwargs...)
-    d = dims(H.chart)
-    x = PVector(randn(ComplexF64, sum(d) + length(d)), d)
-    Tracker(H, x; kwargs...)
-end
 function Tracker(
     H::AbstractHomotopy,
     x::AbstractVector = zeros(size(H, 2));
     weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
     options::TrackerOptions = TrackerOptions(),
-    automatic_differentiation::Int = 3,
-    AD::Int = automatic_differentiation
+    AD::Int = options.automatic_differentiation,
 )
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
