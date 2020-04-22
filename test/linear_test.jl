@@ -47,14 +47,15 @@
         A = rand_affine_subspace(4; codim = 2)
         # Commpute witness set
         L = A(x, Extrinsic)
-        H, S = total_degree(F ∩ L)
-        res = track.(Tracker(H), S)
+        res = track.(total_degree(F ∩ L)...)
         W = solution.(res)
 
         B = rand_affine_subspace(4, codim = 2)
 
-        graff_tracker =
-            Tracker(AffineSubspaceHomotopy(F, A, B), automatic_differentiation = 4)
+        graff_tracker = Tracker(
+            AffineSubspaceHomotopy(F, A, B),
+            options = TrackerOptions(automatic_differentiation = 4),
+        )
         graff_result = track.(graff_tracker, W)
         @test all(is_success, graff_result)
 

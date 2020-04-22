@@ -111,8 +111,6 @@ struct PolyhedralTracker{H1<:ToricHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}} <
     lifting::Vector{Vector{Int32}}
 end
 
-Base.broadcastable(T::PolyhedralTracker) = Ref(T)
-
 """
     polyhedral(F::Union{System, AbstractSystem};
         only_non_zero = false,
@@ -122,7 +120,7 @@ Base.broadcastable(T::PolyhedralTracker) = Ref(T)
 Solve the system `F` in two steps: first solve a generic system derived from the support
 of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
 coefficient-parameter homotopy towards `F`.
-This returns a [`PolyhedralTracker`](@ref) and an iterator to compute the start solutions.
+This returns a path tracker ([`PolyhedralTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
 
 If `only_non_zero` is `true`, then only the solutions with non-zero coordinates are computed.
 In this case the number of paths to track is equal to the
@@ -166,13 +164,40 @@ function polyhedral(F::AbstractSystem; kwargs...)
     @var x[1:n]
     polyhedral(System(F(x), x); kwargs...)
 end
-function polyhedral(f::System; kwargs...)
-    support, target_coeffs = support_coefficients(f)
-    polyhedral(support, target_coeffs; kwargs...)
+function polyhedral(f::System; target_parameters = nothing, kwargs...)
+    if target_parameters !== nothing
+        return polyhedral(ModelKitSystem(f, target_parameters); kwargs...)
+    end
+    homogeneous = is_homogeneous(f)
+    if homogeneous
+        F = on_affine_chart(f)
+        m, n = size(F)
+        m ≥ n || throw(FiniteException(n - m))
+        if m > n
+            F = square_up(F)
+        end
+        @var x[1:n]
+        support, target_coeffs = support_coefficients(System(F(x), x))
+    else
+        m, n = size(f)
+        m ≥ n || throw(FiniteException(n - m))
+        if m > n
+            F = square_up(f)
+            @var x[1:n]
+            support, target_coeffs = support_coefficients(System(F(x), x))
+        else
+            support, target_coeffs = support_coefficients(f)
+        end
+    end
+    tracker, starts = polyhedral(support, target_coeffs; kwargs...)
+    if m > n
+        tracker = OverdeterminedTracker(tracker, F)
+    end
+    tracker, starts
 end
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
-    target_coeffs::AbstractVector{<:AbstractVector{<:Number}};
+    target_coeffs::AbstractVector;
     kwargs...,
 )
     start_coeffs =
@@ -182,11 +207,10 @@ end
 
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
-    start_coeffs::AbstractVector{<:AbstractVector{<:Number}},
-    target_coeffs::AbstractVector{<:AbstractVector{<:Number}};
+    start_coeffs::AbstractVector,
+    target_coeffs::AbstractVector;
     path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
     tracker_options::TrackerOptions = TrackerOptions(),
-    automatic_differentiation::Int = 3,
     only_non_zero = false,
     only_torus = only_non_zero,
 )
@@ -221,17 +245,15 @@ function polyhedral(
 
     F = ModelKit.compile(polyhedral_system(support))
     H₁ = ToricHomotopy(F, start_coeffs)
-    toric_tracker = Tracker(H₁; options = TrackerOptions(), AD = automatic_differentiation)
+    toric_tracker = Tracker(H₁; options = TrackerOptions())
 
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
         q = reduce(append!, target_coeffs; init = ComplexF64[])
         ParameterHomotopy(ModelKitSystem(F), p, q)
     end
-    generic_tracker = PathTracker(
-        Tracker(H₂; AD = automatic_differentiation, options = tracker_options),
-        options = path_tracker_options,
-    )
+    generic_tracker =
+        PathTracker(Tracker(H₂; options = tracker_options), options = path_tracker_options)
 
     S = PolyhedralStartSolutionsIterator(support, start_coeffs)
     tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)

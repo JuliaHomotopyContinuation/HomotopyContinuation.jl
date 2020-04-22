@@ -185,7 +185,7 @@ julia> variables([x^2 + a, y]; parameters = [a])
 ```
 """
 variables(expr::Basic; kwargs...) = variables([expr]; kwargs...)
-function variables(exprs::AbstractVector{<:Basic}; parameters = Variable[])
+function variables(exprs::AbstractArray{<:Basic}; parameters = Variable[])
     S = Set{Variable}()
     for expr in exprs
         union!(S, _variables(expr))
@@ -201,7 +201,7 @@ Obtain the number of variables used in the given expression not counting the the
 declared in `parameters`.
 """
 nvariables(exprs::Basic; kwargs...) = length(variables(exprs; kwargs...))
-nvariables(exprs::AbstractVector{<:Basic}; kwargs...) = length(variables(exprs; kwargs...))
+nvariables(exprs::AbstractArray{<:Basic}; kwargs...) = length(variables(exprs; kwargs...))
 
 """
     subs(expr::Expression, subsitutions::Pair...)
@@ -263,7 +263,7 @@ julia> [x^2, x * y]([x,y] => [2, 3])
 """
 function evaluate(expr::AbstractArray{<:Basic}, args...)
     out = map(to_number, subs(expr, args...))
-    if eltype(out) in (Number, Any)
+    if isabstracttype(eltype(out))
         return to_smallest_eltype(out)
     else
         out
@@ -520,7 +520,7 @@ function exponents_coefficients(
     f::Expression,
     vars::AbstractVector{Variable};
     expanded::Bool = false,
-    unpack_coeffs::Bool = true
+    unpack_coeffs::Bool = true,
 )
     expanded || (f = expand(f))
     D = to_dict(f, vars)
@@ -537,7 +537,7 @@ function exponents_coefficients(
         end
     end
     if unpack_coeffs
-        coeffs = to_number.(values(D))
+        coeffs = to_smallest_eltype(to_number.(values(D)))
     else
         coeffs = collect(values(D))
     end
@@ -607,6 +607,14 @@ function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
     end
 end
 
+function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = false)
+    if !expanded
+        f = expand(f)
+    end
+    exponents = keys(to_dict(f, vars))
+    d = sum(first(exponents))
+    all(e -> sum(e) == d, exponents)
+end
 ################
 # Optimization #
 ################
@@ -800,23 +808,31 @@ struct System
     expressions::Vector{Expression}
     variables::Vector{Variable}
     parameters::Vector{Variable}
+    variable_groups::Union{Nothing,Vector{Vector{Variable}}}
 
     function System(
         exprs::Vector{Expression},
         vars::Vector{Variable},
         params::Vector{Variable},
+        variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
     )
         check_vars_params(exprs, vars, params)
-        new(exprs, vars, params)
+        if !isnothing(variable_groups)
+            vars == reduce(vcat, variable_groups) ||
+            throw(ArgumentError("Variable groups and variables don't match."))
+        end
+        new(exprs, vars, params, variable_groups)
     end
 end
 
 function System(
     exprs::AbstractVector{Expression};
-    variables::Vector{Variable} = variables(exprs),
+    variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
+    variables::Vector{Variable} = isnothing(variable_groups) ? variables(exprs) :
+                                  reduce(vcat, variable_groups),
     parameters::Vector{Variable} = Variable[],
 )
-    System(convert(Vector{Expression}, exprs), variables, parameters)
+    System(convert(Vector{Expression}, exprs), variables, parameters, variable_groups)
 end
 
 function System(
@@ -840,7 +856,18 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
+        if isnothing(F.variable_groups)
+            print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
+        else
+            print(
+                io,
+                length(F.variables),
+                " variables (",
+                length(F.variable_groups),
+                " groups): ",
+                join("[" .* join.(F.variable_groups, Ref(", ")) .* "]", ", "),
+            )
+        end
         if !isempty(F.parameters)
             print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
         end
@@ -905,6 +932,13 @@ Returns the variables of the given system `F`.
 variables(F::System) = F.variables
 
 """
+    variable_groups(F::System)
+
+Returns the variable groups of the given system `F`.
+"""
+variable_groups(F::System) = F.variable_groups
+
+"""
     parameters(F::System)
 
 Returns the parameters of the given system `F`.
@@ -919,6 +953,19 @@ Return the degrees of the given system.
 degrees(F::System) = degrees(F.expressions, F.variables)
 
 """
+    multi_degrees(F::System)
+
+Return the degrees with respect to the given variable groups.
+"""
+function multi_degrees(F::System)
+    if isnothing(F.variable_groups)
+        reshape(degrees(F.expressions, F.variables), 1, nvariables(F))
+    else
+        reduce(vcat, map(vars -> degrees(F.expressions, vars)', F.variable_groups))
+    end
+end
+
+"""
     support_coefficients(F::System)
 
 Return the support of the system and the corresponding coefficients.
@@ -926,6 +973,23 @@ Return the support of the system and the corresponding coefficients.
 function support_coefficients(F::System)
     supp_coeffs = exponents_coefficients.(F.expressions, Ref(F.variables))
     first.(supp_coeffs), last.(supp_coeffs)
+end
+
+"""
+    is_homogeneous(F::System)
+
+Checks whether a given system is homogeneous w.r.t to its variables
+(resp. variable groups).
+"""
+function is_homogeneous(F::System)
+    if isnothing(F.variable_groups)
+        all(f -> is_homogeneous(f, F.variables), F.expressions)
+    else
+        all(F.expressions) do f
+            g = expand(f)
+            all(vars -> is_homogeneous(g, vars; expanded = true), F.variable_groups)
+        end
+    end
 end
 
 Base.iterate(F::System) = iterate(F.expressions)

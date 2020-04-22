@@ -2,9 +2,8 @@
     @testset "Tracking and PathResult" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
-        H, starts = total_degree(System(f); gamma = 1.3im + 0.4)
+        tracker, starts = total_degree(System(f); gamma = 1.3im + 0.4)
         S = collect(starts)
-        tracker = PathTracker(H)
         @test !isempty(sprint(show, tracker.options))
 
         res = map(i -> track(tracker, S[i]; path_number = i), 1:4)
@@ -33,8 +32,7 @@
         # singular stuff
         @var x
         f = [(x - 10)^2]
-        H, starts = total_degree(System(f))
-        tracker = PathTracker(Tracker(H))
+        tracker, starts = total_degree(System(f))
         res = track.(tracker, starts)
         @test winding_number(res[1]) == 2
         @test last_path_point(res[1]) isa Tuple{Vector{ComplexF64},Float64}
@@ -54,10 +52,8 @@
 
         L₁ = rand_affine_subspace(3; codim = 2)
         L₂ = rand_affine_subspace(3; codim = 2)
-
-        H, S =
-            total_degree(System([x^2 + y^2 + z^2 - 1]) ∩ extrinsic(L₁)([x, y, z]))
-        res = track.(Tracker(H), S)
+        F_L₁ = System([x^2 + y^2 + z^2 - 1]) ∩ extrinsic(L₁)([x, y, z])
+        res = track.(total_degree(F_L₁)...)
         @test all(is_success, res)
 
         H = AffineSubspaceHomotopy(F, L₁, L₂)

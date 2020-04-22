@@ -13,13 +13,14 @@ struct AffineChartHomotopy{H<:AbstractHomotopy,N} <: AbstractHomotopy
 end
 
 """
-    on_affine_chart(H::AbstractHomotopy, proj_dims::NTuple{N,Int}) where {N}
+    on_affine_chart(H::AbstractHomotopy, proj_dims)
 
 Construct an `AffineChartHomotopy` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.
 """
-function on_affine_chart(H::AbstractHomotopy, dims::NTuple{N,Int}) where {N}
-    chart = PVector(randn(ComplexF64, sum(dims) + N), dims)
+function on_affine_chart(H::AbstractHomotopy, proj_dims = [size(H,2) - 1])
+    N = length(proj_dims)
+    chart = PVector(randn(ComplexF64, sum(proj_dims) + N), tuple(proj_dims...))
     AffineChartHomotopy(H, chart)
 end
 
@@ -28,38 +29,12 @@ function Base.size(H::AffineChartHomotopy{<:AbstractHomotopy,N}) where {N}
     (m + N, n)
 end
 
-function evaluate_chart!(u, v::PVector{<:Any,N}, x::PVector{<:Any,N}) where {N}
-    ranges = dimension_indices(v)
-    n = length(u) - N
-    for (k, range) in enumerate(ranges)
-        out = zero(eltype(u))
-        @inbounds for i in range
-            out += v[i] * x[i]
-        end
-        u[n+k] = out - 1.0
-    end
-    nothing
-end
-
-function jacobian_chart!(U, v::PVector{<:Any,N}, x::PVector{<:Any,N}) where {N}
-    ranges = dimension_indices(v)
-    n = size(U, 1) - N
-    for j = 1:size(U, 2), i = (n+1):size(U, 1)
-        U[i, j] = zero(eltype(U))
-    end
-    for (k, range) in enumerate(ranges)
-        for j in range
-            U[n+k, j] = v[j]
-        end
-    end
-    nothing
-end
-
-function set_solution!(x::PVector, H::AffineChartHomotopy, y::PVector, t)
+function set_solution!(x::AbstractVector, H::AffineChartHomotopy, y::AbstractVector, t)
     x .= y
     on_chart!(x, H.chart)
+    x
 end
-function on_chart!(x::PVector{<:Any,N}, v::PVector{<:Any,N}) where {N}
+function on_chart!(x::AbstractVector, v::PVector)
     ranges = dimension_indices(v)
     for range in ranges
         λ = zero(eltype(x))
@@ -74,7 +49,7 @@ function on_chart!(x::PVector{<:Any,N}, v::PVector{<:Any,N}) where {N}
     x
 end
 
-function evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::PVector{<:Any,N}, t) where {N}
+function evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::AbstractVector, t) where {N}
     evaluate!(u, H.homotopy, x, t)
     evaluate_chart!(u, H.chart, x)
     u
@@ -84,7 +59,7 @@ function evaluate_and_jacobian!(
     u,
     U,
     H::AffineChartHomotopy{<:Any,N},
-    x::PVector{<:Any,N},
+    x::AbstractVector,
     t,
 ) where {N}
     evaluate_and_jacobian!(u, U, H.homotopy, x, t)

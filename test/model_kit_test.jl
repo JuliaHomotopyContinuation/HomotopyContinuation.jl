@@ -242,6 +242,22 @@ using HomotopyContinuation2.ModelKit
         @test size(T) == size(F) == (2, 2)
     end
 
+    @testset "System variables groups + homogeneous" begin
+        @var x y z
+        f = System([
+            (x^2 + y^2 + x * y - 3z^2) * (x + 3z),
+            (x^2 + y^2 + x * y - 3z^2) * (y - x + 2z),
+            2x + 5y - 3z,
+        ])
+        @test is_homogeneous(f)
+        multi_degrees(f) == [1 1; 2 0]
+
+        @var x y z v w
+        g = System([x * y - 2v * w, x^2 - 4 * v^2], variable_groups = [[x,v], [y,w]])
+        @test is_homogeneous(g)
+        multi_degrees(g) == [1 1; 2 0]
+    end
+
     @testset "Homotopy" begin
         @var x y z t
 

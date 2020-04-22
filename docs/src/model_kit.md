@@ -36,11 +36,13 @@ variables(::Expression)
 System
 degrees(F::System)
 expressions(F::System)
+multi_degrees(::System)
 nparameters(::System)
 nvariables(::System)
 parameters(::System)
 support_coefficients(::System)
 variables(::System)
+variable_groups(::System)
 ```
 
 ## Homotopy

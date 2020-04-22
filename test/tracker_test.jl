@@ -3,8 +3,10 @@
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
 
-        tracker =
-            Tracker(ParameterHomotopy(F, [1, 0], [2, 4]), automatic_differentiation = AD)
+        tracker = Tracker(
+            ParameterHomotopy(F, [1, 0], [2, 4]),
+            options = TrackerOptions(automatic_differentiation = AD),
+        )
         s = [1, 1]
         res = track(tracker, s, 1, 0)
         @test is_success(res)
@@ -29,14 +31,17 @@
         @var x a y b z
         F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
         H = ParameterHomotopy(F, [1, 0], [2, 4])
-        tracker = Tracker(on_affine_chart(H, (2,)), automatic_differentiation = AD)
+        tracker = Tracker(
+            on_affine_chart(H, (2,)),
+            options = TrackerOptions(automatic_differentiation = AD),
+        )
 
-        s = PVector([1, 1, 1])
+        s = [1, 1, 1]
         res = track(tracker, s, 1, 0)
         @test is_success(res)
-        @test isa(solution(res), PVector{ComplexF64,1})
+        @test isa(solution(res),Vector{ComplexF64})
         x₀ = abs(solution(res)[end])
-        @test affine_chart(solution(res)) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
+        @test affine_chart(PVector(solution(res))) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
     end
 
     @testset "iterator" begin
@@ -78,7 +83,7 @@
         G = System((0.2 + 0.4im) .* [x^2 - 1, y - 1], [x, y])
         H = StraightLineHomotopy(G, F)
         S = [[1, 1], [-1, 1]]
-        tracker = Tracker(H, automatic_differentiation = 4)
+        tracker = Tracker(H, options = TrackerOptions(automatic_differentiation = 4))
 
         @test is_success(track(tracker, S[1], 1, 0))
         @test is_success(track(tracker, S[2], 1, 0))
