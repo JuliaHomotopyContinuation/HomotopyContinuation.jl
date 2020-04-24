@@ -171,6 +171,19 @@
         @test nexcess_solutions(res) == 0
         @test !isempty(sprint(show, statistics(res)))
     end
+
+    @testset "composition" begin
+        @var a b c x y z u v
+        e = System([u + 1, v - 2])
+        f = System([a * b - 2, a * c - 1])
+        g = System([x + y, y + 3, x + 2])
+
+        res = solve(e ∘ f ∘ g; start_system = :total_degree)
+        @test nsolutions(res) == 2
+        
+        res = solve(e ∘ f ∘ g; start_system = :polyhedral)
+        @test nsolutions(res) == 2
+    end
     # @testset "Automatic start systems (solve)" begin
     #     @var x y
     #     affine_square = System([

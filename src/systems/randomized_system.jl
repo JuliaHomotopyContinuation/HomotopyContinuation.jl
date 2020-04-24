@@ -7,7 +7,7 @@ Given a ``n × N`` system `F` with ``n > N`` this constructs the system
 ``\\mathfrak{R}(F; k)(x) = [I A]⋅F(x)`` where ``I`` is a ``k × k`` identity matrix and
 ``A`` is random complex ``k × n`` matrix. See Chapter 13.5 in [^SW05] for more details.
 
-    RandomizedSystem(F::Union{System,AbstractSystem}, A::Matrix{ComplexF64}) <: AbstractSystem
+    RandomizedSystem(F::Union{System,AbstractSystem}, A::Matrix{ComplexF64})
 
 Explicitly provide the used randomization matrix `A`.
 
@@ -51,8 +51,8 @@ end
 """
     square_up(F::Union{System, AbstractSystem})
 
-Creates the [`RandomizedSystem`](@ref) ``\\mathfrak{R}(F(x); N)`` where ``N`` is the number of variables
-of `F`.
+Creates the [`RandomizedSystem`](@ref) ``\\mathfrak{R}(F(x); N)`` where ``N`` is the number
+of variables of `F`.
 """
 square_up(F::Union{AbstractSystem,System}) = RandomizedSystem(F, last(size(F)))
 

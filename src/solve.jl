@@ -6,7 +6,7 @@ struct Solver{T<:AbstractPathTracker}
 end
 
 function solver_startsolutions(
-    F::System;
+    F::Union{System,AbstractSystem};
     seed = rand(UInt32),
     start_system = :polyhedral,
     kwargs...,
