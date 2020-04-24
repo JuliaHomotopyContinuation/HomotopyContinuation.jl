@@ -51,7 +51,7 @@ end
 """
     square_up(F::Union{System, AbstractSystem})
 
-Creates the [`RandomizedSystem`](@ref) ``𝕽(F(x); N)`` where ``N`` is the number of variables
+Creates the [`RandomizedSystem`](@ref) ``\\mathfrak{R}(F(x); N)`` where ``N`` is the number of variables
 of `F`.
 """
 square_up(F::Union{AbstractSystem,System}) = RandomizedSystem(F, last(size(F)))

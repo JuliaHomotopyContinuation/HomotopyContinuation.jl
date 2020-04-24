@@ -9,6 +9,10 @@ makedocs(
             "Linear and Affine Subspaces" => "linear_affine.md",
             "Systems and Homotopies" => "systems_homotopies.md",
         ],
+        "Solving systems" => [
+            "Solve" => "solve.md",
+        ],
+        "Results" => "result.md",
         "Start systems" => "start_systems.md",
         "Trackers" => ["PathTracker" => "path_tracker.md", "Tracker" => "tracker.md"],
         "Miscellaneous" => "misc.md",

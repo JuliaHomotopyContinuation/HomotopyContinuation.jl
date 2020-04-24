@@ -1,0 +1,5 @@
+# Solve
+
+```@docs
+solve
+```

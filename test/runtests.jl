@@ -1,4 +1,5 @@
 using HomotopyContinuation2, LinearAlgebra, Test, StaticArrays, Parameters
+using ProjectiveVectors: PVector, affine_chart
 const HC2 = HomotopyContinuation2
 
 include("test_systems.jl")

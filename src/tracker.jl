@@ -1,4 +1,5 @@
-export Tracker,
+export AbstractPathTracker,
+    Tracker,
     TrackerResult,
     TrackerOptions,
     TrackerParameters,
@@ -22,15 +23,6 @@ export Tracker,
     rejected_steps,
     iterator
 
-
-"""
-    AbstractTracker
-
-Supertype for path trackers.
-"""
-abstract type AbstractTracker end
-
-Base.broadcastable(T::AbstractTracker) = Ref(T)
 ###
 ### Options and Parameters
 ###
@@ -212,7 +204,7 @@ is_tracking(S::TrackerCode.codes) = S == TrackerCode.tracking
 ###
 
 """
-    TrackerResult{V<:AbstractVector{ComplexF64}}
+    TrackerResult
 
 Containing the result of tracking a path with a [`Tracker`](@ref).
 
@@ -230,9 +222,9 @@ Containing the result of tracking a path with a [`Tracker`](@ref).
 * `extended_precision_used::Bool`: This is `true` if during the tracking at any point
   extended precision was used.
 """
-struct TrackerResult{V<:AbstractVector{ComplexF64}}
+struct TrackerResult
     return_code::Symbol
-    solution::V
+    solution::Vector{ComplexF64}
     t::ComplexF64
     accuracy::Float64
     accepted_steps::Int
@@ -293,10 +285,10 @@ rejected_steps(result::TrackerResult) = result.rejected_steps
 ### STATE
 ###
 
-mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{ComplexF64}}
-    x::V # current x
-    x̂::V # last prediction
-    x̄::V # candidate for new x
+mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
+    x::Vector{ComplexF64} # current x
+    x̂::Vector{ComplexF64} # last prediction
+    x̄::Vector{ComplexF64} # candidate for new x
     # internal step size
     segment_stepper::SegmentStepper
     Δs_prev::Float64 # previous step size
@@ -330,7 +322,7 @@ mutable struct TrackerState{V<:AbstractVector{ComplexF64},M<:AbstractMatrix{Comp
 end
 
 function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
-    x = isa(x₁, PVector) ? ComplexF64.(x₁) : Vector{ComplexF64}(x₁)
+    x = convert(Vector{ComplexF64}, x₁)
     x̂ = zero(x)
     x̄ = zero(x)
 
@@ -448,22 +440,15 @@ We see that we tracked all 4 paths successfully.
 # successfull: 4
 ```
 """
-struct Tracker{
-    H<:AbstractHomotopy,
-    N,
-    # V and V̄ need to have the same container type
-    V<:AbstractVector{ComplexF64},
-    V̄<:AbstractVector{ComplexDF64},
-    M<:AbstractMatrix{ComplexF64},
-} <: AbstractTracker
+struct Tracker{H<:AbstractHomotopy,N,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
     predictor::Pade21
-    corrector::NewtonCorrector{V̄}
+    corrector::NewtonCorrector
     # these are mutable
-    state::TrackerState{V,M}
+    state::TrackerState{M}
     options::TrackerOptions
     AD::Val{N}
-    ND::NumericalDifferentiation{V,V̄}
+    ND::NumericalDifferentiation
 end
 
 Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(ModelKitHomotopy(H); kwargs...)
@@ -957,8 +942,8 @@ end
 
 
 # PathIterator #
-struct PathIterator{H,P,M}
-    tracker::Tracker{H,P,M}
+struct PathIterator{T<:Tracker}
+    tracker::T
     t_real::Bool
 end
 Base.IteratorSize(::Type{<:PathIterator}) = Base.SizeUnknown()

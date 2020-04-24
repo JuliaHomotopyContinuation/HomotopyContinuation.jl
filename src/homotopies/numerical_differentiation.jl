@@ -1,10 +1,10 @@
-struct NumericalDifferentiation{V<:AbstractVector,V̄<:AbstractVector}
-    xh::V
+struct NumericalDifferentiation
+    xh::Vector{ComplexF64}
     u₁::Vector{ComplexF64}
     u₂::Vector{ComplexF64}
     u₃::Vector{ComplexF64}
     u₄::Vector{ComplexF64}
-    xh_extended::V̄
+    xh_extended::Vector{ComplexDF64}
     u₁_extended::Vector{ComplexDF64}
     u₂_extended::Vector{ComplexDF64}
 end
