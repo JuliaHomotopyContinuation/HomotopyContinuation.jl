@@ -122,14 +122,13 @@ function path_table(io::IO, info::PathInfo)
     ft1 = PrettyTables.ft_printf("%5.2g", [4, 5, 6, 7, 8, 10, 11, 12])
     ft2 = PrettyTables.ft_printf("%5.2g", [3, 9])
     ft4 = PrettyTables.ft_printf("%3.3g", [2, 4])
-    ft = merge(ft1, ft2, ft4)
 
     PrettyTables.pretty_table(
         io,
         data,
         header,
         crop = :none,
-        formatter = ft,
+        formatters = (ft1, ft2, ft4),
         highlighters = (h1, h2, h3, h4),
     )
 end

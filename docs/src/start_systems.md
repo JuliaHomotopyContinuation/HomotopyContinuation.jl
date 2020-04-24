@@ -4,7 +4,6 @@
 
 ```@docs
 total_degree
-total_degree_start_solutions
 ```
 
 ## Mixed Volume (Polyhedral Homotopy)
@@ -12,5 +11,13 @@ total_degree_start_solutions
 ```@docs
 polyhedral
 PolyhedralTracker
-PolyhedralStartSolutionsIterator
+```
+
+## Overdetermined
+
+```@docs
+OverdeterminedTracker
+square_up
+excess_solution_check!
+excess_solution_check
 ```

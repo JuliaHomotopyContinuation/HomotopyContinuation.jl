@@ -6,6 +6,9 @@ returned.
 This is done by following an implicitly defined path ``x(t)`` using [`Tracker`](@ref).
 In contrast to [`Tracker`](@ref) this uses an *endgame* to handle diverging paths and singular solutions.
 
+```@docs
+AbstractPathTracker
+```
 
 ## Constructor and Options
 ```@docs
@@ -18,30 +21,4 @@ PathTrackerOptions
 
 ```@docs
 track(::PathTracker, ::AbstractVector, ::Real)
-```
-
-## PathResult
-
-```@docs
-PathResult
-solution(::PathResult)
-is_success(::PathResult)
-is_at_infinity(::PathResult)
-is_excess_solution(::PathResult)
-is_failed(::PathResult)
-is_finite(::PathResult)
-is_singular(::PathResult)
-is_nonsingular(::PathResult)
-is_real(::PathResult)
-accuracy(::PathResult)
-residual(::PathResult)
-steps(::PathResult)
-accepted_steps(::PathResult)
-rejected_steps(::PathResult)
-winding_number(::PathResult)
-path_number(::PathResult)
-start_solution(::PathResult)
-multiplicity(::PathResult)
-last_path_point(::PathResult)
-valuation(::PathResult)
 ```

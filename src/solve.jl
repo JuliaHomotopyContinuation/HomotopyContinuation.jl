@@ -1,10 +1,17 @@
 export solve, solver_startsolutions
 
-struct Solver{T<:AbstractTracker}
+struct Solver{T<:AbstractPathTracker}
     tracker::T
+    seed::UInt32
 end
 
-function solver_startsolutions(F::System; start_system = :polyhedral, kwargs...)
+function solver_startsolutions(
+    F::System;
+    seed = rand(UInt32),
+    start_system = :polyhedral,
+    kwargs...,
+)
+    Random.seed!(seed)
     if start_system == :polyhedral
         tracker, starts = polyhedral(F; kwargs...)
     elseif start_system == :total_degree
@@ -17,7 +24,7 @@ function solver_startsolutions(F::System; start_system = :polyhedral, kwargs...)
         ))
     end
 
-    Solver(tracker), starts
+    Solver(tracker, seed), starts
 end
 
 """
@@ -29,4 +36,6 @@ function solve(args...; kwargs...)
     solver, starts = solver_startsolutions(args...; kwargs...)
     solve(solver, starts)
 end
-solve(S::Solver, starts) = track.(S.tracker, starts)
+function solve(S::Solver, starts)
+    Result(track.(S.tracker, starts); seed = S.seed)
+end

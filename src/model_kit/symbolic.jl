@@ -756,6 +756,12 @@ function check_vars_params(f, vars, params)
         "Not all variables or parameters of the system are given. Missing: " *
         join(Δ, ", "),
     ))
+    if params !== nothing
+        both = Set(vars) ∩ Set(params)
+        if !isempty(both)
+            error("$(join(both, ", ")) appear as parameters and variables")
+        end
+    end
     nothing
 end
 
@@ -827,10 +833,11 @@ end
 
 function System(
     exprs::AbstractVector{Expression};
-    variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
-    variables::Vector{Variable} = isnothing(variable_groups) ? variables(exprs) :
-                                  reduce(vcat, variable_groups),
     parameters::Vector{Variable} = Variable[],
+    variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
+    variables::Vector{Variable} = isnothing(variable_groups) ?
+                                  setdiff!(variables(exprs), parameters) :
+                                  reduce(vcat, variable_groups),
 )
     System(convert(Vector{Expression}, exprs), variables, parameters, variable_groups)
 end

@@ -98,15 +98,15 @@ function polyhedral_system(support)
 end
 
 """
-    PolyhedralTracker <: AbstractTracker
+    PolyhedralTracker <: AbstractPathTracker
 
 This tracker realises the two step approach of the polyhedral homotopy.
 See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2,N,M<:AbstractMatrix{ComplexF64}} <:
-       AbstractTracker
-    toric_tracker::Tracker{H1,N,Vector{ComplexF64},Vector{ComplexDF64},M}
-    generic_tracker::PathTracker{H2,N,Vector{ComplexF64},Vector{ComplexDF64},M}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <:
+       AbstractPathTracker
+    toric_tracker::Tracker{H1,N,M}
+    generic_tracker::PathTracker{H2,N,M}
     support::Vector{Matrix{Int32}}
     lifting::Vector{Vector{Int32}}
 end

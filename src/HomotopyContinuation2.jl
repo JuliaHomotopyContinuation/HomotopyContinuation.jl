@@ -7,10 +7,12 @@ import LinearAlgebra
 import LoopVectorization
 import MixedSubdivisions
 using Parameters: @unpack
+import Random
 import Printf
 import PrettyTables
 using Reexport: @reexport
 import StructArrays
+import TreeViews
 
 const LA = LinearAlgebra
 
@@ -21,24 +23,7 @@ using .DoubleDouble
 using ProjectiveVectors:
     PVector,
     dims,
-    dimension_indices,
-    fubini_study,
-    affine_chart,
-    ×,
-    component,
-    components,
-    combine
-
-export ProjectiveVectors,
-    PVector,
-    dims,
-    dimension_indices,
-    affine_chart,
-    fubini_study,
-    ×,
-    component,
-    components,
-    combine
+    dimension_indices
 
 include("utils.jl")
 include("norm.jl")
@@ -51,6 +36,7 @@ include("newton_corrector.jl")
 include("newton.jl")
 include("tracker.jl")
 include("valuation.jl")
+include("path_result.jl")
 include("path_tracker.jl")
 include("path_info.jl")
 include("total_degree.jl")
@@ -58,6 +44,6 @@ include("binomial_system.jl")
 include("polyhedral.jl")
 include("overdetermined.jl")
 include("solve.jl")
-# include("result.jl")
+include("result.jl")
 
 end

@@ -32,14 +32,14 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", r::NewtonCorrectorResult)
 Base.show(io::IO, result::NewtonCorrectorResult) = print_fieldnames(io, result)
 is_converged(R::NewtonCorrectorResult) = R.return_code == NEWT_CONVERGED
 
-struct NewtonCorrector{V<:AbstractVector{ComplexDF64}}
+struct NewtonCorrector
     a::Float64
     # derived
     h_a::Float64
     Δx::Vector{ComplexF64}
     r::Vector{ComplexF64}
     r̄::Vector{ComplexF64}
-    x_extended::V
+    x_extended::Vector{ComplexDF64}
 end
 
 function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
