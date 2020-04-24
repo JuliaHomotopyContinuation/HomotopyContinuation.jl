@@ -67,7 +67,10 @@ function total_degree_variables(
     end
 
     if F isa System
-        F = ModelKitSystem(F, target_parameters)
+        F = ModelKitSystem(F)
+    end
+    if target_parameters !== nothing
+        F = fix_parameters(F, target_parameters)
     end
     # if homogeneous put on on an affine chart
     if homogeneous && overdetermined
@@ -84,13 +87,15 @@ function total_degree_variables(
         D = D[1:n]
     end
     if homogeneous
-        G = ModelKitSystem(
-            System(s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]), x, s[1:n-1]),
-            scaling,
-        )
+        G = ModelKitSystem(System(
+            s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]),
+            x,
+            s[1:n-1],
+        ))
     else
-        G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s), scaling)
+        G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s))
     end
+    G = fix_parameters(G, scaling)
 
     H = StraightLineHomotopy(G, F; γ = gamma)
     if homogeneous
@@ -125,7 +130,10 @@ function total_degree_variable_groups(
 
     overdetermined = m > n - M * homogeneous
 
-    F = ModelKitSystem(F, target_parameters)
+    F = ModelKitSystem(F)
+    if target_parameters !== nothing
+        F = fix_parameters(F, target_parameters)
+    end
 
     if homogeneous && overdetermined
         F = on_affine_chart(F, projective_dims)
@@ -142,7 +150,7 @@ function total_degree_variable_groups(
     g, C = multi_homogeneous_system(D, vargroups; homogeneous = homogeneous)
     P = parameters(g)
     p = randn(length(P))
-    G = ModelKitSystem(g, p)
+    G = fix_parameters(ModelKitSystem(g), p)
     starts = MultiBezoutSolutionsIterator(
         D,
         C(P => p),

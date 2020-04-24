@@ -103,8 +103,7 @@ end
 This tracker realises the two step approach of the polyhedral homotopy.
 See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <:
-       AbstractPathTracker
+struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <: AbstractPathTracker
     toric_tracker::Tracker{H1,N,M}
     generic_tracker::PathTracker{H2,N,M}
     support::Vector{Matrix{Int32}}
@@ -166,7 +165,10 @@ function polyhedral(F::AbstractSystem; kwargs...)
 end
 function polyhedral(f::System; target_parameters = nothing, kwargs...)
     if target_parameters !== nothing
-        return polyhedral(ModelKitSystem(f, target_parameters); kwargs...)
+        return polyhedral(
+            FixedParameterSystem(ModelKitSystem(f), target_parameters);
+            kwargs...,
+        )
     end
     homogeneous = is_homogeneous(f)
     if homogeneous

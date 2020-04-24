@@ -13,7 +13,7 @@ struct AffineChartSystem{S<:AbstractSystem,N} <: AbstractSystem
 end
 
 """
-    on_affine_chart(F::AbstractSystem, proj_dims::NTuple{N,Int}) where {N}
+    on_affine_chart(F::Union{System,AbstractSystem}, dimensions)
 
 Construct an `AffineChartSystem` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.

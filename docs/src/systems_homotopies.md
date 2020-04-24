@@ -9,10 +9,30 @@ Systems ([`AbstractSystem`](@ref)) are the basic building blocks of homotopies.
 ```@docs
 AbstractSystem
 ```
+
+### AffineChartSystem
+```@docs
+AffineChartSystem
+on_affine_chart(F::System, dims)
+```
+
+### CompositionSystem
+```@docs
+CompositionSystem
+compose
+```
+
+### FixedParameterSystem
+```@docs
+FixedParameterSystem
+fix_parameters
+```
+
 ### ModelKitSystem
 ```@docs
 ModelKitSystem
 ```
+
 ### RandomizedSystem
 ```@docs
 RandomizedSystem
@@ -32,7 +52,7 @@ AbstractHomotopy
 ### AffineChartHomotopy
 ```@docs
 AffineChartHomotopy
-on_affine_chart
+on_affine_chart(F::Homotopy, dims)
 ```
 
 ### AffineSubspaceHomotopy
@@ -46,7 +66,7 @@ set_subspaces!
 ModelKitHomotopy
 ```
 
-### StraightLineHomotopy
+### ParameterHomotopy
 ```@docs
 ParameterHomotopy
 ```
