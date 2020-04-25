@@ -105,9 +105,9 @@ function taylor!(
         @unpack u₁_extended, u₂_extended, xh_extended = ND
         #use extended precision
         # apply S^{1,1,2} formula
-        h = DoubleF64(min(τ, 2.3099725541661633e-11)) #eps(DoubleF64)^(1/3)
+        h = DoubleF64(min(τ, 2.9567648693326874e-9)) # 2^(-85/3)
         g!(u₁_extended, H, x, t, h, xh_extended)
-        g!(u₂_extended, H, x, t, h, xh_extended)
+        g!(u₂_extended, H, x, t, -h, xh_extended)
         u .= 0.5 .* (u₁_extended .- u₂_extended) ./ h
     end
 
@@ -149,7 +149,7 @@ function taylor!(
         @unpack u₁_extended, u₂_extended, xh_extended = ND
         #use extended precision
         # apply S^{2,2,2} formula
-        h = DoubleF64(min(τ, 1.0536712127723509e-8)) #eps(DoubleF64)^(1/4)
+        h = DoubleF64(min(τ, 4.0097065699277616e-7)) # 2^(-85/4)
         g!(u₁_extended, H, x, t, h, xh_extended)
         g!(u₂_extended, H, x, t, -h, xh_extended)
         h2 = h^2
@@ -193,7 +193,7 @@ function taylor!(
         @unpack u₁_extended, u₂_extended, xh_extended = ND
         #use extended precision
         # apply S^{3,3,2} formula
-        h = DoubleF64(min(τ, 4.151108566742532e-7)) #eps(DoubleF64)^(1/5)
+        h = DoubleF64(min(τ, 7.62939453125e-6)) # 2^(-85/5)
         g!(u₁_extended, H, x, t, h, xh_extended)
         g!(u₂_extended, H, x, t, -h, xh_extended)
         h3 = h^3
@@ -227,7 +227,7 @@ function taylor!(
         #use extended precision
         @unpack u₁_extended, u₂_extended, xh_extended = ND
         # apply S^{4,4,2} formula
-        h = DoubleF64(min(τ, 4.806217383937355e-6)) #eps(DoubleF64)^(1/6)
+        h = DoubleF64(min(τ, 5.4376142464620344e-5)) # 2^(-85/6)
         g!(u₁_extended, H, x, t, h, xh_extended)
         g!(u₂_extended, H, x, t, -h, xh_extended)
         h2 = h^2
