@@ -313,6 +313,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     tx²::TaylorVector{3,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
     tx⁴::TaylorVector{5,ComplexF64}
+    trust_tx::Vector{Bool}
     u::Vector{ComplexF64}
 
     # statistics
@@ -332,7 +333,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     tx¹ = TaylorVector{2}(tx⁴)
     tx² = TaylorVector{3}(tx⁴)
     tx³ = TaylorVector{4}(tx⁴)
-
+    trust_tx = [true, true, true, true]
     u = zeros(ComplexF64, m)
     segment_stepper = SegmentStepper(1.0, 0.0)
     Δs_prev = 0.0
@@ -373,6 +374,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         tx²,
         tx³,
         tx⁴,
+        trust_tx,
         u,
         accepted_steps,
         rejected_steps,
@@ -528,7 +530,7 @@ function update_stepsize!(
     a = options.parameters.β_a * options.parameters.a
     ω = options.parameters.β_ω * state.ω
     p = order(predictor)
-    τ = trust_region(predictor)
+    τ = state.τ #trust_region(predictor)
     if is_converged(result)
         # e₁ = state.norm(local_error(predictor))
         # If we don't use automatic_differentiation for the 4th derivative
@@ -591,7 +593,7 @@ end
 
 function compute_derivatives_and_update_predictor!(tracker::Tracker)
     compute_derivatives!(tracker)
-    update!(tracker.predictor, tracker.state.tx⁴)
+    update!(tracker.predictor, tracker.state.tx⁴, tracker.state.trust_tx)
 end
 
 function compute_derivatives!(
@@ -603,10 +605,23 @@ function compute_derivatives!(
     # unpack stuff to make the rest easier to read
     @unpack u, x, t, tx⁰, tx¹, tx², tx³, tx⁴, jacobian, norm, τ = state
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
+    τ̂ = 1.0 #0.5τ
+
+    dist_target = dist_to_target(state.segment_stepper)
 
     x⁰ .= x
     # compute all taylor coefficients x¹, x², x³, x⁴
-    taylor!(u, Val(1), homotopy, tx⁰, t, AD, ND, 0.5τ)
+    state.trust_tx[1] = taylor!(
+        u,
+        Val(1),
+        homotopy,
+        tx⁰,
+        t,
+        AD,
+        ND;
+        cond = state.cond_J_ẋ,
+        dist_to_target = dist_target,
+    )
     u .= .-u
     LA.ldiv!(x¹, jacobian, u)
 
@@ -628,30 +643,51 @@ function compute_derivatives!(
         end
     end
 
-    taylor!(u, Val(2), homotopy, tx¹, t, AD, ND, 0.5τ; incremental = true)
+    state.trust_tx[2] = taylor!(
+        u,
+        Val(2),
+        homotopy,
+        tx¹,
+        t,
+        AD,
+        ND;
+        cond = state.cond_J_ẋ,
+        dist_to_target = dist_target,
+        incremental = true,
+    )
     u .= .-u
     LA.ldiv!(x², jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    taylor!(u, Val(3), homotopy, tx², t, AD, ND, 0.5τ; incremental = true)
+    state.trust_tx[3] = taylor!(
+        u,
+        Val(3),
+        homotopy,
+        tx²,
+        t,
+        AD,
+        ND;
+        cond = state.cond_J_ẋ,
+        dist_to_target = dist_target,
+        incremental = true,
+    )
     u .= .-u
     LA.ldiv!(x³, jacobian, u)
     iterative_refinement &&
     iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
 
-    # We only need the correct order of magnitude for this one
-    taylor!(
+    state.trust_tx[4] = taylor!(
         u,
         Val(4),
         homotopy,
         tx³,
         t,
         AD,
-        ND,
-        0.5τ;
+        ND;
+        dist_to_target = dist_target,
+        cond = state.cond_J_ẋ,
         incremental = true,
-        use_extended_precision = false,
     )
     u .= .-u
     LA.ldiv!(x⁴, jacobian, u)
@@ -831,12 +867,20 @@ function step!(tracker::Tracker, debug::Bool = false)
         step_success!(state.segment_stepper)
         state.accuracy = result.accuracy
         state.μ = max(result.accuracy, eps())
-        state.ω = max(result.ω, 0.5 * state.ω)
 
+        no_ω_update = result.ω == state.ω
+
+        state.ω = max(result.ω, 0.5 * state.ω)
         update_precision!(tracker, result.μ_low)
         compute_derivatives_and_update_predictor!(tracker)
-        # Update other state
+
+        # # Update other state
+        # if no_ω_update && options.automatic_differentiation < 3
+        #     state.τ = max(trust_region(predictor), 5 * state.τ)
+        # else
         state.τ = trust_region(predictor)
+        # end
+
         state.accepted_steps += 1
         state.last_steps_failed = 0
     else

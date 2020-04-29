@@ -81,7 +81,6 @@
         )
         tracker, starts = total_degree(affine_overdetermined)
         @test count(is_success, track.(tracker, starts)) == 2
-
         @var x y v w
         proj_overdetermined = System(
             [(x^2 - 4v^2) * (x * y - v * w), x * y - v*w, x^2 - v^2],
@@ -180,7 +179,7 @@
 
         res = solve(e ∘ f ∘ g; start_system = :total_degree)
         @test nsolutions(res) == 2
-        
+
         res = solve(e ∘ f ∘ g; start_system = :polyhedral)
         @test nsolutions(res) == 2
     end

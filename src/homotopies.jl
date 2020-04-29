@@ -30,30 +30,3 @@ include("homotopies/affine_subspace_homotopy.jl")
 include("homotopies/model_kit_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
-
-
-include("homotopies/numerical_differentiation.jl")
-
-## Default handling ignores incremental
-taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
-    taylor!(u, v, H, tx, t)
-
-## Type dispatch on automatic differentiation or numerical differentiation
-@generated function taylor!(
-    u,
-    v::Val{M},
-    H,
-    tx,
-    t,
-    AD::Val{N},
-    ND::NumericalDifferentiation,
-    τ;
-    use_extended_precision::Bool = true,
-    incremental::Bool = false,
-) where {M,N}
-    if M ≤ N
-        :(taylor!(u, v, H, tx, t, incremental))
-    else
-        :(taylor!(u, v, H, tx, t, ND, τ, use_extended_precision))
-    end
-end

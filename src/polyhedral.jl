@@ -267,6 +267,7 @@ function track(
     PT::PolyhedralTracker,
     start_solution::Tuple{MixedCell,Vector{ComplexF64}};
     path_number::Union{Nothing,Int} = nothing,
+    debug::Bool = false
 )
     cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
@@ -287,6 +288,9 @@ function track(
     min_weight, max_weight =
         update_weights!(H, PT.support, PT.lifting, cell, min_weight = 1.0)
 
+    if debug
+        println("Min-Max weight: ", min_weight, ", ", max_weight)
+    end
     if max_weight < 10
         retcode = track!(
             PT.toric_tracker,
@@ -296,10 +300,11 @@ function track(
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
+            debug = debug
         )
         @unpack μ, ω = PT.toric_tracker.state
     else
-        t₀ = clamp(0.1^(10 / max_weight), 0.9, 0.985)
+        t₀ = clamp(0.1^(10 / max_weight), 0.9, 1 - 1e-6)
         retcode = track!(
             PT.toric_tracker,
             x∞,
@@ -308,6 +313,7 @@ function track(
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
+            debug = debug
         )
         @unpack μ, ω = PT.toric_tracker.state
         # TODO: check retcode?
@@ -328,6 +334,7 @@ function track(
                 μ = μ,
                 τ = 0.1 * t_restart,
                 keep_steps = true,
+                debug = debug
             )
             @unpack μ, ω = PT.toric_tracker.state
             PT.toric_tracker.options.min_step_size = min_step_size
@@ -363,6 +370,7 @@ function track(
         ω = ω,
         μ = μ,
         path_number = path_number,
+        debug = debug
     )
     r.start_solution = start_solution
     # report accurate steps
