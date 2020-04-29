@@ -141,24 +141,13 @@
     @testset "Steiner - AD: $AD" for AD = 1:4
         tracker = Tracker(
             ParameterHomotopy(F, p, q),
-            options = TrackerOptions(
-                parameters = TrackerParameters(a = 0.05),
-                extended_precision = false,
-                automatic_differentiation = AD,
-            ),
+            options = TrackerOptions(automatic_differentiation = AD),
         )
-        failed_res = track(tracker, s_p, 1, 0)
-        @test !is_success(failed_res)
-        @test !failed_res.extended_precision_used
-        tracker.options.extended_precision = true
-        # check that we can track back and forth
         r_q = track(tracker, s_p, 1, 0)
         @test is_success(r_q)
-        @test r_q.extended_precision_used
         @test solution(r_q) ≈ s_q
         r_p = track(tracker, r_q, 0, 1)
         @test is_success(r_p)
-        @test r_p.extended_precision_used
         @test solution(r_p) ≈ s_p
     end
 end

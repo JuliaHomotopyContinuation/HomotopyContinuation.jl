@@ -37,5 +37,10 @@ function solve(args...; kwargs...)
     solve(solver, starts)
 end
 function solve(S::Solver, starts)
-    Result(track.(S.tracker, starts); seed = S.seed)
+    path_results = PathResult[]
+    for (k, s) in enumerate(starts)
+        push!(path_results, track(S.tracker, s; path_number = k))
+    end
+    
+    Result(path_results; seed = S.seed)
 end

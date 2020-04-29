@@ -17,6 +17,7 @@ struct NewtonResult
     return_code::Symbol
     x::Vector{ComplexF64}
     accuracy::Float64
+    residual::Float64
     iters::Int
     contraction_ratio::Float64
 end
@@ -109,6 +110,7 @@ function newton(
     a = contraction_factor
     norm_x = norm(x)
     norm_Δxᵢ = norm_Δxᵢ₋₁ = NaN
+    res = NaN
     for i = 1:max_iters
         evaluate_and_jacobian!(r, matrix(J), F, x)
         if extended_precision
@@ -127,18 +129,18 @@ function newton(
                 norm_Δxᵢ₋₁ = norm_Δxᵢ
                 a *= a
             elseif i > min_contraction_iters || norm_Δxᵢ < rel_tol * norm_x || norm_Δxᵢ < abs_tol
-                return NewtonResult(:success, x, norm_Δxᵢ, i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+                return NewtonResult(:success, x, norm_Δxᵢ, norm(r), i, norm_Δxᵢ / norm_Δxᵢ₋₁)
             else
-                return NewtonResult(:rejected, x, norm_Δxᵢ, i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+                return NewtonResult(:rejected, x, norm_Δxᵢ, norm(r), i, norm_Δxᵢ / norm_Δxᵢ₋₁)
             end
         elseif i == 1 && (
             norm_Δxᵢ > max_rel_norm_first_update * norm_x ||
             norm_Δxᵢ > max_abs_norm_first_update
         )
-            return NewtonResult(:rejected, x, norm_Δxᵢ, i, NaN)
+            return NewtonResult(:rejected, x, norm(r), norm_Δxᵢ, i, NaN)
         else
             norm_Δxᵢ₋₁ = norm_Δxᵢ
         end
     end
-    return NewtonResult(:max_iters, x, norm_Δxᵢ, max_iters, norm_Δxᵢ / norm_Δxᵢ₋₁)
+    return NewtonResult(:max_iters, x, norm_Δxᵢ, norm(r), max_iters, norm_Δxᵢ / norm_Δxᵢ₋₁)
 end

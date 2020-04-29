@@ -17,18 +17,21 @@ function excess_solution_check!(
 )
     is_success(path_result) || return path_result
     if is_nonsingular(path_result)
+        acc = max(accuracy(path_result), eps())
         res = newton(
             F.system,
             solution(path_result),
             InfNorm(),
             newton_cache;
             extended_precision = path_result.extended_precision,
-            abs_tol = 100 * accuracy(path_result),
-            rel_tol = 100 * accuracy(path_result),
-            max_abs_norm_first_update = 100 * accuracy(path_result),
+            abs_tol = 100 * acc,
+            rel_tol = 100 * acc,
+            max_abs_norm_first_update = 100 * acc,
         )
         if !is_success(res)
             path_result.return_code = :excess_solution
+            path_result.accuracy = res.accuracy
+            path_result.residual = res.residual
         end
     else
         # for singular solutions compare residuals due to lack of something better right now
@@ -36,6 +39,7 @@ function excess_solution_check!(
         system_residual = LA.norm(newton_cache.r, InfNorm())
         if system_residual > 100 * residual(path_result)
             path_result.return_code = :excess_solution
+            path_result.residual = system_residual
         end
     end
 
@@ -64,7 +68,8 @@ excess_solution_check(F::RandomizedSystem) = ExcessSolutionCheck(F, NewtonCache(
 Wraps the given [`AbstractPathTracker`](@ref) `tracker` to apply
 [`excess_solution_check`](@ref) for the given randomized system `F` on each path result.
 """
-struct OverdeterminedTracker{T<:AbstractPathTracker,E<:ExcessSolutionCheck} <: AbstractPathTracker
+struct OverdeterminedTracker{T<:AbstractPathTracker,E<:ExcessSolutionCheck} <:
+       AbstractPathTracker
     tracker::T
     excess_solution_check::E
 end

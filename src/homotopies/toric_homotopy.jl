@@ -144,34 +144,17 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
     tc = H.taylor_coeffs
     # c, c¹, c², c³, c⁴ = H.taylor_coeffs
 
-    if t == 0
+    if iszero(t)
         for i = 1:length(tc)
             wᵢ = H.weights[i]
             uᵢ = H.system_coeffs[i]
-            twᵢ = H.t_weights[i]
             if wᵢ == 0
                 tc[i, 1] = uᵢ
                 tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
             elseif wᵢ == 1
                 tc[i, 2] = uᵢ
                 tc[i, 1] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
-                # elseif wᵢ == 2
-                #     c²[i] = 0.5 * uᵢ
-                #     c[i] = c¹[i] = c³[i] = c⁴[i] = 0.0
-                #     tc[i,3] =  0.5 * uᵢ
-                #     tc[i,1] = tc[i,2] = tc[i,4] = tc[i,5] = 0.0
-                # elseif wᵢ == 3
-                #     c³[i] = uᵢ / 6
-                #     c[i] = c¹[i] = c²[i] = c⁴[i] = 0.0
-                #     tc[i,4] =  uᵢ / 6
-                #     tc[i,1] = tc[i,2] = tc[i,3] =  tc[i,5] = 0.0
-                # elseif wᵢ == 4
-                #     c⁴[i] = uᵢ / 24
-                #     c[i] = c¹[i] = c²[i] = c³[i] = 0.0
-                #     tc[i,4] =  uᵢ / 6
-                #     tc[i,2] = tc[i,3] = tc[i,4] = tc[i,5] = 0.0
             else
-                # c[i] = c¹[i] = c²[i] = c³[i] = c⁴[i] = 0.0
                 tc[i, 1] = tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
             end
         end
@@ -200,8 +183,8 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
     H.taylor_coeffs
 end
 
-function coeffs!(H::ToricHomotopy, t::Real)
-    if t < 0
+function coeffs!(H::ToricHomotopy, t)
+    if !isreal(t) || real(t) < 0
         c, _ = vectors(H.taylor_coeffs)
         evaluate_weights!(
             H.complex_t_weights.re,
@@ -217,18 +200,18 @@ function coeffs!(H::ToricHomotopy, t::Real)
         end
         return c
     else
-        c, _ = vectors(taylor_coeffs!(H, t))
+        c, _ = vectors(taylor_coeffs!(H, real(t)))
         return c
     end
 end
 
 function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
-    c = coeffs!(H::ToricHomotopy, real(t))
+    c = coeffs!(H, t)
     ModelKit.evaluate!(u, H.system, x, c)
 end
 
 function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
-    c = coeffs!(H::ToricHomotopy, real(t))
+    c = coeffs!(H, t)
     ModelKit.evaluate_and_jacobian!(u, U, H.system, x, c)
     nothing
 end

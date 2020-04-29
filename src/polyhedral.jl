@@ -247,7 +247,7 @@ function polyhedral(
 
     F = ModelKit.compile(polyhedral_system(support))
     H₁ = ToricHomotopy(F, start_coeffs)
-    toric_tracker = Tracker(H₁; options = TrackerOptions())
+    toric_tracker = Tracker(H₁; options = tracker_options)
 
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
@@ -267,6 +267,7 @@ function track(
     PT::PolyhedralTracker,
     start_solution::Tuple{MixedCell,Vector{ComplexF64}};
     path_number::Union{Nothing,Int} = nothing,
+    debug::Bool = false
 )
     cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
@@ -279,7 +280,7 @@ function track(
     #      ii) If maximal power is larger than 10 we can get some problems for values close to 1
     #          (since t^k is << 1 for t < 1 and k large)
     #          Therefore split in two stages:
-    #           1) track from 0 to 0.9
+    #           1) track from 0 to t₀ = clamp(0.1^(10 / max_weight), 0.9, 0.985)
     #           2) Second, reperamerize path s.t. max power of t is 10. This shifts the
     #              problem towards 0 again (where we have more accuracy available.)
     #              And then track to 1
@@ -287,6 +288,9 @@ function track(
     min_weight, max_weight =
         update_weights!(H, PT.support, PT.lifting, cell, min_weight = 1.0)
 
+    if debug
+        println("Min-Max weight: ", min_weight, ", ", max_weight)
+    end
     if max_weight < 10
         retcode = track!(
             PT.toric_tracker,
@@ -296,25 +300,27 @@ function track(
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
+            debug = debug
         )
         @unpack μ, ω = PT.toric_tracker.state
     else
+        t₀ = clamp(0.1^(10 / max_weight), 0.9, 1 - 1e-6)
         retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
-            0.9;
+            t₀;
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
+            debug = debug
         )
         @unpack μ, ω = PT.toric_tracker.state
         # TODO: check retcode?
         min_weight, max_weight =
             update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
-
         if is_success(retcode)
-            t_restart = 0.9^(1 / min_weight)
+            t_restart = t₀^(1 / min_weight)
             # set min_step_size to 0.0 to not accidentally loose a solution
             min_step_size = PT.toric_tracker.options.min_step_size
             PT.toric_tracker.options.min_step_size = 0.0
@@ -328,6 +334,7 @@ function track(
                 μ = μ,
                 τ = 0.1 * t_restart,
                 keep_steps = true,
+                debug = debug
             )
             @unpack μ, ω = PT.toric_tracker.state
             PT.toric_tracker.options.min_step_size = min_step_size
@@ -336,17 +343,19 @@ function track(
     if !is_success(retcode)
         state = PT.toric_tracker.state
         return PathResult(
-            return_code = PathTrackerCode.polyhedral_failed,
+            return_code = :polyhedral_failed,
             solution = copy(state.x),
             start_solution = start_solution,
             t = real(state.t),
             accuracy = state.accuracy,
+            condition_jacobian = NaN,
             residual = NaN,
             winding_number = nothing,
-            last_path_point = nothing,
+            last_path_point = (copy(state.x), state.t),
             valuation = nothing,
             ω = state.ω,
             μ = state.μ,
+            multiplicity = nothing,
             path_number = path_number,
             extended_precision = state.extended_prec,
             accepted_steps = state.accepted_steps,
@@ -361,6 +370,7 @@ function track(
         ω = ω,
         μ = μ,
         path_number = path_number,
+        debug = debug
     )
     r.start_solution = start_solution
     # report accurate steps
