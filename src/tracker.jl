@@ -43,8 +43,8 @@ We provide three sets of parameters for common use cases:
 Base.@kwdef mutable struct TrackerParameters
     a::Float64 = 0.125
     β_a::Float64 = 1.0
-    β_ω::Float64 = 20.0
-    β_τ::Float64 = 0.7
+    β_ω::Float64 = 40.0
+    β_τ::Float64 = 0.6
     strict_β_τ::Float64 = min(β_τ, 0.45)
     min_newton_iters::Int = 2
 end

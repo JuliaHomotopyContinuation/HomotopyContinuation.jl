@@ -82,7 +82,20 @@
                 5384944853425480296 * x * y * z^4 +
                 88,
             ])
-        res = track.(total_degree(System(F, [x, z, y]))...)
+        @time res =
+            track.(total_degree(
+                System(F, [x, z, y]),
+                path_tracker_options = PathTrackerOptions(val_finite_tol = 1e-3),
+            )...)
+        @test count(is_success, res) == 693
+
+        # test for γ value where path jumping happened with to loose default config
+        @time res =
+            track.(total_degree(
+                System(F, [x, z, y]),
+                path_tracker_options = PathTrackerOptions(val_finite_tol = 1e-3),
+                γ = -0.9132549847010242 + 0.4073884300256109im,
+            )...)
         @test count(is_success, res) == 693
     end
 end
