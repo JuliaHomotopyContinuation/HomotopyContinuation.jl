@@ -444,7 +444,7 @@ We see that we tracked all 4 paths successfully.
 """
 struct Tracker{H<:AbstractHomotopy,N,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
-    predictor::Pade21
+    predictor::Predictor
     corrector::NewtonCorrector
     # these are mutable
     state::TrackerState{M}
@@ -463,7 +463,7 @@ function Tracker(
 )
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
-    predictor = Pade21(size(H, 2))
+    predictor = Predictor(size(H, 2))
     corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
 
     if !(0 ≤ AD ≤ 4)
@@ -509,7 +509,7 @@ _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
 
 # intial step size
-function initial_step_size(state::TrackerState, predictor::Pade21, options::TrackerOptions)
+function initial_step_size(state::TrackerState, predictor::Predictor, options::TrackerOptions)
     a = options.parameters.β_a * options.parameters.a
     ω = options.parameters.β_ω * state.ω
     e = state.norm(local_error(predictor))
@@ -524,7 +524,7 @@ function update_stepsize!(
     state::TrackerState,
     result::NewtonCorrectorResult,
     options::TrackerOptions,
-    predictor::Pade21;
+    predictor::Predictor;
     ad_for_error_estimate::Bool = true,
 )
     a = options.parameters.β_a * options.parameters.a

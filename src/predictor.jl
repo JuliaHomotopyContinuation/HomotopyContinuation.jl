@@ -3,15 +3,15 @@
 # Mixed Precision Path Tracking for Polynomial Homotopy Continuation,
 # Sascha Timme (2020), arXiv:1902.02968
 
-mutable struct Pade21
+mutable struct Predictor
     taylor::BitVector
     τ::Float64
     local_err::Vector{ComplexF64}
     ord::Int
 end
-Pade21(n::Int) = Pade21(falses(n), Inf, zeros(ComplexF64, n), 4)
+Predictor(n::Int) = Predictor(falses(n), Inf, zeros(ComplexF64, n), 4)
 
-function update!(pred::Pade21, tx::TaylorVector, trust_tx::Vector{Bool})
+function update!(pred::Predictor, tx::TaylorVector, trust_tx::Vector{Bool})
     # This is an adaption of the algorithm outlined in
     # Robust Pad{\'e} approximation via SVD (Trefethen et al)
     τ = Inf
@@ -55,7 +55,7 @@ function update!(pred::Pade21, tx::TaylorVector, trust_tx::Vector{Bool})
     pred
 end
 
-function predict!(x̂, predictor::Pade21, H, tx::TaylorVector, Δt)
+function predict!(x̂, predictor::Predictor, H, tx::TaylorVector, Δt)
     for i = 1:length(tx)
         x, x¹, x², x³ = tx[i]
         if predictor.taylor[i]
@@ -73,6 +73,6 @@ function predict!(x̂, predictor::Pade21, H, tx::TaylorVector, Δt)
     nothing
 end
 
-order(P::Pade21) = P.ord
-local_error(predictor::Pade21) = predictor.local_err
-trust_region(predictor::Pade21) = predictor.τ
+order(P::Predictor) = P.ord
+local_error(predictor::Predictor) = predictor.local_err
+trust_region(predictor::Predictor) = predictor.τ
