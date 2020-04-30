@@ -9,11 +9,12 @@ mutable struct NumericalDifferentiation
     tmp_Δ::Vector{Float64}
 end
 
-function NumericalDifferentiation(x::AbstractVector, n::Int)
+function NumericalDifferentiation(n::Int)
+    xh = zeros(ComplexF64, n)
     default_h = [eps()^(1 / (2 + k)) for k = 1:4]
     h = copy(default_h)
     NumericalDifferentiation(
-        copy(x),
+        xh,
         (zeros(ComplexF64, n) for i = 1:3)...,
         h,
         default_h,
@@ -184,14 +185,24 @@ end
 taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
     taylor!(u, v, H, tx, t)
 
+
 ## Type dispatch on automatic differentiation or numerical differentiation
+struct AD{N} end
+function AD(N::Int)
+    if !(0 ≤ N ≤ 4)
+        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
+    end
+    AD{N}()
+end
+
+
 @generated function taylor!(
     u,
     v::Val{M},
     H,
     tx,
     t,
-    AD::Val{N},
+    ::AD{N},
     ND::NumericalDifferentiation;
     cond::Float64,
     dist_to_target::Float64,

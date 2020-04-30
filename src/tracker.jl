@@ -307,15 +307,6 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
     code::TrackerCode.codes
 
-    # buffer for the computation of derivatives
-    tx⁰::TaylorVector{1,ComplexF64}
-    tx¹::TaylorVector{2,ComplexF64}
-    tx²::TaylorVector{3,ComplexF64}
-    tx³::TaylorVector{4,ComplexF64}
-    tx⁴::TaylorVector{5,ComplexF64}
-    trust_tx::Vector{Bool}
-    u::Vector{ComplexF64}
-
     # statistics
     accepted_steps::Int
     rejected_steps::Int
@@ -327,14 +318,6 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     x̂ = zero(x)
     x̄ = zero(x)
 
-    m, n = size(H)
-    tx⁴ = TaylorVector{5}(ComplexF64, n)
-    tx⁰ = TaylorVector{1}(tx⁴)
-    tx¹ = TaylorVector{2}(tx⁴)
-    tx² = TaylorVector{3}(tx⁴)
-    tx³ = TaylorVector{4}(tx⁴)
-    trust_tx = [true, true, true, true]
-    u = zeros(ComplexF64, m)
     segment_stepper = SegmentStepper(1.0, 0.0)
     Δs_prev = 0.0
     accuracy = 0.0
@@ -369,13 +352,6 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         jacobian,
         cond_J_ẋ,
         code,
-        tx⁰,
-        tx¹,
-        tx²,
-        tx³,
-        tx⁴,
-        trust_tx,
-        u,
         accepted_steps,
         rejected_steps,
         last_steps_failed,
@@ -444,13 +420,11 @@ We see that we tracked all 4 paths successfully.
 """
 struct Tracker{H<:AbstractHomotopy,N,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
-    predictor::Predictor
+    predictor::Predictor{N}
     corrector::NewtonCorrector
     # these are mutable
     state::TrackerState{M}
     options::TrackerOptions
-    AD::Val{N}
-    ND::NumericalDifferentiation
 end
 
 Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(ModelKitHomotopy(H); kwargs...)
@@ -459,18 +433,12 @@ function Tracker(
     x::AbstractVector = zeros(size(H, 2));
     weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
     options::TrackerOptions = TrackerOptions(),
-    AD::Int = options.automatic_differentiation,
 )
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
-    predictor = Predictor(size(H, 2))
+    predictor = Predictor(H, AD(options.automatic_differentiation))
     corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
-
-    if !(0 ≤ AD ≤ 4)
-        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
-    end
-    ND = NumericalDifferentiation(state.x, size(H, 1))
-    Tracker(H, predictor, corrector, state, options, Val(AD), ND)
+    Tracker(H, predictor, corrector, state, options)
 end
 
 function Base.show(io::IO, C::Tracker{<:Any,N}) where {N}
@@ -509,7 +477,11 @@ _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
 
 # intial step size
-function initial_step_size(state::TrackerState, predictor::Predictor, options::TrackerOptions)
+function initial_step_size(
+    state::TrackerState,
+    predictor::Predictor,
+    options::TrackerOptions,
+)
     a = options.parameters.β_a * options.parameters.a
     ω = options.parameters.β_ω * state.ω
     e = state.norm(local_error(predictor))
@@ -583,116 +555,24 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerCode.terminated_max_steps
     elseif state.ω * state.μ > tol_acc
         state.code = TrackerCode.terminated_accuracy_limit
-    elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
-        state.code = TrackerCode.terminated_ill_conditioned
+        # elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
+        #     state.code = TrackerCode.terminated_ill_conditioned
     elseif state.segment_stepper.Δs < options.min_step_size
         state.code = TrackerCode.terminated_step_size_too_small
     end
     nothing
 end
 
-function compute_derivatives_and_update_predictor!(tracker::Tracker)
-    compute_derivatives!(tracker)
-    update!(tracker.predictor, tracker.state.tx⁴, tracker.state.trust_tx)
-end
-
-function compute_derivatives!(
-    tracker::Tracker;
-    min_acc::Float64 = sqrt(eps()),
-    max_iters::Int = 5,
-)
-    @unpack homotopy, state, options, AD, ND = tracker
-    # unpack stuff to make the rest easier to read
-    @unpack u, x, t, tx⁰, tx¹, tx², tx³, tx⁴, jacobian, norm, τ = state
-    x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
-    τ̂ = 1.0 #0.5τ
-
-    dist_target = dist_to_target(state.segment_stepper)
-
-    x⁰ .= x
-    # compute all taylor coefficients x¹, x², x³, x⁴
-    state.trust_tx[1] = taylor!(
-        u,
-        Val(1),
-        homotopy,
-        tx⁰,
-        t,
-        AD,
-        ND;
-        cond = state.cond_J_ẋ,
-        dist_to_target = dist_target,
+function update_predictor!(tracker::Tracker)
+    update!(
+        tracker.predictor,
+        tracker.homotopy,
+        tracker.state.x,
+        tracker.state.t,
+        tracker.state.jacobian,
+        tracker.state.norm;
+        dist_to_target = dist_to_target(tracker.state.segment_stepper),
     )
-    u .= .-u
-    LA.ldiv!(x¹, jacobian, u)
-
-    # Check if we have to do iterative refinment for all the others as well
-    δ = fixed_precision_iterative_refinement!(x¹, workspace(jacobian), u, norm)
-    state.cond_J_ẋ = δ / eps()
-    iterative_refinement = δ > min_acc
-    if iterative_refinement
-        (acc, diverged) = iterative_refinement!(
-            x¹,
-            jacobian,
-            u,
-            norm;
-            tol = min_acc,
-            max_iters = max_iters,
-        )
-        if diverged
-            state.code = TrackerCode.terminated_ill_conditioned
-        end
-    end
-
-    state.trust_tx[2] = taylor!(
-        u,
-        Val(2),
-        homotopy,
-        tx¹,
-        t,
-        AD,
-        ND;
-        cond = state.cond_J_ẋ,
-        dist_to_target = dist_target,
-        incremental = true,
-    )
-    u .= .-u
-    LA.ldiv!(x², jacobian, u)
-    iterative_refinement &&
-    iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
-
-    state.trust_tx[3] = taylor!(
-        u,
-        Val(3),
-        homotopy,
-        tx²,
-        t,
-        AD,
-        ND;
-        cond = state.cond_J_ẋ,
-        dist_to_target = dist_target,
-        incremental = true,
-    )
-    u .= .-u
-    LA.ldiv!(x³, jacobian, u)
-    iterative_refinement &&
-    iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
-
-    state.trust_tx[4] = taylor!(
-        u,
-        Val(4),
-        homotopy,
-        tx³,
-        t,
-        AD,
-        ND;
-        dist_to_target = dist_target,
-        cond = state.cond_J_ẋ,
-        incremental = true,
-    )
-    u .= .-u
-    LA.ldiv!(x⁴, jacobian, u)
-
-    state
 end
 
 """
@@ -763,7 +643,7 @@ function init!(
     state.τ = τ
     evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, state.x, t)
     updated!(jacobian)
-    compute_derivatives_and_update_predictor!(tracker)
+    update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -837,7 +717,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
-    predict!(x̂, predictor, homotopy, state.tx³, Δt)
+    predict!(x̂, predictor, homotopy, Δt)
     # if t′ == 0
     #     e = state.norm(local_error(predictor)) * state.segment_stepper.Δs^4
     # end
@@ -872,14 +752,8 @@ function step!(tracker::Tracker, debug::Bool = false)
 
         state.ω = max(result.ω, 0.5 * state.ω)
         update_precision!(tracker, result.μ_low)
-        compute_derivatives_and_update_predictor!(tracker)
-
-        # # Update other state
-        # if no_ω_update && options.automatic_differentiation < 3
-        #     state.τ = max(trust_region(predictor), 5 * state.τ)
-        # else
+        update_predictor!(tracker)
         state.τ = trust_region(predictor)
-        # end
 
         state.accepted_steps += 1
         state.last_steps_failed = 0
@@ -894,7 +768,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         result,
         options,
         predictor;
-        ad_for_error_estimate = tracker.AD isa Val{4},
+        ad_for_error_estimate = predictor.AD isa AD{4},
     )
 
     check_terminated!(state, options)
