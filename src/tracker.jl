@@ -71,7 +71,7 @@ The set of options for a [`Tracker`](@ref).
   Otherwise numerical differentiation is used. The automatic differentiation results
   in additional compilation time, however for numerically challenging paths it is strongly
   recommended to use `automatic_differentiation = 3`.
-* `max_steps::Int = 1_000`: The maximal number of steps a tracker attempts
+* `max_steps::Int = 10_000`: The maximal number of steps a tracker attempts
 * `max_step_size::Float64 = Inf`: The maximal size of a step
 * `max_initial_step_size::Float64 = Inf`: The maximal size of the first step
 * `min_step_size::Float64 = 1e-48`: The minimal step size. If a smaller step size would
@@ -100,7 +100,7 @@ mutable struct TrackerOptions
 end
 function TrackerOptions(;
     automatic_differentiation::Int = 3,
-    max_steps::Int = 1_000,
+    max_steps::Int = 10_000,
     max_step_size::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
     extended_precision::Bool = true,
