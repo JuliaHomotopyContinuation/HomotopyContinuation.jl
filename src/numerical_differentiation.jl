@@ -9,16 +9,17 @@ mutable struct NumericalDifferentiation
     tmp_Δ::Vector{Float64}
 end
 
-function NumericalDifferentiation(x::AbstractVector, n::Int)
+function NumericalDifferentiation(m::Int, n::Int)
+    xh = zeros(ComplexF64, n)
     default_h = [eps()^(1 / (2 + k)) for k = 1:4]
     h = copy(default_h)
     NumericalDifferentiation(
-        copy(x),
-        (zeros(ComplexF64, n) for i = 1:3)...,
+        xh,
+        (zeros(ComplexF64, m) for i = 1:3)...,
         h,
         default_h,
-        ntuple(_ -> zeros(n), 4),
-        zeros(n),
+        ntuple(_ -> zeros(m), 4),
+        zeros(m),
     )
 end
 
@@ -156,12 +157,13 @@ function taylor!(
     x::TaylorVector{N},
     t,
     ND::NumericalDifferentiation;
+    cond::Float64 = 1.0,
     dist_to_target::Float64,
 ) where {N}
     finite_diff!(u, ND.Δ[N], H, x, t, ND; order = N, dist_to_target = dist_to_target)
     tol = min(0.1, 10 * ND.default_h[N])
     δ = maximum(ND.Δ[N])
-    if δ > tol
+    if δ > tol || (δ * cond > 1)
         h = ND.h[N]
         best_h_finite_diff!(
             u,
@@ -174,9 +176,9 @@ function taylor!(
             dist_to_target = dist_to_target,
         )
         h = ND.h[N]
-        return maximum(ND.Δ[N])
+        return maximum(ND.Δ[N]) * cond < 1
     else
-        return δ
+        return true
     end
 end
 
@@ -184,16 +186,26 @@ end
 taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
     taylor!(u, v, H, tx, t)
 
+
 ## Type dispatch on automatic differentiation or numerical differentiation
+struct AD{N} end
+function AD(N::Int)
+    if !(0 ≤ N ≤ 4)
+        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
+    end
+    AD{N}()
+end
+
+
 @generated function taylor!(
     u,
     v::Val{M},
     H,
     tx,
     t,
-    AD::Val{N},
+    ::AD{N},
     ND::NumericalDifferentiation;
-    cond::Float64,
+    cond::Float64 = 1.0,
     dist_to_target::Float64,
     incremental::Bool = false,
 ) where {M,N}
@@ -204,8 +216,7 @@ taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) 
         end
     else
         quote
-            δ = taylor!(u, v, H, tx, t, ND; dist_to_target = dist_to_target)
-            δ * cond < 1
+            taylor!(u, v, H, tx, t, ND; cond = cond, dist_to_target = dist_to_target)
         end
     end
 end

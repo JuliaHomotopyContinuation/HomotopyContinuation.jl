@@ -10,7 +10,8 @@
         HC2.init!(val)
         track!(tracker, S[1], 1, 1e-13)
 
-        @unpack tx³, t = tracker.state
+        t = tracker.state.t
+        tx³ = tracker.predictor.tx³
         HC2.update!(val, tx³, real(t))
 
         @test val.val_x[1] ≈ 0 atol = 10 * (1e-13)^(1 / 5)
@@ -23,7 +24,10 @@
         path_tracker, starts = total_degree(
             System(f);
             gamma = 1.3im + 0.4,
-            tracker_options = TrackerOptions(parameters = :conservative),
+            tracker_options = TrackerOptions(
+                parameters = :conservative,
+                automatic_differentiation = 3,
+            ),
         )
         S = collect(starts)
         tracker = path_tracker.tracker
@@ -31,7 +35,8 @@
         tf = 1e-10
         track!(tracker, S[3], 1, tf)
 
-        @unpack tx³, t = tracker.state
+        t = tracker.state.t
+        tx³ = tracker.predictor.tx³
         HC2.update!(val, tx³, real(t))
 
         @test val.val_x[1] ≈ -1 atol = tf^(1 / 2)
@@ -48,7 +53,10 @@
         path_tracker, starts = total_degree(
             System([f1, f2]);
             gamma = 1.3im + 0.4,
-            tracker_options = TrackerOptions(parameters = :conservative),
+            tracker_options = TrackerOptions(
+                parameters = :conservative,
+                automatic_differentiation = 3,
+            ),
         )
         S = collect(starts)
         tracker = path_tracker.tracker
@@ -56,7 +64,8 @@
         tf = 1e-10
         HC2.track!(tracker, S[3], 1, tf)
 
-        @unpack tx³, t = tracker.state
+        t = tracker.state.t
+        tx³ = tracker.predictor.tx³
         HC2.update!(val, tx³, real(t))
 
         @test val.val_x[1] ≈ -1 / 6 atol = tf^(1 / 6)

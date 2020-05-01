@@ -53,6 +53,10 @@ Base.getindex(TV::TaylorVector, i::Integer, j::Integer) = getindex(TV.data, i, j
 function Base.setindex!(TV::TaylorVector{N,T}, x, i::Integer) where {N,T}
     setindex!(TV, convert(NTuple{N,T}, x), i)
 end
+function Base.setindex!(TV::TaylorVector{1}, x::Number, i::Integer)
+    TV.data[i] = x
+    x
+end
 @generated function Base.setindex!(
     TV::TaylorVector{N,T},
     x::NTuple{N,T},

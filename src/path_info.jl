@@ -49,7 +49,7 @@ function path_info(tracker::Tracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool =
     while is_tracking(tracker.state.code)
         push!(s, real(state.t))
         push!(Δs, real(state.Δt))
-        e = tracker.state.norm(local_error(tracker.predictor))
+        e = local_error(tracker.predictor)
         push!(Δx_t, e * abs(state.Δt)^p)
         push!(τ, tracker.options.parameters.β_τ * trust_region(tracker.predictor))
         push!(ω, state.ω)
