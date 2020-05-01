@@ -196,6 +196,7 @@ end
 
 function update_pade!(pred::Predictor, norm::AbstractNorm)
     tx = pred.tx⁴
+    local_err_vec = pred.m₁
     trust_tx = pred.trust_tx
     # This is an adaption of the algorithm outlined in
     # Robust Pad{\'e} approximation via SVD (Trefethen et al)
@@ -212,15 +213,15 @@ function update_pade!(pred::Predictor, norm::AbstractNorm)
         tol = 1e-14 * max(c¹, c², c³)
         if (c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol
             pred.taylor[i] = true
-            pred.u[i] = x⁴
+            local_err_vec[i] = x⁴
         else
             pred.taylor[i] = false
             τᵢ = (c² / c³) / λ
             τᵢ < τ && (τ = τᵢ)
-            pred.u[i] = x⁴ - x³ * (x³ / x²)
+            local_err_vec[i] = x⁴ - x³ * (x³ / x²)
         end
     end
-    pred.local_error = norm(pred.u)
+    pred.local_error = norm(local_err_vec)
     pred.trust_region = τ
 
     pred

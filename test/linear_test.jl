@@ -18,10 +18,10 @@
 
         u = rand(1)
         x = A(u, Intrinsic)
-        @test coord_change(A, Extrinsic, Intrinsic, x) ≈ u rtol = 1e-14
-        @test coord_change(A, Intrinsic, Extrinsic, u) ≈ x rtol = 1e-14
+        @test coord_change(A, Extrinsic, Intrinsic, x) ≈ u rtol = 1e-12
+        @test coord_change(A, Intrinsic, Extrinsic, u) ≈ x rtol = 1e-12
         @test norm(A(x, Extrinsic)) ≈ 0 atol = 1e-14
-        @test norm(AffineExtrinsic(intrinsic(A))(x)) ≈ 0.0 atol = 1e-14
+        @test norm(AffineExtrinsic(intrinsic(A))(x)) ≈ 0.0 atol = 1e-12
 
         B = rand_affine_subspace(3; codim = 2)
         @test B != A

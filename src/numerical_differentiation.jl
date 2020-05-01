@@ -18,8 +18,8 @@ function NumericalDifferentiation(m::Int, n::Int)
         (zeros(ComplexF64, m) for i = 1:3)...,
         h,
         default_h,
-        ntuple(_ -> zeros(n), 4),
-        zeros(n),
+        ntuple(_ -> zeros(m), 4),
+        zeros(m),
     )
 end
 
