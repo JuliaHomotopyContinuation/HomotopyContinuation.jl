@@ -418,9 +418,9 @@ We see that we tracked all 4 paths successfully.
 # successfull: 4
 ```
 """
-struct Tracker{H<:AbstractHomotopy,N,M<:AbstractMatrix{ComplexF64}}
+struct Tracker{H<:AbstractHomotopy,AD,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
-    predictor::Predictor{N}
+    predictor::Predictor{AD}
     corrector::NewtonCorrector
     # these are mutable
     state::TrackerState{M}
@@ -441,8 +441,8 @@ function Tracker(
     Tracker(H, predictor, corrector, state, options)
 end
 
-function Base.show(io::IO, C::Tracker{<:Any,N}) where {N}
-    print(io, "Tracker with automatic_differentiation=$N")
+function Base.show(io::IO, C::Tracker{<:Any,AD{N}}) where {N}
+    print(io, "Tracker with automatic_differentiation = $N")
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::Tracker) = x
 Base.broadcastable(C::Tracker) = Ref(C)
@@ -484,7 +484,12 @@ function initial_step_size(
 )
     a = options.parameters.β_a * options.parameters.a
     ω = options.parameters.β_ω * state.ω
-    e = state.norm(local_error(predictor))
+    e = local_error(predictor)
+    if isinf(e)
+        # don't have anything we can use, so just use a conservative number
+        # (in all well-behaved cases)
+        e = 100
+    end
     τ = trust_region(predictor)
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
     Δs₂ = options.parameters.β_τ * τ
@@ -504,15 +509,14 @@ function update_stepsize!(
     p = order(predictor)
     τ = state.τ #trust_region(predictor)
     if is_converged(result)
-        # e₁ = state.norm(local_error(predictor))
         # If we don't use automatic_differentiation for the 4th derivative
         # this can be completely of. So check against the actual error of the
         # last step
-        if ad_for_error_estimate
-            e = state.norm(local_error(predictor))
+        if ad_for_error_estimate && predictor.pade
+            e = local_error(predictor)
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
         else
-            e₁ = nthroot(state.norm(local_error(predictor)), p)
+            e₁ = nthroot(local_error(predictor), p)
             e₂ = nthroot(state.norm(state.x, state.x̂), p) / state.Δs_prev
             e = nanmin(e₁, e₂)
             Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / ω, p) / e
@@ -643,6 +647,7 @@ function init!(
     state.τ = τ
     evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, state.x, t)
     updated!(jacobian)
+    init!(tracker.predictor)
     update_predictor!(tracker)
     state.τ = trust_region(predictor)
     # compute initial step size
@@ -717,10 +722,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
-    predict!(x̂, predictor, homotopy, Δt)
-    # if t′ == 0
-    #     e = state.norm(local_error(predictor)) * state.segment_stepper.Δs^4
-    # end
+    predict!(x̂, predictor, homotopy, x, t, Δt, jacobian)
     update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
