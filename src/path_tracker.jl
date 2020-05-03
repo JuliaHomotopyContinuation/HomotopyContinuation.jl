@@ -379,7 +379,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     end
 
 
-    update!(state.val, tracker.predictor.tx³, t)
+    update!(state.val, tracker.predictor, t)
     (finite, at_infinity, at_zero) = analyze(
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
