@@ -39,7 +39,7 @@
         s = [1, 1, 1]
         res = track(tracker, s, 1, 0)
         @test is_success(res)
-        @test isa(solution(res),Vector{ComplexF64})
+        @test isa(solution(res), Vector{ComplexF64})
         x₀ = abs(solution(res)[end])
         @test affine_chart(PVector(solution(res))) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
     end
@@ -59,14 +59,14 @@
         F = System([x - a], [x], [a])
         ct = Tracker(
             ParameterHomotopy(F, [1], [2]),
-            options = TrackerOptions(max_step_size = 0.125),
+            options = TrackerOptions(max_step_size = 0.03125),
         )
         Xs = Vector{ComplexF64}[]
         for (x, t) in iterator(ct, [1.0], 1.0, 0.0)
             push!(Xs, x)
         end
 
-        @test round.(real.(first.(Xs)), digits = 4) == collect(1:0.125:2)
+        @test round.(real.(first.(Xs)), digits = 6) == collect(1:0.03125:2)
     end
 
     @testset "path info" begin

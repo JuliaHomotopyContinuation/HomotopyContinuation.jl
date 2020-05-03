@@ -125,8 +125,8 @@ function newton!(
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         i >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)
-
-        if i >= 1 && θ > ā
+        if i >= 1 && θ > ā || (i == 0 && norm_Δx₀ > 0.5 && norm_Δx₀ > 0.5norm(x₀))
+            @label return_terminated
             return NewtonCorrectorResult(
                 NEWT_TERMINATED,
                 norm(Δxᵢ),
@@ -153,6 +153,8 @@ function newton!(
             norm_Δxᵢ₊₁ = norm(Δxᵢ)
             if isnan(norm_Δxᵢ₊₁)
                 @goto return_singular
+            elseif norm_Δxᵢ₊₁ > √norm_Δxᵢ
+                @goto return_terminated
             end
 
             if norm_Δxᵢ₊₁ > 2μ && extended_precision

@@ -197,15 +197,23 @@ function polyhedral(f::System; target_parameters = nothing, kwargs...)
     end
     tracker, starts
 end
+
+
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
     target_coeffs::AbstractVector;
     kwargs...,
 )
+    # start_coeffs =
+    #     map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
+    # start_coeffs =
+    #     map(c -> 0.25 .* randn.() .* abs.(c) .* cis2pi.(rand.()) .+ c, target_coeffs)
     start_coeffs =
-        map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
+        map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
     polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
+
+cis2pi(x) = complex(cospi(2x), sinpi(2x))
 
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
@@ -315,6 +323,7 @@ function track(
             max_initial_step_size = 0.2,
             debug = debug
         )
+
         @unpack μ, ω = PT.toric_tracker.state
         # TODO: check retcode?
         min_weight, max_weight =
@@ -367,7 +376,8 @@ function track(
     r = track(
         PT.generic_tracker,
         PT.toric_tracker.state.x;
-        ω = ω,
+        # Don't provide ω since this can be misleading a lead to a too large initial step
+        # ω = ω,
         μ = μ,
         path_number = path_number,
         debug = debug

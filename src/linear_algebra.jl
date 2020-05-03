@@ -700,6 +700,36 @@ function LA.cond(
     end
 end
 
+function egcond(
+    WS::MatrixWorkspace,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    m, n = size(WS)
+    if m == n == 1
+        if isa(d_l, Nothing) && isa(d_r, Nothing)
+            inv(abs(WS.A[1, 1]))
+        elseif isa(d_l, Nothing)
+            inv(abs(WS.A[1, 1]) * d_r[1])
+        elseif isa(d_r, Nothing)
+            inv(d_l[1] * abs(WS.A[1, 1]))
+        else
+            inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
+        end
+    elseif m > n
+        WS.factorized[] || factorize!(WS)
+        rmax, rmin = -Inf, Inf
+        for i = 1:n
+            rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
+            rmax = max(rmax, rᵢ)
+            rmin = min(rmin, rᵢ)
+        end
+        rmax / rmin
+    else
+        inverse_inf_norm_est(WS, d_l, d_r) * max(inf_norm(WS, d_l, d_r), 1.0)
+    end
+end
+
 #####################
 ## Jacobian ##
 #####################
@@ -800,4 +830,12 @@ function LA.cond(
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
     LA.cond(workspace(J), d_l, d_r)
+end
+
+function egcond(
+    J::Jacobian,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    egcond(workspace(J), d_l, d_r)
 end

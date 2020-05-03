@@ -43,6 +43,9 @@ end
 fast_abs(z::Complex) = sqrt(abs2(z))
 fast_abs(x::Real) = abs(x)
 
+"Like `min(a,b)`` but ignoring any `NaN` values."
+nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
+
 """
     unpack(a::Union{Nothing, T}, b::T)
 
