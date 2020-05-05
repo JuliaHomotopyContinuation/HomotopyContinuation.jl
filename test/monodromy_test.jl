@@ -509,4 +509,56 @@
 
         @test size(C, 1) == 4
     end
+
+    @testset "monodromy group Fano problem" begin
+        # Problem from Thomas Yahl
+        k = 1; #dim of linear spaces
+        m = 6; #ambient dim
+        n = [2,2,3]; #hypersurface degrees
+        r = length(n);
+        np = sum(binomial.(n.+m,m));
+
+        #hypersurface equations
+        @polyvar x[1:m+1] t[1:k+1] y[1:(m-k)*(k+1)] p[1:np];
+        monoms = [reshape(monomials(x,[s]),(1,binomial(s+m,m))) for s in n];
+        splits = vcat([0],[sum(length.(monoms[1:i])) for i=1:r]);
+        G = [(monoms[i]*p[splits[i]+1:splits[i+1]])[1] for i=1:r];
+
+        #linear space substitution
+        ℓ = vcat([sum(y[(k+1)*(i-1)+1:(k+1)*i].*t) for i=1:m-k],t);
+        F̂ = subs(G,x=>ℓ).+0*prod(p);
+
+
+        # Compute all monomials of a given degree d
+        function segre(x, d)
+            if d == 1
+                return x
+            else
+                return unique(kron(x,segre(x,d-1)))
+            end
+        end
+
+        F = vcat(map(1:3) do i
+        	d = n[i]
+        	g = F̂[i]
+        	[coefficient(g, v, t) for v in segre(t,d)]
+        end...)
+        F = [subs(f, t=>zeros(2)) for f in F] # annoying bug in MVP
+
+        #base system
+        startSol = randn(ComplexF64,(m-k)*(k+1));
+        params = (nullspace(transpose(hcat(map(f->coefficient.(f,p),subs.(F,y=>startSol))...)))*randn(ComplexF64,np-(m-k)*(k+1),1))[:,1];
+        #subs.(F,y=>startSol,p=>params) #testing base system and solution
+
+        #monodromy_solve
+        F̂ = subs.(F,p=>params);
+        Ĝ = subs.(F,p=>randn(ComplexF64,np));
+        @polyvar τ
+        H = @. (1-τ)*F̂+τ*Ĝ;
+        S = monodromy_solve(H,startSol,[0.0+0.0im];parameters = [τ], target_solutions_count = 720)
+
+        #permutations
+        T = permutations(S)
+        @test size(T,1) == 720
+    end
 end
