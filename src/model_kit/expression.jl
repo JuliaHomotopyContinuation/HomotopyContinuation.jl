@@ -42,6 +42,8 @@ Declare variables with the given and automatically create the variable bindings.
 ## Examples
 
 ```julia
+julia> using HomotopyContinuation.ModelKit: Variable # only needed for pretty printing
+
 julia> @var a b x[1:2] y[1:2,1:3]
 (a, b, Variable[x₁, x₂], Variable[y₁₋₁ y₁₋₂ y₁₋₃; y₂₋₁ y₂₋₂ y₂₋₃])
 
