@@ -1,0 +1,32 @@
+name: Run tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        version:
+          - '1.4'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+
+    steps:
+      - uses: actions/checkout@v1.0.0
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-runtest@latest
+      - uses: julia-actions/julia-uploadcodecov@latest
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
