@@ -2,7 +2,7 @@
 
 | **Documentation** | **Build Status** |
 |:-----------------:|:----------------:|
-| [![][docs-stable-img]][docs-stable-url] | [![Build Status][build-img]][build-url] |
+| [![][docs-stable-img]][docs-stable-url] | ![Run tests](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/workflows/Run%20tests/badge.svg?branch=master) |
 | [![][docs-dev-img]][docs-dev-url] | [![Codecov branch][codecov-img]][codecov-url]|
 
 **HomotopyContinuation.jl** is a Julia package for solving systems of polynomial equations by numerical homotopy continuation.
@@ -55,7 +55,5 @@ A preprint of this paper is [freely available](https://arxiv.org/abs/1711.10911)
 [docs-stable-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/stable
 [docs-dev-url]: https://www.juliahomotopycontinuation.org/HomotopyContinuation.jl/dev
 
-[build-img]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl.svg?branch=master
-[build-url]: https://travis-ci.org/JuliaHomotopyContinuation/HomotopyContinuation.jl
 [codecov-img]: https://codecov.io/gh/juliahomotopycontinuation/HomotopyContinuation.jl/branch/master/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/juliahomotopycontinuation/HomotopyContinuation.jl
