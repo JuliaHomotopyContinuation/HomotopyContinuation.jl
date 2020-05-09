@@ -42,6 +42,8 @@ Declare variables with the given and automatically create the variable bindings.
 ## Examples
 
 ```julia
+julia> using HomotopyContinuation.ModelKit: Variable # only needed for pretty printing
+
 julia> @var a b x[1:2] y[1:2,1:3]
 (a, b, Variable[x₁, x₂], Variable[y₁₋₁ y₁₋₂ y₁₋₃; y₂₋₁ y₂₋₂ y₂₋₃])
 
@@ -629,22 +631,26 @@ Create a system from the given `exprs`. `vars` are the given variables and deter
 the variable ordering.
 
 ## Example
-```julia
+```jldoctest
 julia> @var x y;
-julia> H = System([x^2, y^2], [y, x]);
-julia> H([2, 3], 0)
+
+julia> F = System([x^2, y^2], [y, x]);
+
+julia> F([2, 3])
 2-element Array{Int64,1}:
- 4
  9
+ 4
 ```
 
 It is also possible to declare additional variables.
-```julia
+```jldoctest
 julia> @var x y t a b;
-julia> H = Homotopy([x^2 + a, y^2 + b^2], [x, y], [a, b]);
-julia> H([2, 3], [5, 2])
+
+julia> F = System([x^2 + a, y^2 + b^2], [x, y], [a, b]);
+
+julia> F([2, 3], [5, 2])
 2-element Array{Int64,1}:
- 9
+  9
  13
 ```
 """
@@ -733,14 +739,15 @@ Create a homotopy from the given `exprs`. `vars` are the given variables and det
 the variable ordering, `t` is the dedicated variable along which is "homotopied".
 
 ## Example
-```julia
+```jldoctest
 julia> @var x y t;
+
 julia> H = Homotopy([x + t, y + 2t], [y, x], t);
+
 julia> H([2, 3], 0)
 2-element Array{Int64,1}:
  3
  2
-
 
 julia> H([2, 3], 1)
 2-element Array{Int64,1}:
@@ -749,12 +756,14 @@ julia> H([2, 3], 1)
 ```
 
 It is also possible to declare additional variables.
-```julia
+```jldoctest
 julia> @var x y t a b;
+
 julia> H = Homotopy([x^2 + t*a, y^2 + t*b], [x, y], t, [a, b]);
+
 julia> H([2, 3], 1, [5, 2])
 2-element Array{Int64,1}:
- 9
+  9
  11
 ```
 """

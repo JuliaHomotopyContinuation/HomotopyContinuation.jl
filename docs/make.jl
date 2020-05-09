@@ -19,7 +19,9 @@ makedocs(
         "Polynomial systems" => "systems.md",
         "Reference" => "reference.md"
         ],
-    strict=false)
+    strict = false,
+    doctest = false,
+)
 
 deploydocs(
     repo = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git"

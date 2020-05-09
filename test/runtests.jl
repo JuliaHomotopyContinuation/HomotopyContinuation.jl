@@ -1,4 +1,5 @@
 using Test, LinearAlgebra, Random
+using Documenter: doctest, DocMeta
 using DynamicPolynomials, HomotopyContinuation, StaticArrays
 import TreeViews, ProjectiveVectors, PolynomialTestSystems
 import FiniteDifferences
@@ -46,6 +47,11 @@ end
     include("monodromy_test.jl")
     include("root_count_test.jl")
     include("path_info_test.jl")
+
+    DocMeta.setdocmeta!(HomotopyContinuation, :DocTestSetup, quote
+        using HomotopyContinuation
+    end; recursive=true)
+    doctest(HomotopyContinuation)
 
     # include("nextjournal.jl")
 end

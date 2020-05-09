@@ -242,7 +242,7 @@ routine. The *endgame*  is the name for special algorithms the end of the path t
 These enable to detect if a path is diverging or if it ends in a singular solution.
 The `PathTracker` is more opinionated than the `CoreTracker` and implements additional logic
 to handle numerical difficult solutions. In particular it always reparametrizes a solution
-path to use a logarithmic time scale, i.e., ``x(t) → x(e^{-s})`` and we track for ``s`` from
+path to use a logarithmic time scale, i.e., ``x(t) → x(e^{-s})`` and we track for ``s`` from
 ``0`` to ``∞``.
 
 In order to construct a `PathTracker` it is recommended to use the [`pathtracker`](@ref) and
@@ -438,7 +438,7 @@ function step!(tracker::PathTracker)
     ct_status = status(core_tracker)
 
     # If s > 18.42 we have exp(-18.42) ≈ 1e-8 and we get to the range where numerical
-    # differentation with the Padè predictor can become tricky.
+    # differentation with the Padé predictor can become tricky.
     # Therefore we switch to the other predictor
     s > 18.42 && activate_predictor2!(core_tracker)
 
