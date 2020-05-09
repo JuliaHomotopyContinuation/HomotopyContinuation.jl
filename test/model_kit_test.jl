@@ -165,16 +165,16 @@
         @test evaluate_and_jacobian!(u, U, H, v, s) === nothing
         @test u ≈ û
         @test U ≈ Û
-
-        û = FD.grad(fdm, s -> H_test(v, s), s)[1]
-        @test dt(H, v, s) ≈ û
-        @test dt(ModelKit.interpreted(H), v, s) ≈ û
-        @test dt!(u, H, v, s) ≈ û
-        u .= 0
-        U .= 0
-        @test jacobian_and_dt!(U, u, H, v, s) === nothing
-        @test u ≈ û
-        @test U ≈ Û
+        #
+        # # û = FD.grad(fdm, s -> H_test(v, s), s)[1]
+        # @test dt(H, v, s) ≈ û
+        # @test dt(ModelKit.interpreted(H), v, s) ≈ û
+        # @test dt!(u, H, v, s) ≈ û
+        # u .= 0
+        # U .= 0
+        # @test jacobian_and_dt!(U, u, H, v, s) === nothing
+        # @test u ≈ û
+        # @test U ≈ Û
     end
 
     @testset "Homotopy (parameters)" begin
@@ -231,19 +231,19 @@
         @test u ≈ û
         @test U ≈ Û
 
-        û = FD.grad(fdm, s -> H_test(v, s, p), s)[1]
-        @test dt(H, v, s, p) ≈ û
-        @test dt(ModelKit.interpreted(H), v, s, p) ≈ û
-        @test dt!(u, H, v, s, p) ≈ û
-        u .= 0
-        U .= 0
-        @test jacobian_and_dt!(U, u, H, v, s, p) === nothing
-        @test u ≈ û
-        @test U ≈ Û
-
-        v, V = jacobian_and_dt(H, v, s, p)
-        @test v ≈ û
-        @test V ≈ Û
+        # û = FD.grad(fdm, s -> H_test(v, s, p), s)[1]
+        # @test dt(H, v, s, p) ≈ û
+        # @test dt(ModelKit.interpreted(H), v, s, p) ≈ û
+        # @test dt!(u, H, v, s, p) ≈ û
+        # u .= 0
+        # U .= 0
+        # @test jacobian_and_dt!(U, u, H, v, s, p) === nothing
+        # @test u ≈ û
+        # @test U ≈ Û
+        #
+        # v, V = jacobian_and_dt(H, v, s, p)
+        # @test v ≈ û
+        # @test V ≈ Û
     end
 
     @testset "Modeling" begin
