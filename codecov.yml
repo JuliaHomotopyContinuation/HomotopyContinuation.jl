@@ -1,1 +1,12 @@
-comment: off
+coverage:
+  status:
+    project:
+      default:
+        threshold: 1%
+        informational: true
+        only_pulls: false
+    patch:
+      default:
+        threshold: 1%
+        informational: true
+comment: false
