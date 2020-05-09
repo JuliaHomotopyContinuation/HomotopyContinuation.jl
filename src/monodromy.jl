@@ -494,6 +494,8 @@ parameters(r::MonodromyResult) = r.parameters
 
 Return the permutations of the solutions that are induced by tracking over the loops. If `reduced=false`, then all permutations are returned. If `reduced=true` then permutations without repetitions are returned.
 
+If a solution was not tracked in the loop, then the corresponding entry is 0.
+
 Example: monodromy loop for a varying line that intersects two circles.
 ```julia
 using LinearAlgebra
@@ -526,17 +528,20 @@ and `permutations(S, reduced = false)` returns
 function permutations(r::MonodromyResult; reduced=true)
 
     π = sort!(collect(r.statistics.permutations), by = first)
-    n = maximum(length ∘ last, π)
-    filter!(πᵢ -> length(last(πᵢ)) == n, π)
+    N = length(solutions(r))
     if reduced
         π = unique(map(last, π))
     else
         π = map(last, π)
     end
-    A = zeros(Int, n, length(π))
+    A = zeros(Int, N, length(π))
     for (j, πᵢ) in enumerate(π)
-        for i in 1:n
-            A[i,j] = πᵢ[i]
+        for i in 1:N
+    		if haskey(πᵢ, i)
+    			A[i,j] = πᵢ[i]
+    		else
+    			A[i,j] = 0
+    		end
         end
     end
 
