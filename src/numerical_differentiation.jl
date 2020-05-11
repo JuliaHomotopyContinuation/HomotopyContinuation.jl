@@ -1,26 +1,17 @@
+#
+# We follow the Numerical differentiation scheme derived in Mackens '89
+
 mutable struct NumericalDifferentiation
     xh::Vector{ComplexF64}
     u₁::Vector{ComplexF64}
     u₂::Vector{ComplexF64}
     u₃::Vector{ComplexF64}
-    h::Vector{Float64}
-    default_h::Vector{Float64}
-    Δ::NTuple{4,Vector{Float64}}
-    tmp_Δ::Vector{Float64}
+    logabs_norm::Vector{Float64}
 end
 
 function NumericalDifferentiation(m::Int, n::Int)
     xh = zeros(ComplexF64, n)
-    default_h = [eps()^(1 / (2 + k)) for k = 1:4]
-    h = copy(default_h)
-    NumericalDifferentiation(
-        xh,
-        (zeros(ComplexF64, m) for i = 1:3)...,
-        h,
-        default_h,
-        ntuple(_ -> zeros(m), 4),
-        zeros(m),
-    )
+    NumericalDifferentiation(xh, (zeros(ComplexF64, m) for i = 1:3)..., zeros(4))
 end
 
 function g!(u, H, tx::TaylorVector{1}, t, h, xh)
@@ -54,24 +45,6 @@ end
 
 function finite_diff!(
     u,
-    Δ,
-    H::AbstractHomotopy,
-    x::TaylorVector,
-    t,
-    ND::NumericalDifferentiation;
-    order::Int,
-    dist_to_target::Float64,
-)
-    h̄ = ND.h[order]
-    if dist_to_target < h̄
-        finite_diff!(u, Δ, H, x, t, ND, im * h̄; order = order)
-    else
-        finite_diff!(u, Δ, H, x, t, ND, h̄; order = order)
-    end
-end
-function finite_diff!(
-    u,
-    Δ,
     H::AbstractHomotopy,
     x::TaylorVector,
     t,
@@ -80,112 +53,82 @@ function finite_diff!(
     order::Int,
 )
     @unpack u₁, u₂, xh = ND
-    N = order
 
-    g!(u₁, H, x, t, h, ND.xh)
-    g!(u₂, H, x, t, -h, ND.xh)
+    g!(u₁, H, x, t, h, xh)
+    g!(u₂, H, x, t, -h, xh)
 
-    hN = h^N
-    if iseven(N)
-        u .= 0.5 .* (u₁ .+ u₂) ./ hN
+    hk = h^order
+    if iseven(order)
+        u .= 0.5 .* (u₁ .+ u₂) ./ hk
     else
-        u .= 0.5 .* (u₁ .- u₂) ./ hN
+        u .= 0.5 .* (u₁ .- u₂) ./ hk
     end
-
-    δ = 0.0
-    ntrusted = 0
-    abs_hN = fast_abs(hN)
-    @inbounds for i in eachindex(u)
-        fwdᵢ = fast_abs(u₁[i]) / abs_hN
-        bwdᵢ = fast_abs(u₂[i]) / abs_hN
-        cᵢ = fast_abs(u[i])
-        fδᵢ = abs(1.0 - fwdᵢ / cᵢ)
-        bδᵢ = abs(1.0 - bwdᵢ / cᵢ)
-
-        if !iszero(fwdᵢ) && !iszero(bwdᵢ) && !iszero(cᵢ)
-            Δ[i] = max(fδᵢ, bδᵢ)
-        else
-            Δ[i] = 0.0
-        end
-    end
-    δ
 end
 
-function best_h_finite_diff!(
-    u,
-    Δ,
-    H::AbstractHomotopy,
-    x::TaylorVector,
-    t,
-    ND::NumericalDifferentiation;
-    order::Int,
-    dist_to_target::Float64,
-)
-    h = ND.default_h[order]
-    max_δ = -Inf
-    min_h = h
-    max_ntrusted = 0
-    for k = 0:2
-        ND.h[order] = h
-        finite_diff!(
-            ND.u₃,
-            ND.tmp_Δ,
-            H,
-            x,
-            t,
-            ND;
-            order = order,
-            dist_to_target = dist_to_target,
-        )
-        δ̂ = sum(exp ∘ -, ND.tmp_Δ) / size(H, 1)
-        if δ̂ > max_δ
-            max_δ = δ̂
-            min_h = h
-            u .= ND.u₃
-            Δ .= ND.tmp_Δ
-        end
-        h *= 0.0625
-    end
-    ND.h[order] = min_h
-    h = ND.h[order]
-end
 
-function taylor!(
+function finite_diff_taylor!(
     u,
     ::Val{N},
     H::AbstractHomotopy,
     x::TaylorVector{N},
     t,
     ND::NumericalDifferentiation;
-    cond::Float64 = 1.0,
+    incremental::Bool = false,
     dist_to_target::Float64,
 ) where {N}
-    finite_diff!(u, ND.Δ[N], H, x, t, ND; order = N, dist_to_target = dist_to_target)
-    tol = min(0.1, 10 * ND.default_h[N])
-    δ = maximum(ND.Δ[N])
-    if δ > tol || (δ * cond > 1)
-        h = ND.h[N]
-        best_h_finite_diff!(
-            u,
-            ND.Δ[N],
-            H,
-            x,
-            t,
-            ND;
-            order = N,
-            dist_to_target = dist_to_target,
-        )
-        h = ND.h[N]
-        return maximum(ND.Δ[N]) * cond < 1
+    a = ND.logabs_norm
+    tx = vectors(x)
+    if incremental
+        ND.logabs_norm[N] = log(LA.norm(tx[N], InfNorm()))
     else
-        return true
+        for i = 1:N
+            ND.logabs_norm[i] = log(LA.norm(tx[i], InfNorm()))
+        end
     end
+
+    # We minimize the sum of the squared distance to the mean of the values
+    # Use not machine precision to account for some error in the evaluation
+    ε = 1.4210854715202004e-14
+
+    # λ should be a scaling factor such that the derivatives of x(t/λ) are of of the same
+    # order of magnitude. We can either compute this by balancing the derivatives or
+    # re-using the trust region size of the previous step
+    if N == 1
+        logλ = 0.0
+    elseif N == 2
+        logλ = a[1] - a[2]
+    elseif N == 3
+        logλ = 0.5 * (a[1] - a[3])
+    elseif N == 4
+        logλ = 0.1 * (3 * a[1] + a[2] - a[3] - 3 * a[4])
+    end
+    λ = exp(logλ)
+    # truncation err = (1/λ)^2*h^2
+    # round-off err   = ε/h^N
+    # -->
+    # Compute optimal ĥ by
+    #      round-off err = trunc err
+    # <=>  ελ^-N/ĥ^3 = λ^(-N-2)*ĥ^2
+    # <=>  (ε λ^2)^(1/(N+2)) = ĥ
+    ĥ = (ε * λ^2)^(1 / (N + 2))
+    # Check that truncation and round-off error are both acceptable
+    trunc_err = ĥ^2 / λ^2
+    rnd_err = ε / ĥ^N
+    if trunc_err + rnd_err > 0.05^(4 - N) || !isfinite(ĥ)
+        return false
+    end
+
+    if dist_to_target < ĥ
+        finite_diff!(u, H, x, t, ND, im * ĥ; order = N)
+    else
+        finite_diff!(u, H, x, t, ND, ĥ; order = N)
+    end
+    return true
 end
 
 ## Default handling ignores incremental
 taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
     taylor!(u, v, H, tx, t)
-
 
 ## Type dispatch on automatic differentiation or numerical differentiation
 struct AD{N} end
@@ -205,7 +148,6 @@ end
     t,
     ::AD{N},
     ND::NumericalDifferentiation;
-    cond::Float64 = 1.0,
     dist_to_target::Float64,
     incremental::Bool = false,
 ) where {M,N}
@@ -216,7 +158,17 @@ end
         end
     else
         quote
-            taylor!(u, v, H, tx, t, ND; cond = cond, dist_to_target = dist_to_target)
+            trust = finite_diff_taylor!(
+                u,
+                v,
+                H,
+                tx,
+                t,
+                ND;
+                incremental = M > N + 1,
+                dist_to_target = dist_to_target,
+            )
+            trust
         end
     end
 end

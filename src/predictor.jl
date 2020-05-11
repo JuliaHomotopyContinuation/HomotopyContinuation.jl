@@ -7,7 +7,7 @@ For this, the predictor tries to compute the local derivatives up to order 4.
 This is done using automatic differentiation for the derivatives up to order `N`.
 Otherwise numerical differentiation is used.
 If the numerical derivatives up to order 3 cannot be computed with at least some accuracy
-the predictor switches to a Raltson's 4th order Runge Kutta method.
+the predictor switches to a Ralston's 2nd order Runge Kutta method.
 """
 mutable struct Predictor{T<:AD}
     AD::T
@@ -70,6 +70,7 @@ end
 
 function init!(predictor::Predictor)
     predictor.steps_since_pade_attempt = 0
+    predictor.pade = true
     predictor
 end
 
@@ -79,13 +80,16 @@ function update!(
     x,
     t,
     jacobian::Jacobian,
-    norm::AbstractNorm;
+    norm::AbstractNorm,
+    x̂ = nothing, # the predicted value
+    h = nothing; # the last step size
     dist_to_target::Float64,
 )
     # If we cannot use a Pade approximant then don't try it in every step again, but
     # rather only every k steps
-    if P.steps_since_pade_attempt < 5
-        ord = compute_derivatives!(
+    if P.pade || P.steps_since_pade_attempt ≥ 3
+        P.steps_since_pade_attempt = 0
+        trusted = compute_derivatives!(
             P,
             H,
             x,
@@ -94,17 +98,38 @@ function update!(
             norm;
             dist_to_target = dist_to_target,
         )
-        P.steps_since_pade_attempt = 0
-        if ord ≥ 3
-            update_pade!(P, norm)
-            P.pade = true
-            return P
-        end
+    else
+        P.steps_since_pade_attempt += 1
+        trusted = compute_derivatives!(
+            P,
+            H,
+            x,
+            t,
+            jacobian,
+            norm;
+            dist_to_target = dist_to_target,
+            only_first = true,
+        )
     end
-    P.steps_since_pade_attempt += 1
-    P.local_error = Inf
-    P.trust_region = Inf
-    P.pade = false
+    prev_order = P.pade ? 4 : 3
+    if trusted ≥ 3 && update_pade!(P, norm)
+        P.pade = true
+    else
+        P.local_error = Inf
+        P.trust_region = Inf
+        P.pade = false
+    end
+
+    if trusted < 4 && (isnothing(x̂) || isnothing(h))
+        # just make a pessimistic guess
+        P.local_error = 100.0
+    elseif !(isnothing(x̂) || isnothing(h))
+        P.local_error = min(P.local_error, norm(x, x̂) / h^prev_order)
+        # x⁴ can be completely wrong, as fallback extrapolate the norm of x⁴ from x³ and τ
+    elseif P.pade
+        P.local_error = min(P.local_error, norm(last(vectors(P.tx³))) / P.trust_region)
+    end
+
     P
 end
 
@@ -113,29 +138,24 @@ function compute_derivatives!(
     H::AbstractHomotopy,
     x,
     t,
-    jacobian::Jacobian,
+    J::Jacobian,
     norm::AbstractNorm;
     dist_to_target::Float64,
-    min_acc::Float64 = sqrt(eps()),
-    max_iters::Int = 5,
+    only_first::Bool = false,
 )
     @unpack AD, ND, u, tx⁰, tx¹, tx², tx³, tx⁴, trust_tx = predictor
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
+    τ = local_error(predictor)
     x⁰ .= x
-    taylor!(u, Val(1), H, tx⁰, t, AD, ND; cond = 1.0, dist_to_target = dist_to_target)
+    taylor!(u, Val(1), H, tx⁰, t, AD, ND; dist_to_target = dist_to_target)
     u .= .-u
-    LA.ldiv!(x¹, jacobian, u)
-
+    LA.ldiv!(x¹, J, u)
     # Check if we have to do iterative refinment for all the others as well
-    δ = fixed_precision_iterative_refinement!(x¹, workspace(jacobian), u, norm)
-    cond = δ / eps()
-    iterative_refinement = δ > min_acc
-    iterative_refinement &&
-    iterative_refinement!(x¹, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
-    # if diverged
-    #     state.code = TrackerCode.terminated_ill_conditioned
-    # end
+    δ = fixed_precision_iterative_refinement!(x¹, workspace(J), u, InfNorm())
+    δ > 1e-12 && iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
+    # @show δ
+    only_first && return 1
 
     trust_tx[2] = taylor!(
         u,
@@ -145,16 +165,13 @@ function compute_derivatives!(
         t,
         AD,
         ND;
-        cond = cond,
         dist_to_target = dist_to_target,
         incremental = true,
     )
-
-    trust_tx[2] || return 1
+    trust_tx[2] || (trust_tx[3] = trust_tx[4] = false; return 1)
     u .= .-u
-    LA.ldiv!(x², jacobian, u)
-    iterative_refinement &&
-    iterative_refinement!(x², jacobian, u, norm; tol = min_acc, max_iters = max_iters)
+    LA.ldiv!(x², J, u)
+    δ > 1e-6 && iterative_refinement!(x², J, u, norm; tol = 1e-6, max_iters = 4)
 
     trust_tx[3] = taylor!(
         u,
@@ -164,16 +181,14 @@ function compute_derivatives!(
         t,
         AD,
         ND;
-        cond = cond,
         dist_to_target = dist_to_target,
         incremental = true,
     )
-    trust_tx[3] || return 2
+    trust_tx[3] || (trust_tx[4] = false; return 2)
 
     u .= .-u
-    LA.ldiv!(x³, jacobian, u)
-    iterative_refinement &&
-    iterative_refinement!(x³, jacobian, u, norm; tol = min_acc, max_iters = max_iters)
+    LA.ldiv!(x³, J, u)
+    δ > 1e-4 && iterative_refinement!(x³, J, u, norm; tol = 1e-4, max_iters = 3)
 
     trust_tx[4] = taylor!(
         u,
@@ -184,47 +199,98 @@ function compute_derivatives!(
         AD,
         ND;
         dist_to_target = dist_to_target,
-        cond = cond,
         incremental = true,
     )
     trust_tx[4] || return 3
     u .= .-u
-    LA.ldiv!(x⁴, jacobian, u)
+    LA.ldiv!(x⁴, J, u)
 
     return 4
 end
 
-function update_pade!(pred::Predictor, norm::AbstractNorm)
+function update_pade!(pred::Predictor{AD{M}}, norm::AbstractNorm) where {M}
     tx = pred.tx⁴
     local_err_vec = pred.m₁
     trust_tx = pred.trust_tx
     # This is an adaption of the algorithm outlined in
     # Robust Pad{\'e} approximation via SVD (Trefethen et al)
     τ = Inf
-    λ_min = 3.814697265625e-6 # exp2(-18)
-    for i = 1:length(tx)
-        x, x¹, x², x³, x⁴ = tx[i]
-        c¹ = abs(x¹)
-        λ = max(λ_min, c¹)
-        c¹ /= λ
-        c² = abs(x²) / λ^2
-        absx³ = abs(x³)
-        c³ = absx³ / λ^3
-        tol = 1e-14 * max(c¹, c², c³)
-        if (c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol
-            pred.taylor[i] = true
-            local_err_vec[i] = x⁴
-        else
-            pred.taylor[i] = false
-            τᵢ = (c² / c³) / λ
-            τᵢ < τ && (τ = τᵢ)
-            local_err_vec[i] = x⁴ - x³ * (x³ / x²)
+    local_error = Inf
+    if M ≥ 3
+        λ_min = 3.814697265625e-6 # exp2(-18)
+        for i = 1:length(tx)
+            x, x¹, x², x³, x⁴ = tx[i]
+            # @show tx[i]
+            c, c¹, c², c³ = abs.((x, x¹, x², x³))
+            λ = exp(0.1 * (3 * log(c) + log(c¹) - log(c²) - 3 * log(c³)))
+            tol = 1e-14 * c
+            # @show i, c, λ
+            if !isfinite(λ) || λ * c¹ ≤ tol || λ^2 * c² ≤ tol || λ^3 * c³ ≤ tol
+                pred.taylor[i] = true
+            else
+                pred.taylor[i] = false
+                τᵢ = c² / c³
+                τᵢ < τ && (τ = τᵢ)
+            end
+            #
+            # @show λ
+            # @show c, λ * c¹, λ^2 * c¹, λ^3 * c³
+            # # c¹ = abs(x¹)
+            # c¹ = abs(x¹)
+            # λ = max(λ_min, c¹)
+            # c¹ /= λ
+            # c² = abs(x²) / λ^2
+            # absx³ = abs(x³)
+            # c³ = absx³ / λ^3
+            # tol = 1e-14 * max(c¹, c², c³)
+            # if (c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol
+            #     pred.taylor[i] = true
+            # else
+            #     pred.taylor[i] = false
+            #     τᵢ = (c² / c³) / λ
+            #     τᵢ < τ && (τ = τᵢ)
+            # end
+        end
+    elseif trust_tx[3]
+        # check that the ratio (x¹ / x²) / (x² / x³) doesn't differ by more than a
+        # factor of 10 ≈ exp(2.3)
+        d = pred.ND.logabs_norm[2] - 2 * pred.ND.logabs_norm[3] + pred.ND.logabs_norm[4]
+        abs(d) > 2.3 && return false
+        τ = exp(pred.ND.logabs_norm[3] - pred.ND.logabs_norm[4])
+        τ2 = τ^2
+        τ3 = τ2 * τ
+        for i = 1:length(tx)
+            x, x¹, x², x³, x⁴ = tx[i]
+            tol = 1e-14 * abs(x)
+            if abs(x²) * τ2 ≤ tol || abs(x³) * τ3 ≤ tol
+                pred.taylor[i] = true
+            else
+                pred.taylor[i] = false
+            end
         end
     end
-    pred.local_error = norm(local_err_vec)
-    pred.trust_region = τ
+    isnan(τ) && return false
 
-    pred
+    if trust_tx[4]
+        for i = 1:length(tx)
+            x, x¹, x², x³, x⁴ = tx[i]
+            if pred.taylor[i]
+                local_err_vec[i] = x⁴
+            else
+                e = x⁴ - x³ * (x³ / x²)
+                if !isnan(e)
+                    local_err_vec[i] = e
+                end
+            end
+        end
+
+        local_error = norm(local_err_vec)
+    end
+
+    pred.local_error = nanmin(local_error, Inf)
+    pred.trust_region = nanmin(τ, Inf)
+
+    true
 end
 
 
@@ -232,7 +298,7 @@ function predict!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
     if pred.pade
         predict_pade!(x̂, pred, H, Δt)
     else
-        predict_ralston4!(x̂, pred, H, x, t, Δt, J)
+        predict_ralston2!(x̂, pred, H, x, t, Δt, J)
     end
     nothing
 end
@@ -252,45 +318,35 @@ function predict_pade!(x̂, pred::Predictor, H, Δt)
     x̂
 end
 
-function predict_ralston3!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
+function predict_ralston2!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
     @unpack u, y⁰, m₁, m₂, m₃ = pred
     # 0 | 0 0 0
     m₁ .= last(vectors(pred.tx¹))
 
-    # 1/2 | 1/2 0 0
-    @. y⁰ = x + 0.5 * Δt * m₁
+    # 2/3 | 2/3 0 0
+    h = 2Δt / 3
+    @. y⁰ = x + h * m₁
     x̂ .= first.(y⁰)
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + 0.5Δt)
-    taylor!(u, Val(1), H, y⁰, t + 0.5Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
+    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + h)
+    taylor!(u, Val(1), H, y⁰, t + h, pred.AD, pred.ND; dist_to_target = abs(Δt))
     u .= .-u
     LA.ldiv!(m₂, updated!(J), u)
 
-    # 3/4 | 0 3/4 0
-    @. y⁰ = x + 0.75 * Δt * m₂
-    x̂ .= first.(y⁰)
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + 0.75Δt)
-    taylor!(u, Val(1), H, y⁰, t + 0.75Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
-    u .= .-u
-    LA.ldiv!(m₃, updated!(J), u)
-
-    #   | 2/9 3/9 4/9
-    @. x̂ = x + Δt * (2m₁ + 3m₂ + 4m₃) / 9
+    #   | 1/4 3/4
+    @. x̂ = x + 0.25 * Δt * (m₁ + 3m₂)
     x̂
 end
 
 function predict_ralston4!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
     @unpack u, y⁰, m₁, m₂, m₃ = pred
-    # 0 | 0 0 0
     m₁ .= last(vectors(pred.tx¹))
 
-    # 1/2 | 1/2 0 0
     @. y⁰ = x + 0.4 * Δt * m₁
     x̂ .= first.(y⁰)
     evaluate_and_jacobian!(u, matrix(J), H, x̂, t + 0.4Δt)
     taylor!(u, Val(1), H, y⁰, t + 0.4Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
     u .= .-u
     LA.ldiv!(m₂, updated!(J), u)
-    # 1/1 | 0 1/2 0
 
     @. y⁰ = x + Δt * (0.29697761 * m₁ + 0.15875964 * m₂)
     x̂ .= first.(y⁰)
@@ -307,11 +363,20 @@ function predict_ralston4!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
     taylor!(u, Val(1), H, y⁰, t + Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
     u .= .-u
     LA.ldiv!(m₄, updated!(J), u)
-    #   | 2/9 3/9 4/9
-    @. x̂ = x + Δt * (0.17476028 * m₁ - 0.55148066 * m₂ + 1.20553560m₃ + 0.17118478m₄)
+
+    for i in eachindex(x̂)
+        x̂[i] =
+            x[i] +
+            Δt * (
+                0.17476028 * m₁[i] - 0.55148066 * m₂[i] +
+                1.20553560 * m₃[i] +
+                0.17118478 * m₄[i]
+            )
+    end
+
     x̂
 end
 
-order(P::Predictor) = 4
+order(P::Predictor) = P.pade ? 4 : 3
 local_error(predictor::Predictor) = predictor.local_error
 trust_region(predictor::Predictor) = predictor.trust_region

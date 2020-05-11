@@ -265,14 +265,25 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     @unpack last_point, prediction = state
 
     t = real(tracker.state.t)
-    n₀ = max(ceil(Int, log(eps()) / log(t)), 3)
+    # Mathemtically, we only need `n₀ = ceil(Int, log(eps()) / log(t))` many sample points
+    # to achieve the maximal accuracy since the error is ≈ t^n₀.
+    # However, we have to be careful that we are not getting too close to the singularity
+    # during tracking. E.g. with `n₀ = 3` we track fairly close to the origin for the
+    # first first and third path. So we require at least 8 sample points.
+    n₀ = max(ceil(Int, log(eps()) / log(t)), 8)
     @unpack x, μ, ω = tracker.state
 
-    point_acc = refine_current_solution!(tracker)
+    # always use extended precision for cauchy endgame
+    use_extended_precision!(tracker)
+    # fix tracker to not flip between extended precision and and mach. precision
+    tracker.state.keep_extended_prec = true
+
+
+    prediction_acc = tracker.state.accuracy
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     prediction .= 0.0
-
+    sample_point_acc = Inf
     m = 1
     Δθ = 2π / n₀
     result = CAUCHY_TERMINATED_MAX_WINDING_NUMBER
@@ -283,8 +294,8 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
             θⱼ += Δθ
             tⱼ = j == n₀ ? t : t * cis(θⱼ)
             res = track!(tracker, tⱼ)
-            # TODO: Refine to guarantee high accuracy
-            point_acc = max(point_acc, tracker.state.accuracy)
+            sample_point_acc = tracker.state.accuracy
+            prediction_acc = max(prediction_acc, sample_point_acc)
 
             if !is_success(res)
                 result = CAUCHY_TERMINATED
@@ -295,7 +306,7 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
         end
         # Check that loop is closed
         d = tracker.state.norm(last_point, x)
-        if d < 10 * max(point_acc, tracker.state.accuracy)
+        if d < 10 * max(prediction_acc, sample_point_acc)
             n = n₀ * m
             prediction .= prediction ./ n
 
@@ -313,7 +324,7 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
         init!(tracker, 0.0)
     end
 
-    result, m, point_acc
+    result, m, prediction_acc
 end
 
 function step!(path_tracker::PathTracker, debug::Bool = false)
@@ -322,7 +333,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     proposed_t′ = real(tracker.state.t′)
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
-    step!(tracker)
+    step!(tracker, debug)
 
     state.code = status(tracker)
 
@@ -379,7 +390,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     end
 
 
-    update!(state.val, tracker.predictor.tx³, t)
+    update!(state.val, tracker.predictor, t)
     (finite, at_infinity, at_zero) = analyze(
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
@@ -390,7 +401,13 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
         printstyled("t = ", t, "  t′ = ", real(tracker.state.t′), "\n", color = color)
-        κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+        κ = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+        A∞ = inf_norm(
+            workspace(tracker.state.jacobian),
+            state.row_scaling,
+            state.col_scaling,
+        )
+        @show A∞
         print("κ = ")
         Printf.@printf("%.3e (%.3e)\n", κ, κ / state.cond_eg_start)
         println(state.val)
@@ -409,15 +426,17 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     end
 
     if at_infinity || finite || at_zero
-        state.cond = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+        state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
     end
-
-    if options.at_infinity_check && at_infinity && state.cond > options.min_cond_eg
+    # For the truncation of paths use the stronger requirement of a relative
+    # condition number increase
+    κ = state.cond / state.cond_eg_start
+    if options.at_infinity_check && at_infinity && κ > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         return (state.code = PathTrackerCode.at_infinity)
 
-    elseif options.zero_is_at_infinity && at_zero && state.cond > options.min_cond_eg
+    elseif options.zero_is_at_infinity && at_zero && κ > options.min_cond_eg
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         return (state.code = PathTrackerCode.at_zero)

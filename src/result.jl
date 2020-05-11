@@ -421,6 +421,13 @@ function Base.show(io::IO, x::Result)
     end
 end
 
+function TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline")
+    s = statistics(x)
+    print(
+        io,
+        "<span><span class=\"syntax--support syntax--type syntax--julia\">Result</span> with $(s.nonsingular + s.singular) solutions<span>",
+    )
+end
 TreeViews.hastreeview(::Result) = true
 TreeViews.numberofnodes(::Result) = 8
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
