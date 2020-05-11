@@ -66,7 +66,8 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     cell = iter.mixed_cells[1]
     solve(iter.BSS, iter.support, iter.start_coefficients, cell)
 
-    el = (cell, iter.BSS.X[:, 1])
+    x = [iter.BSS.X[i, 1] for i in 1:length(iter.support)]
+    el = (cell, x)
     next_state = size(iter.BSS.X, 2) == 1 ? (2, 1) : (1, 2)
     el, next_state
 end
@@ -76,7 +77,8 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, (i, j)::Tuple{Int,
 
     cell = iter.mixed_cells[i]
     j == 1 && solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-    el = (cell, iter.BSS.X[:, j])
+    x = [iter.BSS.X[i, j] for i in 1:length(iter.support)]
+    el = (cell, x)
     next_state = size(iter.BSS.X, 2) == j ? (i + 1, 1) : (i, j + 1)
     return el, next_state
 end
@@ -273,7 +275,7 @@ end
 
 function track(
     PT::PolyhedralTracker,
-    start_solution::Tuple{MixedCell,Vector{ComplexF64}};
+    start_solution::Tuple{MixedCell,<:AbstractVector{ComplexF64}};
     path_number::Union{Nothing,Int} = nothing,
     debug::Bool = false
 )
