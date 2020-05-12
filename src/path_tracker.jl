@@ -438,7 +438,7 @@ function step!(tracker::PathTracker)
     ct_status = status(core_tracker)
 
     # If s > 18.42 we have exp(-18.42) ≈ 1e-8 and we get to the range where numerical
-    # differentation with the Padé predictor can become tricky.
+    # differentiation with the Padé predictor can become tricky.
     # Therefore we switch to the other predictor
     s > 18.42 && activate_predictor2!(core_tracker)
 
