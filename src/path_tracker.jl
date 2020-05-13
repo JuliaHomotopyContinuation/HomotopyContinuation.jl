@@ -41,13 +41,13 @@ Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
     max_endgame_steps::Int = 500
     # eg parameter
-    min_cond::Float64 = 1e6
+    min_cond::Float64 = 1e4
     min_coord_growth::Float64 = 100.0
     zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
     # valuation etc
     val_finite_tol::Float64 = 1e-2
-    val_at_infinity_tol::Float64 = 1e-2
+    val_at_infinity_tol::Float64 = 1e-3
 
     # singular solutions parameters
     max_winding_number::Int = 20
