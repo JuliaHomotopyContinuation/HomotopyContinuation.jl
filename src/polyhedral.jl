@@ -222,7 +222,7 @@ function polyhedral(
     start_coeffs::AbstractVector,
     target_coeffs::AbstractVector;
     path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
-    tracker_options::TrackerOptions = TrackerOptions(),
+    tracker_options = TrackerOptions(),
     only_non_zero = false,
     only_torus = only_non_zero,
 )

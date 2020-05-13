@@ -91,6 +91,7 @@ Base.@kwdef mutable struct PathResult
     # performance stats
     accepted_steps::Int
     rejected_steps::Int
+    steps_eg::Int = 0
     extended_precision_used::Bool
 end
 

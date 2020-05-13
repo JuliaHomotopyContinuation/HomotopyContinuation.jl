@@ -21,8 +21,10 @@ Options controlling the behaviour of a [`PathTracker`](@ref).
 ### Endgame parameters
 These parameters control the behaviour during the endgame. See [^BT20] for details.
 
-* `min_cond_eg::Float64 = 1e6`: The minimal condition number for which an endgame strategy
-  is applied.
+* `min_cond::Float64 = 1e6`: The minimal growth of the condition number after which an
+  endgame strategy is considered to be applied.
+* `min_growth::Float64 = 100`: The minimal relative growth of a coordinate necessary to
+  to be considered going to infininity (resp. zero).
 * `at_infinity_check::Bool = true`: Whether divering paths should be truncated.
 * `zero_is_at_infinity::Bool = false`: Whether paths going to a solution where at least one
   coordinates is zero should also be considered diverging.
@@ -37,13 +39,16 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
 """
 Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
+    max_endgame_steps::Int = 500
     # eg parameter
-    min_cond_eg::Float64 = 1e6
-    # valuation etc
+    min_cond::Float64 = 1e6
+    min_coord_growth::Float64 = 100.0
     zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
+    # valuation etc
     val_finite_tol::Float64 = 1e-2
-    val_at_infinity_tol::Float64 = 1e-3
+    val_at_infinity_tol::Float64 = 1e-2
+
     # singular solutions parameters
     max_winding_number::Int = 20
 end
@@ -152,6 +157,7 @@ Base.@kwdef mutable struct PathTrackerState
     row_scaling::Vector{Float64}
     col_scaling::Vector{Float64}
     cond_eg_start::Float64 = 1.0
+    steps_eg::Int = 0
     solution::Vector{ComplexF64}
     winding_number::Union{Nothing,Int} = nothing
     accuracy::Float64 = NaN
@@ -224,6 +230,7 @@ function init!(path_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::
     state.solution .= NaN
     state.accuracy = NaN
     state.winding_number = nothing
+    state.steps_eg = 0
     state.max_winding_number_hit = false
     state.cauchy_failures = 0
     state.jump_to_zero_failed = (false, false)
@@ -277,7 +284,6 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     prediction_acc = use_extended_precision!(tracker)
     # fix tracker to not flip between extended precision and and mach. precision
     tracker.state.keep_extended_prec = true
-
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     prediction .= 0.0
@@ -325,6 +331,21 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     result, m, prediction_acc
 end
 
+function max_ratio(u::Vector{Float64}, v::Vector{Float64})
+    max_rat = -Inf
+    for i in eachindex(u)
+        max_rat = max(max_rat, u[i] / v[i])
+    end
+    max_rat
+end
+function min_ratio(u::Vector{Float64}, v::Vector{Float64})
+    min_rat = Inf
+    for i in eachindex(u)
+        min_rat = max(min_rat, u[i] / v[i])
+    end
+    min_rat
+end
+
 function step!(path_tracker::PathTracker, debug::Bool = false)
     @unpack tracker, state, options = path_tracker
 
@@ -345,6 +366,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         if state.code == PathTrackerCode.terminated_accuracy_limit ||
            state.code == PathTrackerCode.terminated_ill_conditioned
 
+            @label terminated
             res = analyze(
                 state.val;
                 finite_tol = 0.0,
@@ -383,6 +405,11 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         state.endgame_started = true
     end
 
+    state.steps_eg += 1
+
+    if state.steps_eg > options.max_endgame_steps
+        return (state.code = PathTrackerCode.terminated_max_steps)
+    end
     if tracker.state.last_step_failed
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), iszero(proposed_t′))
         return state.code
@@ -410,19 +437,27 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     # condition number increase
     κ = state.cond / state.cond_eg_start
 
-    κ_min = options.min_cond_eg
+    κ_min = options.min_cond
 
     at_infinity =
         options.at_infinity_check &&
-        (κ > κ_min && at_infinity_tol < options.val_at_infinity_tol) ||
-        (κ > κ_min^2 && at_infinity_tol < sqrt(options.val_at_infinity_tol)) ||
-        (κ > κ_min^3 && at_infinity_tol < cbrt(options.val_at_infinity_tol))
+        (
+            (κ > κ_min && at_infinity_tol < options.val_at_infinity_tol) ||
+            (κ > κ_min^2 && at_infinity_tol < sqrt(options.val_at_infinity_tol)) ||
+            (κ > κ_min^3 && at_infinity_tol < cbrt(options.val_at_infinity_tol))
+        ) && (
+            max_ratio(weights(tracker.state.norm), state.col_scaling) >
+            options.min_coord_growth || tracker.state.extended_prec
+        )
     at_zero =
         options.zero_is_at_infinity &&
         (κ > κ_min && at_zero_tol < options.val_at_infinity_tol) ||
         (κ > κ_min^2 && at_zero_tol < sqrt(options.val_at_infinity_tol)) ||
-        (κ > κ_min^3 && at_zero_tol < cbrt(options.val_at_infinity_tol))
-    finite = val_finite && κ > options.min_cond_eg
+        (κ > κ_min^3 && at_zero_tol < cbrt(options.val_at_infinity_tol)) && (
+            min_ratio(weights(tracker.state.norm), state.col_scaling) <
+            inv(options.min_coord_growth) || tracker.state.extended_prec
+        )
+    finite = val_finite && κ > options.min_cond
 
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
@@ -433,12 +468,16 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
             state.row_scaling,
             state.col_scaling,
         )
+        @show maximum(weights(tracker.state.norm) ./ state.col_scaling)
         @show A∞
         print("κ = ")
         Printf.@printf("%.3e (%.3e)\n", κ, κ / state.cond_eg_start)
         println(state.val)
 
         printstyled("Val: ", bold = true)
+        if val_finite
+            printstyled("val_finite ", color = :blue, bold = true)
+        end
         if finite
             printstyled("finite ", color = :blue, bold = true)
         end
@@ -503,6 +542,13 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         elseif res == CAUCHY_TERMINATED
             state.code = tracker.state.code
         end
+    end
+
+    # Catch ill behavior and terminate the tracking
+    # 1) check cond(H_x, ẋ)
+    if tracker.predictor.cond_H_ẋ > 1e12
+        state.code = PathTrackerCode.terminated_ill_conditioned
+        @goto terminated
     end
 
     state.code
@@ -570,6 +616,7 @@ function PathResult(
         extended_precision = tracker.state.extended_prec,
         accepted_steps = tracker.state.accepted_steps,
         rejected_steps = tracker.state.rejected_steps,
+        steps_eg = state.steps_eg,
         extended_precision_used = tracker.state.used_extended_prec,
     )
 end

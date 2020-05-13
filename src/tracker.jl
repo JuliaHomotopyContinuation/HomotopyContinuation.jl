@@ -434,8 +434,11 @@ function Tracker(
     H::AbstractHomotopy,
     x::AbstractVector = zeros(size(H, 2));
     weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
-    options::TrackerOptions = TrackerOptions(),
+    options = TrackerOptions(),
 )
+    if !isa(options, TrackerOptions)
+        options = TrackerOptions(; options...)
+    end
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
     predictor = Predictor(H, AD(options.automatic_differentiation))
@@ -736,7 +739,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         " Δt: ",
         round(Δt; sigdigits = 5),
         "\n";
-        color = :yellow,
+        color = state.extended_prec ? :blue : :yellow,
     )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
@@ -760,6 +763,7 @@ function step!(tracker::Tracker, debug::Bool = false)
 
     if debug
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
+        println("Pade: ", predictor.pade)
     end
     if is_converged(result)
         # @show x̂

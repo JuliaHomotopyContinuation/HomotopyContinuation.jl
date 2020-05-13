@@ -725,7 +725,8 @@ function egcond(
         end
         rmax / rmin
     else
-        inverse_inf_norm_est(WS, d_l, d_r) * max(inf_norm(WS, d_l, d_r), 1.0)
+        a = inf_norm(WS, d_l, d_r)
+        inverse_inf_norm_est(WS, d_l, d_r) * max(a, 1 / a)
     end
 end
 

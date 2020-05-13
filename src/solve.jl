@@ -1,9 +1,10 @@
-export solve, solver_startsolutions
+export solve, Solver, solver_startsolutions
 
 struct Solver{T<:AbstractPathTracker}
     tracker::T
     seed::UInt32
 end
+Solver(tracker) = Solver(tracker, UInt32(0)) 
 
 function solver_startsolutions(
     F::Union{System,AbstractSystem};
@@ -41,6 +42,6 @@ function solve(S::Solver, starts)
     for (k, s) in enumerate(starts)
         push!(path_results, track(S.tracker, s; path_number = k))
     end
-    
+
     Result(path_results; seed = S.seed)
 end

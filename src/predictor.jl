@@ -17,6 +17,7 @@ mutable struct Predictor{T<:AD}
     pade::Bool
     taylor::BitVector
     steps_since_pade_attempt::Int
+    cond_H_ẋ::Float64
     # buffer for the computation of derivatives
     tx⁰::TaylorVector{1,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
@@ -54,6 +55,7 @@ function Predictor(@nospecialize(H::AbstractHomotopy), ad::AD)
         true,
         falses(n),
         0,
+        1.0,
         tx⁰,
         tx¹,
         tx²,
@@ -71,6 +73,7 @@ end
 function init!(predictor::Predictor)
     predictor.steps_since_pade_attempt = 0
     predictor.pade = true
+    predictor.cond_H_ẋ = 1.0
     predictor
 end
 
@@ -153,8 +156,11 @@ function compute_derivatives!(
     LA.ldiv!(x¹, J, u)
     # Check if we have to do iterative refinment for all the others as well
     δ = fixed_precision_iterative_refinement!(x¹, workspace(J), u, InfNorm())
-    δ > 1e-12 && iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
-    # @show δ
+    predictor.cond_H_ẋ = δ / eps()
+    if δ > 1e-12
+        δ̂ = iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
+        # @show δ δ̂
+    end
     only_first && return 1
 
     trust_tx[2] = taylor!(

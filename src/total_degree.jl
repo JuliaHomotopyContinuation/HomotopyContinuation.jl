@@ -30,7 +30,7 @@ function total_degree_variables(
     target_parameters = nothing,
     γ = cis(2π * rand()),
     gamma = γ,
-    tracker_options::TrackerOptions = TrackerOptions(),
+    tracker_options = TrackerOptions(),
     path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
 )
     m, n = size(F)
@@ -116,7 +116,7 @@ function total_degree_variable_groups(
     γ = cis(2π * rand()),
     gamma = γ,
     target_parameters = nothing,
-    tracker_options::TrackerOptions = TrackerOptions(),
+    tracker_options = TrackerOptions(),
     path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
 )
     m, n = size(F)
