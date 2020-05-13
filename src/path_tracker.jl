@@ -274,12 +274,10 @@ function cauchy!(state::PathTrackerState, tracker::Tracker, options::PathTracker
     @unpack x, μ, ω = tracker.state
 
     # always use extended precision for cauchy endgame
-    use_extended_precision!(tracker)
+    prediction_acc = use_extended_precision!(tracker)
     # fix tracker to not flip between extended precision and and mach. precision
     tracker.state.keep_extended_prec = true
 
-
-    prediction_acc = tracker.state.accuracy
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     prediction .= 0.0
@@ -347,16 +345,19 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         if state.code == PathTrackerCode.terminated_accuracy_limit ||
            state.code == PathTrackerCode.terminated_ill_conditioned
 
-            verdict = analyze(
+            res = analyze(
                 state.val;
                 finite_tol = 0.0,
-                at_infinity_tol = sqrt(options.val_at_infinity_tol),
+                # at_infinity_tol = sqrt(options.val_at_infinity_tol),
                 zero_is_finite = !options.zero_is_at_infinity,
             )
 
-            if options.at_infinity_check && verdict.at_infinity
+
+            if options.at_infinity_check &&
+               res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
                 return (state.code = PathTrackerCode.at_infinity)
-            elseif options.zero_is_at_infinity && verdict.at_zero
+            elseif options.zero_is_at_infinity &&
+                   res.at_zero_tol < cbrt(options.val_at_infinity_tol)
                 return (state.code = PathTrackerCode.at_zero)
             end
         end
@@ -391,12 +392,37 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
 
 
     update!(state.val, tracker.predictor, t)
-    (finite, at_infinity, at_zero) = analyze(
+    (val_finite, at_infinity_tol, at_zero_tol) = analyze(
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
-        at_infinity_tol = options.val_at_infinity_tol,
+        # at_infinity_tol = options.val_at_infinity_tol,
         zero_is_finite = !options.zero_is_at_infinity,
     )
+
+    # finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
+    # at_infinity_tol = options.val_at_infinity_tol,
+    # @show val_finite
+    if val_finite || (min(at_zero_tol, at_infinity_tol) < sqrt(options.val_at_infinity_tol))
+        state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+    end
+
+    # For the truncation of paths use the stronger requirement of a relative
+    # condition number increase
+    κ = state.cond / state.cond_eg_start
+
+    κ_min = options.min_cond_eg
+
+    at_infinity =
+        options.at_infinity_check &&
+        (κ > κ_min && at_infinity_tol < options.val_at_infinity_tol) ||
+        (κ > κ_min^2 && at_infinity_tol < sqrt(options.val_at_infinity_tol)) ||
+        (κ > κ_min^3 && at_infinity_tol < cbrt(options.val_at_infinity_tol))
+    at_zero =
+        options.zero_is_at_infinity &&
+        (κ > κ_min && at_zero_tol < options.val_at_infinity_tol) ||
+        (κ > κ_min^2 && at_zero_tol < sqrt(options.val_at_infinity_tol)) ||
+        (κ > κ_min^3 && at_zero_tol < cbrt(options.val_at_infinity_tol))
+    finite = val_finite && κ > options.min_cond_eg
 
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
@@ -425,23 +451,17 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         println("\n")
     end
 
-    if at_infinity || finite || at_zero
-        state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
-    end
-    # For the truncation of paths use the stronger requirement of a relative
-    # condition number increase
-    κ = state.cond / state.cond_eg_start
-    if options.at_infinity_check && at_infinity && κ > options.min_cond_eg
+    if at_infinity
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         return (state.code = PathTrackerCode.at_infinity)
 
-    elseif options.zero_is_at_infinity && at_zero && κ > options.min_cond_eg
+    elseif at_zero
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         return (state.code = PathTrackerCode.at_zero)
 
-    elseif finite && state.cond > options.min_cond_eg
+    elseif finite
         res, m, acc_est = cauchy!(state, tracker, options)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)

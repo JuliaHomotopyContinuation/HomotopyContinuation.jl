@@ -157,30 +157,26 @@ function finite_diff(ν, s, ν₂, s₂, ν₁, s₁)
 end
 
 
+function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
+    @unpack val_x, val_tẋ, Δval_x = val
 
-function analyze(
-    val::Valuation;
-    finite_tol::Float64 = throw(UndefKeywordError(:finite_tol)),
-    at_infinity_tol::Float64 = throw(UndefKeywordError(:at_infinity_tol)),
-    zero_is_finite::Bool = throw(UndefKeywordError(:zero_is_finite)),
-)
-    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
-
-    at_infinity = false
-    at_zero = false
+    at_infinity_tol = at_zero_tol = Inf
     finite = true
     for (i, val_xᵢ) in enumerate(val_x)
-        abs_Δ = max(abs(Δval_x[i]), abs(Δval_tẋ[i]))
-        rel_Δ = abs_Δ / abs(val_xᵢ)
-        m = max(abs(1.0 - val_tẋ[i] / val_xᵢ), rel_Δ)
+        abs_Δ = abs(Δval_x[i])
+        ε∞ = max(abs(1.0 - val_tẋ[i] / val_xᵢ), abs(Δval_x[i] / val_xᵢ))
+        if isnan(ε∞)
+            finite = false
+            continue
+        end
         # ∞ check
-        if val_xᵢ + m < -finite_tol && m < at_infinity_tol
-            at_infinity = true
+        if val_xᵢ + ε∞ < -finite_tol
+            at_infinity_tol = min(ε∞, at_infinity_tol)
         end
 
         # 0 check
-        if val_xᵢ - m > finite_tol && m < at_infinity_tol
-            at_zero = true
+        if !zero_is_finite && val_xᵢ - ε∞ > finite_tol
+            at_zero_tol = min(ε∞, at_zero_tol)
         end
 
         # finite
@@ -191,7 +187,7 @@ function analyze(
             end
             # Case b: val(x) = val(tẋ) > 0
         elseif zero_is_finite && val_xᵢ > finite_tol
-            if m > finite_tol
+            if ε∞ > finite_tol
                 finite = false
             end
         else
@@ -199,5 +195,5 @@ function analyze(
         end
     end
 
-    return (finite = finite, at_infinity = at_infinity, at_zero = at_zero)
+    return (val_finite = finite, at_infinity_tol = at_infinity_tol, at_zero_tol = at_zero_tol)
 end

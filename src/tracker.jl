@@ -697,8 +697,8 @@ function use_extended_precision!(tracker::Tracker)
     @unpack μ, ω, x, t, jacobian, norm = state
     @unpack a = options.parameters
 
-    options.extended_precision || return false
-    !state.extended_prec || return true
+    options.extended_precision || return state.μ
+    !state.extended_prec || return state.μ
 
     state.extended_prec = true
     state.used_extended_prec = true
@@ -707,7 +707,7 @@ function use_extended_precision!(tracker::Tracker)
         μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
     end
     state.μ = max(μ, eps())
-    true
+    state.μ
 end
 
 function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps())
