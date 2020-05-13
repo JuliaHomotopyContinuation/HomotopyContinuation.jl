@@ -707,15 +707,14 @@ function egcond(
 )
     m, n = size(WS)
     if m == n == 1
-        if isa(d_l, Nothing) && isa(d_r, Nothing)
-            inv(abs(WS.A[1, 1]))
-        elseif isa(d_l, Nothing)
-            inv(abs(WS.A[1, 1]) * d_r[1])
-        elseif isa(d_r, Nothing)
-            inv(d_l[1] * abs(WS.A[1, 1]))
-        else
-            inv(d_l[1] * abs(WS.A[1, 1]) * d_r[1])
+        a = abs(WS.A[1, 1])
+        if d_l !== nothing
+            a *= d_l[1]
         end
+        if d_r !== nothing
+            a *= d_r[1]
+        end
+        max(a, 1.0) / a
     elseif m > n
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
