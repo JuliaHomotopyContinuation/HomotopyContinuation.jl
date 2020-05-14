@@ -20,9 +20,9 @@
         @test count(r -> r.winding_number == 3, res) == 12
     end
 
-    @testset "Wilkinson 14" begin
+    @testset "Wilkinson 12" begin
         @var x
-        d = 14
+        d = 12
         f = System([expand(prod(x - i for i = 1:d))])
         res = track.(total_degree(f)...)
         @test all(is_success, res)
