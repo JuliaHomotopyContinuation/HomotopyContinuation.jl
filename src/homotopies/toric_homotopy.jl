@@ -12,18 +12,26 @@ const StructVectorComplexF64 = StructArrays.StructArray{
     Int64,
 }
 
-struct ToricHomotopy{S} <: AbstractHomotopy
+Base.@kwdef struct ToricHomotopy{S} <: AbstractHomotopy
     system::ModelKit.CompiledSystem{S}
     system_coeffs::Vector{ComplexF64}
     weights::Vector{Float64}
 
+    #t^w
     t_weights::Vector{Float64}
+    #t^w for t complex or negative
     complex_t_weights::StructVectorComplexF64
-    t_coeffs::Base.RefValue{Float64}
+    coeffs::Vector{ComplexF64}
+    dt_coeffs::Vector{ComplexF64}
+    x::Vector{ComplexF64}
+    # cache value
+    t_coeffs::Base.RefValue{ComplexF64}
+    t_taylor_coeffs::Base.RefValue{ComplexF64}
+
+    # taylor coefficients
     taylor_coeffs::TaylorVector{5,ComplexF64}
     tc3::TaylorVector{4,ComplexF64}
     tc2::TaylorVector{3,ComplexF64}
-    tc1::TaylorVector{2,ComplexF64}
 end
 
 function ToricHomotopy(
@@ -34,27 +42,22 @@ function ToricHomotopy(
     m1 = sum(length, system_coeffs)
     m == m1 ||
     throw(ArgumentError("System parameters and coefficients do not have the same size, got $m and $m1"))
-
     n = nvariables(system)
-
-    weights = zeros(m)
-
-    t_weights = zeros(m)
-    complex_t_weights = StructArrays.StructArray(zeros(ComplexF64, m))
-    t_coeffs = Ref(0.0)
     taylor_coeffs = TaylorVector{5}(ComplexF64, m)
-
     ToricHomotopy(
-        system,
-        reduce(vcat, system_coeffs),
-        weights,
-        t_weights,
-        complex_t_weights,
-        t_coeffs,
-        taylor_coeffs,
-        TaylorVector{4}(taylor_coeffs),
-        TaylorVector{3}(taylor_coeffs),
-        TaylorVector{2}(taylor_coeffs),
+        system = system,
+        system_coeffs = reduce(vcat, system_coeffs),
+        weights = zeros(m),
+        t_weights = zeros(m),
+        complex_t_weights = StructArrays.StructArray(zeros(ComplexF64, m)),
+        coeffs = zeros(ComplexF64, m),
+        dt_coeffs = zeros(ComplexF64, m),
+        x = zeros(ComplexF64, n),
+        t_coeffs = Ref(complex(0.0, 0.0)),
+        t_taylor_coeffs = Ref(complex(0.0, 0.0)),
+        taylor_coeffs = taylor_coeffs,
+        tc3 = TaylorVector{4}(taylor_coeffs),
+        tc2 = TaylorVector{3}(taylor_coeffs),
     )
 end
 
@@ -103,6 +106,7 @@ function update_weights!(
     end
 
     H.t_coeffs[] = NaN
+    H.t_taylor_coeffs[] = NaN
 
     s_min, s_max
 end
@@ -138,12 +142,87 @@ function evaluate_weights!(
 end
 
 
+function coeffs!(H::ToricHomotopy, t)
+    # H.t_coeffs[] == t && return H.coeffs
+    c = H.coeffs
+    if !isreal(t) || real(t) < 0
+        evaluate_weights!(
+            H.complex_t_weights.re,
+            H.complex_t_weights.im,
+            H.weights,
+            complex(t),
+        )
+        @inbounds for i = 1:length(c)
+            uᵢ = H.system_coeffs[i]
+            ctwᵢ = H.complex_t_weights[i]
+            c[i] = uᵢ * ctwᵢ
+        end
+    elseif iszero(t)
+        @inbounds for i = 1:length(c)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            c[i] = ifelse(wᵢ == 0, uᵢ, complex(0.0, 0.0))
+        end
+    else
+        evaluate_weights!(H.t_weights, H.weights, real(t))
+        @inbounds for i = 1:length(c)
+            uᵢ = H.system_coeffs[i]
+            twᵢ = H.t_weights[i]
+            c[i] = uᵢ * twᵢ
+        end
+    end
+
+    H.t_coeffs[] = t
+    c
+end
+
+
+function dt_coeffs!(H::ToricHomotopy, t)
+    if iszero(t)
+        @inbounds for i = 1:length(H.dt_coeffs)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            H.dt_coeffs[i] = ifelse(wᵢ == 1, uᵢ, complex(0.0, 0.0))
+        end
+    else
+        c = coeffs!(H, t)
+        if isreal(t)
+            s = real(t)
+            @fastmath s⁻¹ = inv(s)
+            for i = 1:length(c)
+                @inbounds H.dt_coeffs[i] = H.weights[i] * c[i] * s⁻¹
+            end
+        else
+            @fastmath t⁻¹ = inv(t)
+            for i = 1:length(c)
+                @inbounds H.dt_coeffs[i] = H.weights[i] * c[i] * t⁻¹
+            end
+        end
+    end
+
+    H.dt_coeffs
+end
+
+function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
+    ModelKit.evaluate!(u, H.system, x, coeffs!(H, t))
+end
+
+function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
+    ModelKit.evaluate_and_jacobian!(u, U, H.system, x, coeffs!(H, t))
+    nothing
+end
+
+
+function taylor!(u, v::Val{1}, H::ToricHomotopy, tx::TaylorVector, t)
+    H.x .= first.(tx)
+    ModelKit.evaluate!(u, H.system, H.x, dt_coeffs!(H, t))
+end
+
 function taylor_coeffs!(H::ToricHomotopy, t::Real)
-    H.t_coeffs[] != t || return H.taylor_coeffs
+    H.t_taylor_coeffs[] != t || return H.taylor_coeffs
 
     tc = H.taylor_coeffs
     # c, c¹, c², c³, c⁴ = H.taylor_coeffs
-
     if iszero(t)
         for i = 1:length(tc)
             wᵢ = H.weights[i]
@@ -159,7 +238,9 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
             end
         end
     else
-        evaluate_weights!(H.t_weights, H.weights, t)
+        if t !== H.t_coeffs[]
+            evaluate_weights!(H.t_weights, H.weights, t)
+        end
         t⁻¹ = inv(t)
         @inbounds for i = 1:length(tc)
             wᵢ = H.weights[i]
@@ -178,48 +259,12 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
 
     end
 
-    H.t_coeffs[] = t
+    H.t_taylor_coeffs[] = t
 
     H.taylor_coeffs
 end
 
-function coeffs!(H::ToricHomotopy, t)
-    if !isreal(t) || real(t) < 0
-        c, _ = vectors(H.taylor_coeffs)
-        evaluate_weights!(
-            H.complex_t_weights.re,
-            H.complex_t_weights.im,
-            H.weights,
-            complex(t),
-        )
-        @inbounds for i = 1:length(c)
-            wᵢ = H.weights[i]
-            uᵢ = H.system_coeffs[i]
-            twᵢ = H.complex_t_weights[i]
-            c[i] = uᵢ * twᵢ
-        end
-        return c
-    else
-        c, _ = vectors(taylor_coeffs!(H, real(t)))
-        return c
-    end
-end
 
-function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
-    c = coeffs!(H, t)
-    ModelKit.evaluate!(u, H.system, x, c)
-end
-
-function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
-    c = coeffs!(H, t)
-    ModelKit.evaluate_and_jacobian!(u, U, H.system, x, c)
-    nothing
-end
-
-function taylor!(u, v::Val{1}, H::ToricHomotopy, tx::TaylorVector, t)
-    taylor_coeffs!(H, real(t))
-    ModelKit.taylor!(u, v, H.system, tx, H.tc1)
-end
 function taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc2)
