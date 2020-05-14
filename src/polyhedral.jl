@@ -262,7 +262,7 @@ function polyhedral(
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
         q = reduce(append!, target_coeffs; init = ComplexF64[])
-        ParameterHomotopy(ModelKitSystem(F), p, q)
+        CoefficientHomotopy(ModelKitSystem(F), p, q)
     end
     generic_tracker =
         PathTracker(Tracker(H₂; options = tracker_options), options = path_tracker_options)
