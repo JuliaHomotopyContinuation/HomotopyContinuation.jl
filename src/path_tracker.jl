@@ -159,6 +159,7 @@ Base.@kwdef mutable struct PathTrackerState
     cond_eg_start::Float64 = 1.0
     steps_eg::Int = 0
     solution::Vector{ComplexF64}
+    t_last_cauchy::Float64 = NaN
     winding_number::Union{Nothing,Int} = nothing
     accuracy::Float64 = NaN
     cond::Float64 = 1.0
@@ -229,6 +230,7 @@ function init!(path_tracker::PathTracker, x, t₁::Real; ω::Float64 = NaN, μ::
     state.cond = 1.0
     state.solution .= NaN
     state.accuracy = NaN
+    state.t_last_cauchy = NaN
     state.winding_number = nothing
     state.steps_eg = 0
     state.max_winding_number_hit = false
@@ -500,7 +502,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         state.solution .= tracker.state.x
         return (state.code = PathTrackerCode.at_zero)
 
-    elseif finite
+    elseif finite && (isnan(state.t_last_cauchy) || 10t < state.t_last_cauchy)
         res, m, acc_est = cauchy!(state, tracker, options)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
@@ -508,6 +510,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         if res == CAUCHY_SUCCESS
             if state.winding_number === nothing
                 @label save_cauchy_result
+                state.t_last_cauchy = t
                 state.winding_number = m
                 state.solution .= state.prediction
                 state.accuracy = acc_est
@@ -516,7 +519,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
                 @goto save_cauchy_result
             elseif state.winding_number == m
                 d = tracker.state.norm(state.prediction, state.solution)
-                if d < 100 * max(state.accuracy, acc_est)
+                if d < 10 * max(state.accuracy, acc_est)
                     state.solution .= state.prediction
                     state.accuracy = d
                     state.cond = LA.cond(
