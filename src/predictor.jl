@@ -128,7 +128,7 @@ function update!(
         P.local_error = max(norm(last(vectors(P.tx¹)))^3,  100)
     elseif !(isnothing(x̂) || isnothing(h))
         P.local_error = min(P.local_error, norm(x, x̂) / h^prev_order)
-        # x⁴ can be completely wrong, as fallback extrapolate the norm of x⁴ from x³ and τ
+    # x⁴ can be completely wrong, as fallback extrapolate the norm of x⁴ from x³ and τ
     elseif P.pade
         P.local_error = min(P.local_error, norm(last(vectors(P.tx³))) / P.trust_region)
     end

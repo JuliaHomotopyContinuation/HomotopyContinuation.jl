@@ -59,14 +59,14 @@
         F = System([x - a], [x], [a])
         ct = Tracker(
             ParameterHomotopy(F, [1], [2]),
-            options = TrackerOptions(max_step_size = 0.03125),
+            options = TrackerOptions(max_step_size = 0.015625),
         )
         Xs = Vector{ComplexF64}[]
         for (x, t) in iterator(ct, [1.0], 1.0, 0.0)
             push!(Xs, x)
         end
 
-        @test round.(real.(first.(Xs)), digits = 6) == collect(1:0.03125:2)
+        @test round.(real.(first.(Xs)), digits = 6) == collect(1:0.015625:2)
     end
 
     @testset "path info" begin

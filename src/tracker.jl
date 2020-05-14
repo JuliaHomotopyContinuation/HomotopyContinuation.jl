@@ -66,7 +66,7 @@ The set of options for a [`Tracker`](@ref).
 
 ## Options
 
-* `automatic_differentiation::Int = 3`: The value `automatic_differentiation` determines
+* `automatic_differentiation::Int = 1`: The value `automatic_differentiation` determines
   up to which order the derivative is computed using automatic differentiation.
   Otherwise numerical differentiation is used. The automatic differentiation results
   in additional compilation time, however for numerically challenging paths it is strongly
@@ -99,7 +99,7 @@ mutable struct TrackerOptions
     parameters::TrackerParameters
 end
 function TrackerOptions(;
-    automatic_differentiation::Int = 3,
+    automatic_differentiation::Int = 1,
     max_steps::Int = 10_000,
     max_step_size::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
@@ -766,8 +766,6 @@ function step!(tracker::Tracker, debug::Bool = false)
         println("Pade: ", predictor.pade)
     end
     if is_converged(result)
-        # @show x̂
-        # @show x̄
         # move forward
         x .= x̄
         state.Δs_prev = state.segment_stepper.Δs
