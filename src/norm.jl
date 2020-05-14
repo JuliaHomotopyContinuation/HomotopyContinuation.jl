@@ -132,7 +132,9 @@ function update!(w::WeightedNorm, x::AbstractVector)
         elseif wᵢ > w.options.scale_max * norm_x
             wᵢ = w.options.scale_max * norm_x
         end
-        w[i] = max(wᵢ, w.options.scale_abs_min)
+        if isfinite(wᵢ)
+            w[i] = max(wᵢ, w.options.scale_abs_min)
+        end
     end
     w
 end
