@@ -4,7 +4,7 @@ struct Solver{T<:AbstractPathTracker}
     tracker::T
     seed::UInt32
 end
-Solver(tracker) = Solver(tracker, UInt32(0)) 
+Solver(tracker) = Solver(tracker, UInt32(0))
 
 function solver_startsolutions(
     F::Union{System,AbstractSystem};
@@ -37,6 +37,8 @@ function solve(args...; kwargs...)
     solver, starts = solver_startsolutions(args...; kwargs...)
     solve(solver, starts)
 end
+
+
 function solve(S::Solver, starts)
     path_results = PathResult[]
     for (k, s) in enumerate(starts)
@@ -45,3 +47,4 @@ function solve(S::Solver, starts)
 
     Result(path_results; seed = S.seed)
 end
+(solver::Solver)(starts) = solve(solver, starts)

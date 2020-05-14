@@ -125,7 +125,7 @@ function update!(
 
     if trusted < 4 && (isnothing(x̂) || isnothing(h))
         # just make a pessimistic guess
-        P.local_error = 100.0
+        P.local_error = max(norm(last(vectors(P.tx¹)))^3,  100)
     elseif !(isnothing(x̂) || isnothing(h))
         P.local_error = min(P.local_error, norm(x, x̂) / h^prev_order)
         # x⁴ can be completely wrong, as fallback extrapolate the norm of x⁴ from x³ and τ
@@ -158,8 +158,7 @@ function compute_derivatives!(
     δ = fixed_precision_iterative_refinement!(x¹, workspace(J), u, InfNorm())
     predictor.cond_H_ẋ = δ / eps()
     if δ > 1e-12
-        δ̂ = iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
-        # @show δ δ̂
+        iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
     end
     only_first && return 1
 
@@ -177,7 +176,7 @@ function compute_derivatives!(
     trust_tx[2] || (trust_tx[3] = trust_tx[4] = false; return 1)
     u .= .-u
     LA.ldiv!(x², J, u)
-    δ > 1e-6 && iterative_refinement!(x², J, u, norm; tol = 1e-6, max_iters = 4)
+    δ > 1e-8 && iterative_refinement!(x², J, u, norm; tol = 1e-8, max_iters = 4)
 
     trust_tx[3] = taylor!(
         u,
@@ -194,7 +193,7 @@ function compute_derivatives!(
 
     u .= .-u
     LA.ldiv!(x³, J, u)
-    δ > 1e-4 && iterative_refinement!(x³, J, u, norm; tol = 1e-4, max_iters = 3)
+    δ > 1e-6 && iterative_refinement!(x³, J, u, norm; tol = 1e-6, max_iters = 3)
 
     trust_tx[4] = taylor!(
         u,
@@ -238,24 +237,6 @@ function update_pade!(pred::Predictor{AD{M}}, norm::AbstractNorm) where {M}
                 τᵢ = c² / c³
                 τᵢ < τ && (τ = τᵢ)
             end
-            #
-            # @show λ
-            # @show c, λ * c¹, λ^2 * c¹, λ^3 * c³
-            # # c¹ = abs(x¹)
-            # c¹ = abs(x¹)
-            # λ = max(λ_min, c¹)
-            # c¹ /= λ
-            # c² = abs(x²) / λ^2
-            # absx³ = abs(x³)
-            # c³ = absx³ / λ^3
-            # tol = 1e-14 * max(c¹, c², c³)
-            # if (c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol
-            #     pred.taylor[i] = true
-            # else
-            #     pred.taylor[i] = false
-            #     τᵢ = (c² / c³) / λ
-            #     τᵢ < τ && (τ = τᵢ)
-            # end
         end
     elseif trust_tx[3]
         # check that the ratio (x¹ / x²) / (x² / x³) doesn't differ by more than a
@@ -337,6 +318,9 @@ function predict_ralston2!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
     taylor!(u, Val(1), H, y⁰, t + h, pred.AD, pred.ND; dist_to_target = abs(Δt))
     u .= .-u
     LA.ldiv!(m₂, updated!(J), u)
+    if pred.cond_H_ẋ * eps() > 1e-12
+        iterative_refinement!(m₂, J, u, InfNorm(); tol = 1e-12, max_iters = 7)
+    end
 
     #   | 1/4 3/4
     @. x̂ = x + 0.25 * Δt * (m₁ + 3m₂)

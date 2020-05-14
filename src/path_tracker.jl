@@ -546,7 +546,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
 
     # Catch ill behavior and terminate the tracking
     # 1) check cond(H_x, ẋ)
-    if tracker.predictor.cond_H_ẋ > 1e12
+    if tracker.predictor.cond_H_ẋ > 1e13 && maximum(state.val.val_tẋ) > 1e2
         state.code = PathTrackerCode.terminated_ill_conditioned
         @goto terminated
     end

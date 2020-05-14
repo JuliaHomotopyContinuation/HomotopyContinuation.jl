@@ -66,7 +66,7 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     cell = iter.mixed_cells[1]
     solve(iter.BSS, iter.support, iter.start_coefficients, cell)
 
-    x = [iter.BSS.X[i, 1] for i in 1:length(iter.support)]
+    x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
     el = (cell, x)
     next_state = size(iter.BSS.X, 2) == 1 ? (2, 1) : (1, 2)
     el, next_state
@@ -77,7 +77,7 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, (i, j)::Tuple{Int,
 
     cell = iter.mixed_cells[i]
     j == 1 && solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-    x = [iter.BSS.X[i, j] for i in 1:length(iter.support)]
+    x = [iter.BSS.X[i, j] for i = 1:length(iter.support)]
     el = (cell, x)
     next_state = size(iter.BSS.X, 2) == j ? (i + 1, 1) : (i, j + 1)
     return el, next_state
@@ -95,7 +95,7 @@ function polyhedral_system(support)
             ModelKit.add!(fi, fi, c[k] * prod(x .^ a))
             k += 1
         end
-        fi
+        ModelKit.horner(fi, x)
     end, x, c)
 end
 
@@ -210,8 +210,7 @@ function polyhedral(
     #     map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
     # start_coeffs =
     #     map(c -> 0.25 .* randn.() .* abs.(c) .* cis2pi.(rand.()) .+ c, target_coeffs)
-    start_coeffs =
-        map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
+    start_coeffs = map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
     polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
 
@@ -277,7 +276,7 @@ function track(
     PT::PolyhedralTracker,
     start_solution::Tuple{MixedCell,<:AbstractVector{ComplexF64}};
     path_number::Union{Nothing,Int} = nothing,
-    debug::Bool = false
+    debug::Bool = false,
 )
     cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
@@ -310,7 +309,7 @@ function track(
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
-            debug = debug
+            debug = debug,
         )
         @unpack μ, ω = PT.toric_tracker.state
     else
@@ -323,14 +322,13 @@ function track(
             ω = 20.0,
             μ = 1e-12,
             max_initial_step_size = 0.2,
-            debug = debug
+            debug = debug,
         )
 
         @unpack μ, ω = PT.toric_tracker.state
-        # TODO: check retcode?
-        min_weight, max_weight =
-            update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
         if is_success(retcode)
+            min_weight, max_weight =
+                update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
             t_restart = t₀^(1 / min_weight)
             # set min_step_size to 0.0 to not accidentally loose a solution
             min_step_size = PT.toric_tracker.options.min_step_size
@@ -345,7 +343,7 @@ function track(
                 μ = μ,
                 τ = 0.1 * t_restart,
                 keep_steps = true,
-                debug = debug
+                debug = debug,
             )
             @unpack μ, ω = PT.toric_tracker.state
             PT.toric_tracker.options.min_step_size = min_step_size
@@ -382,7 +380,7 @@ function track(
         # ω = ω,
         μ = μ,
         path_number = path_number,
-        debug = debug
+        debug = debug,
     )
     r.start_solution = start_solution
     # report accurate steps
