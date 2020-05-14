@@ -20,18 +20,18 @@
         @test count(r -> r.winding_number == 3, res) == 12
     end
 
-    @testset "Wilkinson 18" begin
+    @testset "Wilkinson 14" begin
         @var x
-        d = 18
+        d = 14
         f = System([expand(prod(x - i for i = 1:d))])
         res = track.(total_degree(f)...)
         @test all(is_success, res)
-        @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:18
+        @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:d
         @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-8
-        @test count(r -> isnothing(r.winding_number), res) == 18
+        @test count(r -> isnothing(r.winding_number), res) == d
     end
 
-    @testset "(x-10)^$d" for d in [2, 8, 12, 16, 18]
+    @testset "(x-10)^$d" for d in [2, 8, 12]
         @var x
         f = System([(x - 10)^d])
         res = track.(total_degree(f)...)
