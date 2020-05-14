@@ -766,8 +766,6 @@ function step!(tracker::Tracker, debug::Bool = false)
         println("Pade: ", predictor.pade)
     end
     if is_converged(result)
-        # @show x̂
-        # @show x̄
         # move forward
         x .= x̄
         state.Δs_prev = state.segment_stepper.Δs
