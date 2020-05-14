@@ -3,7 +3,8 @@
         # setup
         @var x
         f = [(x - 10)^5]
-        path_tracker, starts = total_degree(System(f))
+        path_tracker, starts =
+            total_degree(System(f); tracker_options = (automatic_differentiation = 3,))
         S = collect(starts)
         tracker = path_tracker.tracker
         val = HC2.Valuation(1)
@@ -37,8 +38,8 @@
         t = tracker.state.t
         HC2.update!(val, tracker.predictor, real(t))
 
-        @test val.val_x[1] ≈ -1 atol = 10tf^(1 / 2)
-        @test val.val_x[2] ≈ -1 atol = 10tf^(1 / 2)
+        @test val.val_x[1] ≈ -1 atol = 10 * tf^(1 / 2)
+        @test val.val_x[2] ≈ -1 atol = 10 * tf^(1 / 2)
         @test val.val_tẋ[1] ≈ -1 atol = sqrt(tf)
         @test val.val_tẋ[2] ≈ -1 atol = sqrt(tf)
     end

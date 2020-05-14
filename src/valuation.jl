@@ -7,7 +7,6 @@ mutable struct Valuation
     val_x::Vector{Float64}
     val_tẋ::Vector{Float64}
     Δval_x::Vector{Float64}
-    Δval_tẋ::Vector{Float64}
 
     # Data for computing the val_x and val_tẋ and ν̈ by finite differences
     val_x_data::NTuple{2,Vector{Float64}}
@@ -19,11 +18,11 @@ end
 
 Valuation(x::AbstractVector) = Valuation(length(x))
 Valuation(n::Integer) =
-    Valuation((zeros(n) for i = 1:4)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
+    Valuation((zeros(n) for i = 1:3)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
 
 function Base.show(io::IO, val::Valuation)
     print(io, "Valuation :")
-    for field in [:val_x, :val_tẋ, :Δval_x, :Δval_tẋ]
+    for field in [:val_x, :val_tẋ, :Δval_x]
         vs = [Printf.@sprintf("%#.4g", v) for v in getfield(val, field)]
         print(io, "\n • ", field, " → ", "[", join(vs, ", "), "]")
     end
@@ -39,7 +38,6 @@ function init!(val::Valuation)
     val.val_x .= 0.0
     val.val_tẋ .= 0.0
     val.Δval_x .= 0.0
-    val.Δval_tẋ .= 0.0
     val.val_x_data[1] .= val.val_x_data[2] .= 0.0
     val.val_ẋ_data[1] .= val.val_ẋ_data[2] .= 0.0
     val.logx_data[1] .= val.logx_data[2] .= 0.0
@@ -59,7 +57,6 @@ function ν(x, ẋ, t)
 
     t * l
 end
-
 
 function ν_ν¹(x, ẋ, x², t)
     u, v = reim(x)
@@ -101,19 +98,15 @@ function update!(val::Valuation, pred::Predictor{AD{N}}, t::Real) where {N}
 
         logẋᵢ = logabs(ẋᵢ)
         val_ẋᵢ = finite_diff(logẋᵢ, logt, logẋ₂[i], logt₂, logẋ₁[i], logt₁)
-        Δval_ẋᵢ = finite_diff(val_ẋᵢ, logt, val_ẋ₂[i], logt₂, val_ẋ₁[i], logt₁)
 
         val.val_x[i] = νᵢ
         val.Δval_x[i] = Δνᵢ
         val.val_tẋ[i] = val_ẋᵢ + 1
-        val.Δval_tẋ[i] = Δval_ẋᵢ
 
         ν₂[i], ν₁[i] = νᵢ, ν₂[i]
         logx₂[i], logx₁[i] = logxᵢ, logx₂[i]
         logẋ₂[i], logẋ₁[i] = logẋᵢ, logẋ₂[i]
         val_ẋ₂[i], val_ẋ₁[i] = val_ẋᵢ, val_ẋ₂[i]
-
-
     end
     val.logt_data = (logt, logt₂)
 
@@ -130,7 +123,6 @@ function update_analytic!(val::Valuation, tx::TaylorVector, t::Real)
 
         ν, ν¹ = ν_ν¹(ẋᵢ, 2x²ᵢ, 6x³ᵢ, t)
         val.val_tẋ[i] = ν + 1
-        val.Δval_tẋ[i] = t * ν¹
     end
 
     val
@@ -195,5 +187,9 @@ function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
         end
     end
 
-    return (val_finite = finite, at_infinity_tol = at_infinity_tol, at_zero_tol = at_zero_tol)
+    return (
+        val_finite = finite,
+        at_infinity_tol = at_infinity_tol,
+        at_zero_tol = at_zero_tol,
+    )
 end
