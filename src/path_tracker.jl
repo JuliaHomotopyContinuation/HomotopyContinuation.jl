@@ -30,7 +30,7 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
   coordinates is zero should also be considered diverging.
 * `val_finite_tol::Float64 = 1e-2`: Tolerance on the valuation which has to be satisfied
   before the Cauchy endgame is started.
-* `max_winding_number::Int = 20`: The maximal winding number which is attempted in the
+* `max_winding_number::Int = 12`: The maximal winding number which is attempted in the
   Cauchy endgame.
 * `val_at_infinity_tol::Float64 = 1e-3`: Tolerance on the valuation which has to be
   satisfied before a path is considered to diverge / go to infinity.
@@ -50,7 +50,7 @@ Base.@kwdef mutable struct PathTrackerOptions
     val_at_infinity_tol::Float64 = 1e-3
 
     # singular solutions parameters
-    max_winding_number::Int = 20
+    max_winding_number::Int = 12
 end
 
 Base.show(io::IO, opts::PathTrackerOptions) = print_fieldnames(io, opts)
