@@ -18,10 +18,13 @@ end
 Construct an `AffineChartHomotopy` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.
 """
-function on_affine_chart(H::Homotopy, proj_dims = [size(H,2) - 1])
+function on_affine_chart(H::Homotopy, proj_dims = nothing)
     on_affine_chart(ModelKitHomotopy(H), proj_dims)
 end
-function on_affine_chart(H::AbstractHomotopy, proj_dims = [size(H,2) - 1])
+function on_affine_chart(H::AbstractHomotopy, proj_dims = nothing)
+    if proj_dims === nothing
+        proj_dims = [size(H,2) - 1]
+    end
     N = length(proj_dims)
     chart = PVector(randn(ComplexF64, sum(proj_dims) + N), tuple(proj_dims...))
     AffineChartHomotopy(H, chart)

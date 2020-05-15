@@ -83,8 +83,8 @@
         @test count(is_success, track.(tracker, starts)) == 2
         @var x y v w
         proj_overdetermined = System(
-            [(x^2 - 4v^2) * (x * y - v * w), x * y - v*w, x^2 - v^2],
-            variable_groups = [[x,v], [y,w]],
+            [(x^2 - 4 * v^2) * (x * y - v * w), x * y - v * w, x^2 - v^2],
+            variable_groups = [[x, v], [y, w]],
         )
         tracker, starts = total_degree(proj_overdetermined)
         @test count(is_success, track.(tracker, starts)) == 2
@@ -140,10 +140,13 @@
     @testset "Result" begin
         d = 2
         @var x y a[1:6]
-        F = System([
-            (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
-            (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
-        ]; parameters = a)
+        F = System(
+            [
+                (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+                (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+            ];
+            parameters = a,
+        )
         res = solve(F; target_parameters = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32])
 
         @test startswith(sprint(show, res), "Result with 3 solutions")
@@ -183,6 +186,78 @@
         res = solve(e ∘ f ∘ g; start_system = :polyhedral)
         @test nsolutions(res) == 2
     end
+
+    @testset "solve (parameter homotopy)" begin
+        # affine
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
+        s = [1, 1]
+        res = solve(F, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
+        @test nsolutions(res) == 1
+        res = solve(
+            ModelKitSystem(F),
+            [s];
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+        @test nsolutions(res) == 1
+
+        @var x a y b
+        F = System([x^2 - a], [x, y], [a, b])
+        s = [1, 1]
+        @test_throws FiniteException(1) solve(
+            F,
+            [s];
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+
+        # proj
+        @var x a y b z
+        F_proj = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
+        s = [1, 1, 1]
+        res = solve(F_proj, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
+        @test nsolutions(res) == 1
+        res = solve(ModelKitSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
+        @test nsolutions(res) == 1
+
+        F_proj_err = System([x * y + (b - a) * z^2], [x, y, z], [a, b])
+        @test_throws FiniteException solve(F_proj_err, [s]; p₁ = [1, 0], p₀ = [2, 4])
+
+        # multi-proj
+        @var x y v w a b
+        F_multi_proj = System(
+            [x * y - a * v * w, x^2 - b * v^2],
+            parameters = [a, b],
+            variable_groups = [[x, v], [y, w]],
+        )
+        S = [
+            [
+                -1.808683149843597 + 0.2761582523875564im,
+                -0.9043415749217985 + 0.1380791261937782im,
+                -0.0422893850686111 - 0.7152002569359284im,
+                -0.0422893850686111 - 0.7152002569359283im,
+            ],
+            [
+                -0.36370464807054353 + 0.6777414371333245im,
+                0.18185232403527177 - 0.33887071856666223im,
+                -0.3348980281838583 - 0.7759382220656511im,
+                0.3348980281838583 + 0.7759382220656511im,
+            ],
+        ]
+        res = solve(F_multi_proj, S; start_parameters = [2, 4], target_parameters = [3, 5])
+        @test nsolutions(res) == 2
+        res = solve(ModelKitSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
+        @test nsolutions(res) == 2
+
+        F_multi_proj_err = System(
+            [x * y - a * v * w],
+            parameters = [a, b],
+            variable_groups = [[x, v], [y, w]],
+        )
+        @test_throws FiniteException(1) solve(F_multi_proj_err, S; p₁ = [2, 4], p₀ = [3, 5])
+    end
+
     # @testset "Automatic start systems (solve)" begin
     #     @var x y
     #     affine_square = System([
