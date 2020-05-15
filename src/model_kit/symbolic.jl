@@ -857,6 +857,8 @@ function System(
     System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 
+System(F::System) = F
+
 Base.hash(S::System, u::UInt64) =
     hash(S.expressions, hash(S.variables, hash(S.parameters, u)))
 

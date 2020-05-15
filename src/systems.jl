@@ -15,7 +15,19 @@ The following systems are available:
 """
 abstract type AbstractSystem end
 
+# Base.size(F::AbstractSystem)
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
+
+# ModelKit.variables(F::AbstractSystem)
+ModelKit.parameters(F::AbstractSystem) = nothing
+ModelKit.variable_groups(::AbstractSystem) = nothing
+
+ModelKit.nvariables(F::AbstractSystem) = size(F, 2)
+ModelKit.nparameters(F::AbstractSystem) = length(parameters(F))
+function ModelKit.System(F::AbstractSystem)
+    x, p = variables(F), parameters(F)
+    System(F(x, p), x, p, variable_groups(F))
+end
 
 include("systems/model_kit_system.jl")
 include("systems/fixed_parameter_system.jl")

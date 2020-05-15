@@ -13,6 +13,9 @@ end
 ModelKitSystem(F::ModelKit.System) = ModelKitSystem(ModelKit.compile(F))
 
 Base.size(F::ModelKitSystem) = size(F.system)
+ModelKit.variables(F::ModelKitSystem) = variables(F.system.system)
+ModelKit.parameters(F::ModelKitSystem) = parameters(F.system.system)
+ModelKit.variable_groups(F::ModelKitSystem) = variable_groups(F.system.system)
 
 function Base.show(io::IO, F::ModelKitSystem)
     println(io, typeof(F), ":")

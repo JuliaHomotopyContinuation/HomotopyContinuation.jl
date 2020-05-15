@@ -47,6 +47,10 @@ function Base.show(io::IO, mime::MIME"text/plain", F::RandomizedSystem)
     show(io, mime, F.system)
 end
 
+Base.size(F::RandomizedSystem) = (size(F.A, 1), last(size(F.system)))
+ModelKit.variables(F::RandomizedSystem) = variables(F.system)
+ModelKit.parameters(F::RandomizedSystem) = parameters(F.system)
+ModelKit.variable_groups(F::RandomizedSystem) = variable_groups(F.system)
 
 """
     square_up(F::Union{System, AbstractSystem})
@@ -55,8 +59,6 @@ Creates the [`RandomizedSystem`](@ref) ``\\mathfrak{R}(F(x); N)`` where ``N`` is
 of variables of `F`.
 """
 square_up(F::Union{AbstractSystem,System}) = RandomizedSystem(F, last(size(F)))
-
-Base.size(F::RandomizedSystem) = (size(F.A, 1), last(size(F.system)))
 
 function randomize!(u, A, v::AbstractVector, ncols = 1)
     n, m = size(A, 1), length(v)
