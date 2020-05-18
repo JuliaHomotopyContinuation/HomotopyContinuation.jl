@@ -111,4 +111,17 @@
             )...)
         @test count(is_success, res) == 693
     end
+
+    @testset "Ill-conditioned solution - look's almost diverging" begin
+        sys, q₀ = fano_quintic()
+        solver, starts = solver_startsolutions(
+            sys;
+            target_parameters = q₀,
+            start_system = :polyhedral,
+            seed = 0x56db29a3,
+        )
+        S = collect(starts)
+        res = track(solver.tracker, S[1785])
+        @test is_success(res)
+    end
 end
