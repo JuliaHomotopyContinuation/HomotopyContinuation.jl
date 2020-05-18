@@ -563,7 +563,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerCode.terminated_accuracy_limit
         # elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
         #     state.code = TrackerCode.terminated_ill_conditioned
-    elseif state.segment_stepper.Δs < options.min_step_size
+    elseif state.segment_stepper.Δs < options.min_step_size ||
+           state.segment_stepper.Δs < state.segment_stepper.s * 1e-14
         state.code = TrackerCode.terminated_step_size_too_small
     end
     nothing
