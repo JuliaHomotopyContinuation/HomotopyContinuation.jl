@@ -87,11 +87,12 @@
         1.2021910424897007-1.1148794002014533im,
     ]
 
-    @testset "Fourbar - AD: $AD" for AD = 0:4
+    @testset "Fourbar - AD: $AD" for AD = 0:3
         tracker = Tracker(
             ParameterHomotopy(F, p, q),
             options = TrackerOptions(automatic_differentiation = AD),
         )
-        @test is_success(track(tracker, s, 1, 0))
+        res = track(tracker, s, 1, 0)
+        @test is_success(res)
     end
 end

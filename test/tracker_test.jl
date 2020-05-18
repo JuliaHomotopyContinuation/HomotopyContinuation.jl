@@ -1,5 +1,5 @@
 @testset "Tracker" begin
-    @testset "tracking - AD : $AD" for AD = 0:4
+    @testset "tracking - AD : $AD" for AD = 0:3
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
 
@@ -27,7 +27,7 @@
         @test is_success(track(tracker, s, 1, 0))
     end
 
-    @testset "projective tracking- AD: $AD" for AD = 0:4
+    @testset "projective tracking- AD: $AD" for AD = 0:3
         @var x a y b z
         F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
         H = ParameterHomotopy(F, [1, 0], [2, 4])
@@ -83,7 +83,7 @@
         G = System((0.2 + 0.4im) .* [x^2 - 1, y - 1], [x, y])
         H = StraightLineHomotopy(G, F)
         S = [[1, 1], [-1, 1]]
-        tracker = Tracker(H, options = TrackerOptions(automatic_differentiation = 4))
+        tracker = Tracker(H, options = (automatic_differentiation = 3,))
 
         @test is_success(track(tracker, S[1], 1, 0))
         @test is_success(track(tracker, S[2], 1, 0))

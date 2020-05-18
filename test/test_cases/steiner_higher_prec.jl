@@ -138,7 +138,7 @@
         System(F, [a; vec(y)], vec(v))
     end
 
-    @testset "Steiner - AD: $AD" for AD = 1:4
+    @testset "Steiner - AD: $AD" for AD = 1:3
         tracker = Tracker(
             ParameterHomotopy(F, p, q),
             options = TrackerOptions(automatic_differentiation = AD),

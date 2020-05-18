@@ -54,7 +54,7 @@
 
         graff_tracker = Tracker(
             AffineSubspaceHomotopy(F, A, B),
-            options = TrackerOptions(automatic_differentiation = 4),
+            options = (automatic_differentiation = 3,),
         )
         graff_result = track.(graff_tracker, W)
         @test all(is_success, graff_result)
