@@ -569,7 +569,7 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
     nothing
 end
 
-function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing)
+function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
     update!(
         predictor,
@@ -578,9 +578,7 @@ function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing)
         state.t,
         state.jacobian,
         state.norm,
-        x̂,
-        Δs;
-        dist_to_target = dist_to_target(state.segment_stepper),
+        x̂
     )
 end
 
@@ -743,7 +741,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
-    predict!(x̂, predictor, homotopy, x, t, Δt, jacobian)
+    predict!(x̂, predictor, homotopy, x, t, Δt)
     update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
@@ -762,8 +760,10 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
 
     if debug
+        println("Prediction method: ", predictor.method)
+        println("τ: ", predictor.trust_region)
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
-        println("Pade: ", predictor.pade)
+
     end
     if is_converged(result)
         # move forward
@@ -777,8 +777,16 @@ function step!(tracker::Tracker, debug::Bool = false)
 
         state.ω = max(result.ω, 0.5 * state.ω)
         update_precision!(tracker, result.μ_low)
-        update_predictor!(tracker, x̂, state.Δs_prev)
+        update_predictor!(tracker, x̂, state.Δs_prev, t)
         state.τ = trust_region(predictor)
+        # @show state.Δs_prev
+        # @show local_error(predictor)
+        # # @show state.norm(x, ŷ) / state.Δs_prev^3
+        # @show state.norm(x, x̂)
+        # @show state.norm(x, ŷ)
+        # @show state.norm(x, ẑ)
+        # @show state.norm(x, ŵ)
+        # @show state.norm(x, r̂)
 
         state.accepted_steps += 1
         state.last_steps_failed = 0

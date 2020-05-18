@@ -1,372 +1,460 @@
+#=
+
+Predictor
+
+## Introduction
+
+In an ideal world the predictor only uses an order (2,1) Padé approximant to generate
+an initial guess for the Newton corrector.
+The choice of Padé approximants as predictors is motived by the results in [1].
+In particular, the ability to provide a trust region of the prediction method to
+significantly decrease the likelihood of path jumping.
+additionally, sice Padé approximants are rational functions, these perform very well
+for diverging paths and close to singularities.
+
+Now, for an Padé approximant of order (2,1) the first 3 derivatives are needed.
+The most robust way to achieve this it to use automatic differentiation.
+However, due to significant compile times, we also have to consider the case
+that the Padé approximants are computed by numerical differentiation using the scheme
+derived in [2]. The numerical differentiation scheme only uses O(h^2) approximations
+since we are mostly constrained by the available precision.
+
+However, the smaller the trust region is (i.e. the closer we are to a singularity) the
+smaller we need to take the discretization in the numerical differentiation.
+Thus, the error in the numerical differentiation is inversely corrolated to the trust
+region.
+Additionally, the third derivative needs to be sufficiently accurate. Otherwise
+the predictor doesn't generate sufficiently accurate intial guesses resulting
+in very small step sizes.
+Therefore it can necessary to drop down to an Padé approximant of order (1,1).
+Usually the arithmetic is sufficient to obtain for the second derivative a sufficiently
+accurate approximation.
+
+If also the second derivative is not available we use cubic hermite interpolation.
+For diverging paths this works much much better than (explicit) Runge-Kutta methods.
+The reason that we do not use expl. RK methods is that, then when numerical differentiation
+has to give up, we are in a regime where the ODE of the path is *stiff*. Thus, expl.
+RK just don't yield satisfying results.
+
+
+[1]: A Robust Numerical Path Tracking Algorithm for Polynomial Homotopy Continuation,
+ Telen, Van Barel, Verschelde https://arxiv.org/abs/1909.04984
+
+[2]:Mackens, Wolfgang. "Numerical differentiation of implicitly defined space curves."
+   Computing 41.3 (1989): 237-260.
+=#
+
+
+
+module PredictionMethod
+@enum methods begin
+    Pade21
+    Pade11
+    Hermite
+    Euler
+end
+end
+import .PredictionMethod
+
+
+## Type dispatch on automatic differentiation or numerical differentiation
+struct AD{N} end
+function AD(N::Int)
+    if !(0 ≤ N ≤ 3)
+        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
+    end
+    AD{N}()
+end
+
+
 """
     Predict(H::AbstractHomotopy, ::AD{N}) where {N}
 
 Construct a predictor. The predicor uses a Padé approximant of order (2,1) to produce
 an initial guess for the Newton corrector.
-For this, the predictor tries to compute the local derivatives up to order 4.
-This is done using automatic differentiation for the derivatives up to order `N`.
+For this, the predictor tries to compute the local derivatives up to order 3.
+This is done using automatic differentiation for the derivatives up to order `3`.
 Otherwise numerical differentiation is used.
-If the numerical derivatives up to order 3 cannot be computed with at least some accuracy
-the predictor switches to a Ralston's 2nd order Runge Kutta method.
 """
-mutable struct Predictor{T<:AD}
+Base.@kwdef mutable struct Predictor{T<:AD}
     AD::T
-    ND::NumericalDifferentiation
+
+    method::PredictionMethod.methods
+    order::Int
     trust_region::Float64
     local_error::Float64
-    pade::Bool
-    taylor::BitVector
-    steps_since_pade_attempt::Int
     cond_H_ẋ::Float64
-    # buffer for the computation of derivatives
+
     tx⁰::TaylorVector{1,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
     tx⁴::TaylorVector{5,ComplexF64}
-    trust_tx::Vector{Bool}
+    t::ComplexF64
+    tx_norm::Vector{Float64}
+
+    # finite diff
+    xtemp::Vector{ComplexF64}
     u::Vector{ComplexF64}
-    m₁::Vector{ComplexF64}
-    m₂::Vector{ComplexF64}
-    m₃::Vector{ComplexF64}
-    y⁰::TaylorVector{1,ComplexF64}
+    u₁::Vector{ComplexF64}
+    u₂::Vector{ComplexF64}
+    # for hermite interpolation
+    prev_tx¹::TaylorVector{2,ComplexF64}
+    prev_t::ComplexF64
 end
 
-function Predictor(@nospecialize(H::AbstractHomotopy), ad::AD)
+
+function Predictor(H::AbstractHomotopy, autodiff::AD)
     m, n = size(H)
-    ND = NumericalDifferentiation(m, n)
     tx⁴ = TaylorVector{5}(ComplexF64, n)
     tx⁰ = TaylorVector{1}(tx⁴)
     tx¹ = TaylorVector{2}(tx⁴)
     tx² = TaylorVector{3}(tx⁴)
     tx³ = TaylorVector{4}(tx⁴)
-    trust_tx = [true, true, true, true]
-    u = zeros(ComplexF64, m)
-    m₁ = zeros(ComplexF64, n)
-    m₂ = zeros(ComplexF64, n)
-    m₃ = zeros(ComplexF64, n)
-    y⁰ = TaylorVector{1}(ComplexF64, n)
-
     Predictor(
-        ad,
-        ND,
-        Inf,
-        Inf,
-        true,
-        falses(n),
-        0,
-        1.0,
-        tx⁰,
-        tx¹,
-        tx²,
-        tx³,
-        tx⁴,
-        trust_tx,
-        u,
-        m₁,
-        m₂,
-        m₃,
-        y⁰,
+        AD = autodiff,
+        method = PredictionMethod.Pade21,
+        order = 4,
+        trust_region = Inf,
+        local_error = Inf,
+        cond_H_ẋ = Inf,
+        tx⁰ = tx⁰,
+        tx¹ = tx¹,
+        tx² = tx²,
+        tx³ = tx³,
+        tx⁴ = tx⁴,
+        t = complex(NaN),
+        tx_norm = zeros(4),
+        xtemp = zeros(ComplexF64, n),
+        u = zeros(ComplexF64, m),
+        u₁ = zeros(ComplexF64, m),
+        u₂ = zeros(ComplexF64, m),
+        prev_tx¹ = TaylorVector{2}(ComplexF64, n),
+        prev_t = complex(NaN),
     )
 end
 
 function init!(predictor::Predictor)
-    predictor.steps_since_pade_attempt = 0
-    predictor.pade = true
     predictor.cond_H_ẋ = 1.0
+    predictor.t = predictor.prev_t = NaN
     predictor
 end
 
-function update!(
-    P::Predictor,
-    H::AbstractHomotopy,
-    x,
-    t,
-    jacobian::Jacobian,
-    norm::AbstractNorm,
-    x̂ = nothing, # the predicted value
-    h = nothing; # the last step size
-    dist_to_target::Float64,
-)
-    # If we cannot use a Pade approximant then don't try it in every step again, but
-    # rather only every k steps
-    if P.pade || P.steps_since_pade_attempt ≥ 3
-        P.steps_since_pade_attempt = 0
-        trusted = compute_derivatives!(
-            P,
-            H,
-            x,
-            t,
-            jacobian,
-            norm;
-            dist_to_target = dist_to_target,
-        )
-    else
-        P.steps_since_pade_attempt += 1
-        trusted = compute_derivatives!(
-            P,
-            H,
-            x,
-            t,
-            jacobian,
-            norm;
-            dist_to_target = dist_to_target,
-            only_first = true,
-        )
-    end
-    prev_order = P.pade ? 4 : 3
-    if trusted ≥ 3 && update_pade!(P, norm)
-        P.pade = true
-    else
-        P.local_error = Inf
-        P.trust_region = Inf
-        P.pade = false
-    end
+order(predictor::Predictor) = predictor.order
+local_error(predictor::Predictor) = predictor.local_error
+trust_region(predictor::Predictor) = predictor.trust_region
 
-    if trusted < 4 && (isnothing(x̂) || isnothing(h))
-        # just make a pessimistic guess
-        P.local_error = max(norm(last(vectors(P.tx¹)))^3,  100)
-    elseif !(isnothing(x̂) || isnothing(h))
-        P.local_error = min(P.local_error, norm(x, x̂) / h^prev_order)
-    # x⁴ can be completely wrong, as fallback extrapolate the norm of x⁴ from x³ and τ
-    elseif P.pade
-        P.local_error = min(P.local_error, norm(last(vectors(P.tx³))) / P.trust_region)
-    end
+###################
+### FINITE DIFF ###
+###################
 
-    P
+function g!(u, H, tx::TaylorVector{1}, t, h, xtemp)
+    @inbounds for i = 1:length(tx)
+        xtemp[i] = first(tx[i])
+    end
+    evaluate!(u, H, xtemp, t + h)
+end
+function g!(u, H, tx::TaylorVector{2}, t, h, xtemp)
+    @inbounds for i = 1:length(tx)
+        x, x¹ = tx[i]
+        xtemp[i] = muladd(h, x¹, x)
+    end
+    evaluate!(u, H, xtemp, t + h)
+end
+function g!(u, H, tx::TaylorVector{3}, t, h, xtemp)
+    @inbounds for i = 1:length(tx)
+        x, x¹, x² = tx[i]
+        xtemp[i] = muladd(h, muladd(h, x², x¹), x)
+    end
+    evaluate!(u, H, xtemp, t + h)
 end
 
-function compute_derivatives!(
+function g!(u, H, tx::TaylorVector{4}, t, h, xtemp)
+    @inbounds for i = 1:length(tx)
+        x, x¹, x², x³ = tx[i]
+        xtemp[i] = muladd(h, muladd(h, muladd(h, x³, x²), x¹), x)
+    end
+    evaluate!(u, H, xtemp, t + h)
+end
+
+function finite_diff!(
+    u,
+    predictor::Predictor,
+    H::AbstractHomotopy,
+    x::TaylorVector,
+    t,
+    h;
+    order::Int,
+)
+    @unpack u₁, u₂, xtemp = predictor
+
+    g!(u₁, H, x, t, h, xtemp)
+    g!(u₂, H, x, t, -h, xtemp)
+
+    hk = h^order
+    if iseven(order)
+        u .= 0.5 .* (u₁ .+ u₂) ./ hk
+    else
+        u .= 0.5 .* (u₁ .- u₂) ./ hk
+    end
+end
+
+
+function finite_diff_taylor!(
+    u,
+    ::Val{N},
+    predictor::Predictor,
+    H::AbstractHomotopy,
+    x::TaylorVector{N},
+    t;
+    prev_λ::Float64 = NaN,
+) where {N}
+    # Use not machine precision to account for some error in the evaluation
+    ε = 1.4210854715202004e-14
+    # λ should be a scaling factor such that the derivatives of x(t/λ) are of of the same
+    # order of magnitude. We can either compute this by balancing the derivatives or
+    # re-using the trust region size of the previous step
+    if N == 1
+        λ = isfinite(prev_λ) ? prev_λ : 1.0
+    elseif N == 2
+        λ = isfinite(prev_λ) ? prev_λ : predictor.tx_norm[1] / predictor.tx_norm[2]
+    elseif N == 3
+        λ = predictor.tx_norm[2] / predictor.tx_norm[3]
+    end
+    # truncation err = (1/λ)^2*h^2
+    # round-off err   = ε/h^N
+    # -->
+    # Compute optimal ĥ by
+    #      round-off err = trunc err
+    # <=>  ελ^-N/ĥ^3 = λ^(-N-2)*ĥ^2
+    # <=>  (ε λ^2)^(1/(N+2)) = ĥ
+    # To be a little bit pessimistic, reduce λ by a quarter
+    λ *= 0.25
+
+    h = (ε * λ^2)^(1 / (N + 2))
+    # h should be at most half λ
+    h = min(h, 0.5λ)
+    # Check that truncation and round-off error are both acceptable
+    trunc_err = h^2 / λ^2
+    rnd_err = ε / h^N
+    err = trunc_err + rnd_err
+    if trunc_err + rnd_err > 0.01 || !isfinite(h)
+        return false, err
+    end
+
+    finite_diff!(u, predictor, H, x, t, h; order = N)
+
+    return true, err^2
+end
+
+
+
+
+
+## Default handling ignores incremental
+taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
+    taylor!(u, v, H, tx, t)
+@generated function taylor!(u, v::Val{M}, predictor::Predictor{AD{N}}, H, tx, t) where {M,N}
+    if M ≤ N
+        quote
+            taylor!(u, v, H, tx, t, true)
+            true, eps()
+        end
+    else
+        quote
+            finite_diff_taylor!(u, v, predictor, H, tx, t; prev_λ = predictor.trust_region)
+        end
+    end
+end
+
+
+"""
+    update!(
+        P::Predictor,
+        H::AbstractHomotopy,
+        x,
+        t,
+        jacobian::Jacobian,
+        norm::AbstractNorm,
+        x̂ = nothing,
+    )
+
+Upadte the predictor with the new solution `(x,t)` of `H(x,t) = 0`.
+This computes new local derivatives and chooses an appriopriate prediction method.
+"""
+function update!(
     predictor::Predictor,
     H::AbstractHomotopy,
     x,
     t,
     J::Jacobian,
-    norm::AbstractNorm;
-    dist_to_target::Float64,
-    only_first::Bool = false,
+    norm::AbstractNorm,
+    x̂ = nothing, # the predicted value
 )
-    @unpack AD, ND, u, tx⁰, tx¹, tx², tx³, tx⁴, trust_tx = predictor
+    @unpack u, tx⁰, tx¹, tx², tx³, tx⁴, xtemp, tx_norm = predictor
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
-    τ = local_error(predictor)
-    x⁰ .= x
-    taylor!(u, Val(1), H, tx⁰, t, AD, ND; dist_to_target = dist_to_target)
-    u .= .-u
-    LA.ldiv!(x¹, J, u)
-    # Check if we have to do iterative refinment for all the others as well
-    δ = fixed_precision_iterative_refinement!(x¹, workspace(J), u, InfNorm())
-    predictor.cond_H_ẋ = δ / eps()
-    if δ > 1e-12
-        iterative_refinement!(x¹, J, u, InfNorm(); tol = 1e-12, max_iters = 5)
-    end
-    only_first && return 1
 
-    trust_tx[2] = taylor!(
-        u,
-        Val(2),
-        H,
-        tx¹,
-        t,
-        AD,
-        ND;
-        dist_to_target = dist_to_target,
-        incremental = true,
-    )
-    trust_tx[2] || (trust_tx[3] = trust_tx[4] = false; return 1)
-    u .= .-u
-    LA.ldiv!(x², J, u)
-    δ > 1e-8 && iterative_refinement!(x², J, u, norm; tol = 1e-8, max_iters = 4)
-
-    trust_tx[3] = taylor!(
-        u,
-        Val(3),
-        H,
-        tx²,
-        t,
-        AD,
-        ND;
-        dist_to_target = dist_to_target,
-        incremental = true,
-    )
-    trust_tx[3] || (trust_tx[4] = false; return 2)
-
-    u .= .-u
-    LA.ldiv!(x³, J, u)
-    δ > 1e-6 && iterative_refinement!(x³, J, u, norm; tol = 1e-6, max_iters = 3)
-
-    trust_tx[4] = taylor!(
-        u,
-        Val(4),
-        H,
-        tx³,
-        t,
-        AD,
-        ND;
-        dist_to_target = dist_to_target,
-        incremental = true,
-    )
-    trust_tx[4] || return 3
-    u .= .-u
-    LA.ldiv!(x⁴, J, u)
-
-    return 4
-end
-
-function update_pade!(pred::Predictor{AD{M}}, norm::AbstractNorm) where {M}
-    tx = pred.tx⁴
-    local_err_vec = pred.m₁
-    trust_tx = pred.trust_tx
-    # This is an adaption of the algorithm outlined in
-    # Robust Pad{\'e} approximation via SVD (Trefethen et al)
-    τ = Inf
-    local_error = Inf
-    if M ≥ 3
-        λ_min = 3.814697265625e-6 # exp2(-18)
-        for i = 1:length(tx)
-            x, x¹, x², x³, x⁴ = tx[i]
-            # @show tx[i]
-            c, c¹, c², c³ = abs.((x, x¹, x², x³))
-            λ = exp(0.1 * (3 * log(c) + log(c¹) - log(c²) - 3 * log(c³)))
-            tol = 1e-14 * c
-            # @show i, c, λ
-            if !isfinite(λ) || λ * c¹ ≤ tol || λ^2 * c² ≤ tol || λ^3 * c³ ≤ tol
-                pred.taylor[i] = true
-            else
-                pred.taylor[i] = false
-                τᵢ = c² / c³
-                τᵢ < τ && (τ = τᵢ)
-            end
-        end
-    elseif trust_tx[3]
-        # check that the ratio (x¹ / x²) / (x² / x³) doesn't differ by more than a
-        # factor of 10 ≈ exp(2.3)
-        d = pred.ND.logabs_norm[2] - 2 * pred.ND.logabs_norm[3] + pred.ND.logabs_norm[4]
-        abs(d) > 2.3 && return false
-        τ = exp(pred.ND.logabs_norm[3] - pred.ND.logabs_norm[4])
-        τ2 = τ^2
-        τ3 = τ2 * τ
-        for i = 1:length(tx)
-            x, x¹, x², x³, x⁴ = tx[i]
-            tol = 1e-14 * abs(x)
-            if abs(x²) * τ2 ≤ tol || abs(x³) * τ3 ≤ tol
-                pred.taylor[i] = true
-            else
-                pred.taylor[i] = false
-            end
-        end
-    end
-    isnan(τ) && return false
-
-    if trust_tx[4]
-        for i = 1:length(tx)
-            x, x¹, x², x³, x⁴ = tx[i]
-            if pred.taylor[i]
-                local_err_vec[i] = x⁴
-            else
-                e = x⁴ - x³ * (x³ / x²)
-                if !isnan(e)
-                    local_err_vec[i] = e
-                end
-            end
-        end
-
-        local_error = norm(local_err_vec)
-    end
-
-    pred.local_error = nanmin(local_error, Inf)
-    pred.trust_region = nanmin(τ, Inf)
-
-    true
-end
-
-
-function predict!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
-    if pred.pade
-        predict_pade!(x̂, pred, H, Δt)
+    predictor.prev_tx¹ .= predictor.tx¹
+    predictor.prev_t, predictor.t = predictor.t, t
+    # prev_order = predictor.order
+    # prev_method = predictor.method
+    # prev_trust_region = predictor.trust_region
+    if isnothing(x̂)
+        predictor.local_error = NaN
     else
-        predict_ralston2!(x̂, pred, H, x, t, Δt, J)
+        Δs = fast_abs(t - predictor.prev_t)
+        predictor.local_error = norm(x̂, x) / Δs^predictor.order
+        # # check if we should downgrade to Pade11 since the derivatives are better
+        # if predictor.method == prev_method == PredictionMethod.Pade21
+        #
+        # end
     end
-    nothing
+
+    x⁰ .= x
+    predictor.t = t
+    tx_norm[1] = norm(x)
+
+    # Compute ẋ
+    trust, err = taylor!(u, Val(1), predictor, H, tx⁰, t)
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    # Check error made in the linear algebra
+    δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
+    predictor.cond_H_ẋ = δ / eps()
+    tol_δ₁ = max(1e-10, err)
+    δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+    tx_norm[2] = norm(xtemp)
+    x¹ .= xtemp
+
+    trust, err = taylor!(u, Val(2), predictor, H, tx¹, t)
+    if !trust
+        # Use cubic hermite
+        @label use_hermite
+        if isfinite(predictor.prev_t)
+            predictor.method = PredictionMethod.Hermite
+            predictor.order = 3
+            predictor.trust_region = tx_norm[1] / tx_norm[2]
+            if isnan(predictor.local_error)
+                predictor.local_error = (tx_norm[2] / tx_norm[1])^3
+            end
+            return predictor
+        else
+            predictor.method = PredictionMethod.Euler
+            predictor.order = 2
+            predictor.trust_region = tx_norm[1] / tx_norm[2]
+            if isnan(predictor.local_error)
+                predictor.local_error = (tx_norm[2] / tx_norm[1])^2
+            end
+            return predictor
+        end
+    end
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    tol_δ₂ = max(1e-8, err)
+    δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
+    tx_norm[3] = norm(xtemp)
+    x² .= xtemp
+
+    trust, err = taylor!(u, Val(3), predictor, H, tx², t)
+    if !trust
+        @label use_pade11
+        # only trust tx_norm[2] / tx_norm[3] if tx_norm[1] / tx_norm[2] is of the same order
+        if 0.1 ≤ (tx_norm[1] / tx_norm[2]) / (tx_norm[2] / tx_norm[3]) ≤ 10
+            # Use Padé (1,1) predictor
+            predictor.method = PredictionMethod.Pade11
+            predictor.order = 3
+            predictor.trust_region = tx_norm[2] / tx_norm[3]
+            if isnan(predictor.local_error)
+                predictor.local_error = (tx_norm[3] / tx_norm[2])^3
+            end
+            return predictor
+        else
+            @goto use_hermite
+        end
+    end
+
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    tol_δ₃ = max(1e-6, err)
+    δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
+    tx_norm[4] = norm(xtemp)
+    x³ .= xtemp
+
+    if 0.1 ≤ (tx_norm[2] / tx_norm[3]) / (tx_norm[3] / tx_norm[4]) ≤ 10
+        # Use Padé (2,1) predictor
+        predictor.method = PredictionMethod.Pade21
+        predictor.order = 4
+        predictor.trust_region = tx_norm[3] / tx_norm[4]
+        if isnan(predictor.local_error)
+            predictor.local_error = (tx_norm[4] / tx_norm[3])^4
+        end
+    else
+        @goto use_pade11
+    end
+
+    predictor
 end
 
-function predict_pade!(x̂, pred::Predictor, H, Δt)
-    tx = pred.tx³
-    for i = 1:length(tx)
-        x, x¹, x², x³ = tx[i]
-        if pred.taylor[i]
-            x̂[i] = x + Δt * (x¹ + Δt * x²)
-        else
-            δᵢ = 1 - Δt * x³ / x²
-            x̂[i] = x + Δt * (x¹ + Δt * x² / δᵢ)
+predict!(x̂, pred::Predictor, H, x, t, Δt) = predict!(x̂, pred, pred.method, H, x, t, Δt)
+function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, t, Δt)
+    if method == PredictionMethod.Pade21
+        λ = pred.trust_region
+        λ² = λ^2
+        λ³ = λ^3
+        tol = 1e-8
+        for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
+            c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
+            # check if only taylor series is used
+            τ = tol * √(c^2 + (c¹ * λ)^2 + (c² * λ²)^2 + (c³ * λ³)^2)
+            if c³ * λ³ ≤ τ || c² * λ² ≤ τ
+                x̂[i] = x + Δt * (x¹ + Δt * x²)
+            else
+                δᵢ = 1 - Δt * x³ / x²
+                x̂[i] = x + Δt * (x¹ + Δt * x² / δᵢ)
+            end
+        end
+    elseif method == PredictionMethod.Pade11
+        λ = pred.trust_region
+        λ² = λ^2
+        tol = 1e-8
+        for (i, (x, x¹, x²)) in enumerate(pred.tx²)
+            c, c¹, c² = fast_abs.((x, x¹, x²))
+            # check if only taylor series is used
+            τ = tol * √(c^2 + (c¹ * λ)^2 + (c² * λ²)^2)
+            if c¹ * λ ≤ τ || c² * λ² ≤ τ
+                x̂[i] = x + Δt * x¹
+            else
+                δᵢ = 1 - Δt * x² / x¹
+                x̂[i] = x + Δt * x¹ / δᵢ
+            end
+        end
+    elseif method == PredictionMethod.Hermite
+        cubic_hermite!(x̂, pred.prev_tx¹, pred.prev_t, pred.tx¹, t, t + Δt)
+    elseif method == PredictionMethod.Euler
+        for (i, (x, x¹)) in enumerate(pred.tx¹)
+            x̂[i] = x + Δt * x¹
         end
     end
 
     x̂
 end
 
-function predict_ralston2!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
-    @unpack u, y⁰, m₁, m₂, m₃ = pred
-    # 0 | 0 0 0
-    m₁ .= last(vectors(pred.tx¹))
-
-    # 2/3 | 2/3 0 0
-    h = 2Δt / 3
-    @. y⁰ = x + h * m₁
-    x̂ .= first.(y⁰)
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + h)
-    taylor!(u, Val(1), H, y⁰, t + h, pred.AD, pred.ND; dist_to_target = abs(Δt))
-    u .= .-u
-    LA.ldiv!(m₂, updated!(J), u)
-    if pred.cond_H_ẋ * eps() > 1e-12
-        iterative_refinement!(m₂, J, u, InfNorm(); tol = 1e-12, max_iters = 7)
+function cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
+    if isreal(t₀) && isreal(t₁) && isreal(t)
+        _cubic_hermite!(x̂, tx¹₀, real(t₀), tx¹₁, real(t₁), real(t))
+    else
+        _cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
     end
-
-    #   | 1/4 3/4
-    @. x̂ = x + 0.25 * Δt * (m₁ + 3m₂)
+end
+@inline function _cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
+    s = (t - t₀) / (t₁ - t₀)
+    h₀₀ = (1 + 2s) * (1 - s)^2
+    h₁₀ = (t - t₀) * (1 - s)^2
+    h₀₁ = s^2 * (3 - 2s)
+    h₁₁ = (t - t₀) * s * (s - 1)
+    @inbounds for i in eachindex(x̂)
+        x̂[i] = h₀₀ * tx¹₀[i, 1] + h₁₀ * tx¹₀[i, 2] + h₀₁ * tx¹₁[i, 1] + h₁₁ * tx¹₁[i, 2]
+    end
     x̂
 end
-
-function predict_ralston4!(x̂, pred::Predictor, H, x, t, Δt, J::Jacobian)
-    @unpack u, y⁰, m₁, m₂, m₃ = pred
-    m₁ .= last(vectors(pred.tx¹))
-
-    @. y⁰ = x + 0.4 * Δt * m₁
-    x̂ .= first.(y⁰)
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + 0.4Δt)
-    taylor!(u, Val(1), H, y⁰, t + 0.4Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
-    u .= .-u
-    LA.ldiv!(m₂, updated!(J), u)
-
-    @. y⁰ = x + Δt * (0.29697761 * m₁ + 0.15875964 * m₂)
-    x̂ .= first.(y⁰)
-    h = 0.45573725 * Δt
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + h)
-    taylor!(u, Val(1), H, y⁰, t + h, pred.AD, pred.ND; dist_to_target = abs(Δt))
-    u .= .-u
-    LA.ldiv!(m₃, updated!(J), u)
-
-    m₄ = x̂
-    @. y⁰ = x + Δt * (0.21810040 * m₁ - 3.05096516 * m₂ + 3.83286476m₃)
-    x̂ .= first.(y⁰)
-    evaluate_and_jacobian!(u, matrix(J), H, x̂, t + Δt)
-    taylor!(u, Val(1), H, y⁰, t + Δt, pred.AD, pred.ND; dist_to_target = abs(Δt))
-    u .= .-u
-    LA.ldiv!(m₄, updated!(J), u)
-
-    for i in eachindex(x̂)
-        x̂[i] =
-            x[i] +
-            Δt * (
-                0.17476028 * m₁[i] - 0.55148066 * m₂[i] +
-                1.20553560 * m₃[i] +
-                0.17118478 * m₄[i]
-            )
-    end
-
-    x̂
-end
-
-order(P::Predictor) = P.pade ? 4 : 3
-local_error(predictor::Predictor) = predictor.local_error
-trust_region(predictor::Predictor) = predictor.trust_region
