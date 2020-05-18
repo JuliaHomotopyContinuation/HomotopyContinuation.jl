@@ -20,9 +20,22 @@
         @test count(r -> r.winding_number == 3, res) == 12
     end
 
-    @testset "Wilkinson 12" begin
+    @testset "Singular 1" begin
+        # 1 singular solution with multiplicity 3
+        @var x y
+        z = 1
+        F = [
+            x^2 + 2 * y^2 + 2 * im * y * z,
+            (18 + 3 * im) * x * y + 7 * im * y^2 - (3 - 18 * im) * x * z - 14 * y * z -
+                7 * im * z^2,
+        ]
+        result = solve(System(F); start_system = :total_degree)
+        @test nsingular(result) == 3
+        @test nresults(result; only_nonsingular = true) == 1
+    end
+
+    @testset "Wilkinson $d" for d in [16]
         @var x
-        d = 12
         f = System([expand(prod(x - i for i = 1:d))])
         res = track.(total_degree(f)...)
         @test all(is_success, res)
