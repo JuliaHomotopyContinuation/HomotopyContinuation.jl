@@ -235,11 +235,15 @@ using HomotopyContinuation2.ModelKit
         @test sprint(show, F) == show_F
         @test degrees(F) == [3, 2]
 
-        T = ModelKit.compile(F)
+        T = ModelKit.compile(F; optimizations = false)
         F2 = ModelKit.interpret(T)
         @test F == F2
         @test sprint(show, T) == "Compiled: $show_F"
         @test size(T) == size(F) == (2, 2)
+
+        T2 = ModelKit.compile(F; optimizations = true)
+        F3 = ModelKit.interpret(T2)
+        @test expand.(F.expressions) == expand.(F3.expressions)
     end
 
     @testset "System variables groups + homogeneous" begin
