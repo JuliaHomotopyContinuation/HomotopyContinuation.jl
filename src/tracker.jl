@@ -764,8 +764,8 @@ function step!(tracker::Tracker, debug::Bool = false)
         println("Prediction method: ", predictor.method)
         println("τ: ", predictor.trust_region)
         printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
-
     end
+
     if is_converged(result)
         # move forward
         x .= x̄
@@ -773,21 +773,10 @@ function step!(tracker::Tracker, debug::Bool = false)
         step_success!(state.segment_stepper)
         state.accuracy = result.accuracy
         state.μ = max(result.accuracy, eps())
-
-        no_ω_update = result.ω == state.ω
-
         state.ω = max(result.ω, 0.5 * state.ω)
         update_precision!(tracker, result.μ_low)
         update_predictor!(tracker, x̂, state.Δs_prev, t)
         state.τ = trust_region(predictor)
-        # @show state.Δs_prev
-        # @show local_error(predictor)
-        # # @show state.norm(x, ŷ) / state.Δs_prev^3
-        # @show state.norm(x, x̂)
-        # @show state.norm(x, ŷ)
-        # @show state.norm(x, ẑ)
-        # @show state.norm(x, ŵ)
-        # @show state.norm(x, r̂)
 
         state.accepted_steps += 1
         state.last_steps_failed = 0
