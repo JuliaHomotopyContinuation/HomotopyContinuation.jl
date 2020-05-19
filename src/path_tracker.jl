@@ -482,7 +482,6 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         color = tracker.state.extended_prec ? :blue : :yellow
         printstyled("t = ", t, "  t′ = ", real(tracker.state.t′), "\n", color = color)
         κ = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
-        @show tracker.predictor.cond_H_ẋ
         print("κ = ")
         Printf.@printf("%.3e (%.3e)\n", κ, κ / state.cond_eg_start)
         println(state.val)
@@ -518,7 +517,6 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
         end
-        @show state.prediction
         if res == CAUCHY_SUCCESS
             if state.winding_number === nothing
                 @label save_cauchy_result
@@ -530,10 +528,8 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
                 state.cauchy_failures += 1
                 @goto save_cauchy_result
             elseif state.winding_number == m
-                d =
-                    distance(state.prediction, state.solution, InfNorm()) /
-                    maximum(weights(tracker.state.norm))
-                @show d, state.accuracy, acc_est
+                w = weights(tracker.state.norm)
+                d = distance(state.prediction, state.solution, InfNorm()) / maximum(w)
                 if d < 100 * max(state.accuracy, acc_est)
                     state.solution .= state.prediction
                     state.accuracy = d
