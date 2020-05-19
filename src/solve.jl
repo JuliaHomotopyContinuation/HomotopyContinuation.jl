@@ -48,7 +48,7 @@ function solver_startsolutions(
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
     path_tracker_options = PathTrackerOptions(),
-    kwargs...
+    kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
     H = start_target_homotopy(G, F; kwargs...)
@@ -79,7 +79,7 @@ function parameter_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups) .- 1)
+            H = on_affine_chart(H, length.(vargroups,) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -99,9 +99,9 @@ function start_target_homotopy(
 
     size(F) == size(G) || error("The provided systems don't have the same size.")
     is_homogeneous(f) == is_homogeneous(g) ||
-    error("The provided systems are not both homogeneous.")
+        error("The provided systems are not both homogeneous.")
     variable_groups(f) == variable_groups(g) ||
-    error("The provided systems don't decalare the same variable groups.")
+        error("The provided systems don't decalare the same variable groups.")
 
     m, n = size(F)
 
@@ -113,7 +113,7 @@ function start_target_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups) .- 1)
+            H = on_affine_chart(H, length.(vargroups,) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))

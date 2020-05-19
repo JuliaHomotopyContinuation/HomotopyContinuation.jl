@@ -54,7 +54,7 @@ module PredictionMethod
     Euler
 end
 end
-import .PredictionMethod
+using .PredictionMethod: PredictionMethod
 
 
 ## Type dispatch on automatic differentiation or numerical differentiation
@@ -295,9 +295,9 @@ function update!(
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
 
-    @inbounds for i in 1:length(xtemp)
-        predictor.prev_tx¹[i,1] = predictor.tx¹[i,1]
-        predictor.prev_tx¹[i,2] = predictor.tx¹[i,2]
+    @inbounds for i = 1:length(xtemp)
+        predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
+        predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
     end
     predictor.prev_t, predictor.t = predictor.t, t
     # prev_order = predictor.order

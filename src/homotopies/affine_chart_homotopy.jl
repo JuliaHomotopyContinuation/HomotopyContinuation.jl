@@ -23,7 +23,7 @@ function on_affine_chart(H::Homotopy, proj_dims = nothing)
 end
 function on_affine_chart(H::AbstractHomotopy, proj_dims = nothing)
     if proj_dims === nothing
-        proj_dims = [size(H,2) - 1]
+        proj_dims = [size(H, 2) - 1]
     end
     N = length(proj_dims)
     chart = PVector(randn(ComplexF64, sum(proj_dims) + N), tuple(proj_dims...))

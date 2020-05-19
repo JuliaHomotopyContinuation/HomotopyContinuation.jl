@@ -128,10 +128,26 @@ function newton(
             if norm_Δxᵢ < a * norm_Δxᵢ₋₁
                 norm_Δxᵢ₋₁ = norm_Δxᵢ
                 a *= a
-            elseif i > min_contraction_iters || norm_Δxᵢ < rel_tol * norm_x || norm_Δxᵢ < abs_tol
-                return NewtonResult(:success, x, norm_Δxᵢ, norm(r), i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+            elseif i > min_contraction_iters ||
+                   norm_Δxᵢ < rel_tol * norm_x ||
+                   norm_Δxᵢ < abs_tol
+                return NewtonResult(
+                    :success,
+                    x,
+                    norm_Δxᵢ,
+                    norm(r),
+                    i,
+                    norm_Δxᵢ / norm_Δxᵢ₋₁,
+                )
             else
-                return NewtonResult(:rejected, x, norm_Δxᵢ, norm(r), i, norm_Δxᵢ / norm_Δxᵢ₋₁)
+                return NewtonResult(
+                    :rejected,
+                    x,
+                    norm_Δxᵢ,
+                    norm(r),
+                    i,
+                    norm_Δxᵢ / norm_Δxᵢ₋₁,
+                )
             end
         elseif i == 1 && (
             norm_Δxᵢ > max_rel_norm_first_update * norm_x ||

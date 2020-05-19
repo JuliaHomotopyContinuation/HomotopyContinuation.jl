@@ -10,34 +10,3 @@
     end
 
 end
-
-
-@time poly_res = solve(sys; target_parameters = q₀, start_system = :polyhedral,
-    # tracker_options = (parameters = :conservative,),
-    # path_tracker_options = PathTrackerOptions(val_at_infinity_tol = 1e-8),
-        seed = 0x56db29a3)
-
-
-# succ = path_number.(results(poly_res))
-
-succ2 = path_number.(results(poly_res))
-
-
-setdiff(succ, succ2)
-
-solver, starts =solver_startsolutions(sys; target_parameters = q₀, start_system = :polyhedral,
-   # tracker_options = (parameters = :conservative,),
-   # path_tracker_options = PathTrackerOptions(val_at_infinity_tol = 1e-8),
-       seed = 0x56db29a3)
-S = collect(starts)
-
-
-solver.tracker.generic_tracker.options.min_coord_growth = 1000
-track(solver.tracker, S[1785]; debug = true)
-
-
-
-F = six_revolute()
-
-res = solve(F; start_system = :total_degree)
-a x

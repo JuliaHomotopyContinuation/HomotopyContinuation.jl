@@ -120,7 +120,7 @@ function compute_angular_part!(
 
     γ = angle.(b) ./ 2π
 
-    μ = [BigFloat(0.0; precision = prec) for i in 1:n]
+    μ = [BigFloat(0.0; precision = prec) for i = 1:n]
     α = γᵢ = BigFloat(0.0; precision = prec)
     αk = γᵢⱼ = BigFloat(0.0; precision = prec)
     m = BigFloat(2.0; precision = prec)
@@ -135,11 +135,11 @@ function compute_angular_part!(
             add!(μ[j], μ[j], γᵢⱼ)
         end
     end
-    αs = [BigFloat(0.0; precision = prec) for i in 1:n]
+    αs = [BigFloat(0.0; precision = prec) for i = 1:n]
     # solve triangular system
     for i = 1:d̂, j = n:-1:1
         add!(α, μ[j], Int64(unit_roots_table[j, i]))
-        div!(α, α, H[j,j])
+        div!(α, α, H[j, j])
         for k = n:-1:(j+1)
             mul!(αk, αs[k], H[k, j])
             div!(αk, αk, H[j, j])
@@ -380,16 +380,9 @@ function hnf!(A::AbstractMatrix{BigInt}, U::AbstractMatrix{BigInt})
     nothing
 end
 
-cdiv_q!(x::BigInt, a::BigInt, b::BigInt) = (
-    ccall(
-        (:__gmpz_cdiv_q, :libgmp),
-        Cvoid,
-        (MPZ.mpz_t, MPZ.mpz_t, MPZ.mpz_t),
-        x,
-        a,
-        b,
-    ); x
-)
+cdiv_q!(x::BigInt, a::BigInt, b::BigInt) =
+    (ccall((:__gmpz_cdiv_q, :libgmp), Cvoid, (MPZ.mpz_t, MPZ.mpz_t, MPZ.mpz_t), x, a, b);
+    x)
 
 function reduce_off_diagonal!(
     A::AbstractMatrix{BigInt},

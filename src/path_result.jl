@@ -83,7 +83,7 @@ Base.@kwdef mutable struct PathResult
     winding_number::Union{Nothing,Int}
     extended_precision::Bool
     path_number::Union{Nothing,Int}
-    start_solution
+    start_solution::Any
     last_path_point::Tuple{Vector{ComplexF64},Float64}
     valuation::Union{Nothing,Vector{Float64}}
     ω::Float64
@@ -241,7 +241,7 @@ is larger than `tol`.
 is_singular(r::PathResult; tol::Float64 = 1e10) = is_singular(r, tol)
 function is_singular(r::PathResult, tol::Real)
     (unpack(r.condition_jacobian, 1.0) > tol || unpack(winding_number(r), 1) > 1) &&
-    is_success(r)
+        is_success(r)
 end
 
 """

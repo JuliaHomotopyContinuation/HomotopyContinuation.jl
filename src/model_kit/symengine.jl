@@ -142,12 +142,7 @@ function to_string(x::Basic)
     if b.ptr == C_NULL
         return ""
     end
-    a = ccall(
-        (:basic_str_julia, libsymengine),
-        Cstring,
-        (Ref{ExpressionRef},),
-        b,
-    )
+    a = ccall((:basic_str_julia, libsymengine), Cstring, (Ref{ExpressionRef},), b)
     string = unsafe_string(a)
     ccall((:basic_str_free, libsymengine), Nothing, (Cstring,), a)
     return string
@@ -205,8 +200,7 @@ macro init_constant(op, libnm)
         ccall($tup, Nothing, (Ref{Expression},), $op_name)
         finalizer(free!, $op_name)
         $(
-            op != :im ?
-                :(SYMENGINE_CONSTANTS[$op_name] = Base.MathConstants.$op) :
+            op != :im ? :(SYMENGINE_CONSTANTS[$op_name] = Base.MathConstants.$op) :
                 :(nothing)
         )
     end
@@ -226,8 +220,7 @@ end
 ################
 
 ## main ops
-for (op, inplace, libnm) in
-    [(:+, :add!, :add), (:-, :sub!, :sub), (:*, :mul!, :mul)]
+for (op, inplace, libnm) in [(:+, :add!, :add), (:-, :sub!, :sub), (:*, :mul!, :mul)]
     # $(Expr(:., :Base, QuoteNode(op)))
     @eval begin
         function $(inplace)(a::Expression, b1::Basic, b2::Basic)
@@ -305,13 +298,7 @@ end
 
 function Base.convert(::Type{Expression}, s::String)
     a = Expression()
-    ccall(
-        (:symbol_set, libsymengine),
-        Nothing,
-        (Ref{Expression}, Ptr{Int8}),
-        a,
-        s,
-    )
+    ccall((:symbol_set, libsymengine), Nothing, (Ref{Expression}, Ptr{Int8}), a, s)
     return a
 end
 Base.convert(::Type{Expression}, s::Symbol) = convert(Expression, string(s))
@@ -323,21 +310,12 @@ Base.convert(::Type{Expression}, x::Irrational{:catalan}) = __catalan
 
 
 # basic number types
-for (f, T) in [
-    (:integer_set_si, Int),
-    (:integer_set_ui, UInt),
-    (:real_double_set_d, Float64),
-]
+for (f, T) in
+    [(:integer_set_si, Int), (:integer_set_ui, UInt), (:real_double_set_d, Float64)]
     @eval begin
         function Base.convert(::Type{Expression}, x::$T)
             a = Expression()
-            ccall(
-                ($(QuoteNode(f)), libsymengine),
-                Nothing,
-                (Ref{Expression}, $T),
-                a,
-                x,
-            )
+            ccall(($(QuoteNode(f)), libsymengine), Nothing, (Ref{Expression}, $T), a, x)
             return a
         end
     end
@@ -345,13 +323,7 @@ end
 
 function Base.convert(::Type{Expression}, x::BigInt)
     a = Expression()
-    ccall(
-        (:integer_set_mpz, libsymengine),
-        Nothing,
-        (Ref{Expression}, Ref{BigInt}),
-        a,
-        x,
-    )
+    ccall((:integer_set_mpz, libsymengine), Nothing, (Ref{Expression}, Ref{BigInt}), a, x)
     return a
 end
 
@@ -375,10 +347,8 @@ function Base.convert(::Type{Expression}, x::BigFloat)
         return a
     end
 end
-Base.convert(::Type{Expression}, x::Int32) =
-    convert(Expression, convert(Int, x))
-Base.convert(::Type{Expression}, x::UInt32) =
-    convert(Expression, convert(UInt, x))
+Base.convert(::Type{Expression}, x::Int32) = convert(Expression, convert(Int, x))
+Base.convert(::Type{Expression}, x::UInt32) = convert(Expression, convert(UInt, x))
 
 Base.convert(::Type{Expression}, x::Integer) = Expression(BigInt(x))
 Base.convert(::Type{Expression}, x::Rational) =
@@ -465,7 +435,10 @@ end
 
 const REAL_NUMBER_TYPES = [:Integer, :RealDouble, :Rational, :RealMPFR]
 const COMPLEX_NUMBER_TYPES = [:Complex, :ComplexDouble, :ComplexMPC]
-const NUMBER_TYPES = [REAL_NUMBER_TYPES; COMPLEX_NUMBER_TYPES]
+const NUMBER_TYPES = [
+    REAL_NUMBER_TYPES
+    COMPLEX_NUMBER_TYPES
+]
 
 function type_id(s::Basic)
     ccall((:basic_get_type, libsymengine), UInt, (Ref{ExpressionRef},), s)
@@ -539,8 +512,7 @@ function free!(x::ExprVec)
 end
 
 Base.eltype(v::ExprVec) = ExpressionRef
-Base.length(s::ExprVec) =
-    ccall((:vecbasic_size, libsymengine), UInt, (Ptr{Cvoid},), s.ptr)
+Base.length(s::ExprVec) = ccall((:vecbasic_size, libsymengine), UInt, (Ptr{Cvoid},), s.ptr)
 Base.size(s::ExprVec) = (length(s),)
 
 function Base.getindex(v::ExprVec, n)
@@ -611,12 +583,7 @@ function Base.convert(::Type{BigFloat}, c::Basic)
 end
 
 function Base.convert(::Type{Float64}, c::Basic)
-    return ccall(
-        (:real_double_get_d, libsymengine),
-        Cdouble,
-        (Ref{ExpressionRef},),
-        c,
-    )
+    return ccall((:real_double_get_d, libsymengine), Cdouble, (Ref{ExpressionRef},), c)
 end
 
 function Base.real(x::Basic)
@@ -722,12 +689,7 @@ end
 
 function free!(x::ExpressionMap)
     if x.ptr != C_NULL
-        ccall(
-            (:mapbasicbasic_free, libsymengine),
-            Nothing,
-            (Ptr{Cvoid},),
-            x.ptr,
-        )
+        ccall((:mapbasicbasic_free, libsymengine), Nothing, (Ptr{Cvoid},), x.ptr)
         x.ptr = C_NULL
     end
 end
@@ -747,7 +709,7 @@ function ExpressionMap(
     args...,
 )
     size(xs) == size(ys) ||
-    throw(ArgumentError("Substitution arguments don't have the same size."))
+        throw(ArgumentError("Substitution arguments don't have the same size."))
     for (x, y) in zip(xs, ys)
         D[x] = y
     end
@@ -763,8 +725,7 @@ function Base.length(s::ExpressionMap)
     ccall((:mapbasicbasic_size, libsymengine), Int, (Ptr{Cvoid},), s.ptr)
 end
 
-Base.setindex!(s::ExpressionMap, v::Number, k::Basic) =
-    setindex!(s, Expression(v), k)
+Base.setindex!(s::ExpressionMap, v::Number, k::Basic) = setindex!(s, Expression(v), k)
 function Base.setindex!(s::ExpressionMap, v::Basic, k::Basic)
     ccall(
         (:mapbasicbasic_insert, libsymengine),

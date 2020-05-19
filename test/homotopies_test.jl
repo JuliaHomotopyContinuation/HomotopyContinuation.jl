@@ -32,10 +32,7 @@
         end
 
         HC2.evaluate_and_jacobian!(u, U, H, v, t)
-        @test U ≈ differentiate(f, [x, y])(
-            [x, y] => v,
-            [a, b, c] => t * p + (1 - t) * q,
-        )
+        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
     end
 
     @testset "ModelKitHomotopy" begin
@@ -75,16 +72,9 @@
         end
 
         HC2.evaluate_and_jacobian!(u, U, H, v, t)
-        @test U ≈ differentiate(f, [x, y])(
-            [x, y] => v,
-            [a, b, c] => t * p + (1 - t) * q,
-        )
+        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
-        H = ModelKit.Homotopy(
-            [(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2],
-            [x, y],
-            a,
-        )
+        H = ModelKit.Homotopy([(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2], [x, y], a)
         @test ModelKitHomotopy(ModelKit.compile(H)) isa ModelKitHomotopy
     end
 end

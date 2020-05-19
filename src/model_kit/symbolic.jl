@@ -108,7 +108,7 @@ function buildvar(var; unique::Bool = false)
     else
         isa(var, Expr) || error("Expected $var to be a variable name")
         Base.Meta.isexpr(var, :ref) ||
-        error("Expected $var to be of the form varname[idxset]")
+            error("Expected $var to be of the form varname[idxset]")
         (2 ≤ length(var.args)) || error("Expected $var to have at least one index set")
         varname = var.args[1]
         if unique
@@ -378,7 +378,12 @@ julia> c
  q₆
 ```
 """
-function dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false, coeff_name::Symbol = gensym(:c))
+function dense_poly(
+    vars::AbstractVector{Variable},
+    d::Integer;
+    homogeneous::Bool = false,
+    coeff_name::Symbol = gensym(:c),
+)
     M = monomials(vars, d; homogeneous = homogeneous)
     c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
@@ -831,7 +836,7 @@ struct System
         check_vars_params(exprs, vars, params)
         if !isnothing(variable_groups)
             vars == reduce(vcat, variable_groups) ||
-            throw(ArgumentError("Variable groups and variables don't match."))
+                throw(ArgumentError("Variable groups and variables don't match."))
         end
         new(exprs, vars, params, variable_groups)
     end
@@ -910,8 +915,8 @@ end
 
 function Base.:(==)(F::System, G::System)
     F.expressions == G.expressions &&
-    F.variables == G.variables &&
-    F.parameters == G.parameters
+        F.variables == G.variables &&
+        F.parameters == G.parameters
 end
 
 Base.size(F::System) = (length(F.expressions), length(F.variables))
@@ -1016,14 +1021,26 @@ Base.push!(F::System, f::Expression) = (push!(F.expressions, f); F)
 Base.append!(F::System, f::AbstractVector{Expression}) = (append!(F.expressions, f); F)
 
 function Base.intersect(F::System, G::System)
-    exprs = [F.expressions; G.expressions]
-    vars = [F.variables; setdiff(G.variables, F.variables)]
-    params = [F.parameters; setdiff(G.parameters, F.parameters)]
+    exprs = [
+        F.expressions
+        G.expressions
+    ]
+    vars = [
+        F.variables
+        setdiff(G.variables, F.variables)
+    ]
+    params = [
+        F.parameters
+        setdiff(G.parameters, F.parameters)
+    ]
     System(exprs, vars, params, F.variable_groups)
 end
 function Base.intersect(F::System, G::AbstractVector{<:Expression})
     exprs = [F.expressions; G]
-    vars = [F.variables; setdiff(variables(G), F.variables)]
+    vars = [
+        F.variables
+        setdiff(variables(G), F.variables)
+    ]
     System(exprs, vars, F.parameters, F.variable_groups)
 end
 Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
@@ -1173,8 +1190,8 @@ end
 
 function Base.:(==)(H::Homotopy, G::Homotopy)
     H.expressions == G.expressions &&
-    H.variables == G.variables &&
-    H.parameters == G.parameters
+        H.variables == G.variables &&
+        H.parameters == G.parameters
 end
 
 Base.size(H::Homotopy) = (length(H.expressions), length(H.variables))

@@ -212,8 +212,8 @@ using HomotopyContinuation2.ModelKit
         f, c = dense_poly([x, y], 3)
         @test length(c) == 10
         g = rand_poly(Float64, [x, y], 3)
-        @test subs(f, c => coefficients(g, [x,y])) == g
-        _, coeffs = exponents_coefficients(g, [x,y])
+        @test subs(f, c => coefficients(g, [x, y])) == g
+        _, coeffs = exponents_coefficients(g, [x, y])
         @test subs(f, c => coeffs) == g
     end
 
@@ -249,15 +249,15 @@ using HomotopyContinuation2.ModelKit
     @testset "System variables groups + homogeneous" begin
         @var x y z
         f = System([
-            (x^2 + y^2 + x * y - 3z^2) * (x + 3z),
-            (x^2 + y^2 + x * y - 3z^2) * (y - x + 2z),
+            (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
+            (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
             2x + 5y - 3z,
         ])
         @test is_homogeneous(f)
         multi_degrees(f) == [1 1; 2 0]
 
         @var x y z v w
-        g = System([x * y - 2v * w, x^2 - 4 * v^2], variable_groups = [[x,v], [y,w]])
+        g = System([x * y - 2v * w, x^2 - 4 * v^2], variable_groups = [[x, v], [y, w]])
         @test is_homogeneous(g)
         multi_degrees(g) == [1 1; 2 0]
     end
@@ -440,10 +440,14 @@ using HomotopyContinuation2.ModelKit
         y2 .= ẍ
         y3 .= x3
 
-        dt1 = ModelKit.taylor!(zeros(Expression, 4), Val(1), TH, TaylorVector{1}(tx3), t, [γ])
-        dt2 = ModelKit.taylor!(zeros(Expression, 4), Val(2), TH, TaylorVector{2}(tx3), t, [γ])
-        dt3 = ModelKit.taylor!(zeros(Expression, 4), Val(3), TH, TaylorVector{3}(tx3), t, [γ])
-        dt4 = ModelKit.taylor!(zeros(Expression, 4), Val(4), TH, TaylorVector{4}(tx3), t, [γ])
+        dt1 =
+            ModelKit.taylor!(zeros(Expression, 4), Val(1), TH, TaylorVector{1}(tx3), t, [γ])
+        dt2 =
+            ModelKit.taylor!(zeros(Expression, 4), Val(2), TH, TaylorVector{2}(tx3), t, [γ])
+        dt3 =
+            ModelKit.taylor!(zeros(Expression, 4), Val(3), TH, TaylorVector{3}(tx3), t, [γ])
+        dt4 =
+            ModelKit.taylor!(zeros(Expression, 4), Val(4), TH, TaylorVector{4}(tx3), t, [γ])
 
         @var λ
         Hd1 = subs(H.expressions, t => t + λ)
@@ -468,11 +472,11 @@ using HomotopyContinuation2.ModelKit
 
     @testset "taylor! - system" begin
         @var x[1:2] ẋ[1:2] ẍ[1:2] x3[1:2] p[1:2] ṗ[1:2]
-        f = [(x[1] + x[2])^3 + x[1]^2 + x[1] + 5x[2] + 3p[1], 2 * x[1]^2 + p[2]]
+        f = [(x[1] + x[2])^3 + x[1]^2 + x[1] + 5 * x[2] + 3 * p[1], 2 * x[1]^2 + p[2]]
         F = System(f, x, p)
         TF = ModelKit.compile(F)
 
-        tx = TaylorVector{4}([x' ; ẋ' ; ẍ' ; x3'])
+        tx = TaylorVector{4}([x'; ẋ'; ẍ'; x3'])
         tv = TaylorVector{5}(Expression, 2)
         v, v1, v2, v3, v4 = vectors(tv)
         @var λ

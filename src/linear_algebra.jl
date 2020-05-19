@@ -487,7 +487,7 @@ function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
             r[i] += A[i, j] * x_j
         end
     end
-    @inbounds for i in 1:m
+    @inbounds for i = 1:m
         r[i] -= b[i]
     end
     r

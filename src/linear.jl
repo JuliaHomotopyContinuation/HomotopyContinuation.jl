@@ -255,7 +255,7 @@ AffineSubspace(E::AffineExtrinsic) = AffineSubspace(E, AffineIntrinsic(E))
 function AffineSubspace(A::AbstractMatrix{T}, b::AbstractVector{T}) where {T}
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
     0 < size(A, 1) < size(A, 2) ||
-    throw(ArgumentError("Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b."))
+        throw(ArgumentError("Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b."))
 
     AffineSubspace(AffineExtrinsic(Matrix(float.(A)), Vector(float.(b))))
 end
@@ -365,8 +365,8 @@ function rand_affine_subspace(
     real::Bool = false,
 )
     !isnothing(dim) ||
-    !isnothing(codim) ||
-    throw(ArgumentError("Neither `dim` or `codim` specified."))
+        !isnothing(codim) ||
+        throw(ArgumentError("Neither `dim` or `codim` specified."))
 
     if !isnothing(dim)
         0 < dim < n || throw(ArgumentError("`dim` has to be between 0 and `n`."))
@@ -422,7 +422,10 @@ function coord_change(
     ::Coordinates{:IntrinsicStiefel},
     u,
 )
-    [u; 1 / A.intrinsic.Y[end, end]]
+    [
+        u
+        1 / A.intrinsic.Y[end, end]
+    ]
 end
 function coord_change(
     A::AffineSubspace,
@@ -573,6 +576,6 @@ See also Corollary 4.3 in [^LKK19].
 geodesic(A::AffineSubspace, B::AffineSubspace) = geodesic(A.intrinsic, B.intrinsic)
 function geodesic(A::AffineIntrinsic, B::AffineIntrinsic)
     Q, Θ, U = geodesic_svd(A, B)
-    t -> A.Y * U * LA.diagm(cos.(t .* Θ)) * U' + Q * LA.diagm(sin.(t .* Θ)) * U'
+    t -> A.Y * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U'
 end
 #

@@ -22,7 +22,7 @@ struct CompositionSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSyste
 end
 function CompositionSystem(g::AbstractSystem, f::AbstractSystem)
     size(g, 2) == size(f, 1) ||
-    throw(ArgumentError("Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match."))
+        throw(ArgumentError("Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match."))
     f_u = zeros(ComplexF64, size(f, 1))
     f_ū = zeros(ComplexDF64, size(f, 1))
     f_U = zeros(ComplexF64, size(f))
@@ -120,10 +120,8 @@ compose(g::AbstractSystem, f::System) = CompositionSystem(g, ModelKitSystem(f))
 function compose(g::System, f::System)
     pg = parameters(g)
     pf = parameters(f)
-    isempty(pf) ||
-    isempty(pg) ||
-    pf == pg ||
-    throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
+    (isempty(pf) || isempty(pg) || pf == pg) ||
+        throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
     CompositionSystem(ModelKitSystem(g), ModelKitSystem(f))
 end
 import Base: ∘

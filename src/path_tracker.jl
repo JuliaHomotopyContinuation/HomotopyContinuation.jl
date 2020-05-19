@@ -76,7 +76,7 @@ The possible states a `PathTracker` can be in:
 * `PathTrackerCode.terminated_step_size_too_small`
 """
 module PathTrackerCode
-import ..TrackerCode
+using ..TrackerCode: TrackerCode
 
 @enum codes begin
     tracking
@@ -453,7 +453,8 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
 
     at_infinity =
         options.at_infinity_check &&
-        at_infinity_tol < val_at_infinity_tol && (
+        at_infinity_tol < val_at_infinity_tol &&
+        (
             validate_coord_growth(
                 state.val,
                 state.col_scaling,
@@ -466,7 +467,8 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     at_zero =
         options.at_infinity_check &&
         options.zero_is_at_infinity &&
-        at_infinity_tol < val_at_infinity_tol && (
+        at_infinity_tol < val_at_infinity_tol &&
+        (
             validate_coord_growth(
                 state.val,
                 weights(tracker.state.norm),
