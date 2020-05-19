@@ -208,15 +208,13 @@ function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVect
     nothing
 end
 
-function taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+function taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, v, t, incr::Bool)
     γ, γ¹ = taylor_γ!(H, t)
     x, x¹ = vectors(H.tx¹)
-    v, = vectors(tv)
 
-    H.v .= v
-    LA.mul!(H.x, γ, H.v)
+    LA.mul!(H.x, γ, v)
     x .= H.x
-    LA.mul!(H.x, γ¹, H.v)
+    LA.mul!(H.x, γ¹, v)
     x¹ .= H.x
     taylor!(u, Val(1), H.system, H.tx¹)
 

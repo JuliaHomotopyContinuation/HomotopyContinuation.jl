@@ -712,6 +712,34 @@ end
     _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
 end
 
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::Nothing = nothing,
+) where {M}
+    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::AbstractVector,
+) where {M}
+    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::TaylorVector{DP},
+) where {M,DP}
+    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
+end
+
 """
     taylor!(
         u::AbstractVector,
@@ -753,6 +781,36 @@ end
     p::TaylorVector{DP},
 ) where {M,D,DP}
     _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::Nothing = nothing,
+) where {M}
+    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::AbstractVector,
+) where {M}
+    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{1},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::TaylorVector{DP},
+) where {M,DP}
+    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
 end
 
 # non-inplace

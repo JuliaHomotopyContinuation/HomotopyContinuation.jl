@@ -99,13 +99,7 @@ function evaluate_and_jacobian!(
     nothing
 end
 
-function taylor!(
-    u,
-    v::Val{N},
-    F::AffineChartSystem,
-    tx::TaylorVector{N},
-    p = nothing,
-) where {N}
+function taylor!(u, v::Val, F::AffineChartSystem, tx, p = nothing)
     u .= zero(eltype(u))
     taylor!(u, v, F.system, tx, p)
     # affine chart part is always zero since it is an affine linear form

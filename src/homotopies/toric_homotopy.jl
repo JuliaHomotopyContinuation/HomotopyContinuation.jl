@@ -213,9 +213,8 @@ function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
 end
 
 
-function taylor!(u, v::Val{1}, H::ToricHomotopy, tx::TaylorVector, t)
-    H.x .= first.(tx)
-    ModelKit.evaluate!(u, H.system, H.x, dt_coeffs!(H, t))
+function taylor!(u, v::Val{1}, H::ToricHomotopy, x::Vector, t)
+    ModelKit.evaluate!(u, H.system, x, dt_coeffs!(H, t))
 end
 
 function taylor_coeffs!(H::ToricHomotopy, t::Real)

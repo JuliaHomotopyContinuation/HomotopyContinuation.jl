@@ -70,7 +70,7 @@ _get_tu(C::CompositionSystem, ::Val{2}) = C.tu²
 _get_tu(C::CompositionSystem, ::Val{3}) = C.tu³
 _get_tu(C::CompositionSystem, ::Val{4}) = C.tu⁴
 
-function taylor!(u, v::Val, C::CompositionSystem, tx::TaylorVector, p = nothing)
+function taylor!(u, v::Val, C::CompositionSystem, tx, p = nothing)
     tu = _get_tu(C, v)
     taylor!(tu.data, v, C.f, tx, p)
     taylor!(u, v, C.g, tu, p)

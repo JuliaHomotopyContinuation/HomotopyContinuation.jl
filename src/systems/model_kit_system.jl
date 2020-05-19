@@ -26,5 +26,5 @@ end
 evaluate!(u, F::ModelKitSystem, x, p = nothing) = ModelKit.evaluate!(u, F.system, x, p)
 evaluate_and_jacobian!(u, U, F::ModelKitSystem, x, p = nothing) =
     ModelKit.evaluate_and_jacobian!(u, U, F.system, x, p)
-taylor!(u, v::Val, F::ModelKitSystem, tx::TaylorVector, p = nothing) =
+taylor!(u, v::Val, F::ModelKitSystem, tx, p = nothing) =
     ModelKit.taylor!(u, v, F.system, tx, p)

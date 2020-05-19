@@ -44,8 +44,6 @@ RK just don't yield satisfying results.
    Computing 41.3 (1989): 237-260.
 =#
 
-
-
 module PredictionMethod
 @enum methods begin
     Pade21
@@ -148,11 +146,8 @@ trust_region(predictor::Predictor) = predictor.trust_region
 ### FINITE DIFF ###
 ###################
 
-function g!(u, H, tx::TaylorVector{1}, t, h, xtemp)
-    @inbounds for i = 1:length(tx)
-        xtemp[i] = first(tx[i])
-    end
-    evaluate!(u, H, xtemp, t + h)
+function g!(u, H, x::Vector, t, h, xtemp)
+    evaluate!(u, H, x, t + h)
 end
 function g!(u, H, tx::TaylorVector{2}, t, h, xtemp)
     @inbounds for i = 1:length(tx)
@@ -177,15 +172,7 @@ function g!(u, H, tx::TaylorVector{4}, t, h, xtemp)
     evaluate!(u, H, xtemp, t + h)
 end
 
-function finite_diff!(
-    u,
-    predictor::Predictor,
-    H::AbstractHomotopy,
-    x::TaylorVector,
-    t,
-    h;
-    order::Int,
-)
+function finite_diff!(u, predictor::Predictor, H::AbstractHomotopy, x, t, h; order::Int)
     @unpack u₁, u₂, xtemp = predictor
 
     g!(u₁, H, x, t, h, xtemp)
@@ -205,7 +192,7 @@ function finite_diff_taylor!(
     ::Val{N},
     predictor::Predictor,
     H::AbstractHomotopy,
-    x::TaylorVector{N},
+    x,
     t;
     prev_λ::Float64 = NaN,
 ) where {N}
@@ -247,13 +234,8 @@ function finite_diff_taylor!(
     return true, err^2
 end
 
-
-
-
-
 ## Default handling ignores incremental
-taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) =
-    taylor!(u, v, H, tx, t)
+taylor!(u, v::Val, H::AbstractHomotopy, tx, t, incremental::Bool) = taylor!(u, v, H, tx, t)
 @generated function taylor!(u, v::Val{M}, predictor::Predictor{AD{N}}, H, tx, t) where {M,N}
     if M ≤ N
         quote
@@ -266,7 +248,6 @@ taylor!(u, v::Val, H::AbstractHomotopy, tx::TaylorVector, t, incremental::Bool) 
         end
     end
 end
-
 
 """
     update!(
@@ -294,24 +275,16 @@ function update!(
     @unpack u, tx⁰, tx¹, tx², tx³, tx⁴, xtemp, tx_norm = predictor
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
-
     @inbounds for i = 1:length(xtemp)
         predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
         predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
     end
     predictor.prev_t, predictor.t = predictor.t, t
-    # prev_order = predictor.order
-    # prev_method = predictor.method
-    # prev_trust_region = predictor.trust_region
     if isnothing(x̂)
         predictor.local_error = NaN
     else
         Δs = fast_abs(t - predictor.prev_t)
         predictor.local_error = norm(x̂, x) / Δs^predictor.order
-        # # check if we should downgrade to Pade11 since the derivatives are better
-        # if predictor.method == prev_method == PredictionMethod.Pade21
-        #
-        # end
     end
 
     x⁰ .= x
@@ -319,7 +292,7 @@ function update!(
     tx_norm[1] = norm(x)
 
     # Compute ẋ
-    trust, err = taylor!(u, Val(1), predictor, H, tx⁰, t)
+    trust, err = taylor!(u, Val(1), predictor, H, x, t)
     u .= .-u
     LA.ldiv!(xtemp, J, u)
     # Check error made in the linear algebra
