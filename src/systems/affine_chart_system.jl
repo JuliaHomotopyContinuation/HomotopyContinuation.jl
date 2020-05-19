@@ -12,15 +12,25 @@ struct AffineChartSystem{S<:AbstractSystem,N} <: AbstractSystem
     chart::PVector{ComplexF64,N}
 end
 
+ModelKit.variables(F::AffineChartSystem) = variables(F.system)
+ModelKit.parameters(F::AffineChartSystem) = parameters(F.system)
+ModelKit.variable_groups(F::AffineChartSystem) = variable_groups(F.system)
+
 """
     on_affine_chart(F::Union{System,AbstractSystem}, dimensions)
 
 Construct an `AffineChartSystem` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.
 """
-on_affine_chart(F::System, dims = [size(F, 2) - 1]) =
+on_affine_chart(F::System, dims = nothing) =
     on_affine_chart(ModelKitSystem(F), dims)
-function on_affine_chart(F::AbstractSystem, dims = [size(F, 2) - 1])
+function on_affine_chart(F::AbstractSystem, dims = nothing)
+    vargroups = variable_groups(F)
+    if vargroups === nothing
+        dims = [size(F, 2) - 1]
+    else
+        dims = length.(vargroups) .- 1
+    end
     chart = PVector(randn(ComplexF64, sum(dims) + length(dims)), tuple(dims...))
     AffineChartSystem(F, chart)
 end

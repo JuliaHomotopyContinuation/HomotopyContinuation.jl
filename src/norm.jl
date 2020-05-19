@@ -172,6 +172,9 @@ function distance(x::AbstractVector, y::AbstractVector, ::InfNorm)
     end
 end
 function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm})
+    inf_distance(x, y, weights(w))
+end
+function inf_distance(x::AbstractVector, y::AbstractVector, w::AbstractVector)
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2((x[1] - y[1]) / w[1])

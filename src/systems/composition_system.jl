@@ -38,6 +38,10 @@ end
 
 Base.size(C::CompositionSystem) = (size(C.g, 1), size(C.f, 2))
 
+ModelKit.variables(F::CompositionSystem) = variables(F.f)
+ModelKit.parameters(F::CompositionSystem) = parameters(F.f)
+ModelKit.variable_groups(F::CompositionSystem) = variable_groups(F.f)
+
 function Base.show(io::IO, C::CompositionSystem)
     println(io, "Composition G ∘ F:")
     println(io, "F: ")

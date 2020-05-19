@@ -39,14 +39,14 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
 """
 Base.@kwdef mutable struct PathTrackerOptions
     endgame_start::Float64 = 0.1
-    max_endgame_steps::Int = 500
+    max_endgame_steps::Int = 2000
     # eg parameter
     min_cond::Float64 = 1e4
     min_coord_growth::Float64 = 100.0
     zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
     # valuation etc
-    val_finite_tol::Float64 = 1e-2
+    val_finite_tol::Float64 = 1e-3
     val_at_infinity_tol::Float64 = 1e-3
 
     # singular solutions parameters
@@ -428,9 +428,7 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         zero_is_finite = !options.zero_is_at_infinity,
     )
 
-    # finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
-    # at_infinity_tol = options.val_at_infinity_tol,
-    # @show val_finite
+
     if val_finite || (min(at_zero_tol, at_infinity_tol) < sqrt(options.val_at_infinity_tol))
         state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
     end
@@ -441,23 +439,42 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
 
     κ_min = options.min_cond
 
+    val_at_infinity_tol = begin
+        if κ > κ_min^3
+            cbrt(options.val_at_infinity_tol)
+        elseif κ > κ_min^2
+            sqrt(options.val_at_infinity_tol)
+        elseif κ > κ_min
+            options.val_at_infinity_tol
+        else
+            0.0
+        end
+    end
+
     at_infinity =
         options.at_infinity_check &&
-        (
-            (κ > κ_min && at_infinity_tol < options.val_at_infinity_tol) ||
-            (κ > κ_min^2 && at_infinity_tol < sqrt(options.val_at_infinity_tol)) ||
-            (κ > κ_min^3 && at_infinity_tol < cbrt(options.val_at_infinity_tol))
-        ) && (
-            max_ratio(weights(tracker.state.norm), state.col_scaling) >
-            options.min_coord_growth || tracker.state.extended_prec
+        at_infinity_tol < val_at_infinity_tol && (
+            validate_coord_growth(
+                state.val,
+                state.col_scaling,
+                weights(tracker.state.norm);
+                finite_tol = options.val_finite_tol,
+                at_infinity_tol = val_at_infinity_tol,
+                tol = options.min_coord_growth,
+            ) || tracker.state.extended_prec
         )
     at_zero =
+        options.at_infinity_check &&
         options.zero_is_at_infinity &&
-        (κ > κ_min && at_zero_tol < options.val_at_infinity_tol) ||
-        (κ > κ_min^2 && at_zero_tol < sqrt(options.val_at_infinity_tol)) ||
-        (κ > κ_min^3 && at_zero_tol < cbrt(options.val_at_infinity_tol)) && (
-            min_ratio(weights(tracker.state.norm), state.col_scaling) <
-            inv(options.min_coord_growth) || tracker.state.extended_prec
+        at_infinity_tol < val_at_infinity_tol && (
+            validate_coord_growth(
+                state.val,
+                weights(tracker.state.norm),
+                state.col_scaling;
+                finite_tol = options.val_finite_tol,
+                at_infinity_tol = val_at_infinity_tol,
+                tol = options.min_coord_growth,
+            ) || tracker.state.extended_prec
         )
     finite = val_finite && κ > options.min_cond
 
@@ -465,13 +482,6 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
         color = tracker.state.extended_prec ? :blue : :yellow
         printstyled("t = ", t, "  t′ = ", real(tracker.state.t′), "\n", color = color)
         κ = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
-        A∞ = inf_norm(
-            workspace(tracker.state.jacobian),
-            state.row_scaling,
-            state.col_scaling,
-        )
-        @show maximum(weights(tracker.state.norm) ./ state.col_scaling)
-        @show A∞
         print("κ = ")
         Printf.@printf("%.3e (%.3e)\n", κ, κ / state.cond_eg_start)
         println(state.val)
@@ -518,8 +528,9 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
                 state.cauchy_failures += 1
                 @goto save_cauchy_result
             elseif state.winding_number == m
-                d = tracker.state.norm(state.prediction, state.solution)
-                if d < 10 * max(state.accuracy, acc_est)
+                w = weights(tracker.state.norm)
+                d = distance(state.prediction, state.solution, InfNorm()) / maximum(w)
+                if d < 100 * max(state.accuracy, acc_est)
                     state.solution .= state.prediction
                     state.accuracy = d
                     state.cond = LA.cond(
@@ -531,6 +542,8 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
                     )
                     return (state.code = PathTrackerCode.success)
                 else
+                    state.accuracy = acc_est
+                    state.solution .= state.prediction
                     state.cauchy_failures += 1
                     @goto save_cauchy_result
                 end

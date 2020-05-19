@@ -661,6 +661,33 @@ function inf_norm(
     norm
 end
 
+function max_min_row(
+    WS::MatrixWorkspace,
+    d_l::Union{Nothing,Vector{<:Real}} = nothing,
+    d_r::Union{Nothing,Vector{<:Real}} = nothing,
+)
+    max_row = -Inf
+    min_row = Inf
+    A = WS.A
+    n, m = size(A)
+    for i = 1:n
+        normᵢ = 0.0
+        for j = 1:m
+            if d_r isa Nothing
+                normᵢ += fast_abs(A[i, j])
+            else
+                normᵢ += fast_abs(A[i, j]) * d_r[j]
+            end
+        end
+        if !(d_l isa Nothing)
+            normᵢ *= d_l[i]
+        end
+        max_row = max(max_row, normᵢ)
+        min_row = min(min_row, normᵢ)
+    end
+    max_row, min_row
+end
+
 """
     cond(A::MatrixWorkspace,
          d_l::Union{Nothing,Vector{<:Real}} = nothing,
@@ -725,8 +752,8 @@ function egcond(
         end
         rmax / rmin
     else
-        a = inf_norm(WS, d_l, d_r)
-        inverse_inf_norm_est(WS, d_l, d_r) * max(a, 1 / a)
+        max_row, min_row = max_min_row(WS, d_l, d_r)
+        inverse_inf_norm_est(WS, d_l, d_r) * max(max_row, 1 / min_row)
     end
 end
 

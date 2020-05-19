@@ -157,7 +157,7 @@ function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
     for (i, val_xᵢ) in enumerate(val_x)
         abs_Δ = abs(Δval_x[i])
         ε∞ = max(abs(1.0 - val_tẋ[i] / val_xᵢ), abs(Δval_x[i] / val_xᵢ))
-        if isnan(ε∞)
+        if isnan(abs_Δ)
             finite = false
             continue
         end
@@ -192,4 +192,28 @@ function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
         at_infinity_tol = at_infinity_tol,
         at_zero_tol = at_zero_tol,
     )
+end
+
+
+function validate_coord_growth(
+    val::Valuation,
+    scale_old,
+    scale_new;
+    finite_tol::Float64,
+    at_infinity_tol::Float64,
+    tol::Float64,
+)
+    @unpack val_x, val_tẋ, Δval_x = val
+
+    for (i, val_xᵢ) in enumerate(val_x)
+        ε∞ = max(abs(1.0 - val_tẋ[i] / val_xᵢ), abs(Δval_x[i] / val_xᵢ))
+        # ∞ check
+        if val_xᵢ + ε∞ < -finite_tol && ε∞ < at_infinity_tol
+            if scale_new[i] / scale_old[i] > tol
+                return true
+            end
+        end
+    end
+
+    false
 end
