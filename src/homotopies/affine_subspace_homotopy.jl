@@ -84,7 +84,11 @@ Base.size(H::AffineSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
 
 Update the homotopy `H` to track from the affine subspace `start` to `target`.
 """
-function set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+function set_subspaces!(
+    H::AffineSubspaceHomotopy,
+    start::AffineSubspace,
+    target::AffineSubspace,
+)
     Q, Θ, U = geodesic_svd(target, start)
     copy!(H.start, start)
     copy!(H.target, target)
@@ -99,7 +103,7 @@ end
 
 function set_solution!(u::Vector, H::AffineSubspaceHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x_stiefel) - 1) ||
-    throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
+        throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
     for i = 1:length(x)
         H.x_stiefel[i] = x[i]
     end

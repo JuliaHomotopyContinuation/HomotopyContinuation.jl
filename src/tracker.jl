@@ -572,15 +572,7 @@ end
 
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(
-        predictor,
-        homotopy,
-        state.x,
-        state.t,
-        state.jacobian,
-        state.norm,
-        x̂
-    )
+    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
 end
 
 """

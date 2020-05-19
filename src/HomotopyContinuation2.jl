@@ -20,10 +20,7 @@ include("ModelKit.jl")
 include("DoubleDouble.jl")
 using .DoubleDouble
 
-using ProjectiveVectors:
-    PVector,
-    dims,
-    dimension_indices
+using ProjectiveVectors: PVector, dims, dimension_indices
 
 include("utils.jl")
 include("norm.jl")

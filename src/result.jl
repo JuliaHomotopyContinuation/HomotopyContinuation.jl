@@ -168,10 +168,10 @@ function results(
         for
         r in R if
         (!only_real || is_real(r, real_tol)) &&
-        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-        (!only_singular || is_singular(r, singular_tol)) &&
-        (!only_finite || is_finite(r)) &&
-        (multiple_results || !is_multiple_result(r, R))
+            (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
+            (!only_singular || is_singular(r, singular_tol)) &&
+            (!only_finite || is_finite(r)) &&
+            (multiple_results || !is_multiple_result(r, R))
     ]
 end
 
@@ -203,10 +203,10 @@ function nresults(
 )
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
-        (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-        (!only_singular || is_singular(r, singular_tol)) &&
-        (!only_finite || isfinite(r)) &&
-        (multiple_results || !is_multiple_result(r, R))
+            (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
+            (!only_singular || is_singular(r, singular_tol)) &&
+            (!only_finite || isfinite(r)) &&
+            (multiple_results || !is_multiple_result(r, R))
     end
 end
 
@@ -408,9 +408,11 @@ function Base.show(io::IO, x::Result)
         "($(s.real_singular) real)",
     )
     s.at_infinity > 0 &&
-    println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
-    s.excess_solution > 0 &&
-    println(io, "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))")
+        println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
+    s.excess_solution > 0 && println(
+        io,
+        "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))",
+    )
     println(io, "• $(ntracked(x)) paths tracked")
     print(io, "• random seed: ")
     show(io, seed(x))

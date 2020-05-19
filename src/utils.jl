@@ -5,7 +5,7 @@ export FiniteException
 ###
 struct KeywordArgumentException <: Exception
     key::Symbol
-    given
+    given::Any
     msg::String
 end
 function KeywordArgumentException(key, given)

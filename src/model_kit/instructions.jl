@@ -423,29 +423,33 @@ function _impl_taylor_bivariate(K, M, N, op; inline = true)
         $(untuple(:x, :tx, M))
         $(untuple(:y, :ty, N))
         $(ModelKit.to_expr(dlist))
-        $(Expr(
-            :tuple,
-            id,
-            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
-        ))
+        $(Expr(:tuple, id, ((d = diff_map[id, k];
+        d === nothing ? :(zero(x)) : d) for k = 1:K)...))
     end
 end
 
 
-@generated function taylor(::Type{Val{op}}, ::Type{Val{K}}, tx::NTuple{M}, ty::NTuple{N}) where {op, K,M,N}
+@generated function taylor(
+    ::Type{Val{op}},
+    ::Type{Val{K}},
+    tx::NTuple{M},
+    ty::NTuple{N},
+) where {op,K,M,N}
     _impl_taylor_bivariate(K, M, N, op)
 end
 
 make_ntuple(t) = t
 make_ntuple(t::Number) = (t,)
-make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A,B)}, t)
-make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A,B,C)}, t)
-make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} = convert(NTuple{4,promote_type(A,B,C,D)}, t)
-make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} = convert(NTuple{5,promote_type(A,B,C,D,E)}, t)
+make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A, B)}, t)
+make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A, B, C)}, t)
+make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} =
+    convert(NTuple{4,promote_type(A, B, C, D)}, t)
+make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} =
+    convert(NTuple{5,promote_type(A, B, C, D, E)}, t)
 
 taylor(op::Type{T1}, v::Type{T2}, tx, ty) where {T1,T2} =
     taylor(op::Type{T1}, v::Type{T2}, make_ntuple(tx), make_ntuple(ty))
-function taylor(op::Type{T1}, v::Type{T2}, tx)  where {T1,T2}
+function taylor(op::Type{T1}, v::Type{T2}, tx) where {T1,T2}
     taylor(op::Type{T1}, v::Type{T2}, make_ntuple(tx))
 end
 
@@ -460,15 +464,17 @@ function _impl_taylor_pow(K, M)
     quote
         $(untuple(:x, :tx, M))
         $(ModelKit.to_expr(dlist))
-        $(Expr(
-            :tuple,
-            id,
-            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
-        ))
+        $(Expr(:tuple, id, ((d = diff_map[id, k];
+        d === nothing ? :(zero(x)) : d) for k = 1:K)...))
     end
 end
 
-@generated function taylor(::Type{Val{:^}}, ::Type{Val{K}}, tx::NTuple{M}, r::Integer) where {K,M}
+@generated function taylor(
+    ::Type{Val{:^}},
+    ::Type{Val{K}},
+    tx::NTuple{M},
+    r::Integer,
+) where {K,M}
     _impl_taylor_pow(K, M)
 end
 
@@ -483,11 +489,8 @@ function _impl_taylor_sqr(K, M)
     quote
         $(untuple(:x, :tx, M))
         $(ModelKit.to_expr(dlist))
-        $(Expr(
-            :tuple,
-            id,
-            ((d = diff_map[id, k]; d === nothing ? :(zero(x)) : d) for k = 1:K)...,
-        ))
+        $(Expr(:tuple, id, ((d = diff_map[id, k];
+        d === nothing ? :(zero(x)) : d) for k = 1:K)...))
     end
 end
 

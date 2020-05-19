@@ -226,7 +226,7 @@ function polyhedral(
     only_torus = only_non_zero,
 )
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
-    throw(ArgumentError("Number of terms do not coincide."))
+        throw(ArgumentError("Number of terms do not coincide."))
 
     min_vecs = minimum.(support, dims = 2)
     if !all(iszero, min_vecs)
@@ -243,8 +243,20 @@ function polyhedral(
                     push!(targets, target_coeffs[i])
                     push!(supp, A)
                 else
-                    push!(starts, [start_coeffs[i]; randn(ComplexF64)])
-                    push!(targets, [target_coeffs[i]; 0.0])
+                    push!(
+                        starts,
+                        [
+                            start_coeffs[i]
+                            randn(ComplexF64)
+                        ],
+                    )
+                    push!(
+                        targets,
+                        [
+                            target_coeffs[i]
+                            0.0
+                        ],
+                    )
                     push!(supp, [A zeros(Int32, size(A, 1), 1)])
                 end
             end

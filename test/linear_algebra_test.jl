@@ -43,7 +43,7 @@
 
         ldiv!(x, MW, b)
 
-        @test norm(MW.qr.factors - true_qr.factors) /norm(MW.qr.factors) < 1e-14
+        @test norm(MW.qr.factors - true_qr.factors) / norm(MW.qr.factors) < 1e-14
         @test norm(b2 - b) == 0
         @test norm(x - (B \ b2)) / norm(x) < 1e-14
     end

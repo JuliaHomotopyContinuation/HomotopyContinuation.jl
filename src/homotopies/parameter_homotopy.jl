@@ -16,7 +16,11 @@ struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     taylor_pt::TaylorVector{2,ComplexF64}
 end
 
-function ParameterHomotopy(F; start_parameters::AbstractVector, target_parameters::AbstractVector)
+function ParameterHomotopy(
+    F;
+    start_parameters::AbstractVector,
+    target_parameters::AbstractVector,
+)
     ParameterHomotopy(F, start_parameters, target_parameters)
 end
 function ParameterHomotopy(F::ModelKit.System, p::AbstractVector, q::AbstractVector)
@@ -39,12 +43,12 @@ function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
 
     if imag(t) == 0
         let t = real(t)
-            @inbounds for i in 1:length(H.taylor_pt)
+            @inbounds for i = 1:length(H.taylor_pt)
                 H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
             end
         end
     else
-        @inbounds for i in 1:length(H.taylor_pt)
+        @inbounds for i = 1:length(H.taylor_pt)
             H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
         end
     end

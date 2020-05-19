@@ -53,7 +53,7 @@
         @test seg.s′ == 1 - exp2(-20)
         @test seg.t′ == im * (1 - exp2(-20))
         @test seg.t == im
-        @test seg.Δt == - im * exp2(-20)
+        @test seg.Δt == -im * exp2(-20)
         HC2.step_success!(seg)
         @test seg.s == 1 - exp2(-20)
         @test seg.t == im * (1 - exp2(-20))

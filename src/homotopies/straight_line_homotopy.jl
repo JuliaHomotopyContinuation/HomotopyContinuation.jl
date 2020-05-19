@@ -30,7 +30,7 @@ function StraightLineHomotopy(
     gamma = γ,
 )
     size(start) == size(target) ||
-    throw(ArgumentError("Start and target do not have the same size, got $(size(start)) and $(size(target))"))
+        throw(ArgumentError("Start and target do not have the same size, got $(size(start)) and $(size(target))"))
 
     m, n = size(start)
     u = zeros(ComplexF64, m)
