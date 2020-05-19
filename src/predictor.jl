@@ -295,7 +295,10 @@ function update!(
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
 
-    predictor.prev_tx¹ .= predictor.tx¹
+    @inbounds for i in 1:length(xtemp)
+        predictor.prev_tx¹[i,1] = predictor.tx¹[i,1]
+        predictor.prev_tx¹[i,2] = predictor.tx¹[i,2]
+    end
     predictor.prev_t, predictor.t = predictor.t, t
     # prev_order = predictor.order
     # prev_method = predictor.method

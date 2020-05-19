@@ -490,16 +490,20 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         end
     elseif cls == :Pow
         vec = args!(pow_args, op)
+        # check that base is one of the variables
         x = vec[1]
+        is_var_pow = false
         for (i, v) in enumerate(vars)
             if x == v
                 d[i] = convert(Int, vec[2])
+                is_var_pow = true
                 break
             end
         end
-    elseif cls == :Div
-        div!(coeff, coeff, op)
-    elseif cls ∈ NUMBER_TYPES
+        if !is_var_pow
+            coeff = copy(op)
+        end
+    else
         coeff = copy(op)
     end
 
@@ -639,7 +643,7 @@ c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
 function horner(f::Expression, vars = variables(f))
-    M, coeffs = exponents_coefficients(f, vars; unpack_coeffs = false)
+    M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
     multivariate_horner(M, coeffs, vars)
 end
 
@@ -913,6 +917,7 @@ end
 Base.size(F::System) = (length(F.expressions), length(F.variables))
 Base.size(F::System, i::Integer) = size(F)[i]
 Base.length(F::System) = length(F.expressions)
+Base.copy(F::System) = Base.deepcopy(F)
 
 """
     nvariables(F::System)
@@ -1014,17 +1019,51 @@ function Base.intersect(F::System, G::System)
     exprs = [F.expressions; G.expressions]
     vars = [F.variables; setdiff(G.variables, F.variables)]
     params = [F.parameters; setdiff(G.parameters, F.parameters)]
-    System(exprs, vars, params)
+    System(exprs, vars, params, F.variable_groups)
 end
 function Base.intersect(F::System, G::AbstractVector{<:Expression})
     exprs = [F.expressions; G]
     vars = [F.variables; setdiff(variables(G), F.variables)]
-    params = F.parameters
-    System(exprs, vars, params)
+    System(exprs, vars, F.parameters, F.variable_groups)
 end
 Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
 
-Base.copy(F::System) = Base.deepcopy(F)
+"""
+    optimize(F::System)
+
+Optimize the evaluation cost of the given system `F`. This applies a multivariate horner
+schema to the given expressions. See also [`horner`](@ref).
+
+### Example
+
+```julia
+julia> f
+System of length 4
+ 4 variables: z₁, z₂, z₃, z₄
+
+ z₁ + z₂ + z₃ + z₄
+ z₂*z₁ + z₂*z₃ + z₃*z₄ + z₄*z₁
+ z₂*z₃*z₁ + z₂*z₃*z₄ + z₂*z₄*z₁ + z₃*z₄*z₁
+ -1 + z₂*z₃*z₄*z₁
+
+julia> optimize(f)
+System of length 4
+ 4 variables: z₁, z₂, z₃, z₄
+
+ z₁ + z₂ + z₃ + z₄
+ (z₂ + z₄)*z₁ + (z₂ + z₄)*z₃
+ z₁*(z₃*z₄ + (z₃ + z₄)*z₂) + z₂*z₃*z₄
+ -1 + z₂*z₃*z₄*z₁
+```
+"""
+function optimize(F::System)
+    System(
+        horner.(F.expressions, Ref(F.variables)),
+        F.variables,
+        F.parameters,
+        F.variable_groups,
+    )
+end
 
 
 ##############

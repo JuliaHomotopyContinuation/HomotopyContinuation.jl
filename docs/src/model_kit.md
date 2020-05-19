@@ -36,6 +36,7 @@ variables(::Expression)
 System
 degrees(F::System)
 expressions(F::System)
+optimize(::System)
 multi_degrees(::System)
 nparameters(::System)
 nvariables(::System)

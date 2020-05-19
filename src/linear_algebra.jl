@@ -125,9 +125,8 @@ end
 #    coming from the LU wrapper
 function lu!(
     A::AbstractMatrix{T},
-    b::Union{AbstractVector,Nothing} = nothing,
     ipiv::Union{Vector{I},Nothing} = nothing,
-) where {T,I<:Integer,Pivot}
+) where {T,I<:Integer}
     m, n = size(A)
     minmn = min(m, n)
     # LU Factorization
@@ -158,9 +157,6 @@ function lu!(
                         tmp = A[k, i]
                         A[k, i] = A[kp, i]
                         A[kp, i] = tmp
-                    end
-                    if !(b isa Nothing)
-                        b[k], b[kp] = b[kp], b[k]
                     end
                 end
                 # Scale first column
@@ -254,7 +250,7 @@ end
 function factorize!(WS::MatrixWorkspace)
     m, n = size(WS)
     if m == n
-        lu!(WS.lu.factors, nothing, WS.lu.ipiv)
+        lu!(WS.lu.factors, WS.lu.ipiv)
     else
         qr!(WS.qr)
     end
@@ -491,7 +487,9 @@ function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
             r[i] += A[i, j] * x_j
         end
     end
-    r .-= b
+    @inbounds for i in 1:m
+        r[i] -= b[i]
+    end
     r
 end
 
@@ -644,7 +642,7 @@ function inf_norm(
     norm = -Inf
     A = WS.A
     n, m = size(A)
-    for i = 1:n
+    @inbounds for i = 1:n
         normᵢ = 0.0
         for j = 1:m
             if d_r isa Nothing
@@ -656,7 +654,7 @@ function inf_norm(
         if !(d_l isa Nothing)
             normᵢ *= d_l[i]
         end
-        norm = max(norm, normᵢ)
+        norm = @fastmath max(norm, normᵢ)
     end
     norm
 end
@@ -670,7 +668,7 @@ function max_min_row(
     min_row = Inf
     A = WS.A
     n, m = size(A)
-    for i = 1:n
+    @inbounds for i = 1:n
         normᵢ = 0.0
         for j = 1:m
             if d_r isa Nothing
@@ -682,8 +680,8 @@ function max_min_row(
         if !(d_l isa Nothing)
             normᵢ *= d_l[i]
         end
-        max_row = max(max_row, normᵢ)
-        min_row = min(min_row, normᵢ)
+        max_row = @fastmath max(max_row, normᵢ)
+        min_row = @fastmath min(min_row, normᵢ)
     end
     max_row, min_row
 end

@@ -203,15 +203,17 @@ interpret(CH::CompiledHomotopy) = CH.homotopy
 interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][last(HI)]
 
 """
-    compile(F::System)
+    compile(F::System; optimizations = true)
 
-Compile the given system. Returns a `CompiledSystem`.
+Compile the given system. Returns a `CompiledSystem`. If `optimizations == true` then
+the given system is optimized for evaluation efficiency.
 
     compile(H::Homotopy)
 
 Compile the given homotopy. Returns a `CompiledHomotopy`.
 """
-compile(F::System) = CompiledSystem(F)
+compile(F::System; optimizations::Bool = true) =
+    CompiledSystem(optimizations ? optimize(F) : F)
 compile(H::Homotopy) = CompiledHomotopy(H)
 
 #############
