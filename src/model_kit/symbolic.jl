@@ -352,7 +352,9 @@ function td_order(x, y)
 end
 
 """
-    dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+    dense_poly(vars::AbstractVector{Variable}, d::Integer;
+               homogeneous::Bool = false,
+               coeff_name::Symbol = gensym(:c))
 
 Create a dense polynomial of degree `d` in the given variables `variables` where
 each coefficient is a parameter. Returns a tuple with the first argument being the polynomial
@@ -361,24 +363,24 @@ and the second the parameters.
 ```julia-repl
 julia> @var x y;
 
-julia> f, c = dense_poly([x, y], 2);
+julia> f, c = dense_poly([x, y], 2, coeff_name = :q);
 
 julia> f
-c#262₁ + x*c#262₂ + x^2*c#262₄ + y*c#262₃ + y^2*c#262₆ + x*y*c#262₅
+ q₆ + x*q₄ + x^2*q₁ + y*q₅ + y^2*q₃ + x*y*q₂
 
 julia> c
 6-element Array{Variable,1}:
- c#262₁
- c#262₂
- c#262₃
- c#262₄
- c#262₅
- c#262₆
+ q₁
+ q₂
+ q₃
+ q₄
+ q₅
+ q₆
 ```
 """
-function dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+function dense_poly(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false, coeff_name::Symbol = gensym(:c))
     M = monomials(vars, d; homogeneous = homogeneous)
-    @unique_var c[1:length(M)]
+    c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
 end
 
