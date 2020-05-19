@@ -715,7 +715,7 @@ function LA.cond(
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
         for i = 1:n
-            rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
+            rᵢ = fast_abs(WS.qr.factors[i, i]) * d_r[i]
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
         end

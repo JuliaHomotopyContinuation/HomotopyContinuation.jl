@@ -91,8 +91,7 @@ function evaluate_and_jacobian!(
     end
     nothing
 end
-function taylor!(u, ::Val{1}, H::StraightLineHomotopy, tx::TaylorVector{1}, t)
-    x = first(vectors(tx))
+function taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     for i = 1:size(H, 1)

@@ -65,6 +65,6 @@ function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
     evaluate_and_jacobian!(u, U, H.F, x, first(vectors(tp!(H, t))))
 end
 
-function taylor!(u, v::Val, H::ParameterHomotopy, tx::TaylorVector, t)
+function taylor!(u, v::Val, H::ParameterHomotopy, tx, t)
     taylor!(u, v, H.F, tx, tp!(H, t))
 end

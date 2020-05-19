@@ -105,13 +105,7 @@ function evaluate_and_jacobian!(u, U, F::RandomizedSystem, x, p = nothing)
     randomize!(U, F.A, F.U)
 end
 
-function taylor!(
-    u::AbstractVector,
-    v::Val,
-    F::RandomizedSystem,
-    tx::TaylorVector,
-    p = nothing,
-)
+function taylor!(u::AbstractVector, v::Val, F::RandomizedSystem, tx, p = nothing)
     taylor!(F.u, v, F.system, tx, p)
     randomize!(u, F.A, F.u)
 end

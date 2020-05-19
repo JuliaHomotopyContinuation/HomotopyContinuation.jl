@@ -74,7 +74,7 @@ function evaluate_and_jacobian!(
     nothing
 end
 
-function taylor!(u, v::Val{N}, H::AffineChartHomotopy, tx::TaylorVector{N}, t) where {N}
+function taylor!(u, v::Val, H::AffineChartHomotopy, tx, t)
     u .= zero(eltype(u))
     taylor!(u, v, H.homotopy, tx, t)
     # affine chart part is always zero since it is an affine linear form

@@ -22,7 +22,7 @@ evaluate!(u, F::FixedParameterSystem, x, p = nothing) =
     evaluate!(u, F.system, x, F.parameters)
 evaluate_and_jacobian!(u, U, F::FixedParameterSystem, x, p = nothing) =
     evaluate_and_jacobian!(u, U, F.system, x, F.parameters)
-taylor!(u, v::Val, F::FixedParameterSystem, tx::TaylorVector, p = nothing) =
+taylor!(u, v::Val, F::FixedParameterSystem, tx, p = nothing) =
     taylor!(u, v, F.system, tx, F.parameters)
 
 """

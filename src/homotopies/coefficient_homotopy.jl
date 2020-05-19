@@ -97,9 +97,8 @@ function evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t)
     evaluate_and_jacobian!(u, U, H.F, x, coeffs!(H, t))
 end
 
-function taylor!(u, v::Val{1}, H::CoefficientHomotopy, tx::TaylorVector{1}, t)
-    H.x .= first.(tx)
-    evaluate!(u, H.F, H.x, H.dt_coeffs)
+function taylor!(u, v::Val{1}, H::CoefficientHomotopy, x, t)
+    evaluate!(u, H.F, x, H.dt_coeffs)
 end
 
 
