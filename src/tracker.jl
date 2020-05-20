@@ -827,6 +827,12 @@ function track!(
         step!(tracker, debug)
     end
 
+    if is_success(tracker.state.code) &&
+       tracker.options.extended_precision &&
+       tracker.state.accuracy > 1e-14
+        refine_current_solution!(tracker; min_tol = 1e-14)
+    end
+
     tracker.state.code
 end
 
