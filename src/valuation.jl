@@ -7,6 +7,7 @@ mutable struct Valuation
     val_x::Vector{Float64}
     val_tẋ::Vector{Float64}
     Δval_x::Vector{Float64}
+    Δval_tẋ::Vector{Float64}
 
     # Data for computing the val_x and val_tẋ and ν̈ by finite differences
     val_x_data::NTuple{2,Vector{Float64}}
@@ -18,11 +19,11 @@ end
 
 Valuation(x::AbstractVector) = Valuation(length(x))
 Valuation(n::Integer) =
-    Valuation((zeros(n) for i = 1:3)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
+    Valuation((zeros(n) for i = 1:4)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
 
 function Base.show(io::IO, val::Valuation)
     print(io, "Valuation :")
-    for field in [:val_x, :val_tẋ, :Δval_x]
+    for field in [:val_x, :val_tẋ, :Δval_x, :Δval_tẋ]
         vs = [Printf.@sprintf("%#.4g", v) for v in getfield(val, field)]
         print(io, "\n • ", field, " → ", "[", join(vs, ", "), "]")
     end
@@ -38,6 +39,7 @@ function init!(val::Valuation)
     val.val_x .= 0.0
     val.val_tẋ .= 0.0
     val.Δval_x .= 0.0
+    val.Δval_tẋ .= 0.0
     val.val_x_data[1] .= val.val_x_data[2] .= 0.0
     val.val_ẋ_data[1] .= val.val_ẋ_data[2] .= 0.0
     val.logx_data[1] .= val.logx_data[2] .= 0.0
@@ -98,10 +100,12 @@ function update!(val::Valuation, pred::Predictor{AD{N}}, t::Real) where {N}
 
         logẋᵢ = logabs(ẋᵢ)
         val_ẋᵢ = finite_diff(logẋᵢ, logt, logẋ₂[i], logt₂, logẋ₁[i], logt₁)
+        Δval_ẋᵢ = finite_diff(val_ẋᵢ, logt, val_ẋ₂[i], logt₂, val_ẋ₁[i], logt₁)
 
         val.val_x[i] = νᵢ
         val.Δval_x[i] = Δνᵢ
         val.val_tẋ[i] = val_ẋᵢ + 1
+        val.Δval_tẋ[i] = Δval_ẋᵢ
 
         ν₂[i], ν₁[i] = νᵢ, ν₂[i]
         logx₂[i], logx₁[i] = logxᵢ, logx₂[i]
@@ -123,6 +127,7 @@ function update_analytic!(val::Valuation, tx::TaylorVector, t::Real)
 
         ν, ν¹ = ν_ν¹(ẋᵢ, 2x²ᵢ, 6x³ᵢ, t)
         val.val_tẋ[i] = ν + 1
+        val.Δval_tẋ[i] = t * ν¹
     end
 
     val
@@ -150,13 +155,17 @@ end
 
 
 function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
-    @unpack val_x, val_tẋ, Δval_x = val
+    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
     at_infinity_tol = at_zero_tol = Inf
     finite = true
     for (i, val_xᵢ) in enumerate(val_x)
         abs_Δ = abs(Δval_x[i])
-        ε∞ = max(abs(1.0 - val_tẋ[i] / val_xᵢ), abs(Δval_x[i] / val_xᵢ))
+        ε∞ = max(
+            abs(1.0 - val_tẋ[i] / val_xᵢ),
+            abs(Δval_x[i] / val_xᵢ),
+            abs(Δval_tẋ[i] / val_tẋ[i]),
+        )
         if isnan(abs_Δ)
             finite = false
             continue
@@ -203,10 +212,14 @@ function validate_coord_growth(
     at_infinity_tol::Float64,
     tol::Float64,
 )
-    @unpack val_x, val_tẋ, Δval_x = val
+    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
     for (i, val_xᵢ) in enumerate(val_x)
-        ε∞ = max(abs(1.0 - val_tẋ[i] / val_xᵢ), abs(Δval_x[i] / val_xᵢ))
+        ε∞ = max(
+            abs(1.0 - val_tẋ[i] / val_xᵢ),
+            abs(Δval_x[i] / val_xᵢ),
+            abs(Δval_tẋ[i] / val_tẋ[i]),
+        )
         # ∞ check
         if val_xᵢ + ε∞ < -finite_tol && ε∞ < at_infinity_tol
             if scale_new[i] / scale_old[i] > tol

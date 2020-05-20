@@ -44,7 +44,8 @@ Base.iterate(r::Result) = iterate(r.path_results)
 Base.iterate(r::Result, state) = iterate(r.path_results, state)
 Base.lastindex(r::Result) = lastindex(r.path_results)
 Base.eltype(r::Type{Result}) = PathResult
-
+Base.keys(r::Result) = 1:length(r.path_results)
+Base.values(r::Result) = r.path_results
 
 """
     seed(::Result)
