@@ -1,7 +1,6 @@
-export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator
+export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator, mixed_volume
 
-# Start Solutions
-import MixedSubdivisions: MixedCell
+using MixedSubdivisions: MixedCell, mixed_volume
 
 """
     PolyhedralStartSolutionsIterator
@@ -200,16 +199,53 @@ function polyhedral(f::System; target_parameters = nothing, kwargs...)
     tracker, starts
 end
 
+paths_to_track(f::AbstractSystem, val::Val{:polyhedral}) = paths_to_track(System(f), val)
+function paths_to_track(
+    f::System,
+    ::Val{:polyhedral};
+    only_torus::Bool = false,
+    only_non_zero::Bool = only_torus,
+)
+    supp, coeffs = begin
+        if is_homogeneous(f)
+            F = on_affine_chart(f)
+            m, n = size(F)
+            m ≥ n || throw(FiniteException(n - m))
+            if m > n
+                F = square_up(F)
+            end
+            @var x[1:n]
+            support_coefficients(System(F(x), x))
+        else
+            m, n = size(f)
+            m ≥ n || throw(FiniteException(n - m))
+            if m > n
+                F = square_up(f)
+                @var x[1:n]
+                support_coefficients(System(F(x), x))
+            else
+                support_coefficients(f)
+            end
+        end
+    end
+
+    if only_non_zero
+        MixedSubdivisions.mixed_volume(supp)
+    else
+        min_vecs = minimum.(supp, dims = 2)
+        supp′ =
+            map((A, mᵢ) -> iszero(mᵢ) ? A : [A zeros(Int32, size(A, 1), 1)], supp, min_vecs)
+        MixedSubdivisions.mixed_volume(supp′)
+    end
+end
+MixedSubdivisions.mixed_volume(f::Union{System,AbstractSystem}) =
+    paths_to_track(f; start_system = :polyhedral, only_torus = true)
 
 function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
     target_coeffs::AbstractVector;
     kwargs...,
 )
-    # start_coeffs =
-    #     map(c -> exp.(randn.(ComplexF64) .* 0.1 .+ log.(complex.(c))), target_coeffs)
-    # start_coeffs =
-    #     map(c -> 0.25 .* randn.() .* abs.(c) .* cis2pi.(rand.()) .+ c, target_coeffs)
     start_coeffs = map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
     polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
@@ -222,15 +258,15 @@ function polyhedral(
     target_coeffs::AbstractVector;
     path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
     tracker_options = TrackerOptions(),
-    only_non_zero = false,
-    only_torus = only_non_zero,
+    only_torus::Bool = false,
+    only_non_zero::Bool = only_torus,
 )
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
 
     min_vecs = minimum.(support, dims = 2)
     if !all(iszero, min_vecs)
-        if only_torus
+        if only_non_zero
             support = map((A, v) -> A .- v, support, min_vecs)
         else
             # Add 0 to each support
