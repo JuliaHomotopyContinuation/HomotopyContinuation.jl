@@ -29,7 +29,7 @@ Depth = 2
 **Trackers**
 ```@contents
 Pages = [
-    "path_tracker.md",
+    "endgame_tracker.md",
     "tracker.md",
 ]
 Depth = 2

@@ -97,7 +97,7 @@
         @time res =
             track.(total_degree(
                 System(F, [x, z, y]),
-                path_tracker_options = PathTrackerOptions(val_finite_tol = 1e-3),
+                endgame_options = EndgameOptions(val_finite_tol = 1e-3),
             )...)
         @test count(is_success, res) == 693
 
@@ -105,7 +105,7 @@
         @time res =
             track.(total_degree(
                 System(F, [x, z, y]),
-                path_tracker_options = PathTrackerOptions(val_finite_tol = 1e-3),
+                endgame_options = EndgameOptions(val_finite_tol = 1e-3),
                 γ = -0.9132549847010242 + 0.4073884300256109im,
             )...)
         @test count(is_success, res) == 693

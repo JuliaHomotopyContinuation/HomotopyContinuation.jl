@@ -25,7 +25,7 @@ export PathResult,
     PathResult
 
 A `PathResult` is the result of tracking of a path with [`track`](@ref) using an [`AbstractPathTracker`](@ref) (
-e.g. [`PathTracker`](@ref))
+e.g. [`EndgameTracker`](@ref))
 
 ## Fields
 
@@ -62,10 +62,10 @@ Additional path and solution informations
 ## Return codes
 
 Possible return codes are:
-* `:success`: The `PathTracker` obtained a solution.
-* `:at_infinity`: The `PathTracker` stopped the tracking of the path since it determined
+* `:success`: The `EndgameTracker` obtained a solution.
+* `:at_infinity`: The `EndgameTracker` stopped the tracking of the path since it determined
   that that path is diverging towards infinity.
-* `:at_zero`: The `PathTracker` stopped the tracking of the path since it determined
+* `:at_zero`: The `EndgameTracker` stopped the tracking of the path since it determined
   that that path has a solution where at least one coordinate is 0. This only happens if
   the option `zero_is_at_infinity` is `true`.
 * `:excess_solution`: For the solution of the system, the system had to be

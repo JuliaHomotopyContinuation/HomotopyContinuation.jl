@@ -106,7 +106,7 @@ See also [`polyhedral`].
 """
 struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <: AbstractPathTracker
     toric_tracker::Tracker{H1,N,M}
-    generic_tracker::PathTracker{H2,N,M}
+    generic_tracker::EndgameTracker{H2,N,M}
     support::Vector{Matrix{Int32}}
     lifting::Vector{Vector{Int32}}
 end
@@ -114,7 +114,7 @@ end
 """
     polyhedral(F::Union{System, AbstractSystem};
         only_non_zero = false,
-        path_tracker_options = PathTrackerOptions(),
+        endgame_options = EndgameOptions(),
         tracker_options = TrackerOptions())
 
 Solve the system `F` in two steps: first solve a generic system derived from the support
@@ -256,7 +256,7 @@ function polyhedral(
     support::AbstractVector{<:AbstractMatrix},
     start_coeffs::AbstractVector,
     target_coeffs::AbstractVector;
-    path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
+    endgame_options = EndgameOptions(),
     tracker_options = TrackerOptions(),
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
@@ -312,7 +312,7 @@ function polyhedral(
         CoefficientHomotopy(ModelKitSystem(F), p, q)
     end
     generic_tracker =
-        PathTracker(Tracker(H₂; options = tracker_options), options = path_tracker_options)
+        EndgameTracker(Tracker(H₂; options = tracker_options), options = endgame_options)
 
     S = PolyhedralStartSolutionsIterator(support, start_coeffs)
     tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)
