@@ -133,16 +133,39 @@ function solve(args...; kwargs...)
 end
 
 
-function solve(S::Solver, starts)
-    path_results = PathResult[]
+function solve(S::Solver, starts; show_progress::Bool = true)
+    n = length(starts)
+    if show_progress
+        solve(S, starts, make_progress(n; delay = 0.3))
+    else
+        solve(S, starts, nothing)
+    end
+end
+
+function solve(S::Solver, starts, progress)
+    path_results = Vector{PathResult}(undef, length(starts))
     for (k, s) in enumerate(starts)
-        push!(path_results, track(S.tracker, s; path_number = k))
+        path_results[k] = track(S.tracker, s; path_number = k)
+        update_progress!(progress, k)
     end
 
     Result(path_results; seed = S.seed)
 end
 (solver::Solver)(starts) = solve(solver, starts)
 
+
+function make_progress(n::Integer; delay::Float64 = 0.0)
+    desc = "Tracking $n paths... "
+    barlen = min(ProgressMeter.tty_width(desc), 40)
+    progress = ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen)
+    progress.tlast += delay
+    progress
+end
+function update_progress!(progress, ntracked)
+    ProgressMeter.update!(progress, ntracked)
+    nothing
+end
+update_progress!(::Nothing, ntracked) = nothing
 
 """
     paths_to_track(

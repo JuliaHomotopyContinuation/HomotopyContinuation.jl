@@ -7,6 +7,7 @@ import LinearAlgebra
 import LoopVectorization
 import MixedSubdivisions
 using Parameters: @unpack
+import ProgressMeter
 import Random
 import Printf
 import PrettyTables
