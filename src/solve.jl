@@ -96,7 +96,6 @@ function start_target_homotopy(
 )
     f, g = System(F), System(G)
 
-
     size(F) == size(G) || error("The provided systems don't have the same size.")
     is_homogeneous(f) == is_homogeneous(g) ||
         error("The provided systems are not both homogeneous.")
@@ -120,6 +119,16 @@ function start_target_homotopy(
     end
 
     H
+end
+
+function solver_startsolutions(
+    H::Union{Homotopy,AbstractHomotopy},
+    starts = nothing;
+    seed = nothing,
+    kwargs...,
+)
+    !isnothing(seed) && Random.seed!(seed)
+    Solver(EndgameTracker(H), seed), starts
 end
 
 """

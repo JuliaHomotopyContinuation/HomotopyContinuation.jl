@@ -31,10 +31,13 @@ replicate the result.
 struct Result
     path_results::Vector{PathResult}
     tracked_paths::Int
-    seed::UInt32
+    seed::Union{Nothing,UInt32}
 end
-Result(path_results; seed::UInt32, tracked_paths = length(path_results)) =
-    Result(path_results, tracked_paths, seed)
+Result(
+    path_results;
+    seed::Union{Nothing,UInt32} = nothing,
+    tracked_paths = length(path_results),
+) = Result(path_results, tracked_paths, seed)
 
 Base.size(r::Result) = (length(r),)
 Base.length(r::Result) = length(r.path_results)

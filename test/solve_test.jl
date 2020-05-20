@@ -270,6 +270,15 @@
         @test_throws FiniteException(1) solve(F_multi_proj_err, S; p₁ = [2, 4], p₀ = [3, 5])
     end
 
+    @testset "Solve (Homotopy)" begin
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
+        s = [1, 1]
+        H = ParameterHomotopy(F, [1, 0], [2, 4])
+        res = solve(H, [s])
+        @test nsolutions(res) == 1
+    end
+
     # @testset "Automatic start systems (solve)" begin
     #     @var x y
     #     affine_square = System([
