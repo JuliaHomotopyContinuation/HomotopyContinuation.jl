@@ -799,5 +799,5 @@ function fano_quintic()
     L = [a; 1] .* t + [b; 0]
     FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))
     sys = System(ModelKit.horner.(FcapL), [a; b], q)
-    sys, q₀
+    sys, q₀, gamma
 end
