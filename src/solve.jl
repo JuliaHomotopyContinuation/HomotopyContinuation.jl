@@ -1,4 +1,4 @@
-export solve, Solver, solver_startsolutions
+export solve, Solver, solver_startsolutions, paths_to_track
 
 struct Solver{T<:AbstractPathTracker}
     tracker::T
@@ -142,3 +142,20 @@ function solve(S::Solver, starts)
     Result(path_results; seed = S.seed)
 end
 (solver::Solver)(starts) = solve(solver, starts)
+
+
+"""
+    paths_to_track(
+        f::Union{System,AbstractSystem};
+        start_system::Symbol = :polyhedral,
+        kwargs...)
+
+Returns the number of paths tracked when calling [`solve`](@ref) with the given arguments.
+"""
+function paths_to_track(
+    f::Union{System,AbstractSystem};
+    start_system::Symbol = :polyhedral,
+    kwargs...,
+)
+    paths_to_track(f, Val(start_system); kwargs...)
+end

@@ -1,4 +1,4 @@
-export total_degree
+export total_degree, bezout_number
 
 """
     total_degree(
@@ -93,7 +93,7 @@ function total_degree_variables(
             s[1:n-1],
         ))
     else
-        G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s))
+        G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s); optimizations = false)
     end
     G = fix_parameters(G, scaling)
 
@@ -469,31 +469,11 @@ function compute_solution(iter::MultiBezoutSolutionsIterator, perm, q, dᵢ)
 end
 
 
-
-# """
-#     bezout_number(F::MPPolys; variable_groups=[variables(F)], homvars=nothing, parameters=nothing)
-#     bezout_number(multidegrees, groups::VariableGroups)
-# Compute the multi-homogeneous bezout number associated to the given system and variable groups.
-# """
-# bezout_number(D::Matrix, groups::VariableGroups) = bezout_number(D, projective_dims(groups))
-# bezout_number(D::Matrix, k) = sum(first, MultiBezoutIndicesIterator(D, k))
-# function bezout_number(
-#     F::MPPolys;
-#     parameters = nothing,
-#     variable_groups = nothing,
-#     homvars = nothing,
-# )
-#     if variable_groups === nothing
-#         return prod(maxdegrees(F; parameters = parameters))
-#     end
-#
-#     vars = variables(F, parameters)
-#     hominfo =
-#         HomogenizationInformation(variable_groups = variable_groups, homvars = homvars)
-#     D = multidegrees(F, variable_groups)
-#     if is_homogeneous(F, hominfo; parameters = parameters)
-#         bezout_number(D, length.(variable_groups) .- 1)
-#     else
-#         bezout_number(D, length.(variable_groups))
-#     end
-# end
+function paths_to_track(f, ::Val{:total_degree})
+    _, starts = total_degree(f)
+    length(starts)
+end
+@deprecate bezout_number(f::Union{System,AbstractSystem}) paths_to_track(
+    f;
+    start_system = :total_degree,
+)

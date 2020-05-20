@@ -187,6 +187,18 @@
         @test nsolutions(res) == 2
     end
 
+    @testset "paths to track" begin
+        @var x y
+        f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
+
+        @test paths_to_track(f; start_system = :total_degree) == 16
+        @test paths_to_track(f; start_system = :polyhedral) == 8
+        @test paths_to_track(f; start_system = :polyhedral, only_non_zero = true) == 3
+        @test paths_to_track(f) == 8
+        @test_deprecated bezout_number(f) == 16
+        @test mixed_volume(f) == 3
+    end
+
     @testset "solve (parameter homotopy)" begin
         # affine
         @var x a y b

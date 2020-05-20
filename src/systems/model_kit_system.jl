@@ -10,7 +10,8 @@ evaluation of `F` and that `ModelKitSystem <: AbstractSystem`.
 struct ModelKitSystem{S} <: AbstractSystem
     system::ModelKit.CompiledSystem{S}
 end
-ModelKitSystem(F::ModelKit.System) = ModelKitSystem(ModelKit.compile(F))
+ModelKitSystem(F::ModelKit.System; optimizations::Bool = true) =
+    ModelKitSystem(ModelKit.compile(F; optimizations = optimizations))
 
 Base.size(F::ModelKitSystem) = size(F.system)
 ModelKit.variables(F::ModelKitSystem) = variables(F.system.system)
