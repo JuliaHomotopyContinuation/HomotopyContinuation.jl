@@ -6,11 +6,11 @@ export total_degree, bezout_number
         parameters = nothing,
         gamma = cis(2π * rand()),
         tracker_options = TrackerOptions(),
-        path_tracker_options = PathTrackerOptions(),
+        endgame_options = EndgameOptions(),
     )
 
 Solve the system `F` using a total degree homotopy.
-This returns a path tracker ([`PathTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
+This returns a path tracker ([`EndgameTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
 If the system `F` has declared `variable_groups` then a multi-homogeneous
 a start system following [^Wam93] will be constructed.
 
@@ -31,7 +31,7 @@ function total_degree_variables(
     γ = cis(2π * rand()),
     gamma = γ,
     tracker_options = TrackerOptions(),
-    path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
+    endgame_options = EndgameOptions(),
 )
     m, n = size(F)
 
@@ -101,7 +101,7 @@ function total_degree_variables(
     if homogeneous
         H = on_affine_chart(H)
     end
-    T = PathTracker(H, tracker_options = tracker_options, options = path_tracker_options)
+    T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
     if overdetermined
         T = OverdeterminedTracker(T, F)
     end
@@ -117,7 +117,7 @@ function total_degree_variable_groups(
     gamma = γ,
     target_parameters = nothing,
     tracker_options = TrackerOptions(),
-    path_tracker_options::PathTrackerOptions = PathTrackerOptions(),
+    endgame_options = EndgameOptions(),
 )
     m, n = size(F)
     homogeneous = is_homogeneous(F)
@@ -161,7 +161,7 @@ function total_degree_variable_groups(
     if homogeneous
         H = on_affine_chart(H, projective_dims)
     end
-    T = PathTracker(H, tracker_options = tracker_options, options = path_tracker_options)
+    T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
     if overdetermined
         T = OverdeterminedTracker(T, F)
     end

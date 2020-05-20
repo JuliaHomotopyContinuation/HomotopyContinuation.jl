@@ -47,13 +47,13 @@ function solver_startsolutions(
     starts = nothing;
     seed = rand(UInt32),
     tracker_options = TrackerOptions(),
-    path_tracker_options = PathTrackerOptions(),
+    endgame_options = EndgameOptions(),
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
     H = start_target_homotopy(G, F; kwargs...)
     tracker =
-        PathTracker(H; tracker_options = tracker_options, options = path_tracker_options)
+        EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 
     Solver(tracker, seed), starts
 end
@@ -65,7 +65,7 @@ function parameter_homotopy(
     p₀ = nothing,
     target_parameters = p₀,
     tracker_options = TrackerOptions(),
-    path_tracker_options = PathTrackerOptions(),
+    endgame_options = EndgameOptions(),
 )
     isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
     isnothing(target_parameters) && throw(UndefKeywordError(:target_parameters))
@@ -85,7 +85,7 @@ function parameter_homotopy(
         m ≥ n || throw(FiniteException(n - m))
     end
 
-    PathTracker(H; tracker_options = tracker_options, options = path_tracker_options)
+    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 end
 
 function start_target_homotopy(

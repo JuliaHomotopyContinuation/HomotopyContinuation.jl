@@ -1,4 +1,4 @@
-@testset "PathTracker" begin
+@testset "EndgameTracker" begin
     @testset "Tracking and PathResult" begin
         @var x y
         f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
@@ -57,7 +57,7 @@
         @test all(is_success, res)
 
         H = AffineSubspaceHomotopy(F, L₁, L₂)
-        res2 = track.(PathTracker(H), solution.(res))
+        res2 = track.(EndgameTracker(H), solution.(res))
         @test all(is_success, res2)
     end
 end

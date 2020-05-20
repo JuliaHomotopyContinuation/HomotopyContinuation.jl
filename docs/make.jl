@@ -14,7 +14,7 @@ makedocs(
         ],
         "Results" => "result.md",
         "Start systems" => "start_systems.md",
-        "Trackers" => ["PathTracker" => "path_tracker.md", "Tracker" => "tracker.md"],
+        "Trackers" => ["EndgameTracker" => "endgame_tracker.md", "Tracker" => "tracker.md"],
         "Miscellaneous" => "misc.md",
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
