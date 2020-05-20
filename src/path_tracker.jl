@@ -454,29 +454,25 @@ function step!(path_tracker::PathTracker, debug::Bool = false)
     at_infinity =
         options.at_infinity_check &&
         at_infinity_tol < val_at_infinity_tol &&
-        (
-            validate_coord_growth(
-                state.val,
-                state.col_scaling,
-                weights(tracker.state.norm);
-                finite_tol = options.val_finite_tol,
-                at_infinity_tol = val_at_infinity_tol,
-                tol = options.min_coord_growth,
-            ) || tracker.state.extended_prec
+        validate_coord_growth(
+            state.val,
+            state.col_scaling,
+            weights(tracker.state.norm);
+            finite_tol = options.val_finite_tol,
+            at_infinity_tol = val_at_infinity_tol,
+            tol = options.min_coord_growth,
         )
     at_zero =
         options.at_infinity_check &&
         options.zero_is_at_infinity &&
         at_infinity_tol < val_at_infinity_tol &&
-        (
-            validate_coord_growth(
-                state.val,
-                weights(tracker.state.norm),
-                state.col_scaling;
-                finite_tol = options.val_finite_tol,
-                at_infinity_tol = val_at_infinity_tol,
-                tol = options.min_coord_growth,
-            ) || tracker.state.extended_prec
+        validate_coord_growth(
+            state.val,
+            weights(tracker.state.norm),
+            state.col_scaling;
+            finite_tol = options.val_finite_tol,
+            at_infinity_tol = val_at_infinity_tol,
+            tol = options.min_coord_growth,
         )
     finite = val_finite && κ > options.min_cond
 

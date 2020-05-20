@@ -52,7 +52,7 @@ function total_degree_variables(
         end
         D[k] = d
     end
-    scaling = maximum.(abs, coeffs)
+    scaling = maximum.(abs ∘ float, coeffs)
 
     m ≥ (n - homogeneous) || throw(FiniteException(n - homogeneous - m))
 

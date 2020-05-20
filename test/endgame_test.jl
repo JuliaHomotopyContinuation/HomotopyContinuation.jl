@@ -34,7 +34,7 @@
         @test nresults(result; only_nonsingular = true) == 1
     end
 
-    @testset "Wilkinson $d" for d in [16]
+    @testset "Wilkinson $d" for d in [12]
         @var x
         f = System([expand(prod(x - i for i = 1:d))])
         res = track.(total_degree(f)...)
