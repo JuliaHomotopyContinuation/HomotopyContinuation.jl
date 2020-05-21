@@ -211,6 +211,7 @@
             [s];
             start_parameters = [1, 0],
             target_parameters = [2, 4],
+            threading = false,
         )
         @test nsolutions(res) == 1
 
@@ -279,49 +280,8 @@
         @test nsolutions(res) == 1
     end
 
-    # @testset "Automatic start systems (solve)" begin
-    #     @var x y
-    #     affine_square = System([
-    #         2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
-    #         2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
-    #     ])
-    #
-    #     solve(affine_square; start_system = :polyhedral)
-    #     solve(affine_square; start_system = :total_degree)
-    #
-    #     @var x y z
-    #     proj_square = System([
-    #         2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + 3 * z^2,
-    #         2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - 5 * z^2,
-    #     ])
-    #     solve(proj_square, start_system = :total_degree)
-    #     solve(proj_square, start_system = :polyhedral)
-    #
-    #     #TODO: Multi-proj square
-    #
-    #     @var x y
-    #     affine_overdetermined = System([
-    #         (x^2 + y^2 + x * y - 3) * (x + 3),
-    #         (x^2 + y^2 + x * y - 3) * (y - x + 2),
-    #         2x + 5y - 3,
-    #     ])
-    #
-    #     solve(affine_overdetermined, start_system = :total_degree)
-    #     solve(affine_overdetermined, start_system = :polyhedral)
-    #
-    #     # TODO: Test reordering of degrees
-    #     @var x y z
-    #     proj_overdetermined = System([
-    #         (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
-    #         (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
-    #         2x + 5y - 3z,
-    #     ])
-    #
-    #     solve(proj_overdetermined, start_system = :total_degree)
-    #     solve(proj_overdetermined, start_system = :polyhedral)
-    #
-    #     @var x y
-    #     affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
-    #     @test_throws HC2.FiniteException solve(affine_underdetermined)
-    # end
+    @testset "Solve (threading)" begin
+        res = solve(cyclic(7), threading = true, show_progress = false)
+        @test nsolutions(res) == 924
+    end
 end
