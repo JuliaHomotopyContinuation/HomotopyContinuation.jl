@@ -1,10 +1,11 @@
 export solve, Solver, solver_startsolutions, paths_to_track
 
 struct Solver{T<:AbstractPathTracker}
-    tracker::T
+    trackers::Vector{T}
     seed::Union{Nothing,UInt32}
 end
-Solver(tracker::AbstractPathTracker) = Solver(tracker, nothing)
+Solver(tracker::AbstractPathTracker, seed::Union{Nothing,UInt32} = nothing) =
+    Solver([tracker], seed)
 
 function solver_startsolutions(
     F::Union{System,AbstractSystem},
@@ -136,32 +137,40 @@ end
 
 TODO
 """
-function solve(args...; kwargs...)
+function solve(
+    args...;
+    show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
+    catch_interrupt::Bool = true,
+    kwargs...,
+)
     solver, starts = solver_startsolutions(args...; kwargs...)
-    solve(solver, starts)
+    solve(
+        solver,
+        starts;
+        show_progress = show_progress,
+        threading = threading,
+        catch_interrupt = catch_interrupt,
+    )
 end
 
-
-function solve(S::Solver, starts; show_progress::Bool = true)
+function solve(
+    S::Solver,
+    starts;
+    show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
+    catch_interrupt::Bool = true,
+)
     n = length(starts)
-    if show_progress
-        solve(S, starts, make_progress(n; delay = 0.3))
+    progress = show_progress ? make_progress(n; delay = 0.3) : nothing
+    if threading
+        threaded_solve(S, starts, progress; catch_interrupt = catch_interrupt)
     else
-        solve(S, starts, nothing)
+        serial_solve(S, starts, progress; catch_interrupt = catch_interrupt)
     end
 end
-
-function solve(S::Solver, starts, progress)
-    path_results = Vector{PathResult}(undef, length(starts))
-    for (k, s) in enumerate(starts)
-        path_results[k] = track(S.tracker, s; path_number = k)
-        update_progress!(progress, k)
-    end
-
-    Result(path_results; seed = S.seed)
-end
-(solver::Solver)(starts) = solve(solver, starts)
-
+(solver::Solver)(starts; kwargs...) = solve(solver, starts; kwargs...)
+track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
@@ -175,6 +184,67 @@ function update_progress!(progress, ntracked)
     nothing
 end
 update_progress!(::Nothing, ntracked) = nothing
+
+function serial_solve(S::Solver, starts, progress; catch_interrupt::Bool = true)
+    path_results = Vector{PathResult}()
+    tracker = S.trackers[1]
+    try
+        for (k, s) in enumerate(starts)
+            push!(path_results, track(tracker, s; path_number = k))
+            update_progress!(progress, k)
+        end
+    catch e
+        (catch_interrupt && isa(e, InterruptException)) || rethrow(e)
+    end
+
+    Result(path_results; seed = S.seed)
+end
+function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
+    S = collect(starts)
+    N = length(S)
+    path_results = Vector{PathResult}(undef, N)
+    interrupted = false
+    try
+        Threads.resize_nthreads!(solver.trackers)
+        started = Threads.Atomic{Int}(0)
+        finished = Threads.Atomic{Int}(0)
+        tasks = map(solver.trackers) do tracker
+            Threads.@spawn begin
+                while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
+                    path_results[k] = track(tracker, S[k])
+                    nfinished = Threads.atomic_add!(finished, 1) + 1
+                    update_progress!(progress, nfinished)
+                end
+            end
+        end
+        for task in tasks
+            wait(task)
+        end
+    catch e
+        if (
+            isa(e, InterruptException) ||
+            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+        )
+            interrupted = true
+        end
+        if !interrupted || !catch_interrupt
+            rethrow(e)
+        end
+    end
+    # if we got interrupted we need to remove the unassigned filedds
+    if interrupted
+        assigned_results = Vector{PathResult}()
+        for i = 1:started[]
+            if isassigned(path_results, i)
+                push!(assigned_results, path_results[i])
+            end
+        end
+        Result(assigned_results; seed = solver.seed)
+    else
+        Result(path_results; seed = solver.seed)
+    end
+
+end
 
 """
     paths_to_track(
