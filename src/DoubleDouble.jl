@@ -31,17 +31,6 @@ Computes `s = fl(a+b)` and `e = err(a+b)`.
 end
 
 """
-    quick_two_diff(a, b)
-
-Computes `s = fl(a-b)` and `e = err(a-b)`.  Assumes `|a| ≥ |b|`.
-"""
-@inline function quick_two_diff(a::Float64, b::Float64)
-    s = a - b
-    e = (a - s) - b
-    s, e
-end
-
-"""
     two_diff(a, b)
 
 Computes `s = fl(a-b)` and `e = err(a-b)`.
