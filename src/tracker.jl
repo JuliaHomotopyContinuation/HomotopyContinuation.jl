@@ -673,7 +673,7 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low)
+    if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
         if μ_low * ω < a^7 * _h(a)
             state.extended_prec = false
@@ -792,6 +792,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     if is_success(state.code) && options.extended_precision && state.accuracy > 1e-14
         state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
         state.used_extended_prec = true
+        state.extended_prec = true
     end
 
     !state.last_step_failed
