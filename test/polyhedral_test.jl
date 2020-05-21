@@ -10,6 +10,14 @@
         tracker, starts = polyhedral(f; only_torus = true)
         @test length(starts) == 3
         @test count(is_success, track.(tracker, starts)) == 3
+
+        tracker, starts = polyhedral(
+            f;
+            only_torus = true,
+            tracker_options = (automatic_differentiation = 3,),
+        )
+        @test length(starts) == 3
+        @test count(is_success, track.(tracker, starts)) == 3
     end
 
     @testset "cyclic" begin
