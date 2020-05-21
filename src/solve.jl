@@ -8,6 +8,16 @@ Solver(tracker::AbstractPathTracker, seed::Union{Nothing,UInt32} = nothing) =
     Solver([tracker], seed)
 
 function solver_startsolutions(
+    F::AbstractVector{Expression},
+    starts = nothing;
+    parameters = Variable[],
+    variable_groups = nothing,
+    kwargs...,
+)
+    sys = System(F, parameters = parameters, variable_groups = variable_groups)
+    solver_startsolutions(sys, starts; kwargs...)
+end
+function solver_startsolutions(
     F::Union{System,AbstractSystem},
     starts = nothing;
     seed = rand(UInt32),

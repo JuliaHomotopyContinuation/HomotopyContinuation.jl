@@ -284,7 +284,7 @@
         @test_throws FiniteException(1) solve(F_multi_proj_err, S; p₁ = [2, 4], p₀ = [3, 5])
     end
 
-    @testset "Solve (Homotopy)" begin
+    @testset "solve (Homotopy)" begin
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
         s = [1, 1]
@@ -293,7 +293,21 @@
         @test nsolutions(res) == 1
     end
 
-    @testset "Solve (threading)" begin
+    @testset "solve (Vector{Expression})" begin
+        @var x a y b
+        F = [x^2 - a, x * y - a + b]
+        s = [1, 1]
+        res = solve(
+            F,
+            [s];
+            parameters = [a, b],
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+        @test nsolutions(res) == 1
+    end
+
+    @testset "solve (threading)" begin
         res = solve(cyclic(7), threading = true, show_progress = false)
         @test nsolutions(res) == 924
     end
