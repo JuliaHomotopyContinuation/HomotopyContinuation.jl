@@ -204,10 +204,10 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = false
+    started = Threads.Atomic{Int}(0)
+    finished = Threads.Atomic{Int}(0)
     try
         Threads.resize_nthreads!(solver.trackers)
-        started = Threads.Atomic{Int}(0)
-        finished = Threads.Atomic{Int}(0)
         tasks = map(solver.trackers) do tracker
             Threads.@spawn begin
                 while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
