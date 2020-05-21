@@ -563,12 +563,18 @@ function inverse_inf_norm_est(
     d_r::Union{Nothing,Vector{<:Real}} = nothing,
 )
     WS.factorized[] || factorize!(WS)
-    inverse_inf_norm_est(WS.lu, d_l, d_r, WS.inf_norm_est_work, WS.inf_norm_est_rwork)
+    work, rwork = WS.inf_norm_est_work, WS.inf_norm_est_rwork
+    if !WS.scaled[]
+        inverse_inf_norm_est(WS.lu, d_l, d_r, nothing, work, rwork)
+    else
+        inverse_inf_norm_est(WS.lu, d_l, d_r, WS.row_scaling, work, rwork)
+    end
 end
 function inverse_inf_norm_est(
     lu::LA.LU,
-    g::Union{Nothing,Vector{<:Real}},
-    d::Union{Nothing,Vector{<:Real}},
+    d_l::Union{Nothing,Vector{<:Real}},
+    d_r::Union{Nothing,Vector{<:Real}},
+    row_scaling::Union{Nothing,Vector{<:Real}},
     work::Vector{<:Complex},
     rwork::Vector{<:Real},
 )
@@ -577,21 +583,28 @@ function inverse_inf_norm_est(
 
     n = size(lu.factors, 1)
     x .= inv(n)
-    if d !== nothing
-        x ./= d
+    if d_r !== nothing
+        x ./= d_r
     end
     lu_ldiv_adj!(y, lu, x)
-    if g !== nothing
-        y ./= g
+    if d_l !== nothing
+        y ./= d_l
+    end
+    if row_scaling !== nothing
+        y .*= row_scaling
     end
     γ = sum(fast_abs, y)
-    y ./= fast_abs.(y)
-    if g !== nothing
-        y ./= g
+    ξ ./= fast_abs.(y)
+    if d_l !== nothing
+        ξ ./= d_l
+    end
+    if row_scaling !== nothing
+        ξ ./= row_scaling
     end
     lu_ldiv!(z, lu, ξ)
-    if d !== nothing
-        x .= real.(z) ./ d
+
+    if d_r !== nothing
+        x .= real.(z) ./ d_r
     else
         x .= real.(z)
     end
@@ -606,23 +619,29 @@ function inverse_inf_norm_est(
         end
         x .= zero(eltype(x))
         x[j] = one(eltype(x))
-        if d !== nothing
-            x ./= d
+        if d_r !== nothing
+            x ./= d_r
         end
         lu_ldiv_adj!(y, lu, x)
-        if g !== nothing
-            y ./= g
+        if d_l !== nothing
+            y ./= d_l
+        end
+        if row_scaling !== nothing
+            y .*= row_scaling
         end
         γ̄ = γ
         γ = sum(fast_abs, y)
         γ ≤ γ̄ && break
         ξ .= y ./ fast_abs.(y)
-        if g !== nothing
-            ξ ./= g
+        if d_l !== nothing
+            ξ ./= d_l
+        end
+        if row_scaling !== nothing
+            ξ ./= row_scaling
         end
         lu_ldiv!(z, lu, ξ)
-        if d !== nothing
-            x .= real.(z) ./ d
+        if d_r !== nothing
+            x .= real.(z) ./ d_r
         else
             x .= real.(z)
         end
