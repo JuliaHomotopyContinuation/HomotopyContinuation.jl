@@ -787,6 +787,13 @@ function step!(tracker::Tracker, debug::Bool = false)
     )
 
     check_terminated!(state, options)
+
+
+    if is_success(state.code) && options.extended_precision && state.accuracy > 1e-14
+        state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
+        state.used_extended_prec = true
+    end
+
     !state.last_step_failed
 end
 
@@ -825,12 +832,6 @@ function track!(
 
     while is_tracking(tracker.state.code)
         step!(tracker, debug)
-    end
-
-    if is_success(tracker.state.code) &&
-       tracker.options.extended_precision &&
-       tracker.state.accuracy > 1e-14
-        refine_current_solution!(tracker; min_tol = 1e-14)
     end
 
     tracker.state.code
