@@ -170,7 +170,7 @@ function solve(
     end
 end
 (solver::Solver)(starts; kwargs...) = solve(solver, starts; kwargs...)
-
+track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
