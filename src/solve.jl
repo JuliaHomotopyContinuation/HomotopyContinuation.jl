@@ -211,7 +211,7 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
         tasks = map(solver.trackers) do tracker
             Threads.@spawn begin
                 while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
-                    path_results[k] = track(tracker, S[k])
+                    path_results[k] = track(tracker, S[k]; path_number = k)
                     nfinished = Threads.atomic_add!(finished, 1) + 1
                     update_progress!(progress, nfinished)
                 end
