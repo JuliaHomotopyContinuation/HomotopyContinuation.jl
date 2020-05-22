@@ -375,7 +375,11 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         state.accuracy = tracker.state.accuracy
         state.solution .= tracker.state.x
         state.winding_number = nothing
-        state.cond = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+        # only update condition number for successfull paths
+        if is_success(state.code)
+            state.cond =
+                LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+        end
 
         # If a path got terminated, let's be more generous to classify them as at_infinity
         if state.code == EndgameTrackerCode.terminated_accuracy_limit ||

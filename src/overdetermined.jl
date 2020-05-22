@@ -18,6 +18,11 @@ function excess_solution_check!(
     is_success(path_result) || return path_result
     if is_nonsingular(path_result)
         acc = max(accuracy(path_result), eps())
+        if path_result.extended_precision
+            max_abs_norm_first_update = 100 * sqrt(acc)
+        else
+            max_abs_norm_first_update = 100acc
+        end
         res = newton(
             F.system,
             solution(path_result),
@@ -26,7 +31,7 @@ function excess_solution_check!(
             extended_precision = path_result.extended_precision,
             abs_tol = 100 * acc,
             rel_tol = 100 * acc,
-            max_abs_norm_first_update = 100 * acc,
+            max_abs_norm_first_update = max_abs_norm_first_update,
         )
         if !is_success(res)
             path_result.return_code = :excess_solution
