@@ -6,7 +6,7 @@
         @test nsolutions(res) == 2875
 
         @time poly_res = solve(sys; target_parameters = q₀, start_system = :polyhedral)
-        @test nsolutions(poly_res) = 2875
+        @test nsolutions(poly_res) == 2875
     end
 
 end
