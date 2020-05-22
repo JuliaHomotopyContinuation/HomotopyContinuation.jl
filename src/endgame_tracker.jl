@@ -389,10 +389,9 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
             res = analyze(
                 state.val;
                 finite_tol = 0.0,
-                # at_infinity_tol = sqrt(options.val_at_infinity_tol),
                 zero_is_finite = !options.zero_is_at_infinity,
+                max_winding_number = options.max_winding_number,
             )
-
 
             if options.at_infinity_check &&
                res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
@@ -441,8 +440,8 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     (val_finite, at_infinity_tol, at_zero_tol) = analyze(
         state.val;
         finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
-        # at_infinity_tol = options.val_at_infinity_tol,
         zero_is_finite = !options.zero_is_at_infinity,
+        max_winding_number = options.max_winding_number,
     )
 
 

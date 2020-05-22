@@ -46,6 +46,7 @@ Base.@kwdef mutable struct TrackerParameters
     β_ω::Float64 = 40.0
     β_τ::Float64 = 0.6
     strict_β_τ::Float64 = min(β_τ, 0.45)
+    β_max_norm_Δx₀::Float64 = 20.0
     min_newton_iters::Int = 2
 end
 Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
@@ -53,11 +54,11 @@ Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
 "The default [`TrackerParameters`](@ref) which have a good balance between robustness and efficiency."
 const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
 "[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
-const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω = 20.0)
+const FAST_TRACKER_PARAMETERS =
+    TrackerParameters(β_τ = 0.75, β_ω = 20.0, β_max_norm_Δx₀ = 100.0)
 "[`TrackerParameters`](@ref) which trade robustness against some speed."
 const CONSERVATIVE_TRACKER_PARAMETERS =
-    TrackerParameters(β_ω = 100.0, β_τ = 0.45, strict_β_τ = 0.35)
-
+    TrackerParameters(β_ω = 100.0, β_τ = 0.45, strict_β_τ = 0.35, β_max_norm_Δx₀ = 10.0)
 
 """
     TrackerOptions(; options...)
@@ -738,6 +739,12 @@ function step!(tracker::Tracker, debug::Bool = false)
     update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
+    if state.last_steps_failed > 0
+        max_norm_Δx₀ = Inf
+    else
+        exp_norm_Δx₀ = local_error(predictor) * state.segment_stepper.Δs^order(predictor)
+        max_norm_Δx₀ = options.parameters.β_max_norm_Δx₀ * exp_norm_Δx₀
+    end
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
     result = newton!(
         x̄,
@@ -749,6 +756,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         norm;
         ω = state.ω,
         μ = state.μ,
+        max_norm_Δx₀ = max_norm_Δx₀,
         extended_precision = state.extended_prec,
     )
 
