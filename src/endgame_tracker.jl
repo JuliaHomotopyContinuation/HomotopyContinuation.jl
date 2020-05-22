@@ -215,7 +215,7 @@ function EndgameTracker(H::AbstractHomotopy; tracker_options = TrackerOptions(),
 end
 function EndgameTracker(tracker::Tracker; options = EndgameOptions())
     if !(options isa EndgameOptions)
-        options = EndgameOptions(options...)
+        options = EndgameOptions(; options...)
     end
     state = EndgameTrackerState(size(tracker.homotopy, 1), tracker.state.x)
     EndgameTracker(tracker, state, options)
