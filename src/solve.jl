@@ -1,11 +1,38 @@
 export solve, Solver, solver_startsolutions, paths_to_track
 
+struct SolveStats
+    regular::Threads.Atomic{Int}
+    regular_real::Threads.Atomic{Int}
+    singular::Threads.Atomic{Int}
+    singular_real::Threads.Atomic{Int}
+end
+SolveStats() = SolveStats(Threads.Atomic{Int}.((0, 0, 0, 0))...)
+
+function init!(SS::SolveStats)
+    SS.regular[] = SS.regular_real[] = SS.singular[] = SS.singular_real[] = 0
+    SS
+end
+
+function update!(stats::SolveStats, R::PathResult)
+    is_success(R) || return stats
+
+    if is_singular(R)
+        Threads.atomic_add!(stats.singular_real, Int(is_real(R)))
+        Threads.atomic_add!(stats.singular, 1)
+    else
+        Threads.atomic_add!(stats.regular_real, Int(is_real(R)))
+        Threads.atomic_add!(stats.regular, 1)
+    end
+    stats
+end
+
 struct Solver{T<:AbstractPathTracker}
     trackers::Vector{T}
     seed::Union{Nothing,UInt32}
+    stats::SolveStats
 end
 Solver(tracker::AbstractPathTracker, seed::Union{Nothing,UInt32} = nothing) =
-    Solver([tracker], seed)
+    Solver([tracker], seed, SolveStats())
 
 function solver_startsolutions(
     F::AbstractVector{Expression},
@@ -185,29 +212,46 @@ track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
     barlen = min(ProgressMeter.tty_width(desc), 40)
-    progress = ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen)
+    progress = ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen)
     progress.tlast += delay
     progress
 end
-function update_progress!(progress, ntracked)
-    ProgressMeter.update!(progress, ntracked)
+function update_progress!(progress, stats, ntracked)
+    t = time()
+    if ntracked == progress.n || t > progress.tlast + progress.dt
+        showvalues = make_showvalues(stats, ntracked)
+        ProgressMeter.update!(progress, ntracked; showvalues = showvalues)
+    end
     nothing
 end
-update_progress!(::Nothing, ntracked) = nothing
+@noinline function make_showvalues(stats, ntracked)
+    showvalues = (("# paths tracked", ntracked),)
+    nsols = stats.regular[] + stats.singular[]
+    nreal = stats.regular_real[] + stats.singular_real[]
+    (
+        ("# paths tracked", ntracked),
+        ("# non-singular solutions (real)", "$(stats.regular[]) ($(stats.regular_real[]))"),
+        ("# singular solutions (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
+        ("# total solutions (real)", "$(nsols[]) ($(nreal[]))"),
+    )
+end
+update_progress!(::Nothing, stats, ntracked) = nothing
 
-function serial_solve(S::Solver, starts, progress; catch_interrupt::Bool = true)
+function serial_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
     path_results = Vector{PathResult}()
-    tracker = S.trackers[1]
+    tracker = solver.trackers[1]
     try
         for (k, s) in enumerate(starts)
-            push!(path_results, track(tracker, s; path_number = k))
-            update_progress!(progress, k)
+            r = track(tracker, s; path_number = k)
+            push!(path_results, r)
+            update!(solver.stats, r)
+            update_progress!(progress, solver.stats, k)
         end
     catch e
         (catch_interrupt && isa(e, InterruptException)) || rethrow(e)
     end
 
-    Result(path_results; seed = S.seed)
+    Result(path_results; seed = solver.seed)
 end
 function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
     S = collect(starts)
@@ -221,9 +265,11 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
         tasks = map(solver.trackers) do tracker
             Threads.@spawn begin
                 while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
-                    path_results[k] = track(tracker, S[k]; path_number = k)
+                    r = track(tracker, S[k]; path_number = k)
+                    path_results[k] = r
                     nfinished = Threads.atomic_add!(finished, 1) + 1
-                    update_progress!(progress, nfinished)
+                    update!(solver.stats, r)
+                    update_progress!(progress, solver.stats, nfinished[])
                 end
             end
         end
