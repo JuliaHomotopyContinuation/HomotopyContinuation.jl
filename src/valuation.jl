@@ -154,11 +154,17 @@ function finite_diff(ν, s, ν₂, s₂, ν₁, s₁)
 end
 
 
-function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
+function analyze(
+    val::Valuation;
+    finite_tol::Float64,
+    zero_is_finite::Bool,
+    max_winding_number::Int,
+)
     @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
     at_infinity_tol = at_zero_tol = Inf
     finite = true
+    δ = inv(max_winding_number)
     for (i, val_xᵢ) in enumerate(val_x)
         abs_Δ = abs(Δval_x[i])
         ε∞ = max(
@@ -171,12 +177,12 @@ function analyze(val::Valuation; finite_tol::Float64, zero_is_finite::Bool)
             continue
         end
         # ∞ check
-        if val_xᵢ + ε∞ < -finite_tol
+        if val_xᵢ + ε∞ < -(δ + finite_tol)
             at_infinity_tol = min(ε∞, at_infinity_tol)
         end
 
         # 0 check
-        if !zero_is_finite && val_xᵢ - ε∞ > finite_tol
+        if !zero_is_finite && val_xᵢ - ε∞ > (δ + finite_tol)
             at_zero_tol = min(ε∞, at_zero_tol)
         end
 
