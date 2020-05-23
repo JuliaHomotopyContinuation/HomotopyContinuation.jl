@@ -424,7 +424,7 @@ function differentiate(f::Basic, v::Variable)
     )
     return a
 end
-function differentiate(f::Basic, v::Variable, n::Integer)
+function differentiate(f::Basic, v::Variable, n::Int)
     n < 0 && throw(DomainError("n must be non-negative integer"))
     n == 0 && return f
     n == 1 && return differentiate(f, v)

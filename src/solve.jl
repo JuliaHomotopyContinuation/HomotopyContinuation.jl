@@ -38,11 +38,46 @@ function solver_startsolutions(
     F::AbstractVector{Expression},
     starts = nothing;
     parameters = Variable[],
+    variables = setdiff(variables(F), parameters),
     variable_groups = nothing,
     kwargs...,
 )
-    sys = System(F, parameters = parameters, variable_groups = variable_groups)
+    sys = System(
+        F,
+        variables = variables,
+        parameters = parameters,
+        variable_groups = variable_groups,
+    )
     solver_startsolutions(sys, starts; kwargs...)
+end
+function solver_startsolutions(
+    F::AbstractVector{<:MP.AbstractPolynomial},
+    starts = nothing;
+    parameters = similar(MP.variables(F), 0),
+    variables = setdiff(MP.variables(F), parameters),
+    variable_ordering = variables,
+    variable_groups = nothing,
+    target_parameters = nothing,
+    kwargs...,
+)
+    # handle special case that we have no parameters
+    # to shift the coefficients of the polynomials to the parameters
+    # this was the behaviour of HC.jl v1
+    if isnothing(target_parameters) && isempty(parameters)
+        sys, target_parameters = ModelKit.system_with_coefficents_as_params(
+            F,
+            variables = variables,
+            variable_groups = variable_groups,
+        )
+    else
+        sys = System(
+            F,
+            variables = variables,
+            parameters = parameters,
+            variable_groups = variable_groups,
+        )
+    end
+    solver_startsolutions(sys, starts; target_parameters = target_parameters, kwargs...)
 end
 function solver_startsolutions(
     F::Union{System,AbstractSystem},

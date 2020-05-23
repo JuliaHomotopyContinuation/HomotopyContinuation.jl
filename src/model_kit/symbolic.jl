@@ -300,7 +300,7 @@ Returns a `Matrix` where the each row contains the partial derivatives for a giv
 function differentiate(expr::Basic, vars::AbstractVector{Variable})
     [differentiate(expr, v) for v in vars]
 end
-function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
+function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k::Int = 1)
     [differentiate(e, var, k) for e in exprs]
 end
 function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
@@ -868,6 +868,42 @@ function System(
     System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 
+function System(
+    F::AbstractVector{<:MP.AbstractPolynomial};
+    parameters = similar(MP.variables(F), 0),
+    variables = setdiff(MP.variables(F), parameters),
+    variable_groups = nothing,
+)
+    vars = map(variables) do v
+        name, ind = MP.name_base_indices(v)
+        Variable(name, ind...)
+    end
+    params = Variable[]
+    for v in parameters
+        name, ind = MP.name_base_indices(v)
+        push!(params, Variable(name, ind...))
+    end
+    if variable_groups === nothing
+        var_groups = nothing
+    else
+        var_groups = map(var_groups) do group
+            map(group) do v
+                name, ind = MP.name_base_indices(v)
+                Variable(name, ind...)
+            end
+        end
+    end
+    variables_parameters = [variables; parameters]
+    vars_params = [vars; params]
+    G = map(F) do f
+        sum(MP.terms(f)) do t
+            c = MP.coefficient(t)
+            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables_parameters, vars_params))
+        end
+    end
+    System(G, variables = vars, parameters = params, variable_groups = var_groups)
+end
+
 System(F::System) = F
 
 Base.hash(S::System, u::UInt64) =
@@ -1082,6 +1118,42 @@ function optimize(F::System)
     )
 end
 
+## Conversion from MultivariatePolynomials
+function system_with_coefficents_as_params(
+    F::AbstractVector{<:MP.AbstractPolynomial};
+    variables = MP.variables(F),
+    variable_groups = nothing,
+)
+    vars = map(variables) do v
+        name, ind = MP.name_base_indices(v)
+        Variable(name, ind...)
+    end
+    if variable_groups === nothing
+        var_groups = nothing
+    else
+        var_groups = map(var_groups) do group
+            map(group) do v
+                name, ind = MP.name_base_indices(v)
+                Variable(name, ind...)
+            end
+        end
+    end
+    param_name = gensym(:c)
+    k = 1
+    params = Variable[]
+    target_params = MP.coefficienttype(F)[]
+    G = map(F) do f
+        sum(MP.terms(f)) do t
+            c = Variable(param_name, k)
+            k += 1
+            push!(params, c)
+            push!(target_params, MP.coefficient(t))
+            c * prod(w^MP.degree(t, v) for (v, w) in zip(variables, vars))
+        end
+    end
+    sys = System(G, variables = vars, parameters = params, variable_groups = var_groups)
+    sys, target_params
+end
 
 ##############
 ## Homotopy ##
