@@ -307,6 +307,27 @@
         @test nsolutions(res) == 1
     end
 
+    @testset "solve (DynamicPolynomials)" begin
+        @polyvar x y
+        # define the polynomials
+        f₁ = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        f₂ = x^2 + 2x * y^2 - 2 * y^2 - 1 / 2
+        result = solve([f₁, f₂])
+        @test nsolutions(result) == 18
+
+        @polyvar x a y b
+        F = [x^2 - a, x * y - a + b]
+        s = [1, 1]
+        res = solve(
+            F,
+            [s];
+            parameters = [a, b],
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+        @test nsolutions(res) == 1
+    end
+
     @testset "solve (threading)" begin
         res = solve(cyclic(7), threading = true, show_progress = false)
         @test nsolutions(res) == 924

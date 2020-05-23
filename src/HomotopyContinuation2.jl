@@ -2,10 +2,13 @@ module HomotopyContinuation2
 
 export ModelKit
 
+using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
 import LinearAlgebra
 import LoopVectorization
 import MixedSubdivisions
+import MultivariatePolynomials
+const MP = MultivariatePolynomials
 using Parameters: @unpack
 import ProgressMeter
 import Random
@@ -18,6 +21,8 @@ import TreeViews
 const LA = LinearAlgebra
 
 include("ModelKit.jl")
+export @polyvar
+
 include("DoubleDouble.jl")
 using .DoubleDouble
 

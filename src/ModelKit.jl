@@ -35,6 +35,16 @@ export @var,
     vectors
 
 import LinearAlgebra
+import MultivariatePolynomials:
+    MultivariatePolynomials,
+    coefficients,
+    degree,
+    differentiate,
+    nvariables,
+    monomials,
+    subs,
+    variables
+const MP = MultivariatePolynomials
 
 include("model_kit/symengine.jl")
 include("model_kit/symbolic.jl")
