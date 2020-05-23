@@ -83,9 +83,8 @@ function newton!(
     t::Number,
     J::Jacobian,
     norm::AbstractNorm;
-    μ::Float64,
-    ω::Float64,
-    max_norm_Δx₀::Float64 = Inf,
+    μ::Float64 = throw(UndefKeywordError(:μ)),
+    ω::Float64 = throw(UndefKeywordError(:ω)),
     extended_precision::Bool = false,
     accurate_μ::Bool = false,
 )
@@ -126,7 +125,7 @@ function newton!(
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         i >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)
-        if i >= 1 && θ > ā || (i == 0 && norm_Δx₀ > max_norm_Δx₀)
+        if i >= 1 && θ > ā || (i == 0 && norm_Δx₀ > 0.5 && norm_Δx₀ > 0.5 * norm(x₀))
             @label return_terminated
             return NewtonCorrectorResult(
                 NEWT_TERMINATED,
