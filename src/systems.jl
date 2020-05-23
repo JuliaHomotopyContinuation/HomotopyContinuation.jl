@@ -19,7 +19,7 @@ abstract type AbstractSystem end
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
 
 # ModelKit.variables(F::AbstractSystem)
-ModelKit.parameters(F::AbstractSystem) = nothing
+ModelKit.parameters(F::AbstractSystem) = Variable[]
 ModelKit.variable_groups(::AbstractSystem) = nothing
 
 ModelKit.nvariables(F::AbstractSystem) = size(F, 2)

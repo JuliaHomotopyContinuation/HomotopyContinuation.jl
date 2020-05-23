@@ -293,6 +293,19 @@
         @test nsolutions(res) == 1
     end
 
+    @testset "solve (start target)" begin
+        @var x a y b
+        f = System([x^2 - a, x * y - a + b], parameters = [a, b])
+        s = [1, 1]
+        res = solve(f, f, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
+        @test nsolutions(res) == 1
+
+        G = FixedParameterSystem(f, [1, 0])
+        F = FixedParameterSystem(f, [2, 4])
+        res = solve(G, F, [s];)
+        @test nsolutions(res) == 1
+    end
+
     @testset "solve (Vector{Expression})" begin
         @var x a y b
         F = [x^2 - a, x * y - a + b]
@@ -326,6 +339,16 @@
             target_parameters = [2, 4],
         )
         @test nsolutions(res) == 1
+    end
+
+    @testset "change parameters" begin
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b]; parameters = [a, b])
+        s = [1.0, 1.0 + 0im]
+        S = solver(F, generic_parameters = [2.2, 3.2])
+        start_parameters!(S, [1, 0])
+        target_parameters!(S, [2, 4])
+        @test is_success(track(S, s))
     end
 
     @testset "solve (threading)" begin

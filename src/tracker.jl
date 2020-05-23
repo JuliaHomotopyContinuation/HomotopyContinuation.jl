@@ -11,6 +11,8 @@ export AbstractPathTracker,
     init!,
     track!,
     step!,
+    start_parameters!,
+    target_parameters!,
     status,
     state,
     is_success,
@@ -888,6 +890,19 @@ Track the solution of the result `r` from `t₁` to `t₀`.
     TrackerResult(tracker.homotopy, tracker.state)
 end
 
+"""
+    start_parameters!(tracker::Tracker, p)
+
+Set the start parameters of the homotopy of the tracker.
+"""
+start_parameters!(T::Tracker, p) = (start_parameters!(T.homotopy, p); T)
+
+"""
+    target_parameters!(tracker::Tracker, p)
+
+Set the target parameters of the homotopy of the tracker.
+"""
+target_parameters!(T::Tracker, p) = (target_parameters!(T.homotopy, p); T)
 
 # PathIterator #
 struct PathIterator{T<:Tracker}

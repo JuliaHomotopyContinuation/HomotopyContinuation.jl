@@ -1,4 +1,4 @@
-export solve, Solver, solver_startsolutions, paths_to_track
+export solve, Solver, solver, solver_startsolutions, paths_to_track
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -34,6 +34,7 @@ end
 Solver(tracker::AbstractPathTracker, seed::Union{Nothing,UInt32} = nothing) =
     Solver([tracker], seed, SolveStats())
 
+solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
     F::AbstractVector{Expression},
     starts = nothing;
@@ -84,9 +85,10 @@ function solver_startsolutions(
     starts = nothing;
     seed = rand(UInt32),
     start_system = isnothing(variable_groups(F)) ? :polyhedral : :total_degree,
-    p₁ = nothing,
+    generic_parameters = nothing,
+    p₁ = generic_parameters,
     start_parameters = p₁,
-    p₀ = nothing,
+    p₀ = generic_parameters,
     target_parameters = p₀,
     kwargs...,
 )
@@ -133,9 +135,10 @@ end
 
 function parameter_homotopy(
     F::Union{System,AbstractSystem};
-    p₁ = nothing,
+    generic_parameters = nothing,
+    p₁ = generic_parameters,
     start_parameters = p₁,
-    p₀ = nothing,
+    p₀ = generic_parameters,
     target_parameters = p₀,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
@@ -164,6 +167,8 @@ end
 function start_target_homotopy(
     G::Union{System,AbstractSystem},
     F::Union{System,AbstractSystem};
+    start_parameters = nothing,
+    target_parameters = nothing,
     γ = 1.0,
     gamma = γ,
 )
@@ -176,6 +181,14 @@ function start_target_homotopy(
         error("The provided systems don't decalare the same variable groups.")
 
     m, n = size(F)
+
+    if !isnothing(start_parameters)
+        G = FixedParameterSystem(G, start_parameters)
+    end
+
+    if !isnothing(target_parameters)
+        F = FixedParameterSystem(F, target_parameters)
+    end
 
     H = StraightLineHomotopy(G, F; gamma = gamma)
     if is_homogeneous(f)
@@ -334,7 +347,20 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
     else
         Result(path_results; seed = solver.seed)
     end
+end
 
+function start_parameters!(solver::Solver, p)
+    for tracker in solver.trackers
+        start_parameters!(tracker, p)
+    end
+    solver
+end
+
+function target_parameters!(solver::Solver, p)
+    for tracker in solver.trackers
+        target_parameters!(tracker, p)
+    end
+    solver
 end
 
 """

@@ -21,6 +21,8 @@ function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector
 end
 get_solution(H::AbstractHomotopy, x::AbstractVector, t) = copy(x)
 
+start_parameters!(H::AbstractHomotopy, p) = H
+target_parameters!(H::AbstractHomotopy, p) = H
 # internal only
 include("homotopies/toric_homotopy.jl")
 
