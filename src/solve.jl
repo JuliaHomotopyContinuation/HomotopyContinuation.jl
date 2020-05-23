@@ -164,6 +164,8 @@ end
 function start_target_homotopy(
     G::Union{System,AbstractSystem},
     F::Union{System,AbstractSystem};
+    start_parameters = nothing,
+    target_parameters = nothing,
     γ = 1.0,
     gamma = γ,
 )
@@ -176,6 +178,14 @@ function start_target_homotopy(
         error("The provided systems don't decalare the same variable groups.")
 
     m, n = size(F)
+
+    if !isnothing(start_parameters)
+        G = FixedParameterSystem(G, start_parameters)
+    end
+
+    if !isnothing(target_parameters)
+        F = FixedParameterSystem(F, target_parameters)
+    end
 
     H = StraightLineHomotopy(G, F; gamma = gamma)
     if is_homogeneous(f)
