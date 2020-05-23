@@ -57,8 +57,7 @@ const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
 "[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
 const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω_p = 2.0)
 "[`TrackerParameters`](@ref) which trade robustness against some speed."
-const CONSERVATIVE_TRACKER_PARAMETERS =
-    TrackerParameters(β_ω_p = 5.0, β_τ = 0.2)
+const CONSERVATIVE_TRACKER_PARAMETERS = TrackerParameters(β_ω_p = 5.0, β_τ = 0.2)
 
 
 """
@@ -515,7 +514,7 @@ function update_stepsize!(
     τ = state.τ #trust_region(predictor)
     if is_converged(result)
         e = local_error(predictor)
-        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)  / options.parameters.β_ω_p
+        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p) / options.parameters.β_ω_p
         Δs₂ = options.parameters.β_τ * τ
         if state.use_strict_β_τ || dist_to_target(state.segment_stepper) < Δs₂
             Δs₂ = options.parameters.strict_β_τ * τ
