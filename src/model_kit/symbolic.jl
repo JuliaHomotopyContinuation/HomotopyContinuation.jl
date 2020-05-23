@@ -300,7 +300,7 @@ Returns a `Matrix` where the each row contains the partial derivatives for a giv
 function differentiate(expr::Basic, vars::AbstractVector{Variable})
     [differentiate(expr, v) for v in vars]
 end
-function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k = 1)
+function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k::Int = 1)
     [differentiate(e, var, k) for e in exprs]
 end
 function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
