@@ -341,6 +341,16 @@
         @test nsolutions(res) == 1
     end
 
+    @testset "change parameters" begin
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b]; parameters = [a, b])
+        s = [1.0, 1.0 + 0im]
+        S = solver(F, generic_parameters = [2.2, 3.2])
+        start_parameters!(S, [1, 0])
+        target_parameters!(S, [2, 4])
+        @test is_success(track(S, s))
+    end
+
     @testset "solve (threading)" begin
         res = solve(cyclic(7), threading = true, show_progress = false)
         @test nsolutions(res) == 924

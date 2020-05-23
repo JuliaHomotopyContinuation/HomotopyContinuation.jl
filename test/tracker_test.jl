@@ -77,6 +77,17 @@
         @test !isempty(sprint(show, info))
     end
 
+    @testset "Change parameters" begin
+        @var x a y b
+        F = System([x^2 - a, x * y - a + b]; parameters = [a, b])
+        s = [1.0, 1.0 + 0im]
+        tracker = Tracker(ParameterHomotopy(F, [2.2, 3.2], [2.2, 3.2]))
+        start_parameters!(tracker, [1, 0])
+        target_parameters!(tracker, [2, 4])
+        res = track(tracker, s, 1.0, 0.0)
+        @test is_success(res)
+    end
+
     @testset "Straight Line Homotopy" begin
         @var x y
         F = System([x^2 + y^2 - 2.3, 2x + 3y - 4], [x, y])

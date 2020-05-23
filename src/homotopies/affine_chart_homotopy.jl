@@ -40,6 +40,10 @@ function set_solution!(x::AbstractVector, H::AffineChartHomotopy, y::AbstractVec
     on_chart!(x, H.chart)
     x
 end
+
+start_parameters!(H::AffineChartHomotopy, p) = start_parameters!(H.homotopy, p)
+target_parameters!(H::AffineChartHomotopy, p) = target_parameters!(H.homotopy, p)
+
 function on_chart!(x::AbstractVector, v::PVector)
     ranges = dimension_indices(v)
     for range in ranges

@@ -38,6 +38,9 @@ end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
 
+start_parameters!(H::ParameterHomotopy, p) = (H.p .= p; H)
+target_parameters!(H::ParameterHomotopy, q) = (H.q .= q; H)
+
 function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
     t == H.t_cache[] && return H.taylor_pt
 
