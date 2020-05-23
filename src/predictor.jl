@@ -135,6 +135,7 @@ end
 function init!(predictor::Predictor)
     predictor.cond_H_ẋ = 1.0
     predictor.t = predictor.prev_t = NaN
+    predictor.trust_region = predictor.local_error = NaN
     predictor
 end
 

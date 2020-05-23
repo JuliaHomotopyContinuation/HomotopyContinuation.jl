@@ -43,9 +43,11 @@ We provide three sets of parameters for common use cases:
 Base.@kwdef mutable struct TrackerParameters
     a::Float64 = 0.125
     β_a::Float64 = 1.0
-    β_ω::Float64 = 40.0
-    β_τ::Float64 = 0.6
-    strict_β_τ::Float64 = min(β_τ, 0.45)
+    # compared to β_ω in the article, β_ω_p goes into the formula by β_ω_p^p, i.e.
+    # the relative reduction in step size is independent of the order p
+    β_ω_p::Float64 = 3.0
+    β_τ::Float64 = 0.5
+    strict_β_τ::Float64 = min(0.75β_τ, 0.4)
     min_newton_iters::Int = 2
 end
 Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
@@ -53,10 +55,10 @@ Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
 "The default [`TrackerParameters`](@ref) which have a good balance between robustness and efficiency."
 const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
 "[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
-const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω = 20.0)
+const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω_p = 2.0)
 "[`TrackerParameters`](@ref) which trade robustness against some speed."
 const CONSERVATIVE_TRACKER_PARAMETERS =
-    TrackerParameters(β_ω = 100.0, β_τ = 0.45, strict_β_τ = 0.35)
+    TrackerParameters(β_ω_p = 5.0, β_τ = 0.2)
 
 
 """
@@ -485,7 +487,8 @@ function initial_step_size(
     options::TrackerOptions,
 )
     a = options.parameters.β_a * options.parameters.a
-    ω = options.parameters.β_ω * state.ω
+    p = order(predictor)
+    ω = state.ω
     e = local_error(predictor)
     if isinf(e)
         # don't have anything we can use, so just use a conservative number
@@ -493,7 +496,7 @@ function initial_step_size(
         e = 1e5
     end
     τ = trust_region(predictor)
-    Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), order(predictor))
+    Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p) / options.parameters.β_ω_p
     Δs₂ = options.parameters.β_τ * τ
     Δs = nanmin(Δs₁, Δs₂)
     min(Δs, options.max_step_size, options.max_initial_step_size)
@@ -507,12 +510,12 @@ function update_stepsize!(
     ad_for_error_estimate::Bool = true,
 )
     a = options.parameters.β_a * options.parameters.a
-    ω = options.parameters.β_ω * state.ω
     p = order(predictor)
+    ω = state.ω
     τ = state.τ #trust_region(predictor)
     if is_converged(result)
         e = local_error(predictor)
-        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)
+        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p)  / options.parameters.β_ω_p
         Δs₂ = options.parameters.β_τ * τ
         if state.use_strict_β_τ || dist_to_target(state.segment_stepper) < Δs₂
             Δs₂ = options.parameters.strict_β_τ * τ
@@ -535,7 +538,7 @@ function update_stepsize!(
            isnan(result.accuracy) ||
            result.iters == 1
 
-            Δs = 0.125 * state.segment_stepper.Δs
+            Δs = 0.25 * state.segment_stepper.Δs
         else
             Δs =
                 nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
