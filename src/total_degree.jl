@@ -32,7 +32,9 @@ function total_degree_variables(
     gamma = γ,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    kwargs...
 )
+    unsupported_kwargs(kwargs)
     m, n = size(F)
 
     @unique_var x[1:n] t s[1:n]
@@ -118,7 +120,9 @@ function total_degree_variable_groups(
     target_parameters = nothing,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    kwargs...
 )
+    unsupported_kwargs(kwargs)
     m, n = size(F)
     homogeneous = is_homogeneous(F)
     D = multi_degrees(F)

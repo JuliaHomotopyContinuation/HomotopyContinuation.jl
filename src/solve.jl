@@ -148,7 +148,9 @@ function parameter_homotopy(
     target_parameters = p₀,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    kwargs...
 )
+    unsupported_kwargs(kwargs)
     isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
     isnothing(target_parameters) && throw(UndefKeywordError(:target_parameters))
     m, n = size(F)
@@ -177,7 +179,9 @@ function start_target_homotopy(
     target_parameters = nothing,
     γ = 1.0,
     gamma = γ,
+    kwargs...
 )
+    unsupported_kwargs(kwargs)
     f, g = System(F), System(G)
 
     size(F) == size(G) || error("The provided systems don't have the same size.")
