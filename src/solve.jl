@@ -30,9 +30,12 @@ struct Solver{T<:AbstractPathTracker}
     trackers::Vector{T}
     seed::Union{Nothing,UInt32}
     stats::SolveStats
+    start_system::Union{Nothing,Symbol}
 end
-Solver(tracker::AbstractPathTracker, seed::Union{Nothing,UInt32} = nothing) =
-    Solver([tracker], seed, SolveStats())
+Solver(tracker::AbstractPathTracker;
+    seed::Union{Nothing,UInt32} = nothing,
+    start_system = nothing) =
+    Solver([tracker], seed, SolveStats(), start_system)
 
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
@@ -94,6 +97,7 @@ function solver_startsolutions(
 )
     !isnothing(seed) && Random.seed!(seed)
 
+    used_start_system = nothing
     if start_parameters !== nothing
         tracker = parameter_homotopy(
             F;
@@ -102,8 +106,10 @@ function solver_startsolutions(
             kwargs...,
         )
     elseif start_system == :polyhedral
+        used_start_system = :polyhedral
         tracker, starts = polyhedral(F; target_parameters = target_parameters, kwargs...)
     elseif start_system == :total_degree
+        used_start_system = :total_degree
         tracker, starts = total_degree(F; target_parameters = target_parameters, kwargs...)
     else
         throw(KeywordArgumentException(
@@ -113,7 +119,7 @@ function solver_startsolutions(
         ))
     end
 
-    Solver(tracker, seed), starts
+    Solver(tracker; seed = seed, start_system = used_start_system), starts
 end
 
 function solver_startsolutions(
@@ -130,7 +136,7 @@ function solver_startsolutions(
     tracker =
         EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 
-    Solver(tracker, seed), starts
+    Solver(tracker; seed = seed), starts
 end
 
 function parameter_homotopy(
@@ -214,7 +220,7 @@ function solver_startsolutions(
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    Solver(EndgameTracker(H), seed), starts
+    Solver(EndgameTracker(H); seed = seed), starts
 end
 
 """
@@ -337,7 +343,7 @@ function serial_solve(solver::Solver, starts, progress; catch_interrupt::Bool = 
         (catch_interrupt && isa(e, InterruptException)) || rethrow(e)
     end
 
-    Result(path_results; seed = solver.seed)
+    Result(path_results; seed = solver.seed, start_system = solver.start_system)
 end
 function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
     S = collect(starts)
@@ -381,9 +387,9 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
                 push!(assigned_results, path_results[i])
             end
         end
-        Result(assigned_results; seed = solver.seed)
+        Result(assigned_results; seed = solver.seed, start_system = solver.start_system)
     else
-        Result(path_results; seed = solver.seed)
+        Result(path_results; seed = solver.seed, start_system = solver.start_system)
     end
 end
 

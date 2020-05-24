@@ -32,12 +32,14 @@ struct Result
     path_results::Vector{PathResult}
     tracked_paths::Int
     seed::Union{Nothing,UInt32}
+    start_system::Union{Nothing,Symbol}
 end
 Result(
     path_results;
     seed::Union{Nothing,UInt32} = nothing,
     tracked_paths = length(path_results),
-) = Result(path_results, tracked_paths, seed)
+    start_system = nothing,
+) = Result(path_results, tracked_paths, seed, start_system)
 
 Base.size(r::Result) = (length(r),)
 Base.length(r::Result) = length(r.path_results)
@@ -401,26 +403,31 @@ function Base.show(io::IO, x::Result)
     header = "Result with $(s.nonsingular + s.singular) solutions"
     println(io, header)
     println(io, "="^(length(header)))
+    println(io, "• $(ntracked(x)) paths tracked")
     println(
         io,
         "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ",
         "($(s.real_nonsingular) real)",
     )
-    println(
-        io,
-        "• $(s.singular) singular $(plural("solution", s.singular)) ",
-        "($(s.real_singular) real)",
-    )
+    if s.singular > 0
+        println(
+            io,
+            "• $(s.singular) singular $(plural("solution", s.singular)) ",
+            "($(s.real_singular) real)",
+        )
+    end
     s.at_infinity > 0 &&
         println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
     s.excess_solution > 0 && println(
         io,
         "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))",
     )
-    println(io, "• $(ntracked(x)) paths tracked")
     print(io, "• random seed: ")
     show(io, seed(x))
     println()
+    if !isnothing(x.start_system)
+        println(io, "• start_system: :", x.start_system)
+    end
     if s.singular > 0
         println(io, "• multiplicity table of singular solutions:")
         #     singular_multiplicities_table(io, x, s)
@@ -435,7 +442,7 @@ function TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inli
     )
 end
 TreeViews.hastreeview(::Result) = true
-TreeViews.numberofnodes(::Result) = 8
+TreeViews.numberofnodes(::Result) = 9
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
     s = statistics(x)
     if i == 1
@@ -452,7 +459,9 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.failed) failed")
     elseif i == 7
         print(io, "Random seed used")
-    elseif i == 8 && s.singular > 0
+    elseif i == 8
+        print(io, "start_system")
+    elseif i == 9 && s.singular > 0
         print(io, "  multiplicity table of singular solutions: \n")
         # singular_multiplicities_table(io, x, s)
     end
@@ -474,7 +483,9 @@ function TreeViews.treenode(r::Result, i::Integer)
         return failed(r)
     elseif i == 7
         return seed(r)
-    elseif i == 8 && s.singular > 0
+    elseif i == 8
+        return something(r.start_system, missing)
+    elseif i == 9 && s.singular > 0
         return missing
     end
     missing
