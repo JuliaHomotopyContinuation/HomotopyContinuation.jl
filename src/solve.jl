@@ -227,16 +227,54 @@ function solve(
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
+    target_parameters = nothing,
+    # many parameter options,
+    transform_result = nothing,
+    transform_parameters = identity,
+    flatten = nothing,
     kwargs...,
 )
-    solver, starts = solver_startsolutions(args...; kwargs...)
-    solve(
-        solver,
-        starts;
-        show_progress = show_progress,
-        threading = threading,
-        catch_interrupt = catch_interrupt,
-    )
+    many_parameters = false
+    if isnothing(target_parameters)
+        solver, starts = solver_startsolutions(args...; kwargs...)
+    else
+        # check if we have many parameters solve
+        if !isa(transform_parameters(first(target_parameters)), Number)
+            many_parameters = true
+            solver, starts = solver_startsolutions(
+                args...;
+                target_parameters = transform_parameters(first(target_parameters)),
+                kwargs...,
+            )
+        else
+            solver, starts = solver_startsolutions(
+                args...;
+                target_parameters = target_parameters,
+                kwargs...,
+            )
+        end
+    end
+    if many_parameters
+        solve(
+            solver,
+            starts,
+            target_parameters;
+            show_progress = show_progress,
+            threading = threading,
+            catch_interrupt = catch_interrupt,
+            transform_result = transform_result,
+            transform_parameters = transform_parameters,
+            flatten = flatten,
+        )
+    else
+        solve(
+            solver,
+            starts;
+            show_progress = show_progress,
+            threading = threading,
+            catch_interrupt = catch_interrupt,
+        )
+    end
 end
 
 function solve(
@@ -363,6 +401,8 @@ function target_parameters!(solver::Solver, p)
     solver
 end
 
+
+
 """
     paths_to_track(
         f::Union{System,AbstractSystem};
@@ -377,4 +417,130 @@ function paths_to_track(
     kwargs...,
 )
     paths_to_track(f, Val(start_system); kwargs...)
+end
+
+#############################
+### Many parameter solver ###
+#############################
+
+
+struct ManySolveStats
+    solutions::Threads.Atomic{Int}
+end
+
+function solve(
+    S::Solver,
+    starts,
+    target_parameters;
+    show_progress::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
+    catch_interrupt::Bool = true,
+    transform_result = nothing,
+    transform_parameters = nothing,
+    flatten = nothing,
+)
+    transform_result = something(transform_result, tuple) # (solutions ∘ first) ∘ tuple
+    transform_parameters = something(transform_parameters, identity)
+    flatten = something(flatten, false)
+
+    n = length(target_parameters)
+
+    progress = show_progress ? make_many_progress(n; delay = 0.3) : nothing
+    # if threading
+    #     threaded_many_solve(S, starts, progress; catch_interrupt = catch_interrupt)
+    # else
+    serial_many_solve(
+        S,
+        starts,
+        target_parameters,
+        progress,
+        transform_result,
+        transform_parameters,
+        Val(flatten);
+        catch_interrupt = catch_interrupt,
+        threading = threading,
+    )
+    # end
+end
+
+
+function make_many_progress(n::Integer; delay::Float64 = 0.0)
+    desc = "Solving for $n parameters... "
+    barlen = min(ProgressMeter.tty_width(desc), 40)
+    progress = ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen)
+    progress.tlast += delay
+    progress
+end
+function update_many_progress!(progress, results, k; flatten::Bool)
+    t = time()
+    if k == progress.n || t > progress.tlast + progress.dt
+        showvalues = make_many_showvalues(results, k; flatten = flatten)
+        ProgressMeter.update!(progress, k; showvalues = showvalues)
+    end
+    nothing
+end
+@noinline function make_many_showvalues(results, k; flatten::Bool)
+    if flatten
+        [("# parameters solved", k), ("# results", length(results))]
+    else
+        [("# parameters solved", k)]
+    end
+end
+update_many_progress!(::Nothing, results, k; kwargs...) = nothing
+
+function serial_many_solve(
+    solver::Solver,
+    starts,
+    many_target_parameters,
+    progress,
+    transform_result,
+    transform_parameters,
+    ::Val{flatten};
+    threading::Bool,
+    catch_interrupt::Bool,
+) where {flatten}
+    q = first(many_target_parameters)
+    target_parameters!(solver, transform_parameters(q))
+    if threading
+        res = threaded_solve(solver, starts, nothing; catch_interrupt = false)
+    else
+        res = serial_solve(solver, starts, nothing; catch_interrupt = false)
+    end
+    if flatten
+        results = transform_result(res, q)
+        if !(results isa AbstractArray)
+            throw(ArgumentError("Cannot flatten arguments of type `$(typeof(results))`"))
+        end
+    else
+        results = [transform_result(res, q)]
+    end
+    k = 1
+    update_many_progress!(progress, results, k; flatten = flatten)
+    try
+        for q in Iterators.drop(many_target_parameters, 1)
+            target_parameters!(solver, transform_parameters(q))
+            if threading
+                res = threaded_solve(solver, starts, nothing; catch_interrupt = false)
+            else
+                res = serial_solve(solver, starts, nothing; catch_interrupt = false)
+            end
+
+            if flatten
+                append!(results, transform_result(res, q))
+            else
+                push!(results, transform_result(res, q))
+            end
+            k += 1
+            update_many_progress!(progress, results, k; flatten = flatten)
+        end
+    catch e
+        if !(
+            isa(e, InterruptException) ||
+            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+        )
+            rethrow(e)
+        end
+    end
+
+    results
 end
