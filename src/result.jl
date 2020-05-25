@@ -422,9 +422,7 @@ function Base.show(io::IO, x::Result)
         io,
         "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))",
     )
-    print(io, "• random seed: ")
-    show(io, seed(x))
-    println()
+    println(io, "• random seed: ", sprint(show, seed(x)))
     if !isnothing(x.start_system)
         println(io, "• start_system: :", x.start_system)
     end

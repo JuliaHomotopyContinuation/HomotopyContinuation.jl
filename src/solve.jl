@@ -274,7 +274,7 @@ The `solve` routines takes the following options:
 If only a polynomial system is given:
 * `start_system`: Possible values are `:total_degree` and `:polyhedral`. Depending on the
   choice furhter options are possible. See also [`total_degree`](@ref) and
-  [`polyehdral`](@ref).
+  [`polyhedral`](@ref).
 
 If a system `f` depending on parameters together with start parameters, start solutions and
 *multiple* target parameters then the following options are also available:
