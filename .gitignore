@@ -3,6 +3,6 @@
 *.jl.mem
 *.jl.*.mem
 *.jld
-tst.jl
 
 Manifest.toml
+docs/build/
