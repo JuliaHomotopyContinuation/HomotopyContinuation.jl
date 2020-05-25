@@ -32,10 +32,11 @@ struct Solver{T<:AbstractPathTracker}
     stats::SolveStats
     start_system::Union{Nothing,Symbol}
 end
-Solver(tracker::AbstractPathTracker;
+Solver(
+    tracker::AbstractPathTracker;
     seed::Union{Nothing,UInt32} = nothing,
-    start_system = nothing) =
-    Solver([tracker], seed, SolveStats(), start_system)
+    start_system = nothing,
+) = Solver([tracker], seed, SolveStats(), start_system)
 
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
@@ -148,7 +149,7 @@ function parameter_homotopy(
     target_parameters = p₀,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
-    kwargs...
+    kwargs...,
 )
     unsupported_kwargs(kwargs)
     isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
@@ -179,7 +180,7 @@ function start_target_homotopy(
     target_parameters = nothing,
     γ = 1.0,
     gamma = γ,
-    kwargs...
+    kwargs...,
 )
     unsupported_kwargs(kwargs)
     f, g = System(F), System(G)
@@ -227,10 +228,86 @@ function solver_startsolutions(
     Solver(EndgameTracker(H); seed = seed), starts
 end
 
-"""
-    solve(...)
+always_false(x) = false
 
-TODO
+"""
+    solve(f; options...)
+    solve(f, start_solutions; start_parameters, target_parameters, options...)
+    solve(g, f, start_solutions; options...)
+    solve(homotopy, start_solutions; options...)
+
+Solve the given problem. If only a single polynomial system `f` is given, then all
+(complex) isolated solutions are computed.
+If a system `f` depending on parameters together with start and target parameters is given
+then a parameter homotopy is performed.
+If two systems `g` and `f` with solutions of `g` are given then the solutions are tracked
+during the deformation of `g` to `f`.
+Similarly, for a given homotopy `homotopy` ``H(x,t)`` with solutions at ``t=1`` the solutions
+at ``t=0`` are computed.
+See the documentation for examples.
+If the input is a *homogeneous* polynomial system, solutions on a random affine chart of
+projective space are computed.
+
+## General Options
+The `solve` routines takes the following options:
+* `catch_interrupt = true`: If this is `true`, the computation is gracefully stopped and a
+  partial result is returned when the computation is interruped.
+* `endgame_options`: The options and parameters for the endgame.
+  Expects an [`EndgameOptions`](@ref) struct.
+* `seed`: The random seed used during the computations. The seed is also reported in the
+  result. For a given random seed the result is always identical.
+* `show_progress= true`: Indicate whether a progress bar should be displayed.
+* `stop_early_cb`: Here it is possible to provide a function (or any callable struct) which
+  accepts a `PathResult` `r` as input and returns a `Bool`. If `stop_early_cb(r)` is `true`
+  then no further paths are tracked and the computation is finished. This is only called
+  for successfull paths. This is for example useful if you only want to compute one solution
+  of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
+
+* `threading = true`: Enable multi-threading for the computation. The number of
+  available threads is controlled by the environment variable `JULIA_NUM_THREADS`.
+* `tracker_options`: The options and parameters for the path tracker. Expects a
+  [`TrackerOptions`](@ref) struct.
+
+
+## Options depending on input
+
+If only a polynomial system is given:
+* `start_system`: Possible values are `:total_degree` and `:polyhedral`. Depending on the
+  choice furhter options are possible. See also [`total_degree`](@ref) and
+  [`polyehdral`](@ref).
+
+If a system `f` depending on parameters together with start parameters, start solutions and
+*multiple* target parameters then the following options are also available:
+
+* `flatten`: Flatten the output of `transform_result`. This is useful for example if
+   `transform_result` returns a vector of solutions, and you only want a single vector of
+   solutions as the result (instead of a vector of vector of solutions).
+* `transform_parameters = identity`: Transform a parameters values `p` before passing it to
+  `target_parameters = ...`.
+* `transform_result`: A function taking two arguments, the `result` and the
+  parameters `p`. By default this returns the tuple `(result, p)`.
+
+## Basic example
+
+```julia-repl
+julia> @var x y;
+
+julia> F = System([x^2+y^2+1, 2x+3y-1])
+System of length 2
+ 2 variables: x, y
+
+ 1 + x^2 + y^2
+ -1 + 2*x + 3*y
+
+julia> solve(F)
+Result with 2 solutions
+=======================
+• 2 non-singular solutions (0 real)
+• 0 singular solutions (0 real)
+• 2 paths tracked
+• random seed: 0x75a6a462
+• start_system: :polyhedral
+```
 """
 function solve(
     args...;
@@ -238,6 +315,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
     target_parameters = nothing,
+    stop_early_cb = always_false,
     # many parameter options,
     transform_result = nothing,
     transform_parameters = identity,
@@ -280,6 +358,7 @@ function solve(
         solve(
             solver,
             starts;
+            stop_early_cb = stop_early_cb,
             show_progress = show_progress,
             threading = threading,
             catch_interrupt = catch_interrupt,
@@ -290,6 +369,7 @@ end
 function solve(
     S::Solver,
     starts;
+    stop_early_cb = always_false,
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
@@ -297,9 +377,15 @@ function solve(
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     if threading
-        threaded_solve(S, starts, progress; catch_interrupt = catch_interrupt)
+        threaded_solve(
+            S,
+            starts,
+            progress,
+            stop_early_cb;
+            catch_interrupt = catch_interrupt,
+        )
     else
-        serial_solve(S, starts, progress; catch_interrupt = catch_interrupt)
+        serial_solve(S, starts, progress, stop_early_cb; catch_interrupt = catch_interrupt)
     end
 end
 (solver::Solver)(starts; kwargs...) = solve(solver, starts; kwargs...)
@@ -333,7 +419,13 @@ end
 end
 update_progress!(::Nothing, stats, ntracked) = nothing
 
-function serial_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
+function serial_solve(
+    solver::Solver,
+    starts,
+    progress,
+    stop_early_cb;
+    catch_interrupt::Bool = true,
+)
     path_results = Vector{PathResult}()
     tracker = solver.trackers[1]
     try
@@ -342,6 +434,9 @@ function serial_solve(solver::Solver, starts, progress; catch_interrupt::Bool = 
             push!(path_results, r)
             update!(solver.stats, r)
             update_progress!(progress, solver.stats, k)
+            if is_success(r) && stop_early_cb(r)
+                break
+            end
         end
     catch e
         (catch_interrupt && isa(e, InterruptException)) || rethrow(e)
@@ -349,7 +444,13 @@ function serial_solve(solver::Solver, starts, progress; catch_interrupt::Bool = 
 
     Result(path_results; seed = solver.seed, start_system = solver.start_system)
 end
-function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool = true)
+function threaded_solve(
+    solver::Solver,
+    starts,
+    progress,
+    stop_early_cb;
+    catch_interrupt::Bool = true,
+)
     S = collect(starts)
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
@@ -366,6 +467,9 @@ function threaded_solve(solver::Solver, starts, progress; catch_interrupt::Bool 
                     nfinished = Threads.atomic_add!(finished, 1) + 1
                     update!(solver.stats, r)
                     update_progress!(progress, solver.stats, nfinished[])
+                    if is_success(r) && stop_early_cb(r)
+                        interrupted = true
+                    end
                 end
             end
         end
@@ -414,10 +518,7 @@ end
 
 
 """
-    paths_to_track(
-        f::Union{System,AbstractSystem};
-        start_system::Symbol = :polyhedral,
-        kwargs...)
+    paths_to_track(f; optopms..)
 
 Returns the number of paths tracked when calling [`solve`](@ref) with the given arguments.
 """
