@@ -260,7 +260,9 @@ function polyhedral(
     tracker_options = TrackerOptions(),
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
+    kwargs...,
 )
+    unsupported_kwargs(kwargs)
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
 

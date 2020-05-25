@@ -18,9 +18,12 @@ Pages = [
 Depth = 2
 ```
 
-**Start Systems**
+**Solving Systems**
 ```@contents
 Pages = [
+    "solve.md",
+    "result.md",
+    "solve_examples.md",
     "start_systems.md",
 ]
 Depth = 2

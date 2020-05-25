@@ -356,6 +356,54 @@
         @test nsolutions(res) == 924
     end
 
+    @testset "stop early callback" begin
+        @var x
+        first_result = nothing
+        results = solve(
+            [(x - 3) * (x + 6) * (x + 2)];
+            stop_early_cb = r -> begin
+                first_result = r
+                true
+            end,
+            threading = false,
+            show_progress = false,
+            start_system = :total_degree,
+        )
+        @test length(results) == 1
+        @test first(results) === first_result
+
+        nresults = 0
+        result = solve(
+            [(x - 3) * (x + 6) * (x + 2)],
+            stop_early_cb = r -> (nresults += 1) == 2,
+            start_system = :total_degree,
+            show_progress = false,
+            threading = false,
+        )
+        @test length(result) == 2
+
+        # threading
+        @var x y z
+        first_result = nothing
+        # this has 5^3 = 125 solutions, so we should definitely stop early if we
+        # have less than 64 threads
+        results = solve(
+            [
+                (x - 3) * (x + 6) * (x + 2) * (x - 2) * (x + 2.5),
+                (y + 2) * (y - 2) * (y + 3) * (y + 5) * (y - 1),
+                (z + 2) * (z - 2) * (z + 3) * (z + 5) * (z - 2.1),
+            ];
+            stop_early_cb = r -> begin
+                first_result = r
+                true
+            end,
+            threading = true,
+            show_progress = false,
+            start_system = :total_degree,
+        )
+        @test length(results) < 125
+    end
+
     @testset "Many parameters solver" begin
         # Setup
         @var x y

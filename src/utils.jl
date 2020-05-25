@@ -27,6 +27,13 @@ function Base.showerror(io::IO, E::FiniteException)
     )
 end
 
+@noinline function unsupported_kwargs(kwargs)
+    if !(isempty(kwargs))
+        msg = join(["$k = $v" for (k, v) in pairs(kwargs)], ", ")
+        @warn "Ingored unsupported keyword arguments: $msg"
+    end
+end
+
 
 """
     rand_unitary_matrix(n::Int, T=ComplexF64)
