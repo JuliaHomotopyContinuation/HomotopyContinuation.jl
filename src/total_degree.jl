@@ -32,7 +32,7 @@ function total_degree_variables(
     gamma = γ,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
-    kwargs...
+    kwargs...,
 )
     unsupported_kwargs(kwargs)
     m, n = size(F)
@@ -120,7 +120,7 @@ function total_degree_variable_groups(
     target_parameters = nothing,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
-    kwargs...
+    kwargs...,
 )
     unsupported_kwargs(kwargs)
     m, n = size(F)
