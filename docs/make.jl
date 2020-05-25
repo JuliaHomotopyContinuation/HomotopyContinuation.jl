@@ -1,4 +1,4 @@
-using Documenter, HomotopyContinuation2
+using Documenter, HomotopyContinuation
 
 makedocs(
     sitename = "HomotopyContinuation.jl",
@@ -22,6 +22,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/saschatimme/HomotopyContinuation2.jl.git",
+    repo = "github.com/saschatimme/HomotopyContinuation.jl.git",
     push_preview = false,
 )

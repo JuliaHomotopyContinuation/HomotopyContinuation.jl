@@ -1,4 +1,4 @@
-module HomotopyContinuation2
+module HomotopyContinuation
 
 export ModelKit
 

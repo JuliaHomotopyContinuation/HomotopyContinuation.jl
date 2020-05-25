@@ -1,4 +1,4 @@
-using HomotopyContinuation2.ModelKit
+using HomotopyContinuation.ModelKit
 
 @testset "ModelKit" begin
     @testset "SymEngine" begin

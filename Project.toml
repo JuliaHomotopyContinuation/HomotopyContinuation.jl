@@ -1,4 +1,4 @@
-name = "HomotopyContinuation2"
+name = "HomotopyContinuation"
 uuid = "4ea7a0ca-3f64-476c-b483-fec1004562da"
 authors = ["Sascha Timme <sascha@timme.xyz>"]
 version = "2.0.0"

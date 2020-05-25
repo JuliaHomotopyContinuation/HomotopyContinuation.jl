@@ -6,7 +6,7 @@
 We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way
 
 ```@examples $(simple_solve)
-using HomotopyContinuation2 #hide
+using HomotopyContinuation #hide
 @var x y
 F = System([x^2+y^2+1, 2x+3y-1], variables = [x, y])
 solve(F)
@@ -43,7 +43,7 @@ F(x; a) := (x₁^2-a₁, x₁x₂-a₁+a₂)
 and let's say we are only interested in tracking the solution ``[1,1]``.
 This can be accomplished as follows
 ```@example
-using HomotopyContinuation2 #hide
+using HomotopyContinuation #hide
 @var x[1:2] a[1:2]
 F = System([x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]], parameters = a)
 start_solutions = [[1, 1]]
@@ -63,7 +63,7 @@ This constructs the homotopy ``H(x,t) = tG(x)+(1-t)F(x)`` to compute solutions o
 system `F`.
 `start_solutions` is a list of solutions of `G` which are tracked to solutions of `F`.
 ```@example
-using HomotopyContinuation2 #hide
+using HomotopyContinuation #hide
 @var x y
 G = System([x^2-1,y-1])
 F = System([x^2+y^2+z^2, 2x+3y-z])

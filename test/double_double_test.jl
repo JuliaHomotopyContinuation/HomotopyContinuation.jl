@@ -1,5 +1,5 @@
-using HomotopyContinuation2.DoubleDouble
-const DD = HomotopyContinuation2.DoubleDouble
+using HomotopyContinuation.DoubleDouble
+const DD = HomotopyContinuation.DoubleDouble
 
 @testset "DoubleF64" begin
     @test DoubleF64(Float32(2.0)) == DoubleF64(2.0)

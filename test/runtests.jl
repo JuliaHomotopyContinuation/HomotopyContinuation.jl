@@ -1,7 +1,7 @@
-using HomotopyContinuation2, LinearAlgebra, Test, StaticArrays, Parameters
+using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
-const HC2 = HomotopyContinuation2
+const HC2 = HomotopyContinuation
 
 include("test_systems.jl")
 
@@ -18,7 +18,7 @@ function test_show_juno(x)
     @test show(stdout, MIME("application/prs.juno.inline"), x) === x
 end
 
-@testset "HomotopyContinuation2" begin
+@testset "HomotopyContinuation" begin
     include("utils_test.jl")
     include("double_double_test.jl")
     include("binomial_system_test.jl")
