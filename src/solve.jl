@@ -422,8 +422,8 @@ update_progress!(::Nothing, stats, ntracked) = nothing
 function serial_solve(
     solver::Solver,
     starts,
-    progress,
-    stop_early_cb;
+    progress = nothing,
+    stop_early_cb = always_false;
     catch_interrupt::Bool = true,
 )
     path_results = Vector{PathResult}()
@@ -447,8 +447,8 @@ end
 function threaded_solve(
     solver::Solver,
     starts,
-    progress,
-    stop_early_cb;
+    progress = nothing,
+    stop_early_cb = always_false;
     catch_interrupt::Bool = true,
 )
     S = collect(starts)
@@ -557,10 +557,7 @@ function solve(
     n = length(target_parameters)
 
     progress = show_progress ? make_many_progress(n; delay = 0.3) : nothing
-    # if threading
-    #     threaded_many_solve(S, starts, progress; catch_interrupt = catch_interrupt)
-    # else
-    serial_many_solve(
+    many_solve(
         S,
         starts,
         target_parameters,
@@ -571,7 +568,6 @@ function solve(
         catch_interrupt = catch_interrupt,
         threading = threading,
     )
-    # end
 end
 
 
@@ -599,7 +595,7 @@ end
 end
 update_many_progress!(::Nothing, results, k; kwargs...) = nothing
 
-function serial_many_solve(
+function many_solve(
     solver::Solver,
     starts,
     many_target_parameters,
@@ -613,9 +609,9 @@ function serial_many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
-        res = threaded_solve(solver, starts, nothing; catch_interrupt = false)
+        res = threaded_solve(solver, starts; catch_interrupt = false)
     else
-        res = serial_solve(solver, starts, nothing; catch_interrupt = false)
+        res = serial_solve(solver, starts; catch_interrupt = false)
     end
     if flatten
         results = transform_result(res, q)
@@ -631,9 +627,9 @@ function serial_many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if threading
-                res = threaded_solve(solver, starts, nothing; catch_interrupt = false)
+                res = threaded_solve(solver, starts; catch_interrupt = false)
             else
-                res = serial_solve(solver, starts, nothing; catch_interrupt = false)
+                res = serial_solve(solver, starts; catch_interrupt = false)
             end
 
             if flatten
