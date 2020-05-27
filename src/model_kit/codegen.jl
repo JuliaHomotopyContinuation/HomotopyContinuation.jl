@@ -1,544 +1,870 @@
-########################
-## Lift to Type Level ##
-########################
+"""
+    TaylorVector{N,T}
 
-abstract type TExpression end
-struct TOperation{F,A1,A2} <: TExpression end
+A data structure representing a vector of Taylor series with `N` terms.
+Each element is an `NTuple{N,T}`.
 
-TExpression(x) = convert(TExpression, x)
-Base.convert(::Type{TExpression}, v::Variable) = v.name
-Base.convert(::Type{TExpression}, x::Constant) = x.value
-function Base.convert(::Type{TExpression}, op::Operation)
-    if length(op.args) == 1
-        TOperation{op.func,TExpression(op.args[1]),Nothing}()
-    else
-        TOperation{op.func,TExpression(op.args[1]),TExpression(op.args[2])}()
-    end
+    TaylorVector(T, N::Integer, n::Integer)
+
+Create a vector of `n` `NTuple{N,T}`s.
+"""
+struct TaylorVector{N,T} <: AbstractVector{NTuple{N,T}}
+    data::LinearAlgebra.Transpose{T,Matrix{T}}
+    views::NTuple{N,SubArray{T,1,Matrix{T},Tuple{Int,UnitRange{Int}},true}}
+end
+TaylorVector{N}(TV::TaylorVector{M,T}) where {N,M,T} =
+    TaylorVector{N,T}(TV.data, TV.views[1:N])
+function TaylorVector{N}(data::Matrix) where {N}
+    views = tuple((view(data, i, 1:size(data, 2)) for i = 1:N)...)
+    TaylorVector(LinearAlgebra.transpose(data), views)
+end
+function TaylorVector{N}(T, n::Integer) where {N}
+    TaylorVector{N}(zeros(T, N, n))
 end
 
-Base.convert(::Type{Expression}, ::TOperation{F,A1,Nothing}) where {F,A1} =
-    Operation(F, Expression[Expression(A1)])
-Base.convert(::Type{Expression}, ::TOperation{F,A1,A2}) where {F,A1,A2} =
-    Operation(F, Expression[Expression(A1), Expression(A2)])
-
-#############
-## TSystem ##
-#############
-struct TSystem{TE,V,P} end
-
-type_level(sys::System) = typeof(TSystem(sys.expressions, sys.variables, sys.parameters))
-function TSystem(
-    exprs::Vector{<:Expression},
-    var_order::AbstractVector{<:Variable},
-    param_order::AbstractVector{<:Variable} = Variable[],
-)
-    V = tuple((var.name for var in var_order)...)
-    if !isempty(param_order)
-        P = tuple((var.name for var in param_order)...)
-    else
-        P = Nothing
-    end
-    TE = tuple(convert.(TExpression, exprs)...)
-    TSystem{TE,V,P}()
+function Base.show(io::IO, ::MIME"text/plain", X::TaylorVector)
+    summary(io, X)
+    isempty(X) && return
+    println(io, ":")
+    Base.print_array(io, map(i -> X[i], 1:length(X)))
 end
 
-Base.show(io::IO, ::Type{T}) where {T<:TSystem} = show_info(io, T)
-function Base.show(io::IO, TS::TSystem)
-    show_info(io, typeof(TS))
-    print(io, "()")
-end
-function show_info(io::IO, ::Type{TSystem{TE,V,P}}) where {TE,V,P}
-    n = length(TE)
-    m = length(V)
-    mp = (P == Nothing ? 0 : length(P))
-    print(io, "TSystem{$n,$m,$mp,#$(hash(TE))}")
-end
-
-
-interpret(TS::TSystem) = interpret(typeof(TS))
-function interpret(::Type{TSystem{TE,V,P}}) where {TE,V,P}
-    exprs = [Expression(e) for e in TE]
-    vars = [Variable(e) for e in V]
-    if P == Nothing
-        params = Variable[]
-    else
-        params = [Variable(v) for v in P]
-    end
-    System(exprs, vars, params)
-end
-
-###############
-## THomotopy ##
-###############
-
-struct THomotopy{TE,V,T,P} end
-
-type_level(sys::Homotopy) =
-    typeof(THomotopy(sys.expressions, sys.variables, sys.t, sys.parameters))
-function THomotopy(
-    exprs::Vector{<:Expression},
-    var_order::AbstractVector{<:Variable},
-    t::Variable,
-    param_order::AbstractVector{<:Variable} = Variable[],
-)
-    TE = tuple(convert.(TExpression, exprs)...)
-    V = tuple((var.name for var in var_order)...)
-    T = t.name
-    P = isempty(param_order) ? Nothing : tuple((var.name for var in param_order)...)
-    THomotopy{TE,V,T,P}()
-end
-
-Base.show(io::IO, ::Type{T}) where {T<:THomotopy} = show_info(io, T)
-function Base.show(io::IO, TS::THomotopy)
-    show_info(io, typeof(TS))
-    print(io, "()")
-end
-function show_info(io::IO, ::Type{THomotopy{TE,V,T,P}}) where {TE,V,T,P}
-    n = length(TE)
-    m = length(V)
-    mp = (P == Nothing ? 0 : length(P))
-    print(io, "THomotopy{$n,$m,$mp,#$(hash(TE))}")
-end
-
-interpret(TS::THomotopy) = interpret(typeof(TS))
-function interpret(::Type{THomotopy{TE,V,T,P}}) where {TE,V,T,P}
-    exprs = [Expression(e) for e in TE]
-    vars = [Variable(e) for e in V]
-    t = Variable(T)
-    params = P == Nothing ? Variable[] : [Variable(v) for v in P]
-    Homotopy(exprs, vars, t, params)
-end
-
-###########################
-## CODEGEN + COMPILATION ##
-###########################
-
-struct InstructionId
-    name::Symbol
-end
-name(id::InstructionId) = id.name
-
-Base.:(==)(x::InstructionId, y::InstructionId) = x.name == y.name
-Base.show(io::IO, v::InstructionId) = print(io, v.name)
-Base.convert(::Type{Expr}, x::InstructionId) = x.name
-
-const SimpleExpression = Union{InstructionId,Constant,Variable}
-
-struct Instruction
-    func::Union{Nothing,Symbol} # module, function name
-    args::Vector{SimpleExpression}
-end
-
-Instruction(f::Union{Nothing,Symbol}, a::SimpleExpression) = Instruction(f, [a])
-Instruction(x::SimpleExpression) = Instruction(nothing, x)
-
-Base.hash(I::Instruction, h::UInt) = foldr(hash, I.args, init = hash(I.func, h))
-Base.:(==)(a::Instruction, b::Instruction) = a.func == b.func && a.args == b.args
-
-function Base.convert(::Type{Expr}, op::Instruction)
-    if op.func === nothing && length(op.args) == 1
-        convert(Expr, op.args[1])
-    else
-        Expr(:call, op.func, convert.(Expr, op.args)...)
-    end
-end
-Base.show(io::IO, op::Instruction) = print(io, convert(Expr, op))
-
-
-struct InstructionList
-    instructions::OrderedDict{Instruction,InstructionId}
-    var::Symbol
-    n::Base.RefValue{Int}
-end
-
-function InstructionList(; var::Symbol = :ι, n::Base.RefValue{Int} = Ref(0))
-    instructions = OrderedDict{Instruction,InstructionId}()
-    InstructionList(instructions, var, n)
-end
-
-function Base.push!(v::InstructionList, i::Instruction; id_var::Symbol = v.var)
-    if haskey(v.instructions, i)
-        v.instructions[i]
-    else
-        id = InstructionId(Symbol(id_var, v.n[] += 1))
-        push!(v.instructions, i => id)
-        id
-    end
-end
-
-Base.push!(list::InstructionList, x::SimpleExpression) = push!(list, Instruction(x))
-
-function Base.push!(list::InstructionList, op::Operation)
-    if op.func == :^ &&
-       op.args[2] isa Constant && op.args[2].value isa Integer && op.args[2].value > 1
-        n = op.args[2].value
-        if n == 2
-            i = _push!(list, op.args[1])
-            push!(list, Instruction(:*, [i, i]))
-        else
-            n₁ = div(n, 2) + 1 # make sure n₁ > n₂
-            n₂ = n - n₁
-            id1 = push!(list, Operation(:^, op.args[1], Constant(n₁)))
-            if n₂ == 1
-                push!(list, Instruction(:*, [id1, _push!(list, op.args[1])]))
-            else
-                id2 = push!(list, Operation(:^, op.args[1], Constant(n₂)))
-                push!(list, Instruction(:*, [id1, id2]))
-            end
-        end
-    else
-        push!(list, Instruction(op.func, map(arg -> _push!(list, arg), op.args)))
-    end
-end
-_push!(list::InstructionList, op::Operation) = push!(list, op)
-_push!(list::InstructionList, op::Expression) = op
-
-Base.length(v::InstructionList) = length(v.instructions)
-Base.iterate(v::InstructionList) = iterate(v.instructions)
-Base.iterate(v::InstructionList, state) = iterate(v.instructions, state)
-Base.eltype(v::Type{InstructionList}) = eltype(v.instructions)
-
-function Base.show(io::IO, ::MIME"text/plain", list::InstructionList)
-    println(io, "InstructionList:")
-    for (instr, id) in list
-        println(io, convert(Expr, id), " = ", convert(Expr, instr))
-    end
-end
-
-function Base.convert(::Type{Expr}, list::InstructionList)
-    Expr(:block, map(list) do (instr, id)
-        :($(convert(Expr, id)) = $(convert(Expr, instr)))
-    end...)
-end
-
-
-## CODEGEN
-struct Compiled{T1<:Union{TSystem,THomotopy},T2<:Union{System,Homotopy}}
-    obj::T2
-end
-Compiled(obj::T) where {T<:Union{System,Homotopy}} = Compiled{type_level(obj),T}(obj)
-
-Base.size(C::Compiled) = size(C.obj)
-Base.size(C::Compiled, i::Integer) = size(C.obj, i)
-Base.length(C::Compiled) = length(C.obj)
-
-const CompiledSystem{T<:TSystem} = Compiled{T,System}
-const CompiledHomotopy{T<:THomotopy} = Compiled{T,Homotopy}
+Base.length(TV::TaylorVector) = size(TV.data, 1)
+Base.size(TV::TaylorVector) = (length(TV),)
+Base.eltype(::Type{TaylorVector{N,T}}) where {N,T} = NTuple{N,T}
+Base.IndexStyle(::TaylorVector) = Base.IndexLinear()
 
 """
-    compile(F::System)
+    vectors(TV::TaylorVec{N})
+
+Return the Taylor series as `N` seperate vectors.
+"""
+vectors(TV::TaylorVector) = TV.views
+
+@generated function Base.getindex(TV::TaylorVector{N}, i::Integer) where {N}
+    quote
+        Base.@_propagate_inbounds_meta
+        x = TV.data
+        $(Expr(:tuple, (:(x[i, $k]) for k = 1:N)...))
+    end
+end
+Base.getindex(TV::TaylorVector, i::Integer, j::Integer) = getindex(TV.data, i, j)
+
+function Base.setindex!(TV::TaylorVector{N,T}, x, i::Integer) where {N,T}
+    setindex!(TV, convert(NTuple{N,T}, x), i)
+end
+function Base.setindex!(TV::TaylorVector{1}, x::Number, i::Integer)
+    TV.data[i] = x
+    x
+end
+@generated function Base.setindex!(
+    TV::TaylorVector{N,T},
+    x::NTuple{N,T},
+    i::Integer,
+) where {N,T}
+    quote
+        Base.@_propagate_inbounds_meta
+        d = TV.data
+        $(Expr(:tuple, (:(d[i, $k]) for k = 1:N)...)) = x
+        x
+    end
+end
+Base.setindex!(TV::TaylorVector, x, i::Integer, j::Integer) = setindex!(TV.data, x, i, j)
+
+#####################
+## CompiledSystem  ##
+#####################
+const TSYSTEM_TABLE = Dict{UInt,Vector{System}}()
+
+struct CompiledSystem{HI}
+    nexpressions::Int
+    nvariables::Int
+    nparameters::Int
+    system::System
+end
+
+function CompiledSystem(F::System)
+    n = length(F)
+    nvars = nvariables(F)
+    nparams = nparameters(F)
+
+    # We substitute all variable and parameter names away such that two systems
+    # compile to the same code independently of the names
+    @var _x_[1:nvars] _p_[1:nparams]
+    D = ExpressionMap()
+    for (x, y) in zip(variables(F), _x_)
+        D[x] = y
+    end
+    for (x, y) in zip(parameters(F), _p_)
+        D[x] = y
+    end
+    cleard_exprs = subs(expressions(F), D)
+    sys = System(cleard_exprs, _x_, _p_)
+    h = hash(cleard_exprs)
+    k = 0
+    if haskey(TSYSTEM_TABLE, h)
+        # check that it is identical
+        for (i, vi) in enumerate(TSYSTEM_TABLE[h])
+            if vi == sys
+                k = i
+                break
+            end
+        end
+        if k == 0
+            push!(TSYSTEM_TABLE[h], sys)
+            k = length(TSYSTEM_TABLE[h])
+        end
+    else
+        k = 1
+        TSYSTEM_TABLE[h] = [sys]
+    end
+    return CompiledSystem{(h, k)}(n, nvars, nparams, F)
+end
+
+function Base.show(io::IO, TS::CompiledSystem)
+    print(io, "Compiled: ")
+    show(io, TS.system)
+end
+
+interpret(TS::CompiledSystem) = TS.system
+interpret(::Type{CompiledSystem{HI}}) where {HI} = TSYSTEM_TABLE[first(HI)][last(HI)]
+
+Base.size(CS::CompiledSystem) = (CS.nexpressions, CS.nvariables)
+Base.size(CS::CompiledSystem, i::Integer) = size(CS)[i]
+Base.length(CS::CompiledSystem) = CS.nexpressions
+nparameters(CS::CompiledSystem) = CS.nparameters
+nvariables(CS::CompiledSystem) = CS.nvariables
+
+######################
+## CompiledHomotopy ##
+######################
+
+const THOMOTOPY_TABLE = Dict{UInt,Vector{Homotopy}}()
+
+struct CompiledHomotopy{HI}
+    nexpressions::Int
+    nvariables::Int
+    nparameters::Int
+    homotopy::Homotopy
+end
+
+function CompiledHomotopy(H::Homotopy)
+    n = length(H)
+    nvars = nvariables(H)
+    nparams = nparameters(H)
+
+    # We substitute all variable and parameter names away such that two homotopies
+    # compile to the same code independently of the names
+    @var _x_[1:nvars] _t_ _p_[1:nparams]
+    D = ExpressionMap()
+    for (x, y) in zip(variables(H), _x_)
+        D[x] = y
+    end
+    for (x, y) in zip(parameters(H), _p_)
+        D[x] = y
+    end
+    D[H.t] = _t_
+    cleard_exprs = subs(expressions(H), D)
+    homotopy = Homotopy(cleard_exprs, _x_, _t_, _p_)
+    h = hash(cleard_exprs)
+
+    k = 0
+    if haskey(THOMOTOPY_TABLE, h)
+        # check that it is identical
+        for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
+            if vi == homotopy
+                k = 1
+                break
+            end
+        end
+        if k == 0
+            push!(THOMOTOPY_TABLE[h], homotopy)
+            k = 1
+        end
+    else
+        k = 1
+        THOMOTOPY_TABLE[h] = [homotopy]
+    end
+    return CompiledHomotopy{(h, 1)}(n, nvars, nparams, H)
+end
+
+Base.size(CH::CompiledHomotopy) = (CH.nexpressions, CH.nvariables)
+Base.size(CH::CompiledHomotopy, i::Integer) = size(CH)[i]
+Base.length(CH::CompiledHomotopy) = CH.nexpressions
+nparameters(CH::CompiledHomotopy) = CH.nparameters
+nvariables(CH::CompiledHomotopy) = CH.nvariables
+
+function Base.show(io::IO, TH::CompiledHomotopy)
+    print(io, "Compiled: ")
+    show(io, TH.homotopy)
+end
+
+interpret(CH::CompiledHomotopy) = CH.homotopy
+interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][last(HI)]
+
+"""
+    compile(F::System; optimizations = true)
+
+Compile the given system. Returns a `CompiledSystem`. If `optimizations == true` then
+the given system is optimized for evaluation efficiency.
+
     compile(H::Homotopy)
 
-Compile the given object to a straight line program.
+Compile the given homotopy. Returns a `CompiledHomotopy`.
 """
-compile(F::System) = Compiled(F)
-compile(H::Homotopy) = Compiled(H)
+compile(F::System; optimizations::Bool = true) =
+    CompiledSystem(optimizations ? optimize(F) : F)
+compile(H::Homotopy) = CompiledHomotopy(H)
 
-interpreted(C::Compiled) = C.obj
+#############
+## CODEGEN ##
+#############
 
-function Base.show(io::IO, C::Compiled{T}) where {T}
-    println(io, "Compiled{", T, "}:")
-    show(io, C.obj)
-end
-
-#################
-## evaluations ##
-#################
-const TExpr = Union{TSystem,THomotopy}
-
-make_indexing(F::System) = make_indexing(F.variables, nothing, F.parameters)
-make_indexing(H::Homotopy) = make_indexing(H.variables, H.t, H.parameters)
-function make_indexing(vars, t, params)
-    lhs = Any[convert(Expr, v) for v in vars]
-    rhs = Any[:(x[$i]) for i = 1:length(vars)]
+boundscheck_var_map(F::System; kwargs...) =
+    boundscheck_var_map(F.expressions, F.variables, F.parameters; kwargs...)
+boundscheck_var_map(H::Homotopy; kwargs...) =
+    boundscheck_var_map(H.expressions, H.variables, H.parameters, H.t; kwargs...)
+function boundscheck_var_map(
+    exprs,
+    vars,
+    params,
+    t = nothing;
+    taylor = false,
+    jacobian::Bool = false,
+)
+    n = length(exprs)
+    m = length(vars)
+    l = length(params)
+    var_map = Dict{Symbol,Union{Symbol,Expr}}()
+    for i = 1:m
+        if taylor
+            var_map[Symbol(vars[i])] = :(x[$i, 1])
+        else
+            var_map[Symbol(vars[i])] = :(x[$i])
+        end
+    end
+    for i = 1:l
+        if taylor
+            var_map[Symbol(params[i])] = :(p[$i, 1])
+        else
+            var_map[Symbol(params[i])] = :(p[$i])
+        end
+    end
     if t !== nothing
-        push!(lhs, convert(Expr, t))
-        push!(rhs, :t)
+        var_map[Symbol(t)] = :(t)
     end
-    if params !== nothing
-        append!(lhs, convert.(Expr, params))
-        for i = 1:length(params)
-            push!(rhs, :(p[$i]))
-        end
+
+    checks = Expr[]
+    if jacobian
+        push!(checks, :(@boundscheck checkbounds(U, 1:$n, 1:$m)))
+    else
+        push!(checks, :(@boundscheck checkbounds(u, 1:$n)))
     end
-    :($(Expr(:tuple, lhs...)) = $(Expr(:tuple, rhs...)))
+    push!(checks, :(@boundscheck checkbounds(x, 1:$m)))
+    push!(checks, :(@boundscheck p === nothing || checkbounds(p, 1:$l)))
+
+    Expr(:block, checks...), var_map
 end
 
-interpret(T::Type{<:TSystem}) = System(T)
-interpret(T::Type{<:THomotopy}) = Homotopy(T)
-
-function jacobian!(U::AbstractMatrix, S::Compiled, args...)
-    evaluate_and_jacobian!(nothing, U, S, args...)
-    U
-end
-function evaluate_and_jacobian(S::Compiled, args...)
-    evaluate(S, args...), jacobian(S, args...)
+function add_assignement!(D::Dict{Symbol,Vector{Expr}}, id::Symbol, e::Expr)
+    if haskey(D, id)
+        push!(D[id], e)
+    else
+        D[id] = [e]
+    end
+    D
 end
 
-function _evaluate_impl(::Type{T}) where {T<:TExpr}
+function _evaluate!_impl(::Type{T}) where {T<:Union{CompiledSystem,CompiledHomotopy}}
     I = interpret(T)
-    quote
-        let $(make_indexing(I))
-            $(begin
-                list = InstructionList()
-                ids = [convert(Expr, push!(list, fi)) for fi in I.expressions]
-                quote
-                    $(convert(Expr, list))
-                    @SVector $(Expr(:vect, ids...))
-                end
-            end)
+    checks, var_map = boundscheck_var_map(I)
+    slp = let
+        list, ids = instruction_list(I.expressions)
+        assignements = Dict{Symbol,Vector{Expr}}()
+        for (i, id) in enumerate(ids)
+            add_assignement!(assignements, id, :(u[$i] = $id))
         end
+        to_expr(list, var_map, assignements)
     end
-end
 
-@generated function evaluate(F::CompiledSystem{T}, x::AbstractVector, p = nothing) where {T}
-    _evaluate_impl(T)
-end
-(F::CompiledSystem)(x, p = nothing) = evaluate(F, x, p)
-@generated function evaluate(
-    F::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
-    p = nothing,
-) where {T}
-    _evaluate_impl(T)
-end
-(H::CompiledHomotopy)(x, t, p = nothing) = evaluate(H, x, t, p)
-
-function _evaluate!_impl(::Type{T}) where {T<:TExpr}
-    u = gensym(:u)
-    I = interpret(T)
     quote
-        let $u = u
-            let $(make_indexing(I))
-                $(begin
-                    list = InstructionList()
-                    ids = [convert(Expr, push!(list, fi)) for fi in I.expressions]
-                    quote
-                        $(convert(Expr, list))
-                        $(map(i -> :($u[$i] = $(ids[i])), 1:length(ids))...)
-                    end
-                end)
-            end
-        end
+        $checks
+        @inbounds $slp
         u
     end
 end
 
-@generated function evaluate!(
-    u::AbstractVector,
-    F::CompiledSystem{T},
-    x::AbstractVector,
-    p = nothing,
-) where {T}
-    _evaluate!_impl(T)
-end
-@generated function evaluate!(
-    u::AbstractVector,
-    F::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
-    p = nothing,
-) where {T}
-    _evaluate!_impl(T)
+function _jacobian!_impl(::Type{T}) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+    I = interpret(T)
+    checks, var_map = boundscheck_var_map(I; jacobian = true)
+
+    slp = let
+        list, ids = instruction_list(I.expressions)
+        vars = Symbol.(I.variables)
+        params = Symbol.(I.parameters)
+        dlist, J = diff(list, vars, ids)
+
+        assignements = Dict{Symbol,Vector{Expr}}()
+
+        U_constants = Expr[]
+        for j = 1:size(J, 2), i = 1:size(J, 1)
+            if J[i, j] isa Symbol
+                if J[i, j] ∉ vars && J[i, j] ∉ params
+                    add_assignement!(assignements, J[i, j], :(U[$i, $j] = $(J[i, j])))
+                else
+                    push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
+                end
+            elseif J[i, j] !== nothing
+                push!(U_constants, :(U[$i, $j] = $(J[i, j])))
+            end
+        end
+        expr = to_expr(dlist, var_map, assignements)
+        append!(expr.args, U_constants)
+        expr
+    end
+    quote
+        $checks
+        U .= zero(eltype(x))
+        @inbounds $slp
+        U
+    end
 end
 
-function _evaluate_and_jacobian!_impl(::Type{T}) where {T<:TExpr}
-    u, U = gensym(:u), gensym(:U)
+function _evaluate_and_jacobian!_impl(
+    ::Type{T},
+) where {T<:Union{CompiledSystem,CompiledHomotopy}}
     I = interpret(T)
-    n, m = size(I)
+    checks, var_map = boundscheck_var_map(I; jacobian = true)
+
+    slp = let
+        list, ids = instruction_list(I.expressions)
+        vars = Symbol.(I.variables)
+        params = Symbol.(I.parameters)
+        dlist, J = diff(list, vars, ids)
+
+        assignements = Dict{Symbol,Vector{Expr}}()
+        for (i, id) in enumerate(ids)
+            add_assignement!(assignements, id, :(u[$i] = $id))
+        end
+
+        U_constants = Expr[]
+        for j = 1:size(J, 2), i = 1:size(J, 1)
+            if J[i, j] isa Symbol
+                if J[i, j] ∉ vars && J[i, j] ∉ params
+                    add_assignement!(assignements, J[i, j], :(U[$i, $j] = $(J[i, j])))
+                else
+                    push!(U_constants, :(U[$i, $j] = $(var_map[J[i, j]])))
+                end
+            elseif J[i, j] !== nothing
+                push!(U_constants, :(U[$i, $j] = $(J[i, j])))
+            end
+        end
+        expr = to_expr(dlist, var_map, assignements)
+        append!(expr.args, U_constants)
+        expr
+    end
     quote
-        let ($u, $U) = (u, U)
-            let $(make_indexing(I))
-                $(
-                    begin
-                        list = InstructionList()
-                        eval_ids = Vector{Any}(undef, n)
-                        jac_ids = Matrix{Any}(undef, n, m)
-                        for i = 1:n
-                            fᵢ = I.expressions[i]
-                            eval_ids[i] = convert(Expr, push!(list, fᵢ))
-                            for j = 1:m
-                                jac_ids[i, j] =
-                                    convert(Expr, push!(list, I.jacobian[i, j]))
-                            end
-                        end
-                        quote
-                            $(convert(Expr, list))
-                            if !($u isa Nothing)
-                                $(map(i -> :($u[$i] = $(eval_ids[i])), 1:n)...)
-                            end
-                            $(
-                                vec([
-                                    :($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m
-                                ])...
-                            )
-                            nothing
-                        end
+        $checks
+        U .= zero(eltype(x))
+        @inbounds $slp
+        nothing
+    end
+end
+
+Base.@propagate_inbounds function set_row!(u::AbstractMatrix, t::Tuple{A}, i) where {A}
+    u[i, 1] = first(t)
+end
+Base.@propagate_inbounds function set_row!(u::AbstractMatrix, t::Tuple{A,B}, i) where {A,B}
+    a, b = t
+    u[i, 1] = a
+    u[i, 2] = b
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C},
+    i,
+) where {A,B,C}
+    a, b, c = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C,D},
+    i,
+) where {A,B,C,D}
+    a, b, c, d = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+    u[i, 4] = d
+end
+Base.@propagate_inbounds function set_row!(
+    u::AbstractMatrix,
+    t::Tuple{A,B,C,D,E},
+    i,
+) where {A,B,C,D,E}
+    a, b, c, d, e = t
+    u[i, 1] = a
+    u[i, 2] = b
+    u[i, 3] = c
+    u[i, 4] = d
+    u[i, 5] = e
+end
+
+function _functions_taylor!_impl(
+    ::Type{T},
+    K::Int;
+    highest_order_only::Bool,
+) where {T<:Union{CompiledSystem,CompiledHomotopy}}
+    I = interpret(T)
+    checks, var_map = boundscheck_var_map(I)
+    list, ids = instruction_list(I.expressions)
+    assignements = Dict{Symbol,Vector{Expr}}()
+    for (i, id) in enumerate(ids)
+        if highest_order_only
+            add_assignement!(assignements, id, :(u[$i] = last($id)))
+        else
+            add_assignement!(assignements, id, :(set_row!(u, $id, $i)))
+        end
+    end
+
+    block = Expr(:block)
+    exprs = block.args
+    for (id, (op, arg1, arg2)) in list.instructions
+        a = get(var_map, arg1, arg1)
+        if op == :^
+            r::Int = arg2
+            if r == 2
+                push!(exprs, :($id = taylor(Val{:sqr}, Val{$K}, $a)))
+            else
+                push!(exprs, :($id = taylor(Val{:^}, Val{$K}, $a, $r)))
+            end
+        elseif arg2 !== nothing
+            b = get(var_map, arg2, arg2)
+            push!(exprs, :($id = taylor(Val{$(QuoteNode(op))}, Val{$K}, $a, $b)))
+        else
+            push!(exprs, :($id = taylor(Val{$(QuoteNode(op))}, Val{$K}, $a)))
+        end
+        if haskey(assignements, id)
+            append!(exprs, assignements[id])
+        end
+    end
+    # TODO: let block only if homotopy....
+    if I isa Homotopy
+        quote
+            $checks
+            let t = (t, one(t))
+                @inbounds $block
+            end
+            u
+        end
+    else
+        quote
+            $checks
+            @inbounds $block
+            u
+        end
+    end
+end
+
+function _inline_taylor!_impl(
+    T::Type{<:Union{CompiledHomotopy,CompiledSystem}},
+    K,
+    dx,
+    dp;
+    highest_order_only::Bool,
+)
+    H = interpret(T)
+    # @show H
+    checks, var_map = boundscheck_var_map(H; taylor = true)
+
+    list, ids = instruction_list(H.expressions)
+
+    vars = Symbol.(H.variables)
+    params = Symbol.(H.parameters)
+    # @show vars, dx, dp
+    # @show params
+    diff_map = DiffMap()
+    for (i, v) in enumerate(vars)
+        for k = 1:dx
+            diff_map[v, k] = :(x[$i, $(k + 1)])
+        end
+    end
+
+    for (i, v) in enumerate(params)
+        for k = 1:dp
+            diff_map[v, k] = :(p[$i, $(k + 1)])
+        end
+    end
+
+    if H isa Homotopy
+        diff_map[Symbol(H.t), 1] = 1
+    end
+    # @show diff_map
+    dlist = univariate_diff!(list, K, diff_map)
+
+    assignements = Dict{Symbol,Vector{Expr}}()
+    u_constants = Expr[]
+
+    if highest_order_only
+        for (i, id) in enumerate(ids)
+            k = K
+            k_id = diff_map[id, k]
+            if k_id isa Symbol
+                if k_id ∉ vars && k_id ∉ params
+                    add_assignement!(assignements, k_id, :(u[$i] = $k_id))
+                else
+                    push!(u_constants, :(u[$i] = $(var_map[k_id])))
+                end
+            elseif k_id isa Nothing
+                push!(u_constants, :(u[$i] = zero(eltype(u))))
+            else
+                push!(u_constants, :(u[$i] = $k_id))
+            end
+        end
+    else
+        for (i, id) in enumerate(ids)
+            add_assignement!(assignements, id, :(u[$i, 1] = $id))
+            for k = 1:K
+                k_id = diff_map[id, k]
+                if k_id isa Symbol
+                    if k_id ∉ vars && k_id ∉ params
+                        add_assignement!(assignements, k_id, :(u[$i, $(k + 1)] = $k_id))
+                    else
+                        push!(u_constants, :(u[$i, $(k + 1)] = $(var_map[k_id])))
                     end
-                )
+                elseif k_id isa Nothing
+                    push!(u_constants, :(u[$i, $(k + 1)] = zero(u[$i, $(k + 1)])))
+                else
+                    push!(u_constants, :(u[$i, $(k + 1)] = $k_id))
+                end
             end
         end
     end
-end
+    slp = to_expr(dlist, var_map, assignements)
+    append!(slp.args, u_constants)
 
-@generated function evaluate_and_jacobian!(
-    u::Union{Nothing,AbstractVector},
-    U::AbstractMatrix,
-    F::CompiledSystem{T},
-    x::AbstractVector,
-    p::Union{Nothing,AbstractVector} = nothing,
-) where {T}
-    _evaluate_and_jacobian!_impl(T)
-end
-@generated function evaluate_and_jacobian!(
-    u::Union{Nothing,AbstractVector},
-    U::AbstractMatrix,
-    F::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
-    p::Union{Nothing,AbstractVector} = nothing,
-) where {T}
-    _evaluate_and_jacobian!_impl(T)
-end
-
-function _jacobian_impl(::Type{T}) where {T<:TExpr}
-    I = interpret(T)
-    n, m = size(I)
     quote
-        let $(make_indexing(I))
-            $(
-                begin
-                    list = InstructionList()
-                    jac_ids = map(e -> convert(Expr, push!(list, e)), I.jacobian)
-                    quote
-                        $(convert(Expr, list))
-                        @SMatrix $(Expr(
-                            :vcat,
-                            (Expr(:row, jac_ids[i, :]...) for i = 1:n)...,
-                        ))
-                    end
-                end
-            )
-        end
-    end
-end
-
-@generated function jacobian(F::CompiledSystem{T}, x, p = nothing) where {T}
-    _jacobian_impl(T)
-end
-
-@generated function jacobian(F::CompiledHomotopy{T}, x, t, p = nothing) where {T}
-    _jacobian_impl(T)
-end
-
-function _dt_impl(::Type{T}) where {T<:THomotopy}
-    I = interpret(T)
-    quote
-        let $(make_indexing(I))
-            $(begin
-                list = InstructionList()
-                ids = map(e -> convert(Expr, push!(list, e)), I.dt)
-                quote
-                    $(convert(Expr, list))
-                    @SVector $(Expr(:vect, ids...))
-                end
-            end)
-        end
-    end
-end
-
-@generated function dt(H::CompiledHomotopy{T}, x::AbstractVector, t, p = nothing) where {T}
-    _dt_impl(T)
-end
-
-function _dt!_impl(::Type{T}) where {T<:THomotopy}
-    u = gensym(:u)
-    I = interpret(T)
-    quote
-        let $u = u
-            let $(make_indexing(I))
-                $(begin
-                    list = InstructionList()
-                    ids = map(e -> convert(Expr, push!(list, e)), I.dt)
-                    quote
-                        $(convert(Expr, list))
-                        $((:($u[$i] = $(ids[i])) for i = 1:length(ids))...)
-                    end
-                end)
-            end
-        end
+        $checks
+        @inbounds $slp
         u
     end
 end
 
-@generated function dt!(
-    u::AbstractVector,
-    H::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
-    p = nothing,
-) where {T}
-    _dt!_impl(T)
-end
-
-####
-
-function _jacobian_and_dt!_impl(::Type{T}) where {T<:THomotopy}
-    u, U = gensym(:u), gensym(:U)
-    I = interpret(T)
-    n, m = size(I)
-    quote
-        let ($u, $U) = (u, U)
-            let $(make_indexing(I))
-                $(
-                    begin
-                        list = InstructionList()
-                        dt_ids = Vector{Any}(undef, n)
-                        jac_ids = Matrix{Any}(undef, n, m)
-                        for i = 1:n
-                            fᵢ = I.expressions[i]
-                            dt_ids[i] = convert(Expr, push!(list, I.dt[i]))
-                            for j = 1:m
-                                jac_ids[i, j] =
-                                    convert(Expr, push!(list, I.jacobian[i, j]))
-                            end
-                        end
-                        quote
-                            $(convert(Expr, list))
-                            if !($u isa Nothing)
-                                $(map(i -> :($u[$i] = $(dt_ids[i])), 1:n)...)
-                            end
-                            $(
-                                vec([
-                                    :($U[$i, $j] = $(jac_ids[i, j])) for i = 1:n, j = 1:m
-                                ])...
-                            )
-                            nothing
-                        end
-                    end
-                )
-            end
-        end
+function _taylor!_impl(T, K, D, DP; kwargs...)
+    # Experiments show that for K < 2 (i.e. u and u̇) the fully inlined version has better
+    # compilation times, for K ≥ 2 the function version starts to become
+    # significantly faster
+    if K ≤ 1
+        _inline_taylor!_impl(T, K, D, DP; kwargs...)
+    else
+        _functions_taylor!_impl(T, K; kwargs...)
     end
 end
 
-@generated function jacobian_and_dt!(
-    U::AbstractMatrix,
-    u::AbstractVector,
-    H::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
-    p = nothing,
-) where {T}
-    _jacobian_and_dt!_impl(T)
+################
+## EVALUATION ##
+################
+
+# inplace (generated)
+"""
+    evaluate!(u, T::CompiledSystem, x, p = nothing)
+
+Evaluate `T` for variables `x` and parameters `p` and store result in `u`.
+"""
+@generated function evaluate!(u, T::CompiledSystem, x, p = nothing)
+    _evaluate!_impl(T)
 end
 
-function jacobian_and_dt(
-    H::CompiledHomotopy{T},
-    x::AbstractVector,
-    t,
+"""
+    evaluate!(u, T::CompiledHomotopy, x, t, p = nothing)
+
+Evaluate `T` for variables `x`, `t` and parameters `p` and store result in `u`.
+"""
+@generated function evaluate!(u, T::CompiledHomotopy, x, t, p = nothing)
+    _evaluate!_impl(T)
+end
+
+"""
+    jacobian!(U, T::CompiledHomotopy, x, p = nothing)
+
+Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p`
+and store result in `u`.
+"""
+@generated function jacobian!(U, T::CompiledSystem, x, p = nothing)
+    _jacobian!_impl(T)
+end
+
+"""
+    jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
+
+Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p` and
+store result in `u`.
+"""
+@generated function jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
+    _jacobian!_impl(T)
+end
+
+"""
+    evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, p = nothing)
+
+Evaluate `T` and its Jacobian for variables `x` and parameters `p` and
+store result in `u`.
+"""
+@generated function evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
+    _evaluate_and_jacobian!_impl(T)
+end
+
+"""
+    evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, t, p = nothing)
+
+Evaluate `T` and its Jacobian for variables `x`, `t` and parameters `p` and
+store result in `u`.
+"""
+@generated function evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, t, p = nothing)
+    _evaluate_and_jacobian!_impl(T)
+end
+
+"""
+    taylor!(
+        u::AbstractMatrix,
+        v::Val{M}
+        F::CompiledSystem,
+        x::TaylorVector{D},
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
+    taylor!(
+        u::TaylorVector{M},
+        v::Val{M}
+        F::CompiledSystem,
+        x::TaylorVector{D},
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
+
+Compute the Taylor series of ``u = F(x,p)`` given the Taylor series `x` and `p`.
+"""
+@generated function taylor!(
+    u::AbstractMatrix,
+    v::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = false)
+end
+@generated function taylor!(
+    u::AbstractMatrix,
+    v::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = false)
+end
+@generated function taylor!(
+    u::AbstractMatrix,
+    v::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::TaylorVector{DP},
+) where {M,D,DP}
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = false)
+end
+
+function taylor!(
+    u::TaylorVector{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
     p = nothing,
-) where {T}
-    dt(H, x, t, p), jacobian(H, x, t, p)
+) where {M,D}
+    taylor!(u.data, Val(M - 1), T, x, p)
+    u
+end
+
+
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::TaylorVector{D},
+    p::TaylorVector{DP},
+) where {M,D,DP}
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
+end
+
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::Nothing = nothing,
+) where {M}
+    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::AbstractVector,
+) where {M}
+    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledSystem,
+    x::AbstractVector,
+    p::TaylorVector{DP},
+) where {M,DP}
+    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
+end
+
+"""
+    taylor!(
+        u::AbstractVector,
+        ::Val{M}
+        H::Homotopy,
+        x::TaylorVector{D},
+        t::Number,
+        p::Union{Nothing,Vector,TaylorVector} = nothing,
+    )
+
+Compute the `M`-th derivative of ``u=H(x,t,p)`` given the taylor series `x` and `p`.
+"""
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::TaylorVector{D},
+    t::Number,
+    p::Nothing = nothing,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::TaylorVector{D},
+    t::Number,
+    p::AbstractVector,
+) where {M,D}
+    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::TaylorVector{D},
+    t::Number,
+    p::TaylorVector{DP},
+) where {M,D,DP}
+    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::Nothing = nothing,
+) where {M}
+    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{M},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::AbstractVector,
+) where {M}
+    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
+end
+@generated function taylor!(
+    u::AbstractVector,
+    ::Val{1},
+    T::CompiledHomotopy,
+    x::AbstractVector,
+    t::Number,
+    p::TaylorVector{DP},
+) where {M,DP}
+    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
+end
+
+# non-inplace
+
+"""
+    to_smallest_eltype(A::AbstractArray)
+
+Convert an array to the smallest eltype such that all elements still fit.
+
+## Example
+```julia
+typeof(to_smallest_elype(Any[2,3])) == Vector{Int}
+```
+"""
+function to_smallest_eltype(A::AbstractArray)
+    T = typeof(first(A))
+    for a in A
+        T = promote_type(T, typeof(a))
+    end
+    convert.(T, A)
+end
+
+function evaluate(T::CompiledSystem, x, p = nothing)
+    to_smallest_eltype(evaluate!(Vector{Any}(undef, size(T, 1)), T, x, p))
+end
+function evaluate(T::CompiledHomotopy, x, t, p = nothing)
+    to_smallest_eltype(evaluate!(Vector{Any}(undef, size(T, 1)), T, x, t, p))
+end
+
+(T::CompiledSystem)(x, p = nothing) = evaluate(x, p)
+(T::CompiledHomotopy)(x, t, p = nothing) = evaluate(x, t, p)
+
+function jacobian(T::CompiledSystem, x, p = nothing)
+    n, m = size(T)
+    U = Matrix{Any}(undef, n, m)
+    to_smallest_eltype(jacobian!(U, T, x, p))
+end
+function jacobian(T::CompiledHomotopy, x, t, p = nothing)
+    n, m = size(T)
+    U = Matrix{Any}(undef, n, m)
+    to_smallest_eltype(jacobian!(U, T, x, t, p))
+end
+
+function evaluate_and_jacobian(T::CompiledSystem, x, p = nothing)
+    n, m = size(T)
+    u = Vector{Any}(undef, n)
+    U = Matrix{Any}(undef, n, m)
+    evaluate_and_jacobian!(u, U, T, x, p)
+    to_smallest_eltype(u), to_smallest_eltype(U)
+end
+function evaluate_and_jacobian(T::CompiledHomotopy, x, t, p = nothing)
+    n, m = size(T)
+    u = Vector{Any}(undef, n)
+    U = Matrix{Any}(undef, n, m)
+    evaluate_and_jacobian!(u, U, T, x, t, p)
+    to_smallest_eltype(u), to_smallest_eltype(U)
 end

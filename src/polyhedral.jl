@@ -1,114 +1,33 @@
-export PolyhedralStartSolutionsIterator, update_cell!, mixed_volume
+export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator, mixed_volume
 
-import MixedSubdivisions: MixedCell, MixedCellIterator, RegenerationTraverser, mixed_volume
-import ElasticArrays: ElasticArray
-
-
-#####################
-## START SOLUTIONS ##
-#####################
+using MixedSubdivisions: MixedCell, mixed_volume
 
 """
-    PolyhedralStartSolutionsIterator(f)
+    PolyhedralStartSolutionsIterator
 
-Creates an iterator over all mixed cells and their solutions corresponding to the polynomial
-system `f`.
-The iterator returns a tuple `(cell, x)` where `cell` is a `MixedCell` and
-`x` is a vector matrix containing  a solution of the binomial system corresponding to
-the mixed cell.
-
-    PolyhedralStartSolutionsIterator(support)
-
-Construct a polyhedral start solutions iterator by picking a random lifting
-and random start coefficients.
+An iterator providing start solutions for the polyhedral homotopy.
 """
-mutable struct PolyhedralStartSolutionsIterator{CT<:CoreTracker}
+struct PolyhedralStartSolutionsIterator
     support::Vector{Matrix{Int32}}
     start_coefficients::Vector{Vector{ComplexF64}}
-    lifting::Union{Nothing,Vector{Vector{Int32}}}
-    mixed_cells::Union{Nothing,Vector{MixedCell}} # all mixed_cells
-    X::ElasticArray{ComplexF64,2,1} # solutions
-    # Cache
-    D::Matrix{Int} # binomial system lhs
-    b::Vector{ComplexF64} # binomial system rhs
-    H::Matrix{Int} # hermite normal form
-    U::Matrix{Int} # trafo matrix for hnf
-    γ::Vector{Float64} # angle of the elements in b
-    μ::Vector{Float64} # γ^U
-    S::ElasticArray{Int,2,1}
-    αs::Vector{Float64} # partial angles in the triangular solve
-    DT::Matrix{Float64} # transposed of D to solve coords
-    # binomial homotopy fallback solution
-    γU::Vector{Int}
-    x::Vector{ComplexF64}
-    αs_rational::Vector{Rational{Int}}
-    binomial_tracker::CT
+    lifting::Vector{Vector{Int32}}
+    mixed_cells::Vector{MixedCell}
+    BSS::BinomialSystemSolver
 end
-
-function PolyhedralStartSolutionsIterator(f::MPPolys)
-    PolyhedralStartSolutionsIterator(MixedSubdivisions.support(f))
-end
-function PolyhedralStartSolutionsIterator(support::Vector{<:Matrix{<:Integer}})
-    # Intuitively we want to sample the coefficients from the normal distribution
-    # because we like this one very much.
-    # But this yields to a bad surpise for the start solutions in the case that
-    # the ratios of the coefficients in the binomial system is very different in between
-    # the equations
-    start_coefficients = map(A -> rand_approx_unit(size(A, 2)), support)
-    PolyhedralStartSolutionsIterator(
-        convert(Vector{Matrix{Int32}}, support),
-        start_coefficients,
-    )
-end
-
-"""
-    rand_approx_unit(n::Integer)::Vector{ComplexF64}
-
-This samples uniformly from the rectangle ``[0.9,1.1] × [0,2π]`` and transforms the sampled
-values with the map ``(r, φ) ↦ r * e^{i φ}``.
-"""
-rand_approx_unit(n) = map(_ -> (0.9 + 0.2 * rand()) * cis(2π * rand()), 1:n)
 
 function PolyhedralStartSolutionsIterator(
-    support::Vector{Matrix{Int32}},
-    start_coefficients::Vector{Vector{ComplexF64}},
+    support::AbstractVector{<:AbstractMatrix{<:Integer}},
+    coeffs::AbstractVector{<:AbstractVector{<:Number}},
+    lifting = map(c -> zeros(Int32, length(c)), coeffs),
+    mixed_cells = MixedCell[],
 )
-    n = size(first(support), 1)
-    D = zeros(Int, n, n)
-    b = ones(ComplexF64, n)
-    H = zeros(Int, n, n)
-    U = zeros(Int, n, n)
-    γ = ones(Float64, n)
-    μ = zeros(Float64, n)
-    X = ElasticArray{ComplexF64}(undef, n, 0)
-    S = ElasticArray{Int}(undef, n, 0)
-    αs = zeros(Float64, n)
-    DT = zeros(Float64, n, n)
-
-    γU = zeros(Int, n)
-    x = randn(ComplexF64, n)
-    αs_rational = Vector{Rational{Int64}}(undef, n)
-    binomial_tracker = coretracker(BinomialHomotopy(D, b, γ), x; affine_tracking = true)
-
+    BSS = BinomialSystemSolver(length(support))
     PolyhedralStartSolutionsIterator(
-        support,
-        start_coefficients,
-        nothing,
-        nothing,
-        X,
-        D,
-        b,
-        H,
-        U,
-        γ,
-        μ,
-        S,
-        αs,
-        DT,
-        γU,
-        x,
-        αs_rational,
-        binomial_tracker,
+        convert(Vector{Matrix{Int32}}, support),
+        coeffs,
+        lifting,
+        mixed_cells,
+        BSS,
     )
 end
 
@@ -120,16 +39,20 @@ function Base.length(iter::PolyhedralStartSolutionsIterator)
     sum(MixedSubdivisions.volume, iter.mixed_cells)
 end
 
-
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
-    if isnothing(iter.mixed_cells) || isnothing(iter.lifting)
+    if isempty(iter.mixed_cells)
         res = MixedSubdivisions.fine_mixed_cells(iter.support)
         if isnothing(res) || isempty(res[1])
             throw(OverflowError("Cannot compute a start system."))
         end
         mixed_cells, lifting = res
-        iter.mixed_cells = mixed_cells
-        iter.lifting = lifting
+        empty!(iter.mixed_cells)
+        append!(iter.mixed_cells, mixed_cells)
+
+        for (i, w) in enumerate(lifting)
+            empty!(iter.lifting[i])
+            append!(iter.lifting[i], w)
+        end
     end
     iter
 end
@@ -140,10 +63,11 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     isempty(iter.mixed_cells) && return nothing
 
     cell = iter.mixed_cells[1]
-    cell_solutions!(iter, cell)
+    solve(iter.BSS, iter.support, iter.start_coefficients, cell)
 
-    el = (cell, iter.X[:, 1])
-    next_state = size(iter.X, 2) == 1 ? (2, 1) : (1, 2)
+    x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+    el = (cell, x)
+    next_state = size(iter.BSS.X, 2) == 1 ? (2, 1) : (1, 2)
     el, next_state
 end
 
@@ -151,366 +75,367 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, (i, j)::Tuple{Int,
     i > length(iter.mixed_cells) && return nothing
 
     cell = iter.mixed_cells[i]
-    j == 1 && cell_solutions!(iter, cell)
-    el = (cell, iter.X[:, j])
-    next_state = size(iter.X, 2) == j ? (i + 1, 1) : (i, j + 1)
+    j == 1 && solve(iter.BSS, iter.support, iter.start_coefficients, cell)
+    x = [iter.BSS.X[i, j] for i = 1:length(iter.support)]
+    el = (cell, x)
+    next_state = size(iter.BSS.X, 2) == j ? (i + 1, 1) : (i, j + 1)
     return el, next_state
 end
 
-start_solution_sample(iter::PolyhedralStartSolutionsIterator) =
-    randn(ComplexF64, size(iter.X, 1))
-
-###########################
-## SOLVE BINOMIAL SYSTEM ##
-###########################
-function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell)
-    @unpack support, start_coefficients, D, b, H, U = iter
-    n = length(iter.support)
-
-    # setup system and compute hermite normal form
-    construct_binomial_system!(D, b, support, start_coefficients, cell.indices)
-
-    # This beauty tries first to compute the hnf using Int64,
-    # then falls back to Int128 and finally gives up and just uses
-    # BigInt
-    try
-        hnf!(H, U, D)
-        cell_solutions!(iter, cell, H, U)
-    catch e
-        isa(e, OverflowError) || rethrow(e)
-        try
-            H128, U128 = hnf(D, Int128)
-            cell_solutions!(iter, cell, H128, U128)
-        catch e128
-            isa(e128, OverflowError) || rethrow(e128)
-
-            H_big, U_big = hnf(D, BigInt)
-            cell_solutions!(iter, cell, H_big, U_big)
-        end
-    end
-
-    nothing
-end
-
-function cell_solutions!(iter::PolyhedralStartSolutionsIterator, cell::MixedCell, H, U)
-    @unpack D, b, γ, μ, X, S, DT = iter
-    n = size(H, 1)
-    # resize memory
-    d̂ = cell.volume
-    resize!(S, n, d̂)
-    resize!(X, n, d̂)
-
-    # setup a table of all combinations of the types of roots of unity we need
-    fill_unit_roots_combinations!(S, H, d̂)
-
-    cell_solutions_direct!(iter, cell, H, U)
-    if !verify_solutions(iter)
-        cell_solutions_homotopy!(iter, cell, H, U)
-    end
-end
-
-function verify_solutions(iter)
-    @unpack D, b, X = iter
-    n = size(D, 1)
-    for k = 1:size(X, 2), i = 1:n
-        yᵢ = one(X[1, k])
-        for j = 1:n
-            if D[j, i] != 0
-                yᵢ *= X[j, k]^D[j, i]
-            end
-        end
-        abs(yᵢ - b[i]) < 1e-10 || return false
-    end
-    true
-end
-
-function cell_solutions_direct!(
-    iter::PolyhedralStartSolutionsIterator,
-    cell::MixedCell,
-    H,
-    U,
-)
-    @unpack D, b, μ, X, DT = iter
-    n = size(D, 1)
-    # We split the computation of the solution in 2 stages
-    # 1) Compute solutions for the angular part -> d̂ many solutions
-    compute_angular_part!(iter, cell, H, U)
-    # 2) Solve for the absolute value
-    μ .= log.(abs.(b))
-    LinearAlgebra.transpose!(DT, D)
-    LinearAlgebra.ldiv!(LinearAlgebra.lu!(DT), μ)
-    μ .= exp.(μ)
-    for j = 1:cell.volume, i = 1:n
-        X[i, j] *= μ[i]
-    end
-
-    nothing
-end
-
-function fill_unit_roots_combinations!(S, H, d̂)
-    n = size(H, 1)
-    d, e = d̂, 1
-    @inbounds for I = 1:n
-        dᵢ = convert(Int64, H[I, I])
-        d = d ÷ dᵢ
-        k = 1
-        for _ = 1:e, j = 0:(dᵢ-1), _ = 1:d
-            S[I, k] = j
+# Tracker
+function polyhedral_system(support)
+    n = length(support)
+    m = sum(A -> size(A, 2), support)
+    @var x[1:n] c[1:m]
+    k = 1
+    System(map(support) do A
+        fi = Expression(0)
+        for a in eachcol(A)
+            ModelKit.add!(fi, fi, c[k] * prod(x .^ a))
             k += 1
         end
-        e *= dᵢ
-    end
+        ModelKit.horner(fi, x)
+    end, x, c)
 end
-
-function compute_angular_part!(
-    iter::PolyhedralStartSolutionsIterator,
-    cell::MixedCell,
-    H::Matrix{I},
-    U::Matrix{I},
-) where {I<:Union{Int64,Int128}}
-    @unpack γ, b, μ, X, S, αs = iter
-    n = length(iter.support)
-    γ .= angle.(b) ./ (2π)
-    apply_trafo_angles!(μ, γ, U)
-    @inbounds for i = 1:cell.volume, j = n:-1:1
-        α = μ[j] + S[j, i]
-        for k = n:-1:(j + 1)
-            α -= αs[k] * H[k, j]
-        end
-        α /= H[j, j]
-        X[j, i] = cis(2π * α)
-        αs[j] = α
-    end
-end
-
-
-function compute_angular_part!(
-    iter::PolyhedralStartSolutionsIterator,
-    cell::MixedCell,
-    H::Matrix{BigInt},
-    U::Matrix{BigInt},
-)
-    @unpack b, γ, X, S = iter
-    n = length(iter.support)
-    μ = Vector{BigFloat}(undef, n)
-    αs = Vector{BigFloat}(undef, n)
-    γ .= angle.(b) ./ (2π)
-    apply_trafo_angles!(μ, γ, U)
-    @inbounds for i = 1:cell.volume, j = n:-1:1
-        # This is always small in our applications
-        α = μ[j] + S[j, i]
-        for k = n:-1:(j + 1)
-            α -= αs[k] * H[k, j]
-        end
-        α /= H[j, j]
-        X[j, i] = cis(2π * convert(Float64, mod(α, 1.0)))
-        αs[j] = α
-    end
-end
-
-function apply_trafo_angles!(μ, γ, U)
-    n = length(γ)
-    μ .= zero(eltype(μ))
-    @inbounds for j = 1:n, i = 1:n
-        μ[j] += U[i, j] * γ[i]
-    end
-    μ
-end
-
-function construct_binomial_system!(D, b, support, coeffs, indices)
-    n = length(indices)
-    @inbounds for i = 1:n
-        aᵢ, bᵢ = indices[i]
-        for j = 1:n
-            D[j, i] = support[i][j, aᵢ] - support[i][j, bᵢ]
-        end
-        b[i] = -coeffs[i][bᵢ] / coeffs[i][aᵢ]
-    end
-    nothing
-end
-
-
-function cell_solutions_homotopy!(
-    iter::PolyhedralStartSolutionsIterator,
-    cell::MixedCell,
-    H,
-    U,
-)
-    @unpack D, b, γ, μ, X, γU, x, S, αs_rational, binomial_tracker = iter
-
-    γ .= sign.(real.(b))
-    apply_trafo!(γU, γ, U)
-
-    n = size(D, 1)
-    for i = 1:cell.volume
-        αs_denom = 1
-        for j = n:-1:1
-            α = S[j, i]
-            denom = lcm(αs_denom, convert(Int, H[j, j]))
-            if γU[j] == -1
-                α += 1 // 2
-                denom *= 2
-            end
-            for k = n:-1:(j + 1)
-                α -= αs_rational[k] * convert(Int, H[k, j] % denom)
-            end
-            α //= H[j, j]
-            αs_denom = lcm(αs_denom, denominator(α))
-            αs_rational[j] = (numerator(α) % denominator(α)) // denominator(α)
-            x[j] = cis(2π * αs_rational[j])
-        end
-
-        ret = track!(binomial_tracker, x, 1.0, 0.0)
-        x̄ = current_x(binomial_tracker)
-        for j = 1:n
-            X[j, i] = x̄[j]
-        end
-    end
-
-    nothing
-end
-
-function apply_trafo!(γU, γ, U)
-    for i = 1:length(γ)
-        γUᵢ = 1
-        for j = 1:size(U, 2)
-            if γ[j] == -1 && isodd(U[j, i])
-                γUᵢ = -γUᵢ
-            end
-        end
-        γU[i] = γUᵢ
-    end
-    γU
-end
-
-
-########################
-## POLYHEDRAL TRACKER ##
-########################
 
 """
-    PolyhedralTracker{CT<:CoreTracker, PT<:PathTracker, H<:ToricHomotopy}
+    PolyhedralTracker <: AbstractPathTracker
 
-The polyhedral tracker combines the tracking from toric infinity toward the target system
-by a two-stage approach.
+This tracker realises the two step approach of the polyhedral homotopy.
+See also [`polyhedral`].
 """
-struct PolyhedralTracker{
-    CT<:CoreTracker,
-    PT<:PathTracker,
-    H<:ToricHomotopy,
-} <: AbstractPathTracker
-    toric_homotopy::H
-    toric_tracker::CT
-    generic_tracker::PT
-    # state
-    s₀::Base.RefValue{Float64}
-    curr_mixed_cell::Base.RefValue{Union{Nothing,MixedCell}}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <: AbstractPathTracker
+    toric_tracker::Tracker{H1,N,M}
+    generic_tracker::EndgameTracker{H2,N,M}
+    support::Vector{Matrix{Int32}}
+    lifting::Vector{Vector{Int32}}
 end
 
-function construct_tracker(
-    prob::PolyhedralProblem,
-    startsolutions::PolyhedralStartSolutionsIterator;
+"""
+    polyhedral(F::Union{System, AbstractSystem};
+        only_non_zero = false,
+        endgame_options = EndgameOptions(),
+        tracker_options = TrackerOptions())
+
+Solve the system `F` in two steps: first solve a generic system derived from the support
+of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
+coefficient-parameter homotopy towards `F`.
+This returns a path tracker ([`PolyhedralTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
+
+If `only_non_zero` is `true`, then only the solutions with non-zero coordinates are computed.
+In this case the number of paths to track is equal to the
+mixed volume of the Newton polytopes of `F`.
+
+If `only_non_zero` is `false`, then all isolated solutions of `F` are computed.
+In this case the number of paths to track is equal to the
+mixed volume of the convex hulls of ``supp(F_i) ∪ \\{0\\}`` where ``supp(F_i)`` is the support
+of ``F_i``. See also [^LW96].
+
+
+    function polyhedral(
+        support::AbstractVector{<:AbstractMatrix},
+        coefficientss::AbstractVector{<:AbstractVector{<:Number}};
+        kwargs...,
+    )
+
+It is also possible to provide directly the support and coefficients of the system `F` to be solved.
+
+[^HS95]: Birkett Huber and Bernd Sturmfels. “A Polyhedral Method for Solving Sparse Polynomial Systems.” Mathematics of Computation, vol. 64, no. 212, 1995, pp. 1541–1555
+[^LW96]: T.Y. Li and Xiaoshen Wang. "The BKK root count in C^n". Math. Comput. 65, 216 (October 1996), 1477–1484.
+
+### Example
+
+We consider a system `f` which has in total 6 isolated solutions,
+but only 3 where all coordinates are non-zero.
+```julia
+@var x y
+f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
+tracker, starts = polyhedral(f; only_non_zero = false)
+# length(starts) == 8
+count(is_success, track.(tracker, starts)) # 6
+
+tracker, starts = polyhedral(f; only_non_zero = true)
+# length(starts) == 3
+count(is_success, track.(tracker, starts)) # 3
+```
+"""
+function polyhedral(F::AbstractSystem; kwargs...)
+    _, n = size(F)
+    @var x[1:n]
+    polyhedral(System(F(x), x); kwargs...)
+end
+function polyhedral(f::System; target_parameters = nothing, kwargs...)
+    if target_parameters !== nothing
+        return polyhedral(
+            FixedParameterSystem(ModelKitSystem(f), target_parameters);
+            kwargs...,
+        )
+    end
+    homogeneous = is_homogeneous(f)
+    if homogeneous
+        F = on_affine_chart(f)
+        m, n = size(F)
+        m ≥ n || throw(FiniteException(n - m))
+        if m > n
+            F = square_up(F)
+        end
+        @var x[1:n]
+        support, target_coeffs = support_coefficients(System(F(x), x))
+    else
+        m, n = size(f)
+        m ≥ n || throw(FiniteException(n - m))
+        if m > n
+            F = square_up(f)
+            @var x[1:n]
+            support, target_coeffs = support_coefficients(System(F(x), x))
+        else
+            support, target_coeffs = support_coefficients(f)
+        end
+    end
+    tracker, starts = polyhedral(support, target_coeffs; kwargs...)
+    if m > n
+        tracker = OverdeterminedTracker(tracker, F)
+    end
+    tracker, starts
+end
+
+paths_to_track(f::AbstractSystem, val::Val{:polyhedral}) = paths_to_track(System(f), val)
+function paths_to_track(
+    f::System,
+    ::Val{:polyhedral};
+    only_torus::Bool = false,
+    only_non_zero::Bool = only_torus,
+)
+    supp, coeffs = begin
+        if is_homogeneous(f)
+            F = on_affine_chart(f)
+            m, n = size(F)
+            m ≥ n || throw(FiniteException(n - m))
+            if m > n
+                F = square_up(F)
+            end
+            @var x[1:n]
+            support_coefficients(System(F(x), x))
+        else
+            m, n = size(f)
+            m ≥ n || throw(FiniteException(n - m))
+            if m > n
+                F = square_up(f)
+                @var x[1:n]
+                support_coefficients(System(F(x), x))
+            else
+                support_coefficients(f)
+            end
+        end
+    end
+
+    if only_non_zero
+        MixedSubdivisions.mixed_volume(supp)
+    else
+        min_vecs = minimum.(supp, dims = 2)
+        supp′ =
+            map((A, mᵢ) -> iszero(mᵢ) ? A : [A zeros(Int32, size(A, 1), 1)], supp, min_vecs)
+        MixedSubdivisions.mixed_volume(supp′)
+    end
+end
+MixedSubdivisions.mixed_volume(f::Union{System,AbstractSystem}) =
+    paths_to_track(f; start_system = :polyhedral, only_torus = true)
+
+function polyhedral(
+    support::AbstractVector{<:AbstractMatrix},
+    target_coeffs::AbstractVector;
     kwargs...,
 )
-    x = randn(ComplexF64, size(prob.toric_homotopy)[2])
-    toric_tracker = coretracker(
-        prob.toric_homotopy,
-        [x];
-        seed = prob.seed,
-        affine_tracking = true,
-        logarithmic_time_scale = true,
-        from_infinity = true,
-        track_cond = false,
-    )
-    generic_prob = Problem(
-        prob.tracking_type,
-        prob.generic_homotopy,
-        prob.vargroups,
-        prob.seed,
-        prob.startsolutions_need_reordering,
-        prob.regauging_factors,
-    )
-    generic_tracker = construct_tracker(generic_prob, startsolutions; kwargs...)
-
-    PolyhedralTracker(
-        prob.toric_homotopy,
-        toric_tracker,
-        generic_tracker,
-        Ref(NaN),
-        Base.RefValue{Union{Nothing,MixedCell}}(nothing),
-    )
+    start_coeffs = map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
+    polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
 
-seed(PT::PolyhedralTracker) = seed(PT.generic_tracker)
-function PathResult(
-    PT::PolyhedralTracker,
-    (cell, x)::Tuple{MixedCell,Vector{ComplexF64}},
-    path_number = nothing;
+cis2pi(x) = complex(cospi(2x), sinpi(2x))
+
+function polyhedral(
+    support::AbstractVector{<:AbstractMatrix},
+    start_coeffs::AbstractVector,
+    target_coeffs::AbstractVector;
+    endgame_options = EndgameOptions(),
+    tracker_options = TrackerOptions(),
+    only_torus::Bool = false,
+    only_non_zero::Bool = only_torus,
     kwargs...,
 )
-    PathResult(PT.generic_tracker, nothing, path_number; kwargs...)
-end
+    unsupported_kwargs(kwargs)
+    size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
+        throw(ArgumentError("Number of terms do not coincide."))
 
-
-result_type(PT::PolyhedralTracker) = result_type(PT.generic_tracker)
-solution(tracker::PolyhedralTracker) = solution(tracker.generic_tracker)
-LA.norm(tracker::PolyhedralTracker) = LA.norm(tracker.generic_tracker)
-
-function prepare!(PT::PolyhedralTracker, S::PolyhedralStartSolutionsIterator)
-    if S.lifting === nothing
-        compute_mixed_cells!(S)
+    min_vecs = minimum.(support, dims = 2)
+    if !all(iszero, min_vecs)
+        if only_non_zero
+            support = map((A, v) -> A .- v, support, min_vecs)
+        else
+            # Add 0 to each support
+            starts = Vector{ComplexF64}[]
+            targets = Vector{ComplexF64}[]
+            supp = eltype(support)[]
+            for (i, A) in enumerate(support)
+                if iszero(min_vecs[i])
+                    push!(starts, start_coeffs[i])
+                    push!(targets, target_coeffs[i])
+                    push!(supp, A)
+                else
+                    push!(
+                        starts,
+                        [
+                            start_coeffs[i]
+                            randn(ComplexF64)
+                        ],
+                    )
+                    push!(
+                        targets,
+                        [
+                            target_coeffs[i]
+                            0.0
+                        ],
+                    )
+                    push!(supp, [A zeros(Int32, size(A, 1), 1)])
+                end
+            end
+            support = supp
+            start_coeffs = starts
+            target_coeffs = targets
+        end
     end
-    update_lifting!(PT.toric_homotopy, S.lifting)
-    PT
-end
-function track!(
-    PT::PolyhedralTracker,
-    (cell, x∞)::Tuple{MixedCell,Vector{ComplexF64}};
-    accuracy::Union{Nothing,Float64} = nothing,
-    max_corrector_iters::Union{Nothing,Int} = nothing,
-)
-    update_cell!(PT, cell)
-    retcode = track!(PT.toric_tracker, x∞, PT.s₀[], 0.0)
-    if is_invalid_startvalue(retcode)
-        track!(PT.toric_tracker, x∞, 2 * PT.s₀[], 0.0)
+
+    F = ModelKit.compile(polyhedral_system(support))
+    H₁ = ToricHomotopy(F, start_coeffs)
+    toric_tracker = Tracker(H₁; options = tracker_options)
+
+    H₂ = begin
+        p = reduce(append!, start_coeffs; init = ComplexF64[])
+        q = reduce(append!, target_coeffs; init = ComplexF64[])
+        CoefficientHomotopy(ModelKitSystem(F), p, q)
     end
-    track!(
-        PT.generic_tracker,
-        current_x(PT.toric_tracker);
-        accuracy = accuracy,
-        max_corrector_iters = max_corrector_iters,
-    )
+    generic_tracker =
+        EndgameTracker(Tracker(H₂; options = tracker_options), options = endgame_options)
+
+    S = PolyhedralStartSolutionsIterator(support, start_coeffs)
+    tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)
+
+    tracker, S
 end
 
 function track(
-    tracker::PolyhedralTracker,
-    cell_x::Tuple{MixedCell,Vector{ComplexF64}};
-    details::Symbol = :default,
-    path_number::Union{Int,Nothing} = nothing,
-    accuracy::Union{Nothing,Float64} = nothing,
-    max_corrector_iters::Union{Nothing,Int} = nothing,
+    PT::PolyhedralTracker,
+    start_solution::Tuple{MixedCell,<:AbstractVector{ComplexF64}};
+    path_number::Union{Nothing,Int} = nothing,
+    debug::Bool = false,
 )
-    track!(tracker, cell_x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
-    PathResult(tracker, cell_x, path_number; details = details)
-end
+    cell, x∞ = start_solution
+    H = PT.toric_tracker.homotopy
+    # The tracker works in two stages
+    # 1) Revert the totric degeneration by tracking 0 to 1
+    #    Here we use the following strategy
+    #    a) Reparameterize the path such that lowest power of t occuring is 1
+    #    b)
+    #      i) If maximal power is less than 10 track from 0 to 1
+    #      ii) If maximal power is larger than 10 we can get some problems for values close to 1
+    #          (since t^k is << 1 for t < 1 and k large)
+    #          Therefore split in two stages:
+    #           1) track from 0 to t₀ = clamp(0.1^(10 / max_weight), 0.9, 0.985)
+    #           2) Second, reperamerize path s.t. max power of t is 10. This shifts the
+    #              problem towards 0 again (where we have more accuracy available.)
+    #              And then track to 1
+    # 2) Perform coefficient homotopy with possible endgame
+    min_weight, max_weight =
+        update_weights!(H, PT.support, PT.lifting, cell, min_weight = 1.0)
 
+    if debug
+        println("Min-Max weight: ", min_weight, ", ", max_weight)
+    end
+    if max_weight < 10
+        retcode = track!(
+            PT.toric_tracker,
+            x∞,
+            0.0,
+            1.0;
+            ω = 20.0,
+            μ = 1e-12,
+            max_initial_step_size = 0.2,
+            debug = debug,
+        )
+        @unpack μ, ω = PT.toric_tracker.state
+    else
+        t₀ = clamp(0.1^(10 / max_weight), 0.9, 1 - 1e-6)
+        retcode = track!(
+            PT.toric_tracker,
+            x∞,
+            0.0,
+            t₀;
+            ω = 20.0,
+            μ = 1e-12,
+            max_initial_step_size = 0.2,
+            debug = debug,
+        )
 
-"""
-    update_cell!(PT::PolyhedralTracker, cell::MixedCell)
+        @unpack μ, ω = PT.toric_tracker.state
+        if is_success(retcode)
+            min_weight, max_weight =
+                update_weights!(H, PT.support, PT.lifting, cell, max_weight = 10.0)
+            t_restart = t₀^(1 / min_weight)
+            # set min_step_size to 0.0 to not accidentally loose a solution
+            min_step_size = PT.toric_tracker.options.min_step_size
+            PT.toric_tracker.options.min_step_size = 0.0
 
-Update the polyhedral tracker `PT` to track paths coming from the mixed cell `cell`.
-"""
-function update_cell!(PT::PolyhedralTracker, cell::MixedCell)
-    curr_cell = PT.curr_mixed_cell[]
-    if curr_cell !== nothing
-        curr_cell === cell && return PT
+            retcode = track!(
+                PT.toric_tracker,
+                PT.toric_tracker.state.x,
+                t_restart,
+                1.0;
+                ω = ω,
+                μ = μ,
+                τ = 0.1 * t_restart,
+                keep_steps = true,
+                debug = debug,
+            )
+            @unpack μ, ω = PT.toric_tracker.state
+            PT.toric_tracker.options.min_step_size = min_step_size
+        end
+    end
+    if !is_success(retcode)
+        state = PT.toric_tracker.state
+        return PathResult(
+            return_code = :polyhedral_failed,
+            solution = copy(state.x),
+            start_solution = start_solution,
+            t = real(state.t),
+            accuracy = state.accuracy,
+            condition_jacobian = NaN,
+            residual = NaN,
+            winding_number = nothing,
+            last_path_point = (copy(state.x), state.t),
+            valuation = nothing,
+            ω = state.ω,
+            μ = state.μ,
+            multiplicity = nothing,
+            path_number = path_number,
+            extended_precision = state.extended_prec,
+            accepted_steps = state.accepted_steps,
+            rejected_steps = state.rejected_steps,
+            extended_precision_used = state.used_extended_prec,
+        )
     end
 
-    PT.curr_mixed_cell[] = cell
-    min_weight = update_cell!(PT.toric_homotopy, cell)
-    # We construct s₀ such that
-    #   min_{1 ≤ i ≤ n} min_{aᵢ ∈ Aᵢ} exp(s₀ * w(aᵢ)+aᵢ⋅γ-βᵢ) = 10^-8
-    # From this follows:
-    PT.s₀[] = -8.0 * log(10) / min_weight
-    PT
+    r = track(
+        PT.generic_tracker,
+        PT.toric_tracker.state.x;
+        # Don't provide ω since this can be misleading a lead to a too large initial step
+        # ω = ω,
+        μ = μ,
+        path_number = path_number,
+        debug = debug,
+    )
+    r.start_solution = start_solution
+    # report accurate steps
+    r.accepted_steps += PT.toric_tracker.state.accepted_steps
+    r.rejected_steps += PT.toric_tracker.state.rejected_steps
+
+    r
 end

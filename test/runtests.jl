@@ -1,13 +1,9 @@
-using Test, LinearAlgebra, Random
-using Documenter: doctest, DocMeta
-using DynamicPolynomials, HomotopyContinuation, StaticArrays
-import TreeViews, ProjectiveVectors, PolynomialTestSystems
-import FiniteDifferences
-const FD = FiniteDifferences
+using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters
+using ProjectiveVectors: PVector, affine_chart
+using TreeViews: TreeViews
+const HC2 = HomotopyContinuation
 
-import PolynomialTestSystems:
-    cyclic, cyclooctane, katsura, equations, ipp2, heart, griewank_osborne
-const HC = HomotopyContinuation
+include("test_systems.jl")
 
 function test_treeviews(x)
     @test TreeViews.hastreeview(x)
@@ -22,36 +18,23 @@ function test_show_juno(x)
     @test show(stdout, MIME("application/prs.juno.inline"), x) === x
 end
 
-# We order the tests such that isolated things are tested first
 @testset "HomotopyContinuation" begin
+    include("utils_test.jl")
+    include("double_double_test.jl")
+    include("binomial_system_test.jl")
+    include("norm_test.jl")
     include("model_kit_test.jl")
-    include("utilities_test.jl")
-    include("norms_test.jl")
     include("linear_algebra_test.jl")
-    include("affine_patches_test.jl")
-    include("problem_test.jl")
-    include("systems_test.jl")
     include("homotopies_test.jl")
-    include("predictors_test.jl")
-    include("newton_corrector_test.jl")
-    include("core_tracker_test.jl")
+    include("tracker_test.jl")
     include("valuation_test.jl")
-    include("cauchy_endgame_test.jl")
-    include("path_tracker_test.jl")
+    include("endgame_tracker_test.jl")
+    include("linear_test.jl")
     include("polyhedral_test.jl")
-    include("overdetermined_test.jl")
-    include("solver_test.jl")
-    include("result_test.jl")
-    include("composition_test.jl")
-    include("model_kit_integration.jl")
-    include("monodromy_test.jl")
-    include("root_count_test.jl")
-    include("path_info_test.jl")
+    include("solve_test.jl")
+    include("endgame_test.jl")
 
-    DocMeta.setdocmeta!(HomotopyContinuation, :DocTestSetup, quote
-        using HomotopyContinuation
-    end; recursive=true)
-    doctest(HomotopyContinuation)
-
-    # include("nextjournal.jl")
+    if "extensive" in ARGS
+        include("extensive/extensive_test.jl")
+    end
 end

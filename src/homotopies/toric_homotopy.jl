@@ -1,237 +1,278 @@
-export ToricHomotopy, ToricHomotopyCache
+###
+### ToricHomotopy
+###
+# This is part of the implementation of polyhedral homotopy, namely to reverse the toric
+# degeneration from 0 to 1.
+# This is only an internal homotopy.
 
-@enum ToricHomotopyActiveCoeffs begin
-    TH_COEFFS_EVAL
-    TH_COEFFS_DS
-    TH_COEFFS_UNKNOWN
-end
+const StructVectorComplexF64 = StructArrays.StructArray{
+    Complex{Float64},
+    1,
+    NamedTuple{(:re, :im),Tuple{Vector{Float64},Vector{Float64}}},
+    Int64,
+}
 
-"""
-    ToricHomotopy(support, lifting, coefficients)
+Base.@kwdef struct ToricHomotopy{S} <: AbstractHomotopy
+    system::ModelKit.CompiledSystem{S}
+    system_coeffs::Vector{ComplexF64}
+    weights::Vector{Float64}
 
-Construct the homotopy ``H(x, s) = Σ_α c_α e^{(α̂⋅γ̂) s} x^α``.
-"""
-mutable struct ToricHomotopy{S<:SPSystem,T} <: AbstractHomotopy
-    system::S
-    nterms::Vector{Int}
-    support::Matrix{Int32}
-    lifting::Vector{Int32}
-    coeffs::Vector{T}
-    s_weights::Vector{Float64}
-    perms::Vector{Vector{Int}}
+    #t^w
+    t_weights::Vector{Float64}
+    #t^w for t complex or negative
+    complex_t_weights::StructVectorComplexF64
+    coeffs::Vector{ComplexF64}
+    dt_coeffs::Vector{ComplexF64}
+    x::Vector{ComplexF64}
+    # cache value
+    t_coeffs::Base.RefValue{ComplexF64}
+    t_taylor_coeffs::Base.RefValue{ComplexF64}
+
+    # taylor coefficients
+    taylor_coeffs::TaylorVector{5,ComplexF64}
+    tc3::TaylorVector{4,ComplexF64}
+    tc2::TaylorVector{3,ComplexF64}
 end
 
 function ToricHomotopy(
-    supports::Vector{<:Matrix},
-    coefficients::Vector{Vector{T}},
-) where {T}
-    dummy_lifting = Vector{Int32}[collect(Int32(1):Int32(size(A, 2))) for A in supports]
-    ToricHomotopy(supports, dummy_lifting, coefficients)
-end
-function ToricHomotopy(
-    supports::Vector{<:Matrix},
-    liftings::Vector{Vector{Int32}},
-    coefficients::Vector{Vector{T}},
-) where {T}
-    @assert all(length.(coefficients) .== size.(supports, 2))
-    @assert length(liftings) == length(supports)
-
-    system = SPSystem(supports, coefficients)
-    # StaticPolynomials possibly changes the order of the terms.
-    # Therefore the coefficient vectors are maybe no more correct.
-    # We correct this by applying the permutation applied to the columns
-    # of the support
-
-    nterms = length.(liftings)
-    M = sum(nterms)
-    n = length(liftings)
-    support = Matrix{Int32}(undef, n, M)
-    lifting = Vector{Int32}(undef, M)
-    coeffs = Vector{T}(undef, M)
-    perms = Vector{Vector{Int}}()
-    k = 1
-    for (i, f) in enumerate(system.system.polys)
-        p = SP.permutation(f)
-        for j in p
-            @. support[:, k] = supports[i][:, j]
-            lifting[k] = liftings[i][j]
-            coeffs[k] = coefficients[i][j]
-            k += 1
-        end
-        push!(perms, p)
-    end
-    s_weights = zeros(sum(nterms))
-
-    ToricHomotopy(system, nterms, support, lifting, coeffs, s_weights, perms)
-end
-
-function update_cell!(H::ToricHomotopy, cell::MixedSubdivisions.MixedCell)
-    n = length(H.nterms)
-    k = 1
-    s_max = 1.0
-    s_min = Inf
-    @inbounds for (i, m) in enumerate(H.nterms)
-        βᵢ = cell.β[i]
-        for _ = 1:m
-            s_k = Float64(H.lifting[k]) - βᵢ
-            for l = 1:n
-                s_k += H.support[l, k] * cell.normal[l]
-            end
-            H.s_weights[k] = s_k
-
-            s_max = max(s_max, s_k)
-            # avoid zeroish values
-            if s_k > 1e-8
-                s_min = min(s_min, s_k)
-            end
-
-            k += 1
-        end
-    end
-    # We normalize such that 5 is the highest power
-    s_max /= 5.0
-    for k in eachindex(H.s_weights)
-        H.s_weights[k] /= s_max
-    end
-
-    s_min /= s_max
-
-    s_min
-end
-
-function update_lifting!(H::ToricHomotopy, lifting::Vector{<:Vector{<:Integer}})
-    k = 1
-    for (i, p) in enumerate(H.perms), j in p
-        H.lifting[k] = lifting[i][j]
-        k += 1
-    end
-    H
-end
-
-"""
-    ToricHomotopyCache
-
-An simple cache for `ToricHomotopyCache`.
-"""
-mutable struct ToricHomotopyCache{C<:AbstractSystemCache,T} <: AbstractHomotopyCache
-    system::C
-    coeffs::Vector{T}
-    coeffs_ds::Vector{T}
-    views_coeffs::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}},true}}
-    views_coeffs_ds::Vector{SubArray{T,1,Vector{T},Tuple{UnitRange{Int}},true}}
-    s::Float64
-    ds::Float64
-    active_coeffs::ToricHomotopyActiveCoeffs
-end
-
-function cache(H::ToricHomotopy{S,T}, x, s) where {S,T}
-    system = cache(H.system, x, s)
-    U = promote_type(T, typeof(s))
-    coeffs = convert.(U, H.coeffs)
-    coeffs_ds = copy(H.coeffs)
-    views_coeffs = [view(coeffs, 1:H.nterms[1])]
-    views_coeffs_ds = [view(coeffs_ds, 1:H.nterms[1])]
-    k = H.nterms[1] + 1
-    for i = 2:length(H.nterms)
-        push!(views_coeffs, view(coeffs, k:k+H.nterms[i]-1))
-        push!(views_coeffs_ds, view(coeffs_ds, k:k+H.nterms[i]-1))
-        k += H.nterms[i]
-    end
-    s = ds = NaN
-    active_coeffs = TH_COEFFS_UNKNOWN
-    ToricHomotopyCache(
-        system,
-        coeffs,
-        coeffs_ds,
-        views_coeffs,
-        views_coeffs_ds,
-        s,
-        ds,
-        active_coeffs,
+    system::ModelKit.CompiledSystem,
+    system_coeffs::Vector{Vector{ComplexF64}},
+)
+    m = ModelKit.nparameters(system)
+    m1 = sum(length, system_coeffs)
+    m == m1 ||
+        throw(ArgumentError("System parameters and coefficients do not have the same size, got $m and $m1"))
+    n = nvariables(system)
+    taylor_coeffs = TaylorVector{5}(ComplexF64, m)
+    ToricHomotopy(
+        system = system,
+        system_coeffs = reduce(vcat, system_coeffs),
+        weights = zeros(m),
+        t_weights = zeros(m),
+        complex_t_weights = StructArrays.StructArray(zeros(ComplexF64, m)),
+        coeffs = zeros(ComplexF64, m),
+        dt_coeffs = zeros(ComplexF64, m),
+        x = zeros(ComplexF64, n),
+        t_coeffs = Ref(complex(0.0, 0.0)),
+        t_taylor_coeffs = Ref(complex(0.0, 0.0)),
+        taylor_coeffs = taylor_coeffs,
+        tc3 = TaylorVector{4}(taylor_coeffs),
+        tc2 = TaylorVector{3}(taylor_coeffs),
     )
 end
 
 Base.size(H::ToricHomotopy) = size(H.system)
 
-function update_coeffs!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
-    if s == cache.s
-        if cache.active_coeffs != TH_COEFFS_EVAL
-            set_coefficients!(H.system, cache.views_coeffs)
-            cache.active_coeffs = TH_COEFFS_EVAL
+function update_weights!(
+    H::ToricHomotopy,
+    support::AbstractVector{<:AbstractMatrix},
+    lifting::AbstractVector{<:AbstractVector},
+    cell::MixedSubdivisions.MixedCell;
+    min_weight::Union{Nothing,Float64} = nothing,
+    max_weight::Union{Nothing,Float64} = nothing,
+)
+    l = 1
+    s_max, s_min = 0.0, Inf
+    n = length(cell.normal)
+    for (i, Aᵢ) in enumerate(support)
+        wᵢ = lifting[i]
+        βᵢ = cell.β[i]
+        mᵢ = size(Aᵢ, 2)
+        aᵢ, bᵢ = cell.indices[i]
+        for j = 1:mᵢ
+            if j == aᵢ || j == bᵢ
+                H.weights[l] = 0.0
+            else
+                sᵢⱼ = wᵢ[j] - βᵢ
+                for k = 1:n
+                    @inbounds sᵢⱼ += Aᵢ[k, j] * cell.normal[k]
+                end
+                H.weights[l] = sᵢⱼ
+                s_max = max(s_max, sᵢⱼ)
+                s_min = min(s_min, sᵢⱼ)
+            end
+            l += 1
         end
-        return nothing
     end
 
-    @inbounds for k in eachindex(cache.coeffs)
-        cache.coeffs[k] = exp(H.s_weights[k] * s) * H.coeffs[k]
+    if min_weight !== nothing
+        λ = s_min / min_weight
+        H.weights ./= λ
+        s_min, s_max = min_weight, s_max / λ
+    elseif max_weight !== nothing
+        λ = s_max / max_weight
+        H.weights ./= λ
+        s_min, s_max = s_min / λ, max_weight
     end
-    set_coefficients!(H.system, cache.views_coeffs)
-    cache.s = s
-    cache.active_coeffs = TH_COEFFS_EVAL
-    nothing
+
+    H.t_coeffs[] = NaN
+    H.t_taylor_coeffs[] = NaN
+
+    s_min, s_max
 end
 
-function update_coeffs_ds!(cache::ToricHomotopyCache, H::ToricHomotopy, s)
-    if s == cache.ds
-        if cache.active_coeffs != TH_COEFFS_DS
-            set_coefficients!(H.system, cache.views_coeffs_ds)
-            cache.active_coeffs = TH_COEFFS_DS
-        end
-        return nothing
+function evaluate_weights!(u::Vector{Float64}, weights::Vector{Float64}, t::Float64)
+    s = log(t)
+    n = length(weights)
+    LoopVectorization.@avx for i = 1:n
+        u[i] = exp(weights[i] * s)
     end
+    u
+end
 
-    if s == cache.s
-        @inbounds for k in eachindex(cache.coeffs)
-            cache.coeffs_ds[k] = H.s_weights[k] * cache.coeffs[k]
+function evaluate_weights!(
+    u::Vector{Float64},
+    v::Vector{Float64},
+    weights::Vector{Float64},
+    t::ComplexF64,
+)
+    s = log(t)
+    n = length(weights)
+    sr, si = reim(s)
+    LoopVectorization.@avx for i = 1:n
+        r = exp(weights[i] * sr)
+        wsi = weights[i] * si
+        # TODO: This should actually by s, c = sincos(wsi)
+        # However, this it not yet supported by LoopVectorization
+        s = sin(wsi)
+        c = cos(wsi)
+        u[i] = r * c
+        v[i] = r * s
+    end
+end
+
+
+function coeffs!(H::ToricHomotopy, t)
+    # H.t_coeffs[] == t && return H.coeffs
+    c = H.coeffs
+    if !isreal(t) || real(t) < 0
+        evaluate_weights!(
+            H.complex_t_weights.re,
+            H.complex_t_weights.im,
+            H.weights,
+            complex(t),
+        )
+        @inbounds for i = 1:length(c)
+            uᵢ = H.system_coeffs[i]
+            ctwᵢ = H.complex_t_weights[i]
+            c[i] = uᵢ * ctwᵢ
+        end
+    elseif iszero(t)
+        @inbounds for i = 1:length(c)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            c[i] = ifelse(wᵢ == 0, uᵢ, complex(0.0, 0.0))
         end
     else
-        @inbounds for k in eachindex(cache.coeffs)
-            cache.coeffs_ds[k] = H.s_weights[k] * exp(H.s_weights[k] * s) * H.coeffs[k]
+        evaluate_weights!(H.t_weights, H.weights, real(t))
+        @inbounds for i = 1:length(c)
+            uᵢ = H.system_coeffs[i]
+            twᵢ = H.t_weights[i]
+            c[i] = uᵢ * twᵢ
         end
     end
-    set_coefficients!(H.system, cache.views_coeffs_ds)
-    cache.ds = s
-    cache.active_coeffs = TH_COEFFS_DS
+
+    H.t_coeffs[] = t
+    c
+end
+
+
+function dt_coeffs!(H::ToricHomotopy, t)
+    if iszero(t)
+        @inbounds for i = 1:length(H.dt_coeffs)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            H.dt_coeffs[i] = ifelse(wᵢ == 1, uᵢ, complex(0.0, 0.0))
+        end
+    else
+        c = coeffs!(H, t)
+        if isreal(t)
+            s = real(t)
+            @fastmath s⁻¹ = inv(s)
+            for i = 1:length(c)
+                @inbounds H.dt_coeffs[i] = H.weights[i] * c[i] * s⁻¹
+            end
+        else
+            @fastmath t⁻¹ = inv(t)
+            for i = 1:length(c)
+                @inbounds H.dt_coeffs[i] = H.weights[i] * c[i] * t⁻¹
+            end
+        end
+    end
+
+    H.dt_coeffs
+end
+
+function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
+    ModelKit.evaluate!(u, H.system, x, coeffs!(H, t))
+end
+
+function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
+    ModelKit.evaluate_and_jacobian!(u, U, H.system, x, coeffs!(H, t))
     nothing
 end
 
 
-function evaluate!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs!(c, H, real(s))
-    @inbounds evaluate!(u, H.system, x, c.system)
-    u
+function taylor!(u, v::Val{1}, H::ToricHomotopy, x::Vector, t)
+    ModelKit.evaluate!(u, H.system, x, dt_coeffs!(H, t))
 end
 
-function dt!(u, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs_ds!(c, H, real(s))
-    @inbounds evaluate!(u, H.system, x, c.system)
-    u
+function taylor_coeffs!(H::ToricHomotopy, t::Real)
+    H.t_taylor_coeffs[] != t || return H.taylor_coeffs
+
+    tc = H.taylor_coeffs
+    # c, c¹, c², c³, c⁴ = H.taylor_coeffs
+    if iszero(t)
+        for i = 1:length(tc)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            if wᵢ == 0
+                tc[i, 1] = uᵢ
+                tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
+            elseif wᵢ == 1
+                tc[i, 2] = uᵢ
+                tc[i, 1] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
+            else
+                tc[i, 1] = tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
+            end
+        end
+    else
+        if t !== H.t_coeffs[]
+            evaluate_weights!(H.t_weights, H.weights, t)
+        end
+        t⁻¹ = inv(t)
+        @inbounds for i = 1:length(tc)
+            wᵢ = H.weights[i]
+            uᵢ = H.system_coeffs[i]
+            twᵢ = H.t_weights[i]
+            tc[i, 1] = uᵢ * twᵢ
+            tw1 = wᵢ * twᵢ * t⁻¹
+            tc[i, 2] = uᵢ * tw1
+            tw2 = 0.5 * (wᵢ - 1) * tw1 * t⁻¹
+            tc[i, 3] = uᵢ * tw2
+            tw3 = (wᵢ - 2) * tw2 * t⁻¹ / 3
+            tc[i, 4] = uᵢ * tw3
+            tw4 = 0.25 * (wᵢ - 3) * tw3 * t⁻¹
+            tc[i, 5] = uᵢ * tw4
+        end
+
+    end
+
+    H.t_taylor_coeffs[] = t
+
+    H.taylor_coeffs
 end
 
-function jacobian!(U, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs!(c, H, real(s))
-    @inbounds jacobian!(U, H.system, x, c.system)
-end
 
-function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs!(c, H, real(s))
-    @inbounds evaluate_and_jacobian!(u, U, H.system, x, c.system)
-    nothing
+function taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.tc2)
 end
-
-function evaluate(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs!(c, H, real(s))
-    evaluate(H.system, x, c.system)
+function taylor!(u, v::Val{3}, H::ToricHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.tc3)
 end
-
-function dt(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs_ds!(c, H, real(s))
-    evaluate(H.system, x, c.system)
+function taylor!(u, v::Val{4}, H::ToricHomotopy, tx::TaylorVector, t)
+    taylor_coeffs!(H, real(t))
+    ModelKit.taylor!(u, v, H.system, tx, H.taylor_coeffs)
 end
-
-function jacobian(H::ToricHomotopy, x, s, c::ToricHomotopyCache)
-    update_coeffs!(c, H, real(s))
-    jacobian(H.system, x, c.system)
-end
-
-(H::ToricHomotopy)(x, t, c = cache(H, x, t)) = evaluate(H, x, t, c)

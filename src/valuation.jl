@@ -1,53 +1,31 @@
-###############
-## VALUATION ##
-###############
-
 """
-    Valuation(x::PVector; affine = true)
-    Valuation(x::AbstractVector)
+    Valuation
 
-A data structure for approximating the valuation of a solution path ``x(s)``.
-It does this by computing an approximation function [`ν`](@ref) and approximating
-the first and second derivatives ``ν̇`` and ``ν̈``.
-If `affine = true` then the computed valuation is the valuation pulled back
-to the affine space.
-The valuation is estimated continously along a solution path. For this it is assumed that
-the path is tracked in a **logarithmic time scale**.
+A data structure for approximating the valuation of a solution path ``x(t)``.
 """
-struct Valuation
-    # Estimate
-    ν::Vector{Float64}
-    ν̇::Vector{Float64}
-    ν̈::Vector{Float64}
-    s::Base.RefValue{Float64}
-    affine::Bool
-    # Data for computing the ν̇ and ν̈ by finite differences
-    ν_data::NTuple{2,Vector{Float64}}
-    s_data::Base.RefValue{NTuple{2,Float64}}
+mutable struct Valuation
+    val_x::Vector{Float64}
+    val_tẋ::Vector{Float64}
+    Δval_x::Vector{Float64}
+    Δval_tẋ::Vector{Float64}
+
+    # Data for computing the val_x and val_tẋ and ν̈ by finite differences
+    val_x_data::NTuple{2,Vector{Float64}}
+    val_ẋ_data::NTuple{2,Vector{Float64}}
+    logx_data::NTuple{2,Vector{Float64}}
+    logẋ_data::NTuple{2,Vector{Float64}}
+    logt_data::NTuple{2,Float64}
 end
 
-function Valuation(n::Integer, affine::Bool = true)
-    v = zeros(n)
-    ν̇ = zeros(n)
-    ν̈ = zeros(n)
-    ν_data = (zeros(n), zeros(n))
-    s_data = (NaN, NaN)
-    Valuation(v, ν̇, ν̈, Ref(NaN), affine, ν_data, Ref(s_data))
-end
-function Valuation(x::ProjectiveVectors.PVector; affine::Bool = true)
-    if affine
-        Valuation(length(x) - length(ProjectiveVectors.dims(x)), affine)
-    else
-        Valuation(length(x), affine)
-    end
-end
-Valuation(x::Vector; affine::Bool = true) = Valuation(length(x))
+Valuation(x::AbstractVector) = Valuation(length(x))
+Valuation(n::Integer) =
+    Valuation((zeros(n) for i = 1:4)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
 
 function Base.show(io::IO, val::Valuation)
-    println(io, typeof(val), ":")
-    println(io, " • s → ", round.(val.s[]; sigdigits = 4))
-    for name in [:ν, :ν̇, :ν̈]
-        println(io, " • ", name, " → ", round.(getfield(val, name); sigdigits = 4))
+    print(io, "Valuation :")
+    for field in [:val_x, :val_tẋ, :Δval_x, :Δval_tẋ]
+        vs = [Printf.@sprintf("%#.4g", v) for v in getfield(val, field)]
+        print(io, "\n • ", field, " → ", "[", join(vs, ", "), "]")
     end
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
@@ -58,65 +36,109 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 Initialize the valuation estimator to start from scratch.
 """
 function init!(val::Valuation)
-    val.ν .= NaN
-    val.ν̇ .= NaN
-    val.ν̈ .= NaN
-    val.s[] = NaN
-    val.s_data[] = (NaN, NaN)
-    val.ν_data[1] .= NaN
-    val.ν_data[2] .= NaN
+    val.val_x .= 0.0
+    val.val_tẋ .= 0.0
+    val.Δval_x .= 0.0
+    val.Δval_tẋ .= 0.0
+    val.val_x_data[1] .= val.val_x_data[2] .= 0.0
+    val.val_ẋ_data[1] .= val.val_ẋ_data[2] .= 0.0
+    val.logx_data[1] .= val.logx_data[2] .= 0.0
+    val.logẋ_data[1] .= val.logẋ_data[2] .= 0.0
+    val.logt_data = (NaN, NaN)
     val
 end
 
-#############################
-## Valuation approximation ##
-#############################
 
-# First to the coordinate wise functions
+function ν(x, ẋ, t)
+    u, v = reim(x)
+    u¹, v¹ = reim(ẋ)
+    xx = abs2(x)
 
-"""
-    ν(z, ż)
+    μ = u * u¹ + v * v¹
+    l = μ / xx
 
-Computes the function ``ν(z) = -(xẋ + yẏ) / |z|²`` where `x,y = reim(z)`.
-This is equivalent to computing ``d/ds log|x(s)|``.
-"""
-function ν(z::Complex, ż::Complex)
-    x, y = reim(z)
-    ẋ, ẏ = reim(ż)
-    -(x * ẋ + y * ẏ) / abs2(z)
+    t * l
 end
 
-"""
-    ν_ν̇_ν̈(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
+function ν_ν¹(x, ẋ, x², t)
+    u, v = reim(x)
+    u¹, v¹ = reim(ẋ)
+    u², v² = reim(x²)
 
-Computes the function [`ν`](@ref) and the derivaties ``ν̇``, ``ν̈`` by using the analytic
-derivatives.
-"""
-function ν_ν̇_ν̈(z::Complex, ż::Complex, z̈::Complex, z³::Complex)
-    x, y = reim(z)
-    ẋ, ẏ = reim(ż)
-    ẍ, ÿ = reim(z̈)
-    x³, y³ = reim(z³)
+    xx = abs2(x)
 
-    μ = x * ẋ + y * ẏ
-    # The following is just applying product rule properly
-    μ̇ = x * ẍ + ẋ^2 + y * ÿ + ẏ^2
-    μ̈ = x * x³ + 3 * ẋ * ẍ + y * y³ + 3 * ẏ * ÿ
+    μ = u * u¹ + v * v¹
+    l = μ / xx
 
-    z² = abs2(z)
-    ν = -μ / z²
-    # ν̇ = -μ̇ / z² + 2μ²/(z²)² and  μ²/(z²)² = ν^2
-    ν̇ = 2 * ν^2 - μ̇ / z²
-    ν̈ = 4 * ν * ν̇ - μ̈ / z² + 2 * μ̇ * μ / z²^2
-    ν, ν̇, ν̈
+    μ¹ = u * u² + u¹^2 + v * v² + v¹^2
+    l¹ = μ¹ / xx - 2 * l^2
+
+    t * l, t * l¹ + l
 end
 
-"""
-    ν̇_ν̈(z::Complex, ż::Complex, s::Float64, ν₂, s₂, ν₁, s₁)
 
-Computes the function [`ν`](@ref) and the derivaties ``ν̇``, ``ν̈`` by using a finite
-difference scheme. This uses the value `ν₂` of ``ν`` at `s₂` and `ν₁` of ``ν`` at `s₁` with
-``s > s₂ > s₁``.
+logabs(x) = log(fast_abs(x))
+
+function update!(val::Valuation, pred::Predictor{AD{N}}, t::Real) where {N}
+    # use analytic expressions if derivatives are computed with automatic differentiation
+    if N ≥ 3
+        update_analytic!(val, pred.tx³, t)
+        return val
+    end
+
+    # otherwise use finite difference scheme
+    logt = log(t)
+    ν₂, ν₁ = val.val_x_data
+    logx₂, logx₁, = val.logx_data
+    logẋ₂, logẋ₁, = val.logẋ_data
+    logt₂, logt₁ = val.logt_data
+    val_ẋ₂, val_ẋ₁ = val.val_ẋ_data
+    for (i, (xᵢ, ẋᵢ)) in enumerate(pred.tx¹)
+        logxᵢ = logabs(xᵢ)
+        νᵢ = ν(xᵢ, ẋᵢ, t)
+        Δνᵢ = finite_diff(νᵢ, logt, ν₂[i], logt₂, ν₁[i], logt₁)
+
+        logẋᵢ = logabs(ẋᵢ)
+        val_ẋᵢ = finite_diff(logẋᵢ, logt, logẋ₂[i], logt₂, logẋ₁[i], logt₁)
+        Δval_ẋᵢ = finite_diff(val_ẋᵢ, logt, val_ẋ₂[i], logt₂, val_ẋ₁[i], logt₁)
+
+        val.val_x[i] = νᵢ
+        val.Δval_x[i] = Δνᵢ
+        val.val_tẋ[i] = val_ẋᵢ + 1
+        val.Δval_tẋ[i] = Δval_ẋᵢ
+
+        ν₂[i], ν₁[i] = νᵢ, ν₂[i]
+        logx₂[i], logx₁[i] = logxᵢ, logx₂[i]
+        logẋ₂[i], logẋ₁[i] = logẋᵢ, logẋ₂[i]
+        val_ẋ₂[i], val_ẋ₁[i] = val_ẋᵢ, val_ẋ₂[i]
+    end
+    val.logt_data = (logt, logt₂)
+
+    val
+end
+
+function update_analytic!(val::Valuation, tx::TaylorVector, t::Real)
+    for i in eachindex(tx)
+        xᵢ, ẋᵢ, x²ᵢ, x³ᵢ = tx[i]
+
+        ν, ν¹ = ν_ν¹(xᵢ, ẋᵢ, 2x²ᵢ, t)
+        val.val_x[i] = ν
+        val.Δval_x[i] = t * ν¹
+
+        ν, ν¹ = ν_ν¹(ẋᵢ, 2x²ᵢ, 6x³ᵢ, t)
+        val.val_tẋ[i] = ν + 1
+        val.Δval_tẋ[i] = t * ν¹
+    end
+
+    val
+end
+
+
+"""
+    finite_diff(ν₃, s₃, ν₂, s₂, ν₁, s₁)
+
+Compute the derivative `ν̇` of a function ``ν(s)`` at `s₃` by using a finite
+difference scheme. This uses the values `νᵢ = ν(sᵢ)` for ``i=1,…,3``.
 Since we have a non-uniform grid, we need a more elaborate difference scheme.
 The implementation follows the formulas derived in [^BS05].
 
@@ -124,128 +146,93 @@ The implementation follows the formulas derived in [^BS05].
   spaced points." Proceedings of the Royal Society A: Mathematical, Physical and Engineering
   Sciences 461.2059 (2005): 1975-1997.
 """
-function ν̇_ν̈(ν::Float64, s::Float64, ν₂::Float64, s₂::Float64, ν₁::Float64, s₁::Float64)
+function finite_diff(ν, s, ν₂, s₂, ν₁, s₁)
     Δ₁, Δ₂, Δ₁₂ = s - s₁, s - s₂, s₁ - s₂
     ν̇ = (Δ₂ * ν₁) / (Δ₁₂ * Δ₁) - ((Δ₁₂ + Δ₂) * ν₂) / (Δ₁₂ * Δ₂) - (Δ₁₂ * ν) / (Δ₁ * Δ₂)
-    ν̈ = -2ν₁ / (Δ₁₂ * Δ₁) + 2ν₂ / (Δ₁₂ * Δ₂) + 2ν / (Δ₁ * Δ₂)
-    ν̇, ν̈
+    # ν̈ = -2ν₁ / (Δ₁₂ * Δ₁) + 2ν₂ / (Δ₁₂ * Δ₂) + 2ν / (Δ₁ * Δ₂)
+    ν̇
 end
 
-"""
-    update!(val::Valuation, x, ẋ, s,
-            predictor::AbstractPredictorCache = NullPredictorCache())
 
-Compute new approximations of the valuation of the path ``x(s)`` from `x` and `ẋ` at `s`.
-This queries the given predictor cache `predictor` for the second and third derivative
-of the path ``x(s)``. If this information is available it computes the derivatives
-of ``ν`` analytically otherwise a finite differene scheme is used.
-"""
-function update!(
-    val::Valuation,
-    z::AbstractVector,
-    ż,
-    s,
-    predictor::AbstractPredictorCache = NullPredictorCache(),
+function analyze(
+    val::Valuation;
+    finite_tol::Float64,
+    zero_is_finite::Bool,
+    max_winding_number::Int,
 )
-    @unpack ν̇, ν̈, ν_data, s_data = val
+    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
-    ν₂, ν₁ = ν_data
-    s₂, s₁ = s_data[]
-
-    if val.affine && isa(z, PVector)
-        k = 1
-        for (rⱼ, j) in ProjectiveVectors.dimension_indices_homvars(z)
-            νⱼ = ν(z[j], ż[j])
-            for i in rⱼ
-                ν_k = ν(z[i], ż[i]) - νⱼ
-                if !isnan(s₁)
-                    ν̇_k, ν̈_k = ν̇_ν̈(ν_k, s, ν₂[k], s₂, ν₁[k], s₁)
-                    ν̇[k], ν̈[k] = ν̇_k, ν̈_k
-                end
-                # update ν and shift the previous ones
-                val.ν[k], ν₂[k], ν₁[k] = ν_k, val.ν[k], ν₂[k]
-                k += 1
-            end
-        end
-    else
-        for i = 1:length(val.ν)
-            # try to compute the values using higher derivatives from the predictor
-            z̈ = second_derivative(predictor)
-            z³ = third_derivative(predictor)
-            if !isnothing(z̈) && !isnothing(z³)
-                νᵢ, ν̇ᵢ, ν̈ᵢ = ν_ν̇_ν̈(z[i], ż[i], z̈[i], z³[i])
-                if !isnan(s₁)
-                    # The estimates can be sensitive to numerical errors, so we still compare
-                    # against the numerical derivatives since this is cheap anyway
-                    ν̇ᵢ′, ν̈ᵢ′ = ν̇_ν̈(νᵢ, s, ν₂[i], s₂, ν₁[i], s₁)
-                    ν̇[i] = abs(ν̇ᵢ) < abs(ν̇ᵢ′) ? ν̇ᵢ : ν̇ᵢ′
-                    ν̈[i] = abs(ν̈ᵢ) < abs(ν̈ᵢ′) ? ν̈ᵢ : ν̈ᵢ′
-                else
-                    ν̇[i], ν̈[i] = ν̇ᵢ, ν̈ᵢ
-                end
-            else
-                νᵢ = ν(z[i], ż[i])
-                if !isnan(s₁)
-                    ν̇ᵢ, ν̈ᵢ = ν̇_ν̈(νᵢ, s, ν₂[i], s₂, ν₁[i], s₁)
-                    ν̇[i], ν̈[i] = ν̇ᵢ, ν̈ᵢ
-                end
-            end
-            # update ν and shift the previous ones
-            val.ν[i], ν₂[i], ν₁[i] = νᵢ, val.ν[i], ν₂[i]
-        end
-    end
-
-    # Shift the s
-    s_data[] = (val.s[], s₂)
-    val.s[] = s
-    val
-end
-
-
-
-"""
-    enum ValuationVerdict
-
-The possible states the [`judge`](@ref) function returns:
-
-* `VAL_INDECISIVE`: The estimates are not trustworthy enough.
-* `VAL_FINITE`: The valuation indicates that the path is finite.
-* `VAL_AT_INFINITY`: The valuation indicates that the path is diverging.
-"""
-@enum ValuationVerdict begin
-    VAL_INDECISIVE
-    VAL_FINITE
-    VAL_AT_INFINITY
-end
-
-"""
-    judge(val::Valuation; tol = 1e-3, tol_at_infinity = 1e-4)::ValuationVerdict
-
-Judge the current valuation to determine whether a path is diverging. Returns
-a [`ValuationVerdict`](@ref).
-A path is diverging if one entry of the valuation is negative. To assure that
-the estimate is trust worthy we require that the first and second derivative
-of [`ν``](@ref) is smaller than `tol_at_infinity`.
-The `tol` is used to estimate whether a finite valuation is trustworthy.
-"""
-function judge(val::Valuation; tol::Float64 = 1e-3, tol_at_infinity::Float64 = 1e-4)
-    @unpack ν, ν̇, ν̈ = val
+    at_infinity_tol = at_zero_tol = Inf
     finite = true
-    indecisive = false
-    for (i, νᵢ) in enumerate(ν)
-        if νᵢ < -max(0.01, tol)
+    δ = inv(max_winding_number)
+    for (i, val_xᵢ) in enumerate(val_x)
+        abs_Δ = abs(Δval_x[i])
+        ε∞ = max(
+            abs(1.0 - val_tẋ[i] / val_xᵢ),
+            abs(Δval_x[i] / val_xᵢ),
+            abs(Δval_tẋ[i] / val_tẋ[i]),
+        )
+        if isnan(abs_Δ)
+            finite = false
+            continue
+        end
+        # ∞ check
+        if val_xᵢ + ε∞ < -(δ + finite_tol)
+            at_infinity_tol = min(ε∞, at_infinity_tol)
+        end
+
+        # 0 check
+        if !zero_is_finite && val_xᵢ - ε∞ > (δ + finite_tol)
+            at_zero_tol = min(ε∞, at_zero_tol)
+        end
+
+        # finite
+        # Case a: val(x) = 0
+        if abs(val_xᵢ) < finite_tol
+            if abs_Δ > finite_tol || val_tẋ[i] ≤ 0
+                finite = false
+            end
+            # Case b: val(x) = val(tẋ) > 0
+        elseif zero_is_finite && val_xᵢ > finite_tol
+            if ε∞ > finite_tol
+                finite = false
+            end
+        else
             finite = false
         end
+    end
 
-        if νᵢ < -0.05 && abs(ν̇[i]) < tol_at_infinity && abs(ν̈[i]) < tol_at_infinity
-            return VAL_AT_INFINITY
-        end
+    return (
+        val_finite = finite,
+        at_infinity_tol = at_infinity_tol,
+        at_zero_tol = at_zero_tol,
+    )
+end
 
-        if abs(ν̇[i]) > tol
-            indecisive = true
+
+function validate_coord_growth(
+    val::Valuation,
+    scale_old,
+    scale_new;
+    finite_tol::Float64,
+    at_infinity_tol::Float64,
+    tol::Float64,
+)
+    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
+
+    for (i, val_xᵢ) in enumerate(val_x)
+        ε∞ = max(
+            abs(1.0 - val_tẋ[i] / val_xᵢ),
+            abs(Δval_x[i] / val_xᵢ),
+            abs(Δval_tẋ[i] / val_tẋ[i]),
+        )
+        # ∞ check
+        if val_xᵢ + ε∞ < -finite_tol && ε∞ < at_infinity_tol
+            if scale_new[i] / scale_old[i] > tol
+                return true
+            end
         end
     end
-    finite && !indecisive && return VAL_FINITE
 
-    VAL_INDECISIVE
+    false
 end

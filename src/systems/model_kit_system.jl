@@ -1,46 +1,31 @@
 export ModelKitSystem
 
 """
-    ModelKitSystem(system::ModelKit.System) <: AbstractSystem
+    ModelKitSystem(F:System)
+
+Construct a system from the given [`System`](@ref) `F`.
+The difference to `F` is that this compiles a straight line programm for the fast
+evaluation of `F` and that `ModelKitSystem <: AbstractSystem`.
 """
-struct ModelKitSystem{T} <: AbstractSystem
-    system::ModelKit.CompiledSystem{T}
-    degrees::Vector{Int}
+struct ModelKitSystem{S} <: AbstractSystem
+    system::ModelKit.CompiledSystem{S}
 end
-#
-function ModelKitSystem(system::ModelKit.System)
-    csystem = ModelKit.compile(system)
-    degrees = maxdegrees(system)
-    ModelKitSystem(csystem, degrees)
-end
+ModelKitSystem(F::ModelKit.System; optimizations::Bool = true) =
+    ModelKitSystem(ModelKit.compile(F; optimizations = optimizations))
 
 Base.size(F::ModelKitSystem) = size(F.system)
+ModelKit.variables(F::ModelKitSystem) = variables(F.system.system)
+ModelKit.parameters(F::ModelKitSystem) = parameters(F.system.system)
+ModelKit.variable_groups(F::ModelKitSystem) = variable_groups(F.system.system)
 
-cache(F::ModelKitSystem, x, p = nothing) = SystemNullCache()
+function Base.show(io::IO, F::ModelKitSystem)
+    println(io, typeof(F), ":")
+    println(io, F.system)
+end
 
-@propagate_inbounds evaluate!(u, F::ModelKitSystem, x, ::SystemNullCache) =
-    ModelKit.evaluate!(u, F.system, x)
-evaluate(F::ModelKitSystem, x, ::SystemNullCache) = ModelKit.evaluate(F.system, x)
-(F::ModelKitSystem)(x...) = evaluate(F, x...)
-
-@propagate_inbounds jacobian!(U, F::ModelKitSystem, x, ::SystemNullCache) =
-    ModelKit.jacobian!(U, F.system, x)
-jacobian(F::ModelKitSystem, x, ::SystemNullCache) = ModelKit.jacobian(F.system, x)
-
-@propagate_inbounds evaluate_and_jacobian!(u, U, F::ModelKitSystem, x, ::SystemNullCache) =
-    ModelKit.evaluate_and_jacobian!(u, U, F.system, x)
-
-degrees(F::ModelKitSystem) = F.degrees
-
-
-# # parameter version
-# @propagate_inbounds evaluate!(u, F::ModelKitSystem, x, p, ::SystemNullCache) =
-#     ModelKit.evaluate!(u, F.system, x, p)
-# evaluate(F::ModelKitSystem, x, p, ::SystemNullCache) = ModelKit.evaluate(F.system, x, p)
-# @propagate_inbounds jacobian!(U, F::ModelKitSystem, x, p, ::SystemNullCache) =
-#     ModelKit.jacobian!(U, F.system, x, p)
-# jacobian(F::ModelKitSystem, x, p, ::SystemNullCache) = ModelKit.jacobian(F.system, x, p)
-# @propagate_inbounds evaluate_jacobian!(u, U, F::ModelKitSystem, x, p, ::SystemNullCache) =
-#     ModelKit.evaluate_jacobian!(u, U, F.system, x, p)
-# evaluate_jacobian(F::ModelKitSystem, x, p, ::SystemNullCache) =
-#     ModelKit.evaluate_jacobian(F.system, x, p)
+(F::ModelKitSystem)(x, p = nothing) = F.system.system(x, p)
+evaluate!(u, F::ModelKitSystem, x, p = nothing) = ModelKit.evaluate!(u, F.system, x, p)
+evaluate_and_jacobian!(u, U, F::ModelKitSystem, x, p = nothing) =
+    ModelKit.evaluate_and_jacobian!(u, U, F.system, x, p)
+taylor!(u, v::Val, F::ModelKitSystem, tx, p = nothing) =
+    ModelKit.taylor!(u, v, F.system, tx, p)

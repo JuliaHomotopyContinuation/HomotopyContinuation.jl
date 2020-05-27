@@ -1,182 +1,36 @@
-export AbstractSystem,
-    AbstractSystemCache,
-    SystemNullCache,
-    cache,
-    evaluate,
-    evaluate!,
-    jacobian,
-    jacobian!,
-    differentiate_parameters!,
-    differentiate_parameters,
-    evaluate_and_jacobian,
-    evaluate_and_jacobian!
-
+export AbstractSystem
 
 """
-    SystemNullCache
+    AbstractSystem
 
-An empty cache if no cache is necessary.
+An abstract type representing a polynomial system ``F(x)``.
+
+The following systems are available:
+
+* [`AffineChartSystem`](@ref)
+* [`CompositionSystem`](@ref)
+* [`FixedParameterSystem`](@ref)
+* [`ModelKitSystem`](@ref)
+* [`RandomizedSystem`](@ref)
 """
-struct SystemNullCache <: AbstractSystemCache end
+abstract type AbstractSystem end
 
-"""
-    cache(F::AbstractSystem, x)::AbstractSystemCache
-
-Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
-of `x`.
-
-    cache(F::AbstractSystem, x, p)::AbstractSystemCache
-
-Create a cache for the evaluation (incl. Jacobian) of `F` with elements of the type
-of `x` and parameters `p`.
-"""
-cache(F::AbstractSystem, args...) = throw(MethodError(cache, tuple(F, args...)))
-
-
-"""
-    evaluate!(u, F::AbstractSystem, x, cache::AbstractSystemCache)
-
-Evaluate the system `F` at `x` and store the result in `u`.
-
-    evaluate!(u, F::AbstractSystem, x, p, cache::AbstractSystemCache)
-
-Evaluate the system `F` at `x` and parameters `p` and store the result in `u`.
-"""
-evaluate!(u, F::AbstractSystem, args...) =
-    error(MethodError(evaluate!, tuple(u, F, args...)))
-
-"""
-    evaluate(F::AbstractSystem, x::AbstractVector, cache=cache(F, x))
-
-Evaluate the system `F` at `x`.
-
-    evaluate(F::AbstractSystem, x::AbstractVector, p, cache=cache(F, x))
-
-Evaluate the system `F` at `x` and parameters `p`.
-"""
-evaluate(F::AbstractSystem, x, c::AbstractSystemCache = cache(F, x)) = evaluate(F, x, c)
-evaluate(F::AbstractSystem, x, p, c::AbstractSystemCache = cache(F, x, p)) =
-    evaluate(F, x, p, c)
-
-
-"""
-    jacobian!(U, F::AbstractSystem, x , cache::AbstractSystemCache)
-
-Evaluate the Jacobian of the system `F` at `x` and store the result in `U`.
-
-    jacobian!(U, F::AbstractSystem, x , p, cache::AbstractSystemCache)
-
-Evaluate the Jacobian of the system `F` at `x` and parameters `p` and store the result in `U`.
-"""
-jacobian!(U, F::AbstractSystem, args...) =
-    error(MethodError(jacobian!, tuple(U, F, args...)))
-
-"""
-    jacobian(F::AbstractSystem, x, cache=cache(F, x))
-
-Evaluate the Jacobian of the system `F` at `x`.
-
-    jacobian(F::AbstractSystem, x, p, cache=cache(F, x))
-
-Evaluate the Jacobian of the system `F` at `x` and parameters `p`.
-"""
-jacobian(F::AbstractSystem, x, c::AbstractSystemCache = cache(F, x)) = jacobian(F, x, c)
-jacobian(F::AbstractSystem, x, p, c::AbstractSystemCache = cache(F, x, p)) =
-    jacobian(F, x, p, c)
-
-
-"""
-    differentiate_parameters!(u, F::AbstractSystem, x, p, cache::AbstractSystemCache)
-
-Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters
-and store the result in `u`.
-"""
-function differentiate_parameters! end
-
-"""
-    differentiate_parameters(F::AbstractSystem, x, p, cache=cache(F, x))
-
-Evaluate the Jacobian of the system `F` at `x` and parameters `p` w.r.t. the parameters.
-"""
-differentiate_parameters(F::AbstractSystem, x, p, c::AbstractSystemCache = cache(F, x, p)) =
-    differentiate_parameters(F, x, p, c)
-
-# Optional
-"""
-    evaluate_and_jacobian!(u, U, F, x, cache::AbstractSystemCache)
-
-Evaluate the system `F` and its Jacobian at `x` and store the results in `u` (evaluation)
-and `U` (Jacobian).
-"""
-function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, cache::AbstractSystemCache)
-    evaluate!(u, F, x, cache)
-    jacobian!(U, F, x, cache)
-    nothing
-end
-
-"""
-    evaluate_and_jacobian!(u, U, F, x, p, cache::AbstractSystemCache)
-
-Evaluate the system `F` and its Jacobian at `x` and parameters `p` and store the results in `u` (evaluation)
-and `U` (Jacobian).
-"""
-function evaluate_and_jacobian!(u, U, F::AbstractSystem, x, p, cache::AbstractSystemCache)
-    evaluate!(u, F, x, p, cache)
-    jacobian!(U, F, x, p, cache)
-    nothing
-end
-
-
-"""
-    evaluate_and_jacobian(F::AbstractSystem, x, cache=cache(F, x))
-
-Evaluate the system `F` and its Jacobian at `x`.
-"""
-function evaluate_and_jacobian(F::AbstractSystem, x, c::AbstractSystemCache = cache(F, x))
-    u = evaluate(F, x, c)
-    U = jacobian(F, x, c)
-    u, U
-end
-"""
-    evaluate_and_jacobian(F::AbstractSystem, x, p, cache=cache(F, x))
-
-Evaluate the system `F` and its Jacobian at `x` and parameters `p`.
-"""
-function evaluate_and_jacobian(
-    F::AbstractSystem,
-    x,
-    p,
-    c::AbstractSystemCache = cache(F, x),
-)
-    u = evaluate(F, x, p, c)
-    U = jacobian(F, x, p, c)
-    u, U
-end
-
-"""
-    Base.size(F::AbstractSystem)
-
-Returns a tuple `(m, n)` indicating that `F` is a system of `m` polynomials `m` in `n` variables.
-"""
-Base.size(::AbstractSystem) = error("Mandatory to define `Base.size` for `AbstractSystem`s")
+# Base.size(F::AbstractSystem)
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
-Base.length(F::AbstractSystem) = size(F, 1)
 
-"""
-    degrees(F::AbstractSystem)
+# ModelKit.variables(F::AbstractSystem)
+ModelKit.parameters(F::AbstractSystem) = Variable[]
+ModelKit.variable_groups(::AbstractSystem) = nothing
 
-Returns the degrees of the polynomials.
-"""
-degrees(F::AbstractSystem) = nothing
+ModelKit.nvariables(F::AbstractSystem) = size(F, 2)
+ModelKit.nparameters(F::AbstractSystem) = length(parameters(F))
+function ModelKit.System(F::AbstractSystem)
+    x, p = variables(F), parameters(F)
+    System(F(x, p), x, p, variable_groups(F))
+end
 
-include("systems/sp_system.jl")
-include("systems/fixed_homotopy.jl")
-include("systems/fp_system.jl")
-include("systems/totaldegree_system.jl")
-include("systems/multihom_totaldegree_system.jl")
-include("systems/composition_system.jl")
-include("systems/fixed_parameter_system.jl")
-include("systems/squared_up_system.jl")
-include("systems/trace_test_system.jl")
-include("systems/trace_test_pencil.jl")
 include("systems/model_kit_system.jl")
+include("systems/fixed_parameter_system.jl")
+include("systems/randomized_system.jl")
+include("systems/affine_chart_system.jl")
+include("systems/composition_system.jl")

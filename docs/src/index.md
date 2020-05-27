@@ -1,21 +1,47 @@
 # Introduction
 
-[`HomotopyContinuation.jl`](https://www.JuliaHomotopyContinuation.org) is a package for solving systems of polynomials equations with
-only finitely many solutions using numerical homotopy continuation.
-If this is your first time reading this documentation, we recommend you start with the
-[getting started guide](https://www.JuliaHomotopyContinuation.org/guides/get-started).
+[`HomotopyContinuation.jl`](https://www.JuliaHomotopyContinuation.org) is a package for the numerical solution of systems of polynomial equations.
+
+This documentation is a purely **technical description** of the package functionality.
+You can find tutorials, examples, how-to guides and explanations on our homepage
+[JuliaHomotopyContinuation.org](https://www.JuliaHomotopyContinuation.org).
 
 ## Contents
+
+**Problem formulation**
 ```@contents
 Pages = [
-    "solving.md",
-    "solver.md",
-    "monodromy.md",
-    "input.md",
-    "path_tracker.md",
-    "core_tracker.md",
-    "homotopies.md",
-    "systems.md",
-    "reference.md",
+    "model_kit.md",
+    "linear_affine.md",
+    "systems_homotopies.md",
 ]
+Depth = 2
+```
+
+**Solving Systems**
+```@contents
+Pages = [
+    "solve.md",
+    "result.md",
+    "solve_examples.md",
+    "start_systems.md",
+]
+Depth = 2
+```
+
+**Trackers**
+```@contents
+Pages = [
+    "endgame_tracker.md",
+    "tracker.md",
+]
+Depth = 2
+```
+
+**Miscellaneous**
+```@contents
+Pages = [
+    "misc.md",
+]
+Depth = 2
 ```

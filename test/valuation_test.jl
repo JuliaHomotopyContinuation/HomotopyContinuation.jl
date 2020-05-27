@@ -1,225 +1,75 @@
 @testset "Valuation" begin
-    @testset "Correctness (zero valuation)" begin
-        @polyvar x y
-        f = [x^2 - 2, x + y - 1]
-
-        tracker, starts = coretracker_startsolutions(
-            f;
-            homotopy = (g, f) -> StraightLineHomotopy(g, f; gamma = 1.0 + im),
-            seed = 12345,
-            min_step_size = eps()^2,
-            log_homotopy = true,
-        )
-
+    @testset "Example 1" begin
+        # setup
+        @var x
+        f = [(x - 10)^5]
+        endgame_tracker, starts =
+            total_degree(System(f); tracker_options = (automatic_differentiation = 3,))
         S = collect(starts)
-        state = tracker.state
-        val = HC.Valuation(S[1])
-        init!(tracker, S[1], 0.0, 28.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [0.0, 0.0] atol = 1e-8
-        @test norm(val.ν̇) < 1e-2
-        @test norm(val.ν̈) < 1e-2
+        tracker = endgame_tracker.tracker
+        val = HC2.Valuation(1)
+        HC2.init!(val)
+        track!(tracker, S[1], 1, 1e-13)
 
-        init!(val)
-        init!(tracker, S[1], 0.0, 28.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [0.0, 0.0] atol = 1e-8
-        @test norm(val.ν̇) < 1e-7
-        @test norm(val.ν̈) < 1e-6
+        t = tracker.state.t
+        HC2.update!(val, tracker.predictor, real(t))
 
-        init!(val)
-        init!(tracker, S[2], 0.0, 28.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [0.0, 0.0] atol = 1e-8
-        @test norm(val.ν̇) < 1e-7
-        @test norm(val.ν̈) < 1e-6
-
-        ## Multi-projective tracking
-
-        # affine valuation
-        @polyvar x y v w
-
-        tracker, starts = coretracker_startsolutions(
-            [x * y - 6 * v * w, x^2 - 5 * v^2],
-            variable_groups = [(x, v), (y, w)],
-            log_homotopy = true,
-        )
-        S = collect(starts)
-        state = tracker.state
-        val = HC.Valuation(S[1]; affine = true)
-        init!(val)
-        init!(tracker, S[1], 0.0, 30.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test is_success(status(tracker))
-        @test val.ν ≈ [0.0, 0.0] atol = 1e-6
-
-        val = HC.Valuation(S[1]; affine = false)
-        init!(val)
-        init!(tracker, S[1], 0.0, 30.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test is_success(status(tracker))
-        @test val.ν ≈ [0.0, 0.0, 0.0, 0.0] atol = 1e-6
+        @test val.val_x[1] ≈ 0 atol = 10 * (1e-13)^(1 / 5)
+        @test val.val_tẋ[1] ≈ 1 / 5 atol = 10 * (1e-13)^(1 / 5)
     end
 
-    @testset "Correctness (non-zero valuation)" begin
-        f = equations(griewank_osborne())
-        tracker, starts = coretracker_startsolutions(
-            f;
-            homotopy = (g, f) -> StraightLineHomotopy(g, f; gamma = 1.0 + im),
-            seed = 12345,
-            min_step_size = eps()^2,
-            log_homotopy = true,
+    @testset "Example 2" begin
+        @var x y
+        f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
+        endgame_tracker, starts = total_degree(
+            System(f);
+            gamma = 1.3im + 0.4,
+            tracker_options = TrackerOptions(
+                parameters = :conservative,
+                automatic_differentiation = 3,
+            ),
         )
-
         S = collect(starts)
-        state = tracker.state
-        val = HC.Valuation(S[1])
-        init!(tracker, S[1], 0.0, 20.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-4
-        @test norm(val.ν̇) < 1e-4
-        @test norm(val.ν̈) < 1e-4
+        tracker = endgame_tracker.tracker
+        val = HC2.Valuation(2)
+        tf = 1e-10
+        track!(tracker, S[3], 1, tf)
 
-        # Use analytic estimates for ν̇ and ν̈
-        init!(val)
-        @test all(isnan, val.ν)
-        init!(tracker, S[1], 0.0, 20.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-4
-        @test norm(val.ν̇) < 1e-4
-        @test norm(val.ν̈) < 1e-4
-        @test HC.judge(val; tol = 1e-4, tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
+        t = tracker.state.t
+        HC2.update!(val, tracker.predictor, real(t))
 
-        init!(val)
-        init!(tracker, S[2], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
-        @test norm(val.ν̇) < 1e-3
-        @test norm(val.ν̈) < 1e-3
-        @test HC.judge(val; tol = 1e-3) == HC.VAL_FINITE
-
-        init!(val)
-        init!(tracker, S[2], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [1 // 3, 2 // 3] atol = 1e-3
-        @test norm(val.ν̇) < 1e-3
-        @test norm(val.ν̈) < 1e-3
-        @test HC.judge(val; tol = 1e-3) == HC.VAL_FINITE
-        @test HC.judge(val; tol = 1e-10) == HC.VAL_INDECISIVE
-
-        init!(val)
-        init!(tracker, S[3], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [2, -1] atol = 1e-5
-        @test norm(val.ν̇) < 1e-5
-        @test norm(val.ν̈) < 1e-5
-        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
+        @test val.val_x[1] ≈ -1 atol = 10 * tf^(1 / 2)
+        @test val.val_x[2] ≈ -1 atol = 10 * tf^(1 / 2)
+        @test val.val_tẋ[1] ≈ -1 atol = sqrt(tf)
+        @test val.val_tẋ[2] ≈ -1 atol = sqrt(tf)
     end
 
-    @testset "Correctness projective (non-zero valuation)" begin
-        f = homogenize(equations(griewank_osborne()))
-        tracker, starts = coretracker_startsolutions(
-            f;
-            homotopy = (g, f) -> StraightLineHomotopy(g, f; gamma = 1.0 + im),
-            min_step_size = eps()^2,
-            log_homotopy = true,
+    @testset "Example 3" begin
+        a = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        @var x y
+        f1 = (a[1] * x^2 + a[2] * y) * (a[3] * x + a[4] * y) + 1
+        f2 = (a[1] * x^2 + a[2] * y) * (a[5] * x + a[6] * y) + 1
+        endgame_tracker, starts = total_degree(
+            System([f1, f2]);
+            gamma = 1.3im + 0.4,
+            tracker_options = TrackerOptions(
+                parameters = :conservative,
+                automatic_differentiation = 3,
+            ),
         )
-
         S = collect(starts)
-        state = tracker.state
-        val = HC.Valuation(state.x; affine = true)
-        init!(tracker, S[1], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-4
-        @test norm(val.ν̇) < 1e-4
-        @test norm(val.ν̈) < 1e-4
-        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
+        tracker = endgame_tracker.tracker
+        val = HC2.Valuation(2)
+        tf = 1e-10
+        HC2.track!(tracker, S[3], 1, tf)
 
-        # Use analytic estimates for ν̇ and ν̈
-        init!(val)
-        @test all(isnan, val.ν)
-        init!(tracker, S[1], 0.0, 20.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [-0.5, -1] atol = 1e-4
-        @test norm(val.ν̇) < 1e-4
-        @test norm(val.ν̈) < 1e-4
-        @test HC.judge(val; tol_at_infinity = 1e-4) == HC.VAL_AT_INFINITY
-        @test HC.judge(val; tol_at_infinity = 1e-10) == HC.VAL_INDECISIVE
+        t = tracker.state.t
+        HC2.update!(val, tracker.predictor, real(t))
 
-        # PROJECTIVE VALUATIONS
-
-        val = HC.Valuation(state.x; affine = false)
-        init!(tracker, S[1], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s)
-            end
-        end
-        @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
-        @test norm(val.ν̇) < 1e-3
-        @test norm(val.ν̈) < 1e-3
-        @test HC.judge(val; tol = 1e-2) == HC.VAL_FINITE
-
-        # Use analytic estimates for ν̇ and ν̈
-        init!(val)
-        @test all(isnan, val.ν)
-        init!(tracker, S[1], 0.0, 25.0)
-        for _ in tracker
-            if !state.last_step_failed
-                HC.update!(val, state.x, state.ẋ, state.s, tracker.predictor)
-            end
-        end
-        @test val.ν ≈ [0.5, 0, 1] atol = 1e-3
-        @test norm(val.ν̇) < 1e-3
-        @test norm(val.ν̈) < 1e-3
-        @test HC.judge(val; tol = 1e-2) == HC.VAL_FINITE
+        @test val.val_x[1] ≈ -1 / 6 atol = tf^(1 / 6)
+        @test val.val_x[2] ≈ -2 / 6 atol = tf^(1 / 6)
+        @test val.val_tẋ[1] ≈ -1 / 6 atol = tf^(1 / 6)
+        @test val.val_tẋ[2] ≈ -2 / 6 atol = tf^(1 / 6)
+        @test !isempty(sprint(show, val))
     end
 end

@@ -1,111 +1,85 @@
+export excess_solution_check, excess_solution_check!, OverdeterminedTracker
 """
-    OverdeterminedTracker
+    excess_solution_check!(path_result::PathResult,
+                           F::RandomizedSystem,
+                           newton_cache = NewtonCache(F.system))
 
-An `OverdeterminedTracker` allows to solve overdetermined systems by
-first squaring them up, then solving them with a `PolyhedralTracker` or `PathTracker`
-and finally to find all actual solutions.
+Assigns to the [`PathResult`](@ref) `path_result` the `return_code` `:excess_solution` if
+the `path_result` is a solution of the randomized system `F` but not of
+the polynomial system underlying `F`.
+This is performed by using Newton's method for non-singular solutions and comparing the
+residuals of the solutions for singular solutions.
 """
-struct OverdeterminedTracker{
-    T<:AbstractPathTracker,
-    AV<:AbstractVector,
-    S<:HomotopyWithCache,
-    NC<:NewtonCorrectorCache,
-} <: AbstractPathTracker
-    tracker::T
-    # stuff to verify containment
-    system::S
-    y::AV
-    jacobian::JacobianMonitor{Float64}
-    newton::NC
-end
-
-function construct_tracker(prob::OverdeterminedProblem, start_solutions; kwargs...)
-    tracker = construct_tracker(prob.problem, start_solutions)
-    y = copy(path_tracker_state(tracker).solution)
-    system = HomotopyWithCache(ConstantHomotopy(prob.target_system), y, 0.0)
-    J = JacobianMonitor(jacobian(system, y, 0.0))
-    newton_corrector = NewtonCorrectorCache(system, y, 0.0)
-
-    OverdeterminedTracker(tracker, system, y, J, newton_corrector)
-end
-
-
-seed(OT::OverdeterminedTracker) = seed(OT.tracker)
-function PathResult(OT::OverdeterminedTracker, x, path_number = nothing; kwargs...)
-    PathResult(OT.tracker, x, path_number; kwargs...)
-end
-
-result_type(OT::OverdeterminedTracker) = result_type(OT.tracker)
-prepare!(OT::OverdeterminedTracker, S) = prepare!(OT.tracker, S)
-function track!(
-    OT::OverdeterminedTracker,
-    x;
-    accuracy::Union{Nothing,Float64} = nothing,
-    max_corrector_iters::Union{Nothing,Int} = nothing,
+function excess_solution_check!(
+    path_result::PathResult,
+    F::RandomizedSystem,
+    newton_cache::NewtonCache = NewtonCache(F.system),
 )
-    retcode = track!(
-        OT.tracker,
-        x;
-        accuracy = accuracy, max_corrector_iters = max_corrector_iters,
-    )
-    is_success(retcode) || return retcode
-
-    # We take the solution and try an overdetermined Newton method to see whether this also
-    # converges
-    s = solution(OT.tracker)
-    result = newton!(
-        OT.y,
-        OT.system,
-        s,
-        0.0,
-        OT.jacobian,
-        norm(OT.tracker),
-        OT.newton;
-        tol = min_accuracy(OT.tracker),
-        # Make sure to evaluate the Jacobian only *once*. Otherwise it can happen at singuar
-        # solutions that we bounce away from a good solution.
-        full_steps = 1,
-        max_iters = 2,
-        double_64_evaluation = false,
-    )
-
-    # overwrite the solution information used for constructing a `PathResult`
-    state = path_tracker_state(OT)
-    state.solution_cond = cond!(OT.jacobian, InfNorm())
-    original_residual = state.solution_residual
-    state.solution_residual = LA.norm(OT.newton.r, InfNorm())
-    state.solution_accuracy = result.accuracy
-
-    if is_converged(result)
-        state.solution .= OT.y
-        state.status = PathTrackerStatus.success
-    else
-        if state.solution_cond > 1e8
-            evaluate!(OT.newton.r, OT.system, s, 0.0)
-            state.solution_residual = LA.norm(OT.newton.r, InfNorm())
-            if state.solution_residual / original_residual < 1e5
-                state.status = PathTrackerStatus.success
-            else
-                state.status = PathTrackerStatus.excess_solution
-            end
+    is_success(path_result) || return path_result
+    if is_nonsingular(path_result)
+        acc = max(accuracy(path_result), eps())
+        if path_result.extended_precision
+            max_abs_norm_first_update = 100 * sqrt(acc)
         else
-            state.status = PathTrackerStatus.excess_solution
+            max_abs_norm_first_update = 100acc
+        end
+        res = newton(
+            F.system,
+            solution(path_result),
+            InfNorm(),
+            newton_cache;
+            extended_precision = path_result.extended_precision,
+            abs_tol = 100 * acc,
+            rel_tol = 100 * acc,
+            max_abs_norm_first_update = max_abs_norm_first_update,
+        )
+        if !is_success(res)
+            path_result.return_code = :excess_solution
+            path_result.accuracy = res.accuracy
+            path_result.residual = res.residual
+        end
+    else
+        # for singular solutions compare residuals due to lack of something better right now
+        evaluate!(newton_cache.r, F.system, solution(path_result))
+        system_residual = LA.norm(newton_cache.r, InfNorm())
+        if system_residual > 100 * residual(path_result)
+            path_result.return_code = :excess_solution
+            path_result.residual = system_residual
         end
     end
+
+    path_result
 end
 
-function track(
-    tracker::OverdeterminedTracker,
-    x;
-    path_number::Union{Int,Nothing} = nothing,
-    accuracy::Union{Nothing,Float64} = nothing,
-    max_corrector_iters::Union{Nothing,Int} = nothing,
-    details::Symbol = :default,
-)
-    track!(tracker, x; accuracy = accuracy, max_corrector_iters = max_corrector_iters)
-    PathResult(tracker, x, path_number; details = details)
+struct ExcessSolutionCheck{S<:RandomizedSystem,M} <: Function
+    system::S
+    newton_cache::NewtonCache{M}
 end
+(check::ExcessSolutionCheck)(R::PathResult) =
+    excess_solution_check!(R, check.system, check.newton_cache)
 
-path_tracker_state(OT::OverdeterminedTracker) = path_tracker_state(OT.tracker)
-path_tracker_state(PT::PolyhedralTracker) = path_tracker_state(PT.generic_tracker)
-path_tracker_state(T::PathTracker) = T.state
+"""
+    excess_solution_check(F::RandomizedSystem)
+
+Returns a function `λ(::PathResult)` which performs the excess solution check.
+The call `excess_solution_check(F)(path_result)` is identical to
+`excess_solution_check!(F, path_result)`. See also [`excess_solution_check!`](@ref).
+"""
+excess_solution_check(F::RandomizedSystem) = ExcessSolutionCheck(F, NewtonCache(F.system))
+
+"""
+    OverdeterminedTracker(tracker::AbstractPathTracker, F::RandomizedSystem)
+
+Wraps the given [`AbstractPathTracker`](@ref) `tracker` to apply
+[`excess_solution_check`](@ref) for the given randomized system `F` on each path result.
+"""
+struct OverdeterminedTracker{T<:AbstractPathTracker,E<:ExcessSolutionCheck} <:
+       AbstractPathTracker
+    tracker::T
+    excess_solution_check::E
+end
+OverdeterminedTracker(T::AbstractPathTracker, F::RandomizedSystem) =
+    OverdeterminedTracker(T, excess_solution_check(F))
+
+track(T::OverdeterminedTracker, x; kwargs...) =
+    T.excess_solution_check(track(T.tracker, x; kwargs...))

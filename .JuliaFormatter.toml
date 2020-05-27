@@ -1,0 +1,10 @@
+indent = 4
+margin = 92
+always_for_in = false
+whitespace_typedefs = false
+whitespace_ops_in_indices = false
+remove_extra_newlines = false
+import_to_using = false
+pipe_to_function_call = true
+short_to_long_function_def = false
+always_use_return = false

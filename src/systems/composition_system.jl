@@ -1,185 +1,128 @@
-export CompositionSystem
+export CompositionSystem, compose
 
 """
-    CompositionSystem(composition::Composition, systems_constructor) <: AbstractSystem
+    CompositionSystem(G::AbstractSystem, F::AbstractSystem)
 
-A system representing the composition of polynomial maps.
+Construct the system ``G(F(x;p);p)``. Note that the parameters are passed to ``G`` and
+``F`` are identical.
 """
 struct CompositionSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSystem
     # The system is g ∘ f
-    g::S2 # Never a composition system
-    f::S1 # Can be a CompositionSystem again
+    g::S2
+    f::S1
 
-    g_has_parameters::Bool
-    f_has_parameters::Bool
+    f_u::Vector{ComplexF64}
+    f_ū::Vector{ComplexDF64}
+    f_U::Matrix{ComplexF64}
+    g_U::Matrix{ComplexF64}
+    tu⁴::TaylorVector{5,ComplexF64}
+    tu³::TaylorVector{4,ComplexF64}
+    tu²::TaylorVector{3,ComplexF64}
+    tu¹::TaylorVector{2,ComplexF64}
 end
+function CompositionSystem(g::AbstractSystem, f::AbstractSystem)
+    size(g, 2) == size(f, 1) ||
+        throw(ArgumentError("Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match."))
+    f_u = zeros(ComplexF64, size(f, 1))
+    f_ū = zeros(ComplexDF64, size(f, 1))
+    f_U = zeros(ComplexF64, size(f))
+    g_U = zeros(ComplexF64, size(g))
 
-function CompositionSystem(
-    C::Composition,
-    system_constructor;
-    variables = nothing,
-    parameters = nothing,
-    homvars = nothing,
-)
-    n = length(C.polys)
-    f = CompositionSystem(
-        C.polys[n-1],
-        C.polys[n],
-        system_constructor;
-        input_variables = variables, parameters = parameters, homvars = homvars,
-    )
-    for k = (n - 2):-1:1
-        f = CompositionSystem(
-            C.polys[k],
-            f,
-            system_constructor;
-            parameters = parameters, homvars = homvars,
-        )
-    end
-    f
+    tu⁴ = TaylorVector{5}(ComplexF64, size(f, 1))
+    tu¹ = TaylorVector{2}(tu⁴)
+    tu² = TaylorVector{3}(tu⁴)
+    tu³ = TaylorVector{4}(tu⁴)
+
+    CompositionSystem(g, f, f_u, f_ū, f_U, g_U, tu⁴, tu³, tu², tu¹)
 end
 
-function CompositionSystem(
-    g::Vector{<:MP.AbstractPolynomialLike},
-    f::Union{CompositionSystem,Vector{<:MP.AbstractPolynomialLike}},
-    system_constructor;
-    input_variables = nothing,
-    parameters = nothing,
-    homvars = nothing,
-)
+Base.size(C::CompositionSystem) = (size(C.g, 1), size(C.f, 2))
 
-    vars = variables(g, parameters)
-    homvars_to_end!(vars, homvars)
-    G = system_constructor(g, variables = vars, parameters = parameters)
+ModelKit.variables(F::CompositionSystem) = variables(F.f)
+ModelKit.parameters(F::CompositionSystem) = parameters(F.f)
+ModelKit.variable_groups(F::CompositionSystem) = variable_groups(F.f)
 
-    if isa(f, CompositionSystem)
-        CompositionSystem(G, f, hasparameters(g, parameters), hasparameters(f))
-    else
-        F = system_constructor(f, variables = input_variables, parameters = parameters)
-        CompositionSystem(G, F, hasparameters(g, parameters), hasparameters(f, parameters))
-    end
+function Base.show(io::IO, C::CompositionSystem)
+    println(io, "Composition G ∘ F:")
+    println(io, "F: ")
+    show(io, C.f)
+    println(io, "\nG: ")
+    show(io, C.g)
 end
 
-
-hasparameters(C::CompositionSystem) = C.g_has_parameters || C.f_has_parameters
-
-homvars_to_end!(variables, ::Nothing) = variables
-homvars_to_end!(vars, homvars::MP.AbstractVariable) = homvars_to_end!(vars, (homvars,))
-function homvars_to_end!(vars, homvars)
-    deleteat!(vars, findall(v -> v ∈ homvars, vars))
-    append!(vars, homvars)
-    vars
+(C::CompositionSystem)(x, p = nothing) = C.g(C.f(x, p), p)
+function evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexF64}, p = nothing)
+    evaluate!(u, C.g, evaluate!(C.f_u, C.f, x, p), p)
+end
+function evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexDF64}, p = nothing)
+    evaluate!(u, C.g, evaluate!(C.f_ū, C.f, x, p), p)
 end
 
-struct CompositionSystemCache{
-    C1<:AbstractSystemCache,
-    C2<:AbstractSystemCache,
-    T,
-} <: AbstractSystemCache
-    cache_f::C1
-    cache_g::C2
-
-    eval_f::Vector{T}
-    J_f::Matrix{T}
-    J_g::Matrix{T}
-    Jp_f::Union{Nothing,Matrix{T}}
-    Jp_g::Union{Nothing,Matrix{T}}
-end
-
-function cache(C::CompositionSystem, x, p = nothing)
-    f, g = C.f, C.g
-    c_f = p === nothing ? cache(f, x) : cache(f, x, p)
-    eval_f = p === nothing ? evaluate(f, x, c_f) : evaluate(f, x, p, c_f)
-    c_g = p === nothing ? cache(g, eval_f) : cache(g, eval_f, p)
-    J_f = p === nothing ? jacobian(f, x, c_f) : jacobian(f, x, p, c_f)
-    J_g = p === nothing ? jacobian(g, eval_f, c_g) : jacobian(g, eval_f, p, c_g)
-    # need to bring eval_f, J_f, J_g to the same element type
-    T = promote_type(eltype(eval_f), eltype(J_f), eltype(J_g))
-    eval_f_T = convert(Vector{T}, eval_f)
-    J_f_T = convert(Matrix{T}, J_f)
-    J_g_T = convert(Matrix{T}, J_g)
-    if p === nothing
-        Jp_f = Jp_g = nothing
-    else
-        Jp_f = similar(J_f_T, size(J_f_T, 1), length(p))
-        Jp_g = similar(J_g_T, size(J_g_T, 1), length(p))
-    end
-
-    CompositionSystemCache(c_f, c_g, eval_f_T, J_f_T, J_g_T, Jp_f, Jp_g)
-end
-
-Base.size(C::CompositionSystem) = (length(C.g), size(C.f)[2])
-
-function evaluate!(u, C::CompositionSystem, x, c::CompositionSystemCache)
-    evaluate!(u, C.g, evaluate!(c.eval_f, C.f, x, c.cache_f), c.cache_g)
-end
-function evaluate!(u, C::CompositionSystem, x, p, c::CompositionSystemCache)
-    evaluate!(u, C.g, evaluate!(c.eval_f, C.f, x, p, c.cache_f), p, c.cache_g)
-end
-function evaluate(C::CompositionSystem, x, c::CompositionSystemCache)
-    evaluate(C.g, evaluate!(c.eval_f, C.f, x, c.cache_f), c.cache_g)
-end
-function evaluate(C::CompositionSystem, x, p, c::CompositionSystemCache)
-    evaluate(C.g, evaluate!(c.eval_f, C.f, x, p, c.cache_f), p, c.cache_g)
-end
-function jacobian!(U, C::CompositionSystem, x, c::CompositionSystemCache)
-    # chain rule
-    evaluate_and_jacobian!(c.eval_f, c.J_f, C.f, x, c.cache_f)
-    jacobian!(c.J_g, C.g, c.eval_f, c.cache_g)
-    LinearAlgebra.mul!(U, c.J_g, c.J_f)
-end
-function jacobian!(U, C::CompositionSystem, x, p, c::CompositionSystemCache)
-    # chain rule
-    evaluate_and_jacobian!(c.eval_f, c.J_f, C.f, x, p, c.cache_f)
-    jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
-    LinearAlgebra.mul!(U, c.J_g, c.J_f)
-end
-function jacobian(C::CompositionSystem, x, c::CompositionSystemCache)
-    jacobian!(similar(c.J_g, size(c.J_g, 1), size(c.J_f, 2)), C, x, c)
-end
-function jacobian(C::CompositionSystem, x, p, c::CompositionSystemCache)
-    jacobian!(similar(c.J_g, size(c.J_g, 1), size(c.J_f, 2)), C, x, p, c)
-end
-function evaluate_and_jacobian!(u, U, C::CompositionSystem, x, c::CompositionSystemCache)
-    evaluate_and_jacobian!(c.eval_f, c.J_f, C.f, x, c.cache_f)
-    evaluate_and_jacobian!(u, c.J_g, C.g, c.eval_f, c.cache_g)
-    LinearAlgebra.mul!(U, c.J_g, c.J_f)
-    nothing
-end
-function evaluate_and_jacobian!(u, U, C::CompositionSystem, x, p, c::CompositionSystemCache)
-    evaluate_and_jacobian!(c.eval_f, c.J_f, C.f, x, p, c.cache_f)
-    evaluate_and_jacobian!(u, c.J_g, C.g, c.eval_f, p, c.cache_g)
-    LinearAlgebra.mul!(U, c.J_g, c.J_f)
+function evaluate_and_jacobian!(u, U, C::CompositionSystem, x, p = nothing)
+    evaluate_and_jacobian!(C.f_u, C.f_U, C.f, x, p)
+    evaluate_and_jacobian!(u, C.g_U, C.g, C.f_u, p)
+    LA.mul!(U, C.g_U, C.f_U)
     nothing
 end
 
-function differentiate_parameters!(U, C::CompositionSystem, x, p, c::CompositionSystemCache)
-    @assert c.Jp_f !== nothing && c.Jp_g !== nothing
+_get_tu(C::CompositionSystem, ::Val{1}) = C.tu¹
+_get_tu(C::CompositionSystem, ::Val{2}) = C.tu²
+_get_tu(C::CompositionSystem, ::Val{3}) = C.tu³
+_get_tu(C::CompositionSystem, ::Val{4}) = C.tu⁴
 
-    # d/(dp)(g(f(x, p), p)) = g_y(f(x, p), p)f_p(x, p) + g_p(f(x, p), p)
-    evaluate!(c.eval_f, C.f, x, p, c.cache_f)
-    # See whether we can simplify things
-    if C.g_has_parameters && C.f_has_parameters
-        differentiate_parameters!(c.Jp_g, C.g, c.eval_f, p, c.cache_g)
-        differentiate_parameters!(c.Jp_f, C.f, x, p, c.cache_f)
-        jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
-        LinearAlgebra.mul!(U, c.J_g, c.Jp_f)
-        U .= U .+ c.Jp_g
-    elseif C.g_has_parameters # && !C.f_has_parameters
-        differentiate_parameters!(c.Jp_g, C.g, c.eval_f, p, c.cache_g)
-        U .= c.Jp_g
-    elseif C.f_has_parameters  # !C.g_has_parameters &&
-        differentiate_parameters!(c.Jp_f, C.f, x, p, c.cache_f)
-        jacobian!(c.J_g, C.g, c.eval_f, p, c.cache_g)
-        LinearAlgebra.mul!(U, c.J_g, c.Jp_f)
-    else
-        U .= zero(eltype(U))
-    end
-
-    U
+function taylor!(u, v::Val, C::CompositionSystem, tx, p = nothing)
+    tu = _get_tu(C, v)
+    taylor!(tu.data, v, C.f, tx, p)
+    taylor!(u, v, C.g, tu, p)
 end
 
-function differentiate_parameters(F::CompositionSystem, x, p, c::CompositionSystemCache)
-    U = similar(c.J_g, size(c.J_g, 1), size(c.Jp_f, 2))
-    differentiate_parameters!(U, F, x, p, c)
+"""
+    compose(G::Union{AbstractSystem,System}, F::Union{AbstractSystem,System})
+
+Construct the composition ``G(F(x))``. You can also use the infix operator
+`∘` (written by \\circ).
+
+
+### Example
+```julia
+julia> @var a b c x y z
+
+julia> g = System([a * b * c]);
+
+julia> f = System([x+y, y + z, x + z]);
+
+julia> compose(g, f)
+Composition G ∘ F:
+F:
+ModelKitSystem{(0xbb16b481c0808501, 1)}:
+Compiled: System of length 3
+ 3 variables: x, y, z
+
+ x + y
+ y + z
+ x + z
+
+G:
+ModelKitSystem{(0xf0a2384a42428501, 1)}:
+Compiled: System of length 1
+ 3 variables: a, b, c
+
+ a*b*c
+
+
+julia> (g ∘ f)([x,y,z])
+1-element Array{Expression,1}:
+ (x + z)*(y + z)*(x + y)
+```
+"""
+compose(g::AbstractSystem, f::AbstractSystem) = CompositionSystem(g, f)
+compose(g::AbstractSystem, f::System) = CompositionSystem(g, ModelKitSystem(f))
+function compose(g::System, f::System)
+    pg = parameters(g)
+    pf = parameters(f)
+    (isempty(pf) || isempty(pg) || pf == pg) ||
+        throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
+    CompositionSystem(ModelKitSystem(g), ModelKitSystem(f))
 end
+import Base: ∘
+∘(g::Union{AbstractSystem,System}, f::Union{AbstractSystem,System}) = compose(g, f)

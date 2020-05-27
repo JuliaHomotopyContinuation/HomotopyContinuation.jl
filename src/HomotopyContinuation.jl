@@ -1,91 +1,52 @@
 module HomotopyContinuation
 
-import DoubleFloats
-import DynamicPolynomials
-import ElasticArrays
-import FixedPolynomials
+export ModelKit
+
+using DynamicPolynomials: @polyvar
+import ElasticArrays: ElasticArray
 import LinearAlgebra
+import LoopVectorization
 import MixedSubdivisions
 import MultivariatePolynomials
-import PrettyTables
-import Printf
-import ProjectiveVectors
+const MP = MultivariatePolynomials
+using Parameters: @unpack
+import ProgressMeter
 import Random
-import StaticArrays
-import StaticPolynomials
+import Printf
+import PrettyTables
+using Reexport: @reexport
+import StructArrays
 import TreeViews
 
-import MultivariatePolynomials: variables, nvariables, monomials
-using MultivariatePolynomials: subs, differentiate
+const LA = LinearAlgebra
 
-using Base: @propagate_inbounds
-using LinearAlgebra: cond
-using Parameters: @pack!, @unpack
-using DoubleFloats: Double64, ComplexDF64
-using DynamicPolynomials: @polyvar
-using ProjectiveVectors:
-    PVector,
-    dims,
-    dimension_indices,
-    fubini_study,
-    affine_chart,
-    ×,
-    component,
-    components,
-    combine
-using StaticArrays: SVector, @SVector
-using Test: @test
-using MixedSubdivisions: mixed_volume
-
-const FP = FixedPolynomials
-const MP = MultivariatePolynomials
-const SP = StaticPolynomials
-
+include("ModelKit.jl")
 export @polyvar
-export variables, nvariables, subs, differentiate, monomials
-export mixed_volume
-export cond
-export ProjectiveVectors,
-    PVector,
-    dims,
-    dimension_indices,
-    affine_chart,
-    fubini_study,
-    ×,
-    component,
-    components,
-    combine
 
-include("progress_meter.jl")
-import .ProgressMeter
+include("DoubleDouble.jl")
+using .DoubleDouble
 
-include("model_kit.jl")
-import .ModelKit
-using .ModelKit: @var, @unique_var, System, Homotopy, compile, interpreted
-export ModelKit, @var, @unique_var, System, Homotopy, compile, interpreted
+using ProjectiveVectors: PVector, dims, dimension_indices
 
-include("norms.jl")
-include("utilities.jl")
+include("utils.jl")
+include("norm.jl")
 include("linear_algebra.jl")
-include("affine_patches.jl")
-
-include("systems_and_homotopies.jl")
-include("input.jl")
-include("problems.jl")
-include("totaldegree.jl")
-
-include("predictors.jl")
+include("linear.jl")
+include("systems.jl")
+include("homotopies.jl")
+include("predictor.jl")
 include("newton_corrector.jl")
-include("core_tracker.jl")
-
+include("newton.jl")
+include("tracker.jl")
 include("valuation.jl")
-include("cauchy_endgame.jl")
-include("path_tracker.jl")
-include("result.jl")
+include("path_result.jl")
+include("endgame_tracker.jl")
+include("path_info.jl")
+include("total_degree.jl")
+include("binomial_system.jl")
 include("polyhedral.jl")
 include("overdetermined.jl")
-include("solver.jl")
-include("monodromy.jl")
-include("path_info.jl")
+include("solve.jl")
+include("result.jl")
 
 end

@@ -1,28 +1,27 @@
 using Documenter, HomotopyContinuation
-import LinearAlgebra
 
 makedocs(
     sitename = "HomotopyContinuation.jl",
     pages = [
         "Introduction" => "index.md",
-        "Solving polynomial systems" => [
-            "solving.md",
-            "solver.md"
+        "Problem formulation" => [
+            "ModelKit" => "model_kit.md",
+            "Linear and Affine Subspaces" => "linear_affine.md",
+            "Systems and Homotopies" => "systems_homotopies.md",
         ],
-        "Solving parametrized systems with monodromy" => "monodromy.md",
-        "Input" => "input.md",
-        "Tracking paths" => [
-            "path_tracker.md",
-            "core_tracker.md",
+        "Solving systems" => [
+            "Solve" => "solve.md",
+            "Results" => "result.md",
+            "Examples" => "solve_examples.md",
+            "Start systems" => "start_systems.md",
         ],
-        "Homotopies" => "homotopies.md",
-        "Polynomial systems" => "systems.md",
-        "Reference" => "reference.md"
-        ],
-    strict = false,
-    doctest = false,
+        "Trackers" => ["Tracker" => "tracker.md", "EndgameTracker" => "endgame_tracker.md"],
+        "Miscellaneous" => "misc.md",
+    ],
+    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
 )
 
 deploydocs(
-    repo = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git"
+    repo = "github.com/saschatimme/HomotopyContinuation.jl.git",
+    push_preview = false,
 )

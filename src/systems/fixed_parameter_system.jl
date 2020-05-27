@@ -1,42 +1,34 @@
-export FixedParameterSystem
+export FixedParameterSystem, fix_parameters
 
 """
-    FixedParameterSystem(F, p) <: AbstractSystem
+    FixedParameterSystem(F:AbstractSystem, parameters)
 
-Fix a parametrized system `F(x; p)` at `p`, i.e., it is treated as a system without parameters.
+Construct a system from the given [`AbstractSystem`](@ref) `F` with the given `parameters`
+fixed.
 """
-mutable struct FixedParameterSystem{S<:AbstractSystem,P<:AbstractVector} <: AbstractSystem
-    F::S
-    p::P
+struct FixedParameterSystem{S<:AbstractSystem,T} <: AbstractSystem
+    system::S
+    parameters::Vector{T}
 end
+FixedParameterSystem(F::System, p) = FixedParameterSystem(ModelKitSystem(F), p)
+Base.size(F::FixedParameterSystem) = size(F.system)
 
-struct FixedParameterSystemCache{SC<:AbstractSystemCache} <: AbstractSystemCache
-    cache::SC
-end
+ModelKit.variables(F::FixedParameterSystem) = variables(F.system)
+ModelKit.parameters(F::FixedParameterSystem) = Variable[]
+ModelKit.variable_groups(F::FixedParameterSystem) = variable_groups(F.system)
 
-cache(F::FixedParameterSystem, x) = FixedParameterSystemCache(cache(F.F, x, F.p))
+(F::FixedParameterSystem)(x, p = nothing) = F.system(x, F.parameters)
 
-Base.size(F::FixedParameterSystem) = size(F.F)
-
-evaluate!(u, F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    evaluate!(u, F.F, x, F.p, c.cache)
-evaluate(F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    evaluate(F.F, x, F.p, c.cache)
-jacobian!(U, F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    jacobian!(U, F.F, x, F.p, c.cache)
-jacobian(F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    jacobian(F.F, x, F.p, c.cache)
-evaluate_and_jacobian!(u, U, F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    evaluate_and_jacobian!(u, U, F.F, x, F.p, c.cache)
-evaluate_and_jacobian(F::FixedParameterSystem, x, c::FixedParameterSystemCache) =
-    evaluate_and_jacobian(F.F, x, F.p, c.cache)
+evaluate!(u, F::FixedParameterSystem, x, p = nothing) =
+    evaluate!(u, F.system, x, F.parameters)
+evaluate_and_jacobian!(u, U, F::FixedParameterSystem, x, p = nothing) =
+    evaluate_and_jacobian!(u, U, F.system, x, F.parameters)
+taylor!(u, v::Val, F::FixedParameterSystem, tx, p = nothing) =
+    taylor!(u, v, F.system, tx, F.parameters)
 
 """
-    set_parameters!(F::FixedParameterSystem, p)
+    fix_parameters(F::AbstractSystem, p)
 
-Update the parameters `p` of `F`.
+Fix the parameters of the given system `F`. Returns a [`FixedParameterSystem`](@ref).
 """
-set_parameters!(F::FixedParameterSystem, p) = begin
-    F.p .= p
-    F
-end
+fix_parameters(F::AbstractSystem, p) = FixedParameterSystem(F, p)
