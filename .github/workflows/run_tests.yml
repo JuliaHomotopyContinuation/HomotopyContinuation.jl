@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - master
+      - releases/v1
   pull_request:
     branches:
       - master
+      - releases/v1
 
 jobs:
   test:
@@ -15,6 +17,7 @@ jobs:
       matrix:
         version:
           - '1.4'
+          - '1.5'
         os:
           - ubuntu-latest
         arch:
