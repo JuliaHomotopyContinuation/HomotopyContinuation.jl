@@ -30,6 +30,7 @@ using ProjectiveVectors: PVector, dims, dimension_indices
 
 include("utils.jl")
 include("norm.jl")
+include("voronoi_tree.jl")
 include("linear_algebra.jl")
 include("linear.jl")
 include("systems.jl")

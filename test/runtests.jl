@@ -23,6 +23,7 @@ end
     include("double_double_test.jl")
     include("binomial_system_test.jl")
     include("norm_test.jl")
+    include("voronoi_tree_test.jl")
     include("model_kit_test.jl")
     include("linear_algebra_test.jl")
     include("homotopies_test.jl")
