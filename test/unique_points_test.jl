@@ -357,7 +357,7 @@ end
     X = GroupActions(permutation1, permutation2)(x)
 
     # One group action
-    m = multiplicities(X, group_action = permutation1) |> sort
+    m = sort(multiplicities(X, group_action = permutation1))
     @test m == [[1, 2], [3, 4]]
 
     # Two group actions
