@@ -1,4 +1,4 @@
-export GroupActions, UniquePoints, search_in_radius, add!
+export GroupActions, UniquePoints, search_in_radius, add!, multiplicities
 
 ################
 # Group actions
@@ -196,4 +196,62 @@ function add!(UP::UniquePoints{T,Id,M,GA}, v, id::Id, tol::Real) where {T,Id,M,G
     else
         return (found_id::Id, false)
     end
+end
+
+####################
+## Multiplicities ##
+####################
+"""
+    multiplicities(vectors; metric = EuclideanNorm(), atol = 0.0, rtol = 1e-8, kwargs...)
+
+Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i`,`j`
+such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
+The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
+
+```julia-repl
+julia> multiplicities([[1,0.5], [1,0.5], [1,1]])
+[[1,2]]
+```
+This is the same as
+```julia
+multiplicities([[1,0.5], [1,0.5], [1,1]]; distance=(x,y) -> LinearAlgebra.norm(x-y))
+```
+Here is an example for using group actions.
+```julia-repl
+julia> X = [[1, 2, 3, 4], [2,1,3,4], [1,2,4,3], [2,1,4,3]]
+julia> permutation(x) = [x[2], x[1], x[3], x[4]]
+julia> m = multiplicities(X, group_action = permutation)
+[[1,2], [3,4]]
+```
+"""
+multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
+function multiplicities(f::F, v; metric = EuclideanNorm(), kwargs...) where {F<:Function}
+    isempty(v) && return Vector{Vector{Int}}()
+    _multiplicities(f, v, metric; kwargs...)
+end
+function _multiplicities(
+    f::F,
+    V,
+    metric;
+    atol::Float64 = 0.0,
+    rtol::Float64 = 1e-8,
+    kwargs...,
+) where {F<:Function}
+    z = zero(f(first(V)))
+    unique_points = UniquePoints(z, 1; metric = metric, kwargs...)
+    mults = Dict{Int,Vector{Int}}()
+    for (i, vᵢ) in enumerate(V)
+        wᵢ = f(vᵢ)
+        nᵢ = metric(wᵢ, z)
+        radiusᵢ = max(atol, rtol * nᵢ)
+        k, new_point = add!(unique_points, wᵢ, i, radiusᵢ)
+        if !new_point
+            if haskey(mults, k)
+                push!(mults[k], i)
+            else
+                mults[k] = [k, i]
+            end
+        end
+    end
+    collect(values(mults))
 end
