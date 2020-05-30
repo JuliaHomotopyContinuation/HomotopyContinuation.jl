@@ -22,13 +22,14 @@ init!(::WeightedNorm, ::AbstractVector)
 update!(::WeightedNorm, ::AbstractVector)
 ```
 
-## Unique points and group actions
+## Unique points, group actions and multiplicities
 
 ```@docs
 GroupActions
 UniquePoints
 search_in_radius(::UniquePoints, v, tol::Real)
 add!(UP::UniquePoints{T,Id,M,GA}, v, id::Id, tol::Real) where {T,Id,M,GA}
+multiplicities
 ```
 
 ## Debugging
