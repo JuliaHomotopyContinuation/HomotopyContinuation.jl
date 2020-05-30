@@ -24,7 +24,7 @@ using HomotopyContinuation.ModelKit
         @test complex(Expression(1), 2) == Expression(1) + im * 2
         @test complex(1, Expression(2)) == Expression(1) + im * 2
         @test +Expression(2) == 2
-        @test Expression(HC2.DoubleDouble.DoubleF64(2)) == big(2.0)
+        @test Expression(HC.DoubleDouble.DoubleF64(2)) == big(2.0)
     end
 
     @testset "Variables" begin

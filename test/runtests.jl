@@ -1,7 +1,7 @@
-using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters
+using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters, Random
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
-const HC2 = HomotopyContinuation
+const HC = HomotopyContinuation
 
 include("test_systems.jl")
 
@@ -23,6 +23,8 @@ end
     include("double_double_test.jl")
     include("binomial_system_test.jl")
     include("norm_test.jl")
+    include("voronoi_tree_test.jl")
+    include("unique_points_test.jl")
     include("model_kit_test.jl")
     include("linear_algebra_test.jl")
     include("homotopies_test.jl")

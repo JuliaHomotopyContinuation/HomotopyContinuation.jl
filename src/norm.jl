@@ -1,4 +1,4 @@
-export AbstractNorm, InfNorm, WeightedNorm, distance, norm, init!, update!
+export AbstractNorm, InfNorm, WeightedNorm, EuclideanNorm, distance, norm, init!, update!
 
 using Base: @propagate_inbounds
 import LinearAlgebra: norm
@@ -25,6 +25,9 @@ distance(u, v, norm::AbstractNorm) = MethodError(distance, (u, v, norm))
 Compute the norm ||u|| with respect to the given norm `norm`.
 """
 LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, norm))
+
+(N::AbstractNorm)(x::AbstractVector) = norm(x, N)
+(N::AbstractNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
 
 ##################
 ## WeightedNorm ##
@@ -77,9 +80,6 @@ end
 WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
     WeightedNorm(norm, length(x); opts...)
 WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), norm; opts...)
-
-(N::WeightedNorm)(x::AbstractVector) = norm(x, N)
-(N::WeightedNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
 
 """
     weights(WN::WeightedNorm)
@@ -236,5 +236,28 @@ function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
         return d
     end
 end
-(N::InfNorm)(x::AbstractVector) = norm(x, N)
-(N::InfNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
+
+"""
+    EuclideanNorm <: AbstractNorm
+
+The Euclidean resp. 2-norm.
+"""
+struct EuclideanNorm <: AbstractNorm end
+
+@inline function distance(x::AbstractVector, y::AbstractVector, ::EuclideanNorm)
+    n = length(x)
+    @boundscheck n == length(y)
+    @inbounds d = abs2(x[1] - y[1])
+    for i = 2:n
+        @inbounds d += abs2(x[i] - y[i])
+    end
+    sqrt(d)
+end
+@inline function norm(x::AbstractVector, ::EuclideanNorm)
+    n = length(x)
+    @inbounds d = abs2(x[1])
+    for i = 2:n
+        @inbounds d += abs2(x[i])
+    end
+    sqrt(d)
+end

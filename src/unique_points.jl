@@ -1,0 +1,199 @@
+export GroupActions, UniquePoints, search_in_radius, add!
+
+################
+# Group actions
+################
+"""
+    GroupActions(actions::Function...)
+
+Store a bunch of group actions `(f1, f2, f3, ...)`.
+Each action has to return a tuple.
+The actions are applied in the following sense
+1) f1 is applied on the original solution `s`
+2) f2 is applied on `s` and the results of 1
+3) f3 is applied on `s` and the results of 1) and 2)
+and so on
+
+## Example
+```julia-repl
+julia> f1(s) = (s * s,);
+
+julia> f2(s) = (2s, -s, 5s);
+
+julia> f3(s) = (s + 1,);
+
+julia> GroupActions(f1)(3)
+(3, 9)
+
+julia> GroupActions(f1, f2)(3)
+(3, 9, 6, -3, 15, 18, -9, 45)
+
+julia> GroupActions(f1,f2, f3)(3)
+(3, 9, 6, -3, 15, 18, -9, 45, 4, 10, 7, -2, 16, 19, -8, 46)
+```
+"""
+struct GroupActions{T<:Tuple}
+    actions::T
+end
+GroupActions(::Nothing) = GroupActions(())
+GroupActions(actions::GroupActions) = actions
+GroupActions(actions::Function...) = GroupActions(actions)
+GroupActions(actions) = GroupActions(actions...)
+
+function (actions::GroupActions)(s)
+    S = [s]
+    T = typeof(s)
+    apply_actions(actions, s) do sᵢ
+        sⱼ = convert(T, sᵢ)
+        if sⱼ != s
+            push!(S, sⱼ)
+        end
+        false
+    end
+    S
+end
+
+apply_actions(cb, action::GroupActions, s) = _apply_actions(action.actions, s, cb)
+@inline function _apply_actions(actions::Tuple, x, cb::F) where {F}
+    f, rest = first(actions), Base.tail(actions)
+    y = f(x)
+    if isa(x, AbstractVector{<:Number}) && isa(y, AbstractVector{<:Number})
+        cb(y) && return true
+        if _apply_actions(rest, y, cb)
+            return true
+        end
+    else
+        for yᵢ in f(x)
+            cb(yᵢ) && return true
+            if _apply_actions(rest, yᵢ, cb)
+                return true
+            end
+        end
+    end
+    _apply_actions(rest, x, cb)
+end
+@inline _apply_actions(::Tuple{}, s, cb) = false
+
+
+#############
+# UniquePoints
+#############
+
+"""
+    UniquePoints{T, Id, M}
+
+A data structure for assessing quickly whether a point is close to an indexed point as
+determined by the given distances function `M`. The distance function has to be a *metric*.
+The indexed points are only stored by their identifiers `Id`.
+
+    UniquePoints(v::AbstractVector{T}, id::Id;
+                    metric = EuclideanNorm(),
+                    group_actions = nothing)
+
+Initialize the data structure. This *does not* initialize the data structure with the point.
+
+
+## Example
+
+```julia
+x = randn(ComplexF64, 4)
+permutation(x) = ([x[2]; x[1]; x[3]; x[4]],)
+group_actions = GroupActions(permutation)
+X = group_actions(x)
+
+# without group actions
+unique_points = UniquePoints(x, 1)
+HC.add!.(unique_points, X, 1:length(X), 1e-5)
+length(unique_points) # 2
+
+unique_points = UniquePoints(x, 1, group_actions = group_actions)
+HC.add!.(unique_points, X, 1:length(X), 1e-5)
+length(unique_points) # 1
+```
+"""
+struct UniquePoints{T,Id,M,MaybeGA<:Union{Nothing,GroupActions}}
+    tree::VoronoiTree{T,Id,M}
+    group_actions::MaybeGA
+end
+
+function UniquePoints(
+    v::AbstractVector,
+    id;
+    metric = EuclideanNorm(),
+    group_action = nothing,
+    group_actions = group_action === nothing ? nothing : GroupActions(group_action),
+)
+    if !(group_actions isa GroupActions) && !isnothing(group_actions)
+        group_actions = GroupActions(group_actions)
+    end
+
+    tree = VoronoiTree(v, id; metric = metric)
+    UniquePoints(tree, group_actions)
+end
+
+function Base.show(io::IO, UP::UniquePoints)
+    print(io, typeof(UP), " with ", length(UP.tree), " points")
+end
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::UniquePoints) = x
+Base.length(UP::UniquePoints) = length(UP.tree)
+Base.collect(UP::UniquePoints) = collect(UP.tree)
+Base.broadcastable(UP::UniquePoints) = Ref(UP)
+
+
+"""
+    search_in_radius(unique_points, v, tol)
+
+Search whether `unique_points` contains a point `p` with distances at most `tol` from `v`.
+Returns `nothing` if no point exists, otherwise the identifier of `p` is returned.
+"""
+function search_in_radius(UP::UniquePoints{T,Id,M,GA}, v, tol::Real) where {T,Id,M,GA}
+    id = search_in_radius(UP.tree, v, tol)
+    if isnothing(id) && !isnothing(UP.group_actions)
+        let actions = UP.group_actions::GA
+            apply_actions(actions, v) do w
+                id′ = search_in_radius(UP.tree, w, tol)
+                if !isnothing(id′)
+                    id = id′
+                    return true
+                end
+                false
+            end
+        end
+    end
+end
+
+"""
+    add!(unique_points, v, id, tol)
+
+Search whether `unique_points` contains a point `p` with distances at most `tol` from `v`.
+If this is the case the identifier of `p` and `false` is returned. Otherwise `(id, true)`
+is returned.
+"""
+function add!(UP::UniquePoints{T,Id,M,GA}, v, id::Id, tol::Real) where {T,Id,M,GA}
+    found_id = search_in_radius(UP.tree, v, tol)
+    if isnothing(found_id)
+        if isnothing(UP.group_actions)
+            insert!(UP.tree, v, id; use_distances = true)
+            return (id, true)
+        else
+            let actions = UP.group_actions::GA
+                apply_actions(actions, v) do w
+                    found_id′ = search_in_radius(UP.tree, w, tol)
+                    if !isnothing(found_id′)
+                        found_id = found_id′
+                        return true
+                    end
+                    false
+                end
+            end
+            if isnothing(found_id)
+                insert!(UP.tree, v, id)
+                return (id, true)
+            else
+                return (found_id::Id, false)
+            end
+        end
+    else
+        return (found_id::Id, false)
+    end
+end

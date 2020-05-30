@@ -7,12 +7,12 @@
             total_degree(System(f); tracker_options = (automatic_differentiation = 3,))
         S = collect(starts)
         tracker = endgame_tracker.tracker
-        val = HC2.Valuation(1)
-        HC2.init!(val)
+        val = HC.Valuation(1)
+        HC.init!(val)
         track!(tracker, S[1], 1, 1e-13)
 
         t = tracker.state.t
-        HC2.update!(val, tracker.predictor, real(t))
+        HC.update!(val, tracker.predictor, real(t))
 
         @test val.val_x[1] ≈ 0 atol = 10 * (1e-13)^(1 / 5)
         @test val.val_tẋ[1] ≈ 1 / 5 atol = 10 * (1e-13)^(1 / 5)
@@ -31,12 +31,12 @@
         )
         S = collect(starts)
         tracker = endgame_tracker.tracker
-        val = HC2.Valuation(2)
+        val = HC.Valuation(2)
         tf = 1e-10
         track!(tracker, S[3], 1, tf)
 
         t = tracker.state.t
-        HC2.update!(val, tracker.predictor, real(t))
+        HC.update!(val, tracker.predictor, real(t))
 
         @test val.val_x[1] ≈ -1 atol = 10 * tf^(1 / 2)
         @test val.val_x[2] ≈ -1 atol = 10 * tf^(1 / 2)
@@ -59,12 +59,12 @@
         )
         S = collect(starts)
         tracker = endgame_tracker.tracker
-        val = HC2.Valuation(2)
+        val = HC.Valuation(2)
         tf = 1e-10
-        HC2.track!(tracker, S[3], 1, tf)
+        HC.track!(tracker, S[3], 1, tf)
 
         t = tracker.state.t
-        HC2.update!(val, tracker.predictor, real(t))
+        HC.update!(val, tracker.predictor, real(t))
 
         @test val.val_x[1] ≈ -1 / 6 atol = tf^(1 / 6)
         @test val.val_x[2] ≈ -2 / 6 atol = tf^(1 / 6)
