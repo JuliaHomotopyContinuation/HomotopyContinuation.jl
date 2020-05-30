@@ -8,7 +8,7 @@
         p = [5.2, -1.3, 9.3]
         q = [2.6, 3.3, 2.3]
 
-        H = HC2.ParameterHomotopy(F, p, q)
+        H = HC.ParameterHomotopy(F, p, q)
 
         v = [0.192, 2.21]
         t = 0.232
@@ -16,10 +16,10 @@
         u = zeros(ComplexF64, 2)
         U = zeros(ComplexF64, 2, 2)
 
-        HC2.evaluate!(u, H, v, t)
+        HC.evaluate!(u, H, v, t)
         @test u ≈ f([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
-        HC2.taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t)
+        HC.taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t)
         @test u ≈ let
             @var s sp[1:3] sq[1:3]
             pt = s .* sp .+ (1 .- s) .* sq
@@ -31,7 +31,7 @@
             )
         end
 
-        HC2.evaluate_and_jacobian!(u, U, H, v, t)
+        HC.evaluate_and_jacobian!(u, U, H, v, t)
         @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
     end
 
@@ -47,7 +47,7 @@
         p = [5.2, -1.3, 9.3]
         q = [2.6, 3.3, 2.3]
 
-        H = HC2.ModelKitHomotopy(H, [p; q])
+        H = HC.ModelKitHomotopy(H, [p; q])
         @test size(H) == (2, 2)
 
         v = [0.192, 2.21]
@@ -56,10 +56,10 @@
         u = zeros(ComplexF64, 2)
         U = zeros(ComplexF64, 2, 2)
 
-        HC2.evaluate!(u, H, v, t)
+        HC.evaluate!(u, H, v, t)
         @test u ≈ f([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
-        HC2.taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t)
+        HC.taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t)
         @test u ≈ let
             @var s sp[1:3] sq[1:3]
             pt = s .* sp .+ (1 .- s) .* sq
@@ -71,7 +71,7 @@
             )
         end
 
-        HC2.evaluate_and_jacobian!(u, U, H, v, t)
+        HC.evaluate_and_jacobian!(u, U, H, v, t)
         @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
 
         H = ModelKit.Homotopy([(2 * x^2 + y^3 + 2 * a * y)^3, x + y^2], [x, y], a)

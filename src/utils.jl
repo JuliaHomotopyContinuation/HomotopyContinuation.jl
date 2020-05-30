@@ -62,6 +62,8 @@ Returns `a` if it is not `nothing`, otherwise `b`.
 """
 unpack(a::Union{Nothing,T}, b::T) where {T} = a === nothing ? b : a
 
+plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
+
 """
      print_fieldnames(io::IO, obj)
 

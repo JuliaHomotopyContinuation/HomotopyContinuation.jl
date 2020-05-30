@@ -4,12 +4,12 @@ const MS = MixedSubdivisions
 @testset "Binomial System Test" begin
     @testset "Hermite Normal Form" begin
         A = [0 3 1 0; -2 2 -1 2; 1 -1 2 3; -3 3 3 2]
-        H, U = HC2.hnf(A)
+        H, U = HC.hnf(A)
         @test A * U == H
 
         D = zeros(Int, 1, 1)
         D[1, 1] = -2
-        H, U = HC2.hnf(D)
+        H, U = HC.hnf(D)
         @test H[1, 1] == 2
         @test U[1, 1] == -1
 
@@ -26,8 +26,8 @@ const MS = MixedSubdivisions
             -5 -4 -5 3 1 5 0 -3 -3 -1
             2 -5 -3 -1 -1 5 -4 5 -3 1
         ]
-        @test_throws OverflowError HC2.hnf(A)
-        H, U = HC2.hnf(A, BigInt)
+        @test_throws OverflowError HC.hnf(A)
+        H, U = HC.hnf(A, BigInt)
         @test A * U == H
     end
 
@@ -40,7 +40,7 @@ const MS = MixedSubdivisions
             -0.9983533473373446 + 0.057363698105327716im,
             0.9999409355072137 - 0.010868555421874721im,
         ]
-        X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
+        X = HC.solve!(HC.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
         end < 1e-12
@@ -55,7 +55,7 @@ const MS = MixedSubdivisions
         ]
         b = randn(ComplexF64, 6)
         b ./= abs.(b)
-        X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
+        X = HC.solve!(HC.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
         end < 1e-12
@@ -64,7 +64,7 @@ const MS = MixedSubdivisions
     @testset "General solving" begin
         A = [0 1 1 0 -1; 0 0 0 1 -1; -1 0 -1 0 -1; 0 -1 0 -1 -1; 1 0 0 0 -1]
         b = randn(ComplexF64, size(A, 1))
-        X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
+        X = HC.solve!(HC.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
         end < 1e-12
@@ -78,7 +78,7 @@ const MS = MixedSubdivisions
             1 2 0 -3 0 5
         ]
         b = randn(ComplexF64, 6)
-        X = HC2.solve!(HC2.BinomialSystemSolver(A, b))
+        X = HC.solve!(HC.BinomialSystemSolver(A, b))
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(A)] - b) ./ abs.(b))
         end < 1e-12
@@ -92,8 +92,8 @@ const MS = MixedSubdivisions
         coeffs = map(l -> randn(ComplexF64, length(l)), lift)
 
         cell = first(cells)
-        BSS = HC2.BinomialSystemSolver(5)
-        X = HC2.solve(BSS, supp, coeffs, cell)
+        BSS = HC.BinomialSystemSolver(5)
+        X = HC.solve(BSS, supp, coeffs, cell)
         @test maximum(eachcol(X)) do x
             maximum(abs.([prod(x .^ a) for a in eachcol(BSS.A)] - BSS.b) ./ abs.(BSS.b))
         end < 1e-12

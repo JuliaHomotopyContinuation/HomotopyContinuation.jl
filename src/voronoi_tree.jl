@@ -6,12 +6,7 @@ mutable struct VTNode{T,Id}
     distances::Vector{Tuple{Float64,Int}}
 end
 
-function VTNode(
-    ::Type{T},
-    ::Type{Id},
-    d::Int;
-    capacity::Int,
-) where {T,Id}
+function VTNode(::Type{T}, ::Type{Id}, d::Int; capacity::Int) where {T,Id}
     values = Matrix{T}(undef, d, capacity)
     ids = Vector{Id}(undef, capacity)
     children = Vector{VTNode{T,Id}}(undef, capacity)
@@ -31,8 +26,8 @@ Base.length(node::VTNode) = node.nentries
 Base.isempty(node::VTNode) = length(node) == 0
 capacity(node::VTNode) = length(node.children)
 
-function compute_distances!(node, x, metric::M) where {M<:AbstractNorm}
-    for j in 1:length(node)
+function compute_distances!(node, x, metric::M) where {M}
+    for j = 1:length(node)
         node.distances[j] = (metric(x, view(node.values, :, j)), j)
     end
     node.distances
@@ -43,7 +38,7 @@ function search_in_radius(
     x::AbstractVector,
     tol::Real,
     metric::M,
-) where {T,Id,M<:AbstractNorm}
+) where {T,Id,M}
     !isempty(node) || return nothing
 
     n = length(node)
@@ -62,7 +57,7 @@ function search_in_radius(
     m₁ = m₂ = m₃ = (Inf, 1)
     # we have a distances cache per thread
     distances = compute_distances!(node, x, metric)
-    for i in 1:n
+    for i = 1:n
         dᵢ = first(distances[i])
         # early exit
         if dᵢ < tol
@@ -107,7 +102,7 @@ function search_in_radius(
     end
     # Case 2) We know m₂[1] - m₁[1] ≤ 2tol
     if isassigned(node.children, last(m₂))
-        retid = search_in_radius(node.children[lats(m₂)], x, tol, metric)
+        retid = search_in_radius(node.children[last(m₂)], x, tol, metric)
         if !isnothing(retid)
             # we rely on the distances for insertion, so place the smallest element first
             distances[1] = m₁
@@ -132,7 +127,7 @@ function search_in_radius(
 
     # Case 3)
     # We need to sort distances
-    sort!(view(distances, 1, n), Base.Sort.InsertionSort, Base.Sort.By(first))
+    sort!(view(distances, 1:n), Base.Sort.InsertionSort, Base.Sort.By(first))
 
     # We can start at 4 since we already checked the smallest 3
     d = m₃[1]
@@ -160,7 +155,7 @@ function _insert!(
     id::Id,
     metric::M;
     use_distances::Bool = false,
-) where {T,Id,M<:AbstractNorm}
+) where {T,Id,M}
     # if not filled so far, just add it to the current node
     if length(node) < capacity(node)
         k = (node.nentries += 1)
@@ -186,7 +181,7 @@ function _insert!(
 end
 
 function identifiers!(ids, node::VTNode)
-    for i in 1:length(node)
+    for i = 1:length(node)
         push!(ids, node.ids[i])
         if isassigned(node.children, i)
             identifiers!(ids, node.children[i])
@@ -199,24 +194,20 @@ end
      VoronoiTree(
     v::AbstractVector{T},
     id::Id;
-    metric::AbstractNorm = EuclideanNorm(),
+    metric = EuclideanNorm(),
     capacity = 8,
 )
 
 Construct a Voronoi tree data structure for vector `v` of element type `T` and with identifiers
 `Id`. Each node has the given `capacity` and distances are measured by the given `metric`.
 """
-mutable struct VoronoiTree{T,Id,M<:AbstractNorm}
+mutable struct VoronoiTree{T,Id,M}
     root::VTNode{T,Id}
     nentries::Int
     metric::M
 end
 
-function VoronoiTree{T,Id}(
-    d::Int;
-    metric::AbstractNorm = EuclideanNorm(),
-    capacity::Int = 8,
-) where {T,Id}
+function VoronoiTree{T,Id}(d::Int; metric = EuclideanNorm(), capacity::Int = 8) where {T,Id}
     root = VTNode(T, Id, d; capacity = capacity)
     VoronoiTree(root, 0, metric)
 end
@@ -226,14 +217,20 @@ function VoronoiTree(v::AbstractVector{T}, id::Id; kwargs...) where {T,Id}
 end
 
 Base.length(T::VoronoiTree) = T.nentries
+Base.broadcastable(T::VoronoiTree) = Ref(T)
 
 """
     insert!(tree::VoronoiTree, v::AbstractVector, id)
 
 Insert in the tree the point `v` with identifier `id`.
 """
-function Base.insert!(tree::VoronoiTree{T,Id}, v::AbstractVector, id::Id) where {T,Id}
-    _insert!(tree.root, v, id, tree.metric)
+function Base.insert!(
+    tree::VoronoiTree{T,Id},
+    v::AbstractVector,
+    id::Id;
+    use_distances::Bool = false,
+) where {T,Id}
+    _insert!(tree.root, v, id, tree.metric; use_distances = use_distances)
     tree.nentries += 1
     tree
 end
@@ -250,18 +247,19 @@ end
 
 
 """
-    add!(tree::VoronoiTree, v::AbstractVector, id, tol)
+    add!(tree::VoronoiTree, v, id, tol)
 
-Insert in the tree the point `v` with identifier `id` if
-`search_in_radius(tree v, tol)` is `nothing` otherwise the obtained identifier is returned.
+Insert in the tree the point `v` with identifier `id` if `search_in_radius(tree v, tol)` is
+`nothing`. If this is the case the tuple `(id, true)` is returned, otherwise the obtained
+identifier and `false` is returned.
 """
-function add!(tree::VoronoiTree{T,Id}, v::AbstractVector, id::Id, tol::Real) where {T,Id}
-    found_id = search_in_radius(tree.root, v, tol, tree.metric)
+function add!(tree::VoronoiTree{T,Id}, v, id::Id, tol::Real) where {T,Id}
+    found_id = search_in_radius(tree, v, tol)
     if isnothing(found_id)
-        _insert!(tree.root, v, id, tree.metric; use_distances = true)
-        return id
+        insert!(tree, v, id; use_distances = true)
+        return (id, true)
     else
-        return found_id::Id
+        return (found_id::Id, false)
     end
 end
 

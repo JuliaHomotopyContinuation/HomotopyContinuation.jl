@@ -53,11 +53,11 @@
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
-        @test_throws HC2.FiniteException total_degree(affine_underdetermined)
+        @test_throws HC.FiniteException total_degree(affine_underdetermined)
 
         @var x y z
         proj_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x * z])
-        @test_throws HC2.FiniteException total_degree(proj_underdetermined)
+        @test_throws HC.FiniteException total_degree(proj_underdetermined)
     end
 
     @testset "total degree (variable groups)" begin
@@ -123,11 +123,11 @@
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
-        @test_throws HC2.FiniteException polyhedral(affine_underdetermined)
+        @test_throws HC.FiniteException polyhedral(affine_underdetermined)
 
         @var x y z
         proj_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x * z])
-        @test_throws HC2.FiniteException polyhedral(proj_underdetermined)
+        @test_throws HC.FiniteException polyhedral(proj_underdetermined)
     end
 
     @testset "overdetermined" begin

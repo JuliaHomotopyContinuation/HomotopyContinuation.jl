@@ -1,12 +1,12 @@
 @testset "LinearAlgebra" begin
     @testset "Constructor + basics" begin
         A = rand(ComplexF32, 12, 12)
-        WS = HC2.MatrixWorkspace(A)
-        @test WS isa HC2.MatrixWorkspace
+        WS = HC.MatrixWorkspace(A)
+        @test WS isa HC.MatrixWorkspace
 
         WS.factorized[] = true
         B = randn(ComplexF64, 12, 12)
-        HC2.update!(WS, B)
+        HC.update!(WS, B)
         @test WS.A == B
         @test WS.A !== B
         @test WS.factorized[] == false
@@ -25,17 +25,17 @@
 
         #test struct array switch
         A = rand(ComplexF32, 30, 30)
-        WS = HC2.MatrixWorkspace(A)
+        WS = HC.MatrixWorkspace(A)
     end
 
     @testset "QR" begin
         A = randn(ComplexF64, 12, 7)
-        MW = HC2.MatrixWorkspace(A)
+        MW = HC.MatrixWorkspace(A)
         B = randn(ComplexF64, 12, 7)
         true_qr = LinearAlgebra.qrfactUnblocked!(copy(B))
         MW .= B
 
-        HC2.updated!(MW)
+        HC.updated!(MW)
 
         b = randn(ComplexF64, 12)
         b2 = copy(b)
@@ -53,8 +53,8 @@
             A = randn(ComplexF64, n, n)
             b = randn(ComplexF64, n)
             x = zeros(ComplexF64, n)
-            WS = HC2.MatrixWorkspace(A)
-            HC2.update!(WS, A)
+            WS = HC.MatrixWorkspace(A)
+            HC.update!(WS, A)
             ldiv!(x, WS, b)
             WS.factorized[] = false
             @test (@allocated ldiv!(x, WS, b)) == 0
@@ -71,12 +71,12 @@
         A = randn(6, 6)
 
         B = A * inv(D_R)
-        WB = HC2.MatrixWorkspace(B)
-        @test 0.1 ≤ opnorm(inv(B), Inf) / HC2.inverse_inf_norm_est(WB) ≤ 10
+        WB = HC.MatrixWorkspace(B)
+        @test 0.1 ≤ opnorm(inv(B), Inf) / HC.inverse_inf_norm_est(WB) ≤ 10
         @test 0.1 ≤
-              opnorm(inv(B * D_R), Inf) / HC2.inverse_inf_norm_est(WB, nothing, d_r) ≤
+              opnorm(inv(B * D_R), Inf) / HC.inverse_inf_norm_est(WB, nothing, d_r) ≤
               10
-        @test 0.1 ≤ opnorm(inv(D_R * B), Inf) / HC2.inverse_inf_norm_est(WB, d_r) ≤ 10
+        @test 0.1 ≤ opnorm(inv(D_R * B), Inf) / HC.inverse_inf_norm_est(WB, d_r) ≤ 10
 
         @test 0.1 ≤ cond(B, Inf) / cond(WB) ≤ 10
         @test 0.1 ≤ cond(B * D_R, Inf) / cond(WB, nothing, d_r) ≤ 10
@@ -84,11 +84,11 @@
 
 
         C = inv(D_L) * A
-        WC = HC2.MatrixWorkspace(C)
-        @test 0.1 ≤ opnorm(inv(C), Inf) / HC2.inverse_inf_norm_est(WC) ≤ 10
-        @test 0.1 ≤ opnorm(inv(D_L * C), Inf) / HC2.inverse_inf_norm_est(WC, d_l) ≤ 10
+        WC = HC.MatrixWorkspace(C)
+        @test 0.1 ≤ opnorm(inv(C), Inf) / HC.inverse_inf_norm_est(WC) ≤ 10
+        @test 0.1 ≤ opnorm(inv(D_L * C), Inf) / HC.inverse_inf_norm_est(WC, d_l) ≤ 10
         @test 0.1 ≤
-              opnorm(inv(C * D_L), Inf) / HC2.inverse_inf_norm_est(WC, nothing, d_l) ≤
+              opnorm(inv(C * D_L), Inf) / HC.inverse_inf_norm_est(WC, nothing, d_l) ≤
               10
         @test 0.1 ≤ cond(C, Inf) / cond(WC) ≤ 10
         @test 0.1 ≤ cond(C * D_L, Inf) / cond(WC, nothing, d_l) ≤ 10
@@ -96,13 +96,13 @@
 
 
         D = inv(D_L) * A * inv(D_R)
-        WD = HC2.MatrixWorkspace(D)
-        @test 0.1 ≤ opnorm(inv(D), Inf) / HC2.inverse_inf_norm_est(WD) ≤ 10
+        WD = HC.MatrixWorkspace(D)
+        @test 0.1 ≤ opnorm(inv(D), Inf) / HC.inverse_inf_norm_est(WD) ≤ 10
         @test 0.1 ≤
-              opnorm(inv(D_L * D * D_R), Inf) / HC2.inverse_inf_norm_est(WD, d_l, d_r) ≤
+              opnorm(inv(D_L * D * D_R), Inf) / HC.inverse_inf_norm_est(WD, d_l, d_r) ≤
               10
-        @test HC2.inverse_inf_norm_est(WD, d_r, d_l) >
-              100 * HC2.inverse_inf_norm_est(WD, d_l, d_r)
+        @test HC.inverse_inf_norm_est(WD, d_r, d_l) >
+              100 * HC.inverse_inf_norm_est(WD, d_l, d_r)
         @test 0.1 ≤ cond(D, Inf) / cond(WD) ≤ 10
         @test 0.1 ≤ cond(D_L * D * D_R, Inf) / cond(WD, d_l, d_r) ≤ 10
     end
@@ -112,12 +112,12 @@
         b = randn(ComplexF64, 6)
         x̂ = similar(b)
         x = similar(b)
-        JM = HC2.Jacobian(zeros(ComplexF64, 6, 6))
-        @test JM isa HC2.Jacobian
-        HC2.matrix(JM) .= A
-        HC2.updated!(JM)
+        JM = HC.Jacobian(zeros(ComplexF64, 6, 6))
+        @test JM isa HC.Jacobian
+        HC.matrix(JM) .= A
+        HC.updated!(JM)
         ldiv!(x̂, JM, b)
-        ldiv!(x, HC2.workspace(JM), b)
+        ldiv!(x, HC.workspace(JM), b)
         @test x == x̂
     end
 end

@@ -396,14 +396,13 @@ ntracked(R::Result) = R.tracked_paths
 ###
 ### Show
 ####
-plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
-
 function Base.show(io::IO, x::Result)
     s = statistics(x)
-    header = "Result with $(s.nonsingular + s.singular) solutions"
+    total = s.nonsingular + s.singular
+    header = "Result with $total $(plural("solution", total))"
     println(io, header)
     println(io, "="^(length(header)))
-    println(io, "• $(ntracked(x)) paths tracked")
+    println(io, "• $(ntracked(x)) $(plural("path", ntracked(x))) tracked")
     println(
         io,
         "• $(s.nonsingular) non-singular $(plural("solution", s.nonsingular)) ",

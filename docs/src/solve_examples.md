@@ -9,6 +9,7 @@ We can solve the system ``F(x,y) = (x^2+y^2+1, 2x+3y-1)`` in the following way
 using HomotopyContinuation #hide
 @var x y
 F = System([x^2+y^2+1, 2x+3y-1], variables = [x, y])
+solve(F; show_progress = false) #hide
 solve(F)
 ```
 
@@ -49,6 +50,7 @@ F = System([x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]], parameters = a)
 start_solutions = [[1, 1]]
 p₁ = [1, 0]
 p₀ = [2, 4]
+solve(F, start_solutions; start_parameters=p₁, target_parameters=p₀, show_progress=false) #hide
 solve(F, start_solutions; start_parameters=p₁, target_parameters=p₀)
 ```
 
@@ -65,7 +67,8 @@ system `F`.
 ```@example
 using HomotopyContinuation #hide
 @var x y
-G = System([x^2-1,y-1])
-F = System([x^2+y^2+z^2, 2x+3y-z])
-solve(G, F, [[1, 1], [-1, 1]])
+G = System([x^2+1,y+1])
+F = System([x^2+y^2+1, 2x+3y-1])
+solve(G, F, [[im, -1], [-im, -1]]; show_progress = false) #hide
+solve(G, F, [[im, -1], [-im, -1]])
 ```
