@@ -24,7 +24,7 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 [compat]
 DynamicPolynomials = "0.3"
 ElasticArrays = "1"
-LoopVectorization = "0.6,0.7"
+LoopVectorization = "0.6,0.7, 0.8"
 MixedSubdivisions = "1"
 MultivariatePolynomials = "0.3"
 Parameters = "0.10, 0.11, 0.12"
