@@ -754,6 +754,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         ω = state.ω,
         μ = state.μ,
         extended_precision = state.extended_prec,
+        first_correction = state.accepted_steps == 0,
     )
 
     if debug
