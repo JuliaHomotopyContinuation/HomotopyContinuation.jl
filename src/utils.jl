@@ -275,7 +275,7 @@ for (fJ, fC) in ((:add!, :add), (:mul!, :mul))
             ccall(
                 ($(string(:mpfr_, fC, :_si)), :libmpfr),
                 Int32,
-                (Ref{BigFloat}, Ref{BigFloat}, Cdouble, MPFRRoundingMode),
+                (Ref{BigFloat}, Ref{BigFloat}, Clong, MPFRRoundingMode),
                 z,
                 x,
                 c,
@@ -382,7 +382,7 @@ function rem!(z::BigFloat, x::BigFloat, y::BigFloat, ::RoundingMode{:Nearest})
         z,
         x,
         y,
-        MPFR.ROUNDING_MODE[],
+        MPFR.MPFRRoundNearest,
     )
     return z
 end

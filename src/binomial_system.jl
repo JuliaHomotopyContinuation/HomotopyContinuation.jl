@@ -4,7 +4,7 @@ import MixedSubdivisions: MixedCell
 struct BinomialSystemSolver
     A::Matrix{Int32} # binomial system lhs
     b::Vector{ComplexF64} # binomial system rhs
-    X::ElasticArray{ComplexF64,2,1} # Solutions
+    X::ElasticArray{ComplexF64,2,1,Vector{ComplexF64}} # Solutions
     # HNF
     H::Matrix{Int64} # hermite normal form
     U::Matrix{Int64} # trafo matrix for hnf
@@ -12,10 +12,10 @@ struct BinomialSystemSolver
     U_big::Matrix{BigInt} # trafo matrix for hnf
     # Solve data structures
     γ::Vector{Float64} # angle of the elements in b
-    μ::Vector{Float64} # γ^U
-    αs::Vector{Float64} # partial angles in the triangular solve
+    μ::Vector{DoubleF64} # γ^U
+    αs::Vector{DoubleF64} # partial angles in the triangular solve
     Aᵀ::Matrix{Float64} # transposed of A to solve coords
-    unit_roots_table::ElasticArray{Int32,2,1}
+    unit_roots_table::ElasticArray{Int32,2,1,Vector{Int32}}
 end
 
 function BinomialSystemSolver(A::Matrix, b::Vector)
@@ -36,8 +36,8 @@ function BinomialSystemSolver(n::Int)
     U_big = Matrix{BigInt}(undef, n, n)
     U_big .= zero.(BigInt)
     γ = zeros(Float64, n)
-    μ = zeros(Float64, n)
-    αs = zeros(Float64, n)
+    μ = zeros(DoubleF64, n)
+    αs = zeros(DoubleF64, n)
     Aᵀ = zeros(Float64, n, n)
     S = ElasticArray{Int32}(undef, n, 0)
     BinomialSystemSolver(A, b, X, H, U, H_big, U_big, γ, μ, αs, Aᵀ, S)
@@ -78,26 +78,29 @@ function compute_angular_part!(
 )
     @unpack X, γ, b, μ, unit_roots_table, αs = BSS
     n = size(H, 1)
-
     # apply coordinate change to b
     γ .= angle.(b) ./ 2π
-    μ .= zero(eltype(μ))
+    μ .= 0.0
     for j = 1:n
+        μj = DoubleF64(0.0)
         for i = 1:n
-            μ[j] += rem(U[i, j] * γ[i], 2.0, RoundNearest)
+            μij = U[i, j] * DoubleF64(γ[i])
+            μij -= 2round(0.5 * Float64(μij), RoundNearest)
+            μ[j] += μij
         end
         μ[j] = rem(μ[j], 2.0, RoundNearest)
     end
     # solve triangular system
     @inbounds for i = 1:d̂, j = n:-1:1
-        α = μ[j] + unit_roots_table[j, i]
-        α = rem((μ[j] + unit_roots_table[j, i]) / H[j, j], 2.0, RoundNearest)
+        α = (μ[j] + unit_roots_table[j, i]) / H[j, j]
+        α -= 2round(0.5 * Float64(α), RoundNearest)
         for k = n:-1:(j+1)
-            α -= rem(αs[k] * H[k, j] / H[j, j], 2.0, RoundNearest)
-            α = rem(α, 2.0, RoundNearest)
+            αk = (αs[k] * H[k, j]) / H[j, j]
+            αk = αk - 2round(0.5 * Float64(αk), RoundNearest)
+            α -= αk
         end
-        # α = rem(α, 2.0, RoundNearest)
-        X[j, i] = cis(2π * α)
+        α = rem(α, 2.0, RoundNearest)
+        X[j, i] = complex(cospi(2 * Float64(α)), sinpi(2 * Float64(α)))
         αs[j] = α
     end
     BSS
@@ -111,14 +114,13 @@ function compute_angular_part!(
     d̂::Int,
 )
     # @unpack X, γ, b, μ, unit_roots_table = BSS
-    @unpack X, unit_roots_table, b = BSS
+    @unpack X, γ, unit_roots_table, b = BSS
     n = size(H, 1)
 
     # compute precision necessary
     p = max(maximum(x -> MPZ.sizeinbase(x, 2), H), maximum(x -> MPZ.sizeinbase(x, 2), U))
     prec = max((ceil(Int, (p + 53) / 32)) * 32, 64)
-
-    γ = angle.(b) ./ 2π
+    γ .= angle.(b) ./ 2π
 
     μ = [BigFloat(0.0; precision = prec) for i = 1:n]
     α = γᵢ = BigFloat(0.0; precision = prec)
@@ -135,7 +137,9 @@ function compute_angular_part!(
             add!(μ[j], μ[j], γᵢⱼ)
         end
     end
+    rem!.(μ, μ, m, RoundNearest)
     αs = [BigFloat(0.0; precision = prec) for i = 1:n]
+
     # solve triangular system
     for i = 1:d̂, j = n:-1:1
         add!(α, μ[j], Int64(unit_roots_table[j, i]))
@@ -144,9 +148,9 @@ function compute_angular_part!(
             mul!(αk, αs[k], H[k, j])
             div!(αk, αk, H[j, j])
             sub!(α, α, αk)
-        end
-        if α < -1 || α > 1
-            rem!(α, α, m, RoundNearest)
+            if α < -1 || α > 1
+                rem!(α, α, m, RoundNearest)
+            end
         end
         X[j, i] = cis(2π * Float64(α))
         set!(αs[j], α)
@@ -169,12 +173,39 @@ function solve!(BSS::BinomialSystemSolver)
     try
         hnf!(BSS.H, BSS.U, BSS.A)
         solve!(BSS, BSS.H, BSS.U)
+        # check result
+        if !validate_result(BSS)
+            MPZ.set_si!.(BSS.H_big, BSS.H)
+            MPZ.set_si!.(BSS.U_big, BSS.U)
+            hnf!(BSS.H_big, BSS.U_big, BSS.A)
+            solve!(BSS, BSS.H_big, BSS.U_big)
+        end
     catch e
         isa(e, OverflowError) || rethrow(e)
         hnf!(BSS.H_big, BSS.U_big, BSS.A)
         solve!(BSS, BSS.H_big, BSS.U_big)
     end
     BSS.X
+end
+function validate_result(BSS)
+    for k = 1:size(BSS.X, 2)
+        for j = 1:size(BSS.A, 2)
+            r = complex(1.0)
+            for i = 1:size(BSS.A, 1)
+                if BSS.A[i, j] < 0
+                    r = Base.FastMath.div_fast(r, BSS.X[i, k]^(-BSS.A[i, j]))
+                elseif BSS.A[i, j] > 0
+                    r *= BSS.X[i, k]^(BSS.A[i, j])
+                end
+            end
+            r -= BSS.b[j]
+
+            if fast_abs(r) > max(fast_abs(BSS.b[j]) * 1e-8, 1e-8)
+                return false
+            end
+        end
+    end
+    return true
 end
 
 function solve!(BSS::BinomialSystemSolver, H::Matrix{<:Integer}, U::Matrix{<:Integer})
