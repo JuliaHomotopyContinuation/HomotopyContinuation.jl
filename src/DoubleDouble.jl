@@ -327,8 +327,13 @@ end
 
 Base.inv(a::DoubleF64) = 1.0 / a
 
-Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode{:ToZero} = RoundToZero) = a - round(a / b, r) * b
-Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode) = a - round(a / b, r) * b
+Base.rem(
+    a::DoubleF64,
+    b::Union{Float64,DoubleF64},
+    r::RoundingMode{:ToZero} = RoundToZero,
+) = a - round(a / b, r) * b
+Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode) =
+    a - round(a / b, r) * b
 @inline function Base.divrem(a::DoubleF64, b::DoubleF64)
     n = round(a / b)
     n, a - n * b

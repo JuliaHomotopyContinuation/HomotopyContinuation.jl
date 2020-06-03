@@ -37,7 +37,7 @@
     @testset "Wilkinson $d" for d in [12]
         @var x
         f = System([expand(prod(x - i for i = 1:d))])
-        res = track.(total_degree(f, endgame_options=(only_nonsingular=true,))...)
+        res = track.(total_degree(f, endgame_options = (only_nonsingular = true,))...)
         @test all(is_success, res)
         @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:d
         @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-4

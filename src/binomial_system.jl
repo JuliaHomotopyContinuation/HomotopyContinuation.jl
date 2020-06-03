@@ -85,7 +85,7 @@ function compute_angular_part!(
         μj = DoubleF64(0.0)
         for i = 1:n
             μij = U[i, j] * DoubleF64(γ[i])
-            μij -= 2round(0.5 * Float64(μij), RoundNearest)
+            μij -= 2 * round(0.5 * Float64(μij), RoundNearest)
             μ[j] += μij
         end
         μ[j] = rem(μ[j], 2.0, RoundNearest)
@@ -93,10 +93,10 @@ function compute_angular_part!(
     # solve triangular system
     @inbounds for i = 1:d̂, j = n:-1:1
         α = (μ[j] + unit_roots_table[j, i]) / H[j, j]
-        α -= 2round(0.5 * Float64(α), RoundNearest)
+        α -= 2 * round(0.5 * Float64(α), RoundNearest)
         for k = n:-1:(j+1)
             αk = (αs[k] * H[k, j]) / H[j, j]
-            αk = αk - 2round(0.5 * Float64(αk), RoundNearest)
+            αk = αk - 2 * round(0.5 * Float64(αk), RoundNearest)
             α -= αk
         end
         α = rem(α, 2.0, RoundNearest)

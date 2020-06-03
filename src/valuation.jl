@@ -192,8 +192,8 @@ function analyze(
             if abs_Δ > finite_tol || val_tẋ[i] < 0.5δ
                 finite = false
             end
-        # Case b: val(x) = val(tẋ) > 0
-    elseif zero_is_finite && val_xᵢ > (δ - finite_tol)
+            # Case b: val(x) = val(tẋ) > 0
+        elseif zero_is_finite && val_xᵢ > (δ - finite_tol)
             if ε∞ > finite_tol
                 finite = false
             end
@@ -240,7 +240,7 @@ end
 function estimate_winding_number(val::Valuation; max_winding_number::Int)
     m = 1
     min_err = Inf
-    for k in 1:max_winding_number
+    for k = 1:max_winding_number
         err = 0.0
         for vᵢ in val.val_tẋ
             err += abs(round(k * vᵢ) - k * vᵢ)
