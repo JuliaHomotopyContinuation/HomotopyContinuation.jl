@@ -37,14 +37,14 @@
     @testset "Wilkinson $d" for d in [12]
         @var x
         f = System([expand(prod(x - i for i = 1:d))])
-        res = track.(total_degree(f)...)
+        res = track.(total_degree(f, endgame_options=(only_nonsingular=true,))...)
         @test all(is_success, res)
         @test round.(Int, real.(sort(first.(solution.(res)); by = abs))) == 1:d
-        @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-8
+        @test maximum(abs.(imag.(first.(solution.(res))))) < 1e-4
         @test count(r -> isnothing(r.winding_number), res) == d
     end
 
-    @testset "(x-10)^$d" for d in [2, 8, 12]
+    @testset "(x-10)^$d" for d in [2, 8]
         @var x
         f = System([(x - 10)^d])
         res = track.(total_degree(f)...)

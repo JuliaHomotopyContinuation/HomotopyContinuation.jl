@@ -50,11 +50,11 @@ Base.@kwdef mutable struct EndgameOptions
     at_infinity_check::Bool = true
     only_nonsingular::Bool = false
     # valuation etc
-    val_finite_tol::Float64 = 1e-3
+    val_finite_tol::Float64 = 1e-2
     val_at_infinity_tol::Float64 = 1e-3
 
     # singular solutions parameters
-    max_winding_number::Int = 12
+    max_winding_number::Int = 8
 end
 
 Base.show(io::IO, opts::EndgameOptions) = print_fieldnames(io, opts)
@@ -173,6 +173,7 @@ Base.@kwdef mutable struct EndgameTrackerState
     max_winding_number_hit::Bool = false
     cauchy_failures::Int = 0
     jump_to_zero_failed::Tuple{Bool,Bool} = (false, false)
+    best_at_infinity_tol::Float64 = Inf
 end
 
 EndgameTrackerState(npolynomials::Integer, x::AbstractVector) = EndgameTrackerState(;
@@ -249,6 +250,7 @@ function init!(
     state.max_winding_number_hit = false
     state.cauchy_failures = 0
     state.jump_to_zero_failed = (false, false)
+    state.best_at_infinity_tol = Inf
 
     endgame_tracker
 end
@@ -295,8 +297,8 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
     n₀ = max(ceil(Int, log(eps()) / log(t)), 8)
     @unpack x, μ, ω = tracker.state
 
-    # always use extended precision for cauchy endgame
-    prediction_acc = use_extended_precision!(tracker)
+    # # always use extended precision for cauchy endgame
+    prediction_acc = refine_current_solution!(tracker)
     # fix tracker to not flip between extended precision and and mach. precision
     tracker.state.keep_extended_prec = true
     # disallow hermite predictor
@@ -315,7 +317,7 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
         for j = 1:n₀
             θⱼ += Δθ
             tⱼ = j == n₀ ? t : t * cis(θⱼ)
-            res = track!(tracker, tⱼ)
+            res = track!(tracker, tⱼ; debug = false)
             sample_point_acc = tracker.state.accuracy
             prediction_acc = max(prediction_acc, sample_point_acc)
 
@@ -328,7 +330,7 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
         end
         # Check that loop is closed
         d = tracker.state.norm(last_point, x)
-        if d < 10 * max(prediction_acc, sample_point_acc)
+        if d < 100 * max(prediction_acc, sample_point_acc)
             n = n₀ * m
             prediction .= prediction ./ n
 
@@ -340,13 +342,9 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
 
     @label _return
 
-    if result == CAUCHY_TERMINATED
-        init!(tracker, last_point, t, 0.0; ω = ω, μ = μ, keep_steps = true)
-    else
-        init!(tracker, 0.0)
-    end
+    init!(tracker, last_point, t, 0.0; ω = ω, μ = μ, keep_steps = true)
 
-    result, m, prediction_acc
+    result, m, 100prediction_acc
 end
 
 function max_ratio(u::Vector{Float64}, v::Vector{Float64})
@@ -395,9 +393,8 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
                 zero_is_finite = !options.zero_is_at_infinity,
                 max_winding_number = options.max_winding_number,
             )
-
             if options.at_infinity_check &&
-               res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
+               state.best_at_infinity_tol < cbrt(options.val_at_infinity_tol)
                 return (state.code = EndgameTrackerCode.at_infinity)
             elseif options.zero_is_at_infinity &&
                    res.at_zero_tol < cbrt(options.val_at_infinity_tol)
@@ -442,16 +439,17 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     update!(state.val, tracker.predictor, t)
     (val_finite, at_infinity_tol, at_zero_tol) = analyze(
         state.val;
-        finite_tol = options.val_finite_tol * exp10(-state.cauchy_failures),
+        finite_tol = options.val_finite_tol,
         zero_is_finite = !options.zero_is_at_infinity,
         max_winding_number = options.max_winding_number,
     )
-
+    state.best_at_infinity_tol = min(state.best_at_infinity_tol, at_infinity_tol)
 
     if val_finite || (min(at_zero_tol, at_infinity_tol) < sqrt(options.val_at_infinity_tol))
         state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
     end
 
+    # end
     # For the truncation of paths use the stronger requirement of a relative
     # condition number increase
     κ = state.cond / state.cond_eg_start
@@ -493,7 +491,10 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
             at_infinity_tol = val_at_infinity_tol,
             tol = options.min_coord_growth,
         )
-    finite = !options.only_nonsingular && val_finite && κ > options.min_cond
+    finite =
+        !options.only_nonsingular &&
+        val_finite &&
+        (κ > options.min_cond || first(state.jump_to_zero_failed))
 
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
@@ -529,57 +530,42 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         state.solution .= tracker.state.x
         return (state.code = EndgameTrackerCode.at_zero)
 
-    elseif finite && (isnan(state.t_last_cauchy) || 10t < state.t_last_cauchy)
+    elseif finite && (isnan(state.t_last_cauchy) || 100t < state.t_last_cauchy)
+        m̂ = estimate_winding_number(state.val, max_winding_number = 12)
         res, m, acc_est = cauchy!(state, tracker, options)
         if debug
             printstyled("Cauchy result: ", res, " ", m, " ", acc_est, "\n"; color = :blue)
         end
-        if res == CAUCHY_SUCCESS
-            if state.winding_number === nothing
-                @label save_cauchy_result
-                state.t_last_cauchy = t
-                state.winding_number = m
-                state.solution .= state.prediction
-                state.accuracy = acc_est
-            elseif state.winding_number != m
-                state.cauchy_failures += 1
-                @goto save_cauchy_result
-            elseif state.winding_number == m
-                w = weights(tracker.state.norm)
-                d = distance(state.prediction, state.solution, InfNorm()) / maximum(w)
-                if d < 100 * max(state.accuracy, acc_est)
-                    state.solution .= state.prediction
-                    state.accuracy = d
-                    state.cond = LA.cond(
-                        tracker,
-                        state.solution,
-                        0.0,
-                        state.row_scaling,
-                        state.col_scaling,
-                    )
-                    return (state.code = EndgameTrackerCode.success)
-                else
-                    state.accuracy = acc_est
-                    state.solution .= state.prediction
-                    state.cauchy_failures += 1
-                    @goto save_cauchy_result
-                end
-            end
-        elseif res == CAUCHY_TERMINATED_MAX_WINDING_NUMBER
-            if state.max_winding_number_hit
-                state.code = EndgameTrackerCode.terminated_max_winding_number
-            else
-                state.cauchy_failures += 1
-                state.max_winding_number_hit = true
-            end
+
+        # We compare the residuals from before and after to catch
+        # any wrong applications of the Cauchy Endgame
+        perturbation = 1 + 1e4 * acc_est
+        @. tracker.state.x̂ = tracker.state.x .* perturbation
+        @unpack r, x_extended = tracker.corrector
+        evaluate!(r, tracker.homotopy, tracker.state.x̂, complex(t))
+        residual_prev = LA.norm(tracker.corrector.r, InfNorm())
+        # evaluate solution residual with extended precision
+        x_extended .= state.prediction
+        evaluate!(tracker.corrector.r, tracker.homotopy, x_extended, complex(0.0))
+        residual = LA.norm(tracker.corrector.r, InfNorm())
+
+        if res == CAUCHY_SUCCESS && residual < 100residual_prev
+            state.solution .= state.prediction
+            state.accuracy = acc_est
+            state.winding_number = m
+            state.cond =
+                LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
+            return (state.code = EndgameTrackerCode.success)
         elseif res == CAUCHY_TERMINATED
             state.code = tracker.state.code
+        else
+            state.t_last_cauchy = t
         end
     end
 
     # Catch ill behavior and terminate the tracking
     # 1) check cond(H_x, ẋ)
-    if tracker.predictor.cond_H_ẋ > 1e13 && maximum(state.val.val_tẋ) > 1e2
+    if (tracker.predictor.cond_H_ẋ > 1e10) && maximum(state.val.Δval_tẋ) > 1e4
         state.code = EndgameTrackerCode.terminated_ill_conditioned
         @goto terminated
     end

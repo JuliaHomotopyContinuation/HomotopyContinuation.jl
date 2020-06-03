@@ -303,6 +303,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     norm_Δx₀::Float64 # debug info only
     extended_prec::Bool
     used_extended_prec::Bool
+    refined_extended_prec::Bool
     keep_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
     use_strict_β_τ::Bool
@@ -330,7 +331,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     τ = Inf
     norm_Δx₀ = NaN
     use_strict_β_τ = false
-    used_extended_prec = extended_prec = keep_extended_prec = false
+    used_extended_prec = extended_prec = keep_extended_prec = refined_extended_prec = false
     jacobian = Jacobian(zeros(ComplexF64, size(H)))
     cond_J_ẋ = NaN
     code = TrackerCode.tracking
@@ -351,6 +352,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         norm_Δx₀,
         extended_prec,
         used_extended_prec,
+        refined_extended_prec,
         keep_extended_prec,
         norm,
         use_strict_β_τ,
@@ -533,11 +535,13 @@ function update_stepsize!(
     else
         j = result.iters - 2
         Θ_j = nthroot(result.θ, 1 << j)
-
+        h_Θ_j = _h(Θ_j)
+        h_a = _h(0.5a)
         if isnan(Θ_j) ||
            result.return_code == NEWT_SINGULARITY ||
            isnan(result.accuracy) ||
-           result.iters == 1
+           result.iters == 1 ||
+           h_Θ_j < h_a
 
             Δs = 0.25 * state.segment_stepper.Δs
         else
@@ -713,8 +717,10 @@ function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps())
     @unpack x, t, jacobian, norm = state
 
     μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
-    if μ > min_tol
+    k = 1
+    while (μ > min_tol && k ≤ 3)
         μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+        k += 1
     end
     μ
 end
@@ -796,8 +802,7 @@ function step!(tracker::Tracker, debug::Bool = false)
 
     if is_success(state.code) && options.extended_precision && state.accuracy > 1e-14
         state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
-        state.used_extended_prec = true
-        state.extended_prec = true
+        state.refined_extended_prec = true
     end
 
     !state.last_step_failed
@@ -869,8 +874,8 @@ function TrackerResult(H::AbstractHomotopy, state::TrackerState)
         state.accuracy,
         state.accepted_steps,
         state.rejected_steps,
-        state.extended_prec,
-        state.used_extended_prec,
+        state.extended_prec || state.refined_extended_prec,
+        state.used_extended_prec || state.refined_extended_prec,
         state.ω,
         state.μ,
         state.τ,

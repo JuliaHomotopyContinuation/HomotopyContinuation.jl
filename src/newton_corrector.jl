@@ -154,8 +154,19 @@ function newton!(
             norm_Δxᵢ₊₁ = norm(Δxᵢ)
             if isnan(norm_Δxᵢ₊₁)
                 @goto return_singular
+            # it seems that the solution is singular, so we are diverging again when
+            # we are getting tooo close
             elseif norm_Δxᵢ₊₁ > √norm_Δxᵢ
-                @goto return_terminated
+                θ = norm_Δxᵢ₊₁ / norm_Δxᵢ
+                return NewtonCorrectorResult(
+                    NEWT_TERMINATED,
+                    norm_Δxᵢ₊₁,
+                    i + 2,
+                    ω,
+                    θ,
+                    μ_low,
+                    norm_Δx₀,
+                )
             end
 
             if norm_Δxᵢ₊₁ > 2μ && extended_precision

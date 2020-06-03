@@ -177,23 +177,23 @@ function analyze(
             continue
         end
         # ∞ check
-        if val_xᵢ + ε∞ < -(δ + finite_tol)
+        if val_xᵢ + ε∞ < -(0.075 + finite_tol)
             at_infinity_tol = min(ε∞, at_infinity_tol)
         end
 
         # 0 check
-        if !zero_is_finite && val_xᵢ - ε∞ > (δ + finite_tol)
+        if !zero_is_finite && val_xᵢ - ε∞ > (0.075 + finite_tol)
             at_zero_tol = min(ε∞, at_zero_tol)
         end
 
         # finite
         # Case a: val(x) = 0
         if abs(val_xᵢ) < finite_tol
-            if abs_Δ > finite_tol || val_tẋ[i] ≤ 0
+            if abs_Δ > finite_tol || val_tẋ[i] < 0.5δ
                 finite = false
             end
-            # Case b: val(x) = val(tẋ) > 0
-        elseif zero_is_finite && val_xᵢ > finite_tol
+        # Case b: val(x) = val(tẋ) > 0
+    elseif zero_is_finite && val_xᵢ > (δ - finite_tol)
             if ε∞ > finite_tol
                 finite = false
             end
@@ -235,4 +235,20 @@ function validate_coord_growth(
     end
 
     false
+end
+
+function estimate_winding_number(val::Valuation; max_winding_number::Int)
+    m = 1
+    min_err = Inf
+    for k in 1:max_winding_number
+        err = 0.0
+        for vᵢ in val.val_tẋ
+            err += abs(round(k * vᵢ) - k * vᵢ)
+        end
+        if err < min_err
+            m = k
+            min_err = err
+        end
+    end
+    m
 end
