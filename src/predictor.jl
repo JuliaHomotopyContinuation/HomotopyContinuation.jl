@@ -79,6 +79,7 @@ Base.@kwdef mutable struct Predictor{T<:AD}
 
     method::PredictionMethod.methods
     order::Int
+    use_hermite::Bool = true
     trust_region::Float64
     local_error::Float64
     cond_H_ẋ::Float64
@@ -136,6 +137,7 @@ function init!(predictor::Predictor)
     predictor.cond_H_ẋ = 1.0
     predictor.t = predictor.prev_t = NaN
     predictor.trust_region = predictor.local_error = NaN
+    predictor.use_hermite = true
     predictor
 end
 
@@ -309,6 +311,7 @@ function update!(
         # Use cubic hermite
         @label use_hermite
         if isfinite(predictor.prev_t)
+        if isfinite(predictor.prev_t) && predictor.use_hermite
             predictor.method = PredictionMethod.Hermite
             predictor.order = 3
             predictor.trust_region = tx_norm[1] / tx_norm[2]

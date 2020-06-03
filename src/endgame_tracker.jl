@@ -299,6 +299,9 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
     prediction_acc = use_extended_precision!(tracker)
     # fix tracker to not flip between extended precision and and mach. precision
     tracker.state.keep_extended_prec = true
+    # disallow hermite predictor
+    tracker.predictor.use_hermite = false
+
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
     prediction .= 0.0
