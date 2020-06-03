@@ -31,7 +31,7 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
 * `max_endgame_steps = 2000`: The maximal number of steps performed during the endgame.
 * `max_winding_number = 12`: The maximal winding number which is attempted in the
  Cauchy endgame.
-* `min_growth = 100`: The minimal relative growth of a coordinate necessary to
+* `min_coord_growth = 100`: The minimal relative growth of a coordinate necessary to
   to be considered going to infininity (resp. zero).
 * `val_at_infinity_tol = 1e-3`: Tolerance on the valuation which has to be
   satisfied before a path is considered to diverge / go to infinity.
