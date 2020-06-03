@@ -22,6 +22,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/saschatimme/HomotopyContinuation.jl.git",
+    repo = "github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl.git",
     push_preview = false,
 )
