@@ -14,12 +14,15 @@ function VTNode(::Type{T}, ::Type{Id}, d::Int; capacity::Int) where {T,Id}
     VTNode(0, values, ids, children, distances)
 end
 
-function VTNode(v::AbstractVector{T}, id::Id; kwargs...) where {T,Id}
+function VTNode{T,Id}(v::AbstractVector, id::Id; kwargs...) where {T,Id}
     node = VTNode(T, Id, length(v); kwargs...)
     node.nentries = 1
     node.values[:, 1] .= v
     node.ids[1] = id
     node
+end
+function VTNode(v::AbstractVector{T}, id::Id; kwargs...) where {T,Id}
+    VTNode{T,Id}(v, id; kwargs...)
 end
 
 Base.length(node::VTNode) = node.nentries
@@ -172,7 +175,7 @@ function _insert!(
     end
 
     if !isassigned(node.children, minᵢ)
-        node.children[minᵢ] = VTNode(v, id; capacity = capacity(node))
+        node.children[minᵢ] = VTNode{T,Id}(v, id; capacity = capacity(node))
     else # a node already exists, so recurse
         _insert!(node.children[minᵢ], v, id, metric)
     end
