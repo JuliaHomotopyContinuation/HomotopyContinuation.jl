@@ -87,6 +87,7 @@ function newton!(
     ω::Float64 = throw(UndefKeywordError(:ω)),
     extended_precision::Bool = false,
     accurate_μ::Bool = false,
+    first_correction::Bool = false,
 )
     @unpack a, h_a, Δx, r, r̄, x_extended = NC
 
@@ -125,7 +126,7 @@ function newton!(
         i == 0 && (norm_Δx₀ = norm_Δxᵢ)
         i == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         i >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)
-        if i >= 1 && θ > ā || (i == 0 && 8 * norm_Δx₀ * ω > h_a)
+        if i >= 1 && θ > ā || (i == 0 && !first_correction && 0.125 * norm_Δx₀ * ω > h_a)
             @label return_terminated
             return NewtonCorrectorResult(
                 NEWT_TERMINATED,
@@ -153,8 +154,19 @@ function newton!(
             norm_Δxᵢ₊₁ = norm(Δxᵢ)
             if isnan(norm_Δxᵢ₊₁)
                 @goto return_singular
+                # it seems that the solution is singular, so we are diverging again when
+                # we are getting tooo close
             elseif norm_Δxᵢ₊₁ > √norm_Δxᵢ
-                @goto return_terminated
+                θ = norm_Δxᵢ₊₁ / norm_Δxᵢ
+                return NewtonCorrectorResult(
+                    NEWT_TERMINATED,
+                    norm_Δxᵢ₊₁,
+                    i + 2,
+                    ω,
+                    θ,
+                    μ_low,
+                    norm_Δx₀,
+                )
             end
 
             if norm_Δxᵢ₊₁ > 2μ && extended_precision

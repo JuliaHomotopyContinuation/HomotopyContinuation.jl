@@ -226,10 +226,10 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
         for i = 1:length(tc)
             wᵢ = H.weights[i]
             uᵢ = H.system_coeffs[i]
-            if wᵢ == 0
+            if wᵢ < 1e-12
                 tc[i, 1] = uᵢ
                 tc[i, 2] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
-            elseif wᵢ == 1
+            elseif isapprox(wᵢ, 1)
                 tc[i, 2] = uᵢ
                 tc[i, 1] = tc[i, 3] = tc[i, 4] = tc[i, 5] = 0.0
             else

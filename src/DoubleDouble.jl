@@ -113,6 +113,7 @@ Base.zero(::Type{DoubleF64}) = DoubleF64(0.0, 0.0)
 Base.one(::DoubleF64) = DoubleF64(1.0, 0.0)
 Base.one(::Type{DoubleF64}) = DoubleF64(1.0, 0.0)
 
+(::Type{T})(a::DoubleF64) where {T<:AbstractFloat} = convert(T, a)
 Base.convert(::Type{T}, a::DoubleF64) where {T<:AbstractFloat} = convert(T, a.hi)
 Base.convert(::Type{BigFloat}, a::DoubleF64) = big(a.hi) + big(a.lo)
 Base.BigFloat(a::DoubleF64) = convert(BigFloat, a)
@@ -326,7 +327,13 @@ end
 
 Base.inv(a::DoubleF64) = 1.0 / a
 
-Base.rem(a::DoubleF64, b::DoubleF64) = a - round(a / b) * b
+Base.rem(
+    a::DoubleF64,
+    b::Union{Float64,DoubleF64},
+    r::RoundingMode{:ToZero} = RoundToZero,
+) = a - round(a / b, r) * b
+Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode) =
+    a - round(a / b, r) * b
 @inline function Base.divrem(a::DoubleF64, b::DoubleF64)
     n = round(a / b)
     n, a - n * b
