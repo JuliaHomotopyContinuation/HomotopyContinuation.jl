@@ -74,14 +74,17 @@ plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
 function print_fieldnames(io::IO, obj)
     println(io, typeof(obj), ":")
     for name in fieldnames(typeof(obj))
-        if getfield(obj, name) !== nothing
-            val = getfield(obj, name)
-            print(io, " • ", name, " → ")
-            if val isa AbstractFloat
-                println(io, round(val; sigdigits = 5))
-            else
-                println(io, val)
-            end
+        print_fieldname(io, obj, name)
+    end
+end
+function print_fieldname(io::IO, obj, name)
+    if getfield(obj, name) !== nothing
+        val = getfield(obj, name)
+        print(io, " • ", name, " → ")
+        if val isa AbstractFloat
+            println(io, round(val; sigdigits = 5))
+        else
+            println(io, val)
         end
     end
 end
