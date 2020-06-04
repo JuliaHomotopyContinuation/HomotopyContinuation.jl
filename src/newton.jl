@@ -42,7 +42,7 @@ struct NewtonCache{M}
     x::Vector{ComplexF64}
     Δx::Vector{ComplexF64}
     x_ext::Vector{ComplexDF64}
-    J::MatrixWorkspace{M}
+    J::M
     r::Vector{ComplexF64}
 end
 function NewtonCache(F::AbstractSystem)
@@ -50,7 +50,11 @@ function NewtonCache(F::AbstractSystem)
     x = zeros(ComplexF64, n)
     Δx = copy(x)
     x_ext = zeros(ComplexDF64, n)
-    J = MatrixWorkspace(m, n)
+    if m ≥ n
+        J = MatrixWorkspace(m, n)
+    else
+        J = zeros(ComplexF64, m, n)
+    end
     r = zeros(ComplexF64, m)
     NewtonCache(x, Δx, x_ext, J, r)
 end
@@ -59,8 +63,9 @@ end
     newton(
         F::AbstractSystem,
         x₀::AbstractVector,
+        p = nothing,
         norm::AbstractNorm = InfNorm(),
-        cache::NewtonCache = NewtonCache(F, x₀);
+        cache::NewtonCache = NewtonCache(F);
         options...
     )
 
@@ -74,9 +79,9 @@ This is useful if the method is called repeatedly.
 
 ### Options
 
-* `abs_tol::Float64 = 1e-8`: The method is declared converged if `norm(xᵢ₊₁ - xᵢ) < abs_tol`.
-* `rel_tol::Float64 = abs_tol`: The method is declared converged if
-  `norm(xᵢ₊₁ - xᵢ) < abs_tol * norm(x₀)`.
+* `atol::Float64 = 1e-8`: The method is declared converged if `norm(xᵢ₊₁ - xᵢ) < atol`.
+* `rtol::Float64 = atol`: The method is declared converged if
+  `norm(xᵢ₊₁ - xᵢ) < max(atol, rtol * norm(x₀)) `.
 * `max_iters::Int = 20`: The maximal number of iterations.
 * `extended_precision::Bool = false`: An optional use of extended precision for the evaluation
   of `F(x)`. This can increase the achievable accuracy.
@@ -94,11 +99,12 @@ newton(f::System, args...; kwargs...) = newton(ModelKitSystem(f), args...; kwarg
 function newton(
     F::AbstractSystem,
     x₀::AbstractVector,
+    p = nothing,
     norm::AbstractNorm = InfNorm(),
     cache::NewtonCache = NewtonCache(F);
     extended_precision::Bool = false,
-    abs_tol::Float64 = 1e-8,
-    rel_tol::Float64 = abs_tol,
+    atol::Float64 = 1e-8,
+    rtol::Float64 = atol,
     max_iters::Int = 20,
     contraction_factor::Float64 = 1.0,
     min_contraction_iters::Int = typemax(Int),
@@ -111,15 +117,20 @@ function newton(
     norm_x = norm(x)
     norm_Δxᵢ = norm_Δxᵢ₋₁ = NaN
     res = NaN
+    m, n = size(F)
     for i = 1:max_iters
-        evaluate_and_jacobian!(r, matrix(J), F, x)
+        evaluate_and_jacobian!(r, matrix(J), F, x, p)
         if extended_precision
             x_ext .= x
-            evaluate!(r, F, x_ext)
+            evaluate!(r, F, x_ext, p)
         end
 
         updated!(J)
-        LA.ldiv!(Δx, J, r)
+        if m ≥ n
+            LA.ldiv!(Δx, J, r)
+        else
+            LA.ldiv!(Δx, LA.qr!(J, Val(true)), r)
+        end
         norm_Δxᵢ = norm(Δx)
 
         x .= x .- Δx
@@ -129,8 +140,7 @@ function newton(
                 norm_Δxᵢ₋₁ = norm_Δxᵢ
                 a *= a
             elseif i > min_contraction_iters ||
-                   norm_Δxᵢ < rel_tol * norm_x ||
-                   norm_Δxᵢ < abs_tol
+                   norm_Δxᵢ < max(atol, rtol * norm_x)
                 return NewtonResult(
                     :success,
                     x,

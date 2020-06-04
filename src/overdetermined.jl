@@ -25,8 +25,8 @@ function excess_solution_check!(
             InfNorm(),
             newton_cache;
             extended_precision = true,
-            abs_tol = 1e3 * acc,
-            rel_tol = 1e3 * acc,
+            atol = 1e3 * acc,
+            rtol = 1e3 * acc,
             max_abs_norm_first_update = max_abs_norm_first_update,
         )
         if !is_success(res)
