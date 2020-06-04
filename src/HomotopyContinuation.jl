@@ -4,6 +4,7 @@ export ModelKit
 
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
+import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
 import MixedSubdivisions
