@@ -51,5 +51,6 @@ include("polyhedral.jl")
 include("overdetermined.jl")
 include("solve.jl")
 include("result.jl")
+include("monodromy.jl")
 
 end

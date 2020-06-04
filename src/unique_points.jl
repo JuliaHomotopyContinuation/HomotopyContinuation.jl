@@ -1,4 +1,4 @@
-export GroupActions, UniquePoints, search_in_radius, add!, multiplicities
+export GroupActions, SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities
 
 ################
 # Group actions
@@ -74,6 +74,47 @@ apply_actions(cb, action::GroupActions, s) = _apply_actions(action.actions, s, c
 end
 @inline _apply_actions(::Tuple{}, s, cb) = false
 
+# Implemented group actions
+
+"""
+    SymmetricGroup(n)
+
+Group action of the symmetric group S(n).
+"""
+struct SymmetricGroup
+    permutations::Vector{Vector{Int}}
+end
+SymmetricGroup(N::Int) = SymmetricGroup(permutations(N))
+function permutations(N::Int)
+    s = Vector(1:N)
+    perms = [copy(s)]
+    while true
+        i = N - 1
+        while i >= 1 && s[i] >= s[i+1]
+            i -= 1
+        end
+        if i > 0
+            j = N
+            while j > i && s[i] >= s[j]
+                j -= 1
+            end
+            s[i], s[j] = s[j], s[i]
+            reverse!(s, i + 1)
+        else
+            s[1] = N + 1
+        end
+
+        s[1] > N && break
+        push!(perms, copy(s))
+    end
+    perms
+end
+
+Base.eltype(::Type{SymmetricGroup}) = Vector{Int}
+Base.length(p::SymmetricGroup) = length(p.permutations)
+Base.iterate(p::SymmetricGroup) = iterate(p.permutations)
+Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
+
 
 #############
 # UniquePoints
@@ -122,7 +163,7 @@ function UniquePoints(
     id;
     metric = EuclideanNorm(),
     group_action = nothing,
-    group_actions = group_action === nothing ? nothing : GroupActions(group_action),
+    group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
     if !(group_actions isa GroupActions) && !isnothing(group_actions)
         group_actions = GroupActions(group_actions)

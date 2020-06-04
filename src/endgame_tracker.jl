@@ -240,7 +240,7 @@ function init!(
     init!(state.val)
     state.endgame_started = false
     state.row_scaling .= 1
-    state.col_scaling .= weights(tracker.state.norm)
+    state.col_scaling .= 1
     state.cond_eg_start = 1.0
     state.cond = 1.0
     state.solution .= NaN
