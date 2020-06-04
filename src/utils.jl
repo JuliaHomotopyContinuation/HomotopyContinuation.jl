@@ -55,6 +55,8 @@ fast_abs(x::Real) = abs(x)
 "Like `min(a,b)`` but ignoring any `NaN` values."
 nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
 
+always_false(::Any) = false
+
 """
     unpack(a::Union{Nothing, T}, b::T)
 

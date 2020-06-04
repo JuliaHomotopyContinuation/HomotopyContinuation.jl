@@ -228,8 +228,6 @@ function solver_startsolutions(
     Solver(EndgameTracker(H); seed = seed), starts
 end
 
-always_false(x) = false
-
 """
     solve(f; options...)
     solve(f, start_solutions; start_parameters, target_parameters, options...)
