@@ -233,7 +233,7 @@ function _multiplicities(
     f::F,
     V,
     metric;
-    atol::Float64 = 0.0,
+    atol::Float64 = 1e-14,
     rtol::Float64 = 1e-8,
     kwargs...,
 ) where {F<:Function}

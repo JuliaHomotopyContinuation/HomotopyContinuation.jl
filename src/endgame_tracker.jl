@@ -692,7 +692,6 @@ function PathResult(
         residual = residual,
         condition_jacobian = state.cond,
         winding_number = state.winding_number,
-        multiplicity = nothing,
         last_path_point = (get_solution(H, state.last_point, state.last_t), state.last_t),
         valuation = t > options.endgame_start ? nothing : copy(state.val.val_x),
         start_solution = start_solution,

@@ -14,7 +14,7 @@
         @test all(isfinite, solution(res[1]))
         @test is_finite(res[1])
         @test isfinite(res[1])
-        @test multiplicity(res[1]) == nothing
+        @test multiplicity(res[1]) == 1
         @test winding_number(res[1]) == nothing
         @test !is_failed(res[1])
         @test accuracy(res[1]) < 1e-12

@@ -180,7 +180,7 @@
         @var x y
         g = System([(29 / 16) * x^3 - 2 * x * y, x^2 - y])
         res = solve(g; start_system = :total_degree)
-        @test startswith(sprint(show, res), "Result with 3 solutions")
+        @test startswith(sprint(show, res), "Result with 1 solution")
         @test seed(res) isa UInt32
         test_treeviews(res)
         @test !isempty(sprint(show, statistics(res)))
