@@ -415,7 +415,6 @@ function track(
             valuation = nothing,
             ω = state.ω,
             μ = state.μ,
-            multiplicity = nothing,
             path_number = path_number,
             extended_precision = state.extended_prec,
             accepted_steps = state.accepted_steps,

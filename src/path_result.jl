@@ -80,7 +80,7 @@ Base.@kwdef mutable struct PathResult
     accuracy::Float64
     residual::Float64
     singular::Bool
-    multiplicity::Union{Nothing,Int}
+    multiplicity::Int = 1
     condition_jacobian::Float64
     winding_number::Union{Nothing,Int}
     extended_precision::Bool
@@ -177,7 +177,7 @@ start_solution(r::PathResult) = r.start_solution
 """
     multiplicity(r::PathResult)
 
-Get the multiplicity of the solution of the path. Returns `nothing` if it wasn't computed.
+Get the multiplicity of the solution of the path.
 """
 multiplicity(r::PathResult) = r.multiplicity
 

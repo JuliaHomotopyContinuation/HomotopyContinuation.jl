@@ -16,8 +16,11 @@
             0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 + 0.75 * z^4
             10 * x^2 * z + 10 * y^2 * z - 6 * z^3
         ]
-        res = track.(total_degree(System(F))...)
-        @test count(r -> r.winding_number == 3, res) == 12
+        res = solve(System(F); start_system = :total_degree)
+        @test count(r -> r.winding_number == 3, path_results(res)) == 12
+        @test nresults(res) == 2
+        @test nsingular(res) == 2
+        @test all(r -> multiplicity(r) == 6, results(res))
     end
 
     @testset "Singular 1" begin
@@ -30,7 +33,7 @@
             7 * im * z^2,
         ]
         result = solve(System(F); start_system = :total_degree)
-        @test nsingular(result) == 3
+        @test nsingular(result) == 1
         @test nresults(result; only_nonsingular = true) == 1
     end
 
@@ -70,8 +73,8 @@
     end
 
     @testset "Bacillus Subtilis" begin
-        res = track.(total_degree(bacillus())...)
-        @test count(is_success, res) == 44
+        res = solve(bacillus())
+        @test nsolutions(res) == 44
     end
 
     @testset "Mohab" begin
@@ -94,8 +97,8 @@
             5384944853425480296 * x * y * z^4 +
             88,
         ]
-        @time res = track.(total_degree(System(F, [x, z, y]),)...)
-        @test count(is_success, res) == 693
+        @time res = solve(System(F, [x, z, y]); start_system = :total_degree)
+        @test nnonsingular(res) == 693
 
         # test for γ value where path jumping happened with to loose default config
         @time res =
