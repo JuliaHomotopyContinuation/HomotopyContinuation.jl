@@ -303,6 +303,7 @@ function update!(
     predictor.cond_H_ẋ = δ / eps()
     tol_δ₁ = max(1e-10, err)
     δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
+    prev_tx_norm2 = tx_norm[2]
     tx_norm[2] = norm(xtemp)
     x¹ .= xtemp
 
@@ -310,7 +311,9 @@ function update!(
     if !trust
         # Use cubic hermite
         @label use_hermite
-        if isfinite(predictor.prev_t) && predictor.use_hermite
+        if isfinite(predictor.prev_t) &&
+           predictor.use_hermite &&
+           abs((prev_tx_norm2 - tx_norm[2]) / abs(t - predictor.prev_t)) < 1e18
             predictor.method = PredictionMethod.Hermite
             predictor.order = 3
             predictor.trust_region = tx_norm[1] / tx_norm[2]
@@ -326,9 +329,6 @@ function update!(
             predictor.method = PredictionMethod.Euler
             predictor.order = 2
             predictor.trust_region = tx_norm[1] / tx_norm[2]
-            if isnan(predictor.local_error)
-                predictor.local_error = (tx_norm[2] / tx_norm[1])^2
-            end
             return predictor
         end
     end

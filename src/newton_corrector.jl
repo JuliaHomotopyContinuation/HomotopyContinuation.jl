@@ -59,8 +59,7 @@ function extended_prec_refinement_step!(
     x::AbstractVector,
     t::Number,
     J::Jacobian,
-    norm::AbstractNorm;
-    extended_precision::Bool = false,
+    norm::AbstractNorm,
 )
     @unpack Δx, r, x_extended = NC
     evaluate_and_jacobian!(r, matrix(J), H, x, t)
