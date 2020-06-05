@@ -407,6 +407,7 @@ function track(
             start_solution = start_solution,
             t = real(state.t),
             accuracy = state.accuracy,
+            singular = false,
             condition_jacobian = NaN,
             residual = NaN,
             winding_number = nothing,

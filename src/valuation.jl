@@ -93,26 +93,31 @@ function update!(val::Valuation, pred::Predictor{AD{N}}, t::Real) where {N}
     logẋ₂, logẋ₁, = val.logẋ_data
     logt₂, logt₁ = val.logt_data
     val_ẋ₂, val_ẋ₁ = val.val_ẋ_data
+    diff = isnan(logt₂) || abs(logt₂ - logt) > 0.25
     for (i, (xᵢ, ẋᵢ)) in enumerate(pred.tx¹)
         logxᵢ = logabs(xᵢ)
         νᵢ = ν(xᵢ, ẋᵢ, t)
-        Δνᵢ = finite_diff(νᵢ, logt, ν₂[i], logt₂, ν₁[i], logt₁)
+        if diff && !isnan(logt₂)
+            Δνᵢ = finite_diff(νᵢ, logt, ν₂[i], logt₂, ν₁[i], logt₁)
 
-        logẋᵢ = logabs(ẋᵢ)
-        val_ẋᵢ = finite_diff(logẋᵢ, logt, logẋ₂[i], logt₂, logẋ₁[i], logt₁)
-        Δval_ẋᵢ = finite_diff(val_ẋᵢ, logt, val_ẋ₂[i], logt₂, val_ẋ₁[i], logt₁)
+            logẋᵢ = logabs(ẋᵢ)
+            val_ẋᵢ = finite_diff(logẋᵢ, logt, logẋ₂[i], logt₂, logẋ₁[i], logt₁)
+            Δval_ẋᵢ = finite_diff(val_ẋᵢ, logt, val_ẋ₂[i], logt₂, val_ẋ₁[i], logt₁)
 
-        val.val_x[i] = νᵢ
-        val.Δval_x[i] = Δνᵢ
-        val.val_tẋ[i] = val_ẋᵢ + 1
-        val.Δval_tẋ[i] = Δval_ẋᵢ
+            val.val_x[i] = νᵢ
+            val.Δval_x[i] = Δνᵢ
+            val.val_tẋ[i] = val_ẋᵢ + 1
+            val.Δval_tẋ[i] = Δval_ẋᵢ
 
-        ν₂[i], ν₁[i] = νᵢ, ν₂[i]
-        logx₂[i], logx₁[i] = logxᵢ, logx₂[i]
-        logẋ₂[i], logẋ₁[i] = logẋᵢ, logẋ₂[i]
-        val_ẋ₂[i], val_ẋ₁[i] = val_ẋᵢ, val_ẋ₂[i]
+            ν₂[i], ν₁[i] = νᵢ, ν₂[i]
+            logx₂[i], logx₁[i] = logxᵢ, logx₂[i]
+            logẋ₂[i], logẋ₁[i] = logẋᵢ, logẋ₂[i]
+            val_ẋ₂[i], val_ẋ₁[i] = val_ẋᵢ, val_ẋ₂[i]
+        end
     end
-    val.logt_data = (logt, logt₂)
+    if diff
+        val.logt_data = (logt, logt₂)
+    end
 
     val
 end

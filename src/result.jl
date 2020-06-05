@@ -86,11 +86,7 @@ Base.@kwdef struct ResultStatistics
 end
 Base.show(io::IO, stats::ResultStatistics) = print_fieldnames(io, stats)
 
-function ResultStatistics(
-    result::Result;
-    real_tol::Float64 = 1e-6,
-    singular_tol::Float64 = 1e10,
-)
+function ResultStatistics(result::Result; real_tol::Float64 = 1e-6)
     failed = at_infinity = excess_solution = 0
     nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -102,13 +98,13 @@ function ResultStatistics(
             at_infinity += 1
         elseif is_excess_solution(r)
             excess_solution += 1
-        elseif is_singular(r, singular_tol)
+        elseif is_singular(r)
             if is_real(r, real_tol)
                 real_singular += 1
-                real_singular_with_multiplicity += unpack(multiplicity(r), 1)
+                real_singular_with_multiplicity += something(multiplicity(r), 1)
             end
             singular += 1
-            singular_with_multiplicity += unpack(multiplicity(r), 1)
+            singular_with_multiplicity += something(multiplicity(r), 1)
         else # finite, nonsingular
             if is_real(r, real_tol)
                 real_nonsingular += 1
@@ -132,7 +128,7 @@ function ResultStatistics(
 end
 
 """
-    statistics(R::Result; real_tol = 1e-6, singular_tol = 1e10)
+    statistics(R::Result; real_tol = 1e-6)
 
 Statistic about the number of (real) singular and non-singular solutions etc.
 """
@@ -147,7 +143,6 @@ const Results = Union{Result,AbstractVector{<:PathResult}}
         real_tol = 1e-6,
         only_nonsingular = false,
         only_singular = false,
-        singular_tol = 1e10,
         only_finite = true,
         multiple_results = false,
     )
@@ -164,7 +159,6 @@ function results(
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
-    singular_tol::Float64 = 1e10,
     onlyfinite::Bool = true, # deprecated
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
@@ -174,8 +168,8 @@ function results(
         for
         r in R if
         (!only_real || is_real(r, real_tol)) &&
-            (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-            (!only_singular || is_singular(r, singular_tol)) &&
+            (!only_nonsingular || is_nonsingular(r)) &&
+            (!only_singular || is_singular(r)) &&
             (!only_finite || is_finite(r)) &&
             (multiple_results || !is_multiple_result(r, R))
     ]
@@ -188,7 +182,6 @@ end
         real_tol = 1e-6,
         only_nonsingular = false,
         only_singular = false,
-        singular_tol = 1e10,
         only_finite = true,
         multiple_results = false,
     )
@@ -202,15 +195,14 @@ function nresults(
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
-    singular_tol::Float64 = 1e10,
     onlyfinit::Bool = true, # deprecated
     only_finite::Bool = onlyfinit,
     multiple_results::Bool = false,
 )
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
-            (!only_nonsingular || is_nonsingular(r, singular_tol)) &&
-            (!only_singular || is_singular(r, singular_tol)) &&
+            (!only_nonsingular || is_nonsingular(r)) &&
+            (!only_singular || is_singular(r)) &&
             (!only_finite || isfinite(r)) &&
             (multiple_results || !is_multiple_result(r, R))
     end
@@ -266,17 +258,15 @@ For the possible `conditions` see [`results`](@ref).
 nonsingular(R::Results; kwargs...) = results(R; only_nonsingular = true, kwargs...)
 
 """
-    singular(result; tol=1e10, multiple_results=false, kwargs...)
+    singular(result; multiple_results=false, kwargs...)
 
 Return all [`PathResult`]s for which the solution is singular.
-A solution is labeled singular
-if the condition number is greater than `singular_tol`, or if the winding number is > 1.
 If `multiple_results=false` only one point from each cluster of multiple solutions is returned.
 If If `multiple_results=true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Results; tol::Float64 = 1e10, kwargs...)
-    results(R; only_singular = true, singular_tol = tol, kwargs...)
+function singular(R::Results; kwargs...)
+    results(R; only_singular = true, kwargs...)
 end
 
 """
@@ -321,7 +311,6 @@ nsolutions(R::Results) = nresults(R)
 """
     nsingular(
         result;
-        singular_tol = 1e10,
         counting_multiplicities = false,
         kwargs...,
     )
@@ -331,19 +320,8 @@ larger than 1 or the condition number is larger than `tol`.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
 """
-function nsingular(
-    R::Results;
-    singular_tol::Float64 = 1e10,
-    counting_multiplicities::Bool = false,
-    kwargs...,
-)
-    S = results(
-        R;
-        only_singular = true,
-        multiple_results = false,
-        singular_tol = singular_tol,
-        kwargs...,
-    )
+function nsingular(R::Results; counting_multiplicities::Bool = false, kwargs...)
+    S = results(R; only_singular = true, multiple_results = false, kwargs...)
     isempty(S) && return 0
     counting_multiplicities && return sum(multiplicity, S)
     length(S)
@@ -372,11 +350,11 @@ The number of failed paths.
 nfailed(R::Results) = count(is_failed, R)
 
 """
-    nnonsingular(result; tol=1e-10)
+    nnonsingular(result)
 
 The number of non-singular solutions. See also [`is_singular`](@ref).
 """
-nnonsingular(R::Result; tol = 1e10) = count(r -> is_nonsingular(r, tol), R)
+nnonsingular(R::Result) = count(is_nonsingular, R)
 
 """
     nreal(result; tol=1e-6)

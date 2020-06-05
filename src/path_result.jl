@@ -39,6 +39,7 @@ General solution information:
 * `condition_jacobian::Float64`: This is the condition number of the Jacobian at the
   solution. A high condition number indicates a singular solution or a
   solution on a positive dimensional component.
+* `singular::Bool`: Whether the solution is considered singular.
 * `winding_number:Union{Nothing, Int}`: The computed winding number. This is a lower bound
   on the multiplicity of the solution. It is ``nothing`` if the Cauchy endgame was not used.
 * `extended_precision::Bool`: Indicate whether extended precision is necessary to achieve
@@ -78,6 +79,7 @@ Base.@kwdef mutable struct PathResult
     t::Float64
     accuracy::Float64
     residual::Float64
+    singular::Bool
     multiplicity::Union{Nothing,Int}
     condition_jacobian::Float64
     winding_number::Union{Nothing,Int}
@@ -104,7 +106,6 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
 Get the solution of the path.
 """
 solution(r::PathResult) = r.solution
-
 
 """
     accuracy(r::PathResult)
@@ -232,26 +233,19 @@ is_finite(r::PathResult) = is_success(r)
 Base.isfinite(r::PathResult) = is_finite(r)
 
 """
-    is_singular(r::PathResult; tol::Float64 = 1e10)
+    is_singular(r::PathResult)
 
-Checks whether the path result `r` is singular. This is true if
-the winding number is larger than  1 or if the condition number of the Jacobian
-is larger than `tol`.
+Checks whether the path result `r` is singular.
 """
-is_singular(r::PathResult; tol::Float64 = 1e10) = is_singular(r, tol)
-function is_singular(r::PathResult, tol::Real)
-    (unpack(r.condition_jacobian, 1.0) > tol || unpack(winding_number(r), 1) > 1) &&
-        is_success(r)
-end
+is_singular(r::PathResult) = r.singular
 
 """
-    is_nonsingular(r::PathResult; tol::Float64 = 1e10)
+    is_nonsingular(r::PathResult)
 
 Checks whether the path result is non-singular. This is true if
 it is not singular.
 """
-is_nonsingular(r::PathResult; kwargs...) = !is_singular(r; kwargs...) && is_success(r)
-is_nonsingular(r::PathResult, tol::Real) = !is_singular(r, tol) && is_success(r)
+is_nonsingular(r::PathResult) = !is_singular(r) && is_success(r)
 
 
 """

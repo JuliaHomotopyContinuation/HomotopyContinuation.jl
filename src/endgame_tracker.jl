@@ -165,6 +165,7 @@ Base.@kwdef mutable struct EndgameTrackerState
     solution::Vector{ComplexF64}
     t_last_cauchy::Float64 = NaN
     winding_number::Union{Nothing,Int} = nothing
+    singular = false
     accuracy::Float64 = NaN
     cond::Float64 = 1.0
     prediction::Vector{ComplexF64}
@@ -246,6 +247,7 @@ function init!(
     state.accuracy = NaN
     state.t_last_cauchy = NaN
     state.winding_number = nothing
+    state.singular = false
     state.steps_eg = 0
     state.max_winding_number_hit = false
     state.cauchy_failures = 0
@@ -378,8 +380,17 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         state.winding_number = nothing
         # only update condition number for successfull paths
         if is_success(state.code)
-            state.cond =
-                LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+            if tracker.state.extended_prec
+                check_singular!(endgame_tracker)
+            else
+                state.cond = LA.cond(
+                    tracker,
+                    state.solution,
+                    0.0,
+                    state.row_scaling,
+                    state.col_scaling,
+                )
+            end
         end
 
         # If a path got terminated, let's be more generous to classify them as at_infinity
@@ -394,7 +405,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
                 max_winding_number = options.max_winding_number,
             )
             if options.at_infinity_check &&
-               state.best_at_infinity_tol < cbrt(options.val_at_infinity_tol)
+               res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
                 return (state.code = EndgameTrackerCode.at_infinity)
             elseif options.zero_is_at_infinity &&
                    res.at_zero_tol < cbrt(options.val_at_infinity_tol)
@@ -494,7 +505,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     finite =
         !options.only_nonsingular &&
         val_finite &&
-        (κ > options.min_cond || first(state.jump_to_zero_failed))
+        (state.cond > options.min_cond^2 || first(state.jump_to_zero_failed))
 
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
@@ -553,8 +564,21 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
             state.solution .= state.prediction
             state.accuracy = acc_est
             state.winding_number = m
-            state.cond =
-                LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
+
+            # determine whether solution is really singular
+            if m ≥ 2
+                state.singular = true
+                state.cond = LA.cond(
+                    tracker,
+                    state.solution,
+                    0.0,
+                    state.row_scaling,
+                    state.col_scaling,
+                )
+            else
+                check_singular!(endgame_tracker)
+            end
+
             return (state.code = EndgameTrackerCode.success)
         elseif res == CAUCHY_TERMINATED
             state.code = tracker.state.code
@@ -565,7 +589,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
 
     # Catch ill behavior and terminate the tracking
     # 1) check cond(H_x, ẋ)
-    if (tracker.predictor.cond_H_ẋ > 1e10) && maximum(state.val.Δval_tẋ) > 1e4
+    if (tracker.predictor.cond_H_ẋ > 1e12) && maximum(state.val.Δval_tẋ) > 1e4
         state.code = EndgameTrackerCode.terminated_ill_conditioned
         @goto terminated
     end
@@ -573,6 +597,34 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     state.code
 end
 
+function check_singular!(endgame_tracker::EndgameTracker)
+    @unpack tracker = endgame_tracker
+    @unpack row_scaling, col_scaling = endgame_tracker.state
+    @unpack homotopy, corrector, state, options = tracker
+    @unpack jacobian, norm = state
+    t = complex(0.0)
+    x = endgame_tracker.state.solution
+    y = endgame_tracker.state.prediction
+    cond = LA.cond(tracker, x, t, row_scaling, col_scaling)
+    if cond > 1e16
+        endgame_tracker.state.cond = cond
+        return (endgame_tracker.state.singular = true)
+    end
+    Δ1 = extended_prec_refinement_step!(y, corrector, homotopy, x, t, jacobian, norm)
+    Δ2 = extended_prec_refinement_step!(y, corrector, homotopy, y, t, jacobian, norm)
+    if Δ2 > 100Δ1 || Δ1 > sqrt(endgame_tracker.state.accuracy)
+        endgame_tracker.state.cond = cond
+        return (endgame_tracker.state.singular = true)
+    end
+    cond = LA.cond(workspace(jacobian), row_scaling, col_scaling)
+    if cond > 1e15 || inf_norm(workspace(jacobian), row_scaling) < 1e-14
+        endgame_tracker.state.cond = cond
+        x .= y
+        return (endgame_tracker.state.singular = true)
+    else
+        singular = false
+    end
+end
 
 function track!(
     endgame_tracker::EndgameTracker,
@@ -635,6 +687,7 @@ function PathResult(
         return_code = Symbol(state.code),
         solution = solution,
         t = t,
+        singular = state.singular,
         accuracy = state.accuracy,
         residual = residual,
         condition_jacobian = state.cond,
