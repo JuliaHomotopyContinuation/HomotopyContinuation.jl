@@ -376,6 +376,7 @@ function solve(
 )
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
+    init!(S.stats)
     if threading
         threaded_solve(
             S,
