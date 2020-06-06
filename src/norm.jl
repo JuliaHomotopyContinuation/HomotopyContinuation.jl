@@ -34,8 +34,8 @@ LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, 
 ##################
 
 Base.@kwdef struct WeightedNormOptions
-    scale_min::Float64 = sqrt(eps())
-    scale_abs_min::Float64 = min(scale_min^2, sqrt(eps()))
+    scale_min::Float64 = 1e-4
+    scale_abs_min::Float64 = 1e-6
     scale_max::Float64 = exp2(div(1023, 2))
 end
 
@@ -69,17 +69,14 @@ struct WeightedNorm{N<:AbstractNorm} <: AbstractNorm
 end
 function WeightedNorm(
     weights::Vector{Float64},
-    norm::AbstractNorm;
-    scale_min = sqrt(eps()),
-    scale_abs_min = min(scale_min^2, sqrt(eps())),
-    scale_max = exp2(div(1023, 2)),
+    norm::AbstractNorm,
+    opts = WeightedNormOptions()
 )
-    opts = WeightedNormOptions(scale_min, scale_abs_min, scale_max)
     WeightedNorm(weights, norm, opts)
 end
-WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
-    WeightedNorm(norm, length(x); opts...)
-WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), norm; opts...)
+WeightedNorm(norm::AbstractNorm, x::AbstractVector) =
+    WeightedNorm(norm, length(x))
+WeightedNorm(norm::AbstractNorm, n::Integer) = WeightedNorm(ones(n), norm)
 
 """
     weights(WN::WeightedNorm)
@@ -125,7 +122,6 @@ and the norm of `x`.
 function update!(w::WeightedNorm, x)
     norm_x = w(x)
     for i = 1:length(x)
-        # wᵢ = fast_abs(x[i])#
         wᵢ = (fast_abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
