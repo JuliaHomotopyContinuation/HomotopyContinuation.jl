@@ -308,7 +308,7 @@ function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Vari
 end
 
 """
-    monomials(variables::AbstractVector, d::Integer; homogeneous::Bool = true)
+    monomials(variables::AbstractVector, d::Integer; affine = false)
 
 Create all monomials of a given degree in the given `variables`.
 
@@ -323,9 +323,13 @@ julia> monomials([x,y], 2)
  y ^ 2
 ```
 """
-function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer)
+function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer; affine = false)
     n = length(vars)
-    pred = x -> sum(x) == d
+    if affine
+        pred = x -> sum(x) ≤ d
+    else
+        pred = x -> sum(x) == d
+    end
     exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
     sort!(exps, lt = td_order)
     map(exps) do exp
@@ -379,7 +383,7 @@ function dense_poly(
     homogeneous::Bool = false,
     coeff_name::Symbol = gensym(:c),
 )
-    M = monomials([vars; 1], d)
+    M = monomials(vars, d; affine = !homogeneous)
     c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
 end
@@ -403,7 +407,7 @@ function rand_poly(vars::AbstractVector, d::Integer; kwargs...)
     rand_poly(ComplexF64, vars, d; kwargs...)
 end
 function rand_poly(T, vars::AbstractVector, d::Integer; homogeneous::Bool = false)
-    M = monomials([vars; 1], d)
+    M = monomials(vars, d; affine = !homogeneous)
     sum(randn(T, length(M)) .* M)
 end
 

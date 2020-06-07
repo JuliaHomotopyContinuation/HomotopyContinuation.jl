@@ -139,10 +139,10 @@ using HomotopyContinuation.ModelKit
             @var x[1:2] a[1:5] c[1:6] y[1:2, 1:5]
 
             #tangential conics
-            f = sum([a; 1] .* monomials([x;1], 2)
+            f = sum([a; 1] .* monomials([x;1], 2))
             ∇ = differentiate(f, x)
             #5 conics
-            g = sum(c .* monomials([x;1]))
+            g = sum(c .* monomials([x;1], 2))
             ∇_2 = differentiate(g, x)
             #the general system
             #f_a_0 is tangent to g_b₀ at x₀
@@ -213,7 +213,7 @@ using HomotopyContinuation.ModelKit
         @test length(c) == 10
         g = rand_poly(Float64, [x, y], 3)
         @test subs(f, c => coefficients(g, [x, y])) == g
-        _, coeffs = exponents_coefficients(g, [x, y])
+        _, coeffs = exponents_coefficients(g, [x, y]; expanded = true)
         @test subs(f, c => coeffs) == g
     end
 

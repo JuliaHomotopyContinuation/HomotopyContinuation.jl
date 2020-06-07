@@ -58,7 +58,9 @@
         @test length(solutions(result)) == 21
 
         # test with false input
-        result = monodromy_solve(F, [rand(6) for _ = 1:10], p₀)
+        @test_logs (:warn, "None of the provided solutions is a valid start solution.") (
+            result = monodromy_solve(F, [rand(6) for _ = 1:10], p₀)
+        )
         @test result.returncode == :invalid_startvalue
         result =
             monodromy_solve(F.expressions, [x₀, rand(6)], p₀, parameters = F.parameters)
@@ -169,14 +171,17 @@
         )
         @test nsolutions(R) ≤ 225
 
-        R = monodromy_solve(
-            f;
-            group_action = relabeling,
-            show_progress = false,
-            max_loops_no_progress = 20,
-            target_solutions_count = 225,
-        )
-        @test nsolutions(R) == 225
+        for threading in [true, false]
+            R = monodromy_solve(
+                f;
+                group_action = relabeling,
+                show_progress = false,
+                max_loops_no_progress = 20,
+                target_solutions_count = 225,
+                threading = false,
+            )
+            @test nsolutions(R) == 225
+        end
     end
 
     @testset "permutations" begin
@@ -186,7 +191,7 @@
         c₁ = p₁[1]^2 + p₁[2]^2 - 1
         c₂ = p₂[1]^2 + p₂[2]^2 - 1
 
-        F = System([c₁ * c₂; a * x[1] + b * x[2] - c]; parameters = [a,b,c])
+        F = System([c₁ * c₂; a * x[1] + b * x[2] - c]; parameters = [a, b, c])
         S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], permutations = true)
         A = permutations(S)
         B = permutations(S, reduced = false)
@@ -196,9 +201,9 @@
         @test size(B, 1) == 2
         @test size(B, 2) > 2
 
-        start_sols = solve(F; target_parameters=[1,1,1], start_system = :total_degree)
-        S = monodromy_solve(F, solutions(start_sols), [1,1,1]; permutations = true)
+        start_sols = solve(F; target_parameters = [1, 1, 1], start_system = :total_degree)
+        S = monodromy_solve(F, solutions(start_sols), [1, 1, 1]; permutations = true)
         C = permutations(S)
-        @test size(C) == (4, 4)
+        @test size(C, 1) == 4
     end
 end

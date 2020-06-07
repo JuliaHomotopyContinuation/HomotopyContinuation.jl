@@ -22,6 +22,7 @@ function excess_solution_check!(
         res = newton(
             F.system,
             solution(path_result),
+            nothing,
             InfNorm(),
             newton_cache;
             extended_precision = true,
