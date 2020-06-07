@@ -789,12 +789,9 @@ function fano_quintic()
     n = 4
     @var x[1:n]
 
-    ν = monomials(x, 5)
-    N = length(ν)
-
-    @var q[1:N-1]
-    F = sum(q[i] * ν[i] for i = 1:N-1) + 1
-
+    F, q = dense_poly(x, 5; coeff_name = :q)
+    F = F(q[end] => 1)
+    q = q[1:end-1]
     @var a[1:n-1] b[1:n-1] t
     L = [a; 1] .* t + [b; 0]
     FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))

@@ -308,7 +308,7 @@ function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Vari
 end
 
 """
-    monomials(variables::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+    monomials(variables::AbstractVector, d::Integer; homogeneous::Bool = true)
 
 Create all monomials of a given degree in the given `variables`.
 
@@ -317,28 +317,15 @@ julia> @var x y
 (x, y)
 
 julia> monomials([x,y], 2)
-6-element Array{Expression,1}:
-x^2
-x*y
-y^2
-  x
-  y
-  1
-
-julia> monomials([x,y], 2; homogeneous = true)
 3-element Array{Operation,1}:
  x ^ 2
  x * y
  y ^ 2
 ```
 """
-function monomials(vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
+function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer)
     n = length(vars)
-    if homogeneous
-        pred = x -> sum(x) == d
-    else
-        pred = x -> sum(x) ≤ d
-    end
+    pred = x -> sum(x) == d
     exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
     sort!(exps, lt = td_order)
     map(exps) do exp
@@ -349,6 +336,14 @@ function td_order(x, y)
     sx = sum(x)
     sy = sum(y)
     sx == sy ? x > y : sx > sy
+end
+function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, D::AbstractVector{<:Integer})
+    D = sort(D; rev = true)
+    M = monomials(vars, D[1])
+    for i in 2:length(D)
+        append!(M, monomials(vars, D[i]))
+    end
+    M
 end
 
 """
@@ -379,12 +374,12 @@ julia> c
 ```
 """
 function dense_poly(
-    vars::AbstractVector{Variable},
+    vars::AbstractVector{<:Union{Variable,Expression}},
     d::Integer;
     homogeneous::Bool = false,
     coeff_name::Symbol = gensym(:c),
 )
-    M = monomials(vars, d; homogeneous = homogeneous)
+    M = monomials([vars; 1], d)
     c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
 end
@@ -404,11 +399,11 @@ julia> rand_poly(Float64, [x, y], 2)
  0.128891763280247*x*y + 0.878962738754971*x^2 + 0.550480741774464*y^2
 ```
 """
-function rand_poly(vars::AbstractVector{Variable}, d::Integer; kwargs...)
+function rand_poly(vars::AbstractVector, d::Integer; kwargs...)
     rand_poly(ComplexF64, vars, d; kwargs...)
 end
-function rand_poly(T, vars::AbstractVector{Variable}, d::Integer; homogeneous::Bool = false)
-    M = monomials(vars, d; homogeneous = homogeneous)
+function rand_poly(T, vars::AbstractVector, d::Integer; homogeneous::Bool = false)
+    M = monomials([vars; 1], d)
     sum(randn(T, length(M)) .* M)
 end
 
@@ -557,12 +552,14 @@ function exponents_coefficients(
 end
 
 """
-    coefficients(f::Expression, vars::AbstractVector{Variable})
+    coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
 
 Return all coefficients of the given polynomial `f` for the given variables `vars`.
-This assumes that the expression `f` is already expanded, e.g., with [`expand`](@ref).
+If `expanded = true` then this assumes that the expression `f` is already expanded,
+e.g., with [`expand`](@ref).
 """
-function coefficients(f::Expression, vars::AbstractVector{Variable})
+function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::Bool = false)
+    expanded || (f = expand(f))
     D = to_dict(f, vars)
     m = length(D)
     E = collect(keys(D))
