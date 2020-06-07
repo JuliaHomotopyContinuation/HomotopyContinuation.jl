@@ -36,12 +36,7 @@ function compute_distances!(node, x, metric::M) where {M}
     node.distances
 end
 
-function search_in_radius(
-    node::VTNode{T,Id},
-    x,
-    tol::Real,
-    metric::M,
-) where {T,Id,M}
+function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,Id,M}
     !isempty(node) || return nothing
 
     n = length(node)

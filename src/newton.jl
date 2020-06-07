@@ -139,8 +139,7 @@ function newton(
             if norm_Δxᵢ < a * norm_Δxᵢ₋₁
                 norm_Δxᵢ₋₁ = norm_Δxᵢ
                 a *= a
-            elseif i > min_contraction_iters ||
-                   norm_Δxᵢ < max(atol, rtol * norm_x)
+            elseif i > min_contraction_iters || norm_Δxᵢ < max(atol, rtol * norm_x)
                 return NewtonResult(
                     :success,
                     x,

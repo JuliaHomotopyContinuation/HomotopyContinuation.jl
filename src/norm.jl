@@ -70,12 +70,11 @@ end
 function WeightedNorm(
     weights::Vector{Float64},
     norm::AbstractNorm,
-    opts = WeightedNormOptions()
+    opts = WeightedNormOptions(),
 )
     WeightedNorm(weights, norm, opts)
 end
-WeightedNorm(norm::AbstractNorm, x::AbstractVector) =
-    WeightedNorm(norm, length(x))
+WeightedNorm(norm::AbstractNorm, x::AbstractVector) = WeightedNorm(norm, length(x))
 WeightedNorm(norm::AbstractNorm, n::Integer) = WeightedNorm(ones(n), norm)
 
 """

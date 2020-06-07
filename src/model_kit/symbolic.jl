@@ -323,7 +323,11 @@ julia> monomials([x,y], 2)
  y ^ 2
 ```
 """
-function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer; affine = false)
+function monomials(
+    vars::AbstractVector{<:Union{Variable,Expression}},
+    d::Integer;
+    affine = false,
+)
     n = length(vars)
     if affine
         pred = x -> sum(x) ≤ d
@@ -341,10 +345,13 @@ function td_order(x, y)
     sy = sum(y)
     sx == sy ? x > y : sx > sy
 end
-function monomials(vars::AbstractVector{<:Union{Variable,Expression}}, D::AbstractVector{<:Integer})
+function monomials(
+    vars::AbstractVector{<:Union{Variable,Expression}},
+    D::AbstractVector{<:Integer},
+)
     D = sort(D; rev = true)
     M = monomials(vars, D[1])
-    for i in 2:length(D)
+    for i = 2:length(D)
         append!(M, monomials(vars, D[i]))
     end
     M

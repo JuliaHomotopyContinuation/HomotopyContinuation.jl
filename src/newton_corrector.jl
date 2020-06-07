@@ -208,7 +208,7 @@ function init_newton!(
     J::Jacobian,
     norm::WeightedNorm;
     a::Float64,
-    extended_precision::Bool = true
+    extended_precision::Bool = true,
 )
     x₂ = x₁ = x̄ # alias to make logic easier
     @unpack a, Δx, r, x_extended = NC
@@ -258,7 +258,7 @@ function init_newton!(
                     ω = ω,
                     μ = a^7 / ω,
                     accurate_μ = true,
-                    extended_precision = extended_precision
+                    extended_precision = extended_precision,
                 )
                 if is_converged(refined_res)
                     valid = true

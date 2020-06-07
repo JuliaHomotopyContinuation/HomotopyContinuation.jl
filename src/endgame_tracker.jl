@@ -231,7 +231,7 @@ function init!(
     t₁::Real;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
-    extended_precision::Bool =false,
+    extended_precision::Bool = false,
 )
     @unpack tracker, state, options = endgame_tracker
 

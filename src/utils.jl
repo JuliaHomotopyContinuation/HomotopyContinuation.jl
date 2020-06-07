@@ -101,7 +101,7 @@ julia> fetch(t)
 ```
 """
 macro tspawnat(thrdid, expr)
-    thunk = esc(:(()->($expr)))
+    thunk = esc(:(() -> ($expr)))
     var = esc(Base.sync_varname)
     tid = esc(thrdid)
     quote
@@ -110,7 +110,7 @@ macro tspawnat(thrdid, expr)
         end
         local task = Task($thunk)
         task.sticky = false
-        ccall(:jl_set_task_tid, Cvoid, (Any, Cint), task, $tid-1)
+        ccall(:jl_set_task_tid, Cvoid, (Any, Cint), task, $tid - 1)
         if $(Expr(:isdefined, var))
             push!($var, task)
         end

@@ -139,10 +139,10 @@ using HomotopyContinuation.ModelKit
             @var x[1:2] a[1:5] c[1:6] y[1:2, 1:5]
 
             #tangential conics
-            f = sum([a; 1] .* monomials([x;1], 2))
+            f = sum([a; 1] .* monomials([x; 1], 2))
             ∇ = differentiate(f, x)
             #5 conics
-            g = sum(c .* monomials([x;1], 2))
+            g = sum(c .* monomials([x; 1], 2))
             ∇_2 = differentiate(g, x)
             #the general system
             #f_a_0 is tangent to g_b₀ at x₀

@@ -39,7 +39,7 @@ end
 Base.size(H::ParameterHomotopy) = size(H.F)
 
 function start_parameters!(H::ParameterHomotopy, p)
-    H.p .= p;
+    H.p .= p
     # void cache
     H.t_cache[] = NaN
     H
