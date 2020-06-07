@@ -178,4 +178,27 @@
         )
         @test nsolutions(R) == 225
     end
+
+    @testset "permutations" begin
+        @var x[1:2] a b c
+        p₁ = x - [2; 0]
+        p₂ = x - [-2; 0]
+        c₁ = p₁[1]^2 + p₁[2]^2 - 1
+        c₂ = p₂[1]^2 + p₂[2]^2 - 1
+
+        F = System([c₁ * c₂; a * x[1] + b * x[2] - c]; parameters = [a,b,c])
+        S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], permutations = true)
+        A = permutations(S)
+        B = permutations(S, reduced = false)
+
+        @test size(A) == (2, 2)
+        @test A == [1 2; 2 1] || A == [2 1; 1 2]
+        @test size(B, 1) == 2
+        @test size(B, 2) > 2
+
+        start_sols = solve(F; target_parameters=[1,1,1], start_system = :total_degree)
+        S = monodromy_solve(F, solutions(start_sols), [1,1,1]; permutations = true)
+        C = permutations(S)
+        @test size(C) == (4, 4)
+    end
 end

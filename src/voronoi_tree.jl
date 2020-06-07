@@ -221,6 +221,11 @@ end
 
 Base.length(T::VoronoiTree) = T.nentries
 Base.broadcastable(T::VoronoiTree) = Ref(T)
+function Base.empty!(tree::VoronoiTree{T,Id}) where {T,Id}
+    tree.root = VTNode(T, Id, size(tree.root.values, 1); capacity = capacity(tree.root))
+    tree.nentries = 0
+    tree
+end
 
 """
     insert!(tree::VoronoiTree, v::AbstractVector, id)

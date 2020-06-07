@@ -1,5 +1,10 @@
 export monodromy_solve,
-    find_start_pair, MonodromyResult, is_success, is_heuristic_stop, parameters
+    find_start_pair,
+    MonodromyResult,
+    is_success,
+    is_heuristic_stop,
+    parameters,
+    permutations
 # verify_solution_completeness,
 # solution_completeness_witnesses,
 # permutations
@@ -41,6 +46,7 @@ Options for [`monodromy_solve`](@ref).
 * `parameter_sampler = independent_normal`: A function taking the parameter `p` and
   returning a new random parameter `q`. By default each entry of the parameter vector
   is drawn independently from Normal distribution.
+* `permutations = false`: Whether to keep track of the permutations induced by the loops.
 * `resuse_loops::Symbol=:all`: Strategy to reuse other loops for new found solutions. `:all`
   propagates a new solution through all other loops, `:random` picks a random loop, `:none`
   doesn't reuse a loop.
@@ -62,6 +68,7 @@ Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     min_solutions::Union{Nothing,Int} = nothing
     max_loops_no_progress::Int = 10
     reuse_loops::Symbol = :all
+    permutations::Bool = false
 end
 
 """
@@ -111,10 +118,11 @@ end
 Base.@kwdef mutable struct MonodromyStatistics
     tracked_loops::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
     tracking_failures::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    generated_loops::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
     # nreal::Threads.Atomic{Int}
     # nparametergenerations::Threads.Atomic{Int}
     solutions::Vector{Int} = Int[]
-    permutations::Vector{Dict{Int,Int}} = Dict{Int,Int}[]
+    permutations::Vector{Vector{Int}} = Vector{Int}[]
 end
 
 MonodromyStatistics(nsolutions::Int) =
@@ -142,9 +150,15 @@ function loop_finished!(stats, nsolutions)
     push!(stats.solutions, nsolutions)
 end
 
-# tracked loops (queued):            232 (850)
-#   solutions in current (last) loop:  3 (2)
-#   generated loops (no change):       2 (0)
+function add_permutation!(stats::MonodromyStatistics, loop_id, start_id, end_id)
+    perms = stats.permutations[loop_id]
+    # ensure that perms has correct length
+    while length(perms) < start_id
+        push!(perms, 0)
+    end
+    perms[start_id] = end_id
+    stats
+end
 
 function solutions_current_loop(stats::MonodromyStatistics, nsolutions)
     nsolutions - stats.solutions[end]
@@ -171,7 +185,7 @@ end
         ),
         (
             "generated loops (no change)",
-            "$(length(stats.solutions)) ($(loops_no_change(stats, solutions)))",
+            "$(stats.generated_loops[]) ($(loops_no_change(stats, solutions)))",
         ),
     ]
 end
@@ -302,7 +316,7 @@ nresults(r::MonodromyResult) = length(r.results)
 
 Return the parameters corresponding to the given result `r`.
 """
-parameters(r::MonodromyResult) = r.parameters
+ModelKit.parameters(r::MonodromyResult) = r.parameters
 
 """
     seed(result::MonodromyResult)
@@ -310,6 +324,57 @@ parameters(r::MonodromyResult) = r.parameters
 Return the random seed used for the computations.
 """
 seed(r::MonodromyResult) = r.seed
+
+
+"""
+    permutations(r::MonodromyResult; reduced=true)
+
+Return the permutations of the solutions that are induced by tracking over the loops. If `reduced=false`, then all permutations are returned. If `reduced=true` then permutations without repetitions are returned.
+
+If a solution was not tracked in the loop, then the corresponding entry is 0.
+
+Example: monodromy loop for a varying line that intersects two circles.
+```julia
+using LinearAlgebra
+@var x[1:2] a b c
+c1 = (x - [2, 0]) ⋅ (x - [2, 0]) - 1
+c2 = (x - [-2, 0]) ⋅ (x - [-2, 0]) - 1
+F = [c1 * c2; a * x[1] + b * x[2] - c]
+S = monodromy_solve(F, [[1, 0]], [1, 1, 1], parameters = [a, b, c], permutations = true)
+
+permutations(S)
+```
+
+will return
+
+```julia
+2×2 Array{Int64,2}:
+ 1  2
+ 2  1
+```
+
+and `permutations(S, reduced = false)` returns
+
+```julia
+2×12 Array{Int64,2}:
+ 1  2  2  1  1  …  1  2  1  1  1
+ 2  1  1  2  2     2  1  2  2  2
+```
+
+"""
+function permutations(r::MonodromyResult; reduced::Bool = true)
+    π = r.statistics.permutations
+    if reduced
+        π = unique(π)
+    end
+    N = nresults(r)
+    A = zeros(Int, N, length(π))
+    for (j, πⱼ) in enumerate(π), i = 1:N
+        A[i, j] = πⱼ[i]
+    end
+
+    A
+end
 
 #####################
 ## monodromy solve ##
@@ -360,7 +425,14 @@ function MonodromySolver(
     )
 end
 
-add_loop!(MS::MonodromySolver, p) = push!(MS.loops, MonodromyLoop(p, MS.options))
+function add_loop!(MS::MonodromySolver, p)
+    push!(MS.loops, MonodromyLoop(p, MS.options))
+    Threads.atomic_add!(MS.statistics.generated_loops, 1)
+    if MS.options.permutations
+        push!(MS.statistics.permutations, zeros(Int, length(MS.unique_points)))
+    end
+    MS
+end
 loop(MS::MonodromySolver, i) = MS.loops[i]
 nloops(MS::MonodromySolver) = length(MS.loops)
 
@@ -494,14 +566,14 @@ function monodromy_solve(
         progress = ProgressMeter.ProgressUnknown(; dt = 0.1, desc = desc)
         progress.tlast += 0.3
     end
+    MS.statistics = MonodromyStatistics()
+    empty!(MS.unique_points)
     results = check_start_solutions(MS, X, p)
-
-    stats = MonodromyStatistics()
     if isempty(results)
         @warn "None of the provided solutions is a valid start solution."
         retcode = :invalid_startvalue
     else
-        retcode = serial_monodromy_solve!(results, MS, p, seed, progress, stats)
+        retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
     end
 
     MonodromyResult(
@@ -509,7 +581,7 @@ function monodromy_solve(
         results,
         p,
         MS.loops,
-        stats,
+        MS.statistics,
         MS.options.equivalence_classes,
         seed,
     )
@@ -544,12 +616,12 @@ function serial_monodromy_solve!(
     p,
     seed,
     progress,
-    stats::MonodromyStatistics,
 )
     queue = LoopTrackingJob[]
     tracker = MS.trackers[1]
     t₀ = time()
     retcode = :in_progress
+    stats = MS.statistics
     while true
         loop_finished!(stats, length(results))
 
@@ -557,9 +629,12 @@ function serial_monodromy_solve!(
             retcode = :heuristic_stop
             @goto _return
         end
+        if length(results) == something(MS.options.target_solutions_count, -1)
+            retcode = :success
+            @goto _return
+        end
 
         add_loop!(MS, p)
-
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -568,9 +643,10 @@ function serial_monodromy_solve!(
 
         while !isempty(queue)
             job = popfirst!(queue)
-            res = track(tracker, solution(results[job.id]), loop(MS, job.loop_id))
+            res = track(tracker, results[job.id], loop(MS, job.loop_id))
             if !isnothing(res)
                 loop_tracked!(stats)
+
                 # 1) check whether solutions already exists
 
                 # we should have a region of uniqueness of 0.5inv(ω) * norm(x)
@@ -587,6 +663,11 @@ function serial_monodromy_solve!(
                     atol = 1e-14,
                     rtol = rtol,
                 )
+
+                if MS.options.permutations
+                    add_permutation!(stats, job.loop_id, job.id, id)
+                end
+
                 got_added || @goto _update
                 # 2) doesn't exist, so add to results
                 push!(results, res)
@@ -609,6 +690,9 @@ function serial_monodromy_solve!(
                 end
             else
                 loop_failed!(stats)
+                if MS.options.permutations
+                    add_permutation!(stats, job.loop_id, job.id, 0)
+                end
             end
             # Update progress
             @label _update
@@ -619,7 +703,10 @@ function serial_monodromy_solve!(
                 queued = length(queue),
             )
 
-            if length(results) == MS.options.target_solutions_count
+            if length(results) == something(MS.options.target_solutions_count, -1) &&
+               # only terminate after a completed loop to ensure that we collect proper
+               # permutation informations
+               !MS.options.permutations
                 retcode = :success
                 @goto _return
             elseif !isnothing(MS.options.timeout) &&
@@ -650,27 +737,45 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(egtracker::EndgameTracker, x, loop::MonodromyLoop)
+function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
     tracker = egtracker.tracker
 
     start_parameters!(tracker, loop.p)
     target_parameters!(tracker, loop.p₁)
-    retcode = track!(tracker, x)
-    is_success(retcode) || return nothing
+    retcode = track!(
+        tracker,
+        solution(r);
+        ω = r.ω,
+        μ = r.μ,
+        extended_precision = r.extended_precision,
+    )
+    if !is_success(retcode)
+        return nothing
+    end
 
     start_parameters!(tracker, loop.p₁)
     target_parameters!(tracker, loop.p₂)
-    retcode = track!(tracker, tracker.state.x)
-    is_success(retcode) || return nothing
+    retcode = track!(
+        tracker,
+        tracker.state.x;
+        ω = tracker.state.ω,
+        μ = tracker.state.μ,
+        extended_precision = tracker.state.extended_prec,
+    )
+    if !is_success(retcode)
+        return nothing
+    end
 
     start_parameters!(tracker, loop.p₂)
     target_parameters!(tracker, loop.p)
-    result = track(egtracker, tracker.state.x)
-    if !is_success(result)
-        return nothing
-    else
-        result
-    end
+    result = track(
+        egtracker,
+        tracker.state.x;
+        ω = tracker.state.ω,
+        μ = tracker.state.μ,
+        extended_precision = tracker.state.extended_prec,
+    )
+    is_success(result) ? result : nothing
 end
 
 update_progress!(progress::Nothing, stats::MonodromyStatistics; kwargs...) = nothing
@@ -691,206 +796,7 @@ function update_progress!(
     end
     nothing
 end
-#
-# # #############
-# # ## Results ##
-# # #############
-# # """
-# #     MonodromyResult
-# #
-# # The monodromy result contains the result of the `monodromy_solve` computation.
-# # """
-# # struct MonodromyResult{T}
-# #     returncode::Symbol
-# #     results::Vector{PathResult}
-# #     parameters::Vector{T}
-# #     statistics::MonodromyStatistics
-# #     equivalence_classes::Bool
-# #     seed::UInt32
-# # end
-# #
-# # Base.iterate(R::MonodromyResult) = iterate(R.results)
-# # Base.iterate(R::MonodromyResult, state) = iterate(R.results, state)
-# #
-# # Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
-# # function Base.show(io::IO, result::MonodromyResult{N,T}) where {N,T}
-# #     println(io, "MonodromyResult")
-# #     println(io, "==================================")
-# #     if result.equivalence_classes
-# #         println(
-# #             io,
-# #             "• ",
-# #             nsolutions(result),
-# #             " classes of solutions (modulo group action) (",
-# #             nreal(result),
-# #             ") real)",
-# #         )
-# #     else
-# #         println(io, "• $(nsolutions(result)) solutions ($(nreal(result)) real)")
-# #     end
-# #     println(io, "• return code → $(result.returncode)")
-# #     println(io, "• $(result.statistics.ntrackedpaths) tracked paths")
-# #     println(io, "• seed → $(result.seed)")
-# # end
-# #
-# #
-# # TreeViews.hastreeview(::MonodromyResult) = true
-# # TreeViews.numberofnodes(::MonodromyResult) = 6
-# # TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
-# #     print(
-# #         io,
-# #         "<span class=\"syntax--support syntax--type syntax--julia\">MonodromyResult</span>",
-# #     )
-# #
-# # function TreeViews.nodelabel(
-# #     io::IO,
-# #     x::MonodromyResult,
-# #     i::Int,
-# #     ::MIME"application/prs.juno.inline",
-# # )
-# #     if i == 1
-# #         if x.equivalence_classes
-# #             print(io, "$(nsolutions(x)) classes of solutions (modulo group action)")
-# #         else
-# #             print(io, "$(nsolutions(x)) solutions")
-# #         end
-# #     elseif i == 2
-# #         if x.equivalence_classes
-# #             print(io, "$(nreal(x)) classes of real solutions")
-# #         else
-# #             print(io, "$(nreal(x)) real solutions")
-# #         end
-# #     elseif i == 3
-# #         print(io, "Return code")
-# #     elseif i == 4
-# #         print(io, "Statistics")
-# #     elseif i == 5
-# #         print(io, "Parameters")
-# #     elseif i == 6
-# #         print(io, "Seed")
-# #     end
-# # end
-# # function TreeViews.treenode(r::MonodromyResult, i::Integer)
-# #     if i == 1
-# #         return r.solutions
-# #     elseif i == 2
-# #         return real_solutions(r)
-# #     elseif i == 3
-# #         return r.returncode
-# #     elseif i == 4
-# #         return r.statistics
-# #     elseif i == 5
-# #         return r.parameters
-# #     elseif i == 6
-# #         return r.seed
-# #     end
-# #     missing
-# # end
-# #≈
-# # """
-# #     solutions(result::MonodromyResult; only_real=false, real_tol=1e-6)
-# #
-# # Return all solutions (as `SVector`s) for which the given conditions apply.
-# #
-# # ## Example
-# # ```julia
-# # real_solutions = solutions(R, only_real=true)
-# # ```
-# # """
-# # function solutions(R::MonodromyResult; kwargs...)
-# #     mapresults(identity, R; kwargs...)
-# # end
-# #
-# # """
-# #     nsolutions(result::MonodromyResult)
-# #
-# # Returns the number solutions of the `result`.
-# # """
-# # nsolutions(res::MonodromyResult) = length(res.solutions)
-# #
-# # """
-# #     real_solutions(res::MonodromyResult; tol=1e-6)
-# #
-# # Returns the solutions of `res` whose imaginary part has norm less than 1e-6.
-# # """
-# # function real_solutions(res::MonodromyResult; tol = 1e-6)
-# #     map(r -> real_vector(r), filter(r -> is_real_vector(r, tol), res.solutions))
-# # end
-# #
-# # """
-# #     nreal(res::MonodromyResult; tol=1e-6)
-# #
-# # Counts how many solutions of `res` have imaginary part norm less than 1e-6.
-# # """
-# # function nreal(res::MonodromyResult; tol = 1e-6)
-# #     count(r -> is_real_vector(r, tol), res.solutions)
-# # end
-# #
-# # """
-# #     parameters(r::MonodromyResult)
-# #
-# # Return the parameters corresponding to the given result `r`.
-# # """
-# # parameters(r::MonodromyResult) = r.parameters
-# #
-# # """
-# #     permutations(r::MonodromyResult; reduced=true)
-# #
-# # Return the permutations of the solutions that are induced by tracking over the loops. If `reduced=false`, then all permutations are returned. If `reduced=true` then permutations without repetitions are returned.
-# #
-# # If a solution was not tracked in the loop, then the corresponding entry is 0.
-# #
-# # Example: monodromy loop for a varying line that intersects two circles.
-# # ```julia
-# # using LinearAlgebra
-# # @polyvar x[1:2] a b c
-# # c1 = (x-[2;0]) ⋅ (x-[2;0]) - 1
-# # c2 = (x-[-2;0]) ⋅ (x-[-2;0]) - 1
-# # F = [c1 * c2; a * x[1] + b * x[2] - c]
-# # S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], parameters = [a;b;c])
-# #
-# # permutations(S)
-# # ```
-# #
-# # will return
-# #
-# # ```julia
-# # 2×2 Array{Int64,2}:
-# #  1  2
-# #  2  1
-# # ```
-# #
-# # and `permutations(S, reduced = false)` returns
-# #
-# # ```julia
-# # 2×12 Array{Int64,2}:
-# #  1  2  2  1  1  …  1  2  1  1  1
-# #  2  1  1  2  2     2  1  2  2  2
-# # ```
-# #
-# # """
-# # function permutations(r::MonodromyResult; reduced = true)
-# #
-# #     π = sort!(collect(r.statistics.permutations), by = first)
-# #     N = length(solutions(r))
-# #     if reduced
-# #         π = unique(map(last, π))
-# #     else
-# #         π = map(last, π)
-# #     end
-# #     A = zeros(Int, N, length(π))
-# #     for (j, πᵢ) in enumerate(π)
-# #         for i = 1:N
-# #             if haskey(πᵢ, i)
-# #                 A[i, j] = πᵢ[i]
-# #             else
-# #                 A[i, j] = 0
-# #             end
-# #         end
-# #     end
-# #
-# #     A
-# # end
+
 # #
 # #
 # # ##################
