@@ -1,7 +1,6 @@
 using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters, Random
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
-using DynamicPolynomials: DynamicPolynomials
 const HC = HomotopyContinuation
 
 
