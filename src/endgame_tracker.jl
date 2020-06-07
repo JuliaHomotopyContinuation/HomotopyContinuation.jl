@@ -231,10 +231,11 @@ function init!(
     t₁::Real;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    extended_precision::Bool =false,
 )
     @unpack tracker, state, options = endgame_tracker
 
-    init!(tracker, x, t₁, 0.0; ω = ω, μ = μ)
+    init!(tracker, x, t₁, 0.0; ω = ω, μ = μ, extended_precision = extended_precision)
 
     state.code = status(tracker)
     init!(state.val)
@@ -632,9 +633,10 @@ function track!(
     t₁::Real;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    extended_precision::Bool = false,
     debug::Bool = false,
 )
-    init!(endgame_tracker, x, t₁; ω = ω, μ = μ)
+    init!(endgame_tracker, x, t₁; ω = ω, μ = μ, extended_precision = extended_precision)
 
     while is_tracking(endgame_tracker.state.code)
         step!(endgame_tracker, debug)

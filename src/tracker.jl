@@ -606,6 +606,7 @@ function init!(
     τ::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
     keep_steps::Bool = false,
+    extended_precision::Bool = false,
 )
     @unpack state, predictor, corrector, homotopy, options = tracker
     @unpack x, x̄, norm, jacobian = state
@@ -875,7 +876,17 @@ function track!(
 end
 
 function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
-    track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ, τ = r.τ)
+    track!(
+        tracker,
+        solution(r),
+        t₁,
+        t₀;
+        debug = debug,
+        ω = r.ω,
+        μ = r.μ,
+        τ = r.τ,
+        extended_precision = r.extended_precision,
+    )
 end
 function track!(
     tracker::Tracker,
