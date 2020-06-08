@@ -43,5 +43,5 @@ function evaluate_and_jacobian!(u, U, F::StartPairSystem, xp, ::Nothing = nothin
     view(U, :, 1:N) .= F.J
 
     fx = (v, q) -> evaluate!(v, F.F, F.x, q)
-    FiniteDiff.finite_difference_jacobian!(view(U, :, N+1:m), fx, F.p, F.fd_cache)
+    FiniteDiff.finite_difference_jacobian!(view(U, :, N+1:N+m), fx, F.p, F.fd_cache)
 end
