@@ -1,4 +1,4 @@
-export GroupActions, UniquePoints, search_in_radius, add!, multiplicities
+export GroupActions, SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities
 
 ################
 # Group actions
@@ -74,6 +74,47 @@ apply_actions(cb, action::GroupActions, s) = _apply_actions(action.actions, s, c
 end
 @inline _apply_actions(::Tuple{}, s, cb) = false
 
+# Implemented group actions
+
+"""
+    SymmetricGroup(n)
+
+Group action of the symmetric group S(n).
+"""
+struct SymmetricGroup
+    permutations::Vector{Vector{Int}}
+end
+SymmetricGroup(N::Int) = SymmetricGroup(permutations(N))
+function permutations(N::Int)
+    s = Vector(1:N)
+    perms = [copy(s)]
+    while true
+        i = N - 1
+        while i >= 1 && s[i] >= s[i+1]
+            i -= 1
+        end
+        if i > 0
+            j = N
+            while j > i && s[i] >= s[j]
+                j -= 1
+            end
+            s[i], s[j] = s[j], s[i]
+            reverse!(s, i + 1)
+        else
+            s[1] = N + 1
+        end
+
+        s[1] > N && break
+        push!(perms, copy(s))
+    end
+    perms
+end
+
+Base.eltype(::Type{SymmetricGroup}) = Vector{Int}
+Base.length(p::SymmetricGroup) = length(p.permutations)
+Base.iterate(p::SymmetricGroup) = iterate(p.permutations)
+Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
+
 
 #############
 # UniquePoints
@@ -114,6 +155,7 @@ length(unique_points) # 1
 struct UniquePoints{T,Id,M,MaybeGA<:Union{Nothing,GroupActions}}
     tree::VoronoiTree{T,Id,M}
     group_actions::MaybeGA
+    zero_vec::Vector{T}
 end
 
 function UniquePoints(
@@ -121,14 +163,14 @@ function UniquePoints(
     id;
     metric = EuclideanNorm(),
     group_action = nothing,
-    group_actions = group_action === nothing ? nothing : GroupActions(group_action),
+    group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
     if !(group_actions isa GroupActions) && !isnothing(group_actions)
         group_actions = GroupActions(group_actions)
     end
 
     tree = VoronoiTree(v, id; metric = metric)
-    UniquePoints(tree, group_actions)
+    UniquePoints(tree, group_actions, zeros(eltype(v), length(v)))
 end
 
 function Base.show(io::IO, UP::UniquePoints)
@@ -138,7 +180,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::UniquePoints) = x
 Base.length(UP::UniquePoints) = length(UP.tree)
 Base.collect(UP::UniquePoints) = collect(UP.tree)
 Base.broadcastable(UP::UniquePoints) = Ref(UP)
-
+Base.empty!(UP::UniquePoints) = (Base.empty!(UP.tree); UP)
 
 """
     search_in_radius(unique_points, v, tol)
@@ -163,11 +205,12 @@ function search_in_radius(UP::UniquePoints{T,Id,M,GA}, v, tol::Real) where {T,Id
 end
 
 """
-    add!(unique_points, v, id, tol)
+    add!(unique_points, v, id; atol = 1e-14, rtol = sqrt(eps()))
+    add!(unique_points, v, id, atol)
 
-Search whether `unique_points` contains a point `p` with distances at most `tol` from `v`.
-If this is the case the identifier of `p` and `false` is returned. Otherwise `(id, true)`
-is returned.
+Search whether `unique_points` contains a point `p` with distances at most
+`max(atol, norm(v)rtol)` from `v`. If this is the case the identifier of `p` and `false` is
+returned. Otherwise `(id, true)` is returned.
 """
 function add!(UP::UniquePoints{T,Id,M,GA}, v, id::Id, tol::Real) where {T,Id,M,GA}
     found_id = search_in_radius(UP.tree, v, tol)
@@ -197,12 +240,23 @@ function add!(UP::UniquePoints{T,Id,M,GA}, v, id::Id, tol::Real) where {T,Id,M,G
         return (found_id::Id, false)
     end
 end
+function add!(
+    UP::UniquePoints{T,Id,M,GA},
+    v,
+    id::Id;
+    atol::Float64 = 1e-14,
+    rtol::Float64 = sqrt(eps()),
+) where {T,Id,M,GA}
+    n = UP.tree.metric(v, UP.zero_vec)
+    rad = max(atol, rtol * n)
+    add!(UP, v, id, rad)
+end
 
 ####################
 ## Multiplicities ##
 ####################
 """
-    multiplicities(vectors; metric = EuclideanNorm(), atol = 0.0, rtol = 1e-8, kwargs...)
+    multiplicities(vectors; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
 Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i`,`j`
 such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
@@ -237,14 +291,11 @@ function _multiplicities(
     rtol::Float64 = 1e-8,
     kwargs...,
 ) where {F<:Function}
-    z = zero(f(first(V)))
-    unique_points = UniquePoints(z, 1; metric = metric, kwargs...)
+    unique_points = UniquePoints(f(first(V)), 1; metric = metric, kwargs...)
     mults = Dict{Int,Vector{Int}}()
     for (i, vᵢ) in enumerate(V)
         wᵢ = f(vᵢ)
-        nᵢ = metric(wᵢ, z)
-        radiusᵢ = max(atol, rtol * nᵢ)
-        k, new_point = add!(unique_points, wᵢ, i, radiusᵢ)
+        k, new_point = add!(unique_points, wᵢ, i; atol = atol, rtol = rtol)
         if !new_point
             if haskey(mults, k)
                 push!(mults[k], i)

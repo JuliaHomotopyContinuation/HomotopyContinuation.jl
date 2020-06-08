@@ -55,6 +55,8 @@ fast_abs(x::Real) = abs(x)
 "Like `min(a,b)`` but ignoring any `NaN` values."
 nanmin(a, b) = isnan(a) ? b : (isnan(b) ? a : min(a, b))
 
+always_false(::Any) = false
+
 """
     unpack(a::Union{Nothing, T}, b::T)
 
@@ -72,15 +74,48 @@ plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
 function print_fieldnames(io::IO, obj)
     println(io, typeof(obj), ":")
     for name in fieldnames(typeof(obj))
-        if getfield(obj, name) !== nothing
-            val = getfield(obj, name)
-            print(io, " • ", name, " → ")
-            if val isa AbstractFloat
-                println(io, round(val; sigdigits = 5))
-            else
-                println(io, val)
-            end
+        print_fieldname(io, obj, name)
+    end
+end
+function print_fieldname(io::IO, obj, name)
+    if getfield(obj, name) !== nothing
+        val = getfield(obj, name)
+        print(io, " • ", name, " → ")
+        if val isa AbstractFloat
+            println(io, round(val; sigdigits = 5))
+        else
+            println(io, val)
         end
+    end
+end
+
+"""
+    @tspawnat tid -> task
+Mimics `Base.Threads.@spawn`, but assigns the task to thread `tid`.
+# Example
+```julia
+julia> t = @tspawnat 4 Threads.threadid()
+Task (runnable) @0x0000000010743c70
+julia> fetch(t)
+4
+```
+"""
+macro tspawnat(thrdid, expr)
+    thunk = esc(:(() -> ($expr)))
+    var = esc(Base.sync_varname)
+    tid = esc(thrdid)
+    quote
+        if $tid < 1 || $tid > Threads.nthreads()
+            throw(AssertionError("@tspawnat thread assignment ($($tid)) must be between 1 and Threads.nthreads() (1:$(Threads.nthreads()))"))
+        end
+        local task = Task($thunk)
+        task.sticky = false
+        ccall(:jl_set_task_tid, Cvoid, (Any, Cint), task, $tid - 1)
+        if $(Expr(:isdefined, var))
+            push!($var, task)
+        end
+        schedule(task)
+        task
     end
 end
 

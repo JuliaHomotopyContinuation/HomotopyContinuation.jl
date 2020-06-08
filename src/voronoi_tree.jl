@@ -36,12 +36,7 @@ function compute_distances!(node, x, metric::M) where {M}
     node.distances
 end
 
-function search_in_radius(
-    node::VTNode{T,Id},
-    x::AbstractVector,
-    tol::Real,
-    metric::M,
-) where {T,Id,M}
+function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,Id,M}
     !isempty(node) || return nothing
 
     n = length(node)
@@ -154,7 +149,7 @@ end
 
 function _insert!(
     node::VTNode{T,Id},
-    v::AbstractVector,
+    v,
     id::Id,
     metric::M;
     use_distances::Bool = false,
@@ -221,6 +216,11 @@ end
 
 Base.length(T::VoronoiTree) = T.nentries
 Base.broadcastable(T::VoronoiTree) = Ref(T)
+function Base.empty!(tree::VoronoiTree{T,Id}) where {T,Id}
+    tree.root = VTNode(T, Id, size(tree.root.values, 1); capacity = capacity(tree.root))
+    tree.nentries = 0
+    tree
+end
 
 """
     insert!(tree::VoronoiTree, v::AbstractVector, id)
@@ -229,7 +229,7 @@ Insert in the tree the point `v` with identifier `id`.
 """
 function Base.insert!(
     tree::VoronoiTree{T,Id},
-    v::AbstractVector,
+    v,
     id::Id;
     use_distances::Bool = false,
 ) where {T,Id}
@@ -244,7 +244,7 @@ end
 Search whether the given `tree` contains a point `p` with distances at most `tol` from `v`.
 Returns `nothing` if no point exists, otherwise the identifier of `p` is returned.
 """
-function search_in_radius(tree::VoronoiTree, v::AbstractVector, tol::Real)
+function search_in_radius(tree::VoronoiTree, v, tol::Real)
     search_in_radius(tree.root, v, tol, tree.metric)
 end
 

@@ -207,14 +207,18 @@ function init_newton!(
     t::Number,
     J::Jacobian,
     norm::WeightedNorm;
-    a::Float64 = throw(UndefKeywordError(:a)),
+    a::Float64,
+    extended_precision::Bool = true,
 )
     x₂ = x₁ = x̄ # alias to make logic easier
-    @unpack a, Δx, r = NC
+    @unpack a, Δx, r, x_extended = NC
 
     evaluate_and_jacobian!(r, matrix(J), H, x₀, t)
+    if extended_precision
+        x_extended .= x₀
+        evaluate!(r, H, x_extended, t)
+    end
     LA.ldiv!(Δx, updated!(J), r, norm)
-
     v = norm(Δx) + eps()
     valid = false
     ω = μ = NaN
@@ -223,10 +227,19 @@ function init_newton!(
         x̄ .= x₀ .+ ε .* weights(norm)
 
         evaluate_and_jacobian!(r, matrix(J), H, x̄, t)
+        if extended_precision
+            x_extended .= x̄
+            evaluate!(r, H, x_extended, t)
+        end
         LA.ldiv!(Δx, updated!(J), r, norm)
         x₁ .= x̄ .- Δx
         norm_Δx₀ = norm(Δx)
-        evaluate!(r, H, x₁, t)
+        if extended_precision
+            x_extended .= x₁
+            evaluate!(r, H, x_extended, t)
+        else
+            evaluate!(r, H, x₁, t)
+        end
         LA.ldiv!(Δx, J, r, norm)
         x₂ .= x₁ .- Δx
         norm_Δx₁ = norm(Δx) + eps()
@@ -245,6 +258,7 @@ function init_newton!(
                     ω = ω,
                     μ = a^7 / ω,
                     accurate_μ = true,
+                    extended_precision = extended_precision,
                 )
                 if is_converged(refined_res)
                     valid = true

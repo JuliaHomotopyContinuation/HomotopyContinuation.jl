@@ -76,6 +76,7 @@ import Base: @propagate_inbounds
 @propagate_inbounds Base.copyto!(MW::MatrixWorkspace, A::AbstractArray) = copyto!(MW.A, A)
 
 matrix(M::MatrixWorkspace) = M.A
+matrix(M::AbstractMatrix) = M
 
 """
     updated!(MW::MatrixWorkspace)
@@ -93,13 +94,14 @@ function updated!(MW::MatrixWorkspace)
     end
     MW
 end
+updated!(M::AbstractMatrix) = M
 
 """
     update!(MW::MatrixWorkspace, A::Matrix)
 
 Update the matrix in `MW` with `A`.
 """
-@inline function update!(MW::MatrixWorkspace, A::Matrix)
+@inline function update!(MW::AbstractMatrix, A::Matrix)
     @boundscheck (size(MW.A) == size(A) || throw(ArgumentError("Matrix of invalid size.")))
     @inbounds copyto!(MW.A, A)
     updated!(MW)

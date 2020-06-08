@@ -4,6 +4,7 @@ export ModelKit
 
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
+import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
 import MixedSubdivisions
@@ -50,5 +51,6 @@ include("polyhedral.jl")
 include("overdetermined.jl")
 include("solve.jl")
 include("result.jl")
+include("monodromy.jl")
 
 end

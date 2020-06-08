@@ -26,16 +26,16 @@ Compute the norm ||u|| with respect to the given norm `norm`.
 """
 LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, norm))
 
-(N::AbstractNorm)(x::AbstractVector) = norm(x, N)
-(N::AbstractNorm)(x::AbstractVector, y::AbstractVector) = distance(x, y, N)
+(N::AbstractNorm)(x) = norm(x, N)
+(N::AbstractNorm)(x, y) = distance(x, y, N)
 
 ##################
 ## WeightedNorm ##
 ##################
 
 Base.@kwdef struct WeightedNormOptions
-    scale_min::Float64 = sqrt(eps())
-    scale_abs_min::Float64 = min(scale_min^2, sqrt(eps()))
+    scale_min::Float64 = 1e-4
+    scale_abs_min::Float64 = 1e-6
     scale_max::Float64 = exp2(div(1023, 2))
 end
 
@@ -69,17 +69,13 @@ struct WeightedNorm{N<:AbstractNorm} <: AbstractNorm
 end
 function WeightedNorm(
     weights::Vector{Float64},
-    norm::AbstractNorm;
-    scale_min = sqrt(eps()),
-    scale_abs_min = min(scale_min^2, sqrt(eps())),
-    scale_max = exp2(div(1023, 2)),
+    norm::AbstractNorm,
+    opts = WeightedNormOptions(),
 )
-    opts = WeightedNormOptions(scale_min, scale_abs_min, scale_max)
     WeightedNorm(weights, norm, opts)
 end
-WeightedNorm(norm::AbstractNorm, x::AbstractVector; opts...) =
-    WeightedNorm(norm, length(x); opts...)
-WeightedNorm(norm::AbstractNorm, n::Integer; opts...) = WeightedNorm(ones(n), norm; opts...)
+WeightedNorm(norm::AbstractNorm, x::AbstractVector) = WeightedNorm(norm, length(x))
+WeightedNorm(norm::AbstractNorm, n::Integer) = WeightedNorm(ones(n), norm)
 
 """
     weights(WN::WeightedNorm)
@@ -101,7 +97,7 @@ Base.copyto!(WN::WeightedNorm, x) = copyto!(WN.weights, x)
 
 Setup the weighted norm `w` for `x`.
 """
-function init!(w::WeightedNorm, x::AbstractVector)
+function init!(w::WeightedNorm, x)
     point_norm = w.norm(x)
     for i = 1:length(w)
         wᵢ = fast_abs(x[i])
@@ -114,18 +110,17 @@ function init!(w::WeightedNorm, x::AbstractVector)
     end
     w
 end
-init!(n::AbstractNorm, ::AbstractVector) = n
+init!(n::AbstractNorm, ::Any) = n
 
 """
-    update!(w::WeightedNorm, x::AbstractVector)
+    update!(w::WeightedNorm, x)
 
 Update the weighted norm `w` for `x`, this will interpolate between the previous weights
 and the norm of `x`.
 """
-function update!(w::WeightedNorm, x::AbstractVector)
+function update!(w::WeightedNorm, x)
     norm_x = w(x)
     for i = 1:length(x)
-        # wᵢ = fast_abs(x[i])#
         wᵢ = (fast_abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
@@ -138,7 +133,7 @@ function update!(w::WeightedNorm, x::AbstractVector)
     end
     w
 end
-update!(n::AbstractNorm, ::AbstractVector) = n
+update!(n::AbstractNorm, ::Any) = n
 
 
 ####################
@@ -151,7 +146,7 @@ The infinity or [maximum norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#
 """
 struct InfNorm <: AbstractNorm end
 
-function distance(x::AbstractVector, y::AbstractVector, ::InfNorm)
+function distance(x, y, ::InfNorm)
     n = length(x)
     @boundscheck n == length(y)
     @inbounds dmax = abs2(x[1] - y[1])
@@ -171,10 +166,10 @@ function distance(x::AbstractVector, y::AbstractVector, ::InfNorm)
         return d
     end
 end
-function distance(x::AbstractVector, y::AbstractVector, w::WeightedNorm{InfNorm})
+function distance(x, y, w::WeightedNorm{InfNorm})
     inf_distance(x, y, weights(w))
 end
-function inf_distance(x::AbstractVector, y::AbstractVector, w::AbstractVector)
+function inf_distance(x, y, w)
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2((x[1] - y[1]) / w[1])
@@ -195,7 +190,7 @@ function inf_distance(x::AbstractVector, y::AbstractVector, w::AbstractVector)
     end
 end
 
-function norm(x::AbstractVector, ::InfNorm)
+function norm(x, ::InfNorm)
     n = length(x)
     @inbounds dmax = abs2(x[1])
     for i = 2:n
@@ -215,7 +210,7 @@ function norm(x::AbstractVector, ::InfNorm)
         return d
     end
 end
-function norm(x::AbstractVector, w::WeightedNorm{InfNorm})
+function norm(x, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2(x[1] / w[1])
@@ -244,7 +239,7 @@ The Euclidean resp. 2-norm.
 """
 struct EuclideanNorm <: AbstractNorm end
 
-@inline function distance(x::AbstractVector, y::AbstractVector, ::EuclideanNorm)
+@inline function distance(x, y, ::EuclideanNorm)
     n = length(x)
     @boundscheck n == length(y)
     @inbounds d = abs2(x[1] - y[1])
@@ -253,7 +248,7 @@ struct EuclideanNorm <: AbstractNorm end
     end
     sqrt(d)
 end
-@inline function norm(x::AbstractVector, ::EuclideanNorm)
+@inline function norm(x, ::EuclideanNorm)
     n = length(x)
     @inbounds d = abs2(x[1])
     for i = 2:n

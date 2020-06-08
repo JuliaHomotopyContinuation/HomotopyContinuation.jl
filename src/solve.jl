@@ -228,8 +228,6 @@ function solver_startsolutions(
     Solver(EndgameTracker(H); seed = seed), starts
 end
 
-always_false(x) = false
-
 """
     solve(f; options...)
     solve(f, start_solutions; start_parameters, target_parameters, options...)
@@ -395,7 +393,7 @@ track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
     barlen = min(ProgressMeter.tty_width(desc), 40)
-    progress = ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen)
+    progress = ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen)
     progress.tlast += delay
     progress
 end
@@ -460,8 +458,8 @@ function threaded_solve(
     finished = Threads.Atomic{Int}(0)
     try
         Threads.resize_nthreads!(solver.trackers)
-        tasks = map(solver.trackers) do tracker
-            Threads.@spawn begin
+        tasks = map(enumerate(solver.trackers)) do (i, tracker)
+            @tspawnat i begin
                 while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
                     r = track(tracker, S[k]; path_number = k)
                     path_results[k] = r

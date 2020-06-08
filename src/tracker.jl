@@ -606,6 +606,7 @@ function init!(
     τ::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
     keep_steps::Bool = false,
+    extended_precision::Bool = false,
 )
     @unpack state, predictor, corrector, homotopy, options = tracker
     @unpack x, x̄, norm, jacobian = state
@@ -616,7 +617,7 @@ function init!(
     state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
-    state.used_extended_prec = state.extended_prec = state.keep_extended_prec = false
+    state.keep_extended_prec = false
     state.use_strict_β_τ = false
     init!(norm, x)
     init!(jacobian)
@@ -630,19 +631,43 @@ function init!(
     t = state.t
     if isnan(ω) || isnan(μ)
         a = options.parameters.a
-        valid, ω, μ = init_newton!(x̄, corrector, homotopy, x, t, jacobian, norm; a = a)
+        valid, ω, μ = init_newton!(
+            x̄,
+            corrector,
+            homotopy,
+            x,
+            t,
+            jacobian,
+            norm;
+            a = a,
+            extended_precision = extended_precision,
+        )
+        if !valid && !extended_precision
+            extended_precision = true
+            valid, ω, μ = init_newton!(
+                x̄,
+                corrector,
+                homotopy,
+                x,
+                t,
+                jacobian,
+                norm;
+                a = a,
+                extended_precision = true,
+            )
+        end
     else
         valid = true
     end
+    state.used_extended_prec = state.extended_prec = extended_precision
+
     if !isnan(ω)
         state.ω = ω
     end
     if valid
         state.accuracy = μ
         state.μ = max(μ, eps())
-    end
-
-    if !valid
+    else
         state.code = TrackerCode.terminated_invalid_startvalue
         return false
     end
@@ -824,6 +849,7 @@ function track!(
     t₀ = 0.0;
     ω::Float64 = NaN,
     μ::Float64 = NaN,
+    extended_precision::Bool = false,
     τ::Float64 = Inf,
     keep_steps::Bool = false,
     max_initial_step_size::Float64 = Inf,
@@ -836,6 +862,7 @@ function track!(
         t₀;
         ω = ω,
         μ = μ,
+        extended_precision = extended_precision,
         τ = τ,
         keep_steps = keep_steps,
         max_initial_step_size = max_initial_step_size,
@@ -849,7 +876,17 @@ function track!(
 end
 
 function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
-    track!(tracker, solution(r), t₁, t₀; debug = debug, ω = r.ω, μ = r.μ, τ = r.τ)
+    track!(
+        tracker,
+        solution(r),
+        t₁,
+        t₀;
+        debug = debug,
+        ω = r.ω,
+        μ = r.μ,
+        τ = r.τ,
+        extended_precision = r.extended_precision,
+    )
 end
 function track!(
     tracker::Tracker,

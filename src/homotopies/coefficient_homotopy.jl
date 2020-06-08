@@ -69,8 +69,18 @@ end
 
 Base.size(H::CoefficientHomotopy) = size(H.F)
 
-start_parameters!(H::CoefficientHomotopy, p::AbstractVector) = (H.start_coeffs .= p; H)
-target_parameters!(H::CoefficientHomotopy, p::AbstractVector) = (H.target_coeffs .= p; H)
+function start_parameters!(H::CoefficientHomotopy, p::AbstractVector)
+    H.t_cache[] = NaN
+    H.t_taylor_cache[] = NaN
+    H.start_coeffs .= p
+    H
+end
+function target_parameters!(H::CoefficientHomotopy, p::AbstractVector)
+    H.t_cache[] = NaN
+    H.t_taylor_cache[] = NaN
+    H.target_coeffs .= p
+    H
+end
 
 function coeffs!(H::CoefficientHomotopy, t)
     t == H.t_cache[] && return H.coeffs

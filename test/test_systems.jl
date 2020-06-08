@@ -789,15 +789,94 @@ function fano_quintic()
     n = 4
     @var x[1:n]
 
-    ν = monomials(x, 5)
-    N = length(ν)
-
-    @var q[1:N-1]
-    F = sum(q[i] * ν[i] for i = 1:N-1) + 1
-
+    F, q = dense_poly(x, 5; coeff_name = :q)
+    F = F(q[end] => 1)
+    q = q[1:end-1]
     @var a[1:n-1] b[1:n-1] t
     L = [a; 1] .* t + [b; 0]
     FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))
     sys = System(ModelKit.horner.(FcapL), [a; b], q)
     sys, q₀, gamma
+end
+
+
+function steiner()
+    @var x[1:2] a[1:5] c[1:6] y[1:2, 1:5]
+
+    #tangential conics
+    f = a[1] * x[1]^2 + a[2] * x[1] * x[2] + a[3] * x[2]^2 + a[4] * x[1] + a[5] * x[2] + 1
+    ∇ = differentiate(f, x)
+    #5 conics
+    g =
+        c[1] * x[1]^2 +
+        c[2] * x[1] * x[2] +
+        c[3] * x[2]^2 +
+        c[4] * x[1] +
+        c[5] * x[2] +
+        c[6]
+    ∇_2 = differentiate(g, x)
+    #the general system
+    #f_a_0 is tangent to g_b₀ at x₀
+    function Incidence(f, a₀, g, b₀, x₀)
+        fᵢ = f(x => x₀, a => a₀)
+        ∇ᵢ = ∇(x => x₀, a => a₀)
+        Cᵢ = g(x => x₀, c => b₀)
+        ∇_Cᵢ = ∇_2(x => x₀, c => b₀)
+        [fᵢ; Cᵢ; det([∇ᵢ ∇_Cᵢ])]
+    end
+    @var v[1:6, 1:5]
+    F = vcat(map(i -> Incidence(f, a, g, v[:, i], y[:, i]), 1:5)...)
+    System(F, [a; vec(y)], vec(v))
+end
+
+
+function moments3()
+    @var a[1:3] x[1:3] s[1:3] m[0:8]
+
+    f0 = a[1] + a[2] + a[3]
+    f1 = a[1] * x[1] + a[2] * x[2] + a[3] * x[3]
+    f2 = a[1] * (x[1]^2 + s[1]) + a[2] * (x[2]^2 + s[2]) + a[3] * (x[3]^2 + s[3])
+    f3 =
+        a[1] * (x[1]^3 + 3 * s[1] * x[1]) +
+        a[2] * (x[2]^3 + 3 * s[2] * x[2]) +
+        a[3] * (x[3]^3 + 3 * s[3] * x[3])
+    f4 =
+        a[1] * (x[1]^4 + 6 * s[1] * x[1]^2 + 3 * s[1]^2) +
+        a[2] * (x[2]^4 + 6 * s[2] * x[2]^2 + 3 * s[2]^2) +
+        a[3] * (x[3]^4 + 6 * s[3] * x[3]^2 + 3 * s[3]^2)
+    f5 =
+        a[1] * (x[1]^5 + 10 * s[1] * x[1]^3 + 15 * x[1] * s[1]^2) +
+        a[2] * (x[2]^5 + 10 * s[2] * x[2]^3 + 15 * x[2] * s[2]^2) +
+        a[3] * (x[3]^5 + 10 * s[3] * x[3]^3 + 15 * x[3] * s[3]^2)
+    f6 =
+        a[1] * (x[1]^6 + 15 * s[1] * x[1]^4 + 45 * x[1]^2 * s[1]^2 + 15 * s[1]^3) +
+        a[2] * (x[2]^6 + 15 * s[2] * x[2]^4 + 45 * x[2]^2 * s[2]^2 + 15 * s[2]^3) +
+        a[3] * (x[3]^6 + 15 * s[3] * x[3]^4 + 45 * x[3]^2 * s[3]^2 + 15 * s[3]^3)
+    f7 =
+        a[1] * (x[1]^7 + 21 * s[1] * x[1]^5 + 105 * x[1]^3 * s[1]^2 + 105 * x[1] * s[1]^3) +
+        a[2] * (x[2]^7 + 21 * s[2] * x[2]^5 + 105 * x[2]^3 * s[2]^2 + 105 * x[2] * s[2]^3) +
+        a[3] * (x[3]^7 + 21 * s[3] * x[3]^5 + 105 * x[3]^3 * s[3]^2 + 105 * x[3] * s[3]^3)
+    f8 =
+        a[1] * (
+            x[1]^8 +
+            28 * s[1] * x[1]^6 +
+            210 * x[1]^4 * s[1]^2 +
+            420 * x[1]^2 * s[1]^3 +
+            105 * s[1]^4
+        ) +
+        a[2] * (
+            x[2]^8 +
+            28 * s[2] * x[2]^6 +
+            210 * x[2]^4 * s[2]^2 +
+            420 * x[2]^2 * s[2]^3 +
+            105 * s[2]^4
+        ) +
+        a[3] * (
+            x[3]^8 +
+            28 * s[3] * x[3]^6 +
+            210 * x[3]^4 * s[3]^2 +
+            420 * x[3]^2 * s[3]^3 +
+            105 * s[3]^4
+        )
+    System([f0, f1, f2, f3, f4, f5, f6, f7, f8] - m, parameters = m)
 end
