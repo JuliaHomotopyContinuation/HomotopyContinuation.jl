@@ -70,9 +70,6 @@
         result = monodromy_solve(F, x₀, p₀, distance = (x, y) -> 0.0)
         @test length(solutions(result)) == 1
 
-        # Test stop heuristic using too high target_solutions_count
-        result = monodromy_solve(F, x₀, p₀, target_solutions_count = 25)
-        @test is_heuristic_stop(result)
         # Test stop heuristic with no target solutions count
         result = monodromy_solve(F, x₀, p₀)
         @test is_heuristic_stop(result)
