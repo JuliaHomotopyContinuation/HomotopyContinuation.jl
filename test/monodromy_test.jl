@@ -70,9 +70,6 @@
         result = monodromy_solve(F, x₀, p₀, distance = (x, y) -> 0.0)
         @test length(solutions(result)) == 1
 
-        # Test stop heuristic using too high target_solutions_count
-        result = monodromy_solve(F, x₀, p₀, target_solutions_count = 25)
-        @test is_heuristic_stop(result)
         # Test stop heuristic with no target solutions count
         result = monodromy_solve(F, x₀, p₀)
         @test is_heuristic_stop(result)
@@ -182,6 +179,41 @@
             )
             @test nsolutions(R) == 225
         end
+    end
+
+    @testset "Projective + Group Actions" begin
+        @var a[1:2] x[1:2] s[1:2] z m[0:5]
+
+        f0 = a[1] + a[2]
+        f1 = a[1] * x[1] + a[2] * x[2]
+        f2 = a[1] * (x[1]^2 + s[1] * z) + a[2] * (x[2]^2 + s[2] * z)
+        f3 = a[1] * (x[1]^3 + 3 * s[1] * x[1] * z) + a[2] * (x[2]^3 + 3 * s[2] * x[2] * z)
+        f4 =
+            a[1] * (x[1]^4 + 6 * s[1] * x[1]^2 * z + 3 * s[1]^2 * z^2) +
+            a[2] * (x[2]^4 + 6 * s[2] * x[2]^2 * z + 3 * s[2]^2 * z^2)
+        f5 =
+            a[1] * (x[1]^5 + 10 * s[1] * x[1]^3 * z + 15 * x[1] * s[1]^2 * z^2) +
+            a[2] * (x[2]^5 + 10 * s[2] * x[2]^3 * z + 15 * x[2] * s[2]^2 * z^2)
+
+        M2 = System(
+            [f0, f1, f2, f3, f4, f5] - m .* z .^ (1:6),
+            variables = [a; x; s; z],
+            parameters = m,
+        )
+
+        relabeling = let S₂ = SymmetricGroup(2)
+            v -> map(p -> [v[1:2][p]..., v[3:4][p]..., v[5:6][p]..., v[7]], S₂)
+        end
+
+        R = monodromy_solve(
+            M2;
+            group_action = relabeling,
+            show_progress = false,
+            threading = false,
+            max_loops_no_progress = 10,
+        )
+
+        @test nsolutions(R) == 9
     end
 
     @testset "permutations" begin

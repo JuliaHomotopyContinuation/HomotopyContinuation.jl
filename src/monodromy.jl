@@ -409,6 +409,12 @@ function MonodromySolver(
     trackers = [egtracker]
     group_actions = options.equivalence_classes ? options.group_actions : nothing
     x₀ = zeros(ComplexF64, size(F, 2))
+    if !isnothing(group_actions) && (egtracker.tracker.homotopy isa AffineChartHomotopy)
+        group_actions = let H = egtracker.tracker.homotopy, group_actions = group_actions
+            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 1)), group_actions, s)
+        end
+    end
+
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
     statistics = MonodromyStatistics()
@@ -452,9 +458,10 @@ function monodromy_solve(
     args...;
     parameters,
     variables = setdiff(MP.variables(F), parameters),
+    variable_ordering = variables,
     kwargs...,
 )
-    sys = System(F, variables = variables, parameters = parameters)
+    sys = System(F, variables = variable_ordering, parameters = parameters)
     monodromy_solve(sys, args...; kwargs...)
 end
 function monodromy_solve(
@@ -627,7 +634,8 @@ function serial_monodromy_solve!(
     while true
         loop_finished!(stats, length(results))
 
-        if loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
+        if isnothing(MS.options.target_solutions_count) &&
+           loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
             retcode = :heuristic_stop
             @goto _return
         end

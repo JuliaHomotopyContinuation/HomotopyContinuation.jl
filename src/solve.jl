@@ -44,12 +44,13 @@ function solver_startsolutions(
     starts = nothing;
     parameters = Variable[],
     variables = setdiff(variables(F), parameters),
+    variable_ordering = variables,
     variable_groups = nothing,
     kwargs...,
 )
     sys = System(
         F,
-        variables = variables,
+        variables = variable_ordering,
         parameters = parameters,
         variable_groups = variable_groups,
     )
@@ -71,13 +72,13 @@ function solver_startsolutions(
     if isnothing(target_parameters) && isempty(parameters)
         sys, target_parameters = ModelKit.system_with_coefficents_as_params(
             F,
-            variables = variables,
+            variables = variable_ordering,
             variable_groups = variable_groups,
         )
     else
         sys = System(
             F,
-            variables = variables,
+            variables = variable_ordering,
             parameters = parameters,
             variable_groups = variable_groups,
         )
@@ -412,7 +413,7 @@ end
     (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular[]) ($(stats.regular_real[]))"),
-        ("# singular solutions (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
+        ("# singular endpoints (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
         ("# total solutions (real)", "$(nsols[]) ($(nreal[]))"),
     )
 end

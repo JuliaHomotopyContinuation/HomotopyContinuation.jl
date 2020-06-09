@@ -74,6 +74,8 @@ apply_actions(cb, action::GroupActions, s) = _apply_actions(action.actions, s, c
 end
 @inline _apply_actions(::Tuple{}, s, cb) = false
 
+apply_actions(cb::G, actions::F, s) where {G,F} = actions(cb, s)
+
 # Implemented group actions
 
 """
@@ -152,7 +154,7 @@ HC.add!.(unique_points, X, 1:length(X), 1e-5)
 length(unique_points) # 1
 ```
 """
-struct UniquePoints{T,Id,M,MaybeGA<:Union{Nothing,GroupActions}}
+struct UniquePoints{T,Id,M,MaybeGA}
     tree::VoronoiTree{T,Id,M}
     group_actions::MaybeGA
     zero_vec::Vector{T}
@@ -165,7 +167,7 @@ function UniquePoints(
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
-    if !(group_actions isa GroupActions) && !isnothing(group_actions)
+    if (group_actions isa Tuple) || (group_actions isa AbstractVector)
         group_actions = GroupActions(group_actions)
     end
 

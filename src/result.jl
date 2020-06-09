@@ -463,7 +463,7 @@ function TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inli
     )
 end
 TreeViews.hastreeview(::Result) = true
-TreeViews.numberofnodes(::Result) = 9
+TreeViews.numberofnodes(::Result) = 10
 function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
     s = statistics(x)
     if i == 1
@@ -474,15 +474,17 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.singular) singular ($(s.real_singular) real)")
     elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
         print(io, "$(s.real_nonsingular+s.real_singular) real")
-    elseif i == 5 && s.at_infinity > 0
+    elseif i == 5 && s.excess_solution > 0
+        print(io, "$(s.excess_solution) excess $(plural("solution", s.excess_solution))")
+    elseif i == 6 && s.at_infinity > 0
         print(io, "$(s.at_infinity) at_infinity")
-    elseif i == 6 && s.failed > 0
+    elseif i == 7 && s.failed > 0
         print(io, "$(s.failed) failed")
-    elseif i == 7
-        print(io, "Random seed used")
     elseif i == 8
+        print(io, "Random seed used")
+    elseif i == 9
         print(io, "start_system")
-    elseif i == 9 && s.singular > 0
+    elseif i == 10 && s.singular > 0
         print(io, "  multiplicity table of singular solutions: \n")
         singular_multiplicities_table(io, x, s)
     end
@@ -498,15 +500,17 @@ function TreeViews.treenode(r::Result, i::Integer)
         return results(r, only_singular = true)
     elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
         return results(r, only_real = true)
-    elseif i == 5 && s.at_infinity > 0
+    elseif i == 5 && s.excess_solution > 0
+        return filter(is_excess_solution, path_results(r))
+    elseif i == 6 && s.at_infinity > 0
         return at_infinity(r)
-    elseif i == 6 && s.failed > 0
+    elseif i == 7 && s.failed > 0
         return failed(r)
-    elseif i == 7
-        return seed(r)
     elseif i == 8
+        return seed(r)
+    elseif i == 9
         return something(r.start_system, missing)
-    elseif i == 9 && s.singular > 0
+    elseif i == 10 && s.singular > 0
         return missing
     end
     missing
