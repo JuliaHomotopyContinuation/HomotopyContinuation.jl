@@ -47,16 +47,26 @@ const IntrinsicStiefel = Coordinates{:IntrinsicStiefel}()
 const ExtrinsicStiefel = Coordinates{:ExtrinsicStiefel}()
 
 """
-    AffineExtrinsic
+    AffineExtrinsic(A, b)
 
 Extrinsic description of an ``m``-dimensional affine subspace ``L`` in ``n``-dimensional space.
 That is ``L = \\{ x | A x = b \\}``.
+Note that internally `A` and `b` will be stored such that the rows of `A` are orthonormal.
 """
 struct AffineExtrinsic{T}
     A::Matrix{T}
     b::Vector{T}
 end
 (A::AffineExtrinsic)(x::AbstractVector) = A.A * x - A.b
+
+function AffineExtrinsic(A::Matrix{T}, b::Vector{T}; orthonormal::Bool = false) where {T}
+    if orthonormal
+        AffineExtrinsic{T}(A, b)
+    else
+        svd = LA.svd(A)
+        AffineExtrinsic{T}(svd.Vt, (inv.(svd.S) .* (svd.U' * b)))
+    end
+end
 
 """
     dim(A::AffineExtrinsic)
@@ -78,7 +88,7 @@ function Base.copy!(A::AffineExtrinsic, B::AffineExtrinsic)
     copy!(A.b, B.b)
     A
 end
-Base.copy(A::AffineExtrinsic) = AffineExtrinsic(copy(A.A), copy(A.b))
+Base.copy(A::AffineExtrinsic) = AffineExtrinsic(copy(A.A), copy(A.b); orthonormal = true)
 
 function Base.show(io::IO, A::AffineExtrinsic{T}) where {T}
     println(io, "AffineExtrinsic{$T}:")
@@ -168,7 +178,7 @@ function AffineExtrinsic(I::AffineIntrinsic)
     m, n = size(I.A)
     A = Matrix((@view svd.U[:, n+1:end])')
     b = A * I.b₀
-    AffineExtrinsic(A, b)
+    AffineExtrinsic(A, b; orthonormal = true)
 end
 
 """
