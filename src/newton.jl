@@ -86,7 +86,7 @@ This is useful if the method is called repeatedly.
 * `extended_precision::Bool = false`: An optional use of extended precision for the evaluation
   of `F(x)`. This can increase the achievable accuracy.
 * `contraction_factor::Float64 = 1.0`: The Newton updates have to satisfy
-  ``|xᵢ₊₁ - xᵢ| < a^{2^(i-1)}|x₁ - x₀|`` for ``i ≥ 1`` where ``a`` is `contraction_factor`.
+  ``|xᵢ₊₁ - xᵢ| < a^{2^{i-1}}|x₁ - x₀|`` for ``i ≥ 1`` where ``a`` is `contraction_factor`.
 * `min_contraction_iters::Int = typemax(Int)`:  The minimal number of iterations the
   `contraction_factor` has to be satisfied. If after `min_contraction_iters` many
   iterations the contraction factor is not satisfied the step is accepted anyway.
