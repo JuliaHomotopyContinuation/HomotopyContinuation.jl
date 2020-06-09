@@ -74,7 +74,7 @@ apply_actions(cb, action::GroupActions, s) = _apply_actions(action.actions, s, c
 end
 @inline _apply_actions(::Tuple{}, s, cb) = false
 
-apply_actions(cb::G, actions::F, s) where {G, F} = actions(cb, s)
+apply_actions(cb::G, actions::F, s) where {G,F} = actions(cb, s)
 
 # Implemented group actions
 
