@@ -452,9 +452,10 @@ function monodromy_solve(
     args...;
     parameters,
     variables = setdiff(MP.variables(F), parameters),
+    variable_ordering = variables,
     kwargs...,
 )
-    sys = System(F, variables = variables, parameters = parameters)
+    sys = System(F, variables = variable_ordering, parameters = parameters)
     monodromy_solve(sys, args...; kwargs...)
 end
 function monodromy_solve(
@@ -627,7 +628,8 @@ function serial_monodromy_solve!(
     while true
         loop_finished!(stats, length(results))
 
-        if loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
+        if isnothing(MS.options.target_solutions_count) &&
+           loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
             retcode = :heuristic_stop
             @goto _return
         end
