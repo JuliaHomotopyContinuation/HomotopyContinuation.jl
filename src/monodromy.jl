@@ -409,6 +409,12 @@ function MonodromySolver(
     trackers = [egtracker]
     group_actions = options.equivalence_classes ? options.group_actions : nothing
     x₀ = zeros(ComplexF64, size(F, 2))
+    if !isnothing(group_actions) && (egtracker.tracker.homotopy isa AffineChartHomotopy)
+        group_actions = let H = egtracker.tracker.homotopy, group_actions = group_actions
+            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 1)), group_actions, s)
+        end
+    end
+
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
     statistics = MonodromyStatistics()
