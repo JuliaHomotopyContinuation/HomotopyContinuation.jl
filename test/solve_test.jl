@@ -132,8 +132,9 @@
 
     @testset "overdetermined" begin
         @testset "3 by 5 minors" begin
-            res = track.(total_degree(minors())...)
+            res = solve(minors(); start_system = :total_degree)
             @test count(is_success, res) == 80
+            @test count(is_excess_solution, res) == 136
         end
     end
 
