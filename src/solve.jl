@@ -413,7 +413,7 @@ end
     (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular[]) ($(stats.regular_real[]))"),
-        ("# singular solutions (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
+        ("# singular endpoints (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
         ("# total solutions (real)", "$(nsols[]) ($(nreal[]))"),
     )
 end
