@@ -86,6 +86,7 @@ weights(WN::WeightedNorm) = WN.weights
 
 Base.length(WN::WeightedNorm) = length(WN.weights)
 Base.size(WN::WeightedNorm) = (length(WN),)
+Base.ndims(::Type{<:WeightedNorm}) = 1
 Base.copyto!(WN::WeightedNorm, x) = copyto!(WN.weights, x)
 @propagate_inbounds Base.getindex(WN::WeightedNorm, i::Integer) = getindex(WN.weights, i)
 @propagate_inbounds Base.setindex!(WN::WeightedNorm, x, i::Integer) =
