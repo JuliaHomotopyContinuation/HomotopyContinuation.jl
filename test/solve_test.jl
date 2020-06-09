@@ -334,11 +334,23 @@
         res = solve(
             F,
             [s];
+            variables = [x, y],
             parameters = [a, b],
             start_parameters = [1, 0],
             target_parameters = [2, 4],
         )
         @test nsolutions(res) == 1
+        res2 = solve(
+            F,
+            [s];
+            variable_ordering = [y, x],
+            parameters = [a, b],
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
+        s = solutions(res)[1]
+        s2 = solutions(res2)[1]
+        @test s ≈ [s2[2], s2[1]]
     end
 
     @testset "change parameters" begin
