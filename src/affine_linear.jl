@@ -12,7 +12,8 @@ export AffineSubspace,
     rand_affine_subspace,
     coord_change,
     geodesic_distance,
-    geodesic
+    geodesic,
+    translate
 
 # References
 const _LKK19 = """Lim, Lek-Heng, Ken Sze-Wai Wong, and Ke Ye. "Numerical algorithms on the affine Grassmannian." SIAM Journal on Matrix Analysis and Applications 40.2 (2019): 371-393"""
@@ -120,9 +121,14 @@ AffineIntrinsic(A::Matrix, b₀::Vector) = AffineIntrinsic(A, b₀, stiefel_coor
 (A::AffineIntrinsic)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
 
 function stiefel_coordinates(A::AbstractMatrix, b::AbstractVector)
-    γ = sqrt(1 + sum(abs2, b))
     n, k = size(A)
     Y = zeros(eltype(A), n + 1, k + 1)
+    stiefel_coordinates!(Y, A, b)
+    Y
+end
+function stiefel_coordinates!(Y, A::AbstractMatrix, b::AbstractVector)
+    γ = sqrt(1 + sum(abs2, b))
+    n, k = size(A)
     Y[1:n, 1:k] .= A
     Y[1:n, k+1] .= b ./ γ
     Y[n+1, k+1] = 1 / γ
@@ -589,3 +595,19 @@ function geodesic(A::AffineIntrinsic, B::AffineIntrinsic)
     t -> A.Y * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U'
 end
 #
+"""
+    translate(L::AffineSubspace, δb, ::Coordinates)
+
+Translate the affine subspace `L` by `δb`.
+"""
+function translate(L::AffineSubspace, δb, ::Coordinates{:Extrinsic})
+    translate!(copy(L), δb, Extrinsic)
+end
+function translate!(L::AffineSubspace, δb, ::Coordinates{:Extrinsic})
+    ext = extrinsic(L)
+    ext.b .+= δb
+    int = intrinsic(L)
+    LA.mul!(int.b₀, ext.A', δb, true, true)
+    stiefel_coordinates!(int.Y, int.A, int.b₀)
+    L
+end

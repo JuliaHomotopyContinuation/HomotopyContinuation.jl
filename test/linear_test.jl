@@ -36,6 +36,10 @@
         @test geodesic_distance(A, C) > 0
         γ = geodesic(A, C)
         @test size(γ(1)) == size(intrinsic(A).Y)
+
+        A2 = translate(A, [1, 1], Extrinsic)
+        A3 = AffineSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
+        @test A2.intrinsic.Y ≈ A3.intrinsic.Y
     end
 
     @testset "AffineSubspaceHomotopy" begin

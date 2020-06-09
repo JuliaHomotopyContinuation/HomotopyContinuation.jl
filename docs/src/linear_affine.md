@@ -33,4 +33,5 @@ extrinsic
 geodesic
 geodesic_distance
 rand_affine_subspace
+translate
 ```
