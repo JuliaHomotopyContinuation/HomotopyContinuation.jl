@@ -246,9 +246,17 @@ function polyhedral(
     target_coeffs::AbstractVector;
     kwargs...,
 )
-    start_coeffs = map(c -> randn(ComplexF64, length(c)) .* LA.norm(c, Inf), target_coeffs)
+    start_coeffs = map(c -> rand_approx_unit(length(c)) .* LA.norm(c, Inf), target_coeffs)
     polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
+
+"""
+    rand_approx_unit(n::Integer)::Vector{ComplexF64}
+
+This samples uniformly from the rectangle ``[0.9,1.1] × [0,2π]`` and transforms the sampled
+values with the map ``(r, φ) ↦ r * e^{i φ}``.
+"""
+rand_approx_unit(n) = map(_ -> (0.9 + 0.2 * rand()) * cis2pi(rand()), 1:n)
 
 cis2pi(x) = complex(cospi(2x), sinpi(2x))
 
