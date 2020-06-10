@@ -1,5 +1,6 @@
 export monodromy_solve,
     find_start_pair,
+    MonodromyOptions,
     MonodromyResult,
     is_success,
     is_heuristic_stop,
@@ -194,6 +195,11 @@ end
 ## Result ##
 ############
 
+"""
+    MonodromyResult
+
+The monodromy result contains the result of the [`monodromy_solve`](@ref) computation.
+"""
 struct MonodromyResult{T}
     returncode::Symbol
     results::Vector{PathResult}
@@ -303,7 +309,7 @@ Returns the computed [`PathResult`](@ref)s.
 results(r::MonodromyResult) = r.results
 
 """
-    nsolutions(result::MonodromyResult)
+    nresults(result::MonodromyResult)
 
 Returns the number of results computed.
 """

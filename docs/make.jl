@@ -6,11 +6,12 @@ makedocs(
         "Introduction" => "index.md",
         "Problem formulation" => [
             "ModelKit" => "model_kit.md",
-            "Linear and Affine Subspaces" => "linear_affine.md",
             "Systems and Homotopies" => "systems_homotopies.md",
+            "Linear and Affine Subspaces" => "linear_affine.md",
         ],
         "Solving systems" => [
             "Solve" => "solve.md",
+            "Monodromy" => "monodromy.md",
             "Results" => "result.md",
             "Examples" => "solve_examples.md",
             "Start systems" => "start_systems.md",
