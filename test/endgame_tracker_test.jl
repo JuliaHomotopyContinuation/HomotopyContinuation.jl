@@ -19,8 +19,8 @@
         @test !is_failed(res[1])
         @test accuracy(res[1]) < 1e-12
         @test residual(res[1]) < 1e-12
-        @test steps(res[1]) < 10
-        @test accepted_steps(res[1]) < 10
+        @test steps(res[1]) < 20
+        @test accepted_steps(res[1]) < 20
         @test rejected_steps(res[1]) == 0
         @test is_success(res[2])
         @test is_nonsingular(res[2])
