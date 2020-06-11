@@ -470,7 +470,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
 
     val_at_infinity_tol = begin
         if κ > κ_min^2
-            10options.val_at_infinity_tol
+            10 * options.val_at_infinity_tol
         elseif κ > κ_min
             options.val_at_infinity_tol
         else
