@@ -483,7 +483,7 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.failed) failed")
     elseif i == 8
         print(io, "Random seed used")
-    elseif i == 9
+    elseif i == 9 && !isnothing(x.start_system)
         print(io, "start_system")
     elseif i == 10 && s.singular > 0
         print(io, "  multiplicity table of singular solutions: \n")
@@ -509,8 +509,8 @@ function TreeViews.treenode(r::Result, i::Integer)
         return failed(r)
     elseif i == 8
         return seed(r)
-    elseif i == 9
-        return something(r.start_system, missing)
+    elseif i == 9 && !isnothing(r.start_system)
+        return r.start_system
     elseif i == 10 && s.singular > 0
         return missing
     end
