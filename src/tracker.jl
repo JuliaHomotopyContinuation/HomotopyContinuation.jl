@@ -48,7 +48,7 @@ Base.@kwdef mutable struct TrackerParameters
     # compared to β_ω in the article, β_ω_p goes into the formula by β_ω_p^p, i.e.
     # the relative reduction in step size is independent of the order p
     β_ω_p::Float64 = 3.0
-    β_τ::Float64 = 0.5
+    β_τ::Float64 = 0.4
     strict_β_τ::Float64 = min(0.75β_τ, 0.4)
     min_newton_iters::Int = 2
 end

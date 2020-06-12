@@ -241,7 +241,7 @@ end
         multiple_results = false,
     )
 
-Count the number of solutions which satisfy the corresponding conditions. See also
+Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
 """
 function nresults(
@@ -264,7 +264,7 @@ function nresults(
 end
 
 """
-    solutions(result; conditions...)
+    solutions(result; only_nonsingular = true, conditions...)
 
 Returns all solutions for which the given conditions apply, see [`results`](@ref) for the
 possible conditions.
@@ -279,7 +279,8 @@ julia> solutions(solve(F))
  [-3.0 + 0.0im, 0.0 + 0.0im]
 ```
 """
-solutions(result::Results; kwargs...) = results(solution, result; kwargs...)
+solutions(result::Results; only_nonsingular = true, kwargs...) =
+    results(solution, result; only_nonsingular = only_nonsingular, kwargs...)
 
 """
     real_solutions(result; tol=1e-6, conditions...)
@@ -482,7 +483,7 @@ function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.j
         print(io, "$(s.failed) failed")
     elseif i == 8
         print(io, "Random seed used")
-    elseif i == 9
+    elseif i == 9 && !isnothing(x.start_system)
         print(io, "start_system")
     elseif i == 10 && s.singular > 0
         print(io, "  multiplicity table of singular solutions: \n")
@@ -508,8 +509,8 @@ function TreeViews.treenode(r::Result, i::Integer)
         return failed(r)
     elseif i == 8
         return seed(r)
-    elseif i == 9
-        return something(r.start_system, missing)
+    elseif i == 9 && !isnothing(r.start_system)
+        return r.start_system
     elseif i == 10 && s.singular > 0
         return missing
     end
