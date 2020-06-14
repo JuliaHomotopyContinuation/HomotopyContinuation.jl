@@ -822,13 +822,15 @@ Convert an array to the smallest eltype such that all elements still fit.
 
 ## Example
 ```julia
-typeof(to_smallest_elype(Any[2,3])) == Vector{Int}
+typeof(to_smallest_eltype(Any[2,3])) == Vector{Int}
 ```
 """
 function to_smallest_eltype(A::AbstractArray)
     T = typeof(first(A))
     for a in A
-        T = promote_type(T, typeof(a))
+        if !(typeof(a) <: T)
+            T = promote_type(T, typeof(a))
+        end
     end
     convert.(T, A)
 end

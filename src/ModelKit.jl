@@ -44,11 +44,13 @@ import MultivariatePolynomials:
     monomials,
     subs,
     variables
+using Parameters: @unpack
 const MP = MultivariatePolynomials
 
 include("model_kit/symengine.jl")
 include("model_kit/symbolic.jl")
 include("model_kit/instructions.jl")
 include("model_kit/codegen.jl")
+include("model_kit/interpreter.jl")
 
 end # module
