@@ -351,43 +351,37 @@ end
         end
         if I.out isa AbstractMatrix
             for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
-                U[i, j] = let
-                    @unpack data, ind = I.out[i, j]
-                    if data == DATA_I
-                        instructions[ind]
-                    elseif data == DATA_X
-                        x[ind]
-                    elseif data == DATA_C
-                        constants[ind]
-                    end
+                @unpack data, ind = I.out[i, j]
+                if data == DATA_I
+                    U[i, j] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[i, j] = convert(eltype(U), x[ind])
+                elseif data == DATA_C
+                    U[i, j] = convert(eltype(U), constants[ind])
                 end
             end
         else
             for k in eachindex(I.out)
-                U[k] = let
-                    @unpack data, ind = I.out[k]
-                    if data == DATA_I
-                        instructions[ind]
-                    elseif data == DATA_X
-                        x[ind]
-                    elseif data == DATA_C
-                        constants[ind]
-                    end
+                @unpack data, ind = I.out[k]
+                if data == DATA_I
+                    U[k] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[k] = convert(eltype(U), x[ind])
+                elseif data == DATA_C
+                    U[k] = convert(eltype(U), constants[ind])
                 end
             end
         end
 
         if !isa(u, Nothing)
             for k in eachindex(I.eval_out)
-                u[k] = let
-                    @unpack data, ind = I.eval_out[k]
-                    if data == DATA_I
-                        instructions[ind]
-                    elseif data == DATA_X
-                        x[ind]
-                    elseif data == DATA_C
-                        constants[ind]
-                    end
+                @unpack data, ind = I.eval_out[k]
+                if data == DATA_I
+                    u[k] = convert(eltype(u), instructions[ind])
+                elseif data == DATA_X
+                    u[k] = convert(eltype(u), x[ind])
+                elseif data == DATA_C
+                    u[k] = convert(eltype(u), constants[ind])
                 end
             end
         end
@@ -421,53 +415,48 @@ end
 
         if I.out isa AbstractMatrix
             for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
-                U[i, j] = let
+                U[i, j] = begin
                     @unpack data, ind = I.out[i, j]
                     if data == DATA_I
-                        instructions[ind]
+                        convert(eltype(U), instructions[ind])
                     elseif data == DATA_X
-                        x[ind]
+                        convert(eltype(U), x[ind])
                     elseif data == DATA_P
-                        p[ind]
+                        convert(eltype(U), p[ind])
                     elseif data == DATA_C
-                        constants[ind]
+                        convert(eltype(U), constants[ind])
                     end
                 end
             end
         else
             for k in eachindex(I.out)
-                U[k] = let
-                    @unpack data, ind = I.out[k]
-                    if data == DATA_I
-                        instructions[ind]
-                    elseif data == DATA_X
-                        x[ind]
-                    elseif data == DATA_P
-                        p[ind]
-                    elseif data == DATA_C
-                        constants[ind]
-                    end
+                @unpack data, ind = I.out[k]
+                if data == DATA_I
+                    U[k] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[k] = convert(eltype(U), x[ind])
+                elseif data == DATA_P
+                    U[k] = convert(eltype(U), p[ind])
+                elseif data == DATA_C
+                    U[k] = convert(eltype(U), constants[ind])
                 end
             end
         end
 
         if !isa(u, Nothing)
             for k in eachindex(I.eval_out)
-                u[k] = let
-                    @unpack data, ind = I.eval_out[k]
-                    if data == DATA_I
-                        instructions[ind]
-                    elseif data == DATA_X
-                        x[ind]
-                    elseif data == DATA_P
-                        p[ind]
-                    elseif data == DATA_C
-                        constants[ind]
-                    end
+                @unpack data, ind = I.eval_out[k]
+                if data == DATA_I
+                    u[k] = convert(eltype(u), instructions[ind])
+                elseif data == DATA_X
+                    u[k] = convert(eltype(u), x[ind])
+                elseif data == DATA_P
+                    u[k] = convert(eltype(u), p[ind])
+                elseif data == DATA_C
+                    u[k] = convert(eltype(u), constants[ind])
                 end
             end
         end
         U
     end
-
 end
