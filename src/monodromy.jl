@@ -522,7 +522,7 @@ end
 Try to find a pair `(x,p)` for the system `F` such that `F(x,p) = 0` by randomly sampling
 a pair `(x₀, p₀)` and performing Newton's method in variable *and* parameter space.
 """
-find_start_pair(F::System; kwargs...) = find_start_pair(ModelKitSystem(F); kwargs...)
+find_start_pair(F::System; kwargs...) = find_start_pair(CompiledSystem(F); kwargs...)
 function find_start_pair(
     F::AbstractSystem;
     max_tries::Int = 100,

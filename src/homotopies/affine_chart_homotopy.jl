@@ -19,7 +19,7 @@ Construct an `AffineChartHomotopy` on a randomly generated chart `v`. Each entry
 idepdently from a univariate normal distribution.
 """
 function on_affine_chart(H::Homotopy, proj_dims = nothing)
-    on_affine_chart(ModelKitHomotopy(H), proj_dims)
+    on_affine_chart(CompiledHomotopy(H), proj_dims)
 end
 function on_affine_chart(H::AbstractHomotopy, proj_dims = nothing)
     if proj_dims === nothing
@@ -59,13 +59,13 @@ function on_chart!(x::AbstractVector, v::PVector)
     x
 end
 
-function evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::AbstractVector, t) where {N}
+function ModelKit.evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::AbstractVector, t) where {N}
     evaluate!(u, H.homotopy, x, t)
     evaluate_chart!(u, H.chart, x)
     u
 end
 
-function evaluate_and_jacobian!(
+function ModelKit.evaluate_and_jacobian!(
     u,
     U,
     H::AffineChartHomotopy{<:Any,N},
@@ -78,7 +78,7 @@ function evaluate_and_jacobian!(
     nothing
 end
 
-function taylor!(u, v::Val, H::AffineChartHomotopy, tx, t)
+function ModelKit.taylor!(u, v::Val, H::AffineChartHomotopy, tx, t)
     u .= zero(eltype(u))
     taylor!(u, v, H.homotopy, tx, t)
     # affine chart part is always zero since it is an affine linear form

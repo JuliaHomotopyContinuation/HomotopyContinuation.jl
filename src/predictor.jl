@@ -238,8 +238,16 @@ function finite_diff_taylor!(
 end
 
 ## Default handling ignores incremental
-taylor!(u, v::Val, H::AbstractHomotopy, tx, t, incremental::Bool) = taylor!(u, v, H, tx, t)
-@generated function taylor!(u, v::Val{M}, predictor::Predictor{AD{N}}, H, tx, t) where {M,N}
+ModelKit.taylor!(u, v::Val, H::AbstractHomotopy, tx, t, incremental::Bool) =
+    taylor!(u, v, H, tx, t)
+@generated function ModelKit.taylor!(
+    u,
+    v::Val{M},
+    predictor::Predictor{AD{N}},
+    H,
+    tx,
+    t,
+) where {M,N}
     if M ≤ N
         quote
             taylor!(u, v, H, tx, t, true)

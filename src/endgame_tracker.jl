@@ -211,7 +211,7 @@ struct EndgameTracker{
     options::EndgameOptions
 end
 
-EndgameTracker(H::Homotopy; kwargs...) = EndgameTracker(ModelKitHomotopy(H); kwargs...)
+EndgameTracker(H::Homotopy; kwargs...) = EndgameTracker(CompiledHomotopy(H); kwargs...)
 function EndgameTracker(H::AbstractHomotopy; tracker_options = TrackerOptions(), kwargs...)
     EndgameTracker(Tracker(H; options = tracker_options); kwargs...)
 end

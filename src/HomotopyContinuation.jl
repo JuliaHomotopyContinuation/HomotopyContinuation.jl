@@ -21,11 +21,11 @@ import TreeViews
 
 const LA = LinearAlgebra
 
-include("ModelKit.jl")
-export @polyvar
-
 include("DoubleDouble.jl")
 using .DoubleDouble
+
+include("ModelKit.jl")
+export @polyvar
 
 using ProjectiveVectors: PVector, dims, dimension_indices
 

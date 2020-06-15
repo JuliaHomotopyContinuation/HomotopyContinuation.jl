@@ -203,18 +203,18 @@ function dt_coeffs!(H::ToricHomotopy, t)
     H.dt_coeffs
 end
 
-function evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
-    ModelKit.evaluate!(u, H.system, x, coeffs!(H, t))
+function ModelKit.evaluate!(u, H::ToricHomotopy, x::AbstractVector, t)
+    evaluate!(u, H.system, x, coeffs!(H, t))
 end
 
-function evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
-    ModelKit.evaluate_and_jacobian!(u, U, H.system, x, coeffs!(H, t))
+function ModelKit.evaluate_and_jacobian!(u, U, H::ToricHomotopy, x::AbstractVector, t)
+    evaluate_and_jacobian!(u, U, H.system, x, coeffs!(H, t))
     nothing
 end
 
 
-function taylor!(u, v::Val{1}, H::ToricHomotopy, x::Vector, t)
-    ModelKit.evaluate!(u, H.system, x, dt_coeffs!(H, t))
+function ModelKit.taylor!(u, v::Val{1}, H::ToricHomotopy, x::Vector, t)
+    evaluate!(u, H.system, x, dt_coeffs!(H, t))
 end
 
 function taylor_coeffs!(H::ToricHomotopy, t::Real)
@@ -264,15 +264,15 @@ function taylor_coeffs!(H::ToricHomotopy, t::Real)
 end
 
 
-function taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
+function ModelKit.taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc2)
 end
-function taylor!(u, v::Val{3}, H::ToricHomotopy, tx::TaylorVector, t)
+function ModelKit.taylor!(u, v::Val{3}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.tc3)
 end
-function taylor!(u, v::Val{4}, H::ToricHomotopy, tx::TaylorVector, t)
+function ModelKit.taylor!(u, v::Val{4}, H::ToricHomotopy, tx::TaylorVector, t)
     taylor_coeffs!(H, real(t))
     ModelKit.taylor!(u, v, H.system, tx, H.taylor_coeffs)
 end

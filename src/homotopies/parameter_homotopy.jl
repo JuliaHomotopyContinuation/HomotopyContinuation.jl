@@ -13,6 +13,7 @@ struct ParameterHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     q::Vector{ComplexF64}
     #cache
     t_cache::Base.RefValue{ComplexF64}
+    pt::Vector{ComplexF64}
     taylor_pt::TaylorVector{2,ComplexF64}
 end
 
@@ -24,7 +25,7 @@ function ParameterHomotopy(
     ParameterHomotopy(F, start_parameters, target_parameters)
 end
 function ParameterHomotopy(F::ModelKit.System, p::AbstractVector, q::AbstractVector)
-    ParameterHomotopy(ModelKitSystem(F), p, q)
+    ParameterHomotopy(CompiledSystem(F), p, q)
 end
 function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVector)
     @assert length(p) == length(q) == nparameters(F)
@@ -32,8 +33,9 @@ function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVect
     p̂ = Vector{ComplexF64}(p)
     q̂ = Vector{ComplexF64}(q)
     taylor_pt = TaylorVector{2}(ComplexF64, length(q))
+    pt = copy(p̂)
 
-    ParameterHomotopy(F, p̂, q̂, Ref(complex(NaN)), taylor_pt)
+    ParameterHomotopy(F, p̂, q̂, Ref(complex(NaN)), pt, taylor_pt)
 end
 
 Base.size(H::ParameterHomotopy) = size(H.F)
@@ -56,12 +58,16 @@ function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
     if imag(t) == 0
         let t = real(t)
             @inbounds for i = 1:length(H.taylor_pt)
-                H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
+                ptᵢ = t * H.p[i] + (1.0 - t) * H.q[i]
+                H.pt[i] = ptᵢ
+                H.taylor_pt[i] = (ptᵢ, H.p[i] - H.q[i])
             end
         end
     else
         @inbounds for i = 1:length(H.taylor_pt)
-            H.taylor_pt[i] = (t * H.p[i] + (1.0 - t) * H.q[i], H.p[i] - H.q[i])
+            ptᵢ = t * H.p[i] + (1.0 - t) * H.q[i]
+            H.pt[i] = ptᵢ
+            H.taylor_pt[i] = (ptᵢ, H.p[i] - H.q[i])
         end
     end
     H.t_cache[] = t
@@ -69,15 +75,17 @@ function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
     H.taylor_pt
 end
 
-function evaluate!(u, H::ParameterHomotopy, x, t)
-    evaluate!(u, H.F, x, first(vectors(tp!(H, t))))
+function ModelKit.evaluate!(u, H::ParameterHomotopy, x, t)
+    tp!(H, t)
+    evaluate!(u, H.F, x, H.pt)
 end
 
-function evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
-    evaluate_and_jacobian!(u, U, H.F, x, first(vectors(tp!(H, t))))
+function ModelKit.evaluate_and_jacobian!(u, U, H::ParameterHomotopy, x, t)
+    tp!(H, t)
+    evaluate_and_jacobian!(u, U, H.F, x, H.pt)
 end
 
-function taylor!(u, v::Val, H::ParameterHomotopy, tx, t)
+function ModelKit.taylor!(u, v::Val, H::ParameterHomotopy, tx, t)
     taylor!(u, v, H.F, tx, tp!(H, t))
     u
 end

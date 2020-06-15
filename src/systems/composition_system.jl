@@ -51,14 +51,14 @@ function Base.show(io::IO, C::CompositionSystem)
 end
 
 (C::CompositionSystem)(x, p = nothing) = C.g(C.f(x, p), p)
-function evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexF64}, p = nothing)
+function ModelKit.evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexF64}, p = nothing)
     evaluate!(u, C.g, evaluate!(C.f_u, C.f, x, p), p)
 end
-function evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexDF64}, p = nothing)
+function ModelKit.evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexDF64}, p = nothing)
     evaluate!(u, C.g, evaluate!(C.f_ū, C.f, x, p), p)
 end
 
-function evaluate_and_jacobian!(u, U, C::CompositionSystem, x, p = nothing)
+function ModelKit.evaluate_and_jacobian!(u, U, C::CompositionSystem, x, p = nothing)
     evaluate_and_jacobian!(C.f_u, C.f_U, C.f, x, p)
     evaluate_and_jacobian!(u, C.g_U, C.g, C.f_u, p)
     LA.mul!(U, C.g_U, C.f_U)
@@ -70,7 +70,7 @@ _get_tu(C::CompositionSystem, ::Val{2}) = C.tu²
 _get_tu(C::CompositionSystem, ::Val{3}) = C.tu³
 _get_tu(C::CompositionSystem, ::Val{4}) = C.tu⁴
 
-function taylor!(u, v::Val, C::CompositionSystem, tx, p = nothing)
+function ModelKit.taylor!(u, v::Val, C::CompositionSystem, tx, p = nothing)
     tu = _get_tu(C, v)
     taylor!(tu.data, v, C.f, tx, p)
     taylor!(u, v, C.g, tu, p)
@@ -116,13 +116,13 @@ julia> (g ∘ f)([x,y,z])
 ```
 """
 compose(g::AbstractSystem, f::AbstractSystem) = CompositionSystem(g, f)
-compose(g::AbstractSystem, f::System) = CompositionSystem(g, ModelKitSystem(f))
+compose(g::AbstractSystem, f::System) = CompositionSystem(g, CompiledSystem(f))
 function compose(g::System, f::System)
     pg = parameters(g)
     pf = parameters(f)
     (isempty(pf) || isempty(pg) || pf == pg) ||
         throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
-    CompositionSystem(ModelKitSystem(g), ModelKitSystem(f))
+    CompositionSystem(CompiledSystem(g), CompiledSystem(f))
 end
 import Base: ∘
 ∘(g::Union{AbstractSystem,System}, f::Union{AbstractSystem,System}) = compose(g, f)

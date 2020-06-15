@@ -221,7 +221,7 @@
         res = solve(F, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
         @test nsolutions(res) == 1
         res = solve(
-            ModelKitSystem(F),
+            InterpretedSystem(F),
             [s];
             start_parameters = [1, 0],
             target_parameters = [2, 4],
@@ -245,7 +245,7 @@
         s = [1, 1, 1]
         res = solve(F_proj, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
         @test nsolutions(res) == 1
-        res = solve(ModelKitSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
+        res = solve(InterpretedSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
         @test nsolutions(res) == 1
 
         F_proj_err = System([x * y + (b - a) * z^2], [x, y, z], [a, b])
@@ -274,7 +274,7 @@
         ]
         res = solve(F_multi_proj, S; start_parameters = [2, 4], target_parameters = [3, 5])
         @test nsolutions(res) == 2
-        res = solve(ModelKitSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
+        res = solve(InterpretedSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
         @test nsolutions(res) == 2
 
         F_multi_proj_err = System(

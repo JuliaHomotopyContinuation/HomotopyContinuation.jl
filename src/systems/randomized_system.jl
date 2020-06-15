@@ -28,7 +28,7 @@ function RandomizedSystem(F::Union{AbstractSystem,System}, k::Integer)
     A = randn(ComplexF64, k, n - k)
     RandomizedSystem(F, A)
 end
-RandomizedSystem(F::System, A::Matrix{ComplexF64}) = RandomizedSystem(ModelKitSystem(F), A)
+RandomizedSystem(F::System, A::Matrix{ComplexF64}) = RandomizedSystem(CompiledSystem(F), A)
 function RandomizedSystem(F::AbstractSystem, A::Matrix{ComplexF64})
     n, N = size(F)
     n > N || throw(ArgumentError("Then given system is not overdetermined."))
@@ -88,7 +88,7 @@ end
 
 (F::RandomizedSystem)(x, p = nothing) = [LA.I F.A] * F.system(x, p)
 
-function evaluate!(u, F::RandomizedSystem, x, p = nothing)
+function ModelKit.evaluate!(u, F::RandomizedSystem, x, p = nothing)
     if eltype(x) isa ComplexDF64
         evaluate!(F.ū, F.system, x, p)
         randomize!(u, F.A, F.ū)
@@ -99,17 +99,17 @@ function evaluate!(u, F::RandomizedSystem, x, p = nothing)
     u
 end
 
-function evaluate_and_jacobian!(u, U, F::RandomizedSystem, x, p = nothing)
+function ModelKit.evaluate_and_jacobian!(u, U, F::RandomizedSystem, x, p = nothing)
     evaluate_and_jacobian!(F.u, F.U, F.system, x, p)
     randomize!(u, F.A, F.u)
     randomize!(U, F.A, F.U)
 end
 
-function taylor!(u::AbstractVector, v::Val, F::RandomizedSystem, tx, p = nothing)
+function ModelKit.taylor!(u::AbstractVector, v::Val, F::RandomizedSystem, tx, p = nothing)
     taylor!(F.u, v, F.system, tx, p)
     randomize!(u, F.A, F.u)
 end
-function taylor!(
+function ModelKit.taylor!(
     U::AbstractMatrix,
     v::Val{N},
     F::RandomizedSystem,

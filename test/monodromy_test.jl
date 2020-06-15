@@ -113,7 +113,7 @@
 
         # AbstractSystem as input
         result = monodromy_solve(
-            ModelKitSystem(F),
+            InterpretedSystem(F),
             group_action = roots_of_unity,
             target_solutions_count = 7,
             max_loops_no_progress = 20,

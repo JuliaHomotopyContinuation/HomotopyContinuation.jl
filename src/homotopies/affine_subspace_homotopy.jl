@@ -45,7 +45,7 @@ end
 # we are in the affine Grassmanian and that `(γ(t)v)[1:k]` is the correct value in \C^n.
 
 AffineSubspaceHomotopy(F::ModelKit.System, start::AffineSubspace, target::AffineSubspace) =
-    AffineSubspaceHomotopy(ModelKitSystem(F), start, target)
+    AffineSubspaceHomotopy(CompiledSystem(F), start, target)
 
 function AffineSubspaceHomotopy(
     system::AbstractSystem,
@@ -173,7 +173,7 @@ function get_solution(H::AffineSubspaceHomotopy, u::AbstractVector, t)
     end
 end
 
-function evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
+function ModelKit.evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
     n = first(size(H.system))
     if eltype(v) isa ComplexDF64
@@ -188,7 +188,7 @@ function evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     u
 end
 
-function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVector, t)
+function ModelKit.evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
 
     LA.mul!(H.x, γ, v)
@@ -206,7 +206,7 @@ function evaluate_and_jacobian!(u, U, H::AffineSubspaceHomotopy, v::AbstractVect
     nothing
 end
 
-function taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, v, t)
+function ModelKit.taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, v, t)
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
@@ -262,7 +262,7 @@ function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
 end
 
 
-function taylor!(u, v::Val{2}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+function ModelKit.taylor!(u, v::Val{2}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
     γ, γ¹, γ², γ³ = taylor_γ!(H, t)
     x, x¹, x² = vectors(H.tx²)
     v, v¹ = vectors(tv)
@@ -289,7 +289,7 @@ function taylor!(u, v::Val{2}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, i
     u
 end
 
-function taylor!(u, v::Val{3}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
+function ModelKit.taylor!(u, v::Val{3}, H::AffineSubspaceHomotopy, tv::TaylorVector, t, incr::Bool)
     γ, γ¹, γ², γ³ = taylor_γ!(H, t)
     x, x¹, x², x³ = vectors(H.tx³)
     v, v¹, v² = vectors(tv)

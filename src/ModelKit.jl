@@ -2,14 +2,25 @@
 
 export @var,
     @unique_var,
-    Variable,
+    AbstractHomotopy,
+    AbstractSystem,
+    CompiledHomotopy,
+    CompiledSystem,
     Expression,
+    Homotopy,
+    InterpretedHomotopy,
+    InterpretedSystem,
+    System,
+    TaylorVector,
+    Variable,
     coefficients,
     degree,
     degrees,
     differentiate,
     dense_poly,
     evaluate,
+    evaluate!,
+    evaluate_and_jacobian!,
     expand,
     exponents_coefficients,
     expressions,
@@ -25,15 +36,14 @@ export @var,
     subs,
     support_coefficients,
     rand_poly,
+    taylor!,
     to_dict,
     to_number,
     variables,
-    System,
-    Homotopy,
-    TaylorVector,
     variable_groups,
     vectors
 
+using ..DoubleDouble: ComplexDF64
 import LinearAlgebra
 import MultivariatePolynomials:
     MultivariatePolynomials,
@@ -49,8 +59,12 @@ const MP = MultivariatePolynomials
 
 include("model_kit/symengine.jl")
 include("model_kit/symbolic.jl")
+include("model_kit/taylor_vector.jl")
 include("model_kit/instructions.jl")
-include("model_kit/codegen.jl")
+include("model_kit/abstract_types.jl")
+include("model_kit/compiler.jl")
+include("model_kit/compiled.jl")
 include("model_kit/interpreter.jl")
+include("model_kit/interpreted.jl")
 
 end # module

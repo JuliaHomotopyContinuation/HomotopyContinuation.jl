@@ -214,7 +214,7 @@ end
 
 _eltype(x::TaylorVector{N,T}) where {N,T} = T
 _eltype(x) = eltype(x)
-function InterpreterCache(::Type{T}, I::Interpreter) where T
+function InterpreterCache(::Type{T}, I::Interpreter) where {T}
     InterpreterCache(Vector{T}(undef, length(I.instructions)))
 end
 function InterpreterCache(
@@ -349,15 +349,30 @@ end
                 end
             )
         end
-        for k in eachindex(I.out)
-            U[k] = let
-                @unpack data, ind = I.out[k]
-                if data == DATA_I
-                    instructions[ind]
-                elseif data == DATA_X
-                    x[ind]
-                elseif data == DATA_C
-                    constants[ind]
+        if I.out isa AbstractMatrix
+            for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
+                U[i, j] = let
+                    @unpack data, ind = I.out[i, j]
+                    if data == DATA_I
+                        instructions[ind]
+                    elseif data == DATA_X
+                        x[ind]
+                    elseif data == DATA_C
+                        constants[ind]
+                    end
+                end
+            end
+        else
+            for k in eachindex(I.out)
+                U[k] = let
+                    @unpack data, ind = I.out[k]
+                    if data == DATA_I
+                        instructions[ind]
+                    elseif data == DATA_X
+                        x[ind]
+                    elseif data == DATA_C
+                        constants[ind]
+                    end
                 end
             end
         end
@@ -403,17 +418,35 @@ end
                 end
             )
         end
-        for k in eachindex(I.out)
-            U[k] = let
-                @unpack data, ind = I.out[k]
-                if data == DATA_I
-                    instructions[ind]
-                elseif data == DATA_X
-                    x[ind]
-                elseif data == DATA_P
-                    p[ind]
-                elseif data == DATA_C
-                    constants[ind]
+
+        if I.out isa AbstractMatrix
+            for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
+                U[i, j] = let
+                    @unpack data, ind = I.out[i, j]
+                    if data == DATA_I
+                        instructions[ind]
+                    elseif data == DATA_X
+                        x[ind]
+                    elseif data == DATA_P
+                        p[ind]
+                    elseif data == DATA_C
+                        constants[ind]
+                    end
+                end
+            end
+        else
+            for k in eachindex(I.out)
+                U[k] = let
+                    @unpack data, ind = I.out[k]
+                    if data == DATA_I
+                        instructions[ind]
+                    elseif data == DATA_X
+                        x[ind]
+                    elseif data == DATA_P
+                        p[ind]
+                    elseif data == DATA_C
+                        constants[ind]
+                    end
                 end
             end
         end

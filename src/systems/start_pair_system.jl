@@ -16,7 +16,7 @@ struct StartPairSystem{S<:AbstractSystem,C<:FiniteDiff.JacobianCache} <: Abstrac
     fd_cache::C
 end
 
-StartPairSystem(F::System) = StartPairSystem(ModelKitSystem(F))
+StartPairSystem(F::System) = StartPairSystem(CompiledSystem(F))
 function StartPairSystem(F::AbstractSystem)
     x = zeros(ComplexF64, size(F, 2))
     p = zeros(ComplexF64, nparameters(F))
@@ -26,7 +26,7 @@ function StartPairSystem(F::AbstractSystem)
 end
 Base.size(F::StartPairSystem) = (size(F.F, 1), size(F.F, 2) + nparameters(F.F))
 
-function evaluate!(u, F::StartPairSystem, xp, ::Nothing = nothing)
+function ModelKit.evaluate!(u, F::StartPairSystem, xp, ::Nothing = nothing)
     N, m = length(F.x), length(F.p)
     F.x .= view(xp, 1:N)
     F.p .= view(xp, N+1:N+m)
@@ -34,7 +34,7 @@ function evaluate!(u, F::StartPairSystem, xp, ::Nothing = nothing)
 end
 
 
-function evaluate_and_jacobian!(u, U, F::StartPairSystem, xp, ::Nothing = nothing)
+function ModelKit.evaluate_and_jacobian!(u, U, F::StartPairSystem, xp, ::Nothing = nothing)
     n, N, m = size(F.F, 1), length(F.x), length(F.p)
     F.x .= view(xp, 1:N)
     F.p .= view(xp, N+1:N+m)

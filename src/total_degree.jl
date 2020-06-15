@@ -69,7 +69,7 @@ function total_degree_variables(
     end
 
     if F isa System
-        F = ModelKitSystem(F)
+        F = CompiledSystem(F)
     end
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters)
@@ -89,13 +89,13 @@ function total_degree_variables(
         D = D[1:n]
     end
     if homogeneous
-        G = ModelKitSystem(System(
+        G = CompiledSystem(System(
             s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]),
             x,
             s[1:n-1],
         ))
     else
-        G = ModelKitSystem(System(s .* (x .^ D .- 1), x, s); optimizations = false)
+        G = CompiledSystem(System(s .* (x .^ D .- 1), x, s); optimizations = false)
     end
     G = fix_parameters(G, scaling)
 
@@ -134,7 +134,7 @@ function total_degree_variable_groups(
 
     overdetermined = m > n - M * homogeneous
 
-    F = ModelKitSystem(F)
+    F = CompiledSystem(F)
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters)
     end
@@ -154,7 +154,7 @@ function total_degree_variable_groups(
     g, C = multi_homogeneous_system(D, vargroups; homogeneous = homogeneous)
     P = parameters(g)
     p = randn(length(P))
-    G = fix_parameters(ModelKitSystem(g), p)
+    G = fix_parameters(CompiledSystem(g), p)
     starts = MultiBezoutSolutionsIterator(
         D,
         C(P => p),

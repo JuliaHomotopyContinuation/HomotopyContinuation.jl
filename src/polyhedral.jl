@@ -167,7 +167,7 @@ end
 function polyhedral(f::System; target_parameters = nothing, kwargs...)
     if target_parameters !== nothing
         return polyhedral(
-            FixedParameterSystem(ModelKitSystem(f), target_parameters);
+            FixedParameterSystem(CompiledSystem(f), target_parameters);
             kwargs...,
         )
     end
@@ -304,14 +304,14 @@ function polyhedral(
         end
     end
 
-    F = ModelKit.compile(polyhedral_system(support))
+    F = CompiledSystem(polyhedral_system(support))
     H₁ = ToricHomotopy(F, start_coeffs)
     toric_tracker = Tracker(H₁; options = tracker_options)
 
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
         q = reduce(append!, target_coeffs; init = ComplexF64[])
-        CoefficientHomotopy(ModelKitSystem(F), p, q)
+        CoefficientHomotopy(F, p, q)
     end
     generic_tracker =
         EndgameTracker(Tracker(H₂; options = tracker_options), options = endgame_options)
