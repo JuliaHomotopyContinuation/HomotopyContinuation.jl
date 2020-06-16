@@ -157,7 +157,6 @@ is_invalid_startvalue(code::EndgameTrackerCode.codes) =
 Base.@kwdef mutable struct EndgameTrackerState
     code::EndgameTrackerCode.codes = EndgameTrackerCode.tracking
     val::Valuation
-    endgame_started::Bool = false
     row_scaling::Vector{Float64}
     col_scaling::Vector{Float64}
     cond_eg_start::Float64 = 1.0
@@ -240,7 +239,6 @@ function init!(
 
     state.code = status(tracker)
     init!(state.val)
-    state.endgame_started = false
     state.row_scaling .= 1
     state.col_scaling .= 1
     state.cond_eg_start = 1.0
@@ -351,27 +349,13 @@ function cauchy!(state::EndgameTrackerState, tracker::Tracker, options::EndgameO
     result, m, 100prediction_acc
 end
 
-function max_ratio(u::Vector{Float64}, v::Vector{Float64})
-    max_rat = -Inf
-    for i in eachindex(u)
-        max_rat = max(max_rat, u[i] / v[i])
-    end
-    max_rat
-end
-function min_ratio(u::Vector{Float64}, v::Vector{Float64})
-    min_rat = Inf
-    for i in eachindex(u)
-        min_rat = max(min_rat, u[i] / v[i])
-    end
-    min_rat
-end
-
 function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     @unpack tracker, state, options = endgame_tracker
 
     proposed_t′ = real(tracker.state.t′)
     state.last_point .= tracker.state.x
     state.last_t = tracker.state.t
+
     step!(tracker, debug)
 
     state.code = status(tracker)
@@ -395,33 +379,14 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
             end
         end
 
-        # If a path got terminated, let's be more generous to classify them as at_infinity
-        if state.code == EndgameTrackerCode.terminated_accuracy_limit ||
-           state.code == EndgameTrackerCode.terminated_ill_conditioned
-
-            @label terminated
-            res = analyze(
-                state.val;
-                finite_tol = 0.0,
-                zero_is_finite = !options.zero_is_at_infinity,
-                max_winding_number = options.max_winding_number,
-            )
-            if options.at_infinity_check &&
-               res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
-                return (state.code = EndgameTrackerCode.at_infinity)
-            elseif options.zero_is_at_infinity &&
-                   res.at_zero_tol < cbrt(options.val_at_infinity_tol)
-                return (state.code = EndgameTrackerCode.at_zero)
-            end
-        end
+        terminated_post_check!(state, options)
         return state.code
     end
-
 
     t = real(tracker.state.t)
     t < options.endgame_start || return state.code
 
-    if !state.endgame_started
+    if state.steps_eg == 0
         #=
          We enter the endgame.
          We monitor the condition number with a fixed scaling of the columns and rows,
@@ -437,14 +402,16 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         state.cond_eg_start = κ
 
         tracker.state.use_strict_β_τ = true
-        state.endgame_started = true
     end
-
     state.steps_eg += 1
 
     if state.steps_eg > options.max_endgame_steps
         return (state.code = EndgameTrackerCode.terminated_max_steps)
     end
+
+    # keep track on whether we attempted to jump to 0 and it failed
+    # This is indication that we have a solution on a reduced positive dimensional component
+    # at the end of the path
     if tracker.state.last_step_failed
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), iszero(proposed_t′))
         return state.code
@@ -452,64 +419,8 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         state.jump_to_zero_failed = (last(state.jump_to_zero_failed), false)
     end
 
-
     update!(state.val, tracker.predictor, t)
-    (val_finite, at_infinity_tol, at_zero_tol) = analyze(
-        state.val;
-        finite_tol = options.val_finite_tol,
-        zero_is_finite = !options.zero_is_at_infinity,
-        max_winding_number = options.max_winding_number,
-    )
-    state.best_at_infinity_tol = min(state.best_at_infinity_tol, at_infinity_tol)
-
-    if val_finite || (min(at_zero_tol, at_infinity_tol) < sqrt(options.val_at_infinity_tol))
-        state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
-    end
-
-    # end
-    # For the truncation of paths use the stronger requirement of a relative
-    # condition number increase
-    κ = state.cond / state.cond_eg_start
-
-    κ_min = options.min_cond
-
-    val_at_infinity_tol = begin
-        if κ > κ_min^2
-            10 * options.val_at_infinity_tol
-        elseif κ > κ_min
-            options.val_at_infinity_tol
-        else
-            0.0
-        end
-    end
-
-    at_infinity =
-        options.at_infinity_check &&
-        at_infinity_tol < val_at_infinity_tol &&
-        validate_coord_growth(
-            state.val,
-            state.col_scaling,
-            weights(tracker.state.norm);
-            finite_tol = options.val_finite_tol,
-            at_infinity_tol = val_at_infinity_tol,
-            tol = options.min_coord_growth,
-        )
-    at_zero =
-        options.at_infinity_check &&
-        options.zero_is_at_infinity &&
-        at_infinity_tol < val_at_infinity_tol &&
-        validate_coord_growth(
-            state.val,
-            weights(tracker.state.norm),
-            state.col_scaling;
-            finite_tol = options.val_finite_tol,
-            at_infinity_tol = val_at_infinity_tol,
-            tol = options.min_coord_growth,
-        )
-    finite =
-        !options.only_nonsingular &&
-        val_finite &&
-        (state.cond > options.min_cond^2 || first(state.jump_to_zero_failed))
+    at_infinity, at_zero, finite = check_valuation!(state, options, tracker)
 
     if debug
         color = tracker.state.extended_prec ? :blue : :yellow
@@ -570,18 +481,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
             state.winding_number = m
 
             # determine whether solution is really singular
-            if m ≥ 2
-                state.singular = true
-                state.cond = LA.cond(
-                    tracker,
-                    state.solution,
-                    0.0,
-                    state.row_scaling,
-                    state.col_scaling,
-                )
-            else
-                check_singular!(endgame_tracker)
-            end
+            check_singular!(endgame_tracker)
 
             return (state.code = EndgameTrackerCode.success)
         elseif res == CAUCHY_TERMINATED
@@ -592,25 +492,87 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     end
 
     # Catch ill behavior and terminate the tracking
-    # 1) check cond(H_x, ẋ)
     if (tracker.predictor.cond_H_ẋ > 1e12) && maximum(state.val.Δval_tẋ) > 1e4
         state.code = EndgameTrackerCode.terminated_ill_conditioned
-        @goto terminated
+        terminated_post_check!(state, options)
     end
 
     state.code
 end
 
+
+function check_valuation!(state, options, tracker)
+    (val_finite, at_infinity_tol, at_zero_tol) = analyze(
+        state.val;
+        finite_tol = options.val_finite_tol,
+        zero_is_finite = !options.zero_is_at_infinity,
+        max_winding_number = options.max_winding_number,
+    )
+    state.best_at_infinity_tol = min(state.best_at_infinity_tol, at_infinity_tol)
+
+    if val_finite || (min(at_zero_tol, at_infinity_tol) < sqrt(options.val_at_infinity_tol))
+        state.cond = egcond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
+    end
+
+    # For the truncation of paths use the stronger requirement of a relative
+    # condition number increase
+    κ = state.cond / state.cond_eg_start
+
+    κ_min = options.min_cond
+
+    val_at_infinity_tol = begin
+        if κ > κ_min^3
+            cbrt(options.val_at_infinity_tol)
+        elseif κ > κ_min^2
+            sqrt(options.val_at_infinity_tol)
+        elseif κ > κ_min
+            options.val_at_infinity_tol
+        else
+            0.0
+        end
+    end
+
+    at_infinity =
+        options.at_infinity_check &&
+        at_infinity_tol < val_at_infinity_tol &&
+        validate_coord_growth(
+            state.val,
+            state.col_scaling,
+            weights(tracker.state.norm);
+            finite_tol = options.val_finite_tol,
+            at_infinity_tol = val_at_infinity_tol,
+            tol = options.min_coord_growth,
+        )
+    at_zero =
+        options.at_infinity_check &&
+        options.zero_is_at_infinity &&
+        at_infinity_tol < val_at_infinity_tol &&
+        validate_coord_growth(
+            state.val,
+            weights(tracker.state.norm),
+            state.col_scaling;
+            finite_tol = options.val_finite_tol,
+            at_infinity_tol = val_at_infinity_tol,
+            tol = options.min_coord_growth,
+        )
+    finite =
+        !options.only_nonsingular &&
+        val_finite &&
+        (state.cond > options.min_cond^2 || first(state.jump_to_zero_failed))
+
+    at_infinity, at_zero, finite
+end
+
 function check_singular!(endgame_tracker::EndgameTracker)
     @unpack tracker = endgame_tracker
-    @unpack row_scaling, col_scaling = endgame_tracker.state
+    @unpack row_scaling, col_scaling, winding_number = endgame_tracker.state
     @unpack homotopy, corrector, state, options = tracker
     @unpack jacobian, norm = state
     t = complex(0.0)
     x = endgame_tracker.state.solution
     y = endgame_tracker.state.prediction
     cond = LA.cond(tracker, x, t, row_scaling, col_scaling)
-    if cond > 1e16
+    if cond > 1e16 || something(winding_number, 0) > 1
         endgame_tracker.state.cond = cond
         return (endgame_tracker.state.singular = true)
     end
@@ -627,6 +589,27 @@ function check_singular!(endgame_tracker::EndgameTracker)
         return (endgame_tracker.state.singular = true)
     else
         singular = false
+    end
+end
+
+function terminated_post_check!(state, options)
+    # If a path got terminated, let's be more generous to classify them as at_infinity
+    if state.code == EndgameTrackerCode.terminated_accuracy_limit ||
+       state.code == EndgameTrackerCode.terminated_ill_conditioned
+
+        res = analyze(
+            state.val;
+            finite_tol = 0.0,
+            zero_is_finite = !options.zero_is_at_infinity,
+            max_winding_number = options.max_winding_number,
+        )
+        if options.at_infinity_check &&
+           res.at_infinity_tol < cbrt(options.val_at_infinity_tol)
+            return (state.code = EndgameTrackerCode.at_infinity)
+        elseif options.zero_is_at_infinity &&
+               res.at_zero_tol < cbrt(options.val_at_infinity_tol)
+            return (state.code = EndgameTrackerCode.at_zero)
+        end
     end
 end
 
