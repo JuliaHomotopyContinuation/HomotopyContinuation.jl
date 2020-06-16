@@ -248,12 +248,14 @@ function estimate_winding_number(val::Valuation; max_winding_number::Int)
     for k = 1:max_winding_number
         err = 0.0
         for vᵢ in val.val_tẋ
-            err += abs(round(k * vᵢ) - k * vᵢ)
+            kvᵢ = k * vᵢ
+            errᵢ = abs(round(kvᵢ) - kvᵢ)
+            err = ifelse(errᵢ > err, errᵢ, err)
         end
         if err < min_err
             m = k
             min_err = err
         end
     end
-    m
+    m, min_err
 end
