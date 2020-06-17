@@ -1,4 +1,4 @@
-export total_degree, bezout_number
+export total_degree, bezout_number, total_degree_start_solutions
 
 """
     total_degree(

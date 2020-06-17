@@ -61,6 +61,7 @@ end
     DATA_P
     DATA_C
     DATA_I
+    DATA_T
     NO_DATA
 end
 
@@ -68,13 +69,15 @@ struct InterpreterArg
     data::InterpreterData
     ind::Int32
 end
-function InterpreterArg(instr_map, var_map, param_map, constants, arg)
+function InterpreterArg(instr_map, var_map, t, param_map, constants, arg)
     if haskey(instr_map, arg)
         return InterpreterArg(DATA_I, instr_map[arg])
     elseif haskey(var_map, arg)
         return InterpreterArg(DATA_X, var_map[arg])
     elseif haskey(param_map, arg)
         return InterpreterArg(DATA_P, param_map[arg])
+    elseif t == arg
+        return InterpreterArg(DATA_T, 0)
     else # constant
         c = findfirst(c -> c == arg, constants)
         if isnothing(c)
@@ -117,7 +120,7 @@ function show_instructions(io::IO, I::Interpreter)
     end
 end
 
-function evaluate_interpreter(F::System)
+function evaluate_interpreter(F::Union{System,Homotopy})
     var_map = Dict((name(v), i) for (i, v) in enumerate(F.variables))
     param_map = Dict{Symbol,Int}()
     if !isnothing(F.parameters)
@@ -126,10 +129,11 @@ function evaluate_interpreter(F::System)
         end
     end
     list, out = instruction_list(F.expressions)
-    Interpreter(list, out, var_map, param_map, out)
+    t = isa(F, Homotopy) ? name(F.t) : nothing
+    Interpreter(list, out, var_map, t, param_map, out)
 end
 
-function jacobian_interpreter(F::System)
+function jacobian_interpreter(F::Union{System,Homotopy})
     var_map = Dict((name(v), i) for (i, v) in enumerate(F.variables))
     param_map = Dict{Symbol,Int}()
     if !isnothing(F.parameters)
@@ -141,13 +145,20 @@ function jacobian_interpreter(F::System)
     dlist, J = diff(list, Symbol.(F.variables), eval_out)
 
     #replace nothings with 0
-    Interpreter(dlist, something.(J, 0), var_map, param_map, eval_out)
+    t = isa(F, Homotopy) ? name(F.t) : nothing
+    Interpreter(dlist, something.(J, 0), var_map, t, param_map, eval_out)
 end
 
-function taylor_interpreter(F::System; order_out::Int, order_x::Int, order_p::Int)
+function taylor_interpreter(
+    F::Union{System,Homotopy};
+    order_out::Int,
+    order_x::Int,
+    order_p::Int,
+)
     var_map = Dict((name(v), i) for (i, v) in enumerate(F.variables))
     param_map = Dict{Symbol,Int}()
     diff_map = DiffMap()
+    t = isa(F, Homotopy) ? name(F.t) : nothing
 
     N = nvariables(F)
     for (i, v) in enumerate(F.variables)
@@ -171,10 +182,14 @@ function taylor_interpreter(F::System; order_out::Int, order_x::Int, order_p::In
             end
         end
     end
+    if !isnothing(t)
+        diff_map[t, 1] = 1
+    end
+
     list, eval_out = instruction_list(F.expressions)
     dlist = univariate_diff!(list, order_out, diff_map)
     outputs = map(id -> something(diff_map[id, order_out], 0), eval_out)
-    Interpreter(dlist, outputs, var_map, param_map, eval_out)
+    Interpreter(dlist, outputs, var_map, t, param_map, eval_out)
 end
 
 
@@ -182,6 +197,7 @@ function Interpreter(
     list::InstructionList,
     out::AbstractArray,
     var_map::Dict{Symbol,Int},
+    t::Union{Nothing,Symbol},
     param_map::Dict{Symbol,Int},
     eval_out::Vector,
 )
@@ -191,19 +207,19 @@ function Interpreter(
     constants = []
     for (id, (op, arg1, arg2)) in list.instructions
         OP = InterpreterOp(op, arg1, arg2)
-        ARG1 = InterpreterArg(instr_map, var_map, param_map, constants, arg1)
+        ARG1 = InterpreterArg(instr_map, var_map, t, param_map, constants, arg1)
         if isnothing(arg2) || is_univariate(OP)
             ARG2 = InterpreterArg(NO_DATA, Int32(0))
         else
-            ARG2 = InterpreterArg(instr_map, var_map, param_map, constants, arg2)
+            ARG2 = InterpreterArg(instr_map, var_map, t, param_map, constants, arg2)
         end
         push!(instructions, InterpreterInstruction(OP, (ARG1, ARG2)))
         instr_map[id] = length(instructions)
     end
     constants = isempty(constants) ? Bool[] : to_smallest_eltype(constants)
-    output = map(id -> InterpreterArg(instr_map, var_map, param_map, constants, id), out)
+    output = map(id -> InterpreterArg(instr_map, var_map, t, param_map, constants, id), out)
     eval_output =
-        map(id -> InterpreterArg(instr_map, var_map, param_map, constants, id), eval_out)
+        map(id -> InterpreterArg(instr_map, var_map, t, param_map, constants, id), eval_out)
 
     Interpreter(instructions, output, constants, eval_output)
 end
@@ -228,8 +244,37 @@ function InterpreterCache(I::Interpreter{T}, x::AbstractArray, p::AbstractArray)
     InterpreterCache(promote_type(T, _eltype(x), _eltype(p)), I)
 end
 
-function data_block(make_op_block, name1, name2; parameters::Bool)
-    if parameters
+function data_block(make_op_block, name1, name2; parameters::Bool, t::Bool = false)
+    if parameters && t
+        inner_block = outer -> quote
+            if $name2 == DATA_I
+                $(make_op_block(outer, DATA_I))
+            elseif $name2 == DATA_X
+                $(make_op_block(outer, DATA_X))
+            elseif $name2 == DATA_T
+                $(make_op_block(outer, DATA_T))
+            elseif $name2 == DATA_P
+                $(make_op_block(outer, DATA_P))
+            elseif $name2 == DATA_C
+                $(make_op_block(outer, DATA_C))
+            elseif $name2 == NO_DATA
+                $(make_op_block(outer, NO_DATA))
+            end
+        end
+        quote
+            if $name1 == DATA_I
+                $(inner_block(DATA_I))
+            elseif $name1 == DATA_X
+                $(inner_block(DATA_X))
+            elseif $name1 == DATA_T
+                $(inner_block(DATA_T))
+            elseif $name1 == DATA_P
+                $(inner_block(DATA_P))
+            elseif $name1 == DATA_C
+                $(inner_block(DATA_C))
+            end
+        end
+    elseif parameters
         inner_block = outer -> quote
             if $name2 == DATA_I
                 $(make_op_block(outer, DATA_I))
@@ -250,6 +295,31 @@ function data_block(make_op_block, name1, name2; parameters::Bool)
                 $(inner_block(DATA_X))
             elseif $name1 == DATA_P
                 $(inner_block(DATA_P))
+            elseif $name1 == DATA_C
+                $(inner_block(DATA_C))
+            end
+        end
+    elseif t
+        inner_block = outer -> quote
+            if $name2 == DATA_I
+                $(make_op_block(outer, DATA_I))
+            elseif $name2 == DATA_X
+                $(make_op_block(outer, DATA_X))
+            elseif $name2 == DATA_T
+                $(make_op_block(outer, DATA_T))
+            elseif $name2 == DATA_C
+                $(make_op_block(outer, DATA_C))
+            elseif $name2 == NO_DATA
+                $(make_op_block(outer, NO_DATA))
+            end
+        end
+        quote
+            if $name1 == DATA_I
+                $(inner_block(DATA_I))
+            elseif $name1 == DATA_X
+                $(inner_block(DATA_X))
+            elseif $name1 == DATA_T
+                $(inner_block(DATA_T))
             elseif $name1 == DATA_C
                 $(inner_block(DATA_C))
             end
@@ -285,13 +355,14 @@ function gen_access(data, indname)
         :(x[$indname])
     elseif data == DATA_P
         :(p[$indname])
+    elseif data == DATA_T
+        :(t)
     elseif data == DATA_C
         :(constants[$indname])
     elseif data == NO_DATA
         nothing
     end
 end
-
 
 
 for (xarg, xval) in [(:(x::AbstractVector), :x), (:(tx::TaylorVector), :(tx.data))],
@@ -320,6 +391,29 @@ for (xarg, xval) in [(:(x::AbstractVector), :x), (:(tx::TaylorVector), :(tx.data
             cache::InterpreterCache = InterpreterCache(I, $xval, $pval),
         )
             _execute!(u, U, I, $xval, $pval, cache)
+        end
+
+        # # homotopy versions
+        function execute!(
+            u::AbstractArray,
+            I::Interpreter,
+            $xarg,
+            t,
+            $parg,
+            cache::InterpreterCache = InterpreterCache(I, $xval, $pval),
+        )
+            _execute!(nothing, u, I, $xval, t, $pval, cache)
+        end
+        function execute!(
+            u::AbstractArray,
+            U::AbstractArray,
+            I::Interpreter,
+            $xarg,
+            t,
+            $parg,
+            cache::InterpreterCache = InterpreterCache(I, $xval, $pval),
+        )
+            _execute!(u, U, I, $xval, t, $pval, cache)
         end
     end
 end
@@ -415,17 +509,15 @@ end
 
         if I.out isa AbstractMatrix
             for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
-                U[i, j] = begin
-                    @unpack data, ind = I.out[i, j]
-                    if data == DATA_I
-                        convert(eltype(U), instructions[ind])
-                    elseif data == DATA_X
-                        convert(eltype(U), x[ind])
-                    elseif data == DATA_P
-                        convert(eltype(U), p[ind])
-                    elseif data == DATA_C
-                        convert(eltype(U), constants[ind])
-                    end
+                @unpack data, ind = I.out[i, j]
+                if data == DATA_I
+                    U[i, j] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[i, j] = convert(eltype(U), x[ind])
+                elseif data == DATA_P
+                    U[i, j] = convert(eltype(U), p[ind])
+                elseif data == DATA_C
+                    U[i, j] = convert(eltype(U), constants[ind])
                 end
             end
         else
@@ -450,6 +542,166 @@ end
                     u[k] = convert(eltype(u), instructions[ind])
                 elseif data == DATA_X
                     u[k] = convert(eltype(u), x[ind])
+                elseif data == DATA_P
+                    u[k] = convert(eltype(u), p[ind])
+                elseif data == DATA_C
+                    u[k] = convert(eltype(u), constants[ind])
+                end
+            end
+        end
+        U
+    end
+
+    # homotopy versions
+    function _execute!(
+        u::Union{Nothing,AbstractVector},
+        U::AbstractArray,
+        I::Interpreter,
+        x::AbstractArray,
+        t,
+        ::Nothing = nothing,
+        cache::InterpreterCache = InterpreterCache(I, x),
+    )
+        instructions = cache.instructions
+        constants = I.constants
+        for (i, instr) in enumerate(I.instructions)
+            op = instr.op
+            arg1, arg2 = instr.args
+            $(
+                data_block(
+                    :(arg1.data),
+                    :(arg2.data);
+                    parameters = false,
+                    t = true,
+                ) do data1, data2
+                    make_op_block(
+                        :(instructions[i]),
+                        :op,
+                        gen_access(data1, :(arg1.ind)),
+                        gen_access(data2, :(arg2.ind)),
+                    )
+                end
+            )
+        end
+        if I.out isa AbstractMatrix
+            for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
+                @unpack data, ind = I.out[i, j]
+                if data == DATA_I
+                    U[i, j] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[i, j] = convert(eltype(U), x[ind])
+                elseif data == DATA_T
+                    U[i, j] = convert(eltype(U), t)
+                elseif data == DATA_C
+                    U[i, j] = convert(eltype(U), constants[ind])
+                end
+            end
+        else
+            for k in eachindex(I.out)
+                @unpack data, ind = I.out[k]
+                if data == DATA_I
+                    U[k] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[k] = convert(eltype(U), x[ind])
+                elseif data == DATA_T
+                    U[k] = convert(eltype(U), t)
+                elseif data == DATA_C
+                    U[k] = convert(eltype(U), constants[ind])
+                end
+            end
+        end
+
+        if !isa(u, Nothing)
+            for k in eachindex(I.eval_out)
+                @unpack data, ind = I.eval_out[k]
+                if data == DATA_I
+                    u[k] = convert(eltype(u), instructions[ind])
+                elseif data == DATA_X
+                    u[k] = convert(eltype(u), x[ind])
+                elseif data == DATA_T
+                    u[k] = convert(eltype(u), t)
+                elseif data == DATA_C
+                    u[k] = convert(eltype(u), constants[ind])
+                end
+            end
+        end
+        U
+    end
+
+    function _execute!(
+        u::Union{Nothing,AbstractVector},
+        U::AbstractArray,
+        I::Interpreter,
+        x::AbstractArray,
+        t,
+        p::AbstractArray,
+        cache::InterpreterCache = InterpreterCache(I, x, p),
+    )
+        instructions = cache.instructions
+        constants = I.constants
+        for (i, instr) in enumerate(I.instructions)
+            op = instr.op
+            arg1, arg2 = instr.args
+            $(
+                data_block(
+                    :(arg1.data),
+                    :(arg2.data);
+                    parameters = true,
+                    t = true,
+                ) do data1, data2
+                    make_op_block(
+                        :(instructions[i]),
+                        :op,
+                        gen_access(data1, :(arg1.ind)),
+                        gen_access(data2, :(arg2.ind)),
+                    )
+                end
+            )
+        end
+
+        if I.out isa AbstractMatrix
+            for j = 1:size(I.out, 2), i = 1:size(I.out, 1)
+                U[i, j] = begin
+                    @unpack data, ind = I.out[i, j]
+                    if data == DATA_I
+                        convert(eltype(U), instructions[ind])
+                    elseif data == DATA_X
+                        convert(eltype(U), x[ind])
+                    elseif data == DATA_T
+                        convert(eltype(U), t)
+                    elseif data == DATA_P
+                        convert(eltype(U), p[ind])
+                    elseif data == DATA_C
+                        convert(eltype(U), constants[ind])
+                    end
+                end
+            end
+        else
+            for k in eachindex(I.out)
+                @unpack data, ind = I.out[k]
+                if data == DATA_I
+                    U[k] = convert(eltype(U), instructions[ind])
+                elseif data == DATA_X
+                    U[k] = convert(eltype(U), x[ind])
+                elseif data == DATA_T
+                    U[k] = convert(eltype(U), t)
+                elseif data == DATA_P
+                    U[k] = convert(eltype(U), p[ind])
+                elseif data == DATA_C
+                    U[k] = convert(eltype(U), constants[ind])
+                end
+            end
+        end
+
+        if !isa(u, Nothing)
+            for k in eachindex(I.eval_out)
+                @unpack data, ind = I.eval_out[k]
+                if data == DATA_I
+                    u[k] = convert(eltype(u), instructions[ind])
+                elseif data == DATA_X
+                    u[k] = convert(eltype(u), x[ind])
+                elseif data == DATA_T
+                    u[k] = convert(eltype(u), t)
                 elseif data == DATA_P
                     u[k] = convert(eltype(u), p[ind])
                 elseif data == DATA_C

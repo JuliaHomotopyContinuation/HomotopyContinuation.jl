@@ -1126,6 +1126,7 @@ function optimize(F::System)
     )
 end
 
+
 ## Conversion from MultivariatePolynomials
 function system_with_coefficents_as_params(
     F::AbstractVector{<:MP.AbstractPolynomial};
@@ -1331,4 +1332,14 @@ function to_smallest_eltype(A::AbstractArray)
         end
     end
     convert.(T, A)
+end
+
+
+function optimize(H::Homotopy)
+    Homotopy(
+        horner.(H.expressions, Ref(H.variables)),
+        H.variables,
+        H.t,
+        H.parameters,
+    )
 end

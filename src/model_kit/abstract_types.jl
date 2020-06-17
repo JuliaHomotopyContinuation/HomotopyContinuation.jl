@@ -1,4 +1,4 @@
-export AbstractSystem
+export AbstractSystem, AbstractHomotopy, jacobian
 
 """
     AbstractSystem
@@ -78,19 +78,26 @@ end
 ## Homotopy ##
 ##############
 
+"""
+    AbstractHomotopy
+
+An abstract type representing a homotopy ``H(x, t)`` where ``x`` are variables
+and ``t`` is space / time.
+"""
 abstract type AbstractHomotopy end
 
-Base.size(H::AbstractHomotopy, i::Integer) = size(H)[i]
+Base.size(H::AbstractHomotopy, i::Integer) = i == 1 ? first(size(H)) : last(size(H))
 
 (H::AbstractHomotopy)(x, t, p = nothing) = evaluate(H, x, t, p)
 function evaluate(H::AbstractHomotopy, x, t, p = nothing)
-    n = first(size(H))
-    U = Vector{Any}(undef, n)
+    U = Vector{Any}(undef, first(size(H)))
     to_smallest_eltype(evaluate!(U, H, x, t, p))
 end
 
 function jacobian(H::AbstractHomotopy, x, t, p = nothing)
     n, m = size(H)
-    U = Matrix{Any}(undef, n, m)
-    to_smallest_eltype(jacobian!(U, H, x, t, p))
+    u = Vector{Any}(undef, size(H, 1))
+    U = Matrix{Any}(undef, size(H))
+    evaluate_and_jacobian!(u, U, H, x, t, p)
+    to_smallest_eltype(U)
 end
