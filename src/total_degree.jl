@@ -16,11 +16,11 @@ a start system following [^Wam93] will be constructed.
 
 [^Wam93]: An efficient start system for multi-homogeneous polynomial continuation, Wampler, C.W. Numer. Math. (1993) 66: 517. https://doi.org/10.1007/BF01385710
 """
-function total_degree(F::Union{System,AbstractSystem}; kwargs...)
+function total_degree(F::Union{System,AbstractSystem}; compile::Bool = COMPILE_DEFAULT[], kwargs...)
     if isa(F, AbstractSystem) || isnothing(variable_groups(F))
-        return total_degree_variables(F; kwargs...)
+        return total_degree_variables(F; compile = compile, kwargs...)
     else
-        return total_degree_variable_groups(F; kwargs...)
+        return total_degree_variable_groups(F; compile = compile, kwargs...)
     end
 end
 
@@ -32,6 +32,7 @@ function total_degree_variables(
     gamma = γ,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    compile::Bool = COMPILE_DEFAULT[],
     kwargs...,
 )
     unsupported_kwargs(kwargs)
@@ -69,7 +70,7 @@ function total_degree_variables(
     end
 
     if F isa System
-        F = CompiledSystem(F)
+        F = fixed(F; compile = compile)
     end
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters)
@@ -89,13 +90,13 @@ function total_degree_variables(
         D = D[1:n]
     end
     if homogeneous
-        G = CompiledSystem(System(
+        G = fixed(System(
             s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]),
             x,
             s[1:n-1],
-        ))
+        ); compile = compile)
     else
-        G = CompiledSystem(System(s .* (x .^ D .- 1), x, s); optimizations = false)
+        G = fixed(System(s .* (x .^ D .- 1), x, s); compile = compile, optimizations = false)
     end
     G = fix_parameters(G, scaling)
 
@@ -120,6 +121,7 @@ function total_degree_variable_groups(
     target_parameters = nothing,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    compile::Bool = COMPILE_DEFAULT[],
     kwargs...,
 )
     unsupported_kwargs(kwargs)
@@ -134,7 +136,7 @@ function total_degree_variable_groups(
 
     overdetermined = m > n - M * homogeneous
 
-    F = CompiledSystem(F)
+    F = fixed(F; compile = compile)
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters)
     end
@@ -154,7 +156,7 @@ function total_degree_variable_groups(
     g, C = multi_homogeneous_system(D, vargroups; homogeneous = homogeneous)
     P = parameters(g)
     p = randn(length(P))
-    G = fix_parameters(CompiledSystem(g), p)
+    G = fix_parameters(fixed(g; compile = compile), p)
     starts = MultiBezoutSolutionsIterator(
         D,
         C(P => p),

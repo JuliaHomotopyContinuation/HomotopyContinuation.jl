@@ -28,7 +28,8 @@ function RandomizedSystem(F::Union{AbstractSystem,System}, k::Integer)
     A = randn(ComplexF64, k, n - k)
     RandomizedSystem(F, A)
 end
-RandomizedSystem(F::System, A::Matrix{ComplexF64}) = RandomizedSystem(CompiledSystem(F), A)
+RandomizedSystem(F::System, A::Matrix{ComplexF64}; compile::Bool = COMPILE_DEFAULT[]) =
+    RandomizedSystem(fixed(F; compile = compile), A)
 function RandomizedSystem(F::AbstractSystem, A::Matrix{ComplexF64})
     n, N = size(F)
     n > N || throw(ArgumentError("Then given system is not overdetermined."))

@@ -10,7 +10,8 @@ struct FixedParameterHomotopy{S<:AbstractHomotopy,T} <: AbstractHomotopy
     homotopy::S
     parameters::Vector{T}
 end
-FixedParameterHomotopy(H::Homotopy, p) = FixedParameterHomotopy(CompiledHomotopy(H), p)
+FixedParameterHomotopy(H::Homotopy, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterHomotopy(fixed(H; compile = compile), p)
 Base.size(H::FixedParameterHomotopy) = size(H.homotopy)
 
 ModelKit.variables(H::FixedParameterHomotopy) = variables(H.homotopy)
@@ -22,7 +23,7 @@ ModelKit.variable_groups(H::FixedParameterHomotopy) = variable_groups(H.homotopy
 ModelKit.evaluate!(u, H::FixedParameterHomotopy, x, t) =
     evaluate!(u, H.homotopy, x, t, H.parameters)
 ModelKit.evaluate_and_jacobian!(u, U, H::FixedParameterHomotopy, x, t) =
-    evaluate_and_jacobian!(u, U, H.homotopy, x, t,H.parameters)
+    evaluate_and_jacobian!(u, U, H.homotopy, x, t, H.parameters)
 ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t) =
     taylor!(u, v, H.homotopy, tx, t, H.parameters)
 

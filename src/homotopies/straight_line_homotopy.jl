@@ -20,8 +20,17 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     dv_target::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
 end
 
-function StraightLineHomotopy(start::ModelKit.System, target::ModelKit.System; kwargs...)
-    StraightLineHomotopy(CompiledSystem(start), CompiledSystem(target); kwargs...)
+function StraightLineHomotopy(
+    start::System,
+    target::System;
+    compile::Bool = COMPILE_DEFAULT[],
+    kwargs...,
+)
+    StraightLineHomotopy(
+        fixed(start; compile = compile),
+        fixed(target; compile = compile);
+        kwargs...,
+    )
 end
 function StraightLineHomotopy(
     start::AbstractSystem,
@@ -99,7 +108,13 @@ function ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
     end
     u
 end
-function ModelKit.taylor!(u, v::Val{K}, H::StraightLineHomotopy, tx::TaylorVector, t) where {K}
+function ModelKit.taylor!(
+    u,
+    v::Val{K},
+    H::StraightLineHomotopy,
+    tx::TaylorVector,
+    t,
+) where {K}
     taylor!(H.dv_start, v, H.start, tx)
     taylor!(H.dv_target, v, H.target, tx)
 

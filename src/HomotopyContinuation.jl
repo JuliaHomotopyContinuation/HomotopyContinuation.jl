@@ -29,6 +29,8 @@ export @polyvar
 
 using ProjectiveVectors: PVector, dims, dimension_indices
 
+const COMPILE_DEFAULT = Ref(true)
+
 include("utils.jl")
 include("norm.jl")
 include("voronoi_tree.jl")

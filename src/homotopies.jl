@@ -1,3 +1,7 @@
+fixed(H::AbstractHomotopy; kwargs...) = H
+fixed(H::Homotopy; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
+    compile ? CompiledHomotopy(H; kwargs...) : InterpretedHomotopy(H; kwargs...)
+
 function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector, t)
     x .= y
 end

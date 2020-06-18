@@ -95,6 +95,7 @@ function solver_startsolutions(
     start_parameters = p₁,
     p₀ = generic_parameters,
     target_parameters = p₀,
+    compile::Bool = COMPILE_DEFAULT[],
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
@@ -105,14 +106,25 @@ function solver_startsolutions(
             F;
             start_parameters = start_parameters,
             target_parameters = target_parameters,
+            compile = compile,
             kwargs...,
         )
     elseif start_system == :polyhedral
         used_start_system = :polyhedral
-        tracker, starts = polyhedral(F; target_parameters = target_parameters, kwargs...)
+        tracker, starts = polyhedral(
+            F;
+            compile = compile,
+            target_parameters = target_parameters,
+            kwargs...,
+        )
     elseif start_system == :total_degree
         used_start_system = :total_degree
-        tracker, starts = total_degree(F; target_parameters = target_parameters, kwargs...)
+        tracker, starts = total_degree(
+            F;
+            compile = compile,
+            target_parameters = target_parameters,
+            kwargs...,
+        )
     else
         throw(KeywordArgumentException(
             :start_system,
@@ -150,13 +162,14 @@ function parameter_homotopy(
     target_parameters = p₀,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(),
+    compile::Bool = COMPILE_DEFAULT[],
     kwargs...,
 )
     unsupported_kwargs(kwargs)
     isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
     isnothing(target_parameters) && throw(UndefKeywordError(:target_parameters))
     m, n = size(F)
-    H = ParameterHomotopy(F, start_parameters, target_parameters)
+    H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
     if is_homogeneous(f)
         vargroups = variable_groups(f)
@@ -179,6 +192,7 @@ function start_target_homotopy(
     F::Union{System,AbstractSystem};
     start_parameters = nothing,
     target_parameters = nothing,
+    compile::Bool = COMPILE_DEFAULT[],
     γ = 1.0,
     gamma = γ,
     kwargs...,
@@ -194,10 +208,12 @@ function start_target_homotopy(
 
     m, n = size(F)
 
+    G = fixed(G; compile = compile)
     if !isnothing(start_parameters)
         G = FixedParameterSystem(G, start_parameters)
     end
 
+    F = fixed(F; compile = compile)
     if !isnothing(target_parameters)
         F = FixedParameterSystem(F, target_parameters)
     end
@@ -222,11 +238,12 @@ end
 function solver_startsolutions(
     H::Union{Homotopy,AbstractHomotopy},
     starts = nothing;
+    compile::Bool = COMPILE_DEFAULT[],
     seed = nothing,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    Solver(EndgameTracker(H); seed = seed), starts
+    Solver(EndgameTracker(fixed(H; compile = compile)); seed = seed), starts
 end
 
 """
@@ -251,6 +268,11 @@ projective space are computed.
 The `solve` routines takes the following options:
 * `catch_interrupt = true`: If this is `true`, the computation is gracefully stopped and a
   partial result is returned when the computation is interruped.
+* `compile = $(COMPILE_DEFAULT[])`: If `true` then a `System` (resp. `Homotopy`) is compiled
+  to a straight line program ([`CompiledSystem`](@ref) resp. [`CompiledHomotopy`](@ref))
+  for evaluation. This induces a compilation overhead. If `false` then the generated program
+  is only interpreted ([`InterpretedSystem`](@ref) resp. [`InterpretedHomotopy`](@ref)).
+  This is slower than the compiled version, but does not introduce compilation overhead.
 * `endgame_options`: The options and parameters for the endgame.
   Expects an [`EndgameOptions`](@ref) struct.
 * `seed`: The random seed used during the computations. The seed is also reported in the
@@ -261,7 +283,6 @@ The `solve` routines takes the following options:
   then no further paths are tracked and the computation is finished. This is only called
   for successfull paths. This is for example useful if you only want to compute one solution
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
-
 * `threading = true`: Enable multi-threading for the computation. The number of
   available threads is controlled by the environment variable `JULIA_NUM_THREADS`.
 * `tracker_options`: The options and parameters for the path tracker. Expects a

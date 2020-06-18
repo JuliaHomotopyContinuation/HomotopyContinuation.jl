@@ -51,10 +51,20 @@ function Base.show(io::IO, C::CompositionSystem)
 end
 
 (C::CompositionSystem)(x, p = nothing) = C.g(C.f(x, p), p)
-function ModelKit.evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexF64}, p = nothing)
+function ModelKit.evaluate!(
+    u,
+    C::CompositionSystem,
+    x::AbstractVector{ComplexF64},
+    p = nothing,
+)
     evaluate!(u, C.g, evaluate!(C.f_u, C.f, x, p), p)
 end
-function ModelKit.evaluate!(u, C::CompositionSystem, x::AbstractVector{ComplexDF64}, p = nothing)
+function ModelKit.evaluate!(
+    u,
+    C::CompositionSystem,
+    x::AbstractVector{ComplexDF64},
+    p = nothing,
+)
     evaluate!(u, C.g, evaluate!(C.f_ū, C.f, x, p), p)
 end
 
@@ -115,14 +125,16 @@ julia> (g ∘ f)([x,y,z])
  (x + z)*(y + z)*(x + y)
 ```
 """
-compose(g::AbstractSystem, f::AbstractSystem) = CompositionSystem(g, f)
-compose(g::AbstractSystem, f::System) = CompositionSystem(g, CompiledSystem(f))
-function compose(g::System, f::System)
+compose(g::AbstractSystem, f::AbstractSystem; compile::Bool = COMPILE_DEFAULT[]) =
+    CompositionSystem(g, f)
+compose(g::AbstractSystem, f::System; compile::Bool = COMPILE_DEFAULT[]) =
+    CompositionSystem(g, fixed(f; compile = compile))
+function compose(g::System, f::System; compile::Bool = COMPILE_DEFAULT[])
     pg = parameters(g)
     pf = parameters(f)
     (isempty(pf) || isempty(pg) || pf == pg) ||
         throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
-    CompositionSystem(CompiledSystem(g), CompiledSystem(f))
+    CompositionSystem(fixed(g; compile = compile), fixed(f; compile = compile))
 end
 import Base: ∘
 ∘(g::Union{AbstractSystem,System}, f::Union{AbstractSystem,System}) = compose(g, f)

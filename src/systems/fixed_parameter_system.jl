@@ -10,7 +10,8 @@ struct FixedParameterSystem{S<:AbstractSystem,T} <: AbstractSystem
     system::S
     parameters::Vector{T}
 end
-FixedParameterSystem(F::System, p) = FixedParameterSystem(CompiledSystem(F), p)
+FixedParameterSystem(F::System, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterSystem(fixed(F; compile = compile), p)
 Base.size(F::FixedParameterSystem) = size(F.system)
 
 ModelKit.variables(F::FixedParameterSystem) = variables(F.system)

@@ -393,6 +393,7 @@ end
 
 function MonodromySolver(
     F::Union{System,AbstractSystem};
+    compile::Bool = COMPILE_DEFAULT[],
     tracker_options = TrackerOptions(),
     options = MonodromyOptions(),
 )
@@ -402,6 +403,7 @@ function MonodromySolver(
 
     egtracker = parameter_homotopy(
         F;
+        compile = compile,
         generic_parameters = randn(ComplexF64, nparameters(F)),
         tracker_options = tracker_options,
         endgame_options = EndgameOptions(endgame_start = 0.0),
@@ -471,6 +473,7 @@ function monodromy_solve(
     tracker_options = TrackerOptions(),
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    compile::Bool = COMPILE_DEFAULT[],
     # monodromy options
     options = nothing,
     group_action = nothing,
@@ -487,9 +490,14 @@ function monodromy_solve(
     if !isnothing(seed)
         Random.seed!(seed)
     end
-    MS = MonodromySolver(F; options = options, tracker_options = tracker_options)
+    MS = MonodromySolver(
+        F;
+        compile = compile,
+        options = options,
+        tracker_options = tracker_options,
+    )
     if length(args) == 0
-        start_pair = find_start_pair(F)
+        start_pair = find_start_pair(fixed(F; compile = compile))
         if isnothing(start_pair)
             error(
                 "Cannot compute a start pair (x, p) using `find_start_pair(F)`." *
@@ -522,7 +530,8 @@ end
 Try to find a pair `(x,p)` for the system `F` such that `F(x,p) = 0` by randomly sampling
 a pair `(x₀, p₀)` and performing Newton's method in variable *and* parameter space.
 """
-find_start_pair(F::System; kwargs...) = find_start_pair(CompiledSystem(F); kwargs...)
+find_start_pair(F::System; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
+    find_start_pair(fixed(F; compile = compile); kwargs...)
 function find_start_pair(
     F::AbstractSystem;
     max_tries::Int = 100,
@@ -860,7 +869,6 @@ function threaded_monodromy_solve!(
         for i = 1:length(results)
             push!(queue, LoopTrackingJob(i, new_loop_id))
         end
-        # Threads.atomic_add!(queued, length(results))
 
         lock(notify_lock)
         wait(cond_queue_emptied)

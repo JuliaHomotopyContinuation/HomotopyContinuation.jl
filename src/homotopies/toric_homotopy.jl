@@ -12,8 +12,8 @@ const StructVectorComplexF64 = StructArrays.StructArray{
     Int64,
 }
 
-Base.@kwdef struct ToricHomotopy{S} <: AbstractHomotopy
-    system::ModelKit.CompiledSystem{S}
+Base.@kwdef struct ToricHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+    system::S
     system_coeffs::Vector{ComplexF64}
     weights::Vector{Float64}
 
@@ -34,10 +34,7 @@ Base.@kwdef struct ToricHomotopy{S} <: AbstractHomotopy
     tc2::TaylorVector{3,ComplexF64}
 end
 
-function ToricHomotopy(
-    system::ModelKit.CompiledSystem,
-    system_coeffs::Vector{Vector{ComplexF64}},
-)
+function ToricHomotopy(system::AbstractSystem, system_coeffs::Vector{Vector{ComplexF64}})
     m = ModelKit.nparameters(system)
     m1 = sum(length, system_coeffs)
     m == m1 ||

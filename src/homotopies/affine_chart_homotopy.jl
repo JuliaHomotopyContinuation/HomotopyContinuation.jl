@@ -18,8 +18,8 @@ end
 Construct an `AffineChartHomotopy` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.
 """
-function on_affine_chart(H::Homotopy, proj_dims = nothing)
-    on_affine_chart(CompiledHomotopy(H), proj_dims)
+function on_affine_chart(H::Homotopy, proj_dims = nothing; compile::Bool = COMPILE_DEFAULT[])
+    on_affine_chart(fixed(H; compile = compile), proj_dims)
 end
 function on_affine_chart(H::AbstractHomotopy, proj_dims = nothing)
     if proj_dims === nothing

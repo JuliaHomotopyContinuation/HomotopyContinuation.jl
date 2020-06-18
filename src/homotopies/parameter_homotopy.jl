@@ -24,8 +24,13 @@ function ParameterHomotopy(
 )
     ParameterHomotopy(F, start_parameters, target_parameters)
 end
-function ParameterHomotopy(F::ModelKit.System, p::AbstractVector, q::AbstractVector)
-    ParameterHomotopy(CompiledSystem(F), p, q)
+function ParameterHomotopy(
+    F::ModelKit.System,
+    p::AbstractVector,
+    q::AbstractVector;
+    compile::Bool = COMPILE_DEFAULT[],
+)
+    ParameterHomotopy(fixed(F; compile = compile), p, q)
 end
 function ParameterHomotopy(F::AbstractSystem, p::AbstractVector, q::AbstractVector)
     @assert length(p) == length(q) == nparameters(F)

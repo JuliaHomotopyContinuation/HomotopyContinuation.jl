@@ -434,7 +434,8 @@ struct Tracker{H<:AbstractHomotopy,AD,M<:AbstractMatrix{ComplexF64}}
     options::TrackerOptions
 end
 
-Tracker(H::ModelKit.Homotopy; kwargs...) = Tracker(CompiledHomotopy(H); kwargs...)
+Tracker(H::ModelKit.Homotopy; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
+    Tracker(fixed(H; compile = compile); kwargs...)
 function Tracker(
     H::AbstractHomotopy,
     x::AbstractVector = zeros(size(H, 2));
