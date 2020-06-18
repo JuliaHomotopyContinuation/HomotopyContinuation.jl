@@ -18,7 +18,11 @@ end
 Construct an `AffineChartHomotopy` on a randomly generated chart `v`. Each entry is drawn
 idepdently from a univariate normal distribution.
 """
-function on_affine_chart(H::Homotopy, proj_dims = nothing; compile::Bool = COMPILE_DEFAULT[])
+function on_affine_chart(
+    H::Homotopy,
+    proj_dims = nothing;
+    compile::Bool = COMPILE_DEFAULT[],
+)
     on_affine_chart(fixed(H; compile = compile), proj_dims)
 end
 function on_affine_chart(H::AbstractHomotopy, proj_dims = nothing)
@@ -59,7 +63,12 @@ function on_chart!(x::AbstractVector, v::PVector)
     x
 end
 
-function ModelKit.evaluate!(u, H::AffineChartHomotopy{<:Any,N}, x::AbstractVector, t) where {N}
+function ModelKit.evaluate!(
+    u,
+    H::AffineChartHomotopy{<:Any,N},
+    x::AbstractVector,
+    t,
+) where {N}
     evaluate!(u, H.homotopy, x, t)
     evaluate_chart!(u, H.chart, x)
     u

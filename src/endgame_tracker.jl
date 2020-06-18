@@ -428,7 +428,11 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
          which is recorded now.
         =#
         state.col_scaling .= weights(tracker.state.norm)
-        row_scaling!(state.row_scaling, workspace(tracker.state.jacobian), state.col_scaling)
+        row_scaling!(
+            state.row_scaling,
+            workspace(tracker.state.jacobian),
+            state.col_scaling,
+        )
         κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
         state.cond_eg_start = κ
 

@@ -16,7 +16,11 @@ a start system following [^Wam93] will be constructed.
 
 [^Wam93]: An efficient start system for multi-homogeneous polynomial continuation, Wampler, C.W. Numer. Math. (1993) 66: 517. https://doi.org/10.1007/BF01385710
 """
-function total_degree(F::Union{System,AbstractSystem}; compile::Bool = COMPILE_DEFAULT[], kwargs...)
+function total_degree(
+    F::Union{System,AbstractSystem};
+    compile::Bool = COMPILE_DEFAULT[],
+    kwargs...,
+)
     if isa(F, AbstractSystem) || isnothing(variable_groups(F))
         return total_degree_variables(F; compile = compile, kwargs...)
     else
@@ -90,13 +94,16 @@ function total_degree_variables(
         D = D[1:n]
     end
     if homogeneous
-        G = fixed(System(
-            s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]),
-            x,
-            s[1:n-1],
-        ); compile = compile)
+        G = fixed(
+            System(s[1:n-1] .* (x[1:n-1] .^ D[1:n-1] .- x[end] .^ D[1:n-1]), x, s[1:n-1]);
+            compile = compile,
+        )
     else
-        G = fixed(System(s .* (x .^ D .- 1), x, s); compile = compile, optimizations = false)
+        G = fixed(
+            System(s .* (x .^ D .- 1), x, s);
+            compile = compile,
+            optimizations = false,
+        )
     end
     G = fix_parameters(G, scaling)
 

@@ -1336,10 +1336,5 @@ end
 
 
 function optimize(H::Homotopy)
-    Homotopy(
-        horner.(H.expressions, Ref(H.variables)),
-        H.variables,
-        H.t,
-        H.parameters,
-    )
+    Homotopy(horner.(H.expressions, Ref(H.variables)), H.variables, H.t, H.parameters)
 end

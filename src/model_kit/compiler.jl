@@ -246,13 +246,7 @@ function _functions_taylor!_impl(::Type{T}, K::Int; highest_order_only::Bool) wh
     end
 end
 
-function _inline_taylor!_impl(
-    T::Type,
-    K,
-    dx,
-    dp;
-    highest_order_only::Bool,
-)
+function _inline_taylor!_impl(T::Type, K, dx, dp; highest_order_only::Bool)
     H = interpret(T)
     # @show H
     checks, var_map = boundscheck_var_map(H; taylor = true)
