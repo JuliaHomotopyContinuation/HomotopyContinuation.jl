@@ -2,52 +2,52 @@
 
     @testset "total degree (simple)" begin
         @var x y
-        affine_square = System([
+        affine_sqr = System([
             2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
             2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
         ])
-        @test count(is_success, track.(total_degree(affine_square)...)) == 2
+        @test count(is_success, track.(total_degree(affine_sqr; compile = false)...)) == 2
 
         @var x y z
         proj_square = System([
             2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + 3 * z^2,
             2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - 5 * z^2,
         ])
-        @test count(is_success, track.(total_degree(proj_square)...)) == 4
+        @test count(is_success, track.(total_degree(proj_square; compile = false)...)) == 4
 
         @var x y
-        affine_overdetermined = System([
+        affine_ov = System([
             (x^2 + y^2 + x * y - 3) * (x + 3),
             (x^2 + y^2 + x * y - 3) * (y - x + 2),
             2x + 5y - 3,
         ])
-        @test count(is_success, track.(total_degree(affine_overdetermined)...)) == 2
+        @test count(is_success, track.(total_degree(affine_ov; compile = false)...)) == 2
 
         @var x y
-        affine_overdetermined_reordering = System([
+        affine_ov_reordering = System([
             (x^2 + y^2 + x * y - 3) * (x + 3),
             2x + 5y - 3,
             (x^2 + y^2 + x * y - 3) * (y^2 - x + 2),
         ])
-        tracker, starts = total_degree(affine_overdetermined_reordering)
+        tracker, starts = total_degree(affine_ov_reordering; compile = false)
         @test length(starts) == 4 * 3
         @test count(is_success, track.(tracker, starts)) == 2
 
         @var x y z
-        proj_overdetermined = System([
+        proj_ov = System([
             (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
             (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
             2x + 5y - 3z,
         ])
-        @test count(is_success, track.(total_degree(proj_overdetermined)...)) == 2
+        @test count(is_success, track.(total_degree(proj_ov; compile = false)...)) == 2
 
         @var x y
-        proj_overdetermined_reordering = System([
+        proj_ov_reordering = System([
             (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
             2x + 5y - 3z,
             (x^2 + y^2 + x * y - 3 * z^2) * (y^2 - x * z + 2 * z^2),
         ])
-        tracker, starts = total_degree(proj_overdetermined_reordering)
+        tracker, starts = total_degree(proj_ov_reordering; compile = false)
         @test length(starts) == 4 * 3
         @test count(is_success, track.(tracker, starts)) == 2
 
@@ -63,7 +63,7 @@
     @testset "total degree (variable groups)" begin
         @var x y v w
         affine_sqr = System([x * y - 2, x^2 - 4], variable_groups = [[x], [y]])
-        tracker, starts = total_degree(affine_sqr)
+        tracker, starts = total_degree(affine_sqr; compile = false)
         @test length(collect(starts)) == 2
         @test count(is_success, track.(tracker, starts)) == 2
 
@@ -75,51 +75,51 @@
         @test count(is_success, track.(tracker, starts)) == 2
 
         @var x y v w
-        affine_overdetermined = System(
+        affine_ov = System(
             [(x^2 - 4) * (x * y - 2), x * y - 2, x^2 - 4],
             variable_groups = [[x], [y]],
         )
-        tracker, starts = total_degree(affine_overdetermined)
+        tracker, starts = total_degree(affine_ov; compile = false)
         @test count(is_success, track.(tracker, starts)) == 2
         @var x y v w
-        proj_overdetermined = System(
+        proj_ov = System(
             [(x^2 - 4 * v^2) * (x * y - v * w), x * y - v * w, x^2 - v^2],
             variable_groups = [[x, v], [y, w]],
         )
-        tracker, starts = total_degree(proj_overdetermined)
+        tracker, starts = total_degree(proj_ov; compile = false)
         @test count(is_success, track.(tracker, starts)) == 2
     end
 
     @testset "polyhedral" begin
         @var x y
-        affine_square = System([
+        affine_sqr = System([
             2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
             2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
         ])
-        @test count(is_success, track.(polyhedral(affine_square)...)) == 2
+        @test count(is_success, track.(polyhedral(affine_sqr; compile = false)...)) == 2
 
         @var x y z
         proj_square = System([
             2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + 3 * z^2,
             2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - 5 * z^2,
         ])
-        @test count(is_success, track.(polyhedral(proj_square)...)) == 4
+        @test count(is_success, track.(polyhedral(proj_square; compile = false)...)) == 4
 
         @var x y
-        affine_overdetermined = System([
+        affine_ov = System([
             (x^2 + y^2 + x * y - 3) * (x + 3),
             (x^2 + y^2 + x * y - 3) * (y - x + 2),
             2x + 5y - 3,
         ])
-        @test count(is_success, track.(polyhedral(affine_overdetermined)...)) == 2
+        @test count(is_success, track.(polyhedral(affine_ov; compile = false)...)) == 2
 
         @var x y z
-        proj_overdetermined = System([
+        proj_ov = System([
             (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
             (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
             2x + 5y - 3z,
         ])
-        @test count(is_success, track.(polyhedral(proj_overdetermined)...)) == 2
+        @test count(is_success, track.(polyhedral(proj_ov; compile = false)...)) == 2
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
@@ -132,7 +132,7 @@
 
     @testset "overdetermined" begin
         @testset "3 by 5 minors" begin
-            res = solve(minors(); start_system = :total_degree)
+            res = solve(minors(); start_system = :total_degree, compile = false)
             @test count(is_success, res) == 80
             @test count(is_excess_solution, res) == 136
         end
@@ -194,7 +194,7 @@
         f = System([a * b - 2, a * c - 1])
         g = System([x + y, y + 3, x + 2])
 
-        res = solve(e ∘ f ∘ g; start_system = :total_degree)
+        res = solve(e ∘ f ∘ g; start_system = :total_degree, compile = false)
         @test nsolutions(res) == 2
 
         res = solve(e ∘ f ∘ g; start_system = :polyhedral)
@@ -221,7 +221,7 @@
         res = solve(F, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
         @test nsolutions(res) == 1
         res = solve(
-            ModelKitSystem(F),
+            InterpretedSystem(F),
             [s];
             start_parameters = [1, 0],
             target_parameters = [2, 4],
@@ -245,7 +245,7 @@
         s = [1, 1, 1]
         res = solve(F_proj, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
         @test nsolutions(res) == 1
-        res = solve(ModelKitSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
+        res = solve(InterpretedSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
         @test nsolutions(res) == 1
 
         F_proj_err = System([x * y + (b - a) * z^2], [x, y, z], [a, b])
@@ -274,7 +274,7 @@
         ]
         res = solve(F_multi_proj, S; start_parameters = [2, 4], target_parameters = [3, 5])
         @test nsolutions(res) == 2
-        res = solve(ModelKitSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
+        res = solve(InterpretedSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
         @test nsolutions(res) == 2
 
         F_multi_proj_err = System(
@@ -339,6 +339,7 @@
             parameters = [a, b],
             start_parameters = [1, 0],
             target_parameters = [2, 4],
+            compile = false,
         )
         @test nsolutions(res) == 1
         res2 = solve(
@@ -348,6 +349,7 @@
             parameters = [a, b],
             start_parameters = [1, 0],
             target_parameters = [2, 4],
+            compile = false,
         )
         s = solutions(res)[1]
         s2 = solutions(res2)[1]

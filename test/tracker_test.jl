@@ -100,6 +100,36 @@
         @test is_success(track(tracker, S[2], 1, 0))
     end
 
+    @testset "Compiled/InterpretedHomotopy" begin
+        @var x y t γ
+        H = Homotopy(
+            t * γ * [x^2 - 1, y^2 - 1] + (1 - t) .* [2 * x^2 - 4 + 2x * y, y^2 - 5],
+            [x, y],
+            t,
+            [γ],
+        )
+        S = total_degree_start_solutions([2, 2])
+        for make in [CompiledHomotopy, InterpretedHomotopy]
+            tracker = Tracker(
+                fix_parameters(make(H), [randn(ComplexF64)]);
+                options = (automatic_differentiation = 3,),
+            )
+            @test all(is_success, track.(tracker, S))
+        end
+
+        # also test without parameters
+        γ = randn(ComplexF64)
+        H = Homotopy(
+            t * γ * [x^2 - 1, y^2 - 1] + (1 - t) .* [2 * x^2 - 4 + 2x * y, y^2 - 5],
+            [x, y],
+            t,
+        )
+        for make in [CompiledHomotopy, InterpretedHomotopy]
+            tracker = Tracker(make(H); options = (automatic_differentiation = 1,))
+            @test all(is_success, track.(tracker, S))
+        end
+    end
+
     include("test_cases/steiner_higher_prec.jl")
     include("test_cases/four_bar.jl")
 end

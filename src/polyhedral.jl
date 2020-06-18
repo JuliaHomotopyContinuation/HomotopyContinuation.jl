@@ -164,10 +164,15 @@ function polyhedral(F::AbstractSystem; kwargs...)
     @var x[1:n]
     polyhedral(System(F(x), x); kwargs...)
 end
-function polyhedral(f::System; target_parameters = nothing, kwargs...)
+function polyhedral(
+    f::System;
+    compile::Bool = COMPILE_DEFAULT[],
+    target_parameters = nothing,
+    kwargs...,
+)
     if target_parameters !== nothing
         return polyhedral(
-            FixedParameterSystem(ModelKitSystem(f), target_parameters);
+            FixedParameterSystem(fixed(f; compile = compile), target_parameters);
             kwargs...,
         )
     end
@@ -192,7 +197,7 @@ function polyhedral(f::System; target_parameters = nothing, kwargs...)
             support, target_coeffs = support_coefficients(f)
         end
     end
-    tracker, starts = polyhedral(support, target_coeffs; kwargs...)
+    tracker, starts = polyhedral(support, target_coeffs; compile = compile, kwargs...)
     if m > n
         tracker = OverdeterminedTracker(tracker, F)
     end
@@ -268,6 +273,7 @@ function polyhedral(
     tracker_options = TrackerOptions(),
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
+    compile::Bool = COMPILE_DEFAULT[],
     kwargs...,
 )
     unsupported_kwargs(kwargs)
@@ -312,14 +318,14 @@ function polyhedral(
         end
     end
 
-    F = ModelKit.compile(polyhedral_system(support))
+    F = fixed(polyhedral_system(support); compile = compile)
     H₁ = ToricHomotopy(F, start_coeffs)
     toric_tracker = Tracker(H₁; options = tracker_options)
 
     H₂ = begin
         p = reduce(append!, start_coeffs; init = ComplexF64[])
         q = reduce(append!, target_coeffs; init = ComplexF64[])
-        CoefficientHomotopy(ModelKitSystem(F), p, q)
+        CoefficientHomotopy(F, p, q)
     end
     generic_tracker =
         EndgameTracker(Tracker(H₂; options = tracker_options), options = endgame_options)

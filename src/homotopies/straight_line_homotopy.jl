@@ -20,8 +20,17 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     dv_target::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
 end
 
-function StraightLineHomotopy(start::ModelKit.System, target::ModelKit.System; kwargs...)
-    StraightLineHomotopy(ModelKitSystem(start), ModelKitSystem(target); kwargs...)
+function StraightLineHomotopy(
+    start::System,
+    target::System;
+    compile::Bool = COMPILE_DEFAULT[],
+    kwargs...,
+)
+    StraightLineHomotopy(
+        fixed(start; compile = compile),
+        fixed(target; compile = compile);
+        kwargs...,
+    )
 end
 function StraightLineHomotopy(
     start::AbstractSystem,
@@ -54,7 +63,7 @@ function Base.show(io::IO, mime::MIME"text/plain", H::StraightLineHomotopy)
     show(io, mime, H.target)
 end
 
-function evaluate!(u, H::StraightLineHomotopy, x::AbstractVector{T}, t) where {T}
+function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::AbstractVector{T}, t) where {T}
     evaluate!(u, H.start, x)
 
     if T isa ComplexDF64 || T isa DoubleF64
@@ -73,7 +82,7 @@ function evaluate!(u, H::StraightLineHomotopy, x::AbstractVector{T}, t) where {T
     u
 end
 
-function evaluate_and_jacobian!(
+function ModelKit.evaluate_and_jacobian!(
     u,
     U,
     H::StraightLineHomotopy,
@@ -91,7 +100,7 @@ function evaluate_and_jacobian!(
     end
     nothing
 end
-function taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
+function ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     for i = 1:size(H, 1)
@@ -99,7 +108,13 @@ function taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
     end
     u
 end
-function taylor!(u, v::Val{K}, H::StraightLineHomotopy, tx::TaylorVector, t) where {K}
+function ModelKit.taylor!(
+    u,
+    v::Val{K},
+    H::StraightLineHomotopy,
+    tx::TaylorVector,
+    t,
+) where {K}
     taylor!(H.dv_start, v, H.start, tx)
     taylor!(H.dv_target, v, H.target, tx)
 

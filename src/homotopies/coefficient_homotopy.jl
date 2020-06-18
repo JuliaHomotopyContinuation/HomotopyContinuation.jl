@@ -30,10 +30,11 @@ end
 function CoefficientHomotopy(
     F::ModelKit.System,
     start_coeffs::AbstractVector,
-    target_coeffs::AbstractVector,
+    target_coeffs::AbstractVector;
+    compile::Bool = COMPILE_DEFAULT[],
 )
     @assert length(start_coeffs) == length(target_coeffs) == length(F.parameters)
-    CoefficientHomotopy(ModelKitSystem(F), start_coeffs, target_coeffs)
+    CoefficientHomotopy(fixed(F; compile = compile), start_coeffs, target_coeffs)
 end
 function CoefficientHomotopy(
     F::AbstractSystem,
@@ -102,15 +103,15 @@ function coeffs!(H::CoefficientHomotopy, t)
     H.coeffs
 end
 
-function evaluate!(u, H::CoefficientHomotopy, x, t)
+function ModelKit.evaluate!(u, H::CoefficientHomotopy, x, t)
     evaluate!(u, H.F, x, coeffs!(H, t))
 end
 
-function evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t)
+function ModelKit.evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t)
     evaluate_and_jacobian!(u, U, H.F, x, coeffs!(H, t))
 end
 
-function taylor!(u, v::Val{1}, H::CoefficientHomotopy, x, t)
+function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x, t)
     evaluate!(u, H.F, x, H.dt_coeffs)
 end
 
@@ -129,6 +130,6 @@ function taylor_coeffs!(H::CoefficientHomotopy, t::Union{ComplexF64,Float64})
 end
 
 
-function taylor!(u, v::Val, H::CoefficientHomotopy, tx::TaylorVector, t)
+function ModelKit.taylor!(u, v::Val, H::CoefficientHomotopy, tx::TaylorVector, t)
     taylor!(u, v, H.F, tx, taylor_coeffs!(H, t))
 end

@@ -235,14 +235,14 @@ using HomotopyContinuation.ModelKit
         @test sprint(show, F) == show_F
         @test degrees(F) == [3, 2]
 
-        T = ModelKit.compile(F; optimizations = false)
-        F2 = ModelKit.interpret(T)
+        T = CompiledSystem(F; optimizations = false)
+        F2 = System(T)
         @test F == F2
         @test sprint(show, T) == "Compiled: $show_F"
         @test size(T) == size(F) == (2, 2)
 
-        T2 = ModelKit.compile(F; optimizations = true)
-        F3 = ModelKit.interpret(T2)
+        T2 = CompiledSystem(F; optimizations = true)
+        F3 = System(T2)
         @test expand.(F.expressions) == expand.(F3.expressions)
     end
 
@@ -281,13 +281,52 @@ using HomotopyContinuation.ModelKit
 
         @test sprint(show, H) == show_H
 
-        T = ModelKit.compile(H)
+        T = CompiledHomotopy(H)
         H2 = ModelKit.interpret(T)
         @test H == H2
         @test sprint(show, T) == "Compiled: $show_H"
         @test size(T) == size(H) == (2, 3)
     end
 
+    @testset "CompiledHomotopy" begin
+        @var x y a b c
+        f = [(2 * x^2 + b^2 * y^3 + 2 * a * x * y)^3, (a + c)^4 * x + y^2]
+
+        @var s sp[1:3] sq[1:3]
+        g = subs(f, [a, b, c] => s .* sp .+ (1 .- s) .* sq)
+
+        H = Homotopy(g, [x, y], s, [sp; sq])
+
+        p = [5.2, -1.3, 9.3]
+        q = [2.6, 3.3, 2.3]
+
+        H = CompiledHomotopy(H)
+        @test size(H) == (2, 2)
+
+        v = [0.192, 2.21]
+        t = 0.232
+
+        u = zeros(ComplexF64, 2)
+        U = zeros(ComplexF64, 2, 2)
+
+        evaluate!(u, H, v, t, [p; q])
+        @test u ≈ f([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
+
+        taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t, [p; q])
+        @test u ≈ let
+            @var s sp[1:3] sq[1:3]
+            pt = s .* sp .+ (1 .- s) .* sq
+            differentiate(subs(f, [a, b, c] => pt), s)(
+                [x, y] => v,
+                sp => p,
+                sq => q,
+                s => t,
+            )
+        end
+
+        evaluate_and_jacobian!(u, U, H, v, t, [p; q])
+        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
+    end
 
     @testset "Codegen helpers" begin
         @test ModelKit.sqr(3 + 2im) == (3 + 2im)^2
@@ -431,7 +470,7 @@ using HomotopyContinuation.ModelKit
 
         h = γ .* t .* [x[1:n] .^ 2 .- 1; x[n+1] - 1] + (1 - t) .* K
         H = ModelKit.Homotopy(h, x, t, [γ])
-        TH = ModelKit.compile(H)
+        TH = CompiledHomotopy(H)
 
         tx3 = TaylorVector{4}(zeros(Expression, 4, 4))
         y, y1, y2, y3 = vectors(tx3)
@@ -462,7 +501,7 @@ using HomotopyContinuation.ModelKit
         Hd4 = subs(H.expressions, x => x .+ λ .* ẋ .+ λ^2 .* ẍ .+ λ^3 .* x3, t => t + λ)
         true_dt4 = subs(differentiate(Hd4, λ, 4), λ => 0) / 24
 
-        @test expand.(ModelKit.evaluate(TH, x, t, [γ])) == expand.(h)
+        @test expand.(TH(x, t, [γ])) == expand.(h)
         @test expand.(ModelKit.jacobian(TH, x, t, [γ])) == expand.(differentiate(h, x))
         @test expand.(dt1) == expand.(true_dt1)
         @test expand.(dt2) == expand.(true_dt2)
@@ -474,7 +513,7 @@ using HomotopyContinuation.ModelKit
         @var x[1:2] ẋ[1:2] ẍ[1:2] x3[1:2] p[1:2] ṗ[1:2]
         f = [(x[1] + x[2])^3 + x[1]^2 + x[1] + 5 * x[2] + 3 * p[1], 2 * x[1]^2 + p[2]]
         F = System(f, x, p)
-        TF = ModelKit.compile(F)
+        TF = CompiledSystem(F)
 
         tx = TaylorVector{4}([x'; ẋ'; ẍ'; x3'])
         tv = TaylorVector{5}(Expression, 2)

@@ -1,21 +1,7 @@
-export AbstractHomotopy
+fixed(H::AbstractHomotopy; kwargs...) = H
+fixed(H::Homotopy; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
+    compile ? CompiledHomotopy(H; kwargs...) : InterpretedHomotopy(H; kwargs...)
 
-"""
-    AbstractHomotopy
-
-An abstract type representing a homotopy ``H(x,t)``.
-
-The following homotopies are available:
-
-* [`AffineChartHomotopy`](@ref)
-* [`AffineSubspaceHomotopy`](@ref)
-* [`ModelKitHomotopy`](@ref)
-* [`ParameterHomotopy`](@ref)
-* [`StraightLineHomotopy`](@ref)
-"""
-abstract type AbstractHomotopy end
-
-Base.size(H::AbstractHomotopy, i::Integer) = size(H)[i]
 function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector, t)
     x .= y
 end
@@ -29,7 +15,7 @@ include("homotopies/toric_homotopy.jl")
 # public, these should be linked on the top
 include("homotopies/affine_chart_homotopy.jl")
 include("homotopies/affine_subspace_homotopy.jl")
-include("homotopies/model_kit_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/coefficient_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
+include("homotopies/fixed_parameter_homotopy.jl")

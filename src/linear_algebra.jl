@@ -788,7 +788,6 @@ end
 Jacobian(A::AbstractMatrix) = Jacobian(MatrixWorkspace(A), Ref(0), Ref(0))
 
 updated!(J::Jacobian) = (updated!(J.workspace); J)
-jacobian(J::Jacobian) = J.workspace
 
 workspace(J::Jacobian) = J.workspace
 matrix(J::Jacobian) = matrix(workspace(J))

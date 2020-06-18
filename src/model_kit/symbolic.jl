@@ -1126,6 +1126,7 @@ function optimize(F::System)
     )
 end
 
+
 ## Conversion from MultivariatePolynomials
 function system_with_coefficents_as_params(
     F::AbstractVector{<:MP.AbstractPolynomial};
@@ -1312,3 +1313,28 @@ variables(H::Homotopy) = H.variables
 Returns the parameters of the given homotopy `H`.
 """
 parameters(H::Homotopy) = H.parameters
+
+"""
+    to_smallest_eltype(A::AbstractArray)
+
+Convert an array to the smallest eltype such that all elements still fit.
+
+## Example
+```julia
+typeof(to_smallest_eltype(Any[2,3])) == Vector{Int}
+```
+"""
+function to_smallest_eltype(A::AbstractArray)
+    T = typeof(first(A))
+    for a in A
+        if !(typeof(a) <: T)
+            T = promote_type(T, typeof(a))
+        end
+    end
+    convert.(T, A)
+end
+
+
+function optimize(H::Homotopy)
+    Homotopy(horner.(H.expressions, Ref(H.variables)), H.variables, H.t, H.parameters)
+end
