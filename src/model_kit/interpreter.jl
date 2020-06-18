@@ -31,15 +31,34 @@ function is_univariate(op::InterpreterOp)
     op == OP_SQR
 end
 
-function make_op_block(assign, op, arg1, arg2)
-    if isnothing(arg2)
-        # only univariate ops
+@enum InterpreterData::UInt16 begin
+    DATA_X
+    DATA_P
+    DATA_C
+    DATA_I
+    DATA_T
+    NO_DATA
+end
+
+function make_op_block(
+    assign,
+    op,
+    data1::InterpreterData,
+    index1,
+    data2::InterpreterData,
+    index2,
+)
+    arg1 = gen_access(data1, index1)
+    if data2 == NO_DATA
         quote
             if $op == OP_SQR
                 $assign = sqr($arg1)
+            elseif $op == OP_POW
+                $assign = Base.power_by_squaring($arg1, $index2)
             end
         end
     else
+        arg2 = gen_access(data2, index2)
         quote
             if $op == OP_MUL
                 $assign = $arg1 * $arg2
@@ -49,21 +68,11 @@ function make_op_block(assign, op, arg1, arg2)
                 $assign = $arg1 - $arg2
             elseif $op == OP_DIV
                 $assign = $arg1 / $arg2
-            elseif $op == OP_POW
-                $assign = Base.power_by_squaring($arg1, $arg2)
             end
         end
     end
 end
 
-@enum InterpreterData::UInt16 begin
-    DATA_X
-    DATA_P
-    DATA_C
-    DATA_I
-    DATA_T
-    NO_DATA
-end
 
 struct InterpreterArg
     data::InterpreterData
@@ -111,6 +120,10 @@ function Base.show(io::IO, I::Interpreter{T,N}) where {T,N}
     print(io, "Interpreter{$T,$N} with ", length(I.instructions), " instructions")
 end
 
+Base.eltype(::Interpreter{T}) where {T} = T
+function Base.convert(::Type{Interpreter{T,N}}, I::Interpreter{S,N}) where {T,S,N}
+    Interpreter(I.instructions, I.out, convert(Vector{T}, I.constants), I.eval_out)
+end
 show_instructions(I::Interpreter) = show_instructions(stdout, I)
 function show_instructions(io::IO, I::Interpreter)
     for (i, instr) in enumerate(I.instructions)
@@ -210,13 +223,15 @@ function Interpreter(
         ARG1 = InterpreterArg(instr_map, var_map, t, param_map, constants, arg1)
         if isnothing(arg2) || is_univariate(OP)
             ARG2 = InterpreterArg(NO_DATA, Int32(0))
+        elseif OP == OP_POW
+            ARG2 = InterpreterArg(NO_DATA, Int32(arg2))
         else
             ARG2 = InterpreterArg(instr_map, var_map, t, param_map, constants, arg2)
         end
         push!(instructions, InterpreterInstruction(OP, (ARG1, ARG2)))
         instr_map[id] = length(instructions)
     end
-    constants = isempty(constants) ? Bool[] : to_smallest_eltype(constants)
+    constants = isempty(constants) ? Float64[] : to_smallest_eltype(constants)
     output = map(id -> InterpreterArg(instr_map, var_map, t, param_map, constants, id), out)
     eval_output =
         map(id -> InterpreterArg(instr_map, var_map, t, param_map, constants, id), eval_out)
@@ -437,8 +452,10 @@ end
                     make_op_block(
                         :(instructions[i]),
                         :op,
-                        gen_access(data1, :(arg1.ind)),
-                        gen_access(data2, :(arg2.ind)),
+                        data1,
+                        :(arg1.ind),
+                        data2,
+                        :(arg2.ind),
                     )
                 end
             )
@@ -500,8 +517,10 @@ end
                     make_op_block(
                         :(instructions[i]),
                         :op,
-                        gen_access(data1, :(arg1.ind)),
-                        gen_access(data2, :(arg2.ind)),
+                        data1,
+                        :(arg1.ind),
+                        data2,
+                        :(arg2.ind),
                     )
                 end
             )
@@ -577,8 +596,10 @@ end
                     make_op_block(
                         :(instructions[i]),
                         :op,
-                        gen_access(data1, :(arg1.ind)),
-                        gen_access(data2, :(arg2.ind)),
+                        data1,
+                        :(arg1.ind),
+                        data2,
+                        :(arg2.ind),
                     )
                 end
             )
@@ -652,8 +673,10 @@ end
                     make_op_block(
                         :(instructions[i]),
                         :op,
-                        gen_access(data1, :(arg1.ind)),
-                        gen_access(data2, :(arg2.ind)),
+                        data1,
+                        :(arg1.ind),
+                        data2,
+                        :(arg2.ind),
                     )
                 end
             )

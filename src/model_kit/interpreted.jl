@@ -28,11 +28,18 @@ end
 function InterpretedSystem(F::System; optimizations::Bool = true)
     F = optimizations ? optimize(F) : F
     eval_interpreter = evaluate_interpreter(F)
+    jac_interpreter = jacobian_interpreter(F)
+    T = promote_type(eltype(eval_interpreter), eltype(jac_interpreter))
+    if !(T isa Rational)
+        T = promote_type(T, Float64)
+    end
+    eval_interpreter = convert(Interpreter{T,1}, eval_interpreter)
+    jac_interpreter = convert(Interpreter{T,2}, jac_interpreter)
     eval_interpreter_cache = InterpreterCache(ComplexF64, eval_interpreter)
     eval_interpreter_cache_ext = InterpreterCache(ComplexDF64, eval_interpreter)
-    jac_interpreter = jacobian_interpreter(F)
+
     taylor_interpreters =
-        Dict{NTuple{3,Int},Tuple{typeof(eval_interpreter),InterpreterCache{ComplexF64}}}()
+        Dict{NTuple{3,Int},Tuple{Interpreter{T,1},InterpreterCache{ComplexF64}}}()
 
     InterpretedSystem(
         F,
@@ -44,7 +51,6 @@ function InterpretedSystem(F::System; optimizations::Bool = true)
         taylor_interpreters,
     )
 end
-
 
 Base.size(F::InterpretedSystem) = size(F.system)
 variables(F::InterpretedSystem) = variables(F.system)
@@ -125,11 +131,18 @@ end
 function InterpretedHomotopy(H::Homotopy; optimizations::Bool = true)
     H = optimizations ? optimize(H) : H
     eval_interpreter = evaluate_interpreter(H)
+    jac_interpreter = jacobian_interpreter(H)
+    T = promote_type(eltype(eval_interpreter), eltype(jac_interpreter))
+    if !(T isa Rational)
+        T = promote_type(T, Float64)
+    end
+    eval_interpreter = convert(Interpreter{T,1}, eval_interpreter)
+    jac_interpreter = convert(Interpreter{T,2}, jac_interpreter)
     eval_interpreter_cache = InterpreterCache(ComplexF64, eval_interpreter)
     eval_interpreter_cache_ext = InterpreterCache(ComplexDF64, eval_interpreter)
-    jac_interpreter = jacobian_interpreter(H)
+
     taylor_interpreters =
-        Dict{NTuple{3,Int},Tuple{typeof(eval_interpreter),InterpreterCache{ComplexF64}}}()
+        Dict{NTuple{3,Int},Tuple{Interpreter{T,1},InterpreterCache{ComplexF64}}}()
 
     InterpretedHomotopy(
         H,
