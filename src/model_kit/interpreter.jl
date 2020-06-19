@@ -242,6 +242,7 @@ end
 struct InterpreterCache{T}
     instructions::Vector{T}
 end
+Base.length(c::InterpreterCache) = length(c.instructions)
 
 _eltype(x::TaylorVector{N,T}) where {N,T} = T
 _eltype(x) = eltype(x)
