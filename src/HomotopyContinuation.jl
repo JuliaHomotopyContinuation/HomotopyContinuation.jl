@@ -1,7 +1,5 @@
 module HomotopyContinuation
 
-export ModelKit
-
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
 import FiniteDiff
@@ -24,7 +22,11 @@ const LA = LinearAlgebra
 include("DoubleDouble.jl")
 using .DoubleDouble
 
+include("interval_arithmetic.jl")
+using .IntervalArithmetic
+
 include("ModelKit.jl")
+export ModelKit
 export @polyvar
 
 using ProjectiveVectors: PVector, dims, dimension_indices
