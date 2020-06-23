@@ -158,8 +158,39 @@ function finite_diff(ν, s, ν₂, s₂, ν₁, s₁)
     ν̇
 end
 
+function at_infinity_tol!(
+    at_infinity_tols,
+    val::Valuation;
+    finite_tol::Float64,
+    zero_is_finite::Bool,
+)
+    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
-function analyze(
+    for (i, val_xᵢ) in enumerate(val_x)
+        ε∞ = max(
+            abs(1.0 - val_tẋ[i] / val_xᵢ),
+            abs(Δval_x[i] / val_xᵢ),
+            abs(Δval_tẋ[i] / val_tẋ[i]),
+        )
+        if isnan(ε∞)
+            at_infinity_tols[i] = Inf
+            continue
+        end
+
+        # ∞ check
+        if val_xᵢ + ε∞ < -finite_tol
+            at_infinity_tols[i] = ε∞
+            # 0 check
+        elseif !zero_is_finite && val_xᵢ - ε∞ > -finite_tol
+            at_infinity_tols[i] = ε∞
+        else
+            at_infinity_tols[i] = Inf
+        end
+    end
+    at_infinity_tols
+end
+
+function is_finite(
     val::Valuation;
     finite_tol::Float64,
     zero_is_finite::Bool,
@@ -167,95 +198,49 @@ function analyze(
 )
     @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
-    at_infinity_tol = at_zero_tol = Inf
-    finite = true
     δ = inv(max_winding_number)
     for (i, val_xᵢ) in enumerate(val_x)
-        abs_Δ = abs(Δval_x[i])
-        ε∞ = max(
-            abs(1.0 - val_tẋ[i] / val_xᵢ),
-            abs(Δval_x[i] / val_xᵢ),
-            abs(Δval_tẋ[i] / val_tẋ[i]),
-        )
-        if isnan(abs_Δ)
-            finite = false
-            continue
-        end
-        # ∞ check
-        if val_xᵢ + ε∞ < -(0.075 + finite_tol)
-            at_infinity_tol = min(ε∞, at_infinity_tol)
-        end
-
-        # 0 check
-        if !zero_is_finite && val_xᵢ - ε∞ > (0.075 + finite_tol)
-            at_zero_tol = min(ε∞, at_zero_tol)
-        end
-
-        # finite
         # Case a: val(x) = 0
         if abs(val_xᵢ) < finite_tol
-            if abs_Δ > finite_tol || val_tẋ[i] < 0.5δ
-                finite = false
+            if !(abs(Δval_x[i]) < finite_tol) || val_tẋ[i] < 0.5δ
+                return false
             end
             # Case b: val(x) = val(tẋ) > 0
         elseif zero_is_finite && val_xᵢ > (δ - finite_tol)
-            if ε∞ > finite_tol
-                finite = false
+            ε∞ = max(
+                abs(1.0 - val_tẋ[i] / val_xᵢ),
+                abs(Δval_x[i] / val_xᵢ),
+                abs(Δval_tẋ[i] / val_tẋ[i]),
+            )
+            if !(ε∞ < finite_tol)
+                return false
             end
         else
-            finite = false
+            return false
         end
     end
-
-    return (
-        val_finite = finite,
-        at_infinity_tol = at_infinity_tol,
-        at_zero_tol = at_zero_tol,
-    )
-end
-
-
-function validate_coord_growth(
-    val::Valuation,
-    scale_old,
-    scale_new;
-    finite_tol::Float64,
-    at_infinity_tol::Float64,
-    tol::Float64,
-)
-    @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
-
-    for (i, val_xᵢ) in enumerate(val_x)
-        ε∞ = max(
-            abs(1.0 - val_tẋ[i] / val_xᵢ),
-            abs(Δval_x[i] / val_xᵢ),
-            abs(Δval_tẋ[i] / val_tẋ[i]),
-        )
-        # ∞ check
-        if val_xᵢ + ε∞ < -finite_tol && ε∞ < at_infinity_tol
-            if scale_new[i] / scale_old[i] > tol
-                return true
-            end
-        end
-    end
-
-    false
+    return true
 end
 
 function estimate_winding_number(val::Valuation; max_winding_number::Int)
     m = 1
     min_err = Inf
     for k = 1:max_winding_number
-        err = 0.0
-        for vᵢ in val.val_tẋ
-            kvᵢ = k * vᵢ
-            errᵢ = abs(round(kvᵢ) - kvᵢ)
-            err = ifelse(errᵢ > err, errᵢ, err)
-        end
+        err = check_winding_number(val, k)
         if err < min_err
             m = k
             min_err = err
         end
     end
     m, min_err
+end
+
+function check_winding_number(val::Valuation, m::Int)
+    err = 0.0
+    for vᵢ in val.val_tẋ
+        mvᵢ = m * vᵢ
+        errᵢ = abs(round(mvᵢ) - mvᵢ)
+        err = ifelse(errᵢ > err, errᵢ, err)
+    end
+    err
 end

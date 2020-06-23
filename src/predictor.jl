@@ -470,6 +470,22 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
             cubic_hermite!(x̂, pred.prev_ty¹, prev_s, pred.ty¹, s, s′)
         else
             cubic_hermite!(x̂, pred.prev_tx¹, pred.prev_t, pred.tx¹, t, t + Δt)
+
+            # ŷ = map(1:length(pred.tx¹)) do i
+            #     t₀ = pred.prev_t# / t
+            #     t₁ = t #1
+            #     x₀, _ = pred.prev_tx¹[i]
+            #     x₁, ẋ₁ = pred.tx¹[i]
+            #     #ẋ₁ = t
+            #     a₀, a₁, b₁ = Complex{BigFloat}[1 t₀ -x₀*t₀; 1 t₁ -x₁*t₁; 0 1  -x₁-ẋ₁*t₁] \ [x₀, x₁, ẋ₁]
+            #     # a₀, a₁, b₁ = [1 t₀ -x₀ * t₀; 1 0 0; 0 1 -x₁] \ [x₀, x₁, ẋ₁]
+            #     # @show a₀, a₁, b₁
+            #
+            #     # @show [1 t₀ -x₀*t₀; 1 t₁ -x₁*t₁; 0 1  -x₁-ẋ₁*t₁]
+            #     (a₀ + ((t + Δt)) * a₁) / (1 + ((t + Δt)) * b₁)
+            # end
+            # @show InfNorm()(x̂, ŷ)
+            # x̂ .= ŷ
         end
     elseif method == PredictionMethod.Euler
         if m > 1
@@ -489,6 +505,7 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
 
     x̂
 end
+
 
 """
     t_to_s_plane(t::Complex, m::Int; branch::Int = 0)
