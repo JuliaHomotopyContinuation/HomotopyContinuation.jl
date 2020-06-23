@@ -98,6 +98,7 @@ mutable struct TrackerOptions
     max_initial_step_size::Float64
     extended_precision::Bool
     min_step_size::Float64
+    min_rel_step_size::Float64
     terminate_cond::Float64
     parameters::TrackerParameters
 end
@@ -108,6 +109,7 @@ function TrackerOptions(;
     max_initial_step_size::Float64 = Inf,
     extended_precision::Bool = true,
     min_step_size::Float64 = 1e-48,
+    min_rel_step_size::Float64 = 0.0,
     terminate_cond::Float64 = 1e13,
     parameters::Union{Symbol,TrackerParameters} = :default,
 )
@@ -131,6 +133,7 @@ function TrackerOptions(;
         max_initial_step_size,
         extended_precision,
         min_step_size,
+        min_rel_step_size,
         terminate_cond,
         parameters,
     )
@@ -316,6 +319,8 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     accepted_steps::Int
     rejected_steps::Int
     last_steps_failed::Int
+    ext_accepted_steps::Int
+    ext_rejected_steps::Int
 end
 
 function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
@@ -336,7 +341,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     cond_J_ẋ = NaN
     code = TrackerCode.tracking
     u = zeros(ComplexF64, size(H, 1))
-    accepted_steps = rejected_steps = 0
+    accepted_steps = rejected_steps = ext_accepted_steps = ext_rejected_steps = 0
     last_steps_failed = 0
 
     TrackerState(
@@ -362,6 +367,8 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         accepted_steps,
         rejected_steps,
         last_steps_failed,
+        ext_accepted_steps,
+        ext_rejected_steps,
     )
 end
 
@@ -382,6 +389,7 @@ function Base.getproperty(state::TrackerState, sym::Symbol)
 end
 
 steps(S::TrackerState) = S.accepted_steps + S.rejected_steps
+ext_steps(S::TrackerState) = S.ext_accepted_steps + S.ext_rejected_steps
 
 ###
 ### TRACKER
@@ -444,6 +452,8 @@ function Tracker(
 )
     if !isa(options, TrackerOptions)
         options = TrackerOptions(; options...)
+    else
+        options = deepcopy(options)
     end
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
@@ -564,6 +574,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         tol_acc = Inf
     end
 
+    t′ = state.segment_stepper.t′
+    t = state.segment_stepper.t
     if is_done(state.segment_stepper)
         state.code = TrackerCode.success
     elseif steps(state) ≥ options.max_steps
@@ -572,8 +584,13 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerCode.terminated_accuracy_limit
         # elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
         #     state.code = TrackerCode.terminated_ill_conditioned
-    elseif state.segment_stepper.Δs < options.min_step_size ||
-           state.segment_stepper.Δs < state.segment_stepper.s * 1e-14
+    elseif state.segment_stepper.Δs < options.min_step_size
+        state.code = TrackerCode.terminated_step_size_too_small
+    elseif fast_abs(t′ - t) ≤ 2eps(fast_abs(t))
+        state.code = TrackerCode.terminated_step_size_too_small
+    elseif options.min_rel_step_size > 0 &&
+           t′ != state.segment_stepper.target &&
+           fast_abs(t′ - t) < fast_abs(t) * options.min_rel_step_size
         state.code = TrackerCode.terminated_step_size_too_small
     end
     nothing
@@ -625,6 +642,7 @@ function init!(
     state.code = TrackerCode.tracking
     if !keep_steps
         state.accepted_steps = state.rejected_steps = 0
+        state.ext_accepted_steps = state.ext_rejected_steps = 0
     end
     state.last_steps_failed = 0
 
@@ -804,14 +822,23 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.μ = max(result.accuracy, eps())
         state.ω = max(result.ω, 0.5 * state.ω)
         update_precision!(tracker, result.μ_low)
+
+        if is_done(state.segment_stepper) &&
+           options.extended_precision &&
+           state.accuracy > 1e-14
+            state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
+            state.refined_extended_prec = true
+        end
         update_predictor!(tracker, x̂, state.Δs_prev, t)
         state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
+        state.ext_accepted_steps += state.extended_prec
         state.last_steps_failed = 0
     else
         # Step failed, so we have to try with a new (smaller) step size
         state.rejected_steps += 1
+        state.ext_rejected_steps += state.extended_prec
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
@@ -825,11 +852,6 @@ function step!(tracker::Tracker, debug::Bool = false)
 
     check_terminated!(state, options)
 
-
-    if is_success(state.code) && options.extended_precision && state.accuracy > 1e-14
-        state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
-        state.refined_extended_prec = true
-    end
 
     !state.last_step_failed
 end

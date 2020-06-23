@@ -448,7 +448,7 @@ function row_scaling!(
 )
     m, n = size(WS)
     if m == n
-        skeel_row_scaling!(d, WS.A, d)
+        skeel_row_scaling!(d, WS.A, c)
     else
         d .= 1.0
     end
@@ -652,7 +652,7 @@ function inverse_inf_norm_est(
             break
         end
     end
-    γ
+    nanmin(γ, Inf)
 end
 
 function inf_norm(

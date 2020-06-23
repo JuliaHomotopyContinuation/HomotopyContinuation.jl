@@ -1,9 +1,7 @@
 @testset "Endgame" begin
     @testset "Cyclic 7" begin
-        res = track.(total_degree(cyclic(7))...)
-
-        @test count(is_success, res) == 924
-        @test 4000 ≤ count(is_at_infinity, res) ≤ 4116
+        res = solve(cyclic(7); start_system = :total_degree)
+        @test nsolutions(res) == 924
     end
 
     @testset "Hyperbolic - 6,6" begin
@@ -47,7 +45,7 @@
         @test count(r -> isnothing(r.winding_number), res) == d
     end
 
-    @testset "(x-10)^$d" for d in [2, 8]
+    @testset "(x-10)^$d" for d in [2, 6]
         @var x
         f = System([(x - 10)^d])
         res = track.(total_degree(f)...)

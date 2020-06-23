@@ -36,6 +36,14 @@ The reason that we do not use expl. RK methods is that, then when numerical diff
 has to give up, we are in a regime where the ODE of the path is *stiff*. Thus, expl.
 RK just don't yield satisfying results.
 
+## Endgame and coordinates
+
+Additionally, the predictor computes in s-coordinates, that is for the path x(t)
+the predictor internally computes with y(s) = x(s^m) where m is the *winding number*.
+If m = 1 then this is the same as computing with x(t). However, during the endgame
+`m` is possibly set.
+All APIs expect input in t-coordinates and return results in t-coordinates.
+
 
 [1]: A Robust Numerical Path Tracking Algorithm for Polynomial Homotopy Continuation,
  Telen, Van Barel, Verschelde https://arxiv.org/abs/1909.04984
@@ -59,7 +67,7 @@ using .PredictionMethod: PredictionMethod
 struct AD{N} end
 function AD(N::Int)
     if !(0 ≤ N ≤ 3)
-        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 4."))
+        throw(ArgumentError("`automatic_differentiation` has to be between 0 and 3."))
     end
     AD{N}()
 end
@@ -77,65 +85,64 @@ Otherwise numerical differentiation is used.
 Base.@kwdef mutable struct Predictor{T<:AD}
     AD::T
 
-    method::PredictionMethod.methods
-    order::Int
+    method::PredictionMethod.methods = PredictionMethod.Pade21
+    order::Int = 4
     use_hermite::Bool = true
-    trust_region::Float64
-    local_error::Float64
-    cond_H_ẋ::Float64
+    trust_region::Float64 = Inf
+    local_error::Float64 = Inf
+    cond_H_ẋ::Float64 = Inf
 
     tx⁰::TaylorVector{1,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
-    tx⁴::TaylorVector{5,ComplexF64}
-    t::ComplexF64
-    tx_norm::Vector{Float64}
+    t::ComplexF64 = complex(NaN)
+    tx_norm::Vector{Float64} = zeros(4)
 
     # finite diff
     xtemp::Vector{ComplexF64}
     u::Vector{ComplexF64}
     u₁::Vector{ComplexF64}
     u₂::Vector{ComplexF64}
-    # for hermite interpolation
+
+    # for interpolation
     prev_tx¹::TaylorVector{2,ComplexF64}
-    prev_t::ComplexF64
+    prev_t::ComplexF64 = complex(NaN)
+
+    # endgame predictor
+    winding_number::Int = 1
+    s::ComplexF64 = complex(NaN)
+    prev_s::ComplexF64 = complex(NaN)
+    ty¹::TaylorVector{2,ComplexF64}
+    prev_ty¹::TaylorVector{2,ComplexF64}
 end
 
 
 function Predictor(H::AbstractHomotopy, autodiff::AD)
     m, n = size(H)
-    tx⁴ = TaylorVector{5}(ComplexF64, n)
-    tx⁰ = TaylorVector{1}(tx⁴)
-    tx¹ = TaylorVector{2}(tx⁴)
-    tx² = TaylorVector{3}(tx⁴)
-    tx³ = TaylorVector{4}(tx⁴)
+    tx³ = TaylorVector{4}(ComplexF64, n)
     Predictor(
         AD = autodiff,
-        method = PredictionMethod.Pade21,
-        order = 4,
-        trust_region = Inf,
-        local_error = Inf,
-        cond_H_ẋ = Inf,
-        tx⁰ = tx⁰,
-        tx¹ = tx¹,
-        tx² = tx²,
+        tx⁰ = TaylorVector{1}(tx³),
+        tx¹ = TaylorVector{2}(tx³),
+        tx² = TaylorVector{3}(tx³),
         tx³ = tx³,
-        tx⁴ = tx⁴,
-        t = complex(NaN),
-        tx_norm = zeros(4),
         xtemp = zeros(ComplexF64, n),
         u = zeros(ComplexF64, m),
         u₁ = zeros(ComplexF64, m),
         u₂ = zeros(ComplexF64, m),
         prev_tx¹ = TaylorVector{2}(ComplexF64, n),
-        prev_t = complex(NaN),
+        ty¹ = TaylorVector{2}(ComplexF64, n),
+        prev_ty¹ = TaylorVector{2}(ComplexF64, n),
     )
 end
 
 function init!(predictor::Predictor)
     predictor.cond_H_ẋ = 1.0
+    predictor.winding_number = 1
+
     predictor.t = predictor.prev_t = NaN
+    predictor.s = predictor.prev_s = NaN
     predictor.trust_region = predictor.local_error = NaN
     predictor.use_hermite = true
     predictor
@@ -209,7 +216,7 @@ function finite_diff_taylor!(
     elseif N == 2
         λ = isfinite(prev_λ) ? prev_λ : predictor.tx_norm[1] / predictor.tx_norm[2]
     elseif N == 3
-        λ = predictor.tx_norm[2] / predictor.tx_norm[3]
+        λ = isfinite(prev_λ) ? prev_λ : predictor.tx_norm[2] / predictor.tx_norm[3]
     end
     # truncation err = (1/λ)^2*h^2
     # round-off err   = ε/h^N
@@ -228,6 +235,8 @@ function finite_diff_taylor!(
     trunc_err = h^2 / λ^2
     rnd_err = ε / h^N
     err = trunc_err + rnd_err
+    # @show N
+    # @show λ, h, trunc_err, rnd_err
     if trunc_err + rnd_err > 0.01 || !isfinite(h)
         return false, err
     end
@@ -260,6 +269,11 @@ ModelKit.taylor!(u, v::Val, H::AbstractHomotopy, tx, t, incremental::Bool) =
     end
 end
 
+function winding_number!(P::Predictor, m)
+    P.winding_number = m
+    P
+end
+
 """
     update!(
         P::Predictor,
@@ -283,14 +297,23 @@ function update!(
     norm::AbstractNorm,
     x̂ = nothing, # the predicted value
 )
-    @unpack u, tx⁰, tx¹, tx², tx³, tx⁴, xtemp, tx_norm = predictor
-    x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
+    @unpack u, tx⁰, tx¹, tx², tx³, ty¹, xtemp, tx_norm = predictor
+    x⁰, x¹, x², x³ = vectors(tx³)
+    y⁰, y¹ = vectors(ty¹)
+    m = predictor.winding_number
 
     @inbounds for i = 1:length(xtemp)
         predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
         predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
     end
+
     predictor.prev_t, predictor.t = predictor.t, t
+
+    if m > 1
+        predictor.prev_s = predictor.s
+        predictor.s = t_to_s_plane(t, m)
+    end
+
     if isnothing(x̂)
         predictor.local_error = NaN
     else
@@ -299,8 +322,10 @@ function update!(
     end
 
     x⁰ .= x
-    predictor.t = t
     tx_norm[1] = norm(x)
+    if m > 1
+        y⁰ .= x
+    end
 
     # Compute ẋ
     trust, err = taylor!(u, Val(1), predictor, H, x, t)
@@ -315,13 +340,18 @@ function update!(
     tx_norm[2] = norm(xtemp)
     x¹ .= xtemp
 
+    if m > 1
+        μ = m * predictor.s^(m - 1)
+        y¹ .= μ .* xtemp
+        @goto use_hermite
+    end
+
     trust, err = taylor!(u, Val(2), predictor, H, tx¹, t)
+
     if !trust
         # Use cubic hermite
         @label use_hermite
-        if isfinite(predictor.prev_t) &&
-           predictor.use_hermite &&
-           abs((prev_tx_norm2 - tx_norm[2]) / abs(t - predictor.prev_t)) < 1e18
+        if isfinite(predictor.prev_t) && predictor.use_hermite
             predictor.method = PredictionMethod.Hermite
             predictor.order = 3
             predictor.trust_region = tx_norm[1] / tx_norm[2]
@@ -389,6 +419,8 @@ end
 
 predict!(x̂, pred::Predictor, H, x, t, Δt) = predict!(x̂, pred, pred.method, H, x, t, Δt)
 function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, t, Δt)
+    m = pred.winding_number
+
     if method == PredictionMethod.Pade21
         λ = pred.trust_region
         λ² = λ^2
@@ -421,15 +453,82 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
             end
         end
     elseif method == PredictionMethod.Hermite
-        cubic_hermite!(x̂, pred.prev_tx¹, pred.prev_t, pred.tx¹, t, t + Δt)
+        if m > 1
+            prev_s = t_to_s_plane(pred.prev_t, m)
+            s = t_to_s_plane(t, m)
+            s′ = t_to_s_plane(t + Δt, m)
+            prev_sm = m * prev_s^(m - 1)
+            for i = 1:length(pred.prev_tx¹)
+                pred.prev_ty¹[i, 1] = pred.prev_tx¹[i, 1]
+                pred.prev_ty¹[i, 2] = prev_sm * pred.prev_tx¹[i, 2]
+            end
+            sm = m * s^(m - 1)
+            for i = 1:length(pred.prev_tx¹)
+                pred.ty¹[i, 1] = pred.tx¹[i, 1]
+                pred.ty¹[i, 2] = sm * pred.tx¹[i, 2]
+            end
+            cubic_hermite!(x̂, pred.prev_ty¹, prev_s, pred.ty¹, s, s′)
+        else
+            cubic_hermite!(x̂, pred.prev_tx¹, pred.prev_t, pred.tx¹, t, t + Δt)
+
+            # ŷ = map(1:length(pred.tx¹)) do i
+            #     t₀ = pred.prev_t# / t
+            #     t₁ = t #1
+            #     x₀, _ = pred.prev_tx¹[i]
+            #     x₁, ẋ₁ = pred.tx¹[i]
+            #     #ẋ₁ = t
+            #     a₀, a₁, b₁ = Complex{BigFloat}[1 t₀ -x₀*t₀; 1 t₁ -x₁*t₁; 0 1  -x₁-ẋ₁*t₁] \ [x₀, x₁, ẋ₁]
+            #     # a₀, a₁, b₁ = [1 t₀ -x₀ * t₀; 1 0 0; 0 1 -x₁] \ [x₀, x₁, ẋ₁]
+            #     # @show a₀, a₁, b₁
+            #
+            #     # @show [1 t₀ -x₀*t₀; 1 t₁ -x₁*t₁; 0 1  -x₁-ẋ₁*t₁]
+            #     (a₀ + ((t + Δt)) * a₁) / (1 + ((t + Δt)) * b₁)
+            # end
+            # @show InfNorm()(x̂, ŷ)
+            # x̂ .= ŷ
+        end
     elseif method == PredictionMethod.Euler
-        for (i, (x, x¹)) in enumerate(pred.tx¹)
-            x̂[i] = x + Δt * x¹
+        if m > 1
+            s = t_to_s_plane(t, m)
+            s′ = t_to_s_plane(t + Δt, m)
+            Δs = s′ - s
+            sm = m * s^(m - 1)
+            for (i, (x, x¹)) in enumerate(pred.tx¹)
+                x̂[i] = x + Δs * sm * x¹
+            end
+        else
+            for (i, (x, x¹)) in enumerate(pred.tx¹)
+                x̂[i] = x + Δt * x¹
+            end
         end
     end
 
     x̂
 end
+
+
+"""
+    t_to_s_plane(t::Complex, m::Int; branch::Int = 0)
+
+Convert ``t = r * \\exp(√(-1)θ)`` to ``t = r^{1/m} * \\exp(√(-1)θ/m)`` where for
+``r^{1/m}`` the positive real root is choosen.
+The `branch` keyword allows to choose a different branch cut.
+"""
+function t_to_s_plane(t::Complex, m::Int; branch::Int = 0)
+    r = fast_abs(t)
+    if isreal(t) && real(t) > 0
+        if branch > 0
+            complex(nthroot(r, m), 2branch * π / m)
+        else
+            complex(nthroot(r, m))
+        end
+    else
+        # angle returns a value in [-π,π], but we want [0,π]
+        θ = mod2pi(angle(t)) + branch * 2π
+        return nthroot(r, m) * cis(θ / m)
+    end
+end
+
 
 function cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
     if isreal(t₀) && isreal(t₁) && isreal(t)
