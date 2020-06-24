@@ -1,6 +1,6 @@
 @testset "Endgame" begin
     @testset "Cyclic 7" begin
-        res = solve(cyclic(7); start_system = :total_degree)
+        res = solve(cyclic(7); start_system = :total_degree, show_progress = false)
         @test nsolutions(res) == 924
     end
 
@@ -95,7 +95,8 @@
             5384944853425480296 * x * y * z^4 +
             88,
         ]
-        @time res = solve(System(F, [x, z, y]); start_system = :total_degree)
+        @time res =
+            solve(System(F, [x, z, y]); start_system = :total_degree, show_progress = false)
         @test nnonsingular(res) == 693
 
         # test for γ value where path jumping happened with to loose default config

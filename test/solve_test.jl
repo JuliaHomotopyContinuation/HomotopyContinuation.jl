@@ -132,7 +132,12 @@
 
     @testset "overdetermined" begin
         @testset "3 by 5 minors" begin
-            res = solve(minors(); start_system = :total_degree, compile = false)
+            res = solve(
+                minors();
+                start_system = :total_degree,
+                compile = false,
+                show_progress = false,
+            )
             @test count(is_success, res) == 80
             @test count(is_excess_solution, res) == 136
         end
