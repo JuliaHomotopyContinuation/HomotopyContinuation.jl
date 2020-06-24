@@ -211,11 +211,17 @@
         f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
 
         @test paths_to_track(f; start_system = :total_degree) == 16
+        @test paths_to_track(f; start_system = :total_degree, target_parameters = nothing) == 16
         @test paths_to_track(f; start_system = :polyhedral) == 8
         @test paths_to_track(f; start_system = :polyhedral, only_non_zero = true) == 3
         @test paths_to_track(f) == 8
         @test_deprecated bezout_number(f) == 16
         @test mixed_volume(f) == 3
+
+        @var x y a
+        g = System([2y + a * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y], parameters=[a])
+        @test paths_to_track(g; start_system = :total_degree) == 16
+        @test paths_to_track(g; start_system = :polyhedral) == 8
     end
 
     @testset "solve (parameter homotopy)" begin

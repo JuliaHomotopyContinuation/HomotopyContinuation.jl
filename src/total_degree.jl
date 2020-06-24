@@ -483,7 +483,8 @@ end
 
 
 function paths_to_track(f, ::Val{:total_degree})
-    _, starts = total_degree(f)
+    target_parameters = nparameters(f) > 0 ? zeros(nparameters(f)) : nothing
+    _, starts = total_degree(f; target_parameters = target_parameters)
     length(starts)
 end
 @deprecate bezout_number(f::Union{System,AbstractSystem}) paths_to_track(
