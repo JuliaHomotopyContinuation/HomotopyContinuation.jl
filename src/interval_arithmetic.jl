@@ -4,6 +4,11 @@ export Interval,
     IComplex, IComplexF64, mid, diam, rad, mig, mag, hull, isinterior, isdisjoint
 
 import Base: *, /, +, -, ^
+
+@static if VERSION ≥ v"1.5.0-"
+    import Base: isdisjoint
+end
+
 import Printf
 
 # Implementation of interval arithmetic following "Interval Analysis" - Mayer.
@@ -131,6 +136,56 @@ function *(a::Interval, b::Interval)
     end
 end
 
+function Base.muladd(a::Interval, b::Interval, c::Interval)
+    lo = let
+        lo1 = muladd(a.lo, b.lo, c.lo)
+        lo2 = muladd(a.lo, b.hi, c.lo)
+        lo3 = muladd(a.hi, b.lo, c.lo)
+        lo4 = muladd(a.hi, b.hi, c.lo)
+        round_down(Base.FastMath.min_fast(lo1, lo2, lo3, lo4))
+    end
+
+    hi = let
+        hi1 = muladd(a.lo, b.lo, c.hi)
+        hi2 = muladd(a.lo, b.hi, c.hi)
+        hi3 = muladd(a.hi, b.lo, c.hi)
+        hi4 = muladd(a.hi, b.hi, c.hi)
+        round_up(Base.FastMath.max_fast(hi1, hi2, hi3, hi4))
+    end
+
+    Interval(lo, hi)
+end
+function Base.muladd(a::Interval{T}, b::T, c::Interval) where {T}
+    lo = let
+        lo1 = muladd(a.lo, b, c.lo)
+        lo2 = muladd(a.hi, b, c.lo)
+        round_down(Base.FastMath.min_fast(lo1, lo2))
+    end
+
+    hi = let
+        hi1 = muladd(a.lo, b, c.hi)
+        hi2 = muladd(a.hi, b, c.hi)
+        round_up(Base.FastMath.max_fast(hi1, hi2))
+    end
+
+    Interval(lo, hi)
+end
+function Base.muladd(a::T, b::Interval{T}, c::Interval) where {T}
+    lo = let
+        lo1 = muladd(a, b.lo, c.lo)
+        lo2 = muladd(a, b.hi, c.lo)
+        round_down(Base.FastMath.min_fast(lo1, lo2))
+    end
+
+    hi = let
+        hi1 = muladd(a, b.lo, c.hi)
+        hi2 = muladd(a, b.hi, c.hi)
+        round_up(Base.FastMath.max_fast(hi1, hi2))
+    end
+
+    Interval(lo, hi)
+end
+
 function inv(a::Interval{T}) where {T<:Real}
     if zero(T) ∈ a
         return Interval(convert(T, NaN))
@@ -209,6 +264,8 @@ struct IComplex{T} <: Number
     re::Interval{T}
     im::Interval{T}
 end
+IComplex(x::Real, y::Interval) = IComplex(promote(x, y)...)
+IComplex(x::Interval, y::Real) = IComplex(promote(x, y)...)
 function IComplex(x::Real, y::Real)
     ix, iy = promote(x, y)
     IComplex(Interval(ix), Interval(iy))
@@ -270,6 +327,11 @@ Base.conj(z::IComplex) = IComplex(real(z), -imag(z))
     IComplex(real(z) * real(w) - imag(z) * imag(w), real(z) * imag(w) + imag(z) * real(w))
 *(x::Union{Interval,Real}, z::IComplex) = IComplex(x * real(z), x * imag(z))
 *(z::IComplex, x::Union{Interval,Real}) = IComplex(x * real(z), x * imag(z))
+
+Base.muladd(z::Union{Complex,IComplex}, w::Union{Complex,IComplex}, x::IComplex) = IComplex(
+    muladd(real(z), real(w), real(x)) - imag(z) * imag(w),
+    muladd(real(z), imag(w), muladd(imag(z), real(w), imag(x))),
+)
 
 /(a::R, z::S) where {R<:Real,S<:IComplex} = (T = promote_type(R, S); a * inv(T(z)))
 /(z::IComplex, x::Union{Interval,Real}) = IComplex(real(z) / x, imag(z) / x)

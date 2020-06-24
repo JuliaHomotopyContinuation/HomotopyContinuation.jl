@@ -56,6 +56,7 @@ include("overdetermined.jl")
 include("solve.jl")
 include("result.jl")
 include("monodromy.jl")
+include("certification.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See
