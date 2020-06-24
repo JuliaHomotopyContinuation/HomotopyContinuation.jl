@@ -324,6 +324,15 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         return (state.code = EndgameTrackerCode.terminated_max_steps)
     elseif ext_steps(tracker.state) - state.ext_steps_eg_start >
            options.max_endgame_extended_steps
+        # check if we had previously a singular solution attempt and return this
+        if all(!isnan, state.solution) &&
+           !isnothing(state.winding_number) &&
+           state.accuracy < 1e-5
+            state.cond =
+                LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
+            state.singular = true
+            return (state.code = EndgameTrackerCode.success)
+        end
         return (state.code = EndgameTrackerCode.terminated_max_extended_steps)
     end
 
@@ -503,7 +512,6 @@ function switch_to_singular!(state, tracker; debug::Bool)
 end
 function switch_to_regular!(state, tracker)
     state.singular_endgame = false
-    state.winding_number = 1
     winding_number!(tracker.predictor, 1)
     init!(tracker, 0.0)
     return state
@@ -566,9 +574,11 @@ function singular_endgame_step!(endgame_tracker::EndgameTracker, debug::Bool = f
     acc = predict_endpoint!(state, tracker.state.norm)
     if state.singular_steps == 2
         state.accuracy = acc
+        state.solution .= state.prediction
         return state.code
     elseif acc < state.accuracy && state.accuracy > 1e-12
         state.accuracy = acc
+        state.solution .= state.prediction
         return state.code
     end
 
@@ -580,7 +590,6 @@ function singular_endgame_step!(endgame_tracker::EndgameTracker, debug::Bool = f
         state.solution[i] = (state.val.val_x[i] < zero_cond) * state.prediction[i]
     end
     κ₀ = LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
-
     J₀_norm = inf_norm(workspace(tracker.state.jacobian), state.row_scaling)
     if debug
         display(matrix(tracker.state.jacobian))
@@ -591,13 +600,13 @@ function singular_endgame_step!(endgame_tracker::EndgameTracker, debug::Bool = f
             (m > 1 && κ > options.min_cond && nanmax(κ₀, inv(J₀_norm)) > κ) ||
             (m == 1 && κ₀ > 1e12)
         ) ||
-        #handle univariate case
+        # # some solution is better than none
+        max_steps ||
+        # handle univariate case
         (length(state.solution) == 1 && inv(J₀_norm) < options.min_cond)
     )
-
         state.cond = max(κ₀, inv(J₀_norm))
         state.singular = true
-        # state.solution .= state.prediction
         return (state.code = EndgameTrackerCode.success)
     elseif !max_steps
         switch_to_regular!(state, tracker)
@@ -645,7 +654,7 @@ function predict_endpoint!(state, norm)
     state.singular_steps ≥ 2 || return Inf
     if state.singular_steps == 2
         cubic_hermite!(
-            state.solution,
+            state.prediction,
             state.samples[1],
             state.sample_times[1],
             state.samples[2],
@@ -653,26 +662,19 @@ function predict_endpoint!(state, norm)
             0.0,
         )
     end
-    state.prediction .= state.solution
+    state.prev_prediction .= state.prediction
     cubic_hermite!(
-        state.solution,
+        state.prediction,
         state.samples[2],
         state.sample_times[2],
         state.samples[3],
         state.sample_times[3],
         0.0,
     )
-    # zero_cond = 1 / (state.winding_number + 1)
-    # for i = 1:length(state.prediction)
-    #     if state.val.val_x[i] > zero_cond
-    #         state.solution[i] = 0
-    #         state.prediction[i] = 0
-    #     end
-    # end
     p = state.sample_times[3] / state.sample_times[2]
     # Use error estimate from MSW92 (7)
-    err = InfNorm()(state.prediction, state.solution) / abs((p^2)^2 - 1)
-    norm_s = InfNorm()(state.solution)
+    err = InfNorm()(state.prediction, state.prev_prediction) / abs((p^2)^2 - 1)
+    norm_s = InfNorm()(state.prediction)
     if norm_s > 1e-8
         err /= norm_s
     end
