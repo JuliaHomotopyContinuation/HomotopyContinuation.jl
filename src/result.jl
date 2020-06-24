@@ -65,7 +65,8 @@ end
 function assign_multiplicities!(path_results::Vector{<:PathResult}, I::MultiplicityInfo)
     #assign multiplicities
     for (k, clusters) in I.multiplicities, cluster in clusters, vᵢ in cluster
-        path_results[vᵢ].multiplicity = k
+        path_results[vᵢ].multiplicity =
+            max(k, something(path_results[vᵢ].winding_number, 1))
     end
     path_results
 end
