@@ -244,6 +244,9 @@ using HomotopyContinuation.ModelKit
         T2 = CompiledSystem(F; optimizations = true)
         F3 = System(T2)
         @test expand.(F.expressions) == expand.(F3.expressions)
+
+        F4 = System(f, parameters = [b, a])
+        @test variables(F4) == [x, y]
     end
 
     @testset "System variables groups + homogeneous" begin
