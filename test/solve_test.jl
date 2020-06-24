@@ -211,7 +211,7 @@
         f = System([2y + 3 * y^2 - x * y^3, x + 4 * x^2 - 2 * x^3 * y])
 
         @test paths_to_track(f; start_system = :total_degree) == 16
-        @test paths_to_track(f; start_system = :total_degree, target_parameters = nothing) == 16
+        @test paths_to_track(f; start_system = :total_degree) == 16
         @test paths_to_track(f; start_system = :polyhedral) == 8
         @test paths_to_track(f; start_system = :polyhedral, only_non_zero = true) == 3
         @test paths_to_track(f) == 8

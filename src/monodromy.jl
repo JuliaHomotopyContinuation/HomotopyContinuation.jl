@@ -599,7 +599,6 @@ function monodromy_solve(
                 retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
             end
         catch e
-            @show catch_interrupt
             if !catch_interrupt ||
                !(
                 isa(e, InterruptException) ||

@@ -863,14 +863,19 @@ end
 function _default_vars_params(exprs, vars, parameters, variable_groups)
     all_vars = variables(exprs)
     if isnothing(variable_groups)
-        if isnothing(parameters)
-            all_vars, Variable[]
-        else
+        parameters = something(parameters, Variable[])
+        if isnothing(vars)
             setdiff(all_vars, parameters), parameters
+        else
+            vars, parameters
         end
     elseif isnothing(vars)
         vars = reduce(vcat, variable_groups)
-        vars, setdiff(all_vars, vars)
+        if isnothing(parameters)
+            vars, setdiff(all_vars, vars)
+        else
+            vars, parameters
+        end
     else
         if isnothing(parameters)
             vars, Variable[]
