@@ -45,7 +45,7 @@ Base.@kwdef mutable struct EndgameOptions
     max_endgame_steps::Int = 2000
     max_endgame_extended_steps::Int = 200
     # eg parameter
-    min_cond::Float64 = 1e8
+    min_cond::Float64 = 1e6
     min_cond_growth::Float64 = 100.0
     min_coord_growth::Float64 = 100.0
     zero_is_at_infinity::Bool = false
@@ -469,10 +469,11 @@ function check_at_infinity!(state, tracker, options; debug::Bool = false)
                     @show κ, cond_growth, δt, log(cond_growth / δt)
                 end
 
-                if coord_growth > max(0.25^(4vᵢ), 20) &&
+                if coord_growth > clamp(0.25^(4vᵢ), 10, 100) &&
                    (cond_growth > options.min_cond_growth || κ > options.min_cond)
+
                     if at_zero
-                        state.code = EndgaemTrackerCode.at_zero
+                        state.code = EndgameTrackerCode.at_zero
                     else
                         state.code = EndgameTrackerCode.at_infinity
                     end
