@@ -38,6 +38,8 @@ Solver(
     start_system = nothing,
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
+Base.show(io::IO, solver::Solver) = print(io, "Solver")
+
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
     F::AbstractVector{Expression},

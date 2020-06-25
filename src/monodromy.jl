@@ -474,6 +474,7 @@ function monodromy_solve(
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     compile::Bool = COMPILE_DEFAULT[],
+    catch_interrupt::Bool = true,
     # monodromy options
     options = nothing,
     group_action = nothing,
@@ -512,6 +513,7 @@ function monodromy_solve(
             seed;
             show_progress = show_progress,
             threading = threading,
+            catch_interrupt = catch_interrupt,
         )
     else
         monodromy_solve(
@@ -520,6 +522,7 @@ function monodromy_solve(
             seed;
             show_progress = show_progress,
             threading = threading,
+            catch_interrupt = catch_interrupt,
         )
     end
 end
@@ -568,6 +571,7 @@ function monodromy_solve(
     seed;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    catch_interrupt::Bool = true,
 )
     if !show_progress
         progress = nothing
@@ -587,10 +591,22 @@ function monodromy_solve(
         @warn "None of the provided solutions is a valid start solution."
         retcode = :invalid_startvalue
     else
-        if threading
-            retcode = threaded_monodromy_solve!(results, MS, p, seed, progress)
-        else
-            retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
+        retcode = :default
+        try
+            if threading
+                retcode = threaded_monodromy_solve!(results, MS, p, seed, progress)
+            else
+                retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
+            end
+        catch e
+            if !catch_interrupt ||
+               !(
+                isa(e, InterruptException) ||
+                (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+            )
+                rethrow(e)
+            end
+            retcode = :interrupted
         end
     end
 

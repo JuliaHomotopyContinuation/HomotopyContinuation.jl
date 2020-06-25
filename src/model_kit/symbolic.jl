@@ -852,14 +852,39 @@ end
 
 function System(
     exprs::AbstractVector{Expression};
-    parameters::Vector{Variable} = Variable[],
+    parameters::Union{Nothing,Vector{Variable}} = nothing,
     variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
-    variables::Vector{Variable} = isnothing(variable_groups) ?
-                                  setdiff!(variables(exprs), parameters) :
-                                  reduce(vcat, variable_groups),
+    variables::Union{Nothing,Vector{Variable}} = nothing,
 )
-    System(convert(Vector{Expression}, exprs), variables, parameters, variable_groups)
+    vars, params = _default_vars_params(exprs, variables, parameters, variable_groups)
+    System(convert(Vector{Expression}, exprs), vars, params, variable_groups)
 end
+
+function _default_vars_params(exprs, vars, parameters, variable_groups)
+    all_vars = variables(exprs)
+    if isnothing(variable_groups)
+        parameters = something(parameters, Variable[])
+        if isnothing(vars)
+            setdiff(all_vars, parameters), parameters
+        else
+            vars, parameters
+        end
+    elseif isnothing(vars)
+        vars = reduce(vcat, variable_groups)
+        if isnothing(parameters)
+            vars, setdiff(all_vars, vars)
+        else
+            vars, parameters
+        end
+    else
+        if isnothing(parameters)
+            vars, Variable[]
+        else
+            vars, parameters
+        end
+    end
+end
+
 
 function System(
     exprs::AbstractVector{Expression},
