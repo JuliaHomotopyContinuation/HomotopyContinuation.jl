@@ -474,8 +474,8 @@ function coord_change(
     ::Coordinates{:ExtrinsicStiefel},
     u,
 )
-    v = coord_change(A, Intrinsic(), IntrinsicStiefel(), u)
-    coord_change(A, IntrinsicStiefel(), ExtrinsicStiefel(), v)
+    v = coord_change(A, Intrinsic, IntrinsicStiefel, u)
+    coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, v)
 end
 
 coord_change(A::AffineSubspace, ::Coordinates{:Extrinsic}, ::Coordinates{:Intrinsic}, x) =
@@ -486,8 +486,8 @@ function coord_change(
     ::Coordinates{:IntrinsicStiefel},
     x,
 )
-    u = coord_change(A, Extrinsic(), Intrinsic(), x)
-    coord_change(A, Intrinsic(), IntrinsicStiefel(), u)
+    u = coord_change(A, Extrinsic, Intrinsic, x)
+    coord_change(A, Intrinsic, IntrinsicStiefel, u)
 end
 function coord_change(
     A::AffineSubspace,
@@ -512,8 +512,8 @@ function coord_change(
     ::Coordinates{:Extrinsic},
     u,
 )
-    x = coord_change(A, IntrinsicStiefel(), ExtrinsicStiefel(), u)
-    coord_change(A, ExtrinsicStiefel(), Extrinsic(), x)
+    x = coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, u)
+    coord_change(A, ExtrinsicStiefel, Extrinsic, x)
 end
 function coord_change(
     A::AffineSubspace,
@@ -529,8 +529,8 @@ function coord_change(
     ::Coordinates{:Intrinsic},
     x,
 )
-    u = coord_change(A, ExtrinsicStiefel(), IntrinsicStiefel(), x)
-    coord_change(A, IntrinsicStiefel(), Intrinsic(), u)
+    u = coord_change(A, ExtrinsicStiefel, IntrinsicStiefel, x)
+    coord_change(A, IntrinsicStiefel, Intrinsic, u)
 end
 function coord_change(
     A::AffineSubspace,
