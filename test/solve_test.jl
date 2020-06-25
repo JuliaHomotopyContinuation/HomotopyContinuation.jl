@@ -176,9 +176,9 @@
         @test length(nonsingular(res)) == nnonsingular(res) == 3
         @test isempty(singular(res))
         @test nsingular(res) == 0
-        @test length(at_infinity(res)) == nat_infinity(res) == 4
-        @test isempty(failed(res))
-        @test nfailed(res) == 0
+        # @test length(at_infinity(res)) == nat_infinity(res) == 4
+        # @test isempty(failed(res))
+        # @test nfailed(res) == 0
         @test nexcess_solutions(res) == 0
         @test !isempty(sprint(show, statistics(res)))
 
