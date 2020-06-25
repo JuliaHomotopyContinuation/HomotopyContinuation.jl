@@ -51,9 +51,10 @@ include("total_degree.jl")
 include("binomial_system.jl")
 include("polyhedral.jl")
 include("overdetermined.jl")
-include("solve.jl")
 include("result.jl")
+include("solve.jl")
 include("monodromy.jl")
+include("witness_set.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See

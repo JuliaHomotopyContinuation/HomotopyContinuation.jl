@@ -37,6 +37,7 @@ end
     include("solve_test.jl")
     include("endgame_test.jl")
     include("monodromy_test.jl")
+    include("witness_set_test.jl")
 
     if "extensive" in ARGS
         include("extensive/extensive_test.jl")

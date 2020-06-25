@@ -884,7 +884,7 @@ Track `solution(r)` from `t` towards `0` using the given `endgame_tracker`.
 """
 function track(
     endgame_tracker::EndgameTracker,
-    x::AbstractVector,
+    x,
     t₁::Real = 1.0;
     path_number::Union{Nothing,Int} = nothing,
     kwargs...,

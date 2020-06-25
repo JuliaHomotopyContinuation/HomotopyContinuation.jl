@@ -375,7 +375,7 @@ function MonodromySolver(
         options = MonodromyOptions(; options...)
     end
 
-    egtracker = parameter_homotopy(
+    egtracker = parameter_homotopy_tracker(
         F;
         compile = compile,
         generic_parameters = randn(ComplexF64, nparameters(F)),

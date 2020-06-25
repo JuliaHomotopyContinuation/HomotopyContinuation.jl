@@ -82,7 +82,7 @@ function (F::AffineChartSystem{<:Any,N})(x, p = nothing) where {N}
 end
 
 function ModelKit.evaluate!(u, F::AffineChartSystem{<:Any,N}, x, p = nothing) where {N}
-    evaluate!(u, F.system, x)
+    evaluate!(u, F.system, x, p)
     evaluate_chart!(u, F.chart, x)
     u
 end
@@ -94,7 +94,7 @@ function ModelKit.evaluate_and_jacobian!(
     x,
     p = nothing,
 ) where {N}
-    evaluate_and_jacobian!(u, U, F.system, x)
+    evaluate_and_jacobian!(u, U, F.system, x, p)
     evaluate_chart!(u, F.chart, x)
     jacobian_chart!(U, F.chart, x)
     nothing

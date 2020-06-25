@@ -51,12 +51,24 @@ AffineSubspaceHomotopy(
     compile::Bool = COMPILE_DEFAULT[],
 ) = AffineSubspaceHomotopy(fixed(F; compile = compile), start, target)
 
+
 function AffineSubspaceHomotopy(
     system::AbstractSystem,
     start::AffineSubspace,
     target::AffineSubspace,
 )
+    AffineSubspaceHomotopy(
+        system,
+        convert(AffineSubspace{ComplexF64}, start),
+        convert(AffineSubspace{ComplexF64}, target),
+    )
+end
 
+function AffineSubspaceHomotopy(
+    system::AbstractSystem,
+    start::AffineSubspace{ComplexF64},
+    target::AffineSubspace{ComplexF64},
+)
     Q, Θ, U = geodesic_svd(target, start)
     Q_cos = target.intrinsic.Y * U
     tx³ = TaylorVector{4}(ComplexF64, size(Q, 1))

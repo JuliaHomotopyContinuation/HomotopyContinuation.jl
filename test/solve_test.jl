@@ -318,6 +318,16 @@
         @test nsolutions(res) == 1
     end
 
+    @testset "solve (affine sliced)" begin
+        @var x y
+        F = System([x^2 + y^2 - 5], [x, y])
+        l1 = rand_affine_subspace(2; codim = 1)
+        l2 = rand_affine_subspace(2; codim = 1)
+
+        _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
+        @test _solver.trackers[1].tracker.homotopy isa AffineSubspaceHomotopy
+    end
+
     @testset "solve (Vector{Expression})" begin
         @var x a y b
         F = [x^2 - a, x * y - a + b]

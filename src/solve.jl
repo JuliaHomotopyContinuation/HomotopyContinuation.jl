@@ -1,4 +1,4 @@
-export solve, Solver, solver, solver_startsolutions, paths_to_track
+export solve, Solver, solver, solver_startsolutions, paths_to_track, parameter_homotopy
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -38,7 +38,7 @@ Solver(
     start_system = nothing,
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
-Base.show(io::IO, solver::Solver) = print(io, "Solver")
+Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
 
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
@@ -104,7 +104,7 @@ function solver_startsolutions(
 
     used_start_system = nothing
     if start_parameters !== nothing
-        tracker = parameter_homotopy(
+        tracker = parameter_homotopy_tracker(
             F;
             start_parameters = start_parameters,
             target_parameters = target_parameters,
@@ -148,16 +148,36 @@ function solver_startsolutions(
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    H = start_target_homotopy(G, F; kwargs...)
+    if F isa AffineSlicedSystem && G isa AffineSlicedSystem && system(F) == system(G)
+        H = AffineSubspaceHomotopy(system(F), affine_subspace(F), affine_subspace(G))
+    else
+        H = start_target_homotopy(G, F; kwargs...)
+    end
     tracker =
         EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 
     Solver(tracker; seed = seed), starts
 end
 
+function parameter_homotopy_tracker(
+    F::Union{System,AbstractSystem};
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(),
+    kwargs...,
+)
+    H = parameter_homotopy(F; kwargs...)
+    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
+end
+
+"""
+    parameter_homotopy(F; start_parameters, target_parameters)
+
+Construct a [`ParameterHomotopy`](@ref). If `F` is homogeneous, then a random affine chart
+is chosen.
+"""
 function parameter_homotopy(
     F::Union{System,AbstractSystem};
-    generic_parameters = nothing,
+    generic_parameters = randn(ComplexF64, nparameters(F)),
     p₁ = generic_parameters,
     start_parameters = p₁,
     p₀ = generic_parameters,
@@ -168,8 +188,6 @@ function parameter_homotopy(
     kwargs...,
 )
     unsupported_kwargs(kwargs)
-    isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
-    isnothing(target_parameters) && throw(UndefKeywordError(:target_parameters))
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
@@ -186,7 +204,7 @@ function parameter_homotopy(
         m ≥ n || throw(FiniteException(n - m))
     end
 
-    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
+    H
 end
 
 function start_target_homotopy(
@@ -387,6 +405,9 @@ function solve(
     end
 end
 
+function solve(S::Solver, R::Result; kwargs...)
+    solve(S, solutions(R; only_nonsingular = true); kwargs...)
+end
 function solve(
     S::Solver,
     starts;

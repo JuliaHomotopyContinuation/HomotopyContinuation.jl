@@ -56,6 +56,7 @@ Base.size(F::InterpretedSystem) = size(F.system)
 variables(F::InterpretedSystem) = variables(F.system)
 parameters(F::InterpretedSystem) = parameters(F.system)
 variable_groups(F::InterpretedSystem) = variable_groups(F.system)
+Base.:(==)(F::InterpretedSystem, G::InterpretedSystem) = F.system == G.system
 
 function Base.show(io::IO, F::InterpretedSystem)
     print(io, "Interpreted: ")

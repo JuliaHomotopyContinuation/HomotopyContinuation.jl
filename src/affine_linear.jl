@@ -18,6 +18,8 @@ export AffineSubspace,
 # References
 const _LKK19 = """Lim, Lek-Heng, Ken Sze-Wai Wong, and Ke Ye. "Numerical algorithms on the affine Grassmannian." SIAM Journal on Matrix Analysis and Applications 40.2 (2019): 371-393"""
 
+abstract type AbstractSubspace{T} end
+
 """
     Coordinates
 
@@ -57,16 +59,24 @@ Note that internally `A` and `b` will be stored such that the rows of `A` are or
 struct AffineExtrinsic{T}
     A::Matrix{T}
     b::Vector{T}
+
+    function AffineExtrinsic(
+        A::Matrix{T},
+        b::Vector{T};
+        orthonormal::Bool = false,
+    ) where {T}
+        if orthonormal
+            new{T}(A, b)
+        else
+            svd = LA.svd(A)
+            new{T}(svd.Vt, (inv.(svd.S) .* (svd.U' * b)))
+        end
+    end
 end
 (A::AffineExtrinsic)(x::AbstractVector) = A.A * x - A.b
 
-function AffineExtrinsic(A::Matrix{T}, b::Vector{T}; orthonormal::Bool = false) where {T}
-    if orthonormal
-        AffineExtrinsic{T}(A, b)
-    else
-        svd = LA.svd(A)
-        AffineExtrinsic{T}(svd.Vt, (inv.(svd.S) .* (svd.U' * b)))
-    end
+function Base.convert(::Type{AffineExtrinsic{T}}, A::AffineExtrinsic) where {T}
+    AffineExtrinsic(convert(Matrix{T}, A.A), convert(Vector{T}, A.b); orthonormal = true)
 end
 
 """
@@ -116,6 +126,14 @@ struct AffineIntrinsic{T}
     Y::Matrix{T}
 end
 AffineIntrinsic(A::Matrix, b₀::Vector) = AffineIntrinsic(A, b₀, stiefel_coordinates(A, b₀))
+
+function Base.convert(::Type{AffineIntrinsic{T}}, A::AffineIntrinsic) where {T}
+    AffineIntrinsic(
+        convert(Matrix{T}, A.A),
+        convert(Vector{T}, A.b₀),
+        convert(Matrix{T}, A.Y),
+    )
+end
 
 (A::AffineIntrinsic)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b₀
 (A::AffineIntrinsic)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
@@ -260,7 +278,7 @@ julia> coord_change(A, Extrinsic, Intrinsic, x)
  0.49999999999999994
 ```
 """
-struct AffineSubspace{T}
+struct AffineSubspace{T} <: AbstractSubspace{T}
     extrinsic::AffineExtrinsic{T}
     intrinsic::AffineIntrinsic{T}
 end
@@ -274,6 +292,13 @@ function AffineSubspace(A::AbstractMatrix{T}, b::AbstractVector{T}) where {T}
         throw(ArgumentError("Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b."))
 
     AffineSubspace(AffineExtrinsic(Matrix(float.(A)), Vector(float.(b))))
+end
+
+function Base.convert(::Type{AffineSubspace{T}}, A::AffineSubspace) where {T}
+    AffineSubspace(
+        convert(AffineExtrinsic{T}, A.extrinsic),
+        convert(AffineIntrinsic{T}, A.intrinsic),
+    )
 end
 
 Base.broadcastable(A::AffineSubspace) = Ref(A)
@@ -596,14 +621,14 @@ function geodesic(A::AffineIntrinsic, B::AffineIntrinsic)
 end
 #
 """
-    translate(L::AffineSubspace, δb, ::Coordinates)
+    translate(L::AffineSubspace, δb, ::Coordinates = Extrinsic)
 
 Translate the affine subspace `L` by `δb`.
 """
-function translate(L::AffineSubspace, δb, ::Coordinates{:Extrinsic})
+function translate(L::AffineSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsic)
     translate!(copy(L), δb, Extrinsic)
 end
-function translate!(L::AffineSubspace, δb, ::Coordinates{:Extrinsic})
+function translate!(L::AffineSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsic)
     ext = extrinsic(L)
     ext.b .+= δb
     int = intrinsic(L)
