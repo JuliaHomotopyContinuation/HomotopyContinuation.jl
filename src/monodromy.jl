@@ -21,40 +21,6 @@ export monodromy_solve,
     MonodromyOptions(; options...)
 
 Options for [`monodromy_solve`](@ref).
-
-## Options
-
-* `check_startsolutions=true`: If `true`, we do a Newton step for each entry of `sols`for
-  checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
-* `distance = EuclideanNorm()`: The distance function used for [`UniquePoints`](@ref).
-* `loop_finished_callback=always_false`: A callback to end the computation. This function is
-  called with all current [`PathResult`](@ref)s after a loop is exhausted.
-  2 arguments. Return `true` if the compuation should be stopped.
-* `equivalence_classes=true`: This only applies if there is at least one group action
-  supplied. We then consider two solutions in the same equivalence class if we can transform
-  one to the other by the supplied group actions. We only track one solution per equivalence
-  class.
-* `group_action=nothing`: A function taking one solution and returning other solutions if
-  there is a constructive way to obtain them, e.g. by symmetry.
-* `group_actions=nothing`: If there is more than one group action you can use this to chain
-  the application of them. For example if you have two group actions `foo` and `bar` you can
-  set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the
-  application rules.
-* `max_loops_no_progress::Int=10`: The maximal number of iterations (i.e. loops generated)
-  without any progress.
-* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied.
-  By default no lower limit is enforced.
-* `parameter_sampler = independent_normal`: A function taking the parameter `p` and
-  returning a new random parameter `q`. By default each entry of the parameter vector
-  is drawn independently from Normal distribution.
-* `permutations = false`: Whether to keep track of the permutations induced by the loops.
-* `resuse_loops::Symbol=:all`: Strategy to reuse other loops for new found solutions. `:all`
-  propagates a new solution through all other loops, `:random` picks a random loop, `:none`
-  doesn't reuse a loop.
-* `target_solutions_count`: The computation is stopped if this number of solutions is
-  reached.
-* `threading = true`: Enable multithreading of the path tracking.
-* `timeout`: The maximal number of *seconds* the computation is allowed to run.
 """
 Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     check_startsolutions::Bool = true
@@ -333,7 +299,9 @@ seed(r::MonodromyResult) = r.seed
 """
     permutations(r::MonodromyResult; reduced=true)
 
-Return the permutations of the solutions that are induced by tracking over the loops. If `reduced=false`, then all permutations are returned. If `reduced=true` then permutations without repetitions are returned.
+Return the permutations of the solutions that are induced by tracking over the loops.
+If `reduced=false`, then all permutations are returned.
+If `reduced=true` then permutations without repetitions are returned.
 
 If a solution was not tracked in the loop, then the corresponding entry is 0.
 
@@ -456,7 +424,48 @@ by monodromy techniques. This makes loops in the parameter space of `F` to find 
 If `F` the parameters `p` only occur *linearly* in `F` it is eventually possible to compute
 a *start pair* ``(x₀, p₀)`` automatically. In this case `sols` and `p` can be omitted and
 the automatically generated parameters can be obtained with the [`parameters`](@ref) function
-from the [`MonodromyResult`](@ref). See also [`MonodromyOptions`](@ref).
+from the [`MonodromyResult`](@ref).
+
+## Options
+
+* `catch_interrupt = true`: If true catches interruptions (e.g. issued by pressing Ctrl-C)
+  and returns the partial result.
+* `check_startsolutions = true`: If `true`, we do a Newton step for each entry of `sols`for
+  checking if it is a valid startsolutions. Solutions which are not valid are sorted out.
+* `compile = $(COMPILE_DEFAULT[])`: If `true` then a `System` (resp. `Homotopy`) is compiled
+  to a straight line program ([`CompiledSystem`](@ref) resp. [`CompiledHomotopy`](@ref))
+  for evaluation. This induces a compilation overhead. If `false` then the generated program
+  is only interpreted ([`InterpretedSystem`](@ref) resp. [`InterpretedHomotopy`](@ref)).
+  This is slower than the compiled version, but does not introduce compilation overhead.
+* `distance = EuclideanNorm()`: The distance function used for [`UniquePoints`](@ref).
+* `loop_finished_callback = always_false`: A callback to end the computation. This function is
+  called with all current [`PathResult`](@ref)s after a loop is exhausted.
+  2 arguments. Return `true` if the compuation should be stopped.
+* `equivalence_classes=true`: This only applies if there is at least one group action
+  supplied. We then consider two solutions in the same equivalence class if we can transform
+  one to the other by the supplied group actions. We only track one solution per equivalence
+  class.
+* `group_action = nothing`: A function taking one solution and returning other solutions if
+  there is a constructive way to obtain them, e.g. by symmetry.
+* `group_actions = nothing`: If there is more than one group action you can use this to chain
+  the application of them. For example if you have two group actions `foo` and `bar` you can
+  set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the
+  application rules.
+* `max_loops_no_progress = 10`: The maximal number of iterations (i.e. loops generated)
+  without any progress.
+* `min_solutions`: The minimal number of solutions before a stopping heuristic is applied.
+  By default no lower limit is enforced.
+* `parameter_sampler = independent_normal`: A function taking the parameter `p` and
+  returning a new random parameter `q`. By default each entry of the parameter vector
+  is drawn independently from Normal distribution.
+* `permutations = false`: Whether to keep track of the permutations induced by the loops.
+* `resuse_loops = :all`: Strategy to reuse other loops for new found solutions. `:all`
+  propagates a new solution through all other loops, `:random` picks a random loop, `:none`
+  doesn't reuse a loop.
+* `target_solutions_count`: The computation is stopped if this number of solutions is
+  reached.
+* `threading = true`: Enable multithreading of the path tracking.
+* `timeout`: The maximal number of *seconds* the computation is allowed to run.
 """
 function monodromy_solve(F::Vector{<:ModelKit.Expression}, args...; parameters, kwargs...)
     monodromy_solve(System(F; parameters = parameters), args...; kwargs...)

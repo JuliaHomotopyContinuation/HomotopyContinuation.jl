@@ -1,8 +1,4 @@
-# Systems and Homotopies
-
-Systems ([`AbstractSystem`](@ref)) and homotopies ([`AbstractHomotopy`](@ref)) are used for the numerical computations.
-
-## Systems
+# Systems
 
 Systems ([`AbstractSystem`](@ref)) are the basic building blocks of homotopies.
 
@@ -10,7 +6,21 @@ Systems ([`AbstractSystem`](@ref)) are the basic building blocks of homotopies.
 AbstractSystem
 ```
 
-### Interface
+Although they sound similar, [`AbstractSystem`](@ref)s and [`System`](@ref) share different
+purposes. [`AbstractSystem`](@ref)s are intented for the fast numerical evaluation
+of a fixed system. Whereas a [`System`](@ref) is intended for formulating your problem
+symbolically.
+A [`System`](@ref) can be converted to two different basic `AbstractSystem`s,
+a [`CompiledSystem`](@ref) (fast, but introduce compilation overhead) and an
+[`InterpretedSystem`](@ref) (slower, but not compilation overhead).
+
+```@docs
+CompiledSystem
+InterpretedSystem
+fixed(::System)
+```
+
+## Interface
 
 An [`AbstractSystem`](@ref) needs to implement the following methods:
 
@@ -34,75 +44,25 @@ implement
 taylor!(u, ::Val{1}, F::AbstractSystem, x, p::TaylorVector{2})
 ```
 
-
-
-
-
-
-
-
-### AffineChartSystem
+## AffineChartSystem
 ```@docs
 AffineChartSystem
 on_affine_chart(F::System, dims)
 ```
 
-### CompositionSystem
+## CompositionSystem
 ```@docs
 CompositionSystem
 compose
 ```
 
-### FixedParameterSystem
+## FixedParameterSystem
 ```@docs
 FixedParameterSystem
-fix_parameters
+fix_parameters(F::AbstractSystem, p)
 ```
 
-### ModelKitSystem
-```@docs
-ModelKitSystem
-```
-
-### RandomizedSystem
+## RandomizedSystem
 ```@docs
 RandomizedSystem
-```
-
-
-## Homotopies
-Homotopies ([`AbstractHomotopy`](@ref)) are at the heart of homotopy continuation.
-A homotopy is a parameterized family ``H(x,t)`` of polynomial systems.
-By convention, homotopies are tracked from ``t=1`` to ``t=0``, i.e., ``H(x,1)`` is considered
-the *start system* and ``H(x,0)`` is the *target system*.
-
-```@docs
-AbstractHomotopy
-```
-
-### AffineChartHomotopy
-```@docs
-AffineChartHomotopy
-on_affine_chart(F::Homotopy, dims)
-```
-
-### AffineSubspaceHomotopy
-```@docs
-AffineSubspaceHomotopy
-set_subspaces!
-```
-
-### ModelKitHomotopy
-```@docs
-ModelKitHomotopy
-```
-
-### ParameterHomotopy
-```@docs
-ParameterHomotopy
-```
-
-### StraightLineHomotopy
-```@docs
-StraightLineHomotopy
 ```
