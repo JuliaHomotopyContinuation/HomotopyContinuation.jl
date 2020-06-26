@@ -1,6 +1,13 @@
-fixed(H::AbstractHomotopy; kwargs...) = H
+"""
+    fixed(H::Homotopy; compile::Bool = COMPILE_DEFAULT[])
+
+Constructs either a [`CompiledHomotopy`](@ref) (if `compile = true`) or an
+[`InterpretedHomotopy`](@ref) (if `compile = false`).
+"""
 fixed(H::Homotopy; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
     compile ? CompiledHomotopy(H; kwargs...) : InterpretedHomotopy(H; kwargs...)
+fixed(H::AbstractHomotopy; kwargs...) = H
+
 
 function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector, t)
     x .= y

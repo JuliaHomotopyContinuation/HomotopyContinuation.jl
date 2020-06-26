@@ -276,7 +276,7 @@ The `solve` routines takes the following options:
   is only interpreted ([`InterpretedSystem`](@ref) resp. [`InterpretedHomotopy`](@ref)).
   This is slower than the compiled version, but does not introduce compilation overhead.
 * `endgame_options`: The options and parameters for the endgame.
-  Expects an [`EndgameOptions`](@ref) struct.
+  See [`EndgameOptions`](@ref).
 * `seed`: The random seed used during the computations. The seed is also reported in the
   result. For a given random seed the result is always identical.
 * `show_progress= true`: Indicate whether a progress bar should be displayed.
@@ -287,9 +287,8 @@ The `solve` routines takes the following options:
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
 * `threading = true`: Enable multi-threading for the computation. The number of
   available threads is controlled by the environment variable `JULIA_NUM_THREADS`.
-* `tracker_options`: The options and parameters for the path tracker. Expects a
-  [`TrackerOptions`](@ref) struct.
-
+* `tracker_options`: The options and parameters for the path tracker.
+  See [`TrackerOptions`](@ref).
 
 ## Options depending on input
 
