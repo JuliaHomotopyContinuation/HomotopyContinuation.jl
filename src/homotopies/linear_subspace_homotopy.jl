@@ -1,20 +1,20 @@
-export AffineSubspaceHomotopy, set_subspaces!
+export LinearSubspaceHomotopy, set_subspaces!
 
 """
-    AffineSubspaceHomotopy(F::System, V::AffineSubspace, W::AffineSubspace)
-    AffineSubspaceHomotopy(F::AbstractSystem, V::AffineSubspace, W::AffineSubspace)
+    LinearSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
+    LinearSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
 
 Creates a homotopy ``H(x,t) = (F ∩ γ(t))(x)`` where ``γ(t)`` is a family of affine subspaces
 such that ``H(x,1) = (F ∩ V)(x)`` and ``H(x,0) = (F ∩ W)(x)``.
 Here ``γ(t)`` is the geodesic between `V` and `W` in the affine Grassmanian, i.e.,
 it is the curve of minimal length connecting `V` and `W`.
-See also [`AffineSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
+See also [`LinearSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
 """
-Base.@kwdef struct AffineSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+Base.@kwdef struct LinearSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
 
-    start::AffineSubspace{ComplexF64}
-    target::AffineSubspace{ComplexF64}
+    start::LinearSubspace{ComplexF64}
+    target::LinearSubspace{ComplexF64}
 
     J::Matrix{ComplexF64}
     Q::Matrix{ComplexF64}
@@ -44,36 +44,36 @@ end
 # ``[F(γ(t)v); (γ(t)v)[end] - 1]``. Here the `(γ(t)v)[k+1] - 1` condition ensures that
 # we are in the affine Grassmanian and that `(γ(t)v)[1:k]` is the correct value in \C^n.
 
-AffineSubspaceHomotopy(
+LinearSubspaceHomotopy(
     F::ModelKit.System,
-    start::AffineSubspace,
-    target::AffineSubspace;
+    start::LinearSubspace,
+    target::LinearSubspace;
     compile::Bool = COMPILE_DEFAULT[],
-) = AffineSubspaceHomotopy(fixed(F; compile = compile), start, target)
+) = LinearSubspaceHomotopy(fixed(F; compile = compile), start, target)
 
 
-function AffineSubspaceHomotopy(
+function LinearSubspaceHomotopy(
     system::AbstractSystem,
-    start::AffineSubspace,
-    target::AffineSubspace,
+    start::LinearSubspace,
+    target::LinearSubspace,
 )
-    AffineSubspaceHomotopy(
+    LinearSubspaceHomotopy(
         system,
-        convert(AffineSubspace{ComplexF64}, start),
-        convert(AffineSubspace{ComplexF64}, target),
+        convert(LinearSubspace{ComplexF64}, start),
+        convert(LinearSubspace{ComplexF64}, target),
     )
 end
 
-function AffineSubspaceHomotopy(
+function LinearSubspaceHomotopy(
     system::AbstractSystem,
-    start::AffineSubspace{ComplexF64},
-    target::AffineSubspace{ComplexF64},
+    start::LinearSubspace{ComplexF64},
+    target::LinearSubspace{ComplexF64},
 )
     Q, Θ, U = geodesic_svd(target, start)
     Q_cos = target.intrinsic.Y * U
     tx³ = TaylorVector{4}(ComplexF64, size(Q, 1))
 
-    AffineSubspaceHomotopy(
+    LinearSubspaceHomotopy(
         system = system,
         start = copy(start),
         target = copy(target),
@@ -95,17 +95,17 @@ function AffineSubspaceHomotopy(
         tx¹ = TaylorVector{2}(tx³),
     )
 end
-Base.size(H::AffineSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+Base.size(H::LinearSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
 
 """
-    set_subspaces!(H::AffineSubspaceHomotopy, start::AffineSubspace, target::AffineSubspace)
+    set_subspaces!(H::LinearSubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
 
 Update the homotopy `H` to track from the affine subspace `start` to `target`.
 """
 function set_subspaces!(
-    H::AffineSubspaceHomotopy,
-    start::AffineSubspace,
-    target::AffineSubspace,
+    H::LinearSubspaceHomotopy,
+    start::LinearSubspace,
+    target::LinearSubspace,
 )
     Q, Θ, U = geodesic_svd(target, start)
     copy!(H.start, start)
@@ -119,7 +119,7 @@ function set_subspaces!(
     H
 end
 
-function γ!(H::AffineSubspaceHomotopy, t::Number)
+function γ!(H::LinearSubspaceHomotopy, t::Number)
     H.t_cache[] != t || return first(H.taylor_γ)
     if isreal(t)
         _γ!(H, real(t))
@@ -130,7 +130,7 @@ function γ!(H::AffineSubspaceHomotopy, t::Number)
 
     first(H.taylor_γ)
 end
-@inline function _γ!(H::AffineSubspaceHomotopy, t::Number)
+@inline function _γ!(H::LinearSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ = H
     γ = first(H.taylor_γ)
     n, k = size(γ)
@@ -144,8 +144,8 @@ end
     γ
 end
 
-γ̇!(H::AffineSubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
-@inline function _γ̇!(H::AffineSubspaceHomotopy, t::Number)
+γ̇!(H::LinearSubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
+@inline function _γ̇!(H::LinearSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ = H
     _, γ̇ = H.taylor_γ
     n, k = size(γ̇)
@@ -161,7 +161,7 @@ end
     γ̇
 end
 
-function set_solution!(u::Vector, H::AffineSubspaceHomotopy, x::AbstractVector, t)
+function set_solution!(u::Vector, H::LinearSubspaceHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x) - 1) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
     for i = 1:length(x)
@@ -178,7 +178,7 @@ function set_solution!(u::Vector, H::AffineSubspaceHomotopy, x::AbstractVector, 
     end
 end
 
-function get_solution(H::AffineSubspaceHomotopy, u::AbstractVector, t)
+function get_solution(H::LinearSubspaceHomotopy, u::AbstractVector, t)
     if isone(t)
         (@view H.γ1[1:end-1, :]) * u
     elseif iszero(t)
@@ -189,7 +189,7 @@ function get_solution(H::AffineSubspaceHomotopy, u::AbstractVector, t)
     end
 end
 
-function ModelKit.evaluate!(u, H::AffineSubspaceHomotopy, v::AbstractVector, t)
+function ModelKit.evaluate!(u, H::LinearSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
     n = first(size(H.system))
     if eltype(v) isa ComplexDF64
@@ -207,7 +207,7 @@ end
 function ModelKit.evaluate_and_jacobian!(
     u,
     U,
-    H::AffineSubspaceHomotopy,
+    H::LinearSubspaceHomotopy,
     v::AbstractVector,
     t,
 )
@@ -228,7 +228,7 @@ function ModelKit.evaluate_and_jacobian!(
     nothing
 end
 
-function ModelKit.taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, v, t)
+function ModelKit.taylor!(u, ::Val{1}, H::LinearSubspaceHomotopy, v, t)
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
@@ -244,7 +244,7 @@ function ModelKit.taylor!(u, ::Val{1}, H::AffineSubspaceHomotopy, v, t)
     u
 end
 
-function _taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
+function _taylor_γ!(H::LinearSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ, U, taylor_γ = H
 
     γ, γ¹, γ², γ³ = taylor_γ
@@ -270,7 +270,7 @@ function _taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
 
 end
 
-function taylor_γ!(H::AffineSubspaceHomotopy, t::Number)
+function taylor_γ!(H::LinearSubspaceHomotopy, t::Number)
     H.taylor_t_cache[] != t || return H.taylor_γ
 
     if isreal(t)
@@ -287,7 +287,7 @@ end
 function ModelKit.taylor!(
     u,
     v::Val{2},
-    H::AffineSubspaceHomotopy,
+    H::LinearSubspaceHomotopy,
     tv::TaylorVector,
     t,
     incr::Bool,
@@ -321,7 +321,7 @@ end
 function ModelKit.taylor!(
     u,
     v::Val{3},
-    H::AffineSubspaceHomotopy,
+    H::LinearSubspaceHomotopy,
     tv::TaylorVector,
     t,
     incr::Bool,

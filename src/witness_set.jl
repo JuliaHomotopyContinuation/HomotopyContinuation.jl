@@ -36,7 +36,7 @@ linear_subspace(W::WitnessSet) = W.L
 
 Get the affine linear subspace stored in `W`.
 """
-affine_subspace(W::WitnessSet{<:AffineSubspace}) = W.L
+affine_subspace(W::WitnessSet{<:LinearSubspace}) = W.L
 
 """
     solutions(W::WitnessSet)
@@ -123,7 +123,7 @@ function witness_set(F::AbstractSystem; dim = nothing, codim = nothing, options.
     witness_set(F, L; options...)
 end
 
-function witness_set(F::AbstractSystem, L::AffineSubspace; options...)
+function witness_set(F::AbstractSystem, L::LinearSubspace; options...)
     F_L = slice(F, L)
     res = solve(F_L; options...)
     R = results(res; only_nonsingular = true)
@@ -131,8 +131,8 @@ function witness_set(F::AbstractSystem, L::AffineSubspace; options...)
 end
 
 ### Move witness sets around
-function witness_set(W::WitnessSet, L::AffineSubspace; options...)
-    H = AffineSubspaceHomotopy(W.F, W.L, L)
+function witness_set(W::WitnessSet, L::LinearSubspace; options...)
+    H = LinearSubspaceHomotopy(W.F, W.L, L)
     res = solve(H, W.R; options...)
     WitnessSet(W.F, L, results(res; only_nonsingular = true))
 end

@@ -11,7 +11,7 @@
     @test solutions(W) isa Vector{Vector{ComplexF64}}
     @test results(W) isa Vector{PathResult}
 
-    L = AffineSubspace([1 1], [-1])
+    L = LinearSubspace([1 1], [-1])
 
     W_L = witness_set(W, L)
     @test degree(W_L) == 2

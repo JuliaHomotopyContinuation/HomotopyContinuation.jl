@@ -148,8 +148,8 @@ function solver_startsolutions(
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    if F isa AffineSlicedSystem && G isa AffineSlicedSystem && system(F) == system(G)
-        H = AffineSubspaceHomotopy(system(F), affine_subspace(F), affine_subspace(G))
+    if F isa SlicedSystem && G isa SlicedSystem && system(F) == system(G)
+        H = LinearSubspaceHomotopy(system(F), affine_subspace(F), affine_subspace(G))
     else
         H = start_target_homotopy(G, F; kwargs...)
     end

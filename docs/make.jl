@@ -8,7 +8,7 @@ makedocs(
             "ModelKit" => "model_kit.md",
             "Systems" => "systems.md",
             "Homotopies" => "homotopies.md",
-            "Linear and Affine Subspaces" => "linear_affine.md",
+            "Linear Subspaces" => "linear_subspaces.md"
         ],
         "Solving systems" => [
             "Solve" => "solve.md",

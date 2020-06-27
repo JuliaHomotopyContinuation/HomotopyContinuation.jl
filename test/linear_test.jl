@@ -1,6 +1,6 @@
 @testset "Linear Spaces" begin
-    @testset "AffineSubspace" begin
-        A = AffineSubspace([1 0 3; 2 1 3], [5, -2])
+    @testset "LinearSubspace" begin
+        A = LinearSubspace([1 0 3; 2 1 3], [5, -2])
         @test dim(A) == dim(intrinsic(A)) == dim(extrinsic(A)) == 1
         @test codim(A) == codim(intrinsic(A)) == codim(extrinsic(A)) == 2
         @test ambient_dim(A) == 3
@@ -38,11 +38,11 @@
         @test size(γ(1)) == size(intrinsic(A).Y)
 
         A2 = translate(A, [1, 1], Extrinsic)
-        A3 = AffineSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
+        A3 = LinearSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
         @test A2.intrinsic.Y ≈ A3.intrinsic.Y
     end
 
-    @testset "AffineSubspaceHomotopy" begin
+    @testset "LinearSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)
         f2 = rand_poly(x, 2)
@@ -57,7 +57,7 @@
         B = rand_affine_subspace(4, codim = 2)
 
         graff_tracker = Tracker(
-            AffineSubspaceHomotopy(F, A, B),
+            LinearSubspaceHomotopy(F, A, B),
             options = (automatic_differentiation = 3,),
         )
         graff_result = track.(graff_tracker, W)
@@ -69,7 +69,7 @@
         @test A == copy_A
         @test all(is_success, track.(graff_tracker, solution.(graff_result)))
 
-        graff_path_tracker = EndgameTracker(AffineSubspaceHomotopy(F, A, B))
+        graff_path_tracker = EndgameTracker(LinearSubspaceHomotopy(F, A, B))
         graff_path_result = track.(graff_path_tracker, W)
         @test all(is_success, graff_path_result)
 

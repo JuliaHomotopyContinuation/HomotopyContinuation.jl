@@ -325,7 +325,7 @@
         l2 = rand_affine_subspace(2; codim = 1)
 
         _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
-        @test _solver.trackers[1].tracker.homotopy isa AffineSubspaceHomotopy
+        @test _solver.trackers[1].tracker.homotopy isa LinearSubspaceHomotopy
     end
 
     @testset "solve (Vector{Expression})" begin
