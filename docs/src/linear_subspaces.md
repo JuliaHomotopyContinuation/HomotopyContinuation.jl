@@ -17,8 +17,8 @@ Extrinsic
 
 ```@docs
 LinearSubspace
-AffineExtrinsic
-AffineIntrinsic
+ExtrinsicDescription
+IntrinsicDescription
 ```
 
 ### Functions

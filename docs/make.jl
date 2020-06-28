@@ -8,10 +8,11 @@ makedocs(
             "ModelKit" => "model_kit.md",
             "Systems" => "systems.md",
             "Homotopies" => "homotopies.md",
-            "Linear Subspaces" => "linear_subspaces.md"
+            "Linear Subspaces" => "linear_subspaces.md",
         ],
-        "Solving systems" => [
-            "Solve" => "solve.md",
+        "Solving Systems" => [
+            "Solve (finitely many solutions)" => "solve.md",
+            "Witness Sets (infinitely many solutions)" => "witness_sets.md",
             "Monodromy" => "monodromy.md",
             "Results" => "result.md",
             "Examples" => "solve_examples.md",
@@ -21,7 +22,7 @@ makedocs(
         "Miscellaneous" => "misc.md",
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
-    strict = false
+    strict = false,
 )
 
 deploydocs(

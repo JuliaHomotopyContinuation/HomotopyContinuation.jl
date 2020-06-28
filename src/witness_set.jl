@@ -1,5 +1,4 @@
-export WitnessSet,
-    witness_set, linear_subspace, system, degree, dim, codim, trace_test
+export WitnessSet, witness_set, linear_subspace, system, dim, codim, trace_test
 
 """
     WitnessSet(F, L, S)
@@ -7,8 +6,8 @@ export WitnessSet,
 Store solutions `S` of the polynomial system `F(x) = L(x) = 0` into a witness set.
 """
 struct WitnessSet{
-    Sub<:AbstractSubspace,
     S<:AbstractSystem,
+    Sub<:AbstractSubspace,
     R<:Union{Vector{ComplexF64},PathResult},
 }
     F::S
@@ -130,7 +129,7 @@ end
 """
     trace_test(W::WitnessSet; options...)
 
-Performs a trace test to verify whether the given witness set `W` is complete.
+Performs a trace test [^LRS18] to verify whether the given witness set `W` is complete.
 Returns the trace of the witness set which should be theoretically be 0 if `W` is complete.
 Due to floating point arithmetic this is not the case, thus is has to be manually checked
 that the trace is sufficiently small.
@@ -151,6 +150,10 @@ Witness set for dimension 1 of degree 2
 julia> trace = trace_test(W)
 9.981960497718987e-16
 ```
+
+[^LRS18]: Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test." Arnold Mathematical Journal 4.1 (2018): 113-125.
+APA
+
 """
 function trace_test(W₀::WitnessSet; options...)
     L₀ = linear_subspace(W₀)
@@ -161,7 +164,7 @@ function trace_test(W₀::WitnessSet; options...)
     # Therefore make the affine chart now
     if is_linear(L₀) && is_homogeneous(System(F))
         F = on_affine_chart(F)
-        s₀ = sum(s -> set_solution!(s,  F, s), solutions(W₀))
+        s₀ = sum(s -> set_solution!(s, F, s), solutions(W₀))
     else
         s₀ = sum(solutions(W₀))
     end

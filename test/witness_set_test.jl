@@ -28,17 +28,17 @@
 
         F = System([x^2 + y^2 - 5z^2], [x, y,z])
 
-        W = witness_set(F)
+        W = witness_set(F; compile = false)
 
         @test dim(W) == 1
-        @test codim(W) == 1
+        @test codim(W) == 2
         @test degree(W) == 2
         @test solutions(W) isa Vector{Vector{ComplexF64}}
         @test results(W) isa Vector{PathResult}
 
         L = LinearSubspace([1 1 1])
 
-        W_L = witness_set(W, L)
+        W_L = witness_set(W, L; compile = false)
         @test degree(W_L) == 2
 
         @test trace_test(W) < 1e-8

@@ -250,7 +250,7 @@ julia> ambient_dim(A)
 
 A `LinearSubspace` holds always its [`extrinsic`](@ref) description,
 see also [`ExtrinsicDescription`](@ref), as well as its [`intrinsic`](@ref) description,
-see [`InstrinsicDescription`](@ref).
+see [`IntrinsicDescription`](@ref).
 
 ```julia-repl
 julia> intrinsic(A)

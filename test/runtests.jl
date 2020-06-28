@@ -3,7 +3,6 @@ using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation
 
-
 include("test_systems.jl")
 
 function test_treeviews(x)
