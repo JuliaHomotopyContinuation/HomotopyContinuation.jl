@@ -556,9 +556,11 @@ function find_start_pair(
     atol::Float64 = 0.0,
     rtol::Float64 = 1e-12,
 )
-    nparameters(F) > 0 || throw(ArgumentError("Need a system with parameters as input."))
-
-    SF = StartPairSystem(F)
+    if nparameters(F) == 0
+        SF = F
+    else
+        SF = StartPairSystem(F)
+    end
     m = nparameters(F)
     n = nvariables(F)
     c = NewtonCache(SF)
@@ -569,7 +571,7 @@ function find_start_pair(
             x, p = res.x[1:n], res.x[n+1:end]
             res2 = newton(F, x, p, InfNorm())
             if is_success(res2)
-                return res2.x, p
+                return res2.x, isempty(p) ? nothing : p
             end
         end
     end
