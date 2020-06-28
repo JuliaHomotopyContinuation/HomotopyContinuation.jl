@@ -1,5 +1,5 @@
 export WitnessSet,
-    witness_set, affine_subspace, linear_subspace, system, degree, dim, codim, trace_test
+    witness_set, linear_subspace, system, degree, dim, codim, trace_test
 
 """
     WitnessSet(F, L, S)
@@ -30,13 +30,6 @@ system(W::WitnessSet) = W.F
 Get the linear subspace stored in `W`.
 """
 linear_subspace(W::WitnessSet) = W.L
-
-"""
-    affine_subspace(W::WitnessSet)
-
-Get the affine linear subspace stored in `W`.
-"""
-affine_subspace(W::WitnessSet{<:LinearSubspace}) = W.L
 
 """
     solutions(W::WitnessSet)
@@ -111,15 +104,12 @@ Witness set for dimension 1 of degree 2
 witness_set(F::System, args...; compile = COMPILE_DEFAULT[], kwargs...) =
     witness_set(fixed(F; compile = compile), args...; kwargs...)
 function witness_set(F::AbstractSystem; dim = nothing, codim = nothing, options...)
-    if isnothing(dim) && isnothing(codim)
-        codim = size(F, 2) - size(F, 1)
-    end
     f = System(F)
-    if !is_homogeneous(f)
-        L = rand_affine_subspace(size(F, 2); dim = dim, codim = codim)
-    else
-        error("TODO")
+    affine = !is_homogeneous(f)
+    if isnothing(dim) && isnothing(codim)
+        codim = size(F, 2) - !affine - size(F, 1)
     end
+    L = rand_subspace(size(F, 2); dim = dim, codim = codim, affine = affine)
     witness_set(F, L; options...)
 end
 
@@ -132,7 +122,7 @@ end
 
 ### Move witness sets around
 function witness_set(W::WitnessSet, L::LinearSubspace; options...)
-    H = LinearSubspaceHomotopy(W.F, W.L, L)
+    H = linear_subspace_homotopy(W.F, W.L, L)
     res = solve(H, W.R; options...)
     WitnessSet(W.F, L, results(res; only_nonsingular = true))
 end
@@ -163,24 +153,34 @@ julia> trace = trace_test(W)
 ```
 """
 function trace_test(W₀::WitnessSet; options...)
-    L₀ = affine_subspace(W₀)
+    L₀ = linear_subspace(W₀)
+    F = system(W₀)
+
+    # if we are in the projective setting, we need to make sure that
+    # all solutions are on the same affine chart
+    # Therefore make the affine chart now
+    if is_linear(L₀) && is_homogeneous(System(F))
+        F = on_affine_chart(F)
+        s₀ = sum(s -> set_solution!(s,  F, s), solutions(W₀))
+    else
+        s₀ = sum(solutions(W₀))
+    end
 
     v = randn(ComplexF64, codim(L₀))
     L₁ = translate(L₀, v)
     L₋₁ = translate(L₀, -v)
 
-    W₁ = witness_set(W₀, L₁; options...)
-    degree(W₁) == degree(W₀) || return nothing
+    R₁ = solve(LinearSubspaceHomotopy(F, L₀, L₁), solutions(W₀); options...)
+    nsolutions(R₁) == degree(W₀) || return nothing
 
-    W₋₁ = witness_set(W₀, L₋₁; options...)
-    degree(W₋₁) == degree(W₀) || return nothing
+    R₋₁ = solve(LinearSubspaceHomotopy(F, L₀, L₋₁), solutions(W₀); options...)
+    nsolutions(R₋₁) == degree(W₀) || return nothing
 
-    s₀ = sum(solutions(W₀))
-    s₁ = sum(solutions(W₁))
-    s₋₁ = sum(solutions(W₋₁))
+    s₁ = sum(solutions(R₁))
+    s₋₁ = sum(solutions(R₋₁))
     Δs₁ = (s₁ - s₀)
     Δs₋₁ = (s₀ - s₋₁)
-    trace = InfNorm()(Δs₁, Δs₋₁) / max(norm(Δs₁), norm(Δs₋₁))
+    trace = InfNorm()(Δs₁, Δs₋₁) / max(InfNorm()(Δs₁), InfNorm()(Δs₋₁))
 
     trace
 end

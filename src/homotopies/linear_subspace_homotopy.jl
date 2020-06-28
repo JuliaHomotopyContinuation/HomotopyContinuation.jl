@@ -114,8 +114,13 @@ function set_subspaces!(
     H.Θ .= Θ
     H.U .= U
     LA.mul!(H.Q_cos, target.intrinsic.Y, U)
-    LA.mul!(H.γ1, Q, LA.diagm(0 => sin.(Θ)))
-    LA.mul!(H.γ1, H.Q_cos, LA.diagm(0 => cos.(Θ)), true, true)
+    n, k = size(H.γ1)
+    @inbounds for j = 1:k
+        s, c = sincos(Θ[j])
+        for i = 1:n
+            H.γ1[i, j] = H.Q_cos[i, j] * c + Q[i, j] * s
+        end
+    end
     H
 end
 
@@ -164,9 +169,8 @@ end
 function set_solution!(u::Vector, H::LinearSubspaceHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x) - 1) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
-    for i = 1:length(x)
-        H.x[i] = x[i]
-    end
+
+    set_solution!(view(H.x, 1:length(x)), H.system, x)
     H.x[end] = 1
 
     if isone(t)
@@ -174,7 +178,7 @@ function set_solution!(u::Vector, H::LinearSubspaceHomotopy, x::AbstractVector, 
     elseif iszero(t)
         LA.mul!(u, H.Q_cos', H.x)
     else
-        LA.mul!(u, γ!(H, t), H.x)
+        LA.mul!(u, γ!(H, t)', H.x)
     end
 end
 

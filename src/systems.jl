@@ -10,6 +10,7 @@ fixed(F::System; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
     compile ? CompiledSystem(F; kwargs...) : InterpretedSystem(F; kwargs...)
 fixed(F::AbstractSystem; kwargs...) = F
 
+set_solution!(x, ::AbstractSystem, y) = (x .= y; x)
 
 include("systems/affine_chart_system.jl")
 include("systems/composition_system.jl")

@@ -34,7 +34,7 @@ ModelKit.variables(F::SlicedSystem) = variables(F.system)
 ModelKit.parameters(F::SlicedSystem) = parameters(F.system)
 ModelKit.variable_groups(F::SlicedSystem) = nothing
 
-affine_subspace(A::SlicedSystem) = A.affine
+linear_subspace(A::SlicedSystem) = A.affine
 system(A::SlicedSystem) = A.system
 
 function Base.size(F::SlicedSystem)

@@ -70,7 +70,8 @@ function ModelKit.evaluate!(
     t,
 ) where {N}
     evaluate!(u, H.homotopy, x, t)
-    evaluate_chart!(u, H.chart, x)
+    m = size(H.homotopy, 1)
+    evaluate_chart!(view(u, m+1:m+N), H.chart, x)
     u
 end
 
@@ -82,8 +83,9 @@ function ModelKit.evaluate_and_jacobian!(
     t,
 ) where {N}
     evaluate_and_jacobian!(u, U, H.homotopy, x, t)
-    evaluate_chart!(u, H.chart, x)
-    jacobian_chart!(U, H.chart, x)
+    m = size(H.homotopy, 1)
+    evaluate_chart!(view(u, m+1:m+N), H.chart, x)
+    jacobian_chart!(view(U, m+1:m+N,:), H.chart, x)
     nothing
 end
 

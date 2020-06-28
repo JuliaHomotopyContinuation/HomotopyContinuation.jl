@@ -1,4 +1,10 @@
-export solve, Solver, solver, solver_startsolutions, paths_to_track, parameter_homotopy
+export solve,
+    Solver,
+    solver,
+    solver_startsolutions,
+    paths_to_track,
+    parameter_homotopy,
+    linear_subspace_homotopy
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -149,7 +155,7 @@ function solver_startsolutions(
 )
     !isnothing(seed) && Random.seed!(seed)
     if F isa SlicedSystem && G isa SlicedSystem && system(F) == system(G)
-        H = LinearSubspaceHomotopy(system(F), affine_subspace(F), affine_subspace(G))
+        H = linear_subspace_homotopy(system(F), linear_subspace(F), linear_subspace(G))
     else
         H = start_target_homotopy(G, F; kwargs...)
     end
@@ -206,6 +212,25 @@ function parameter_homotopy(
 
     H
 end
+
+"""
+    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace)
+
+Construct a [`LinearSubspaceHomotopy`](@ref). Compared to the direct constructor, this
+takes care of homogeneous systems.
+"""
+function linear_subspace_homotopy(
+    F::Union{System,AbstractSystem},
+    V::LinearSubspace,
+    W::LinearSubspace,
+)
+    if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+        LinearSubspaceHomotopy(on_affine_chart(F), V, W)
+    else
+        LinearSubspaceHomotopy(F, V, W)
+    end
+end
+
 
 function start_target_homotopy(
     G::Union{System,AbstractSystem},

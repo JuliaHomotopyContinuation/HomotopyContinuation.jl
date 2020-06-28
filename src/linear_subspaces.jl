@@ -302,7 +302,10 @@ end
 LinearSubspace(I::IntrinsicDescription) = LinearSubspace(ExtrinsicDescription(I), I)
 LinearSubspace(E::ExtrinsicDescription) = LinearSubspace(E, IntrinsicDescription(E))
 
-function LinearSubspace(A::AbstractMatrix{T}, b::AbstractVector{T}) where {T}
+function LinearSubspace(
+    A::AbstractMatrix{T},
+    b::AbstractVector{T} = zeros(eltype(A), size(A, 1)),
+) where {T}
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
     0 < size(A, 1) < size(A, 2) ||
         throw(ArgumentError("Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b."))
@@ -349,11 +352,17 @@ Returns `true` if the space is proper linear subspace, i.e., described by
 is_linear(A::LinearSubspace) = iszero(extrinsic(A).b)
 
 function Base.show(io::IO, A::LinearSubspace{T}) where {T}
-    println(io, "$(dim(A))-dim. (affine) linear subspace {x|Ax=b} with eltype $T:")
-    println(io, "A:")
-    show(io, A.extrinsic.A)
-    println(io, "\nb:")
-    show(io, A.extrinsic.b)
+    if is_linear(A)
+        println(io, "$(dim(A))-dim. linear subspace {x | Ax=0} with eltype $T:")
+        println(io, "A:")
+        show(io, A.extrinsic.A)
+    else
+        println(io, "$(dim(A))-dim. affine linear subspace {x | Ax=b} with eltype $T:")
+        println(io, "A:")
+        show(io, A.extrinsic.A)
+        println(io, "\nb:")
+        show(io, A.extrinsic.b)
+    end
 end
 
 """
