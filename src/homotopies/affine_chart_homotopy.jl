@@ -47,6 +47,7 @@ end
 
 start_parameters!(H::AffineChartHomotopy, p) = start_parameters!(H.homotopy, p)
 target_parameters!(H::AffineChartHomotopy, p) = target_parameters!(H.homotopy, p)
+parameters!(H::AffineChartHomotopy, p, q) = parameters!(H.homotopy, p, q)
 
 function on_chart!(x::AbstractVector, v::PVector)
     ranges = dimension_indices(v)

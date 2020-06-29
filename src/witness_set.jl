@@ -173,10 +173,10 @@ function trace_test(W₀::WitnessSet; options...)
     L₁ = translate(L₀, v)
     L₋₁ = translate(L₀, -v)
 
-    R₁ = solve(LinearSubspaceHomotopy(F, L₀, L₁), solutions(W₀); options...)
+    R₁ = solve(IntrinsicSubspaceHomotopy(F, L₀, L₁), solutions(W₀); options...)
     nsolutions(R₁) == degree(W₀) || return nothing
 
-    R₋₁ = solve(LinearSubspaceHomotopy(F, L₀, L₋₁), solutions(W₀); options...)
+    R₋₁ = solve(IntrinsicSubspaceHomotopy(F, L₀, L₋₁), solutions(W₀); options...)
     nsolutions(R₋₁) == degree(W₀) || return nothing
 
     s₁ = sum(solutions(R₁))

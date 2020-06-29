@@ -214,24 +214,36 @@ function parameter_homotopy(
 end
 
 """
-    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace)
+    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspacel intrinsic = nothing)
 
-Construct a [`LinearSubspaceHomotopy`](@ref). Compared to the direct constructor, this
-takes care of homogeneous systems.
+Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
+`intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).
+Compared to the direct constructor, this also takes care of homogeneous systems.
 """
 function linear_subspace_homotopy(
     F::Union{System,AbstractSystem},
     V::LinearSubspace,
     W::LinearSubspace;
     compile::Bool = COMPILE_DEFAULT[],
+    intrinsic = nothing
 )
-    if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
-        LinearSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W)
+    # Intrinsic: m+1,dim(V)+1
+    # Extrinsic: m+codim(V), dim(V) + codim(V)
+    if dim(V) < codim(V) || something(intrinsic, false)
+        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+            IntrinsicSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W)
+        else
+            IntrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        end
     else
-        LinearSubspaceHomotopy(F, V, W; compile = compile)
+        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+            on_affine_chart(H)
+        else
+            H
+        end
     end
 end
-
 
 function start_target_homotopy(
     G::Union{System,AbstractSystem},

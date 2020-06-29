@@ -8,8 +8,6 @@ export monodromy_solve,
     permutations
 # verify_solution_completeness,
 # solution_completeness_witnesses,
-# permutations
-
 
 #####################
 # Monodromy Options #
@@ -381,6 +379,7 @@ end
 function MonodromySolver(
     F::Union{System,AbstractSystem},
     parameters;
+    intrinsic = nothing,
     compile::Bool = COMPILE_DEFAULT[],
     tracker_options = TrackerOptions(),
     options = MonodromyOptions(),
@@ -390,7 +389,13 @@ function MonodromySolver(
     end
 
     if parameters isa LinearSubspace
-        H = linear_subspace_homotopy(F, parameters, parameters; compile = compile)
+        H = linear_subspace_homotopy(
+            F,
+            parameters,
+            parameters;
+            compile = compile,
+            intrinsic = intrinsic,
+        )
         P = LinearSubspace{ComplexF64}
     else
         H = parameter_homotopy(F; generic_parameters = parameters)
@@ -404,7 +409,7 @@ function MonodromySolver(
     trackers = [egtracker]
     group_actions = options.equivalence_classes ? options.group_actions : nothing
     x₀ = zeros(ComplexF64, size(F, 2))
-    #TODO: This is wrong for LinearSubspaceHomotopy of projective varieties
+    #TODO: This is wrong for IntrinsicSubspaceHomotopy of projective varieties
     if !isnothing(group_actions) && (egtracker.tracker.homotopy isa AffineChartHomotopy)
         group_actions = let H = egtracker.tracker.homotopy, group_actions = group_actions
             (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 0)), group_actions, s)
@@ -444,6 +449,14 @@ If `F` the parameters `p` only occur *linearly* in `F` it is eventually possible
 a *start pair* ``(x₀, p₀)`` automatically. In this case `sols` and `p` can be omitted and
 the automatically generated parameters can be obtained with the [`parameters`](@ref) function
 from the [`MonodromyResult`](@ref).
+
+    monodromy_solve(F, [sols, L]; dim, codim, intrinsic = nothing, options...,
+                                  tracker_options = TrackerOptions())
+
+Solve the polynomial system `[F(x); L(x)] = 0` where `L` is a `[LinearSubspace`](@ref).
+If `sols` and `L` are not provided it is necesary to provide `dim` or `codim` where `(co)dim`
+is the expected (co)dimension of a component of `V(F)`.
+See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 
 ## Options
 
@@ -511,6 +524,7 @@ function monodromy_solve(
     catch_interrupt::Bool = true,
     dim = nothing,
     codim = nothing,
+    intrinsic = nothing,
     # monodromy options
     options = nothing,
     group_action = nothing,
@@ -566,6 +580,7 @@ function monodromy_solve(
         compile = compile,
         options = options,
         tracker_options = tracker_options,
+        intrinsic = intrinsic,
     )
     monodromy_solve(
         MS,

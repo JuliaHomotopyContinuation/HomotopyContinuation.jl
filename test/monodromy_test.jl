@@ -238,4 +238,22 @@
         C = permutations(S)
         @test size(C, 1) == 4
     end
+
+    @testset "Linear subspaces" begin
+        @var x[1:4]
+        f1 = rand_poly(x, 6)
+        F = System([f1], x)
+        res = monodromy_solve(F; dim = 3)
+        @test nsolutions(res) == 6
+
+        @var x[1:4]
+        f1 = rand_poly(x, 6; homogeneous = true)
+        F = System([f1], x)
+        res = monodromy_solve(F; dim = 2)
+        @test nsolutions(res) == 6
+
+        F = System([f1, rand_poly(x, 3), rand_poly(x, 4)], x)
+        res = monodromy_solve(F; codim = 3, compile = false)
+        @test nsolutions(res) == 72
+    end
 end

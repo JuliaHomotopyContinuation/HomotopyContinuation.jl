@@ -56,7 +56,7 @@
         res = track.(total_degree(F_L₁)...)
         @test all(is_success, res)
 
-        H = LinearSubspaceHomotopy(F, L₁, L₂)
+        H = IntrinsicSubspaceHomotopy(F, L₁, L₂)
         res2 = track.(EndgameTracker(H), solution.(res))
         @test all(is_success, res2)
     end

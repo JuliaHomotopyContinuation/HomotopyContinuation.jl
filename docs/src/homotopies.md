@@ -38,9 +38,9 @@ FixedParameterHomotopy
 fix_parameters(H::AbstractHomotopy, p)
 ```
 
-## LinearSubspaceHomotopy
+## IntrinsicSubspaceHomotopy
 ```@docs
-LinearSubspaceHomotopy
+IntrinsicSubspaceHomotopy
 set_subspaces!
 ```
 

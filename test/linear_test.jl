@@ -50,7 +50,7 @@
         @test norm(L2(x)) ≈ 0 atol = 1e-8
     end
 
-    @testset "LinearSubspaceHomotopy" begin
+    @testset "IntrinsicSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)
         f2 = rand_poly(x, 2)
@@ -65,7 +65,7 @@
         B = rand_subspace(4, codim = 2)
 
         graff_tracker = Tracker(
-            LinearSubspaceHomotopy(F, A, B),
+            IntrinsicSubspaceHomotopy(F, A, B),
             options = (automatic_differentiation = 3,),
         )
         graff_result = track.(graff_tracker, W)
@@ -77,7 +77,7 @@
         @test A == copy_A
         @test all(is_success, track.(graff_tracker, solution.(graff_result)))
 
-        graff_path_tracker = EndgameTracker(LinearSubspaceHomotopy(F, A, B))
+        graff_path_tracker = EndgameTracker(IntrinsicSubspaceHomotopy(F, A, B))
         graff_path_result = track.(graff_path_tracker, W)
         @test all(is_success, graff_path_result)
 

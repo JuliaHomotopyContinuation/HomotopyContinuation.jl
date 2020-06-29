@@ -65,7 +65,7 @@ function Base.show(io::IO, mime::MIME"text/plain", H::StraightLineHomotopy)
     show(io, mime, H.target)
 end
 
-function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexF64}, t) where {T}
+function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexDF64}, t) where {T}
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t

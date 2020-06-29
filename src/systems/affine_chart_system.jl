@@ -24,7 +24,7 @@ idepdently from a univariate normal distribution.
 """
 on_affine_chart(F::System, dims = nothing; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
     on_affine_chart(fixed(F; compile = compile), dims)
-function on_affine_chart(F::AbstractSystem, dims = nothing)
+function on_affine_chart(F::AbstractSystem, dims = nothing, compile::Bool = true)
     vargroups = variable_groups(F)
     if vargroups === nothing
         dims = [size(F, 2) - 1]
