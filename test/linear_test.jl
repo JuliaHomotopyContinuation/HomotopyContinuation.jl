@@ -40,6 +40,14 @@
         A2 = translate(A, [1, 1], Extrinsic)
         A3 = LinearSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
         @test A2.intrinsic.Y ≈ A3.intrinsic.Y
+
+        # rand subspace through a point
+        x = randn(ComplexF64, 5)
+        L = rand_subspace(x; dim = 2)
+        @test norm(L(x)) ≈ 0 atol = 1e-8
+        L2 = rand_subspace(x; dim = 2, affine = false)
+        @test is_linear(L2)
+        @test norm(L2(x)) ≈ 0 atol = 1e-8
     end
 
     @testset "LinearSubspaceHomotopy" begin
