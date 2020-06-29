@@ -222,12 +222,13 @@ takes care of homogeneous systems.
 function linear_subspace_homotopy(
     F::Union{System,AbstractSystem},
     V::LinearSubspace,
-    W::LinearSubspace,
+    W::LinearSubspace;
+    compile::Bool = COMPILE_DEFAULT[],
 )
     if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
-        LinearSubspaceHomotopy(on_affine_chart(F), V, W)
+        LinearSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W)
     else
-        LinearSubspaceHomotopy(F, V, W)
+        LinearSubspaceHomotopy(F, V, W; compile = compile)
     end
 end
 

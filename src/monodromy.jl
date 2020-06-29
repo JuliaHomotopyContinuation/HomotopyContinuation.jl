@@ -63,14 +63,14 @@ end
 #######################
 
 
-struct MonodromyLoop
+struct MonodromyLoop{P<:Union{LinearSubspace{ComplexF64},Vector{ComplexF64}}}
     # p -> p₁ -> p₂ -> p
-    p::Vector{ComplexF64}
-    p₁::Vector{ComplexF64}
-    p₂::Vector{ComplexF64}
+    p::P
+    p₁::P
+    p₂::P
 end
 
-function MonodromyLoop(base, options::MonodromyOptions)
+function MonodromyLoop(base::AbstractVector, options::MonodromyOptions)
     p = convert(Vector{ComplexF64}, base)
     p₁ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
     p₂ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
@@ -166,11 +166,11 @@ end
 
 The monodromy result contains the result of the [`monodromy_solve`](@ref) computation.
 """
-struct MonodromyResult{T}
+struct MonodromyResult{P,LP}
     returncode::Symbol
     results::Vector{PathResult}
-    parameters::Vector{T}
-    loops::Vector{MonodromyLoop}
+    parameters::P
+    loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
     seed::UInt32
@@ -354,11 +354,12 @@ end
 
 mutable struct MonodromySolver{
     Tracker<:EndgameTracker,
+    P,
     UP<:UniquePoints,
     MO<:MonodromyOptions,
 }
     trackers::Vector{Tracker}
-    loops::Vector{MonodromyLoop}
+    loops::Vector{MonodromyLoop{P}}
     unique_points::UP
     unique_points_lock::ReentrantLock
     options::MO
@@ -366,7 +367,8 @@ mutable struct MonodromySolver{
 end
 
 function MonodromySolver(
-    F::Union{System,AbstractSystem};
+    F::Union{System,AbstractSystem},
+    parameters;
     compile::Bool = COMPILE_DEFAULT[],
     tracker_options = TrackerOptions(),
     options = MonodromyOptions(),
@@ -375,29 +377,34 @@ function MonodromySolver(
         options = MonodromyOptions(; options...)
     end
 
-    egtracker = parameter_homotopy_tracker(
-        F;
-        compile = compile,
-        generic_parameters = randn(ComplexF64, nparameters(F)),
+    if parameters isa LinearSubspace
+        H = linear_subspace_homotopy(F, parameters, parameters; compile = compile)
+        P = LinearSubspace{ComplexF64}
+    else
+        H = parameter_homotopy(F; generic_parameters = parameters)
+        P = Vector{ComplexF64}
+    end
+    egtracker = EndgameTracker(
+        H;
         tracker_options = tracker_options,
-        endgame_options = EndgameOptions(endgame_start = 0.0),
+        options = EndgameOptions(endgame_start = 0.0),
     )
     trackers = [egtracker]
     group_actions = options.equivalence_classes ? options.group_actions : nothing
     x₀ = zeros(ComplexF64, size(F, 2))
+    #TODO: This is wrong for LinearSubspaceHomotopy of projective varieties
     if !isnothing(group_actions) && (egtracker.tracker.homotopy isa AffineChartHomotopy)
         group_actions = let H = egtracker.tracker.homotopy, group_actions = group_actions
-            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 1)), group_actions, s)
+            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 0)), group_actions, s)
         end
     end
 
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
     statistics = MonodromyStatistics()
-
     MonodromySolver(
         trackers,
-        MonodromyLoop[],
+        MonodromyLoop{P}[],
         unique_points,
         ReentrantLock(),
         options,
@@ -506,12 +513,6 @@ function monodromy_solve(
     if !isnothing(seed)
         Random.seed!(seed)
     end
-    MS = MonodromySolver(
-        F;
-        compile = compile,
-        options = options,
-        tracker_options = tracker_options,
-    )
     if length(args) == 0
         start_pair = find_start_pair(fixed(F; compile = compile))
         if isnothing(start_pair)
@@ -521,25 +522,26 @@ function monodromy_solve(
             )
         end
         x, p = start_pair
-        monodromy_solve(
-            MS,
-            [x],
-            p,
-            seed;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        S = [x]
     else
-        monodromy_solve(
-            MS,
-            args...,
-            seed;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        S, p = args
     end
+    MS = MonodromySolver(
+        F,
+        p;
+        compile = compile,
+        options = options,
+        tracker_options = tracker_options,
+    )
+    monodromy_solve(
+        MS,
+        S,
+        p,
+        seed;
+        show_progress = show_progress,
+        threading = threading,
+        catch_interrupt = catch_interrupt,
+    )
 end
 
 """
@@ -939,7 +941,11 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
+function track(
+    egtracker::EndgameTracker,
+    r::PathResult,
+    loop::MonodromyLoop{<:AbstractVector},
+)
     tracker = egtracker.tracker
 
     start_parameters!(tracker, loop.p)
