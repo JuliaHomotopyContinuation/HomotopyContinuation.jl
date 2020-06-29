@@ -389,6 +389,7 @@ Base.copy(A::LinearSubspace) = LinearSubspace(copy(A.extrinsic), copy(A.intrinsi
 function Base.:(==)(A::LinearSubspace, B::LinearSubspace)
     intrinsic(A) == intrinsic(B) && extrinsic(A) == extrinsic(B)
 end
+Base.isequal(A::LinearSubspace, B::LinearSubspace) = A === B
 
 function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:Intrinsic})
     intrinsic(A)(x, Intrinsic)

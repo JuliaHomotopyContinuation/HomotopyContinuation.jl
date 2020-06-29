@@ -7,6 +7,7 @@ import ElasticArrays: ElasticArray
 import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
+using LRUCache: LRU
 import MixedSubdivisions
 import MultivariatePolynomials
 const MP = MultivariatePolynomials

@@ -1,5 +1,34 @@
 export LinearSubspaceHomotopy, set_subspaces!
 
+struct LinearSubspaceGeodesicInfo
+    Q::Matrix{ComplexF64}
+    Q_cos::Matrix{ComplexF64}
+    Θ::Vector{Float64}
+    U::Matrix{ComplexF64}
+    γ1::Matrix{ComplexF64}
+end
+
+function LinearSubspaceGeodesicInfo(start::LinearSubspace, target::LinearSubspace)
+    Q, Θ, U = geodesic_svd(target, start)
+    Q_cos = target.intrinsic.Y * U
+    γ1 = similar(Q_cos)
+    n, k = size(γ1)
+    for j = 1:k
+        s, c = sincos(Θ[j])
+        for i = 1:n
+            γ1[i, j] = Q_cos[i, j] * c + Q[i, j] * s
+        end
+    end
+    LinearSubspaceGeodesicInfo(Q, Q_cos, Θ, U, γ1)
+end
+
+const GEODESIC_LRU = LRU{
+    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
+    LinearSubspaceGeodesicInfo,
+}(
+    maxsize = 128,
+)
+
 """
     LinearSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
     LinearSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
@@ -10,19 +39,14 @@ Here ``γ(t)`` is the geodesic between `V` and `W` in the affine Grassmanian, i.
 it is the curve of minimal length connecting `V` and `W`.
 See also [`LinearSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
 """
-Base.@kwdef struct LinearSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+Base.@kwdef mutable struct LinearSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
+    geodesic::LinearSubspaceGeodesicInfo
 
     J::Matrix{ComplexF64}
-    Q::Matrix{ComplexF64}
-    Q_cos::Matrix{ComplexF64}
-    Θ::Vector{Float64}
-    U::Matrix{ComplexF64}
-    γ1::Matrix{ComplexF64}
-
     x::Vector{ComplexF64}
     ẋ::Vector{ComplexF64}
     x_high::Vector{ComplexDF64}
@@ -69,20 +93,17 @@ function LinearSubspaceHomotopy(
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64},
 )
-    Q, Θ, U = geodesic_svd(target, start)
-    Q_cos = target.intrinsic.Y * U
+    geodesic = get!(GEODESIC_LRU, (start, target)) do
+        LinearSubspaceGeodesicInfo(start, target)
+    end
+    Q = geodesic.Q
     tx³ = TaylorVector{4}(ComplexF64, size(Q, 1))
-
     LinearSubspaceHomotopy(
         system = system,
-        start = copy(start),
-        target = copy(target),
+        start = start,
+        target = target,
+        geodesic = LinearSubspaceGeodesicInfo(start, target),
         J = zeros(ComplexF64, size(system) .+ (1, 1)),
-        Q = Q,
-        Q_cos = Q_cos,
-        Θ = Θ,
-        U = U,
-        γ1 = Q_cos * LA.diagm(0 => cos.(Θ)) + Q * LA.diagm(0 => sin.(Θ)),
         x = zeros(ComplexF64, size(Q, 1)),
         ẋ = zeros(ComplexF64, size(Q, 1)),
         x_high = zeros(ComplexDF64, size(Q, 1)),
@@ -107,24 +128,15 @@ function set_subspaces!(
     start::LinearSubspace,
     target::LinearSubspace,
 )
-    Q, Θ, U = geodesic_svd(target, start)
-    copy!(H.start, start)
-    copy!(H.target, target)
-    H.Q .= Q
-    H.Θ .= Θ
-    H.U .= U
-    LA.mul!(H.Q_cos, target.intrinsic.Y, U)
-    n, k = size(H.γ1)
-    @inbounds for j = 1:k
-        s, c = sincos(Θ[j])
-        for i = 1:n
-            H.γ1[i, j] = H.Q_cos[i, j] * c + Q[i, j] * s
-        end
+    H.start = start
+    H.target = target
+    H.geodesic = get!(GEODESIC_LRU, (start, target)) do
+        LinearSubspaceGeodesicInfo(start, target)
     end
     H
 end
 
-parameters!(H::LinearSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) = 
+parameters!(H::LinearSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
     set_subspaces!(H, p, q)
 
 function γ!(H::LinearSubspaceHomotopy, t::Number)
@@ -139,7 +151,7 @@ function γ!(H::LinearSubspaceHomotopy, t::Number)
     first(H.taylor_γ)
 end
 @inline function _γ!(H::LinearSubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H
+    @unpack Q, Q_cos, Θ = H.geodesic
     γ = first(H.taylor_γ)
     n, k = size(γ)
     @inbounds for j = 1:k
@@ -154,7 +166,7 @@ end
 
 γ̇!(H::LinearSubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
 @inline function _γ̇!(H::LinearSubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H
+    @unpack Q, Q_cos, Θ = H.geodesic
     _, γ̇ = H.taylor_γ
     n, k = size(γ̇)
     @inbounds for j = 1:k
@@ -177,9 +189,9 @@ function set_solution!(u::Vector, H::LinearSubspaceHomotopy, x::AbstractVector, 
     H.x[end] = 1
 
     if isone(t)
-        LA.mul!(u, H.γ1', H.x)
+        LA.mul!(u, H.geodesic.γ1', H.x)
     elseif iszero(t)
-        LA.mul!(u, H.Q_cos', H.x)
+        LA.mul!(u, H.geodesic.Q_cos', H.x)
     else
         LA.mul!(u, γ!(H, t)', H.x)
     end
@@ -187,9 +199,9 @@ end
 
 function get_solution(H::LinearSubspaceHomotopy, u::AbstractVector, t)
     if isone(t)
-        (@view H.γ1[1:end-1, :]) * u
+        (@view H.geodesic.γ1[1:end-1, :]) * u
     elseif iszero(t)
-        (@view H.Q_cos[1:end-1, :]) * u
+        (@view H.geodesic.Q_cos[1:end-1, :]) * u
     else
         γ = γ!(H, t)
         (@view γ[1:end-1, :]) * u
@@ -252,7 +264,8 @@ function ModelKit.taylor!(u, ::Val{1}, H::LinearSubspaceHomotopy, v, t)
 end
 
 function _taylor_γ!(H::LinearSubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ, U, taylor_γ = H
+    @unpack geodesic, taylor_γ = H
+    @unpack Q, Q_cos, Θ, U = geodesic
 
     γ, γ¹, γ², γ³ = taylor_γ
     n, k = size(γ)
