@@ -273,7 +273,7 @@ function init!(
     state.cond = NaN
     state.singular = false
     state.steps_eg = 0
-    state.ext_steps_eg_start = 0
+    state.ext_steps_eg_start = typemax(Int)
 
     state.row_scaling .= 1
     state.col_scaling .= 1
