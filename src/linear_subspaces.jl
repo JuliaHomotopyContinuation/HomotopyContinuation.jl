@@ -494,7 +494,7 @@ function rand_subspace(
         LinearSubspace(A, b)
     else
         N = LA.nullspace(Matrix(x'))'
-        A = randn(eltype(N), n - k, size(N,1)) * N
+        A = randn(eltype(N), n - k, size(N, 1)) * N
         LinearSubspace(A)
     end
 end
@@ -651,7 +651,7 @@ These values are necessary to construct the geodesic between `A` and `B`.
 """
 geodesic_svd(A::LinearSubspace, B::LinearSubspace) = geodesic_svd(A.intrinsic, B.intrinsic)
 function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
-    U, Σ, V = LA.svd(A.Y' * B.Y)
+    U, Σ, V = LA.svd!(A.Y' * B.Y)
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
@@ -667,7 +667,7 @@ function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
 
     # inv(A.Y' * B.Y) * U = V * LA.diagm(inv.(Σ))
     MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
-    Q, R = LA.qr(MU, Val(true))
+    Q, R = LA.qr!(MU, Val(true))
     # correct signs and ordering of Q
     Q′ = Q[:, k:-1:1]
     for j = 1:k

@@ -124,6 +124,9 @@ function set_subspaces!(
     H
 end
 
+parameters!(H::LinearSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) = 
+    set_subspaces!(H, p, q)
+
 function γ!(H::LinearSubspaceHomotopy, t::Number)
     H.t_cache[] != t || return first(H.taylor_γ)
     if isreal(t)

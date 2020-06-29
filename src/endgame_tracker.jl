@@ -822,6 +822,8 @@ Set the target parameters of the homotopy of the tracker.
 """
 target_parameters!(T::EndgameTracker, p) = (target_parameters!(T.tracker, p); T)
 
+parameters!(T::EndgameTracker, p, q) = (parameters!(T.tracker, p, q); T)
+
 function solution(endgame_tracker::EndgameTracker)
     get_solution(endgame_tracker.tracker.homotopy, endgame_tracker.state.solution, 0.0)
 end

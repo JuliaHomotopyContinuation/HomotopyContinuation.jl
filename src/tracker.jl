@@ -480,6 +480,14 @@ state(tracker::Tracker) = tracker.state
 
 Get the current [`TrackerCode`](@ref) of `tracker`.
 """
+
+"""
+    solution(tracker::Tracker)
+
+Get the current solution.
+"""
+solution(T::Tracker) = get_solution(T.homotopy, T.state.x, T.state.t)
+
 status(tracker::Tracker) = tracker.state.code
 
 LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
@@ -969,6 +977,8 @@ start_parameters!(T::Tracker, p) = (start_parameters!(T.homotopy, p); T)
 Set the target parameters of the homotopy of the tracker.
 """
 target_parameters!(T::Tracker, p) = (target_parameters!(T.homotopy, p); T)
+
+parameters!(T::Tracker, p, q) = (parameters!(T.homotopy, p, q); T)
 
 # PathIterator #
 struct PathIterator{T<:Tracker}

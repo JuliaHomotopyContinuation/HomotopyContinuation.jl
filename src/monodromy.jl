@@ -43,9 +43,13 @@ end
 
 Sample a vector where each entry is drawn independently from the complex Normal distribution
 by calling [`randn(ComplexF64)`](@ref).
+
+    independent_normal(L::LinearSubspace)
+
+Creates a random linear subspace by calling [`rand_subspace`](@ref).
 """
 independent_normal(p::AbstractVector{T}) where {T} = randn(ComplexF64, length(p))
-
+independent_normal(L::LinearSubspace) = rand_subspace(ambient_dim(L); dim = dim(L))
 
 #############################
 # Loops and Data Structures #
@@ -76,6 +80,14 @@ function MonodromyLoop(base::AbstractVector, options::MonodromyOptions)
     p₂ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
 
     MonodromyLoop(p, p₁, p₂)
+end
+
+function MonodromyLoop(base::LinearSubspace, options::MonodromyOptions)
+    L = convert(LinearSubspace{ComplexF64}, base)
+    L₁ = translate(L, 2randn(ComplexF64, codim(L)), Extrinsic)
+    L₂ = convert(LinearSubspace{ComplexF64}, options.parameter_sampler(L))
+
+    MonodromyLoop(L, L₁, L₂)
 end
 
 ##########################
@@ -497,6 +509,8 @@ function monodromy_solve(
     threading::Bool = Threads.nthreads() > 1,
     compile::Bool = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
+    dim = nothing,
+    codim = nothing,
     # monodromy options
     options = nothing,
     group_action = nothing,
@@ -523,6 +537,24 @@ function monodromy_solve(
         end
         x, p = start_pair
         S = [x]
+        # if we have no parameters, then we intersect with a linear subspace.
+        # For this we need to know the intended dimension or codimension.
+        # We don't guess dim to catch the case that the user just forgot to pass
+        # parameters
+        if isnothing(p) && isnothing(dim) && isnothing(codim)
+            error(
+                "Given system doesn't have any parameters. If you intended to intersect " *
+                "with a linear subspace it is necessary to provide a " *
+                "dimension (`dim`) or codimension (`codim`) of the component of interest.",
+            )
+        else
+            p = rand_subspace(
+                x;
+                dim = codim,
+                codim = dim,
+                affine = !is_homogeneous(System(F)),
+            )
+        end
     else
         S, p = args
     end
@@ -612,10 +644,16 @@ function monodromy_solve(
     else
         retcode = :default
         try
-            if threading
-                retcode = threaded_monodromy_solve!(results, MS, p, seed, progress)
+            # convert to complex base
+            if p isa LinearSubspace
+                cp = convert(LinearSubspace{ComplexF64}, p)
             else
-                retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
+                cp = convert(Vector{ComplexF64}, p)
+            end
+            if threading
+                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress)
+            else
+                retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
         catch e
             if !catch_interrupt ||
@@ -642,8 +680,7 @@ end
 
 function check_start_solutions(MS::MonodromySolver, X, p)
     tracker = MS.trackers[1]
-    start_parameters!(tracker, p)
-    target_parameters!(tracker, p)
+    parameters!(tracker, p, p)
     results = PathResult[]
     for x in X
         res = track(tracker, x)
@@ -941,15 +978,10 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(
-    egtracker::EndgameTracker,
-    r::PathResult,
-    loop::MonodromyLoop{<:AbstractVector},
-)
+function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
     tracker = egtracker.tracker
 
-    start_parameters!(tracker, loop.p)
-    target_parameters!(tracker, loop.p₁)
+    parameters!(tracker, loop.p, loop.p₁)
     retcode = track!(
         tracker,
         solution(r);
@@ -961,11 +993,11 @@ function track(
         return nothing
     end
 
-    start_parameters!(tracker, loop.p₁)
-    target_parameters!(tracker, loop.p₂)
+    x₁ = solution(tracker)
+    parameters!(tracker, loop.p₁, loop.p₂)
     retcode = track!(
         tracker,
-        tracker.state.x;
+        x₁;
         ω = tracker.state.ω,
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
@@ -974,11 +1006,11 @@ function track(
         return nothing
     end
 
-    start_parameters!(tracker, loop.p₂)
-    target_parameters!(tracker, loop.p)
+    x₂ = solution(tracker)
+    parameters!(tracker, loop.p₂, loop.p)
     result = track(
         egtracker,
-        tracker.state.x;
+        x₂;
         ω = tracker.state.ω,
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
