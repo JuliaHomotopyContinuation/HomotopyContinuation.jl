@@ -14,6 +14,7 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
 
     u::Vector{ComplexF64}
     ū::Vector{ComplexDF64}
+    v̄::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
     dv_start::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
@@ -44,12 +45,13 @@ function StraightLineHomotopy(
     m, n = size(start)
     u = zeros(ComplexF64, m)
     ū = zeros(ComplexDF64, m)
+    v̄ = zeros(ComplexDF64, m)
     U = zeros(ComplexF64, m, n)
 
     dv_start = LA.transpose(zeros(ComplexF64, 5, m))
     dv_target = LA.transpose(zeros(ComplexF64, 5, m))
 
-    StraightLineHomotopy(start, target, ComplexF64(gamma), u, ū, U, dv_start, dv_target)
+    StraightLineHomotopy(start, target, ComplexF64(gamma), u, ū,v̄, U, dv_start, dv_target)
 end
 
 Base.size(H::StraightLineHomotopy) = size(H.start)
@@ -63,21 +65,20 @@ function Base.show(io::IO, mime::MIME"text/plain", H::StraightLineHomotopy)
     show(io, mime, H.target)
 end
 
-function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::AbstractVector{T}, t) where {T}
-    evaluate!(u, H.start, x)
+function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexF64}, t) where {T}
+    evaluate!(H.v̄, H.start, x)
+    evaluate!(H.ū, H.target, x)
+    ts, tt = H.γ .* t, 1 - t
+    for i = 1:size(H, 1)
+        @inbounds u[i] = ts * H.v̄[i] + tt * H.ū[i]
+    end
+end
 
-    if T isa ComplexDF64 || T isa DoubleF64
-        evaluate!(H.ū, H.target, x)
-        ts, tt = H.γ .* t, 1 - t
-        for i = 1:size(H, 1)
-            @inbounds u[i] = ts * u[i] + tt * H.ū[i]
-        end
-    else
-        evaluate!(H.u, H.target, x)
-        ts, tt = H.γ .* t, 1 - t
-        for i = 1:size(H, 1)
-            @inbounds u[i] = ts * u[i] + tt * H.u[i]
-        end
+function ModelKit.evaluate!(u, H::StraightLineHomotopy, x, t)
+    evaluate!(H.u, H.target, x)
+    ts, tt = H.γ .* t, 1 - t
+    for i = 1:size(H, 1)
+        @inbounds u[i] = ts * u[i] + tt * H.u[i]
     end
     u
 end

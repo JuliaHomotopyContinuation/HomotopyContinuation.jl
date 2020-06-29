@@ -541,19 +541,21 @@ function monodromy_solve(
         # For this we need to know the intended dimension or codimension.
         # We don't guess dim to catch the case that the user just forgot to pass
         # parameters
-        if isnothing(p) && isnothing(dim) && isnothing(codim)
-            error(
-                "Given system doesn't have any parameters. If you intended to intersect " *
-                "with a linear subspace it is necessary to provide a " *
-                "dimension (`dim`) or codimension (`codim`) of the component of interest.",
-            )
-        else
-            p = rand_subspace(
-                x;
-                dim = codim,
-                codim = dim,
-                affine = !is_homogeneous(System(F)),
-            )
+        if isnothing(p)
+            if isnothing(dim) && isnothing(codim)
+                error(
+                    "Given system doesn't have any parameters. If you intended to intersect " *
+                    "with a linear subspace it is necessary to provide a " *
+                    "dimension (`dim`) or codimension (`codim`) of the component of interest.",
+                )
+            else
+                p = rand_subspace(
+                    x;
+                    dim = codim,
+                    codim = dim,
+                    affine = !is_homogeneous(System(F)),
+                )
+            end
         end
     else
         S, p = args
@@ -1015,7 +1017,11 @@ function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
     )
-    is_success(result) ? result : nothing
+    if is_success(result)
+        result
+    else
+        nothing
+    end
 end
 
 update_progress!(progress::Nothing, stats::MonodromyStatistics; kwargs...) = nothing

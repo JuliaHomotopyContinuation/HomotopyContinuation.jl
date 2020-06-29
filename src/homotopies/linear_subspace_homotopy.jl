@@ -79,7 +79,8 @@ LinearSubspaceHomotopy(
 function LinearSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
-    target::LinearSubspace,
+    target::LinearSubspace;
+    compile::Bool = COMPILE_DEFAULT[],
 )
     LinearSubspaceHomotopy(
         system,
@@ -208,18 +209,20 @@ function get_solution(H::LinearSubspaceHomotopy, u::AbstractVector, t)
     end
 end
 
+function ModelKit.evaluate!(u, H::LinearSubspaceHomotopy, v::Vector{ComplexDF64}, t)
+    γ = γ!(H, t)
+    n = first(size(H.system))
+    LA.mul!(H.x_high, γ, v)
+    evaluate!(u, H.system, H.x_high)
+    u[n+1] = H.x_high[end] - 1.0
+end
+
 function ModelKit.evaluate!(u, H::LinearSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
     n = first(size(H.system))
-    if eltype(v) isa ComplexDF64
-        LA.mul!(H.x_high, γ, v)
-        evaluate!(u, H.system, H.x_high)
-        u[n+1] = H.x_high[end] - 1.0
-    else
-        LA.mul!(H.x, γ, v)
-        evaluate!(u, H.system, H.x)
-        u[n+1] = H.x[end] - 1.0
-    end
+    LA.mul!(H.x, γ, v)
+    evaluate!(u, H.system, H.x)
+    u[n+1] = H.x[end] - 1.0
     u
 end
 
