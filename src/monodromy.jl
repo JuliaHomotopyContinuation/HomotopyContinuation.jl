@@ -5,7 +5,8 @@ export monodromy_solve,
     is_success,
     is_heuristic_stop,
     parameters,
-    permutations
+    permutations,
+    trace
 # verify_solution_completeness,
 # solution_completeness_witnesses,
 
@@ -28,6 +29,8 @@ Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     parameter_sampler::F2 = independent_normal
     equivalence_classes::Bool = !isnothing(group_actions)
     # stopping heuristic
+    trace_test_tol::Float64 = 1e-6
+    trace_test::Bool = true
     target_solutions_count::Union{Nothing,Int} = nothing
     timeout::Union{Nothing,Float64} = nothing
     min_solutions::Union{Nothing,Int} = nothing
@@ -68,6 +71,7 @@ end
 struct MonodromyLoop{P<:Union{LinearSubspace{ComplexF64},Vector{ComplexF64}}}
     # p -> p₁ -> p₂ -> p
     p::P
+    p₀₁::P # halfway
     p₁::P
     p₂::P
 end
@@ -77,15 +81,20 @@ function MonodromyLoop(base::AbstractVector, options::MonodromyOptions)
     p₁ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
     p₂ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
 
-    MonodromyLoop(p, p₁, p₂)
+    MonodromyLoop(p, 0.5 .* (p₁ .- p), p₁, p₂)
 end
 
 function MonodromyLoop(base::LinearSubspace, options::MonodromyOptions)
     L = convert(LinearSubspace{ComplexF64}, base)
-    L₁ = translate(L, 2randn(ComplexF64, codim(L)), Extrinsic)
+    # the second linear space is just a translation in order to perform a trace test
+    # To still find new solutions quickly we translate the linear space
+    # by a larger distance
+    v = LA.rmul!(LA.normalize!(randn(ComplexF64, codim(L))), 5)
+    L₀₁ = translate(L, v, Extrinsic)
+    L₁ = translate(L₀₁, v, Extrinsic)
     L₂ = convert(LinearSubspace{ComplexF64}, options.parameter_sampler(L))
 
-    MonodromyLoop(L, L₁, L₂)
+    MonodromyLoop(L, L₀₁, L₁, L₂)
 end
 
 ##########################
@@ -184,6 +193,7 @@ struct MonodromyResult{P,LP}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
     seed::UInt32
+    trace::Union{Nothing,Float64}
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
@@ -198,10 +208,13 @@ function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     end
     println(io, "• $(result.statistics.tracked_loops[]) tracked loops")
     print(io, "• random seed: ", sprint(show, result.seed))
+    if !isnothing(result.trace)
+        print(io, "\n• trace: ", sprint(show, result.trace))
+    end
 end
 
 TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 6
+TreeViews.numberofnodes(::MonodromyResult) = 7
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(
         io,
@@ -230,6 +243,8 @@ function TreeViews.nodelabel(
         print(io, "Parameters")
     elseif i == 6
         print(io, "Seed")
+    elseif i == 7
+        print(io, "Trace")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
@@ -245,15 +260,17 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
         return r.parameters
     elseif i == 6
         return r.seed
+    elseif i == 7
+        return something(r.trace, missing)
     end
     missing
 end
 
 """
-#     is_success(result::MonodromyResult)
-#
-# Returns true if the monodromy computation achieved its target solution count.
-# """
+    is_success(result::MonodromyResult)
+
+Returns true if the monodromy computation achieved its target solution count.
+"""
 is_success(result::MonodromyResult) = result.returncode == :success
 
 """
@@ -304,6 +321,13 @@ ModelKit.parameters(r::MonodromyResult) = r.parameters
 Return the random seed used for the computations.
 """
 seed(r::MonodromyResult) = r.seed
+
+"""
+    trace(result::MonodromyResult)
+
+Return the result of the trace test computed during the monodromy.
+"""
+trace(r::MonodromyResult) = r.trace
 
 
 """
@@ -374,6 +398,8 @@ mutable struct MonodromySolver{
     unique_points_lock::ReentrantLock
     options::MO
     statistics::MonodromyStatistics
+    trace::Vector{ComplexF64}
+    trace_lock::ReentrantLock
 end
 
 function MonodromySolver(
@@ -418,7 +444,7 @@ function MonodromySolver(
 
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
-    statistics = MonodromyStatistics()
+    trace = zeros(ComplexF64, length(x₀))
     MonodromySolver(
         trackers,
         MonodromyLoop{P}[],
@@ -426,6 +452,8 @@ function MonodromySolver(
         ReentrantLock(),
         options,
         MonodromyStatistics(),
+        trace,
+        ReentrantLock(),
     )
 end
 
@@ -498,6 +526,11 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   reached.
 * `threading = true`: Enable multithreading of the path tracking.
 * `timeout`: The maximal number of *seconds* the computation is allowed to run.
+* `trace_test = true`: If `true` a trace test is performed to check whether all solutions
+  are found. This is only applicable if monodromy is performed with a linear subspace.
+  See also [`trace_test`](@ref).
+* `trace_test_tol = 1e-6`: The tolerance for the trace test to be successfull.
+
 """
 function monodromy_solve(F::Vector{<:ModelKit.Expression}, args...; parameters, kwargs...)
     monodromy_solve(System(F; parameters = parameters), args...; kwargs...)
@@ -654,6 +687,11 @@ function monodromy_solve(
     end
     MS.statistics = MonodromyStatistics()
     empty!(MS.unique_points)
+    if p isa LinearSubspace
+        MS.trace .= 0.0
+    else
+        MS.trace .= Inf
+    end
     results = check_start_solutions(MS, X, p)
     if isempty(results)
         @warn "None of the provided solutions is a valid start solution."
@@ -692,6 +730,7 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
+        LA.norm(MS.trace, Inf),
     )
 end
 
@@ -732,6 +771,13 @@ function serial_monodromy_solve!(
     while true
         loop_finished!(stats, length(results))
 
+        if p isa LinearSubspace &&
+           nloops(MS) > 0 &&
+           MS.options.trace_test &&
+           LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+            retcode = :success
+            @goto _return
+        end
         if isnothing(MS.options.target_solutions_count) &&
            loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
             retcode = :heuristic_stop
@@ -743,6 +789,7 @@ function serial_monodromy_solve!(
         end
 
         add_loop!(MS, p)
+        MS.trace .= 0.0
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -751,7 +798,14 @@ function serial_monodromy_solve!(
 
         while !isempty(queue)
             job = popfirst!(queue)
-            res = track(tracker, results[job.id], loop(MS, job.loop_id))
+            res = track(
+                tracker,
+                results[job.id],
+                loop(MS, job.loop_id),
+                MS.trace,
+                MS.trace_lock;
+                collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+            )
             if !isnothing(res)
                 loop_tracked!(stats)
 
@@ -853,7 +907,14 @@ function threaded_monodromy_solve!(
         @tspawnat tid begin
             for job in queue
                 workers_idle[64*(tid-1)+1] = false
-                res = track(tracker, results[job.id], loop(MS, job.loop_id))
+                res = track(
+                    tracker,
+                    results[job.id],
+                    loop(MS, job.loop_id),
+                    MS.trace,
+                    MS.trace_lock;
+                    collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+                )
                 # @show tid, job
                 if !isnothing(res)
                     loop_tracked!(stats)
@@ -951,8 +1012,16 @@ function threaded_monodromy_solve!(
             retcode = :success
             break
         end
+        if p isa LinearSubspace &&
+           nloops(MS) > 0 &&
+           MS.options.trace_test &&
+           LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+            retcode = :success
+            break
+        end
 
         add_loop!(MS, p)
+        MS.trace .= 0.0
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -995,22 +1064,61 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
+function track(
+    egtracker::EndgameTracker,
+    r::PathResult,
+    loop::MonodromyLoop,
+    trace,
+    trace_lock;
+    collect_trace::Bool = false,
+)
     tracker = egtracker.tracker
 
-    parameters!(tracker, loop.p, loop.p₁)
-    retcode = track!(
-        tracker,
-        solution(r);
-        ω = r.ω,
-        μ = r.μ,
-        extended_precision = r.extended_precision,
-    )
-    if !is_success(retcode)
-        return nothing
+    if loop.p isa LinearSubspace && collect_trace
+        parameters!(tracker, loop.p, loop.p₀₁)
+        retcode = track!(
+            tracker,
+            solution(r);
+            ω = r.ω,
+            μ = r.μ,
+            extended_precision = r.extended_precision,
+        )
+        x₀₁ = solution(tracker)
+        if !is_success(retcode)
+            return nothing
+        end
+
+        parameters!(tracker, loop.p₀₁, loop.p₁)
+        retcode = track!(
+            tracker,
+            x₀₁;
+            ω = tracker.state.ω,
+            μ = tracker.state.μ,
+            extended_precision = tracker.state.extended_prec,
+        )
+        x₁ = solution(tracker)
+        if !is_success(retcode)
+            return nothing
+        end
+
+        lock(trace_lock)
+        trace .+= (x₁ .- x₀₁) .- (x₀₁ .- solution(r))
+        unlock(trace_lock)
+    else
+        parameters!(tracker, loop.p, loop.p₁)
+        retcode = track!(
+            tracker,
+            solution(r);
+            ω = r.ω,
+            μ = r.μ,
+            extended_precision = r.extended_precision,
+        )
+        if !is_success(retcode)
+            return nothing
+        end
+        x₁ = solution(tracker)
     end
 
-    x₁ = solution(tracker)
     parameters!(tracker, loop.p₁, loop.p₂)
     retcode = track!(
         tracker,

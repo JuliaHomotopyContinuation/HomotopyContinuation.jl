@@ -243,17 +243,37 @@
         @var x[1:4]
         f1 = rand_poly(x, 6)
         F = System([f1], x)
-        res = monodromy_solve(F; dim = 3)
+        res = monodromy_solve(F; dim = 3, threading = false)
         @test nsolutions(res) == 6
+        @test trace(res) < 1e-6
+        @test is_success(res)
+
+        res = monodromy_solve(F; dim = 3, trace_test = false, threading = false)
+        @test nsolutions(res) == 6
+        @test is_heuristic_stop(res)
+
+        res = monodromy_solve(
+            F;
+            dim = 3,
+            trace_test = true,
+            trace_test_tol = 1e-50,
+            threading = false,
+        )
+        @test nsolutions(res) == 6
+        @test is_heuristic_stop(res)
 
         @var x[1:4]
         f1 = rand_poly(x, 6; homogeneous = true)
         F = System([f1], x)
-        res = monodromy_solve(F; dim = 2)
+        res = monodromy_solve(F; dim = 2, compile = false)
         @test nsolutions(res) == 6
+        @test trace(res) < 1e-6
+        @test is_success(res)
 
         F = System([f1, rand_poly(x, 3), rand_poly(x, 4)], x)
         res = monodromy_solve(F; codim = 3, compile = false)
         @test nsolutions(res) == 72
+        @test trace(res) < 1e-6
+        @test is_success(res)
     end
 end
