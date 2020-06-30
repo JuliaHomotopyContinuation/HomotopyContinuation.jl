@@ -3,7 +3,6 @@ using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation
 
-
 include("test_systems.jl")
 
 function test_treeviews(x)
@@ -37,6 +36,7 @@ end
     include("solve_test.jl")
     include("endgame_test.jl")
     include("monodromy_test.jl")
+    include("witness_set_test.jl")
 
     if "extensive" in ARGS
         include("extensive/extensive_test.jl")

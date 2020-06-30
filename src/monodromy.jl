@@ -5,11 +5,10 @@ export monodromy_solve,
     is_success,
     is_heuristic_stop,
     parameters,
-    permutations
+    permutations,
+    trace
 # verify_solution_completeness,
 # solution_completeness_witnesses,
-# permutations
-
 
 #####################
 # Monodromy Options #
@@ -30,6 +29,8 @@ Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     parameter_sampler::F2 = independent_normal
     equivalence_classes::Bool = !isnothing(group_actions)
     # stopping heuristic
+    trace_test_tol::Float64 = 1e-6
+    trace_test::Bool = true
     target_solutions_count::Union{Nothing,Int} = nothing
     timeout::Union{Nothing,Float64} = nothing
     min_solutions::Union{Nothing,Int} = nothing
@@ -43,9 +44,13 @@ end
 
 Sample a vector where each entry is drawn independently from the complex Normal distribution
 by calling [`randn(ComplexF64)`](@ref).
+
+    independent_normal(L::LinearSubspace)
+
+Creates a random linear subspace by calling [`rand_subspace`](@ref).
 """
 independent_normal(p::AbstractVector{T}) where {T} = randn(ComplexF64, length(p))
-
+independent_normal(L::LinearSubspace) = rand_subspace(ambient_dim(L); dim = dim(L))
 
 #############################
 # Loops and Data Structures #
@@ -63,19 +68,33 @@ end
 #######################
 
 
-struct MonodromyLoop
+struct MonodromyLoop{P<:Union{LinearSubspace{ComplexF64},Vector{ComplexF64}}}
     # p -> p₁ -> p₂ -> p
-    p::Vector{ComplexF64}
-    p₁::Vector{ComplexF64}
-    p₂::Vector{ComplexF64}
+    p::P
+    p₀₁::P # halfway
+    p₁::P
+    p₂::P
 end
 
-function MonodromyLoop(base, options::MonodromyOptions)
+function MonodromyLoop(base::AbstractVector, options::MonodromyOptions)
     p = convert(Vector{ComplexF64}, base)
     p₁ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
     p₂ = convert(Vector{ComplexF64}, options.parameter_sampler(p))
 
-    MonodromyLoop(p, p₁, p₂)
+    MonodromyLoop(p, 0.5 .* (p₁ .- p), p₁, p₂)
+end
+
+function MonodromyLoop(base::LinearSubspace, options::MonodromyOptions)
+    L = convert(LinearSubspace{ComplexF64}, base)
+    # the second linear space is just a translation in order to perform a trace test
+    # To still find new solutions quickly we translate the linear space
+    # by a larger distance
+    v = LA.rmul!(LA.normalize!(randn(ComplexF64, codim(L))), 5)
+    L₀₁ = translate(L, v, Extrinsic)
+    L₁ = translate(L₀₁, v, Extrinsic)
+    L₂ = convert(LinearSubspace{ComplexF64}, options.parameter_sampler(L))
+
+    MonodromyLoop(L, L₀₁, L₁, L₂)
 end
 
 ##########################
@@ -166,14 +185,15 @@ end
 
 The monodromy result contains the result of the [`monodromy_solve`](@ref) computation.
 """
-struct MonodromyResult{T}
+struct MonodromyResult{P,LP}
     returncode::Symbol
     results::Vector{PathResult}
-    parameters::Vector{T}
-    loops::Vector{MonodromyLoop}
+    parameters::P
+    loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
     seed::UInt32
+    trace::Union{Nothing,Float64}
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
@@ -188,10 +208,13 @@ function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     end
     println(io, "• $(result.statistics.tracked_loops[]) tracked loops")
     print(io, "• random seed: ", sprint(show, result.seed))
+    if !isnothing(result.trace)
+        print(io, "\n• trace: ", sprint(show, result.trace))
+    end
 end
 
 TreeViews.hastreeview(::MonodromyResult) = true
-TreeViews.numberofnodes(::MonodromyResult) = 6
+TreeViews.numberofnodes(::MonodromyResult) = 7
 TreeViews.treelabel(io::IO, x::MonodromyResult, ::MIME"application/prs.juno.inline") =
     print(
         io,
@@ -220,6 +243,8 @@ function TreeViews.nodelabel(
         print(io, "Parameters")
     elseif i == 6
         print(io, "Seed")
+    elseif i == 7
+        print(io, "Trace")
     end
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
@@ -235,15 +260,17 @@ function TreeViews.treenode(r::MonodromyResult, i::Integer)
         return r.parameters
     elseif i == 6
         return r.seed
+    elseif i == 7
+        return something(r.trace, missing)
     end
     missing
 end
 
 """
-#     is_success(result::MonodromyResult)
-#
-# Returns true if the monodromy computation achieved its target solution count.
-# """
+    is_success(result::MonodromyResult)
+
+Returns true if the monodromy computation achieved its target solution count.
+"""
 is_success(result::MonodromyResult) = result.returncode == :success
 
 """
@@ -294,6 +321,13 @@ ModelKit.parameters(r::MonodromyResult) = r.parameters
 Return the random seed used for the computations.
 """
 seed(r::MonodromyResult) = r.seed
+
+"""
+    trace(result::MonodromyResult)
+
+Return the result of the trace test computed during the monodromy.
+"""
+trace(r::MonodromyResult) = r.trace
 
 
 """
@@ -354,19 +388,24 @@ end
 
 mutable struct MonodromySolver{
     Tracker<:EndgameTracker,
+    P,
     UP<:UniquePoints,
     MO<:MonodromyOptions,
 }
     trackers::Vector{Tracker}
-    loops::Vector{MonodromyLoop}
+    loops::Vector{MonodromyLoop{P}}
     unique_points::UP
     unique_points_lock::ReentrantLock
     options::MO
     statistics::MonodromyStatistics
+    trace::Vector{ComplexF64}
+    trace_lock::ReentrantLock
 end
 
 function MonodromySolver(
-    F::Union{System,AbstractSystem};
+    F::Union{System,AbstractSystem},
+    parameters;
+    intrinsic = nothing,
     compile::Bool = COMPILE_DEFAULT[],
     tracker_options = TrackerOptions(),
     options = MonodromyOptions(),
@@ -375,33 +414,46 @@ function MonodromySolver(
         options = MonodromyOptions(; options...)
     end
 
-    egtracker = parameter_homotopy(
-        F;
-        compile = compile,
-        generic_parameters = randn(ComplexF64, nparameters(F)),
+    if parameters isa LinearSubspace
+        H = linear_subspace_homotopy(
+            F,
+            parameters,
+            parameters;
+            compile = compile,
+            intrinsic = intrinsic,
+        )
+        P = LinearSubspace{ComplexF64}
+    else
+        H = parameter_homotopy(F; generic_parameters = parameters)
+        P = Vector{ComplexF64}
+    end
+    egtracker = EndgameTracker(
+        H;
         tracker_options = tracker_options,
-        endgame_options = EndgameOptions(endgame_start = 0.0),
+        options = EndgameOptions(endgame_start = 0.0),
     )
     trackers = [egtracker]
     group_actions = options.equivalence_classes ? options.group_actions : nothing
     x₀ = zeros(ComplexF64, size(F, 2))
+    #TODO: This is wrong for IntrinsicSubspaceHomotopy of projective varieties
     if !isnothing(group_actions) && (egtracker.tracker.homotopy isa AffineChartHomotopy)
         group_actions = let H = egtracker.tracker.homotopy, group_actions = group_actions
-            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 1)), group_actions, s)
+            (cb, s) -> apply_actions(v -> cb(set_solution!(v, H, v, 0)), group_actions, s)
         end
     end
 
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
-    statistics = MonodromyStatistics()
-
+    trace = zeros(ComplexF64, length(x₀))
     MonodromySolver(
         trackers,
-        MonodromyLoop[],
+        MonodromyLoop{P}[],
         unique_points,
         ReentrantLock(),
         options,
         MonodromyStatistics(),
+        trace,
+        ReentrantLock(),
     )
 end
 
@@ -425,6 +477,14 @@ If `F` the parameters `p` only occur *linearly* in `F` it is eventually possible
 a *start pair* ``(x₀, p₀)`` automatically. In this case `sols` and `p` can be omitted and
 the automatically generated parameters can be obtained with the [`parameters`](@ref) function
 from the [`MonodromyResult`](@ref).
+
+    monodromy_solve(F, [sols, L]; dim, codim, intrinsic = nothing, options...,
+                                  tracker_options = TrackerOptions())
+
+Solve the polynomial system `[F(x); L(x)] = 0` where `L` is a `[LinearSubspace`](@ref).
+If `sols` and `L` are not provided it is necesary to provide `dim` or `codim` where `(co)dim`
+is the expected (co)dimension of a component of `V(F)`.
+See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 
 ## Options
 
@@ -466,6 +526,11 @@ from the [`MonodromyResult`](@ref).
   reached.
 * `threading = true`: Enable multithreading of the path tracking.
 * `timeout`: The maximal number of *seconds* the computation is allowed to run.
+* `trace_test = true`: If `true` a trace test is performed to check whether all solutions
+  are found. This is only applicable if monodromy is performed with a linear subspace.
+  See also [`trace_test`](@ref).
+* `trace_test_tol = 1e-6`: The tolerance for the trace test to be successfull.
+
 """
 function monodromy_solve(F::Vector{<:ModelKit.Expression}, args...; parameters, kwargs...)
     monodromy_solve(System(F; parameters = parameters), args...; kwargs...)
@@ -490,6 +555,9 @@ function monodromy_solve(
     threading::Bool = Threads.nthreads() > 1,
     compile::Bool = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
+    dim = nothing,
+    codim = nothing,
+    intrinsic = nothing,
     # monodromy options
     options = nothing,
     group_action = nothing,
@@ -506,12 +574,6 @@ function monodromy_solve(
     if !isnothing(seed)
         Random.seed!(seed)
     end
-    MS = MonodromySolver(
-        F;
-        compile = compile,
-        options = options,
-        tracker_options = tracker_options,
-    )
     if length(args) == 0
         start_pair = find_start_pair(fixed(F; compile = compile))
         if isnothing(start_pair)
@@ -521,25 +583,47 @@ function monodromy_solve(
             )
         end
         x, p = start_pair
-        monodromy_solve(
-            MS,
-            [x],
-            p,
-            seed;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        S = [x]
+        # if we have no parameters, then we intersect with a linear subspace.
+        # For this we need to know the intended dimension or codimension.
+        # We don't guess dim to catch the case that the user just forgot to pass
+        # parameters
+        if isnothing(p)
+            if isnothing(dim) && isnothing(codim)
+                error(
+                    "Given system doesn't have any parameters. If you intended to intersect " *
+                    "with a linear subspace it is necessary to provide a " *
+                    "dimension (`dim`) or codimension (`codim`) of the component of interest.",
+                )
+            else
+                p = rand_subspace(
+                    x;
+                    dim = codim,
+                    codim = dim,
+                    affine = !is_homogeneous(System(F)),
+                )
+            end
+        end
     else
-        monodromy_solve(
-            MS,
-            args...,
-            seed;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        S, p = args
     end
+    MS = MonodromySolver(
+        F,
+        p;
+        compile = compile,
+        options = options,
+        tracker_options = tracker_options,
+        intrinsic = intrinsic,
+    )
+    monodromy_solve(
+        MS,
+        S,
+        p,
+        seed;
+        show_progress = show_progress,
+        threading = threading,
+        catch_interrupt = catch_interrupt,
+    )
 end
 
 """
@@ -556,9 +640,11 @@ function find_start_pair(
     atol::Float64 = 0.0,
     rtol::Float64 = 1e-12,
 )
-    nparameters(F) > 0 || throw(ArgumentError("Need a system with parameters as input."))
-
-    SF = StartPairSystem(F)
+    if nparameters(F) == 0
+        SF = F
+    else
+        SF = StartPairSystem(F)
+    end
     m = nparameters(F)
     n = nvariables(F)
     c = NewtonCache(SF)
@@ -569,7 +655,7 @@ function find_start_pair(
             x, p = res.x[1:n], res.x[n+1:end]
             res2 = newton(F, x, p, InfNorm())
             if is_success(res2)
-                return res2.x, p
+                return res2.x, isempty(p) ? nothing : p
             end
         end
     end
@@ -601,6 +687,11 @@ function monodromy_solve(
     end
     MS.statistics = MonodromyStatistics()
     empty!(MS.unique_points)
+    if p isa LinearSubspace
+        MS.trace .= 0.0
+    else
+        MS.trace .= Inf
+    end
     results = check_start_solutions(MS, X, p)
     if isempty(results)
         @warn "None of the provided solutions is a valid start solution."
@@ -608,10 +699,16 @@ function monodromy_solve(
     else
         retcode = :default
         try
-            if threading
-                retcode = threaded_monodromy_solve!(results, MS, p, seed, progress)
+            # convert to complex base
+            if p isa LinearSubspace
+                cp = convert(LinearSubspace{ComplexF64}, p)
             else
-                retcode = serial_monodromy_solve!(results, MS, p, seed, progress)
+                cp = convert(Vector{ComplexF64}, p)
+            end
+            if threading
+                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress)
+            else
+                retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
         catch e
             if !catch_interrupt ||
@@ -633,13 +730,13 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
+        LA.norm(MS.trace, Inf),
     )
 end
 
 function check_start_solutions(MS::MonodromySolver, X, p)
     tracker = MS.trackers[1]
-    start_parameters!(tracker, p)
-    target_parameters!(tracker, p)
+    parameters!(tracker, p, p)
     results = PathResult[]
     for x in X
         res = track(tracker, x)
@@ -674,6 +771,13 @@ function serial_monodromy_solve!(
     while true
         loop_finished!(stats, length(results))
 
+        if p isa LinearSubspace &&
+           nloops(MS) > 0 &&
+           MS.options.trace_test &&
+           LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+            retcode = :success
+            @goto _return
+        end
         if isnothing(MS.options.target_solutions_count) &&
            loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
             retcode = :heuristic_stop
@@ -685,6 +789,7 @@ function serial_monodromy_solve!(
         end
 
         add_loop!(MS, p)
+        MS.trace .= 0.0
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -693,7 +798,14 @@ function serial_monodromy_solve!(
 
         while !isempty(queue)
             job = popfirst!(queue)
-            res = track(tracker, results[job.id], loop(MS, job.loop_id))
+            res = track(
+                tracker,
+                results[job.id],
+                loop(MS, job.loop_id),
+                MS.trace,
+                MS.trace_lock;
+                collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+            )
             if !isnothing(res)
                 loop_tracked!(stats)
 
@@ -795,7 +907,14 @@ function threaded_monodromy_solve!(
         @tspawnat tid begin
             for job in queue
                 workers_idle[64*(tid-1)+1] = false
-                res = track(tracker, results[job.id], loop(MS, job.loop_id))
+                res = track(
+                    tracker,
+                    results[job.id],
+                    loop(MS, job.loop_id),
+                    MS.trace,
+                    MS.trace_lock;
+                    collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+                )
                 # @show tid, job
                 if !isnothing(res)
                     loop_tracked!(stats)
@@ -893,8 +1012,16 @@ function threaded_monodromy_solve!(
             retcode = :success
             break
         end
+        if p isa LinearSubspace &&
+           nloops(MS) > 0 &&
+           MS.options.trace_test &&
+           LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+            retcode = :success
+            break
+        end
 
         add_loop!(MS, p)
+        MS.trace .= 0.0
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -937,27 +1064,65 @@ end
 Track `x` along the edge `edge` in the loop `loop` using `tracker`. Record statistics
 in `stats`.
 """
-function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
+function track(
+    egtracker::EndgameTracker,
+    r::PathResult,
+    loop::MonodromyLoop,
+    trace,
+    trace_lock;
+    collect_trace::Bool = false,
+)
     tracker = egtracker.tracker
 
-    start_parameters!(tracker, loop.p)
-    target_parameters!(tracker, loop.p₁)
-    retcode = track!(
-        tracker,
-        solution(r);
-        ω = r.ω,
-        μ = r.μ,
-        extended_precision = r.extended_precision,
-    )
-    if !is_success(retcode)
-        return nothing
+    if loop.p isa LinearSubspace && collect_trace
+        parameters!(tracker, loop.p, loop.p₀₁)
+        retcode = track!(
+            tracker,
+            solution(r);
+            ω = r.ω,
+            μ = r.μ,
+            extended_precision = r.extended_precision,
+        )
+        x₀₁ = solution(tracker)
+        if !is_success(retcode)
+            return nothing
+        end
+
+        parameters!(tracker, loop.p₀₁, loop.p₁)
+        retcode = track!(
+            tracker,
+            x₀₁;
+            ω = tracker.state.ω,
+            μ = tracker.state.μ,
+            extended_precision = tracker.state.extended_prec,
+        )
+        x₁ = solution(tracker)
+        if !is_success(retcode)
+            return nothing
+        end
+
+        lock(trace_lock)
+        trace .+= (x₁ .- x₀₁) .- (x₀₁ .- solution(r))
+        unlock(trace_lock)
+    else
+        parameters!(tracker, loop.p, loop.p₁)
+        retcode = track!(
+            tracker,
+            solution(r);
+            ω = r.ω,
+            μ = r.μ,
+            extended_precision = r.extended_precision,
+        )
+        if !is_success(retcode)
+            return nothing
+        end
+        x₁ = solution(tracker)
     end
 
-    start_parameters!(tracker, loop.p₁)
-    target_parameters!(tracker, loop.p₂)
+    parameters!(tracker, loop.p₁, loop.p₂)
     retcode = track!(
         tracker,
-        tracker.state.x;
+        x₁;
         ω = tracker.state.ω,
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
@@ -966,16 +1131,20 @@ function track(egtracker::EndgameTracker, r::PathResult, loop::MonodromyLoop)
         return nothing
     end
 
-    start_parameters!(tracker, loop.p₂)
-    target_parameters!(tracker, loop.p)
+    x₂ = solution(tracker)
+    parameters!(tracker, loop.p₂, loop.p)
     result = track(
         egtracker,
-        tracker.state.x;
+        x₂;
         ω = tracker.state.ω,
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
     )
-    is_success(result) ? result : nothing
+    if is_success(result)
+        result
+    else
+        nothing
+    end
 end
 
 update_progress!(progress::Nothing, stats::MonodromyStatistics; kwargs...) = nothing

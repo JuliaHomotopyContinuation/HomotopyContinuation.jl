@@ -79,6 +79,7 @@ parameters(F::CompiledSystem) = parameters(F.system)
 variable_groups(F::CompiledSystem) = variable_groups(F.system)
 System(F::CompiledSystem) = F.system
 
+Base.:(==)(F::CompiledSystem{A}, G::CompiledSystem{B}) where {A,B} = A == B
 
 ######################
 ## CompiledHomotopy ##

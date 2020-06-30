@@ -273,7 +273,7 @@ function init!(
     state.cond = NaN
     state.singular = false
     state.steps_eg = 0
-    state.ext_steps_eg_start = 0
+    state.ext_steps_eg_start = typemax(Int)
 
     state.row_scaling .= 1
     state.col_scaling .= 1
@@ -822,6 +822,8 @@ Set the target parameters of the homotopy of the tracker.
 """
 target_parameters!(T::EndgameTracker, p) = (target_parameters!(T.tracker, p); T)
 
+parameters!(T::EndgameTracker, p, q) = (parameters!(T.tracker, p, q); T)
+
 function solution(endgame_tracker::EndgameTracker)
     get_solution(endgame_tracker.tracker.homotopy, endgame_tracker.state.solution, 0.0)
 end
@@ -884,7 +886,7 @@ Track `solution(r)` from `t` towards `0` using the given `endgame_tracker`.
 """
 function track(
     endgame_tracker::EndgameTracker,
-    x::AbstractVector,
+    x,
     t₁::Real = 1.0;
     path_number::Union{Nothing,Int} = nothing,
     kwargs...,

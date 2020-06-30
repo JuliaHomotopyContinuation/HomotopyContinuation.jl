@@ -1,4 +1,10 @@
-export solve, Solver, solver, solver_startsolutions, paths_to_track
+export solve,
+    Solver,
+    solver,
+    solver_startsolutions,
+    paths_to_track,
+    parameter_homotopy,
+    linear_subspace_homotopy
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -38,7 +44,7 @@ Solver(
     start_system = nothing,
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
-Base.show(io::IO, solver::Solver) = print(io, "Solver")
+Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
 
 solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
 function solver_startsolutions(
@@ -104,7 +110,7 @@ function solver_startsolutions(
 
     used_start_system = nothing
     if start_parameters !== nothing
-        tracker = parameter_homotopy(
+        tracker = parameter_homotopy_tracker(
             F;
             start_parameters = start_parameters,
             target_parameters = target_parameters,
@@ -148,16 +154,36 @@ function solver_startsolutions(
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    H = start_target_homotopy(G, F; kwargs...)
+    if F isa SlicedSystem && G isa SlicedSystem && system(F) == system(G)
+        H = linear_subspace_homotopy(system(F), linear_subspace(F), linear_subspace(G))
+    else
+        H = start_target_homotopy(G, F; kwargs...)
+    end
     tracker =
         EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 
     Solver(tracker; seed = seed), starts
 end
 
+function parameter_homotopy_tracker(
+    F::Union{System,AbstractSystem};
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(),
+    kwargs...,
+)
+    H = parameter_homotopy(F; kwargs...)
+    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
+end
+
+"""
+    parameter_homotopy(F; start_parameters, target_parameters)
+
+Construct a [`ParameterHomotopy`](@ref). If `F` is homogeneous, then a random affine chart
+is chosen.
+"""
 function parameter_homotopy(
     F::Union{System,AbstractSystem};
-    generic_parameters = nothing,
+    generic_parameters = randn(ComplexF64, nparameters(F)),
     p₁ = generic_parameters,
     start_parameters = p₁,
     p₀ = generic_parameters,
@@ -168,8 +194,6 @@ function parameter_homotopy(
     kwargs...,
 )
     unsupported_kwargs(kwargs)
-    isnothing(start_parameters) && throw(UndefKeywordError(:start_parameters))
-    isnothing(target_parameters) && throw(UndefKeywordError(:target_parameters))
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
@@ -186,7 +210,39 @@ function parameter_homotopy(
         m ≥ n || throw(FiniteException(n - m))
     end
 
-    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
+    H
+end
+
+"""
+    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspacel intrinsic = nothing)
+
+Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
+`intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).
+Compared to the direct constructor, this also takes care of homogeneous systems.
+"""
+function linear_subspace_homotopy(
+    F::Union{System,AbstractSystem},
+    V::LinearSubspace,
+    W::LinearSubspace;
+    compile::Bool = COMPILE_DEFAULT[],
+    intrinsic = nothing,
+)
+    # Intrinsic: m+1,dim(V)+1
+    # Extrinsic: m+codim(V), dim(V) + codim(V)
+    if dim(V) < codim(V) || something(intrinsic, false)
+        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+            IntrinsicSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W)
+        else
+            IntrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        end
+    else
+        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
+            on_affine_chart(H)
+        else
+            H
+        end
+    end
 end
 
 function start_target_homotopy(
@@ -387,6 +443,9 @@ function solve(
     end
 end
 
+function solve(S::Solver, R::Result; kwargs...)
+    solve(S, solutions(R; only_nonsingular = true); kwargs...)
+end
 function solve(
     S::Solver,
     starts;

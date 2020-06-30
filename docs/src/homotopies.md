@@ -27,12 +27,6 @@ AffineChartHomotopy
 on_affine_chart(F::Homotopy, dims)
 ```
 
-## AffineSubspaceHomotopy
-```@docs
-AffineSubspaceHomotopy
-set_subspaces!
-```
-
 ## CoefficientHomotopy
 ```@docs
 CoefficientHomotopy
@@ -42,6 +36,12 @@ CoefficientHomotopy
 ```@docs
 FixedParameterHomotopy
 fix_parameters(H::AbstractHomotopy, p)
+```
+
+## IntrinsicSubspaceHomotopy
+```@docs
+IntrinsicSubspaceHomotopy
+set_subspaces!
 ```
 
 ## ParameterHomotopy
