@@ -348,11 +348,12 @@ Get all results where the solutions is at infinity.
 at_infinity(R::Results) = filter(is_at_infinity, path_results(R))
 
 """
-    nsolutions(result)
+    nsolutions(result; only_nonsingular = true, options...)
 
-The number of solutions.
+The number of solutions. See [`results`](@ref) for the possible options.
 """
-nsolutions(R::Results) = nresults(R)
+nsolutions(R::Results; only_nonsingular = true, options...) =
+    nresults(R; only_nonsingular = only_nonsingular, options...)
 
 """
     nsingular(

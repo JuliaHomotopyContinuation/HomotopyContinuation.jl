@@ -2,6 +2,7 @@ module HomotopyContinuation
 
 export ModelKit
 
+import DelimitedFiles
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
 import FiniteDiff

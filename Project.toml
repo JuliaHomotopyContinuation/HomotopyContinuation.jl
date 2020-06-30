@@ -4,6 +4,7 @@ authors = ["Sascha Timme <sascha@timme.xyz>"]
 version = "2.0.0"
 
 [deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 ElasticArrays = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"

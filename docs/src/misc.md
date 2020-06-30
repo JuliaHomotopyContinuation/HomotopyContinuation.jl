@@ -1,5 +1,14 @@
 # Miscellaneous
 
+## Storing solutions and parameters
+
+```@docs
+write_solutions
+read_solutions
+write_parameters
+read_parameters
+```
+
 ## Newton's method
 
 ```@docs
