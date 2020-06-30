@@ -86,7 +86,7 @@ function ModelKit.evaluate_and_jacobian!(
     evaluate_and_jacobian!(u, U, H.homotopy, x, t)
     m = size(H.homotopy, 1)
     evaluate_chart!(view(u, m+1:m+N), H.chart, x)
-    jacobian_chart!(view(U, m+1:m+N,:), H.chart, x)
+    jacobian_chart!(view(U, m+1:m+N, :), H.chart, x)
     nothing
 end
 

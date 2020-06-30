@@ -157,13 +157,7 @@ function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x, 
     u
 end
 
-function ModelKit.taylor!(
-    u,
-    v::Val{1},
-    H::ExtrinsicSubspaceHomotopy,
-    tx,
-    t,
-)
+function ModelKit.taylor!(u, v::Val{1}, H::ExtrinsicSubspaceHomotopy, tx, t)
     m = first(size(H.F))
     for i = 1:m
         u[i] = zero(eltype(u))

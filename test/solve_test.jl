@@ -325,6 +325,14 @@
         l2 = rand_subspace(2; codim = 1)
 
         _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
+        @test _solver.trackers[1].tracker.homotopy isa ExtrinsicSubspaceHomotopy
+
+        @var x y z u v
+        F = System([x^2 + y^2 - 5], [x, y, z, u, v])
+        l1 = rand_subspace(5; dim = 1)
+        l2 = rand_subspace(5; dim = 1)
+
+        _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
         @test _solver.trackers[1].tracker.homotopy isa IntrinsicSubspaceHomotopy
     end
 

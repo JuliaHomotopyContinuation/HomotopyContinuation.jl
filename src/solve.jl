@@ -225,7 +225,7 @@ function linear_subspace_homotopy(
     V::LinearSubspace,
     W::LinearSubspace;
     compile::Bool = COMPILE_DEFAULT[],
-    intrinsic = nothing
+    intrinsic = nothing,
 )
     # Intrinsic: m+1,dim(V)+1
     # Extrinsic: m+codim(V), dim(V) + codim(V)

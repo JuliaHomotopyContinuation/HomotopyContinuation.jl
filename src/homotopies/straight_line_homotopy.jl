@@ -51,7 +51,17 @@ function StraightLineHomotopy(
     dv_start = LA.transpose(zeros(ComplexF64, 5, m))
     dv_target = LA.transpose(zeros(ComplexF64, 5, m))
 
-    StraightLineHomotopy(start, target, ComplexF64(gamma), u, ū,v̄, U, dv_start, dv_target)
+    StraightLineHomotopy(
+        start,
+        target,
+        ComplexF64(gamma),
+        u,
+        ū,
+        v̄,
+        U,
+        dv_start,
+        dv_target,
+    )
 end
 
 Base.size(H::StraightLineHomotopy) = size(H.start)

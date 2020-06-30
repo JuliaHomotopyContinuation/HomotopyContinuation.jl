@@ -25,10 +25,8 @@ See also [`SlicedSystem`](@ref).
 slice(F::System, A::LinearSubspace; compile::Bool = COMPILE_DEFAULT[]) =
     SlicedSystem(fixed(F; compile = compile), A)
 slice(F::AbstractSystem, A::LinearSubspace) = SlicedSystem(F, A)
-Base.intersect(F::Union{System,AbstractSystem}, A::LinearSubspace) =
-    SlicedSystem(F, A)
-Base.intersect(A::LinearSubspace, F::Union{System,AbstractSystem}) =
-    SlicedSystem(F, A)
+Base.intersect(F::Union{System,AbstractSystem}, A::LinearSubspace) = SlicedSystem(F, A)
+Base.intersect(A::LinearSubspace, F::Union{System,AbstractSystem}) = SlicedSystem(F, A)
 
 ModelKit.variables(F::SlicedSystem) = variables(F.system)
 ModelKit.parameters(F::SlicedSystem) = parameters(F.system)

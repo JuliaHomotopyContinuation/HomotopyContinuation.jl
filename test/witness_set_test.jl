@@ -26,7 +26,7 @@
     @testset "projective" begin
         @var x y z
 
-        F = System([x^2 + y^2 - 5z^2], [x, y,z])
+        F = System([x^2 + y^2 - 5z^2], [x, y, z])
 
         W = witness_set(F; compile = false)
 
