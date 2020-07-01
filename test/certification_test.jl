@@ -101,7 +101,7 @@
         @test ndistinct_real_certified(cert) == 8
 
         # Invalid solutions
-        cert = certify(C, [randn(ComplexF64, 3) for i in 1:10], u₀)
+        cert = certify(C, [randn(ComplexF64, 3) for i = 1:10], u₀)
         @test ncertified(cert) == 0
     end
 
@@ -136,7 +136,7 @@
     @testset "positive" begin
         @var x y
         f = System([x^2 + y^2 - 1, x - y])
-        res = solve(f; compile = false, start_system=:total_degree)
+        res = solve(f; compile = false, start_system = :total_degree)
         cert = certify(f, res, compile = false)
         @test count(is_positive, certificates(cert)) == 1
         @test count(is_real, certificates(cert)) == 2
