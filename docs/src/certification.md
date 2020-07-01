@@ -16,4 +16,5 @@ ncertified
 nreal_certified
 ndistinct_certified
 ndistinct_real_certified
+save(filename, R::CertificationResult)
 ```

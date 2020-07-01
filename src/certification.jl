@@ -11,7 +11,8 @@ export certify,
     ncertified,
     nreal_certified,
     ndistinct_certified,
-    ndistinct_real_certified
+    ndistinct_real_certified,
+    save
 
 """
     SolutionCertificate
@@ -71,6 +72,28 @@ end
 Returns a vector of complex intervals where the true solution is contained in.
 """
 certified_solution(C::SolutionCertificate) = C.certified_solution
+
+
+function Base.show(f::IO, cert::SolutionCertificate)
+    if !isnothing(cert.index)
+        println(f, "index = ", cert.index)
+    end
+    println(f, "initial_solution = [")
+    for z in initial_solution(cert)
+        print(f, "  ")
+        print(f, z)
+        println(f, ",")
+    end
+    println(f, "]")
+    println(f, "certified_solution = [")
+    for z in certified_solution(cert)
+        print(f, "  ")
+        print(f, z)
+        println(f, ",")
+    end
+    println(f, "]")
+    println(f, "is_real = ", is_real(cert))
+end
 
 """
     CertificationResult
@@ -145,9 +168,25 @@ function Base.show(io::IO, R::CertificationResult)
     println(io)
     print(io, "• $(ndistinct_certified(R)) distinct certified solutions")
     print(io, " ($(ndistinct_real_certified(R)) real)")
-    println(io)
 end
 
+"""
+    save(filename, C::CertificationResult)
+
+Store a text representation of the certification result `C` on disk.
+"""
+function save(filename, R::CertificationResult)
+    open(filename, "w") do f
+        println(f, "## Summary")
+        show(f, R)
+        println(f, "\n\n## Certificates")
+        for cert in certificates(R)
+            show(f, cert)
+            println(f)
+        end
+    end
+    filename
+end
 """
     CertifyCache(F::AbstractSystem)
 

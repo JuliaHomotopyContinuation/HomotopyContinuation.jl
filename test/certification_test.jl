@@ -14,6 +14,8 @@
         @test ndistinct_certified(cert) == 18
         @test nreal_certified(cert) == 4
         @test ndistinct_real_certified(cert) == 4
+        save("tmp_cert.txt", cert)
+        @test !isempty(read("tmp_cert.txt", String))
 
         # Input: F
         cert = certify(F, result)

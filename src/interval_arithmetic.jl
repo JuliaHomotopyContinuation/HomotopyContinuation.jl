@@ -83,6 +83,7 @@ function Base.show(io::IO, a::Interval)
     print(io, mid(a), " ± ")
     Printf.@printf(io, "%.5g", rad(a))
 end
+Base.print(io::IO, a::Interval) = print(io, mid(a), " ± ", rad(a))
 
 # arithmetic
 
@@ -291,7 +292,14 @@ Base.zero(::Type{IComplex{T}}) where {T} = IComplex(zero(Interval{T}))
 Base.one(a::IComplex{T}) where {T} = IComplex(one(Interval{T}))
 Base.one(::Type{IComplex{T}}) where {T} = IComplex(one(Interval{T}))
 
-Base.show(io::IO, c::IComplex) = print(io, "(", c.re, ") + (", c.im, ")im")
+function Base.show(io::IO, c::IComplex)
+    print(io, "(")
+    show(io, c.re)
+    print(io, ") + (")
+    show(io, c.im)
+    print(io, ")im")
+end
+Base.print(io::IO, c::IComplex) = print(io, "(", c.re, ") + (", c.im, ")im")
 Base.Base.broadcastable(z::IComplex) = z
 Base.promote_rule(::Type{IComplex{T}}, ::Type{S}) where {T,S<:Real} =
     IComplex{promote_type(T, S)}
