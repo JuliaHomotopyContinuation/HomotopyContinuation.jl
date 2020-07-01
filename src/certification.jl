@@ -168,30 +168,79 @@ end
 function certify(F::System, args...; compile::Bool = COMPILE_DEFAULT[], kwargs...)
     certify(fixed(F; compile = compile), args...; kwargs...)
 end
-function certify(F::AbstractSystem, X, cache = CertifyCache(F); target_parameters = nothing, check_real = true, show_progress = true)
-    _certify(F, X, target_parameters, cache; check_real = check_real, show_progress=show_progress)
+function certify(
+    F::AbstractSystem,
+    X,
+    cache = CertifyCache(F);
+    target_parameters = nothing,
+    check_real = true,
+    show_progress = true,
+)
+    _certify(
+        F,
+        X,
+        target_parameters,
+        cache;
+        check_real = check_real,
+        show_progress = show_progress,
+    )
 end
 function certify(
     F::AbstractSystem,
     X::MonodromyResult,
     cache = CertifyCache(F);
     target_parameters = parameters(X),
-    check_real = true, show_progress = true
+    check_real = true,
+    show_progress = true,
 )
-    _certify(F, solutions(X), target_parameters, cache; check_real = check_real, show_progress=show_progress)
+    _certify(
+        F,
+        solutions(X),
+        target_parameters,
+        cache;
+        check_real = check_real,
+        show_progress = show_progress,
+    )
 end
 
-function _certify(F::AbstractSystem, X::Result, p, cache::CertifyCache; check_real::Bool, show_progress::Bool)
-    _certify(F, results(X; only_nonsingular = true), p, cache; check_real = check_real, show_progress=show_progress)
+function _certify(
+    F::AbstractSystem,
+    X::Result,
+    p,
+    cache::CertifyCache;
+    check_real::Bool,
+    show_progress::Bool,
+)
+    _certify(
+        F,
+        results(X; only_nonsingular = true),
+        p,
+        cache;
+        check_real = check_real,
+        show_progress = show_progress,
+    )
 end
-function _certify(F::AbstractSystem, X, p, cache::CertifyCache; check_real::Bool, show_progress::Bool)
+function _certify(
+    F::AbstractSystem,
+    X,
+    p,
+    cache::CertifyCache;
+    check_real::Bool,
+    show_progress::Bool,
+)
 
 
     if show_progress
         n = length(X)
         desc = "Certifying $n solutions... "
         barlen = min(ProgressMeter.tty_width(desc), 40)
-        progress = ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen, color=:green)
+        progress = ProgressMeter.Progress(
+            n;
+            dt = 0.2,
+            desc = desc,
+            barlen = barlen,
+            color = :green,
+        )
     end
 
     certified = map(enumerate(X)) do (i, x)
@@ -223,8 +272,6 @@ function _certify(
 )
     @unpack C, IJ, IJ_cache, A, δx, norm, newton_cache = cache
     @unpack Δx, J, r = newton_cache
-
-    @show typeof(F)
 
     init!(norm, x₀)
     res = newton(
