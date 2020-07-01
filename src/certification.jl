@@ -228,8 +228,6 @@ function _certify(
     check_real::Bool,
     show_progress::Bool,
 )
-
-
     if show_progress
         n = length(X)
         desc = "Certifying $n solutions... "
@@ -241,17 +239,42 @@ function _certify(
             barlen = barlen,
             color = :green,
         )
-    end
-
-    certified = map(enumerate(X)) do (i, x)
-        if show_progress
-            ProgressMeter.next!(progress)
+        progress.tlast += progress.dt
+        ncertified = 0
+        nreal_certified = 0
+        for (i, x) in enumerate(X)
+            r = _certify(F, x, p, cache, i; check_real = check_real)
+            push!(certified, r)
+            ncertified += is_certified(r)
+            nreal_certified += is_certified(r) && is_real(r)
+            if show_progress
+                update_certify_progress!(progress, i, ncertified, nreal_certified)
+            end
         end
-        _certify(F, x, p, cache, i; check_real = check_real)
+    else
+        for (i, x) in enumerate(X)
+            push!(certified, _certify(F, x, p, cache, i; check_real = check_real))
+        end
     end
-    duplicates = find_duplicates(certified)
+    duplicates = find_duplicates(certified; show_progress = show_progress)
     CertificationResult(certified, duplicates)
 end
+
+function update_certify_progress!(progress, k, ncertified, nreal_certified)
+    t = time()
+    if k == progress.n || t > progress.tlast + progress.dt
+        showvalues = make_certifiy_showvalues(k, ncertified, nreal_certified)
+        ProgressMeter.update!(progress, k; showvalues = showvalues)
+    end
+    nothing
+end
+@noinline function make_certifiy_showvalues(k, ncertified, nreal_certified)
+    (
+        ("# solutions considered", k),
+        ("# certified solutions (real)", "$(ncertified) ($nreal_certified)"),
+    )
+end
+
 function _certify(
     F::AbstractSystem,
     r::PathResult,
@@ -377,13 +400,19 @@ function sqr_mul!(C, A, B)
     C
 end
 
-function find_duplicates(R::AbstractVector{SolutionCertificate})
+function find_duplicates(R::AbstractVector{SolutionCertificate}; show_progress::Bool = true)
     # TODO: Do better than n^2 check
     duplicates = Dict{Int,Vector{Int}}()
     duplicated_indices = Set{Int}()
+    t0 = time()
+    displayed_info = !show_progress
     for i = 1:length(R)
         is_certified(R[i]) && i ∉ duplicated_indices || continue
         rᵢ = R[i]
+        if !displayed_info && (time() - t0 > 0.2)
+            @info "Checking for duplicates"
+            displayed_info = true
+        end
         for j = i+1:length(R)
             is_certified(R[j]) && j ∉ duplicated_indices || continue
             if all2(!isdisjoint, rᵢ.certified_solution, R[j].certified_solution)
