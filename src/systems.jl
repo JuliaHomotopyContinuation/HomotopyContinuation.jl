@@ -1,7 +1,7 @@
 export fixed
 
 """
-    fixed(F::System; compile::Bool = COMPILE_DEFAULT[])
+    fixed(F::System; compile::Bool = $(COMPILE_DEFAULT[]))
 
 Constructs either a [`CompiledSystem`](@ref) (if `compile = true`) or an
 [`InterpretedSystem`](@ref) (if `compile = false`).
