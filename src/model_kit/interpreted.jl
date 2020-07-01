@@ -74,6 +74,10 @@ function evaluate_and_jacobian!(u, U, F::InterpretedSystem, x, p = nothing)
     execute!(u, U, F.jac_interpreter, x, p, F.jac_interpreter_cache)
     nothing
 end
+function jacobian!(U, F::InterpretedSystem, x, p = nothing, cache = F.jac_interpreter_cache)
+    execute!(U, F.jac_interpreter, x, p, cache)
+    nothing
+end
 
 function taylor!(
     u::AbstractVector,

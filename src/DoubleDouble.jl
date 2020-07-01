@@ -149,7 +149,11 @@ const double_e = convert(DoubleF64, Base.MathConstants.e)
 const double_log2 = convert(DoubleF64, log(BigFloat(2.0)))
 const double_log10 = convert(DoubleF64, log(BigFloat(10.0)))
 
-const double_eps = 4.93038065763132e-32 # 2^-104
+const double_eps = 5.048709793414476e-29 # 2^-94 ## Conservative for basic arithmetic
+
+
+Base.nextfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo + nextfloat(double_eps * abs(x.hi)))
+Base.prevfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo - prevfloat(double_eps * abs(x.hi)))
 
 #
 # ADDITION
@@ -174,7 +178,9 @@ end
 end
 +(a::Float64, b::DoubleF64) = b + a
 +(a::Integer, b::DoubleF64) = b + float(a)
++(a::Bool, b::DoubleF64) = b + float(a)
 +(a::DoubleF64, b::Integer) = a + float(b)
++(a::DoubleF64, b::Bool) = a + float(b)
 
 @inline function +(a::DoubleF64, b::DoubleF64)
     hi, lo = two_sum(a.hi, b.hi)
@@ -454,8 +460,8 @@ Base.iszero(a::DoubleF64) = a.hi == 0.0
 Base.isone(a::DoubleF64) = a.hi == 1.0 && a.lo == 0.0
 Base.abs(a::DoubleF64) = a.hi < 0.0 ? -a : a
 
-Base.eps(::DoubleF64) = 4.93038065763132e-32 # 2^-104
-Base.eps(::Type{DoubleF64}) = 4.93038065763132e-32 # 2^-104
+Base.eps(::DoubleF64) = double_eps
+Base.eps(::Type{DoubleF64}) = double_eps # 2^-104
 
 # Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
 # Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)

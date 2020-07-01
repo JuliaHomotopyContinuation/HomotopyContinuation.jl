@@ -195,6 +195,20 @@ nanmax(a, b) = isnan(a) ? b : (isnan(b) ? a : max(a, b))
 always_false(::Any) = false
 
 """
+    all2(f, a, b)
+
+Checks if `f(a[i], b[i]) == true` for `i=1:length(a)`.
+"""
+function all2(f::F, a::AbstractVector, b::AbstractVector) where {F}
+    length(a) == length(b) || return false
+    for (ai, bi) in zip(a, b)
+        f(ai, bi) || return false
+    end
+    true
+end
+
+
+"""
     unpack(a::Union{Nothing, T}, b::T)
 
 Returns `a` if it is not `nothing`, otherwise `b`.

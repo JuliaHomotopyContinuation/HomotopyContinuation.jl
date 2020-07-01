@@ -405,6 +405,16 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
     x
 end
 
+function LA.inv!(B::AbstractMatrix, M::MatrixWorkspace)
+    M.factorized[] || factorize!(M)
+    B .= M.lu.factors
+    LA.inv!(M.lu)
+    @inbounds for i in eachindex(B)
+        M.lu.factors[i], B[i] = B[i], M.lu.factors[i]
+    end
+    return B
+end
+
 """
     skeel_row_scaling!(W::MatrixWorkspace, c)
     skeel_row_scaling!(d, A, c)

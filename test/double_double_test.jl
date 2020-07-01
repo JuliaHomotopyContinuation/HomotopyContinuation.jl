@@ -93,8 +93,4 @@ const DD = HomotopyContinuation.DoubleDouble
         n, p, d = Base.decompose(x)
         @test x ≈ BigFloat(n) * BigFloat(2)^p / BigFloat(d)
     end
-
-    @test eps(DoubleF64(1.0)) == 4.93038065763132e-32 # 2^-104
-    @test eps(DoubleF64) == 4.93038065763132e-32 # 2^-104
-    @test eps(DoubleF64) == 4.93038065763132e-32 # 2^-104
 end

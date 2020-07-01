@@ -242,9 +242,6 @@ end
 struct InterpreterCache{T}
     instructions::Vector{T}
 end
-
-_eltype(x::TaylorVector{N,T}) where {N,T} = T
-_eltype(x) = eltype(x)
 function InterpreterCache(::Type{T}, I::Interpreter) where {T}
     InterpreterCache(Vector{T}(undef, length(I.instructions)))
 end
@@ -258,6 +255,12 @@ end
 function InterpreterCache(I::Interpreter{T}, x::AbstractArray, p::AbstractArray) where {T}
     InterpreterCache(promote_type(T, _eltype(x), _eltype(p)), I)
 end
+_eltype(x::TaylorVector{N,T}) where {N,T} = T
+_eltype(x) = eltype(x)
+
+Base.length(c::InterpreterCache) = length(c.instructions)
+Base.similar(::Type{T}, I::InterpreterCache) where {T} =
+    InterpreterCache(Vector{T}(undef, length(I)))
 
 function data_block(make_op_block, name1, name2; parameters::Bool, t::Bool = false)
     if parameters && t

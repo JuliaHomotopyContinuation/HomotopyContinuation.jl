@@ -9,7 +9,7 @@ Result returned by [`newton`](@ref).
 
 * `return_code::Symbol`: Can be `:success`, `:rejected` or `:max_iters`.
 * `x::Vector{ComplexF64}`: The last value obtained.
-* `accuracy::Float64`: Estimate of the distance of `x` to a true zero.
+* `accuracy::Float64`: Estimate of the absolute distance of `x` to a true zero.
 * `iters::Int` Number of iterations performed.
 * `contraction_ratio::Float64`: The value `|xᵢ - xᵢ₋₁| / |xᵢ₋₁ - xᵢ₋₂| `.
 """
@@ -32,6 +32,13 @@ Base.show(io::IO, result::NewtonResult) = print_fieldnames(io, result)
 Returns `true` if the [`newton`](@ref) was successfull.
 """
 is_success(R::NewtonResult) = R.return_code == :success
+
+"""
+    solution(R::NewtonResult)
+
+Return the solution stored in `R`.
+"""
+solution(R::NewtonResult) = R.x
 
 """
     NewtonCache(F::AbstractSystem)

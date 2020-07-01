@@ -26,6 +26,9 @@ const LA = LinearAlgebra
 include("DoubleDouble.jl")
 using .DoubleDouble
 
+include("interval_arithmetic.jl")
+using .IntervalArithmetic
+
 include("ModelKit.jl")
 export @polyvar
 
@@ -57,6 +60,7 @@ include("result.jl")
 include("solve.jl")
 include("monodromy.jl")
 include("witness_set.jl")
+include("certification.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See
