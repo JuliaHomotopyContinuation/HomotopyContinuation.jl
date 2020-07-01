@@ -26,10 +26,6 @@
         # Control Display
         cert = certify(F, result, show_progress = false)
 
-        # Control Real Check
-        cert = certify(F, result, check_real = false)
-        @test nreal_certified(cert) == 0
-
         # Double solutions
         S = solutions(result)
         cert = certify(F, [S; S])
@@ -66,10 +62,6 @@
         # Control Display
         cert = certify(F, result, show_progress = false)
 
-        # Control Real Check
-        cert = certify(F, result, check_real = false)
-        @test nreal_certified(cert) == 0
-
         # Double solutions
         S = solutions(result)
         cert = certify(System(F), [S; S])
@@ -100,11 +92,15 @@
         @test ndistinct_real_certified(cert) == 8
 
         # Input: F
-        cert = certify(F, res; parameters = u, target_parameters = u₀)
+        cert = certify(F, res, u₀; parameters = u)
         @test ncertified(cert) == 36
         @test ndistinct_certified(cert) == 36
         @test nreal_certified(cert) == 8
         @test ndistinct_real_certified(cert) == 8
+
+        # Invalid solutions
+        cert = certify(C, [randn(ComplexF64, 3) for i in 1:10], u₀)
+        @test ncertified(cert) == 0
     end
 
     @testset "Parameters: Input = Vector{MP.Polynomial}" begin
@@ -133,5 +129,14 @@
         @test ndistinct_certified(cert) == 36
         @test nreal_certified(cert) == 8
         @test ndistinct_real_certified(cert) == 8
+    end
+
+    @testset "positive" begin
+        @var x y
+        f = System([x^2 + y^2 - 1, x - y])
+        res = solve(f; compile = false, start_system=:total_degree)
+        cert = certify(f, res, compile = false)
+        @test count(is_positive, certificates(cert)) == 1
+        @test count(is_real, certificates(cert)) == 2
     end
 end

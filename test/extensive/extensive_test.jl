@@ -9,6 +9,7 @@
             show_progress = true,
         )
         @test nsolutions(res) == 2875
+        @test ndistinct_certified(certify(sys, res, q₀)) == 2875
 
         @time poly_res = solve(sys; target_parameters = q₀, start_system = :polyhedral)
         @test nsolutions(poly_res) == 2875
@@ -19,6 +20,7 @@
         p = randn(ComplexF64, 30)
         res = solve(F; target_parameters = p)
         @test nresults(res; only_nonsingular = true) == 3264
+        @test ndistinct_certified(certify(F, res, p)) == 3264
 
         real_conics = [
             10124547 // 662488724,
@@ -57,7 +59,9 @@
             solve(F, solutions(res); start_parameters = p, target_parameters = real_conics)
 
         @test nsolutions(real_res) == 3264
-
+        real_cert = certify(F, real_res, real_conics)
+        @test ndistinct_certified(real_cert) == 3264
+        @test ndistinct_real_certified(real_cert) == 3264
 
         direct_real_res = solve(F; target_parameters = real_conics)
         @test nresults(direct_real_res; only_nonsingular = true) == 3264

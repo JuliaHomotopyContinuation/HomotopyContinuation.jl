@@ -1,45 +1,116 @@
-# TODOs
-#
-# Modify certify(F,S) such that
-#   F can be <: DP
-#   S can be <: Result or MonodromyResult
-#
-# If there are zero certified solutions, this should also be displayed
-#
-# Write refine function (using Newton from HC.jl)
-#
-# Combine certify with the refine function
-#
-# Progress bar
-
-
 export certify,
-    CertifiedSolution,
+    SolutionCertificate,
     CertificationResult,
+    CertifyCache,
+    is_certified,
+    is_real,
+    is_positive,
+    certified_solution,
+    initial_solution,
+    certificates,
     ncertified,
     nreal_certified,
     ndistinct_certified,
     ndistinct_real_certified
 
+"""
+    SolutionCertificate
+
+Result of [`certify`](@ref) for a single solution. Contains the initial solutions
+and if the certification was successfull a vector of complex intervals where the true
+solution is contained in.
+"""
 Base.@kwdef struct SolutionCertificate
     initial_solution::Vector{ComplexF64}
     certified_solution::Union{Nothing,Vector{IComplexF64}} = nothing
-    certified_extended_solution::Union{Nothing,Vector{IComplex{DoubleF64}}} = nothing
     is_real::Bool = false
     index::Union{Nothing,Int} = nothing
 end
 
-is_certified(C::SolutionCertificate) =
-    !isnothing(C.certified_solution) || !isnothing(C.certified_extended_solution)
+"""
+    initial_solution(C::SolutionCertificate)
+
+Returns the given initial solution.
+"""
+initial_solution(C::SolutionCertificate) = C.initial_solution
+
+"""
+    is_certified(C::SolutionCertificate)
+
+Returns `true` if `C` certifies that the given initial solution corresponds to a true
+solution.
+"""
+is_certified(C::SolutionCertificate) = !isnothing(C.certified_solution)
+
+"""
+    is_real(C::SolutionCertificate)
+
+Returns `true` if `C` certifies that the given initial solution corresponds to a true
+real solution of the system.
+"""
 is_real(C::SolutionCertificate) = C.is_real
 
+
+"""
+    is_positive(C::SolutionCertificate)
+
+Returns `true` if `C` is certifiably a real, positive solution.
+"""
+function is_positive(C::SolutionCertificate)
+    if isnothing(C.certified_solution) || !is_real(C)
+        return false
+    else
+        all(zᵢ -> real(zᵢ).lo > 0, C.certified_solution)
+    end
+end
+
+
+"""
+    certified_solution(C::SolutionCertificate)
+
+Returns a vector of complex intervals where the true solution is contained in.
+"""
+certified_solution(C::SolutionCertificate) = C.certified_solution
+
+"""
+    CertificationResult
+
+The result of [`certify`](@ref) for multiple solutions.
+Contains a vector of [`SolutionCertificate`](@ref) as well as a list of certificates
+which correspond to the same true solution.
+"""
 struct CertificationResult
-    certified::Vector{SolutionCertificate}
+    certificates::Vector{SolutionCertificate}
     duplicates::Vector{Vector{Int}}
 end
-ncertified(R::CertificationResult) = count(is_certified, R.certified)
+
+"""
+    certificates(R::CertificationResult)
+
+Obtain the stored [`SolutionCertificate`](@ref)s.
+"""
+certificates(R::CertificationResult) = R.certificates
+
+"""
+    ncertified(R::CertificationResult)
+
+Returns the number of certified solutions.
+"""
+ncertified(R::CertificationResult) = count(is_certified, R.certificates)
+
+"""
+    nreal_certified(R::CertificationResult)
+
+Returns the number of certified real solutions.
+"""
 nreal_certified(R::CertificationResult) =
-    count(r -> is_certified(r) && is_real(r), R.certified)
+    count(r -> is_certified(r) && is_real(r), R.certificates)
+
+"""
+    ndistinct_certified(R::CertificationResult)
+
+Returns the number of distinct certified solutions.
+"""
 function ndistinct_certified(R::CertificationResult)
     ncert = ncertified(R)
     if isempty(R.duplicates)
@@ -48,13 +119,19 @@ function ndistinct_certified(R::CertificationResult)
         return ncert - sum(length, R.duplicates) + length(R.duplicates)
     end
 end
+
+"""
+    ndistinct_real_certified(R::CertificationResult)
+
+Returns the number of distinct certified real solutions.
+"""
 function ndistinct_real_certified(R::CertificationResult)
     ncert = nreal_certified(R)
     if isempty(R.duplicates)
         return ncert
     else
         ncert - sum(R.duplicates) do dup
-            is_real(R.certified[dup[1]]) ? length(dup) - 1 : 0
+            is_real(R.certificates[dup[1]]) ? length(dup) - 1 : 0
         end
     end
 end
@@ -62,37 +139,32 @@ end
 function Base.show(io::IO, R::CertificationResult)
     println(io, "CertificationResult")
     println(io, "===================")
-    println(io, "• $(length(R.certified)) solutions given")
+    println(io, "• $(length(R.certificates)) solutions given")
     print(io, "• $(ncertified(R)) certified solutions")
-    # if nreal_certified(R) > 0
     print(io, " ($(nreal_certified(R)) real)")
-    # end
     println(io)
     print(io, "• $(ndistinct_certified(R)) distinct certified solutions")
-    # if ndistinct_real_certified(R) > 0
     print(io, " ($(ndistinct_real_certified(R)) real)")
-    # end
     println(io)
 end
 
+"""
+    CertifyCache(F::AbstractSystem)
+
+Contains the necessary data structures for [`certify`](@ref).
+"""
 struct CertifyCache{T,M}
     jac_interpreter::ModelKit.Interpreter{T,2}
     newton_cache::NewtonCache{M}
     # norm
     norm::WeightedNorm{InfNorm}
-
     # data for krawczyc_step
-    # complex case
     C::Matrix{ComplexF64}
     IJ::Matrix{IComplexF64}
     IJ_cache::ModelKit.InterpreterCache{IComplexF64}
     A::Matrix{IComplexF64}
     δx::Vector{IComplexF64}
-    # complex extended precision case
-    # TODO: Replace wih arb
-    C_ext::Matrix{ComplexDF64}
-    IJ_ext::Matrix{IComplex{DoubleF64}}
-    IJ_ext_cache::ModelKit.InterpreterCache{IComplex{DoubleF64}}
+    # TODO: complex extended precision case with arb
 end
 function CertifyCache(F::AbstractSystem)
     m, n = size(F)
@@ -107,20 +179,68 @@ function CertifyCache(F::AbstractSystem)
         IJ_cache,
         zeros(IComplexF64, m, n),
         zeros(IComplexF64, m),
-        zeros(ComplexDF64, m, n),
-        zeros(IComplex{DoubleF64}, m, n),
-        ModelKit.InterpreterCache(IComplex{DoubleF64}, jac_interpreter),
     )
 end
 
 """
-    certify(F::System, solutions; check_real, compile = $(COMPILE_DEFAULT[]))
+    certify(F, solutions, [p, certify_cache]; options...)
+    certify(F, result, [p, certify_cache]; options...)
+
+Attempt to certify that the given approximate `solutions` correspond to true solutions
+of the polynomial system ``F(x;p)``. Also attemps to certify for each solutions whether it
+approximates a real solution. The certification is done using interval arithmetic and the
+Krawczyk method[^Moo77]. Returns a [`CertificationResult`](@ref) which additionall returns
+the number of distinct solutions. For more details of the implementation see [^BRT20].
+
+## Options
+
+* `show_progress = true`: If `true` shows a progress bar of the certification process.
+* `compile = $(COMPILE_DEFAULT[])`: See the [`solve`](@ref) documentation.
 
 
+## Example
+We take the [first example](https://www.juliahomotopycontinuation.org/guides/introduction/#a-first-example) from our
+introduction guide.
+```julia
+@var x y
+# define the polynomials
+f₁ = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+f₂ = x^2+2x*y^2 - 2y^2 - 1/2
+F = System([f₁, f₂], variables = [x,y])
+result = solve(F)
+```
+```
+Result with 18 solutions
+========================
+• 18 paths tracked
+• 18 non-singular solutions (4 real)
+• random seed: 0xcaa483cd
+• start_system: :polyhedral
+```
+We see that we obtain 18 solutions and it seems that 4 solutions are real. However,
+this is based on heuristics. To be absolute certain we can certify the result
+
+```julia
+certify(F, result)
+```
+```
+CertificationResult
+===================
+• 18 solutions given
+• 18 certified solutions (4 real)
+• 18 distinct certified solutions (4 real)
+```
+
+and see that there are indeed 18 solutions and that they are all distinct.
+
+
+[^Moo77]: Moore, Ramon E. "A test for existence of solutions to nonlinear systems." SIAM Journal on Numerical Analysis 14.4 (1977): 611-615.
+[^BRT20]: Breiding, P., Rose, K. and Timme, S. "Certifying roots of polynomial systems using interval arithmetic." In preparation (2020).
 """
 function certify(
     F::AbstractVector{Expression},
-    X;
+    X,
+    p = nothing;
     parameters = Variable[],
     variables = setdiff(variables(F), parameters),
     variable_ordering = variables,
@@ -133,11 +253,12 @@ function certify(
         parameters = parameters,
         variable_groups = variable_groups,
     )
-    certify(sys, X; kwargs...)
+    certify(sys, X, p; kwargs...)
 end
 function certify(
     F::AbstractVector{<:MP.AbstractPolynomial},
-    X;
+    X,
+    p = nothing;
     parameters = similar(MP.variables(F), 0),
     variables = setdiff(MP.variables(F), parameters),
     variable_ordering = variables,
@@ -145,6 +266,9 @@ function certify(
     target_parameters = nothing,
     kwargs...,
 )
+    if !isnothing(p)
+        target_parameters = p
+    end
     # as in solver_startsolutions():
     # handle special case that we have no parameters
     # to shift the coefficients of the polynomials to the parameters
@@ -163,7 +287,7 @@ function certify(
             variable_groups = variable_groups,
         )
     end
-    certify(sys, X; target_parameters = target_parameters, kwargs...)
+    certify(sys, X, p; target_parameters = target_parameters, kwargs...)
 end
 function certify(F::System, args...; compile::Bool = COMPILE_DEFAULT[], kwargs...)
     certify(fixed(F; compile = compile), args...; kwargs...)
@@ -171,63 +295,41 @@ end
 function certify(
     F::AbstractSystem,
     X,
+    p = nothing,
     cache = CertifyCache(F);
     target_parameters = nothing,
-    check_real = true,
     show_progress = true,
 )
-    _certify(
-        F,
-        X,
-        target_parameters,
-        cache;
-        check_real = check_real,
-        show_progress = show_progress,
-    )
+    if !isnothing(p)
+        target_parameters = p
+    end
+    _certify(F, X, target_parameters, cache; show_progress = show_progress)
 end
 function certify(
     F::AbstractSystem,
     X::MonodromyResult,
+    p = nothing,
     cache = CertifyCache(F);
     target_parameters = parameters(X),
-    check_real = true,
     show_progress = true,
 )
-    _certify(
-        F,
-        solutions(X),
-        target_parameters,
-        cache;
-        check_real = check_real,
-        show_progress = show_progress,
-    )
+    if !isnothing(p)
+        target_parameters = p
+    end
+    _certify(F, solutions(X), target_parameters, cache; show_progress = show_progress)
 end
 
-function _certify(
-    F::AbstractSystem,
-    X::Result,
-    p,
-    cache::CertifyCache;
-    check_real::Bool,
-    show_progress::Bool,
-)
+function _certify(F::AbstractSystem, X::Result, p, cache::CertifyCache; show_progress::Bool)
     _certify(
         F,
         results(X; only_nonsingular = true),
         p,
         cache;
-        check_real = check_real,
         show_progress = show_progress,
     )
 end
-function _certify(
-    F::AbstractSystem,
-    X,
-    p,
-    cache::CertifyCache;
-    check_real::Bool,
-    show_progress::Bool,
-)
+function _certify(F::AbstractSystem, X, p, cache::CertifyCache; show_progress::Bool)
+    certificates = SolutionCertificate[]
     if show_progress
         n = length(X)
         desc = "Certifying $n solutions... "
@@ -243,8 +345,8 @@ function _certify(
         ncertified = 0
         nreal_certified = 0
         for (i, x) in enumerate(X)
-            r = _certify(F, x, p, cache, i; check_real = check_real)
-            push!(certified, r)
+            r = _certify(F, x, p, cache, i)
+            push!(certificates, r)
             ncertified += is_certified(r)
             nreal_certified += is_certified(r) && is_real(r)
             if show_progress
@@ -253,11 +355,11 @@ function _certify(
         end
     else
         for (i, x) in enumerate(X)
-            push!(certified, _certify(F, x, p, cache, i; check_real = check_real))
+            push!(certificates, _certify(F, x, p, cache, i))
         end
     end
-    duplicates = find_duplicates(certified; show_progress = show_progress)
-    CertificationResult(certified, duplicates)
+    duplicates = find_duplicates(certificates; show_progress = show_progress)
+    CertificationResult(certificates, duplicates)
 end
 
 function update_certify_progress!(progress, k, ncertified, nreal_certified)
@@ -275,23 +377,24 @@ end
     )
 end
 
-function _certify(
-    F::AbstractSystem,
-    r::PathResult,
-    p,
-    cache::CertifyCache,
-    index = nothing;
-    check_real::Bool,
-)
-    _certify(F, solution(r), p, cache, index; check_real = check_real)
+function _certify(F::AbstractSystem, r::PathResult, p, cache::CertifyCache, index = nothing)
+    _certify(F, solution(r), p, cache, index)
 end
 function _certify(
     F::AbstractSystem,
     x₀::AbstractVector{<:Number},
     p::Union{Nothing,AbstractVector},
     cache::CertifyCache,
-    index = nothing;
-    check_real::Bool,
+    index = nothing,
+)
+    _certify(F, convert(Vector{ComplexF64}, x₀), p, cache, index)
+end
+function _certify(
+    F::AbstractSystem,
+    x₀::Vector{ComplexF64},
+    p::Union{Nothing,AbstractVector},
+    cache::CertifyCache,
+    index = nothing,
 )
     @unpack C, IJ, IJ_cache, A, δx, norm, newton_cache = cache
     @unpack Δx, J, r = newton_cache
@@ -306,6 +409,7 @@ function _certify(
         atol = 4 * eps(),
         rtol = 4 * eps(),
         extended_precision = true,
+        max_iters = 4,
     )
     #TODO: Don't assume res is of acc < 4eps()
 
@@ -357,16 +461,13 @@ function _certify(
     end
 
     if !certified
-        return CertifiedSolution(initial_solution = x₀, index = index)
+        return SolutionCertificate(initial_solution = x₀, index = index)
     end
 
     # We have a certified solution x.
     # Now we want to check if it is a real solution.
-    if check_real
-        is_real = all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
-    else
-        is_real = false
-    end
+    is_real = all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
+
     return SolutionCertificate(
         initial_solution = x₀,
         certified_solution = x,

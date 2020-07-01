@@ -14,6 +14,7 @@ makedocs(
             "Solve" => "solve.md",
             "Monodromy" => "monodromy.md",
             "Results" => "result.md",
+            "Certification (experimentell)" => "certification.md",
             "Examples" => "solve_examples.md",
             "Start systems" => "start_systems.md",
         ],
