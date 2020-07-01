@@ -179,7 +179,7 @@ end
     parameter_homotopy(F; start_parameters, target_parameters)
 
 Construct a [`ParameterHomotopy`](@ref). If `F` is homogeneous, then a random affine chart
-is chosen.
+is chosen (via [`AffineChartHomotopy`](@ref)).
 """
 function parameter_homotopy(
     F::Union{System,AbstractSystem};
@@ -214,7 +214,7 @@ function parameter_homotopy(
 end
 
 """
-    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspacel intrinsic = nothing)
+    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace, intrinsic = nothing)
 
 Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
 `intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).

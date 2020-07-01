@@ -1,5 +1,5 @@
 """
-    fixed(H::Homotopy; compile::Bool = COMPILE_DEFAULT[])
+    fixed(H::Homotopy; compile::Bool = $(COMPILE_DEFAULT[]))
 
 Constructs either a [`CompiledHomotopy`](@ref) (if `compile = true`) or an
 [`InterpretedHomotopy`](@ref) (if `compile = false`).

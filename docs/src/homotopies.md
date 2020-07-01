@@ -21,6 +21,14 @@ InterpretedHomotopy
 fixed(::Homotopy)
 ```
 
+Below you can find a list of all pre-defined homotopies. Additionally the following
+higher level constructors are exported.
+
+```@docs
+parameter_homotopy
+linear_subspace_homotopy
+```
+
 ## AffineChartHomotopy
 ```@docs
 AffineChartHomotopy
@@ -36,6 +44,11 @@ CoefficientHomotopy
 ```@docs
 FixedParameterHomotopy
 fix_parameters(H::AbstractHomotopy, p)
+```
+
+## ExtrinsicSubspaceHomotopy
+```@docs
+ExtrinsicSubspaceHomotopy
 ```
 
 ## IntrinsicSubspaceHomotopy

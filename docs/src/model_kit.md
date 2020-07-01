@@ -13,18 +13,18 @@ Variable
 
 ## Methods
 ```@docs
-coefficients
-degree
+coefficients(f::Expression, vars::AbstractVector{Variable})
+degree(f::Expression, vars::AbstractVector{Variable})
 degrees(::AbstractVector{Expression})
-differentiate
+differentiate(expr::ModelKit.Basic, vars::AbstractVector{Variable})
 dense_poly
-evaluate
+evaluate(expr::AbstractArray{<:ModelKit.Basic}, args...)
 expand
 exponents_coefficients
 horner
 nvariables(::Expression)
-monomials
-subs
+monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer)
+subs(ex::ModelKit.Basic, args...)
 rand_poly
 to_dict
 to_number
