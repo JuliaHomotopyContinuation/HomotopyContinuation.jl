@@ -118,6 +118,53 @@ end
 
 
 """
+function certify(
+    F::AbstractVector{Expression},
+    X;
+    parameters = Variable[],
+    variables = setdiff(variables(F), parameters),
+    variable_ordering = variables,
+    variable_groups = nothing,
+    kwargs...,
+)
+    sys = System(
+        F,
+        variables = variable_ordering,
+        parameters = parameters,
+        variable_groups = variable_groups,
+    )
+    certify(sys, X; kwargs...)
+end
+function certify(
+    F::AbstractVector{<:MP.AbstractPolynomial},
+    X;
+    parameters = similar(MP.variables(F), 0),
+    variables = setdiff(MP.variables(F), parameters),
+    variable_ordering = variables,
+    variable_groups = nothing,
+    target_parameters = nothing,
+    kwargs...,
+)
+    # as in solver_startsolutions():
+    # handle special case that we have no parameters
+    # to shift the coefficients of the polynomials to the parameters
+    # this was the behaviour of HC.jl v1
+    if isnothing(target_parameters) && isempty(parameters)
+        sys, target_parameters = ModelKit.system_with_coefficents_as_params(
+            F,
+            variables = variable_ordering,
+            variable_groups = variable_groups,
+        )
+    else
+        sys = System(
+            F,
+            variables = variable_ordering,
+            parameters = parameters,
+            variable_groups = variable_groups,
+        )
+    end
+    certify(sys, X; target_parameters = target_parameters, kwargs...)
+end
 function certify(F::System, args...; compile::Bool = COMPILE_DEFAULT[], kwargs...)
     certify(fixed(F; compile = compile), args...; kwargs...)
 end
@@ -138,6 +185,7 @@ function _certify(F::AbstractSystem, X::Result, p, cache::CertifyCache; check_re
     _certify(F, results(X; only_nonsingular = true), p, cache; check_real = check_real, show_progress=show_progress)
 end
 function _certify(F::AbstractSystem, X, p, cache::CertifyCache; check_real::Bool, show_progress::Bool)
+
 
     if show_progress
         n = length(X)
@@ -175,6 +223,8 @@ function _certify(
 )
     @unpack C, IJ, IJ_cache, A, δx, norm, newton_cache = cache
     @unpack Δx, J, r = newton_cache
+
+    @show typeof(F)
 
     init!(norm, x₀)
     res = newton(
@@ -242,7 +292,11 @@ function _certify(
 
     # We have a certified solution x.
     # Now we want to check if it is a real solution.
-    is_real = all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
+    if check_real
+        is_real = all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
+    else
+        is_real = false
+    end
     return SolutionCertificate(
         initial_solution = x₀,
         certified_solution = x,
