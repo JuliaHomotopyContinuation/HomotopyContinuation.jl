@@ -1,10 +1,14 @@
 module HomotopyContinuation
 
+export ModelKit
+
+import DelimitedFiles
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray
 import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
+using LRUCache: LRU
 import MixedSubdivisions
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
@@ -26,7 +30,6 @@ include("interval_arithmetic.jl")
 using .IntervalArithmetic
 
 include("ModelKit.jl")
-export ModelKit
 export @polyvar
 
 using ProjectiveVectors: PVector, dims, dimension_indices
@@ -38,7 +41,7 @@ include("norm.jl")
 include("voronoi_tree.jl")
 include("unique_points.jl")
 include("linear_algebra.jl")
-include("linear.jl")
+include("linear_subspaces.jl")
 include("systems.jl")
 include("homotopies.jl")
 include("predictor.jl")
@@ -53,9 +56,10 @@ include("total_degree.jl")
 include("binomial_system.jl")
 include("polyhedral.jl")
 include("overdetermined.jl")
-include("solve.jl")
 include("result.jl")
+include("solve.jl")
 include("monodromy.jl")
+include("witness_set.jl")
 include("certification.jl")
 
 function __init__()

@@ -23,6 +23,8 @@ Depth = 2
 ```@contents
 Pages = [
     "solve.md",
+    "witness_sets.md",
+    "monodromy.md",
     "result.md",
     "solve_examples.md",
     "start_systems.md",

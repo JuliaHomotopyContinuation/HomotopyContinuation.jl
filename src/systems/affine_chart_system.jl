@@ -24,7 +24,7 @@ idepdently from a univariate normal distribution.
 """
 on_affine_chart(F::System, dims = nothing; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
     on_affine_chart(fixed(F; compile = compile), dims)
-function on_affine_chart(F::AbstractSystem, dims = nothing)
+function on_affine_chart(F::AbstractSystem, dims = nothing, compile::Bool = true)
     vargroups = variable_groups(F)
     if vargroups === nothing
         dims = [size(F, 2) - 1]
@@ -40,28 +40,30 @@ function Base.size(F::AffineChartSystem{<:AbstractSystem,N}) where {N}
     (m + N, n)
 end
 
-function evaluate_chart!(u, v::PVector{<:Any,N}, x::AbstractVector) where {N}
+function set_solution!(x, F::AffineChartSystem, y)
+    x .= y
+    on_chart!(x, F.chart)
+end
+@inline function evaluate_chart!(u, v::PVector{<:Any,N}, x::AbstractVector) where {N}
     ranges = dimension_indices(v)
-    n = length(u) - N
     for (k, range) in enumerate(ranges)
         out = zero(promote_type(eltype(u), eltype(x)))
         @inbounds for i in range
             out += v[i] * x[i]
         end
-        u[n+k] = out - 1.0
+        u[k] = out - 1.0
     end
     nothing
 end
 
-function jacobian_chart!(U, v::PVector{<:Any,N}, x::AbstractVector) where {N}
+@inline function jacobian_chart!(U, v::PVector{<:Any,N}, x::AbstractVector) where {N}
     ranges = dimension_indices(v)
-    n = size(U, 1) - N
-    for j = 1:size(U, 2), i = (n+1):size(U, 1)
+    for j = 1:size(U, 2), i = 1:size(U, 1)
         U[i, j] = zero(eltype(U))
     end
     for (k, range) in enumerate(ranges)
         for j in range
-            U[n+k, j] = v[j]
+            U[k, j] = v[j]
         end
     end
     nothing
@@ -71,19 +73,22 @@ function (F::AffineChartSystem{<:Any,N})(x::AbstractVector, p = nothing) where {
     v = PVector(x, dims(F.chart))
     u = F.system(x, p)
     append!(u, zeros(N))
-    evaluate_chart!(u, F.chart, v)
+    m = size(F.system, 1)
+    evaluate_chart!(view(u, m+1:m+N), F.chart, v)
     u
 end
 function (F::AffineChartSystem{<:Any,N})(x, p = nothing) where {N}
     u = F.system(x, p)
     append!(u, zeros(N))
-    evaluate_chart!(u, F.chart, x)
+    m = size(F.system, 1)
+    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
     u
 end
 
 function ModelKit.evaluate!(u, F::AffineChartSystem{<:Any,N}, x, p = nothing) where {N}
-    evaluate!(u, F.system, x)
-    evaluate_chart!(u, F.chart, x)
+    evaluate!(u, F.system, x, p)
+    m = size(F.system, 1)
+    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
     u
 end
 
@@ -94,9 +99,10 @@ function ModelKit.evaluate_and_jacobian!(
     x,
     p = nothing,
 ) where {N}
-    evaluate_and_jacobian!(u, U, F.system, x)
-    evaluate_chart!(u, F.chart, x)
-    jacobian_chart!(U, F.chart, x)
+    evaluate_and_jacobian!(u, U, F.system, x, p)
+    m = size(F.system, 1)
+    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
+    jacobian_chart!(view(U, m+1:m+N, :), F.chart, x)
     nothing
 end
 

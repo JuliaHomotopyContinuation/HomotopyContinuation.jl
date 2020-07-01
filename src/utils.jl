@@ -1,4 +1,140 @@
-export FiniteException
+export FiniteException, write_solutions, read_solutions, write_parameters, read_parameters
+
+"""
+    write_solutions(filename, solutions)
+
+Stores the as a plain text file onto disk.
+The storage format is as follows. The first line indicates the number of solutions stored
+followed by a blank line.
+Then the solutions are stored where each solution is separated by a blank line.
+Note that the solutions are *always* considered as complex numbers.
+See [`read_solutions`](@ref) for reading the solution file back.
+
+Note that this is the same file format as used in [Bertini](https://bertini.nd.edu).
+
+## Example
+
+```julia
+julia> write_solutions("solutions.txt", [[1, 1], [-1, 2]])
+
+shell> cat solutions.txt
+2
+
+1 0
+1 0
+
+-1 0
+2 0
+
+julia> read_solutions("solutions.txt")
+2-element Array{Array{Complex{Int64},1},1}:
+ [1 + 0im, 1 + 0im]
+ [-1 + 0im, 2 + 0im]
+```
+"""
+function write_solutions(filename, S::AbstractVector{<:AbstractVector{<:Number}})
+    open(filename, "w") do f
+        write(f, "$(length(S))\n")
+        for s in S
+            write(f, "\n")
+            DelimitedFiles.writedlm(f, [real.(s) imag.(s)], ' ')
+        end
+    end
+end
+
+
+"""
+    read_solutions(filename)
+
+Read the solutions stored with [`write_solutions`](@ref).
+
+## Example
+
+```julia
+julia> write_solutions("solutions.txt", [[1, 1], [-1, 2]])
+
+julia> read_solutions("solutions.txt")
+2-element Array{Array{Complex{Int64},1},1}:
+ [1 + 0im, 1 + 0im]
+ [-1 + 0im, 2 + 0im]
+```
+"""
+function read_solutions(filename)
+    A = DelimitedFiles.readdlm(filename; skipblanks = false)
+    n = convert(Int, A[1, 1])
+    # figure out number of variables
+    nvars = 0
+    for k = 4:size(A, 1)
+        if isempty(A[k, 1])
+            nvars = k - 3
+            break
+        end
+    end
+    map(3:nvars+1:size(A, 1)) do i
+        map(i:i+nvars-1) do k
+            A[k, 1] + im * A[k, 2]
+        end
+    end
+end
+
+"""
+    write_parameters(filename, parameters)
+
+Stores the parameters as a plain text file onto disk.
+The storage format is as follows. The first line indicates the number of parameter values
+stored followed by a blank line. Then the parameter values are stored.
+
+See [`read_parameters`](@ref)
+
+Note that this is the same file format as used in [Bertini](https://bertini.nd.edu).
+
+## Example
+
+```julia
+julia> write_parameters("parameters.txt", [2.0, -3.2 + 2im])
+
+shell> cat parameters.txt
+2
+
+2.0 0.0
+-3.2 2.0
+
+julia> read_parameters("parameters.txt")
+2-element Array{Complex{Float64},1}:
+  2.0 + 0.0im
+ -3.2 + 2.0im
+```
+"""
+function write_parameters(filename, p::Vector{<:Number})
+    open(filename, "w") do f
+        write(f, "$(length(p))\n\n")
+        DelimitedFiles.writedlm(f, [real.(p) imag.(p)], ' ')
+    end
+end
+
+"""
+    read_parameters(filename)
+
+Read the parameters stored with [`write_parameters`](@ref).
+
+## Example
+
+```julia
+julia> write_parameters("parameters.txt", [2.0, -3.2 + 2im])
+
+julia> read_parameters("parameters.txt")
+2-element Array{Complex{Float64},1}:
+  2.0 + 0.0im
+ -3.2 + 2.0im
+```
+"""
+function read_parameters(filename)
+    A = DelimitedFiles.readdlm(filename)
+    n = A[1, 1]
+    map(1:n) do i
+        A[i+1, 1] + im * A[i+1, 2]
+    end
+end
 
 ###
 ### Exceptions

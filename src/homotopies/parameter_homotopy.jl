@@ -56,6 +56,12 @@ function target_parameters!(H::ParameterHomotopy, q)
     H.t_cache[] = NaN
     H
 end
+function parameters!(H::ParameterHomotopy, p, q)
+    H.p .= p
+    H.q .= q
+    H.t_cache[] = NaN
+    H
+end
 
 function tp!(H::ParameterHomotopy, t::Union{ComplexF64,Float64})
     t == H.t_cache[] && return H.taylor_pt

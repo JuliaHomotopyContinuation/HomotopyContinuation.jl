@@ -89,14 +89,14 @@ end
 
 (F::RandomizedSystem)(x, p = nothing) = [LA.I F.A] * F.system(x, p)
 
+function ModelKit.evaluate!(u, F::RandomizedSystem, x::Vector{ComplexDF64}, p = nothing)
+    evaluate!(F.ū, F.system, x, p)
+    randomize!(u, F.A, F.ū)
+    u
+end
 function ModelKit.evaluate!(u, F::RandomizedSystem, x, p = nothing)
-    if eltype(x) isa ComplexDF64
-        evaluate!(F.ū, F.system, x, p)
-        randomize!(u, F.A, F.ū)
-    else
-        evaluate!(F.u, F.system, x, p)
-        randomize!(u, F.A, F.u)
-    end
+    evaluate!(F.u, F.system, x, p)
+    randomize!(u, F.A, F.u)
     u
 end
 

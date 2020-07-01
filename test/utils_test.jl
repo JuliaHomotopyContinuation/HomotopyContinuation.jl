@@ -1,4 +1,14 @@
 @testset "utils.jl" begin
+    @testset "writing and reading" begin
+        S = [rand(ComplexF64, 3) for i = 1:2]
+        write_solutions("tmp_sols.txt", S)
+        @test read_solutions("tmp_sols.txt") == S
+
+        p = rand(ComplexF64, 14)
+        write_parameters("tmp_params.txt", p)
+        @test read_parameters("tmp_params.txt") == p
+    end
+
     Q = HC.rand_unitary_matrix(8, ComplexF64)
     @test norm(I - Q' * Q, Inf) < 1e-14
 
