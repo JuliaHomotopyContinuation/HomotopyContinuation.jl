@@ -16,8 +16,9 @@ HomotopyContinuation.jl aims at having easy-to-understand top-level commands. He
 
 ```julia
 using HomotopyContinuation
-@polyvar x y; # declare the variables x and y
-result = solve([x^2+2y, y^2-2])
+@var x y; # declare the variables x and y
+F = System([x^2+2y, y^2-2])
+result = solve(F)
 ```
 ```
 Result with 4 solutions
@@ -36,7 +37,7 @@ If you find HomotopyContinuation.jl useful in your work, we kindly request that 
 
 ```latex
 @inproceedings{HomotopyContinuation.jl,
-  title={HomotopyContinuation.jl: A Package for Homotopy Continuation in Julia},
+  title={{H}omotopy{C}ontinuation.jl: {A} {P}ackage for {H}omotopy {C}ontinuation in {J}ulia},
   author={Breiding, Paul and Timme, Sascha},
   booktitle={International Congress on Mathematical Software},
   pages={458--465},
