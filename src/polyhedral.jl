@@ -178,11 +178,11 @@ function polyhedral(
     end
     homogeneous = is_homogeneous(f)
     if homogeneous
-        F = on_affine_chart(f)
+        F = on_affine_chart(f; compile = compile)
         m, n = size(F)
         m ≥ n || throw(FiniteException(n - m))
         if m > n
-            F = square_up(F)
+            F = square_up(F; compile = compile)
         end
         @var x[1:n]
         support, target_coeffs = support_coefficients(System(F(x), x))
@@ -190,7 +190,7 @@ function polyhedral(
         m, n = size(f)
         m ≥ n || throw(FiniteException(n - m))
         if m > n
-            F = square_up(f)
+            F = square_up(f; compile = compile)
             @var x[1:n]
             support, target_coeffs = support_coefficients(System(F(x), x))
         else
