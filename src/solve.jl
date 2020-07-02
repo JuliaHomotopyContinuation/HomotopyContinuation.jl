@@ -475,7 +475,8 @@ track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
     barlen = min(ProgressMeter.tty_width(desc), 40)
-    progress = ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen)
+    progress =
+        ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay
     progress
 end
@@ -655,26 +656,31 @@ end
 function make_many_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Solving for $n parameters... "
     barlen = min(ProgressMeter.tty_width(desc), 40)
-    progress = ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen)
+    progress =
+        ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay
     progress
 end
-function update_many_progress!(progress, results, k; flatten::Bool)
+function update_many_progress!(progress, results, k, paths_per_param; flatten::Bool)
     t = time()
     if k == progress.n || t > progress.tlast + progress.dt
-        showvalues = make_many_showvalues(results, k; flatten = flatten)
+        showvalues = make_many_showvalues(results, k, paths_per_param; flatten = flatten)
         ProgressMeter.update!(progress, k; showvalues = showvalues)
     end
     nothing
 end
-@noinline function make_many_showvalues(results, k; flatten::Bool)
+@noinline function make_many_showvalues(results, k, paths_per_param; flatten::Bool)
     if flatten
-        [("# parameters solved", k), ("# results", length(results))]
+        [
+            ("# parameters solved", k),
+            ("# paths tracked", paths_per_param * k),
+            ("# results", length(results)),
+        ]
     else
-        [("# parameters solved", k)]
+        [("# parameters solved", k), ("# paths tracked", paths_per_param * k)]
     end
 end
-update_many_progress!(::Nothing, results, k; kwargs...) = nothing
+update_many_progress!(::Nothing, results, k, paths_per_param; kwargs...) = nothing
 
 function many_solve(
     solver::Solver,
@@ -703,7 +709,8 @@ function many_solve(
         results = [transform_result(res, q)]
     end
     k = 1
-    update_many_progress!(progress, results, k; flatten = flatten)
+    m = length(starts)
+    update_many_progress!(progress, results, k, m; flatten = flatten)
     try
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
@@ -719,7 +726,7 @@ function many_solve(
                 push!(results, transform_result(res, q))
             end
             k += 1
-            update_many_progress!(progress, results, k; flatten = flatten)
+            update_many_progress!(progress, results, k, m; flatten = flatten)
         end
     catch e
         if !(

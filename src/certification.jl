@@ -379,6 +379,7 @@ function _certify(F::AbstractSystem, X, p, cache::CertifyCache; show_progress::B
             desc = desc,
             barlen = barlen,
             color = :green,
+            output = stdout,
         )
         progress.tlast += progress.dt
         ncertified = 0

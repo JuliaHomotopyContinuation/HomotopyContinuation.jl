@@ -682,7 +682,7 @@ function monodromy_solve(
         else
             desc = "Solutions found:"
         end
-        progress = ProgressMeter.ProgressUnknown(; dt = 0.2, desc = desc)
+        progress = ProgressMeter.ProgressUnknown(; dt = 0.2, desc = desc, output = stdout)
         progress.tlast += 0.3
     end
     MS.statistics = MonodromyStatistics()
