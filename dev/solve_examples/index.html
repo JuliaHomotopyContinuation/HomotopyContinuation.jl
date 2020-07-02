@@ -5,7 +5,7 @@ solve(F)</code></pre><pre><code class="language-none">Result with 2 solutions
 =======================
 • 2 paths tracked
 • 2 non-singular solutions (0 real)
-• random seed: 0x421331b7
+• random seed: 0x41acab22
 • start_system: :polyhedral
 </code></pre><p>Here, the call</p><pre><code class="language-julia">F = System([x^2+y^2+1, 2x+3y-1], variables = [x, y])</code></pre><p>also determines the ordering of the variables in the solution vectors. By default, variables are ordered <em>lexciographically</em>. If this is okay, you can also call <code>solve</code> without first constructing a system, i.e.,</p><pre><code class="language-julia">solve([x^2+y^2+1, 2x+3y-1])</code></pre><h2 id="Parameter-Homotopy-1"><a class="docs-heading-anchor" href="#Parameter-Homotopy-1">Parameter Homotopy</a><a class="docs-heading-anchor-permalink" href="#Parameter-Homotopy-1" title="Permalink"></a></h2><p>Using the syntax</p><pre><code class="language-julia">solve(F, startsolutions; start_parameters, target_parameters)</code></pre><p>We can track the given start solutions alogn the parameter homotopy</p><div>\[H(x, t) = F(x, tp₁+(1-t)p₀),\]</div><p>where <span>$p₁$</span> (=<code>start_parameters</code>) and <span>$p₀$</span> (=<code>target_parameters</code>) are vectors of parameter values for <span>$F$</span> where <span>$F$</span> is a <a href="../model_kit/#HomotopyContinuation.ModelKit.System"><code>System</code></a> depending on parameters.</p><p>Assume we want to perform a parameter homotopy <span>$H(x,t) := F(x; t[1, 0]+(1-t)[2, 4])$</span> where</p><div>\[F(x; a) := (x₁^2-a₁, x₁x₂-a₁+a₂)\]</div><p>and let&#39;s say we are only interested in tracking the solution <span>$[1,1]$</span>. This can be accomplished as follows</p><pre><code class="language-julia">@var x[1:2] a[1:2]
 F = System([x[1]^2-a[1], x[1]*x[2]-a[1]+a[2]], parameters = a)
@@ -16,7 +16,7 @@ solve(F, start_solutions; start_parameters=p₁, target_parameters=p₀)</code><
 ======================
 • 1 path tracked
 • 1 non-singular solution (1 real)
-• random seed: 0x99005500
+• random seed: 0xb9674ca9
 </code></pre><h2 id="Start-Target-Homotopy-1"><a class="docs-heading-anchor" href="#Start-Target-Homotopy-1">Start Target Homotopy</a><a class="docs-heading-anchor-permalink" href="#Start-Target-Homotopy-1" title="Permalink"></a></h2><pre><code class="language-julia">solve(G, F, start_solutions; options...)</code></pre><p>This constructs the homotopy <span>$H(x,t) = tG(x)+(1-t)F(x)$</span> to compute solutions of the system <code>F</code>. <code>start_solutions</code> is a list of solutions of <code>G</code> which are tracked to solutions of <code>F</code>.</p><pre><code class="language-julia">@var x y
 G = System([x^2+1,y+1])
 F = System([x^2+y^2+1, 2x+3y-1])
@@ -24,5 +24,5 @@ solve(G, F, [[im, -1], [-im, -1]])</code></pre><pre><code class="language-none">
 =======================
 • 2 paths tracked
 • 2 non-singular solutions (0 real)
-• random seed: 0x5bd5aef6
-</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../certification/">« Certification (experimentell)</a><a class="docs-footer-nextpage" href="../start_systems/">Start systems »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 2 July 2020 07:27">Thursday 2 July 2020</span>. Using Julia version 1.4.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+• random seed: 0x7260eadb
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../certification/">« Certification (experimentell)</a><a class="docs-footer-nextpage" href="../start_systems/">Start systems »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 2 July 2020 07:28">Thursday 2 July 2020</span>. Using Julia version 1.4.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
