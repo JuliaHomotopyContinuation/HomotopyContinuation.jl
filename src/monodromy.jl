@@ -730,7 +730,7 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
-        LA.norm(MS.trace, Inf),
+        p isa LinearSubspace ? LA.norm(MS.trace, Inf) : nothing,
     )
 end
 
