@@ -34,7 +34,7 @@ Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     target_solutions_count::Union{Nothing,Int} = nothing
     timeout::Union{Nothing,Float64} = nothing
     min_solutions::Union{Nothing,Int} = nothing
-    max_loops_no_progress::Int = 10
+    max_loops_no_progress::Int = 5
     reuse_loops::Symbol = :all
     permutations::Bool = false
 end
@@ -511,7 +511,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   the application of them. For example if you have two group actions `foo` and `bar` you can
   set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the
   application rules.
-* `max_loops_no_progress = 10`: The maximal number of iterations (i.e. loops generated)
+* `max_loops_no_progress = 5`: The maximal number of iterations (i.e. loops generated)
   without any progress.
 * `min_solutions`: The minimal number of solutions before a stopping heuristic is applied.
   By default no lower limit is enforced.
