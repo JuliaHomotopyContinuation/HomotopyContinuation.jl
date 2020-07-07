@@ -28,8 +28,9 @@ ModelKit.taylor!(u, v::Val, H::FixedParameterHomotopy, tx, t) =
     taylor!(u, v, H.homotopy, tx, t, H.parameters)
 
 """
-    fix_parameters(H::AbstractHomotopy, p)
+    fix_parameters(H::AbstractHomotopy, p; compile::Bool = $(COMPILE_DEFAULT[]))
 
 Fix the parameters of the given homotopy `H`. Returns a [`FixedParameterHomotopy`](@ref).
 """
-fix_parameters(H::AbstractHomotopy, p) = FixedParameterHomotopy(H, p)
+fix_parameters(H::AbstractHomotopy, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterHomotopy(H, p; compile = compile)

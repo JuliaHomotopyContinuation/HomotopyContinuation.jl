@@ -10,6 +10,10 @@ struct FixedParameterSystem{S<:AbstractSystem,T} <: AbstractSystem
     system::S
     parameters::Vector{T}
 end
+
+FixedParameterSystem(F::AbstractSystem, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterSystem(F, p)
+
 FixedParameterSystem(F::System, p; compile::Bool = COMPILE_DEFAULT[]) =
     FixedParameterSystem(fixed(F; compile = compile), p)
 Base.size(F::FixedParameterSystem) = size(F.system)
@@ -34,8 +38,9 @@ ModelKit.jacobian!(U, F::FixedParameterSystem{<:InterpretedSystem}, x, p, cache)
     ModelKit.jacobian!(U, F.system, x, F.parameters, cache)
 
 """
-    fix_parameters(F::AbstractSystem, p)
+    fix_parameters(F::AbstractSystem, p; compile::Bool = $(COMPILE_DEFAULT[]))
 
 Fix the parameters of the given system `F`. Returns a [`FixedParameterSystem`](@ref).
 """
-fix_parameters(F::AbstractSystem, p) = FixedParameterSystem(F, p)
+fix_parameters(F::AbstractSystem, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterSystem(F, p; compile = compile)
