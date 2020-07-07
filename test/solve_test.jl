@@ -421,7 +421,7 @@
         @var x a y b
         F = System([x^2 - a, x * y - a + b]; parameters = [a, b])
         s = [1.0, 1.0 + 0im]
-        S,_ = solver_startsolutions(F, generic_parameters = [2.2, 3.2])
+        S, _ = solver_startsolutions(F, generic_parameters = [2.2, 3.2])
         start_parameters!(S, [1, 0])
         target_parameters!(S, [2, 4])
         @test is_success(track(S, s))
@@ -578,7 +578,7 @@
             start_subspace = l₀,
             target_subspaces = subspaces,
             threading = false,
-            intrinsic = false
+            intrinsic = false,
         )
         @test all(r -> nsolutions(first(r)) == 2, result1)
     end

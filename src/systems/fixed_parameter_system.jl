@@ -10,10 +10,8 @@ struct FixedParameterSystem{S<:AbstractSystem,T} <: AbstractSystem
     system::S
     parameters::Vector{T}
 end
-
 FixedParameterSystem(F::AbstractSystem, p; compile::Bool = COMPILE_DEFAULT[]) =
     FixedParameterSystem(F, p)
-
 FixedParameterSystem(F::System, p; compile::Bool = COMPILE_DEFAULT[]) =
     FixedParameterSystem(fixed(F; compile = compile), p)
 Base.size(F::FixedParameterSystem) = size(F.system)

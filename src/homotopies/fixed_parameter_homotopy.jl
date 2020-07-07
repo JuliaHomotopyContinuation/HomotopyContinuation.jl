@@ -12,6 +12,8 @@ struct FixedParameterHomotopy{S<:AbstractHomotopy,T} <: AbstractHomotopy
 end
 FixedParameterHomotopy(H::Homotopy, p; compile::Bool = COMPILE_DEFAULT[]) =
     FixedParameterHomotopy(fixed(H; compile = compile), p)
+FixedParameterHomotopy(H::AbstractHomotopy, p; compile::Bool = COMPILE_DEFAULT[]) =
+    FixedParameterHomotopy(H, p)
 Base.size(H::FixedParameterHomotopy) = size(H.homotopy)
 
 ModelKit.variables(H::FixedParameterHomotopy) = variables(H.homotopy)

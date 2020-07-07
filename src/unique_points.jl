@@ -1,4 +1,5 @@
-export GroupActions, SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities, unique_points
+export GroupActions,
+    SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities, unique_points
 
 ################
 # Group actions
