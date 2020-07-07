@@ -247,6 +247,8 @@ function EndgameTracker(tracker::Tracker; options = EndgameOptions())
     EndgameTracker(tracker, state, options)
 end
 
+Base.show(io::IO, x::EndgameTracker) = print(io, typeof(x), "()")
+Base.show(io::IO, ::MIME"application/prs.juno.inline", x::EndgameTracker) = x
 Base.broadcastable(T::EndgameTracker) = Ref(T)
 
 function init!(

@@ -31,6 +31,13 @@ function PolyhedralStartSolutionsIterator(
     )
 end
 
+Base.show(io::IO, C::PolyhedralStartSolutionsIterator) =
+    print(io, "PolyhedralStartSolutionsIterator()")
+Base.show(
+    io::IO,
+    ::MIME"application/prs.juno.inline",
+    x::PolyhedralStartSolutionsIterator,
+) = x
 Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}

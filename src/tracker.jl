@@ -462,9 +462,7 @@ function Tracker(
     Tracker(H, predictor, corrector, state, options)
 end
 
-function Base.show(io::IO, C::Tracker{<:Any,AD{N}}) where {N}
-    print(io, "Tracker with automatic_differentiation = $N")
-end
+Base.show(io::IO, C::Tracker) = print(io, typeof(C), "()")
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::Tracker) = x
 Base.broadcastable(C::Tracker) = Ref(C)
 
