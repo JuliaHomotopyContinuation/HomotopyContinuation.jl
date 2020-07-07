@@ -443,9 +443,9 @@ function solve(
     end
 end
 
-function solve(S::Solver, R::Result; kwargs...)
+solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
-end
+solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
 function solve(
     S::Solver,
     starts;
