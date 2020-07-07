@@ -1,6 +1,5 @@
 export solve,
     Solver,
-    solver,
     solver_startsolutions,
     paths_to_track,
     parameter_homotopy,
@@ -32,6 +31,13 @@ function update!(stats::SolveStats, R::PathResult)
     stats
 end
 
+"""
+    Solver(path_tracker; seed = nothing)
+
+A struct containing multiple copies of `path_tracker`. This contains all pre-allocated
+data structures to call [`solve`]. The most convenient way to construct a `Solver` is
+via [`solver_startsolutions`](@ref).
+"""
 struct Solver{T<:AbstractPathTracker}
     trackers::Vector{T}
     seed::Union{Nothing,UInt32}
@@ -46,7 +52,20 @@ Solver(
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
 
-solver(args...; kwargs...) = first(solver_startsolutions(args...; kwargs...))
+"""
+    solver_startsolutions(args...; kwargs...)
+
+Takes the same input as [`solve`](@ref) but instead of directly solving the problem
+returns a [`Solver`](@ref) struct and the start solutions.
+
+## Example
+
+Calling `solve(args..; kwargs...)` is equivalent to
+```julia
+solver, starts = solver_startsolutions(args...; kwargs...)
+solve(solver, starts)
+```
+"""
 function solver_startsolutions(
     F::AbstractVector{Expression},
     starts = nothing;
