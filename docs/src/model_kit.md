@@ -9,6 +9,7 @@ Expression
 Variable
 @var
 @unique_var
+variables(prefix::Union{Symbol,String}, indices...)
 ```
 
 ## Methods

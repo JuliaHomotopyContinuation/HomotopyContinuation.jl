@@ -87,18 +87,16 @@ end
 
 # Tracker
 function polyhedral_system(support)
-    n = length(support)
-    m = sum(A -> size(A, 2), support)
-    @var x[1:n] c[1:m]
-    k = 1
-    System(map(support) do A
-        fi = Expression(0)
-        for a in eachcol(A)
-            ModelKit.add!(fi, fi, c[k] * prod(x .^ a))
-            k += 1
-        end
-        ModelKit.horner(fi, x)
-    end, x, c)
+    m = 0
+    p = Variable[]
+    coeffs = map(support) do A
+        c = variables(:c, m+1:m+size(A, 2))
+        m += size(A, 2)
+        append!(p, c)
+        c
+    end
+
+    System(support, coeffs; variables = variables(:x, 1:length(support)), parameters = p)
 end
 
 """

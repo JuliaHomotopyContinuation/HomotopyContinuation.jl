@@ -92,7 +92,13 @@ macro unique_var(args...)
     $(Expr(:tuple, esc.(vars)...)))
 end
 
-function var_array(prefix, indices...)
+"""
+    variables(prefix::Union{Symbol,String}, indices...)
+
+Create an `Array` of variables with the given `prefix` and indices.
+The expression  `@var x[1:3, 1:2]` is equivalent to  `x = variables(:x, 1:3, 1:2)`.
+"""
+function variables(prefix::Union{Symbol,String}, indices...)
     map(i -> Variable(prefix, i...), Iterators.product(indices...))
 end
 
@@ -116,7 +122,7 @@ function buildvar(var; unique::Bool = false)
         else
             prefix = string(varname)
         end
-        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname, :($(esc(varname)) = variables($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
@@ -788,11 +794,17 @@ end
     System(exprs::AbstractVector{Expression};
                 variables = variables(exprssion),
                 parameters = Variable[])
-    System(exprs, variables; parameters = Variable[])
 
 Create a system from the given [`Expression`](@ref)s `exprs`.
 The `variables` determine also the variable ordering.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
+
+    System(support::AbstractVector{<:AbstractMatrix{<:Integer}},
+           coefficients::AbstractVector{<:AbstractVector};
+           variables,
+           parameters = Variable[])
+
+Create a system from the given support and coefficients.
 
 ## Examples
 ```julia-repl
@@ -938,6 +950,26 @@ function System(
 end
 
 System(F::System) = F
+
+function System(
+    support::AbstractVector{<:AbstractMatrix{<:Integer}},
+    coefficients::AbstractVector{<:AbstractVector};
+    variables::AbstractVector{Variable},
+    parameters::AbstractVector{Variable} = Variable[],
+)
+
+    System(
+        map(support, coefficients) do A, c
+            fi = Expression(0)
+            for (k, a) in enumerate(eachcol(A))
+                ModelKit.add!(fi, fi, c[k] * prod(variables .^ convert.(Int, a)))
+            end
+            fi
+        end,
+        variables,
+        parameters,
+    )
+end
 
 Base.hash(S::System, u::UInt64) =
     hash(S.expressions, hash(S.variables, hash(S.parameters, u)))
