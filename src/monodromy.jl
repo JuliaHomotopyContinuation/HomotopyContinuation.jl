@@ -199,17 +199,17 @@ end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     println(io, "MonodromyResult")
-    println(io, "=========================")
-    println(io, "• return code: :$(result.returncode)")
+    println(io, "="^length("MonodromyResult"))
+    println(io, "• return_code → :$(result.returncode)")
     if result.equivalence_classes
         println(io, "• $(nsolutions(result)) classes of solutions (modulo group action)")
     else
         println(io, "• $(nsolutions(result)) solutions")
     end
     println(io, "• $(result.statistics.tracked_loops[]) tracked loops")
-    print(io, "• random seed: ", sprint(show, result.seed))
+    print(io, "• random_seed → ", sprint(show, result.seed))
     if !isnothing(result.trace)
-        print(io, "\n• trace: ", sprint(show, result.trace))
+        print(io, "\n• trace → ", sprint(show, result.trace))
     end
 end
 
