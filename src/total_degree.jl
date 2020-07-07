@@ -77,7 +77,7 @@ function total_degree_variables(
         F = fixed(F; compile = compile)
     end
     if target_parameters !== nothing
-        F = fix_parameters(F, target_parameters)
+        F = fix_parameters(F, target_parameters; compile = compile)
     end
     # if homogeneous put on on an affine chart
     if homogeneous && overdetermined
@@ -145,7 +145,7 @@ function total_degree_variable_groups(
 
     F = fixed(F; compile = compile)
     if target_parameters !== nothing
-        F = fix_parameters(F, target_parameters)
+        F = fix_parameters(F, target_parameters; compile = compile)
     end
 
     if homogeneous && overdetermined
