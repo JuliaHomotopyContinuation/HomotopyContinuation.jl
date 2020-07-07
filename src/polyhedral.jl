@@ -31,13 +31,9 @@ function PolyhedralStartSolutionsIterator(
     )
 end
 
-Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasLength()
+Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
-function Base.length(iter::PolyhedralStartSolutionsIterator)
-    compute_mixed_cells!(iter)
-    sum(MixedSubdivisions.volume, iter.mixed_cells)
-end
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isempty(iter.mixed_cells)

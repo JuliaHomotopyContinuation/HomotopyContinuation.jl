@@ -454,6 +454,9 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
 )
+    if Base.IteratorSize(typeof(starts)) == Base.SizeUnknown()
+        starts = collect(starts)
+    end
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
@@ -533,7 +536,11 @@ function threaded_solve(
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
 )
-    S = collect(starts)
+    if starts isa AbstractArray
+        S = starts
+    else
+        S = collect(starts)
+    end
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = false

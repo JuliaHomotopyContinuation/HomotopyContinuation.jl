@@ -66,6 +66,7 @@
         tracker, starts = total_degree(affine_sqr; compile = false)
         @test length(collect(starts)) == 2
         @test count(is_success, track.(tracker, starts)) == 2
+        @test nsolutions(solve(affine_sqr, start_system = :total_degree)) == 2
 
         @var x y v w
         proj_sqr =
@@ -237,6 +238,15 @@
             start_parameters = [1, 0],
             target_parameters = [2, 4],
             threading = false,
+        )
+        @test nsolutions(res) == 1
+        res = solve(
+            F,
+            s;
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+            threading = false,
+            compile = false,
         )
         @test nsolutions(res) == 1
 
