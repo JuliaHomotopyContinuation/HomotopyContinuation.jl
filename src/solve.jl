@@ -104,41 +104,61 @@ function solver_startsolutions(
     p₀ = generic_parameters,
     target_parameters = p₀,
     compile::Bool = COMPILE_DEFAULT[],
+    start_subspace = nothing,
+    target_subspace = nothing,
+    intrinsic = nothing,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
 
     used_start_system = nothing
-    if start_parameters !== nothing
-        tracker = parameter_homotopy_tracker(
-            F;
-            start_parameters = start_parameters,
-            target_parameters = target_parameters,
+    if start_subspace !== nothing
+        if target_parameters !== nothing
+            F = fix_parameters(F, target_parameters; compile = compile)
+        end
+        H = linear_subspace_homotopy(
+            F,
+            start_subspace,
+            target_subspace;
+            intrinsic = intrinsic,
             compile = compile,
-            kwargs...,
         )
-    elseif start_system == :polyhedral
-        used_start_system = :polyhedral
-        tracker, starts = polyhedral(
-            F;
-            compile = compile,
-            target_parameters = target_parameters,
-            kwargs...,
-        )
-    elseif start_system == :total_degree
-        used_start_system = :total_degree
-        tracker, starts = total_degree(
-            F;
-            compile = compile,
-            target_parameters = target_parameters,
-            kwargs...,
-        )
+        tracker = EndgameTracker(H; kwargs...)
     else
-        throw(KeywordArgumentException(
-            :start_system,
-            start_system,
-            "Possible values are: `:polyhedral` and `:total_degree`.",
-        ))
+        if target_subspace !== nothing
+            F = slice(F, target_subspace, compile = compile)
+        end
+        if start_parameters !== nothing
+            tracker = parameter_homotopy_tracker(
+                F;
+                start_parameters = start_parameters,
+                target_parameters = target_parameters,
+                compile = compile,
+                kwargs...,
+            )
+        elseif start_system == :polyhedral
+            used_start_system = :polyhedral
+            tracker, starts = polyhedral(
+                F;
+                compile = compile,
+                target_parameters = target_parameters,
+                kwargs...,
+            )
+        elseif start_system == :total_degree
+            used_start_system = :total_degree
+            tracker, starts = total_degree(
+                F;
+                compile = compile,
+                target_parameters = target_parameters,
+                kwargs...,
+            )
+        else
+            throw(KeywordArgumentException(
+                :start_system,
+                start_system,
+                "Possible values are: `:polyhedral` and `:total_degree`.",
+            ))
+        end
     end
 
     Solver(tracker; seed = seed, start_system = used_start_system), starts
@@ -307,6 +327,7 @@ end
 """
     solve(f; options...)
     solve(f, start_solutions; start_parameters, target_parameters, options...)
+    solve(f, start_solutions; start_subspace, target_subspace, options...)
     solve(g, f, start_solutions; options...)
     solve(homotopy, start_solutions; options...)
 
@@ -353,8 +374,9 @@ If only a polynomial system is given:
   choice furhter options are possible. See also [`total_degree`](@ref) and
   [`polyhedral`](@ref).
 
-If a system `f` depending on parameters together with start parameters, start solutions and
-*multiple* target parameters then the following options are also available:
+If a system `f` depending on parameters together with start parameters (or start subspace),
+start solutions and *multiple* target parameters (or target subspaces) then the following
+options are also available:
 
 * `flatten`: Flatten the output of `transform_result`. This is useful for example if
    `transform_result` returns a vector of solutions, and you only want a single vector of
@@ -397,12 +419,19 @@ function solve(
     transform_result = nothing,
     transform_parameters = identity,
     flatten = nothing,
+    target_subspaces = nothing,
     kwargs...,
 )
     many_parameters = false
-    if isnothing(target_parameters)
-        solver, starts = solver_startsolutions(args...; kwargs...)
-    else
+    if target_subspaces !== nothing
+        many_parameters = true
+        solver, starts = solver_startsolutions(
+            args...;
+            target_subspace = first(target_subspaces),
+            kwargs...,
+        )
+        target_parameters = target_subspaces
+    elseif target_parameters !== nothing
         # check if we have many parameters solve
         if !isa(transform_parameters(first(target_parameters)), Number)
             many_parameters = true
@@ -418,6 +447,8 @@ function solve(
                 kwargs...,
             )
         end
+    else
+        solver, starts = solver_startsolutions(args...; kwargs...)
     end
     if many_parameters
         solve(
@@ -596,8 +627,12 @@ function target_parameters!(solver::Solver, p)
     end
     solver
 end
-
-
+function parameters!(solver::Solver, p, q)
+    for tracker in solver.trackers
+        parameters!(tracker, p, q)
+    end
+    solver
+end
 
 """
     paths_to_track(f; optopms..)

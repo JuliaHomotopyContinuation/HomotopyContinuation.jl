@@ -136,7 +136,10 @@ function set_subspaces!(
     end
     H
 end
-
+start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
+    set_subspaces!(H, p, H.target)
+target_parameters!(H::IntrinsicSubspaceHomotopy, q::LinearSubspace) =
+    set_subspaces!(H, H.starts, q)
 parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
     set_subspaces!(H, p, q)
 
