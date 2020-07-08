@@ -1,4 +1,5 @@
-export GroupActions, SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities
+export GroupActions,
+    SymmetricGroup, UniquePoints, search_in_radius, add!, multiplicities, unique_points
 
 ################
 # Group actions
@@ -260,7 +261,7 @@ end
 """
     multiplicities(vectors; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
-Returns an array of arrays of integers. Each vector `w` in 'v' contains all indices `i`,`j`
+Returns a `Vector{Vector{Int}}` `v`. Each vector `w` in 'v' contains all indices `i`,`j`
 such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
 The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
 
@@ -307,4 +308,22 @@ function _multiplicities(
         end
     end
     collect(values(mults))
+end
+"""
+    unique_points(vectors; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+
+Returns all elements in `vector` for which two elements have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
+Note that the output can depend on the order of elements in vectors.
+The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
+"""
+function unique_points(V; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    unique_points = UniquePoints(first(V), 1; metric = metric, kwargs...)
+    out = Vector{eltype(V)}()
+    for (i, vᵢ) in enumerate(V)
+        _, new_point = add!(unique_points, vᵢ, i; atol = atol, rtol = rtol)
+        if new_point
+            push!(out, vᵢ)
+        end
+    end
+    out
 end

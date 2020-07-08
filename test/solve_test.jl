@@ -66,6 +66,7 @@
         tracker, starts = total_degree(affine_sqr; compile = false)
         @test length(collect(starts)) == 2
         @test count(is_success, track.(tracker, starts)) == 2
+        @test nsolutions(solve(affine_sqr, start_system = :total_degree)) == 2
 
         @var x y v w
         proj_sqr =
@@ -239,6 +240,15 @@
             threading = false,
         )
         @test nsolutions(res) == 1
+        res = solve(
+            F,
+            s;
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+            threading = false,
+            compile = false,
+        )
+        @test nsolutions(res) == 1
 
         @var x a y b
         F = System([x^2 - a], [x, y], [a, b])
@@ -327,6 +337,28 @@
         _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
         @test _solver.trackers[1].tracker.homotopy isa ExtrinsicSubspaceHomotopy
 
+        @var x y
+        r1 = solve(F; target_subspace = l1, compile = false)
+        @test nsolutions(r1) == 2
+        r2 = solve(
+            F,
+            solutions(r1);
+            start_subspace = l1,
+            target_subspace = l2,
+            compile = false,
+            intrinsic = true,
+        )
+        @test nsolutions(r2) == 2
+        r3 = solve(
+            F,
+            solutions(r1);
+            start_subspace = l1,
+            target_subspace = l2,
+            compile = false,
+            intrinsic = false,
+        )
+        @test nsolutions(r2) == 2
+
         @var x y z u v
         F = System([x^2 + y^2 - 5], [x, y, z, u, v])
         l1 = rand_subspace(5; dim = 1)
@@ -389,7 +421,7 @@
         @var x a y b
         F = System([x^2 - a, x * y - a + b]; parameters = [a, b])
         s = [1.0, 1.0 + 0im]
-        S = solver(F, generic_parameters = [2.2, 3.2])
+        S, _ = solver_startsolutions(F, generic_parameters = [2.2, 3.2])
         start_parameters!(S, [1, 0])
         target_parameters!(S, [2, 4])
         @test is_success(track(S, s))
@@ -416,14 +448,15 @@
         @test length(results) == 1
         @test first(results) === first_result
 
-        nresults = 0
-        result = solve(
-            [(x - 3) * (x + 6) * (x + 2)],
-            stop_early_cb = r -> (nresults += 1) == 2,
-            start_system = :total_degree,
-            show_progress = false,
-            threading = false,
-        )
+        result = let k = 0
+            solve(
+                [(x - 3) * (x + 6) * (x + 2)],
+                stop_early_cb = r -> (k += 1) == 2,
+                start_system = :total_degree,
+                show_progress = false,
+                threading = false,
+            )
+        end
         @test length(result) == 2
 
         # threading
@@ -529,5 +562,25 @@
             transform_parameters = _ -> rand(3),
         )
         @test typeof(result4) == Vector{Tuple{Vector{Vector{Float64}},Int64}}
+
+
+        @var x y
+        f = System([x^2 + y^2 - 1])
+
+
+        # Compute start solutions S₀ for given start parameters p₀
+        l₀ = rand_subspace(2; dim = 1)
+        S₀ = solutions(solve(f, target_subspace = l₀))
+        # The parameters we are intersted in
+        subspaces = [rand_subspace(2; dim = 1) for i = 1:100]
+        result1 = solve(
+            f,
+            S₀;
+            start_subspace = l₀,
+            target_subspaces = subspaces,
+            threading = false,
+            intrinsic = false,
+        )
+        @test all(r -> nsolutions(first(r)) == 2, result1)
     end
 end

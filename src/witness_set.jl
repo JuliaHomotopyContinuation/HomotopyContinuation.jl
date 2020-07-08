@@ -113,16 +113,13 @@ function witness_set(F::AbstractSystem; dim = nothing, codim = nothing, options.
 end
 
 function witness_set(F::AbstractSystem, L::LinearSubspace; options...)
-    F_L = slice(F, L)
-    res = solve(F_L; options...)
-    R = results(res; only_nonsingular = true)
-    WitnessSet(F, L, R)
+    res = solve(F; target_subspace = L, options...)
+    WitnessSet(F, L, results(res; only_nonsingular = true))
 end
 
 ### Move witness sets around
 function witness_set(W::WitnessSet, L::LinearSubspace; options...)
-    H = linear_subspace_homotopy(W.F, W.L, L)
-    res = solve(H, W.R; options...)
+    res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
     WitnessSet(W.F, L, results(res; only_nonsingular = true))
 end
 
@@ -173,10 +170,10 @@ function trace_test(W₀::WitnessSet; options...)
     L₁ = translate(L₀, v)
     L₋₁ = translate(L₀, -v)
 
-    R₁ = solve(IntrinsicSubspaceHomotopy(F, L₀, L₁), solutions(W₀); options...)
+    R₁ = solve(F, solutions(W₀); start_subspace = L₀, target_subspace = L₁, options...)
     nsolutions(R₁) == degree(W₀) || return nothing
 
-    R₋₁ = solve(IntrinsicSubspaceHomotopy(F, L₀, L₋₁), solutions(W₀); options...)
+    R₋₁ = solve(F, solutions(W₀); start_subspace = L₀, target_subspace = L₋₁, options...)
     nsolutions(R₋₁) == degree(W₀) || return nothing
 
     s₁ = sum(solutions(R₁))

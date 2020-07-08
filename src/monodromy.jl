@@ -34,7 +34,7 @@ Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
     target_solutions_count::Union{Nothing,Int} = nothing
     timeout::Union{Nothing,Float64} = nothing
     min_solutions::Union{Nothing,Int} = nothing
-    max_loops_no_progress::Int = 10
+    max_loops_no_progress::Int = 5
     reuse_loops::Symbol = :all
     permutations::Bool = false
 end
@@ -199,17 +199,17 @@ end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
 function Base.show(io::IO, result::MonodromyResult{T}) where {T}
     println(io, "MonodromyResult")
-    println(io, "=========================")
-    println(io, "• return code: :$(result.returncode)")
+    println(io, "="^length("MonodromyResult"))
+    println(io, "• return_code → :$(result.returncode)")
     if result.equivalence_classes
         println(io, "• $(nsolutions(result)) classes of solutions (modulo group action)")
     else
         println(io, "• $(nsolutions(result)) solutions")
     end
     println(io, "• $(result.statistics.tracked_loops[]) tracked loops")
-    print(io, "• random seed: ", sprint(show, result.seed))
+    print(io, "• random_seed → ", sprint(show, result.seed))
     if !isnothing(result.trace)
-        print(io, "\n• trace: ", sprint(show, result.trace))
+        print(io, "\n• trace → ", sprint(show, result.trace))
     end
 end
 
@@ -511,7 +511,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   the application of them. For example if you have two group actions `foo` and `bar` you can
   set `group_actions=[foo, bar]`. See [`GroupActions`](@ref) for details regarding the
   application rules.
-* `max_loops_no_progress = 10`: The maximal number of iterations (i.e. loops generated)
+* `max_loops_no_progress = 5`: The maximal number of iterations (i.e. loops generated)
   without any progress.
 * `min_solutions`: The minimal number of solutions before a stopping heuristic is applied.
   By default no lower limit is enforced.
@@ -730,7 +730,7 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
-        LA.norm(MS.trace, Inf),
+        p isa LinearSubspace ? LA.norm(MS.trace, Inf) : nothing,
     )
 end
 

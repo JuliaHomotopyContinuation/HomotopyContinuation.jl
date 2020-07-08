@@ -5,6 +5,8 @@ For the mathematical background take a look at our [introduction](https://www.ju
 
 ```@docs
 solve
+solver_startsolutions
+Solver
 ```
 
 The function [`paths_to_track`](@ref) allows you to know beforehand how manys the you

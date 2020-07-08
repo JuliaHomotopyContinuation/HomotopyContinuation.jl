@@ -440,13 +440,13 @@ function Base.show(io::IO, x::Result)
             "($(s.real_singular) real)",
         )
     end
-    s.at_infinity > 0 &&
-        println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
+    # s.at_infinity > 0 &&
+    #     println(io, "• $(s.at_infinity) $(plural("solution", s.at_infinity)) at infinity")
     s.excess_solution > 0 && println(
         io,
         "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))",
     )
-    println(io, "• random seed: ", sprint(show, seed(x)))
+    println(io, "• random_seed: ", sprint(show, seed(x)))
     if !isnothing(x.start_system)
         println(io, "• start_system: :", x.start_system)
     end

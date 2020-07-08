@@ -31,13 +31,16 @@ function PolyhedralStartSolutionsIterator(
     )
 end
 
-Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasLength()
+Base.show(io::IO, C::PolyhedralStartSolutionsIterator) =
+    print(io, "PolyhedralStartSolutionsIterator()")
+Base.show(
+    io::IO,
+    ::MIME"application/prs.juno.inline",
+    x::PolyhedralStartSolutionsIterator,
+) = x
+Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
-function Base.length(iter::PolyhedralStartSolutionsIterator)
-    compute_mixed_cells!(iter)
-    sum(MixedSubdivisions.volume, iter.mixed_cells)
-end
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     if isempty(iter.mixed_cells)
@@ -84,18 +87,16 @@ end
 
 # Tracker
 function polyhedral_system(support)
-    n = length(support)
-    m = sum(A -> size(A, 2), support)
-    @var x[1:n] c[1:m]
-    k = 1
-    System(map(support) do A
-        fi = Expression(0)
-        for a in eachcol(A)
-            ModelKit.add!(fi, fi, c[k] * prod(x .^ a))
-            k += 1
-        end
-        ModelKit.horner(fi, x)
-    end, x, c)
+    m = 0
+    p = Variable[]
+    coeffs = map(support) do A
+        c = variables(:c, m+1:m+size(A, 2))
+        m += size(A, 2)
+        append!(p, c)
+        c
+    end
+
+    System(support, coeffs; variables = variables(:x, 1:length(support)), parameters = p)
 end
 
 """

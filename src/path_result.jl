@@ -97,8 +97,24 @@ Base.@kwdef mutable struct PathResult
     extended_precision_used::Bool
 end
 
-Base.show(io::IO, r::PathResult) = print_fieldnames(io, r)
 Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
+function Base.show(io::IO, r::PathResult)
+    println(io, "PathResult:")
+    println(io, " • return_code → :", r.return_code)
+    for f in [:solution, :accuracy, :residual, :condition_jacobian]
+        print_fieldname(io, r, f)
+    end
+    if r.singular
+        for f in [:singular, :multiplicity, :winding_number]
+            print_fieldname(io, r, f)
+        end
+    end
+    println(io, " • steps → ", r.accepted_steps, " / ", r.rejected_steps)
+    for f in [:extended_precision, :path_number]
+        print_fieldname(io, r, f)
+    end
+end
+
 
 """
     solution(r::PathResult)

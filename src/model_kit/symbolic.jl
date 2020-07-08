@@ -92,7 +92,13 @@ macro unique_var(args...)
     $(Expr(:tuple, esc.(vars)...)))
 end
 
-function var_array(prefix, indices...)
+"""
+    variables(prefix::Union{Symbol,String}, indices...)
+
+Create an `Array` of variables with the given `prefix` and indices.
+The expression  `@var x[1:3, 1:2]` is equivalent to  `x = variables(:x, 1:3, 1:2)`.
+"""
+function variables(prefix::Union{Symbol,String}, indices...)
     map(i -> Variable(prefix, i...), Iterators.product(indices...))
 end
 
@@ -116,7 +122,7 @@ function buildvar(var; unique::Bool = false)
         else
             prefix = string(varname)
         end
-        varname, :($(esc(varname)) = var_array($prefix, $(esc.(var.args[2:end])...)))
+        varname, :($(esc(varname)) = variables($prefix, $(esc.(var.args[2:end])...)))
     end
 end
 
@@ -308,7 +314,7 @@ function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Vari
 end
 
 """
-    monomials(variables::AbstractVector, d::Integer; affine = false)
+    monomials(variables::AbstractVector, d::Integer; affine = true)
 
 Create all monomials of a given degree in the given `variables`.
 
@@ -316,7 +322,7 @@ Create all monomials of a given degree in the given `variables`.
 julia> @var x y
 (x, y)
 
-julia> monomials([x,y], 2)
+julia> monomials([x,y], 2; affine = false)
 3-element Array{Operation,1}:
  x ^ 2
  x * y
@@ -326,20 +332,29 @@ julia> monomials([x,y], 2)
 function monomials(
     vars::AbstractVector{<:Union{Variable,Expression}},
     d::Integer;
-    affine = false,
+    affine::Bool = true,
+    homogeneous::Bool = !affine,
 )
     n = length(vars)
+    exps = monomials_exponents(n, d; affine = !homogeneous)
+    map(exps) do exp
+        prod(i -> vars[i]^exp[i], 1:n)
+    end
+end
+function monomials_exponents(n, d; affine::Bool)
     if affine
         pred = x -> sum(x) ≤ d
     else
         pred = x -> sum(x) == d
     end
-    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
-    sort!(exps, lt = td_order)
-    map(exps) do exp
-        prod(i -> vars[i]^exp[i], 1:n)
+    E = map(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...))) do e
+        collect(e)
     end
+
+    sort!(E, lt = td_order)
+    E
 end
+
 function td_order(x, y)
     sx = sum(x)
     sy = sum(y)
@@ -350,16 +365,16 @@ function monomials(
     D::AbstractVector{<:Integer},
 )
     D = sort(D; rev = true)
-    M = monomials(vars, D[1])
+    M = monomials(vars, D[1]; affine = false)
     for i = 2:length(D)
-        append!(M, monomials(vars, D[i]))
+        append!(M, monomials(vars, D[i]; affine = false))
     end
     M
 end
 
 """
     dense_poly(vars::AbstractVector{Variable}, d::Integer;
-               homogeneous::Bool = false,
+               homogeneous = false,
                coeff_name::Symbol = gensym(:c))
 
 Create a dense polynomial of degree `d` in the given variables `variables` where
@@ -393,6 +408,42 @@ function dense_poly(
     M = monomials(vars, d; affine = !homogeneous)
     c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
+end
+
+"""
+    coeffs_as_dense_poly(f, vars, d; homogeneous = false)
+
+Given a polynomial `f` this returns a vector `c` of coefficients such that
+`subs(dense_poly(vars, d; homogeneous = homogeneous), c) == f`.
+
+## Example
+
+```julia
+@var x[1:3]
+f, c = dense_poly(x, 3, coeff_name = :c)
+g = x[1]^3+x[2]^3+x[3]^3-1
+gc = coeffs_as_dense_poly(g, x, 3)
+subs(f, c => gc) == g
+```
+```
+true
+```
+"""
+function coeffs_as_dense_poly(
+    f::Expression,
+    vars::AbstractVector{<:Union{Variable,Expression}},
+    d::Integer;
+    homogeneous::Bool = false,
+)
+    exps = monomials_exponents(length(vars), d; affine = !homogeneous)
+    D = to_dict(expand(f), vars)
+    to_smallest_eltype(map(exps) do exp
+        if haskey(D, exp)
+            to_number(D[exp])
+        else
+            false
+        end
+    end)
 end
 
 
@@ -788,11 +839,17 @@ end
     System(exprs::AbstractVector{Expression};
                 variables = variables(exprssion),
                 parameters = Variable[])
-    System(exprs, variables; parameters = Variable[])
 
 Create a system from the given [`Expression`](@ref)s `exprs`.
 The `variables` determine also the variable ordering.
 The `parameters` argument allows to declare certain [`Variable`](@ref)s as parameters.
+
+    System(support::AbstractVector{<:AbstractMatrix{<:Integer}},
+           coefficients::AbstractVector{<:AbstractVector};
+           variables,
+           parameters = Variable[])
+
+Create a system from the given support and coefficients.
 
 ## Examples
 ```julia-repl
@@ -938,6 +995,26 @@ function System(
 end
 
 System(F::System) = F
+
+function System(
+    support::AbstractVector{<:AbstractMatrix{<:Integer}},
+    coefficients::AbstractVector{<:AbstractVector};
+    variables::AbstractVector{Variable},
+    parameters::AbstractVector{Variable} = Variable[],
+)
+
+    System(
+        map(support, coefficients) do A, c
+            fi = Expression(0)
+            for (k, a) in enumerate(eachcol(A))
+                ModelKit.add!(fi, fi, c[k] * prod(variables .^ convert.(Int, a)))
+            end
+            fi
+        end,
+        variables,
+        parameters,
+    )
+end
 
 Base.hash(S::System, u::UInt64) =
     hash(S.expressions, hash(S.variables, hash(S.parameters, u)))
