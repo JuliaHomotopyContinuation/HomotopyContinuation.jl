@@ -207,6 +207,7 @@ struct CertifyCache{T,M}
 end
 function CertifyCache(F::AbstractSystem)
     m, n = size(F)
+    m == n || error("Can only certify square polynomial systems.")
     jac_interpreter = ModelKit.jacobian_interpreter(System(F))
     IJ_cache = ModelKit.InterpreterCache(IComplexF64, jac_interpreter)
     CertifyCache(
@@ -226,7 +227,8 @@ end
     certify(F, result, [p, certify_cache]; options...)
 
 Attempt to certify that the given approximate `solutions` correspond to true solutions
-of the polynomial system ``F(x;p)``. Also attemps to certify for each solutions whether it
+of the polynomial system ``F(x;p)``. The system ``F`` has to be an (affine) square
+polynomial system. Also attemps to certify for each solutions whether it
 approximates a real solution. The certification is done using interval arithmetic and the
 Krawczyk method[^Moo77]. Returns a [`CertificationResult`](@ref) which additionall returns
 the number of distinct solutions. For more details of the implementation see [^BRT20].
