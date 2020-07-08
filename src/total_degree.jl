@@ -485,7 +485,15 @@ end
 function paths_to_track(f, ::Val{:total_degree})
     target_parameters = nparameters(f) > 0 ? zeros(nparameters(f)) : nothing
     _, starts = total_degree(f; target_parameters = target_parameters)
-    length(starts)
+    if Base.IteratorSize(typeof(starts)) == Base.SizeUnknown()
+        k = 0
+        for s in starts
+            k += 1
+        end
+        k
+    else
+        length(starts)
+    end
 end
 @deprecate bezout_number(f::Union{System,AbstractSystem}) paths_to_track(
     f;
