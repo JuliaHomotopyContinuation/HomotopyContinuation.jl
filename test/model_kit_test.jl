@@ -139,10 +139,10 @@ using HomotopyContinuation.ModelKit
             @var x[1:2] a[1:5] c[1:6] y[1:2, 1:5]
 
             #tangential conics
-            f = sum([a; 1] .* monomials([x; 1], 2))
+            f = sum([a; 1] .* monomials([x; 1], 2; affine = false))
             ∇ = differentiate(f, x)
             #5 conics
-            g = sum(c .* monomials([x; 1], 2))
+            g = sum(c .* monomials([x; 1], 2; affine = false))
             ∇_2 = differentiate(g, x)
             #the general system
             #f_a_0 is tangent to g_b₀ at x₀
@@ -184,7 +184,7 @@ using HomotopyContinuation.ModelKit
         n = 4
         s = 1
         @var x[1:n]
-        ν = monomials(x, 5)
+        ν = monomials(x, 5; affine = false)
         N = length(ν)
         q₀ = randn(ComplexF64, N - 1)
         @var q[1:N-1]

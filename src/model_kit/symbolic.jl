@@ -314,7 +314,7 @@ function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Vari
 end
 
 """
-    monomials(variables::AbstractVector, d::Integer; affine = false)
+    monomials(variables::AbstractVector, d::Integer; affine = true)
 
 Create all monomials of a given degree in the given `variables`.
 
@@ -322,7 +322,7 @@ Create all monomials of a given degree in the given `variables`.
 julia> @var x y
 (x, y)
 
-julia> monomials([x,y], 2)
+julia> monomials([x,y], 2; affine = false)
 3-element Array{Operation,1}:
  x ^ 2
  x * y
@@ -332,20 +332,29 @@ julia> monomials([x,y], 2)
 function monomials(
     vars::AbstractVector{<:Union{Variable,Expression}},
     d::Integer;
-    affine = false,
+    affine::Bool = true,
+    homogeneous::Bool = !affine
 )
     n = length(vars)
+    exps = monomials_exponents(n, d; affine = !homogeneous)
+    map(exps) do exp
+        prod(i -> vars[i]^exp[i], 1:n)
+    end
+end
+function monomials_exponents(n, d; affine::Bool)
     if affine
         pred = x -> sum(x) ≤ d
     else
         pred = x -> sum(x) == d
     end
-    exps = collect(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...)))
-    sort!(exps, lt = td_order)
-    map(exps) do exp
-        prod(i -> vars[i]^exp[i], 1:n)
+    E = map(Iterators.filter(pred, Iterators.product(Iterators.repeated(0:d, n)...))) do e
+        collect(e)
     end
+
+    sort!(E, lt = td_order)
+    E
 end
+
 function td_order(x, y)
     sx = sum(x)
     sy = sum(y)
@@ -356,16 +365,16 @@ function monomials(
     D::AbstractVector{<:Integer},
 )
     D = sort(D; rev = true)
-    M = monomials(vars, D[1])
+    M = monomials(vars, D[1]; affine = false)
     for i = 2:length(D)
-        append!(M, monomials(vars, D[i]))
+        append!(M, monomials(vars, D[i]; affine = false))
     end
     M
 end
 
 """
     dense_poly(vars::AbstractVector{Variable}, d::Integer;
-               homogeneous::Bool = false,
+               homogeneous = false,
                coeff_name::Symbol = gensym(:c))
 
 Create a dense polynomial of degree `d` in the given variables `variables` where
@@ -399,6 +408,42 @@ function dense_poly(
     M = monomials(vars, d; affine = !homogeneous)
     c = Variable.(coeff_name, 1:length(M))
     sum(c .* M), c
+end
+
+"""
+    coeffs_as_dense_poly(f, vars, d; homogeneous = false)
+
+Given a polynomial `f` this returns a vector `c` of coefficients such that
+`subs(dense_poly(vars, d; homogeneous = homogeneous), c) == f`.
+
+## Example
+
+```julia
+@var x[1:3]
+f, c = dense_poly(x, 3, coeff_name = :c)
+g = x[1]^3+x[2]^3+x[3]^3-1
+gc = coeffs_as_dense_poly(g, x, 3)
+subs(f, c => gc) == g
+```
+```
+true
+```
+"""
+function coeffs_as_dense_poly(
+    f::Expression,
+    vars::AbstractVector{<:Union{Variable,Expression}},
+    d::Integer;
+    homogeneous::Bool = false,
+)
+    exps = monomials_exponents(length(vars), d; affine = !homogeneous)
+    D = to_dict(expand(f), vars)
+    to_smallest_eltype(map(exps) do exp
+        if haskey(D, exp)
+            to_number(D[exp])
+        else
+            false
+        end
+    end)
 end
 
 

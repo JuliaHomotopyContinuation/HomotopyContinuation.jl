@@ -15,6 +15,7 @@ variables(prefix::Union{Symbol,String}, indices...)
 ## Methods
 ```@docs
 coefficients(f::Expression, vars::AbstractVector{Variable})
+coeffs_as_dense_poly
 degree(f::Expression, vars::AbstractVector{Variable})
 degrees(::AbstractVector{Expression})
 differentiate(expr::ModelKit.Basic, vars::AbstractVector{Variable})
