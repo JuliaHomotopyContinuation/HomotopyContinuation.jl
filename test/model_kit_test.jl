@@ -215,6 +215,12 @@ using HomotopyContinuation.ModelKit
         @test subs(f, c => coefficients(g, [x, y])) == g
         _, coeffs = exponents_coefficients(g, [x, y]; expanded = true)
         @test subs(f, c => coeffs) == g
+
+        @var x[1:3]
+        f, c = dense_poly(x, 3, coeff_name = :c)
+        g = x[1]^3+x[2]^3+x[3]^3-1
+        gc = coeffs_as_dense_poly(g, x, 3)
+        @test subs(f, c => gc) == g
     end
 
     @testset "System" begin
