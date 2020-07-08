@@ -448,14 +448,15 @@
         @test length(results) == 1
         @test first(results) === first_result
 
-        nresults = 0
-        result = solve(
-            [(x - 3) * (x + 6) * (x + 2)],
-            stop_early_cb = r -> (nresults += 1) == 2,
-            start_system = :total_degree,
-            show_progress = false,
-            threading = false,
-        )
+        result = let k = 0
+            solve(
+                [(x - 3) * (x + 6) * (x + 2)],
+                stop_early_cb = r -> (k += 1) == 2,
+                start_system = :total_degree,
+                show_progress = false,
+                threading = false,
+            )
+        end
         @test length(result) == 2
 
         # threading

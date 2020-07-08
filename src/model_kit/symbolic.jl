@@ -333,7 +333,7 @@ function monomials(
     vars::AbstractVector{<:Union{Variable,Expression}},
     d::Integer;
     affine::Bool = true,
-    homogeneous::Bool = !affine
+    homogeneous::Bool = !affine,
 )
     n = length(vars)
     exps = monomials_exponents(n, d; affine = !homogeneous)
