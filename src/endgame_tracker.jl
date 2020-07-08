@@ -32,7 +32,7 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
  Cauchy endgame.
 * `min_cond = 1e6`: The minimal condition number after which an endgame strategy is
   considered to be applied.
-* `min_cond_growth = 100`: The minimal condition number growth after which an
+* `min_cond_growth = 1e4`: The minimal condition number growth after which an
    endgame strategy is considered to be applied.
 * `min_coord_growth = 100`: The minimal relative growth of a coordinate necessary to
   to be considered going to infininity (resp. zero).
@@ -49,7 +49,7 @@ Base.@kwdef mutable struct EndgameOptions
     max_endgame_extended_steps::Int = 200
     # eg parameter
     min_cond::Float64 = 1e6
-    min_cond_growth::Float64 = 100.0
+    min_cond_growth::Float64 = 1e4
     min_coord_growth::Float64 = 100.0
     zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
@@ -474,9 +474,8 @@ function check_at_infinity!(state, tracker, options; debug::Bool = false)
                     @show κ, cond_growth, δt, log(cond_growth / δt)
                 end
 
-                if coord_growth > clamp(0.25^(4vᵢ), 10, 100) &&
-                   (cond_growth > options.min_cond_growth || κ > options.min_cond)
-
+                if coord_growth > clamp(0.25^(4vᵢ), 20, options.min_coord_growth) &&
+                   (cond_growth > options.min_cond_growth || κ > max(1e8, options.min_cond))
                     if at_zero
                         state.code = EndgameTrackerCode.at_zero
                     else
