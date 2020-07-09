@@ -626,8 +626,21 @@ function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::B
     m = length(D)
     E = collect(keys(D))
     perm = sortperm(E; lt = td_order)
-    permute!(to_number.(values(D)), perm)
+    make_to_number = true
+    for c in values(D)
+        if !is_number(c)
+            make_to_number = false
+            break
+        end
+    end
+
+    if make_to_number
+        permute!(to_number.(values(D)), perm)
+    else
+        permute!(collect(values(D)), perm)
+    end
 end
+coefficients(f::Expression, var::Variable; kwargs...) = coefficients(f, [var]; kwargs...)
 
 """
     degree(f::Expression, vars = variables(f); expanded = false)
