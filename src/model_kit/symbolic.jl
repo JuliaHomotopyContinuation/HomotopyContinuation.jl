@@ -907,6 +907,7 @@ struct System
     end
 end
 
+System(exprs; kwargs...) = System(convert(Vector{Expression}, exprs); kwargs...)
 function System(
     exprs::AbstractVector{Expression};
     parameters::Union{Nothing,Vector{Variable}} = nothing,
@@ -944,14 +945,14 @@ end
 
 
 function System(
-    exprs::AbstractVector{Expression},
+    exprs::AbstractVector,
     variables::Vector{Variable};
     parameters::Vector{Variable} = Variable[],
 )
     System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 function System(
-    exprs::AbstractVector{Expression},
+    exprs::AbstractVector,
     variables::Vector{Variable},
     parameters::Vector{Variable},
 )
@@ -1339,6 +1340,9 @@ function Homotopy(
     parameters::Vector{Variable} = Variable[],
 )
     Homotopy(convert(Vector{Expression}, exprs), variables, t, parameters)
+end
+function Homotopy(exprs, variables::Vector{Variable}, t::Variable; kwargs...)
+    Homotopy(convert(Vector{Expression}, exprs), variables, t; kwargs...)
 end
 
 function Base.show(io::IO, H::Homotopy)
