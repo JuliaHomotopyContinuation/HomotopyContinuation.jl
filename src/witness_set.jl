@@ -158,6 +158,12 @@ end
 
 ### Move witness sets around
 function witness_set(W::WitnessSet, L::LinearSubspace; options...)
+    if W.projective && !is_linear(L)
+        error(
+            "The given space is an affine linear subspace (``b ≠ 0``). " *
+            " Expected a linear subspace since the given witness set is projective.",
+        )
+    end
     res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
     WitnessSet(W.F, L, results(res; only_nonsingular = true), is_linear(L) && W.projective)
 end

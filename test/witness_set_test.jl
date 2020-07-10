@@ -35,13 +35,18 @@
         @test degree(W) == 2
         @test solutions(W) isa Vector{Vector{ComplexF64}}
         @test results(W) isa Vector{PathResult}
+        @test trace_test(W) < 1e-8
 
         L = LinearSubspace([1 1 1])
-
         W_L = witness_set(W, L; compile = false)
         @test degree(W_L) == 2
 
-        @test trace_test(W) < 1e-8
+        L = rand_subspace(3; codim = 1, affine = false)
+        W_L = witness_set(W, L; compile = false)
+        @test degree(W_L) == 2
+
+        L = rand_subspace(3; codim = 1, affine = true)
+        @test_throws ErrorException witness_set(W, L; compile = false)
     end
 
     @testset "dim / codim" begin
