@@ -200,32 +200,32 @@ APA
 function trace_test(W₀::WitnessSet; options...)
     L₀ = linear_subspace(W₀)
     F = system(W₀)
-
+    S₀ = solutions(W₀)
     # if we are in the projective setting, we need to make sure that
     # all solutions are on the same affine chart
     # Therefore make the affine chart now
     if W₀.projective
         F = on_affine_chart(F)
-        s₀ = sum(s -> set_solution!(s, F, s), solutions(W₀))
+        s₀ = sum(s -> set_solution!(s, F, s), S₀)
     else
-        s₀ = sum(solutions(W₀))
+        s₀ = sum(S₀)
     end
 
     v = randn(ComplexF64, codim(L₀))
     L₁ = translate(L₀, v)
     L₋₁ = translate(L₀, -v)
 
-    R₁ = solve(F, solutions(W₀); start_subspace = L₀, target_subspace = L₁, options...)
+    R₁ = solve(F, S₀; start_subspace = L₀, target_subspace = L₁, options...)
     nsolutions(R₁) == degree(W₀) || return nothing
 
-    R₋₁ = solve(F, solutions(W₀); start_subspace = L₀, target_subspace = L₋₁, options...)
+    R₋₁ = solve(F, S₀; start_subspace = L₀, target_subspace = L₋₁, options...)
     nsolutions(R₋₁) == degree(W₀) || return nothing
 
     s₁ = sum(solutions(R₁))
     s₋₁ = sum(solutions(R₋₁))
     Δs₁ = (s₁ - s₀)
     Δs₋₁ = (s₀ - s₋₁)
-    trace = InfNorm()(Δs₁, Δs₋₁) / max(InfNorm()(Δs₁), InfNorm()(Δs₋₁))
+    trace = InfNorm()(Δs₁, Δs₋₁) / (length(S₀) * max(InfNorm()(Δs₁), InfNorm()(Δs₋₁)))
 
     trace
 end

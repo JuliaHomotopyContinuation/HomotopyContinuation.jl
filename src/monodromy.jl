@@ -529,7 +529,8 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 * `trace_test = true`: If `true` a trace test is performed to check whether all solutions
   are found. This is only applicable if monodromy is performed with a linear subspace.
   See also [`trace_test`](@ref).
-* `trace_test_tol = 1e-6`: The tolerance for the trace test to be successfull.
+* `trace_test_tol = 1e-10`: The tolerance for the trace test to be successfull.
+  The trace is divided by the number of solutions before compared to the trace_test_tol.
 
 """
 function monodromy_solve(F::Vector{<:ModelKit.Expression}, args...; parameters, kwargs...)
@@ -734,7 +735,7 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
-        p isa LinearSubspace ? LA.norm(MS.trace, Inf) : nothing,
+        p isa LinearSubspace ? LA.norm(MS.trace, Inf) / length(results) : nothing,
     )
 end
 
@@ -778,7 +779,7 @@ function serial_monodromy_solve!(
         if p isa LinearSubspace &&
            nloops(MS) > 0 &&
            MS.options.trace_test &&
-           LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+           LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
             retcode = :success
             @goto _return
         end
@@ -1022,7 +1023,7 @@ function threaded_monodromy_solve!(
             if p isa LinearSubspace &&
                nloops(MS) > 0 &&
                MS.options.trace_test &&
-               LA.norm(MS.trace, Inf) < MS.options.trace_test_tol
+               LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
                 retcode = :success
                 break
             end
