@@ -688,6 +688,9 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
     @unpack tracker, state, options = endgame_tracker
 
     state.accuracy = tracker.state.accuracy
+    if is_success(state.code) && state.accuracy > 1e-14
+        refine_current_solution!(tracker; min_tol = 1e-14)
+    end
     state.solution .= tracker.state.x
     state.winding_number = nothing
     # only update condition number for successfull paths
@@ -700,7 +703,7 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
         )
         state.cond =
             LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
-        state.singular = state.cond > 1e14
+        state.singular = state.cond > 1e14 || state.accuracy > 1e-12
     end
 end
 
