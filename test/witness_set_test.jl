@@ -43,4 +43,35 @@
 
         @test trace_test(W) < 1e-8
     end
+
+    @testset "dim / codim" begin
+        @var x[1:6]
+        homogeneous = true
+
+        f = System([
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+        ])
+
+        # quadratic_surface = rand_poly([x,y,z,w], 2; homogeneous = true)
+        # sextic_curve = System([cubic_surface, quadratic_surface])
+        @test degree(witness_set(f; dim = 1, compile = false)) == 16
+        @test degree(witness_set(f; codim = 4, compile = false)) == 16
+        @test degree(witness_set(f; compile = false)) == 16
+
+        homogeneous = false
+        f = System([
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+            rand_poly(x, 2; homogeneous = homogeneous),
+        ])
+        # quadratic_surface = rand_poly([x,y,z,w], 2; homogeneous = true)
+        # sextic_curve = System([cubic_surface, quadratic_surface])
+        @test degree(witness_set(f; dim = 2, compile = false)) == 16
+        @test degree(witness_set(f; codim = 4, compile = false)) == 16
+        @test degree(witness_set(f; compile = false)) == 16
+    end
 end

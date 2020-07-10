@@ -596,6 +596,10 @@ function monodromy_solve(
                     "dimension (`dim`) or codimension (`codim`) of the component of interest.",
                 )
             else
+                projective = is_homogeneous(System(F))
+                if !isnothing(codim)
+                    codim += projective
+                end
                 p = rand_subspace(
                     x;
                     dim = codim,

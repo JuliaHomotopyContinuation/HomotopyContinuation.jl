@@ -14,6 +14,16 @@ struct WitnessSet{
     L::Sub
     # only non-singular results or solutions
     R::Vector{R}
+    projective::Bool
+end
+
+function WitnessSet(
+    F::AbstractSystem,
+    L::LinearSubspace,
+    R;
+    projective::Bool = is_linear(A) && is_homogeneous(System(F)),
+)
+    WitnessSet(F, L, R, projective)
 end
 
 """
@@ -102,25 +112,54 @@ Witness set for dimension 1 of degree 2
 """
 witness_set(F::System, args...; compile = COMPILE_DEFAULT[], kwargs...) =
     witness_set(fixed(F; compile = compile), args...; kwargs...)
-function witness_set(F::AbstractSystem; dim = nothing, codim = nothing, options...)
+function witness_set(
+    F::AbstractSystem;
+    target_parameters = nothing,
+    dim = nothing,
+    codim = nothing,
+    options...,
+)
     f = System(F)
-    affine = !is_homogeneous(f)
+    projective = is_homogeneous(f)
     if isnothing(dim) && isnothing(codim)
-        codim = size(F, 2) - !affine - size(F, 1)
+        dim = corank(F) - projective
+    elseif !isnothing(codim) && projective
+        codim += 1
     end
-    L = rand_subspace(size(F, 2); dim = dim, codim = codim, affine = affine)
-    witness_set(F, L; options...)
+    L = rand_subspace(size(F, 2); dim = codim, codim = dim, affine = !projective)
+    witness_set(
+        F,
+        L;
+        target_parameters = target_parameters,
+        projective = projective,
+        options...,
+    )
 end
 
-function witness_set(F::AbstractSystem, L::LinearSubspace; options...)
+function witness_set(F::AbstractSystem, L::LinearSubspace; projective = nothing, options...)
     res = solve(F; target_subspace = L, options...)
-    WitnessSet(F, L, results(res; only_nonsingular = true))
+    if isnothing(projective)
+        WitnessSet(F, L, results(res; only_nonsingular = true))
+    else
+        WitnessSet(F, L, results(res; only_nonsingular = true); projective = projective)
+    end
 end
+
+corank(F::AbstractSystem; kwargs...) = nvariables(F) - LA.rank(F)
+function LinearAlgebra.rank(F::AbstractSystem; target_parameters = nothing)
+    m, n = size(F)
+    u = zeros(ComplexF64, m)
+    U = zeros(ComplexF64, m, n)
+    x = randn(ComplexF64, n)
+    evaluate_and_jacobian!(u, U, F, x, target_parameters)
+    LA.rank(U)
+end
+
 
 ### Move witness sets around
 function witness_set(W::WitnessSet, L::LinearSubspace; options...)
     res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
-    WitnessSet(W.F, L, results(res; only_nonsingular = true))
+    WitnessSet(W.F, L, results(res; only_nonsingular = true), is_linear(L) && W.projective)
 end
 
 """
@@ -159,7 +198,7 @@ function trace_test(W₀::WitnessSet; options...)
     # if we are in the projective setting, we need to make sure that
     # all solutions are on the same affine chart
     # Therefore make the affine chart now
-    if is_linear(L₀) && is_homogeneous(System(F))
+    if W₀.projective
         F = on_affine_chart(F)
         s₀ = sum(s -> set_solution!(s, F, s), solutions(W₀))
     else
