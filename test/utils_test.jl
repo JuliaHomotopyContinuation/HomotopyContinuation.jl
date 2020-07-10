@@ -10,7 +10,7 @@
     end
 
     Q = HC.rand_unitary_matrix(8, ComplexF64)
-    @test norm(I - Q' * Q, Inf) < 1e-14
+    @test norm(LinearAlgebra.I - Q' * Q, Inf) < 1e-14
 
     @test HC.fast_abs(-2.0) ≈ abs(-2.0)
     @test HC.fast_abs(2.0 + 3im) ≈ abs(2.0 + 3im)

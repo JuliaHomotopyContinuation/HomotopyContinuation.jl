@@ -643,7 +643,10 @@ function inverse_inf_norm_est(
         end
         γ̄ = γ
         γ = sum(fast_abs, y)
-        γ ≤ γ̄ && break
+        if γ ≤ γ̄
+            γ = γ̄
+            break
+        end
         ξ .= y ./ fast_abs.(y)
         if d_l !== nothing
             ξ ./= d_l

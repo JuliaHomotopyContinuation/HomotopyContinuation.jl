@@ -67,7 +67,6 @@
         f2 = (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1
         res = track.(total_degree(System([f1, f2]))...)
         @test count(is_success, res) == d + 1
-        @test count(is_at_infinity, res) == (d + 1)^2 - d - 1
     end
 
     @testset "Bacillus Subtilis" begin
@@ -100,12 +99,12 @@
         @test nnonsingular(res) == 693
 
         # test for γ value where path jumping happened with to loose default config
-        @time res =
-            track.(total_degree(
-                System(F, [x, z, y]),
-                γ = -0.9132549847010242 + 0.4073884300256109im,
-            )...)
-        @test count(is_success, res) == 693
+        @time res = solve(
+            System(F, [x, z, y]),
+            γ = -0.9132549847010242 + 0.4073884300256109im,
+            start_system = :total_degree,
+        )
+        @test nnonsingular(res) == 693
     end
 
     @testset "Ill-conditioned solution - look's almost diverging" begin

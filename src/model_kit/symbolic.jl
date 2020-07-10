@@ -626,8 +626,21 @@ function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::B
     m = length(D)
     E = collect(keys(D))
     perm = sortperm(E; lt = td_order)
-    permute!(to_number.(values(D)), perm)
+    make_to_number = true
+    for c in values(D)
+        if !is_number(c)
+            make_to_number = false
+            break
+        end
+    end
+
+    if make_to_number
+        permute!(to_number.(values(D)), perm)
+    else
+        permute!(collect(values(D)), perm)
+    end
 end
+coefficients(f::Expression, var::Variable; kwargs...) = coefficients(f, [var]; kwargs...)
 
 """
     degree(f::Expression, vars = variables(f); expanded = false)
@@ -907,6 +920,7 @@ struct System
     end
 end
 
+System(exprs; kwargs...) = System(convert(Vector{Expression}, exprs); kwargs...)
 function System(
     exprs::AbstractVector{Expression};
     parameters::Union{Nothing,Vector{Variable}} = nothing,
@@ -944,14 +958,14 @@ end
 
 
 function System(
-    exprs::AbstractVector{Expression},
+    exprs::AbstractVector,
     variables::Vector{Variable};
     parameters::Vector{Variable} = Variable[],
 )
     System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 function System(
-    exprs::AbstractVector{Expression},
+    exprs::AbstractVector,
     variables::Vector{Variable},
     parameters::Vector{Variable},
 )
@@ -1339,6 +1353,9 @@ function Homotopy(
     parameters::Vector{Variable} = Variable[],
 )
     Homotopy(convert(Vector{Expression}, exprs), variables, t, parameters)
+end
+function Homotopy(exprs, variables::Vector{Variable}, t::Variable; kwargs...)
+    Homotopy(convert(Vector{Expression}, exprs), variables, t; kwargs...)
 end
 
 function Base.show(io::IO, H::Homotopy)

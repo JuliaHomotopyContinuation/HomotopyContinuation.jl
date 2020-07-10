@@ -149,6 +149,11 @@ function to_string(x::Basic)
 end
 
 Base.show(io::IO, b::Basic) = print(io, to_string(b))
+function Base.show(io::IO, mime::MIME"text/latex", b::Basic)
+    print(io, "\$\$ ")
+    print(io, to_string(b))
+    print(io, " \$\$")
+end
 
 function Base.hash(ex::Basic, h::UInt)
     h2 = ccall((:basic_hash, libsymengine), UInt, (Ref{ExpressionRef},), ex)

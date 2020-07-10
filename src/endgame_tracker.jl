@@ -46,7 +46,7 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
 Base.@kwdef mutable struct EndgameOptions
     endgame_start::Float64 = 0.1
     max_endgame_steps::Int = 2000
-    max_endgame_extended_steps::Int = 200
+    max_endgame_extended_steps::Int = 400
     # eg parameter
     min_cond::Float64 = 1e6
     min_cond_growth::Float64 = 1e4
@@ -322,7 +322,6 @@ end
 
 function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     @unpack tracker, state, options = endgame_tracker
-
     # For performance reasons (and to catch degenerate situations) we only allow a maximal
     # number of steps in the endgame. Check if we reached this and if so terminate.
     if state.steps_eg ≥ options.max_endgame_steps
@@ -354,7 +353,6 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
 
     # perform a simple tracker step
     step_success = step!(tracker, debug)
-    state.steps_eg += 1
     state.code = status(tracker)
 
     if !is_tracking(state.code)
@@ -367,17 +365,18 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     # at the end of the path
     state.jump_to_zero_failed = (last(state.jump_to_zero_failed), is_jump_to_zero)
 
-    # continue if we didn't make progress
-    if !step_success
-        return state.code
-    end
-
     # check if we can start the endgame
     t = real(tracker.state.t)
     t ≤ options.endgame_start || return state.code
 
     if state.steps_eg == 0
         state.ext_steps_eg_start = ext_steps(tracker.state)
+    end
+    state.steps_eg += 1
+
+    # continue if we didn't make progress
+    if !step_success
+        return state.code
     end
 
     # Update the valuation to get more information about the path
@@ -597,7 +596,6 @@ function singular_endgame_step!(endgame_tracker::EndgameTracker, debug::Bool = f
     κ₀ = LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
     J₀_norm = inf_norm(workspace(tracker.state.jacobian), state.row_scaling)
     if debug
-        display(matrix(tracker.state.jacobian))
         @show κ κ₀ state.accuracy nanmax(κ₀, inv(J₀_norm))
     end
     if state.accuracy < options.singular_min_accuracy && (
@@ -690,6 +688,9 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
     @unpack tracker, state, options = endgame_tracker
 
     state.accuracy = tracker.state.accuracy
+    if is_success(state.code) && state.accuracy > 1e-14
+        refine_current_solution!(tracker; min_tol = 1e-14)
+    end
     state.solution .= tracker.state.x
     state.winding_number = nothing
     # only update condition number for successfull paths
@@ -702,7 +703,7 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
         )
         state.cond =
             LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
-        state.singular = state.cond > 1e14
+        state.singular = state.cond > 1e14 || state.accuracy > 1e-12
     end
 end
 

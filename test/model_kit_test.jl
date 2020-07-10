@@ -253,6 +253,11 @@ using HomotopyContinuation.ModelKit
 
         F4 = System(f, parameters = [b, a])
         @test variables(F4) == [x, y]
+
+        @var x y a b
+        f = Any[(x + y)^3+x^2+x+5y+3a, 2*x^2+b]
+        F = System(f, [x, y], [b, a])
+        @test F isa System
     end
 
     @testset "System variables groups + homogeneous" begin
@@ -289,6 +294,9 @@ using HomotopyContinuation.ModelKit
          4*z - 6*x*y*z^2 + 4*x^2*y*z^2"""
 
         @test sprint(show, H) == show_H
+
+        H_any = Homotopy(convert(Vector{Any}, h), [x, y, z], t)
+        @test H_any isa Homotopy
 
         T = CompiledHomotopy(H)
         H2 = ModelKit.interpret(T)
