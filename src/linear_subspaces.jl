@@ -469,7 +469,7 @@ function rand_subspace(
     end
 
 end
-
+rand_subspace(x::AbstractVector{Variable}; kwargs...) = rand_subspace(length(x); kwargs...)
 function rand_subspace(
     x::AbstractVector;
     dim::Union{Nothing,Integer} = nothing,

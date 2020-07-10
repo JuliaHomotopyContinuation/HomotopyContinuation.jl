@@ -45,6 +45,10 @@
         W_L = witness_set(W, L; compile = false)
         @test degree(W_L) == 2
 
+        L = rand_subspace([x, y, z]; codim = 1, affine = false)
+        W_L = witness_set(W, L; compile = false)
+        @test degree(W_L) == 2
+
         L = rand_subspace(3; codim = 1, affine = true)
         @test_throws ErrorException witness_set(W, L; compile = false)
     end
