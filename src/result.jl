@@ -47,6 +47,14 @@ function MultiplicityInfo(pathresults::Vector{PathResult})
             push!(multiple_indicator, path_number(pathresults[cluster[i]]))
         end
     end
+    # the multiplicities are currently with respect to the indices of the pathresults
+    # but we want to have them with respect to path numbers in case pathresults
+    # is just a subset of all paths
+    for k in keys(multiplicities)
+        multiplicities[k] = map(multiplicities[k]) do cluster
+            map(i -> path_number(pathresults[i]), cluster)
+        end
+    end
     MultiplicityInfo(multiplicities, multiple_indicator)
 end
 
