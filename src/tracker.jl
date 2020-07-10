@@ -301,6 +301,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     # path tracking algorithm
     accuracy::Float64 # norm(x - x(t))
     ω::Float64 # liptschitz constant estimate, see arxiv:1902.02968
+    ω_prev::Float64
     μ::Float64 # limit accuracy
     τ::Float64 # trust region size
     norm_Δx₀::Float64 # debug info only
@@ -333,6 +334,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     accuracy = 0.0
     μ = eps()
     ω = 1.0
+    ω_prev = 1.0
     τ = Inf
     norm_Δx₀ = NaN
     use_strict_β_τ = false
@@ -352,6 +354,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         Δs_prev,
         accuracy,
         ω,
+        ω_prev,
         μ,
         τ,
         norm_Δx₀,
@@ -531,7 +534,7 @@ function update_stepsize!(
 )
     a = options.parameters.β_a * options.parameters.a
     p = order(predictor)
-    ω = state.ω
+    ω = clamp(state.ω + 2(state.ω - state.ω_prev), state.ω, 8state.ω)
     τ = state.τ #trust_region(predictor)
     if is_converged(result)
         e = local_error(predictor)
@@ -708,6 +711,7 @@ function init!(
     Δs = initial_step_size(state, predictor, tracker.options)
     Δs = min(Δs, max_initial_step_size)
     propose_step!(state.segment_stepper, Δs)
+    state.ω_prev = state.ω
 
     is_tracking(state.code)
 end
@@ -826,7 +830,8 @@ function step!(tracker::Tracker, debug::Bool = false)
         step_success!(state.segment_stepper)
         state.accuracy = result.accuracy
         state.μ = max(result.accuracy, eps())
-        state.ω = max(result.ω, 0.5 * state.ω)
+        state.ω_prev = state.ω
+        state.ω = max(result.ω, 0.5 * state.ω, 0.1)
         update_precision!(tracker, result.μ_low)
 
         if is_done(state.segment_stepper) &&
