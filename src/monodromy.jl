@@ -424,7 +424,7 @@ function MonodromySolver(
         )
         P = LinearSubspace{ComplexF64}
     else
-        H = parameter_homotopy(F; generic_parameters = parameters)
+        H = parameter_homotopy(F; generic_parameters = parameters, compile = compile)
         P = Vector{ComplexF64}
     end
     egtracker = EndgameTracker(
