@@ -680,13 +680,16 @@ end
 
 
 function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
-    m = size(M)[1]
+    m, n = size(M)
+    m == n || error("Cannot take determinant of non-square matrix.")
     if m > 2
         return sum(
             (-1)^(i - 1) * M[i, 1] * LinearAlgebra.det(M[1:end.!=i, 2:end]) for i = 1:m
         )
-    else
+    elseif m == 2
         return M[1, 1] * M[2, 2] - M[2, 1] * M[1, 2]
+    else # m == 1
+        return M[1, 1]
     end
 end
 

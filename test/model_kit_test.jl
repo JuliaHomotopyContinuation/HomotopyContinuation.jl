@@ -83,6 +83,7 @@ using HomotopyContinuation.ModelKit
 
     @testset "Linear Algebra" begin
         @var x[1:2, 1:2]
+        @test det(x[1:1, 1:1]) == x[1, 1]
         @test det(x) == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
         @test det(x') == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
         @test det(transpose(x)) == -x[2, 1] * x[1, 2] + x[2, 2] * x[1, 1]
