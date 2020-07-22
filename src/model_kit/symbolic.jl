@@ -692,6 +692,8 @@ function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
         return M[1, 1]
     end
 end
+LinearAlgebra.det(M::LinearAlgebra.Symmetric{<:Union{Variable,Expression}}) =
+    LinearAlgebra.det(Matrix(M))
 
 function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = false)
     if !expanded
