@@ -280,8 +280,10 @@ function polyhedral(
     unsupported_kwargs(kwargs)
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
-
-    min_vecs = minimum.(support, dims = 2)
+    min_vecs = map(support) do A
+        cols = view.(Ref(A), Ref(:), 1:size(A, 2))
+        first(sort!(cols; lt = ModelKit.td_order, rev = true))
+    end
     if !all(iszero, min_vecs)
         if only_non_zero
             support = map((A, v) -> A .- v, support, min_vecs)

@@ -85,6 +85,7 @@ function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexDF64}, 
 end
 
 function ModelKit.evaluate!(u, H::StraightLineHomotopy, x, t)
+    evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     ts, tt = H.γ .* t, 1 - t
     for i = 1:size(H, 1)
