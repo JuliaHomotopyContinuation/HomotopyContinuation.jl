@@ -224,7 +224,13 @@
         c₂ = p₂[1]^2 + p₂[2]^2 - 1
 
         F = System([c₁ * c₂; a * x[1] + b * x[2] - c]; parameters = [a, b, c])
-        S = monodromy_solve(F, [[1.0, 0.0]], [1, 1, 1], permutations = true)
+        S = monodromy_solve(
+            F,
+            [[1.0, 0.0]],
+            [1, 1, 1],
+            permutations = true,
+            max_loops_no_progress = 20,
+        )
         A = permutations(S)
         B = permutations(S, reduced = false)
 
