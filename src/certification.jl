@@ -391,6 +391,9 @@ function certify(
         ip = dip = nothing
     end
 
+    if X isa PathResult || X isa AbstractVector{<:Number}
+        X = [X]
+    end
     _certify(F, X, target_parameters, ip, dip, cache; show_progress = show_progress)
 end
 
