@@ -124,7 +124,7 @@ Base.eltype(::Interpreter{T}) where {T} = T
 function Base.convert(::Type{Interpreter{T,N}}, I::Interpreter{S,N}) where {T,S,N}
     Interpreter(I.instructions, I.out, convert(Vector{T}, I.constants), I.eval_out)
 end
-promote_common_constants(a::Interpreter{T,N}, b::Interpreter{T,M}) where {T,N,M} = (a,b)
+promote_common_constants(a::Interpreter{T,N}, b::Interpreter{T,M}) where {T,N,M} = (a, b)
 function promote_common_constants(a::Interpreter{T,N}, b::Interpreter{S,M}) where {T,S,N,M}
     TS = promote_type(T, S)
     (convert(Interpreter{TS,N}, a), convert(Interpreter{TS,M}, b))
@@ -132,7 +132,7 @@ end
 
 
 Base.promote_rule(::Type{Interpreter{T,N}}, I::Interpreter{S,N}) where {T,S,N} =
-    Interpreter{promote_type(T,S),N}
+    Interpreter{promote_type(T, S),N}
 show_instructions(I::Interpreter) = show_instructions(stdout, I)
 function show_instructions(io::IO, I::Interpreter)
     for (i, instr) in enumerate(I.instructions)
