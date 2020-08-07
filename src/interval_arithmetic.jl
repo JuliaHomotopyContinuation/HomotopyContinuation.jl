@@ -99,20 +99,20 @@ Base.one(::Type{Interval{T}}) where {T} = Interval(one(T))
 
 ## Addition and subtraction
 +(a::Interval) = a
-+(a::Interval, b) = @round(a.lo + b, a.hi + b)
-+(b, a::Interval) = a + b
++(a::Interval, b::Real) = @round(a.lo + b, a.hi + b)
++(b::Real, a::Interval) = a + b
 function +(a::Interval, b::Interval)
     @round(a.lo + b.lo, a.hi + b.hi)
 end
 
 -(a::Interval) = Interval(-a.hi, -a.lo)
--(a::Interval, b) = @round(a.lo - b, a.hi - b)
--(b, a::Interval) = @round(b - a.hi, b - a.lo)
+-(a::Interval, b::Real) = @round(a.lo - b, a.hi - b)
+-(b::Real, a::Interval) = @round(b - a.hi, b - a.lo)
 -(a::Interval, b::Interval) = @round(a.lo - b.hi, a.hi - b.lo)
 
 
 ## Multiplication
-function *(x, a::Interval)
+function *(x::Real, a::Interval)
     (iszero(a) || iszero(x)) && return zero(a.lo * x)
     if x ≥ 0.0
         return @round(a.lo * x, a.hi * x)
@@ -120,7 +120,7 @@ function *(x, a::Interval)
         return @round(a.hi * x, a.lo * x)
     end
 end
-*(a::Interval, x) = x * a
+*(a::Interval, x::Real) = x * a
 function *(a::Interval, b::Interval)
     if b.lo >= zero(b.lo)
         a.lo >= zero(a.lo) && return @round(*(a.lo, b.lo), *(a.hi, b.hi))
@@ -309,6 +309,8 @@ Base.promote_rule(::Type{IComplex{T}}, ::Type{Interval{S}}) where {T,S<:Real} =
     IComplex{promote_type(T, S)}
 Base.promote_rule(::Type{IComplex{T}}, ::Type{IComplex{S}}) where {T,S} =
     IComplex{promote_type(T, S)}
+Base.convert(::Type{IComplex{T}}, x::IComplex) where {T} = IComplex{T}(x)
+Base.convert(::Type{IComplex{T}}, x::Interval) where {T} = IComplex{T}(x)
 
 Base.widen(::Type{IComplex{T}}) where {T} = IComplex{widen(T)}
 
@@ -353,6 +355,7 @@ end
 mid(z::IComplex) = Complex(mid(real(z)), mid(imag(z)))
 diam(z::IComplex) = max(diam(real(z)), diam(imag(z)))
 rad(z::IComplex) = max(rad(real(z)), rad(imag(z)))
+mag(z::IComplex) = max(mag(real(z)), mag(imag(z)))
 isinterior(a::IComplex, b::IComplex) =
     isinterior(real(a), real(b)) && isinterior(imag(a), imag(b))
 Base.issubset(a::IComplex, b::IComplex) = real(a) ⊆ real(b) && imag(a) ⊆ imag(b)

@@ -152,8 +152,8 @@ const double_log10 = convert(DoubleF64, log(BigFloat(10.0)))
 const double_eps = 5.048709793414476e-29 # 2^-94 ## Conservative for basic arithmetic
 
 
-Base.nextfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo + nextfloat(double_eps * abs(x.hi)))
-Base.prevfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo - prevfloat(double_eps * abs(x.hi)))
+Base.nextfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo + double_eps * abs(x.hi))
+Base.prevfloat(x::DoubleF64) = DoubleF64(x.hi, x.lo - double_eps * abs(x.hi))
 
 #
 # ADDITION

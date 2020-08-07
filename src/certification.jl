@@ -193,14 +193,20 @@ end
 Contains the necessary data structures for [`certify`](@ref).
 """
 struct CertifyCache{T,M}
+    eval_interpreter::ModelKit.Interpreter{T,1}
     jac_interpreter::ModelKit.Interpreter{T,2}
     newton_cache::NewtonCache{M}
     # norm
     norm::WeightedNorm{InfNorm}
     # data for krawczyc_step
+    ir::Vector{IComplexF64}
+    iΔx::Vector{IComplexF64}
+    ix̃::Vector{IComplexF64}
+    dix̃::Vector{IComplex{DoubleF64}}
     C::Matrix{ComplexF64}
     IJ::Matrix{IComplexF64}
     IJ_cache::ModelKit.InterpreterCache{IComplexF64}
+    dIJ_cache::ModelKit.InterpreterCache{IComplex{DoubleF64}}
     A::Matrix{IComplexF64}
     δx::Vector{IComplexF64}
     # TODO: complex extended precision case with arb
@@ -208,15 +214,31 @@ end
 function CertifyCache(F::AbstractSystem)
     m, n = size(F)
     m == n || error("Can only certify square polynomial systems.")
-    jac_interpreter = ModelKit.jacobian_interpreter(System(F))
-    IJ_cache = ModelKit.InterpreterCache(IComplexF64, jac_interpreter)
+    eval_interpreter, jac_interpreter =
+        ModelKit.promote_common_constants(ModelKit.evaluate_jacobian_interpreter(System(
+            F,
+        ))...)
+    IJ_cache = ModelKit.InterpreterCache(Vector{IComplexF64}(
+        undef,
+        max(length(eval_interpreter.instructions), length(jac_interpreter.instructions)),
+    ))
+    dIJ_cache = ModelKit.InterpreterCache(Vector{IComplex{DoubleF64}}(
+        undef,
+        max(length(eval_interpreter.instructions), length(jac_interpreter.instructions)),
+    ))
     CertifyCache(
+        eval_interpreter,
         jac_interpreter,
         NewtonCache(F),
         WeightedNorm(InfNorm(), n),
+        zeros(IComplexF64, m),
+        zeros(IComplexF64, m),
+        zeros(IComplexF64, m),
+        zeros(IComplex{DoubleF64}, m),
         zeros(ComplexF64, m, n),
         zeros(IComplexF64, m, n),
         IJ_cache,
+        dIJ_cache,
         zeros(IComplexF64, m, n),
         zeros(IComplexF64, m),
     )
@@ -335,41 +357,74 @@ function certify(F::System, args...; compile::Bool = COMPILE_DEFAULT[], kwargs..
 end
 function certify(
     F::AbstractSystem,
+    X::MonodromyResult,
+    cache::CertifyCache = CertifyCache(F);
+    show_progress = true,
+)
+    certify(F, solutions(X), parameters(X), cache; show_progress = show_progress)
+end
+function certify(
+    F::AbstractSystem,
     X,
     p = nothing,
-    cache = CertifyCache(F);
+    cache::CertifyCache = CertifyCache(F);
     target_parameters = nothing,
     show_progress = true,
 )
     if !isnothing(p)
         target_parameters = p
     end
-    _certify(F, X, target_parameters, cache; show_progress = show_progress)
-end
-function certify(
-    F::AbstractSystem,
-    X::MonodromyResult,
-    p = nothing,
-    cache = CertifyCache(F);
-    target_parameters = parameters(X),
-    show_progress = true,
-)
-    if !isnothing(p)
-        target_parameters = p
+    if !isnothing(target_parameters)
+        # convert target parameters to something certifyable
+        if isa(target_parameters, AbstractVector{<:Rational}) ||
+           isa(target_parameters, AbstractVector{<:Complex{<:Rational}})
+            ip = target_parameters
+            dip = target_parameters
+        elseif isa(target_parameters, AbstractVector{<:Complex})
+            ip = IComplexF64.(target_parameters)
+            dip = IComplex{DoubleF64}.(target_parameters)
+        else
+            ip = Interval{Float64}.(target_parameters)
+            dip = Interval{DoubleF64}.(target_parameters)
+        end
+    else
+        ip = dip = nothing
     end
-    _certify(F, solutions(X), target_parameters, cache; show_progress = show_progress)
+
+    if X isa PathResult || X isa AbstractVector{<:Number}
+        X = [X]
+    end
+    _certify(F, X, target_parameters, ip, dip, cache; show_progress = show_progress)
 end
 
-function _certify(F::AbstractSystem, X::Result, p, cache::CertifyCache; show_progress::Bool)
+function _certify(
+    F::AbstractSystem,
+    X::Result,
+    p,
+    ip,
+    dip,
+    cache::CertifyCache;
+    show_progress::Bool,
+)
     _certify(
         F,
         results(X; only_nonsingular = true),
         p,
+        ip,
+        dip,
         cache;
         show_progress = show_progress,
     )
 end
-function _certify(F::AbstractSystem, X, p, cache::CertifyCache; show_progress::Bool)
+function _certify(
+    F::AbstractSystem,
+    X,
+    p,
+    ip,
+    dip,
+    cache::CertifyCache;
+    show_progress::Bool,
+)
     certificates = SolutionCertificate[]
     if show_progress
         n = length(X)
@@ -387,7 +442,7 @@ function _certify(F::AbstractSystem, X, p, cache::CertifyCache; show_progress::B
         ncertified = 0
         nreal_certified = 0
         for (i, x) in enumerate(X)
-            r = _certify(F, x, p, cache, i)
+            r = _certify(F, x, p, ip, dip, cache, i)
             push!(certificates, r)
             ncertified += is_certified(r)
             nreal_certified += is_certified(r) && is_real(r)
@@ -397,7 +452,7 @@ function _certify(F::AbstractSystem, X, p, cache::CertifyCache; show_progress::B
         end
     else
         for (i, x) in enumerate(X)
-            push!(certificates, _certify(F, x, p, cache, i))
+            push!(certificates, _certify(F, x, p, ip, dip, cache, i))
         end
     end
     duplicates = find_duplicates(certificates; show_progress = show_progress)
@@ -419,26 +474,39 @@ end
     )
 end
 
-function _certify(F::AbstractSystem, r::PathResult, p, cache::CertifyCache, index = nothing)
-    _certify(F, solution(r), p, cache, index)
+function _certify(
+    F::AbstractSystem,
+    r::PathResult,
+    p,
+    ip,
+    dip,
+    cache::CertifyCache,
+    index = nothing,
+)
+    _certify(F, solution(r), p, ip, dip, cache, index)
 end
 function _certify(
     F::AbstractSystem,
     x₀::AbstractVector{<:Number},
     p::Union{Nothing,AbstractVector},
+    ip,
+    dip,
     cache::CertifyCache,
     index = nothing,
 )
-    _certify(F, convert(Vector{ComplexF64}, x₀), p, cache, index)
+    _certify(F, convert(Vector{ComplexF64}, x₀), p, ip, dip, cache, index)
 end
 function _certify(
     F::AbstractSystem,
     x₀::Vector{ComplexF64},
     p::Union{Nothing,AbstractVector},
+    ip,
+    dip,
     cache::CertifyCache,
     index = nothing,
 )
-    @unpack C, IJ, IJ_cache, A, δx, norm, newton_cache = cache
+    @unpack C, IJ, IJ_cache, dIJ_cache, A, δx, ir, iΔx, ix̃, dix̃, norm, newton_cache =
+        cache
     @unpack Δx, J, r = newton_cache
 
     init!(norm, x₀)
@@ -446,60 +514,49 @@ function _certify(
         F,
         x₀,
         p,
-        cache.norm,
-        cache.newton_cache;
+        norm,
+        newton_cache;
         atol = 4 * eps(),
         rtol = 4 * eps(),
         extended_precision = true,
         max_iters = 4,
     )
-    #TODO: Don't assume res is of acc < 4eps()
-
-    # The Newton method actually the accuracy of x + Δx, so use this, i.e., x̃ = x + Δx
-    # This has the benefit that we don't need to compute F(x̃) or J(x̃) or an LU factorization
     x̃ = solution(res)
-    x̃ .+= Δx
-
-    # compute the inverse
     LA.inv!(C, J)
-    # compute condition number
-    κ = LA.opnorm(C, Inf) * LA.opnorm(J, Inf)
-    # We have to make a first guess on the interval expansion factor with 1024, i.e.,
-    # 1/(1024κ) is our guess for a sufficient ε.
-    # But we want to have at least 8eps() and upper bound it by sqrt(eps())
-    ε = clamp(inv(1024κ), 4 * eps(), 1e-12)
-    # perform inflation
-    δ = complex(Interval(-ε, ε), Interval(-ε, ε))
-    # multiply by weights to account for relative accuracies
-    x = x̃ .+ weights(norm) .* δ
 
-    ModelKit.execute!(IJ, cache.jac_interpreter, x, p, IJ_cache)
+    ix̃ .= IComplexF64.(x̃)
+    ModelKit.execute!(ir, cache.eval_interpreter, ix̃, ip, IJ_cache)
+    sqr_mul!(iΔx, C, ir)
 
-    # Perform Krawczyk step: x′ = x̃ - Δx + (I - C * IJ) * (x - x̃)
-    x′ = krawczyk_step(x̃, Δx, x, C, IJ, A, δx)
-    certified = false
-    if all2(isinterior, x′, x)
-        certified = true
-    else
-        # # no success, check actual expansion factor
-        K = maximum(diam, A) / (eps() * κ)
-        # check if it makes sense to try again with new K
-        ε = inv(16 * K * κ)
-        if ε ≥ 4 * eps() # don't take eps() to have a buffer
-            δ = complex(Interval(-ε, ε), Interval(-ε, ε))
-            x .= x̃ .+ weights(norm) .* δ
-            ModelKit.execute!(IJ, cache.jac_interpreter, x, p, IJ_cache)
-            # Perform Krawczyk step: x′ = x̃ - Δx + (I - C * IJ) * (x - x̃)
-            x′ = krawczyk_step(x̃, Δx, x, C, IJ, A, δx)
+    x = map(x̃, iΔx) do x̃ᵢ, iΔxᵢ
+        Δᵢ = abs(mid(iΔxᵢ)) + diam(iΔxᵢ)
+        εᵢ = max(4Δᵢ, 8eps() * abs(x̃ᵢ))
+        complex(
+            Interval(real(x̃ᵢ) - εᵢ, real(x̃ᵢ) + εᵢ),
+            Interval(imag(x̃ᵢ) - εᵢ, imag(x̃ᵢ) + εᵢ),
+        )
+    end
+    ModelKit.execute!(IJ, cache.jac_interpreter, x, ip, IJ_cache)
+    x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
+    certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
 
-            certified = all2(isinterior, x′, x)
-        else
-            # TODO: extended precision necessary
-            ε /= 16
-
-            # 1) Perform newton steps to refine
-            # 2) run krawczyc_step again
+    if !certified
+        dix̃ .= IComplex{DoubleF64}.(x̃)
+        ModelKit.execute!(ir, cache.eval_interpreter, dix̃, dip, dIJ_cache)
+        # multiplication in standard precision
+        sqr_mul!(iΔx, C, ir)
+        # ε-inflation
+        x = map(x̃, iΔx) do x̃ᵢ, iΔxᵢ
+            Δᵢ = mag(iΔxᵢ)
+            εᵢ = max(8Δᵢ, 8eps() * abs(x̃ᵢ))
+            a, b = reim(ComplexDF64(x̃ᵢ))
+            complex(Interval(a - εᵢ, a + εᵢ), Interval(b - εᵢ, b + εᵢ))
         end
+
+        # Compute interval jacobian in extended precision
+        ModelKit.execute!(IJ, cache.jac_interpreter, x, dip, dIJ_cache)
+        x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
+        certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
     end
 
     if !certified
@@ -508,7 +565,7 @@ function _certify(
 
     # We have a certified solution x.
     # Now we want to check if it is a real solution.
-    is_real = all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
+    is_real = certified && all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
 
     return SolutionCertificate(
         initial_solution = x₀,
@@ -528,7 +585,7 @@ function krawczyk_step(x̃, Δx, x, C, IJ, A, δx)
     @. x′ += x̃ - Δx
 end
 
-"Simple matrix multiplcation using the muladd method which is much faster four our case."
+"Simple matrix multiplication using the muladd method which is much faster four our case."
 function sqr_mul!(C, A, B)
     n = size(A, 1)
     C .= zero(eltype(C))

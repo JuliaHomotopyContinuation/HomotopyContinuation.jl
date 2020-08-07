@@ -124,6 +124,15 @@ Base.eltype(::Interpreter{T}) where {T} = T
 function Base.convert(::Type{Interpreter{T,N}}, I::Interpreter{S,N}) where {T,S,N}
     Interpreter(I.instructions, I.out, convert(Vector{T}, I.constants), I.eval_out)
 end
+promote_common_constants(a::Interpreter{T,N}, b::Interpreter{T,M}) where {T,N,M} = (a, b)
+function promote_common_constants(a::Interpreter{T,N}, b::Interpreter{S,M}) where {T,S,N,M}
+    TS = promote_type(T, S)
+    (convert(Interpreter{TS,N}, a), convert(Interpreter{TS,M}, b))
+end
+
+
+Base.promote_rule(::Type{Interpreter{T,N}}, I::Interpreter{S,N}) where {T,S,N} =
+    Interpreter{promote_type(T, S),N}
 show_instructions(I::Interpreter) = show_instructions(stdout, I)
 function show_instructions(io::IO, I::Interpreter)
     for (i, instr) in enumerate(I.instructions)
@@ -161,6 +170,25 @@ function jacobian_interpreter(F::Union{System,Homotopy})
     t = isa(F, Homotopy) ? name(F.t) : nothing
     Interpreter(dlist, something.(J, 0), var_map, t, param_map, eval_out)
 end
+
+function evaluate_jacobian_interpreter(F::Union{System,Homotopy})
+    var_map = Dict((name(v), i) for (i, v) in enumerate(F.variables))
+    param_map = Dict{Symbol,Int}()
+    if !isnothing(F.parameters)
+        for (i, v) in enumerate(F.parameters)
+            param_map[name(v)] = i
+        end
+    end
+    list, eval_out = instruction_list(F.expressions)
+    dlist, J = diff(list, Symbol.(F.variables), eval_out)
+
+    #replace nothings with 0
+    t = isa(F, Homotopy) ? name(F.t) : nothing
+    eval_interpreter = Interpreter(list, eval_out, var_map, t, param_map, eval_out)
+    jac_interpreter = Interpreter(dlist, something.(J, 0), var_map, t, param_map, eval_out)
+    eval_interpreter, jac_interpreter
+end
+
 
 function taylor_interpreter(
     F::Union{System,Homotopy};
@@ -204,7 +232,6 @@ function taylor_interpreter(
     outputs = map(id -> something(diff_map[id, order_out], 0), eval_out)
     Interpreter(dlist, outputs, var_map, t, param_map, eval_out)
 end
-
 
 function Interpreter(
     list::InstructionList,
