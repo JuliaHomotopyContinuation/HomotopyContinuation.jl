@@ -105,9 +105,9 @@ end
 This tracker realises the two step approach of the polyhedral homotopy.
 See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,N,M} <: AbstractPathTracker
-    toric_tracker::Tracker{H1,N,M}
-    generic_tracker::EndgameTracker{H2,N,M}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,M} <: AbstractPathTracker
+    toric_tracker::Tracker{H1,M}
+    generic_tracker::EndgameTracker{H2,M}
     support::Vector{Matrix{Int32}}
     lifting::Vector{Vector{Int32}}
 end
@@ -167,7 +167,7 @@ function polyhedral(F::AbstractSystem; kwargs...)
 end
 function polyhedral(
     f::System;
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     target_parameters = nothing,
     kwargs...,
 )
@@ -274,7 +274,7 @@ function polyhedral(
     tracker_options = TrackerOptions(),
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     kwargs...,
 )
     unsupported_kwargs(kwargs)

@@ -20,7 +20,7 @@ function ExtrinsicSubspaceHomotopy(
     F::System,
     start,
     target;
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 )
     ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target)
 end
@@ -167,6 +167,27 @@ function ModelKit.taylor!(u, v::Val{1}, H::ExtrinsicSubspaceHomotopy, tx, t)
     end
     for j = 1:size(H.Ȧ, 2)
         xⱼ, = tx[j]
+        for i = 1:size(H.Ȧ, 1)
+            u[m+i] = muladd(H.Ȧ[i, j], xⱼ, u[m+i])
+        end
+    end
+    u
+end
+
+function ModelKit.taylor!(
+    u,
+    v::Val{K},
+    H::ExtrinsicSubspaceHomotopy,
+    tx::TaylorVector{K},
+    t,
+) where {K}
+    m = first(size(H.F))
+    taylor!(u, v, H.F, tx)
+    for i = 1:length(H.b)
+        u[m+i] = 0.0
+    end
+    for j = 1:size(H.Ȧ, 2)
+        xⱼ = tx[j, K]
         for i = 1:size(H.Ȧ, 1)
             u[m+i] = muladd(H.Ȧ[i, j], xⱼ, u[m+i])
         end

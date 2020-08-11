@@ -59,7 +59,7 @@ const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
 "[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
 const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω_p = 2.0)
 "[`TrackerParameters`](@ref) which trade robustness against some speed."
-const CONSERVATIVE_TRACKER_PARAMETERS = TrackerParameters(β_ω_p = 5.0, β_τ = 0.2)
+const CONSERVATIVE_TRACKER_PARAMETERS = TrackerParameters(β_ω_p = 4.0, β_τ = 0.25)
 
 
 """
@@ -436,16 +436,16 @@ We see that we tracked all 4 paths successfully.
 # successfull: 4
 ```
 """
-struct Tracker{H<:AbstractHomotopy,AD,M<:AbstractMatrix{ComplexF64}}
+struct Tracker{H<:AbstractHomotopy,M<:AbstractMatrix{ComplexF64}}
     homotopy::H
-    predictor::Predictor{AD}
+    predictor::Predictor
     corrector::NewtonCorrector
     # these are mutable
     state::TrackerState{M}
     options::TrackerOptions
 end
 
-Tracker(H::ModelKit.Homotopy; compile::Bool = COMPILE_DEFAULT[], kwargs...) =
+Tracker(H::ModelKit.Homotopy; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...) =
     Tracker(fixed(H; compile = compile); kwargs...)
 function Tracker(
     H::AbstractHomotopy,
@@ -460,7 +460,7 @@ function Tracker(
     end
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
-    predictor = Predictor(H, AD(options.automatic_differentiation))
+    predictor = Predictor(H)
     corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
     Tracker(H, predictor, corrector, state, options)
 end
@@ -760,7 +760,16 @@ function use_extended_precision!(tracker::Tracker)
     state.used_extended_prec = true
     # do two refinement steps
     for i = 1:2
-        μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+        μ = extended_prec_refinement_step!(
+            x,
+            corrector,
+            homotopy,
+            x,
+            t,
+            jacobian,
+            norm;
+            simple_newton_step = false,
+        )
     end
     state.μ = max(μ, eps())
     state.μ
@@ -768,12 +777,30 @@ end
 
 function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps())
     @unpack homotopy, corrector, state, options = tracker
-    @unpack x, t, jacobian, norm = state
+    @unpack x, x̄, t, jacobian, norm = state
 
-    μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+    μ = state.accuracy
+    μ̄ = extended_prec_refinement_step!(
+        x̄,
+        corrector,
+        homotopy,
+        x,
+        t,
+        jacobian,
+        norm;
+        simple_newton_step = false,
+    )
+    if μ̄ < μ
+        x .= x̄
+        μ = μ̄
+    end
     k = 1
     while (μ > min_tol && k ≤ 3)
-        μ = extended_prec_refinement_step!(x, corrector, homotopy, x, t, jacobian, norm)
+        μ̄ = extended_prec_refinement_step!(x̄, corrector, homotopy, x, t, jacobian, norm)
+        if μ̄ < μ
+            x .= x̄
+            μ = μ̄
+        end
         k += 1
     end
     μ
@@ -853,13 +880,7 @@ function step!(tracker::Tracker, debug::Bool = false)
         state.last_steps_failed += 1
     end
     state.norm_Δx₀ = result.norm_Δx₀
-    update_stepsize!(
-        state,
-        result,
-        options,
-        predictor;
-        ad_for_error_estimate = predictor.AD isa AD{4},
-    )
+    update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
 
     check_terminated!(state, options)
 

@@ -56,13 +56,11 @@ function _precompile_()
         Array{Variable,1},
     })
     Base.precompile(Tuple{
-        Core.kwftype(typeof(HomotopyContinuation.ModelKit._taylor!_impl)),
-        NamedTuple{(:highest_order_only,),Tuple{Bool}},
-        typeof(HomotopyContinuation.ModelKit._taylor!_impl),
-        Type{T} where T,
-        Int64,
-        Int64,
-        Int64,
+        Core.kwftype(typeof(HomotopyContinuation.ModelKit.Type)),
+        NamedTuple{(:variables, :parameters),Tuple{Array{Variable,1},Array{Variable,1}}},
+        Type{System},
+        Array{Array{Int32,2},1},
+        Array{Array{Variable,1},1},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.ModelKit.buildvars)),
@@ -84,44 +82,15 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
-        NamedTuple{
-            (:AD, :tx⁰, :tx¹, :tx², :tx³, :xtemp, :u, :u₁, :u₂, :prev_tx¹, :ty¹, :prev_ty¹),
-            Tuple{
-                HomotopyContinuation.AD{1},
-                TaylorVector{1,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{3,Complex{Float64}},
-                TaylorVector{4,Complex{Float64}},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-            },
-        },
-        Type{HomotopyContinuation.Predictor},
+        NamedTuple{(:options,),Tuple{EndgameOptions}},
+        Type{EndgameTracker},
+        Tracker{CoefficientHomotopy{InterpretedSystem{Float64}},Array{Complex{Float64},2}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:options,),Tuple{EndgameOptions}},
         Type{EndgameTracker},
-        Tracker{
-            CoefficientHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
-            Array{Complex{Float64},2},
-        },
-    })
-    Base.precompile(Tuple{
-        Core.kwftype(typeof(HomotopyContinuation.Type)),
-        NamedTuple{(:options,),Tuple{EndgameOptions}},
-        Type{EndgameTracker},
-        Tracker{
-            ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-            HomotopyContinuation.AD{1},
-            Array{Complex{Float64},2},
-        },
+        Tracker{ParameterHomotopy{InterpretedSystem{Float64}},Array{Complex{Float64},2}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
@@ -132,7 +101,6 @@ function _precompile_()
                 FixedParameterSystem{InterpretedSystem{Float64},Float64},
                 InterpretedSystem{Float64},
             },
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
     })
@@ -246,6 +214,21 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
+        NamedTuple{(:seed, :start_system),Tuple{UInt32,Nothing}},
+        Type{Result},
+        Array{PathResult,1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.Type)),
+        NamedTuple{(:seed, :start_system),Tuple{UInt32,Nothing}},
+        Type{Solver},
+        EndgameTracker{
+            ParameterHomotopy{InterpretedSystem{Float64}},
+            Array{Complex{Float64},2},
+        },
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:seed, :start_system),Tuple{UInt32,Symbol}},
         Type{Result},
         Array{PathResult,1},
@@ -259,7 +242,6 @@ function _precompile_()
                 FixedParameterSystem{InterpretedSystem{Float64},Float64},
                 InterpretedSystem{Float64},
             },
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
     })
@@ -271,7 +253,6 @@ function _precompile_()
             PolyhedralTracker{
                 HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
                 CoefficientHomotopy{InterpretedSystem{Float64}},
-                HomotopyContinuation.AD{1},
                 Array{Complex{Float64},2},
             },
             HomotopyContinuation.ExcessSolutionCheck{
@@ -287,7 +268,6 @@ function _precompile_()
         PolyhedralTracker{
             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
             CoefficientHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
     })
@@ -336,7 +316,7 @@ function _precompile_()
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:tracker_options, :options),Tuple{TrackerOptions,EndgameOptions}},
         Type{EndgameTracker},
-        ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
+        ParameterHomotopy{InterpretedSystem{Float64}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
@@ -346,6 +326,26 @@ function _precompile_()
             FixedParameterSystem{InterpretedSystem{Float64},Float64},
             InterpretedSystem{Float64},
         },
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.Type)),
+        NamedTuple{
+            (:tx⁰, :tx¹, :tx², :tx³, :xtemp, :u, :u₁, :u₂, :prev_tx¹, :ty¹, :prev_ty¹),
+            Tuple{
+                TaylorVector{1,Complex{Float64}},
+                TaylorVector{2,Complex{Float64}},
+                TaylorVector{3,Complex{Float64}},
+                TaylorVector{4,Complex{Float64}},
+                Array{Complex{Float64},1},
+                Array{Complex{Float64},1},
+                Array{Complex{Float64},1},
+                Array{Complex{Float64},1},
+                TaylorVector{2,Complex{Float64}},
+                TaylorVector{2,Complex{Float64}},
+                TaylorVector{2,Complex{Float64}},
+            },
+        },
+        Type{HomotopyContinuation.Predictor},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
@@ -373,8 +373,7 @@ function _precompile_()
         typeof(monodromy_solve),
         HomotopyContinuation.MonodromySolver{
             EndgameTracker{
-                ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-                HomotopyContinuation.AD{1},
+                ParameterHomotopy{InterpretedSystem{Float64}},
                 Array{Complex{Float64},2},
             },
             Array{Complex{Float64},1},
@@ -472,6 +471,31 @@ function _precompile_()
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.solve)),
         NamedTuple{
+            (:start_parameters, :target_parameters, :compile),
+            Tuple{Array{Complex{Float64},1},Array{Float64,1},Bool},
+        },
+        typeof(solve),
+        System,
+        Array{Array{Complex{Float64},1},1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.solve)),
+        NamedTuple{
+            (:stop_early_cb, :show_progress, :threading, :catch_interrupt),
+            Tuple{typeof(HomotopyContinuation.always_false),Bool,Bool,Bool},
+        },
+        typeof(solve),
+        Solver{
+            EndgameTracker{
+                ParameterHomotopy{InterpretedSystem{Float64}},
+                Array{Complex{Float64},2},
+            },
+        },
+        Array{Array{Complex{Float64},1},1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.solve)),
+        NamedTuple{
             (:stop_early_cb, :show_progress, :threading, :catch_interrupt),
             Tuple{typeof(HomotopyContinuation.always_false),Bool,Bool,Bool},
         },
@@ -482,7 +506,6 @@ function _precompile_()
                     FixedParameterSystem{InterpretedSystem{Float64},Float64},
                     InterpretedSystem{Float64},
                 },
-                HomotopyContinuation.AD{1},
                 Array{Complex{Float64},2},
             },
         },
@@ -503,7 +526,6 @@ function _precompile_()
                 PolyhedralTracker{
                     HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
                     CoefficientHomotopy{InterpretedSystem{Float64}},
-                    HomotopyContinuation.AD{1},
                     Array{Complex{Float64},2},
                 },
                 HomotopyContinuation.ExcessSolutionCheck{
@@ -525,7 +547,6 @@ function _precompile_()
             PolyhedralTracker{
                 HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
                 CoefficientHomotopy{InterpretedSystem{Float64}},
-                HomotopyContinuation.AD{1},
                 Array{Complex{Float64},2},
             },
         },
@@ -604,39 +625,6 @@ function _precompile_()
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
     })
-    Base.precompile(Tuple{
-        Type{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-        Int64,
-        Int64,
-        Int64,
-        System,
-    })
-    Base.precompile(Tuple{
-        Type{Core.Compiler.Signature},
-        EuclideanNorm,
-        Core.Compiler.Const,
-        Array{Any,1},
-        Type{T} where T,
-    })
-    Base.precompile(Tuple{
-        Type{Core.Compiler.Signature},
-        InfNorm,
-        Core.Compiler.Const,
-        Array{Any,1},
-        Type{T} where T,
-    })
-    Base.precompile(Tuple{
-        Type{
-            Dict{
-                Tuple{Int64,Int64,Int64},
-                Tuple{
-                    HomotopyContinuation.ModelKit.Interpreter{Float64,1},
-                    HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
-                },
-            },
-        },
-    })
-    Base.precompile(Tuple{Type{HomotopyContinuation.AD{1}}})
     Base.precompile(Tuple{
         Type{HomotopyContinuation.ExcessSolutionCheck},
         RandomizedSystem{InterpretedSystem{Float64}},
@@ -822,8 +810,7 @@ function _precompile_()
         Type{HomotopyContinuation.MonodromySolver},
         Array{
             EndgameTracker{
-                ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-                HomotopyContinuation.AD{1},
+                ParameterHomotopy{InterpretedSystem{Float64}},
                 Array{Complex{Float64},2},
             },
             1,
@@ -842,29 +829,6 @@ function _precompile_()
         ReentrantLock,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.Predictor},
-        CoefficientHomotopy{InterpretedSystem{Float64}},
-        HomotopyContinuation.AD{1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.Predictor},
-        HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-        HomotopyContinuation.AD{1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.Predictor},
-        ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-        HomotopyContinuation.AD{1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.Predictor},
-        StraightLineHomotopy{
-            FixedParameterSystem{InterpretedSystem{Float64},Float64},
-            InterpretedSystem{Float64},
-        },
-        HomotopyContinuation.AD{1},
-    })
-    Base.precompile(Tuple{
         Type{HomotopyContinuation.ToricHomotopy},
         InterpretedSystem{Float64},
         Array{Array{Complex{Float64},1},1},
@@ -881,6 +845,7 @@ function _precompile_()
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
         HomotopyContinuation.SegmentStepper,
+        Float64,
         Float64,
         Float64,
         Float64,
@@ -912,47 +877,17 @@ function _precompile_()
         }},
         HomotopyContinuation.ModelKit.Interpreter{Float64,2},
         HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
-        Dict{
-            Tuple{Int64,Int64,Int64},
-            Tuple{
-                HomotopyContinuation.ModelKit.Interpreter{Float64,1},
-                HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
-            },
-        },
-    })
-    Base.precompile(Tuple{
-        Type{
-            NamedTuple{
-                (
-                    :AD,
-                    :tx⁰,
-                    :tx¹,
-                    :tx²,
-                    :tx³,
-                    :xtemp,
-                    :u,
-                    :u₁,
-                    :u₂,
-                    :prev_tx¹,
-                    :ty¹,
-                    :prev_ty¹,
-                ),
-                T,
-            } where T<:Tuple,
-        },
         Tuple{
-            HomotopyContinuation.AD{1},
-            TaylorVector{1,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{3,Complex{Float64}},
-            TaylorVector{4,Complex{Float64}},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
+            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
+                Complex{Float64},
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
+                Complex{Float64},
+                Complex{Float64},
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{NTuple{4,Complex{Float64}}},
         },
     })
     Base.precompile(Tuple{
@@ -998,6 +933,27 @@ function _precompile_()
         },
     })
     Base.precompile(Tuple{
+        Type{
+            NamedTuple{
+                (:tx⁰, :tx¹, :tx², :tx³, :xtemp, :u, :u₁, :u₂, :prev_tx¹, :ty¹, :prev_ty¹),
+                T,
+            } where T<:Tuple,
+        },
+        Tuple{
+            TaylorVector{1,Complex{Float64}},
+            TaylorVector{2,Complex{Float64}},
+            TaylorVector{3,Complex{Float64}},
+            TaylorVector{4,Complex{Float64}},
+            Array{Complex{Float64},1},
+            Array{Complex{Float64},1},
+            Array{Complex{Float64},1},
+            Array{Complex{Float64},1},
+            TaylorVector{2,Complex{Float64}},
+            TaylorVector{2,Complex{Float64}},
+            TaylorVector{2,Complex{Float64}},
+        },
+    })
+    Base.precompile(Tuple{
         Type{NamedTuple{(:val, :solution, :row_scaling, :samples),T} where T<:Tuple},
         Tuple{
             HomotopyContinuation.Valuation,
@@ -1019,7 +975,6 @@ function _precompile_()
         PolyhedralTracker{
             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
             CoefficientHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
         HomotopyContinuation.ExcessSolutionCheck{
@@ -1032,27 +987,30 @@ function _precompile_()
         PolyhedralTracker{
             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
             CoefficientHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
         RandomizedSystem{InterpretedSystem{Float64}},
     })
     Base.precompile(Tuple{
         Type{ParameterHomotopy},
-        CompiledSystem{(0xe5a477b71c578e55, 1)},
+        InterpretedSystem{Float64},
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
+    })
+    Base.precompile(Tuple{
+        Type{ParameterHomotopy},
+        InterpretedSystem{Float64},
+        Array{Complex{Float64},1},
+        Array{Float64,1},
     })
     Base.precompile(Tuple{
         Type{PolyhedralTracker},
         Tracker{
             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
         EndgameTracker{
             CoefficientHomotopy{InterpretedSystem{Float64}},
-            HomotopyContinuation.AD{1},
             Array{Complex{Float64},2},
         },
         Array{Array{Int32,2},1},
@@ -1079,71 +1037,13 @@ function _precompile_()
         },
     })
     Base.precompile(Tuple{Type{TaylorVector{1,T} where T},TaylorVector{4,Complex{Float64}}})
-    Base.precompile(Tuple{
-        Type{TaylorVector{2,Complex{Float64}}},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        Tuple{
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
     Base.precompile(Tuple{Type{TaylorVector{2,T} where T},TaylorVector{4,Complex{Float64}}})
-    Base.precompile(Tuple{
-        Type{TaylorVector{3,Complex{Float64}}},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        Tuple{
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
+    Base.precompile(Tuple{Type{TaylorVector{2,T} where T},Type{T} where T,Int64})
     Base.precompile(Tuple{Type{TaylorVector{3,T} where T},TaylorVector{4,Complex{Float64}}})
     Base.precompile(Tuple{Type{TaylorVector{3,T} where T},TaylorVector{5,Complex{Float64}}})
-    Base.precompile(Tuple{
-        Type{TaylorVector{4,Complex{Float64}}},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        NTuple{
-            4,
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
     Base.precompile(Tuple{Type{TaylorVector{4,T} where T},TaylorVector{5,Complex{Float64}}})
+    Base.precompile(Tuple{Type{TaylorVector{4,T} where T},Type{T} where T,Int64})
+    Base.precompile(Tuple{Type{TaylorVector{5,T} where T},Type{T} where T,Int64})
     Base.precompile(Tuple{
         Type{TaylorVector},
         LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
@@ -1195,7 +1095,7 @@ function _precompile_()
     Base.precompile(Tuple{
         Type{Tracker},
         CoefficientHomotopy{InterpretedSystem{Float64}},
-        HomotopyContinuation.Predictor{HomotopyContinuation.AD{1}},
+        HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
         TrackerOptions,
@@ -1203,15 +1103,15 @@ function _precompile_()
     Base.precompile(Tuple{
         Type{Tracker},
         HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-        HomotopyContinuation.Predictor{HomotopyContinuation.AD{1}},
+        HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
         TrackerOptions,
     })
     Base.precompile(Tuple{
         Type{Tracker},
-        ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-        HomotopyContinuation.Predictor{HomotopyContinuation.AD{1}},
+        ParameterHomotopy{InterpretedSystem{Float64}},
+        HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
         TrackerOptions,
@@ -1222,18 +1122,16 @@ function _precompile_()
             FixedParameterSystem{InterpretedSystem{Float64},Float64},
             InterpretedSystem{Float64},
         },
-        HomotopyContinuation.Predictor{HomotopyContinuation.AD{1}},
+        HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
         TrackerOptions,
     })
-    Base.precompile(Tuple{Type{Variable},String})
     Base.precompile(Tuple{typeof(*),Array{Complex{Float64},2},Array{Expression,1}})
     Base.precompile(Tuple{typeof(*),Complex{Int64},Expression})
     Base.precompile(Tuple{typeof(*),Expression,Expression})
     Base.precompile(Tuple{typeof(*),Float64,Expression})
     Base.precompile(Tuple{typeof(*),Int64,Variable})
-    Base.precompile(Tuple{typeof(*),Variable,Expression})
     Base.precompile(Tuple{typeof(*),Variable,Variable})
     Base.precompile(Tuple{typeof(+),Expression,Expression,Expression,Expression})
     Base.precompile(Tuple{typeof(+),Expression,Expression,Expression})
@@ -1282,11 +1180,6 @@ function _precompile_()
         Int64,
     })
     Base.precompile(Tuple{
-        typeof(Base.Broadcast.broadcasted),
-        Type{T} where T,
-        Array{Variable,1},
-    })
-    Base.precompile(Tuple{
         typeof(Base.Broadcast.copyto_nonleaf!),
         Array{Complex{Float64},1},
         Base.Broadcast.Broadcasted{
@@ -1310,19 +1203,6 @@ function _precompile_()
                 Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}},
                 Base.RefValue{Array{Variable,1}},
             },
-        },
-        Base.OneTo{Int64},
-        Int64,
-        Int64,
-    })
-    Base.precompile(Tuple{
-        typeof(Base.Broadcast.copyto_nonleaf!),
-        Array{Float64,1},
-        Base.Broadcast.Broadcasted{
-            Base.Broadcast.DefaultArrayStyle{1},
-            Tuple{Base.OneTo{Int64}},
-            typeof(to_number),
-            Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
         },
         Base.OneTo{Int64},
         Int64,
@@ -1414,30 +1294,14 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(Base.Broadcast.restart_copyto_nonleaf!),
         Array{Number,1},
-        Array{Float64,1},
+        Array{Complex{Float64},1},
         Base.Broadcast.Broadcasted{
             Base.Broadcast.DefaultArrayStyle{1},
             Tuple{Base.OneTo{Int64}},
             typeof(to_number),
             Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
         },
-        Complex{Float64},
-        Int64,
-        Base.OneTo{Int64},
-        Int64,
-        Int64,
-    })
-    Base.precompile(Tuple{
-        typeof(Base.Broadcast.restart_copyto_nonleaf!),
-        Array{Real,1},
-        Array{Float64,1},
-        Base.Broadcast.Broadcasted{
-            Base.Broadcast.DefaultArrayStyle{1},
-            Tuple{Base.OneTo{Int64}},
-            typeof(to_number),
-            Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
-        },
-        Int64,
+        Float64,
         Int64,
         Base.OneTo{Int64},
         Int64,
@@ -1485,24 +1349,28 @@ function _precompile_()
         Base.HasShape{1},
     })
     Base.precompile(Tuple{
+        typeof(Base._compute_eltype),
+        Type{Tuple{Array{Array{Variable,1},1},Array{Variable,1}}},
+    })
+    Base.precompile(Tuple{
+        typeof(Base._compute_eltype),
+        Type{Tuple{typeof(HomotopyContinuation.always_false),Bool,Bool,Bool}},
+    })
+    Base.precompile(Tuple{
         typeof(Base._similar_for),
         Array{Expression,1},
         Type{Expression},
         Base.Generator{Array{Expression,1},typeof(to_number)},
         Base.HasShape{1},
     })
+    Base.precompile(Tuple{
+        typeof(Base.allocatedinline),
+        Type{Complex{HomotopyContinuation.DoubleDouble.DoubleF64}},
+    })
     Base.precompile(Tuple{typeof(Base.allocatedinline),Type{Expression}})
     Base.precompile(Tuple{
         typeof(Base.allocatedinline),
         Type{HomotopyContinuation.ModelKit.ExpressionRef},
-    })
-    Base.precompile(Tuple{
-        typeof(Base.allocatedinline),
-        Type{HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}}},
-    })
-    Base.precompile(Tuple{
-        typeof(Base.allocatedinline),
-        Type{HomotopyContinuation.ModelKit.Interpreter{Float64,1}},
     })
     Base.precompile(Tuple{typeof(Base.allocatedinline),Type{Variable}})
     Base.precompile(Tuple{
@@ -1540,12 +1408,17 @@ function _precompile_()
     Base.precompile(Tuple{typeof(Base.deepcopy_internal),Array{Variable,1},IdDict{Any,Any}})
     Base.precompile(Tuple{
         typeof(Base.deepcopy_internal),
-        Dict{
-            Tuple{Int64,Int64,Int64},
-            Tuple{
-                HomotopyContinuation.ModelKit.Interpreter{Float64,1},
-                HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
-            },
+        Tuple{
+            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
+                Complex{Float64},
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
+                Complex{Float64},
+                Complex{Float64},
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{NTuple{4,Complex{Float64}}},
         },
         IdDict{Any,Any},
     })
@@ -1559,20 +1432,28 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(Base.vect),
         EndgameTracker{
-            ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-            HomotopyContinuation.AD{1},
+            ParameterHomotopy{InterpretedSystem{Float64}},
             Array{Complex{Float64},2},
         },
     })
     Base.precompile(Tuple{typeof(Base.vect),Expression,Vararg{Expression,N} where N})
     Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.__init__)})
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit._evaluate!_impl),
-        Type{CompiledSystem{(0xe5a477b71c578e55, 1)}},
+        typeof(HomotopyContinuation.ModelKit._impl_taylor_bivariate),
+        Int64,
+        Int64,
+        Int64,
+        Symbol,
     })
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit._evaluate_and_jacobian!_impl),
-        Type{CompiledSystem{(0xe5a477b71c578e55, 1)}},
+        typeof(HomotopyContinuation.ModelKit._impl_taylor_pow),
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit._impl_taylor_sqr),
+        Int64,
+        Int64,
     })
     Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.free!),Expression})
     Base.precompile(Tuple{
@@ -1610,12 +1491,17 @@ function _precompile_()
         Array{Real,1},
     })
     Base.precompile(Tuple{
+        typeof(HomotopyContinuation.qr_ldiv!),
+        Array{Complex{Float64},1},
+        LinearAlgebra.QR{Complex{Float64},Array{Complex{Float64},2}},
+        Array{Complex{Float64},1},
+    })
+    Base.precompile(Tuple{
         typeof(HomotopyContinuation.threaded_monodromy_solve!),
         Array{PathResult,1},
         HomotopyContinuation.MonodromySolver{
             EndgameTracker{
-                ParameterHomotopy{CompiledSystem{(0xe5a477b71c578e55, 1)}},
-                HomotopyContinuation.AD{1},
+                ParameterHomotopy{InterpretedSystem{Float64}},
                 Array{Complex{Float64},2},
             },
             Array{Complex{Float64},1},
@@ -1632,6 +1518,7 @@ function _precompile_()
         ProgressMeter.ProgressUnknown,
     })
     Base.precompile(Tuple{typeof(append!),Array{Expression,1},Array{Float64,1}})
+    Base.precompile(Tuple{typeof(append!),Array{Variable,1},Array{Variable,1}})
     Base.precompile(Tuple{
         typeof(convert),
         Type{HomotopyContinuation.ModelKit.Interpreter{Float64,1}},
@@ -1718,6 +1605,10 @@ function _precompile_()
         NewtonCache{HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}}},
     })
     Base.precompile(Tuple{typeof(on_affine_chart),InterpretedSystem{Float64},Nothing})
+    Base.precompile(Tuple{
+        typeof(parameters),
+        MonodromyResult{Array{Complex{Float64},1},Array{Complex{Float64},1}},
+    })
     Base.precompile(Tuple{typeof(permute!),Array{Expression,1},Array{Int64,1}})
     Base.precompile(Tuple{
         typeof(push!),
@@ -1747,22 +1638,17 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(push!),
         HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Int64,Expr},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
         Tuple{Symbol,Int64,Int64},
     })
     Base.precompile(Tuple{
         typeof(push!),
         HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Int64,Symbol},
+        Tuple{Symbol,Symbol,Float64},
     })
     Base.precompile(Tuple{
         typeof(push!),
         HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Symbol,Float64},
+        Tuple{Symbol,Symbol,Nothing},
     })
     Base.precompile(Tuple{
         typeof(setindex!),
@@ -1869,62 +1755,33 @@ function _precompile_()
             typeof(to_number),
             Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
         },
-        Type{Float64},
-    })
-    Base.precompile(Tuple{
-        typeof(similar),
-        Base.Broadcast.Broadcasted{
-            Base.Broadcast.DefaultArrayStyle{1},
-            Tuple{Base.OneTo{Int64}},
-            typeof(to_number),
-            Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
-        },
         Type{Int64},
     })
     Base.precompile(Tuple{typeof(size),AffineChartSystem{InterpretedSystem{Float64},1}})
     Base.precompile(Tuple{
-        typeof(which(
-            HomotopyContinuation.ModelKit.evaluate!,
-            (Any, CompiledSystem, Any, Any),
-        ).generator.gen),
-        Any,
-        Any,
-        Any,
-        Any,
-        Any,
+        typeof(solutions),
+        MonodromyResult{Array{Complex{Float64},1},Array{Complex{Float64},1}},
     })
-    Base.precompile(Tuple{
-        typeof(which(
-            HomotopyContinuation.ModelKit.evaluate_and_jacobian!,
-            (Any, Any, CompiledSystem, Any, Any),
-        ).generator.gen),
-        Any,
-        Any,
-        Any,
-        Any,
-        Any,
-        Any,
-    })
-    isdefined(HomotopyContinuation, Symbol("#216#217")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation, Symbol("#216#217")),
+    isdefined(HomotopyContinuation, Symbol("#221#222")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation, Symbol("#221#222")),
         Array{Complex{Float64},1},
     })
-    isdefined(HomotopyContinuation, Symbol("#271#273")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#271#273"))})
-    isdefined(HomotopyContinuation, Symbol("#299#302")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#299#302"))})
-    isdefined(HomotopyContinuation, Symbol("#300#303")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#300#303"))})
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#156#157")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#156#157")),
+    isdefined(HomotopyContinuation, Symbol("#283#285")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#283#285"))})
+    isdefined(HomotopyContinuation, Symbol("#311#314")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#311#314"))})
+    isdefined(HomotopyContinuation, Symbol("#312#315")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#312#315"))})
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#168#169")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#168#169")),
         Float64,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#156#157")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#156#157")),
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#168#169")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#168#169")),
         Int64,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#167#169")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#167#169")),
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#170#172")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#170#172")),
         Int64,
     })
     let fbody = try
@@ -1952,18 +1809,49 @@ function _precompile_()
                 (
                     Solver{
                         EndgameTracker{
+                            ParameterHomotopy{InterpretedSystem{Float64}},
+                            Array{Complex{Float64},2},
+                        },
+                    },
+                    Array{Array{Complex{Float64},1},1},
+                ),
+            ))
+        catch missing
+        end
+        if !ismissing(fbody)
+            precompile(
+                fbody,
+                (
+                    Function,
+                    Bool,
+                    Bool,
+                    Bool,
+                    typeof(solve),
+                    Solver{
+                        EndgameTracker{
+                            ParameterHomotopy{InterpretedSystem{Float64}},
+                            Array{Complex{Float64},2},
+                        },
+                    },
+                    Array{Array{Complex{Float64},1},1},
+                ),
+            )
+        end
+    end
+    let fbody = try
+            __lookup_kwbody__(which(
+                HomotopyContinuation.solve,
+                (
+                    Solver{
+                        EndgameTracker{
                             StraightLineHomotopy{
                                 FixedParameterSystem{InterpretedSystem{Float64},Float64},
                                 InterpretedSystem{Float64},
                             },
-                            HomotopyContinuation.AD{1},
                             Array{Complex{Float64},2},
                         },
                     },
-                    HomotopyContinuation.TotalDegreeStartSolutionsIterator{Base.Iterators.ProductIterator{Tuple{
-                        UnitRange{Int64},
-                        UnitRange{Int64},
-                    }}},
+                    Array{Array{Complex{Float64},1},1},
                 ),
             ))
         catch missing
@@ -1983,14 +1871,10 @@ function _precompile_()
                                 FixedParameterSystem{InterpretedSystem{Float64},Float64},
                                 InterpretedSystem{Float64},
                             },
-                            HomotopyContinuation.AD{1},
                             Array{Complex{Float64},2},
                         },
                     },
-                    HomotopyContinuation.TotalDegreeStartSolutionsIterator{Base.Iterators.ProductIterator{Tuple{
-                        UnitRange{Int64},
-                        UnitRange{Int64},
-                    }}},
+                    Array{Array{Complex{Float64},1},1},
                 ),
             )
         end
@@ -2006,7 +1890,6 @@ function _precompile_()
                                     Float64,
                                 }},
                                 CoefficientHomotopy{InterpretedSystem{Float64}},
-                                HomotopyContinuation.AD{1},
                                 Array{Complex{Float64},2},
                             },
                             HomotopyContinuation.ExcessSolutionCheck{
@@ -2018,7 +1901,7 @@ function _precompile_()
                             },
                         },
                     },
-                    PolyhedralStartSolutionsIterator,
+                    Array{Tuple{MixedSubdivisions.MixedCell,Array{Complex{Float64},1}},1},
                 ),
             ))
         catch missing
@@ -2039,7 +1922,6 @@ function _precompile_()
                                     Float64,
                                 }},
                                 CoefficientHomotopy{InterpretedSystem{Float64}},
-                                HomotopyContinuation.AD{1},
                                 Array{Complex{Float64},2},
                             },
                             HomotopyContinuation.ExcessSolutionCheck{
@@ -2051,7 +1933,7 @@ function _precompile_()
                             },
                         },
                     },
-                    PolyhedralStartSolutionsIterator,
+                    Array{Tuple{MixedSubdivisions.MixedCell,Array{Complex{Float64},1}},1},
                 ),
             )
         end
@@ -2064,11 +1946,10 @@ function _precompile_()
                         PolyhedralTracker{
                             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
                             CoefficientHomotopy{InterpretedSystem{Float64}},
-                            HomotopyContinuation.AD{1},
                             Array{Complex{Float64},2},
                         },
                     },
-                    PolyhedralStartSolutionsIterator,
+                    Array{Tuple{MixedSubdivisions.MixedCell,Array{Complex{Float64},1}},1},
                 ),
             ))
         catch missing
@@ -2086,11 +1967,10 @@ function _precompile_()
                         PolyhedralTracker{
                             HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
                             CoefficientHomotopy{InterpretedSystem{Float64}},
-                            HomotopyContinuation.AD{1},
                             Array{Complex{Float64},2},
                         },
                     },
-                    PolyhedralStartSolutionsIterator,
+                    Array{Tuple{MixedSubdivisions.MixedCell,Array{Complex{Float64},1}},1},
                 ),
             )
         end
@@ -2110,6 +1990,7 @@ function _precompile_()
                     Function,
                     Nothing,
                     typeof(identity),
+                    Nothing,
                     Nothing,
                     Base.Iterators.Pairs{
                         Symbol,
@@ -2139,6 +2020,7 @@ function _precompile_()
                     Nothing,
                     typeof(identity),
                     Nothing,
+                    Nothing,
                     Base.Iterators.Pairs{
                         Symbol,
                         Bool,
@@ -2147,6 +2029,42 @@ function _precompile_()
                     },
                     typeof(solve),
                     System,
+                ),
+            )
+        end
+    end
+    let fbody = try
+            __lookup_kwbody__(which(
+                HomotopyContinuation.solve,
+                (System, Vararg{Any,N} where {N}),
+            ))
+        catch missing
+        end
+        if !ismissing(fbody)
+            precompile(
+                fbody,
+                (
+                    Bool,
+                    Bool,
+                    Bool,
+                    Array{Float64,1},
+                    Function,
+                    Nothing,
+                    typeof(identity),
+                    Nothing,
+                    Nothing,
+                    Base.Iterators.Pairs{
+                        Symbol,
+                        Any,
+                        Tuple{Symbol,Symbol},
+                        NamedTuple{
+                            (:start_parameters, :compile),
+                            Tuple{Array{Complex{Float64},1},Bool},
+                        },
+                    },
+                    typeof(solve),
+                    System,
+                    Vararg{Any,N} where {N},
                 ),
             )
         end

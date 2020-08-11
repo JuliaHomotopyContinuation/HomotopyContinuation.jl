@@ -25,19 +25,22 @@ end
 function RandomizedSystem(
     F::Union{AbstractSystem,System},
     k::Integer;
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 )
     n, N = size(F)
     #TODO: Should the rows of [I A] be unitary?
     A = randn(ComplexF64, k, n - k)
     RandomizedSystem(F, A; compile = compile)
 end
-RandomizedSystem(F::System, A::Matrix{ComplexF64}; compile::Bool = COMPILE_DEFAULT[]) =
-    RandomizedSystem(fixed(F; compile = compile), A)
+RandomizedSystem(
+    F::System,
+    A::Matrix{ComplexF64};
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+) = RandomizedSystem(fixed(F; compile = compile), A)
 function RandomizedSystem(
     F::AbstractSystem,
     A::Matrix{ComplexF64};
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 )
     n, N = size(F)
     n > N || throw(ArgumentError("Then given system is not overdetermined."))
@@ -67,8 +70,10 @@ ModelKit.variable_groups(F::RandomizedSystem) = variable_groups(F.system)
 Creates the [`RandomizedSystem`](@ref) ``\\mathfrak{R}(F(x); N)`` where ``N`` is the number
 of variables of `F`.
 """
-square_up(F::Union{AbstractSystem,System}; compile::Bool = COMPILE_DEFAULT[]) =
-    RandomizedSystem(F, last(size(F)); compile = compile)
+square_up(
+    F::Union{AbstractSystem,System};
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+) = RandomizedSystem(F, last(size(F)); compile = compile)
 
 function randomize!(u, A, v::AbstractVector, ncols = 1)
     n, m = size(A, 1), length(v)

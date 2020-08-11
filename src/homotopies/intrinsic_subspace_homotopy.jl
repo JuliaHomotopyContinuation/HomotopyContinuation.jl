@@ -72,7 +72,7 @@ IntrinsicSubspaceHomotopy(
     F::ModelKit.System,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 ) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target)
 
 
@@ -80,7 +80,7 @@ function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Bool = COMPILE_DEFAULT[],
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 )
     IntrinsicSubspaceHomotopy(
         system,
@@ -322,7 +322,10 @@ function ModelKit.taylor!(
     x, x¹, x² = vectors(H.tx²)
     v, v¹ = vectors(tv)
 
-    if !incr
+    if incr
+        x .= H.x
+        x¹ .= H.ẋ
+    else
         LA.mul!(x, γ, v)
         LA.mul!(x¹, γ¹, v)
     end
