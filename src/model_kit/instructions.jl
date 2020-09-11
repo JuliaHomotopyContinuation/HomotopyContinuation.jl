@@ -86,7 +86,7 @@ function div!(list::InstructionList, @nospecialize(a), @nospecialize(b))
     push!(list, (:/, a, b))
 end
 
-function pow!(list, @nospecialize(a), b::Int)
+function pow!(list, @nospecialize(a), b::Integer)
     @assert b ≥ 0
     b == 1 && return a
     b == 0 && return 1
@@ -117,8 +117,16 @@ function flat_expr!(
         end
         return s
     elseif t == :Pow
-        x, k = ModelKit.args(ex)
-        return push!(v, (:^, flat_expr!(v, x, CSE, PSE), convert(Int32, k)))
+        x, k_expr = ModelKit.args(ex)
+        k = convert(Int32, k_expr)
+        xinstr = flat_expr!(v, x, CSE, PSE)
+        if k == -1
+            div!(v, Int32(1), xinstr)
+        elseif k < -1
+            div!(v, Int32(1), pow!(v, xinstr, -k))
+        else
+            pow!(v, xinstr, k)
+        end
     elseif t == :Mul
         vec = ModelKit.args(ex)
         op_arg = nothing
@@ -127,47 +135,50 @@ function flat_expr!(
             if class(vec_arg) == :Pow
                 x, k_expr = args(vec_arg)
                 k = convert(Int32, k_expr)
+                xinstr = flat_expr!(v, x, CSE, PSE)
                 if k == -1
-                    push!(divs, flat_expr!(v, x, CSE, PSE))
+                    push!(divs, xinstr)
                 elseif k < -1
-                    push!(divs, push!(v, (:^, flat_expr!(v, x, CSE, PSE), -k)))
-                elseif isnothing(op_arg)
-                    op_arg = push!(v, (:^, flat_expr!(v, x, CSE, PSE), k))
+                    push!(divs, pow!(v, xinstr, -k))
                 else
-                    pow_instr = push!(v, (:^, flat_expr!(v, x, CSE, PSE), k))
-                    op_arg = push!(v, (:*, op_arg, pow_instr))
+                    if isnothing(op_arg)
+                        op_arg = pow!(v, xinstr, k)
+                    else
+                        op_arg = mul!(op_arg, pow!(v, xinstr, k))
+                    end
                 end
-            elseif isnothing(op_arg)
-                op_arg = flat_expr!(v, vec_arg, CSE, PSE)
             else
-                op_arg = push!(v, (:*, op_arg, flat_expr!(v, vec_arg, CSE, PSE)))
+                vinstr = flat_expr!(v, vec_arg, CSE, PSE)
+                if isnothing(op_arg)
+                    op_arg = vinstr
+                else
+                    op_arg = mul!(v, op_arg, vinstr)
+                end
             end
         end
 
         if !isempty(divs)
             denom = first(divs)
             for i = 2:length(divs)
-                denom = push!(v, (:*, denom, divs[i]))
+                denom = mul!(v, denom, divs[i])
             end
             if isnothing(op_arg)
-                op_arg = push!(v, (:/, Int32(1), denom))
+                op_arg = div!(v, Int32(1), denom)
             else
-                op_arg = push!(v, (:/, op_arg, denom))
+                op_arg = div!(v, op_arg, denom)
             end
         end
         return op_arg
     elseif t == :Add
-        op = :+
         vec = ModelKit.args(ex)
         op_arg = flat_expr!(v, vec[1], CSE, PSE)
-
         for i = 2:length(vec)
-            op_arg = push!(v, (op, op_arg, flat_expr!(v, vec[i], CSE, PSE)))
+            op_arg = add!(v, op_arg, flat_expr!(v, vec[i], CSE, PSE))
         end
         return op_arg
     elseif t == :Div
         x, y = ModelKit.args(ex)
-        return push!(v, (:/, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE)))
+        return div!(v, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE))
     else
         return to_number(ex)
     end

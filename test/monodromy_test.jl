@@ -302,5 +302,23 @@
             max_loops_no_progress = 100,
         )
         @test nsolutions(r1) == nsolutions(r2) == 4
+
+        @var A1[1:3, 1:4] A2[1:3, 1:4]
+        @var x[1:3] u1[1:2] u2[1:2]
+        y1 = A1 * [x; 1]
+        y2 = A2 * [x; 1]
+        f = sum((u1 - y1[1:2] ./ y1[3]) .^ 2) + sum((u2 - y2[1:2] ./ y2[3]) .^ 2)
+        F = System(
+            differentiate(f, x),
+            variables = x,
+            parameters = [u1; u2; vec(A1); vec(A2)],
+        )
+        r = monodromy_solve(
+            F,
+            compile = false,
+            max_loops_no_progress = 100,
+            target_solutions_count = 6,
+        )
+        @test nsolutions(r) == 6
     end
 end
