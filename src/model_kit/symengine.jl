@@ -562,6 +562,7 @@ function Base.convert(::Type{Int}, n::Basic)
     @assert class(n) == :Integer
     ccall((:integer_get_si, libsymengine), Int, (Ref{ExpressionRef},), n)
 end
+Base.convert(::Type{Int32}, n::Basic) = convert(Int32, convert(Int, n))
 
 function Base.convert(::Type{BigInt}, c::Basic)
     a = BigInt()
@@ -654,7 +655,9 @@ function to_number(x::Basic)
 
     if cls == :Integer
         n = convert(BigInt, x)
-        if typemin(Int64) ≤ n ≤ typemax(Int64)
+        if typemin(Int32) ≤ n ≤ typemax(Int32)
+            return convert(Int32, n)
+        elseif typemin(Int64) ≤ n ≤ typemax(Int64)
             return convert(Int64, n)
         elseif typemin(Int128) ≤ n ≤ typemax(Int128)
             return convert(Int128, n)

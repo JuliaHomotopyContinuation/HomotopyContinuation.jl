@@ -118,11 +118,49 @@ function flat_expr!(
         return s
     elseif t == :Pow
         x, k = ModelKit.args(ex)
-        return push!(v, (:^, flat_expr!(v, x, CSE, PSE), convert(Int, k)))
-    elseif t == :Add || t == :Mul
-        op = t == :Add ? :+ : :*
+        return push!(v, (:^, flat_expr!(v, x, CSE, PSE), convert(Int32, k)))
+    elseif t == :Mul
+        vec = ModelKit.args(ex)
+        op_arg = nothing
+        divs = []
+        for vec_arg in vec
+            if class(vec_arg) == :Pow
+                x, k_expr = args(vec_arg)
+                k = convert(Int32, k_expr)
+                if k == -1
+                    push!(divs, flat_expr!(v, x, CSE, PSE))
+                elseif k < -1
+                    push!(divs, push!(v, (:^, flat_expr!(v, x, CSE, PSE), -k)))
+                elseif isnothing(op_arg)
+                    op_arg = push!(v, (:^, flat_expr!(v, x, CSE, PSE), k))
+                else
+                    pow_instr = push!(v, (:^, flat_expr!(v, x, CSE, PSE), k))
+                    op_arg = push!(v, (:*, op_arg, pow_instr))
+                end
+            elseif isnothing(op_arg)
+                op_arg = flat_expr!(v, vec_arg, CSE, PSE)
+            else
+                op_arg = push!(v, (:*, op_arg, flat_expr!(v, vec_arg, CSE, PSE)))
+            end
+        end
+
+        if !isempty(divs)
+            denom = first(divs)
+            for i = 2:length(divs)
+                denom = push!(v, (:*, denom, divs[i]))
+            end
+            if isnothing(op_arg)
+                op_arg = push!(v, (:/, Int32(1), denom))
+            else
+                op_arg = push!(v, (:/, op_arg, denom))
+            end
+        end
+        return op_arg
+    elseif t == :Add
+        op = :+
         vec = ModelKit.args(ex)
         op_arg = flat_expr!(v, vec[1], CSE, PSE)
+
         for i = 2:length(vec)
             op_arg = push!(v, (op, op_arg, flat_expr!(v, vec[i], CSE, PSE)))
         end
@@ -175,7 +213,7 @@ function diff!(list::InstructionList, N::Int, D::DiffMap)
             p2 = :NONE
             instr_added = false
             for ∂i = 1:N
-                exp::Int = arg2
+                exp = arg2
                 arg1_∂i = D[arg1, ∂i]
                 if arg1_∂i !== nothing
                     if p2 == :NONE
@@ -184,7 +222,7 @@ function diff!(list::InstructionList, N::Int, D::DiffMap)
                     end
                     if !instr_added
                         if exp == 2
-                            push!(v, id => (:^, arg1, 2))
+                            push!(v, id => (:^, arg1, Int32(2)))
                         else
                             push!(v, id => (:*, p1, arg1))
                         end

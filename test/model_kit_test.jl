@@ -16,9 +16,8 @@ using HomotopyContinuation.ModelKit
         @test convert(BigFloat, Expression(big(2.1))) == big(2.1)
         @test ModelKit.is_number(Expression(2))
         @test ModelKit.to_number(Expression(big(2.1))) isa BigFloat
-        @test ModelKit.to_number(Expression(2 // 3)) isa Rational{Int}
-        @test ModelKit.to_number(Expression(2) // 3) isa Rational{Int}
-        @test ModelKit.to_number(Expression(2) // Expression(3)) isa Rational{Int}
+        @test ModelKit.to_number(Expression(2 // 3)) isa Rational{Int32}
+        @test ModelKit.to_number(Expression(2) // Expression(3)) isa Rational{Int32}
         @test ModelKit.to_number(Expression(big(2)^129)) isa BigInt
         @test complex(Expression(1), Expression(2)) == Expression(1) + im * 2
         @test complex(Expression(1), 2) == Expression(1) + im * 2

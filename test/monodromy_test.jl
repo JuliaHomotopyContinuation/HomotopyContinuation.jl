@@ -282,4 +282,25 @@
         @test trace(res) < 1e-6
         @test is_success(res)
     end
+
+    @testset "Monodromy rational functions" begin
+        @var x y
+        @var u[1:4]
+        f1 = u[1] / x^2 + u[2]
+        f2 = u[3] / y^2 + u[4]
+        F = System([f1, f2], variables = [x, y], parameters = u[1:4])
+        r1 = monodromy_solve(
+            F,
+            compile = true,
+            target_solutions_count = 4,
+            max_loops_no_progress = 100,
+        )
+        r2 = monodromy_solve(
+            F,
+            compile = false,
+            target_solutions_count = 4,
+            max_loops_no_progress = 100,
+        )
+        @test nsolutions(r1) == nsolutions(r2) == 4
+    end
 end
