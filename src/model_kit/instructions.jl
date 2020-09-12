@@ -14,14 +14,13 @@ function instruction_list(
     perform_cse::Bool = true,
 )
     v = InstructionList()
-    PSE = Set{Symbol}()
     if perform_cse
         exprs, CSE = cse(exprs)
         merge!(CSE, subexpressions)
     else
         CSE = subexpressions
     end
-    v, map(ex -> flat_expr!(v, ex, CSE, PSE), exprs)
+    v, map(ex -> add_instructions!(v, ex, CSE), exprs)
 end
 
 Base.length(v::InstructionList) = v.n[]
@@ -86,7 +85,7 @@ function div!(list::InstructionList, @nospecialize(a), @nospecialize(b))
     push!(list, (:/, a, b))
 end
 
-function pow!(list, @nospecialize(a), b::Int)
+function pow!(list, @nospecialize(a), b::Integer)
     @assert b ≥ 0
     b == 1 && return a
     b == 0 && return 1
@@ -95,41 +94,109 @@ function pow!(list, @nospecialize(a), b::Int)
     push!(list, (:^, a, b))
 end
 
-function flat_expr!(
-    v,
+function add_instructions!(
+    list::InstructionList,
     ex::Basic,
     # common sub expression
     CSE::Dict{Expression,Expression},
+)
+
+    cse = Dict{Symbol,Expression}()
+    for (k, v) in CSE
+        push!(cse, Symbol(to_string(k)) => v)
+    end
+    pse = Dict{Symbol,Symbol}()
+    _add_instructions!(list, ex, cse, pse)
+end
+
+function _add_instructions!(
+    list::InstructionList,
+    ex::Basic,
+    # common sub expression
+    cse::Dict{Symbol,Expression},
     # processed sub expression
-    PSE::Set{Symbol} = Set{Symbol}(),
+    # mapping of the cse var with the instruction used
+    pse::Dict{Symbol,Symbol},
 )
     t = class(ex)
     if t == :Symbol
         s = Symbol(to_string(ex))
-        if haskey(CSE, ex) && s ∉ PSE
-            push!(PSE, s)
-            val = flat_expr!(v, CSE[ex], CSE, PSE)
-            if val isa Symbol
-                v.instructions[end] = (s, last(v.instructions[end]))
+        if haskey(pse, s)
+            return pse[s]
+        elseif haskey(cse, s)
+            val = _add_instructions!(list, cse[s], cse, pse)
+            push!(pse, s => val)
+            val
+        else
+            s
+        end
+    elseif t == :Pow
+        x, k_expr = args(ex)
+        k = convert(Int32, k_expr)
+        xinstr = _add_instructions!(list, x, cse, pse)
+        if k == -1
+            div!(list, Int32(1), xinstr)
+        elseif k < -1
+            div!(list, Int32(1), pow!(list, xinstr, -k))
+        else
+            pow!(list, xinstr, k)
+        end
+    elseif t == :Mul
+        vec = args(ex)
+        op_arg = nothing
+        divs = []
+        for vec_arg in vec
+            if class(vec_arg) == :Pow
+                x, k_expr = args(vec_arg)
+                k = convert(Int32, k_expr)
+                xinstr = _add_instructions!(list, x, cse, pse)
+                if k == -1
+                    push!(divs, xinstr)
+                elseif k < -1
+                    push!(divs, pow!(list, xinstr, -k))
+                else
+                    if isnothing(op_arg)
+                        op_arg = pow!(list, xinstr, k)
+                    else
+                        op_arg = mul!(list, op_arg, pow!(list, xinstr, k))
+                    end
+                end
             else
-                push!(v, s => val)
+                vinstr = _add_instructions!(list, vec_arg, cse, pse)
+                if isnothing(op_arg)
+                    op_arg = vinstr
+                else
+                    op_arg = mul!(list, op_arg, vinstr)
+                end
             end
         end
-        return s
-    elseif t == :Pow
-        x, k = ModelKit.args(ex)
-        return push!(v, (:^, flat_expr!(v, x, CSE, PSE), convert(Int, k)))
-    elseif t == :Add || t == :Mul
-        op = t == :Add ? :+ : :*
-        vec = ModelKit.args(ex)
-        op_arg = flat_expr!(v, vec[1], CSE, PSE)
+
+        if !isempty(divs)
+            denom = first(divs)
+            for i = 2:length(divs)
+                denom = mul!(list, denom, divs[i])
+            end
+            if isnothing(op_arg)
+                op_arg = div!(list, Int32(1), denom)
+            else
+                op_arg = div!(list, op_arg, denom)
+            end
+        end
+        return op_arg
+    elseif t == :Add
+        vec = args(ex)
+        op_arg = _add_instructions!(list, vec[1], cse, pse)
         for i = 2:length(vec)
-            op_arg = push!(v, (op, op_arg, flat_expr!(v, vec[i], CSE, PSE)))
+            op_arg = add!(list, op_arg, _add_instructions!(list, vec[i], cse, pse))
         end
         return op_arg
     elseif t == :Div
         x, y = ModelKit.args(ex)
-        return push!(v, (:/, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE)))
+        return div!(
+            list,
+            _add_instructions!(list, x, cse, pse),
+            _add_instructions!(list, y, cse, pse),
+        )
     else
         return to_number(ex)
     end
@@ -175,7 +242,7 @@ function diff!(list::InstructionList, N::Int, D::DiffMap)
             p2 = :NONE
             instr_added = false
             for ∂i = 1:N
-                exp::Int = arg2
+                exp = arg2
                 arg1_∂i = D[arg1, ∂i]
                 if arg1_∂i !== nothing
                     if p2 == :NONE
@@ -184,7 +251,7 @@ function diff!(list::InstructionList, N::Int, D::DiffMap)
                     end
                     if !instr_added
                         if exp == 2
-                            push!(v, id => (:^, arg1, 2))
+                            push!(v, id => (:^, arg1, Int32(2)))
                         else
                             push!(v, id => (:*, p1, arg1))
                         end

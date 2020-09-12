@@ -1239,12 +1239,17 @@ System of length 4
 ```
 """
 function optimize(F::System)
-    System(
-        horner.(F.expressions, Ref(F.variables)),
-        F.variables,
-        F.parameters,
-        F.variable_groups,
-    )
+    # horner can fail for rational functions
+    try
+        System(
+            horner.(F.expressions, Ref(F.variables)),
+            F.variables,
+            F.parameters,
+            F.variable_groups,
+        )
+    catch
+        F
+    end
 end
 
 

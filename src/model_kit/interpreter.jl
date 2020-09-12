@@ -60,6 +60,8 @@ function make_op_block(
                 $assign = Base.power_by_squaring($arg1, $index2)
             elseif $op == OP_INV_NOT_ZERO
                 $assign = inv_not_zero($arg1)
+            elseif $op == OP_SUB
+                $assign = -$arg1
             end
         end
     else
