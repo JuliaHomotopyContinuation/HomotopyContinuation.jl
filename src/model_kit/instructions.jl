@@ -14,14 +14,13 @@ function instruction_list(
     perform_cse::Bool = true,
 )
     v = InstructionList()
-    PSE = Set{Symbol}()
     if perform_cse
         exprs, CSE = cse(exprs)
         merge!(CSE, subexpressions)
     else
         CSE = subexpressions
     end
-    v, map(ex -> flat_expr!(v, ex, CSE, PSE), exprs)
+    v, map(ex -> add_instructions!(v, ex, CSE), exprs)
 end
 
 Base.length(v::InstructionList) = v.n[]
@@ -95,64 +94,79 @@ function pow!(list, @nospecialize(a), b::Integer)
     push!(list, (:^, a, b))
 end
 
-function flat_expr!(
-    v,
+function add_instructions!(
+    list::InstructionList,
     ex::Basic,
     # common sub expression
     CSE::Dict{Expression,Expression},
+)
+
+    cse = Dict{Symbol,Expression}()
+    for (k, v) in CSE
+        push!(cse, Symbol(to_string(k)) => v)
+    end
+    pse = Dict{Symbol,Symbol}()
+    _add_instructions!(list, ex, cse, pse)
+end
+
+function _add_instructions!(
+    list::InstructionList,
+    ex::Basic,
+    # common sub expression
+    cse::Dict{Symbol,Expression},
     # processed sub expression
-    PSE::Set{Symbol} = Set{Symbol}(),
+    # mapping of the cse var with the instruction used
+    pse::Dict{Symbol,Symbol},
 )
     t = class(ex)
     if t == :Symbol
         s = Symbol(to_string(ex))
-        if haskey(CSE, ex) && s ∉ PSE
-            push!(PSE, s)
-            val = flat_expr!(v, CSE[ex], CSE, PSE)
-            if val isa Symbol
-                v.instructions[end] = (s, last(v.instructions[end]))
-            else
-                push!(v, s => val)
-            end
-        end
-        return s
-    elseif t == :Pow
-        x, k_expr = ModelKit.args(ex)
-        k = convert(Int32, k_expr)
-        xinstr = flat_expr!(v, x, CSE, PSE)
-        if k == -1
-            div!(v, Int32(1), xinstr)
-        elseif k < -1
-            div!(v, Int32(1), pow!(v, xinstr, -k))
+        if haskey(pse, s)
+            return pse[s]
+        elseif haskey(cse, s)
+            val = _add_instructions!(list, cse[s], cse, pse)
+            push!(pse, s => val)
+            val
         else
-            pow!(v, xinstr, k)
+            s
+        end
+    elseif t == :Pow
+        x, k_expr = args(ex)
+        k = convert(Int32, k_expr)
+        xinstr = _add_instructions!(list, x, cse, pse)
+        if k == -1
+            div!(list, Int32(1), xinstr)
+        elseif k < -1
+            div!(list, Int32(1), pow!(list, xinstr, -k))
+        else
+            pow!(list, xinstr, k)
         end
     elseif t == :Mul
-        vec = ModelKit.args(ex)
+        vec = args(ex)
         op_arg = nothing
         divs = []
         for vec_arg in vec
             if class(vec_arg) == :Pow
                 x, k_expr = args(vec_arg)
                 k = convert(Int32, k_expr)
-                xinstr = flat_expr!(v, x, CSE, PSE)
+                xinstr = _add_instructions!(list, x, cse, pse)
                 if k == -1
                     push!(divs, xinstr)
                 elseif k < -1
-                    push!(divs, pow!(v, xinstr, -k))
+                    push!(divs, pow!(list, xinstr, -k))
                 else
                     if isnothing(op_arg)
-                        op_arg = pow!(v, xinstr, k)
+                        op_arg = pow!(list, xinstr, k)
                     else
-                        op_arg = mul!(op_arg, pow!(v, xinstr, k))
+                        op_arg = mul!(list, op_arg, pow!(list, xinstr, k))
                     end
                 end
             else
-                vinstr = flat_expr!(v, vec_arg, CSE, PSE)
+                vinstr = _add_instructions!(list, vec_arg, cse, pse)
                 if isnothing(op_arg)
                     op_arg = vinstr
                 else
-                    op_arg = mul!(v, op_arg, vinstr)
+                    op_arg = mul!(list, op_arg, vinstr)
                 end
             end
         end
@@ -160,25 +174,29 @@ function flat_expr!(
         if !isempty(divs)
             denom = first(divs)
             for i = 2:length(divs)
-                denom = mul!(v, denom, divs[i])
+                denom = mul!(list, denom, divs[i])
             end
             if isnothing(op_arg)
-                op_arg = div!(v, Int32(1), denom)
+                op_arg = div!(list, Int32(1), denom)
             else
-                op_arg = div!(v, op_arg, denom)
+                op_arg = div!(list, op_arg, denom)
             end
         end
         return op_arg
     elseif t == :Add
-        vec = ModelKit.args(ex)
-        op_arg = flat_expr!(v, vec[1], CSE, PSE)
+        vec = args(ex)
+        op_arg = _add_instructions!(list, vec[1], cse, pse)
         for i = 2:length(vec)
-            op_arg = add!(v, op_arg, flat_expr!(v, vec[i], CSE, PSE))
+            op_arg = add!(list, op_arg, _add_instructions!(list, vec[i], cse, pse))
         end
         return op_arg
     elseif t == :Div
         x, y = ModelKit.args(ex)
-        return div!(v, flat_expr!(v, x, CSE, PSE), flat_expr!(v, y, CSE, PSE))
+        return div!(
+            list,
+            _add_instructions!(list, x, cse, pse),
+            _add_instructions!(list, y, cse, pse),
+        )
     else
         return to_number(ex)
     end
