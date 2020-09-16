@@ -525,7 +525,7 @@ track(solver::Solver, s; kwargs...) = track(solver.trackers[1], s; kwargs...)
 
 function make_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Tracking $n paths... "
-    barlen = min(ProgressMeter.tty_width(desc), 40)
+    barlen = min(ProgressMeter.tty_width(desc, stdout), 40)
     progress =
         ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay
@@ -709,7 +709,7 @@ end
 
 function make_many_progress(n::Integer; delay::Float64 = 0.0)
     desc = "Solving for $n parameters... "
-    barlen = min(ProgressMeter.tty_width(desc), 40)
+    barlen = min(ProgressMeter.tty_width(desc, stdout), 40)
     progress =
         ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay

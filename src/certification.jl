@@ -429,7 +429,7 @@ function _certify(
     if show_progress
         n = length(X)
         desc = "Certifying $n solutions... "
-        barlen = min(ProgressMeter.tty_width(desc), 40)
+        barlen = min(ProgressMeter.tty_width(desc, stdout), 40)
         progress = ProgressMeter.Progress(
             n;
             dt = 0.2,
