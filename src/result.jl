@@ -259,8 +259,8 @@ function nresults(
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
-    onlyfinit::Bool = true, # deprecated
-    only_finite::Bool = onlyfinit,
+    onlyfinite::Bool = true, # deprecated
+    only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
     count(R) do r
@@ -416,7 +416,7 @@ nnonsingular(R::Result) = count(is_nonsingular, R)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::Results; tol = 1e-6) = count(r -> is_real(r, tol), R)
+nreal(R::Results; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
 
 
 """
