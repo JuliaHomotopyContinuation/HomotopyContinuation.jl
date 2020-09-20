@@ -20,11 +20,11 @@ Constructs either a [`CompiledHomotopy`](@ref) (if `compile = :all`), an
 """
 function fixed(H::Homotopy; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...)
     if compile == true || compile == :all
-        CompiledHomotopy(F; kwargs...)
+        CompiledHomotopy(H; kwargs...)
     elseif compile == false || compile == :none
-        InterpretedHomotopy(F; kwargs...)
+        InterpretedHomotopy(H; kwargs...)
     elseif compile == :mixed
-        MixedHomotopy(F; kwargs...)
+        MixedHomotopy(H; kwargs...)
     else
         error("Unknown argument $compile for keyword `compile`.")
     end

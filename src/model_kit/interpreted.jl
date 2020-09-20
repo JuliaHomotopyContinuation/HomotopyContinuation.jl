@@ -154,6 +154,7 @@ end
 Base.size(H::InterpretedHomotopy) = size(H.homotopy)
 variables(H::InterpretedHomotopy) = variables(H.homotopy)
 parameters(H::InterpretedHomotopy) = parameters(H.homotopy)
+Homotopy(H::InterpretedHomotopy) = H.homotopy
 
 function Base.show(io::IO, H::InterpretedHomotopy)
     print(io, "Interpreted: ")
