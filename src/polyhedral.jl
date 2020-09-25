@@ -205,6 +205,20 @@ function polyhedral(
     tracker, starts
 end
 
+function has_zero_col(A)
+    for j = 1:size(A, 2)
+        has_non_zero = false
+        for i = 1:size(A, 1)
+            if !iszero(A[i, j])
+                has_non_zero = true
+                break
+            end
+        end
+        has_non_zero || return true
+    end
+    false
+end
+
 paths_to_track(f::AbstractSystem, val::Val{:polyhedral}) = paths_to_track(System(f), val)
 function paths_to_track(
     f::System,
@@ -238,9 +252,7 @@ function paths_to_track(
     if only_non_zero
         MixedSubdivisions.mixed_volume(supp)
     else
-        min_vecs = minimum.(supp, dims = 2)
-        supp′ =
-            map((A, mᵢ) -> iszero(mᵢ) ? A : [A zeros(Int32, size(A, 1), 1)], supp, min_vecs)
+        supp′ = map(A -> has_zero_col(A) ? A : [A zeros(Int32, size(A, 1), 1)], supp)
         MixedSubdivisions.mixed_volume(supp′)
     end
 end
@@ -280,45 +292,28 @@ function polyhedral(
     unsupported_kwargs(kwargs)
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
-    min_vecs = map(support) do A
-        cols = view.(Ref(A), Ref(:), 1:size(A, 2))
-        first(sort!(cols; lt = ModelKit.td_order, rev = true))
-    end
-    if !all(iszero, min_vecs)
-        if only_non_zero
-            support = map((A, v) -> A .- v, support, min_vecs)
-        else
-            # Add 0 to each support
-            starts = Vector{ComplexF64}[]
-            targets = Vector{ComplexF64}[]
-            supp = eltype(support)[]
-            for (i, A) in enumerate(support)
-                if iszero(min_vecs[i])
-                    push!(starts, start_coeffs[i])
-                    push!(targets, target_coeffs[i])
-                    push!(supp, A)
-                else
-                    push!(
-                        starts,
-                        [
-                            start_coeffs[i]
-                            randn(ComplexF64)
-                        ],
-                    )
-                    push!(
-                        targets,
-                        [
-                            target_coeffs[i]
-                            0.0
-                        ],
-                    )
-                    push!(supp, [A zeros(Int32, size(A, 1), 1)])
-                end
+    if only_non_zero
+        min_vecs = minimum.(support, dims = 2)
+        support = map((A, v) -> A .- v, support, min_vecs)
+    elseif !all(has_zero_col, support)
+        # Add 0 to each support
+        starts = Vector{ComplexF64}[]
+        targets = Vector{ComplexF64}[]
+        supp = eltype(support)[]
+        for (i, A) in enumerate(support)
+            if has_zero_col(A)
+                push!(starts, start_coeffs[i])
+                push!(targets, target_coeffs[i])
+                push!(supp, A)
+            else
+                push!(starts, vcat(start_coeffs[i], randn(ComplexF64)))
+                push!(targets, vcat(target_coeffs[i], 0.0))
+                push!(supp, [A zeros(Int32, size(A, 1), 1)])
             end
-            support = supp
-            start_coeffs = starts
-            target_coeffs = targets
         end
+        support = supp
+        start_coeffs = starts
+        target_coeffs = targets
     end
 
     F = fixed(polyhedral_system(support); compile = compile)
