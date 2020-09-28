@@ -52,13 +52,13 @@ struct NewtonCache{M}
     J::M
     r::Vector{ComplexF64}
 end
-function NewtonCache(F::AbstractSystem)
+function NewtonCache(F::AbstractSystem; optimize_data_structure = true)
     m, n = size(F)
     x = zeros(ComplexF64, n)
     Δx = copy(x)
     x_ext = zeros(ComplexDF64, n)
     if m ≥ n
-        J = MatrixWorkspace(m, n)
+        J = MatrixWorkspace(m, n, optimize_data_structure = optimize_data_structure)
     else
         J = zeros(ComplexF64, m, n)
     end

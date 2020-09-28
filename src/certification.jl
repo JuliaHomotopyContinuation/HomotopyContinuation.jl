@@ -229,7 +229,7 @@ function CertifyCache(F::AbstractSystem)
     CertifyCache(
         eval_interpreter,
         jac_interpreter,
-        NewtonCache(F),
+        NewtonCache(F, optimize_data_structure = false),
         WeightedNorm(InfNorm(), n),
         zeros(IComplexF64, m),
         zeros(IComplexF64, m),
