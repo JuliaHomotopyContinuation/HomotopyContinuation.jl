@@ -21,8 +21,9 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     inf_norm_est_rwork::Vector{Float64}
 end
 
-MatrixWorkspace(m::Integer, n::Integer; kwargs...) = MatrixWorkspace(zeros(ComplexF64, m, n); kwargs...)
-function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure=true)
+MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
+    MatrixWorkspace(zeros(ComplexF64, m, n); kwargs...)
+function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
