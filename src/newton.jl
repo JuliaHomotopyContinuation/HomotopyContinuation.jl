@@ -41,7 +41,7 @@ Return the solution stored in `R`.
 solution(R::NewtonResult) = R.x
 
 """
-    NewtonCache(F::AbstractSystem)
+    NewtonCache(F::AbstractSystem; optimize_data_structure = true)
 
 Pre-allocates the necessary memory for [`newton`](@ref).
 """
