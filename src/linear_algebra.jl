@@ -21,8 +21,9 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     inf_norm_est_rwork::Vector{Float64}
 end
 
-MatrixWorkspace(m::Integer, n::Integer) = MatrixWorkspace(zeros(ComplexF64, m, n))
-function MatrixWorkspace(Â::AbstractMatrix)
+MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
+    MatrixWorkspace(zeros(ComplexF64, m, n); kwargs...)
+function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
@@ -32,7 +33,7 @@ function MatrixWorkspace(Â::AbstractMatrix)
     qr = LA.qrfactUnblocked!(copy(A))
     # experiments show that for m > 25 the data layout as a
     # struct array is beneficial
-    if m > 25
+    if m > 25 && optimize_data_structure
         A = StructArrays.StructArray(A)
     end
     row_scaling = ones(m)
