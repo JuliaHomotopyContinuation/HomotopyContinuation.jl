@@ -237,6 +237,7 @@ function init_newton!(
             evaluate!(r, H, x_extended, t)
         end
         LA.ldiv!(Δx, updated!(J), r, norm)
+
         x₁ .= x̄ .- Δx
         norm_Δx₀ = norm(Δx)
         if extended_precision

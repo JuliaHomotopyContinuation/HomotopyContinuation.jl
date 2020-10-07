@@ -12,43 +12,36 @@ but rather interpreted. See also [`CompiledSystem`](@ref).
 Construct an `InterpretedSystem` from the given [`System`](@ref) `F`.
 If `optimizations = true` then [`optimize`](@ref) is called on `F` before compiling.
 """
-struct InterpretedSystem{T} <: AbstractSystem
+struct InterpretedSystem{T₁,T₂} <: AbstractSystem
     system::System
-    eval_interpreter::Interpreter{T,1}
-    eval_interpreter_cache::InterpreterCache{ComplexF64}
-    eval_interpreter_cache_ext::InterpreterCache{ComplexDF64}
-    jac_interpreter::Interpreter{T,2}
-    jac_interpreter_cache::InterpreterCache{ComplexF64}
+    eval_interpreter::Interpreter{T₁}
+    eval_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
+    eval_interpreter_cache_ext::InterpreterCache{Vector{ComplexDF64}}
+    jac_interpreter::Interpreter{T₂}
+    jac_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
     taylor_caches::Tuple{
-        InterpreterCache{NTuple{2,ComplexF64}},
-        InterpreterCache{NTuple{3,ComplexF64}},
-        InterpreterCache{NTuple{4,ComplexF64}},
+        InterpreterCache{TaylorVector{2,ComplexF64}},
+        InterpreterCache{TaylorVector{3,ComplexF64}},
+        InterpreterCache{TaylorVector{4,ComplexF64}},
     }
 end
 
 function InterpretedSystem(F::System; optimizations::Bool = true)
     F = optimizations ? optimize(F) : F
-    eval_interpreter = evaluate_interpreter(F)
+    eval_interpreter = interpreter(F)
     jac_interpreter = jacobian_interpreter(F)
-    T = promote_type(eltype(eval_interpreter), eltype(jac_interpreter))
-    if !(T isa Rational)
-        T = promote_type(T, Float64)
-    end
-    eval_interpreter = convert(Interpreter{T,1}, eval_interpreter)
-    jac_interpreter = convert(Interpreter{T,2}, jac_interpreter)
-    eval_interpreter_cache = InterpreterCache(ComplexF64, eval_interpreter)
-    eval_interpreter_cache_ext = InterpreterCache(ComplexDF64, eval_interpreter)
+    N = cache_min_length(eval_interpreter)
     taylor_caches = (
-        InterpreterCache(NTuple{2,ComplexF64}, eval_interpreter),
-        InterpreterCache(NTuple{3,ComplexF64}, eval_interpreter),
-        InterpreterCache(NTuple{4,ComplexF64}, eval_interpreter),
+        InterpreterCache(TaylorVector{2}(ComplexF64, N)),
+        InterpreterCache(TaylorVector{3}(ComplexF64, N)),
+        InterpreterCache(TaylorVector{4}(ComplexF64, N)),
     )
 
     InterpretedSystem(
         F,
         eval_interpreter,
-        eval_interpreter_cache,
-        eval_interpreter_cache_ext,
+        InterpreterCache(ComplexF64, eval_interpreter),
+        InterpreterCache(ComplexDF64, eval_interpreter),
         jac_interpreter,
         InterpreterCache(ComplexF64, jac_interpreter),
         taylor_caches,
@@ -78,19 +71,19 @@ function evaluate_and_jacobian!(u, U, F::InterpretedSystem, x, p = nothing)
     nothing
 end
 function jacobian!(U, F::InterpretedSystem, x, p = nothing, cache = F.jac_interpreter_cache)
-    execute!(U, F.jac_interpreter, x, p, cache)
+    execute!(nothing, U, F.jac_interpreter, x, p, cache)
     nothing
 end
 
 for M = 1:3
     @eval function taylor!(
-        u::AbstractVecOrMat,
-        v::Val{$M},
+        u::AbstractVector,
+        Order::Val{$M},
         F::InterpretedSystem,
         x,
         p = nothing,
     )
-        execute!(u, Val{$M}, F.eval_interpreter, x, p, F.taylor_caches[$M])
+        execute!(u, Order, F.eval_interpreter, x, p, F.taylor_caches[$M])
         u
     end
 end
@@ -107,43 +100,36 @@ but rather interpreted. See also [`CompiledHomotopy`](@ref).
 Construct an `InterpretedHomotopy` from the given [`Homotopy`](@ref) `H`.
 If `optimizations = true` then [`optimize`](@ref) is called on `H` before compiling.
 """
-struct InterpretedHomotopy{T} <: AbstractHomotopy
+struct InterpretedHomotopy{T₁,T₂} <: AbstractHomotopy
     homotopy::Homotopy
-    eval_interpreter::Interpreter{T,1}
-    eval_interpreter_cache::InterpreterCache{ComplexF64}
-    eval_interpreter_cache_ext::InterpreterCache{ComplexDF64}
-    jac_interpreter::Interpreter{T,2}
-    jac_interpreter_cache::InterpreterCache{ComplexF64}
+    eval_interpreter::Interpreter{T₁}
+    eval_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
+    eval_interpreter_cache_ext::InterpreterCache{Vector{ComplexDF64}}
+    jac_interpreter::Interpreter{T₂}
+    jac_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
     taylor_caches::Tuple{
-        InterpreterCache{NTuple{2,ComplexF64}},
-        InterpreterCache{NTuple{3,ComplexF64}},
-        InterpreterCache{NTuple{4,ComplexF64}},
+        InterpreterCache{TaylorVector{2,ComplexF64}},
+        InterpreterCache{TaylorVector{3,ComplexF64}},
+        InterpreterCache{TaylorVector{4,ComplexF64}},
     }
 end
 
 function InterpretedHomotopy(H::Homotopy; optimizations::Bool = true)
     H = optimizations ? optimize(H) : H
-    eval_interpreter = evaluate_interpreter(H)
+    eval_interpreter = interpreter(H)
     jac_interpreter = jacobian_interpreter(H)
-    T = promote_type(eltype(eval_interpreter), eltype(jac_interpreter))
-    if !(T isa Rational)
-        T = promote_type(T, Float64)
-    end
-    eval_interpreter = convert(Interpreter{T,1}, eval_interpreter)
-    jac_interpreter = convert(Interpreter{T,2}, jac_interpreter)
-    eval_interpreter_cache = InterpreterCache(ComplexF64, eval_interpreter)
-    eval_interpreter_cache_ext = InterpreterCache(ComplexDF64, eval_interpreter)
+    N = cache_min_length(eval_interpreter)
     taylor_caches = (
-        InterpreterCache(NTuple{2,ComplexF64}, eval_interpreter),
-        InterpreterCache(NTuple{3,ComplexF64}, eval_interpreter),
-        InterpreterCache(NTuple{4,ComplexF64}, eval_interpreter),
+        InterpreterCache(TaylorVector{2}(ComplexF64, N)),
+        InterpreterCache(TaylorVector{3}(ComplexF64, N)),
+        InterpreterCache(TaylorVector{4}(ComplexF64, N)),
     )
 
     InterpretedHomotopy(
         H,
         eval_interpreter,
-        eval_interpreter_cache,
-        eval_interpreter_cache_ext,
+        InterpreterCache(ComplexF64, eval_interpreter),
+        InterpreterCache(ComplexDF64, eval_interpreter),
         jac_interpreter,
         InterpreterCache(ComplexF64, jac_interpreter),
         taylor_caches,
@@ -202,20 +188,20 @@ function jacobian!(
     p = nothing,
     cache = H.jac_interpreter_cache,
 )
-    execute!(U, H.jac_interpreter, x, t, p, cache)
+    execute!(nothing, U, H.jac_interpreter, x, t, p, cache)
     nothing
 end
 
 for M = 1:3
     @eval function taylor!(
         u::AbstractVecOrMat,
-        v::Val{$M},
+        Order::Val{$M},
         H::InterpretedHomotopy,
         x,
         t,
         p::Union{AbstractVector,Nothing} = nothing,
     )
-        execute!(u, Val{$M}, H.eval_interpreter, x, t, p, H.taylor_caches[$M])
+        execute!(u, Order, H.eval_interpreter, x, t, p, H.taylor_caches[$M])
         u
     end
 end

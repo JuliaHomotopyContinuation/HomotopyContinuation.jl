@@ -19,7 +19,7 @@ struct RandomizedSystem{S<:AbstractSystem} <: AbstractSystem
     u::Vector{ComplexF64}
     ū::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
-    taylor_U::Matrix{ComplexF64}
+    taylor_u::TaylorVector{4,ComplexF64}
 end
 
 function RandomizedSystem(
@@ -47,8 +47,8 @@ function RandomizedSystem(
     u = zeros(ComplexF64, n)
     ū = zeros(ComplexDF64, n)
     U = zeros(ComplexF64, n, N)
-    taylor_U = zeros(ComplexF64, n, 5)
-    RandomizedSystem(F, A, u, ū, U, taylor_U)
+    taylor_u = TaylorVector{4}(ComplexF64, n)
+    RandomizedSystem(F, A, u, ū, U, taylor_u)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", F::RandomizedSystem)
@@ -89,16 +89,21 @@ function randomize!(u, A, v::AbstractVector, ncols = 1)
     end
     u
 end
-function randomize!(U, A, V::AbstractMatrix, ncols = size(A, 1))
-    n, m = size(A, 1), size(V, 1)
+function randomize!(
+    u::Union{AbstractMatrix,TaylorVector},
+    A,
+    v::Union{AbstractMatrix,TaylorVector},
+    ncols::Int = size(A, 1),
+)
+    n, m = size(A, 1), size(v,1)
 
     for j = 1:ncols, i = 1:n
-        U[i, j] = V[i, j]
+        u[i, j] = v[i, j]
     end
     for j = 1:ncols, k = 1:(m-n), i = 1:n
-        U[i, j] += A[i, k] * V[n+k, j]
+        u[i, j] += A[i, k] * v[n+k, j]
     end
-    U
+    u
 end
 
 (F::RandomizedSystem)(x, p = nothing) = [LA.I F.A] * F.system(x, p)
@@ -125,12 +130,12 @@ function ModelKit.taylor!(u::AbstractVector, v::Val, F::RandomizedSystem, tx, p 
     randomize!(u, F.A, F.u)
 end
 function ModelKit.taylor!(
-    U::AbstractMatrix,
+    u::TaylorVector,
     v::Val{N},
     F::RandomizedSystem,
-    tx::TaylorVector,
+    tx,
     p = nothing,
 ) where {N}
-    taylor!(F.taylor_U, v, F.system, tx, p)
-    randomize!(U, F.A, F.taylor_U, N + 1)
+    taylor!(F.taylor_u, v, F.system, tx, p)
+    randomize!(u, F.A, F.taylor_u, N + 1)
 end

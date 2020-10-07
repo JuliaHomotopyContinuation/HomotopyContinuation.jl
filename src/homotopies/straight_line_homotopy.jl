@@ -17,8 +17,8 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     v̄::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
-    dv_start::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
-    dv_target::LA.Transpose{ComplexF64,Matrix{ComplexF64}}
+    dv_start::TaylorVector{4,ComplexF64}
+    dv_target::TaylorVector{4,ComplexF64}
 end
 
 function StraightLineHomotopy(
@@ -48,8 +48,8 @@ function StraightLineHomotopy(
     v̄ = zeros(ComplexDF64, m)
     U = zeros(ComplexF64, m, n)
 
-    dv_start = LA.transpose(zeros(ComplexF64, 5, m))
-    dv_target = LA.transpose(zeros(ComplexF64, 5, m))
+    dv_start = TaylorVector{4}(ComplexF64, m)
+    dv_target = TaylorVector{4}(ComplexF64, m)
 
     StraightLineHomotopy(
         start,
@@ -75,7 +75,13 @@ function Base.show(io::IO, mime::MIME"text/plain", H::StraightLineHomotopy)
     show(io, mime, H.target)
 end
 
-function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexDF64}, t) where {T}
+function ModelKit.evaluate!(
+    u,
+    H::StraightLineHomotopy,
+    x::Vector{ComplexDF64},
+    t,
+    p = nothing,
+) where {T}
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t
@@ -84,7 +90,7 @@ function ModelKit.evaluate!(u, H::StraightLineHomotopy, x::Vector{ComplexDF64}, 
     end
 end
 
-function ModelKit.evaluate!(u, H::StraightLineHomotopy, x, t)
+function ModelKit.evaluate!(u, H::StraightLineHomotopy, x, t, p = nothing)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     ts, tt = H.γ .* t, 1 - t
@@ -100,6 +106,7 @@ function ModelKit.evaluate_and_jacobian!(
     H::StraightLineHomotopy,
     x::AbstractVector{T},
     t,
+    p = nothing,
 ) where {T}
     evaluate_and_jacobian!(u, U, H.start, x)
     evaluate_and_jacobian!(H.u, H.U, H.target, x)

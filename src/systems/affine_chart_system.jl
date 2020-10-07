@@ -115,7 +115,7 @@ function ModelKit.evaluate_and_jacobian!(
 end
 
 function ModelKit.taylor!(u, v::Val, F::AffineChartSystem, tx, p = nothing)
-    u .= zero(eltype(u))
+    u .= zero(ComplexF64)
     taylor!(u, v, F.system, tx, p)
     # affine chart part is always zero since it is an affine linear form
     u

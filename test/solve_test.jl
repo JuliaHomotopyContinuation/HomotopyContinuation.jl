@@ -346,6 +346,7 @@
             start_subspace = l1,
             target_subspace = l2,
             compile = false,
+            threading = false,
             intrinsic = true,
         )
         @test nsolutions(r2) == 2
@@ -357,7 +358,7 @@
             compile = false,
             intrinsic = false,
         )
-        @test nsolutions(r2) == 2
+        @test nsolutions(r3) == 2
 
         @var x y z u v
         F = System([x^2 + y^2 - 5], [x, y, z, u, v])

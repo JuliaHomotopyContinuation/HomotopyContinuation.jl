@@ -184,10 +184,23 @@ function Base.:(==)(b1::Basic, b2::Basic)
     ) == 1
 end
 
+const EXPR_1 = Expression(C_NULL)
+const EXPR_0 = Expression(C_NULL)
+const EXPR_M1 = Expression(C_NULL)
+
 Base.zero(::Basic) = zero(Expression)
 Base.zero(::Type{<:Basic}) = Expression(0)
+Base.iszero(x::Basic) = x == EXPR_0
 Base.one(::Basic) = one(Expression)
 Base.one(::Type{<:Basic}) = Expression(1)
+Base.isone(x::Basic) = x == EXPR_1
+
+is_one(x::Union{Number,Basic}) = isone(x)
+is_one(x) = false
+is_zero(x::Union{Number,Basic}) = iszero(x)
+is_zero(x) = false
+is_minus_one(x::Basic) = x == EXPR_M1
+is_minus_one(x) = x == -1
 
 for op in [:im, :π, :ℯ, :γ, :catalan]
     @eval begin
@@ -218,6 +231,18 @@ function __init_constants()
     @init_constant ℯ E
     @init_constant γ EulerGamma
     @init_constant catalan Catalan
+
+    ccall((:basic_new_stack, libsymengine), Nothing, (Ref{Expression},), EXPR_1)
+    ccall((:integer_set_si, libsymengine), Nothing, (Ref{Expression}, Int), EXPR_1, 1)
+    finalizer(free!, EXPR_1)
+
+    ccall((:basic_new_stack, libsymengine), Nothing, (Ref{Expression},), EXPR_0)
+    ccall((:integer_set_si, libsymengine), Nothing, (Ref{Expression}, Int), EXPR_0, 0)
+    finalizer(free!, EXPR_0)
+
+    ccall((:basic_new_stack, libsymengine), Nothing, (Ref{Expression},), EXPR_M1)
+    ccall((:integer_set_si, libsymengine), Nothing, (Ref{Expression}, Int), EXPR_M1, -1)
+    finalizer(free!, EXPR_M1)
 end
 
 ################
@@ -297,6 +322,17 @@ end
 
 @make_func symengine_expand basic_expand
 
+function Base.sin(b::Basic)
+    a = Expression()
+    ccall((:basic_sin, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+function Base.cos(b::Basic)
+    a = Expression()
+    ccall((:basic_cos, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+Base.sincos(x::Basic) = (sin(x), cos(x))
 ##############################
 ## conversion to Expression ##
 ##############################
@@ -758,26 +794,6 @@ function subs(ex::Basic, d::ExpressionMap)
     )
     return s
 end
-#
-# subs(ex::Basic, (k, v)::Pair{<:Basic,<:Number}) = subs(ex, k => Expression(v))
-# function subs(ex::Basic, (k, v)::Pair{<:Basic,<:Basic})
-#     s = Expression()
-#     ccall(
-#         (:basic_subs2, libsymengine),
-#         Nothing,
-#         (
-#             Ref{Expression},
-#             Ref{ExpressionRef},
-#             Ref{ExpressionRef},
-#             Ref{ExpressionRef},
-#         ),
-#         s,
-#         ex,
-#         k,
-#         v,
-#     )
-#     return s
-# end
 
 function cse(exprs::Vector{Expression})
     vec = ExprVec()
@@ -799,9 +815,24 @@ function cse(exprs::Vector{Expression})
         vec.ptr,
     )
 
-    subs = Dict{Expression,Expression}()
+    # The symengine cse alg also considers in (x - a) * (y - a) the -a as a cse.
+    # We don't want these since we can handle them with no overhead directly,
+    # so we remove these again.
+    bad_subs = ExpressionMap()
+    substs = Dict{Expression,Expression}()
     for (sᵢ, exᵢ) in zip(replacement_syms, replacement_exprs)
-        subs[sᵢ] = exᵢ
+        if class(exᵢ) == :Mul
+            exs = args(exᵢ)
+            if length(exs) == 2 && (is_minus_one(exs[1]) || is_one(exs[1]))
+                bad_subs[sᵢ] = exᵢ
+            else
+                substs[sᵢ] = subs(exᵢ, bad_subs)
+            end
+        else
+            substs[sᵢ] = subs(exᵢ, bad_subs)
+        end
     end
-    map(Expression, reduced_exprs), subs
+
+
+    map(e -> subs(e, bad_subs), reduced_exprs), substs
 end

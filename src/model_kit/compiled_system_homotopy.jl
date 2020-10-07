@@ -165,8 +165,18 @@ interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][
 ################
 ## EVALUATION ##
 ################
+function _evaluate!_impl(T)
+    I = interpret(T)
+    list, out = instruction_list(expressions(I))
+    generate_evaluate_impl(
+        list,
+        out;
+        variables = Symbol.(variables(I)),
+        parameters = Symbol.(parameters(I)),
+        t = I isa Homotopy ? Symbol(I.t) : nothing,
+    )
+end
 
-# inplace (generated)
 """
     evaluate!(u, T::CompiledSystem, x, p = nothing)
 
@@ -185,28 +195,20 @@ Evaluate `T` for variables `x`, `t` and parameters `p` and store result in `u`.
     _evaluate!_impl(T)
 end
 
-"""
-    jacobian!(U, T::CompiledHomotopy, x, p = nothing)
-
-Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p`
-and store result in `u`.
-"""
-@generated function jacobian!(U, T::CompiledSystem, x, p = nothing)
-    _jacobian!_impl(T)
+function _evaluate_and_jacobian!_impl(T)
+    I = interpret(T)
+    list, out = instruction_list(expressions(I))
+    generate_evaluate_and_jacobian_impl(
+        list,
+        out;
+        variables = Symbol.(variables(I)),
+        parameters = Symbol.(parameters(I)),
+        t = I isa Homotopy ? Symbol(I.t) : nothing,
+    )
 end
 
 """
-    jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
-
-Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p` and
-store result in `u`.
-"""
-@generated function jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
-    _jacobian!_impl(T)
-end
-
-"""
-    evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, p = nothing)
+    evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
 
 Evaluate `T` and its Jacobian for variables `x` and parameters `p` and
 store result in `u`.
@@ -214,7 +216,7 @@ store result in `u`.
 @generated function evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
     _evaluate_and_jacobian!_impl(T)
 end
-
+#
 """
     evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, t, p = nothing)
 
@@ -225,188 +227,79 @@ store result in `u`.
     _evaluate_and_jacobian!_impl(T)
 end
 
+#
+"""
+    jacobian!(U, T::CompiledSystem, x, p = nothing)
+
+Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p`
+and store result in `u`.
+"""
+function jacobian!(U, T::CompiledSystem, x, p = nothing)
+    evaluate_and_jacobian!(nothing, U, T, x, p)
+end
+
+"""
+    jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
+
+Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p` and
+store result in `u`.
+"""
+function jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
+    evaluate_and_jacobian!(nothing, U, T, x, t, p)
+end
+
+
+function _taylor!_impl(T)
+    I = interpret(T)
+    list, out = instruction_list(expressions(I))
+    generate_taylor_impl(
+        list,
+        out;
+        variables = Symbol.(variables(I)),
+        parameters = Symbol.(parameters(I)),
+        t = I isa Homotopy ? Symbol(I.t) : nothing,
+    )
+end
+
 """
     taylor!(
-        u::AbstractMatrix,
-        v::Val{M}
+        u,
+        ::Val{K},
         F::CompiledSystem,
-        x::TaylorVector{D},
-        p::Union{Nothing,Vector,TaylorVector} = nothing,
-    )
-    taylor!(
-        u::TaylorVector{M},
-        v::Val{M}
-        F::CompiledSystem,
-        x::TaylorVector{D},
-        p::Union{Nothing,Vector,TaylorVector} = nothing,
+        x,
+        p = nothing,
     )
 
-Compute the Taylor series of ``u = F(x,p)`` given the Taylor series `x` and `p`.
+Compute the Taylor series order order `K` of ``u = F(x,p)``.
 """
 @generated function taylor!(
-    u::AbstractMatrix,
-    v::Val{M},
+    u::AbstractArray,
+    Order::Val{M},
     T::CompiledSystem,
-    x::TaylorVector{D},
-    p::Nothing = nothing,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, -1; highest_order_only = false)
-end
-@generated function taylor!(
-    u::AbstractMatrix,
-    v::Val{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p::AbstractVector,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, 0; highest_order_only = false)
-end
-@generated function taylor!(
-    u::AbstractMatrix,
-    v::Val{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p::TaylorVector{DP},
-) where {M,D,DP}
-    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = false)
-end
-
-function taylor!(
-    u::TaylorVector{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p = nothing,
-) where {M,D}
-    taylor!(u.data, Val(M - 1), T, x, p)
-    u
-end
-
-
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p::Nothing = nothing,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p::AbstractVector,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::TaylorVector{D},
-    p::TaylorVector{DP},
-) where {M,D,DP}
-    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
-end
-
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::AbstractVector,
-    p::Nothing = nothing,
+    x::AbstractArray,
+    p::Union{Nothing,AbstractArray} = nothing,
 ) where {M}
-    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::AbstractVector,
-    p::AbstractVector,
-) where {M}
-    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledSystem,
-    x::AbstractVector,
-    p::TaylorVector{DP},
-) where {M,DP}
-    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
+    _taylor!_impl(T)
 end
 
 """
     taylor!(
-        u::AbstractVector,
-        ::Val{M}
-        H::Homotopy,
-        x::TaylorVector{D},
-        t::Number,
-        p::Union{Nothing,Vector,TaylorVector} = nothing,
+        u,
+        ::Val{K},
+        H::CompiledHomotopy,
+        x,
+        p = nothing,
     )
 
-Compute the `M`-th derivative of ``u=H(x,t,p)`` given the taylor series `x` and `p`.
+Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
 """
 @generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
+    u::AbstractArray,
+    Order::Val{M},
     T::CompiledHomotopy,
-    x::TaylorVector{D},
-    t::Number,
-    p::Nothing = nothing,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, -1; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledHomotopy,
-    x::TaylorVector{D},
-    t::Number,
-    p::AbstractVector,
-) where {M,D}
-    _taylor!_impl(T, M, D - 1, 0; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledHomotopy,
-    x::TaylorVector{D},
-    t::Number,
-    p::TaylorVector{DP},
-) where {M,D,DP}
-    _taylor!_impl(T, M, D - 1, DP - 1; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledHomotopy,
-    x::AbstractVector,
-    t::Number,
-    p::Nothing = nothing,
+    x::AbstractArray,
+    t,
+    p::Union{Nothing,AbstractArray} = nothing,
 ) where {M}
-    _taylor!_impl(T, M, 0, -1; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{M},
-    T::CompiledHomotopy,
-    x::AbstractVector,
-    t::Number,
-    p::AbstractVector,
-) where {M}
-    _taylor!_impl(T, M, 0, 0; highest_order_only = true)
-end
-@generated function taylor!(
-    u::AbstractVector,
-    ::Val{1},
-    T::CompiledHomotopy,
-    x::AbstractVector,
-    t::Number,
-    p::TaylorVector{DP},
-) where {M,DP}
-    _taylor!_impl(T, M, 0, DP - 1; highest_order_only = true)
+    _taylor!_impl(T)
 end
