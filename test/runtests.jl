@@ -1,4 +1,5 @@
-using HomotopyContinuation, LinearAlgebra, Test, StaticArrays, Parameters, Random
+using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
+using StaticArrays
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation

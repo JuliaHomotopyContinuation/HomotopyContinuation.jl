@@ -192,9 +192,9 @@ end
 
 Contains the necessary data structures for [`certify`](@ref).
 """
-struct CertifyCache{T,M}
-    eval_interpreter::ModelKit.Interpreter{T,1}
-    jac_interpreter::ModelKit.Interpreter{T,2}
+struct CertifyCache{T₁,T₂,M}
+    eval_interpreter::ModelKit.Interpreter{T₁}
+    jac_interpreter::ModelKit.Interpreter{T₂}
     newton_cache::NewtonCache{M}
     # norm
     norm::WeightedNorm{InfNorm}
@@ -205,8 +205,8 @@ struct CertifyCache{T,M}
     dix̃::Vector{IComplex{DoubleF64}}
     C::Matrix{ComplexF64}
     IJ::Matrix{IComplexF64}
-    IJ_cache::ModelKit.InterpreterCache{IComplexF64}
-    dIJ_cache::ModelKit.InterpreterCache{IComplex{DoubleF64}}
+    IJ_cache::ModelKit.InterpreterCache{Vector{IComplexF64}}
+    dIJ_cache::ModelKit.InterpreterCache{Vector{IComplex{DoubleF64}}}
     A::Matrix{IComplexF64}
     δx::Vector{IComplexF64}
     # TODO: complex extended precision case with arb
@@ -214,18 +214,15 @@ end
 function CertifyCache(F::AbstractSystem)
     m, n = size(F)
     m == n || error("Can only certify square polynomial systems.")
-    eval_interpreter, jac_interpreter =
-        ModelKit.promote_common_constants(ModelKit.evaluate_jacobian_interpreter(System(
-            F,
-        ))...)
-    IJ_cache = ModelKit.InterpreterCache(Vector{IComplexF64}(
-        undef,
-        max(length(eval_interpreter.instructions), length(jac_interpreter.instructions)),
-    ))
-    dIJ_cache = ModelKit.InterpreterCache(Vector{IComplex{DoubleF64}}(
-        undef,
-        max(length(eval_interpreter.instructions), length(jac_interpreter.instructions)),
-    ))
+    f = System(F)
+    eval_interpreter = ModelKit.interpreter(f)
+    jac_interpreter = ModelKit.jacobian_interpreter(f)
+    cap = max(
+        ModelKit.cache_min_length(jac_interpreter),
+        ModelKit.cache_min_length(eval_interpreter),
+    )
+    IJ_cache = ModelKit.InterpreterCache(zeros(IComplexF64, cap))
+    dIJ_cache = ModelKit.InterpreterCache(zeros(IComplex{DoubleF64}, cap))
     CertifyCache(
         eval_interpreter,
         jac_interpreter,
@@ -541,7 +538,7 @@ function _certify(
             Interval(imag(x̃ᵢ) - εᵢ, imag(x̃ᵢ) + εᵢ),
         )
     end
-    ModelKit.execute!(IJ, cache.jac_interpreter, x, ip, IJ_cache)
+    ModelKit.execute!(nothing, IJ, cache.jac_interpreter, x, ip, IJ_cache)
     x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
     certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
 
@@ -559,7 +556,7 @@ function _certify(
         end
 
         # Compute interval jacobian in extended precision
-        ModelKit.execute!(IJ, cache.jac_interpreter, x, dip, dIJ_cache)
+        ModelKit.execute!(nothing, IJ, cache.jac_interpreter, x, dip, dIJ_cache)
         x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
         certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
     end

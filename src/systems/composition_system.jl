@@ -82,7 +82,7 @@ _get_tu(C::CompositionSystem, ::Val{4}) = C.tu⁴
 
 function ModelKit.taylor!(u, v::Val, C::CompositionSystem, tx, p = nothing)
     tu = _get_tu(C, v)
-    taylor!(tu.data, v, C.f, tx, p)
+    taylor!(tu, v, C.f, tx, p)
     taylor!(u, v, C.g, tu, p)
 end
 

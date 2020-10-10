@@ -52,7 +52,7 @@ end
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
     Base.precompile(Tuple{
-        AffineChartSystem{InterpretedSystem{Float64},1},
+        AffineChartSystem{InterpretedSystem{Float64,Float64},1},
         Array{Variable,1},
     })
     Base.precompile(Tuple{
@@ -61,6 +61,36 @@ function _precompile_()
         Type{System},
         Array{Array{Int32,2},1},
         Array{Array{Variable,1},1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.ModelKit.Type)),
+        NamedTuple{
+            (:variables, :parameters, :t),
+            Tuple{Array{Symbol,1},Array{Symbol,1},Nothing},
+        },
+        Type{HomotopyContinuation.ModelKit.Interpreter},
+        HomotopyContinuation.ModelKit.InstructionList,
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.ModelKit.Type)),
+        NamedTuple{
+            (:variables, :parameters, :t, :nexpressions),
+            Tuple{Array{Symbol,1},Array{Symbol,1},Nothing,Int64},
+        },
+        Type{HomotopyContinuation.ModelKit.Interpreter},
+        HomotopyContinuation.ModelKit.InstructionList,
+        Array{Any,1},
+    })
+    Base.precompile(Tuple{
+        Core.kwftype(typeof(HomotopyContinuation.ModelKit.Type)),
+        NamedTuple{
+            (:variables, :parameters, :t, :nexpressions),
+            Tuple{Array{Symbol,1},Array{Symbol,1},Nothing,Int64},
+        },
+        Type{HomotopyContinuation.ModelKit.Interpreter},
+        HomotopyContinuation.ModelKit.InstructionList,
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.ModelKit.buildvars)),
@@ -84,13 +114,19 @@ function _precompile_()
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:options,),Tuple{EndgameOptions}},
         Type{EndgameTracker},
-        Tracker{CoefficientHomotopy{InterpretedSystem{Float64}},Array{Complex{Float64},2}},
+        Tracker{
+            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
+            Array{Complex{Float64},2},
+        },
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:options,),Tuple{EndgameOptions}},
         Type{EndgameTracker},
-        Tracker{ParameterHomotopy{InterpretedSystem{Float64}},Array{Complex{Float64},2}},
+        Tracker{
+            ParameterHomotopy{InterpretedSystem{Int32,Int32}},
+            Array{Complex{Float64},2},
+        },
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
@@ -98,8 +134,8 @@ function _precompile_()
         Type{EndgameTracker},
         Tracker{
             StraightLineHomotopy{
-                FixedParameterSystem{InterpretedSystem{Float64},Float64},
-                InterpretedSystem{Float64},
+                FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+                InterpretedSystem{Float64,Float64},
             },
             Array{Complex{Float64},2},
         },
@@ -108,13 +144,13 @@ function _precompile_()
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:options,),Tuple{TrackerOptions}},
         Type{Tracker},
-        CoefficientHomotopy{InterpretedSystem{Float64}},
+        CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:options,),Tuple{TrackerOptions}},
         Type{Tracker},
-        HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
+        HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
@@ -223,7 +259,7 @@ function _precompile_()
         NamedTuple{(:seed, :start_system),Tuple{UInt32,Nothing}},
         Type{Solver},
         EndgameTracker{
-            ParameterHomotopy{InterpretedSystem{Float64}},
+            ParameterHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
     })
@@ -239,8 +275,8 @@ function _precompile_()
         Type{Solver},
         EndgameTracker{
             StraightLineHomotopy{
-                FixedParameterSystem{InterpretedSystem{Float64},Float64},
-                InterpretedSystem{Float64},
+                FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+                InterpretedSystem{Float64,Float64},
             },
             Array{Complex{Float64},2},
         },
@@ -251,12 +287,12 @@ function _precompile_()
         Type{Solver},
         OverdeterminedTracker{
             PolyhedralTracker{
-                HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-                CoefficientHomotopy{InterpretedSystem{Float64}},
+                HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+                CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
             HomotopyContinuation.ExcessSolutionCheck{
-                RandomizedSystem{InterpretedSystem{Float64}},
+                RandomizedSystem{InterpretedSystem{Float64,Float64}},
                 HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}},
             },
         },
@@ -266,106 +302,32 @@ function _precompile_()
         NamedTuple{(:seed, :start_system),Tuple{UInt32,Symbol}},
         Type{Solver},
         PolyhedralTracker{
-            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-            CoefficientHomotopy{InterpretedSystem{Float64}},
+            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
-        NamedTuple{
-            (
-                :system,
-                :system_coeffs,
-                :weights,
-                :t_weights,
-                :complex_t_weights,
-                :coeffs,
-                :dt_coeffs,
-                :x,
-                :t_coeffs,
-                :t_taylor_coeffs,
-                :taylor_coeffs,
-                :tc3,
-                :tc2,
-            ),
-            Tuple{
-                InterpretedSystem{Float64},
-                Array{Complex{Float64},1},
-                Array{Float64,1},
-                Array{Float64,1},
-                StructArrays.StructArray{
-                    Complex{Float64},
-                    1,
-                    NamedTuple{(:re, :im),Tuple{Array{Float64,1},Array{Float64,1}}},
-                    Int64,
-                },
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Base.RefValue{Complex{Float64}},
-                Base.RefValue{Complex{Float64}},
-                TaylorVector{5,Complex{Float64}},
-                TaylorVector{4,Complex{Float64}},
-                TaylorVector{3,Complex{Float64}},
-            },
-        },
-        Type{HomotopyContinuation.ToricHomotopy},
-    })
-    Base.precompile(Tuple{
-        Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:tracker_options, :options),Tuple{TrackerOptions,EndgameOptions}},
         Type{EndgameTracker},
-        ParameterHomotopy{InterpretedSystem{Float64}},
+        ParameterHomotopy{InterpretedSystem{Int32,Int32}},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:tracker_options, :options),Tuple{TrackerOptions,EndgameOptions}},
         Type{EndgameTracker},
         StraightLineHomotopy{
-            FixedParameterSystem{InterpretedSystem{Float64},Float64},
-            InterpretedSystem{Float64},
+            FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+            InterpretedSystem{Float64,Float64},
         },
-    })
-    Base.precompile(Tuple{
-        Core.kwftype(typeof(HomotopyContinuation.Type)),
-        NamedTuple{
-            (:tx⁰, :tx¹, :tx², :tx³, :xtemp, :u, :u₁, :u₂, :prev_tx¹, :ty¹, :prev_ty¹),
-            Tuple{
-                TaylorVector{1,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{3,Complex{Float64}},
-                TaylorVector{4,Complex{Float64}},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                Array{Complex{Float64},1},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-                TaylorVector{2,Complex{Float64}},
-            },
-        },
-        Type{HomotopyContinuation.Predictor},
-    })
-    Base.precompile(Tuple{
-        Core.kwftype(typeof(HomotopyContinuation.Type)),
-        NamedTuple{
-            (:val, :solution, :row_scaling, :samples),
-            Tuple{
-                HomotopyContinuation.Valuation,
-                Array{Complex{Float64},1},
-                Array{Float64,1},
-                Array{TaylorVector{2,Complex{Float64}},1},
-            },
-        },
-        Type{HomotopyContinuation.EndgameTrackerState},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.Type)),
         NamedTuple{(:γ,),Tuple{Complex{Float64}}},
         Type{StraightLineHomotopy},
-        FixedParameterSystem{InterpretedSystem{Float64},Float64},
-        InterpretedSystem{Float64},
+        FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+        InterpretedSystem{Float64,Float64},
     })
     Base.precompile(Tuple{
         Core.kwftype(typeof(HomotopyContinuation.monodromy_solve)),
@@ -373,7 +335,7 @@ function _precompile_()
         typeof(monodromy_solve),
         HomotopyContinuation.MonodromySolver{
             EndgameTracker{
-                ParameterHomotopy{InterpretedSystem{Float64}},
+                ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
             Array{Complex{Float64},1},
@@ -403,14 +365,14 @@ function _precompile_()
         NamedTuple{(:atol, :rtol),Tuple{Float64,Float64}},
         typeof(newton),
         HomotopyContinuation.StartPairSystem{
-            InterpretedSystem{Float64},
+            InterpretedSystem{Int32,Int32},
             FiniteDiff.JacobianCache{
                 Array{Complex{Float64},1},
                 Array{Complex{Float64},1},
                 Array{Complex{Float64},1},
                 UnitRange{Int64},
                 Nothing,
-                Val{:forward},
+                Val{:forward}(),
                 Complex{Float64},
             },
         },
@@ -487,7 +449,7 @@ function _precompile_()
         typeof(solve),
         Solver{
             EndgameTracker{
-                ParameterHomotopy{InterpretedSystem{Float64}},
+                ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
         },
@@ -503,8 +465,8 @@ function _precompile_()
         Solver{
             EndgameTracker{
                 StraightLineHomotopy{
-                    FixedParameterSystem{InterpretedSystem{Float64},Float64},
-                    InterpretedSystem{Float64},
+                    FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+                    InterpretedSystem{Float64,Float64},
                 },
                 Array{Complex{Float64},2},
             },
@@ -524,12 +486,12 @@ function _precompile_()
         Solver{
             OverdeterminedTracker{
                 PolyhedralTracker{
-                    HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-                    CoefficientHomotopy{InterpretedSystem{Float64}},
+                    HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+                    CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                     Array{Complex{Float64},2},
                 },
                 HomotopyContinuation.ExcessSolutionCheck{
-                    RandomizedSystem{InterpretedSystem{Float64}},
+                    RandomizedSystem{InterpretedSystem{Float64,Float64}},
                     HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}},
                 },
             },
@@ -545,8 +507,8 @@ function _precompile_()
         typeof(solve),
         Solver{
             PolyhedralTracker{
-                HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-                CoefficientHomotopy{InterpretedSystem{Float64}},
+                HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+                CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
         },
@@ -558,7 +520,10 @@ function _precompile_()
         typeof(total_degree_start_solutions),
         Array{Int64,1},
     })
-    Base.precompile(Tuple{RandomizedSystem{InterpretedSystem{Float64}},Array{Variable,1}})
+    Base.precompile(Tuple{
+        RandomizedSystem{InterpretedSystem{Float64,Float64}},
+        Array{Variable,1},
+    })
     Base.precompile(Tuple{
         Type{
             Base.Broadcast.Broadcasted{
@@ -616,18 +581,522 @@ function _precompile_()
                 Args,
             } where {Args<:Tuple} where {F} where Axes,
         },
+        typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+        Tuple{Array{HomotopyContinuation.ModelKit.InstructionRef,1},Base.RefValue{Nothing}},
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.DefaultArrayStyle{1},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+        Tuple{
+            Array{Union{Nothing,HomotopyContinuation.ModelKit.InstructionRef},1},
+            Base.RefValue{Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.DefaultArrayStyle{1},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
         typeof(^),
         Tuple{Array{Variable,1},Array{Int64,1}},
     })
     Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{
+                Float64,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+            Tuple{
+                Float64,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Float64,Symbol,Nothing},
+            Tuple{Float64,Symbol,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                Nothing,
+            },
+            Tuple{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                Nothing,
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+            Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                Symbol,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+            Tuple{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                Symbol,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+            Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{
+                Int32,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+            Tuple{
+                Int32,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Int32,Symbol,Int32},
+            Tuple{Int32,Symbol,Int32},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Int32,Symbol,Nothing},
+            Tuple{Int32,Symbol,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Float64,Nothing},
+            Tuple{Symbol,Float64,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{
+                Symbol,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+            Tuple{
+                Symbol,
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+            Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Int32,Nothing},
+            Tuple{Symbol,Int32,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Nothing,Nothing},
+            Tuple{Symbol,Nothing,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Symbol,Int32},
+            Tuple{Symbol,Symbol,Int32},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Symbol,Nothing},
+            Tuple{Symbol,Symbol,Nothing},
+        },
+    })
+    Base.precompile(Tuple{
+        Type{
+            Base.Broadcast.Broadcasted{
+                Base.Broadcast.Style{Tuple},
+                Axes,
+                F,
+                Args,
+            } where {Args<:Tuple} where {F} where Axes,
+        },
+        typeof(get),
+        Tuple{
+            Base.RefValue{Dict{
+                HomotopyContinuation.ModelKit.InstructionRef,
+                HomotopyContinuation.ModelKit.InstructionRef,
+            }},
+            Tuple{Symbol,Symbol,Symbol},
+            Tuple{Symbol,Symbol,Symbol},
+        },
+    })
+    Base.precompile(Tuple{
         Type{CoefficientHomotopy},
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
     })
     Base.precompile(Tuple{
         Type{HomotopyContinuation.ExcessSolutionCheck},
-        RandomizedSystem{InterpretedSystem{Float64}},
+        RandomizedSystem{InterpretedSystem{Float64,Float64}},
         NewtonCache{HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}}},
     })
     Base.precompile(Tuple{
@@ -653,164 +1122,185 @@ function _precompile_()
         Array{Float64,1},
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Any,1},
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Float64,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Any,1},
-        Int64,
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Float64,
+        HomotopyContinuation.ModelKit.InstructionRef,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Any,1},
-        Symbol,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Float64,1},
-        Int64,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Float64,1},
-        Symbol,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Int64,1},
-        Int64,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterArg},
-        Dict{Symbol,Int64},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Int64,1},
-        Symbol,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
-        Symbol,
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Float64,
         Symbol,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
-        Symbol,
-        Int64,
-        Int64,
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        HomotopyContinuation.ModelKit.InstructionRef,
         Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Int32,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Int32,
+        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Int32,
+        Symbol,
+        Int32,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Int64,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Int64,
         Symbol,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Symbol,
+        Float64,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Symbol,
         Float64,
     })
     Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Int32,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Symbol,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        Int32,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
         Symbol,
         Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        Symbol,
+        Int32,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        Symbol,
+        Symbol,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Instruction},
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Symbol,
+        Symbol,
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.InterpreterCache},
+        Type{T} where T,
+        HomotopyContinuation.ModelKit.Interpreter{Float64},
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.InterpreterCache},
+        Type{T} where T,
+        HomotopyContinuation.ModelKit.Interpreter{Int32},
+    })
+    Base.precompile(Tuple{
+        Type{HomotopyContinuation.ModelKit.Interpreter},
+        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
+        Array{Float64,1},
         Int64,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.InterpreterOp},
-        Symbol,
-        Symbol,
-        Symbol,
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
         Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-        Array{Float64,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-        Array{Int64,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,2},
-        Array{Float64,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,2},
-        Array{Int64,1},
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        HomotopyContinuation.ModelKit.InstructionList,
-        Array{Any,2},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
+        Array{Symbol,1},
         Array{Symbol,1},
     })
     Base.precompile(Tuple{
         Type{HomotopyContinuation.ModelKit.Interpreter},
-        HomotopyContinuation.ModelKit.InstructionList,
+        Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
+        Array{Int32,1},
+        Int64,
+        Array{HomotopyContinuation.ModelKit.InterpreterArg,1},
         Array{Symbol,1},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
-        Array{Symbol,1},
-    })
-    Base.precompile(Tuple{
-        Type{HomotopyContinuation.ModelKit.Interpreter},
-        HomotopyContinuation.ModelKit.InstructionList,
-        Array{Symbol,2},
-        Dict{Symbol,Int64},
-        Nothing,
-        Dict{Symbol,Int64},
         Array{Symbol,1},
     })
     Base.precompile(Tuple{
         Type{HomotopyContinuation.MonodromySolver},
         Array{
             EndgameTracker{
-                ParameterHomotopy{InterpretedSystem{Float64}},
+                ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
             1,
@@ -830,7 +1320,7 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Type{HomotopyContinuation.ToricHomotopy},
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Array{Complex{Float64},1},1},
     })
     Base.precompile(Tuple{
@@ -870,96 +1360,53 @@ function _precompile_()
     Base.precompile(Tuple{
         Type{InterpretedSystem},
         System,
-        HomotopyContinuation.ModelKit.Interpreter{Float64,1},
-        HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
-        HomotopyContinuation.ModelKit.InterpreterCache{Complex{
-            HomotopyContinuation.DoubleDouble.DoubleF64,
+        HomotopyContinuation.ModelKit.Interpreter{Float64},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{
+            Complex{HomotopyContinuation.DoubleDouble.DoubleF64},
+            1,
         }},
-        HomotopyContinuation.ModelKit.Interpreter{Float64,2},
-        HomotopyContinuation.ModelKit.InterpreterCache{Complex{Float64}},
+        HomotopyContinuation.ModelKit.Interpreter{Float64},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
         Tuple{
-            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
-                Complex{Float64},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                2,
                 Complex{Float64},
             }},
-            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
-                Complex{Float64},
-                Complex{Float64},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                3,
                 Complex{Float64},
             }},
-            HomotopyContinuation.ModelKit.InterpreterCache{NTuple{4,Complex{Float64}}},
-        },
-    })
-    Base.precompile(Tuple{
-        Type{
-            NamedTuple{
-                (
-                    :system,
-                    :system_coeffs,
-                    :weights,
-                    :t_weights,
-                    :complex_t_weights,
-                    :coeffs,
-                    :dt_coeffs,
-                    :x,
-                    :t_coeffs,
-                    :t_taylor_coeffs,
-                    :taylor_coeffs,
-                    :tc3,
-                    :tc2,
-                ),
-                T,
-            } where T<:Tuple,
-        },
-        Tuple{
-            InterpretedSystem{Float64},
-            Array{Complex{Float64},1},
-            Array{Float64,1},
-            Array{Float64,1},
-            StructArrays.StructArray{
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                4,
                 Complex{Float64},
-                1,
-                NamedTuple{(:re, :im),Tuple{Array{Float64,1},Array{Float64,1}}},
-                Int64,
-            },
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Base.RefValue{Complex{Float64}},
-            Base.RefValue{Complex{Float64}},
-            TaylorVector{5,Complex{Float64}},
-            TaylorVector{4,Complex{Float64}},
-            TaylorVector{3,Complex{Float64}},
+            }},
         },
     })
     Base.precompile(Tuple{
-        Type{
-            NamedTuple{
-                (:tx⁰, :tx¹, :tx², :tx³, :xtemp, :u, :u₁, :u₂, :prev_tx¹, :ty¹, :prev_ty¹),
-                T,
-            } where T<:Tuple,
-        },
+        Type{InterpretedSystem},
+        System,
+        HomotopyContinuation.ModelKit.Interpreter{Int32},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{
+            Complex{HomotopyContinuation.DoubleDouble.DoubleF64},
+            1,
+        }},
+        HomotopyContinuation.ModelKit.Interpreter{Int32},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
         Tuple{
-            TaylorVector{1,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{3,Complex{Float64}},
-            TaylorVector{4,Complex{Float64}},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            Array{Complex{Float64},1},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
-            TaylorVector{2,Complex{Float64}},
-        },
-    })
-    Base.precompile(Tuple{
-        Type{NamedTuple{(:val, :solution, :row_scaling, :samples),T} where T<:Tuple},
-        Tuple{
-            HomotopyContinuation.Valuation,
-            Array{Complex{Float64},1},
-            Array{Float64,1},
-            Array{TaylorVector{2,Complex{Float64}},1},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                2,
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                3,
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                4,
+                Complex{Float64},
+            }},
         },
     })
     Base.precompile(Tuple{
@@ -973,44 +1420,44 @@ function _precompile_()
     Base.precompile(Tuple{
         Type{OverdeterminedTracker},
         PolyhedralTracker{
-            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-            CoefficientHomotopy{InterpretedSystem{Float64}},
+            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
         HomotopyContinuation.ExcessSolutionCheck{
-            RandomizedSystem{InterpretedSystem{Float64}},
+            RandomizedSystem{InterpretedSystem{Float64,Float64}},
             HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}},
         },
     })
     Base.precompile(Tuple{
         Type{OverdeterminedTracker},
         PolyhedralTracker{
-            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-            CoefficientHomotopy{InterpretedSystem{Float64}},
+            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
+            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
-        RandomizedSystem{InterpretedSystem{Float64}},
+        RandomizedSystem{InterpretedSystem{Float64,Float64}},
     })
     Base.precompile(Tuple{
         Type{ParameterHomotopy},
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
     })
     Base.precompile(Tuple{
         Type{ParameterHomotopy},
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Complex{Float64},1},
         Array{Float64,1},
     })
     Base.precompile(Tuple{
         Type{PolyhedralTracker},
         Tracker{
-            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
+            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
         EndgameTracker{
-            CoefficientHomotopy{InterpretedSystem{Float64}},
+            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
         Array{Array{Int32,2},1},
@@ -1018,83 +1465,14 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Type{RandomizedSystem},
-        InterpretedSystem{Float64},
+        InterpretedSystem{Float64,Float64},
         Array{Complex{Float64},2},
     })
     Base.precompile(Tuple{Type{System},Array{Expression,1},Array{Variable,1}})
     Base.precompile(Tuple{Type{System},Array{Expression,1}})
     Base.precompile(Tuple{
-        Type{TaylorVector{1,Complex{Float64}}},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        Tuple{
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
-    Base.precompile(Tuple{Type{TaylorVector{1,T} where T},TaylorVector{4,Complex{Float64}}})
-    Base.precompile(Tuple{Type{TaylorVector{2,T} where T},TaylorVector{4,Complex{Float64}}})
-    Base.precompile(Tuple{Type{TaylorVector{2,T} where T},Type{T} where T,Int64})
-    Base.precompile(Tuple{Type{TaylorVector{3,T} where T},TaylorVector{4,Complex{Float64}}})
-    Base.precompile(Tuple{Type{TaylorVector{3,T} where T},TaylorVector{5,Complex{Float64}}})
-    Base.precompile(Tuple{Type{TaylorVector{4,T} where T},TaylorVector{5,Complex{Float64}}})
-    Base.precompile(Tuple{Type{TaylorVector{4,T} where T},Type{T} where T,Int64})
-    Base.precompile(Tuple{Type{TaylorVector{5,T} where T},Type{T} where T,Int64})
-    Base.precompile(Tuple{
-        Type{TaylorVector},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        NTuple{
-            4,
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
-    Base.precompile(Tuple{
-        Type{TaylorVector},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        NTuple{
-            5,
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
-    Base.precompile(Tuple{
-        Type{TaylorVector},
-        LinearAlgebra.Transpose{Complex{Float64},Array{Complex{Float64},2}},
-        Tuple{
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-            SubArray{
-                Complex{Float64},
-                1,
-                Array{Complex{Float64},2},
-                Tuple{Int64,UnitRange{Int64}},
-                true,
-            },
-        },
-    })
-    Base.precompile(Tuple{
         Type{Tracker},
-        CoefficientHomotopy{InterpretedSystem{Float64}},
+        CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
         HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
@@ -1102,7 +1480,7 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Type{Tracker},
-        HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
+        HomotopyContinuation.ToricHomotopy{InterpretedSystem{Int32,Int32}},
         HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
@@ -1110,7 +1488,7 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         Type{Tracker},
-        ParameterHomotopy{InterpretedSystem{Float64}},
+        ParameterHomotopy{InterpretedSystem{Int32,Int32}},
         HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
         HomotopyContinuation.TrackerState{Array{Complex{Float64},2}},
@@ -1119,8 +1497,8 @@ function _precompile_()
     Base.precompile(Tuple{
         Type{Tracker},
         StraightLineHomotopy{
-            FixedParameterSystem{InterpretedSystem{Float64},Float64},
-            InterpretedSystem{Float64},
+            FixedParameterSystem{InterpretedSystem{Int32,Int32},Float64},
+            InterpretedSystem{Float64,Float64},
         },
         HomotopyContinuation.Predictor,
         HomotopyContinuation.NewtonCorrector,
@@ -1129,20 +1507,356 @@ function _precompile_()
     })
     Base.precompile(Tuple{typeof(*),Array{Complex{Float64},2},Array{Expression,1}})
     Base.precompile(Tuple{typeof(*),Complex{Int64},Expression})
-    Base.precompile(Tuple{typeof(*),Expression,Expression})
     Base.precompile(Tuple{typeof(*),Float64,Expression})
     Base.precompile(Tuple{typeof(*),Int64,Variable})
     Base.precompile(Tuple{typeof(*),Variable,Variable})
     Base.precompile(Tuple{typeof(+),Expression,Expression,Expression,Expression})
     Base.precompile(Tuple{typeof(+),Expression,Expression,Expression})
-    Base.precompile(Tuple{typeof(+),Expression,Expression})
     Base.precompile(Tuple{typeof(+),Expression,Float64})
     Base.precompile(Tuple{typeof(+),Expression,Int64})
     Base.precompile(Tuple{typeof(+),Variable,Int64})
     Base.precompile(Tuple{typeof(-),Expression,Expression})
     Base.precompile(Tuple{typeof(-),Expression,Int64})
     Base.precompile(Tuple{typeof(-),Variable,Variable})
-    Base.precompile(Tuple{typeof(/),Expression,Expression})
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast._broadcast_getindex_evalf),
+        typeof(get),
+        Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Float64,
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast._broadcast_getindex_evalf),
+        typeof(get),
+        Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast._broadcast_getindex_evalf),
+        typeof(get),
+        Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Int32,
+        Int32,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast._broadcast_getindex_evalf),
+        typeof(get),
+        Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Nothing,
+        Nothing,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{
+            Float64,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Float64,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Float64,Symbol,Nothing},
+        Tuple{Float64,Symbol,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Nothing,
+        },
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Nothing,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{
+            Int32,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Int32,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Int32,Symbol,Int32},
+        Tuple{Int32,Symbol,Int32},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Int32,Symbol,Nothing},
+        Tuple{Int32,Symbol,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Float64,Nothing},
+        Tuple{Symbol,Float64,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Int32,Nothing},
+        Tuple{Symbol,Int32,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Nothing,Nothing},
+        Tuple{Symbol,Nothing,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Symbol,Int32},
+        Tuple{Symbol,Symbol,Int32},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Symbol,Nothing},
+        Tuple{Symbol,Symbol,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Base.Broadcast.Style{Tuple},
+        Function,
+        Base.RefValue{Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        }},
+        Tuple{Symbol,Symbol,Symbol},
+        Tuple{Symbol,Symbol,Symbol},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.broadcasted),
+        Function,
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+        Nothing,
+    })
     Base.precompile(Tuple{
         typeof(Base.Broadcast.broadcasted),
         Function,
@@ -1180,6 +1894,116 @@ function _precompile_()
         Int64,
     })
     Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{
+            Float64,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Float64,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Nothing,
+        },
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Nothing,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{
+            Int32,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Int32,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Tuple{
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.combine_styles),
+        Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+    })
+    Base.precompile(Tuple{
         typeof(Base.Broadcast.copyto_nonleaf!),
         Array{Complex{Float64},1},
         Base.Broadcast.Broadcasted{
@@ -1210,12 +2034,48 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         typeof(Base.Broadcast.copyto_nonleaf!),
-        Array{Int64,1},
+        Array{Int32,1},
         Base.Broadcast.Broadcasted{
             Base.Broadcast.DefaultArrayStyle{1},
             Tuple{Base.OneTo{Int64}},
             typeof(to_number),
             Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
+        },
+        Base.OneTo{Int64},
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.copyto_nonleaf!),
+        Array{Symbol,1},
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Tuple{Base.OneTo{Int64}},
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Base.Broadcast.Extruded{Array{Any,1},Tuple{Bool},Tuple{Int64}},
+                Base.RefValue{Nothing},
+            },
+        },
+        Base.OneTo{Int64},
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.copyto_nonleaf!),
+        Array{Symbol,1},
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Tuple{Base.OneTo{Int64}},
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Base.Broadcast.Extruded{
+                    Array{Union{Nothing,HomotopyContinuation.ModelKit.InstructionRef},1},
+                    Tuple{Bool},
+                    Tuple{Int64},
+                },
+                Base.RefValue{Nothing},
+            },
         },
         Base.OneTo{Int64},
         Int64,
@@ -1267,6 +2127,414 @@ function _precompile_()
         Int64,
     })
     Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Float64,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Float64,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Float64,Symbol,Nothing},
+                Tuple{Float64,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Nothing,
+                },
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Nothing,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Int32,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Int32,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+                Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,Int32},
+                Tuple{Int32,Symbol,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,Nothing},
+                Tuple{Int32,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Float64,Nothing},
+                Tuple{Symbol,Float64,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Int32,Nothing},
+                Tuple{Symbol,Int32,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Nothing,Nothing},
+                Tuple{Symbol,Nothing,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+                Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Int32},
+                Tuple{Symbol,Symbol,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Nothing},
+                Tuple{Symbol,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.instantiate),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Symbol},
+                Tuple{Symbol,Symbol,Symbol},
+            },
+        },
+    })
+    Base.precompile(Tuple{
         typeof(Base.Broadcast.materialize),
         Base.Broadcast.Broadcasted{
             Base.Broadcast.DefaultArrayStyle{1},
@@ -1292,6 +2560,30 @@ function _precompile_()
         },
     })
     Base.precompile(Tuple{
+        typeof(Base.Broadcast.materialize),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Nothing,
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+                Base.RefValue{Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(Base.Broadcast.materialize),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Nothing,
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Array{Union{Nothing,HomotopyContinuation.ModelKit.InstructionRef},1},
+                Base.RefValue{Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
         typeof(Base.Broadcast.restart_copyto_nonleaf!),
         Array{Number,1},
         Array{Complex{Float64},1},
@@ -1310,7 +2602,7 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(Base.Broadcast.restart_copyto_nonleaf!),
         Array{Real,1},
-        Array{Int64,1},
+        Array{Int32,1},
         Base.Broadcast.Broadcasted{
             Base.Broadcast.DefaultArrayStyle{1},
             Tuple{Base.OneTo{Int64}},
@@ -1343,10 +2635,32 @@ function _precompile_()
         Int64,
     })
     Base.precompile(Tuple{
+        typeof(Base.Broadcast.restart_copyto_nonleaf!),
+        Array{Union{Nothing,Symbol},1},
+        Array{Symbol,1},
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Tuple{Base.OneTo{Int64}},
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Base.Broadcast.Extruded{Array{Any,1},Tuple{Bool},Tuple{Int64}},
+                Base.RefValue{Nothing},
+            },
+        },
+        Nothing,
+        Int64,
+        Base.OneTo{Int64},
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
         typeof(Base._array_for),
-        Type{TaylorVector{2,Complex{Float64}}},
-        UnitRange{Int64},
-        Base.HasShape{1},
+        Type{HomotopyContinuation.ModelKit.InstructionRef},
+        Base.Iterators.ProductIterator{Tuple{
+            Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+            UnitRange{Int64},
+        }},
+        Base.HasShape{2},
     })
     Base.precompile(Tuple{
         typeof(Base._compute_eltype),
@@ -1372,6 +2686,10 @@ function _precompile_()
         typeof(Base.allocatedinline),
         Type{HomotopyContinuation.ModelKit.ExpressionRef},
     })
+    Base.precompile(Tuple{
+        typeof(Base.allocatedinline),
+        Type{HomotopyContinuation.ModelKit.InstructionRef},
+    })
     Base.precompile(Tuple{typeof(Base.allocatedinline),Type{Variable}})
     Base.precompile(Tuple{
         typeof(Base.collect_to_with_first!),
@@ -1392,11 +2710,6 @@ function _precompile_()
     })
     Base.precompile(Tuple{
         typeof(Base.deepcopy_internal),
-        Array{HomotopyContinuation.ModelKit.InterpreterArg,2},
-        IdDict{Any,Any},
-    })
-    Base.precompile(Tuple{
-        typeof(Base.deepcopy_internal),
         Array{HomotopyContinuation.ModelKit.InterpreterInstruction,1},
         IdDict{Any,Any},
     })
@@ -1409,18 +2722,110 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(Base.deepcopy_internal),
         Tuple{
-            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
-                Complex{Float64},
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{Tuple{
-                Complex{Float64},
-                Complex{Float64},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                2,
                 Complex{Float64},
             }},
-            HomotopyContinuation.ModelKit.InterpreterCache{NTuple{4,Complex{Float64}}},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                3,
+                Complex{Float64},
+            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
+                4,
+                Complex{Float64},
+            }},
         },
         IdDict{Any,Any},
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{
+            Float64,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Nothing,
+        },
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{
+            Int32,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{
+            Symbol,
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.indexed_iterate),
+        Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+        Int64,
     })
     Base.precompile(Tuple{typeof(Base.literal_pow),typeof(^),Variable,Val{2}})
     Base.precompile(Tuple{
@@ -1430,30 +2835,56 @@ function _precompile_()
         Type{NamedTuple{(),Tuple{}}},
     })
     Base.precompile(Tuple{
+        typeof(Base.setindex_widen_up_to),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+        Symbol,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.setindex_widen_up_to),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,2},
+        Int32,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.setindex_widen_up_to),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,2},
+        Nothing,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(Base.setindex_widen_up_to),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,2},
+        Symbol,
+        Int64,
+    })
+    Base.precompile(Tuple{
         typeof(Base.vect),
         EndgameTracker{
-            ParameterHomotopy{InterpretedSystem{Float64}},
+            ParameterHomotopy{InterpretedSystem{Int32,Int32}},
             Array{Complex{Float64},2},
         },
     })
     Base.precompile(Tuple{typeof(Base.vect),Expression,Vararg{Expression,N} where N})
-    Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.__init__)})
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit._impl_taylor_bivariate),
-        Int64,
-        Int64,
-        Int64,
-        Symbol,
+        typeof(HomotopyContinuation.ModelKit._add_mul_instructions!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        SubArray{
+            HomotopyContinuation.ModelKit.ExpressionRef,
+            1,
+            HomotopyContinuation.ModelKit.ExprVec,
+            Tuple{UnitRange{UInt64}},
+            false,
+        },
+        Dict{Symbol,Expression},
+        Dict{Symbol,HomotopyContinuation.ModelKit.InstructionRef},
     })
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit._impl_taylor_pow),
-        Int64,
-        Int64,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit._impl_taylor_sqr),
-        Int64,
-        Int64,
+        typeof(HomotopyContinuation.ModelKit.add_instructions!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Expression,
+        Dict{Symbol,Expression},
+        Dict{Symbol,HomotopyContinuation.ModelKit.InstructionRef},
     })
     Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.free!),Expression})
     Base.precompile(Tuple{
@@ -1469,15 +2900,98 @@ function _precompile_()
         HomotopyContinuation.ModelKit.ExpressionSet,
     })
     Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.gradient),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+        Array{Symbol,1},
+    })
+    Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.is_minus_one),Float64})
+    Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.is_minus_one),Symbol})
+    Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.is_one),Float64})
+    Base.precompile(Tuple{
         typeof(HomotopyContinuation.ModelKit.multivariate_horner),
         Array{Int32,2},
         Array{Expression,1},
         Array{Variable,1},
     })
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.to_smallest_eltype),
-        Array{Any,1},
+        typeof(HomotopyContinuation.ModelKit.pow!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Any,
+        Int64,
     })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_add),
+        Val{2},
+        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_add),
+        Val{2},
+        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
+        Int32,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_add),
+        Val{3},
+        NTuple{4,Complex{Float64}},
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_add),
+        Val{3},
+        NTuple{4,Complex{Float64}},
+        Int32,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_cos_impl),
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_mul),
+        Val{2},
+        Float64,
+        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_mul),
+        Val{2},
+        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_mul),
+        Val{3},
+        Float64,
+        NTuple{4,Complex{Float64}},
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_mul),
+        Val{3},
+        NTuple{4,Complex{Float64}},
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_pow_impl),
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_sin_impl),
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_tuple),
+        Array{Symbol,1},
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.taylor_tuple),
+        Array{Union{Nothing,Symbol},1},
+    })
+    Base.precompile(Tuple{typeof(HomotopyContinuation.ModelKit.to_expr_arg),Int64,Nothing})
     Base.precompile(Tuple{
         typeof(HomotopyContinuation.ModelKit.to_smallest_eltype),
         Array{Complex{Float64},1},
@@ -1491,6 +3005,24 @@ function _precompile_()
         Array{Real,1},
     })
     Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.update_lifetime!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Float64,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.update_lifetime!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Int32,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.ModelKit.update_lifetime!),
+        HomotopyContinuation.ModelKit.InstructionList,
+        Int64,
+        Int64,
+    })
+    Base.precompile(Tuple{
         typeof(HomotopyContinuation.qr_ldiv!),
         Array{Complex{Float64},1},
         LinearAlgebra.QR{Complex{Float64},Array{Complex{Float64},2}},
@@ -1501,7 +3033,7 @@ function _precompile_()
         Array{PathResult,1},
         HomotopyContinuation.MonodromySolver{
             EndgameTracker{
-                ParameterHomotopy{InterpretedSystem{Float64}},
+                ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                 Array{Complex{Float64},2},
             },
             Array{Complex{Float64},1},
@@ -1519,26 +3051,6 @@ function _precompile_()
     })
     Base.precompile(Tuple{typeof(append!),Array{Expression,1},Array{Float64,1}})
     Base.precompile(Tuple{typeof(append!),Array{Variable,1},Array{Variable,1}})
-    Base.precompile(Tuple{
-        typeof(convert),
-        Type{HomotopyContinuation.ModelKit.Interpreter{Float64,1}},
-        HomotopyContinuation.ModelKit.Interpreter{Float64,1},
-    })
-    Base.precompile(Tuple{
-        typeof(convert),
-        Type{HomotopyContinuation.ModelKit.Interpreter{Float64,1}},
-        HomotopyContinuation.ModelKit.Interpreter{Int64,1},
-    })
-    Base.precompile(Tuple{
-        typeof(convert),
-        Type{HomotopyContinuation.ModelKit.Interpreter{Float64,2}},
-        HomotopyContinuation.ModelKit.Interpreter{Float64,2},
-    })
-    Base.precompile(Tuple{
-        typeof(convert),
-        Type{HomotopyContinuation.ModelKit.Interpreter{Float64,2}},
-        HomotopyContinuation.ModelKit.Interpreter{Int64,2},
-    })
     Base.precompile(Tuple{
         typeof(copy),
         Base.Broadcast.Broadcasted{
@@ -1558,26 +3070,424 @@ function _precompile_()
         },
     })
     Base.precompile(Tuple{
-        typeof(eltype),
-        HomotopyContinuation.ModelKit.Interpreter{Float64,1},
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Float64,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Float64,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
     })
     Base.precompile(Tuple{
-        typeof(eltype),
-        HomotopyContinuation.ModelKit.Interpreter{Float64,2},
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Float64,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
     })
     Base.precompile(Tuple{
-        typeof(eltype),
-        HomotopyContinuation.ModelKit.Interpreter{Int64,1},
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Float64,Symbol,Nothing},
+                Tuple{Float64,Symbol,Nothing},
+            },
+        },
     })
     Base.precompile(Tuple{
-        typeof(eltype),
-        HomotopyContinuation.ModelKit.Interpreter{Int64,2},
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Nothing,
+                },
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Nothing,
+                },
+            },
+        },
     })
-    Base.precompile(Tuple{typeof(find_start_pair),InterpretedSystem{Float64}})
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int32,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+                Tuple{HomotopyContinuation.ModelKit.InstructionRef,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Int32,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Int32,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Int32,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+                Tuple{Int32,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,Int32},
+                Tuple{Int32,Symbol,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Int32,Symbol,Nothing},
+                Tuple{Int32,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Float64,Nothing},
+                Tuple{Symbol,Float64,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+                Tuple{
+                    Symbol,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                },
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+                Tuple{Symbol,HomotopyContinuation.ModelKit.InstructionRef,Symbol},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Int32,Nothing},
+                Tuple{Symbol,Int32,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Nothing,Nothing},
+                Tuple{Symbol,Nothing,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+                Tuple{Symbol,Symbol,HomotopyContinuation.ModelKit.InstructionRef},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Int32},
+                Tuple{Symbol,Symbol,Int32},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Nothing},
+                Tuple{Symbol,Symbol,Nothing},
+            },
+        },
+    })
+    Base.precompile(Tuple{
+        typeof(copy),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.Style{Tuple},
+            Nothing,
+            typeof(get),
+            Tuple{
+                Base.RefValue{Dict{
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                    HomotopyContinuation.ModelKit.InstructionRef,
+                }},
+                Tuple{Symbol,Symbol,Symbol},
+                Tuple{Symbol,Symbol,Symbol},
+            },
+        },
+    })
+    Base.precompile(Tuple{typeof(find_start_pair),InterpretedSystem{Int32,Int32}})
     Base.precompile(Tuple{
         typeof(fix_parameters),
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Float64,1},
+    })
+    Base.precompile(Tuple{
+        typeof(get),
+        Dict{Symbol,Symbol},
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
     })
     Base.precompile(Tuple{
         typeof(getindex),
@@ -1588,104 +3498,115 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(getindex),
         HomotopyContinuation.ModelKit.DiffMap,
-        Int64,
+        Int32,
         Int64,
     })
     Base.precompile(Tuple{
-        typeof(merge!),
-        Dict{Expression,Expression},
-        Dict{Expression,Expression},
+        typeof(getindex),
+        HomotopyContinuation.ModelKit.DiffMap,
+        Symbol,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Float64,
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Int32,
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        Tuple{Float64,Int64},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+        Tuple{Symbol,Int64},
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        Tuple{Int32,Int64},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+    })
+    Base.precompile(Tuple{
+        typeof(isequal),
+        Tuple{Symbol,Int64},
+        Tuple{HomotopyContinuation.ModelKit.InstructionRef,Int64},
+    })
+    Base.precompile(Tuple{
+        typeof(map),
+        Function,
+        Array{HomotopyContinuation.ModelKit.InstructionRef,2},
     })
     Base.precompile(Tuple{
         typeof(newton),
-        InterpretedSystem{Float64},
+        InterpretedSystem{Int32,Int32},
         Array{Complex{Float64},1},
         Array{Complex{Float64},1},
         InfNorm,
         NewtonCache{HomotopyContinuation.MatrixWorkspace{Array{Complex{Float64},2}}},
     })
-    Base.precompile(Tuple{typeof(on_affine_chart),InterpretedSystem{Float64},Nothing})
+    Base.precompile(Tuple{
+        typeof(on_affine_chart),
+        InterpretedSystem{Float64,Float64},
+        Nothing,
+    })
     Base.precompile(Tuple{
         typeof(parameters),
         MonodromyResult{Array{Complex{Float64},1},Array{Complex{Float64},1}},
     })
     Base.precompile(Tuple{typeof(permute!),Array{Expression,1},Array{Int64,1}})
     Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Pair{Symbol,Tuple{Symbol,Float64,Symbol}},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Pair{Symbol,Tuple{Symbol,Int64,Symbol}},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Pair{Symbol,Tuple{Symbol,Symbol,Int64}},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Pair{Symbol,Tuple{Symbol,Symbol,Symbol}},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Float64,Symbol},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Int64,Int64},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Symbol,Float64},
-    })
-    Base.precompile(Tuple{
-        typeof(push!),
-        HomotopyContinuation.ModelKit.InstructionList,
-        Tuple{Symbol,Symbol,Nothing},
-    })
-    Base.precompile(Tuple{
         typeof(setindex!),
-        Dict{Expression,Irrational},
-        Irrational{:catalan},
-        Expression,
-    })
-    Base.precompile(Tuple{
-        typeof(setindex!),
-        Dict{Expression,Irrational},
-        Irrational{:γ},
-        Expression,
-    })
-    Base.precompile(Tuple{
-        typeof(setindex!),
-        Dict{Expression,Irrational},
-        Irrational{:π},
-        Expression,
-    })
-    Base.precompile(Tuple{
-        typeof(setindex!),
-        Dict{Expression,Irrational},
-        Irrational{:ℯ},
-        Expression,
+        Dict{
+            HomotopyContinuation.ModelKit.InstructionRef,
+            HomotopyContinuation.ModelKit.InstructionRef,
+        },
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
     })
     Base.precompile(Tuple{
         typeof(setindex!),
         HomotopyContinuation.ModelKit.DiffMap,
         Float64,
-        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(setindex!),
+        HomotopyContinuation.ModelKit.DiffMap,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(setindex!),
+        HomotopyContinuation.ModelKit.DiffMap,
+        Int32,
+        HomotopyContinuation.ModelKit.InstructionRef,
+        Int64,
+    })
+    Base.precompile(Tuple{
+        typeof(setindex!),
+        HomotopyContinuation.ModelKit.DiffMap,
+        Nothing,
+        HomotopyContinuation.ModelKit.InstructionRef,
         Int64,
     })
     Base.precompile(Tuple{
         typeof(setindex!),
         HomotopyContinuation.ModelKit.DiffMap,
         Symbol,
-        Symbol,
+        HomotopyContinuation.ModelKit.InstructionRef,
         Int64,
     })
     Base.precompile(Tuple{
@@ -1697,6 +3618,19 @@ function _precompile_()
             Tuple{Base.Broadcast.Extruded{Array{Variable,1},Tuple{Bool},Tuple{Int64}}},
         },
         Type{Tuple{String,Array{Int64,1}}},
+    })
+    Base.precompile(Tuple{
+        typeof(similar),
+        Base.Broadcast.Broadcasted{
+            Base.Broadcast.DefaultArrayStyle{1},
+            Tuple{Base.OneTo{Int64}},
+            typeof(HomotopyContinuation.ModelKit.to_expr_arg),
+            Tuple{
+                Base.Broadcast.Extruded{Array{Any,1},Tuple{Bool},Tuple{Int64}},
+                Base.RefValue{Nothing},
+            },
+        },
+        Type{Symbol},
     })
     Base.precompile(Tuple{
         typeof(similar),
@@ -1755,34 +3689,47 @@ function _precompile_()
             typeof(to_number),
             Tuple{Base.Broadcast.Extruded{Array{Expression,1},Tuple{Bool},Tuple{Int64}}},
         },
-        Type{Int64},
+        Type{Int32},
     })
-    Base.precompile(Tuple{typeof(size),AffineChartSystem{InterpretedSystem{Float64},1}})
+    Base.precompile(Tuple{
+        typeof(size),
+        AffineChartSystem{InterpretedSystem{Float64,Float64},1},
+    })
     Base.precompile(Tuple{
         typeof(solutions),
         MonodromyResult{Array{Complex{Float64},1},Array{Complex{Float64},1}},
+    })
+    Base.precompile(Tuple{
+        typeof(vcat),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+        Array{HomotopyContinuation.ModelKit.InstructionRef,1},
+    })
+    Base.precompile(Tuple{
+        typeof(vec),
+        Array{HomotopyContinuation.ModelKit.InstructionRef,2},
     })
     isdefined(HomotopyContinuation, Symbol("#221#222")) && Base.precompile(Tuple{
         getfield(HomotopyContinuation, Symbol("#221#222")),
         Array{Complex{Float64},1},
     })
-    isdefined(HomotopyContinuation, Symbol("#283#285")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#283#285"))})
-    isdefined(HomotopyContinuation, Symbol("#311#314")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#311#314"))})
-    isdefined(HomotopyContinuation, Symbol("#312#315")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#312#315"))})
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#168#169")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#168#169")),
-        Float64,
+    isdefined(HomotopyContinuation, Symbol("#281#283")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#281#283"))})
+    isdefined(HomotopyContinuation, Symbol("#309#312")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#309#312"))})
+    isdefined(HomotopyContinuation, Symbol("#310#313")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#310#313"))})
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#132#135")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#132#135")),
+        Int32,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#168#169")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#168#169")),
-        Int64,
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#132#135")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#132#135")),
+        Symbol,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#170#172")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#170#172")),
-        Int64,
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#143#144")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#143#144")),
+        HomotopyContinuation.ModelKit.InstructionOp,
+        Tuple{Symbol},
     })
     let fbody = try
             __lookup_kwbody__(which(HomotopyContinuation.ModelKit.buildvar, (Expr,)))
@@ -1809,7 +3756,7 @@ function _precompile_()
                 (
                     Solver{
                         EndgameTracker{
-                            ParameterHomotopy{InterpretedSystem{Float64}},
+                            ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                             Array{Complex{Float64},2},
                         },
                     },
@@ -1829,7 +3776,7 @@ function _precompile_()
                     typeof(solve),
                     Solver{
                         EndgameTracker{
-                            ParameterHomotopy{InterpretedSystem{Float64}},
+                            ParameterHomotopy{InterpretedSystem{Int32,Int32}},
                             Array{Complex{Float64},2},
                         },
                     },
@@ -1845,8 +3792,11 @@ function _precompile_()
                     Solver{
                         EndgameTracker{
                             StraightLineHomotopy{
-                                FixedParameterSystem{InterpretedSystem{Float64},Float64},
-                                InterpretedSystem{Float64},
+                                FixedParameterSystem{
+                                    InterpretedSystem{Int32,Int32},
+                                    Float64,
+                                },
+                                InterpretedSystem{Float64,Float64},
                             },
                             Array{Complex{Float64},2},
                         },
@@ -1868,8 +3818,11 @@ function _precompile_()
                     Solver{
                         EndgameTracker{
                             StraightLineHomotopy{
-                                FixedParameterSystem{InterpretedSystem{Float64},Float64},
-                                InterpretedSystem{Float64},
+                                FixedParameterSystem{
+                                    InterpretedSystem{Int32,Int32},
+                                    Float64,
+                                },
+                                InterpretedSystem{Float64,Float64},
                             },
                             Array{Complex{Float64},2},
                         },
@@ -1887,13 +3840,14 @@ function _precompile_()
                         OverdeterminedTracker{
                             PolyhedralTracker{
                                 HomotopyContinuation.ToricHomotopy{InterpretedSystem{
-                                    Float64,
+                                    Int32,
+                                    Int32,
                                 }},
-                                CoefficientHomotopy{InterpretedSystem{Float64}},
+                                CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                                 Array{Complex{Float64},2},
                             },
                             HomotopyContinuation.ExcessSolutionCheck{
-                                RandomizedSystem{InterpretedSystem{Float64}},
+                                RandomizedSystem{InterpretedSystem{Float64,Float64}},
                                 HomotopyContinuation.MatrixWorkspace{Array{
                                     Complex{Float64},
                                     2,
@@ -1919,13 +3873,14 @@ function _precompile_()
                         OverdeterminedTracker{
                             PolyhedralTracker{
                                 HomotopyContinuation.ToricHomotopy{InterpretedSystem{
-                                    Float64,
+                                    Int32,
+                                    Int32,
                                 }},
-                                CoefficientHomotopy{InterpretedSystem{Float64}},
+                                CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                                 Array{Complex{Float64},2},
                             },
                             HomotopyContinuation.ExcessSolutionCheck{
-                                RandomizedSystem{InterpretedSystem{Float64}},
+                                RandomizedSystem{InterpretedSystem{Float64,Float64}},
                                 HomotopyContinuation.MatrixWorkspace{Array{
                                     Complex{Float64},
                                     2,
@@ -1944,8 +3899,11 @@ function _precompile_()
                 (
                     Solver{
                         PolyhedralTracker{
-                            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-                            CoefficientHomotopy{InterpretedSystem{Float64}},
+                            HomotopyContinuation.ToricHomotopy{InterpretedSystem{
+                                Int32,
+                                Int32,
+                            }},
+                            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                             Array{Complex{Float64},2},
                         },
                     },
@@ -1965,8 +3923,11 @@ function _precompile_()
                     typeof(solve),
                     Solver{
                         PolyhedralTracker{
-                            HomotopyContinuation.ToricHomotopy{InterpretedSystem{Float64}},
-                            CoefficientHomotopy{InterpretedSystem{Float64}},
+                            HomotopyContinuation.ToricHomotopy{InterpretedSystem{
+                                Int32,
+                                Int32,
+                            }},
+                            CoefficientHomotopy{InterpretedSystem{Int32,Int32}},
                             Array{Complex{Float64},2},
                         },
                     },
