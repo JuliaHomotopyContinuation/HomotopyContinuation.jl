@@ -95,7 +95,7 @@ function randomize!(
     v::Union{AbstractMatrix,TaylorVector},
     ncols::Int = size(A, 1),
 )
-    n, m = size(A, 1), size(v,1)
+    n, m = size(A, 1), size(v, 1)
 
     for j = 1:ncols, i = 1:n
         u[i, j] = v[i, j]

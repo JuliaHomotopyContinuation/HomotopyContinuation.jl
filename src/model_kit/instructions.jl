@@ -697,9 +697,10 @@ function to_expr(
     end
     block
 end
-to_expr(list::InstructionList; kwargs...) = to_expr(list; kwargs...) do op, args
-    Expr(:call, call_op(op), args...)
-end
+to_expr(list::InstructionList; kwargs...) =
+    to_expr(list; kwargs...) do op, args
+        Expr(:call, call_op(op), args...)
+    end
 
 # HIGHER ORDER DIFFERENTIATION
 # This follows Chapter 13 of Griewank & Walther - Evaluating derivatives
@@ -765,7 +766,8 @@ end
 @inline make_ntuple(t::N) where {N<:Number} = (t,)
 @inline make_ntuple(t::Tuple{A}) where {A} = t
 @inline make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A, B)}, t)
-@inline make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A, B, C)}, t)
+@inline make_ntuple(t::Tuple{A,B,C}) where {A,B,C} =
+    convert(NTuple{3,promote_type(A, B, C)}, t)
 @inline make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} =
     convert(NTuple{4,promote_type(A, B, C, D)}, t)
 @inline make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} =
@@ -814,30 +816,19 @@ end
     taylor_sqr_impl(K, M - 1)
 end
 
-@generated function taylor_add(::Val{K},
-    x::NTuple{M},
-    y::NTuple{N},
-) where {K,M,N}
+@generated function taylor_add(::Val{K}, x::NTuple{M}, y::NTuple{N}) where {K,M,N}
     taylor_impl(K, M - 1, N - 1) do list, D
         [add!(list, D[:x, k], D[:y, k]) for k = 0:K]
     end
 end
 
-@generated function taylor_sub(
-    ::Val{K},
-    x::NTuple{M},
-    y::NTuple{N},
-) where {K,M,N}
+@generated function taylor_sub(::Val{K}, x::NTuple{M}, y::NTuple{N}) where {K,M,N}
     taylor_impl(K, M - 1, N - 1) do list, D
         [sub!(list, D[:x, k], D[:y, k]) for k = 0:K]
     end
 end
 
-@generated function taylor_mul(
-    ::Val{K},
-    x::NTuple{M},
-    y::NTuple{N},
-) where {K,M,N}
+@generated function taylor_mul(::Val{K}, x::NTuple{M}, y::NTuple{N}) where {K,M,N}
     taylor_impl(K, M - 1, N - 1) do list, D
         map(0:K) do k
             c_k = nothing
@@ -849,11 +840,7 @@ end
     end
 end
 
-@generated function taylor_div(
-    ::Val{K},
-    x::NTuple{M},
-    y::NTuple{N},
-) where {K,M,N}
+@generated function taylor_div(::Val{K}, x::NTuple{M}, y::NTuple{N}) where {K,M,N}
     taylor_impl(K, M - 1, N - 1) do list, D
         ids = []
         for k = 0:K

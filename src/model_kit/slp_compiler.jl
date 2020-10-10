@@ -115,7 +115,7 @@ function generate_evaluate_and_jacobian_impl(
     for l = 1:length(variables), k = 1:length(out)
         a = jac_out[k, l]
         if a != 0
-            push!(jac_assign, :(U[$k,$l] = $(to_expr_arg(get(var_param_map, a, a)))))
+            push!(jac_assign, :(U[$k, $l] = $(to_expr_arg(get(var_param_map, a, a)))))
         else
             all_assigned = false
         end
@@ -150,7 +150,7 @@ function generate_taylor_impl(
         u = true,
         U = false,
     )
-    slp = to_expr(list; variables = var_param_map)  do op, args
+    slp = to_expr(list; variables = var_param_map) do op, args
         Expr(:call, taylor_call_op(op), :(Val(K)), args...)
     end
     assign_taylor = map(1:length(out), out) do i, a
