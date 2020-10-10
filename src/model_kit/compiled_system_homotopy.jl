@@ -274,11 +274,11 @@ Compute the Taylor series order order `K` of ``u = F(x,p)``.
 """
 @generated function taylor!(
     u::AbstractArray,
-    Order::Val{M},
+    Order::Val{K},
     T::CompiledSystem,
     x::AbstractArray,
     p::Union{Nothing,AbstractArray} = nothing,
-) where {M}
+) where {K}
     _taylor!_impl(T)
 end
 
@@ -295,11 +295,11 @@ Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
 """
 @generated function taylor!(
     u::AbstractArray,
-    Order::Val{M},
+    Order::Val{K},
     T::CompiledHomotopy,
     x::AbstractArray,
     t,
     p::Union{Nothing,AbstractArray} = nothing,
-) where {M}
+) where {K}
     _taylor!_impl(T)
 end

@@ -762,36 +762,27 @@ function taylor_impl(f!, K::Int, dx::Int, dy::Int, dz::Int)
     end
 end
 
-make_ntuple(t::T) where {T>:Tuple} = (t,)
-make_ntuple(t::Tuple{A}) where {A} = t
-make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A, B)}, t)
-make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A, B, C)}, t)
-make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} =
+@inline make_ntuple(t::N) where {N<:Number} = (t,)
+@inline make_ntuple(t::Tuple{A}) where {A} = t
+@inline make_ntuple(t::Tuple{A,B}) where {A,B} = convert(NTuple{2,promote_type(A, B)}, t)
+@inline make_ntuple(t::Tuple{A,B,C}) where {A,B,C} = convert(NTuple{3,promote_type(A, B, C)}, t)
+@inline make_ntuple(t::Tuple{A,B,C,D}) where {A,B,C,D} =
     convert(NTuple{4,promote_type(A, B, C, D)}, t)
-make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} =
+@inline make_ntuple(t::Tuple{A,B,C,D,E}) where {A,B,C,D,E} =
     convert(NTuple{5,promote_type(A, B, C, D, E)}, t)
 
 
-for f in [
-    :taylor_add,
-    :taylor_sub,
-    :tayor_neg,
-    :taylor_mul,
-    :taylor_div,
-    :taylor_muladd,
-    :taylor_mulsub,
-    :taylor_submul,
-    :taylor_sqr,
-    :taylor_pow,
-    :taylor_sin,
-    :taylor_cos,
-]
-    @eval begin
-        $f(ord::O, x::X) where {V<:Val,O<:Val,X} = $f(ord, make_ntuple(x))
-        $f(ord::O, x, y) where {V<:Val,O<:Val,X,Y} = $f(ord, make_ntuple(x), make_ntuple(y))
-        $f(ord::O, x::X, y::Y, z::Z) where {O<:Val,X,Y,Z} =
-            $f(ord, make_ntuple(x), make_ntuple(y), make_ntuple(z))
-    end
+for f in [:taylor_neg, :taylor_sin, :taylor_cos, :taylor_sqr]
+    @eval @inline $f(::Val{K}, x::X) where {K,X} = $f(Val(K), make_ntuple(x))
+end
+for f in [:taylor_add, :taylor_sub, :taylor_mul, :taylor_div]
+    @eval $f(::Val{K}, x::X, y::Y) where {K,X,Y} =
+        $f(Val(K), make_ntuple(x), make_ntuple(y))
+end
+taylor_pow(::Val{K}, x::X, r::Integer) where {K,X} = taylor_pow(Val(K), make_ntuple(x), r)
+for f in [:taylor_muladd, :taylor_mulsub, :taylor_submul]
+    @eval @inline $f(::Val{K}, x::X, y::Y, z::Z) where {K,X,Y,Z} =
+        $f(Val(K), make_ntuple(x), make_ntuple(y), make_ntuple(z))
 end
 
 @generated function taylor_neg(::Val{K}, x::NTuple{M}) where {K,M}
@@ -911,7 +902,7 @@ function taylor_pow_impl(K, dx)
         $(taylor_tuple(to_expr_arg.(w, nothing)))
     end
 end
-@generated function taylor_pow(::Val{K}, x::NTuple{M}, r::Integer) where {K,M}
+@generated function taylor_pow(::Val{K}, x::NTuple{M,T}, r::Integer) where {K,M,T}
     taylor_pow_impl(K, M - 1)
 end
 

@@ -151,7 +151,7 @@ function generate_taylor_impl(
         U = false,
     )
     slp = to_expr(list; variables = var_param_map)  do op, args
-        Expr(:call, taylor_call_op(op), :Order, args...)
+        Expr(:call, taylor_call_op(op), :(Val(K)), args...)
     end
     assign_taylor = map(1:length(out), out) do i, a
         :(u[$i] = $(to_expr_arg(get(var_param_map, a, a))))
