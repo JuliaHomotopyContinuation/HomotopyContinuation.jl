@@ -61,6 +61,13 @@ InterpreterCache(::Type{Acb}, I::Interpreter) =
 InterpreterCache(A::AcbRefVector) =
     InterpreterCache(A, Acb(prec = precision(A)), Acb(prec = precision(A)))
 
+function set_prec!(A::InterpreterCache{AcbRefVector,Acb}, prec::Int)
+    A.tape = setprecision(A.tape, prec)
+    A.t₁ = setprecision(A.t₁, prec)
+    A.t₂ = setprecision(A.t₂, prec)
+    A
+end
+
 function InterpreterArg(instr_map, var_map, t, param_map, constants, arg)
     if haskey(instr_map, arg)
         return InterpreterArg(DATA_I, instr_map[arg])
