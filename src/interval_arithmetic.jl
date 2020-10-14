@@ -1,5 +1,7 @@
 module IntervalArithmetic
 
+import Arblib
+
 export Interval,
     IComplex, IComplexF64, mid, diam, rad, mig, mag, hull, isinterior, isdisjoint
 
@@ -19,9 +21,12 @@ struct Interval{T<:Real}
 end
 
 Interval{T}(a::Real) where {T<:Real} = Interval(convert(T, a))
+Interval{T}(a::Rational) where {T<:Real} =
+    Interval(convert(T, numerator(a))) / Interval(convert(T, denominator(a)))
 Interval{T}(a::Interval{S}) where {T<:Real,S<:Real} =
     Interval(convert(T, a.lo), convert(T, a.hi))
 Interval(a::T) where {T<:Real} = Interval(a, a)
+Interval(a::Rational) = Interval{Float64}(a)
 Interval(a::T, b::S) where {T<:Real,S<:Real} = Interval(promote(a, b)...)
 Interval(a::T, b::T) where {T<:Integer} = Interval(float(a), float(b))
 
@@ -364,5 +369,22 @@ isdisjoint(a::IComplex, b::IComplex) =
 Base.intersect(a::IComplex, b::IComplex) =
     IComplex(intersect(real(a), real(b)), intersect(imag(a), imag(b)))
 Base.in(x::Number, a::IComplex) = in(real(x), real(a)) && in(imag(x), imag(a))
+
+
+## Arb
+function Base.convert(
+    ::Type{T},
+    x::AbstractVector{IComplexF64},
+) where {
+    T<:Union{Arblib.AcbVector,Arblib.AcbRefVector,Arblib.AcbMatrix,Arblib.AcbRefMatrix},
+}
+    y = T(mid.(x), prec=53)
+    m = Arblib.Mag()
+    for (i, xᵢ) in enumerate(x)
+        m[] = rad(xᵢ)
+        Arblib.add_error!(y[i], m)
+    end
+    y
+end
 
 end #module
