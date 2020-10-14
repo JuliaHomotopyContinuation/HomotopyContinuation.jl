@@ -88,8 +88,8 @@ function Interpreter(
             push!(assignment_tape_indices, a.i)
         end
     end
-    # alloc_alias = allocation_alias(list, assignment_tape_indices)
-    alloc_alias = collect(1:length(list))
+    alloc_alias = allocation_alias(list, assignment_tape_indices)
+    # alloc_alias = collect(1:length(list))
     # we shift all allocation alias by the number of variables (plus t if applicable)
     # since we will always put the variables at the start of the tape
     shift = length(variables) + !isnothing(t)
