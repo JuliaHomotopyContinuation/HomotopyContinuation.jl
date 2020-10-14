@@ -46,12 +46,20 @@ end
 function Base.show(io::IO, I::Interpreter{T}) where {T}
     print(io, "Interpreter{$T} for $(length(I.instructions)) instructions")
 end
-struct InterpreterCache{A<:AbstractArray}
+mutable struct InterpreterCache{A<:AbstractArray,T}
     tape::A
+    t₁::T
+    t₂::T
 end
 Base.length(C::InterpreterCache) = length(C.tape)
 cache_min_length(I::Interpreter) = maximum(instr -> instr.tape_index, I.instructions)
 InterpreterCache(T::Type, I::Interpreter) = InterpreterCache(zeros(T, cache_min_length(I)))
+InterpreterCache(A::AbstractArray) = InterpreterCache(A, nothing, nothing)
+
+InterpreterCache(::Type{Acb}, I::Interpreter) =
+    InterpreterCache(AcbRefVector(cache_min_length(I)))
+InterpreterCache(A::AcbRefVector) =
+    InterpreterCache(A, Acb(prec = precision(A)), Acb(prec = precision(A)))
 
 function InterpreterArg(instr_map, var_map, t, param_map, constants, arg)
     if haskey(instr_map, arg)
@@ -222,16 +230,52 @@ Base.@propagate_inbounds neg_fast!(z, i, x) = (z[i] = neg_fast(x))
 Base.@propagate_inbounds sqr_fast!(z, i, x) = (z[i] = sqr_fast(x))
 Base.@propagate_inbounds sin_fast!(z, i, x) = (z[i] = sin(x))
 Base.@propagate_inbounds cos_fast!(z, i, x) = (z[i] = cos(x))
-
-Base.@propagate_inbounds add_fast!(z, i, x, y) = (z[i] = add_fast(x, y))
-Base.@propagate_inbounds sub_fast!(z, i, x, y) = (z[i] = sub_fast(x, y))
-Base.@propagate_inbounds mul_fast!(z, i, x, y) = (z[i] = mul_fast(x, y))
-Base.@propagate_inbounds div_fast!(z, i, x, y) = (z[i] = div_fast(x, y))
 Base.@propagate_inbounds pow_fast!(z, i, x, k::Integer) = (z[i] = pow_fast(x, k))
 
-Base.@propagate_inbounds muladd_fast!(z, i, u, v, w) = (z[i] = muladd_fast(u, v, w))
-Base.@propagate_inbounds mulsub_fast!(z, i, u, v, w) = (z[i] = mulsub_fast(u, v, w))
-Base.@propagate_inbounds submul_fast!(z, i, u, v, w) = (z[i] = submul_fast(u, v, w))
+Base.@propagate_inbounds add_fast!(z, i, x, y, _t₁) = (z[i] = add_fast(x, y))
+Base.@propagate_inbounds sub_fast!(z, i, x, y, _t₁) = (z[i] = sub_fast(x, y))
+Base.@propagate_inbounds mul_fast!(z, i, x, y, _t₁) = (z[i] = mul_fast(x, y))
+Base.@propagate_inbounds div_fast!(z, i, x, y, _t₁) = (z[i] = div_fast(x, y))
+
+Base.@propagate_inbounds muladd_fast!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = muladd_fast(u, v, w))
+Base.@propagate_inbounds mulsub_fast!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = mulsub_fast(u, v, w))
+Base.@propagate_inbounds submul_fast!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = submul_fast(u, v, w))
+
+
+# Arb versions
+opt_set!(z::Union{Acb,AcbRef}, x::Union{Acb,AcbRef}) = x
+opt_set!(z::Union{Acb,AcbRef}, x::Number) = (z[] = x; z)
+
+neg_fast!(z::AcbRefVector, i, x) = Arblib.neg!(z[i], opt_set!(z[i], x))
+sqr_fast!(z::AcbRefVector, i, x) = Arblib.sqr!(z[i], opt_set!(z[i], x))
+sin_fast!(z::AcbRefVector, i, x) = Arblib.sin!(z[i], opt_set!(z[i], x))
+cos_fast!(z::AcbRefVector, i, x) = Arblib.cos!(z[i], opt_set!(z[i], x))
+pow_fast!(z::AcbRefVector, i, x, k::Integer) = Arblib.pow!(z[i], opt_set!(z[i], x), k)
+
+add_fast!(z::AcbRefVector, i, x, y, t₁) =
+    Arblib.add!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
+sub_fast!(z::AcbRefVector, i, x, y, t₁) =
+    Arblib.sub!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
+mul_fast!(z::AcbRefVector, i, x, y, t₁) =
+    Arblib.mul!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
+div_fast!(z::AcbRefVector, i, x, y, t₁) =
+    Arblib.div!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
+
+function muladd_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+    z[i][] = w
+    Arblib.addmul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
+end
+function mulsub_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+    Arblib.neg!(z[i], opt_set!(t₁, w))
+    Arblib.addmul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
+end
+function submul_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+    z[i][] = w
+    Arblib.submul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
+end
 
 function evaluate_block(; has_parameters::Bool = false)
     # This should get compiled to a jump table by LLVM, so order doesn't matter
@@ -252,23 +296,47 @@ function evaluate_block(; has_parameters::Bool = false)
                     load_data(:v₂, :arg₂, has_parameters) do v₂
                         quote
                             if op == INSTR_ADD
-                                add_fast!(tape, i, $v₁, $v₂)
+                                add_fast!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_SUB
-                                sub_fast!(tape, i, $v₁, $v₂)
+                                sub_fast!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_MUL
-                                mul_fast!(tape, i, $v₁, $v₂)
+                                mul_fast!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_DIV
-                                div_fast!(tape, i, $v₁, $v₂)
+                                div_fast!(tape, i, $v₁, $v₂, t₁)
                             else
                                 $(
                                     load_data(:v₃, :arg₃, has_parameters) do v₃
                                         quote
                                             if op == INSTR_MULADD
-                                                muladd_fast!(tape, i, $v₁, $v₂, $v₃)
+                                                muladd_fast!(
+                                                    tape,
+                                                    i,
+                                                    $v₁,
+                                                    $v₂,
+                                                    $v₃,
+                                                    t₁,
+                                                    t₂,
+                                                )
                                             elseif op == INSTR_MULSUB
-                                                mulsub_fast!(tape, i, $v₁, $v₂, $v₃)
+                                                mulsub_fast!(
+                                                    tape,
+                                                    i,
+                                                    $v₁,
+                                                    $v₂,
+                                                    $v₃,
+                                                    t₁,
+                                                    t₂,
+                                                )
                                             elseif op == INSTR_SUBMUL
-                                                submul_fast!(tape, i, $v₁, $v₂, $v₃)
+                                                submul_fast!(
+                                                    tape,
+                                                    i,
+                                                    $v₁,
+                                                    $v₂,
+                                                    $v₃,
+                                                    t₁,
+                                                    t₂,
+                                                )
                                             else
                                                 throw(error(string(
                                                     "Unexpected fall-through. instr: ",
@@ -356,6 +424,8 @@ for has_parameters in [true, false], has_t in [true, false]
             tape[i] = x[i]
         end
         $((has_t ? (:(tape[D+1] = t),) : ())...)
+        t₁ = cache.t₁
+        t₂ = cache.t₂
         @inbounds for instr in I.instructions
             i = instr.tape_index
             op = instr.op
@@ -390,6 +460,8 @@ for has_parameters in [true, false], has_t in [true, false]
             tape[i] = x[i]
         end
         $((has_t ? (:(tape[D+1] = t),) : ())...)
+        t₁ = cache.t₁
+        t₂ = cache.t₂
         @inbounds for instr in I.instructions
             i = instr.tape_index
             op = instr.op

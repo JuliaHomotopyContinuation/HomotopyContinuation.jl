@@ -4,9 +4,9 @@
     INSTR_NEG
     INSTR_MUL
     INSTR_DIV
-    INSTR_MULADD
-    INSTR_MULSUB
-    INSTR_SUBMUL #-x*y+z
+    INSTR_MULADD # muladd(x,y,z) = x * y + z
+    INSTR_MULSUB # mulsub(x,y,z) = x * y - z
+    INSTR_SUBMUL # submul(x,y,z) = z - x * y
     INSTR_SQR
     INSTR_POW
     INSTR_SIN

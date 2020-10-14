@@ -4,6 +4,7 @@ authors = ["Sascha Timme <sascha@timme.xyz>", "Paul Breiding <p.breiding@tu-berl
 version = "2.1.0-dev"
 
 [deps]
+Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
 ElasticArrays = "fdbdab4c-e67f-52f5-8c3f-e7b388dad3d4"

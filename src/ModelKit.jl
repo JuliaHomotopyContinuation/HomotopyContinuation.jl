@@ -47,6 +47,8 @@ export @var,
     vectors
 
 using ..DoubleDouble: ComplexDF64
+
+using Arblib: Arblib, Acb, AcbRef, AcbRefVector, AcbRefMatrix
 import LinearAlgebra
 import MultivariatePolynomials:
     MultivariatePolynomials,
