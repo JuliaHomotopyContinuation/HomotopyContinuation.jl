@@ -2,7 +2,7 @@ module HomotopyContinuation
 
 export ModelKit
 
-import Arblib
+using Arblib: Arblib
 import DelimitedFiles
 using DynamicPolynomials: @polyvar
 import ElasticArrays: ElasticArray

@@ -53,15 +53,17 @@ mutable struct InterpreterCache{A<:AbstractArray,T}
 end
 Base.length(C::InterpreterCache) = length(C.tape)
 cache_min_length(I::Interpreter) = maximum(instr -> instr.tape_index, I.instructions)
-InterpreterCache(T::Type, I::Interpreter) = InterpreterCache(zeros(T, cache_min_length(I)))
+InterpreterCache(T::Type, I::Interpreter) = InterpreterCache(T, cache_min_length(I))
+InterpreterCache(T::Type, n::Int) = InterpreterCache(zeros(T, n))
 InterpreterCache(A::AbstractArray) = InterpreterCache(A, nothing, nothing)
-
-InterpreterCache(::Type{Acb}, I::Interpreter) =
-    InterpreterCache(AcbRefVector(cache_min_length(I)))
 InterpreterCache(A::AcbRefVector) =
     InterpreterCache(A, Acb(prec = precision(A)), Acb(prec = precision(A)))
 
-function set_prec!(A::InterpreterCache{AcbRefVector,Acb}, prec::Int)
+InterpreterCache(::Type{Acb}, I::Interpreter; prec::Int) =
+    InterpreterCache(Acb, cache_min_length(I), prec = prec)
+InterpreterCache(::Type{Acb}, n::Int; prec::Int) =
+    InterpreterCache(AcbRefVector(n, prec = prec))
+function set_arb_precision!(A::InterpreterCache{AcbRefVector,Acb}, prec::Int)
     A.tape = setprecision(A.tape, prec)
     A.t₁ = setprecision(A.t₁, prec)
     A.t₂ = setprecision(A.t₂, prec)
@@ -450,8 +452,8 @@ for has_parameters in [true, false], has_t in [true, false]
     end
 
     @eval function execute!(
-        u::Union{Nothing,AbstractVector},
-        U::AbstractMatrix,
+        u::Union{Nothing,AbstractArray},
+        U::AbstractArray,
         I::Interpreter,
         x::AbstractArray,
         $((has_t ? (:t,) : ())...),
