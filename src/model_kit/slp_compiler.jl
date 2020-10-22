@@ -127,7 +127,7 @@ function generate_evaluate_and_jacobian_impl(
         @inbounds begin
             $slp
             if !(u isa Nothing)
-                $((:(u[$i] = $(to_expr_arg(a))) for (i, a) in enumerate(out))...)
+                $((:(u[$i] = $(to_expr_arg(get(var_param_map, a, a)))) for (i, a) in enumerate(out))...)
             end
             $(jac_assign...)
         end

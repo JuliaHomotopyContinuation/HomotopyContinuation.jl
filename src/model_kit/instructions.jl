@@ -577,7 +577,7 @@ function gradient(list::InstructionList, assignments, variables::Vector{Symbol})
         end
     end
 
-    new_assignments = [list_ref_mapping[instr] for instr in assignments]
+    new_assignments = [get(list_ref_mapping, instr, instr) for instr in assignments]
     grad_assignments = map([D[instr, ∂i] for instr in new_assignments, ∂i = 1:N]) do x
         isnothing(x) ? 0 : x
     end

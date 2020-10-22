@@ -128,4 +128,17 @@
         @test v2(sub) == true_v2(sub)
         @test v3(sub) == true_v3(sub)
     end
+
+    @testset "Monomials" begin
+        @var x y
+        F = System([x^2 - 1, y])
+        u = zeros(ComplexF64, 2)
+        U = zeros(ComplexF64, 2, 2)
+        w = randn(ComplexF64, 2)
+        evaluate_and_jacobian!(u, U, CompiledSystem(F), w)
+        @test sum(abs, U) > 0
+        U .= 0
+        evaluate_and_jacobian!(u, U, InterpretedSystem(F), w)
+        @test sum(abs, U) > 0
+    end
 end
