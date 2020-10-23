@@ -70,10 +70,10 @@ is_real(C::SolutionCertificate) = C.real
 Returns `true` if `C` is certifiably a real, positive solution.
 """
 function is_positive(C::SolutionCertificate)
-    if !certified(C) || !is_real(C)
+    if !is_certified(C) || !is_real(C)
         return false
     else
-        all(i -> Arblib.is_positive(real(Arblib.ref(x₀, i))), 1:length(C.x₀))
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.x₀, i, 1))), 1:length(C.x₀))
     end
 end
 
@@ -90,21 +90,23 @@ function Base.show(f::IO, cert::SolutionCertificate)
     if !isnothing(cert.index)
         println(f, "index = ", cert.index)
     end
-    println(f, "initial_solution = [")
-    for z in initial_solution(cert)
+    println(f, "solution_candidate = [")
+    for z in solution_candidate(cert)
         print(f, "  ")
         print(f, z)
         println(f, ",")
     end
     println(f, "]")
-    println(f, "certified_solution = [")
-    for z in certified_solution(cert)
-        print(f, "  ")
-        print(f, z)
-        println(f, ",")
+    if !isnothing(certified_solution(cert))
+        println(f, "certified_solution = [")
+        for z in certified_solution(cert)
+            print(f, "  ")
+            print(f, z)
+            println(f, ",")
+        end
+        println(f, "]")
+        println(f, "is_real = ", is_real(cert))
     end
-    println(f, "]")
-    println(f, "is_real = ", is_real(cert))
 end
 
 """
@@ -283,7 +285,7 @@ function set_arb_precision!(cache::CertificationCache, p::Int)
     cache.arb_J_x₀ = setprecision(cache.arb_J_x₀, p)
     cache.arb_M = setprecision(cache.arb_M, p)
     cache.arb_δx = setprecision(cache.arb_δx, p)
-    set_arb_precision!(arb_interpreter_cache)
+    ModelKit.set_arb_precision!(cache.arb_interpreter_cache, p)
 
     cache
 end
@@ -353,7 +355,7 @@ struct CertificationParameters
     arb_interval_params::AcbRefVector
 end
 #
-function CertificationParameters(p::AbstractVector; prec::Int = 128)
+function CertificationParameters(p::AbstractVector; prec::Int = 256)
     arb_ip = AcbRefVector(length(p); prec = prec)
     for (i, p_i) in enumerate(p)
         x = arb_ip[i]
@@ -366,8 +368,8 @@ function CertificationParameters(p::AbstractVector; prec::Int = 128)
     )
 end
 
-certification_parameters(p::AbstractVector) = CertificationParameters(p)
-certification_parameters(::Nothing) = nothing
+certification_parameters(p::AbstractVector; prec::Int = 256) = CertificationParameters(p)
+certification_parameters(::Nothing; prec::Int = 256) = nothing
 
 
 complexF64_params(C::CertificationParameters) = C.params
@@ -377,19 +379,20 @@ complexF64_params(::Nothing) = nothing
 complexF64_interval_params(::Nothing) = nothing
 arb_interval_params(::Nothing) = nothing
 
-function certify(
+function _certify(
     F::AbstractSystem,
     solution_candidates::AbstractArray{<:AbstractArray{<:Number}},
-    p::Union{Nothing,CertificationParameters} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,CertificationParameters},
+    cache::CertificationCache;
     show_progress::Bool = true,
     max_precision::Int = 256,
+    check_distinct::Bool = true,
 )
     certificates = SolutionCertificate[]
 
     if !show_progress
         for (i, s) in enumerate(solution_candidates)
-            push!(certificates, certify_solution(F, x, s, cache, i))
+            push!(certificates, certify_solution(F, s, p, cache, i))
         end
     else
         # Create progress meter
@@ -417,9 +420,11 @@ function certify(
             update_certify_progress!(progress, i, ncertified, nreal_certified)
         end
     end
-    # duplicates = find_duplicates_fast(certificates; show_progress = show_progress)
-    @warn "Duplicate check disabled"
-    duplicates = Vector{Vector{Int}}()
+    if check_distinct
+        duplicates = find_duplicates(certificates)
+    else
+        duplicates = Vector{Vector{Int}}()
+    end
     CertificationResult(certificates, duplicates)
 end
 
@@ -522,10 +527,15 @@ function certify_solution(
         end
 
         prec += 64
+        set_arb_precision!(cert_cache, prec)
     end
 
     # certification failed
-    return SolutionCertificate(solution_candidate = solution_candidate, index = index)
+    return SolutionCertificate(
+        solution_candidate = solution_candidate,
+        certified = false,
+        index = index,
+    )
 end
 
 
@@ -608,11 +618,13 @@ function arb_ε_inflation_krawczyk(
         arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag
     @unpack arb_interpreter_cache = cert_cache
 
+    # @show prec
     m = arb_mag
     x̃₀′ = x̄₁ = Δx₀
     # Perform a simple newton refinement using arb_C until we cannot improve the
     # accuracy anymore
-    acc = max_iters = 10
+    acc = Inf
+    max_iters = 10
     for i = 1:max_iters
         ModelKit.execute!(
             arb_r₀,
@@ -637,8 +649,12 @@ function arb_ε_inflation_krawczyk(
     n = length(x̃₀)
     x₀ = AcbRefMatrix(n, 1; prec = prec)
     Arblib.get_mid!(x₀, x̃₀)
+    # We increase the radius by 2^(prec/4) to avoid hitting the precision limit.
+    # We choose a dynamic increase to account for bad situations where any fixed choice
+    # would be insufficient.
+    incr_factor = exp2(div(prec, 4))
     for i = 1:n
-        m[] = 128magF64(Δx₀[i], m)
+        m[] = magF64(Δx₀[i], m) * incr_factor
         Arblib.add_error!(x₀[i], m)
     end
 
@@ -665,6 +681,7 @@ function arb_ε_inflation_krawczyk(
 
     # Necessary condition is ||M|| < 1 / √2
     # We lower bound 1 / √2 by 0.7071
+    # @show Arblib.get(Arblib.bound_inf_norm!(m, M))
     if Arblib.get(Arblib.bound_inf_norm!(m, M)) < 0.7071
         # x₀ - x̃₀
         Arblib.sub!(δx, x₀, x̃₀)
@@ -675,6 +692,8 @@ function arb_ε_inflation_krawczyk(
         # (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
         Arblib.sub!(x₁, x̃₀′, x₁)
 
+        # @show x₀[14] x₁[14]
+        # @show Bool.(Arblib.contains.(x₀[14], x₁[14]))
         certified = Bool(Arblib.contains(x₀, x₁))
 
         # check realness
@@ -711,102 +730,152 @@ function sqr_mul!(C, A, B)
     C
 end
 
-function find_duplicates(R::AbstractVector{SolutionCertificate}; show_progress::Bool = true)
-    # TODO: Do better than n^2 check
-    duplicates = Dict{Int,Vector{Int}}()
-    duplicated_indices = Set{Int}()
-    t0 = time()
-    displayed_info = !show_progress
-    for i = 1:length(R)
-        is_certified(R[i]) && i ∉ duplicated_indices || continue
-        rᵢ = R[i]
-        if !displayed_info && (time() - t0 > 0.2)
-            @info "Checking for duplicates"
-            displayed_info = true
-        end
-        for j = i+1:length(R)
-            is_certified(R[j]) && j ∉ duplicated_indices || continue
-            if Bool(Arblib.overlaps(rᵢ.certified_solution, R[j].certified_solution))
-                if haskey(duplicates, i)
-                    push!(duplicated_indices, j)
-                    push!(duplicates[i], j)
-                else
-                    push!(duplicated_indices, i)
-                    push!(duplicated_indices, j)
-                    duplicates[i] = [i, j]
-                end
+"""
+    find_duplicates(certificates)
+
+Find all duplicate solutions. A solution is considered to be duplicate if the unique
+region overlap.
+"""
+function find_duplicates(certificates::AbstractVector{SolutionCertificate})
+    # The strategy to indentify duplication candidates is as following.
+    # We first compute the squared euclidean distance to a random point
+    # in interval arithmetic. We then compute all overlapping intervals and return this
+    # list of tuples.
+    # The complexity of this is O(n log(n)) (we need to perform an array sort)
+
+    # 1 Compute squared euclidean distance to a random point
+    original_indices = Int[]
+
+    n = length(solution_candidate(first(certificates)))
+    pt = randn(ComplexF64, n)
+
+    sq_eucl_distances = Interval{Float64}[]
+
+    a, b = Arblib.Arf(prec = 53), Arblib.Arf(prec = 53)
+    for (i, cert) in enumerate(certificates)
+        if is_certified(cert)
+            push!(original_indices, i)
+
+            d = zero(Interval{Float64})
+            for i = 1:n
+                yᵢ = IComplexF64(cert.x₁[i], a, b)
+                d +=
+                    IntervalArithmetic.sqr(real(yᵢ) - real(pt[i])) +
+                    IntervalArithmetic.sqr(imag(yᵢ) - imag(pt[i]))
             end
+            push!(sq_eucl_distances, d)
         end
     end
 
-    isempty(duplicates) ? Vector{Int}[] : collect(values(duplicates))
-end
+    # 2) Find all overlapping intervals
 
-radF64(x::Arblib.AcbLike) = max(
-    Float64(Arblib.radref(Arblib.realref(x))),
-    Float64(Arblib.radref(Arblib.imagref(x))),
-)
+    # strategy:
+    # Look at close and open of an interval separately and merge all these in one large vector
+    # (keeping track if open or close of an interval),
+    # sort this (first by value, then open, then close).
+    # Now iterate through sorted array and keep track of open intervals
 
-function find_duplicates_fast(
-    R::AbstractVector{SolutionCertificate};
-    show_progress::Bool = true,
-)
-    # TODO: Do better than n^2 check
-    duplicates = Dict{Int,Vector{Int}}()
-    duplicated_indices = Set{Int}()
-    tree =
-        VoronoiTree{Float64,Int}(2 * length(first(R).initial_solution); metric = InfNorm())
-    t0 = time()
-    displayed_info = !show_progress
-    max_norm = 0.0
-    max_diam = 0.0
-    inf_norm = InfNorm()
-    m = Arblib.Mag()
-
-    add_duplicate = (i, j) -> begin
-        if haskey(duplicates, i)
-            push!(duplicated_indices, j)
-            push!(duplicates[i], j)
-        else
-            push!(duplicated_indices, i)
-            push!(duplicated_indices, j)
-            duplicates[i] = [i, j]
-        end
+    # value, index, and false if opening and true if closing
+    interval_bounds = Tuple{Float64,Int,Bool}[]
+    for (i, d) in enumerate(sq_eucl_distances)
+        push!(interval_bounds, (d.lo, i, false), (d.hi, i, true))
     end
 
-    for i = 1:length(R)
-        is_certified(R[i]) && i ∉ duplicated_indices || continue
-        rᵢ = R[i]
-        if !displayed_info && (time() - t0 > 0.2)
-            @info "Checking for duplicates"
-            displayed_info = true
-        end
-        mid = reinterpret(Float64, rᵢ.certified_midpoint::Vector{ComplexF64})
-        norm_mid = inf_norm(mid)
-        max_norm = max(max_norm, norm_mid)
-        rad = maximum(radF64, rᵢ.certified_solution)
-        max_diam = max(max_diam, 2 * rad) # this is exact
-        tol = nextfloat(max_diam + nextfloat(eps() * max_norm))
+    sort!(interval_bounds; lt = (a, b) -> a[1] != b[1] ? a[1] < b[1] : !a[3])
 
-        (id, added) = add!(tree, mid, i, tol)
-        if !added
-            if Bool(Arblib.overlaps(rᵢ.certified_solution, R[id].certified_solution))
-                add_duplicate(i, id)
+    current_open = Int[]
+    # dict to help group duplicates:
+    # Assume (1,3) and (3,5) overlap then we want to have entries 1=>1, 3=>1 and 5=>1
+    duplicate_grouping = Dict{Int,Int}()
+    # final duplicates. From our example: 1 => [1,3,5]
+    duplicates_dict = Dict{Int,Vector{Int}}()
+
+    for (_v, index, is_closing) in interval_bounds
+        if is_closing
+            if index == current_open[1]
+                popfirst!(current_open)
             else
-                for j = 1:i-1
-                    is_certified(R[j]) && j ∉ duplicated_indices || continue
-                    if Bool(Arblib.overlaps(rᵢ.certified_solution, R[j].certified_solution))
-                        add_duplicate(i, j)
+                for (k, idx) in enumerate(current_open)
+                    if idx == index
+                        deleteat!(current_open, k)
+                        break
                     end
                 end
             end
+        else
+            if !isempty(current_open)
+                for idx in current_open
+                    # 3) Interval (idx, index) is overlapping. Check for duplicate
+                    check_duplicate_candidate!(
+                        duplicate_grouping,
+                        duplicates_dict,
+                        original_indices[idx],
+                        original_indices[index],
+                        certificates,
+                    )
+                end
+            end
+            push!(current_open, index)
         end
-
     end
 
-    isempty(duplicates) ? Vector{Int}[] : collect(values(duplicates))
+    isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
 end
 
+function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, certificates)
+    i_is_dupl = haskey(duplicate_grouping, i)
+    j_is_dupl = haskey(duplicate_grouping, j)
+    #If i and j are already in a duplicate cluster then there is no need to
+    # check again overlapping by transitivity of our clustering
+    i_is_dupl && j_is_dupl && return true
+    if Bool(Arblib.overlaps(certificates[i].x₁, certificates[j].x₁))
+        if i_is_dupl
+            duplicate_grouping[j] = duplicate_grouping[i]
+            push!(duplicates_dict[duplicate_grouping[i]], j)
+        elseif j_is_dupl
+            duplicate_grouping[i] = duplicate_grouping[j]
+            push!(duplicates_dict[duplicate_grouping[j]], i)
+        else
+            duplicate_grouping[i] = i
+            duplicate_grouping[j] = i
+            duplicates_dict[i] = [i, j]
+        end
+        true
+    else
+        false
+    end
+end
+
+function _old_find_duplicates(certificates)
+    candidates = find_duplicate_candidates(certificates)
+    # dict to help group duplicates:
+    # Assume (1,3) and (3,5) overlap then we want to have entries 1=>1, 3=>1 and 5=>1
+    duplicate_grouping = Dict{Int,Int}()
+    # final duplicates. From our example: 1 => [1,3,5]
+    duplicates_dict = Dict{Int,Vector{Int}}()
+    for (i, j) in candidates
+        i_is_dupl = haskey(duplicate_grouping, i)
+        j_is_dupl = haskey(duplicate_grouping, j)
+        #If i and j are already in a duplicate cluster then there is no need to
+        # check again overlapping by transitivity of our clustering
+        i_is_dupl && j_is_dupl && continue
+        if Bool(Arblib.overlaps(certificates[i].x₁, certificates[j].x₁))
+            if i_is_dupl
+                duplicate_grouping[j] = duplicate_grouping[i]
+                push!(duplicates_dict[duplicate_grouping[i]], j)
+            elseif j_is_dupl
+                duplicate_grouping[i] = duplicate_grouping[j]
+                push!(duplicates_dict[duplicate_grouping[j]], i)
+            else
+                duplicate_grouping[i] = i
+                duplicate_grouping[j] = i
+                duplicates_dict[i] = [i, j]
+            end
+        end
+    end
+
+    isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
+end
 
 function certify(
     F::AbstractVector{Expression},
@@ -866,68 +935,97 @@ function certify(F::System, args...; compile::Union{Bool,Symbol} = false, kwargs
     certify(fixed(F; compile = compile), args...; kwargs...)
 end
 
+
 function certify(
     F::AbstractSystem,
     X::MonodromyResult,
     cache::CertificationCache = CertificationCache(F);
+    max_precision::Int = 256,
     kwargs...,
 )
-    certify(F, solutions(X), parameters(X), cache; kwargs...)
-end
-
-function certify(
-    F::AbstractSystem,
-    X,
-    p::AbstractArray,
-    cache::CertificationCache = CertificationCache(F);
-    target_parameters = nothing,
-    kwargs...,
-)
-    if !isnothing(p)
-        target_parameters = p
-    end
-
-    cert_params = certification_parameters(target_parameters)
-    certify(F, X, cert_params, cache; kwargs...)
+    _certify(
+        F,
+        solutions(X),
+        certification_parameters(parameters(X)),
+        cache;
+        max_precision = max_precision,
+        kwargs...,
+    )
 end
 
 function certify(
     F::AbstractSystem,
     r::PathResult,
-    p::Union{Nothing,CertificationParameters} = nothing,
+    p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
-    certify(F, [solution(r)], p, cache, index; kwargs...)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, [solution(r)], cert_params, cache; max_precision = max_precision, kwargs...)
 end
-
 
 function certify(
     F::AbstractSystem,
     r::AbstractVector{PathResult},
-    p::Union{Nothing,CertificationParameters} = nothing,
+    p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
-    certify(F, solution.(r), p, cache, index; kwargs...)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, solution.(r), cert_params, cache; max_precision = max_precision, kwargs...)
 end
 
 function certify(
     F::AbstractSystem,
     x::AbstractVector{<:Number},
-    p::Union{Nothing,CertificationParameters} = nothing,
+    p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
-    certify(F, [x], p, cache, index; kwargs...)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, [x], cert_params, cache; max_precision = max_precision, kwargs...)
 end
 
 function certify(
     F::AbstractSystem,
     X::Result,
-    p::Union{Nothing,CertificationParameters} = nothing,
+    p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
-    certify(F, solutions(X; only_nonsingular = true), p, cache; kwargs...)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(
+        F,
+        solutions(X; only_nonsingular = true),
+        cert_params,
+        cache;
+        max_precision = max_precision,
+        kwargs...,
+    )
+end
+
+function certify(
+    F::AbstractSystem,
+    X,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, X, cert_params, cache; max_precision = max_precision, kwargs...)
 end
