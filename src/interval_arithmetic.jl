@@ -385,7 +385,11 @@ function inf_norm_bound(A::AbstractMatrix{IComplex{T}}) where {T}
 end
 
 ## Arb
-function IComplexF64(z::Arblib.AcbLike, a = Arblib.Arf(prec=53), b = Arblib.Arf(prec=53))
+function IComplexF64(
+    z::Arblib.AcbLike,
+    a = Arblib.Arf(prec = 53),
+    b = Arblib.Arf(prec = 53),
+)
     Arblib.get_interval!(a, b, Arblib.realref(z); prec = 53)
     re = Interval(Arblib.get_d(a, RoundDown), Arblib.get_d(b, RoundUp))
     Arblib.get_interval!(a, b, Arblib.imagref(z); prec = 53)
@@ -408,7 +412,7 @@ function Base.convert(
     y
 end
 
-function Base.setindex!(z::Union{Arblib.Acb, Arblib.AcbRef}, x::IComplexF64)
+function Base.setindex!(z::Union{Arblib.Acb,Arblib.AcbRef}, x::IComplexF64)
     rz = Arblib.realref(z)
     iz = Arblib.imagref(z)
 
