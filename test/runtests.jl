@@ -1,5 +1,5 @@
 using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
-using Arblib: Arblib
+import Arblib
 using StaticArrays
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
