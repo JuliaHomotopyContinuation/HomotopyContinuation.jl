@@ -1,5 +1,7 @@
 module IntervalArithmetic
 
+import Arblib
+
 export Interval,
     IComplex, IComplexF64, mid, diam, rad, mig, mag, hull, isinterior, isdisjoint
 
@@ -19,9 +21,12 @@ struct Interval{T<:Real}
 end
 
 Interval{T}(a::Real) where {T<:Real} = Interval(convert(T, a))
+Interval{T}(a::Rational) where {T<:Real} =
+    Interval(convert(T, numerator(a))) / Interval(convert(T, denominator(a)))
 Interval{T}(a::Interval{S}) where {T<:Real,S<:Real} =
     Interval(convert(T, a.lo), convert(T, a.hi))
 Interval(a::T) where {T<:Real} = Interval(a, a)
+Interval(a::Rational) = Interval{Float64}(a)
 Interval(a::T, b::S) where {T<:Real,S<:Real} = Interval(promote(a, b)...)
 Interval(a::T, b::T) where {T<:Integer} = Interval(float(a), float(b))
 
@@ -59,9 +64,7 @@ function rad(a::Interval)
     m = mid(a)
     return round_up(max(m - a.lo, a.hi - m))
 end
-function mag(a::Interval{T}) where {T}
-    max(abs(a.lo), abs(a.hi))
-end
+mag(a::Interval) = max(abs(a.lo), abs(a.hi))
 function mig(a::Interval{T}) where {T}
     zero(T) ∈ a && return zero(T)
     min(abs(a.lo), abs(a.hi))
@@ -92,7 +95,6 @@ Base.zero(a::Interval{T}) where {T} = Interval(zero(T))
 Base.zero(::Type{Interval{T}}) where {T} = Interval(zero(T))
 Base.one(a::Interval{T}) where {T} = Interval(one(T))
 Base.one(::Type{Interval{T}}) where {T} = Interval(one(T))
-
 # The arithmetic of Interval is based on the IntervalArithmetic.jl package
 # https://github.com/JuliaIntervals/IntervalArithmetic.jl/
 # IntervalArithmetic.jl is licensed under the MIT "Expat" License
@@ -364,5 +366,70 @@ isdisjoint(a::IComplex, b::IComplex) =
 Base.intersect(a::IComplex, b::IComplex) =
     IComplex(intersect(real(a), real(b)), intersect(imag(a), imag(b)))
 Base.in(x::Number, a::IComplex) = in(real(x), real(a)) && in(imag(x), imag(a))
+
+
+function inf_norm_bound(A::AbstractMatrix{IComplex{T}}) where {T}
+    # ||A|| = maxᵢ ∑ⱼ|Aᵢⱼ| ≤ √2 * maxᵢ ∑ⱼmax(|real(Aᵢⱼ)|,|imag(Aᵢⱼ)|)
+    bound = zero(T)
+    for i = 1:size(A, 1)
+        # use again an interval arithmetic to account for accumulation error
+        bᵢ = Interval(zero(T))
+        for j = 1:size(A, 2)
+            bᵢ += mag(A[i, j])
+        end
+        bound = max(bound, mag(bᵢ))
+    end
+    # Upper bound √2 by 1.41422, this also accounts
+    # for the multiplcation error in √2 * bound
+    1.41422 * bound
+end
+
+## Arb
+function IComplexF64(
+    z::Arblib.AcbLike,
+    a = Arblib.Arf(prec = 53),
+    b = Arblib.Arf(prec = 53),
+)
+    Arblib.get_interval!(a, b, Arblib.realref(z); prec = 53)
+    re = Interval(Arblib.get_d(a, RoundDown), Arblib.get_d(b, RoundUp))
+    Arblib.get_interval!(a, b, Arblib.imagref(z); prec = 53)
+    im = Interval(Arblib.get_d(a, RoundDown), Arblib.get_d(b, RoundUp))
+    IComplexF64(re, im)
+end
+
+function Base.convert(
+    ::Type{T},
+    x::AbstractVector{IComplexF64},
+) where {
+    T<:Union{Arblib.AcbVector,Arblib.AcbRefVector,Arblib.AcbMatrix,Arblib.AcbRefMatrix},
+}
+    y = T(mid.(x), prec = 53)
+    m = Arblib.Mag()
+    for (i, xᵢ) in enumerate(x)
+        m[] = rad(xᵢ)
+        Arblib.add_error!(y[i], m)
+    end
+    y
+end
+
+function Base.setindex!(z::Union{Arblib.Acb,Arblib.AcbRef}, x::IComplexF64)
+    rz = Arblib.realref(z)
+    iz = Arblib.imagref(z)
+
+    Arblib.midref(rz)[] = mid(real(x))
+    Arblib.midref(iz)[] = mid(imag(x))
+
+    Arblib.radref(rz)[] = rad(real(x))
+    Arblib.radref(iz)[] = rad(imag(x))
+    z
+end
+function Base.setindex!(
+    A::Union{Arblib.AcbMatrix,Arblib.AcbRefMatrix},
+    x::IComplexF64,
+    i::Integer,
+    j::Integer,
+)
+    Arblib.ref(A, i, j)[] = x
+end
 
 end #module

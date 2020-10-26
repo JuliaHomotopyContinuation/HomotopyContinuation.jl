@@ -1,7 +1,9 @@
+using Arblib: Acb, AcbRef, AcbVector, AcbRefVector, AcbMatrix, AcbRefMatrix
+
 export certify,
     SolutionCertificate,
     CertificationResult,
-    CertifyCache,
+    CertificationCache,
     is_certified,
     is_real,
     is_positive,
@@ -14,6 +16,7 @@ export certify,
     ndistinct_real_certified,
     save
 
+
 """
     SolutionCertificate
 
@@ -22,18 +25,27 @@ and if the certification was successfull a vector of complex intervals where the
 solution is contained in.
 """
 Base.@kwdef struct SolutionCertificate
-    initial_solution::Vector{ComplexF64}
-    certified_solution::Union{Nothing,Vector{IComplexF64}} = nothing
-    is_real::Bool = false
+    solution_candidate::AbstractVector
+    certified::Bool
+    real::Bool = false
     index::Union{Nothing,Int} = nothing
+    prec::Int = 53
+    # x₀, x₁ ∈ 𝕀ℂⁿ and are certified solution has x₁ ⊊ x₀
+    x₀::Union{Nothing,AcbMatrix} = nothing
+    x₁::Union{Nothing,AcbMatrix} = nothing
+    # We also store a double precision representation of the midpoint of x₁
+    # as the best available double precision estimate of the solution
+    solution::Union{Nothing,Vector{ComplexF64}} = nothing
 end
 
-"""
-    initial_solution(C::SolutionCertificate)
 
-Returns the given initial solution.
 """
-initial_solution(C::SolutionCertificate) = C.initial_solution
+    solution_candidate(C::SolutionCertificate)
+
+Returns the given provided solution candidate.
+"""
+solution_candidate(C::SolutionCertificate) = C.solution_candidate
+@deprecate initial_solution(cert::SolutionCertificate) solution_candidate(cert)
 
 """
     is_certified(C::SolutionCertificate)
@@ -41,7 +53,7 @@ initial_solution(C::SolutionCertificate) = C.initial_solution
 Returns `true` if `C` certifies that the given initial solution corresponds to a true
 solution.
 """
-is_certified(C::SolutionCertificate) = !isnothing(C.certified_solution)
+is_certified(C::SolutionCertificate) = C.certified
 
 """
     is_real(C::SolutionCertificate)
@@ -49,7 +61,7 @@ is_certified(C::SolutionCertificate) = !isnothing(C.certified_solution)
 Returns `true` if `C` certifies that the given initial solution corresponds to a true
 real solution of the system.
 """
-is_real(C::SolutionCertificate) = C.is_real
+is_real(C::SolutionCertificate) = C.real
 
 
 """
@@ -58,10 +70,10 @@ is_real(C::SolutionCertificate) = C.is_real
 Returns `true` if `C` is certifiably a real, positive solution.
 """
 function is_positive(C::SolutionCertificate)
-    if isnothing(C.certified_solution) || !is_real(C)
+    if !is_certified(C) || !is_real(C)
         return false
     else
-        all(zᵢ -> real(zᵢ).lo > 0, C.certified_solution)
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.x₁, i, 1))), 1:length(C.x₁))
     end
 end
 
@@ -69,30 +81,44 @@ end
 """
     certified_solution(C::SolutionCertificate)
 
-Returns a vector of complex intervals where the true solution is contained in.
+Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where the
+true solution is contained in.
 """
-certified_solution(C::SolutionCertificate) = C.certified_solution
+solution_interval(certificate::SolutionCertificate) = certificate.x₀
+@deprecate certified_solution(certificate) solution_interval(certificate)
 
+"""
+    index(certificate::SolutionCertificate)
+
+Return the index of the solution certificate. Here the index refers to the index of the
+provided soluion candidates.
+"""
+index(certificate::SolutionCertificate) = C.index
 
 function Base.show(f::IO, cert::SolutionCertificate)
+    println(f, "SolutionCertificate:")
+    println(f, "solution_candidate = [")
+    for z in solution_candidate(cert)
+        print(f, "  ")
+        print(f, z)
+        println(f, ",")
+    end
+    println(f, "]")
+    print(f, "is_certified = ", is_certified(cert))
+    if !isnothing(solution_interval(cert))
+        println(f, "\nsolution_interval = [")
+        for z in solution_interval(cert)
+            print(f, "  ")
+            print(f, z)
+            println(f, ",")
+        end
+        println(f, "]")
+        println(f, "precision = ", cert.prec)
+        print(f, "is_real = ", is_real(cert))
+    end
     if !isnothing(cert.index)
-        println(f, "index = ", cert.index)
+        print(f, "\nindex = ", cert.index)
     end
-    println(f, "initial_solution = [")
-    for z in initial_solution(cert)
-        print(f, "  ")
-        print(f, z)
-        println(f, ",")
-    end
-    println(f, "]")
-    println(f, "certified_solution = [")
-    for z in certified_solution(cert)
-        print(f, "  ")
-        print(f, z)
-        println(f, ",")
-    end
-    println(f, "]")
-    println(f, "is_real = ", is_real(cert))
 end
 
 """
@@ -187,58 +213,93 @@ function save(filename, R::CertificationResult)
     end
     filename
 end
+
 """
-    CertifyCache(F::AbstractSystem)
+    CertificationCache(F::AbstractSystem)
 
 Contains the necessary data structures for [`certify`](@ref).
 """
-struct CertifyCache{T₁,T₂,M}
+Base.@kwdef mutable struct CertificationCache{T₁,T₂}
     eval_interpreter::ModelKit.Interpreter{T₁}
     jac_interpreter::ModelKit.Interpreter{T₂}
-    newton_cache::NewtonCache{M}
+    newton_cache::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}}
     # norm
     norm::WeightedNorm{InfNorm}
     # data for krawczyc_step
-    ir::Vector{IComplexF64}
-    iΔx::Vector{IComplexF64}
-    ix̃::Vector{IComplexF64}
-    dix̃::Vector{IComplex{DoubleF64}}
     C::Matrix{ComplexF64}
-    IJ::Matrix{IComplexF64}
-    IJ_cache::ModelKit.InterpreterCache{Vector{IComplexF64}}
-    dIJ_cache::ModelKit.InterpreterCache{Vector{IComplex{DoubleF64}}}
-    A::Matrix{IComplexF64}
+    r₀::Vector{IComplexF64}
+    Δx₀::Vector{IComplexF64}
+    ix̃₀::Vector{IComplexF64}
+    Jx₀::Matrix{IComplexF64}
+    M::Matrix{IComplexF64}
     δx::Vector{IComplexF64}
-    # TODO: complex extended precision case with arb
+    interpreter_cache::ModelKit.InterpreterCache{Vector{IComplexF64},Nothing}
+
+    arb_prec::Int
+    arb_C::AcbRefMatrix
+    arb_r₀::AcbRefMatrix # m × 1
+    arb_Δx₀::AcbRefMatrix # m × 1
+    arb_x̃₀::AcbRefMatrix # m × 1
+    arb_J_x₀::AcbRefMatrix
+    arb_M::AcbRefMatrix
+    arb_δx::AcbRefMatrix # m × 1
+    arb_mag::Arblib.Mag
+    arb_interpreter_cache::ModelKit.InterpreterCache{AcbRefVector,Acb}
 end
-function CertifyCache(F::AbstractSystem)
+function CertificationCache(F::AbstractSystem)
     m, n = size(F)
     m == n || error("Can only certify square polynomial systems.")
     f = System(F)
-    eval_interpreter = ModelKit.interpreter(f)
+    interpreter = ModelKit.interpreter(f)
     jac_interpreter = ModelKit.jacobian_interpreter(f)
-    cap = max(
+    tape_length = max(
+        ModelKit.cache_min_length(interpreter),
         ModelKit.cache_min_length(jac_interpreter),
-        ModelKit.cache_min_length(eval_interpreter),
     )
-    IJ_cache = ModelKit.InterpreterCache(zeros(IComplexF64, cap))
-    dIJ_cache = ModelKit.InterpreterCache(zeros(IComplex{DoubleF64}, cap))
-    CertifyCache(
-        eval_interpreter,
-        jac_interpreter,
-        NewtonCache(F, optimize_data_structure = false),
-        WeightedNorm(InfNorm(), n),
-        zeros(IComplexF64, m),
-        zeros(IComplexF64, m),
-        zeros(IComplexF64, m),
-        zeros(IComplex{DoubleF64}, m),
-        zeros(ComplexF64, m, n),
-        zeros(IComplexF64, m, n),
-        IJ_cache,
-        dIJ_cache,
-        zeros(IComplexF64, m, n),
-        zeros(IComplexF64, m),
+    arb_prec = 128
+    CertificationCache(;
+        eval_interpreter = interpreter,
+        jac_interpreter = jac_interpreter,
+        newton_cache = NewtonCache(F; optimize_data_structure = false),
+        norm = WeightedNorm(InfNorm(), m),
+        C = zeros(ComplexF64, m, m),
+        r₀ = zeros(IComplexF64, m),
+        Δx₀ = zeros(IComplexF64, m),
+        ix̃₀ = zeros(IComplexF64, m),
+        Jx₀ = zeros(IComplexF64, m, m),
+        M = zeros(IComplexF64, m, m),
+        δx = zeros(IComplexF64, m),
+        interpreter_cache = ModelKit.InterpreterCache(IComplexF64, tape_length),
+        arb_prec = arb_prec,
+        arb_C = AcbRefMatrix(m, m; prec = arb_prec),
+        arb_r₀ = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_Δx₀ = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_x̃₀ = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_J_x₀ = AcbRefMatrix(m, m; prec = arb_prec),
+        arb_M = AcbRefMatrix(m, m; prec = arb_prec),
+        arb_δx = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_mag = Arblib.Mag(),
+        arb_interpreter_cache = ModelKit.InterpreterCache(
+            Acb,
+            tape_length;
+            prec = arb_prec,
+        ),
     )
+end
+
+Base.setprecision(M::AcbRefMatrix, p::Int) = AcbRefMatrix(M.acb_mat, p)
+function set_arb_precision!(cache::CertificationCache, p::Int)
+    cache.arb_prec == p && return cache
+    cache.arb_prec = p
+    cache.arb_r₀ = setprecision(cache.arb_r₀, p)
+    cache.arb_Δx₀ = setprecision(cache.arb_Δx₀, p)
+    cache.arb_x̃₀ = setprecision(cache.arb_x̃₀, p)
+    cache.arb_J_x₀ = setprecision(cache.arb_J_x₀, p)
+    cache.arb_M = setprecision(cache.arb_M, p)
+    cache.arb_δx = setprecision(cache.arb_δx, p)
+    ModelKit.set_arb_precision!(cache.arb_interpreter_cache, p)
+
+    cache
 end
 
 """
@@ -297,6 +358,502 @@ and see that there are indeed 18 solutions and that they are all distinct.
 [^Moo77]: Moore, Ramon E. "A test for existence of solutions to nonlinear systems." SIAM Journal on Numerical Analysis 14.4 (1977): 611-615.
 [^BRT20]: Breiding, P., Rose, K. and Timme, S. "Certifying roots of polynomial systems using interval arithmetic." In preparation (2020).
 """
+function certify end
+
+
+struct CertificationParameters
+    params::Vector{ComplexF64}
+    interval_params::Vector{IComplexF64}
+    arb_interval_params::AcbRefVector
+end
+#
+function CertificationParameters(p::AbstractVector; prec::Int = 256)
+    arb_ip = AcbRefVector(length(p); prec = prec)
+    for (i, p_i) in enumerate(p)
+        x = arb_ip[i]
+        x[] = p_i
+    end
+    CertificationParameters(
+        convert(Vector{ComplexF64}, p),
+        convert(Vector{IComplexF64}, p),
+        arb_ip,
+    )
+end
+
+certification_parameters(p::AbstractVector; prec::Int = 256) = CertificationParameters(p)
+certification_parameters(::Nothing; prec::Int = 256) = nothing
+
+
+complexF64_params(C::CertificationParameters) = C.params
+complexF64_interval_params(C::CertificationParameters) = C.interval_params
+arb_interval_params(C::CertificationParameters) = C.arb_interval_params
+complexF64_params(::Nothing) = nothing
+complexF64_interval_params(::Nothing) = nothing
+arb_interval_params(::Nothing) = nothing
+
+function _certify(
+    F::AbstractSystem,
+    solution_candidates::AbstractArray{<:AbstractArray{<:Number}},
+    p::Union{Nothing,CertificationParameters},
+    cache::CertificationCache;
+    show_progress::Bool = true,
+    max_precision::Int = 256,
+    check_distinct::Bool = true,
+)
+    certificates = SolutionCertificate[]
+
+    if !show_progress
+        for (i, s) in enumerate(solution_candidates)
+            push!(certificates, certify_solution(F, s, p, cache, i))
+        end
+    else
+        # Create progress meter
+        n = length(solution_candidates)
+        desc = "Certifying $n solutions... "
+        barlen = min(ProgressMeter.tty_width(desc, stdout), 40)
+        progress = ProgressMeter.Progress(
+            n;
+            dt = 0.2,
+            desc = desc,
+            barlen = barlen,
+            color = :green,
+            output = stdout,
+        )
+        progress.tlast += progress.dt
+
+        # Go over all solution
+        ncertified = 0
+        nreal_certified = 0
+        for (i, s) in enumerate(solution_candidates)
+            r = certify_solution(F, s, p, cache, i)
+            push!(certificates, r)
+            ncertified += is_certified(r)
+            nreal_certified += is_certified(r) && is_real(r)
+            update_certify_progress!(progress, i, ncertified, nreal_certified)
+        end
+    end
+    if check_distinct
+        duplicates = find_duplicates(certificates)
+    else
+        duplicates = Vector{Vector{Int}}()
+    end
+    CertificationResult(certificates, duplicates)
+end
+
+function update_certify_progress!(progress, k, ncertified, nreal_certified)
+    t = time()
+    if k == progress.n || t > progress.tlast + progress.dt
+        showvalues = make_certify_showvalues(k, ncertified, nreal_certified)
+        ProgressMeter.update!(progress, k; showvalues = showvalues)
+    end
+    nothing
+end
+@noinline function make_certify_showvalues(k, ncertified, nreal_certified)
+    (
+        ("# solutions considered", k),
+        ("# certified solutions (real)", "$(ncertified) ($nreal_certified)"),
+    )
+end
+
+
+function certify_solution(
+    F::AbstractSystem,
+    solution_candidate::Vector{ComplexF64},
+    cert_params::Union{Nothing,CertificationParameters},
+    cert_cache::CertificationCache,
+    index::Int,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+)
+    @unpack C, arb_C, arb_x̃₀ = cert_cache
+
+    # refine solution to machine precicision
+    init!(cert_cache.norm, solution_candidate)
+    res = newton(
+        F,
+        solution_candidate,
+        complexF64_params(cert_params),
+        cert_cache.norm,
+        cert_cache.newton_cache;
+        # we have a weighted norm, so atol is fine
+        atol = 8 * eps(),
+        # this should already be an approximate zero
+        contraction_factor = 0.5,
+        extended_precision = true,
+        max_iters = 8,
+    )
+
+    # Abort if we cannot refine to this accuracy
+    if !is_success(res)
+        return SolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = false,
+            index = index,
+        )
+    end
+
+    x̃₀ = solution(res)
+    LA.inv!(C, cert_cache.newton_cache.J)
+
+    certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
+
+    if certified
+        return SolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = true,
+            real = is_real,
+            index = index,
+            prec = 53,
+            x₀ = AcbMatrix(x₀; prec = 53),
+            x₁ = AcbMatrix(x₁; prec = 53),
+            solution = mid.(x₁),
+        )
+    end
+
+    # If not certified we do the computation in higher precision using Arb
+    prec = 128
+    set_arb_precision!(cert_cache, prec)
+
+    # We keep the same C matrix for now.
+    for j = 1:size(C, 2), i = 1:size(C, 1)
+        arb_C[i, j][] = C[i, j]
+    end
+    for (i, x̃₀_i) in enumerate(x̃₀)
+        arb_x̃₀[i][] = x̃₀_i
+    end
+    while (prec <= max_precision)
+        certified, arb_x₁, arb_x₀, is_real =
+            arb_ε_inflation_krawczyk(arb_x̃₀, cert_params, arb_C, cert_cache; prec = prec)
+
+        if certified
+            return SolutionCertificate(
+                solution_candidate = solution_candidate,
+                certified = true,
+                real = is_real,
+                index = index,
+                prec = prec,
+                x₀ = arb_x₀,
+                x₁ = arb_x₁,
+                solution = [ComplexF64(arb_x₁[i]) for i = 1:size(C, 1)],
+            )
+        end
+
+        prec += 64
+        set_arb_precision!(cert_cache, prec)
+    end
+
+    # certification failed
+    return SolutionCertificate(
+        solution_candidate = solution_candidate,
+        certified = false,
+        index = index,
+    )
+end
+
+
+
+function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
+    @assert size(A, 2) == 1
+    [ComplexF64(Arblib.ref(A, i, 1).acb_ptr) for i = 1:size(A, 1)]
+end
+
+function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}, C, cert_cache)
+    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx, interpreter_cache = cert_cache
+    J_x₀ = Jx₀
+
+    ix̃₀ .= IComplexF64.(x̃₀)
+    ModelKit.execute!(
+        r₀,
+        cert_cache.eval_interpreter,
+        ix̃₀,
+        complexF64_interval_params(p),
+        interpreter_cache,
+    )
+    # iΔx = C * r₀
+    sqr_mul!(Δx₀, C, r₀)
+
+    # Perform ε-inflation. We choose a different εᵢ per coordinate. This matches our strategy
+    # to use a weighted norm.
+    x₀ = map(x̃₀, Δx₀) do x̃₀_i, Δx₀_i
+        εᵢ = 512 * mag(Δx₀_i)
+        complex(
+            Interval(real(x̃₀_i) - εᵢ, real(x̃₀_i) + εᵢ),
+            Interval(imag(x̃₀_i) - εᵢ, imag(x̃₀_i) + εᵢ),
+        )
+    end
+
+    ModelKit.execute!(
+        nothing,
+        J_x₀,
+        cert_cache.jac_interpreter,
+        x₀,
+        complexF64_interval_params(p),
+        interpreter_cache,
+    )
+
+    x₁ = similar(x₀)
+    # x₁ = (x̃₀ - C * F(x₀)) + (I - C * J(x₀)) * (x₀ - x̃₀)
+    #    = (x̃₀ - C * F(x₀)) - (C * J(x₀) - I) * (x₀ - x̃₀)
+    #    = (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
+
+    # Define M = C * J(x₀) - I
+    sqr_mul!(M, C, J_x₀)
+    for i = 1:size(M, 1)
+        M[i, i] -= 1
+    end
+    # Necessary condition is ||M|| < 1 / √2
+    # We lower bound 1 / √2 by 0.7071
+    if IntervalArithmetic.inf_norm_bound(M) < 0.7071
+        δx .= x₀ .- x̃₀
+        sqr_mul!(x₁, M, δx)
+        x₁ .= (x̃₀ .- Δx₀) .- x₁
+        certified = all2(isinterior, x₁, x₀)
+        is_real =
+            certified ? all2((x₁_i, x₀_i) -> isinterior(conj(x₁_i), x₀_i), x₁, x₀) : false
+    else
+        certified = false
+        is_real = false
+    end
+    certified, x₁, x₀, is_real
+end
+
+function arb_ε_inflation_krawczyk(
+    x̃₀::AcbRefMatrix,
+    p::Union{Nothing,CertificationParameters},
+    C::Arblib.AcbMatrixLike,
+    cert_cache;
+    prec::Int,
+)
+    @unpack arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag = cert_cache
+    r₀, Δx₀, x̃₀, J_x₀, M, δx, m =
+        arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag
+    @unpack arb_interpreter_cache = cert_cache
+
+    # @show prec
+    m = arb_mag
+    x̃₀′ = x̄₁ = Δx₀
+    # Perform a simple newton refinement using arb_C until we cannot improve the
+    # accuracy anymore
+    acc = Inf
+    max_iters = 10
+    for i = 1:max_iters
+        ModelKit.execute!(
+            r₀,
+            cert_cache.eval_interpreter,
+            x̃₀,
+            arb_interval_params(p),
+            arb_interpreter_cache,
+        )
+        Arblib.mul!(Δx₀, C, r₀)
+
+        acc_new = Arblib.get(Arblib.bound_inf_norm!(m, Δx₀))
+        if acc_new > acc || i == max_iters
+            break
+        end
+        acc = acc_new
+        Arblib.sub!(x̃₀, x̃₀, Δx₀)
+        Arblib.get_mid!(x̃₀, x̃₀)
+    end
+
+    # Perform ε-inflation
+    n = length(x̃₀)
+    x₀ = AcbRefMatrix(n, 1; prec = prec)
+    Arblib.get_mid!(x₀, x̃₀)
+    # We increase the radius by 2^(prec/4) to avoid hitting the precision limit.
+    # We choose a dynamic increase to account for bad situations where any fixed choice
+    # would be insufficient.
+    incr_factor = exp2(div(prec, 4))
+    for i = 1:n
+        m[] = magF64(Δx₀[i], m) * incr_factor
+        Arblib.add_error!(x₀[i], m)
+    end
+
+    ModelKit.execute!(
+        nothing,
+        J_x₀,
+        cert_cache.jac_interpreter,
+        x₀,
+        arb_interval_params(p),
+        arb_interpreter_cache,
+    )
+
+    # x₁ = (x̃₀ - C * F(x₀)) + (I - C * J(x₀)) * (x₀ - x̃₀)
+    #    = (x̃₀ - C * F(x₀)) - (C * J(x₀) - I) * (x₀ - x̃₀)
+    #    = (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
+
+    # Define M = C * J(x₀) - I
+    Arblib.mul!(M, C, J_x₀)
+    for i = 1:n
+        Arblib.sub!(M[i, i], M[i, i], 1)
+    end
+
+    x₁ = similar(x₀)
+
+    # Necessary condition is ||M|| < 1 / √2
+    # We lower bound 1 / √2 by 0.7071
+    if Arblib.get(Arblib.bound_inf_norm!(m, M)) < 0.7071
+        # x₀ - x̃₀
+        Arblib.sub!(δx, x₀, x̃₀)
+        # (C * J(x₀) - I) * (x₀ - x̃₀)
+        Arblib.mul!(x₁, M, δx)
+        # (x̃₀ - Δx₀)
+        Arblib.sub!(x̃₀′, x̃₀, Δx₀)
+        # (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
+        Arblib.sub!(x₁, x̃₀′, x₁)
+
+        certified = Bool(Arblib.contains(x₀, x₁))
+
+        # check realness
+        Arblib.conjugate!(x̄₁, x₁)
+        is_real = Bool(Arblib.contains(x₀, x̄₁))
+    else
+        certified = false
+        is_real = false
+    end
+
+    if !certified
+        # Update the approximation of the inverse
+        Arblib.get_mid!(J_x₀, J_x₀)
+        Arblib.inv!(C, J_x₀)
+    end
+
+    certified, AcbMatrix(x₁), AcbMatrix(x₀), is_real
+end
+
+magF64(x, mag) = Arblib.get(Arblib.get!(mag, x))
+
+"Simple matrix multiplication using the muladd method which is much faster four our case."
+function sqr_mul!(C, A, B)
+    n = size(A, 1)
+    C .= zero(eltype(C))
+    @inbounds for j = 1:size(B, 2)
+        for k = 1:n
+            bkj = B[k, j]
+            for i = 1:n
+                C[i, j] = muladd(A[i, k], bkj, C[i, j])
+            end
+        end
+    end
+    C
+end
+
+"""
+    find_duplicates(certificates)
+
+Find all duplicate solutions. A solution is considered to be duplicate if the unique
+region overlap.
+"""
+function find_duplicates(certificates::AbstractVector{SolutionCertificate})
+    # The strategy to indentify duplication candidates is as following.
+    # We first compute the squared euclidean distance to a random point
+    # in interval arithmetic. We then compute all overlapping intervals and return this
+    # list of tuples.
+    # The complexity of this is O(n log(n)) (we need to perform an array sort)
+
+    # 1 Compute squared euclidean distance to a random point
+    original_indices = Int[]
+
+    n = length(solution_candidate(first(certificates)))
+    pt = randn(ComplexF64, n)
+
+    sq_eucl_distances = Interval{Float64}[]
+
+    a, b = Arblib.Arf(prec = 53), Arblib.Arf(prec = 53)
+    for (i, cert) in enumerate(certificates)
+        if is_certified(cert)
+            push!(original_indices, i)
+
+            d = zero(Interval{Float64})
+            for i = 1:n
+                yᵢ = IComplexF64(cert.x₁[i], a, b)
+                d +=
+                    IntervalArithmetic.sqr(real(yᵢ) - real(pt[i])) +
+                    IntervalArithmetic.sqr(imag(yᵢ) - imag(pt[i]))
+            end
+            push!(sq_eucl_distances, d)
+        end
+    end
+
+    # 2) Find all overlapping intervals
+
+    # strategy:
+    # Look at close and open of an interval separately and merge all these in one large vector
+    # (keeping track if open or close of an interval),
+    # sort this (first by value, then open, then close).
+    # Now iterate through sorted array and keep track of open intervals
+
+    # value, index, and false if opening and true if closing
+    interval_bounds = Tuple{Float64,Int,Bool}[]
+    for (i, d) in enumerate(sq_eucl_distances)
+        push!(interval_bounds, (d.lo, i, false), (d.hi, i, true))
+    end
+
+    sort!(interval_bounds; lt = (a, b) -> a[1] != b[1] ? a[1] < b[1] : !a[3])
+
+    current_open = Int[]
+    # dict to help group duplicates:
+    # Assume (1,3) and (3,5) overlap then we want to have entries 1=>1, 3=>1 and 5=>1
+    duplicate_grouping = Dict{Int,Int}()
+    # final duplicates. From our example: 1 => [1,3,5]
+    duplicates_dict = Dict{Int,Vector{Int}}()
+
+    for (_v, index, is_closing) in interval_bounds
+        if is_closing
+            if index == current_open[1]
+                popfirst!(current_open)
+            else
+                for (k, idx) in enumerate(current_open)
+                    if idx == index
+                        deleteat!(current_open, k)
+                        break
+                    end
+                end
+            end
+        else
+            if !isempty(current_open)
+                for idx in current_open
+                    # 3) Interval (idx, index) is overlapping. Check for duplicate
+                    check_duplicate_candidate!(
+                        duplicate_grouping,
+                        duplicates_dict,
+                        original_indices[idx],
+                        original_indices[index],
+                        certificates,
+                    )
+                end
+            end
+            push!(current_open, index)
+        end
+    end
+
+    isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
+end
+
+function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, certificates)
+    i_is_dupl = haskey(duplicate_grouping, i)
+    j_is_dupl = haskey(duplicate_grouping, j)
+    #If i and j are already in a duplicate cluster then there is no need to
+    # check again overlapping by transitivity of our clustering
+    i_is_dupl && j_is_dupl && return true
+    if Bool(Arblib.overlaps(certificates[i].x₁, certificates[j].x₁))
+        if i_is_dupl
+            duplicate_grouping[j] = duplicate_grouping[i]
+            push!(duplicates_dict[duplicate_grouping[i]], j)
+        elseif j_is_dupl
+            duplicate_grouping[i] = duplicate_grouping[j]
+            push!(duplicates_dict[duplicate_grouping[j]], i)
+        else
+            duplicate_grouping[i] = i
+            duplicate_grouping[j] = i
+            duplicates_dict[i] = [i, j]
+        end
+        true
+    else
+        false
+    end
+end
+
+
 function certify(
     F::AbstractVector{Expression},
     X,
@@ -349,286 +906,103 @@ function certify(
     end
     certify(sys, X, p; target_parameters = target_parameters, kwargs...)
 end
-function certify(
-    F::System,
-    args...;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+
+
+function certify(F::System, args...; compile::Union{Bool,Symbol} = false, kwargs...)
     certify(fixed(F; compile = compile), args...; kwargs...)
 end
+
+
 function certify(
     F::AbstractSystem,
     X::MonodromyResult,
-    cache::CertifyCache = CertifyCache(F);
-    show_progress = true,
-)
-    certify(F, solutions(X), parameters(X), cache; show_progress = show_progress)
-end
-function certify(
-    F::AbstractSystem,
-    X,
-    p = nothing,
-    cache::CertifyCache = CertifyCache(F);
-    target_parameters = nothing,
-    show_progress = true,
-)
-    if !isnothing(p)
-        target_parameters = p
-    end
-    if !isnothing(target_parameters)
-        # convert target parameters to something certifyable
-        if isa(target_parameters, AbstractVector{<:Rational}) ||
-           isa(target_parameters, AbstractVector{<:Complex{<:Rational}})
-            ip = target_parameters
-            dip = target_parameters
-        elseif isa(target_parameters, AbstractVector{<:Complex})
-            ip = IComplexF64.(target_parameters)
-            dip = IComplex{DoubleF64}.(target_parameters)
-        else
-            ip = Interval{Float64}.(target_parameters)
-            dip = Interval{DoubleF64}.(target_parameters)
-        end
-    else
-        ip = dip = nothing
-    end
-
-    if X isa PathResult || X isa AbstractVector{<:Number}
-        X = [X]
-    end
-    _certify(F, X, target_parameters, ip, dip, cache; show_progress = show_progress)
-end
-
-function _certify(
-    F::AbstractSystem,
-    X::Result,
-    p,
-    ip,
-    dip,
-    cache::CertifyCache;
-    show_progress::Bool,
+    cache::CertificationCache = CertificationCache(F);
+    max_precision::Int = 256,
+    kwargs...,
 )
     _certify(
         F,
-        results(X; only_nonsingular = true),
-        p,
-        ip,
-        dip,
+        solutions(X),
+        certification_parameters(parameters(X)),
         cache;
-        show_progress = show_progress,
-    )
-end
-function _certify(
-    F::AbstractSystem,
-    X,
-    p,
-    ip,
-    dip,
-    cache::CertifyCache;
-    show_progress::Bool,
-)
-    certificates = SolutionCertificate[]
-    if show_progress
-        n = length(X)
-        desc = "Certifying $n solutions... "
-        barlen = min(ProgressMeter.tty_width(desc, stdout), 40)
-        progress = ProgressMeter.Progress(
-            n;
-            dt = 0.2,
-            desc = desc,
-            barlen = barlen,
-            color = :green,
-            output = stdout,
-        )
-        progress.tlast += progress.dt
-        ncertified = 0
-        nreal_certified = 0
-        for (i, x) in enumerate(X)
-            r = _certify(F, x, p, ip, dip, cache, i)
-            push!(certificates, r)
-            ncertified += is_certified(r)
-            nreal_certified += is_certified(r) && is_real(r)
-            if show_progress
-                update_certify_progress!(progress, i, ncertified, nreal_certified)
-            end
-        end
-    else
-        for (i, x) in enumerate(X)
-            push!(certificates, _certify(F, x, p, ip, dip, cache, i))
-        end
-    end
-    duplicates = find_duplicates(certificates; show_progress = show_progress)
-    CertificationResult(certificates, duplicates)
-end
-
-function update_certify_progress!(progress, k, ncertified, nreal_certified)
-    t = time()
-    if k == progress.n || t > progress.tlast + progress.dt
-        showvalues = make_certifiy_showvalues(k, ncertified, nreal_certified)
-        ProgressMeter.update!(progress, k; showvalues = showvalues)
-    end
-    nothing
-end
-@noinline function make_certifiy_showvalues(k, ncertified, nreal_certified)
-    (
-        ("# solutions considered", k),
-        ("# certified solutions (real)", "$(ncertified) ($nreal_certified)"),
+        max_precision = max_precision,
+        kwargs...,
     )
 end
 
-function _certify(
+function certify(
     F::AbstractSystem,
     r::PathResult,
-    p,
-    ip,
-    dip,
-    cache::CertifyCache,
-    index = nothing,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
 )
-    _certify(F, solution(r), p, ip, dip, cache, index)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, [solution(r)], cert_params, cache; max_precision = max_precision, kwargs...)
 end
-function _certify(
-    F::AbstractSystem,
-    x₀::AbstractVector{<:Number},
-    p::Union{Nothing,AbstractVector},
-    ip,
-    dip,
-    cache::CertifyCache,
-    index = nothing,
-)
-    _certify(F, convert(Vector{ComplexF64}, x₀), p, ip, dip, cache, index)
-end
-function _certify(
-    F::AbstractSystem,
-    x₀::Vector{ComplexF64},
-    p::Union{Nothing,AbstractVector},
-    ip,
-    dip,
-    cache::CertifyCache,
-    index = nothing,
-)
-    @unpack C, IJ, IJ_cache, dIJ_cache, A, δx, ir, iΔx, ix̃, dix̃, norm, newton_cache =
-        cache
-    @unpack Δx, J, r = newton_cache
 
-    init!(norm, x₀)
-    res = newton(
+function certify(
+    F::AbstractSystem,
+    r::AbstractVector{PathResult},
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, solution.(r), cert_params, cache; max_precision = max_precision, kwargs...)
+end
+
+function certify(
+    F::AbstractSystem,
+    x::AbstractVector{<:Number},
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, [x], cert_params, cache; max_precision = max_precision, kwargs...)
+end
+
+function certify(
+    F::AbstractSystem,
+    X::Result,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(
         F,
-        x₀,
-        p,
-        norm,
-        newton_cache;
-        atol = 4 * eps(),
-        rtol = 4 * eps(),
-        extended_precision = true,
-        max_iters = 4,
-    )
-    x̃ = solution(res)
-    LA.inv!(C, J)
-
-    ix̃ .= IComplexF64.(x̃)
-    ModelKit.execute!(ir, cache.eval_interpreter, ix̃, ip, IJ_cache)
-    sqr_mul!(iΔx, C, ir)
-
-    x = map(x̃, iΔx) do x̃ᵢ, iΔxᵢ
-        Δᵢ = abs(mid(iΔxᵢ)) + diam(iΔxᵢ)
-        εᵢ = max(4Δᵢ, 8eps() * abs(x̃ᵢ))
-        complex(
-            Interval(real(x̃ᵢ) - εᵢ, real(x̃ᵢ) + εᵢ),
-            Interval(imag(x̃ᵢ) - εᵢ, imag(x̃ᵢ) + εᵢ),
-        )
-    end
-    ModelKit.execute!(nothing, IJ, cache.jac_interpreter, x, ip, IJ_cache)
-    x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
-    certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
-
-    if !certified
-        dix̃ .= IComplex{DoubleF64}.(x̃)
-        ModelKit.execute!(ir, cache.eval_interpreter, dix̃, dip, dIJ_cache)
-        # multiplication in standard precision
-        sqr_mul!(iΔx, C, ir)
-        # ε-inflation
-        x = map(x̃, iΔx) do x̃ᵢ, iΔxᵢ
-            Δᵢ = mag(iΔxᵢ)
-            εᵢ = max(8Δᵢ, 8eps() * abs(x̃ᵢ))
-            a, b = reim(ComplexDF64(x̃ᵢ))
-            complex(Interval(a - εᵢ, a + εᵢ), Interval(b - εᵢ, b + εᵢ))
-        end
-
-        # Compute interval jacobian in extended precision
-        ModelKit.execute!(nothing, IJ, cache.jac_interpreter, x, dip, dIJ_cache)
-        x′ = krawczyk_step(x̃, iΔx, x, C, IJ, A, δx)
-        certified = maximum(mag, A) < 0.7 && all2(isinterior, x′, x)
-    end
-
-    if !certified
-        return SolutionCertificate(initial_solution = x₀, index = index)
-    end
-
-    # We have a certified solution x.
-    # Now we want to check if it is a real solution.
-    is_real = certified && all2((xᵢ′, xᵢ) -> isinterior(conj(xᵢ′), xᵢ), x′, x)
-
-    return SolutionCertificate(
-        initial_solution = x₀,
-        certified_solution = x,
-        is_real = is_real,
-        index = index,
+        solutions(X; only_nonsingular = true),
+        cert_params,
+        cache;
+        max_precision = max_precision,
+        kwargs...,
     )
 end
 
-function krawczyk_step(x̃, Δx, x, C, IJ, A, δx)
-    sqr_mul!(A, C, IJ)
-    for i = 1:size(A, 1)
-        A[i, i] -= 1
-    end
-    δx .= x .- x̃
-    x′ = sqr_mul!(copy(δx), A, δx)
-    @. x′ += x̃ - Δx
-end
-
-"Simple matrix multiplication using the muladd method which is much faster four our case."
-function sqr_mul!(C, A, B)
-    n = size(A, 1)
-    C .= zero(eltype(C))
-    for j = 1:size(B, 2)
-        for k = 1:n
-            @inbounds bkj = B[k, j]
-            for i = 1:n
-                @inbounds C[i, j] = muladd(A[i, k], bkj, C[i, j])
-            end
-        end
-    end
-    C
-end
-
-function find_duplicates(R::AbstractVector{SolutionCertificate}; show_progress::Bool = true)
-    # TODO: Do better than n^2 check
-    duplicates = Dict{Int,Vector{Int}}()
-    duplicated_indices = Set{Int}()
-    t0 = time()
-    displayed_info = !show_progress
-    for i = 1:length(R)
-        is_certified(R[i]) && i ∉ duplicated_indices || continue
-        rᵢ = R[i]
-        if !displayed_info && (time() - t0 > 0.2)
-            @info "Checking for duplicates"
-            displayed_info = true
-        end
-        for j = i+1:length(R)
-            is_certified(R[j]) && j ∉ duplicated_indices || continue
-            if all2(!isdisjoint, rᵢ.certified_solution, R[j].certified_solution)
-                if haskey(duplicates, i)
-                    push!(duplicated_indices, j)
-                    push!(duplicates[i], j)
-                else
-                    push!(duplicated_indices, i)
-                    push!(duplicated_indices, j)
-                    duplicates[i] = [i, j]
-                end
-            end
-        end
-    end
-
-    isempty(duplicates) ? Vector{Int}[] : collect(values(duplicates))
+function certify(
+    F::AbstractSystem,
+    X,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::CertificationCache = CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    _certify(F, X, cert_params, cache; max_precision = max_precision, kwargs...)
 end

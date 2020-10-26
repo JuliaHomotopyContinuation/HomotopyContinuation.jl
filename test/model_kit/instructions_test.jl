@@ -41,6 +41,45 @@
         test_instr_interpreter(ModelKit.INSTR_SUBMUL, [:x, :y, :z], z - x * y)
     end
 
+    @testset "evaluate with arb" begin
+        function test_instr_interpreter(instr, vars, values, expected)
+            list = ModelKit.InstructionList()
+            out = push!(list, ModelKit.Instruction(instr, vars...))
+            I = ModelKit.Interpreter(list, [out]; variables = vars)
+            cache = ModelKit.InterpreterCache(Arblib.Acb, I; prec = 256)
+            u = Arblib.AcbVector(1; prec = 256)
+            ModelKit.execute!(u, I, values, nothing, cache)
+            @test Float64(Arblib.get!(Arblib.Mag(), u[1] - expected)) < 1e-14
+        end
+        function test_instr_pow_interpreter(instr, r, x, expected)
+            list = ModelKit.InstructionList()
+            out = push!(list, ModelKit.Instruction(instr, :x, r))
+            I = ModelKit.Interpreter(list, [out]; variables = [:x])
+            cache = ModelKit.InterpreterCache(Arblib.Acb, I; prec = 256)
+            u = Arblib.AcbVector(1; prec = 256)
+            ModelKit.execute!(u, I, [x], nothing, cache)
+            @test Float64(Arblib.get!(Arblib.Mag(), u[1] - expected)) < 1e-14
+        end
+
+        x, y, z = Arblib.Acb.(randn(ComplexF64, 3); prec = 256)
+        test_instr_interpreter(ModelKit.INSTR_NEG, [:x], [x], -x)
+        test_instr_interpreter(ModelKit.INSTR_SQR, [:x], [x], x^2)
+        test_instr_interpreter(ModelKit.INSTR_SIN, [:x], [x], sin(x))
+        test_instr_interpreter(ModelKit.INSTR_COS, [:x], [x], cos(x))
+
+        test_instr_pow_interpreter(ModelKit.INSTR_POW, 2, x, x^2)
+        test_instr_pow_interpreter(ModelKit.INSTR_POW, 5, x, x^5)
+        test_instr_pow_interpreter(ModelKit.INSTR_POW, 6, x, x^6)
+        test_instr_interpreter(ModelKit.INSTR_ADD, [:x, :y], [x, y], x + y)
+        test_instr_interpreter(ModelKit.INSTR_MUL, [:x, :y], [x, y], x * y)
+        test_instr_interpreter(ModelKit.INSTR_SUB, [:x, :y], [x, y], x - y)
+        test_instr_interpreter(ModelKit.INSTR_DIV, [:x, :y], [x, y], x / y)
+
+        test_instr_interpreter(ModelKit.INSTR_MULADD, [:x, :y, :z], [x, y, z], x * y + z)
+        test_instr_interpreter(ModelKit.INSTR_MULSUB, [:x, :y, :z], [x, y, z], x * y - z)
+        test_instr_interpreter(ModelKit.INSTR_SUBMUL, [:x, :y, :z], [x, y, z], z - x * y)
+    end
+
     @testset "gradient" begin
         function test_instr_interpreter_grad(instr, vars, expected)
             list = ModelKit.InstructionList()
