@@ -73,7 +73,7 @@ function is_positive(C::SolutionCertificate)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        all(i -> Arblib.is_positive(real(Arblib.ref(C.x₀, i, 1))), 1:length(C.x₀))
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.x₁, i, 1))), 1:length(C.x₁))
     end
 end
 
@@ -81,15 +81,22 @@ end
 """
     certified_solution(C::SolutionCertificate)
 
-Returns a vector of complex intervals where the true solution is contained in.
+Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where the
+true solution is contained in.
 """
-certified_solution(C::SolutionCertificate) = C.x₀
+solution_interval(certificate::SolutionCertificate) = certificate.x₀
+@deprecate certified_solution(certificate) solution_interval(certificate)
 
+"""
+    index(certificate::SolutionCertificate)
+
+Return the index of the solution certificate. Here the index refers to the index of the
+provided soluion candidates.
+"""
+index(certificate::SolutionCertificate) = C.index
 
 function Base.show(f::IO, cert::SolutionCertificate)
-    if !isnothing(cert.index)
-        println(f, "index = ", cert.index)
-    end
+    println(f, "SolutionCertificate:")
     println(f, "solution_candidate = [")
     for z in solution_candidate(cert)
         print(f, "  ")
@@ -97,15 +104,20 @@ function Base.show(f::IO, cert::SolutionCertificate)
         println(f, ",")
     end
     println(f, "]")
-    if !isnothing(certified_solution(cert))
-        println(f, "certified_solution = [")
-        for z in certified_solution(cert)
+    print(f, "is_certified = ", is_certified(cert))
+    if !isnothing(solution_interval(cert))
+        println(f, "\nsolution_interval = [")
+        for z in solution_interval(cert)
             print(f, "  ")
             print(f, z)
             println(f, ",")
         end
         println(f, "]")
-        println(f, "is_real = ", is_real(cert))
+        println(f, "precision = ", cert.prec)
+        print(f, "is_real = ", is_real(cert))
+    end
+    if !isnothing(cert.index)
+        print(f, "\nindex = ", cert.index)
     end
 end
 
@@ -563,8 +575,7 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     # Perform ε-inflation. We choose a different εᵢ per coordinate. This matches our strategy
     # to use a weighted norm.
     x₀ = map(x̃₀, Δx₀) do x̃₀_i, Δx₀_i
-        Δᵢ = mag(Δx₀_i)
-        εᵢ = max(4Δᵢ, 8eps() * abs(x̃₀_i))
+        εᵢ = 512 * mag(Δx₀_i)
         complex(
             Interval(real(x̃₀_i) - εᵢ, real(x̃₀_i) + εᵢ),
             Interval(imag(x̃₀_i) - εᵢ, imag(x̃₀_i) + εᵢ),
@@ -627,13 +638,12 @@ function arb_ε_inflation_krawczyk(
     max_iters = 10
     for i = 1:max_iters
         ModelKit.execute!(
-            arb_r₀,
+            r₀,
             cert_cache.eval_interpreter,
             x̃₀,
             arb_interval_params(p),
             arb_interpreter_cache,
         )
-        Arblib.get_mid!(r₀, r₀)
         Arblib.mul!(Δx₀, C, r₀)
 
         acc_new = Arblib.get(Arblib.bound_inf_norm!(m, Δx₀))
@@ -681,7 +691,6 @@ function arb_ε_inflation_krawczyk(
 
     # Necessary condition is ||M|| < 1 / √2
     # We lower bound 1 / √2 by 0.7071
-    # @show Arblib.get(Arblib.bound_inf_norm!(m, M))
     if Arblib.get(Arblib.bound_inf_norm!(m, M)) < 0.7071
         # x₀ - x̃₀
         Arblib.sub!(δx, x₀, x̃₀)
@@ -692,8 +701,6 @@ function arb_ε_inflation_krawczyk(
         # (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
         Arblib.sub!(x₁, x̃₀′, x₁)
 
-        # @show x₀[14] x₁[14]
-        # @show Bool.(Arblib.contains.(x₀[14], x₁[14]))
         certified = Bool(Arblib.contains(x₀, x₁))
 
         # check realness
@@ -846,36 +853,6 @@ function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, c
     end
 end
 
-function _old_find_duplicates(certificates)
-    candidates = find_duplicate_candidates(certificates)
-    # dict to help group duplicates:
-    # Assume (1,3) and (3,5) overlap then we want to have entries 1=>1, 3=>1 and 5=>1
-    duplicate_grouping = Dict{Int,Int}()
-    # final duplicates. From our example: 1 => [1,3,5]
-    duplicates_dict = Dict{Int,Vector{Int}}()
-    for (i, j) in candidates
-        i_is_dupl = haskey(duplicate_grouping, i)
-        j_is_dupl = haskey(duplicate_grouping, j)
-        #If i and j are already in a duplicate cluster then there is no need to
-        # check again overlapping by transitivity of our clustering
-        i_is_dupl && j_is_dupl && continue
-        if Bool(Arblib.overlaps(certificates[i].x₁, certificates[j].x₁))
-            if i_is_dupl
-                duplicate_grouping[j] = duplicate_grouping[i]
-                push!(duplicates_dict[duplicate_grouping[i]], j)
-            elseif j_is_dupl
-                duplicate_grouping[i] = duplicate_grouping[j]
-                push!(duplicates_dict[duplicate_grouping[j]], i)
-            else
-                duplicate_grouping[i] = i
-                duplicate_grouping[j] = i
-                duplicates_dict[i] = [i, j]
-            end
-        end
-    end
-
-    isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
-end
 
 function certify(
     F::AbstractVector{Expression},
