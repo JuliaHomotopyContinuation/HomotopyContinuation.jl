@@ -46,7 +46,7 @@
             list = ModelKit.InstructionList()
             out = push!(list, ModelKit.Instruction(instr, vars...))
             I = ModelKit.Interpreter(list, [out]; variables = vars)
-            cache = ModelKit.InterpreterCache(Arblib.Acb, I)
+            cache = ModelKit.InterpreterCache(Arblib.Acb, I; prec = 256)
             u = Arblib.AcbVector(1; prec = 256)
             ModelKit.execute!(u, I, values, nothing, cache)
             @test Float64(Arblib.get!(Arblib.Mag(), u[1] - expected)) < 1e-14
@@ -55,7 +55,7 @@
             list = ModelKit.InstructionList()
             out = push!(list, ModelKit.Instruction(instr, :x, r))
             I = ModelKit.Interpreter(list, [out]; variables = [:x])
-            cache = ModelKit.InterpreterCache(Arblib.Acb, I)
+            cache = ModelKit.InterpreterCache(Arblib.Acb, I; prec = 256)
             u = Arblib.AcbVector(1; prec = 256)
             ModelKit.execute!(u, I, [x], nothing, cache)
             @test Float64(Arblib.get!(Arblib.Mag(), u[1] - expected)) < 1e-14
