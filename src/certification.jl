@@ -79,6 +79,22 @@ end
 
 
 """
+    is_positive(C::SolutionCertificate, i::Int)
+
+If `C` is a certifiably real solution, `is_positive` returns `true`, if the `i`-th coordinate is certifiably positive. Otherwie, it returns `false`.
+
+If `C` is not a certifiably real solution, `is_positive` always returns `false`.
+"""
+function is_positive(C::SolutionCertificate, i::Int)
+    if !is_certified(C) || !is_real(C)
+        return false
+    else
+        Arblib.is_positive(real(Arblib.ref(C.x₁, i, 1)))
+    end
+end
+
+
+"""
     certified_solution(C::SolutionCertificate)
 
 Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where the

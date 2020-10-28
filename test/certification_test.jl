@@ -139,6 +139,7 @@
         res = solve(f; compile = false, start_system = :total_degree)
         cert = certify(f, res, compile = false)
         @test count(is_positive, certificates(cert)) == 1
+        @test count(s -> is_positive(s, 1), certificates(cert)) == 1
         @test count(is_real, certificates(cert)) == 2
     end
 end
