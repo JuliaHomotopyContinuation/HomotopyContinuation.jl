@@ -18,6 +18,7 @@ a [`CompiledHomotopy`](@ref) (fast, but introduce compilation overhead) and an
 ```@docs
 CompiledHomotopy
 InterpretedHomotopy
+MixedHomotopy
 fixed(::Homotopy)
 ```
 

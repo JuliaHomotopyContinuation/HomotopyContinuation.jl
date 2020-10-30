@@ -7,14 +7,20 @@ export certify,
     is_certified,
     is_real,
     is_positive,
-    certified_solution,
-    initial_solution,
+    solution_candidate,
+    certified_solution_interval,
+    certificate_index,
+    solution_approximation,
     certificates,
     ncertified,
     nreal_certified,
     ndistinct_certified,
     ndistinct_real_certified,
-    save
+    save,
+    # deprecated
+    initial_solution,
+    certified_solution
+
 
 
 """
@@ -30,7 +36,7 @@ Base.@kwdef struct SolutionCertificate
     real::Bool = false
     index::Union{Nothing,Int} = nothing
     prec::Int = 53
-    # x₀, x₁ ∈ 𝕀ℂⁿ and are certified solution has x₁ ⊊ x₀
+    # x₀, x₁ ∈ 𝕀ℂⁿ and a certified solution has x₁ ⊊ x₀
     x₀::Union{Nothing,AcbMatrix} = nothing
     x₁::Union{Nothing,AcbMatrix} = nothing
     # We also store a double precision representation of the midpoint of x₁
@@ -40,7 +46,7 @@ end
 
 
 """
-    solution_candidate(C::SolutionCertificate)
+    solution_candidate(certificate::SolutionCertificate)
 
 Returns the given provided solution candidate.
 """
@@ -48,26 +54,26 @@ solution_candidate(C::SolutionCertificate) = C.solution_candidate
 @deprecate initial_solution(cert::SolutionCertificate) solution_candidate(cert)
 
 """
-    is_certified(C::SolutionCertificate)
+    is_certified(certificate::SolutionCertificate)
 
-Returns `true` if `C` certifies that the given initial solution corresponds to a true
-solution.
+Returns `true` if `certificate` is a certificate that `certified_solution_interval(certificate)`
+contains a unique zero.
 """
 is_certified(C::SolutionCertificate) = C.certified
 
 """
-    is_real(C::SolutionCertificate)
+    is_real(certificate::SolutionCertificate)
 
-Returns `true` if `C` certifies that the given initial solution corresponds to a true
-real solution of the system.
+Returns `true` if `certificate` certifies that the given solution candidate
+corresponds to a true real solution of the system.
 """
 is_real(C::SolutionCertificate) = C.real
 
-
 """
-    is_positive(C::SolutionCertificate)
+    is_positive(certificate::SolutionCertificate)
 
-Returns `true` if `C` is certifiably a real, positive solution.
+Returns `true` if `is_certified(certificate)` is `true` and the unique zero contained
+in `certified_solution_interval(certificate)` is real and positive.
 """
 function is_positive(C::SolutionCertificate)
     if !is_certified(C) || !is_real(C)
@@ -79,13 +85,12 @@ end
 
 
 """
-    is_positive(C::SolutionCertificate, i::Int)
+    is_positive(certificate::SolutionCertificate, i)
 
-If `C` is a certifiably real solution, `is_positive` returns `true`, if the `i`-th coordinate is certifiably positive. Otherwie, it returns `false`.
-
-If `C` is not a certifiably real solution, `is_positive` always returns `false`.
+Returns `true` if `is_certified(certificate)` is `true` and `i`-th coordinate of the
+unique zero contained in `certified_solution_interval(certificate)` is real and positive.
 """
-function is_positive(C::SolutionCertificate, i::Int)
+function is_positive(C::SolutionCertificate, i::Integer)
     if !is_certified(C) || !is_real(C)
         return false
     else
@@ -95,21 +100,39 @@ end
 
 
 """
-    certified_solution(C::SolutionCertificate)
+    certified_solution_interval(certificate::SolutionCertificate)
 
-Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where the
-true solution is contained in.
+Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where a unique
+zero of the system is contained in.
+Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-solution_interval(certificate::SolutionCertificate) = certificate.x₀
-@deprecate certified_solution(certificate) solution_interval(certificate)
+certified_solution_interval(certificate::SolutionCertificate) = certificate.x₀
+@deprecate certified_solution(certificate) certified_solution_interval(certificate)
 
 """
-    index(certificate::SolutionCertificate)
+    certificate_index(certificate::SolutionCertificate)
 
 Return the index of the solution certificate. Here the index refers to the index of the
-provided soluion candidates.
+provided solution candidates.
 """
-index(certificate::SolutionCertificate) = C.index
+certificate_index(certificate::SolutionCertificate) = C.index
+
+"""
+    precision(certificate::SolutionCertificate)
+
+Returns the maximal precision used to produce the given `certificate`.
+"""
+Base.precision(certificate::SolutionCertificate) = certificate.prec
+
+"""
+    solution_approximation(certificate::SolutionCertificate)
+
+If `is_certified(certificate)` is `true` this returns the midpoint of the
+[`certified_solution_interval`](@ref) of the given `certificate` as a `Vector{ComplexF64}`.
+Returns `nothing` if `is_certified(certificate)` is `false`.
+"""
+solution_approximation(certificate::SolutionCertificate) = certificate.solution
+
 
 function Base.show(f::IO, cert::SolutionCertificate)
     println(f, "SolutionCertificate:")
@@ -204,11 +227,11 @@ end
 function Base.show(io::IO, R::CertificationResult)
     println(io, "CertificationResult")
     println(io, "===================")
-    println(io, "• $(length(R.certificates)) solutions given")
-    print(io, "• $(ncertified(R)) certified solutions")
+    println(io, "• $(length(R.certificates)) solution candidates given")
+    print(io, "• $(ncertified(R)) certified solution intervals")
     print(io, " ($(nreal_certified(R)) real)")
     println(io)
-    print(io, "• $(ndistinct_certified(R)) distinct certified solutions")
+    print(io, "• $(ndistinct_certified(R)) distinct certified solution intervals")
     print(io, " ($(ndistinct_real_certified(R)) real)")
 end
 
@@ -264,7 +287,7 @@ Base.@kwdef mutable struct CertificationCache{T₁,T₂}
 end
 function CertificationCache(F::AbstractSystem)
     m, n = size(F)
-    m == n || error("Can only certify square polynomial systems.")
+    m == n || error("We can only certify square systems.")
     f = System(F)
     interpreter = ModelKit.interpreter(f)
     jac_interpreter = ModelKit.jacobian_interpreter(f)
@@ -332,7 +355,8 @@ the number of distinct solutions. For more details of the implementation see [^B
 ## Options
 
 * `show_progress = true`: If `true` shows a progress bar of the certification process.
-* `compile = $(COMPILE_DEFAULT[])`: See the [`solve`](@ref) documentation.
+* `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
+* `compile = false`: See the [`solve`](@ref) documentation.
 
 
 ## Example
@@ -363,9 +387,9 @@ certify(F, result)
 ```
 CertificationResult
 ===================
-• 18 solutions given
-• 18 certified solutions (4 real)
-• 18 distinct certified solutions (4 real)
+• 18 solution candidates given
+• 18 certified solution intervals (4 real)
+• 18 distinct certified solution intervals (4 real)
 ```
 
 and see that there are indeed 18 solutions and that they are all distinct.
@@ -382,7 +406,7 @@ struct CertificationParameters
     interval_params::Vector{IComplexF64}
     arb_interval_params::AcbRefVector
 end
-#
+
 function CertificationParameters(p::AbstractVector; prec::Int = 256)
     arb_ip = AcbRefVector(length(p); prec = prec)
     for (i, p_i) in enumerate(p)
@@ -417,6 +441,9 @@ function _certify(
     check_distinct::Bool = true,
 )
     certificates = SolutionCertificate[]
+
+    m, n = size(F)
+    m == n || throw(ArgumentError("We can only certify solutions to square systems."))
 
     if !show_progress
         for (i, s) in enumerate(solution_candidates)
@@ -466,15 +493,15 @@ function update_certify_progress!(progress, k, ncertified, nreal_certified)
 end
 @noinline function make_certify_showvalues(k, ncertified, nreal_certified)
     (
-        ("# solutions considered", k),
-        ("# certified solutions (real)", "$(ncertified) ($nreal_certified)"),
+        ("# solutions candidates considered", k),
+        ("# certified solution intervals (real)", "$(ncertified) ($nreal_certified)"),
     )
 end
 
 
 function certify_solution(
     F::AbstractSystem,
-    solution_candidate::Vector,
+    solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
     index::Int,
@@ -578,6 +605,7 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     J_x₀ = Jx₀
 
     ix̃₀ .= IComplexF64.(x̃₀)
+    # r₀ = F(ix̃₀)
     ModelKit.execute!(
         r₀,
         cert_cache.eval_interpreter,
@@ -608,8 +636,8 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     )
 
     x₁ = similar(x₀)
-    # x₁ = (x̃₀ - C * F(x₀)) + (I - C * J(x₀)) * (x₀ - x̃₀)
-    #    = (x̃₀ - C * F(x₀)) - (C * J(x₀) - I) * (x₀ - x̃₀)
+    # x₁ = (x̃₀ - C * F([x̃₀])) + (I - C * J(x₀)) * (x₀ - x̃₀)
+    #    = (x̃₀ - C * F([x̃₀])) - (C * J(x₀) - I) * (x₀ - x̃₀)
     #    = (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
 
     # Define M = C * J(x₀) - I
@@ -693,8 +721,8 @@ function arb_ε_inflation_krawczyk(
         arb_interpreter_cache,
     )
 
-    # x₁ = (x̃₀ - C * F(x₀)) + (I - C * J(x₀)) * (x₀ - x̃₀)
-    #    = (x̃₀ - C * F(x₀)) - (C * J(x₀) - I) * (x₀ - x̃₀)
+    # x₁ = (x̃₀ - C * F([x̃₀])) + (I - C * J(x₀)) * (x₀ - x̃₀)
+    #    = (x̃₀ - C * F([x̃₀])) - (C * J(x₀) - I) * (x₀ - x̃₀)
     #    = (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
 
     # Define M = C * J(x₀) - I
