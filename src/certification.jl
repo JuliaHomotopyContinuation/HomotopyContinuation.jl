@@ -144,9 +144,10 @@ function Base.show(f::IO, cert::SolutionCertificate)
     end
     println(f, "]")
     print(f, "is_certified = ", is_certified(cert))
-    if !isnothing(solution_interval(cert))
-        println(f, "\nsolution_interval = [")
-        for z in solution_interval(cert)
+    if !isnothing(certified_solution_interval(cert))
+        println(f)
+        println(f, "certified_solution_interval = [")
+        for z in certified_solution_interval(cert)
             print(f, "  ")
             print(f, z)
             println(f, ",")
@@ -156,7 +157,8 @@ function Base.show(f::IO, cert::SolutionCertificate)
         print(f, "is_real = ", is_real(cert))
     end
     if !isnothing(cert.index)
-        print(f, "\nindex = ", cert.index)
+        println(f)
+        print(f, "index = ", cert.index)
     end
 end
 
