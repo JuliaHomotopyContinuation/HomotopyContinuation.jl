@@ -1,3 +1,11 @@
+export MixedSystem
+
+"""
+    MixedSystem
+
+A data structure which uses for `evaluate!` and `evaluate_and_jacobian!` a [`CompiledSystem`](@ref)
+and for `taylor!` an [`InterpretedSystem`](@ref).
+"""
 struct MixedSystem{T,ID} <: AbstractSystem
     compiled::CompiledSystem{ID}
     interpreted::InterpretedSystem{T}

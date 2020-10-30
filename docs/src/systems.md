@@ -17,6 +17,7 @@ a [`CompiledSystem`](@ref) (fast, but introduce compilation overhead) and an
 ```@docs
 CompiledSystem
 InterpretedSystem
+MixedSystem
 fixed(::System)
 ```
 

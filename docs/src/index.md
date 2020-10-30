@@ -26,6 +26,7 @@ Pages = [
     "witness_sets.md",
     "monodromy.md",
     "result.md",
+    "certification.md",
     "solve_examples.md",
     "start_systems.md",
 ]

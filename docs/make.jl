@@ -15,7 +15,7 @@ makedocs(
             "Witness Sets (infinitely many solutions)" => "witness_sets.md",
             "Monodromy" => "monodromy.md",
             "Results" => "result.md",
-            "Certification (experimentell)" => "certification.md",
+            "Certification" => "certification.md",
             "Examples" => "solve_examples.md",
             "Start systems" => "start_systems.md",
         ],
