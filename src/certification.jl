@@ -474,7 +474,7 @@ end
 
 function certify_solution(
     F::AbstractSystem,
-    solution_candidate::Vector{ComplexF64},
+    solution_candidate::Vector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
     index::Int,
