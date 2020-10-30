@@ -54,7 +54,7 @@ Show the instruction executed by the interpreter `I`.
 """
 show_instructions(I::Interpreter) = show_instructions(stdout, I)
 function show_instructions(io::IO, I::Interpreter)
-    for i in 1:length(I.variables)
+    for i = 1:length(I.variables)
         println(io, "tape[", i, "] = x[", i, "]")
     end
     for instr in I.instructions
