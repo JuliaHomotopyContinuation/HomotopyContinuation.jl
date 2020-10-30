@@ -79,6 +79,36 @@ function is_univariate(op::InstructionOp)
     op == INSTR_SQR || op == INSTR_NEG
 end
 
+function arity(op::InstructionOp)
+    if op == INSTR_ADD
+        2
+    elseif op == INSTR_SUB
+        2
+    elseif op == INSTR_NEG
+        1
+    elseif op == INSTR_MUL
+        2
+    elseif op == INSTR_DIV
+        2
+    elseif op == INSTR_MULADD
+        3
+    elseif op == INSTR_MULSUB
+        3
+    elseif op == INSTR_SUBMUL
+        3
+    elseif op == INSTR_SQR
+        1
+    elseif op == INSTR_POW
+        2
+    elseif op == INSTR_SIN
+        1
+    elseif op == INSTR_COS
+        1
+    else
+        error(op)
+        :UNKNOWN
+    end
+end
 @inline neg_fast(x) = Base.FastMath.sub_fast(x)
 @inline add_fast(x, y) = Base.FastMath.add_fast(x, y)
 @inline sub_fast(x, y) = Base.FastMath.sub_fast(x, y)

@@ -10,11 +10,11 @@ struct InterpreterArg
 end
 function Base.show(io::IO, arg::InterpreterArg)
     if arg.data == DATA_TAPE
-        print(io, "tape_", arg.ind)
+        print(io, "tape[", arg.ind, "]")
     elseif arg.data == DATA_PARAMETERS
-        print(io, "p_", arg.ind)
+        print(io, "parameters[", arg.ind, "]")
     elseif arg.data == DATA_CONSTANTS
-        print(io, "c_", arg.ind)
+        print(io, "constants[", arg.ind, "]")
     end
 end
 
@@ -25,13 +25,13 @@ struct InterpreterInstruction
 end
 
 function Base.show(io::IO, instr::InterpreterInstruction)
-    print(
-        io,
-        :(
-            tape[$(instr.tape_index)] =
-                $(Expr(:call, Symbol(instr.op), Symbol.(sprint.(show, instr.args))...))
-        ),
-    )
+    print(io, "tape[$(instr.tape_index)] = ", string(Symbol(instr.op))[7:end], "(")
+    if instr.op == INSTR_POW
+        print(io, instr.args[1], ",", instr.args[2].ind)
+    else
+        join(io, instr.args[1:arity(instr.op)], ",")
+    end
+    print(io, ")")
 end
 
 struct Interpreter{T}
@@ -46,6 +46,25 @@ end
 function Base.show(io::IO, I::Interpreter{T}) where {T}
     print(io, "Interpreter{$T} for $(length(I.instructions)) instructions")
 end
+
+"""
+    show_instructions([io::IO], I::Interpreter)
+
+Show the instruction executed by the interpreter `I`.
+"""
+show_instructions(I::Interpreter) = show_instructions(stdout, I)
+function show_instructions(io::IO, I::Interpreter)
+    for i in 1:length(I.variables)
+        println(io, "tape[", i, "] = x[", i, "]")
+    end
+    for instr in I.instructions
+        println(io, instr)
+    end
+    for (i, a) in enumerate(I.assignments)
+        println(io, "out[", i, "] = ", a)
+    end
+end
+
 mutable struct InterpreterCache{A<:AbstractArray,T}
     tape::A
     t₁::T
