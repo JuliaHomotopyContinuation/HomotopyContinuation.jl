@@ -264,8 +264,6 @@ Base.@kwdef mutable struct CertificationCache{T₁,T₂}
     eval_interpreter::ModelKit.Interpreter{T₁}
     jac_interpreter::ModelKit.Interpreter{T₂}
     newton_cache::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}}
-    # norm
-    norm::WeightedNorm{InfNorm}
     # data for krawczyc_step
     C::Matrix{ComplexF64}
     r₀::Vector{IComplexF64}
@@ -302,7 +300,6 @@ function CertificationCache(F::AbstractSystem)
         eval_interpreter = interpreter,
         jac_interpreter = jac_interpreter,
         newton_cache = NewtonCache(F; optimize_data_structure = false),
-        norm = WeightedNorm(InfNorm(), m),
         C = zeros(ComplexF64, m, m),
         r₀ = zeros(IComplexF64, m),
         Δx₀ = zeros(IComplexF64, m),
@@ -513,29 +510,18 @@ function certify_solution(
     @unpack C, arb_C, arb_x̃₀ = cert_cache
 
     # refine solution to machine precicision
-    init!(cert_cache.norm, solution_candidate)
     res = newton(
         F,
         solution_candidate,
         complexF64_params(cert_params),
-        cert_cache.norm,
+        InfNorm(),
         cert_cache.newton_cache;
-        # we have a weighted norm, so atol is fine
-        atol = 8 * eps(),
+        rtol = 8 * eps(),
+        atol = 0.0,
         # this should already be an approximate zero
-        contraction_factor = 0.5,
         extended_precision = true,
         max_iters = 8,
     )
-
-    # Abort if we cannot refine to this accuracy
-    if !is_success(res)
-        return SolutionCertificate(
-            solution_candidate = solution_candidate,
-            certified = false,
-            index = index,
-        )
-    end
 
     x̃₀ = solution(res)
     LA.inv!(C, cert_cache.newton_cache.J)
@@ -675,7 +661,6 @@ function arb_ε_inflation_krawczyk(
         arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag
     @unpack arb_interpreter_cache = cert_cache
 
-    # @show prec
     m = arb_mag
     x̃₀′ = x̄₁ = Δx₀
     # Perform a simple newton refinement using arb_C until we cannot improve the
