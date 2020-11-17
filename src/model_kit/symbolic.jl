@@ -726,6 +726,8 @@ c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 """
 function horner(f::Expression, vars = variables(f))
     M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
+    # Bail out if we have rational expression
+    all(d -> d ≥ 0, M) || return f
     multivariate_horner(M, coeffs, vars)
 end
 

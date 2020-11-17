@@ -96,7 +96,7 @@
         @test differentiate(f, [x, y]) == [2x, 2y]
 
         @test differentiate([f, g], x) == [2x, 3 * x^2]
-        @test differentiate([f, g], [x, y]) == [2x 2y; 3 * x^2 3 * y^2]
+        @test differentiate([f, g], [x, y]) == [2x 2y; 3*x^2 3*y^2]
     end
 
     @testset "Expand" begin
@@ -301,5 +301,22 @@
         @test H == H2
         @test sprint(show, T) == "Compiled: $show_H"
         @test size(T) == size(H) == (2, 3)
+    end
+
+    @testset "Optimizations for rational system" begin
+        @var y[1:6] q[1:8]
+        y₁, y₂, y₃, y₄, y₅, y₆ = y
+        q₁, q₂, q₃, q₄, q₅, q₆, q₇, q₈ = q
+
+        f =
+            q₁ / y₁ - q₂ / (-y₁ + y₂) +
+            q₅ * y₄ / (y₁ * y₄ - y₃ * y₂) +
+            q₈ * y₆ / (y₁ * y₆ - y₂ * y₅)
+        F = ModelKit.System([f], y, q)
+        I = ModelKit.interpreter(ModelKit.optimize(F))
+        u = Expression[0]
+        ModelKit.execute!(u, I, y, q, ModelKit.InterpreterCache(Expression, I))
+
+        @test expand(u[1] - f) == 0
     end
 end
