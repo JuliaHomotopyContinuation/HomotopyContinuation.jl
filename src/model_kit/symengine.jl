@@ -219,7 +219,7 @@ macro init_constant(op, libnm)
         finalizer(free!, $op_name)
         $(
             op != :im ? :(SYMENGINE_CONSTANTS[$op_name] = Base.MathConstants.$op) :
-                :(nothing)
+            :(nothing)
         )
     end
     c
