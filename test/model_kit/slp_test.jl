@@ -141,4 +141,33 @@
         evaluate_and_jacobian!(u, U, InterpretedSystem(F), w)
         @test sum(abs, U) > 0
     end
+
+    @testset "Evaluation of Arb" begin
+        @var x y
+        # define the polynomials
+        f₁ = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        f₂ = x^2 + 2x * y^2 - 2 * y^2 - 1 / 2
+        F = System([f₁, f₂])
+        for I in [
+            Arblib.AcbMatrix(randn(ComplexF64, 2, 1)),
+            Arblib.AcbRefVector(randn(ComplexF64, 2)),
+        ]
+            @test all(!iszero, F(I))
+            @test F(real.(I)) isa Arblib.ArbVector
+            @test all(!iszero, System(F)(real.(I)))
+
+            u = Arblib.AcbVector(2)
+            evaluate!(u, InterpretedSystem(System(F)), I)
+            @test all(!iszero, u)
+            v = Arblib.ArbVector(2)
+            evaluate!(v, InterpretedSystem(System(F)), real.(I))
+            @test all(!iszero, v)
+            U = Arblib.AcbMatrix(2, 2)
+            jacobian!(U, InterpretedSystem(System(F)), I)
+            @test all(!iszero, U)
+            V = Arblib.ArbMatrix(2, 2)
+            jacobian!(V, InterpretedSystem(System(F)), real.(I))
+            @test all(!iszero, V)
+        end
+    end
 end

@@ -80,12 +80,18 @@ InterpreterCache(T::Type, n::Int) = InterpreterCache(zeros(T, n))
 InterpreterCache(A::AbstractArray) = InterpreterCache(A, nothing, nothing)
 InterpreterCache(A::AcbRefVector) =
     InterpreterCache(A, Acb(prec = precision(A)), Acb(prec = precision(A)))
+InterpreterCache(A::ArbRefVector) =
+    InterpreterCache(A, Arb(prec = precision(A)), Arb(prec = precision(A)))
 
 InterpreterCache(::Type{Acb}, I::Interpreter; prec::Int) =
     InterpreterCache(Acb, cache_min_length(I), prec = prec)
 InterpreterCache(::Type{Acb}, n::Int; prec::Int) =
     InterpreterCache(AcbRefVector(n, prec = prec))
-function set_arb_precision!(A::InterpreterCache{AcbRefVector,Acb}, prec::Int)
+InterpreterCache(::Type{Arb}, I::Interpreter; prec::Int) =
+    InterpreterCache(Arb, cache_min_length(I), prec = prec)
+InterpreterCache(::Type{Arb}, n::Int; prec::Int) =
+    InterpreterCache(ArbRefVector(n, prec = prec))
+function set_arb_precision!(A::InterpreterCache, prec::Int)
     A.tape = setprecision(A.tape, prec)
     A.t₁ = setprecision(A.t₁, prec)
     A.t₂ = setprecision(A.t₂, prec)
