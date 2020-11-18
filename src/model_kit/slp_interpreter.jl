@@ -10,11 +10,11 @@ struct InterpreterArg
 end
 function Base.show(io::IO, arg::InterpreterArg)
     if arg.data == DATA_TAPE
-        print(io, "tape[", arg.ind, "]")
+        print(io, "t[", arg.ind, "]")
     elseif arg.data == DATA_PARAMETERS
-        print(io, "parameters[", arg.ind, "]")
+        print(io, "p[", arg.ind, "]")
     elseif arg.data == DATA_CONSTANTS
-        print(io, "constants[", arg.ind, "]")
+        print(io, "c[", arg.ind, "]")
     end
 end
 
@@ -25,7 +25,7 @@ struct InterpreterInstruction
 end
 
 function Base.show(io::IO, instr::InterpreterInstruction)
-    print(io, "tape[$(instr.tape_index)] = ", string(Symbol(instr.op))[7:end], "(")
+    print(io, "t[$(instr.tape_index)] = ", string(Symbol(instr.op))[7:end], "(")
     if instr.op == INSTR_POW
         print(io, instr.args[1], ",", instr.args[2].ind)
     else
@@ -54,8 +54,11 @@ Show the instruction executed by the interpreter `I`.
 """
 show_instructions(I::Interpreter) = show_instructions(stdout, I)
 function show_instructions(io::IO, I::Interpreter)
+    print(io, "c = [")
+    join(io, I.constants, ",")
+    println("]")
     for i = 1:length(I.variables)
-        println(io, "tape[", i, "] = x[", i, "]")
+        println(io, "t[", i, "] = x[", i, "]")
     end
     for instr in I.instructions
         println(io, instr)
@@ -77,12 +80,18 @@ InterpreterCache(T::Type, n::Int) = InterpreterCache(zeros(T, n))
 InterpreterCache(A::AbstractArray) = InterpreterCache(A, nothing, nothing)
 InterpreterCache(A::AcbRefVector) =
     InterpreterCache(A, Acb(prec = precision(A)), Acb(prec = precision(A)))
+InterpreterCache(A::ArbRefVector) =
+    InterpreterCache(A, Arb(prec = precision(A)), Arb(prec = precision(A)))
 
 InterpreterCache(::Type{Acb}, I::Interpreter; prec::Int) =
     InterpreterCache(Acb, cache_min_length(I), prec = prec)
 InterpreterCache(::Type{Acb}, n::Int; prec::Int) =
     InterpreterCache(AcbRefVector(n, prec = prec))
-function set_arb_precision!(A::InterpreterCache{AcbRefVector,Acb}, prec::Int)
+InterpreterCache(::Type{Arb}, I::Interpreter; prec::Int) =
+    InterpreterCache(Arb, cache_min_length(I), prec = prec)
+InterpreterCache(::Type{Arb}, n::Int; prec::Int) =
+    InterpreterCache(ArbRefVector(n, prec = prec))
+function set_arb_precision!(A::InterpreterCache, prec::Int)
     A.tape = setprecision(A.tape, prec)
     A.t₁ = setprecision(A.t₁, prec)
     A.t₂ = setprecision(A.t₂, prec)

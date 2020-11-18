@@ -12,18 +12,22 @@ but rather interpreted. See also [`CompiledSystem`](@ref).
 Construct an `InterpretedSystem` from the given [`System`](@ref) `F`.
 If `optimizations = true` then [`optimize`](@ref) is called on `F` before compiling.
 """
-struct InterpretedSystem{T₁,T₂} <: AbstractSystem
+mutable struct InterpretedSystem{T₁,T₂} <: AbstractSystem
     system::System
     eval_interpreter::Interpreter{T₁}
-    eval_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
-    eval_interpreter_cache_ext::InterpreterCache{Vector{ComplexDF64}}
+    eval_interpreter_cache::InterpreterCache{Vector{ComplexF64},Nothing}
+    eval_interpreter_cache_ext::InterpreterCache{Vector{ComplexDF64},Nothing}
     jac_interpreter::Interpreter{T₂}
-    jac_interpreter_cache::InterpreterCache{Vector{ComplexF64}}
+    jac_interpreter_cache::InterpreterCache{Vector{ComplexF64},Nothing}
     taylor_caches::Tuple{
-        InterpreterCache{TaylorVector{2,ComplexF64}},
-        InterpreterCache{TaylorVector{3,ComplexF64}},
-        InterpreterCache{TaylorVector{4,ComplexF64}},
+        InterpreterCache{TaylorVector{2,ComplexF64},Nothing},
+        InterpreterCache{TaylorVector{3,ComplexF64},Nothing},
+        InterpreterCache{TaylorVector{4,ComplexF64},Nothing},
     }
+    arb_eval_interpreter_cache::Union{Nothing,InterpreterCache{ArbRefVector,Arb}}
+    arb_jac_interpreter_cache::Union{Nothing,InterpreterCache{ArbRefVector,Arb}}
+    acb_eval_interpreter_cache::Union{Nothing,InterpreterCache{AcbRefVector,Acb}}
+    acb_jac_interpreter_cache::Union{Nothing,InterpreterCache{AcbRefVector,Acb}}
 end
 
 function InterpretedSystem(F::System; optimizations::Bool = true)
@@ -45,6 +49,10 @@ function InterpretedSystem(F::System; optimizations::Bool = true)
         jac_interpreter,
         InterpreterCache(ComplexF64, jac_interpreter),
         taylor_caches,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
     )
 end
 
@@ -70,9 +78,9 @@ function evaluate_and_jacobian!(u, U, F::InterpretedSystem, x, p = nothing)
     execute!(u, U, F.jac_interpreter, x, p, F.jac_interpreter_cache)
     nothing
 end
-function jacobian!(U, F::InterpretedSystem, x, p = nothing, cache = F.jac_interpreter_cache)
-    execute!(nothing, U, F.jac_interpreter, x, p, cache)
-    nothing
+function jacobian!(U, F::InterpretedSystem, x, p = nothing)
+    evaluate_and_jacobian!(nothing, U, F, x, p)
+    U
 end
 
 for M = 1:3
@@ -87,6 +95,106 @@ for M = 1:3
         u
     end
 end
+
+# Arb
+function evaluate!(
+    u,
+    F::InterpretedSystem,
+    x::AbstractArray{<:Union{Arb,ArbRef}},
+    p = nothing,
+)
+    if isnothing(F.arb_eval_interpreter_cache)
+        F.arb_eval_interpreter_cache = InterpreterCache(Arb, F.eval_interpreter; prec = 128)
+    end
+    if u isa AbstractArray{<:Union{Arb,ArbRef}}
+        set_arb_precision!(
+            F.arb_eval_interpreter_cache,
+            max(precision(first(u)), precision(first(x))),
+        )
+    else
+        set_arb_precision!(F.arb_eval_interpreter_cache, precision(first(x)))
+    end
+    execute!(u, F.eval_interpreter, x, p, F.arb_eval_interpreter_cache)
+end
+function evaluate!(
+    u,
+    F::InterpretedSystem,
+    x::AbstractArray{<:Union{Acb,AcbRef}},
+    p = nothing,
+)
+    if isnothing(F.acb_eval_interpreter_cache)
+        F.acb_eval_interpreter_cache = InterpreterCache(Acb, F.eval_interpreter; prec = 128)
+    end
+    if u isa AbstractArray{<:Union{Acb,AcbRef}}
+        set_arb_precision!(
+            F.acb_eval_interpreter_cache,
+            max(precision(first(u)), precision(first(x))),
+        )
+    else
+        set_arb_precision!(F.acb_eval_interpreter_cache, precision(first(x)))
+    end
+    execute!(u, F.eval_interpreter, x, p, F.acb_eval_interpreter_cache)
+end
+
+function evaluate_and_jacobian!(
+    u,
+    U,
+    F::InterpretedSystem,
+    x::AbstractArray{<:Union{Arb,ArbRef}},
+    p = nothing,
+)
+    if isnothing(F.arb_eval_interpreter_cache)
+        F.arb_jac_interpreter_cache = InterpreterCache(Arb, F.jac_interpreter; prec = 128)
+    end
+    if U isa AbstractArray{<:Union{Arb,ArbRef}}
+        set_arb_precision!(
+            F.arb_jac_interpreter_cache,
+            max(precision(first(U)), precision(first(x))),
+        )
+    else
+        set_arb_precision!(F.arb_jac_interpreter_cache, precision(first(x)))
+    end
+    execute!(u, U, F.jac_interpreter, x, p, F.arb_jac_interpreter_cache)
+end
+
+function evaluate_and_jacobian!(
+    u,
+    U,
+    F::InterpretedSystem,
+    x::AbstractArray{<:Union{Acb,AcbRef}},
+    p = nothing,
+)
+    if isnothing(F.acb_eval_interpreter_cache)
+        F.acb_jac_interpreter_cache = InterpreterCache(Acb, F.jac_interpreter; prec = 128)
+    end
+    if U isa AbstractArray{<:Union{Acb,AcbRef}}
+        set_arb_precision!(
+            F.acb_jac_interpreter_cache,
+            max(precision(first(U)), precision(first(x))),
+        )
+    else
+        set_arb_precision!(F.acb_jac_interpreter_cache, precision(first(x)))
+    end
+    execute!(u, U, F.jac_interpreter, x, p, F.acb_jac_interpreter_cache)
+end
+
+function (F::InterpretedSystem)(x::AbstractArray{<:Union{Arb,ArbRef}}, p = nothing)
+    u = ArbVector(first(size(F)); prec = precision(first(x)))
+    evaluate!(u, F, x, p)
+    u
+end
+function (F::InterpretedSystem)(x::AbstractArray{<:Union{Acb,AcbRef}}, p = nothing)
+    u = AcbVector(first(size(F)); prec = precision(first(x)))
+    evaluate!(u, F, x, p)
+    u
+end
+(F::System)(x::AbstractVector{<:Union{Arb,ArbRef,Acb,AcbRef}}, p::Nothing = nothing) =
+    InterpretedSystem(F)(x, p)
+(F::System)(x::AbstractVector{<:Union{Arb,ArbRef,Acb,AcbRef}}, p::AbstractArray) =
+    InterpretedSystem(F)(x, p)
+(F::System)(x::AbstractMatrix{<:Union{Arb,ArbRef,Acb,AcbRef}}, p = nothing) =
+    InterpretedSystem(F)(x, p)
+
 
 """
     InterpretedHomotopy <: AbstractHomotopy
@@ -158,13 +266,7 @@ function evaluate!(
 )
     execute!(u, H.eval_interpreter, x, t, p, cache)
 end
-function evaluate!(
-    u,
-    H::InterpretedHomotopy,
-    x::AbstractVector{ComplexDF64},
-    t,
-    p = nothing,
-)
+function evaluate!(u, H::InterpretedHomotopy, x::AbstractArray{ComplexDF64}, t, p = nothing)
     execute!(u, H.eval_interpreter, x, t, p, H.eval_interpreter_cache_ext)
 end
 function evaluate_and_jacobian!(
