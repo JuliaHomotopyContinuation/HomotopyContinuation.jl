@@ -687,7 +687,7 @@ function monodromy_solve(
         else
             desc = "Solutions found:"
         end
-        progress = ProgressMeter.ProgressUnknown(; dt = 0.2, desc = desc, output = stdout)
+        progress = ProgressMeter.ProgressUnknown(; dt = 0.4, desc = desc, output = stdout)
         progress.tlast += 0.3
     end
     MS.statistics = MonodromyStatistics()
@@ -913,6 +913,9 @@ function threaded_monodromy_solve!(
         workers = map(enumerate(MS.trackers)) do (tid, tracker)
             @tspawnat tid begin
                 for job in queue
+                    if interrupted[]
+                        break
+                    end
                     workers_idle[64*(tid-1)+1] = false
                     res = track(
                         tracker,
@@ -998,12 +1001,14 @@ function threaded_monodromy_solve!(
                         lock(notify_lock)
                         notify(cond_queue_emptied)
                         unlock(notify_lock)
+                        interrupted[] = true
                     elseif !isnothing(MS.options.timeout) &&
                            time() - t₀ > (MS.options.timeout::Float64)
                         retcode = :timeout
                         lock(notify_lock)
                         notify(cond_queue_emptied)
                         unlock(notify_lock)
+                        interrupted[] = true
                     end
                 end
             end
