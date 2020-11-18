@@ -333,6 +333,12 @@ function Base.cos(b::Basic)
     return a
 end
 Base.sincos(x::Basic) = (sin(x), cos(x))
+
+function Base.log(b::ModelKit.Basic)
+    a = Expression()
+    ccall((:basic_log, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
 ##############################
 ## conversion to Expression ##
 ##############################
