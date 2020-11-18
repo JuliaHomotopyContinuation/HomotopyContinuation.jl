@@ -444,6 +444,10 @@ function _certify(
     m, n = size(F)
     m == n || throw(ArgumentError("We can only certify solutions to square systems."))
 
+    if isnothing(p) && nparameters(System(F)) > 0
+        throw(ArgumentError("The given system expects parameters but none are given."))
+    end
+
     if !show_progress
         for (i, s) in enumerate(solution_candidates)
             push!(certificates, certify_solution(F, s, p, cache, i))
@@ -1012,8 +1016,8 @@ function certify(
     max_precision::Int = 256,
     kwargs...,
 )
-    cert_params =
-        certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
+    params = isnothing(p) ? target_parameters : p
+    cert_params = certification_parameters(params; prec = max_precision)
     _certify(
         F,
         solutions(X; only_nonsingular = true),
