@@ -142,4 +142,47 @@
         @test count(s -> is_positive(s, 1), certificates(cert)) == 1
         @test count(is_real, certificates(cert)) == 2
     end
+
+    @testset "3264" begin
+        F = steiner()
+        real_conics = [
+            10124547 // 662488724,
+            8554609 // 755781377,
+            5860508 // 2798943247,
+            -251402893 // 1016797750,
+            -25443962 // 277938473,
+            1 // 1,
+            520811 // 1788018449,
+            2183697 // 542440933,
+            9030222 // 652429049,
+            -12680955 // 370629407,
+            -24872323 // 105706890,
+            1 // 1,
+            6537193 // 241535591,
+            -7424602 // 363844915,
+            6264373 // 1630169777,
+            13097677 // 39806827,
+            -29825861 // 240478169,
+            1 // 1,
+            13173269 // 2284890206,
+            4510030 // 483147459,
+            2224435 // 588965799,
+            33318719 // 219393000,
+            92891037 // 755709662,
+            1 // 1,
+            8275097 // 452566634,
+            -19174153 // 408565940,
+            5184916 // 172253855,
+            -23713234 // 87670601,
+            28246737 // 81404569,
+            1 // 1,
+        ]
+        real_sols = read_solutions(joinpath(@__DIR__, "data/3264_real_sols.txt"))
+        cert = certify(F, real_sols, real_conics; compile = true)
+        @test ndistinct_real_certified(cert) == 3264
+        cert = certify(F, real_sols, real_conics; compile = false)
+        @test ndistinct_real_certified(cert) == 3264
+        @test_throws ArgumentError certify(F, real_sols; compile = false)
+        @test_throws ArgumentError certify(F, real_sols; compile = true)
+    end
 end

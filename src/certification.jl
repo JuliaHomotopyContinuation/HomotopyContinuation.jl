@@ -9,6 +9,7 @@ export certify,
     is_positive,
     solution_candidate,
     certified_solution_interval,
+    certified_solution_interval_after_krawczyk,
     certificate_index,
     solution_approximation,
     certificates,
@@ -16,6 +17,7 @@ export certify,
     nreal_certified,
     ndistinct_certified,
     ndistinct_real_certified,
+    show_straight_line_program,
     save,
     # deprecated
     initial_solution,
@@ -36,9 +38,12 @@ Base.@kwdef struct SolutionCertificate
     real::Bool = false
     index::Union{Nothing,Int} = nothing
     prec::Int = 53
-    # x₀, x₁ ∈ 𝕀ℂⁿ and a certified solution has x₁ ⊊ x₀
-    x₀::Union{Nothing,AcbMatrix} = nothing
-    x₁::Union{Nothing,AcbMatrix} = nothing
+    # I, I′ ∈ 𝕀ℂⁿ and a certified solution has I′ ⊊ I
+    I::Union{Nothing,AcbMatrix} = nothing
+    I′::Union{Nothing,AcbMatrix} = nothing
+    x̃::Union{Nothing,AcbMatrix} = nothing
+    Y::Union{Nothing,AcbMatrix} = nothing
+
     # We also store a double precision representation of the midpoint of x₁
     # as the best available double precision estimate of the solution
     solution::Union{Nothing,Vector{ComplexF64}} = nothing
@@ -79,7 +84,7 @@ function is_positive(C::SolutionCertificate)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        all(i -> Arblib.is_positive(real(Arblib.ref(C.x₁, i, 1))), 1:length(C.x₁))
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.I′, i, 1))), 1:length(C.I′))
     end
 end
 
@@ -94,7 +99,7 @@ function is_positive(C::SolutionCertificate, i::Integer)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        Arblib.is_positive(real(Arblib.ref(C.x₁, i, 1)))
+        Arblib.is_positive(real(Arblib.ref(C.I′, i, 1)))
     end
 end
 
@@ -102,12 +107,23 @@ end
 """
     certified_solution_interval(certificate::SolutionCertificate)
 
-Returns an `Arblib.ArbMatrix` representing a vector of complex intervals where a unique
+Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval(certificate::SolutionCertificate) = certificate.x₀
+certified_solution_interval(certificate::SolutionCertificate) = certificate.I
 @deprecate certified_solution(certificate) certified_solution_interval(certificate)
+
+"""
+    certified_solution_interval_after_krawczyk(certificate::SolutionCertificate)
+
+Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
+zero of the system is contained in.
+This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`.
+Returns `nothing` if `is_certified(certificate)` is `false`.
+"""
+certified_solution_interval_after_krawczyk(certificate::SolutionCertificate) =
+    certificate.I′
 
 """
     certificate_index(certificate::SolutionCertificate)
@@ -133,6 +149,12 @@ Returns `nothing` if `is_certified(certificate)` is `false`.
 """
 solution_approximation(certificate::SolutionCertificate) = certificate.solution
 
+"""
+    krawczyk_operator_parameters(cert::SolutionCertificate)
+
+Returns a `NamedTuple` `(x, Y)` with the parameters of the Krawczyk operator following [BRT20].
+"""
+krawczyk_operator_parameters(cert::SolutionCertificate) = (x = cert.x̃, Y = cert.Y)
 
 function Base.show(f::IO, cert::SolutionCertificate)
     println(f, "SolutionCertificate:")
@@ -172,6 +194,8 @@ which correspond to the same true solution.
 struct CertificationResult
     certificates::Vector{SolutionCertificate}
     duplicates::Vector{Vector{Int}}
+    slp::ModelKit.Interpreter
+    slp_jacobian::ModelKit.Interpreter
 end
 
 """
@@ -226,6 +250,16 @@ function ndistinct_real_certified(R::CertificationResult)
     end
 end
 
+"""
+    show_straight_line_program(R::CertificationResult)
+    show_straight_line_program(io::IO, R::CertificationResult)
+
+Print a representation of the used straight line program.
+"""
+show_straight_line_program(R::CertificationResult) = show_straight_line_program(stdout, R)
+show_straight_line_program(io::IO, R::CertificationResult) =
+    ModelKit.show_instructions(io, R.slp)
+
 function Base.show(io::IO, R::CertificationResult)
     println(io, "CertificationResult")
     println(io, "===================")
@@ -279,6 +313,8 @@ Base.@kwdef mutable struct CertificationCache{T₁,T₂}
     arb_r₀::AcbRefMatrix # m × 1
     arb_Δx₀::AcbRefMatrix # m × 1
     arb_x̃₀::AcbRefMatrix # m × 1
+    arb_x₀::AcbRefMatrix # m × 1
+    arb_x₁::AcbRefMatrix # m × 1
     arb_J_x₀::AcbRefMatrix
     arb_M::AcbRefMatrix
     arb_δx::AcbRefMatrix # m × 1
@@ -313,6 +349,8 @@ function CertificationCache(F::AbstractSystem)
         arb_r₀ = AcbRefMatrix(m, 1; prec = arb_prec),
         arb_Δx₀ = AcbRefMatrix(m, 1; prec = arb_prec),
         arb_x̃₀ = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_x₀ = AcbRefMatrix(m, 1; prec = arb_prec),
+        arb_x₁ = AcbRefMatrix(m, 1; prec = arb_prec),
         arb_J_x₀ = AcbRefMatrix(m, m; prec = arb_prec),
         arb_M = AcbRefMatrix(m, m; prec = arb_prec),
         arb_δx = AcbRefMatrix(m, 1; prec = arb_prec),
@@ -332,6 +370,8 @@ function set_arb_precision!(cache::CertificationCache, p::Int)
     cache.arb_r₀ = setprecision(cache.arb_r₀, p)
     cache.arb_Δx₀ = setprecision(cache.arb_Δx₀, p)
     cache.arb_x̃₀ = setprecision(cache.arb_x̃₀, p)
+    cache.arb_x₀ = setprecision(cache.arb_x₀, p)
+    cache.arb_x₁ = setprecision(cache.arb_x₁, p)
     cache.arb_J_x₀ = setprecision(cache.arb_J_x₀, p)
     cache.arb_M = setprecision(cache.arb_M, p)
     cache.arb_δx = setprecision(cache.arb_δx, p)
@@ -393,9 +433,8 @@ CertificationResult
 
 and see that there are indeed 18 solutions and that they are all distinct.
 
-
 [^Moo77]: Moore, Ramon E. "A test for existence of solutions to nonlinear systems." SIAM Journal on Numerical Analysis 14.4 (1977): 611-615.
-[^BRT20]: Breiding, P., Rose, K. and Timme, S. "Certifying roots of polynomial systems using interval arithmetic." In preparation (2020).
+[^BRT20]: Breiding, P., Rose, K. and Timme, S. "Certifying zeros of polynomial systems using interval arithmetic." arXiv:2011.05000.
 """
 function certify end
 
@@ -483,7 +522,13 @@ function _certify(
     else
         duplicates = Vector{Vector{Int}}()
     end
-    CertificationResult(certificates, duplicates)
+
+    CertificationResult(
+        certificates,
+        duplicates,
+        cache.eval_interpreter,
+        cache.jac_interpreter,
+    )
 end
 
 function update_certify_progress!(progress, k, ncertified, nreal_certified)
@@ -512,6 +557,7 @@ function certify_solution(
     refine_solution::Bool = true,
 )
     @unpack C, arb_C, arb_x̃₀ = cert_cache
+    n = size(C, 1)
 
     # refine solution to machine precicision
     res = newton(
@@ -539,8 +585,10 @@ function certify_solution(
             real = is_real,
             index = index,
             prec = 53,
-            x₀ = AcbMatrix(x₀; prec = 53),
-            x₁ = AcbMatrix(x₁; prec = 53),
+            I = AcbMatrix(x₀; prec = 53),
+            I′ = AcbMatrix(x₁; prec = 53),
+            x̃ = AcbMatrix(x̃₀; prec = 53),
+            Y = AcbMatrix(C; prec = 53),
             solution = mid.(x₁),
         )
     end
@@ -550,7 +598,7 @@ function certify_solution(
     set_arb_precision!(cert_cache, prec)
 
     # We keep the same C matrix for now.
-    for j = 1:size(C, 2), i = 1:size(C, 1)
+    for j = 1:n, i = 1:n
         arb_C[i, j][] = C[i, j]
     end
     for (i, x̃₀_i) in enumerate(x̃₀)
@@ -561,15 +609,25 @@ function certify_solution(
             arb_ε_inflation_krawczyk(arb_x̃₀, cert_params, arb_C, cert_cache; prec = prec)
 
         if certified
+            I = AcbMatrix(n, 1; prec = prec)
+            I′ = AcbMatrix(n, 1; prec = prec)
+            x̃ = AcbMatrix(n, 1; prec = prec)
+            Y = AcbMatrix(n, n; prec = prec)
+            Arblib.set!(I, arb_x₀)
+            Arblib.set!(I′, arb_x₁)
+            Arblib.set!(x̃, arb_x̃₀)
+            Arblib.set!(Y, arb_C)
             return SolutionCertificate(
                 solution_candidate = solution_candidate,
                 certified = true,
                 real = is_real,
                 index = index,
                 prec = prec,
-                x₀ = arb_x₀,
-                x₁ = arb_x₁,
-                solution = [ComplexF64(arb_x₁[i]) for i = 1:size(C, 1)],
+                I = I,
+                I′ = I′,
+                x̃ = x̃,
+                Y = Y,
+                solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
             )
         end
 
@@ -660,9 +718,10 @@ function arb_ε_inflation_krawczyk(
     cert_cache;
     prec::Int,
 )
-    @unpack arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag = cert_cache
-    r₀, Δx₀, x̃₀, J_x₀, M, δx, m =
-        arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag
+    @unpack arb_r₀, arb_Δx₀, arb_x̃₀, arb_J_x₀, arb_M, arb_δx, arb_mag, arb_x₀, arb_x₁ =
+        cert_cache
+    r₀, Δx₀, x̃₀, x₀, x₁, J_x₀, M, δx, m =
+        arb_r₀, arb_Δx₀, arb_x̃₀, arb_x₀, arb_x₁, arb_J_x₀, arb_M, arb_δx, arb_mag
     @unpack arb_interpreter_cache = cert_cache
 
     m = arb_mag
@@ -692,7 +751,6 @@ function arb_ε_inflation_krawczyk(
 
     # Perform ε-inflation
     n = length(x̃₀)
-    x₀ = AcbRefMatrix(n, 1; prec = prec)
     Arblib.get_mid!(x₀, x̃₀)
     # We increase the radius by 2^(prec/4) to avoid hitting the precision limit.
     # We choose a dynamic increase to account for bad situations where any fixed choice
@@ -721,8 +779,6 @@ function arb_ε_inflation_krawczyk(
     for i = 1:n
         Arblib.sub!(M[i, i], M[i, i], 1)
     end
-
-    x₁ = similar(x₀)
 
     # Necessary condition is ||M|| < 1 / √2
     # We lower bound 1 / √2 by 0.7071
@@ -800,7 +856,7 @@ function find_duplicates(certificates::AbstractVector{SolutionCertificate})
 
             d = zero(Interval{Float64})
             for i = 1:n
-                yᵢ = IComplexF64(cert.x₁[i], a, b)
+                yᵢ = IComplexF64(cert.I′[i], a, b)
                 d +=
                     IntervalArithmetic.sqr(real(yᵢ) - real(pt[i])) +
                     IntervalArithmetic.sqr(imag(yᵢ) - imag(pt[i]))
@@ -870,7 +926,7 @@ function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, c
     #If i and j are already in a duplicate cluster then there is no need to
     # check again overlapping by transitivity of our clustering
     i_is_dupl && j_is_dupl && return true
-    if Bool(Arblib.overlaps(certificates[i].x₁, certificates[j].x₁))
+    if Bool(Arblib.overlaps(certificates[i].I′, certificates[j].I′))
         if i_is_dupl
             duplicate_grouping[j] = duplicate_grouping[i]
             push!(duplicates_dict[duplicate_grouping[i]], j)
