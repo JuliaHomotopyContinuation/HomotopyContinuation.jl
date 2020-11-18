@@ -18,8 +18,10 @@ CertificationResult
 certificates
 ncertified
 nreal_certified
+ncomplex_certified
 ndistinct_certified
 ndistinct_real_certified
+ndistinct_complex_certified
 save(filename, R::CertificationResult)
 show_straight_line_program
 ```
@@ -30,6 +32,7 @@ A [`CertificationResult`](@ref) contains in particular all [`SolutionCertificate
 SolutionCertificate
 is_certified
 is_real(::SolutionCertificate)
+is_complex(::SolutionCertificate)
 is_positive(::SolutionCertificate)
 solution_candidate
 certified_solution_interval

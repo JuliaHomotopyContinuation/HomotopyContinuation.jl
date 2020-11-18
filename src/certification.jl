@@ -6,6 +6,7 @@ export certify,
     CertificationCache,
     is_certified,
     is_real,
+    is_complex,
     is_positive,
     solution_candidate,
     certified_solution_interval,
@@ -15,8 +16,10 @@ export certify,
     certificates,
     ncertified,
     nreal_certified,
+    ncomplex_certified,
     ndistinct_certified,
     ndistinct_real_certified,
+    ndistinct_complex_certified,
     show_straight_line_program,
     save,
     # deprecated
@@ -36,6 +39,7 @@ Base.@kwdef struct SolutionCertificate
     solution_candidate::AbstractVector
     certified::Bool
     real::Bool = false
+    complex::Bool = false
     index::Union{Nothing,Int} = nothing
     prec::Int = 53
     # I, I′ ∈ 𝕀ℂⁿ and a certified solution has I′ ⊊ I
@@ -69,10 +73,19 @@ is_certified(C::SolutionCertificate) = C.certified
 """
     is_real(certificate::SolutionCertificate)
 
-Returns `true` if `certificate` certifies that the given solution candidate
-corresponds to a true real solution of the system.
+Returns `true` if `certificate` certifies that the certified solution interval
+contains a true real zero of the system.
+If `false` is returned then this does not necessarily mean that the true solution is not real.
 """
 is_real(C::SolutionCertificate) = C.real
+
+"""
+    is_complex(certificate::SolutionCertificate)
+
+Returns `true` if `certificate` certifies that the certified solution interval
+contains a true complex zero of the system.
+"""
+is_complex(C::SolutionCertificate) = C.complex
 
 """
     is_positive(certificate::SolutionCertificate)
@@ -221,6 +234,14 @@ nreal_certified(R::CertificationResult) =
     count(r -> is_certified(r) && is_real(r), R.certificates)
 
 """
+    ncomplex_certified(R::CertificationResult)
+
+Returns the number of certified complex solutions.
+"""
+ncomplex_certified(R::CertificationResult) =
+    count(r -> is_certified(r) && is_complex(r), R.certificates)
+
+"""
     ndistinct_certified(R::CertificationResult)
 
 Returns the number of distinct certified solutions.
@@ -251,6 +272,22 @@ function ndistinct_real_certified(R::CertificationResult)
 end
 
 """
+    ndistinct_complex_certified(R::CertificationResult)
+
+Returns the number of distinct certified complex solutions.
+"""
+function ndistinct_complex_certified(R::CertificationResult)
+    ncert = ncomplex_certified(R)
+    if isempty(R.duplicates)
+        return ncert
+    else
+        ncert - sum(R.duplicates) do dup
+            is_real(R.certificates[dup[1]]) ? length(dup) - 1 : 0
+        end
+    end
+end
+
+"""
     show_straight_line_program(R::CertificationResult)
     show_straight_line_program(io::IO, R::CertificationResult)
 
@@ -264,11 +301,26 @@ function Base.show(io::IO, R::CertificationResult)
     println(io, "CertificationResult")
     println(io, "===================")
     println(io, "• $(length(R.certificates)) solution candidates given")
-    print(io, "• $(ncertified(R)) certified solution intervals")
-    print(io, " ($(nreal_certified(R)) real)")
-    println(io)
-    print(io, "• $(ndistinct_certified(R)) distinct certified solution intervals")
-    print(io, " ($(ndistinct_real_certified(R)) real)")
+    ncert = ncertified(R)
+    print(io, "• $ncert certified solution intervals")
+    nreal = nreal_certified(R)
+    ncomplex = ncomplex_certified(R)
+    print(io, " ($nreal real, $ncomplex complex")
+    if nreal + ncomplex < ncert
+        println(io, ", $(ncert - (nreal + ncomplex)) undecided)")
+    else
+        println(io, ")")
+    end
+    ndist_cert = ndistinct_certified(R)
+    print(io, "• $ndist_cert distinct certified solution intervals")
+    ndist_real = ndistinct_real_certified(R)
+    ndist_complex = ndistinct_complex_certified(R)
+    print(io, " ($ndist_real real, $ndist_complex complex")
+    if ndist_real + ndist_complex < ndist_cert
+        print(io, ", $(ndist_cert - (ndist_real + ndist_complex)) undecided)")
+    else
+        print(io, ")")
+    end
 end
 
 """
@@ -427,8 +479,8 @@ certify(F, result)
 CertificationResult
 ===================
 • 18 solution candidates given
-• 18 certified solution intervals (4 real)
-• 18 distinct certified solution intervals (4 real)
+• 18 certified solution intervals (4 real, 14 complex)
+• 18 distinct certified solution intervals (4 real, 14 complex)
 ```
 
 and see that there are indeed 18 solutions and that they are all distinct.
@@ -583,6 +635,7 @@ function certify_solution(
             solution_candidate = solution_candidate,
             certified = true,
             real = is_real,
+            complex = all(xi -> !(0.0 in imag(xi)), x₁),
             index = index,
             prec = 53,
             I = AcbMatrix(x₀; prec = 53),
@@ -621,6 +674,7 @@ function certify_solution(
                 solution_candidate = solution_candidate,
                 certified = true,
                 real = is_real,
+                complex = all(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
                 index = index,
                 prec = prec,
                 I = I,

@@ -13,7 +13,9 @@
         @test ncertified(cert) == 18
         @test ndistinct_certified(cert) == 18
         @test nreal_certified(cert) == 4
+        @test ncomplex_certified(cert) == 14
         @test ndistinct_real_certified(cert) == 4
+        @test ndistinct_complex_certified(cert) == 14
         save("tmp_cert.txt", cert)
         @test !isempty(read("tmp_cert.txt", String))
 
