@@ -28,6 +28,7 @@ nresults(result::MonodromyResult)
 is_success(result::MonodromyResult)
 is_heuristic_stop(result::MonodromyResult)
 seed(result::MonodromyResult)
+permutations(r::MonodromyResult)
 ```
 
 ## Group actions
