@@ -282,7 +282,7 @@ function ndistinct_complex_certified(R::CertificationResult)
         return ncert
     else
         ncert - sum(R.duplicates) do dup
-            is_real(R.certificates[dup[1]]) ? length(dup) - 1 : 0
+            is_complex(R.certificates[dup[1]]) ? length(dup) - 1 : 0
         end
     end
 end
