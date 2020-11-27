@@ -15,6 +15,12 @@ MonodromyOptions
 find_start_pair
 ```
 
+It is also possible to verify (but not certify) that all solutions were found.
+Note that this computation can take substantially longer than the original `monodromy_solve` computation.
+```
+verify_solution_completeness
+```
+
 ## Monodromy Result
 
 A call to [`monodromy_solve`](@ref) returns a [`MonodromyResult`](@ref):

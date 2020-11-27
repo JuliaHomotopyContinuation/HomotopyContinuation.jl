@@ -229,7 +229,7 @@ function distinct_certificates(C::CertificationResult)
     cs = certificates(C)
     isempty(C.duplicates) && return cs
     indices = trues(length(cs))
-    for d in C.duplicates, k in 2:length(d)
+    for d in C.duplicates, k = 2:length(d)
         indices[d[k]] = false
     end
     cs[indices]
