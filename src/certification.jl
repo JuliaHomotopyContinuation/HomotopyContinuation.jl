@@ -14,6 +14,7 @@ export certify,
     certificate_index,
     solution_approximation,
     certificates,
+    distinct_certificates,
     ncertified,
     nreal_certified,
     ncomplex_certified,
@@ -217,6 +218,21 @@ end
 Obtain the stored [`SolutionCertificate`](@ref)s.
 """
 certificates(R::CertificationResult) = R.certificates
+
+
+"""
+    distinct_certificates(R::CertificationResult)
+
+Obtain the certificates corresponding to the determined distinct solution intervals.
+"""
+function distinct_certificates(C::CertificationResult)
+    cs = certificates(C)
+    indices = trues(length(cs))
+    for d in C.duplicates, k in 2:length(d)
+        indices[d[k]] = false
+    end
+    cs[indices]
+end
 
 """
     ncertified(R::CertificationResult)

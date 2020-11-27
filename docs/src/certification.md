@@ -16,6 +16,7 @@ The result of [`certify`](@ref) is a [`CertificationResult`](@ref):
 ```@docs
 CertificationResult
 certificates
+distinct_certificates
 ncertified
 nreal_certified
 ncomplex_certified
