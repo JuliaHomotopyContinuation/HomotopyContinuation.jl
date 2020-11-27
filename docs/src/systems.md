@@ -21,6 +21,11 @@ MixedSystem
 fixed(::System)
 ```
 
+It is also possible to set the default compile flag.
+```@docs
+set_default_compile
+```
+
 ## Interface
 
 An [`AbstractSystem`](@ref) needs to implement the following methods:

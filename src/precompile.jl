@@ -340,12 +340,7 @@ function _precompile_()
             },
             Array{Complex{Float64},1},
             UniquePoints{Complex{Float64},Int64,EuclideanNorm,Nothing},
-            MonodromyOptions{
-                EuclideanNorm,
-                typeof(HomotopyContinuation.always_false),
-                Nothing,
-                typeof(HomotopyContinuation.independent_normal),
-            },
+            MonodromyOptions{EuclideanNorm,Nothing},
         },
         Array{Array{Complex{Float64},1},1},
         Array{Complex{Float64},1},
@@ -1308,12 +1303,7 @@ function _precompile_()
         Array{HomotopyContinuation.MonodromyLoop{Array{Complex{Float64},1}},1},
         UniquePoints{Complex{Float64},Int64,EuclideanNorm,Nothing},
         ReentrantLock,
-        MonodromyOptions{
-            EuclideanNorm,
-            typeof(HomotopyContinuation.always_false),
-            Nothing,
-            typeof(HomotopyContinuation.independent_normal),
-        },
+        MonodromyOptions{EuclideanNorm,Nothing},
         HomotopyContinuation.MonodromyStatistics,
         Array{Complex{Float64},1},
         ReentrantLock,
@@ -1361,53 +1351,61 @@ function _precompile_()
         Type{InterpretedSystem},
         System,
         HomotopyContinuation.ModelKit.Interpreter{Float64},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{
-            Complex{HomotopyContinuation.DoubleDouble.DoubleF64},
-            1,
-        }},
-        HomotopyContinuation.ModelKit.Interpreter{Float64},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
-        Tuple{
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                2,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                3,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                4,
-                Complex{Float64},
-            }},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1},Nothing},
+        HomotopyContinuation.ModelKit.InterpreterCache{
+            Array{Complex{HomotopyContinuation.DoubleDouble.DoubleF64},1},
+            Nothing,
         },
+        HomotopyContinuation.ModelKit.Interpreter{Float64},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1},Nothing},
+        Tuple{
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{2,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{3,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{4,Complex{Float64}},
+                Nothing,
+            },
+        },
+        Nothing,
+        Nothing,
+        Nothing,
+        Nothing,
     })
     Base.precompile(Tuple{
         Type{InterpretedSystem},
         System,
         HomotopyContinuation.ModelKit.Interpreter{Int32},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{
-            Complex{HomotopyContinuation.DoubleDouble.DoubleF64},
-            1,
-        }},
-        HomotopyContinuation.ModelKit.Interpreter{Int32},
-        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1}},
-        Tuple{
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                2,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                3,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                4,
-                Complex{Float64},
-            }},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1},Nothing},
+        HomotopyContinuation.ModelKit.InterpreterCache{
+            Array{Complex{HomotopyContinuation.DoubleDouble.DoubleF64},1},
+            Nothing,
         },
+        HomotopyContinuation.ModelKit.Interpreter{Int32},
+        HomotopyContinuation.ModelKit.InterpreterCache{Array{Complex{Float64},1},Nothing},
+        Tuple{
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{2,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{3,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{4,Complex{Float64}},
+                Nothing,
+            },
+        },
+        Nothing,
+        Nothing,
+        Nothing,
+        Nothing,
     })
     Base.precompile(Tuple{
         Type{NewtonCache},
@@ -2722,18 +2720,18 @@ function _precompile_()
     Base.precompile(Tuple{
         typeof(Base.deepcopy_internal),
         Tuple{
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                2,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                3,
-                Complex{Float64},
-            }},
-            HomotopyContinuation.ModelKit.InterpreterCache{TaylorVector{
-                4,
-                Complex{Float64},
-            }},
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{2,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{3,Complex{Float64}},
+                Nothing,
+            },
+            HomotopyContinuation.ModelKit.InterpreterCache{
+                TaylorVector{4,Complex{Float64}},
+                Nothing,
+            },
         },
         IdDict{Any,Any},
     })
@@ -2921,57 +2919,9 @@ function _precompile_()
         Int64,
     })
     Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_add),
-        Val{2},
-        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
-        Float64,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_add),
-        Val{2},
-        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
-        Int32,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_add),
-        Val{3},
-        NTuple{4,Complex{Float64}},
-        Float64,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_add),
-        Val{3},
-        NTuple{4,Complex{Float64}},
-        Int32,
-    })
-    Base.precompile(Tuple{
         typeof(HomotopyContinuation.ModelKit.taylor_cos_impl),
         Int64,
         Int64,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_mul),
-        Val{2},
-        Float64,
-        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_mul),
-        Val{2},
-        Tuple{Complex{Float64},Complex{Float64},Complex{Float64}},
-        Float64,
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_mul),
-        Val{3},
-        Float64,
-        NTuple{4,Complex{Float64}},
-    })
-    Base.precompile(Tuple{
-        typeof(HomotopyContinuation.ModelKit.taylor_mul),
-        Val{3},
-        NTuple{4,Complex{Float64}},
-        Float64,
     })
     Base.precompile(Tuple{
         typeof(HomotopyContinuation.ModelKit.taylor_pow_impl),
@@ -3022,6 +2972,11 @@ function _precompile_()
         Int64,
         Int64,
     })
+    Base.precompile(Tuple{typeof(HomotopyContinuation.always_false),Array{PathResult,1}})
+    Base.precompile(Tuple{
+        typeof(HomotopyContinuation.independent_normal),
+        Array{Complex{Float64},1},
+    })
     Base.precompile(Tuple{
         typeof(HomotopyContinuation.qr_ldiv!),
         Array{Complex{Float64},1},
@@ -3038,12 +2993,7 @@ function _precompile_()
             },
             Array{Complex{Float64},1},
             UniquePoints{Complex{Float64},Int64,EuclideanNorm,Nothing},
-            MonodromyOptions{
-                EuclideanNorm,
-                typeof(HomotopyContinuation.always_false),
-                Nothing,
-                typeof(HomotopyContinuation.independent_normal),
-            },
+            MonodromyOptions{EuclideanNorm,Nothing},
         },
         Array{Complex{Float64},1},
         UInt32,
@@ -3708,26 +3658,26 @@ function _precompile_()
         typeof(vec),
         Array{HomotopyContinuation.ModelKit.InstructionRef,2},
     })
-    isdefined(HomotopyContinuation, Symbol("#221#222")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation, Symbol("#221#222")),
+    isdefined(HomotopyContinuation, Symbol("#224#225")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation, Symbol("#224#225")),
         Array{Complex{Float64},1},
     })
-    isdefined(HomotopyContinuation, Symbol("#281#283")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#281#283"))})
-    isdefined(HomotopyContinuation, Symbol("#309#312")) &&
-        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#309#312"))})
+    isdefined(HomotopyContinuation, Symbol("#282#284")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#282#284"))})
     isdefined(HomotopyContinuation, Symbol("#310#313")) &&
         Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#310#313"))})
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#132#135")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#132#135")),
+    isdefined(HomotopyContinuation, Symbol("#311#314")) &&
+        Base.precompile(Tuple{getfield(HomotopyContinuation, Symbol("#311#314"))})
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#134#137")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#134#137")),
         Int32,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#132#135")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#132#135")),
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#134#137")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#134#137")),
         Symbol,
     })
-    isdefined(HomotopyContinuation.ModelKit, Symbol("#143#144")) && Base.precompile(Tuple{
-        getfield(HomotopyContinuation.ModelKit, Symbol("#143#144")),
+    isdefined(HomotopyContinuation.ModelKit, Symbol("#145#146")) && Base.precompile(Tuple{
+        getfield(HomotopyContinuation.ModelKit, Symbol("#145#146")),
         HomotopyContinuation.ModelKit.InstructionOp,
         Tuple{Symbol},
     })
