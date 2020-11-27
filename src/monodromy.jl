@@ -1384,3 +1384,12 @@ end
 # #     end
 # #     nothing
 # # end
+## Parameter homotopy constructor
+solve(F, R::MonodromyResult; target_parameters, kwargs...) = solve(
+    F,
+    solutions(R);
+    start_parameters = parameters(R),
+    target_parameters = target_parameters,
+    kwargs...,
+)
+

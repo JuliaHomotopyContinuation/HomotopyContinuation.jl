@@ -321,4 +321,15 @@
         )
         @test nsolutions(r) == 6
     end
+
+    @testset "parameter homotopy with monodromy result" begin
+        F = toric_ed([3 2 1 0; 0 1 2 3])
+        mres = monodromy_solve(
+            F,
+            target_solutions_count = 21,
+            max_loops_no_progress = 20,
+            threading = false,
+        )
+        @test nsolutions(solve(F, mres, target_parameters = randn(ComplexF64, 4))) == 21
+    end
 end
