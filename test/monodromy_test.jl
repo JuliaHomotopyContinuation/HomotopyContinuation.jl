@@ -321,4 +321,55 @@
         )
         @test nsolutions(r) == 6
     end
+
+    @testset "parameter homotopy with monodromy result" begin
+        F = toric_ed([3 2 1 0; 0 1 2 3])
+        mres = monodromy_solve(
+            F,
+            target_solutions_count = 21,
+            max_loops_no_progress = 20,
+            threading = false,
+        )
+        @test nsolutions(solve(F, mres, target_parameters = randn(ComplexF64, 4))) == 21
+    end
+
+    @testset "Verify solution_completeness" begin
+        @var x y a b c
+        f = x^2 + y^2 - 1
+        l = a * x + b * y + c
+        sys = System([f, l]; parameters = [a, b, c])
+        res = solve(sys, [-0.6 - 0.8im, -1.2 + 0.4im]; target_parameters = [1, 2, 3])
+        @test verify_solution_completeness(sys, solutions(res), [1, 2, 3])
+        @test verify_solution_completeness(
+            sys,
+            solutions(res),
+            [1, 2, 3],
+            show_progress = false,
+        )
+        @test verify_solution_completeness(
+            sys,
+            solutions(res),
+            [1, 2, 3],
+            monodromy_options = (compile = false,),
+            parameter_homotopy_options = (compile = false,),
+            show_progress = false,
+        )
+        @test false == verify_solution_completeness(
+            sys,
+            solutions(res)[1:1],
+            [1, 2, 3],
+            monodromy_options = (compile = false,),
+            parameter_homotopy_options = (compile = false,),
+            show_progress = true,
+        )
+        @test false == verify_solution_completeness(
+            sys,
+            solutions(res),
+            [1, 2, 3],
+            monodromy_options = (compile = false,),
+            parameter_homotopy_options = (compile = false,),
+            show_progress = false,
+            trace_tol = 1e-60,
+        )
+    end
 end

@@ -1,7 +1,7 @@
 name = "HomotopyContinuation"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
 authors = ["Sascha Timme <sascha@timme.xyz>", "Paul Breiding <p.breiding@tu-berlin.de>"]
-version = "2.2.2"
+version = "2.3.0"
 
 [deps]
 Arblib = "fb37089c-8514-4489-9461-98f9c8763369"

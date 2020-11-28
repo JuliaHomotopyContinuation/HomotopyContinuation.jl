@@ -6,9 +6,8 @@ export monodromy_solve,
     is_heuristic_stop,
     parameters,
     permutations,
-    trace
-# verify_solution_completeness,
-# solution_completeness_witnesses,
+    trace,
+    verify_solution_completeness
 
 #####################
 # Monodromy Options #
@@ -21,12 +20,12 @@ export monodromy_solve,
 
 Options for [`monodromy_solve`](@ref).
 """
-Base.@kwdef struct MonodromyOptions{D,F1,GA<:Union{Nothing,GroupActions},F2}
+Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     check_startsolutions::Bool = true
     distance::D = EuclideanNorm()
     group_actions::GA = nothing
-    loop_finished_callback::F1 = always_false
-    parameter_sampler::F2 = independent_normal
+    loop_finished_callback = always_false
+    parameter_sampler = independent_normal
     equivalence_classes::Bool = !isnothing(group_actions)
     # stopping heuristic
     trace_test_tol::Float64 = 1e-6
@@ -776,6 +775,10 @@ function serial_monodromy_solve!(
     while true
         loop_finished!(stats, length(results))
 
+        if MS.options.loop_finished_callback(results)
+            retcode = :terminated_callback
+            @goto _return
+        end
         if p isa LinearSubspace &&
            nloops(MS) > 0 &&
            MS.options.trace_test &&
@@ -1017,6 +1020,10 @@ function threaded_monodromy_solve!(
         t = Threads.@spawn while !interrupted[]
             loop_finished!(stats, length(results))
 
+            if MS.options.loop_finished_callback(results)
+                retcode = :terminated_callback
+                break
+            end
             if loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
                 retcode = :heuristic_stop
                 break
@@ -1186,201 +1193,197 @@ function update_progress!(
     nothing
 end
 
-# #
-# #
-# # ##################
-# # ## VERIFICATION ##
-# # ##################
-# # """
-# #     verify_solution_completeness(F, res::MonodromyResult;
-# #                                  parameters=..., trace_tol=1e-6, options...)
-# #
-# # Verify that the monodromy computation found all solutions by [`monodromy_solve`](@ref).
-# # This uses a trace test as described in [^LRS18].
-# # The trace is a numerical value which is 0 if all solutions are found, for this the
-# # `trace_tol` keyword argument is used. The function returns `nothing` if some computation
-# # couldn't be carried out. Otherwise returns a boolean. Note that this function requires the
-# # computation of solutions to another polynomial system using monodromy. This routine can
-# # return `false` although all solutions are found if this additional solution set is not
-# # complete. The `options...` arguments can be everything which is accepted by `solve` and
-# # `monodromy_solve`.
-# #
-# # ### Example
-# #
-# # ```
-# # julia> @polyvar x y a b c;
-# #
-# # julia> f = x^2+y^2-1;
-# #
-# # julia> l = a*x+b*y+c;
-# #
-# # julia> res = monodromy_solve([f,l], [-0.6-0.8im, -1.2+0.4im], [1,2,3]; parameters=[a,b,c])
-# # MonodromyResult
-# # ==================================
-# # • 2 solutions (0 real)
-# # • return code → heuristic_stop
-# # • 44 tracked paths
-# # • seed → 367230
-# #
-# # julia> verify_solution_completeness([f,l], res; parameters=[a,b,c], trace_tol = 1e-8)
-# # [ Info: Compute additional witnesses for completeness...
-# # [ Info: Found 2 additional witnesses
-# # [ Info: Compute trace...
-# # [ Info: Norm of trace: 1.035918995391323e-15
-# # true
-# # ```
-# #
-# #     verify_solution_completeness(F, S, p; parameters=..., kwargs...)
-# #
-# # Verify the solution completeness using the computed solutions `S` to the parameter `p`.
-# #
-# #     verify_solution_completeness(TTS, S, W₁₀, p₀::Vector{<:Number}, l₀)
-# #
-# # Use the already computeded additional witnesses `W₁₀`. You want to obtain
-# # `TTS`, `W₁₀` and `l₀` as the output from [`solution_completeness_witnesses`](@ref).
-# #
-# #
-# # [^LRS18]:
-# #     Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test."
-# #     Arnold Mathematical Journal 4.1 (2018): 113-125.
-# # """
-# # function verify_solution_completeness(F, R::MonodromyResult; kwargs...)
-# #     verify_solution_completeness(F, solutions(R), R.parameters; kwargs...)
-# # end
-# #
-# # function verify_solution_completeness(
-# #     F,
-# #     W₀₁::AbstractVector{<:AbstractVector},
-# #     p₀::Vector{<:Number};
-# #     show_progress = true,
-# #     parameters = nothing,
-# #     trace_tol = 1e-6,
-# #     kwargs...,
-# # )
-# #     W₁₀, TTS, l₀ = solution_completeness_witnesses(
-# #         F,
-# #         W₀₁,
-# #         p₀;
-# #         show_progress = show_progress,
-# #         parameters = parameters,
-# #         kwargs...,
-# #     )
-# #     verify_solution_completeness(TTS, W₀₁, W₁₀, p₀, l₀; show_progress = show_progress)
-# # end
-# #
-# # function verify_solution_completeness(
-# #     TTS,
-# #     W₀₁::AbstractVector{<:AbstractVector},
-# #     W₁₀::AbstractVector{<:AbstractVector},
-# #     p₀::Vector{<:Number},
-# #     l₀;
-# #     show_progress = true,
-# #     trace_tol = 1e-6,
-# #     kwargs...,
-# # )
-# #     # Combine W₀₁ and W₁₀.
-# #     S = append!([[x; 0.0] for x in W₀₁], W₁₀)
-# #     # To verify that we found all solutions we need move in the pencil
-# #     if show_progress
-# #         @info("Compute trace...")
-# #     end
-# #
-# #     trace = track_and_compute_trace(TTS, S, l₀; kwargs...)
-# #     if isnothing(trace)
-# #         return nothing
-# #     else
-# #         show_progress && @info("Norm of trace: $(LinearAlgebra.norm(trace))")
-# #         LinearAlgebra.norm(trace) < trace_tol
-# #     end
-# # end
-# #
-# # """
-# #     solution_completeness_witnesses(F, S, p; parameters=..., kwargs...)
-# #
-# # Compute the additional necessary witnesses. Returns a triple `(W₁₀, TTS, l)`
-# # containing the additional witnesses `W₁₀`, a trace test system `TTS` and
-# # the parameters `l` for `TTS`.
-# # """
-# # function solution_completeness_witnesses(
-# #     F,
-# #     W₀₁,
-# #     p₀::Vector{<:Number};
-# #     parameters = nothing,
-# #     show_progress = true,
-# #     kwargs...,
-# # )
-# #     # generate another start pair
-# #     q₀ = randn(ComplexF64, length(p₀))
-# #     # Construct the trace test system
-# #     TTS = TraceTestSystem(SPSystem(F; parameters = parameters), p₀, q₀ - p₀)
-# #
-# #     y₁ = solution(solve(F, W₀₁[1]; p₁ = p₀, p₀ = q₀, parameters = parameters, kwargs...)[1])
-# #     # construct an affine hyperplane l(x) going through y₀
-# #     l₁ = cis.(2π .* rand(length(y₁)))
-# #     push!(l₁, -sum(l₁ .* y₁))
-# #     # This is numerically sometimes not so nice. Let's move to a truly generic one.
-# #     l₀ = randn(ComplexF64, length(l₁))
-# #     y₀ = solution(solve(TTS, [y₁; 1]; p₁ = l₁, p₀ = l₀)[1])
-# #
-# #     if show_progress
-# #         @info("Compute additional witnesses for completeness...")
-# #     end
-# #
-# #     R₁₀ = monodromy_solve(TTS, y₀, l₀; max_loops_no_progress = 5, kwargs...)
-# #     best_result = R₁₀
-# #     best_params = l₀
-# #     result_agreed = 0
-# #     for i = 1:10
-# #         k₀ = randn(ComplexF64, length(l₀))
-# #         S_k₀ = solutions(solve(
-# #             TTS,
-# #             solutions(R₁₀);
-# #             start_parameters = l₀,
-# #             target_parameters = k₀,
-# #         ))
-# #         new_result = monodromy_solve(TTS, S_k₀, k₀; max_loops_no_progress = 5)
-# #         if nsolutions(new_result) == nsolutions(best_result)
-# #             result_agreed += 1
-# #         elseif nsolutions(new_result) > nsolutions(best_result)
-# #             best_result = new_result
-# #             best_params = k₀
-# #         end
-# #         if result_agreed > 2
-# #             break
-# #         end
-# #     end
-# #
-# #     W₁₀ = solutions(best_result)
-# #
-# #     if show_progress
-# #         @info("Found $(length(W₁₀)) additional witnesses")
-# #     end
-# #     W₁₀, TTS, best_params
-# # end
-# #
-# #
-# # function track_and_compute_trace(TTS::TraceTestSystem, S, l₀; kwargs...)
-# #     for i = 1:3
-# #         TTP = TraceTestPencil(TTS, l₀)
-# #         R₁ = solve(TTP, S, start_parameters = [0.0], target_parameters = [0.1], kwargs...)
-# #         R₂ = solve(TTP, S, start_parameters = [0.0], target_parameters = [-.1], kwargs...)
-# #         if nsolutions(R₁) ≠ length(S) || nsolutions(R₂) ≠ length(S)
-# #             if i == 3
-# #                 printstyled("Lost solutions $i times. Abort.\n", color = :red, bold = true)
-# #                 return nothing
-# #             end
-# #             printstyled(
-# #                 "Lost solutions, need to recompute trace...\n",
-# #                 color = :yellow,
-# #                 bold = true,
-# #             )
-# #         end
-# #         s₁ = sum(solutions(R₁))
-# #         s = sum(S)
-# #         s₂ = sum(solutions(R₂))
-# #         # Due to floating point errors, we compute the RELATIVE trace
-# #         trace = ((s₁ .- s) .- (s .- s₂)) ./ max.(abs.(s₁ .- s), 1.0)
-# #         return trace
-# #     end
-# #     nothing
-# # end
+## Parameter homotopy constructor
+solve(F, R::MonodromyResult; target_parameters, kwargs...) = solve(
+    F,
+    solutions(R);
+    start_parameters = parameters(R),
+    target_parameters = target_parameters,
+    kwargs...,
+)
+
+##################
+## VERIFICATION ##
+##################
+"""
+    verify_solution_completeness(F::System, monodromy_result; options...)
+    verify_solution_completeness(F::System, solutions, parameters;
+        trace_tol = 1e-12,
+        show_progress = true,
+        monodromy_options = (),
+        parameter_homotopy_options = (),
+    )
+
+Verify that a monodromy computation found all solutions by [`monodromy_solve`](@ref).
+This uses the trace test described in [^dCR17] and [^LRS18].
+The trace is a numerical value which is 0 if all solutions are found, for this the
+`trace_tol` keyword argument is used. The function returns `nothing` if some computation
+couldn't be carried out. Otherwise returns a boolean. Note that this function requires the
+computation of solutions to another polynomial system using monodromy. This routine can
+return `false` although all solutions are found if this additional solution set is not
+complete.
+
+### Example
+```julia
+@var x y a b c;
+f = x^2+y^2-1;
+l = a*x+b*y+c;
+sys = System([f, l]; parameters = [a, b, c]);
+mres = monodromy_solve(sys, [-0.6-0.8im, -1.2+0.4im], [1,2,3]);
+show(mres);
+verify_solution_completeness(sys, mres)
+```
+```
+MonodromyResult
+==================================
+• 2 solutions (0 real)
+• return code → heuristic_stop
+• 44 tracked paths
+• seed → 367230
+julia> verify_solution_completeness(sys, mres)
+[ Info: Certify provided solutions...
+[ Info: Got 2 dinstinct solutions.
+[ Info: Compute additional witnesses for completeness...
+┌ Info: MonodromyResult
+│ ===============
+│ • return_code → :heuristic_stop
+│ • 4 solutions
+│ • 28 tracked loops
+└ • random_seed → 0x21e7406a
+[ Info: Certify additional witnesses...
+[ Info: Computed 2 additional witnesses
+[ Info: Compute trace using two parameter homotopies...
+[ Info: Norm of trace: 9.33238819760471e-17
+true
+```
+
+[^dCR17]:
+    del Campo, Abraham Martín, and Jose Israel Rodriguez.
+    "Critical points via monodromy and local methods."
+    Journal of Symbolic Computation 79 (2017): 559-574.
+
+[^LRS18]:
+    Leykin, Anton, Jose Israel Rodriguez, and Frank Sottile. "Trace test."
+    Arnold Mathematical Journal 4.1 (2018): 113-125.
+"""
+verify_solution_completeness(F::System, mres::MonodromyResult; kwargs...) =
+    verify_solution_completeness(F, solutions(mres), parameters(mres); kwargs...)
+function verify_solution_completeness(
+    F::System,
+    sols::AbstractVector{<:AbstractVector},
+    q::AbstractVector;
+    show_progress = true,
+    monodromy_options = (),
+    parameter_homotopy_options = (),
+    trace_tol = 1e-12,
+)
+    n = nvariables(F)
+    m = nparameters(F)
+    @unique_var t v[1:m] a[1:n] λ
+
+    x = variables(F)
+    p = parameters(F)
+
+    verify_system = System(
+        [F(x, p + λ * v); (sum(a .* x) - 1) * λ + t],
+        variables = [x; λ],
+        parameters = [t; p; v; a],
+    )
+    # perform monodromy computation to compute the additional witnesses
+    if show_progress
+        @info "Compute additional witnesses for completeness check..."
+    end
+    # use the verify_system but enforce t = 0 and start with λ ≠ 0
+    # this way we stay on a different irreducible component
+
+    # Let's compute some start solutions for some parameters
+    Y, base_params = let
+        # We sample some random parameters to set v = qq - q
+        qq = randn(ComplexF64, length(q))
+        # Its good to have more than 1 start solution, we can construct n
+        # by performing a parameter homotopy to qq
+        # and then  computing an `a` such that n solutions are on the linear space  a⋅x-1
+        qq_res = solve(
+            F,
+            sols[1:min(n, length(sols))];
+            start_parameters = q,
+            target_parameters = qq,
+            show_progress = show_progress,
+            parameter_homotopy_options...,
+        )
+        a0 = reduce(vcat, transpose.(solutions(qq_res))) \ ones(nsolutions(qq_res))
+        map(s -> [s; 1], solutions(qq_res)), [q; qq - q; a0]
+    end
+
+    # now use monodromy to find more solutions
+    additional_mres = monodromy_solve(
+        verify_system,
+        Y,
+        [0.0; base_params];
+        parameter_sampler = p -> [0; randn(ComplexF64, length(p) - 1)],
+        show_progress = show_progress,
+        monodromy_options...,
+    )
+    additional_sols = solutions(additional_mres)
+    if show_progress
+        @info additional_mres
+        @info "Computed $(length(additional_sols)) additional witnesses"
+        @info "Compute trace using two parameter homotopies..."
+    end
+
+    # Perform parameter homotopy for the trace
+    S = [map(s -> [s; 0], sols); additional_sols]
+    γ = randn(ComplexF64)
+    res1 = solve(
+        verify_system,
+        S;
+        start_parameters = [0.0; base_params],
+        target_parameters = [0.5 * γ; base_params],
+        show_progress = show_progress,
+        parameter_homotopy_options...,
+    )
+    S1 = solutions(res1)
+    if length(S1) ≠ length(S)
+        if show_progress
+            @warn "Lost solution during parameter homotopy. Abort."
+        end
+        return nothing
+    end
+
+    res2 = solve(
+        verify_system,
+        solutions(res1);
+        start_parameters = [0.5 * γ; base_params],
+        target_parameters = [1.0 * γ; base_params],
+        show_progress = show_progress,
+        parameter_homotopy_options...,
+    )
+    S2 = solutions(res2)
+    if length(S2) ≠ length(S)
+        if show_progress
+            @warn "Lost solution during parameter homotopy. Abort."
+        end
+        return nothing
+    end
+
+    # Compute trace now
+    T = sum(S)
+    T1 = sum(S1)
+    T2 = sum(S2)
+
+    max_norm = max(
+        1.0,
+        maximum(x -> norm(x, Inf), T),
+        maximum(x -> norm(x, Inf), T1),
+        maximum(x -> norm(x, Inf), T2),
+    )
+    trace = (T1 - T) - (T2 - T1)
+    # try to account for some floating point error in the trace computation
+    trace_norm = norm(trace, Inf) / (max_norm * length(S))
+
+    if show_progress
+        @info "Norm of trace: $trace_norm"
+    end
+
+    trace_norm < trace_tol
+end

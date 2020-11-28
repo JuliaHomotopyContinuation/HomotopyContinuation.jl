@@ -14,6 +14,7 @@ export certify,
     certificate_index,
     solution_approximation,
     certificates,
+    distinct_certificates,
     ncertified,
     nreal_certified,
     ncomplex_certified,
@@ -218,6 +219,22 @@ Obtain the stored [`SolutionCertificate`](@ref)s.
 """
 certificates(R::CertificationResult) = R.certificates
 
+
+"""
+    distinct_certificates(R::CertificationResult)
+
+Obtain the certificates corresponding to the determined distinct solution intervals.
+"""
+function distinct_certificates(C::CertificationResult)
+    cs = certificates(C)
+    isempty(C.duplicates) && return cs
+    indices = trues(length(cs))
+    for d in C.duplicates, k = 2:length(d)
+        indices[d[k]] = false
+    end
+    cs[indices]
+end
+
 """
     ncertified(R::CertificationResult)
 
@@ -282,7 +299,7 @@ function ndistinct_complex_certified(R::CertificationResult)
         return ncert
     else
         ncert - sum(R.duplicates) do dup
-            is_real(R.certificates[dup[1]]) ? length(dup) - 1 : 0
+            is_complex(R.certificates[dup[1]]) ? length(dup) - 1 : 0
         end
     end
 end
@@ -723,7 +740,7 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     # Perform ε-inflation. We choose a different εᵢ per coordinate. This matches our strategy
     # to use a weighted norm.
     x₀ = map(x̃₀, Δx₀) do x̃₀_i, Δx₀_i
-        εᵢ = 512 * mag(Δx₀_i)
+        εᵢ = 512 * max(mag(Δx₀_i), eps())
         complex(
             Interval(real(x̃₀_i) - εᵢ, real(x̃₀_i) + εᵢ),
             Interval(imag(x̃₀_i) - εᵢ, imag(x̃₀_i) + εᵢ),
@@ -810,8 +827,9 @@ function arb_ε_inflation_krawczyk(
     # We choose a dynamic increase to account for bad situations where any fixed choice
     # would be insufficient.
     incr_factor = exp2(div(prec, 4))
+    mach_eps = exp2(-prec)
     for i = 1:n
-        m[] = magF64(Δx₀[i], m) * incr_factor
+        m[] = max(magF64(Δx₀[i], m), mach_eps) * incr_factor
         Arblib.add_error!(x₀[i], m)
     end
 
