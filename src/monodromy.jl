@@ -685,7 +685,16 @@ function find_start_pair_linear_in_params(F; kwargs...)
     Ab = construct_linear_system(F_x₀, parameters(F))
     if !isnothing(Ab)
         A, b = Ab
-        p₀ = A \ b
+        m, n = size(A)
+        m ≤ n || return nothing
+        # if b is 0 then we compute the a basis vector of the nullspace
+        if iszero(b)
+            # don't want to have 0 as a parameter
+            m == n && return nothing
+            p₀ = LA.nullspace(A)[:,1]
+        else
+            p₀ = LA.qr(A, Val(true)) \ b
+        end
         return x₀, p₀
     else
         return nothing
