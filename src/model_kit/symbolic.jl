@@ -485,11 +485,17 @@ julia> expand((x + y) ^ 2)
 """
 expand(e::Basic) = symengine_expand(e)
 
+struct PolynomialError <: Exception end
+function Base.showerror(io::IO, ::PolynomialError)
+    print(io, "Encountered an unexpected rational expression.")
+end
+
 """
     to_dict(expr::Expression, vars::AbstractVector{Variable})
 
 Return the coefficients of `expr` w.r.t. the given variables `vars`. Assumes that `expr`
-is expanded.
+is expanded and representing a polynomial.
+Throws a `PolynomialError` if a rational expression is encountered.
 """
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
@@ -526,9 +532,13 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
             elseif arg_cls == :Pow
                 vec = args!(pow_args, arg)
                 x = vec[1]
+                k = convert(Int, vec[2])
+                if k < 0
+                    throw(PolynomialError())
+                end
                 for (i, v) in enumerate(vars)
                     if x == v
-                        d[i] = convert(Int, vec[2])
+                        d[i] = k
                         is_coeff = false
                         break
                     end
@@ -555,9 +565,13 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         # check that base is one of the variables
         x = vec[1]
         is_var_pow = false
+        k = convert(Int, vec[2])
+        if k < 0
+            throw(PolynomialError())
+        end
         for (i, v) in enumerate(vars)
             if x == v
-                d[i] = convert(Int, vec[2])
+                d[i] = k
                 is_var_pow = true
                 break
             end
@@ -583,6 +597,7 @@ end
 Return a matrix `M` containing the exponents for all occuring terms
 (one term per column) and a vector `c` containing the corresponding coefficients.
 Expands the given expression `f` unless `expanded = true`.
+Throws a `PolynomialError` if a rational expression is encountered.
 """
 function exponents_coefficients(
     f::Expression,
@@ -699,9 +714,18 @@ function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = 
     if !expanded
         f = expand(f)
     end
-    exponents = keys(to_dict(f, vars))
-    d = sum(first(exponents))
-    all(e -> sum(e) == d, exponents)
+    try
+        exponents = keys(to_dict(f, vars))
+
+        d = sum(first(exponents))
+        all(e -> sum(e) == d, exponents)
+    catch err
+        if err isa PolynomialError
+            return false
+        else
+            rethrow(e)
+        end
+    end
 end
 ################
 # Optimization #
@@ -725,10 +749,16 @@ c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
 function horner(f::Expression, vars = variables(f))
-    M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
-    # Bail out if we have rational expression
-    all(d -> d ≥ 0, M) || return f
-    multivariate_horner(M, coeffs, vars)
+    try
+        M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
+        multivariate_horner(M, coeffs, vars)
+    catch err
+        if err isa PolynomialError
+            return f
+        else
+            rethrow(err)
+        end
+    end
 end
 
 function horner(coeffs::AbstractVector, var::Variable)
@@ -1241,17 +1271,12 @@ System of length 4
 ```
 """
 function optimize(F::System)
-    # horner can fail for rational functions
-    try
-        System(
-            horner.(F.expressions, Ref(F.variables)),
-            F.variables,
-            F.parameters,
-            F.variable_groups,
-        )
-    catch
-        F
-    end
+    System(
+        horner.(F.expressions, Ref(F.variables)),
+        F.variables,
+        F.parameters,
+        F.variable_groups,
+    )
 end
 
 
