@@ -1164,6 +1164,7 @@ function uniqueness_rtol(res::PathResult)
     # and require at most sqrt(res.accuracy) and at least 1e-14.
     clamp(0.25 * inv(res.ω)^2, 1e-14, sqrt(res.accuracy))
 end
+
 """
     track(tracker, x, edge::LoopEdge, loop::MonodromyLoop, stats::MonodromyStatistics)
 
@@ -1290,8 +1291,9 @@ solve(F, R::MonodromyResult; target_parameters, kwargs...) = solve(
     verify_solution_completeness(F::System, solutions, parameters;
         trace_tol = 1e-12,
         show_progress = true,
-        monodromy_options = (),
-        parameter_homotopy_options = (),
+        compile = COMPILE_DEFAULT[],
+        monodromy_options = (compile = compile,),
+        parameter_homotopy_options = (compile = compile,),
     )
 
 Verify that a monodromy computation found all solutions by [`monodromy_solve`](@ref).
@@ -1353,8 +1355,9 @@ function verify_solution_completeness(
     sols::AbstractVector{<:AbstractVector},
     q::AbstractVector;
     show_progress = true,
-    monodromy_options = (),
-    parameter_homotopy_options = (),
+    compile = COMPILE_DEFAULT[],
+    monodromy_options = (compile = compile,),
+    parameter_homotopy_options = (compile = compile,),
     trace_tol = 1e-12,
 )
     n = nvariables(F)
