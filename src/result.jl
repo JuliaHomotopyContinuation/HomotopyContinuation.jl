@@ -564,7 +564,7 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
         io,
         data,
         headers;
-        tf = PrettyTables.unicode,
+        tf = PrettyTables.tf_unicode_rounded,
         alignment = :c,
         header_crayon = PrettyTables.Crayon(bold = false),
         border_crayon = PrettyTables.Crayon(faint = true),
