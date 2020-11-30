@@ -691,7 +691,7 @@ function find_start_pair_linear_in_params(F; kwargs...)
         if iszero(b)
             # don't want to have 0 as a parameter
             m == n && return nothing
-            p₀ = LA.nullspace(A)[:,1]
+            p₀ = LA.nullspace(A)[:, 1]
         else
             p₀ = LA.qr(A, Val(true)) \ b
         end
