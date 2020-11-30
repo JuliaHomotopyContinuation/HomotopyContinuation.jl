@@ -985,6 +985,14 @@ function threaded_monodromy_solve!(
             @tspawnat tid begin
                 for job in queue
                     if interrupted[]
+                        # mark worker as idle
+                        workers_idle[64*(tid-1)+1] = true
+                        # if all idle notify that we want a new low
+                        if all(workers_idle)
+                            lock(notify_lock)
+                            notify(cond_queue_emptied)
+                            unlock(notify_lock)
+                        end
                         break
                     end
                     workers_idle[64*(tid-1)+1] = false
@@ -1069,58 +1077,62 @@ function threaded_monodromy_solve!(
                        # permutation informations
                        !MS.options.permutations
                         retcode = :success
-                        lock(notify_lock)
-                        notify(cond_queue_emptied)
-                        unlock(notify_lock)
                         interrupted[] = true
+
                     elseif !isnothing(MS.options.timeout) &&
                            time() - t₀ > (MS.options.timeout::Float64)
                         retcode = :timeout
-                        lock(notify_lock)
-                        notify(cond_queue_emptied)
-                        unlock(notify_lock)
                         interrupted[] = true
                     end
                 end
             end
         end
 
-        t = Threads.@spawn while !interrupted[]
-            loop_finished!(stats, length(results))
-
-            if MS.options.loop_finished_callback(results)
-                retcode = :terminated_callback
-                break
-            end
-            if loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
-                retcode = :heuristic_stop
-                break
-            end
-            if length(results) == something(MS.options.target_solutions_count, -1)
-                retcode = :success
-                break
-            end
-            if p isa LinearSubspace &&
-               nloops(MS) > 0 &&
-               MS.options.trace_test &&
-               LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
-                retcode = :success
-                break
-            end
-
-            add_loop!(MS, p)
-            MS.trace .= 0.0
-            # schedule all jobs
-            new_loop_id = nloops(MS)
-            for i = 1:length(results)
-                push!(queue, LoopTrackingJob(i, new_loop_id))
-            end
-
+        t = Threads.@spawn begin
             lock(notify_lock)
-            wait(cond_queue_emptied)
-            unlock(notify_lock)
+            try
+                while !interrupted[]
+                    loop_finished!(stats, length(results))
 
-            retcode == :in_progress || break
+                    if MS.options.loop_finished_callback(results)
+                        retcode = :terminated_callback
+                        break
+                    end
+                    if loops_no_change(stats, length(results)) ≥
+                       MS.options.max_loops_no_progress
+                        retcode = :heuristic_stop
+                        break
+                    end
+                    if length(results) == something(MS.options.target_solutions_count, -1)
+                        retcode = :success
+                        printstyled("DONE"; bold = true, color = :blue)
+                        break
+                    end
+                    if p isa LinearSubspace &&
+                       nloops(MS) > 0 &&
+                       MS.options.trace_test &&
+                       LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
+                        retcode = :success
+                        break
+                    end
+
+                    add_loop!(MS, p)
+                    MS.trace .= 0.0
+                    # schedule all jobs
+                    new_loop_id = nloops(MS)
+                    for i = 1:length(results)
+                        push!(queue, LoopTrackingJob(i, new_loop_id))
+                    end
+
+                    # println("locking")
+                    lock(notify_lock)
+                    wait(cond_queue_emptied)
+                    # println("unlocking")
+                    retcode == :in_progress || break
+                end
+            finally
+                unlock(notify_lock)
+            end
         end
 
         wait(t)
