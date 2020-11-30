@@ -636,11 +636,23 @@ end
 Try to find a pair `(x,p)` for the system `F` such that `F(x,p) = 0` by randomly sampling
 a pair `(x₀, p₀)` and performing Newton's method in variable *and* parameter space.
 """
-find_start_pair(F::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...) =
-    find_start_pair(fixed(F; compile = compile); kwargs...)
+function find_start_pair(
+    F::System;
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    max_tries = 1_000,
+    kwargs...,
+)
+    if nparameters(F) != 0
+        start_pair = find_start_pair_linear_in_params(F; kwargs...)
+        if !isnothing(start_pair)
+            return start_pair
+        end
+    end
+    find_start_pair(fixed(F; compile = compile); max_tries = max_tries, kwargs...)
+end
 function find_start_pair(
     F::AbstractSystem;
-    max_tries::Int = 100,
+    max_tries::Int = 1_000,
     atol::Float64 = 0.0,
     rtol::Float64 = 1e-12,
 )
@@ -664,6 +676,53 @@ function find_start_pair(
         end
     end
     nothing
+end
+function find_start_pair_linear_in_params(F; kwargs...)
+    x₀ = randn(ComplexF64, nvariables(F))
+    F_x₀ = F(x₀, parameters(F))
+    all(!ModelKit.is_number, F_x₀) || return nothing
+
+    Ab = construct_linear_system(F_x₀, parameters(F))
+    if !isnothing(Ab)
+        A, b = Ab
+        p₀ = A \ b
+        return x₀, p₀
+    else
+        return nothing
+    end
+end
+
+function construct_linear_system(F, x)
+    A = zeros(ComplexF64, length(F), length(x))
+    b = zeros(ComplexF64, length(F))
+
+    try
+        for (i, f) in enumerate(F)
+            M, coeffs = exponents_coefficients(f, x)
+            for (j, exp) in enumerate(eachcol(M))
+                var_found = false
+                for (k, d) in enumerate(exp)
+                    if d < 0 || d > 1 || (d == 1 && var_found)
+                        return nothing
+                    end
+                    if d == 1
+                        var_found = true
+                        A[i, k] = coeffs[j]
+                    end
+                end
+                if !var_found
+                    b[i] = -coeffs[j]
+                end
+            end
+        end
+    catch err
+        if err isa ModelKit.PolynomialError
+            return nothing
+        else
+            rethrow(err)
+        end
+    end
+    A, b
 end
 
 monodromy_solve(MS::MonodromySolver, x::AbstractVector{<:Number}, p, seed; kwargs...) =
