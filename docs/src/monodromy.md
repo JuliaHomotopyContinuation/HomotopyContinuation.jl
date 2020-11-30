@@ -17,7 +17,8 @@ find_start_pair
 
 It is also possible to verify (but not certify) that all solutions were found.
 Note that this computation can take substantially longer than the original `monodromy_solve` computation.
-```
+
+```@docs
 verify_solution_completeness
 ```
 
