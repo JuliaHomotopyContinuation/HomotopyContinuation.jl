@@ -1004,7 +1004,6 @@ function threaded_monodromy_solve!(
                         MS.trace_lock;
                         collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
                     )
-                    # @show tid, job
                     if !isnothing(res)
                         loop_tracked!(stats)
 
@@ -1105,7 +1104,6 @@ function threaded_monodromy_solve!(
                     end
                     if length(results) == something(MS.options.target_solutions_count, -1)
                         retcode = :success
-                        printstyled("DONE"; bold = true, color = :blue)
                         break
                     end
                     if p isa LinearSubspace &&
@@ -1124,10 +1122,7 @@ function threaded_monodromy_solve!(
                         push!(queue, LoopTrackingJob(i, new_loop_id))
                     end
 
-                    # println("locking")
-                    lock(notify_lock)
                     wait(cond_queue_emptied)
-                    # println("unlocking")
                     retcode == :in_progress || break
                 end
             finally
