@@ -110,7 +110,7 @@ function buildvar(var; unique::Bool = false)
         else
             varname = var
         end
-        var, :($(esc(var)) = Variable($"$varname"))
+        var, :($(esc(var)) = Variable($(QuoteNode(varname))))
     else
         isa(var, Expr) || error("Expected $var to be a variable name")
         Base.Meta.isexpr(var, :ref) ||
