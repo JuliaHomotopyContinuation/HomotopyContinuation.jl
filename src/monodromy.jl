@@ -974,28 +974,31 @@ function threaded_monodromy_solve!(
     retcode = :in_progress
     stats = MS.statistics
     notify_lock = ReentrantLock()
-    progress_lock = ReentrantLock()
     cond_queue_emptied = Threads.Condition(notify_lock)
-    # make sure to avoid false sharing
-    workers_idle = fill(true, 64 * Threads.nthreads())
+    workers_idle = fill(true, Threads.nthreads())
     interrupted = Ref(false)
     queued = Ref(0)
     try
         workers = map(enumerate(MS.trackers)) do (tid, tracker)
             @tspawnat tid begin
                 for job in queue
-                    if interrupted[]
-                        # mark worker as idle
-                        workers_idle[64*(tid-1)+1] = true
-                        # if all idle notify that we want a new low
-                        if all(workers_idle)
-                            lock(notify_lock)
-                            notify(cond_queue_emptied)
-                            unlock(notify_lock)
+                    stop_queue = false
+                    Base.@lock notify_lock begin
+                        if interrupted[]
+                            # mark worker as idle
+                            workers_idle[tid] = true
+                            # if all idle notify that we want a new low
+                            if all(workers_idle)
+                                notify(cond_queue_emptied)
+                            end
+                            stop_queue = true
+                        else
+                            workers_idle[tid] = false
                         end
+                    end
+                    if stop_queue
                         break
                     end
-                    workers_idle[64*(tid-1)+1] = false
                     res = track(
                         tracker,
                         results[job.id],
@@ -1061,13 +1064,12 @@ function threaded_monodromy_solve!(
                     )
 
                     # mark worker as idle
-                    workers_idle[64*(tid-1)+1] = true
-
-                    # if queue is empty, check whether all other are also waiting
-                    if !isready(queue) && all(workers_idle)
-                        lock(notify_lock)
-                        notify(cond_queue_emptied)
-                        unlock(notify_lock)
+                    Base.@lock notify_lock begin
+                        workers_idle[tid] = true
+                        # if queue is empty, check whether all other are also waiting
+                        if !isready(queue) && all(workers_idle)
+                            notify(cond_queue_emptied)
+                        end
                     end
 
                     if length(results) ==
@@ -1076,21 +1078,27 @@ function threaded_monodromy_solve!(
                        # permutation informations
                        !MS.options.permutations
                         retcode = :success
-                        interrupted[] = true
+                        Base.@lock notify_lock begin
+                            interrupted[] = true
+                        end
 
                     elseif !isnothing(MS.options.timeout) &&
                            time() - t₀ > (MS.options.timeout::Float64)
                         retcode = :timeout
-                        interrupted[] = true
+                        Base.@lock notify_lock begin
+                            interrupted[] = true
+                        end
                     end
                 end
             end
         end
 
         t = Threads.@spawn begin
-            lock(notify_lock)
-            try
-                while !interrupted[]
+            Base.@lock notify_lock begin
+                while true
+                    if interrupted[]
+                        break
+                    end
                     loop_finished!(stats, length(results))
 
                     if MS.options.loop_finished_callback(results)
@@ -1125,8 +1133,6 @@ function threaded_monodromy_solve!(
                     wait(cond_queue_emptied)
                     retcode == :in_progress || break
                 end
-            finally
-                unlock(notify_lock)
             end
         end
 
