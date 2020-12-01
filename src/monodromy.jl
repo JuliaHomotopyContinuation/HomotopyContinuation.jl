@@ -397,7 +397,12 @@ mutable struct MonodromySolver{
     unique_points_lock::ReentrantLock
     options::MO
     statistics::MonodromyStatistics
-    trace::Vector{ComplexF64}
+    # We save the sums of the solutions for three
+    # values to check if the trace is colinear
+    # We augment the sums by 1 in each coordinate to
+    # make this work for the two variables case
+    # (n + 1) × 3 matrix
+    trace::Matrix{ComplexF64}
     trace_lock::ReentrantLock
 end
 
@@ -443,7 +448,7 @@ function MonodromySolver(
 
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
-    trace = zeros(ComplexF64, length(x₀))
+    trace = zeros(ComplexF64, length(x₀) + 1, 3)
     MonodromySolver(
         trackers,
         MonodromyLoop{P}[],
@@ -466,6 +471,18 @@ function add_loop!(MS::MonodromySolver, p)
 end
 loop(MS::MonodromySolver, i) = MS.loops[i]
 nloops(MS::MonodromySolver) = length(MS.loops)
+
+function reset_trace!(MS::MonodromySolver)
+    MS.trace .= 0
+    MS.trace[end, :] .= 1
+    MS
+end
+
+# Check if trace is colinear
+function trace_colinearity(MS)
+    σ = LA.svdvals(MS.trace)
+    σ[3] / σ[1]
+end
 
 """
     monodromy_solve(F, [sols, p]; options..., tracker_options = TrackerOptions())
@@ -759,11 +776,7 @@ function monodromy_solve(
     end
     MS.statistics = MonodromyStatistics()
     empty!(MS.unique_points)
-    if p isa LinearSubspace
-        MS.trace .= 0.0
-    else
-        MS.trace .= Inf
-    end
+    reset_trace!(MS)
     results = check_start_solutions(MS, X, p)
     if isempty(results)
         @warn "None of the provided solutions is a valid start solution."
@@ -802,7 +815,7 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         seed,
-        p isa LinearSubspace ? LA.norm(MS.trace, Inf) / length(results) : nothing,
+        p isa LinearSubspace ? trace_colinearity(MS) : nothing,
     )
 end
 
@@ -850,7 +863,7 @@ function serial_monodromy_solve!(
         if p isa LinearSubspace &&
            nloops(MS) > 0 &&
            MS.options.trace_test &&
-           LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
+           trace_colinearity(MS) < MS.options.trace_test_tol
             retcode = :success
             @goto _return
         end
@@ -865,7 +878,7 @@ function serial_monodromy_solve!(
         end
 
         add_loop!(MS, p)
-        MS.trace .= 0.0
+        reset_trace!(MS)
         # schedule all jobs
         new_loop_id = nloops(MS)
         for i = 1:length(results)
@@ -1117,13 +1130,13 @@ function threaded_monodromy_solve!(
                     if p isa LinearSubspace &&
                        nloops(MS) > 0 &&
                        MS.options.trace_test &&
-                       LA.norm(MS.trace, Inf) < length(results) * MS.options.trace_test_tol
+                       trace_colinearity(MS) < MS.options.trace_test_tol
                         retcode = :success
                         break
                     end
 
                     add_loop!(MS, p)
-                    MS.trace .= 0.0
+                    reset_trace!(MS)
                     # schedule all jobs
                     new_loop_id = nloops(MS)
                     for i = 1:length(results)
@@ -1184,13 +1197,9 @@ function track(
 
     if loop.p isa LinearSubspace && collect_trace
         parameters!(tracker, loop.p, loop.p₀₁)
-        retcode = track!(
-            tracker,
-            solution(r);
-            ω = r.ω,
-            μ = r.μ,
-            extended_precision = r.extended_precision,
-        )
+        x₀ = solution(r)
+        retcode =
+            track!(tracker, x₀; ω = r.ω, μ = r.μ, extended_precision = r.extended_precision)
         x₀₁ = solution(tracker)
         if !is_success(retcode)
             return nothing
@@ -1209,9 +1218,13 @@ function track(
             return nothing
         end
 
-        lock(trace_lock)
-        trace .+= (x₁ .- x₀₁) .- (x₀₁ .- solution(r))
-        unlock(trace_lock)
+        Base.@lock trace_lock begin
+            for i = 1:length(x₀)
+                trace[i, 1] += x₀[i]
+                trace[i, 2] += x₀₁[i]
+                trace[i, 3] += x₁[i]
+            end
+        end
     else
         parameters!(tracker, loop.p, loop.p₁)
         retcode = track!(
@@ -1290,7 +1303,7 @@ solve(F, R::MonodromyResult; target_parameters, kwargs...) = solve(
 """
     verify_solution_completeness(F::System, monodromy_result; options...)
     verify_solution_completeness(F::System, solutions, parameters;
-        trace_tol = 1e-12,
+        trace_tol = 1e-14,
         show_progress = true,
         compile = COMPILE_DEFAULT[],
         monodromy_options = (compile = compile,),
@@ -1359,7 +1372,7 @@ function verify_solution_completeness(
     compile = COMPILE_DEFAULT[],
     monodromy_options = (compile = compile,),
     parameter_homotopy_options = (compile = compile,),
-    trace_tol = 1e-12,
+    trace_tol = 1e-14,
 )
     n = nvariables(F)
     m = nparameters(F)
@@ -1455,15 +1468,9 @@ function verify_solution_completeness(
     T1 = sum(S1)
     T2 = sum(S2)
 
-    max_norm = max(
-        1.0,
-        maximum(x -> norm(x, Inf), T),
-        maximum(x -> norm(x, Inf), T1),
-        maximum(x -> norm(x, Inf), T2),
-    )
-    trace = (T1 - T) - (T2 - T1)
-    # try to account for some floating point error in the trace computation
-    trace_norm = norm(trace, Inf) / (max_norm * length(S))
+    M = [T T1 T2; 1 1 1]
+    singvals = LA.svdvals(M)
+    trace_norm = singvals[3] / singvals[1]
 
     if show_progress
         @info "Norm of trace: $trace_norm"
