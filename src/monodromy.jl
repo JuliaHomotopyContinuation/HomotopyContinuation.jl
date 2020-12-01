@@ -1449,15 +1449,9 @@ function verify_solution_completeness(
     T1 = sum(S1)
     T2 = sum(S2)
 
-    max_norm = max(
-        1.0,
-        maximum(x -> norm(x, Inf), T),
-        maximum(x -> norm(x, Inf), T1),
-        maximum(x -> norm(x, Inf), T2),
-    )
-    trace = (T1 - T) - (T2 - T1)
-    # try to account for some floating point error in the trace computation
-    trace_norm = norm(trace, Inf) / (max_norm * length(S))
+    M = [T T1 T2; 1 1 1]
+    singvals = LA.svdvals(M)
+    trace_norm = singvals[3] / singvals[1]
 
     if show_progress
         @info "Norm of trace: $trace_norm"

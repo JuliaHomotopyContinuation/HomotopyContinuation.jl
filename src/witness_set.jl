@@ -223,9 +223,10 @@ function trace_test(W₀::WitnessSet; options...)
 
     s₁ = sum(solutions(R₁))
     s₋₁ = sum(solutions(R₋₁))
-    Δs₁ = (s₁ - s₀)
-    Δs₋₁ = (s₀ - s₋₁)
-    trace = InfNorm()(Δs₁, Δs₋₁) / (length(S₀) * max(InfNorm()(Δs₁), InfNorm()(Δs₋₁)))
+
+    M = [s₋₁ s₀ s₁; 1 1 1]
+    singvals = LA.svdvals(M)
+    trace = singvals[3] / singvals[1]
 
     trace
 end
