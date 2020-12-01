@@ -68,10 +68,10 @@
         @test count(is_success, res) == d + 1
     end
 
-    @testset "Bacillus Subtilis" begin
-        res = solve(bacillus())
-        @test nsolutions(res) == 44
-    end
+    # @testset "Bacillus Subtilis" begin
+    #     res = solve(bacillus())
+    #     @test nsolutions(res) == 44
+    # end
 
     @testset "Mohab" begin
         # Communicated by Mohab Safey El Din
