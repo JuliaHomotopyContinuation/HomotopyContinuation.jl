@@ -17,6 +17,12 @@
         @test ModelKit.to_number(Expression(2 // 3)) isa Rational{Int32}
         @test ModelKit.to_number(Expression(2) // Expression(3)) isa Rational{Int32}
         @test ModelKit.to_number(Expression(big(2)^129)) isa BigInt
+
+        @test BigFloat(Expression(big(2.1))) == big(2.1)
+        @test Float64(Expression(2)) == 2.0
+        @test Rational{Int32}(Expression(2 // 3)) == 2 // 3
+        @test UInt(Expression(2)) == UInt(2)
+
         @test complex(Expression(1), Expression(2)) == Expression(1) + im * 2
         @test complex(Expression(1), 2) == Expression(1) + im * 2
         @test complex(1, Expression(2)) == Expression(1) + im * 2
