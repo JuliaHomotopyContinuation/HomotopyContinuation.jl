@@ -723,6 +723,17 @@ function to_number(x::Basic)
     end
 end
 
+function (::Type{T})(x::Basic) where {T<:Union{AbstractFloat,Rational,Complex,Integer}}
+    y = to_number(x)
+    if y isa Basic
+        # Throw error to avoid endless loop
+        # The T.name.name part is done the same way in Base
+        throw(InexactError(T.name.name, T, x))
+    else
+        T(y)
+    end
+end
+
 ##########
 ## SUBS ##
 ##########
