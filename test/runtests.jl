@@ -4,6 +4,7 @@ using StaticArrays
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation
+import SemialgebraicSets
 
 include("test_systems.jl")
 
@@ -40,6 +41,7 @@ end
     include("monodromy_test.jl")
     include("witness_set_test.jl")
     include("certification_test.jl")
+    include("semialgebraic_sets_test.jl")
 
     if "extensive" in ARGS
         include("extensive/extensive_test.jl")
