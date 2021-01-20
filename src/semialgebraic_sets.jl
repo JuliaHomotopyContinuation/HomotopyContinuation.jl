@@ -5,7 +5,7 @@ function ModelKit.System(V::SemialgebraicSets.AbstractAlgebraicSet; kwargs...)
 end
 
 """
-    SemialgebraicSetsHCSolver(; options...)
+    SemialgebraicSetsHCSolver(; compile = false, options...)
 
 Construct a `SemialgebraicSets.AbstractAlgebraicSolver` to be used in `SemialgebraicSets`.
 `options` are all valid options for [`solve`](@ref).
@@ -15,8 +15,8 @@ Construct a `SemialgebraicSets.AbstractAlgebraicSolver` to be used in `Semialgeb
 ```
 julia> using HomotopyContinuation, SemialgebraicSets;
 
-julia> solver = SemialgebraicSetsHCSolver(; compile = false)
-SemialgebraicSetsHCSolver(; compile = false)
+julia> solver = SemialgebraicSetsHCSolver(; show_progress = false)
+SemialgebraicSetsHCSolver(; compile = :none, show_progress = false)
 
 julia> @polyvar x y
 (x, y)
@@ -37,12 +37,14 @@ julia> collect(V)
 struct SemialgebraicSetsHCSolver <: SemialgebraicSets.AbstractAlgebraicSolver
     options::Any
 end
-SemialgebraicSetsHCSolver(; options...) = SemialgebraicSetsHCSolver(options)
+SemialgebraicSetsHCSolver(; compile = :none, options...) =
+    SemialgebraicSetsHCSolver((compile = compile, options...))
+
 function Base.show(io::IO, solver::SemialgebraicSetsHCSolver)
     print(io, "SemialgebraicSetsHCSolver(; ")
     join(
         io,
-        ["$(k) = $(v isa Symbol ? Expr(:quote, v) : v)" for (k, v) in solver.options],
+        ["$(k) = $(v isa Symbol ? Expr(:quote, v) : v)" for (k, v) in pairs(solver.options)],
         ", ",
     )
     print(io, ")")
