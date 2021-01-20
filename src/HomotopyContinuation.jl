@@ -19,6 +19,7 @@ import Random
 import Printf
 import PrettyTables
 using Reexport: @reexport
+import SemialgebraicSets
 import StructArrays
 import TreeViews
 
@@ -76,6 +77,7 @@ include("solve.jl")
 include("monodromy.jl")
 include("witness_set.jl")
 include("certification.jl")
+include("semialgebraic_sets.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See
