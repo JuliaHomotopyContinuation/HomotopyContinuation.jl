@@ -21,8 +21,11 @@ struct CompositionSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSyste
     tu¹::TaylorVector{2,ComplexF64}
 end
 function CompositionSystem(g::AbstractSystem, f::AbstractSystem)
-    size(g, 2) == size(f, 1) ||
-        throw(ArgumentError("Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match."))
+    size(g, 2) == size(f, 1) || throw(
+        ArgumentError(
+            "Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match.",
+        ),
+    )
     f_u = zeros(ComplexF64, size(f, 1))
     f_ū = zeros(ComplexDF64, size(f, 1))
     f_U = zeros(ComplexF64, size(f))
@@ -135,8 +138,11 @@ compose(g::AbstractSystem, f::System; compile::Union{Bool,Symbol} = COMPILE_DEFA
 function compose(g::System, f::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[])
     pg = parameters(g)
     pf = parameters(f)
-    (isempty(pf) || isempty(pg) || pf == pg) ||
-        throw(ArgumentError("Cannot construct a composition of two system with different sets of parameters."))
+    (isempty(pf) || isempty(pg) || pf == pg) || throw(
+        ArgumentError(
+            "Cannot construct a composition of two system with different sets of parameters.",
+        ),
+    )
     CompositionSystem(fixed(g; compile = compile), fixed(f; compile = compile))
 end
 import Base: ∘

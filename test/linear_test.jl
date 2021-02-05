@@ -81,10 +81,8 @@
         graff_path_result = track.(graff_path_tracker, W)
         @test all(is_success, graff_path_result)
 
-        @test all(isapprox.(
-            solution.(graff_path_result),
-            solution.(graff_result),
-            rtol = 1e-12,
-        ))
+        @test all(
+            isapprox.(solution.(graff_path_result), solution.(graff_result), rtol = 1e-12),
+        )
     end
 end

@@ -37,8 +37,11 @@ end
 function ToricHomotopy(system::AbstractSystem, system_coeffs::Vector{Vector{ComplexF64}})
     m = ModelKit.nparameters(system)
     m1 = sum(length, system_coeffs)
-    m == m1 ||
-        throw(ArgumentError("System parameters and coefficients do not have the same size, got $m and $m1"))
+    m == m1 || throw(
+        ArgumentError(
+            "System parameters and coefficients do not have the same size, got $m and $m1",
+        ),
+    )
     n = nvariables(system)
     taylor_coeffs = TaylorVector{5}(ComplexF64, m)
     ToricHomotopy(

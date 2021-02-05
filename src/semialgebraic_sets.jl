@@ -45,8 +45,8 @@ function Base.show(io::IO, solver::SemialgebraicSetsHCSolver)
     join(
         io,
         [
-            "$(k) = $(v isa Symbol ? Expr(:quote, v) : v)"
-            for (k, v) in pairs(solver.options)
+            "$(k) = $(v isa Symbol ? Expr(:quote, v) : v)" for
+            (k, v) in pairs(solver.options)
         ],
         ", ",
     )

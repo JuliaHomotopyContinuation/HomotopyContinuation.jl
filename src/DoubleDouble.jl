@@ -421,7 +421,11 @@ end
     # Also, the multiplication (a*x) and [-]*x can be done with
     # only half the precision.
     if a.hi < 0
-        throw(DomainError("sqrt will only return a complex result if called with a complex argument."))
+        throw(
+            DomainError(
+                "sqrt will only return a complex result if called with a complex argument.",
+            ),
+        )
     end
     if iszero(a)
         return zero(a)

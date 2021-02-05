@@ -172,11 +172,13 @@ function solver_startsolutions(
                 kwargs...,
             )
         else
-            throw(KeywordArgumentException(
-                :start_system,
-                start_system,
-                "Possible values are: `:polyhedral` and `:total_degree`.",
-            ))
+            throw(
+                KeywordArgumentException(
+                    :start_system,
+                    start_system,
+                    "Possible values are: `:polyhedral` and `:total_degree`.",
+                ),
+            )
         end
     end
 

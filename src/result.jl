@@ -228,10 +228,7 @@ function results(
     multiple_results::Bool = false,
 )
     [
-        f(r)
-        for
-        r in R if
-        (!only_real || is_real(r, real_tol)) &&
+        f(r) for r in R if (!only_real || is_real(r, real_tol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
             (!only_singular || is_singular(r)) &&
             (!only_finite || is_finite(r)) &&

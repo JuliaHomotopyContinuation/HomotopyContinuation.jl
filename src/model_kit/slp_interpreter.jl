@@ -375,10 +375,14 @@ function evaluate_block(; has_parameters::Bool = false)
                                                     t₂,
                                                 )
                                             else
-                                                throw(error(string(
-                                                    "Unexpected fall-through. instr: ",
-                                                    Symbol(op),
-                                                )))
+                                                throw(
+                                                    error(
+                                                        string(
+                                                            "Unexpected fall-through. instr: ",
+                                                            Symbol(op),
+                                                        ),
+                                                    ),
+                                                )
                                             end
                                         end
                                     end

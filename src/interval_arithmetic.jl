@@ -40,7 +40,11 @@ function interval(a::Real, b::Real)
 end
 is_valid_interval(a::Real, b::Real) = isfinite(a) && isfinite(b) && a ≤ b
 @noinline function invalid_interval_error(a, b)
-    throw(ArgumentError("`[$a, $b]` is not a valid interval. Need `a ≤ b` to construct `interval(a, b)`."))
+    throw(
+        ArgumentError(
+            "`[$a, $b]` is not a valid interval. Need `a ≤ b` to construct `interval(a, b)`.",
+        ),
+    )
 end
 
 Base.hash(x::Interval, h::UInt) = hash(x.hi, hash(x.lo, u))

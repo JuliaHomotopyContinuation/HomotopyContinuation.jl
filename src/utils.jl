@@ -276,7 +276,11 @@ macro tspawnat(thrdid, expr)
     tid = esc(thrdid)
     quote
         if $tid < 1 || $tid > Threads.nthreads()
-            throw(AssertionError("@tspawnat thread assignment ($($tid)) must be between 1 and Threads.nthreads() (1:$(Threads.nthreads()))"))
+            throw(
+                AssertionError(
+                    "@tspawnat thread assignment ($($tid)) must be between 1 and Threads.nthreads() (1:$(Threads.nthreads()))",
+                ),
+            )
         end
         local task = Task($thunk)
         task.sticky = false

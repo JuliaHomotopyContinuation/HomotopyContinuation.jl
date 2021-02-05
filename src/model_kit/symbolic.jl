@@ -872,10 +872,12 @@ end
 function check_vars_params(f, vars, params)
     vars_params = params === nothing ? vars : [vars; params]
     Δ = setdiff(variables(f), vars_params)
-    isempty(Δ) || throw(ArgumentError(
-        "Not all variables or parameters of the system are given. Missing: " *
-        join(Δ, ", "),
-    ))
+    isempty(Δ) || throw(
+        ArgumentError(
+            "Not all variables or parameters of the system are given. Missing: " *
+            join(Δ, ", "),
+        ),
+    )
     if params !== nothing
         both = Set(vars) ∩ Set(params)
         if !isempty(both)

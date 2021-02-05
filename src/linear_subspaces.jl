@@ -307,8 +307,11 @@ function LinearSubspace(
     b::AbstractVector{T} = zeros(eltype(A), size(A, 1)),
 ) where {T}
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
-    0 < size(A, 1) < size(A, 2) ||
-        throw(ArgumentError("Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b."))
+    0 < size(A, 1) < size(A, 2) || throw(
+        ArgumentError(
+            "Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b.",
+        ),
+    )
 
     LinearSubspace(ExtrinsicDescription(Matrix(float.(A)), Vector(float.(b))))
 end
