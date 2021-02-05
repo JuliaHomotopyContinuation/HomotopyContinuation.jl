@@ -35,4 +35,5 @@ geodesic
 geodesic_distance
 rand_subspace
 translate
+Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
 ```

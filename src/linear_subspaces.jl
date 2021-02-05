@@ -307,7 +307,7 @@ function LinearSubspace(
     b::AbstractVector{T} = zeros(eltype(A), size(A, 1)),
 ) where {T}
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
-    0 < size(A, 1) < size(A, 2) || throw(
+    0 < size(A, 1) ≤ size(A, 2) || throw(
         ArgumentError(
             "Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b.",
         ),
@@ -715,4 +715,20 @@ function translate!(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsi
     LA.mul!(int.b₀, ext.A', δb, true, true)
     stiefel_coordinates!(int.Y, int.A, int.b₀)
     L
+end
+
+"""
+    Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
+
+Intersect the two given linear subspaces.
+Throws an `ErrorException` if the intersection is the sum of the
+codimensions is larger than the ambient dimension.
+"""
+function Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
+    ambient_dim(L₁) == ambient_dim(L₂) || error("Ambient dimensions don't match.")
+    codim(L₁) + codim(L₂) ≤ ambient_dim(L₁) ||
+        error("Sum of codimensions larger than ambient dimension.")
+    ext₁ = extrinsic(L₁)
+    ext₂ = extrinsic(L₂)
+    LinearSubspace([ext₁.A; ext₂.A], [ext₁.b; ext₂.b])
 end
