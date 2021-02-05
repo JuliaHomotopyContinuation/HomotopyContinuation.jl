@@ -50,6 +50,19 @@
         @test norm(L2(x)) ≈ 0 atol = 1e-8
     end
 
+    @testset "Intersect subspaces" begin
+        L₁ = rand_subspace(7; codim = 2)
+        L₂ = rand_subspace(7; codim = 3)
+        L₃ = L₁ ∩ L₂
+        @test codim(L₃) == 5
+        @test dim(L₃) == 2
+        @test ambient_dim(L₃) == 7
+        E₃ = extrinsic(L₃)
+        @test norm(L₁(E₃.A \ E₃.b, Extrinsic)) ≈ 0 atol = 1e-12
+        @test norm(L₂(E₃.A \ E₃.b, Extrinsic)) ≈ 0 atol = 1e-12
+        @test norm(L₃(E₃.A \ E₃.b, Extrinsic)) ≈ 0 atol = 1e-12
+    end
+
     @testset "IntrinsicSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)
