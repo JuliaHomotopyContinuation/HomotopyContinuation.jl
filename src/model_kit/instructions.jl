@@ -144,10 +144,10 @@ struct Instruction
     args::Tuple{InstructionArg,InstructionArg,InstructionArg}
 end
 
-Instruction(op::InstructionOp, a::T) where {T>:Tuple} =
-    Instruction(op, (a, nothing, nothing))
-Instruction(op, a, b) = Instruction(op, (a, b, nothing))
-Instruction(op, a, b, c) = Instruction(op, (a, b, c))
+Instruction(op::InstructionOp, a::InstructionArg) = Instruction(op, (a, nothing, nothing))
+Instruction(op, a::InstructionArg, b::InstructionArg) = Instruction(op, (a, b, nothing))
+Instruction(op, a::InstructionArg, b::InstructionArg, c::InstructionArg) =
+    Instruction(op, (a, b, c))
 Base.getindex(I::Instruction, i) = I.args[i]
 
 
