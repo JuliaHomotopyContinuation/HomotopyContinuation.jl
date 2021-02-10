@@ -170,6 +170,7 @@ module TrackerCode
     terminated_accuracy_limit
     terminated_ill_conditioned
     terminated_invalid_startvalue
+    terminated_invalid_startvalue_singular_jacobian
     terminated_step_size_too_small
     terminated_unknown
 end
@@ -194,9 +195,12 @@ is_terminated(S::TrackerCode.codes) = S ≠ TrackerCode.tracking && S ≠ Tracke
     is_invalid_startvalue(code::TrackerCode.codes)
 
 Returns `true` if `code` indicates that the path tracking got terminated since the start
-value was not a zero.
+value was not a regular zero.
 """
-is_invalid_startvalue(S::TrackerCode.codes) = S == TrackerCode.terminated_invalid_startvalue
+function is_invalid_startvalue(S::TrackerCode.codes)
+    S == TrackerCode.terminated_invalid_startvalue ||
+        S == TrackerCode.terminated_invalid_startvalue_singular_jacobian
+end
 
 """
     is_tracking(code::TrackerCode.codes)
@@ -256,8 +260,17 @@ is_success(R::TrackerResult) = R.return_code == :success
     is_invalid_startvalue(result::TrackerResult)
 
 Returns `true` if the path tracking failed since the start value was invalid.
+You can inspect `result.return_code` to get the exact return code. Possible values
+if `is_invalid_startvalue(result) == true` are
+* `:terminated_invalid_startvalue_singular_jacobian` indicates that the Jacobian of the homotopy at
+  the provided start value is singular, i.e., if it has not full-column rank.
+* `:terminated_invalid_startvalue` indicates that the the provided start value is not sufficiently
+  close to a solution of the homotopy.
 """
-is_invalid_startvalue(R::TrackerResult) = R.return_code == :invalid_startvalue
+function is_invalid_startvalue(R::TrackerResult)
+    R.return_code == :terminated_invalid_startvalue ||
+        R.return_code == :terminated_invalid_startvalue_singular_jacobian
+end
 
 """
     solution(result::TrackerResult)
@@ -696,7 +709,15 @@ function init!(
         state.accuracy = μ
         state.μ = max(μ, eps())
     else
-        state.code = TrackerCode.terminated_invalid_startvalue
+        evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, x, t)
+        J = matrix(workspace(jacobian))
+        corank = size(J, 2) - LA.rank(J, rtol = 1e-14)
+        if corank > 0
+            state.code = TrackerCode.terminated_invalid_startvalue_singular_jacobian
+        else
+            state.code = TrackerCode.terminated_invalid_startvalue
+        end
+
         return false
     end
 

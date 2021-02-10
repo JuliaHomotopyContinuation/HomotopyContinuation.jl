@@ -81,6 +81,7 @@ The possible states an `EndgameTracker` can be in:
 * `EndgameTrackerCode.terminated_accuracy_limit`
 * `EndgameTrackerCode.terminated_ill_conditioned`
 * `EndgameTrackerCode.terminated_invalid_startvalue`
+* `EndgameTrackerCode.terminated_invalid_startvalue_singular_jacobian`
 * `EndgameTrackerCode.terminated_max_winding_number`
 * `EndgameTrackerCode.terminated_max_steps`
 * `EndgameTrackerCode.terminated_step_size_too_small`
@@ -95,6 +96,7 @@ using ..TrackerCode: TrackerCode
     at_zero
     terminated_accuracy_limit
     terminated_invalid_startvalue
+    terminated_invalid_startvalue_singular_jacobian
     terminated_ill_conditioned
     terminated_max_steps
     terminated_max_extended_steps
@@ -117,6 +119,8 @@ function Base.convert(::Type{codes}, code::TrackerCode.codes)
         return terminated_ill_conditioned
     elseif code == TrackerCode.terminated_invalid_startvalue
         return terminated_invalid_startvalue
+    elseif code == TrackerCode.terminated_invalid_startvalue_singular_jacobian
+        return terminated_invalid_startvalue_singular_jacobian
     elseif code == TrackerCode.terminated_step_size_too_small
         return terminated_step_size_too_small
     elseif code == TrackerCode.terminated_unknown
