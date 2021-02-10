@@ -956,7 +956,13 @@ struct System
             vars == reduce(vcat, variable_groups) ||
                 throw(ArgumentError("Variable groups and variables don't match."))
         end
-        new(exprs, vars, params, variable_groups, Ref{Union{Nothing,Matrix{Expression}}}(nothing))
+        new(
+            exprs,
+            vars,
+            params,
+            variable_groups,
+            Ref{Union{Nothing,Matrix{Expression}}}(nothing),
+        )
     end
 end
 
