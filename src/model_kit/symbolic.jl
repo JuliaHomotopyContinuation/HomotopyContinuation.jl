@@ -943,6 +943,7 @@ struct System
     variables::Vector{Variable}
     parameters::Vector{Variable}
     variable_groups::Union{Nothing,Vector{Vector{Variable}}}
+    _jacobian::Ref{Union{Nothing,Matrix{Expression}}}
 
     function System(
         exprs::Vector{Expression},
@@ -955,7 +956,13 @@ struct System
             vars == reduce(vcat, variable_groups) ||
                 throw(ArgumentError("Variable groups and variables don't match."))
         end
-        new(exprs, vars, params, variable_groups)
+        new(
+            exprs,
+            vars,
+            params,
+            variable_groups,
+            Ref{Union{Nothing,Matrix{Expression}}}(nothing),
+        )
     end
 end
 
@@ -1105,12 +1112,82 @@ function Base.show(io::IO, F::System)
     end
 end
 
+"""
+    evaluate(F::System, x, p = nothing)
+
+Evaluates the system `F` at `(x, p)`.
+
+# Example
+
+```julia
+@var x y
+F = System([x^2 + 3y, (y*x+1)^3])
+evaluate(F, [2, 3])
+```
+```
+2-element Array{Int32,1}:
+  13
+ 343
+```
+"""
+
 evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
     evaluate(F.expressions, F.variables => x, F.parameters => p)
 end
 (F::System)(x::AbstractVector, p::Nothing = nothing) = evaluate(F, x)
 (F::System)(x::AbstractVector, p::AbstractVector) = evaluate(F, x, p)
+
+"""
+    jacobian(F::System)
+
+Computes the symbolic Jacobian of the system `F`.
+
+# Example
+
+```julia
+@var x y
+F = System([x^2 + 3y, (y*x+1)^3])
+jacobian(F)
+```
+```
+2×2 Array{Expression,2}:
+             2*x                3
+ 3*y*(1 + x*y)^2  3*x*(1 + x*y)^2
+```
+"""
+function jacobian(F::System)
+    if isnothing(F._jacobian[])
+        F._jacobian[] = differentiate(F.expressions, F.variables)
+    end
+    F._jacobian[]::Matrix{Expression}
+end
+
+"""
+    jacobian(F::System, x, p = nothing)
+
+Evaluates the Jacobian of the system `F` at `(x, p)`.
+
+# Example
+
+```julia
+@var x y
+F = System([x^2 + 3y, (y*x+1)^3])
+jacobian(F, [2, 3])
+```
+```
+2×2 Array{Int32,2}:
+   4    3
+ 441  294
+```
+"""
+function jacobian(F::System, x, p = nothing)
+    if p isa Nothing
+        evaluate(jacobian(F), F.variables => x)
+    else
+        evaluate(jacobian(F), F.variables => x, F.parameters => p)
+    end
+end
 
 function Base.:(==)(F::System, G::System)
     F.expressions == G.expressions &&

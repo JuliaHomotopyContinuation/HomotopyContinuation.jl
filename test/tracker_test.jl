@@ -98,6 +98,8 @@
 
         @test is_success(track(tracker, S[1], 1, 0))
         @test is_success(track(tracker, S[2], 1, 0))
+
+        @test is_invalid_startvalue(track(tracker, [100, -100], 1, 0))
     end
 
     @testset "Compiled/InterpretedHomotopy" begin
@@ -128,6 +130,90 @@
             tracker = Tracker(make(H); options = (automatic_differentiation = 1,))
             @test all(is_success, track.(tracker, S))
         end
+    end
+
+    @testset "invalid_startvalue_singular_jacobian" begin
+        # https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/issues/454
+        p0 = [
+            0 0
+            1 0
+            1 1
+            2 1
+            3/2 1/2
+            3.0 1.0
+            4 1
+            5 1
+            9/2 1/2
+            5 0
+            6 0
+        ]
+        E = [
+            1 2
+            2 3
+            2 5
+            3 4
+            3 5
+            4 5
+            4 6
+            5 9
+            6 7
+            7 8
+            7 9
+            8 9
+            8 10
+            9 10
+            10 11
+        ]
+        pinnedvertices = [1; 6; 11]
+        freevertices = [2; 3; 4; 5; 7; 8; 9; 10]
+
+        @var x[1:size(p0)[1], 1:size(p0)[2]] # x[1:11, 1:2] # create all variables
+        xvarz_moving_frame = [Variable(:x, i, k) for i in freevertices for k = 1:2]
+
+        # create random, real-valued, linear equation in the moving frame variables
+        # created so that it passes through the initial configuration p0
+        a = randn(1, length(xvarz_moving_frame)) # random coefficients
+        a = [0 1.0 0 1.0 0 1.0 0 1.0 0 1.0 0 1.0 0 1.0 0 1.0]
+        b0 = evaluate(
+            a * xvarz_moving_frame,
+            [Variable(:x, i, k) => p0[i, k] for i in freevertices for k = 1:2]...,
+        )[1]
+        # the parameters to move linear "slice" later in a parameter homotopy, just move
+        # the constant term "b"
+        bvarz = [Variable(:b)]
+
+        # the linear equation with parameters
+        L = (a*xvarz_moving_frame)[1] .- Variable(:b)
+
+        ε = 1e-3 #1e-10
+        p1 = p0 + ε * randn(size(p0))
+
+        b1 = subs(
+            a * xvarz_moving_frame,
+            [Variable(:x, i, k) => p1[i, k] for i in freevertices for k = 1:2]...,
+        )[1]
+        b1 = to_number(b1) # Float64(b1) throws an error
+
+        function edge_equation(i, j)
+            eqn = sum([(x[i, k] - x[j, k])^2 for k = 1:2])
+            eqn += -sum([(p0[i, k] - p0[j, k])^2 for k = 1:2])
+        end
+        fs = [edge_equation(E[m, 1], E[m, 2]) for m = 1:size(E)[1]]
+
+        # pin the vertices by substitution
+        gs = [
+            subs(
+                fij,
+                [Variable(:x, i, k) => p0[i, k] for i in pinnedvertices for k = 1:2]...,
+            ) for fij in fs
+        ]
+
+        G = System(vcat(gs, L); variables = xvarz_moving_frame, parameters = bvarz)
+        startsolutions0 = [p0[i, k] for i in freevertices for k = 1:2]
+        tracker = Tracker(ParameterHomotopy(G, [b0], [b1]; compile = false))
+        result = track(tracker, startsolutions0, 1, 0)
+        @test is_invalid_startvalue(result)
+        @test result.return_code == :terminated_invalid_startvalue_singular_jacobian
     end
 
     include("test_cases/steiner_higher_prec.jl")
