@@ -36,6 +36,9 @@ variables(::Expression)
 ## System
 ```@docs
 System
+evaluate(F::System, x, p = nothing)
+jacobian(F::System)
+jacobian(F::System, x, p = nothing)
 degrees(F::System)
 expressions(F::System)
 optimize(::System)
