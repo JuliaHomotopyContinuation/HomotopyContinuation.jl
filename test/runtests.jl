@@ -31,6 +31,7 @@ end
     include("model_kit_test.jl")
     include("linear_algebra_test.jl")
     include("homotopies_test.jl")
+    include("systems_test.jl")
     include("tracker_test.jl")
     include("valuation_test.jl")
     include("endgame_tracker_test.jl")

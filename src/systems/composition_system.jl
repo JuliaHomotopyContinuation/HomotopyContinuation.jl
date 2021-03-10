@@ -10,6 +10,7 @@ struct CompositionSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSyste
     # The system is g ∘ f
     g::S2
     f::S1
+    parameters::Vector{Variable}
 
     f_u::Vector{ComplexF64}
     f_ū::Vector{ComplexDF64}
@@ -26,6 +27,16 @@ function CompositionSystem(g::AbstractSystem, f::AbstractSystem)
             "Cannot create composition G ∘ F since the number of variabels of `G` and the number polynomials of `F` doesn't match.",
         ),
     )
+
+    pg = parameters(g)
+    pf = parameters(f)
+    (isempty(pf) || isempty(pg) || pf == pg) || throw(
+        ArgumentError(
+            "Cannot construct a composition of two system with different sets of parameters.",
+        ),
+    )
+    p = isempty(pg) ? [pg; pf] : pg
+
     f_u = zeros(ComplexF64, size(f, 1))
     f_ū = zeros(ComplexDF64, size(f, 1))
     f_U = zeros(ComplexF64, size(f))
@@ -36,13 +47,13 @@ function CompositionSystem(g::AbstractSystem, f::AbstractSystem)
     tu² = TaylorVector{3}(tu⁴)
     tu³ = TaylorVector{4}(tu⁴)
 
-    CompositionSystem(g, f, f_u, f_ū, f_U, g_U, tu⁴, tu³, tu², tu¹)
+    CompositionSystem(g, f, p, f_u, f_ū, f_U, g_U, tu⁴, tu³, tu², tu¹)
 end
 
 Base.size(C::CompositionSystem) = (size(C.g, 1), size(C.f, 2))
 
 ModelKit.variables(F::CompositionSystem) = variables(F.f)
-ModelKit.parameters(F::CompositionSystem) = parameters(F.f)
+ModelKit.parameters(F::CompositionSystem) = F.parameters
 ModelKit.variable_groups(F::CompositionSystem) = variable_groups(F.f)
 
 function Base.show(io::IO, C::CompositionSystem)
@@ -135,15 +146,10 @@ compose(
 ) = CompositionSystem(g, f)
 compose(g::AbstractSystem, f::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]) =
     CompositionSystem(g, fixed(f; compile = compile))
-function compose(g::System, f::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[])
-    pg = parameters(g)
-    pf = parameters(f)
-    (isempty(pf) || isempty(pg) || pf == pg) || throw(
-        ArgumentError(
-            "Cannot construct a composition of two system with different sets of parameters.",
-        ),
-    )
+compose(g::System, f::AbstractSystem; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]) =
+    CompositionSystem(fixed(g; compile = compile), f)
+compose(g::System, f::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]) =
     CompositionSystem(fixed(g; compile = compile), fixed(f; compile = compile))
-end
+
 import Base: ∘
 ∘(g::Union{AbstractSystem,System}, f::Union{AbstractSystem,System}) = compose(g, f)
