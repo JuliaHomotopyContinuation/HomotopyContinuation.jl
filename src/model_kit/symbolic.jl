@@ -1133,7 +1133,11 @@ evaluate(F, [2, 3])
 
 evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
-    evaluate(F.expressions, F.variables => x, F.parameters => p)
+    if isempty(F.parameters)
+        evaluate(F.expressions, F.variables => x)
+    else
+        evaluate(F.expressions, F.variables => x, F.parameters => p)
+    end
 end
 (F::System)(x::AbstractVector, p::Nothing = nothing) = evaluate(F, x)
 (F::System)(x::AbstractVector, p::AbstractVector) = evaluate(F, x, p)
