@@ -617,11 +617,19 @@ end
 ## conversion from Expression ##
 ################################
 
-function Base.convert(::Type{Int}, n::Basic)
-    @assert class(n) == :Integer
-    ccall((:integer_get_si, libsymengine), Int, (Ref{ExpressionRef},), n)
+@static if Int == Int64 && Sys.iswindows()
+    function Base.convert(::Type{Int32}, n::Basic)
+        @assert class(n) == :Integer
+        ccall((:integer_get_si, libsymengine), Int32, (Ref{ExpressionRef},), n)
+    end
+    Base.convert(::Type{Int64}, n::Basic) = convert(Int64, convert(BigInt, n))
+else
+    function Base.convert(::Type{Int}, n::Basic)
+        @assert class(n) == :Integer
+        ccall((:integer_get_si, libsymengine), Int, (Ref{ExpressionRef},), n)
+    end
+    Base.convert(::Type{Int32}, n::Basic) = convert(Int32, convert(Int, n))
 end
-Base.convert(::Type{Int32}, n::Basic) = convert(Int32, convert(Int, n))
 
 function Base.convert(::Type{BigInt}, c::Basic)
     a = BigInt()
