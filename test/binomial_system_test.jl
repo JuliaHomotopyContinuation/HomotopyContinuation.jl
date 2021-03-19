@@ -2,6 +2,26 @@ import MixedSubdivisions
 const MS = MixedSubdivisions
 
 @testset "Binomial System Test" begin
+
+    if Sys.iswindows()
+        @testset "GMP set Int64 on 32-bit systems" begin
+            x = BigInt()
+            a = round(UInt64, rand() * typemax(Int32))
+            for y in [a, a + typemax(Int32), a + UInt64(4) * typemax(UInt32)]
+                HC.set_ui64!(x, y)
+                @test x == y
+                HC.set_si64!(x, Int64(y))
+                @test x == Int64(y)
+                HC.set_si64!(x, -Int64(y))
+                @test x == -Int64(y)
+            end
+            HC.set_si64!(x, Int64(typemin(Int32)))
+            @test x == typemin(Int32)
+            HC.set_si64!(x, typemin(Int64))
+            @test x == typemin(Int64)
+        end
+    end
+
     @testset "Hermite Normal Form" begin
         A = [0 3 1 0; -2 2 -1 2; 1 -1 2 3; -3 3 3 2]
         H, U = HC.hnf(A)

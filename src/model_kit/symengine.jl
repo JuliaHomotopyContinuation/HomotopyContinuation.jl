@@ -356,16 +356,35 @@ Base.convert(::Type{Expression}, x::Irrational{:ℯ}) = __ℯ
 Base.convert(::Type{Expression}, x::Irrational{:catalan}) = __catalan
 
 
-# basic number types
-for (f, T) in
-    [(:integer_set_si, Int), (:integer_set_ui, UInt), (:real_double_set_d, Float64)]
-    @eval begin
-        function Base.convert(::Type{Expression}, x::$T)
-            a = Expression()
-            ccall(($(QuoteNode(f)), libsymengine), Nothing, (Ref{Expression}, $T), a, x)
-            return a
+@static if Int == Int64 && Sys.iswindows()
+    # basic number types
+    for (f, T) in
+        [(:integer_set_si, Int32), (:integer_set_ui, UInt32), (:real_double_set_d, Float64)]
+        @eval begin
+            function Base.convert(::Type{Expression}, x::$T)
+                a = Expression()
+                ccall(($(QuoteNode(f)), libsymengine), Nothing, (Ref{Expression}, $T), a, x)
+                return a
+            end
         end
     end
+
+    Base.convert(::Type{Expression}, x::Int64) = convert(Expression, BigInt(x))
+    Base.convert(::Type{Expression}, x::UInt64) = convert(Expression, BigInt(x))
+else
+    # basic number types
+    for (f, T) in
+        [(:integer_set_si, Int), (:integer_set_ui, UInt), (:real_double_set_d, Float64)]
+        @eval begin
+            function Base.convert(::Type{Expression}, x::$T)
+                a = Expression()
+                ccall(($(QuoteNode(f)), libsymengine), Nothing, (Ref{Expression}, $T), a, x)
+                return a
+            end
+        end
+    end
+    Base.convert(::Type{Expression}, x::Int32) = convert(Expression, convert(Int, x))
+    Base.convert(::Type{Expression}, x::UInt32) = convert(Expression, convert(UInt, x))
 end
 
 function Base.convert(::Type{Expression}, x::BigInt)
@@ -394,8 +413,6 @@ function Base.convert(::Type{Expression}, x::BigFloat)
         return a
     end
 end
-Base.convert(::Type{Expression}, x::Int32) = convert(Expression, convert(Int, x))
-Base.convert(::Type{Expression}, x::UInt32) = convert(Expression, convert(UInt, x))
 
 Base.convert(::Type{Expression}, x::Integer) = Expression(BigInt(x))
 Base.convert(::Type{Expression}, x::Rational) =
