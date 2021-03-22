@@ -175,8 +175,13 @@ function solve!(BSS::BinomialSystemSolver)
         solve!(BSS, BSS.H, BSS.U)
         # check result
         if !validate_result(BSS)
-            MPZ.set_si!.(BSS.H_big, BSS.H)
-            MPZ.set_si!.(BSS.U_big, BSS.U)
+            if Int == Int64
+                MPZ.set_si!.(BSS.H_big, BSS.H)
+                MPZ.set_si!.(BSS.U_big, BSS.U)
+            else
+                MPZ.set_si64!.(BSS.H_big, BSS.H)
+                MPZ.set_si64!.(BSS.U_big, BSS.U)
+            end
             hnf!(BSS.H_big, BSS.U_big, BSS.A)
             solve!(BSS, BSS.H_big, BSS.U_big)
         end
@@ -187,6 +192,29 @@ function solve!(BSS::BinomialSystemSolver)
     end
     BSS.X
 end
+
+# Set a (U)Int64 to a BigInt assuming that we are on 32-bit system
+function set_ui64!(x::BigInt, a::UInt64)
+    hi = unsafe_trunc(UInt32, a >> 32)
+    lo = unsafe_trunc(UInt32, a)
+    MPZ.set_ui!(x, hi)
+    MPZ.mul_2exp!(x, 32)
+    MPZ.add_ui!(x, lo)
+    x
+end
+function set_si64!(x::BigInt, a::Int64)
+    if a ≥ 0
+        set_ui64!(x, UInt64(a))
+    elseif a > typemin(Int64)
+        set_ui64!(x, UInt64(abs(a)))
+        MPZ.mul_si!(x, -1)
+    else
+        MPZ.set_si!(x, -1)
+        MPZ.mul_2exp!(x, 63)
+    end
+    x
+end
+
 function validate_result(BSS)
     for k = 1:size(BSS.X, 2)
         for j = 1:size(BSS.A, 2)
