@@ -139,7 +139,7 @@ end
 start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
     set_subspaces!(H, p, H.target)
 target_parameters!(H::IntrinsicSubspaceHomotopy, q::LinearSubspace) =
-    set_subspaces!(H, H.starts, q)
+    set_subspaces!(H, H.start, q)
 parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
     set_subspaces!(H, p, q)
 
