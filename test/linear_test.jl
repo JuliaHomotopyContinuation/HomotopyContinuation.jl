@@ -90,6 +90,10 @@
         @test A == copy_A
         @test all(is_success, track.(graff_tracker, solution.(graff_result)))
 
+        target_parameters!(graff_tracker.homotopy, C)
+        @test A == copy_A
+        @test all(is_success, track.(graff_tracker, solution.(graff_result)))
+
         graff_path_tracker = EndgameTracker(IntrinsicSubspaceHomotopy(F, A, B))
         graff_path_result = track.(graff_path_tracker, W)
         @test all(is_success, graff_path_result)
