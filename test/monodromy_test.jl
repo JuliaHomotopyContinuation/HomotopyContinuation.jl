@@ -15,7 +15,7 @@
         result = monodromy_solve(
             F,
             target_solutions_count = 21,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
             threading = false,
         )
         @test is_success(result)
@@ -27,7 +27,7 @@
         result2 = monodromy_solve(
             F,
             target_solutions_count = 21,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
             threading = false,
             seed = result.seed,
         )
@@ -36,7 +36,7 @@
         result = monodromy_solve(
             F,
             target_solutions_count = 21,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
             threading = true,
         )
         @test is_success(result)
@@ -53,7 +53,7 @@
             [x₀ for _ = 1:30],
             p₀,
             target_solutions_count = 21,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
         )
         @test length(solutions(result)) == 21
 
@@ -97,7 +97,7 @@
             p₀,
             equivalence_classes = true,
             target_solutions_count = 7,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
             group_actions = roots_of_unity,
         )
         @test nresults(result) == 7
@@ -107,7 +107,7 @@
             x₀,
             p₀,
             group_action = roots_of_unity,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
         )
         @test nsolutions(result) == 7
 
@@ -116,7 +116,7 @@
             InterpretedSystem(F),
             group_action = roots_of_unity,
             target_solutions_count = 7,
-            max_loops_no_progress = 20,
+            max_loops_no_progress = 50,
         )
         @test nsolutions(result) == 7
 
