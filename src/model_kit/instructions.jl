@@ -110,21 +110,44 @@ function arity(op::InstructionOp)
     end
 end
 @inline neg_fast(x) = Base.FastMath.sub_fast(x)
-@inline add_fast(x, y) = Base.FastMath.add_fast(x, y)
-@inline add_fast(x::T, y::T) where {T} = x + y
-@inline sub_fast(x, y) = Base.FastMath.sub_fast(x, y)
-@inline sub_fast(x::T, y::T) where {T} = x - y
-@inline mul_fast(x, y) = Base.FastMath.mul_fast(x, y)
-@inline mul_fast(x::T, y::T) where {T} = x * y
-@inline div_fast(x, y) = Base.FastMath.div_fast(x, y)
-@inline div_fast(x::T, y::T) where {T} = x / y
+
+#@inline add_fast(x, y) = Base.FastMath.add_fast(x, y)
+#@inline add_fast(x::T, y::T) where {T} = x + y
+@inline add_fast(x::T, y::T) where {T}= Base.FastMath.add_fast(x, y)
+@inline add_fast(x, y)= x + y
+
+#@inline sub_fast(x, y) = Base.FastMath.sub_fast(x, y)
+#@inline sub_fast(x::T, y::T) where {T} = x - y
+@inline sub_fast(x::T, y::T) where {T}= Base.FastMath.sub_fast(x, y)
+@inline sub_fast(x, y)= x - y
+
+#@inline mul_fast(x, y) = Base.FastMath.mul_fast(x, y)
+#@inline mul_fast(x::T, y::T) where {T} = x * y
+@inline mul_fast(x::T, y::T) where {T}= Base.FastMath.mul_fast(x, y)
+@inline mul_fast(x, y)= x * y
+
+#@inline div_fast(x, y) = Base.FastMath.div_fast(x, y)
+#@inline div_fast(x::T, y::T) where {T} = x / y
+@inline div_fast(x::T, y::T) where {T}= Base.FastMath.div_fast(x, y)
+@inline div_fast(x, y)= x / y
+
 @inline pow_fast(x, p::Integer) = Base.power_by_squaring(x, p)
-@inline muladd_fast(x, y, z) = @fastmath x * y + z
-@inline muladd_fast(x::T, y::T, z::T) where {T} = x * y + z
-@inline mulsub_fast(x, y, z) = @fastmath x * y - z
-@inline mulsub_fast(x::T, y::T, z::T) where {T} = x * y - z
-@inline submul_fast(x, y, z) = @fastmath z - x * y
-@inline submul_fast(x::T, y::T, z::T) where {T} = z - x * y
+
+#@inline muladd_fast(x, y, z) = @fastmath x * y + z
+#@inline muladd_fast(x::T, y::T, z::T) where {T} = x * y + z
+@inline muladd_fast(x::T, y::T, z::T) where {T}= @fastmath x * y + z
+@inline muladd_fast(x, y, z)= x * y + z
+
+#@inline mulsub_fast(x, y, z) = @fastmath x * y - z
+#@inline mulsub_fast(x::T, y::T, z::T) where {T} = x * y - z
+@inline mulsub_fast(x::T, y::T, z::T) where {T}= @fastmath x * y - z
+@inline mulsub_fast(x, y, z)= x * y - z
+
+#@inline submul_fast(x, y, z) = @fastmath z - x * y
+#@inline submul_fast(x::T, y::T, z::T) where {T} = z - x * y
+@inline submul_fast(x::T, y::T, z::T) where {T}= @fastmath z - x * y
+@inline submul_fast(x, y, z)= z - x * y
+
 @inline sqr_fast(x) = sqr(x)
 @inline sqr(x) = @fastmath x * x
 @inline function sqr(z::Complex)
