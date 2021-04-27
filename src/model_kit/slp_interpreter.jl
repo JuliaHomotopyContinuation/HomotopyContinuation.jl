@@ -263,53 +263,53 @@ function load_data(f, var_name, arg, has_parameters::Bool)
     end
 end
 
-Base.@propagate_inbounds neg_fast!(z, i, x) = (z[i] = neg_fast(x))
-Base.@propagate_inbounds sqr_fast!(z, i, x) = (z[i] = sqr_fast(x))
-Base.@propagate_inbounds sin_fast!(z, i, x) = (z[i] = sin(x))
-Base.@propagate_inbounds cos_fast!(z, i, x) = (z[i] = cos(x))
-Base.@propagate_inbounds pow_fast!(z, i, x, k::Integer) = (z[i] = pow_fast(x, k))
+Base.@propagate_inbounds neg_instr!(z, i, x) = (z[i] = neg_instr(x))
+Base.@propagate_inbounds sqr_instr!(z, i, x) = (z[i] = sqr_instr(x))
+Base.@propagate_inbounds sin_instr!(z, i, x) = (z[i] = sin(x))
+Base.@propagate_inbounds cos_instr!(z, i, x) = (z[i] = cos(x))
+Base.@propagate_inbounds pow_instr!(z, i, x, k::Integer) = (z[i] = pow_instr(x, k))
 
-Base.@propagate_inbounds add_fast!(z, i, x, y, _t₁) = (z[i] = add_fast(x, y))
-Base.@propagate_inbounds sub_fast!(z, i, x, y, _t₁) = (z[i] = sub_fast(x, y))
-Base.@propagate_inbounds mul_fast!(z, i, x, y, _t₁) = (z[i] = mul_fast(x, y))
-Base.@propagate_inbounds div_fast!(z, i, x, y, _t₁) = (z[i] = div_fast(x, y))
+Base.@propagate_inbounds add_instr!(z, i, x, y, _t₁) = (z[i] = add_instr(x, y))
+Base.@propagate_inbounds sub_instr!(z, i, x, y, _t₁) = (z[i] = sub_instr(x, y))
+Base.@propagate_inbounds mul_instr!(z, i, x, y, _t₁) = (z[i] = mul_instr(x, y))
+Base.@propagate_inbounds div_instr!(z, i, x, y, _t₁) = (z[i] = div_instr(x, y))
 
-Base.@propagate_inbounds muladd_fast!(z, i, u, v, w, _t₁, _t₂) =
-    (z[i] = muladd_fast(u, v, w))
-Base.@propagate_inbounds mulsub_fast!(z, i, u, v, w, _t₁, _t₂) =
-    (z[i] = mulsub_fast(u, v, w))
-Base.@propagate_inbounds submul_fast!(z, i, u, v, w, _t₁, _t₂) =
-    (z[i] = submul_fast(u, v, w))
+Base.@propagate_inbounds muladd_instr!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = muladd_instr(u, v, w))
+Base.@propagate_inbounds mulsub_instr!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = mulsub_instr(u, v, w))
+Base.@propagate_inbounds submul_instr!(z, i, u, v, w, _t₁, _t₂) =
+    (z[i] = submul_instr(u, v, w))
 
 
 # Arb versions
 opt_set!(z::Union{Acb,AcbRef}, x::Union{Acb,AcbRef}) = x
 opt_set!(z::Union{Acb,AcbRef}, x::Number) = (z[] = x; z)
 
-neg_fast!(z::AcbRefVector, i, x) = Arblib.neg!(z[i], opt_set!(z[i], x))
-sqr_fast!(z::AcbRefVector, i, x) = Arblib.sqr!(z[i], opt_set!(z[i], x))
-sin_fast!(z::AcbRefVector, i, x) = Arblib.sin!(z[i], opt_set!(z[i], x))
-cos_fast!(z::AcbRefVector, i, x) = Arblib.cos!(z[i], opt_set!(z[i], x))
-pow_fast!(z::AcbRefVector, i, x, k::Integer) = Arblib.pow!(z[i], opt_set!(z[i], x), k)
+neg_instr!(z::AcbRefVector, i, x) = Arblib.neg!(z[i], opt_set!(z[i], x))
+sqr_instr!(z::AcbRefVector, i, x) = Arblib.sqr!(z[i], opt_set!(z[i], x))
+sin_instr!(z::AcbRefVector, i, x) = Arblib.sin!(z[i], opt_set!(z[i], x))
+cos_instr!(z::AcbRefVector, i, x) = Arblib.cos!(z[i], opt_set!(z[i], x))
+pow_instr!(z::AcbRefVector, i, x, k::Integer) = Arblib.pow!(z[i], opt_set!(z[i], x), k)
 
-add_fast!(z::AcbRefVector, i, x, y, t₁) =
+add_instr!(z::AcbRefVector, i, x, y, t₁) =
     Arblib.add!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
-sub_fast!(z::AcbRefVector, i, x, y, t₁) =
+sub_instr!(z::AcbRefVector, i, x, y, t₁) =
     Arblib.sub!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
-mul_fast!(z::AcbRefVector, i, x, y, t₁) =
+mul_instr!(z::AcbRefVector, i, x, y, t₁) =
     Arblib.mul!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
-div_fast!(z::AcbRefVector, i, x, y, t₁) =
+div_instr!(z::AcbRefVector, i, x, y, t₁) =
     Arblib.div!(z[i], opt_set!(z[i], x), opt_set!(t₁, y))
 
-function muladd_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+function muladd_instr!(z::AcbRefVector, i, u, v, w, t₁, t₂)
     z[i][] = w
     Arblib.addmul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
 end
-function mulsub_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+function mulsub_instr!(z::AcbRefVector, i, u, v, w, t₁, t₂)
     Arblib.neg!(z[i], opt_set!(t₁, w))
     Arblib.addmul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
 end
-function submul_fast!(z::AcbRefVector, i, u, v, w, t₁, t₂)
+function submul_instr!(z::AcbRefVector, i, u, v, w, t₁, t₂)
     z[i][] = w
     Arblib.submul!(z[i], opt_set!(t₁, u), opt_set!(t₂, v))
 end
@@ -319,33 +319,33 @@ function evaluate_block(; has_parameters::Bool = false)
     load_data(:v₁, :arg₁, has_parameters) do v₁
         quote
             if op == INSTR_NEG
-                neg_fast!(tape, i, $v₁)
+                neg_instr!(tape, i, $v₁)
             elseif op == INSTR_SQR
-                sqr_fast!(tape, i, $v₁)
+                sqr_instr!(tape, i, $v₁)
             elseif op == INSTR_SIN
-                sin_fast!(tape, i, $v₁)
+                sin_instr!(tape, i, $v₁)
             elseif op == INSTR_COS
-                cos_fast!(tape, i, $v₁)
+                cos_instr!(tape, i, $v₁)
             elseif op == INSTR_POW
-                pow_fast!(tape, i, $v₁, arg₂.ind)
+                pow_instr!(tape, i, $v₁, arg₂.ind)
             else
                 $(
                     load_data(:v₂, :arg₂, has_parameters) do v₂
                         quote
                             if op == INSTR_ADD
-                                add_fast!(tape, i, $v₁, $v₂, t₁)
+                                add_instr!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_SUB
-                                sub_fast!(tape, i, $v₁, $v₂, t₁)
+                                sub_instr!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_MUL
-                                mul_fast!(tape, i, $v₁, $v₂, t₁)
+                                mul_instr!(tape, i, $v₁, $v₂, t₁)
                             elseif op == INSTR_DIV
-                                div_fast!(tape, i, $v₁, $v₂, t₁)
+                                div_instr!(tape, i, $v₁, $v₂, t₁)
                             else
                                 $(
                                     load_data(:v₃, :arg₃, has_parameters) do v₃
                                         quote
                                             if op == INSTR_MULADD
-                                                muladd_fast!(
+                                                muladd_instr!(
                                                     tape,
                                                     i,
                                                     $v₁,
@@ -355,7 +355,7 @@ function evaluate_block(; has_parameters::Bool = false)
                                                     t₂,
                                                 )
                                             elseif op == INSTR_MULSUB
-                                                mulsub_fast!(
+                                                mulsub_instr!(
                                                     tape,
                                                     i,
                                                     $v₁,
@@ -365,7 +365,7 @@ function evaluate_block(; has_parameters::Bool = false)
                                                     t₂,
                                                 )
                                             elseif op == INSTR_SUBMUL
-                                                submul_fast!(
+                                                submul_instr!(
                                                     tape,
                                                     i,
                                                     $v₁,
