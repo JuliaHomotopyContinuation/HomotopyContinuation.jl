@@ -15,25 +15,25 @@ end
 
 function call_op(op::InstructionOp)
     if op == INSTR_ADD
-        :add_fast
+        :add_instr
     elseif op == INSTR_SUB
-        :sub_fast
+        :sub_instr
     elseif op == INSTR_NEG
-        :neg_fast
+        :neg_instr
     elseif op == INSTR_MUL
-        :mul_fast
+        :mul_instr
     elseif op == INSTR_DIV
-        :div_fast
+        :div_instr
     elseif op == INSTR_MULADD
-        :muladd_fast
+        :muladd_instr
     elseif op == INSTR_MULSUB
-        :mulsub_fast
+        :mulsub_instr
     elseif op == INSTR_SUBMUL
-        :submul_fast
+        :submul_instr
     elseif op == INSTR_SQR
-        :sqr_fast
+        :sqr_instr
     elseif op == INSTR_POW
-        :pow_fast
+        :pow_instr
     elseif op == INSTR_SIN
         :sin
     elseif op == INSTR_COS
@@ -109,35 +109,30 @@ function arity(op::InstructionOp)
         :UNKNOWN
     end
 end
-@inline neg_fast(x) = Base.FastMath.sub_fast(x)
-@inline add_fast(x, y) = Base.FastMath.add_fast(x, y)
-@inline add_fast(x::T, y::T) where {T} = x + y
-@inline sub_fast(x, y) = Base.FastMath.sub_fast(x, y)
-@inline sub_fast(x::T, y::T) where {T} = x - y
-@inline mul_fast(x, y) = Base.FastMath.mul_fast(x, y)
-@inline mul_fast(x::T, y::T) where {T} = x * y
-@inline div_fast(x, y) = Base.FastMath.div_fast(x, y)
-@inline div_fast(x::T, y::T) where {T} = x / y
-@inline pow_fast(x, p::Integer) = Base.power_by_squaring(x, p)
-@inline muladd_fast(x, y, z) = @fastmath x * y + z
-@inline muladd_fast(x::T, y::T, z::T) where {T} = x * y + z
-@inline mulsub_fast(x, y, z) = @fastmath x * y - z
-@inline mulsub_fast(x::T, y::T, z::T) where {T} = x * y - z
-@inline submul_fast(x, y, z) = @fastmath z - x * y
-@inline submul_fast(x::T, y::T, z::T) where {T} = z - x * y
-@inline sqr_fast(x) = sqr(x)
-@inline sqr(x) = @fastmath x * x
+@inline neg_instr(x) = -x
+@inline add_instr(x, y) = x + y
+@inline sub_instr(x, y) = x - y
+@inline mul_instr(x, y) = x * y
+@inline div_instr(x, y) = x / y
+@inline div_instr(x::Complex, y::Complex) = Base.FastMath.div_fast(x, y)
+@inline pow_instr(x, p::Integer) = Base.power_by_squaring(x, p)
+@inline muladd_instr(x, y, z) = x * y + z
+@inline mulsub_instr(x, y, z) = x * y - z
+@inline submul_instr(x, y, z) = z - x * y
+@inline sqr_instr(x) = sqr(x)
+@inline sqr(x) = x * x
 @inline function sqr(z::Complex)
     x, y = reim(z)
-    @fastmath Complex((x + y) * (x - y), (x + x) * y)
+    Complex((x + y) * (x - y), (x + x) * y)
 end
 """
     inv_not_zero(x)
 
 Invert x unless it is 0, then return 0.
 """
-@inline inv_not_zero(x) = ifelse(is_zero(x), x, @fastmath inv(x))
-@inline inv_fast(x) = @fastmath inv(x)
+@inline inv_not_zero(x) = ifelse(is_zero(x), x, inv_instr(x))
+@inline inv_instr(x) = inv(x)
+@inline inv_instr(x::Complex) = Base.FastMath.inv_fast(x)
 
 struct InstructionRef
     i::Int
@@ -637,20 +632,20 @@ julia> list, _ = ModelKit.instruction_list([ex]);
 
 julia> ModelKit.to_expr(list)
 quote
-    ι1 = sub_fast(h, u)
-    ι2 = mul_fast(c, d)
-    ι3 = mul_fast(b, ι1)
-    ι4 = mulsub_fast(a, ι3, ι2)
-    ι5 = mul_fast(ι1, ι4)
+    ι1 = sub_instr(h, u)
+    ι2 = mul_instr(c, d)
+    ι3 = mul_instr(b, ι1)
+    ι4 = mulsub_instr(a, ι3, ι2)
+    ι5 = mul_instr(ι1, ι4)
 end
 
 julia> ModelKit.to_expr(list; allocation_alias = ModelKit.allocation_alias(list))
 quote
-    ι1 = sub_fast(h, u)
-    ι2 = mul_fast(c, d)
-    ι3 = mul_fast(b, ι1)
-    ι3 = mulsub_fast(a, ι3, ι2)
-    ι3 = mul_fast(ι1, ι3)
+    ι1 = sub_instr(h, u)
+    ι2 = mul_instr(c, d)
+    ι3 = mul_instr(b, ι1)
+    ι3 = mulsub_instr(a, ι3, ι2)
+    ι3 = mul_instr(ι1, ι3)
 end
 
 ```
@@ -716,7 +711,10 @@ function to_expr(
             if op == INSTR_POW && arg2 isa Int
                 k::Int = arg2
                 if k < 0
-                    push!(exprs, :($id = inv_fast($(unroll_pow(get(variables, a, a), -k)))))
+                    push!(
+                        exprs,
+                        :($id = inv_instr($(unroll_pow(get(variables, a, a), -k)))),
+                    )
                 else
                     push!(exprs, :($id = $(unroll_pow(get(variables, a, a), k))))
                 end
@@ -920,8 +918,8 @@ function taylor_pow_impl(K, dx)
     quote
         $(untuple(:x, dx))
         iszero(x0) && return $(taylor_tuple([nothing for _ = 0:K]))
-        w₀ = pow_fast(x0, r)
-        $((K > 0 ? (:(u₀_inv = inv_fast(x0)),) : ())...)
+        w₀ = pow_instr(x0, r)
+        $((K > 0 ? (:(u₀_inv = inv_instr(x0)),) : ())...)
         $(to_expr(list; variables = Dict(:x => :x, :u₀_inv => :u₀_inv, :w₀ => :w₀)))
         $(taylor_tuple(to_expr_arg.(w, nothing)))
     end
