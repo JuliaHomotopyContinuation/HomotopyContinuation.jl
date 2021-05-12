@@ -21,7 +21,7 @@ function WitnessSet(
     F::AbstractSystem,
     L::LinearSubspace,
     R;
-    projective::Bool = is_linear(A) && is_homogeneous(System(F)),
+    projective::Bool = is_linear(L) && is_homogeneous(System(F)),
 )
     WitnessSet(F, L, R, projective)
 end
