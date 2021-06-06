@@ -50,7 +50,7 @@ function taylor_call_op(op::InstructionOp)
     elseif op == INSTR_SUB
         :taylor_sub
     elseif op == INSTR_NEG
-        :tayor_neg
+        :taylor_neg
     elseif op == INSTR_MUL
         :taylor_mul
     elseif op == INSTR_DIV
