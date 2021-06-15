@@ -374,14 +374,13 @@
     end
 
     @testset "monodromy with predefined tolerance for unique_points" begin
-
-        # Example from
-        # https://www.juliahomotopycontinuation.org/examples/symmetroids/
         d = 3; n = 4
         M = binomial(d - 1 + 2, 2)
         D = (n-1) * M + 3
         N = binomial(n - 1 + d, d)
-
+        # Example from
+        # https://www.juliahomotopycontinuation.org/examples/symmetroids/
+        
         @var x[0:n-1] a[1:D]
         A = map(0:n-2) do ℓ
             Aᵢ  = []
