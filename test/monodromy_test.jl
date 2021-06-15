@@ -436,7 +436,10 @@
                          target_solutions_count = 305
                          )
 
-        UP = unique_points(solutions(points), metric = dist, rtol = 1e-8, atol = 1e-14)
+        UP = unique_points(solutions(points),
+                            metric = dist,
+                            rtol = 1e-8,
+                            atol = 1e-14)
 
         @test length(solutions(points)) == length(UP)
    end
