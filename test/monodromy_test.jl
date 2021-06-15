@@ -442,6 +442,5 @@
                             atol = 1e-14)
 
         @test length(solutions(points)) == length(UP)
-   end
-
+    end
 end
