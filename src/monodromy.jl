@@ -915,11 +915,7 @@ function serial_monodromy_solve!(
                 loop_tracked!(stats)
 
                 # 1) check whether solutions already exists
-                id, got_added = add!(
-                    MS,
-                    res,
-                    length(results) + 1
-                )
+                id, got_added = add!(MS, res, length(results) + 1)
 
                 if MS.options.permutations
                     add_permutation!(stats, job.loop_id, job.id, id)
@@ -1039,11 +1035,7 @@ function threaded_monodromy_solve!(
 
                         # 1) check whether solutions already exists
                         lock(data_lock)
-                        id, got_added = add!(
-                            MS,
-                            res,
-                            length(results) + 1
-                        )
+                        id, got_added = add!(MS, res, length(results) + 1)
 
                         if MS.options.permutations
                             add_permutation!(stats, job.loop_id, job.id, id)
