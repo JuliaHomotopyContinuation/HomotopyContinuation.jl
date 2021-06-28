@@ -22,7 +22,6 @@ Options for [`monodromy_solve`](@ref).
 """
 Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     check_startsolutions::Bool = true
-    distance::D = EuclideanNorm()
     group_actions::GA = nothing
     loop_finished_callback = always_false
     parameter_sampler = independent_normal
@@ -36,6 +35,10 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     max_loops_no_progress::Int = 5
     reuse_loops::Symbol = :all
     permutations::Bool = false
+    # unique points options
+    distance::D = EuclideanNorm()
+    unique_points_atol::Union{Nothing,Float64} = nothing
+    unique_points_rtol::Union{Nothing,Float64} = nothing
 end
 
 """
@@ -448,6 +451,7 @@ function MonodromySolver(
 
     unique_points =
         UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
+
     trace = zeros(ComplexF64, length(x₀) + 1, 3)
     MonodromySolver(
         trackers,
@@ -547,7 +551,8 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   See also [`trace_test`](@ref).
 * `trace_test_tol = 1e-10`: The tolerance for the trace test to be successfull.
   The trace is divided by the number of solutions before compared to the trace_test_tol.
-
+* `unique_points_rtol`: the relative tolerance for [`unique_points`](@ref).
+* `unique_points_atol`: the absolute tolerance for [`unique_points`](@ref).
 """
 function monodromy_solve(F::Vector{<:ModelKit.Expression}, args...; parameters, kwargs...)
     monodromy_solve(System(F; parameters = parameters), args...; kwargs...)
@@ -636,6 +641,7 @@ function monodromy_solve(
         tracker_options = tracker_options,
         intrinsic = intrinsic,
     )
+
     monodromy_solve(
         MS,
         S,
@@ -837,8 +843,18 @@ function check_start_solutions(MS::MonodromySolver, X, p)
 end
 
 function add!(MS::MonodromySolver, res::PathResult, id)
-    rtol = clamp(0.25 * inv(res.ω)^2, 1e-14, sqrt(res.accuracy))
-    add!(MS.unique_points, solution(res), id; atol = 1e-14, rtol = rtol)
+    if isnothing(MS.options.unique_points_rtol)
+        rtol = uniqueness_rtol(res)
+    else
+        rtol = MS.options.unique_points_rtol
+    end
+    if isnothing(MS.options.unique_points_atol)
+        atol = 1e-14
+    else
+        atol = MS.options.unique_points_atol
+    end
+
+    add!(MS.unique_points, solution(res), id; atol = atol, rtol = rtol)
 end
 
 function serial_monodromy_solve!(
@@ -899,13 +915,7 @@ function serial_monodromy_solve!(
                 loop_tracked!(stats)
 
                 # 1) check whether solutions already exists
-                id, got_added = add!(
-                    MS.unique_points,
-                    solution(res),
-                    length(results) + 1;
-                    atol = 1e-14,
-                    rtol = uniqueness_rtol(res),
-                )
+                id, got_added = add!(MS, res, length(results) + 1)
 
                 if MS.options.permutations
                     add_permutation!(stats, job.loop_id, job.id, id)
@@ -1025,13 +1035,7 @@ function threaded_monodromy_solve!(
 
                         # 1) check whether solutions already exists
                         lock(data_lock)
-                        id, got_added = add!(
-                            MS.unique_points,
-                            solution(res),
-                            length(results) + 1;
-                            atol = 1e-14,
-                            rtol = uniqueness_rtol(res),
-                        )
+                        id, got_added = add!(MS, res, length(results) + 1)
 
                         if MS.options.permutations
                             add_permutation!(stats, job.loop_id, job.id, id)

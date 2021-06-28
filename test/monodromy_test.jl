@@ -372,4 +372,69 @@
             trace_tol = 1e-60,
         )
     end
+
+    @testset "monodromy with predefined tolerance for unique_points" begin
+        d = 3
+        n = 4
+        M = binomial(d - 1 + 2, 2)
+        D = (n - 1) * M + 3
+        N = binomial(n - 1 + d, d)
+        # Example from
+        # https://www.juliahomotopycontinuation.org/examples/symmetroids/
+
+        @var x[0:n-1] a[1:D]
+        A = map(0:n-2) do ℓ
+            Aᵢ = []
+            for i = 1:d
+                k = ℓ * M + sum(d - j for j = 0:i-1)
+                push!(Aᵢ, [zeros(i - 1); a[k-(d-i):k]])
+            end
+            Aᵢ = hcat(Aᵢ...)
+            (Aᵢ + transpose(Aᵢ)) ./ 2
+        end
+
+        A₀ = [a[D-2] 0 0; 0 a[D-1] 0; 0 0 a[D]]
+        μ = x[1] .* A₀ + sum(x[i+1] .* A[i] for i = 1:n-1)
+        f = System(coefficients(det(μ), x))
+
+        J₀ = jacobian(InterpretedSystem(f), randn(ComplexF64, D))
+        dimQ = rank(J₀)
+        dim_fibers = D - dimQ
+        S1 = qr(randn(ComplexF64, D, D)).Q
+        S = S1[:, 1:dimQ]
+        s = S1[:, dimQ+1]
+
+        @var b[1:dimQ]
+        L₁ = System(S * b + s)
+        @var k[1:N+1] f₀[1:length(f)]
+        b₁ = randn(ComplexF64, dimQ)
+        f₁ = f(L₁(b₁))
+
+        R1 = qr(randn(ComplexF64, N, N)).Q
+        R = [transpose(k[1:N]); R1[1:(dimQ-1), :]]
+        r = [k[N+1]; R[2:end, :] * f₁]
+
+        L₂ = System(R * f₀ - r, variables = f₀; parameters = k)
+
+
+        p₁ = randn(ComplexF64, N)
+        params = [p₁; transpose(p₁) * f₁]
+
+        dist(x, y) = norm(f(L₁(x)) - f(L₁(y)), Inf)
+
+        points = monodromy_solve(
+            L₂ ∘ f ∘ L₁,
+            [b₁],
+            params,
+            distance = dist,
+            compile = false,
+            unique_points_rtol = 1e-8,
+            unique_points_atol = 1e-14,
+            target_solutions_count = 305,
+        )
+
+        UP = unique_points(solutions(points), metric = dist, rtol = 1e-8, atol = 1e-14)
+
+        @test length(solutions(points)) == length(UP)
+    end
 end
