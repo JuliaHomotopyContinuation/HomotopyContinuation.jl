@@ -58,9 +58,6 @@ function SemialgebraicSets.solvealgebraicequations(
     solver::SemialgebraicSetsHCSolver,
 )
     F = System(V)
-    m, n = size(F)
-    # Check that we can have isolated solutions
-    m ≥ n || return nothing
     # Only return real, non-singular solutions
     return real_solutions(solve(F; solver.options...); only_nonsingular = true)
 end
