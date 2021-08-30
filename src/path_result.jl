@@ -229,7 +229,8 @@ is_at_infinity(r::PathResult) = r.return_code == :at_infinity || r.return_code =
 """
     is_excess_solution(r::PathResult)
 
-Checks whether the path is successfull.
+Checks whether gives an excess solution that was artificially introduced
+by the homotopy continuation from the modified system.
 """
 is_excess_solution(r::PathResult) = r.return_code == :excess_solution
 
