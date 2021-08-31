@@ -5,7 +5,7 @@ import Arblib
 export Interval,
     IComplex, IComplexF64, mid, diam, rad, mig, mag, hull, isinterior, isdisjoint
 
-import Base: *, /, +, -, ^
+import Base: *, /, +, -, ^, inv
 
 @static if VERSION ≥ v"1.5.0-"
     import Base: isdisjoint
@@ -198,6 +198,12 @@ function inv(a::Interval{T}) where {T<:Real}
         return Interval(convert(T, NaN))
     end
     @round(inv(a.hi), inv(a.lo))
+end
+
+function inv(b::IComplex{T}) where {T}
+    bre, bim = reim(b)
+    denom = bre^2 + bim^2
+    IComplex(bre / denom, (-bim) / denom)
 end
 
 function /(a::Interval{T}, x::T) where {T<:Real}
