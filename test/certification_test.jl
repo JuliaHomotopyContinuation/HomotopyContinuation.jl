@@ -190,9 +190,9 @@
 
     @testset "certify uses complex inversion" begin
         @var x y
-        F = System([y/x+x^2-3], parameters = [y])
+        F = System([y / x + x^2 - 3], parameters = [y])
         monres = monodromy_solve(F)
-        cert = certify(F,monres)
+        cert = certify(F, monres)
         @test ndistinct_certified(cert) >= 1
     end
 end
