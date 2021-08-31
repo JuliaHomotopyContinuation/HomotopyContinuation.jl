@@ -187,4 +187,12 @@
         @test_throws ArgumentError certify(F, real_sols; compile = false)
         @test_throws ArgumentError certify(F, real_sols; compile = true)
     end
+
+    @testset "certify uses complex inversion" begin
+        @var x y
+        F = System([y / x + x^2 - 3], parameters = [y])
+        monres = monodromy_solve(F)
+        cert = certify(F, monres)
+        @test ndistinct_certified(cert) >= 1
+    end
 end
