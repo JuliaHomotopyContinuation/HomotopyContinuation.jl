@@ -200,12 +200,6 @@ function inv(a::Interval{T}) where {T<:Real}
     @round(inv(a.hi), inv(a.lo))
 end
 
-function inv(b::IComplex{T}) where {T}
-    bre, bim = reim(b)
-    denom = bre^2 + bim^2
-    IComplex(bre / denom, (-bim) / denom)
-end
-
 function /(a::Interval{T}, x::T) where {T<:Real}
     iszero(a) && return zero(Interval{T})
 
@@ -355,6 +349,11 @@ Base.muladd(z::Union{Complex,IComplex}, w::Union{Complex,IComplex}, x::IComplex)
     muladd(real(z), imag(w), muladd(imag(z), real(w), imag(x))),
 )
 
+function inv(b::IComplex{T}) where {T}
+    bre, bim = reim(b)
+    denom = bre^2 + bim^2
+    IComplex(bre / denom, (-bim) / denom)
+end
 /(a::R, z::S) where {R<:Real,S<:IComplex} = (T = promote_type(R, S); a * inv(T(z)))
 /(z::IComplex, x::Union{Interval,Real}) = IComplex(real(z) / x, imag(z) / x)
 function /(a::IComplex{T}, b::IComplex{T}) where {T}

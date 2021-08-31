@@ -192,7 +192,7 @@
         @var x y
         F = System([y/x+x^2-3], parameters = [y])
         monres = monodromy_solve(F)
-        certify(F,monres)
-        @test ndistinct_real_certified(cert) >= 1
+        cert = certify(F,monres)
+        @test ndistinct_certified(cert) >= 1
     end
 end
