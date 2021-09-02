@@ -278,7 +278,7 @@ function IComplex(x::Real, y::Real)
     IComplex(Interval(ix), Interval(iy))
 end
 IComplex(re::Interval{T}, im::Interval{S}) where {T<:Real,S<:Real} =
-    IComplex{promote_type(T,S)}(promote(re, im)...)
+    IComplex{promote_type(T, S)}(promote(re, im)...)
 IComplex(x::Union{Interval,Real}) = IComplex(x, zero(x))
 IComplex(z::Complex) = IComplex(real(z), imag(z))
 IComplex(z::IComplex) = z
