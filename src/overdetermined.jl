@@ -1,4 +1,19 @@
 export excess_solution_check, excess_solution_check!, OverdeterminedTracker
+
+function _excess_solution_residual_check!(
+    path_result::PathResult,
+    F::RandomizedSystem,
+    newton_cache::NewtonCache,
+    tol,
+)
+    evaluate!(newton_cache.r, F.system, solution(path_result))
+    system_residual = LA.norm(newton_cache.r, InfNorm())
+    if system_residual > tol
+        path_result.return_code = :excess_solution
+        path_result.residual = system_residual
+    end
+end
+
 """
     excess_solution_check!(path_result::PathResult,
                            F::RandomizedSystem,
@@ -37,12 +52,12 @@ function excess_solution_check!(
         end
     else
         # for singular solutions compare residuals due to lack of something better right now
-        evaluate!(newton_cache.r, F.system, solution(path_result))
-        system_residual = LA.norm(newton_cache.r, InfNorm())
-        if system_residual > 100 * residual(path_result)
-            path_result.return_code = :excess_solution
-            path_result.residual = system_residual
-        end
+        _excess_solution_residual_check!(
+            path_result,
+            F,
+            newton_cache,
+            100 * residual(path_result),
+        )
     end
 
     path_result
