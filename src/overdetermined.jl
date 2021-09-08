@@ -52,7 +52,12 @@ function excess_solution_check!(
         end
     else
         # for singular solutions compare residuals due to lack of something better right now
-        _excess_solution_residual_check!(path_result, F, newton_cache, 100 * residual(path_result))
+        _excess_solution_residual_check!(
+            path_result,
+            F,
+            newton_cache,
+            100 * residual(path_result),
+        )
     end
 
     path_result

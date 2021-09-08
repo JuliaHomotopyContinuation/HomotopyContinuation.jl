@@ -46,8 +46,16 @@ struct SemialgebraicSetsHCSolver <: SemialgebraicSets.AbstractAlgebraicSolver
     real_tol::Float64
     options::Any
 end
-SemialgebraicSetsHCSolver(; excess_residual_tol = nothing, real_tol = 1e-6, compile = :none, options...) =
-    SemialgebraicSetsHCSolver(excess_residual_tol, real_tol, (compile = compile, options...))
+SemialgebraicSetsHCSolver(;
+    excess_residual_tol = nothing,
+    real_tol = 1e-6,
+    compile = :none,
+    options...,
+) = SemialgebraicSetsHCSolver(
+    excess_residual_tol,
+    real_tol,
+    (compile = compile, options...),
+)
 
 function Base.show(io::IO, solver::SemialgebraicSetsHCSolver)
     print(io, "SemialgebraicSetsHCSolver(; ")
@@ -95,5 +103,5 @@ function SemialgebraicSets.solvealgebraicequations(
         hcsolver.excess_residual_tol,
     )
     # Only return real, non-singular solutions
-    return real_solutions(results; real_tol=hcsolver.real_tol, only_nonsingular = true)
+    return real_solutions(results; real_tol = hcsolver.real_tol, only_nonsingular = true)
 end
