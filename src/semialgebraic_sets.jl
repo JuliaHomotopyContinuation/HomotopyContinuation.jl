@@ -10,8 +10,8 @@ end
 Construct a `SemialgebraicSets.AbstractAlgebraicSolver` to be used in `SemialgebraicSets`.
 `options` are all valid options for [`solve`](@ref).
 
-Solutions with imaginary part of absolute value larger than `tol` are filtered
-out.
+Solutions with imaginary part of absolute value larger than `real_tol` are
+filtered out.
 
 For overdetermined systems, `excess_residual_tol` can be set to a `Float64`
 value. Excess solutions that have a residual smaller than `excess_residual_tol`
