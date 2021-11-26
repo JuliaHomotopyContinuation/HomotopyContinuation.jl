@@ -27,7 +27,7 @@ SymEngine_jll = "3428059b-622b-5399-b16f-d347a77089a4"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-Arblib = "0.2.2, 0.3, 0.4, 0.5"
+Arblib = "0.2.2, 0.3, 0.4, 0.5, 0.6"
 DynamicPolynomials = "0.3, 0.4"
 ElasticArrays = "1"
 FiniteDiff = "2.3"
