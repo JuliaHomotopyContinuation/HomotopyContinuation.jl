@@ -137,7 +137,7 @@ function newton(
         if m ≥ n
             LA.ldiv!(Δx, J, r)
         else
-            LA.ldiv!(Δx, LA.qr!(J, Val(true)), r)
+            LA.ldiv!(Δx, LA.qr!(J, LA.ColumnNorm()), r)
         end
         norm_Δxᵢ = norm(Δx)
 

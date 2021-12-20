@@ -671,7 +671,7 @@ function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
 
     # inv(A.Y' * B.Y) * U = V * LA.diagm(inv.(Σ))
     MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
-    Q, R = LA.qr!(MU, Val(true))
+    Q, R = LA.qr!(MU, LA.ColumnNorm())
     # correct signs and ordering of Q
     Q′ = Q[:, k:-1:1]
     for j = 1:k
