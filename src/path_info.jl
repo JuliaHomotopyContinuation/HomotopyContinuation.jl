@@ -125,8 +125,8 @@ function path_table(io::IO, info::PathInfo)
 
     PrettyTables.pretty_table(
         io,
-        data,
-        header,
+        data;
+        header = header,
         crop = :none,
         formatters = (ft1, ft2, ft4),
         highlighters = (h1, h2, h3, h4),
