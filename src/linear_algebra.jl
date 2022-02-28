@@ -898,3 +898,9 @@ function egcond(
 )
     egcond(workspace(J), d_l, d_r)
 end
+
+@static if VERSION ≥ v"1.7.0-"
+    qr_col_norm!(M) = LA.qr!(M, LA.ColumnNorm())
+else
+    qr_col_norm!(M) = LA.qr!(M, Val(true))
+end
