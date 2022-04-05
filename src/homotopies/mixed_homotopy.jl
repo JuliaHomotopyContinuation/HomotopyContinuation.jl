@@ -6,9 +6,9 @@ export MixedHomotopy
 A data structure which uses for `evaluate!` and `evaluate_and_jacobian!` a [`CompiledHomotopy`](@ref)
 and for `taylor!` an [`InterpretedHomotopy`](@ref).
 """
-struct MixedHomotopy{T,ID} <: AbstractHomotopy
+struct MixedHomotopy{ID} <: AbstractHomotopy
     compiled::CompiledHomotopy{ID}
-    interpreted::InterpretedHomotopy{T}
+    interpreted::InterpretedHomotopy
 end
 MixedHomotopy(H::Homotopy) = MixedHomotopy(CompiledHomotopy(H), InterpretedHomotopy(H))
 

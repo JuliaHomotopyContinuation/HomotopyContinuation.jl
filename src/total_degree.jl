@@ -99,11 +99,7 @@ function total_degree_variables(
             compile = compile,
         )
     else
-        G = fixed(
-            System(s .* (x .^ D .- 1), x, s);
-            compile = compile,
-            optimizations = false,
-        )
+        G = fixed(System(s .* (x .^ D .- 1), x, s); compile = compile)
     end
     G = fix_parameters(G, scaling)
 

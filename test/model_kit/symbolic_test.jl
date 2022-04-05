@@ -27,7 +27,7 @@
         @test complex(Expression(1), 2) == Expression(1) + im * 2
         @test complex(1, Expression(2)) == Expression(1) + im * 2
         @test +Expression(2) == 2
-        @test Expression(HC.DoubleDouble.DoubleF64(2)) == big(2.0)
+        # @test Expression(HC.DoubleDouble.DoubleF64(2)) == big(2.0)
     end
 
     @testset "Variables" begin
@@ -245,16 +245,6 @@
         @test sprint(show, F) == show_F
         @test degrees(F) == [3, 2]
 
-        T = CompiledSystem(F; optimizations = false)
-        F2 = System(T)
-        @test F == F2
-        @test sprint(show, T) == "Compiled: $show_F"
-        @test size(T) == size(F) == (2, 2)
-
-        T2 = CompiledSystem(F; optimizations = true)
-        F3 = System(T2)
-        @test expand.(F.expressions) == expand.(F3.expressions)
-
         F4 = System(f, parameters = [b, a])
         @test variables(F4) == [x, y]
 
@@ -301,28 +291,5 @@
 
         H_any = Homotopy(convert(Vector{Any}, h), [x, y, z], t)
         @test H_any isa Homotopy
-
-        T = CompiledHomotopy(H)
-        H2 = ModelKit.interpret(T)
-        @test H == H2
-        @test sprint(show, T) == "Compiled: $show_H"
-        @test size(T) == size(H) == (2, 3)
-    end
-
-    @testset "Optimizations for rational system" begin
-        @var y[1:6] q[1:8]
-        y₁, y₂, y₃, y₄, y₅, y₆ = y
-        q₁, q₂, q₃, q₄, q₅, q₆, q₇, q₈ = q
-
-        f =
-            q₁ / y₁ - q₂ / (-y₁ + y₂) +
-            q₅ * y₄ / (y₁ * y₄ - y₃ * y₂) +
-            q₈ * y₆ / (y₁ * y₆ - y₂ * y₅)
-        F = ModelKit.System([f], y, q)
-        I = ModelKit.interpreter(ModelKit.optimize(F))
-        u = Expression[0]
-        ModelKit.execute!(u, I, y, q, ModelKit.InterpreterCache(Expression, I))
-
-        @test expand(u[1] - f) == 0
     end
 end

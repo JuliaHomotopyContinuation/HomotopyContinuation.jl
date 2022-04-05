@@ -10,6 +10,7 @@ abstract type AbstractSystem end
 
 # Base.size(F::AbstractSystem)
 Base.size(F::AbstractSystem, i::Integer) = size(F)[i]
+Base.length(F::AbstractSystem) = size(F, 1)
 
 """
     parameters(F::AbstractSystem)

@@ -8,8 +8,5 @@ ProjectiveVectors = "01f381cc-face-5a0a-ade9-ef63dc65d628"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 SemialgebraicSets = "8e049039-38e8-557d-ae3a-bc521ccf6204"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[compat]
-StaticArrays = "0.12"

@@ -802,8 +802,7 @@ function monodromy_solve(
                 retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
         catch e
-            if !catch_interrupt ||
-               !(
+            if !catch_interrupt || !(
                 isa(e, InterruptException) ||
                 (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
             )
