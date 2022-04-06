@@ -1,3 +1,74 @@
+function RigidMultiView()
+    @var A[1:3, 1:4, 1:2]
+    @var x[1:3] y[1:3] u[1:2] v[1:2]
+
+    ũ = [A[:, :, k] * [x[1:3]; 1] for k = 1:2]
+    û = [ũ[k][1:2] ./ ũ[k][3] for k = 1:2]
+
+    d = sum(sum((u .- û) .^ 2) for û in û)
+
+    F = System(differentiate(d, x); parameters = [u; vec(A)])
+
+    # rigid multiview
+
+    @var A[1:3, 1:4, 1:2]
+    @var x[1:3] y[1:3] u[1:2] v[1:2] δ λ
+
+    ũ = [A[:, :, k] * [x[1:3]; 1] for k = 1:2]
+    û = [ũ[k][1:2] ./ ũ[k][3] for k = 1:2]
+    ṽ = [A[:, :, k] * [y[1:3]; 1] for k = 1:2]
+    v̂ = [ṽ[k][1:2] ./ ṽ[k][3] for k = 1:2]
+
+    r = sum((x .- y) .^ 2) - δ
+    L =
+        sum(sum((u .- û) .^ 2) for û in û) +
+        sum(sum((v .- v̂) .^ 2) for v̂ in v̂) +
+        λ * r
+
+    System([differentiate(L, [x; y]); r]; parameters = [u; v; δ; vec(A)])
+end
+
+function Tritangtens()
+    @var h[1:3] # variables for the plane
+    @var x[1:3] y[1:3] z[1:3] #variables for the contact points
+
+    #the quadric
+    Q = x[3] - x[1] * x[2]
+    #the cubic C with coefficients c
+    C, c = dense_poly(x, 3, coeff_name = :c)
+
+    #generate the system P for the contact point x
+    P_x = [
+        h ⋅ x - 1
+        Q
+        C
+        det([h differentiate(Q, x) differentiate(C, x)])
+    ]
+
+    #generate a copy of P for the other contact points y,z
+    P_y = [p([h; x; c] => [h; y; c]) for p in P_x]
+    P_z = [p([h; x; c] => [h; z; c]) for p in P_x]
+
+    #define F
+    F = System([P_x; P_y; P_z]; variables = [h; x; y; z], parameters = c)
+end
+
+
+function cyclo()
+    c² = 2
+    @var z[1:3, 1:6]
+    z_vec = vec(z)[1:17] # the 17 variables in a vector
+    Z = [zeros(3) z[:, 1:5] [z[1, 6]; z[2, 6]; 0] [√c²; 0; 0]] # the eight points in a matrix
+
+    # define the functions for cyclooctane:
+    F1 = [(Z[:, i] - Z[:, i+1]) ⋅ (Z[:, i] - Z[:, i+1]) - c² for i = 1:7]
+    F2 = [(Z[:, i] - Z[:, i+2]) ⋅ (Z[:, i] - Z[:, i+2]) - 8c² / 3 for i = 1:6]
+    F3 = (Z[:, 7] - Z[:, 1]) ⋅ (Z[:, 7] - Z[:, 1]) - 8c² / 3
+    F4 = (Z[:, 8] - Z[:, 2]) ⋅ (Z[:, 8] - Z[:, 2]) - 8c² / 3
+    f = System([F1; F2; F3; F4])
+end
+
+
 function cyclic(n)
     @var z[1:n]
     eqs = [sum(prod(z[(k-1)%n+1] for k = j:j+m) for j = 1:n) for m = 0:(n-2)]
@@ -795,8 +866,7 @@ function fano_quintic()
     @var a[1:n-1] b[1:n-1] t
     L = [a; 1] .* t + [b; 0]
     FcapL = last(ModelKit.exponents_coefficients(subs(F, x => L), [t]))
-    sys = System(ModelKit.horner.(FcapL), [a; b], q)
-    sys, q₀, gamma
+    System(ModelKit.horner.(FcapL), [a; b], q)
 end
 
 
@@ -880,3 +950,62 @@ function moments3()
         )
     System([f0, f1, f2, f3, f4, f5, f6, f7, f8] - m, parameters = m)
 end
+
+function four_bar()
+    @var x a y b x_hat a_hat y_hat b_hat
+    gamma = [Variable(Symbol(:gamma, i)) for i = 1:8]
+    delta = [Variable(Symbol(:delta, i)) for i = 1:8]
+    gamma_hat = [Variable(Symbol(:gamma_hat, i)) for i = 1:8]
+    delta_hat = [Variable(Symbol(:delta_hat, i)) for i = 1:8]
+    #system of polynomials
+    D1 = map(1:8) do i
+        (a_hat * x - delta_hat[i] * x) * gamma[i] +
+        (a * x_hat - delta[i] * x_hat) * gamma_hat[i] +
+        (a_hat - x_hat) * delta[i] +
+        (a - x) * delta_hat[i] - delta[i] * delta_hat[i]
+    end
+    D2 = map(1:8) do i
+        (b_hat * y - delta_hat[i] * y) * gamma[i] +
+        (b * y_hat - delta[i] * y_hat) * gamma_hat[i] +
+        (b_hat - y_hat) * delta[i] +
+        (b - y) * delta_hat[i] - delta[i] * delta_hat[i]
+    end
+    D3 = [gamma[i] * gamma_hat[i] + gamma[i] + gamma_hat[i] for i = 1:8]
+    System(
+        [D1; D2; D3],
+        [x; a; y; b; x_hat; a_hat; y_hat; b_hat; gamma; gamma_hat],
+        [delta; delta_hat],
+    )
+end
+
+function small_rational()
+    @var y[1:6] q[1:8]
+    y₁, y₂, y₃, y₄, y₅, y₆ = y
+    q₁, q₂, q₃, q₄, q₅, q₆, q₇, q₈ = q
+
+    System(
+        [
+            q₁ / y₁ - q₂ / (-y₁ + y₂) +
+            q₅ * y₄ / (y₁ * y₄ - y₃ * y₂) +
+            q₈ * y₆ / (y₁ * y₆ - y₂ * y₅),
+        ],
+        y,
+        q,
+    )
+end
+
+TEST_SYSTEM_COLLECTION = [
+    ("moments3", moments3()),
+    ("fano_quintic", fano_quintic()),
+    ("RigidMultiView", RigidMultiView()),
+    ("Tritangtens", Tritangtens()),
+    ("cyclo", cyclo()),
+    ("cyclic5", cyclic(5)),
+    ("cyclic7", cyclic(7)),
+    ("bacillus", bacillus()),
+    ("minors", minors()),
+    ("six_revolute", six_revolute()),
+    ("steiner", steiner()),
+    ("four_bar", four_bar()),
+    ("small_rational", small_rational()),
+]
