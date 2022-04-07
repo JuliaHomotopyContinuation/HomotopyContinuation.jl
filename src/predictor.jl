@@ -206,14 +206,12 @@ function update!(
     end
 
     # Compute ẋ always using AD
-    taylor!(u, Val(1), H, x, t, true)
-    # @show u[1:2]
+    taylor!(u, Val(1), H, x, t)
     u .= .-u
     LA.ldiv!(xtemp, J, u)
     # Check error made in the linear algebra
     δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
     predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
-    # @show cond_H_ẋ
     tol_δ₁ = 1e-10
 
     δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)

@@ -1,6 +1,6 @@
 using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
+using HomotopyContinuation.DoubleDouble: ComplexDF64
 import Arblib
-using StaticArrays
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation
@@ -34,8 +34,8 @@ end
     include("systems_test.jl")
     include("tracker_test.jl")
     include("valuation_test.jl")
-    include("endgame_tracker_test.jl")
     include("linear_test.jl")
+    include("endgame_tracker_test.jl")
     include("polyhedral_test.jl")
     include("solve_test.jl")
     include("endgame_test.jl")
@@ -44,7 +44,7 @@ end
     include("certification_test.jl")
     include("semialgebraic_sets_test.jl")
 
-    if "extensive" in ARGS
-        include("extensive/extensive_test.jl")
-    end
+    # if "extensive" in ARGS
+    #     include("extensive/extensive_test.jl")
+    # end
 end

@@ -1,4 +1,5 @@
 using SymEngine_jll: libsymengine
+import Base: div
 
 function __init__()
     __init_constants()
@@ -140,6 +141,7 @@ Base.promote_rule(::Type{Variable}, ::Type{ExpressionRef}) = Expression
 function to_string(x::Basic)
     b = ExpressionRef(x)
     if b.ptr == C_NULL
+        throw("Cannot print uninitialized")
         return ""
     end
     a = ccall((:basic_str_julia, libsymengine), Cstring, (Ref{ExpressionRef},), b)
@@ -250,18 +252,25 @@ end
 ################
 
 ## main ops
-for (op, inplace, libnm) in [(:+, :add!, :add), (:-, :sub!, :sub), (:*, :mul!, :mul)]
+for (op, inplace, libnm) in [
+    (:+, :add!, :add),
+    (:-, :sub!, :sub),
+    (:*, :mul!, :mul),
+    (:/, :div!, :div),
+    (:^, :pow!, :pow),
+]
     # $(Expr(:., :Base, QuoteNode(op)))
     @eval begin
         function $(inplace)(a::Expression, b1::Basic, b2::Basic)
-            ccall(
+            err_code = ccall(
                 $((Symbol("basic_", libnm), libsymengine)),
-                Nothing,
+                Cuint,
                 (Ref{Expression}, Ref{ExpressionRef}, Ref{ExpressionRef}),
                 a,
                 b1,
                 b2,
             )
+            throw_if_error(err_code, $(string(libnm)))
             return a
         end
         function Base.$op(b1::Basic, b2::Basic)
@@ -270,19 +279,43 @@ for (op, inplace, libnm) in [(:+, :add!, :add), (:-, :sub!, :sub), (:*, :mul!, :
     end
 end
 
-function div!(a::Expression, b1::Basic, b2::Basic)
-    # class(b2) ∈ NUMBER_TYPES || throw(ArgumentError("Cannot divide by " * string(b2)))
-    ccall(
-        (:basic_div, libsymengine),
-        Nothing,
-        (Ref{Expression}, Ref{ExpressionRef}, Ref{ExpressionRef}),
-        a,
-        b1,
-        b2,
-    )
-    return a
+@inline function throw_if_error(error_code::Cuint, str = nothing)
+    if error_code == 0
+        return
+    else
+        throw(get_error(error_code, str))
+    end
 end
-Base.:(/)(b1::Basic, b2::Basic) = div!(Expression(), b1, b2)
+
+function get_error(error_code::Cuint, str = nothing)
+    if error_code == 1
+        return ErrorException("Unknown SymEngine Exception")
+    elseif error_code == 2
+        return DivideError()
+    elseif error_code == 3
+        return ErrorException("Not implemented SymEngine feature")
+    elseif error_code == 4
+        return DomainError(str)
+    elseif error_code == 5
+        return Meta.ParseError(str)
+    else
+        return ErrorException("Unexpected SymEngine error code")
+    end
+end
+
+# function div!(a::Expression, b1::Basic, b2::Basic)
+#     # class(b2) ∈ NUMBER_TYPES || throw(ArgumentError("Cannot divide by " * string(b2)))
+#     ccall(
+#         (:basic_div, libsymengine),
+#         Nothing,
+#         (Ref{Expression}, Ref{ExpressionRef}, Ref{ExpressionRef}),
+#         a,
+#         b1,
+#         b2,
+#     )
+#     return a
+# end
+# Base.:(/)(b1::Basic, b2::Basic) = div!(Expression(), b1, b2)
 
 Base.:(//)(x::Basic, y::Basic) = x / y
 Base.:(//)(x::Basic, y::Integer) = x / Expression(y)
@@ -337,6 +370,12 @@ Base.sincos(x::Basic) = (sin(x), cos(x))
 function Base.log(b::ModelKit.Basic)
     a = Expression()
     ccall((:basic_log, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+
+function Base.sqrt(b::Basic)
+    a = Expression()
+    ccall((:basic_sqrt, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
     return a
 end
 ##############################
@@ -600,7 +639,9 @@ function Base.push!(v::ExprVec, x::Basic)
     v
 end
 
-args(ex::Basic) = args!(ExprVec(), ex)
+
+args(ex::Basic) = [copy(e) for e in unsafe_args(ex)]
+unsafe_args(ex::Basic) = args!(ExprVec(), ex)
 function args!(vec::ExprVec, ex::Basic)
     ccall(
         (:basic_get_args, libsymengine),
@@ -698,7 +739,7 @@ function _numer_denom(x::Basic)
         (Ref{Expression}, Ref{Expression}, Ref{ExpressionRef}),
         a,
         b,
-        x,
+        copy(x),
     )
     return a, b
 end
@@ -747,6 +788,7 @@ function to_number(x::Basic)
         return x
     end
 end
+to_number(x) = x
 
 function (::Type{T})(x::Basic) where {T<:Union{AbstractFloat,Rational,Complex,Integer}}
     y = to_number(x)

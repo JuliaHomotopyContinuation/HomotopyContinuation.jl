@@ -1,10 +1,12 @@
 @testset "Tracker" begin
-    @testset "tracking - AD : $AD" for AD = 0:3
+    @testset "tracking $mode - AD: $AD" for mode in [InterpretedSystem, CompiledSystem],
+        AD = 0:3
+
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
 
         tracker = Tracker(
-            ParameterHomotopy(F, [1, 0], [2, 4]),
+            ParameterHomotopy(mode(F), [1, 0], [2, 4]),
             options = TrackerOptions(automatic_differentiation = AD),
         )
         s = [1, 1]
@@ -22,15 +24,15 @@
         @unpack μ, ω = tracker.state
         @test is_success(track(tracker, s0, 0, 1))
         @test is_success(track(tracker, s0, 0, 1, μ = μ, ω = ω))
-
-        s = @SVector [1, 1]
-        @test is_success(track(tracker, s, 1, 0))
     end
 
-    @testset "projective tracking- AD: $AD" for AD = 0:3
+    @testset "projective tracking $mode - AD: $AD" for mode in
+                                                       [InterpretedSystem, CompiledSystem],
+        AD = 0:3
+
         @var x a y b z
         F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
-        H = ParameterHomotopy(F, [1, 0], [2, 4])
+        H = ParameterHomotopy(mode(F), [1, 0], [2, 4])
         tracker = Tracker(
             on_affine_chart(H, (2,)),
             options = TrackerOptions(automatic_differentiation = AD),

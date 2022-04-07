@@ -208,8 +208,8 @@ which correspond to the same true solution.
 struct CertificationResult
     certificates::Vector{SolutionCertificate}
     duplicates::Vector{Vector{Int}}
-    slp::ModelKit.Interpreter
-    slp_jacobian::ModelKit.Interpreter
+    slp::ModelKit.Interpreter{Vector{IComplexF64}}
+    slp_jacobian::ModelKit.Interpreter{Vector{IComplexF64}}
 end
 
 """
@@ -363,9 +363,11 @@ end
 
 Contains the necessary data structures for [`certify`](@ref).
 """
-Base.@kwdef mutable struct CertificationCache{T₁,T₂}
-    eval_interpreter::ModelKit.Interpreter{T₁}
-    jac_interpreter::ModelKit.Interpreter{T₂}
+Base.@kwdef mutable struct CertificationCache
+    eval_interpreter_F64::ModelKit.Interpreter{Vector{IComplexF64}}
+    jac_interpreter_F64::ModelKit.Interpreter{Vector{IComplexF64}}
+    eval_interpreter_acb::ModelKit.Interpreter{AcbRefVector}
+    jac_interpreter_acb::ModelKit.Interpreter{AcbRefVector}
     newton_cache::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}}
     # data for krawczyc_step
     C::Matrix{ComplexF64}
@@ -375,7 +377,6 @@ Base.@kwdef mutable struct CertificationCache{T₁,T₂}
     Jx₀::Matrix{IComplexF64}
     M::Matrix{IComplexF64}
     δx::Vector{IComplexF64}
-    interpreter_cache::ModelKit.InterpreterCache{Vector{IComplexF64},Nothing}
 
     arb_prec::Int
     arb_C::AcbRefMatrix
@@ -388,22 +389,22 @@ Base.@kwdef mutable struct CertificationCache{T₁,T₂}
     arb_M::AcbRefMatrix
     arb_δx::AcbRefMatrix # m × 1
     arb_mag::Arblib.Mag
-    arb_interpreter_cache::ModelKit.InterpreterCache{AcbRefVector,Acb}
 end
 function CertificationCache(F::AbstractSystem)
     m, n = size(F)
     m == n || error("We can only certify square systems.")
     f = System(F)
-    interpreter = ModelKit.interpreter(f)
-    jac_interpreter = ModelKit.jacobian_interpreter(f)
-    tape_length = max(
-        ModelKit.cache_min_length(interpreter),
-        ModelKit.cache_min_length(jac_interpreter),
-    )
+    eval_interpreter_F64 = ModelKit.interpreter(IComplexF64, f)
+    jac_interpreter_F64 = ModelKit.jacobian_interpreter(IComplexF64, f)
+    eval_interpreter_acb = ModelKit.interpreter(AcbRefVector, eval_interpreter_F64)
+    jac_interpreter_acb = ModelKit.interpreter(AcbRefVector, jac_interpreter_F64)
+
     arb_prec = 128
     CertificationCache(;
-        eval_interpreter = interpreter,
-        jac_interpreter = jac_interpreter,
+        eval_interpreter_F64 = eval_interpreter_F64,
+        jac_interpreter_F64 = jac_interpreter_F64,
+        eval_interpreter_acb = eval_interpreter_acb,
+        jac_interpreter_acb = jac_interpreter_acb,
         newton_cache = NewtonCache(F; optimize_data_structure = false),
         C = zeros(ComplexF64, m, m),
         r₀ = zeros(IComplexF64, m),
@@ -412,7 +413,6 @@ function CertificationCache(F::AbstractSystem)
         Jx₀ = zeros(IComplexF64, m, m),
         M = zeros(IComplexF64, m, m),
         δx = zeros(IComplexF64, m),
-        interpreter_cache = ModelKit.InterpreterCache(IComplexF64, tape_length),
         arb_prec = arb_prec,
         arb_C = AcbRefMatrix(m, m; prec = arb_prec),
         arb_r₀ = AcbRefMatrix(m, 1; prec = arb_prec),
@@ -424,11 +424,6 @@ function CertificationCache(F::AbstractSystem)
         arb_M = AcbRefMatrix(m, m; prec = arb_prec),
         arb_δx = AcbRefMatrix(m, 1; prec = arb_prec),
         arb_mag = Arblib.Mag(),
-        arb_interpreter_cache = ModelKit.InterpreterCache(
-            Acb,
-            tape_length;
-            prec = arb_prec,
-        ),
     )
 end
 
@@ -444,7 +439,8 @@ function set_arb_precision!(cache::CertificationCache, p::Int)
     cache.arb_J_x₀ = setprecision(cache.arb_J_x₀, p)
     cache.arb_M = setprecision(cache.arb_M, p)
     cache.arb_δx = setprecision(cache.arb_δx, p)
-    ModelKit.set_arb_precision!(cache.arb_interpreter_cache, p)
+    ModelKit.setprecision!(cache.eval_interpreter_acb, p)
+    ModelKit.setprecision!(cache.jac_interpreter_acb, p)
 
     cache
 end
@@ -595,8 +591,8 @@ function _certify(
     CertificationResult(
         certificates,
         duplicates,
-        cache.eval_interpreter,
-        cache.jac_interpreter,
+        cache.eval_interpreter_F64,
+        cache.jac_interpreter_F64,
     )
 end
 
@@ -722,17 +718,16 @@ function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
 end
 
 function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}, C, cert_cache)
-    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx, interpreter_cache = cert_cache
+    @unpack C, r₀, Δx₀, ix̃₀, Jx₀, M, δx = cert_cache
     J_x₀ = Jx₀
 
     ix̃₀ .= IComplexF64.(x̃₀)
     # r₀ = F(ix̃₀)
     ModelKit.execute!(
         r₀,
-        cert_cache.eval_interpreter,
+        cert_cache.eval_interpreter_F64,
         ix̃₀,
         complexF64_interval_params(p),
-        interpreter_cache,
     )
     # iΔx = C * r₀
     sqr_mul!(Δx₀, C, r₀)
@@ -750,10 +745,9 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter,
+        cert_cache.jac_interpreter_F64,
         x₀,
         complexF64_interval_params(p),
-        interpreter_cache,
     )
 
     x₁ = similar(x₀)
@@ -793,7 +787,6 @@ function arb_ε_inflation_krawczyk(
         cert_cache
     r₀, Δx₀, x̃₀, x₀, x₁, J_x₀, M, δx, m =
         arb_r₀, arb_Δx₀, arb_x̃₀, arb_x₀, arb_x₁, arb_J_x₀, arb_M, arb_δx, arb_mag
-    @unpack arb_interpreter_cache = cert_cache
 
     m = arb_mag
     x̃₀′ = x̄₁ = Δx₀
@@ -802,13 +795,7 @@ function arb_ε_inflation_krawczyk(
     acc = Inf
     max_iters = 10
     for i = 1:max_iters
-        ModelKit.execute!(
-            r₀,
-            cert_cache.eval_interpreter,
-            x̃₀,
-            arb_interval_params(p),
-            arb_interpreter_cache,
-        )
+        ModelKit.execute!(r₀, cert_cache.eval_interpreter_acb, x̃₀, arb_interval_params(p))
         Arblib.mul!(Δx₀, C, r₀)
 
         acc_new = Arblib.get(Arblib.bound_inf_norm!(m, Δx₀))
@@ -836,10 +823,9 @@ function arb_ε_inflation_krawczyk(
     ModelKit.execute!(
         nothing,
         J_x₀,
-        cert_cache.jac_interpreter,
+        cert_cache.jac_interpreter_acb,
         x₀,
         arb_interval_params(p),
-        arb_interpreter_cache,
     )
 
     # x₁ = (x̃₀ - C * F([x̃₀])) + (I - C * J(x₀)) * (x₀ - x̃₀)

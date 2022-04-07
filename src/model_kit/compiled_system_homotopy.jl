@@ -8,10 +8,9 @@ fast evaluation of a system `F` and its Jacobian.
 For large systems the compilation can take some time and require a large amount of memory.
 If this is a problem consider [`InterpretedSystem`](@ref).
 
-    CompiledSystem(F::System; optimizations = true)
+    CompiledSystem(F::System)
 
-Construct a `CompiledSystem` from the given [`System`](@ref) `F`. If `optimizations = true`
-then [`optimize`](@ref) is called on `F` before compiling.
+Construct a `CompiledSystem` from the given [`System`](@ref) `F`.
 """
 struct CompiledSystem{HI} <: AbstractSystem
     nexpressions::Int
@@ -20,8 +19,7 @@ struct CompiledSystem{HI} <: AbstractSystem
     system::System
 end
 
-function CompiledSystem(F::System; optimizations::Bool = true)
-    F = optimizations ? optimize(F) : F
+function CompiledSystem(F::System)
     n = length(F)
     nvars = nvariables(F)
     nparams = nparameters(F)
@@ -79,7 +77,7 @@ parameters(F::CompiledSystem) = parameters(F.system)
 variable_groups(F::CompiledSystem) = variable_groups(F.system)
 System(F::CompiledSystem) = F.system
 
-Base.:(==)(F::CompiledSystem{A}, G::CompiledSystem{B}) where {A,B} = A == B
+Base.:(==)(::CompiledSystem{A}, ::CompiledSystem{B}) where {A,B} = A == B
 
 ######################
 ## CompiledHomotopy ##
@@ -95,10 +93,9 @@ fast evaluation of a homotopy `H` and its Jacobian.
 For large homotopies the compilation can take some time and require a large amount of
 memory. If this is a problem consider [`InterpretedHomotopy`](@ref).
 
-    CompiledSystem(F::System; optimizations = true)
+    CompiledSystem(F::System)
 
-Construct a `CompiledSystem` from the given [`System`](@ref) `F`. If `optimizations = true`
-then [`optimize`](@ref) is called on `F` before compiling.
+Construct a `CompiledSystem` from the given [`System`](@ref) `F`.
 """
 struct CompiledHomotopy{HI} <: AbstractHomotopy
     nexpressions::Int
@@ -132,7 +129,7 @@ function CompiledHomotopy(H::Homotopy)
         # check that it is identical
         for (i, vi) in enumerate(THOMOTOPY_TABLE[h])
             if vi == homotopy
-                k = 1
+                k = i
                 break
             end
         end
@@ -144,7 +141,7 @@ function CompiledHomotopy(H::Homotopy)
         k = 1
         THOMOTOPY_TABLE[h] = [homotopy]
     end
-    return CompiledHomotopy{(h, 1)}(n, nvars, nparams, H)
+    return CompiledHomotopy{(h, k)}(n, nvars, nparams, H)
 end
 
 Base.size(CH::CompiledHomotopy) = (CH.nexpressions, CH.nvariables)
@@ -165,17 +162,92 @@ interpret(::Type{CompiledHomotopy{HI}}) where {HI} = THOMOTOPY_TABLE[first(HI)][
 ################
 ## EVALUATION ##
 ################
-function _evaluate!_impl(T)
-    I = interpret(T)
-    list, out = instruction_list(expressions(I))
-    generate_evaluate_impl(
-        list,
-        out;
-        variables = Symbol.(variables(I)),
-        parameters = Symbol.(parameters(I)),
-        t = I isa Homotopy ? Symbol(I.t) : nothing,
-    )
+function boundschecks(; nexpressions::Int, nvariables, nparameters, has_second_output)
+    checks = Expr[]
+    if has_second_output
+        push!(checks, :(@boundscheck checkbounds(U, 1:$nexpressions, 1:$nvariables)))
+    end
+    push!(checks, :(@boundscheck u === nothing || checkbounds(u, 1:$nexpressions)))
+    push!(checks, :(@boundscheck checkbounds(x, 1:$nvariables)))
+    push!(checks, :(@boundscheck p === nothing || checkbounds(p, 1:$nparameters)))
+
+    Expr(:block, checks...)
 end
+
+
+function compiled_execute_impl(
+    seq::InstructionSequence;
+    has_second_output = false,
+    taylor = false,
+)
+    if taylor
+        expr, get_var_name = sequence_to_expr(seq; op_call = taylor_op_call, order = :Order)
+    else
+        expr, get_var_name = sequence_to_expr(seq; op_call = op_call)
+    end
+    assignments = if has_second_output
+        quote
+            zero!(U)
+            if isnothing(u)
+                $(map(seq.assignments) do (i, k)
+                    if i > seq.output_dim
+                        :(U[$(i - seq.output_dim)] = $(get_var_name(k)))
+                    end
+                end...)
+            else
+                zero!(u)
+                idx = CartesianIndices(($(seq.output_dim), size(U, 2)))
+                $(map(seq.assignments) do (i, k)
+                    if i <= seq.output_dim
+                        :(u[$(i)] = $(get_var_name(k)))
+                    else
+                        :(U[idx[$(i - seq.output_dim)]] = $(get_var_name(k)))
+                    end
+                end...)
+            end
+        end
+    elseif taylor
+        quote
+            zero!(u)
+            if (assign_highest_order_only)
+                $(map(seq.assignments) do (i, k)
+                    :(u[$(i)] = $(get_var_name(k))[K])
+                end...)
+            else
+                $(map(seq.assignments) do (i, k)
+                    :(u[$(i)] = $(get_var_name(k)))
+                end...)
+            end
+
+
+        end
+
+    else
+        quote
+            zero!(u)
+            $(map(seq.assignments) do (i, k)
+                :(u[$(i)] = $(get_var_name(k)))
+            end...)
+        end
+    end
+
+    quote
+        $(boundschecks(
+            nexpressions = seq.output_dim,
+            has_second_output = has_second_output,
+            nparameters = length(seq.parameters_range),
+            nvariables = length(seq.variables_range),
+        ))
+        @inbounds begin
+            $(expr)
+            $(assignments)
+        end
+        u
+    end
+end
+
+_evaluate!_impl(T) = compiled_execute_impl(instruction_sequence(interpret(T)))
+
 
 """
     evaluate!(u, T::CompiledSystem, x, p = nothing)
@@ -195,17 +267,10 @@ Evaluate `T` for variables `x`, `t` and parameters `p` and store result in `u`.
     _evaluate!_impl(T)
 end
 
-function _evaluate_and_jacobian!_impl(T)
-    I = interpret(T)
-    list, out = instruction_list(expressions(I))
-    generate_evaluate_and_jacobian_impl(
-        list,
-        out;
-        variables = Symbol.(variables(I)),
-        parameters = Symbol.(parameters(I)),
-        t = I isa Homotopy ? Symbol(I.t) : nothing,
-    )
-end
+_evaluate_and_jacobian!_impl(T) = compiled_execute_impl(
+    jacobian_instruction_sequence(interpret(T));
+    has_second_output = true,
+)
 
 """
     evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
@@ -249,17 +314,7 @@ function jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
 end
 
 
-function _taylor!_impl(T)
-    I = interpret(T)
-    list, out = instruction_list(expressions(I))
-    generate_taylor_impl(
-        list,
-        out;
-        variables = Symbol.(variables(I)),
-        parameters = Symbol.(parameters(I)),
-        t = I isa Homotopy ? Symbol(I.t) : nothing,
-    )
-end
+_taylor!_impl(T) = compiled_execute_impl(instruction_sequence(interpret(T)); taylor = true)
 
 """
     taylor!(
@@ -277,7 +332,8 @@ Compute the Taylor series order order `K` of ``u = F(x,p)``.
     Order::Val{K},
     T::CompiledSystem,
     x::AbstractArray,
-    p::Union{Nothing,AbstractArray} = nothing,
+    p::Union{Nothing,AbstractArray} = nothing;
+    assign_highest_order_only::Bool = u isa Vector,
 ) where {K}
     _taylor!_impl(T)
 end
@@ -298,8 +354,12 @@ Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
     Order::Val{K},
     T::CompiledHomotopy,
     x::AbstractArray,
-    t,
-    p::Union{Nothing,AbstractArray} = nothing,
+    t_,
+    p::Union{Nothing,AbstractArray} = nothing;
+    assign_highest_order_only::Bool = u isa Vector,
 ) where {K}
-    _taylor!_impl(T)
+    quote
+        t = (t_, 1)
+        $(_taylor!_impl(T))
+    end
 end

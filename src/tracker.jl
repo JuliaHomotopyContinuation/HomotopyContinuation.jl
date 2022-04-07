@@ -734,7 +734,7 @@ function init!(
     state.τ = trust_region(predictor)
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
-    Δs = min(Δs, max_initial_step_size)
+    Δs = max(min(Δs, max_initial_step_size), tracker.options.min_step_size)
     propose_step!(state.segment_stepper, Δs)
     state.ω_prev = state.ω
 

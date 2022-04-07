@@ -27,7 +27,7 @@ Base.isless(a::Variable, b::Variable) = isless(sort_key(a), sort_key(b))
 Base.sort!(vs::AbstractVector{Variable}; kwargs...) =
     permute!(vs, sortperm(sort_key.(vs); kwargs...))
 
-Symbol(v::Variable) = name(v)
+Base.Symbol(v::Variable) = name(v)
 
 
 """
@@ -98,7 +98,7 @@ end
 Create an `Array` of variables with the given `prefix` and indices.
 The expression  `@var x[1:3, 1:2]` is equivalent to  `x = variables(:x, 1:3, 1:2)`.
 """
-function variables(prefix::Union{Symbol,String}, indices...)
+function MP.variables(prefix::Union{Symbol,String}, indices...)
     map(i -> Variable(prefix, i...), Iterators.product(indices...))
 end
 
@@ -153,7 +153,7 @@ Create a variable with a unique name which doesn't clash with `variables` or
 If `var` is not possible the names `var##k` for `k=0,1,...` are tried until
 one is possible,
 """
-function unique_variable(var::Symbol, vars::Vector{Variable}, params::Vector{Variable})
+function unique_variable(var, vars::Vector{Variable}, params::Vector{Variable})
     v = Variable(var)
     k = 0
     while (v in vars || v in params)
