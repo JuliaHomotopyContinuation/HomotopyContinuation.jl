@@ -371,12 +371,32 @@ rad(z::IComplex) = max(rad(real(z)), rad(imag(z)))
 mag(z::IComplex) = max(mag(real(z)), mag(imag(z)))
 isinterior(a::IComplex, b::IComplex) =
     isinterior(real(a), real(b)) && isinterior(imag(a), imag(b))
+function isinterior(a::Vector{IComplex}, b::Vector{IComplex})
+    iter = zip(a, b)
+    all(map(I -> isinterior(I[1],I[2]), iter))
+end
 Base.issubset(a::IComplex, b::IComplex) = real(a) ⊆ real(b) && imag(a) ⊆ imag(b)
+function Base.issubset(a::Vector{IComplex}, b::Vector{IComplex})
+    iter = zip(a, b)
+    all(map(I -> Base.issubset(I[1],I[2]), iter))
+end
 isdisjoint(a::IComplex, b::IComplex) =
     isdisjoint(real(a), real(b)) || isdisjoint(imag(a), imag(b))
+function isdisjoint(a::Vector{IComplex}, b::Vector{IComplex})
+    iter = zip(a, b)
+    any(map(I -> isdisjoint(I[1],I[2]), iter))
+end
 Base.intersect(a::IComplex, b::IComplex) =
     IComplex(intersect(real(a), real(b)), intersect(imag(a), imag(b)))
+function Base.intersect(a::Vector{IComplex}, b::Vector{IComplex})
+    iter = zip(a, b)
+    map(I -> intersect(I[1],I[2]), iter)
+end
 Base.in(x::Number, a::IComplex) = in(real(x), real(a)) && in(imag(x), imag(a))
+function Base.in(a::Vector{Number}, b::Vector{IComplex})
+    iter = zip(a, b)
+    all(map(I -> Base.in(I[1],I[2]), iter))
+end
 
 
 function inf_norm_bound(A::AbstractMatrix{IComplex{T}}) where {T}
