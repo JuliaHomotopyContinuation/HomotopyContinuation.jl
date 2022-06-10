@@ -378,7 +378,7 @@ end
 Base.issubset(a::IComplex, b::IComplex) = real(a) ⊆ real(b) && imag(a) ⊆ imag(b)
 function Base.issubset(a::Vector{IComplex}, b::Vector{IComplex})
     iter = zip(a, b)
-    all(map(I -> Base.issubset(I[1], I[2]), iter))
+    all(I -> Base.issubset(I[1], I[2]), iter)
 end
 isdisjoint(a::IComplex, b::IComplex) =
     isdisjoint(real(a), real(b)) || isdisjoint(imag(a), imag(b))
