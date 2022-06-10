@@ -395,7 +395,7 @@ end
 Base.in(x::Number, a::IComplex) = in(real(x), real(a)) && in(imag(x), imag(a))
 function Base.in(a::Vector{Number}, b::Vector{IComplex})
     iter = zip(a, b)
-    all(map(I -> Base.in(I[1], I[2]), iter))
+    all(I -> Base.in(I[1], I[2]), iter)
 end
 
 
