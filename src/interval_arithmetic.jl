@@ -384,7 +384,7 @@ isdisjoint(a::IComplex, b::IComplex) =
     isdisjoint(real(a), real(b)) || isdisjoint(imag(a), imag(b))
 function isdisjoint(a::Vector{IComplex}, b::Vector{IComplex})
     iter = zip(a, b)
-    any(map(I -> isdisjoint(I[1], I[2]), iter))
+    any(I -> isdisjoint(I[1], I[2]), iter)
 end
 Base.intersect(a::IComplex, b::IComplex) =
     IComplex(intersect(real(a), real(b)), intersect(imag(a), imag(b)))
