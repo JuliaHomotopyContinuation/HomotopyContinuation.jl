@@ -141,7 +141,11 @@ start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
 target_parameters!(H::IntrinsicSubspaceHomotopy, q::LinearSubspace) =
     set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
 parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
-    set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), convert(LinearSubspace{ComplexF64}, q))
+    set_subspaces!(
+        H,
+        convert(LinearSubspace{ComplexF64}, p),
+        convert(LinearSubspace{ComplexF64}, q),
+    )
 
 function γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     H.t_cache[] != t || return first(H.taylor_γ)
