@@ -137,11 +137,15 @@ function set_subspaces!(
     H
 end
 start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
-    set_subspaces!(H, p, H.target)
+    set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
 target_parameters!(H::IntrinsicSubspaceHomotopy, q::LinearSubspace) =
-    set_subspaces!(H, H.start, q)
+    set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
 parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
-    set_subspaces!(H, p, q)
+    set_subspaces!(
+        H,
+        convert(LinearSubspace{ComplexF64}, p),
+        convert(LinearSubspace{ComplexF64}, q),
+    )
 
 function γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     H.t_cache[] != t || return first(H.taylor_γ)
