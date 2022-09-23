@@ -17,7 +17,7 @@ struct BinomialSystemSolver
     unit_roots_table::ElasticArray{Int32,2,1,Vector{Int32}}
 end
 
-function BinomialSystemSolver{T1,T2}(A::Matrix{T1}, b::Vector{T2})
+function BinomialSystemSolver(A::Matrix{T1}, b::Vector{T2}) where {T1,T2}
     BSS = BinomialSystemSolver(size(A, 1))
     BSS.A .= A
     BSS.b .= b

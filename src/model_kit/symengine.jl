@@ -276,6 +276,9 @@ for (op, inplace, libnm) in [
         function Base.$op(b1::Basic, b2::Basic)
             $inplace(Expression(), b1, b2)
         end
+        function Base.$op(b1::Expression, b2::Expression)
+            $inplace(Expression(), b1, b2)
+        end
     end
 end
 

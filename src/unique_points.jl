@@ -183,7 +183,7 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::UniquePoints) = x
 Base.length(UP::UniquePoints) = length(UP.tree)
 Base.collect(UP::UniquePoints) = collect(UP.tree)
 Base.broadcastable(UP::UniquePoints) = Ref(UP)
-function Base.empty!{T,Id,M}(UP::UniquePoints{T,Id,M})
+function Base.empty!(UP::UniquePoints{T,Id,M}) where {T,Id,M}
     empty!(UP.tree)
     UP
 end

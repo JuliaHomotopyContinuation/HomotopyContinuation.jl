@@ -5,12 +5,12 @@ export ModelKit
 using Arblib: Arblib
 import DelimitedFiles
 using DynamicPolynomials: @polyvar
-import ElasticArrays: ElasticArray
+import ElasticArrays: ElasticArrays, ElasticArray
 import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
 using LRUCache: LRU
-import MixedSubdivisions: MixedCell, mixed_volume
+import MixedSubdivisions: MixedSubdivisions, MixedCell, mixed_volume
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 using Parameters: @unpack
