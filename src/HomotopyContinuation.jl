@@ -10,7 +10,7 @@ import FiniteDiff
 import LinearAlgebra
 import LoopVectorization
 using LRUCache: LRU
-import MixedSubdivisions
+import MixedSubdivisions: MixedCell, mixed_volume
 import MultivariatePolynomials
 const MP = MultivariatePolynomials
 using Parameters: @unpack

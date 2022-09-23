@@ -416,7 +416,7 @@ function inf_norm_bound(A::AbstractMatrix{IComplex{T}}) where {T}
 end
 
 ## Arb
-function IComplexF64(
+function IComplex{Float64}(
     z::Arblib.AcbLike,
     a = Arblib.Arf(prec = 53),
     b = Arblib.Arf(prec = 53),

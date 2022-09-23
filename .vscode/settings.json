@@ -1,2 +1,5 @@
 {
+  "julia.lint.call": false,
+  "julia.lint.datadecl": false,
+  "julia.lint.iter": false
 }
