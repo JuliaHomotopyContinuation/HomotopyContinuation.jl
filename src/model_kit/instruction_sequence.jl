@@ -312,7 +312,7 @@ Build a directed graph from the instructions.
 """
 function dag_from_instructions(instructions::Vector{Instruction}; start_from_inputs = false)
     index_to_instr = Dict{Int32,Instruction}()
-    g = SimpleGraphs.SimpleDigraph{Int32}()
+    g = SimpleGraphs.DirectedGraph{Int32}()
     for instr in instructions
         index_to_instr[instr.output] = instr
         for k = 1:arity(instr.op)

@@ -131,7 +131,7 @@ struct IntrinsicDescription{T}
     # stiefel coordinates
     Y::Matrix{T}
 end
-IntrinsicDescription(A::Matrix, b₀::Vector) =
+IntrinsicDescription(A::Matrix{T1}, b₀::Vector{T2}) where {T1,T2} =
     IntrinsicDescription(A, b₀, stiefel_coordinates(A, b₀))
 
 function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) where {T}

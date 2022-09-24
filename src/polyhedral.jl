@@ -1,6 +1,5 @@
 export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator, mixed_volume
 
-using MixedSubdivisions: MixedCell, mixed_volume
 
 """
     PolyhedralStartSolutionsIterator

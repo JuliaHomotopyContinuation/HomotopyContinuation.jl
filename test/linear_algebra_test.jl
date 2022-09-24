@@ -57,6 +57,7 @@
             HC.update!(WS, A)
             ldiv!(x, WS, b)
             WS.factorized[] = false
+            @allocated ldiv!(x, WS, b)
             @test (@allocated ldiv!(x, WS, b)) == 0
             @test (lu(A) \ b) ≈ x rtol = cond(A) * 10
         end

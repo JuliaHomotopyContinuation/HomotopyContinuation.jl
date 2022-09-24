@@ -1,5 +1,4 @@
 import Base.GMP: MPZ
-import MixedSubdivisions: MixedCell
 
 struct BinomialSystemSolver
     A::Matrix{Int32} # binomial system lhs
@@ -18,7 +17,7 @@ struct BinomialSystemSolver
     unit_roots_table::ElasticArray{Int32,2,1,Vector{Int32}}
 end
 
-function BinomialSystemSolver(A::Matrix, b::Vector)
+function BinomialSystemSolver(A::Matrix{T1}, b::Vector{T2}) where {T1,T2}
     BSS = BinomialSystemSolver(size(A, 1))
     BSS.A .= A
     BSS.b .= b
@@ -55,7 +54,7 @@ end
 
 function fill_unit_roots_combinations!(S::ElasticArray, H, d̂)
     n = size(H, 1)
-    resize!(S, n, d̂)
+    ElasticArrays.resize!(S, n, d̂)
     d, e = d̂, 1
     @inbounds for i = 1:n
         dᵢ = Int64(H[i, i])
@@ -242,7 +241,7 @@ function solve!(BSS::BinomialSystemSolver, H::Matrix{<:Integer}, U::Matrix{<:Int
     for i = 1:n
         d̂ *= Int64(H[i, i])
     end
-    resize!(BSS.X, n, d̂)
+    ElasticArrays.resize!(BSS.X, n, d̂)
     fill_unit_roots_combinations!(BSS.unit_roots_table, H, d̂)
 
     # We split the computation of the solution in 2 stages

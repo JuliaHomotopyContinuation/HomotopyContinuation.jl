@@ -183,7 +183,10 @@ Base.show(io::IO, ::MIME"application/prs.juno.inline", x::UniquePoints) = x
 Base.length(UP::UniquePoints) = length(UP.tree)
 Base.collect(UP::UniquePoints) = collect(UP.tree)
 Base.broadcastable(UP::UniquePoints) = Ref(UP)
-Base.empty!(UP::UniquePoints) = (Base.empty!(UP.tree); UP)
+function Base.empty!(UP::UniquePoints{T,Id,M}) where {T,Id,M}
+    empty!(UP.tree)
+    UP
+end
 
 """
     search_in_radius(unique_points, v, tol)

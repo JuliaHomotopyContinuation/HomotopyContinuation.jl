@@ -31,13 +31,13 @@ include("../test_systems.jl")
 
         J(x, p) = begin
             M = jf(x, p)
-            map(M) do m
+            ComplexF64.(map(M) do m
                 if m isa Expression
                     ModelKit.to_number(expand(m))
                 else
                     m
                 end
-            end
+            end)
         end
         evaluate!(u, F, x, p)
         @test u ≈ system(x, p) rtol = 1e-12
@@ -107,13 +107,13 @@ include("../test_systems.jl")
 
         J(x, p) = begin
             M = jf(x, p)
-            map(M) do m
+            ComplexF64.(map(M) do m
                 if m isa Expression
                     ModelKit.to_number(expand(m))
                 else
                     m
                 end
-            end
+            end)
         end
         evaluate!(u, F, acb_x, acb_p)
         @test ComplexF64.(u) ≈ system(x, p) rtol = 1e-12
@@ -151,13 +151,13 @@ include("../test_systems.jl")
 
         J(x, p) = begin
             M = jf(x, p)
-            j = map(M) do m
+            j = ComplexF64.(map(M) do m
                 if m isa Expression
                     ModelKit.to_number(expand(m))
                 else
                     m
                 end
-            end
+            end)
             (1 - t) .* j + t^2 .* j
         end
         evaluate!(u, H, x, t, p)
