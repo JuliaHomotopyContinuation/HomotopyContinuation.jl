@@ -1,7 +1,7 @@
 function test_homotopy_evaluate(homotopy, symbolic_homotopy)
-
-    u = zeros(ComplexF64, length(homotopy))
-    x = randn(ComplexF64, nvariables(homotopy))
+    m, n = size(homotopy)
+    u = zeros(ComplexF64, m)
+    x = randn(ComplexF64, n)
     t = randn(ComplexF64)
 
     evaluate!(u, homotopy, x, t)
@@ -9,10 +9,10 @@ function test_homotopy_evaluate(homotopy, symbolic_homotopy)
 end
 
 function test_homotopy_jacobian(homotopy, symbolic_homotopy)
-
-    u = zeros(ComplexF64, length(homotopy))
-    U = zeros(ComplexF64, length(homotopy), nvariables(homotopy))
-    x = randn(ComplexF64, nvariables(homotopy))
+    m, n = size(homotopy)
+    u = zeros(ComplexF64, m)
+    U = zeros(ComplexF64, m, n)
+    x = randn(ComplexF64, n)
     t = randn(ComplexF64)
 
     evaluate_and_jacobian!(u, U, homotopy, x, t)
@@ -26,37 +26,35 @@ end
 
 
 function test_homotopy_taylor(homotopy, symbolic_homotopy)
+    m, n = size(homotopy)
+    v = zeros(ComplexF64, m)
+    t = randn(ComplexF64)
+
     for K = 1:3
-        h = homotopy
-        H = symbolic_homotopy
+        k = K
+        x = TaylorVector{K}(randn(ComplexF64, K, n))
 
-        u = zeros(ComplexF64, length(h))
-        v = zeros(ComplexF64, length(h))
-        w = zeros(ComplexF64, length(h))
-        x = TaylorVector{K}(randn(ComplexF64, K, nvariables(h)))
-        t = randn(ComplexF64)
-
-        taylor!(u, Val(K), H, x, t)
         @var λ
         tx = [sum(xi .* λ .^ (0:length(xi)-1)) for xi in eachcol(x.data)]
-        for k = 0:K
-            true_value =
-                (differentiate(Expression.(h(tx, t + λ)), λ, k)).(λ => 0) / factorial(k)
-            @test u ≈ true_value rtol = 1e-12
-            if k > 0
-                v .= 0
-                taylor!(v, Val(k), H, x, t)
-                @test v ≈ true_value rtol = 1e-12
-            end
-        end
+        true_value =
+            (differentiate(Expression.(symbolic_homotopy(tx, t + λ)), λ, k)).(λ => 0) /
+            factorial(k)
+        v .= 0
+        taylor!(v, Val(k), homotopy, x, t)
+        @test v ≈ true_value rtol = 1e-12
+
     end
 end
 
+function test_homotopy(homotopy, symbolic_homotopy)
+    test_homotopy_evaluate(homotopy, symbolic_homotopy)
+    test_homotopy_jacobian(homotopy, symbolic_homotopy)
+    test_homotopy_taylor(homotopy, symbolic_homotopy)
+end
 
 
 @testset "Homotopies" begin
     @testset "ParameterHomotopy" begin
-        using HomotopyContinuation
         @var x y a b c
 
         f = [(2 * x^2 + b^2 * y^3 + 2 * a * x * y)^3, (a + c)^4 * x + y^2]
@@ -66,38 +64,15 @@ end
         q = [2.6, 3.3, 2.3]
 
         @var tvar
-        f([x, y] => [x, y], [a, b, c] => tvar * p + (1 - tvar) * q)
         h = Homotopy(
             f([x, y] => [x, y], [a, b, c] => tvar * p + (1 - tvar) * q),
             [x, y],
             tvar,
         )
 
-        H = HC.ParameterHomotopy(F, p, q)
+        H = ParameterHomotopy(F, p, q)
 
-        v = [0.192, 2.21]
-        t = 0.232
-
-        u = zeros(ComplexF64, 2)
-        U = zeros(ComplexF64, 2, 2)
-
-        HC.evaluate!(u, H, v, t)
-        @test u ≈ f([x, y] => [x, y], [a, b, c] => t * p + (1 - t) * q)
-
-        HC.taylor!(u, Val(1), H, TaylorVector{1}(Matrix(v')), t)
-        @test u ≈ let
-            @var s sp[1:3] sq[1:3]
-            pt = s .* sp .+ (1 .- s) .* sq
-            differentiate(subs(f, [a, b, c] => pt), s)(
-                [x, y] => v,
-                sp => p,
-                sq => q,
-                s => t,
-            )
-        end
-
-        HC.evaluate_and_jacobian!(u, U, H, v, t)
-        @test U ≈ differentiate(f, [x, y])([x, y] => v, [a, b, c] => t * p + (1 - t) * q)
+        test_homotopy(H, h)
     end
 
     @testset "AffineSubspaceHomotopy" begin
@@ -129,5 +104,8 @@ end
         evaluate!(out1, InterpretedHomotopy(h), v0, t0)
 
         @test out0 ≈ out1 rtol = 1e-12
+
+
+        test_homotopy(H, h)
     end
 end
