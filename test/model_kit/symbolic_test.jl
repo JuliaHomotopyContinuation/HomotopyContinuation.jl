@@ -117,6 +117,25 @@
         @test ModelKit.degree(x * y^5 + y^2, [x, y]) == 6
     end
 
+
+    @testset "evaluate - Issue #500" begin
+        @var a0₀ b₀
+        constraints = [
+            -0.2 * (-4.2467 * (0.1 + 1.0 * a0₀^2) + 1.0 * b₀^2)
+            -0.222 * (-4.49 * (0.5 + 1.0 * a0₀^2) + 1.0 * b₀^2)
+        ]
+
+        X = Dict([a0₀, b₀] .=> rand.())
+
+        @test HomotopyContinuation.evaluate(constraints, X) isa Vector{Float64}
+    end
+
+    @testset "evaluate - Issue #511" begin
+        @var x[1:1]
+        F = System(1.0 * x .^ 2; variables = x)
+        @test F([2]) isa Vector{Float64}
+    end
+
     @testset "Modeling" begin
         @testset "Bottleneck" begin
             @var x y z

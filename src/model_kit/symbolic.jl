@@ -267,15 +267,15 @@ julia> [x^2, x * y]([x,y] => [2, 3])
  6
 ```
 """
-function evaluate(expr::AbstractArray{<:Basic}, args...)
-    out = map(to_number, subs(expr, args...))
+function evaluate(expr::AbstractArray{<:Basic}, args...; bits::Int = 53)
+    out = map(e -> to_number(evalf(e, bits)), subs(expr, args...))
     if isabstracttype(eltype(out))
         return to_smallest_eltype(out)
     else
         out
     end
 end
-evaluate(expr::Basic, args...) = to_number(subs(expr, args...))
+evaluate(expr::Basic, args...; bits::Int = 53) = to_number(evalf(subs(expr, args...), bits))
 (f::Union{Basic,AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
 
 """

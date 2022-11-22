@@ -173,6 +173,16 @@ function _copy(x::Basic)
     )
     y
 end
+function set!(y::Basic, x::Basic)
+    ccall(
+        (:basic_assign, libsymengine),
+        Nothing,
+        (Ref{Expression}, Ref{ExpressionRef}),
+        y,
+        x,
+    )
+    y
+end
 Base.copy(x::Basic) = _copy(x)
 Base.copy(x::Variable) = Variable(_copy(x))
 
@@ -192,7 +202,10 @@ const EXPR_M1 = Expression(C_NULL)
 
 Base.zero(::Basic) = zero(Expression)
 Base.zero(::Type{<:Basic}) = Expression(0)
-Base.iszero(x::Basic) = x == EXPR_0
+function Base.iszero(x::Basic)
+    is_number(x::Basic) || return false
+    ccall((:number_is_zero, libsymengine), Int32, (Ref{Expression},), x) == 1
+end
 Base.one(::Basic) = one(Expression)
 Base.one(::Type{<:Basic}) = Expression(1)
 Base.isone(x::Basic) = x == EXPR_1
@@ -747,7 +760,10 @@ function _numer_denom(x::Basic)
     return a, b
 end
 
-is_number(ex::Expression) = class(ex) in NUMBER_TYPES
+# is_number(ex::Expression) = class(ex) in NUMBER_TYPES
+function is_number(x::Basic)
+    ccall((:is_a_Number, libsymengine), Int32, (Ref{Expression},), x) == 1
+end
 
 """
     to_number(x::Expression)
@@ -922,4 +938,23 @@ function cse(exprs::Vector{Expression})
 
 
     map(e -> subs(e, bad_subs), reduced_exprs), substs
+end
+
+function evalf(e::Basic, bits::Int)
+    x = Expression()
+    ccall(
+        (:basic_evalf, libsymengine),
+        Nothing,
+        (Ref{Expression}, Ref{ExpressionRef}, Int, Int32),
+        x,
+        e,
+        bits,
+        0,
+    )
+    # If the evaluation cannot be performed since the result
+    # is not a number, then `x` is uninitialized`
+    if x.ptr == C_NULL
+        set!(x, e)
+    end
+    return is_zero(imag(x)) ? real(x) : x
 end
