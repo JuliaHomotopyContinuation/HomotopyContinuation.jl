@@ -69,8 +69,12 @@ struct ExtrinsicDescription{T}
         if orthonormal
             new{T}(A, b)
         else
-            svd = LA.svd(A)
-            new{T}(svd.Vt, (inv.(svd.S) .* (svd.U' * b)))
+            if size(A,1) == 0
+                new{T}(A, b)
+            else
+                svd = LA.svd(A)
+                new{T}(svd.Vt, (inv.(svd.S) .* (svd.U' * b)))
+            end
         end
     end
 end
@@ -307,7 +311,7 @@ function LinearSubspace(
     b::AbstractVector{T} = zeros(eltype(A), size(A, 1)),
 ) where {T}
     size(A, 1) == length(b) || throw(ArgumentError("Size of A and b not compatible."))
-    0 < size(A, 1) ≤ size(A, 2) || throw(
+    0 ≤ size(A, 1) ≤ size(A, 2) || throw(
         ArgumentError(
             "Affine subspace has to be given in extrinsic coordinates, i.e., by A x = b.",
         ),
