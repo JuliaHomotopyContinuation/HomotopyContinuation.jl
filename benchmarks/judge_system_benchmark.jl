@@ -6,7 +6,7 @@ function judge_results(result1_name, result2_name)
     r2 = minimum(BenchmarkTools.load(result2_name)[1])
     res = BenchmarkTools.judge(r1, r2)
 
-    println("Interpreted [PR / master]:")
+    println("Interpreted [PR / main]:")
     data = vcat(
         map(res["InterpretedSystem"]) do (system, group)
             [system group["evaluate"].ratio.time group["evaluate_and_jacobian"].ratio.time group["taylor_1"].ratio.time group["taylor_2"].ratio.time]
@@ -20,7 +20,7 @@ function judge_results(result1_name, result2_name)
 
 
 
-    println("Compiled [PR / master]:")
+    println("Compiled [PR / main]:")
     data = vcat(
         map(res["CompiledSystem"]) do (system, group)
             [system group["evaluate"].ratio.time group["evaluate_and_jacobian"].ratio.time]
@@ -30,7 +30,7 @@ function judge_results(result1_name, result2_name)
 
 
 
-    println("Compiled / Interpreted [master]:")
+    println("Compiled / Interpreted [main]:")
     j = judge(r2["InterpretedSystem"], r2["CompiledSystem"])
     data = vcat(
         map(j) do (system, group)

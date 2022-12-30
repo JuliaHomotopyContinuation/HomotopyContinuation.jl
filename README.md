@@ -1,6 +1,6 @@
 <img src="https://www.juliahomotopycontinuation.org/images/logo_transparent_bg.png" width="320px">
 
-[![][docs-stable-img]][docs-stable-url] ![Run tests](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/workflows/Run%20tests/badge.svg?branch=master)
+[![][docs-stable-img]][docs-stable-url] ![Run tests](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/workflows/Run%20tests/badge.svg?branch=main)
 
 **HomotopyContinuation.jl** is a Julia package for solving systems of polynomial equations by numerical homotopy continuation.
 
@@ -20,6 +20,7 @@ using HomotopyContinuation
 F = System([x^2+2y, y^2-2])
 result = solve(F)
 ```
+
 ```
 Result with 4 solutions
 ==================================
@@ -31,8 +32,8 @@ Result with 4 solutions
 
 For more see [our user guides](https://www.juliahomotopycontinuation.org/guides/).
 
-
 ## Citing HomotopyContinuation.jl
+
 If you find HomotopyContinuation.jl useful in your work, we kindly request that you cite the [following paper](https://link.springer.com/chapter/10.1007/978-3-319-96418-8_54):
 
 ```latex
