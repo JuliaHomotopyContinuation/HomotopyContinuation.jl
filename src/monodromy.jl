@@ -39,6 +39,8 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     distance::D = EuclideanNorm()
     unique_points_atol::Union{Nothing,Float64} = nothing
     unique_points_rtol::Union{Nothing,Float64} = nothing
+    #
+    single_loop_per_start_solution = false
 end
 
 """
@@ -476,6 +478,11 @@ end
 loop(MS::MonodromySolver, i) = MS.loops[i]
 nloops(MS::MonodromySolver) = length(MS.loops)
 
+function reset_loops!(MS::MonodromySolver)
+    empty!(MS.loops)
+    MS
+end
+
 function reset_trace!(MS::MonodromySolver)
     MS.trace .= 0
     MS.trace[end, :] .= 1
@@ -783,6 +790,7 @@ function monodromy_solve(
     MS.statistics = MonodromyStatistics()
     empty!(MS.unique_points)
     reset_trace!(MS)
+    reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
     if isempty(results)
         @warn "None of the provided solutions is a valid start solution."
@@ -892,6 +900,11 @@ function serial_monodromy_solve!(
             @goto _return
         end
 
+        if nloops(MS) > 0 && MS.options.single_loop_per_start_solution
+            retcode = :success
+            @goto _return
+        end
+
         add_loop!(MS, p)
         reset_trace!(MS)
         # schedule all jobs
@@ -925,7 +938,9 @@ function serial_monodromy_solve!(
                 push!(results, res)
 
                 # 3) schedule on same loop again
-                push!(queue, LoopTrackingJob(id, job.loop_id))
+                if !MS.options.single_loop_per_start_solution
+                    push!(queue, LoopTrackingJob(id, job.loop_id))
+                end
 
                 # 4) schedule on other loops
                 if MS.options.reuse_loops == :all
@@ -1049,8 +1064,9 @@ function threaded_monodromy_solve!(
                         unlock(data_lock)
 
                         # 3) schedule on same loop again
-                        push!(queue, LoopTrackingJob(id, job.loop_id))
-
+                        if !MS.options.single_loop_per_start_solution
+                            push!(queue, LoopTrackingJob(id, job.loop_id))
+                        end
                         # 4) schedule on other loops
                         if MS.options.reuse_loops == :all
                             for k = 1:nloops(MS)
@@ -1147,6 +1163,10 @@ function threaded_monodromy_solve!(
                     end
 
                     wait(cond_queue_emptied)
+                    if (MS.options.single_loop_per_start_solution)
+                        retcode = :success
+                        break
+                    end
                     retcode == :in_progress || break
                 end
             end
@@ -1264,6 +1284,7 @@ function track(
         μ = tracker.state.μ,
         extended_precision = tracker.state.extended_prec,
     )
+
     if is_success(result)
         result
     else
