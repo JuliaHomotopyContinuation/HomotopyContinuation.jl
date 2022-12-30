@@ -88,6 +88,8 @@ and ``t`` is space / time.
 abstract type AbstractHomotopy end
 
 Base.size(H::AbstractHomotopy, i::Integer) = i == 1 ? first(size(H)) : last(size(H))
+Base.length(H::AbstractHomotopy) = size(H, 1)
+nvariables(F::AbstractHomotopy) = size(F, 2)
 
 (H::AbstractHomotopy)(x, t, p = nothing) = evaluate(H, x, t, p)
 function evaluate(H::AbstractHomotopy, x, t, p = nothing)

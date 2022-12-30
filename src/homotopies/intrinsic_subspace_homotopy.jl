@@ -53,8 +53,9 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     t_cache::Base.RefValue{ComplexF64}
     # For AD
     taylor_t_cache::Base.RefValue{ComplexF64}
-    taylor_γ::NTuple{4,Matrix{ComplexF64}}
+    taylor_γ::NTuple{5,Matrix{ComplexF64}}
     v::Vector{ComplexF64}
+    tx⁴::TaylorVector{5,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
@@ -98,7 +99,7 @@ function IntrinsicSubspaceHomotopy(
         LinearSubspaceGeodesicInfo(start, target)
     end
     Q = geodesic.Q
-    tx³ = TaylorVector{4}(ComplexF64, size(Q, 1))
+    tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
     IntrinsicSubspaceHomotopy(
         system = system,
         start = start,
@@ -110,11 +111,12 @@ function IntrinsicSubspaceHomotopy(
         x_high = zeros(ComplexDF64, size(Q, 1)),
         t_cache = Ref(complex(NaN, NaN)),
         taylor_t_cache = Ref(complex(NaN, NaN)),
-        taylor_γ = tuple((similar(Q) for i = 0:3)...),
+        taylor_γ = tuple((similar(Q) for i = 0:4)...),
         v = zeros(ComplexF64, size(Q, 2)),
-        tx³ = tx³,
-        tx² = TaylorVector{3}(tx³),
-        tx¹ = TaylorVector{2}(tx³),
+        tx⁴ = tx⁴,
+        tx³ = TaylorVector{4}(tx⁴),
+        tx² = TaylorVector{3}(tx⁴),
+        tx¹ = TaylorVector{2}(tx⁴),
     )
 end
 Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
@@ -257,20 +259,24 @@ function ModelKit.evaluate_and_jacobian!(
     nothing
 end
 
-function ModelKit.taylor!(u, ::Val{1}, H::IntrinsicSubspaceHomotopy, v, t)
+function ModelKit.taylor!(
+    u,
+    ::Val{1},
+    H::IntrinsicSubspaceHomotopy,
+    v,
+    t,
+    incr::Bool = true,
+)
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
     # apply chain rule
     #    d/dt [F(γ(t)v); (γ(t)v)[end] - 1] = [J_F(γ(t)v)* γ̇(t)*v;  (γ̇(t)v)[end]]
-    # if v isa Vector{<:TruncatedTaylorSeries}
-    H.v = first.(v)
+
+    H.v .= first.(v)
     LA.mul!(H.x, γ, H.v)
     LA.mul!(H.ẋ, γ̇, H.v)
-    # else
-    #     LA.mul!(H.x, γ, v)
-    #     LA.mul!(H.ẋ, γ̇, v)
-    # end
+
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
     M = size(H, 1)
@@ -283,7 +289,7 @@ function _taylor_γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     @unpack geodesic, taylor_γ = H
     @unpack Q, Q_cos, Θ, U = geodesic
 
-    γ, γ¹, γ², γ³ = taylor_γ
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ
     n, k = size(γ)
     @inbounds for j = 1:k
         Θⱼ = Θ[j]
@@ -291,16 +297,20 @@ function _taylor_γ!(H::IntrinsicSubspaceHomotopy, t::Number)
         c¹ = -s * Θⱼ
         s¹ = c * Θⱼ
         Θⱼ_2 = 0.5 * Θⱼ^2
-        s² = -s * Θⱼ_2
         c² = -c * Θⱼ_2
+        s² = -s * Θⱼ_2
         Θⱼ_3 = Θⱼ_2 * Θⱼ / 3
-        s³ = -c * Θⱼ_3
         c³ = s * Θⱼ_3
+        s³ = -c * Θⱼ_3
+        Θⱼ_4 = 0.25 * Θⱼ_3 * Θⱼ
+        c⁴ = c * Θⱼ_4
+        s⁴ = s * Θⱼ_4
         for i = 1:n
             γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
             γ¹[i, j] = Q_cos[i, j] * c¹ + Q[i, j] * s¹
             γ²[i, j] = Q_cos[i, j] * c² + Q[i, j] * s²
             γ³[i, j] = Q_cos[i, j] * c³ + Q[i, j] * s³
+            γ⁴[i, j] = Q_cos[i, j] * c⁴ + Q[i, j] * s⁴
         end
     end
 
@@ -322,13 +332,13 @@ end
 
 function ModelKit.taylor!(
     u,
-    v::Val{2},
+    ::Val{2},
     H::IntrinsicSubspaceHomotopy,
     tv::TaylorVector,
     t,
     incr::Bool = false,
 )
-    γ, γ¹, γ², γ³ = taylor_γ!(H, t)
+    γ, γ¹, γ² = taylor_γ!(H, t)
     x, x¹, x² = vectors(H.tx²)
     v, v¹ = vectors(tv)
 
@@ -359,7 +369,7 @@ end
 
 function ModelKit.taylor!(
     u,
-    v::Val{3},
+    ::Val{3},
     H::IntrinsicSubspaceHomotopy,
     tv::TaylorVector,
     t,
@@ -392,6 +402,47 @@ function ModelKit.taylor!(
 
     n = first(size(H.system))
     u[n+1] = x³[end]
+
+    u
+end
+
+function ModelKit.taylor!(
+    u,
+    ::Val{4},
+    H::IntrinsicSubspaceHomotopy,
+    tv::TaylorVector,
+    t,
+    incr::Bool = false,
+)
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    x, x¹, x², x³, x⁴ = vectors(H.tx⁴)
+    v, v¹, v², v³ = vectors(tv)
+
+    if !incr
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
+        LA.mul!(x¹, γ, v¹, true, true)
+        LA.mul!(x², γ², v)
+        LA.mul!(x², γ¹, v¹, true, true)
+        LA.mul!(x², γ, v², true, true)
+
+        LA.mul!(x³, γ³, v)
+        LA.mul!(x³, γ², v¹, true, true)
+        LA.mul!(x³, γ¹, v², true, true)
+    end
+
+    LA.mul!(x³, γ, v³, true, true)
+
+    # Currently H.v .= v³
+    LA.mul!(x⁴, γ¹, v³)
+    LA.mul!(x⁴, γ², v², true, true)
+    LA.mul!(x⁴, γ³, v¹, true, true)
+    LA.mul!(x⁴, γ⁴, v, true, true)
+
+    taylor!(u, Val(4), H.system, H.tx⁴)
+
+    n = first(size(H.system))
+    u[n+1] = x⁴[end]
 
     u
 end
