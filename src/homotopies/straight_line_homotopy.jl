@@ -122,7 +122,12 @@ function ModelKit.evaluate_and_jacobian!(
     end
     nothing
 end
-function ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x, t)
+ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::TaylorVector{1}, t) =
+    taylor_1!(u, H, first(vectors(x)), t)
+ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::AbstractVector{<:Number}, t) =
+    taylor_1!(u, H, x, t)
+
+function taylor_1!(u, H::StraightLineHomotopy, x, t)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     for i = 1:size(H, 1)

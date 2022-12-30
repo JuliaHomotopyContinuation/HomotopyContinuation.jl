@@ -23,8 +23,6 @@ function test_homotopy_jacobian(homotopy, symbolic_homotopy)
         1e-12
 end
 
-
-
 function test_homotopy_taylor(homotopy, symbolic_homotopy)
     m, n = size(homotopy)
     v = zeros(ComplexF64, m)
@@ -52,7 +50,6 @@ function test_homotopy(homotopy, symbolic_homotopy)
     test_homotopy_taylor(homotopy, symbolic_homotopy)
 end
 
-
 @testset "Homotopies" begin
     @testset "ParameterHomotopy" begin
         @var x y a b c
@@ -70,19 +67,33 @@ end
             tvar,
         )
 
-        H = ParameterHomotopy(F, p, q)
+        H = ParameterHomotopy(F, p, q; compile = false)
+
+        test_homotopy(H, h)
+    end
+    @testset "StraightLineHomotopy" begin
+        @var x y
+        a, b, c, = rand(3)
+        f = [(2 * x^2 + b^2 * y^3 + 2 * a * x * y)^3, (a + c)^4 * x + y^2]
+        F = System(f, [x, y])
+        g = [(2 * y^2 + b^2 * x^3 + 2 * a * x * y)^2, (a - c)^3 * y + x^2]
+        G = System(g, [x, y])
+        H = StraightLineHomotopy(F, G; compile = false)
+
+        @var t
+        h = Homotopy(t .* F([x, y]) + (1 - t) .* G([x, y]), [x, y], t)
 
         test_homotopy(H, h)
     end
 
-    @testset "AffineSubspaceHomotopy" begin
+    @testset "IntrinsicSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)
         f2 = rand_poly(x, 2)
         F = System([f1, f2], x)
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
-        H = IntrinsicSubspaceHomotopy(F, A, B)
+        H = IntrinsicSubspaceHomotopy(fixed(F; compile = false), A, B)
         @unpack Q, Q_cos, Θ = H.geodesic
 
         @var v[1:3] t
@@ -105,6 +116,37 @@ end
 
         @test out0 ≈ out1 rtol = 1e-12
 
+
+        test_homotopy(H, h)
+    end
+
+    @testset "ExtrinsicSubspaceHomotopy" begin
+        @var x[1:4]
+        f1 = rand_poly(x, 2)
+        f2 = rand_poly(x, 2)
+        F = System([f1, f2], x)
+        A = rand_subspace(4; codim = 2)
+        B = rand_subspace(4, codim = 2)
+        H = ExtrinsicSubspaceHomotopy(fixed(F; compile = false), A, B;)
+
+        @var t
+        h = Homotopy([F(x); t .* A(x) .+ (1 - t) .* B(x)], x, t)
+
+        test_homotopy(H, h)
+    end
+
+    @testset "CoefficientHomotopy" begin
+        @var x[1:4]
+        f1, c1 = dense_poly(x, 2)
+        f2, c2 = dense_poly(x, 2)
+        F = System([f1, f2]; parameters = [c1; c2])
+
+        p = randn(ComplexF64, 2 * length(c1))
+        q = randn(ComplexF64, 2 * length(c1))
+        H = CoefficientHomotopy(F, p, q; compile = false)
+
+        @var t
+        h = Homotopy(t .* F(x, p) .+ (1 - t) .* F(x, q), x, t)
 
         test_homotopy(H, h)
     end
