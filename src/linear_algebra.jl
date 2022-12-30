@@ -97,6 +97,12 @@ function updated!(MW::MatrixWorkspace)
 end
 updated!(M::AbstractMatrix) = M
 
+function init!(MW::MatrixWorkspace)
+    MW.factorized[] = false
+    MW.scaled[] = false
+    MW
+end
+
 """
     update!(MW::MatrixWorkspace, A::Matrix)
 
@@ -883,8 +889,11 @@ end
 (Re-)initialize the `Jacobian`.
 """
 function init!(J::Jacobian; keep_stats::Bool = false)
-    J.factorizations[] = 0
-    J.ldivs[] = 0
+    if (!keep_stats)
+        J.factorizations[] = 0
+        J.ldivs[] = 0
+    end
+    init!(J.workspace)
     J
 end
 
