@@ -6,6 +6,8 @@ using TreeViews: TreeViews
 const HC = HomotopyContinuation
 import SemialgebraicSets
 
+set_default_compile(:none)
+
 include("test_systems.jl")
 
 function test_treeviews(x)
