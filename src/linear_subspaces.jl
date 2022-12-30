@@ -69,7 +69,7 @@ struct ExtrinsicDescription{T}
         if orthonormal
             new{T}(A, b)
         else
-            if size(A,1) == 0
+            if size(A, 1) == 0
                 new{T}(A, b)
             else
                 svd = LA.svd(A)
