@@ -114,8 +114,11 @@ function ModelKit.evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t)
     evaluate_and_jacobian!(u, U, H.F, x, coeffs!(H, t))
 end
 
-function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x, t)
+function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x::AbstractVector, t)
     evaluate!(u, H.F, x, H.dt_coeffs)
+end
+function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x::TaylorVector{1}, t)
+    evaluate!(u, H.F, first(vectors(x)), H.dt_coeffs)
 end
 
 

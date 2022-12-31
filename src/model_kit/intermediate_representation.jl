@@ -488,10 +488,10 @@ function expr_to_ir_statements!(
         )
     elseif t == :Sin
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
-        return add_op!(ir, ir_sin, x)
+        return add_op!(ir, OP_SIN, x)
     elseif t == :Cos
         x = expr_to_ir_statements!(ir, args(ex)[1], cse, pse)
-        return add_op!(ir, ir_cos, x)
+        return add_op!(ir, OP_COS, x)
     else
         n = to_number(ex)
         if (n === ex)

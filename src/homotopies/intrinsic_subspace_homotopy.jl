@@ -263,8 +263,14 @@ function ModelKit.taylor!(u, ::Val{1}, H::IntrinsicSubspaceHomotopy, v, t)
 
     # apply chain rule
     #    d/dt [F(γ(t)v); (γ(t)v)[end] - 1] = [J_F(γ(t)v)* γ̇(t)*v;  (γ̇(t)v)[end]]
-    LA.mul!(H.x, γ, v)
-    LA.mul!(H.ẋ, γ̇, v)
+    # if v isa Vector{<:TruncatedTaylorSeries}
+    H.v = first.(v)
+    LA.mul!(H.x, γ, H.v)
+    LA.mul!(H.ẋ, γ̇, H.v)
+    # else
+    #     LA.mul!(H.x, γ, v)
+    #     LA.mul!(H.ẋ, γ̇, v)
+    # end
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
     M = size(H, 1)
@@ -320,7 +326,7 @@ function ModelKit.taylor!(
     H::IntrinsicSubspaceHomotopy,
     tv::TaylorVector,
     t,
-    incr::Bool,
+    incr::Bool = false,
 )
     γ, γ¹, γ², γ³ = taylor_γ!(H, t)
     x, x¹, x² = vectors(H.tx²)
@@ -357,7 +363,7 @@ function ModelKit.taylor!(
     H::IntrinsicSubspaceHomotopy,
     tv::TaylorVector,
     t,
-    incr::Bool,
+    incr::Bool = false,
 )
     γ, γ¹, γ², γ³ = taylor_γ!(H, t)
     x, x¹, x², x³ = vectors(H.tx³)
