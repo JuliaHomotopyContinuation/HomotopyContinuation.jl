@@ -17,8 +17,8 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     v̄::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
-    dv_start::TaylorVector{4,ComplexF64}
-    dv_target::TaylorVector{4,ComplexF64}
+    dv_start::TaylorVector{5,ComplexF64}
+    dv_target::TaylorVector{5,ComplexF64}
 end
 
 function StraightLineHomotopy(
@@ -51,8 +51,8 @@ function StraightLineHomotopy(
     v̄ = zeros(ComplexDF64, m)
     U = zeros(ComplexF64, m, n)
 
-    dv_start = TaylorVector{4}(ComplexF64, m)
-    dv_target = TaylorVector{4}(ComplexF64, m)
+    dv_start = TaylorVector{5}(ComplexF64, m)
+    dv_target = TaylorVector{5}(ComplexF64, m)
 
     StraightLineHomotopy(
         start,

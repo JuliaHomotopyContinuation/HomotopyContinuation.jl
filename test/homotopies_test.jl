@@ -27,21 +27,28 @@ function test_homotopy_taylor(homotopy, symbolic_homotopy)
     m, n = size(homotopy)
     v = zeros(ComplexF64, m)
     t = randn(ComplexF64)
+    X = TaylorVector{4}(randn(ComplexF64, 4, n))
 
-    for K = 1:3
-        k = K
-        x = TaylorVector{K}(randn(ComplexF64, K, n))
-
-        @var λ
-        tx = [sum(xi .* λ .^ (0:length(xi)-1)) for xi in eachcol(x.data)]
-        true_value =
-            (differentiate(Expression.(symbolic_homotopy(tx, t + λ)), λ, k)).(λ => 0) /
-            factorial(k)
-        v .= 0
-        taylor!(v, Val(k), homotopy, x, t)
-        @test v ≈ true_value rtol = 1e-12
-
+    for incr in [false, true]
+        for K = 1:4
+            @testset "Taylor, K = $K, incr = $incr" begin
+                k = K
+                x = TaylorVector{K}(X)
+                @var λ
+                tx = [sum(xi .* λ .^ (0:length(xi)-1)) for xi in eachcol(x.data[1:K, :])]
+                true_value =
+                    (differentiate(
+                        Expression.(symbolic_homotopy(tx, t + λ)),
+                        λ,
+                        k,
+                    )).(λ => 0) / factorial(k)
+                v .= 0
+                taylor!(v, Val(k), homotopy, x, t, incr)
+                @test v ≈ true_value rtol = 1e-12
+            end
+        end
     end
+
 end
 
 function test_homotopy(homotopy, symbolic_homotopy)
