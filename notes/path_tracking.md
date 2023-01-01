@@ -31,7 +31,9 @@ If we require
 
 $$
 \Vert  \Delta x^{(N-1)}  \Vert  \leq
-\exp\left(\frac12 \left[\log(1/\omega_{\textnormal{prev}}) + \log(\mu^*)\right]\right) =: \tau(\omega_{\textnormal{prev}}, \mu^*),
+\exp\left(\frac12 \left[\log(1/\omega_{\textnormal{prev}}) + \log(\mu^*)\right]\right)  =
+\sqrt{\frac{\mu^*}{\omega_{\textnormal{prev}}}}
+=: \tau(\omega_{\textnormal{prev}}, \mu^*),
 $$
 
 then follows
@@ -59,10 +61,14 @@ $$
 For our step size control this implies that the optimal step size $\delta^*$ is
 
 $$
-\delta^* := \left[ \; \eta_p  \,\varphi(\omega_{\textnormal{prev}}, \mu^*, N)  \; \right]^{1/p}
+\delta^* := \left[ \;   \,\varphi(\omega_{\textnormal{prev}}, \mu^*, N) / \eta_p  \; \right]^{1/p}
 $$
 
 where $\eta_p$ is the prediction error of the predictor with local order $p$.
+
+### Tracking with extended precision
+
+We track with extended precision if the required $\Vert \Delta x^{(N-1)} \Vert$ is smaller than $\beta \mu$ where $\beta$ is a constant buffer.
 
 ## Computational testing
 

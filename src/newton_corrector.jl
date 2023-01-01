@@ -85,9 +85,10 @@ function newton!(
     norm::AbstractNorm;
     μ::Float64 = throw(UndefKeywordError(:μ)),
     ω::Float64 = throw(UndefKeywordError(:ω)),
+    ε::Float64,
     extended_precision::Bool = false,
 )
-    @unpack Δx, r, r̄, x_extended, N, ε = NC
+    @unpack Δx, r, r̄, x_extended, N = NC
     x̄ .= x₀
     xᵢ₊₁ = xᵢ = x̄
     Δxᵢ₊₁ = Δxᵢ = Δx
@@ -137,7 +138,7 @@ function newton!(
         iter == 1 && (ω = 2 * norm_Δxᵢ / norm_Δxᵢ₋₁^2)
         iter >= 1 && (θ = norm_Δxᵢ / norm_Δxᵢ₋₁)
 
-        if (ω * norm_Δxᵢ^2 ≤ ε)
+        if norm_Δxᵢ ≤ ε
             evaluate!(r, H, xᵢ, t)
             LA.ldiv!(Δxᵢ₊₁, J, r)
             μ_low = norm(Δxᵢ₊₁)

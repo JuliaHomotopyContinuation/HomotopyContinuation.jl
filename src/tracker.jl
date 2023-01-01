@@ -534,14 +534,16 @@ function update_stepsize!(
     predictor::Predictor;
 )
     @unpack ω, Δs_prev, = state
-    @unpack N, ε = options.parameters
+    @unpack N = options.parameters
     p = predictor.order
 
 
+
+    μ_ = 2.842170943040401e-14
     if is_converged(result)
-        m = 2^N
+        m = 2^(N - 1)
         η = result.norm_Δx₀ / abs(Δs_prev)^p
-        δ1 = nthroot(ε, m) / ω^((m - 1) / m)
+        δ1 = nthroot(sqrt(μ_ / ω) * ω^(-m + 1), m)
         δ2 = 1 / (m * ω)
         Δs₁ = nthroot(min(δ1, δ2) / η, p)
         Δs₂ = trust_region(predictor)
@@ -739,8 +741,9 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    m = 2^N
-    μ_threshold = ((nthroot(corrector.ε, m) / ω^(7 / m))^2 * ω)^(1.5)
+    β = 1e-3
+    μ_ = 2.842170943040401e-14 # 128 * eps()
+    μ_threshold = β * √(μ_ / ω)
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
         if μ_low < 0.125 * μ_threshold
@@ -826,6 +829,7 @@ function step!(tracker::Tracker)
 
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
+    μ_ = 2.842170943040401e-14 # 128 * eps()
     result = newton!(
         x̄,
         corrector,
@@ -834,6 +838,7 @@ function step!(tracker::Tracker)
         t′, # = t + Δt
         jacobian,
         norm;
+        ε = sqrt(μ_ / (isnan(state.ω) ? 1.0 : state.ω)),
         ω = state.ω,
         μ = state.μ,
         extended_precision = state.extended_prec,
@@ -870,7 +875,7 @@ function step!(tracker::Tracker)
         update!(state.norm, x)
     else
 
-        # Step failed, so we have to try with a new (smaller) step size
+        # Step failed, so we have to try with a  (smaller) step size
         state.rejected_steps += 1
         state.ext_rejected_steps += state.extended_prec
         state.last_steps_failed += 1

@@ -10,40 +10,40 @@ using BenchmarkTools
 include("test/test_systems.jl")
 include("test/engame_test_systems.jl")
 
-f = eg_system_1(2)
-(T, xs) = total_degree(f)
+# f = eg_system_1(2)
+# (T, xs) = total_degree(f)
 
 
-function estimate_system_distance(H)
-    m, n = size(H)
-    u1 = zeros(ComplexF64, m)
-    u0 = zeros(ComplexF64, m)
-    v = zeros(m)
-    normalizer = zeros(m)
+# function estimate_system_distance(H)
+#     m, n = size(H)
+#     u1 = zeros(ComplexF64, m)
+#     u0 = zeros(ComplexF64, m)
+#     v = zeros(m)
+#     normalizer = zeros(m)
 
-    nsamples = 5
+#     nsamples = 5
 
-    for i = 1:nsamples
-        x = randn(ComplexF64, n)
-        x ./= norm(x)
-        evaluate!(u1, H, x, 1.0)
-        evaluate!(u0, H, x, 0.0)
-        normalizer .+= abs.(u1)
-        v .+= abs.(u1 .- u0)
-    end
-    normalizer ./= nsamples
-    v .= v ./ nsamples
-    v .= v ./ normalizer
+#     for i = 1:nsamples
+#         x = randn(ComplexF64, n)
+#         x ./= norm(x)
+#         evaluate!(u1, H, x, 1.0)
+#         evaluate!(u0, H, x, 0.0)
+#         normalizer .+= abs.(u1)
+#         v .+= abs.(u1 .- u0)
+#     end
+#     normalizer ./= nsamples
+#     v .= v ./ nsamples
+#     v .= v ./ normalizer
 
-    return v
-end
+#     return v
+# end
 
-estimate_system_distance(T.tracker.homotopyq)
+# estimate_system_distance(T.tracker.homotopyq)
 
 
-x = collect(xs)[1]
+# x = collect(xs)[1]
 
-path_info(T.tracker, x)
+# path_info(T.tracker, x)
 
 
 
@@ -69,9 +69,22 @@ H = ParameterHomotopy(F, q, p; compile = false);
 
 T = Tracker(H)
 t = x -> track(T, x)
+@time track(T, xs[1])
+
+for i = 1:length(xs)
+    @show i
+    @time track(T, xs[i])
+end
+
+
+path_info(T, xs[2])
 R = map(t, xs)
 count(is_success, R)
 @time R = map(t, xs);
+
+bad_ = findall(!is_success, R)
+
+
 
 
 bad_paths = [
