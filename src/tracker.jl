@@ -43,23 +43,17 @@ We provide three sets of parameters for common use cases:
 [^Tim20]: Timme, S. "Mixed Precision Path Tracking for Polynomial Homotopy Continuation". arXiv:1902.02968 (2020)
 """
 Base.@kwdef mutable struct TrackerParameters
-    a::Float64 = 0.125
-    β_a::Float64 = 1.0
-    # compared to β_ω in the article, β_ω_p goes into the formula by β_ω_p^p, i.e.
-    # the relative reduction in step size is independent of the order p
-    β_ω_p::Float64 = 3.0
-    β_τ::Float64 = 0.4
-    strict_β_τ::Float64 = min(0.75β_τ, 0.4)
-    min_newton_iters::Int = 2
+    N::Int = 3
+    ε::Float64 = 1e-14
 end
 Base.show(io::IO, TP::TrackerParameters) = print_fieldnames(io, TP)
 
 "The default [`TrackerParameters`](@ref) which have a good balance between robustness and efficiency."
 const DEFAULT_TRACKER_PARAMETERS = TrackerParameters()
 "[`TrackerParameters`](@ref) which trade speed against a higher chance of path jumping."
-const FAST_TRACKER_PARAMETERS = TrackerParameters(β_τ = 0.75, β_ω_p = 2.0)
+const FAST_TRACKER_PARAMETERS = TrackerParameters(ε = 1e-12)
 "[`TrackerParameters`](@ref) which trade robustness against some speed."
-const CONSERVATIVE_TRACKER_PARAMETERS = TrackerParameters(β_ω_p = 4.0, β_τ = 0.25)
+const CONSERVATIVE_TRACKER_PARAMETERS = TrackerParameters(ε = eps())
 
 
 """
@@ -103,7 +97,6 @@ mutable struct TrackerOptions
     parameters::TrackerParameters
 end
 function TrackerOptions(;
-    automatic_differentiation::Int = 1,
     max_steps::Int = 10_000,
     max_step_size::Float64 = Inf,
     max_initial_step_size::Float64 = Inf,
@@ -127,7 +120,7 @@ function TrackerOptions(;
     end
 
     TrackerOptions(
-        automatic_differentiation,
+        4,
         max_steps,
         max_step_size,
         max_initial_step_size,
@@ -474,7 +467,8 @@ function Tracker(
     norm = WeightedNorm(ones(size(H, 2)), InfNorm(), weighted_norm_options)
     state = TrackerState(H, x, norm)
     predictor = Predictor(H)
-    corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
+    corrector =
+        NewtonCorrector(options.parameters.N, options.parameters.ε, state.x, size(H, 1))
     Tracker(H, predictor, corrector, state, options)
 end
 
@@ -504,6 +498,7 @@ solution(T::Tracker) = get_solution(T.homotopy, T.state.x, T.state.t)
 
 status(tracker::Tracker) = tracker.state.code
 
+
 LA.cond(tracker::Tracker) = tracker.state.cond_J_ẋ
 
 function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
@@ -512,9 +507,14 @@ function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
     updated!(J)
     LA.cond(J, d_l, d_r)
 end
-# Step Size
 
-_h(a) = 2a * (√(4 * a^2 + 1) - 2a)
+
+###############
+## Step Size ##
+###############
+
+
+# _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 
 # intial step size
 function initial_step_size(
@@ -522,20 +522,9 @@ function initial_step_size(
     predictor::Predictor,
     options::TrackerOptions,
 )
-    a = options.parameters.β_a * options.parameters.a
-    p = order(predictor)
-    ω = state.ω
-    e = local_error(predictor)
-    if isinf(e)
-        # don't have anything we can use, so just use a conservative number
-        # (in all well-behaved cases)
-        e = 1e5
-    end
     τ = trust_region(predictor)
-    Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p) / options.parameters.β_ω_p
-    Δs₂ = options.parameters.β_τ * τ
-    Δs = nanmin(Δs₁, Δs₂)
-    min(Δs, options.max_step_size, options.max_initial_step_size)
+    Δs₁ = 0.25τ
+    min(Δs₁, options.max_step_size, options.max_initial_step_size)
 end
 
 function update_stepsize!(
@@ -543,45 +532,27 @@ function update_stepsize!(
     result::NewtonCorrectorResult,
     options::TrackerOptions,
     predictor::Predictor;
-    ad_for_error_estimate::Bool = true,
 )
-    a = options.parameters.β_a * options.parameters.a
-    p = order(predictor)
-    ω = clamp(state.ω + 2(state.ω - state.ω_prev), state.ω, 8state.ω)
-    τ = state.τ #trust_region(predictor)
+    @unpack ω, Δs_prev, = state
+    @unpack N, ε = options.parameters
+    p = predictor.order
+
+
     if is_converged(result)
-        e = local_error(predictor)
-        Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p) / options.parameters.β_ω_p
-        Δs₂ = options.parameters.β_τ * τ
-        if state.use_strict_β_τ || dist_to_target(state.segment_stepper) < Δs₂
-            Δs₂ = options.parameters.strict_β_τ * τ
-        end
-        Δs = min(nanmin(Δs₁, Δs₂), options.max_step_size)
-        if state.use_strict_β_τ && dist_to_target(state.segment_stepper) < Δs
-            Δs *= options.parameters.strict_β_τ
-        end
-        # increase step size by a factor of at most 10 in one step
-        Δs = min(Δs, 10 * state.Δs_prev)
+        m = 2^N
+        η = result.norm_Δx₀ / abs(Δs_prev)^p
+        δ1 = nthroot(ε, m) / ω^((m - 1) / m)
+        δ2 = 1 / (m * ω)
+        Δs₁ = nthroot(min(δ1, δ2) / η, p)
+        Δs₂ = trust_region(predictor)
+        Δs = 0.8min(Δs₁, Δs₂)
+        # increase step size by a factor of at most 8 in one step
+        Δs = min(Δs, 8 * state.Δs_prev)
         if state.last_step_failed
-            Δs = min(Δs, state.Δs_prev)
+            Δs = min(Δs, 1.25state.Δs_prev)
         end
     else
-        j = result.iters - 2
-        Θ_j = nthroot(result.θ, 1 << j)
-        h_Θ_j = _h(Θ_j)
-        h_a = _h(0.5a)
-        if isnan(Θ_j) ||
-           result.return_code == NEWT_SINGULARITY ||
-           isnan(result.accuracy) ||
-           result.iters == 1 ||
-           h_Θ_j < h_a
-
-            Δs = 0.25 * state.segment_stepper.Δs
-        else
-            Δs =
-                nthroot((√(1 + 2 * _h(0.5a)) - 1) / (√(1 + 2 * _h(Θ_j)) - 1), p) *
-                state.segment_stepper.Δs
-        end
+        Δs = 0.5 * state.segment_stepper.Δs
     end
     propose_step!(state.segment_stepper, Δs)
     nothing
@@ -590,11 +561,17 @@ end
 
 function check_terminated!(state::TrackerState, options::TrackerOptions)
     if state.extended_prec || !options.extended_precision
-        @unpack a, min_newton_iters = options.parameters
-        tol_acc = a^(2^min_newton_iters - 1) * _h(a)
-    else
-        tol_acc = Inf
+        @unpack N, ε = options.parameters
+        @unpack ω = state
+        m = 2^N
+
+        μ_threshold = ((nthroot(ε, m) / ω^((m - 1) / m))^2 * ω)^(1)
+        if state.μ > μ_threshold && state.last_steps_failed > 3
+            state.code = TrackerCode.terminated_accuracy_limit
+            return
+        end
     end
+
 
     t′ = state.segment_stepper.t′
     t = state.segment_stepper.t
@@ -602,10 +579,6 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         state.code = TrackerCode.success
     elseif steps(state) ≥ options.max_steps
         state.code = TrackerCode.terminated_max_steps
-    elseif state.ω * state.μ > tol_acc
-        state.code = TrackerCode.terminated_accuracy_limit
-        # elseif state.last_steps_failed ≥ 3 && state.cond_J_ẋ > options.terminate_cond
-        #     state.code = TrackerCode.terminated_ill_conditioned
     elseif state.segment_stepper.Δs < options.min_step_size
         state.code = TrackerCode.terminated_step_size_too_small
     elseif fast_abs(t′ - t) ≤ 2eps(fast_abs(t))
@@ -653,14 +626,14 @@ function init!(
 
     # intialize state
     set_solution!(x, homotopy, x₁, t₁)
+    init!(norm, x)
+    init!(jacobian)
+
     init!(state.segment_stepper, t₁, t₀)
     state.Δs_prev = 0.0
     state.accuracy = eps()
     state.ω = 1.0
     state.keep_extended_prec = false
-    state.use_strict_β_τ = false
-    init!(norm, x)
-    init!(jacobian)
     state.code = TrackerCode.tracking
     if !keep_steps
         state.accepted_steps = state.rejected_steps = 0
@@ -668,11 +641,12 @@ function init!(
     end
     state.last_steps_failed = 0
 
+
     # compute ω and limit accuracy μ for the start value
+    performed_newton_step = false
     t = state.t
     if isnan(ω) || isnan(μ)
-        a = options.parameters.a
-        valid, ω, μ = init_newton!(
+        valid, μ = init_newton!(
             x̄,
             corrector,
             homotopy,
@@ -680,12 +654,12 @@ function init!(
             t,
             jacobian,
             norm;
-            a = a,
             extended_precision = extended_precision,
         )
+        performed_newton_step = true
         if !valid && !extended_precision
             extended_precision = true
-            valid, ω, μ = init_newton!(
+            valid, μ = init_newton!(
                 x̄,
                 corrector,
                 homotopy,
@@ -693,7 +667,6 @@ function init!(
                 t,
                 jacobian,
                 norm;
-                a = a,
                 extended_precision = true,
             )
         end
@@ -709,29 +682,35 @@ function init!(
         state.accuracy = μ
         state.μ = max(μ, eps())
     else
-        evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, x, t)
+        # Let's do some more computations to figure out why
+        # the solution is bad (could be non-zero or a singular Solution)
         J = matrix(workspace(jacobian))
+        evaluate_and_jacobian!(corrector.r, J, homotopy, x, t)
         if J isa StructArrays.StructArray
             corank = size(J, 2) - LA.rank(Matrix(J), rtol = 1e-14)
         else
             corank = size(J, 2) - LA.rank(J, rtol = 1e-14)
         end
-        if corank > 0
-            state.code = TrackerCode.terminated_invalid_startvalue_singular_jacobian
+
+        state.code = if corank > 0
+            TrackerCode.terminated_invalid_startvalue_singular_jacobian
         else
-            state.code = TrackerCode.terminated_invalid_startvalue
+            TrackerCode.terminated_invalid_startvalue
         end
 
         return false
     end
 
+
     # initialize the predictor
-    state.τ = τ
-    evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, state.x, t)
-    updated!(jacobian)
     init!(tracker.predictor)
+    if (!performed_newton_step)
+        evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, state.x, t)
+        updated!(jacobian)
+    end
     update_predictor!(tracker)
     state.τ = trust_region(predictor)
+
     # compute initial step size
     Δs = initial_step_size(state, predictor, tracker.options)
     Δs = max(min(Δs, max_initial_step_size), tracker.options.min_step_size)
@@ -742,7 +721,7 @@ function init!(
 end
 
 function init!(tracker::Tracker, t₀::Number; max_initial_step_size::Float64 = Inf)
-    @unpack state, predictor, options = tracker
+    @unpack state, predictor, options = Pathtracker
     state.code = TrackerCode.tracking
     init!(state.segment_stepper, state.t, t₀)
     Δs = initial_step_size(state, predictor, tracker.options)
@@ -756,17 +735,19 @@ end
 function update_precision!(tracker::Tracker, μ_low)
     @unpack homotopy, corrector, state, options = tracker
     @unpack μ, ω, x, t, jacobian, norm = state
-    @unpack a = options.parameters
+    @unpack N = options.parameters
 
     options.extended_precision || return false
 
+    m = 2^N
+    μ_threshold = ((nthroot(corrector.ε, m) / ω^(7 / m))^2 * ω)^(1.5)
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
-        if μ_low * ω < a^7 * _h(a)
+        if μ_low < 0.125 * μ_threshold
             state.extended_prec = false
             state.μ = μ_low
         end
-    elseif μ * ω > a^5 * _h(a)
+    elseif μ > μ_threshold
         use_extended_precision!(tracker)
     end
 
@@ -776,7 +757,6 @@ end
 function use_extended_precision!(tracker::Tracker)
     @unpack homotopy, corrector, state, options = tracker
     @unpack μ, ω, x, t, jacobian, norm = state
-    @unpack a = options.parameters
 
     options.extended_precision || return state.μ
     !state.extended_prec || return state.μ
@@ -836,22 +816,13 @@ end
 
 Perform a single tracking step. Returns `true` if the step was accepted.
 """
-function step!(tracker::Tracker, debug::Bool = false)
+function step!(tracker::Tracker)
     @unpack homotopy, corrector, predictor, state, options = tracker
     @unpack t, Δt, t′, x, x̂, x̄, jacobian, norm = state
 
-    debug && printstyled(
-        "\nt: ",
-        round(t, sigdigits = 5),
-        " Δt: ",
-        round(Δt; sigdigits = 5),
-        "\n";
-        color = state.extended_prec ? :blue : :yellow,
-    )
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
     predict!(x̂, predictor, homotopy, x, t, Δt)
-    update!(state.norm, x̂)
 
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
@@ -860,55 +831,54 @@ function step!(tracker::Tracker, debug::Bool = false)
         corrector,
         homotopy,
         x̂,
-        t′,
+        t′, # = t + Δt
         jacobian,
         norm;
         ω = state.ω,
         μ = state.μ,
         extended_precision = state.extended_prec,
-        first_correction = state.accepted_steps == 0,
     )
 
-    if debug
-        println("Prediction method: ", predictor.method)
-        println("τ: ", predictor.trust_region)
-        printstyled(result, "\n"; color = is_converged(result) ? :green : :red)
-    end
-
+    state.norm_Δx₀ = result.norm_Δx₀
     if is_converged(result)
         # move forward
         x .= x̄
+
         state.Δs_prev = state.segment_stepper.Δs
         step_success!(state.segment_stepper)
-        state.accuracy = result.accuracy
-        state.μ = max(result.accuracy, eps())
-        state.ω_prev = state.ω
-        state.ω = max(result.ω, 0.5 * state.ω, 0.1)
-        update_precision!(tracker, result.μ_low)
-
-        if is_done(state.segment_stepper) &&
-           options.extended_precision &&
-           state.accuracy > 1e-14
-            state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
-            state.refined_extended_prec = true
-        end
-        update_predictor!(tracker, x̂, state.Δs_prev, t)
-        state.τ = trust_region(predictor)
 
         state.accepted_steps += 1
         state.ext_accepted_steps += state.extended_prec
         state.last_steps_failed = 0
+        state.accuracy = result.accuracy
+        state.μ = max(result.accuracy, eps())
+        ω = max(result.ω, 1)
+        state.ω_prev = state.ω
+        state.ω = ω
+
+        update_precision!(tracker, result.μ_low)
+        if is_done(state.segment_stepper) &&
+           options.extended_precision &&
+           state.accuracy > 1e-12
+            state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
+            state.refined_extended_prec = true
+        end
+
+        update_predictor!(tracker, x̂, state.Δs_prev, t)
+        state.τ = trust_region(predictor)
+
+        update!(state.norm, x)
     else
+
         # Step failed, so we have to try with a new (smaller) step size
         state.rejected_steps += 1
         state.ext_rejected_steps += state.extended_prec
         state.last_steps_failed += 1
     end
-    state.norm_Δx₀ = result.norm_Δx₀
-    update_stepsize!(state, result, options, predictor; ad_for_error_estimate = false)
+
+    update_stepsize!(state, result, options, predictor)
 
     check_terminated!(state, options)
-
 
     !state.last_step_failed
 end
@@ -933,7 +903,6 @@ function track!(
     τ::Float64 = Inf,
     keep_steps::Bool = false,
     max_initial_step_size::Float64 = Inf,
-    debug::Bool = false,
 )
     init!(
         tracker,
@@ -949,7 +918,7 @@ function track!(
     )
 
     while is_tracking(tracker.state.code)
-        step!(tracker, debug)
+        step!(tracker)
     end
 
     tracker.state.code
@@ -961,23 +930,17 @@ function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debu
         solution(r),
         t₁,
         t₀;
-        debug = debug,
         ω = r.ω,
         μ = r.μ,
         τ = r.τ,
         extended_precision = r.extended_precision,
     )
 end
-function track!(
-    tracker::Tracker,
-    t₀;
-    debug::Bool = false,
-    max_initial_step_size::Float64 = Inf,
-)
+function track!(tracker::Tracker, t₀; max_initial_step_size::Float64 = Inf)
     init!(tracker, t₀; max_initial_step_size = max_initial_step_size)
 
     while is_tracking(tracker.state.code)
-        step!(tracker, debug)
+        step!(tracker)
     end
 
     tracker.state.code

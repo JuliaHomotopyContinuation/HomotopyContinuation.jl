@@ -54,10 +54,12 @@ All APIs expect input in t-coordinates and return results in t-coordinates.
 
 module PredictionMethod
 @enum methods begin
+    Pade31
     Pade21
     Hermite
 end
 end
+
 using .PredictionMethod: PredictionMethod
 
 """
@@ -70,9 +72,8 @@ This is done using automatic differentiation for the derivatives up to order `3`
 Otherwise numerical differentiation is used.
 """
 Base.@kwdef mutable struct Predictor
-    method::PredictionMethod.methods = PredictionMethod.Pade21
-    order::Int = 4
-    use_hermite::Bool = true
+    method::PredictionMethod.methods = PredictionMethod.Pade31
+    order::Int = 5
     trust_region::Float64 = Inf
     local_error::Float64 = Inf
     cond_H_ẋ::Float64 = Inf
@@ -81,54 +82,51 @@ Base.@kwdef mutable struct Predictor
     tx¹::TaylorVector{2,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
+    tx⁴::TaylorVector{5,ComplexF64}
     t::ComplexF64 = complex(NaN)
-    tx_norm::Vector{Float64} = zeros(4)
+    tx_norm::Vector{Float64} = zeros(5)
 
     # finite diff
     xtemp::Vector{ComplexF64}
     u::Vector{ComplexF64}
-    u₁::Vector{ComplexF64}
-    u₂::Vector{ComplexF64}
 
-    # for interpolation
-    prev_tx¹::TaylorVector{2,ComplexF64}
-    prev_t::ComplexF64 = complex(NaN)
-
-    # endgame predictor
-    winding_number::Int = 1
-    s::ComplexF64 = complex(NaN)
-    prev_s::ComplexF64 = complex(NaN)
-    ty¹::TaylorVector{2,ComplexF64}
-    prev_ty¹::TaylorVector{2,ComplexF64}
+    # # endgame predictor
+    # winding_number::Int = 1
+    # s::ComplexF64 = complex(NaN)
+    # prev_s::ComplexF64 = complex(NaN)
+    # ty¹::TaylorVector{2,ComplexF64}
+    # prev_ty¹::TaylorVector{2,ComplexF64}
 end
 
 
 function Predictor(H::AbstractHomotopy)
     m, n = size(H)
-    tx³ = TaylorVector{4}(ComplexF64, n)
+    tx⁴ = TaylorVector{5}(ComplexF64, n)
     Predictor(
-        tx⁰ = TaylorVector{1}(tx³),
-        tx¹ = TaylorVector{2}(tx³),
-        tx² = TaylorVector{3}(tx³),
-        tx³ = tx³,
+        tx⁰ = TaylorVector{1}(tx⁴),
+        tx¹ = TaylorVector{2}(tx⁴),
+        tx² = TaylorVector{3}(tx⁴),
+        tx³ = TaylorVector{4}(tx⁴),
+        tx⁴ = tx⁴,
         xtemp = zeros(ComplexF64, n),
         u = zeros(ComplexF64, m),
-        u₁ = zeros(ComplexF64, m),
-        u₂ = zeros(ComplexF64, m),
-        prev_tx¹ = TaylorVector{2}(ComplexF64, n),
-        ty¹ = TaylorVector{2}(ComplexF64, n),
-        prev_ty¹ = TaylorVector{2}(ComplexF64, n),
+        # u₁ = zeros(ComplexF64, m),
+        # u₂ = zeros(ComplexF64, m),
+        # prev_tx¹ = TaylorVector{2}(ComplexF64, n),
+        # ty¹ = TaylorVector{2}(ComplexF64, n),
+        # prev_ty¹ = TaylorVector{2}(ComplexF64, n),
     )
 end
 
 function init!(predictor::Predictor)
     predictor.cond_H_ẋ = 1.0
-    predictor.winding_number = 1
+    # predictor.winding_number = 1
 
-    predictor.t = predictor.prev_t = NaN
-    predictor.s = predictor.prev_s = NaN
-    predictor.trust_region = predictor.local_error = NaN
-    predictor.use_hermite = true
+    predictor.t = NaN
+    # predictor.s = predictor.prev_s = NaN
+    predictor.trust_region = NaN
+    predictor.local_error = NaN
+    # predictor.use_hermite = true
     predictor
 end
 
@@ -162,7 +160,8 @@ function update!(
     t,
     J::Jacobian,
     norm::AbstractNorm,
-    x̂ = nothing, # the predicted value
+    x̂ = nothing;
+    winding_number::Int = 1,
 )
     # The general strategy is as follows:
     #
@@ -173,156 +172,135 @@ function update!(
     # We obtain accurate derivatives by using automatic differentiation (AD) with the taylor!
     # api.
 
-    @unpack u, tx⁰, tx¹, tx², tx³, ty¹, xtemp, tx_norm = predictor
+    @unpack u, tx⁰, tx¹, tx², tx³, tx⁴, xtemp, tx_norm = predictor
 
-    x⁰, x¹, x², x³ = vectors(tx³)
-    y⁰, y¹ = vectors(ty¹)
-
-    m = predictor.winding_number
-    @inbounds for i = 1:length(xtemp)
-        predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
-        predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
-    end
-
-    predictor.prev_t, predictor.t = predictor.t, t
-
-    if m > 1
-        predictor.prev_s = predictor.s
-        predictor.s = t_to_s_plane(t, m)
-    end
-
-    # we use the accuracy of the previous prediction for the local error estimate
-    if isnothing(x̂)
-        predictor.local_error = NaN
-    else
-        Δs = fast_abs(t - predictor.prev_t)
-        predictor.local_error = norm(x̂, x) / Δs^predictor.order
-    end
+    x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
     x⁰ .= x
     tx_norm[1] = norm(x)
-    if m > 1
-        y⁰ .= x
-    end
 
-    # Compute ẋ always using AD
+    # Compute first derivative
     taylor!(u, Val(1), H, x, t)
     u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    # Check error made in the linear algebra
-    δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
-    predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
-    tol_δ₁ = 1e-10
+    LA.ldiv!(xtemp, J, u, norm)
 
-    δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
-    tx_norm[2] = norm(xtemp)
+    # establish linear algebra error using fixed precision error
+    # The error of the fixed precision refinement is `2n * cond(J, ẋ) * eps()`
+    δ, fixed_refinement_iters = iterative_refinement!(
+        xtemp,
+        J,
+        u,
+        norm;
+        mixed_precision = false,
+        tol = 1e-14,
+        max_iters = 4,
+    )
+    cond_H_ẋ = δ / (2 * length(x) * eps())
+    predictor.cond_H_ẋ = cond_H_ẋ
 
+    # target 
+    refine =
+        () -> begin
+            (fixed_refinement_iters == 1) && return
+            iterative_refinement!(
+                xtemp,
+                J,
+                u,
+                norm;
+                mixed_precision = cond_H_ẋ > 1e5,
+                tol = 1e-8,
+                max_iters = 3,
+            )
+        end
+    refine()
+    tx_norm[3] = norm(xtemp)
     x¹ .= xtemp
-    if m > 1
-        if m == 2
-            μ = 2 * predictor.s
-        else
-            μ = m * predictor.s^(m - 1)
-        end
-        y¹ .= μ .* xtemp
 
-        predictor.method = PredictionMethod.Hermite
-        predictor.order = 4
-        predictor.trust_region = tx_norm[1] / tx_norm[2]
-        if isnan(predictor.local_error)
-            predictor.local_error = (tx_norm[2] / tx_norm[1])^3
-        end
-        return predictor
-    end
 
     taylor!(u, Val(2), H, tx¹, t, true)
     u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₂ = 1e-10
-    δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
+    LA.ldiv!(xtemp, J, u, norm)
+    refine()
     tx_norm[3] = norm(xtemp)
     x² .= xtemp
 
+
     taylor!(u, Val(3), H, tx², t, true)
     u .= .-u
-    LA.ldiv!(xtemp, J, u)
-    tol_δ₃ = 1e-4
-    δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
+    LA.ldiv!(xtemp, J, u, norm)
+    refine()
     tx_norm[4] = norm(xtemp)
     x³ .= xtemp
 
-    τ = Inf
-    for (i, (x, x¹, x², x³)) in enumerate(tx³)
-        c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
-        λ = max(1e-6, c¹)
-        c¹ /= λ
-        c² /= λ^2
-        c³ /= λ^3
-        tol = 1e-14 * max(c¹, c², c³)
-        if !((c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol)
-            τᵢ = (c² / c³) / λ
-            if τᵢ < τ
-                τ = τᵢ
-            end
-        end
-    end
-    if !isfinite(τ)
-        τ = tx_norm[3] / tx_norm[4]
-    end
-    if !isfinite(τ)
-        τ = tx_norm[1] / maximum(tx_norm)
-    end
 
-    predictor.method = PredictionMethod.Pade21
-    predictor.order = 4
-    predictor.trust_region = τ
-    if isnan(predictor.local_error)
-        predictor.local_error = ((inv(τ))^2)^2
+    taylor!(u, Val(4), H, tx³, t, true)
+    u .= .-u
+    LA.ldiv!(xtemp, J, u, norm)
+    refine()
+    tx_norm[5] = norm(xtemp)
+    x⁴ .= xtemp
+
+
+    # Now detect whether we can actually use a taylor predictor of order 4
+
+    c, c¹, c², c³, c⁴ = tx_norm
+    λ = max(c, 1)
+    c¹ /= λ
+    c² /= λ^2
+    c³ /= λ^3
+    c⁴ /= λ^4
+    tol = 1e-14 * c
+
+    # check if all derivatives are zero effectively
+    if c⁴ > tol
+        predictor.order = 5
+        τ = c³ / (λ * c⁴)
+    elseif c³ > tol
+        predictor.order = 4
+        τ = c² / (λ * c³)
+    elseif c² > tol
+        predictor.order = 3
+        τ = c¹ / (λ * c²)
+    elseif c¹ > tol
+        predictor.order = 2
+        τ = c / (λ * c¹)
+    else
+        predictor.order = 1
+        τ = 1.0
     end
+    predictor.trust_region = τ
 
     predictor
 end
 
-predict!(x̂, pred::Predictor, H, x, t, Δt) = predict!(x̂, pred, pred.method, H, x, t, Δt)
-function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, t, Δt)
-    m = pred.winding_number
+function predict!(x̂, pred::Predictor, H, x, t, Δt; winding_number::Int = 1)
+    @unpack u, tx⁰, tx¹, tx², tx³, tx⁴, xtemp, tx_norm = pred
 
-    if method == PredictionMethod.Pade21
-        λ = pred.trust_region
-        λ² = λ^2
-        λ³ = λ^3
-        tol = 1e-12
-        for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
-            c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
-            # check if only taylor series is used
-            τ = tol * √(c^2 + (c¹ * λ)^2 + (c² * λ²)^2 + (c³ * λ³)^2)
-            if c³ * λ³ ≤ τ || c² * λ² ≤ τ
-                x̂[i] = x + Δt * (x¹ + Δt * x²)
-            else
-                δᵢ = 1 - Δt * x³ / x²
-                x̂[i] = x + Δt * (x¹ + Δt * x² / δᵢ)
-            end
+    τ = pred.trust_region
+    if (pred.order <= 2)
+        for (i, (xᵢ, xᵢ¹)) in enumerate(tx²)
+            x̂[i] = xᵢ + Δt * xᵢ¹
         end
-    elseif method == PredictionMethod.Hermite
-        prev_s = t_to_s_plane(pred.prev_t, m)
-        s = t_to_s_plane(t, m)
-        s′ = t_to_s_plane(t + Δt, m)
-        if m == 2
-            prev_sm = 2 * prev_s
-            sm = 2 * s
-        else
-            prev_sm = m * prev_s^(m - 1)
-            sm = m * s^(m - 1)
+    elseif (pred.order == 3)
+        λ = τ
+        for (i, (xᵢ, xᵢ¹, xᵢ²)) in enumerate(tx²)
+            δᵢ = 1 - Δt * Base.FastMath.div_fast(λ * xᵢ², λ * xᵢ¹)
+            x̂[i] = @fastmath xᵢ + Δt * xᵢ¹ / δᵢ
         end
-        for i = 1:length(pred.prev_tx¹)
-            pred.prev_ty¹[i, 1] = pred.prev_tx¹[i, 1]
-            pred.prev_ty¹[i, 2] = prev_sm * pred.prev_tx¹[i, 2]
+        τ = norm(x¹) / norm(x²)
+        return τ
+    elseif (pred.order == 4)
+        λ = τ^2
+        for (i, (xᵢ, xᵢ¹, xᵢ², xᵢ³)) in enumerate(tx³)
+            δᵢ = 1 - Δt * Base.FastMath.div_fast(λ * xᵢ³, λ * xᵢ²)
+            x̂[i] = @fastmath xᵢ + Δt * (xᵢ¹ + Δt * xᵢ² / δᵢ)
         end
-        for i = 1:length(pred.prev_tx¹)
-            pred.ty¹[i, 1] = pred.tx¹[i, 1]
-            pred.ty¹[i, 2] = sm * pred.tx¹[i, 2]
+    elseif (pred.order == 5)
+        λ = τ^3
+        for (i, (xᵢ, xᵢ¹, xᵢ², xᵢ³, xᵢ⁴)) in enumerate(tx⁴)
+            δᵢ = 1 - Δt * Base.FastMath.div_fast(λ * xᵢ⁴, λ * xᵢ³)
+            x̂[i] = @fastmath xᵢ + Δt * (xᵢ¹ + Δt * (xᵢ² + Δt * xᵢ³ / δᵢ))
         end
-        cubic_hermite!(x̂, pred.prev_ty¹, prev_s, pred.ty¹, s, s′)
     end
 
     x̂
@@ -351,21 +329,3 @@ function t_to_s_plane(t::Complex, m::Int; branch::Int = 0)
 end
 
 
-function cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
-    if isreal(t₀) && isreal(t₁) && isreal(t)
-        _cubic_hermite!(x̂, tx¹₀, real(t₀), tx¹₁, real(t₁), real(t))
-    else
-        _cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
-    end
-end
-@inline function _cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
-    s = (t - t₀) / (t₁ - t₀)
-    h₀₀ = (1 + 2s) * (1 - s)^2
-    h₁₀ = (t - t₀) * (1 - s)^2
-    h₀₁ = s^2 * (3 - 2s)
-    h₁₁ = (t - t₀) * s * (s - 1)
-    @inbounds for i in eachindex(x̂)
-        x̂[i] = h₀₀ * tx¹₀[i, 1] + h₁₀ * tx¹₀[i, 2] + h₀₁ * tx¹₁[i, 1] + h₁₁ * tx¹₁[i, 2]
-    end
-    x̂
-end
