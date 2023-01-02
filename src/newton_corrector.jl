@@ -94,7 +94,7 @@ function newton!(
     Δxᵢ₊₁ = Δxᵢ = Δx
     μ_low = θ = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = NaN
 
-    needs_refinement = extended_precision
+    # needs_refinement = extended_precision
     for iter = 0:(N-1)
         evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
         if extended_precision
@@ -102,21 +102,21 @@ function newton!(
             evaluate!(r, H, x_extended, t)
         end
         LA.ldiv!(Δxᵢ, updated!(J), r, norm)
-        if (needs_refinement)
-            tol = 1e-8
-            (δ, refinment_iters) = iterative_refinement!(
-                Δxᵢ,
-                J,
-                r,
-                norm;
-                tol = tol,
-                max_iters = 3,
-                mixed_precision = true,
-            )
-            if (refinment_iters == 1 && δ < tol)
-                needs_refinement = false
-            end
-        end
+        # if (needs_refinement)
+        #     tol = 1e-6
+        #     (δ, refinment_iters) = iterative_refinement!(
+        #         Δxᵢ,
+        #         J,
+        #         r,
+        #         norm;
+        #         tol = tol,
+        #         max_iters = 3,
+        #         mixed_precision = false,
+        #     )
+        #     if (refinment_iters == 1 && δ < tol)
+        #         needs_refinement = false
+        #     end
+        # end
 
         norm_Δxᵢ = norm(Δxᵢ)
 

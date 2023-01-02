@@ -741,8 +741,8 @@ function update_precision!(tracker::Tracker, μ_low)
 
     options.extended_precision || return false
 
-    β = 1e-3
-    μ_ = 2.842170943040401e-14 # 128 * eps()
+    β = 1e-2
+    μ_ = 2.842170943040401e-14
     μ_threshold = β * √(μ_ / ω)
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again

@@ -192,8 +192,8 @@ function update!(
         u,
         norm;
         mixed_precision = false,
-        tol = 1e-14,
-        max_iters = 4,
+        tol = 1e-6,
+        max_iters = 3,
     )
     cond_H_ẋ = δ / (2 * length(x) * eps())
     predictor.cond_H_ẋ = cond_H_ẋ
@@ -207,12 +207,14 @@ function update!(
                 J,
                 u,
                 norm;
-                mixed_precision = cond_H_ẋ > 1e5,
-                tol = 1e-8,
+                mixed_precision = cond_H_ẋ > 1e6,
+                tol = 1e-6,
                 max_iters = 3,
             )
         end
-    refine()
+    if cond_H_ẋ > 1e6
+        refine()
+    end
     tx_norm[3] = norm(xtemp)
     x¹ .= xtemp
 
