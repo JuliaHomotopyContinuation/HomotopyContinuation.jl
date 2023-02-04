@@ -3,12 +3,69 @@ using HomotopyContinuation: ComplexDF64
 import Arblib
 import Arblib: Acb, Arb, AcbMatrix, AcbVector
 using LinearAlgebra
+import Random
+
 
 using BenchmarkTools
-# include("src/new_tracker/adaptive_tracker.jl")
 
 include("test/test_systems.jl")
 include("test/engame_test_systems.jl")
+
+
+@var x z
+y = 1
+# This has two roots of multiplicity 6 at the hyperplane z=0
+# each root has winding number 3
+F = [
+    0.75 * x^4 + 1.5 * x^2 * y^2 - 2.5 * x^2 * z^2 + 0.75 * y^4 - 2.5 * y^2 * z^2 +
+    0.75 * z^4
+    10 * x^2 * z + 10 * y^2 * z - 6 * z^3
+]
+
+
+Random.seed!(0x123412)
+ET, start = total_degree(System(F));
+S = collect(start)
+
+tracker = ET.tracker
+
+path_info(tracker, S[1], 1, 1e-4)
+
+
+
+
+Random.seed!(0x123412)
+@var x y
+f = [2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3, 2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5]
+ET, start = total_degree(System(f))
+S = collect(start)
+tracker = ET.tracker
+r = path_info(tracker, S[3], 1, 1e-4)
+
+@test count(is_success, res) == 2
+@test count(is_at_infinity, res) == 2
+
+Random.seed!(0x123412)
+@var x y z
+# system with isolated higher component
+g = rand_poly([x, y, z], 3)
+f = System([2x - 3y + 4z, 2x - 3y + 4z, g^2])
+
+ET, start = total_degree(f)
+S = collect(start)
+tracker = ET.tracker
+r = path_info(tracker, S[3], 1, 1e-8)
+
+
+
+
+
+
+
+
+# include("src/new_tracker/adaptive_tracker.jl")
+
+
 
 # f = eg_system_1(2)
 # (T, xs) = total_degree(f)

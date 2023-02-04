@@ -317,6 +317,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     keep_extended_prec::Bool
     norm::WeightedNorm{InfNorm}
     use_strict_β_τ::Bool
+    β_trust_region::Float64
 
     jacobian::Jacobian{M}
     cond_J_ẋ::Float64 # estimate of cond(H(x(t),t), ẋ(t))
@@ -325,6 +326,7 @@ mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
     # statistics
     accepted_steps::Int
     rejected_steps::Int
+    last_steps_accepted::Int
     last_steps_failed::Int
     ext_accepted_steps::Int
     ext_rejected_steps::Int
@@ -350,7 +352,8 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     code = TrackerCode.tracking
     u = zeros(ComplexF64, size(H, 1))
     accepted_steps = rejected_steps = ext_accepted_steps = ext_rejected_steps = 0
-    last_steps_failed = 0
+    last_steps_accepted = last_steps_failed = 0
+    β_trust_region = 0.8
 
     TrackerState(
         x,
@@ -370,11 +373,13 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
         keep_extended_prec,
         norm,
         use_strict_β_τ,
+        β_trust_region,
         jacobian,
         cond_J_ẋ,
         code,
         accepted_steps,
         rejected_steps,
+        last_steps_accepted,
         last_steps_failed,
         ext_accepted_steps,
         ext_rejected_steps,
@@ -537,9 +542,13 @@ function update_stepsize!(
     @unpack N = options.parameters
     p = predictor.order
 
-
-
     μ_ = 2.842170943040401e-14
+    if (state.last_steps_failed > 0)
+        state.β_trust_region = max(state.β_trust_region - 0.1, 0.5)
+    elseif (state.last_steps_accepted > 0 && state.last_steps_accepted % 3 === 0)
+        state.β_trust_region = min(state.β_trust_region + 0.1, 0.8)
+    end
+
     if is_converged(result)
         m = 2^(N - 1)
         η = result.norm_Δx₀ / abs(Δs_prev)^p
@@ -547,7 +556,7 @@ function update_stepsize!(
         δ2 = 1 / (m * ω)
         Δs₁ = nthroot(min(δ1, δ2) / η, p)
         Δs₂ = trust_region(predictor)
-        Δs = 0.8min(Δs₁, Δs₂)
+        Δs = min(0.8Δs₁, state.β_trust_region * Δs₂)
         # increase step size by a factor of at most 8 in one step
         Δs = min(Δs, 8 * state.Δs_prev)
         if state.last_step_failed
@@ -642,6 +651,7 @@ function init!(
         state.ext_accepted_steps = state.ext_rejected_steps = 0
     end
     state.last_steps_failed = 0
+    state.β_trust_region = 0.8
 
 
     # compute ω and limit accuracy μ for the start value
@@ -855,6 +865,7 @@ function step!(tracker::Tracker)
         state.accepted_steps += 1
         state.ext_accepted_steps += state.extended_prec
         state.last_steps_failed = 0
+        state.last_steps_accepted += 1
         state.accuracy = result.accuracy
         state.μ = max(result.accuracy, eps())
         ω = max(result.ω, 1)
@@ -879,6 +890,7 @@ function step!(tracker::Tracker)
         state.rejected_steps += 1
         state.ext_rejected_steps += state.extended_prec
         state.last_steps_failed += 1
+        state.last_steps_accepted = 0
     end
 
     update_stepsize!(state, result, options, predictor)

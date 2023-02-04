@@ -118,7 +118,7 @@ q = Complex{Float64}[
     1.2021910424897007-1.1148794002014533im,
 ];
 
-tracker = Tracker(ParameterHomotopy(F, p, q));
+tracker = Tracker(ParameterHomotopy(F, p, q; compile = false));
 println("warm up")
 r_q = track(tracker, s, 1, 0);
 @time r = track(tracker, s, 1, 0)
