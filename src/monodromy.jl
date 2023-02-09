@@ -593,6 +593,10 @@ function monodromy_solve(
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
     kwargs...,
 )
+    if !isnothing(seed)
+        Random.seed!(seed)
+    end
+
     if isnothing(options)
         if !(group_actions isa GroupActions) && !isnothing(group_actions)
             group_actions = GroupActions(group_actions)
@@ -600,9 +604,6 @@ function monodromy_solve(
         options = MonodromyOptions(; group_actions = group_actions, kwargs...)
     end
 
-    if !isnothing(seed)
-        Random.seed!(seed)
-    end
     if length(args) == 0
         start_pair = find_start_pair(fixed(F; compile = compile))
         if isnothing(start_pair)
