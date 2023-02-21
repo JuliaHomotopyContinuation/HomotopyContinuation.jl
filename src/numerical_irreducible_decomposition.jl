@@ -1,6 +1,5 @@
 export nid, numerical_irreducible_decomposition, witness_supersets
 
-
 """
     WitnessPoints
 
@@ -21,7 +20,7 @@ points(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = W.R
 points(W::WitnessSet{A,B,C}) where {A,B,C} = W.R
 codim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = dim(linear_subspace(W))
 dim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = codim(linear_subspace(W))
-degree(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = length(points(W))
+ModelKit.degree(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = length(points(W))
 append!(
     W::WitnessPoints{A,B,Vector{ComplexF64}},
     R::Vector{Vector{T}},
@@ -75,7 +74,7 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    d = degree(H)
+    d = ModelKit.degree(H)
     γ = exp(2 * pi * im * rand())
     g0 = γ * (u^d - 1)
 
@@ -351,7 +350,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
 
     vars = variables(F)
     if sorted
-        f = sort(expressions(F), by = degree, rev = true)
+        f = sort(expressions(F), by = ModelKit.degree, rev = true)
     else
         f = expressions(F)
     end
@@ -474,6 +473,7 @@ function decompose_witness_superset(
     P, L = u_transform(W)
     ℓ = length(P)
 
+    n = ambient_dim(L)
 
     decomposition = Vector{WitnessSet}()
 
@@ -605,7 +605,7 @@ function merge_sets_find(parent, i)
     if parent[i] == i
         return i
     end
-    return find(parent, parent[i])
+    return merge_sets_find(parent, parent[i])
 end
 function merge_sets_union(parent, rank, x, y)
     xroot = merge_sets_find(parent, x)
@@ -716,9 +716,9 @@ function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
     for W in D
         c = dim(W)
         if haskey(P, c)
-            push!(P[dim(W)], degree(W))
+            push!(P[dim(W)], ModelKit.degree(W))
         else
-            P[dim(W)] = [degree(W)]
+            P[dim(W)] = [ModelKit.degree(W)]
         end
     end
 
@@ -762,7 +762,7 @@ function decompose(Ws::Vector{WitnessPoints}, F::System)
     out = Vector{WitnessSet}()
     FF = fixed(F, compile = false)
     for (i, W) in enumerate(Ws)
-        if degree(W) > 0
+        if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
             decompose = decompose_witness_superset(W, FF)
@@ -893,7 +893,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
-        components = Tuple(degree(W) for W in D[key])
+        components = Tuple(ModelKit.degree(W) for W in D[key])
         if length(components) == 1
             data[i, 2] = first(components)
         else
