@@ -1,10 +1,6 @@
 export nid, numerical_irreducible_decomposition, witness_supersets
 
 
-const HC = HomotopyContinuation
-import HomotopyContinuation: solutions, linear_subspace, system, codim, degree, dim
-
-
 """
     WitnessPoints
 
