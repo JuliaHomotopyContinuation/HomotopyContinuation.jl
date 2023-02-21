@@ -1,4 +1,4 @@
-export nid, numerical_irreducible_decomposition, witness_supersets
+export nid, numerical_irreducible_decomposition, witness_supersets, n_components, witness_sets, degrees
 
 """
     WitnessPoints

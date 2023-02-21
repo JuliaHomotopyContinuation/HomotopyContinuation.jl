@@ -53,7 +53,7 @@
         @test degree.(W_TwistedCubicSphere) == [0; 0; 3]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
-        @test degrees(N_TwistedCubicSphere) = Dict(0 => 3)
+        @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
         @test n_components(N_TwistedCubicSphere) == 1
     end
 
