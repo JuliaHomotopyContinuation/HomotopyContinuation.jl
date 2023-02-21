@@ -7,8 +7,8 @@ export nid, numerical_irreducible_decomposition, witness_supersets
 A wrapper for storing data about witness points.
 """
 mutable struct WitnessPoints{
-    Sub1<:HC.AbstractSubspace,
-    Sub2<:HC.AbstractSubspace,
+    Sub1<:AbstractSubspace,
+    Sub2<:AbstractSubspace,
     R<:Vector{ComplexF64},
 }
     L::Sub1
@@ -209,7 +209,7 @@ function is_contained(
             E = ExtrinsicDescription(A, b; orthonormal = true)
             L = LinearSubspace(E)
             # set L as the target for homotopy continuation
-            HC.target_parameters!(tracker, L)
+            target_parameters!(tracker, L)
 
             # reuse U
             empty!(U)
@@ -477,9 +477,9 @@ function decompose_witness_superset(
 
     decomposition = Vector{WitnessSet}()
 
-    if HC.dim(L) < n
+    if dim(L) < n
         trace_test_tol = 1e-10
-        MS = HC.MonodromySolver(
+        MS = MonodromySolver(
             G,
             L;
             compile = false,
@@ -657,7 +657,7 @@ function get_orbits_from_monodromy_permutations(
     monodromy_result;
     initial_orbits = Vector{Set{Int}}(),
 )
-    P = HC.permutations(monodromy_result)
+    P = permutations(monodromy_result)
     orbits = copy(initial_orbits)
 
     for col in eachcol(P)
