@@ -80,6 +80,7 @@ include("monodromy.jl")
 include("witness_set.jl")
 include("certification.jl")
 include("semialgebraic_sets.jl")
+include("numerical_irreducible_decomposition.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See
