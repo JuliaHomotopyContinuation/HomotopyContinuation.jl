@@ -504,7 +504,9 @@ function decompose_witness_superset(
                 break
             end
             # @show iter
-            res = monodromy_solve(MS, non_complete_points, L, seed; threading = threading)
+            res = monodromy_solve(MS, non_complete_points, L, seed; 
+                                    threading = threading,
+                                    show_progress = false)
             if trace(res) > trace_test_tol
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
