@@ -467,11 +467,11 @@ This function decomposes the witness sets W into irreducible components using th
 ### Example
 ```julia-repl
 julia> @var x y
-julia> f = x^2 + y^2 - 1
-julia> N = nid(f)
+julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
 julia> W = witness_supersets([f])
 julia> decompose(W)
-1-element Vector{WitnessSet}:
+2-element Vector{WitnessSet}:
+ Witness set for dimension 1 of degree 2
  Witness set for dimension 1 of degree 2
 """
 function decompose(
