@@ -449,19 +449,23 @@ function witness_supersets!(F::System; sorted::Bool = true)
     pop!(vars)
     ProgressMeter.finish!(progress_meter, showvalues = showvalues())
 
-    out
+    map(out) do W
+        P, L = u_transform(W)
+        WitnessSet(fixed(F, compile = false), L, P)
+    end
 end
 witness_supersets(F::Vector{Expression}) = witness_supersets(System(F))
 
 
 function decompose_witness_superset(
-    W::WitnessPoints{T1,T2,Vector{ComplexF64}},
-    G::AS;
+    W::WitnessSet{T1,T2,Vector{ComplexF64}};
     max_iters = 50,
     threading = true,
 ) where {T1,T2,AS<:AbstractSystem}
-    P, L = u_transform(W)
+    P = points(W)
+    L = linear_subspace(W)
     ℓ = length(P)
+    G = system(W)
 
     n = ambient_dim(L)
 
@@ -512,8 +516,7 @@ function decompose_witness_superset(
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
-                                        threading = threading,
-                                        report_progress = false)
+                                        threading = threading)
 
                 if trace(res_orbit) < trace_test_tol
                     push!(decomposition, WitnessSet(G, L, P_orbit))
@@ -720,14 +723,14 @@ function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
 end
 
 """
-    decompose(Ws::Vector{WitnessPoints}, F::System) 
+    decompose(Ws::Vector{WitnessPoints}) 
 
-This function decomposes the witness supersets in Ws into irreducible components using the trace test.
+This function decomposes the witness sets in Ws into irreducible components using the trace test.
 """
-function decompose(Ws::Vector{WitnessPoints}, F::System)
+function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:Number}
 
     c = length(Ws)
-    n = length(variables(F))
+    n = ambient_dim(linear_subspace(Ws[1]))
 
     progress = DecomposeProgress(n, c)
     function showvalues()
@@ -754,12 +757,11 @@ function decompose(Ws::Vector{WitnessPoints}, F::System)
     )
 
     out = Vector{WitnessSet}()
-    FF = fixed(F, compile = false)
     for (i, W) in enumerate(Ws)
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            decompose = decompose_witness_superset(W, FF)
+            decompose = decompose_witness_superset(W)
             if !isnothing(decompose)
                 append!(out, decompose)
             end
@@ -947,7 +949,7 @@ Numerical irreducible decomposition with 4 components
 function numerical_irreducible_decomposition(F::System; sorted::Bool = true)
 
     Ws = witness_supersets!(F, sorted = sorted)
-    out = decompose(Ws, F)
+    out = decompose(Ws)
 
     NumericalIrreducibleDecomposition(out)
 end
