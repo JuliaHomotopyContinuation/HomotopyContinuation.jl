@@ -303,14 +303,14 @@ end
 function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
-    ℓ = extrinsic(L).A * vars - extrinsic(L).b
-
+    
     for i = 1:c
-        h_L = fixed(System([f[i]; ℓ], variables = vars), compile = false)
-        res = solve(h_L; start_system = :total_degree, show_progress = false)
+        h = fixed(System([f[i]], variables = vars), compile = false)
+        res = solve(h, target_subspace = L;
+                         start_system = :total_degree, 
+                         show_progress = false)
         S = solutions(res, only_nonsingular = true)
 
-        h = fixed(System([f[i]], variables = vars), compile = false)
         out[i] = WitnessSet(h, L, S)
     end
 

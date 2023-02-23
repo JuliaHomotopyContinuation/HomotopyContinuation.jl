@@ -95,8 +95,4 @@ function ModelKit.evaluate_and_jacobian!(u, U, F::SlicedSystem, x, p = nothing)
     nothing
 end
 
-function ModelKit.taylor!(u, v::Val, F::SlicedSystem, tx, p = nothing)
-    u .= zero(eltype(u))
-    taylor!(u, v, F.system, tx, p)
-    u
-end
+ModelKit.taylor!(u, v::Val, F::SlicedSystem, tx, p = nothing) = taylor!(u, v, F.system, tx, p)
