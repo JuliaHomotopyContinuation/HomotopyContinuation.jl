@@ -511,7 +511,9 @@ function decompose_witness_superset(
             for orbit in orbits
 
                 P_orbit = non_complete_points[collect(orbit)]
-                res_orbit = monodromy_solve(MS, P_orbit, L, seed; threading = threading)
+                res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
+                                        threading = threading,
+                                        report_progress = false)
 
                 if trace(res_orbit) < trace_test_tol
                     push!(decomposition, WitnessSet(G, L, P_orbit))
@@ -953,8 +955,26 @@ end
     nid(F::System; sorted::Bool = true)
 
 Calls [`numerical_irreducible_decomposition`](@ref).
+
+### Example
+```julia-repl
+julia> @var x, y
+julia> f = [x^2 + y^2 - 1]
+julia> N = nid(f)
+
+Numerical irreducible decomposition with 1 components
+• 1 component(s) of dimension 1.
+
+ degree table of components:
+╭───────────┬───────────────────────╮
+│ dimension │ degrees of components │
+├───────────┼───────────────────────┤
+│     1     │           2           │
+╰───────────┴───────────────────────╯
+```
 """
 nid(F::System; kwargs...) = numerical_irreducible_decomposition(F; kwargs...)
 nid(F::Vector{Expression}; kwargs...) = numerical_irreducible_decomposition(F; kwargs...)
+nid(F::Expression; kwargs...) = numerical_irreducible_decomposition([F]; kwargs...)
 numerical_irreducible_decomposition(F::Vector{Expression}; kwargs...) =
     numerical_irreducible_decomposition(System(F); kwargs...)
