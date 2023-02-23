@@ -13,7 +13,7 @@
         W_F = witness_supersets(F)
         @test degree.(W_F) == [2, 8, 8]
 
-        N_F = numerical_irreducible_decomposition(F)
+        N_F = decompose(W_F)
         @test degrees(N_F) == Dict(2 => [2], 1 => [4, 4], 0 => [8])
     end
 
