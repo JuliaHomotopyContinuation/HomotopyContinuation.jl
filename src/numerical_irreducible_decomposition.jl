@@ -78,29 +78,19 @@ function intersect_with_hypersurface!(
     γ = exp(2 * pi * im * rand())
     g0 = γ * (u^d - 1)
 
-    # we start with the linear space L which does not use pose conditions on u,
-    # so that we can have u^d-1
+    # we start with the linear space L which does not use pose conditions on u, so that u^d=1
+    # we end with the linear space K with u=0.
     L = linear_subspace_u(W)
-    F₀ = System([f; g0; extrinsic(L).A * vars - extrinsic(L).b], variables = vars)
-    # # we end with the linear space K which forces u=0.
     K = linear_subspace(X)
-    G₀ = System([f; g; extrinsic(K).A * vars - extrinsic(K).b], variables = vars)
-    Hom = StraightLineHomotopy(F₀, G₀; compile = false)
-
-    #@unique_var t
-    # Hom = ParameterHomotopy(System([f
-    #             t * g0 + (1 - t) * g[1]
-    #             t .* (extrinsic(L).A * vars - extrinsic(L).b) .+ (1 - t) .* (extrinsic(K).A * vars - extrinsic(K).b)
-    #             # t .* (extrinsic(L).A[1:1, :] * vars .- extrinsic(L).b[1]) .+ (1 - t) .* (extrinsic(K).A[1:1, :] * vars .- extrinsic(K).b[1])
-    #             # (extrinsic(K).A[2:end, :] * vars .- extrinsic(K).b[2:end])
-    #         ]; parameters=[t]), [1.0], [0.0]; compile=false)
-    # and set up the corresponding homotopy
-
-    ## TODO: BUGS HERE
-    # F₀ = slice(System([f; g0], variables=vars), L; compile=false) # is this better?
-    # G₀ = slice(System([f; g], variables=vars), K; compile=false)
-    # Hom = StraightLineHomotopy(F₀, G₀)
+    F₀ = slice(System([f; g0], variables=vars), L; compile=false) # is this better?
+    G₀ = slice(System([f; g], variables=vars), K; compile=false)
+    Hom = StraightLineHomotopy(F₀, G₀)
     tracker = EndgameTracker(Hom)
+
+    # Previous unefficient code:
+    #F₀ = System([f; g0; extrinsic(L).A * vars - extrinsic(L).b], variables = vars)
+    #G₀ = System([f; g; extrinsic(K).A * vars - extrinsic(K).b], variables = vars)
+    #Hom = StraightLineHomotopy(F₀, G₀; compile = false)
 
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
