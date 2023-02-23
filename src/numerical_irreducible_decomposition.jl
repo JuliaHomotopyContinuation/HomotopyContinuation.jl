@@ -1,4 +1,4 @@
-export nid, numerical_irreducible_decomposition, witness_supersets, n_components, witness_sets, degrees
+export nid, numerical_irreducible_decomposition, witness_supersets, n_components, witness_sets, degrees, decompose
 
 """
     WitnessPoints
@@ -456,12 +456,29 @@ function witness_supersets!(F::System; sorted::Bool = true)
 end
 witness_supersets(F::Vector{Expression}) = witness_supersets(System(F))
 
+"""
+    decompose(
+        W::WitnessSet;
+        max_iters = 50,
+        threading = true) 
 
-function decompose_witness_superset(
+This function decomposes the witness sets W into irreducible components using the trace test.
+
+### Example
+```julia-repl
+julia> @var x y
+julia> f = x^2 + y^2 - 1
+julia> N = nid(f)
+julia> W = witness_supersets([f])
+julia> decompose(W)
+1-element Vector{WitnessSet}:
+ Witness set for dimension 1 of degree 2
+"""
+function decompose(
     W::WitnessSet{T1,T2,Vector{ComplexF64}};
     max_iters = 50,
-    threading = true,
-) where {T1,T2,AS<:AbstractSystem}
+    threading = true
+) where {T1,T2}
     P = points(W)
     L = linear_subspace(W)
     ℓ = length(P)
@@ -725,7 +742,7 @@ end
 """
     decompose(Ws::Vector{WitnessPoints}) 
 
-This function decomposes the witness sets in Ws into irreducible components using the trace test.
+Calls [`decompose`](@ref) on the vector of witness points Ws.
 """
 function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:Number}
 
@@ -761,12 +778,12 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:N
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            decompose = decompose_witness_superset(W)
-            if !isnothing(decompose)
-                append!(out, decompose)
+            dec = decompose(W)
+            if !isnothing(dec)
+                append!(out, dec)
             end
 
-            update_progress!(progress, decompose)
+            update_progress!(progress, dec)
             ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
         end
     end
