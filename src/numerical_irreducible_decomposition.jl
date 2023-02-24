@@ -794,6 +794,26 @@ end
     NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
 
 Store the witness sets in a common data structure.
+
+### Example
+
+The following example computes the numerical irreducible decomposition for a union of two circles ([`numerical_irreducible_decomposition`](@ref) is a shortcut for the following steps).
+
+```julia-repl
+julia> @var x y
+julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
+julia> W = witness_sets([f])
+julia> D = decompose(W)
+julia> NumericalIrreducibleDecomposition(D)
+Numerical irreducible decomposition with 2 components
+• 2 component(s) of dimension 1.
+
+ degree table of components:
+╭───────────┬───────────────────────╮
+│ dimension │ degrees of components │
+├───────────┼───────────────────────┤
+│     1     │        (2, 2)         │
+╰───────────┴───────────────────────╯
 """                                     
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
