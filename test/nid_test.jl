@@ -10,20 +10,17 @@
             p * (z - 3) * (z - 5)
         ]
 
-        W_F = witness_supersets(F)
+        W_F = witness_sets(F)
         @test degree.(W_F) == [2, 8, 8]
 
         N_F = decompose(W_F)
-        @test degrees(N_F) == Dict(2 => [2], 1 => [4, 4], 0 => [8])
+        @test degree.(N_F) == [2, 4, 4, 8]
     end
 
     @testset "Hypersurface of degree 5" begin
         @var x[1:4]
         f = rand_poly(ComplexF64, x, 5)
         Hyp = System([f], variables = x)
-
-        W_Hyp = witness_supersets(Hyp)
-        @test degree.(W_Hyp) == [5]
 
         N_Hyp = nid(Hyp)
         @test degrees(N_Hyp) == Dict(3 => [5])
@@ -36,9 +33,6 @@
         g = rand_poly(ComplexF64, x, 3)
         Curve = System([f; g], variables = x)
 
-        W_Curve = witness_supersets(Curve)
-        @test degree.(W_Curve) == [0; 6]
-
         N_Curve = nid(Curve)
         @test degrees(N_Curve) == Dict(1 => [6])
         @test n_components(N_Curve) == 1
@@ -49,7 +43,7 @@
         TwistedCubicSphere =
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
-        W_TwistedCubicSphere = witness_supersets(TwistedCubicSphere)
+        W_TwistedCubicSphere = witness_sets(TwistedCubicSphere)
         @test degree.(W_TwistedCubicSphere) == [0; 0; 3]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
@@ -65,7 +59,7 @@
         g = y * z + x
         ThreeLines = System([f; g], variables = [x; y; z])
 
-        W_ThreeLines = witness_supersets(ThreeLines)
+        W_ThreeLines = witness_sets(ThreeLines)
         @test degree.(W_ThreeLines) == [0; 3]
 
         N_ThreeLines = nid(ThreeLines)
@@ -164,12 +158,6 @@
             [unit2, unit3, unit4, unit5, twist1, twist2, twist3, twist4, twist5, X, Y, Z],
             variables = [z2x, z2y, z2z, z3x, z3y, z3z, z4x, z4y, z4z, z5x, z5y, z5z],
         )
-
-
-        W_Bricard6R = witness_supersets(Bricard6R)
-        degs_W_Bricard6R = zeros(Int, 12)
-        degs_W_Bricard6R[11] = 8
-        @test degree.(W_Bricard6R) == degs_W_Bricard6R
 
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])

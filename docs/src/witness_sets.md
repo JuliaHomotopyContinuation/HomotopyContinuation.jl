@@ -1,19 +1,54 @@
-# Witness Sets
+# Positive Dimensional Solution Sets
 
-A [`WitnessSet`](@ref) ``W`` is the basic data structure to work with positive dimensional solution sets ``V(F)`` of a polynomial system ``F``.
+The basic data structure to work with positive dimensional solution sets ``V(F)`` of a polynomial system ``F`` is a [`WitnessSet`](@ref) ``W``.
 The general idea is to intersect ``V(F)`` with an (affine) linear space ``L`` such that
 the intersection ``V(F) ∩ L`` consists of only finitely many points (witnesses).
-Over the complex numbers the number of points is independent of the linear space ``L`` and called the *degree* of ``V(F)``.
 
 ```@docs
 WitnessSet
 ```
 
-To compute a [`WitnessSet`](@ref) call [`witness_set`](@ref).
+To compute a [`WitnessSet`](@ref) call [`witness_set`](@ref). 
 
 ```@docs
 witness_set
 ```
+
+To compute witness sets for all possible dimensions use [`witness_sets`](@ref).
+
+```@docs
+witness_sets
+```
+
+Witness sets can be decomposed into [irreducible components](https://en.wikipedia.org/wiki/Irreducible_component) by using the [`decompose`](@ref) function.
+
+```@docs
+decompose
+```
+
+## Numerical Irreducible Decomposition
+
+A numerical irreducible decomposition for ``F`` is a collection of witness sets ``W₁, ..., Wᵣ`` such that the ``Wᵢ`` are all witness sets for different [irreducible components](https://en.wikipedia.org/wiki/Irreducible_component) and ``V(F)`` is their union. 
+
+```@docs
+numerical_irreducible_decomposition
+nid
+```
+
+The output of [`nid`](@ref) is a [`NumericalIrreducibleDecomposition`](@ref).
+
+```@docs
+NumericalIrreducibleDecomposition
+```
+
+```@docs
+n_components
+witness_sets
+degrees
+```
+
+
+## Computing Information about Witness Sets
 
 To obtain information about a [`WitnessSet`](@ref) the following functions are provided.
 ```@docs

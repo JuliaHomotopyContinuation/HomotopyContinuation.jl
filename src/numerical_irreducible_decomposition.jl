@@ -1,4 +1,4 @@
-export nid, numerical_irreducible_decomposition, witness_supersets, n_components, witness_sets, degrees, decompose
+export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, n_components, witness_sets, degrees, decompose
 
 """
     WitnessPoints
@@ -308,31 +308,27 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
 end
 
 """
-    witness_supersets(F::System; sorted::Bool = true) 
+    witness_sets(F::System; sorted::Bool = true) 
 
-A function that computes witness supersets for the variety defined by F=0.
+A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
 
 If sorted = true, the polynomials in F will be sorted by degree in decreasing order.
 
 ### Example
 
-The following example computes witness supersets for a union of
-    * one 2-dimensional component of degree 2.
-    * two 1-dimensional components each of degree 4.
-    * 8 points
-```julia
-@var x, y, z
-p = (x * y - x^2) + 1 - z
-q = x^4 + x^2 - y - 1
-F = [p * q * (x - 3) * (x - 5);
-    p * q * (y - 3) * (y - 5);
-    p * (z - 3) * (z - 5)]
+The following example computes witness sets for a union of two circles.
 
-W = witness_supersets(F)
+```julia-repl
+julia> @var x y
+julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
+julia> W = witness_sets([f])
+1-element Vector{WitnessSet}:
+ Witness set for dimension 1 of degree 4
 ```
 """
-witness_supersets(F::System; kwargs...) = witness_supersets!(deepcopy(F); kwargs...)
+witness_sets(F::System; kwargs...) = witness_supersets!(deepcopy(F); kwargs...)
+witness_sets(F::Vector{Expression}) = witness_sets(System(F))
 function witness_supersets!(F::System; sorted::Bool = true)
 
     # the algorithm is u-regeneration as proposed 
@@ -367,7 +363,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
 
     progress_meter = ProgressMeter.ProgressUnknown(
         dt = 0.01,
-        desc = "Computing witness supersets",
+        desc = "Computing witness (super)sets",
         enabled = true,
         spinner = true,
     )
@@ -454,7 +450,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
         WitnessSet(fixed(F, compile = false), L, P)
     end
 end
-witness_supersets(F::Vector{Expression}) = witness_supersets(System(F))
+
 
 """
     decompose(
@@ -465,10 +461,12 @@ witness_supersets(F::Vector{Expression}) = witness_supersets(System(F))
 This function decomposes the witness sets W into irreducible components using the trace test.
 
 ### Example
+The following example decomposes the witness set for a union of two circles.
+
 ```julia-repl
 julia> @var x y
 julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
-julia> W = witness_supersets([f])
+julia> W = witness_sets([f])
 julia> decompose(W)
 2-element Vector{WitnessSet}:
  Witness set for dimension 1 of degree 2
@@ -768,7 +766,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:N
     end
     progress_meter = ProgressMeter.ProgressUnknown(
         dt = 0.01,
-        desc = "Decomposing $c witness supersets",
+        desc = "Decomposing $c witness sets",
         enabled = true,
         spinner = true,
     )
@@ -792,7 +790,11 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:N
     out
 end
 
+"""
+    NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
 
+Store the witness sets in a common data structure.
+"""                                     
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
 end
@@ -934,7 +936,7 @@ Computes the numerical irreducible of the variety defined by F=0.
 If sorted = true, the polynomials in F will be sorted by degree in decreasing order. 
 
 ### Example
-The following example computes witness supersets for a union of
+The following example computes witness sets for a union of
     * one 2-dimensional component of degree 2.
     * two 1-dimensional components each of degree 4.
     * 8 points
