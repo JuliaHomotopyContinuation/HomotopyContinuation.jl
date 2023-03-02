@@ -297,7 +297,7 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     for i = 1:c
         h = fixed(System([f[i]], variables = vars), compile = false)
         res = solve(h, target_subspace = L;
-                         start_system = :total_degree, 
+                         start_system = :total_degree,
                          show_progress = false)
         S = solutions(res, only_nonsingular = true)
 
@@ -363,7 +363,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
 
     progress_meter = ProgressMeter.ProgressUnknown(
         dt = 0.01,
-        desc = "Computing witness (super)sets",
+        desc = "Computing witness sets...",
         enabled = true,
         spinner = true,
     )
@@ -392,6 +392,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
     begin
         for i = 1:c
             update_progress!(progress, i)
+            ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
             if i == 1
                 # the first step: take the witness superset H[1] as initial witness superset
                 begin
@@ -399,6 +400,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
                     X = out[1]
                     append!(X, P)
                     update_progress!(progress, X)
+                    ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
                 end
             else
                 begin
@@ -418,6 +420,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
                             # at this point the equation for W is f[1:(i-1)]
                             intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u)
                         end
+                        ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
                     end
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
@@ -453,7 +456,7 @@ end
 
 
 """
-    decompose_with_monodromy(
+    decompose_with_monodromy(   
         W::WitnessSet;
         max_iters = 50,
         threading = true) 
