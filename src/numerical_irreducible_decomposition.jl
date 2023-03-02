@@ -453,26 +453,14 @@ end
 
 
 """
-    decompose(
+    decompose_with_monodromy(
         W::WitnessSet;
         max_iters = 50,
         threading = true) 
 
-This function decomposes the witness sets W into irreducible components using the trace test.
-
-### Example
-The following example decomposes the witness set for a union of two circles.
-
-```julia-repl
-julia> @var x y
-julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
-julia> W = witness_sets([f])
-julia> decompose(W)
-2-element Vector{WitnessSet}:
- Witness set for dimension 1 of degree 2
- Witness set for dimension 1 of degree 2
+The core function for decomposing a witness set into irreducible components.
 """
-function decompose(
+function decompose_with_monodromy(
     W::WitnessSet{T1,T2,Vector{ComplexF64}};
     max_iters = 50,
     threading = true
@@ -741,8 +729,26 @@ end
     decompose(Ws::Vector{WitnessPoints}) 
 
 Calls [`decompose`](@ref) on the vector of witness points Ws.
+
+### Example
+The following example decomposes the witness set for a union of two circles.
+
+```julia-repl
+julia> @var x y
+julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
+julia> W = witness_sets([f])
+julia> decompose(W)
+Numerical irreducible decomposition with 2 components
+• 2 component(s) of dimension 1.
+
+ degree table of components:
+╭───────────┬───────────────────────╮
+│ dimension │ degrees of components │
+├───────────┼───────────────────────┤
+│     1     │        (2, 2)         │
+╰───────────┴───────────────────────╯
 """
-function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:Number}
+function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}; kwargs...) where {T1,T2,T3<:Number}
 
     c = length(Ws)
     n = ambient_dim(linear_subspace(Ws[1]))
@@ -776,7 +782,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:N
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            dec = decompose(W)
+            dec = decompose_with_monodromy(W)
             if !isnothing(dec)
                 append!(out, dec)
             end
@@ -787,33 +793,16 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}) where {T1,T2,T3<:N
     end
     ProgressMeter.finish!(progress_meter, showvalues = showvalues())
 
-    out
+    NumericalIrreducibleDecomposition(out)
 end
+decompose(W::WitnessSet) = decompose([W])
+
+
 
 """
     NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
 
 Store the witness sets in a common data structure.
-
-### Example
-
-The following example computes the numerical irreducible decomposition for a union of two circles ([`numerical_irreducible_decomposition`](@ref) is a shortcut for the following steps).
-
-```julia-repl
-julia> @var x y
-julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
-julia> W = witness_sets([f])
-julia> D = decompose(W)
-julia> NumericalIrreducibleDecomposition(D)
-Numerical irreducible decomposition with 2 components
-• 2 component(s) of dimension 1.
-
- degree table of components:
-╭───────────┬───────────────────────╮
-│ dimension │ degrees of components │
-├───────────┼───────────────────────┤
-│     1     │        (2, 2)         │
-╰───────────┴───────────────────────╯
 """                                     
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
@@ -988,9 +977,7 @@ Numerical irreducible decomposition with 4 components
 function numerical_irreducible_decomposition(F::System; sorted::Bool = true)
 
     Ws = witness_supersets!(F, sorted = sorted)
-    out = decompose(Ws)
-
-    NumericalIrreducibleDecomposition(out)
+    decompose(Ws)
 end
 """
     nid(F::System; sorted::Bool = true)

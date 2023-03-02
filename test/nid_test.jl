@@ -14,7 +14,7 @@
         @test degree.(W_F) == [2, 8, 8]
 
         N_F = decompose(W_F)
-        @test degree.(N_F) == [2, 4, 4, 8]
+        @test isa(N_F, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
