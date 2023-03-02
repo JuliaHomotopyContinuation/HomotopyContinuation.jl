@@ -419,6 +419,8 @@ function witness_supersets!(F::System; sorted::Bool = true)
                             # because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
                             intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u)
+                            update_progress!(progress, W)
+                            update_progress!(progress, X)
                         end
                         ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
                     end
@@ -433,6 +435,8 @@ function witness_supersets!(F::System; sorted::Bool = true)
                             for j = 1:(k-1)
                                 X = out[j]
                                 remove_points!(W, X, Fᵢ)
+                                update_progress!(progress, W)
+                                ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
                             end
                         end
                         update_progress!(progress, W)
