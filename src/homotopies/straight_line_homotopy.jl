@@ -84,7 +84,7 @@ function ModelKit.evaluate!(
     x::Vector{ComplexDF64},
     t,
     p = nothing,
-) where {T}
+)
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t

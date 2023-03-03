@@ -374,7 +374,7 @@ function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
     end
     b
 end
-function qr_ldiv!(x, QR::LA.QR, b::AbstractVector) where {T}
+function qr_ldiv!(x, QR::LA.QR, b::AbstractVector)
     # overwrites b
     # assumes QR is a tall matrix
     lmul_Q_adj!(QR, b)
