@@ -40,6 +40,45 @@ function u_transform(W::WitnessPoints)
 end
 
 
+Base.@kwdef mutable struct WitnessSetsProgress
+    ambient_dim::Int
+    codim::Int
+    current_codim::Int
+    degrees::Dict{Int,Int}
+    is_solving::Bool
+end
+WitnessSetsProgress(n::Int, codim::Int) = WitnessSetsProgress(
+    ambient_dim = n,
+    codim = codim,
+    current_codim = 1,
+    degrees = Dict{Int,Int}(),
+    is_solving = false,
+)
+
+function update_progress!(progress::WitnessSetsProgress, i::Int)
+    progress.is_solving = true
+    progress.current_codim = i
+end
+function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
+    progress.degrees[codim(W)] = length(points(W))
+    progress.is_solving = false
+end
+function showvalues(progress::WitnessSetsProgress)
+    text = [
+        (
+            "Intersect with hypersurface",
+            "$(progress.current_codim) / $(progress.codim)",
+        ),
+        ("Current number of witness points", ""),
+    ]
+    for c = 1:progress.codim
+        d = progress.ambient_dim - c
+        push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+    end
+
+    text
+end
+
 """
     intersect_with_hypersurface!
 
@@ -66,7 +105,7 @@ function intersect_with_hypersurface!(
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!is_contained(W, H)
+    m = .!is_contained(W, H, progress, progress_meter)
     P_next = P[m]
     deleteat!(P, m)
 
@@ -106,7 +145,7 @@ function intersect_with_hypersurface!(
             new = copy(tracker.state.solution)
             push!(P_out, new)
         end
-        ProgressMeter.update!(progress_meter, length(f)+1, showvalues = showvalues(progress))
+        ProgressMeter.update!(progress_meter, codim(W), showvalues = showvalues(progress))
     end
 
     # finally, we add the points in P_out to X
@@ -119,8 +158,10 @@ function remove_points!(
     W::WitnessPoints{T1,T2,Vector{ComplexF64}},
     V::WitnessPoints{T3,T4,Vector{ComplexF64}},
     F::AS,
+    progress::WitnessSetsProgress,
+    progress_meter
 ) where {T1,T2,T3,T4,AS<:AbstractSystem}
-    m = is_contained(W, V, F)
+    m = is_contained(W, V, F, progress, progress_meter)
     deleteat!(W.R, m)
 
     nothing
@@ -136,6 +177,8 @@ function is_contained(
     X::W₁,
     Y::W₂,
     F::AS,
+    progress::WitnessSetsProgress,
+    progress_meter
 ) where {
     W₁<:Union{WitnessPoints,WitnessSet},
     W₂<:Union{WitnessPoints,WitnessSet},
@@ -207,6 +250,8 @@ function is_contained(
                 track!(tracker, p, 1)
                 q = solution(tracker)
                 add!(U, q, i)
+
+                ProgressMeter.update!(progress_meter, codim(X), showvalues = showvalues(progress))
             end
             # check if x is among the points in U
             _, added = add!(U, x, 0)
@@ -220,50 +265,7 @@ function is_contained(
 
     out
 end
-is_contained(V::WitnessSet, W::WitnessSet) = is_contained(V, W, system(W))
-is_contained(V::WitnessPoints, W::WitnessSet) = is_contained(V, W, system(W))
-
-
-
-Base.@kwdef mutable struct WitnessSetsProgress
-    ambient_dim::Int
-    codim::Int
-    current_codim::Int
-    degrees::Dict{Int,Int}
-    is_solving::Bool
-end
-WitnessSetsProgress(n::Int, codim::Int) = WitnessSetsProgress(
-    ambient_dim = n,
-    codim = codim,
-    current_codim = 1,
-    degrees = Dict{Int,Int}(),
-    is_solving = false,
-)
-
-function update_progress!(progress::WitnessSetsProgress, i::Int)
-    progress.is_solving = true
-    progress.current_codim = i
-end
-function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
-    progress.degrees[codim(W)] = length(points(W))
-    progress.is_solving = false
-end
-function showvalues(progress::WitnessSetsProgress)
-    text = [
-        (
-            "Intersect with hypersurface",
-            "$(progress.current_codim) / $(progress.codim)",
-        ),
-        ("Current number of witness points", ""),
-    ]
-    for c = 1:progress.codim
-        d = progress.ambient_dim - c
-        push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
-    end
-
-    text
-end
-
+is_contained(V::WitnessPoints, W::WitnessSet, progress::WitnessSetsProgress, progress_meter) = is_contained(V, W, system(W), progress, progress_meter)
 
 function initialize_linear_equations(n::Int)
     A₀ = randn(ComplexF64, n - 1, n)
@@ -434,7 +436,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
                             for j = 1:(k-1)
                                 X = out[j]
                                     if degree(X) > 0
-                                        remove_points!(W, X, Fᵢ)
+                                        remove_points!(W, X, Fᵢ, progress, progress_meter)
                                         update_progress!(progress, W)
                                     end
                                 ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
