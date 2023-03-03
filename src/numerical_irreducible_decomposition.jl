@@ -431,11 +431,13 @@ function witness_supersets!(F::System; sorted::Bool = true)
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     for (k, W) in E # k = codim(W) for W in Ws
-                        if k > 1 && k <= i
+                        if k > 1 && k <= i && degree(W) > 0
                             for j = 1:(k-1)
                                 X = out[j]
-                                remove_points!(W, X, Fᵢ)
-                                update_progress!(progress, W)
+                                    if degree(X) > 0
+                                        remove_points!(W, X, Fᵢ)
+                                        update_progress!(progress, W)
+                                    end
                                 ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
                             end
                         end
