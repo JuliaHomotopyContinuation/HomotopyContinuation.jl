@@ -46,6 +46,10 @@ Base.@kwdef mutable struct WitnessSetsProgress
     current_codim::Int
     degrees::Dict{Int,Int}
     is_solving::Bool
+    is_removing_points::Bool
+    is_computing_hypersurfaces::Bool
+    current_path::Int
+    current_npaths::Int
 end
 WitnessSetsProgress(n::Int, codim::Int) = WitnessSetsProgress(
     ambient_dim = n,
@@ -53,27 +57,56 @@ WitnessSetsProgress(n::Int, codim::Int) = WitnessSetsProgress(
     current_codim = 1,
     degrees = Dict{Int,Int}(),
     is_solving = false,
+    is_removing_points = false,
+    is_computing_hypersurfaces = true,
+    current_path = 0,
+    current_npaths = 0
 )
 
+function update_progress!(progress::WitnessSetsProgress)
+    progress.is_computing_hypersurfaces = false
+end
 function update_progress!(progress::WitnessSetsProgress, i::Int)
-    progress.is_solving = true
     progress.current_codim = i
 end
+function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
+    progress.is_solving = true
+    progress.is_removing_points = false
+    progress.current_path = i
+    progress.current_npaths = m
+end
 function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
-    progress.degrees[codim(W)] = length(points(W))
     progress.is_solving = false
+    progress.is_removing_points = true
+    progress.degrees[codim(W)] = length(points(W))
+end
+function finish_progress!(progress::WitnessSetsProgress)
+    progress.is_solving = false
+    progress.is_removing_points = false
 end
 function showvalues(progress::WitnessSetsProgress)
-    text = [
-        (
-            "Intersect with hypersurface",
-            "$(progress.current_codim) / $(progress.codim)",
-        ),
-        ("Current number of witness points", ""),
-    ]
-    for c = 1:progress.codim
-        d = progress.ambient_dim - c
-        push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+    if progress.is_computing_hypersurfaces
+        text = [
+            (
+                "Computing hypersurfaces",
+                "",
+            )]
+    else
+        text = [
+            (
+                "Intersect with hypersurface",
+                "$(progress.current_codim) / $(progress.codim)",
+            )]
+        if progress.is_solving
+            push!(text, ("Tracking paths", "$(progress.current_path)/$(progress.current_npaths)"))
+        elseif progress.is_removing_points
+            push!(text, ("Removing points", "..."))
+        end
+        push!(text, ("Current number of witness points", ""))
+        for c = 1:progress.codim
+            d = progress.ambient_dim - c
+            push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+        end
     end
 
     text
@@ -136,7 +169,8 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for trakcking
     P_out = Vector{Vector{ComplexF64}}()
-    for s in start
+    l_start = length(start)
+    for (i,s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
@@ -145,6 +179,7 @@ function intersect_with_hypersurface!(
             new = copy(tracker.state.solution)
             push!(P_out, new)
         end
+        update_progress!(progress, i, l_start)
         ProgressMeter.update!(progress_meter, codim(W), showvalues = showvalues(progress))
     end
 
@@ -363,11 +398,11 @@ function witness_supersets!(F::System; sorted::Bool = true)
 
     progress = WitnessSetsProgress(n, codim)
     progress_meter = ProgressMeter.ProgressUnknown(
-        dt = 0.01,
-        desc = "Computing witness sets...",
-        enabled = true,
-        spinner = true,
-    )
+            dt = 0.2,
+            desc = "Computing witness sets...",
+            enabled = true,
+            spinner = true,
+        )
 
     # u-regeneration adds another variable u to F
     @unique_var u
@@ -385,6 +420,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
+    update_progress!(progress)
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -453,6 +489,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
         end
     end
     pop!(vars)
+    finish_progress!(progress)
     ProgressMeter.finish!(progress_meter, showvalues = showvalues(progress))
 
     map(out) do W
