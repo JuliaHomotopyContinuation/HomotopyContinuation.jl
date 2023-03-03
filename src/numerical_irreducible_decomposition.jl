@@ -40,9 +40,6 @@ function u_transform(W::WitnessPoints)
 end
 
 
-
-
-
 """
     intersect_with_hypersurface!
 
@@ -54,6 +51,8 @@ function intersect_with_hypersurface!(
     F::AS,
     H::WitnessSet{T5,T6,Vector{ComplexF64}},
     u::Variable,
+    progress::WitnessSetsProgress,
+    progress_meter
 ) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
 
 
@@ -107,6 +106,7 @@ function intersect_with_hypersurface!(
             new = copy(tracker.state.solution)
             push!(P_out, new)
         end
+        ProgressMeter.update!(progress_meter, length(f)+1, showvalues = showvalues(progress))
     end
 
     # finally, we add the points in P_out to X
@@ -225,30 +225,44 @@ is_contained(V::WitnessPoints, W::WitnessSet) = is_contained(V, W, system(W))
 
 
 
-
-
-Base.@kwdef mutable struct WitnessSupersetsProgress
+Base.@kwdef mutable struct WitnessSetsProgress
+    ambient_dim::Int
     codim::Int
     current_codim::Int
     degrees::Dict{Int,Int}
     is_solving::Bool
 end
-WitnessSupersetsProgress(codim::Int) = WitnessSupersetsProgress(
+WitnessSetsProgress(n::Int, codim::Int) = WitnessSetsProgress(
+    ambient_dim = n,
     codim = codim,
     current_codim = 1,
     degrees = Dict{Int,Int}(),
     is_solving = false,
 )
 
-function update_progress!(progress::WitnessSupersetsProgress, i::Int)
+function update_progress!(progress::WitnessSetsProgress, i::Int)
     progress.is_solving = true
     progress.current_codim = i
 end
-function update_progress!(progress::WitnessSupersetsProgress, W::WitnessPoints)
+function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
     progress.degrees[codim(W)] = length(points(W))
     progress.is_solving = false
 end
+function showvalues(progress::WitnessSetsProgress)
+    text = [
+        (
+            "Intersect with hypersurface",
+            "$(progress.current_codim) / $(progress.codim)",
+        ),
+        ("Current number of witness points", ""),
+    ]
+    for c = 1:progress.codim
+        d = progress.ambient_dim - c
+        push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+    end
 
+    text
+end
 
 
 function initialize_linear_equations(n::Int)
@@ -307,6 +321,7 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
+
 """
     witness_sets(F::System; sorted::Bool = true) 
 
@@ -344,23 +359,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
     c = length(f) # we can have witness sets of codimesion at most min(c,n)
     codim = min(c, n)
 
-    progress = WitnessSupersetsProgress(codim)
-    function showvalues()
-        text = [
-            (
-                "Intersect with hypersurface",
-                "$(progress.current_codim) / $(progress.codim)",
-            ),
-            ("Current number of witness points", ""),
-        ]
-        for c = 1:codim
-            d = n - c
-            push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
-        end
-
-        text
-    end
-
+    progress = WitnessSetsProgress(n, codim)
     progress_meter = ProgressMeter.ProgressUnknown(
         dt = 0.01,
         desc = "Computing witness sets...",
@@ -392,7 +391,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
     begin
         for i = 1:c
             update_progress!(progress, i)
-            ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+            ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
             if i == 1
                 # the first step: take the witness superset H[1] as initial witness superset
                 begin
@@ -400,7 +399,7 @@ function witness_supersets!(F::System; sorted::Bool = true)
                     X = out[1]
                     append!(X, P)
                     update_progress!(progress, X)
-                    ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+                    ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
                 end
             else
                 begin
@@ -418,11 +417,11 @@ function witness_supersets!(F::System; sorted::Bool = true)
                             # the next witness superset X is also passed to this function,
                             # because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
-                            intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u)
+                            intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u, progress, progress_meter)
                             update_progress!(progress, W)
                             update_progress!(progress, X)
                         end
-                        ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+                        ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
                     end
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
@@ -438,21 +437,21 @@ function witness_supersets!(F::System; sorted::Bool = true)
                                         remove_points!(W, X, Fᵢ)
                                         update_progress!(progress, W)
                                     end
-                                ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+                                ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
                             end
                         end
                         update_progress!(progress, W)
-                        ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+                        ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
                     end
                 end
 
             end
-            ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+            ProgressMeter.update!(progress_meter, i, showvalues = showvalues(progress))
 
         end
     end
     pop!(vars)
-    ProgressMeter.finish!(progress_meter, showvalues = showvalues())
+    ProgressMeter.finish!(progress_meter, showvalues = showvalues(progress))
 
     map(out) do W
         P, L = u_transform(W)
@@ -763,7 +762,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}; kwargs...) where {
     n = ambient_dim(linear_subspace(Ws[1]))
 
     progress = DecomposeProgress(n, c)
-    function showvalues()
+    function showstatus()
         text = [("Current status", "")]
         degs = progress.degrees
         k = sort(collect(keys(degs)), rev = true)
@@ -797,10 +796,10 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}; kwargs...) where {
             end
 
             update_progress!(progress, dec)
-            ProgressMeter.update!(progress_meter, i, showvalues = showvalues())
+            ProgressMeter.update!(progress_meter, i, showvalues = showstatus())
         end
     end
-    ProgressMeter.finish!(progress_meter, showvalues = showvalues())
+    ProgressMeter.finish!(progress_meter, showvalues = showstatus())
 
     NumericalIrreducibleDecomposition(out)
 end
