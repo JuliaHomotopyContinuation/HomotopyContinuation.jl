@@ -100,7 +100,7 @@ function showvalues(progress::WitnessSetsProgress)
         if progress.is_solving
             push!(text, ("Tracking paths", "$(progress.current_path)/$(progress.current_npaths)"))
         elseif progress.is_removing_points
-            push!(text, ("Removing points", "..."))
+            push!(text, ("Removing points", ""))
         end
         push!(text, ("Current number of witness points", ""))
         for c = 1:progress.codim
