@@ -502,6 +502,7 @@ function regeneration!(F::System;
     pop!(vars)
     finish_progress!(progress)
 
+    filter!(W -> degree(W)>0, out)
     map(out) do W
         P, L = u_transform(W)
         WitnessSet(fixed(F, compile = false), L, P)
@@ -593,7 +594,8 @@ function decompose_with_monodromy(
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
-                                        threading = threading)
+                                        threading = threading,
+                                        show_progress = false)
 
                 if trace(res_orbit) < trace_test_tol
                     push!(decomposition, WitnessSet(G, L, P_orbit))
