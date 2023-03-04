@@ -21,10 +21,10 @@ points(W::WitnessSet{A,B,C}) where {A,B,C} = W.R
 codim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = dim(linear_subspace(W))
 dim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = codim(linear_subspace(W))
 ModelKit.degree(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = length(points(W))
-append!(
+push!(
     W::WitnessPoints{A,B,Vector{ComplexF64}},
-    R::Vector{Vector{T}},
-) where {A,B,T<:Number} = append!(W.R, R)
+    R::Vector{T},
+) where {A,B,T<:Number} = push!(W.R, R)
 
 function u_transform(W::WitnessPoints)
     L = linear_subspace_u(W)
@@ -149,19 +149,21 @@ function intersect_with_hypersurface!(
     m = .!(is_contained!(progress, W, H))
     P_next = P[m]
     deleteat!(P, m)
+    update_progress!(progress, W)
 
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
     d = ModelKit.degree(H)
-    γ = exp(2 * pi * im * rand())
+    γ = exp(2 * pi * im * rand()) # gamma trick
     g0 = γ * (u^d - 1)
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space K with u=0.
     L = linear_subspace_u(W)
     K = linear_subspace(X)
-    F₀ = slice(System([f; g0], variables=vars), L; compile=false) # is this better?
+    
+    F₀ = slice(System([f; g0], variables=vars), L; compile=false) 
     G₀ = slice(System([f; g], variables=vars), K; compile=false)
     Hom = StraightLineHomotopy(F₀, G₀)
     tracker = EndgameTracker(Hom)
@@ -175,8 +177,7 @@ function intersect_with_hypersurface!(
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
 
-    # here comes the loop for trakcking
-    P_out = Vector{Vector{ComplexF64}}()
+    # here comes the loop for tracking
     l_start = length(start)
     for (i,s) in enumerate(start)
         p = s[1]
@@ -185,13 +186,12 @@ function intersect_with_hypersurface!(
         res = track(tracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
             new = copy(tracker.state.solution)
-            push!(P_out, new)
+            push!(X, new)
+            update_progress!(progress, X)
         end
         update_progress!(progress, i, l_start)
     end
 
-    # finally, we add the points in P_out to X
-    append!(X, P_out)
 
     nothing
 end
@@ -448,7 +448,9 @@ function regeneration!(F::System;
                 begin
                     P = solutions(H[1])
                     X = out[1]
-                    append!(X, P)
+                    for p in P
+                        push!(X, p)
+                    end
                     update_progress!(progress, X)
                 end
             else

@@ -24,7 +24,7 @@ import SemialgebraicSets
 import StructArrays
 import TreeViews
 import Base.Iterators: product, reverse
-import Base: append!
+import Base: push!
 
 const LA = LinearAlgebra
 
