@@ -15,6 +15,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 using Parameters: @unpack
 import ProgressMeter
+const PM = ProgressMeter
 import Random
 import Printf
 import PrettyTables
