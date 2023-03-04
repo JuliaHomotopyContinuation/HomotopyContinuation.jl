@@ -528,14 +528,16 @@ witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs.
 
 
 """
-    decompose_with_monodromy(   
+    decompose_with_monodromy!(
+        progress::Union{DecomposeProgress, Nothing},  
         W::WitnessSet;
         max_iters = 50,
         threading = true) 
 
 The core function for decomposing a witness set into irreducible components.
 """
-function decompose_with_monodromy(
+function decompose_with_monodromy!(
+    progress::Union{DecomposeProgress, Nothing},
     W::WitnessSet{T1,T2,Vector{ComplexF64}};
     max_iters = 50,
     threading = true
@@ -571,6 +573,7 @@ function decompose_with_monodromy(
         seed = 0x45625873
 
         while !isempty(non_complete_points)
+            update_progress!(progress)
             iter += 1
             if iter > max_iters
                 break
@@ -591,6 +594,7 @@ function decompose_with_monodromy(
 
             complete_orbits = Vector{Set{Int}}()
             for orbit in orbits
+                update_progress!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
@@ -670,6 +674,8 @@ function decompose_with_monodromy(
     else
         push!(decomposition, WitnessSet(G, L, P))
     end
+
+    update_progress!(progress)
 
     decomposition
 end
@@ -775,18 +781,39 @@ Base.@kwdef mutable struct DecomposeProgress
     current_dim::Int
     degrees::Dict{Int,Vector{Int}}
     is_solving::Bool
+    step::Int
+    progress_meter::PM.ProgressUnknown
 end
-DecomposeProgress(n::Int, codim::Int) = DecomposeProgress(
+DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) = DecomposeProgress(
     codim = codim,
     current_dim = n - 1,
     degrees = Dict{Int,Vector{Int}}(),
     is_solving = false,
+    step = 0,
+    progress_meter = progress_meter
 )
-
-function update_progress!(progress::DecomposeProgress, i::Int)
-    progress.is_solving = true
-    progress.current_dim = i
+update_progress_step!(progress::Nothing) = nothing
+function update_progress_step!(progress::DecomposeProgress)
+    progress.step += 1
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
 end
+update_progress!(progress::Nothing, d::Int) = nothing
+function update_progress!(progress::DecomposeProgress, d::Int)
+    progress.is_solving = true
+    progress.current_dim = d
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+update_progress!(progress::Nothing) = nothing
+function update_progress!(progress::DecomposeProgress)
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
 function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
     P = progress.degrees
     for W in D
@@ -797,8 +824,27 @@ function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
             P[dim(W)] = [ModelKit.degree(W)]
         end
     end
-
     progress.is_solving = false
+
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+function showstatus(progress::DecomposeProgress)
+    text = [("Current status", "")]
+    degs = progress.degrees
+    k = sort(collect(keys(degs)), rev = true)
+    for key in k
+        push!(
+            text,
+            (
+                "Degrees of components of dim. $key",
+                "$(join(map(string, degs[key]), ','))",
+            ),
+        )
+    end
+
+    text
 end
 
 """
@@ -824,50 +870,39 @@ Numerical irreducible decomposition with 2 components
 │     1     │        (2, 2)         │
 ╰───────────┴───────────────────────╯
 """
-function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}}; kwargs...) where {T1,T2,T3<:Number}
+function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};       
+                    show_progress::Bool = true) where {T1,T2,T3<:Number}
 
     c = length(Ws)
     n = ambient_dim(linear_subspace(Ws[1]))
 
-    progress = DecomposeProgress(n, c)
-    function showstatus()
-        text = [("Current status", "")]
-        degs = progress.degrees
-        k = sort(collect(keys(degs)), rev = true)
-        for key in k
-            push!(
-                text,
-                (
-                    "Degrees of components of dim. $key",
-                    "$(join(map(string, degs[key]), ','))",
-                ),
-            )
-        end
-
-        text
+    if show_progress
+        progress = DecomposeProgress(n, c, PM.ProgressUnknown(
+            dt = 0.2,
+            desc = "Decomposing $c witness sets",
+            enabled = true,
+            spinner = true,
+        ))
+    else
+        progress = nothing
     end
-    progress_meter = PM.ProgressUnknown(
-        dt = 0.01,
-        desc = "Decomposing $c witness sets",
-        enabled = true,
-        spinner = true,
-    )
+    
 
     out = Vector{WitnessSet}()
     for (i, W) in enumerate(Ws)
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            dec = decompose_with_monodromy(W)
+            dec = decompose_with_monodromy!(progress, W)
             if !isnothing(dec)
                 append!(out, dec)
             end
 
             update_progress!(progress, dec)
-            PM.update!(progress_meter, i, showvalues = showstatus())
         end
+        update_progress_step!(progress)
     end
-    PM.finish!(progress_meter, showvalues = showstatus())
+    PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
 
     NumericalIrreducibleDecomposition(out)
 end
@@ -1056,10 +1091,11 @@ function numerical_irreducible_decomposition(F::System;
     sorted::Bool = true,
     show_progress::Bool = true)
 
-    Ws = regeneration!(F, 
+    Ws = regeneration!(F;
                 sorted = sorted,
                 show_progress = show_progress)
-    decompose(Ws)
+    decompose(Ws;
+                show_progress = show_progress)
 end
 """
     nid(F::System; kwargs...)
