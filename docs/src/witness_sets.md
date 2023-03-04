@@ -14,9 +14,10 @@ To compute a [`WitnessSet`](@ref) call [`witness_set`](@ref).
 witness_set
 ```
 
-To compute witness sets for all possible dimensions use [`witness_sets`](@ref).
+To compute witness sets for all possible dimensions use [`regeneration`](@ref) or [`witness_sets`](@ref).
 
 ```@docs
+regeneration
 witness_sets
 ```
 

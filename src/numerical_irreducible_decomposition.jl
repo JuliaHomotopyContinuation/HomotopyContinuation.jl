@@ -1,4 +1,4 @@
-export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, n_components, witness_sets, degrees, decompose
+export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, regeneration, witness_sets, decompose, n_components, degrees
 
 """
     WitnessPoints
@@ -322,7 +322,7 @@ function initialize_linear_equations(n::Int)
 
     (A, b, Aᵤ, bᵤ)
 end
-function initialize_witness_supersets(
+function initialize_witness_sets(
     codim::Int,
     n::Int,
     A::Matrix,
@@ -363,13 +363,17 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
 end
 
 
+
 """
-    witness_sets(F::System; sorted::Bool = true) 
+    regeneration(F::System; 
+                sorted::Bool = true,
+                show_progress::Bool = true) 
 
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
 
-If sorted = true, the polynomials in F will be sorted by degree in decreasing order.
+* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `show_progress`: indicate if the progress of the computation should be displayed.
 
 ### Example
 
@@ -380,12 +384,12 @@ julia> @var x y
 julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
 julia> W = witness_sets([f])
 1-element Vector{WitnessSet}:
- Witness set for dimension 1 of degree 4
-```
+    Witness set for dimension 1 of degree 4  
+````          
 """
-witness_sets(F::System; kwargs...) = witness_supersets!(deepcopy(F); kwargs...)
-witness_sets(F::Vector{Expression}) = witness_sets(System(F))
-function witness_supersets!(F::System; 
+regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
+regeneration(F::Vector{Expression}) = regeneration(System(F))
+function regeneration!(F::System; 
     sorted::Bool = true,
     show_progress::Bool = true)
 
@@ -421,10 +425,10 @@ function witness_supersets!(F::System;
     # initialize the linear equations for witness sets
     A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
 
-    # prepare c witness supersets for the output
+    # prepare c witness sets for the output
     # internally we represent a witness superset by WitnessPoints
     # the i-th witness superset out[i] is for codimension i
-    out = initialize_witness_supersets(codim, n, A, b, Aᵤ, bᵤ)
+    out = initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
 
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
@@ -434,7 +438,7 @@ function witness_supersets!(F::System;
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
-    # then, we for i in 2:c we iteratively intersect all current witness supersets with f[i]=0
+    # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
     begin
         for i = 1:c
@@ -453,7 +457,7 @@ function witness_supersets!(F::System;
                     Hᵢ = H[i]
 
                     E = enumerate(out)
-                    # we enumerate reversely, so that we can add points to witness supersets that we have already
+                    # we enumerate reversely, so that we can add points to witness sets that we have already
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
                     for (k, W) in reverse(E) # k = codim(W) for W in Ws
@@ -501,6 +505,23 @@ function witness_supersets!(F::System;
         WitnessSet(fixed(F, compile = false), L, P)
     end
 end
+
+"""
+    witness_sets(F::System; 
+                sorted::Bool = true,
+                show_progress::Bool = true) 
+
+A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
+The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
+
+* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `show_progress`: indicate if the progress of the computation should be displayed.
+
+Does the same as [`regeneration`](@ref).
+```
+"""
+witness_sets(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
+witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 
 
 """
@@ -988,12 +1009,14 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
 end
 
 """
-    numerical_irreducible_decomposition(F::System;
-                                        sorted::Bool = true)
+    numerical_irreducible_decomposition(F::System
+                                sorted::Bool = true,
+                                show_progress::Bool = true)
 
 Computes the numerical irreducible of the variety defined by F=0. 
 
-If sorted = true, the polynomials in F will be sorted by degree in decreasing order. 
+* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `show_progress`: indicate if the progress of the computation should be displayed.
 
 ### Example
 The following example computes witness sets for a union of
@@ -1029,13 +1052,13 @@ function numerical_irreducible_decomposition(F::System;
     sorted::Bool = true,
     show_progress::Bool = true)
 
-    Ws = witness_supersets!(F, 
+    Ws = regeneration!(F, 
                 sorted = sorted,
                 show_progress = show_progress)
     decompose(Ws)
 end
 """
-    nid(F::System; sorted::Bool = true)
+    nid(F::System; kwargs...)
 
 Calls [`numerical_irreducible_decomposition`](@ref).
 

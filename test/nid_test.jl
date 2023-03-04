@@ -13,6 +13,9 @@
         W_F = witness_sets(F)
         @test degree.(W_F) == [2, 8, 8]
 
+        W_F = regeneration(F)
+        @test degree.(W_F) == [2, 8, 8]
+
         N_F = decompose(W_F)
         @test isa(N_F, NumericalIrreducibleDecomposition)
     end
