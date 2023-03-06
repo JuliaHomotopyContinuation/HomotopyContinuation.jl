@@ -569,10 +569,12 @@ witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs.
 The core function for decomposing a witness set into irreducible components.
 """
 function decompose_with_monodromy!(
-    progress::Union{DecomposeProgress, Nothing},
-    W::WitnessSet{T1,T2,Vector{ComplexF64}};
-    max_iters = 50,
-    threading = true
+    W::WitnessSet{T1,T2,Vector{ComplexF64}},
+    show_monodromy_progress::Bool,
+    options::MonodromyOptions,
+    max_iters::Int,
+    threading::Bool,
+    progress::Union{DecomposeProgress, Nothing}
 ) where {T1,T2}
     P = points(W)
     L = linear_subspace(W)
@@ -584,24 +586,19 @@ function decompose_with_monodromy!(
     decomposition = Vector{WitnessSet}()
 
     if dim(L) < n
-        trace_test_tol = 1e-10
+
         MS = MonodromySolver(
             G,
             L;
             compile = false,
-            options = (
-                permutations = true,
-                trace_test = true,
-                single_loop_per_start_solution = true,
-                trace_test_tol = trace_test_tol,
-            ),
+            options = options
         )
 
         non_complete_points = P
         non_complete_orbits = Vector{Set{Int}}()
 
         iter = 0
-        # seed = rand(UInt32)
+
         seed = 0x45625873
 
         while !isempty(non_complete_points)
@@ -613,8 +610,8 @@ function decompose_with_monodromy!(
             # @show iter
             res = monodromy_solve(MS, non_complete_points, L, seed; 
                                     threading = threading,
-                                    show_progress = false)
-            if trace(res) > trace_test_tol
+                                    show_progress = show_monodromy_progress)
+            if trace(res) > options.trace_test_tol
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
 
@@ -631,9 +628,9 @@ function decompose_with_monodromy!(
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
                                         threading = threading,
-                                        show_progress = false)
+                                        show_progress = show_monodromy_progress)
 
-                if trace(res_orbit) < trace_test_tol
+                if trace(res_orbit) < options.trace_test_tol
                     push!(decomposition, WitnessSet(G, L, P_orbit))
                     push!(complete_orbits, orbit)
                 end
@@ -862,6 +859,8 @@ function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
                     progress.step, 
                     showvalues = showstatus(progress))
 end
+finish_progress!(progress::Nothing) = nothing
+finish_progress!(progress::DecomposeProgress) = PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
 function showstatus(progress::DecomposeProgress)
     text = [("Current status", "")]
     degs = progress.degrees
@@ -903,7 +902,17 @@ Numerical irreducible decomposition with 2 components
 ╰───────────┴───────────────────────╯
 """
 function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};       
-                    show_progress::Bool = true) where {T1,T2,T3<:Number}
+                    show_progress::Bool = true,
+                    show_monodromy_progress::Bool = false,
+                    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10,
+                                                                            permutations = true,
+                                                                            trace_test = true,
+                                                                            single_loop_per_start_solution = true
+                                                                            ),
+                    max_iters::Int = 50,
+                    threading::Bool = true,
+                    ) where {T1,T2,T3<:Number}
+
 
     c = length(Ws)
     n = ambient_dim(linear_subspace(Ws[1]))
@@ -925,7 +934,12 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            dec = decompose_with_monodromy!(progress, W)
+            dec = decompose_with_monodromy!(W, 
+                                            show_monodromy_progress,
+                                            monodromy_options,
+                                            max_iters,
+                                            threading,
+                                            progress)
             if !isnothing(dec)
                 append!(out, dec)
             end
@@ -934,7 +948,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
         end
         update_progress_step!(progress)
     end
-    PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
+    finish_progress!(progress)
 
     NumericalIrreducibleDecomposition(out)
 end
