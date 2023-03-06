@@ -975,7 +975,7 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
     out = Vector{WitnessSet}()
 
     if isempty(Ws)
-        return out
+        return NumericalIrreducibleDecomposition(out, seed)
     end
 
     c = length(Ws)
@@ -1110,25 +1110,38 @@ degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
 
 function max_dim(N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
-    maximum(keys(D))
+    k = keys(D)
+    if !isempty(k)
+        maximum(k)
+    else
+        -1
+    end
 end
 
 function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
-    total = sum(length(last(Ws)) for Ws in D)
+    if !isempty(D)
+        total = sum(length(last(Ws)) for Ws in D)
+    else
+        total = 0
+    end
     header = "\n Numerical irreducible decomposition with $total components"
     println(io, header)
-    for d = max_dim(N):-1:0
-        if haskey(D, d)
-            ℓ = length(D[d])
-            if ℓ > 0
-                println(io, "• $ℓ component(s) of dimension $d.")
+    
+    mdim = max_dim(N)
+    if mdim > 0
+        for d = max_dim(N):-1:0
+            if haskey(D, d)
+                ℓ = length(D[d])
+                if ℓ > 0
+                    println(io, "• $ℓ component(s) of dimension $d.")
+                end
             end
         end
-    end
 
-    println(io, "\n degree table of components:")
-    degree_table(io, N)
+        println(io, "\n degree table of components:")
+        degree_table(io, N)
+    end
     println(io, "random seed: $(seed(N))")
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition)

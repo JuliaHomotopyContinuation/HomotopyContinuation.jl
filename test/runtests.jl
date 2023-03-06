@@ -50,6 +50,7 @@ hc_testset = get(ENV, "HC_TESTSET", "none")
         include("witness_set_test.jl")
         include("certification_test.jl")
         include("semialgebraic_sets_test.jl")
+        include("nid_test.jl")
     end
 
     # if "extensive" in ARGS

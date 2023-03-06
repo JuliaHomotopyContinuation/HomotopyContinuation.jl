@@ -10,14 +10,20 @@
             p * (z - 3) * (z - 5)
         ]
 
-        W_F = witness_sets(F)
-        @test degree.(W_F) == [2, 8, 8]
+        W = witness_sets(F)
+        @test degree.(W) == [2, 8, 8]
 
-        W_F = regeneration(F)
-        @test degree.(W_F) == [2, 8, 8]
+        W = regeneration(F)
+        @test degree.(W) == [2, 8, 8]
 
-        N_F = decompose(W_F)
-        @test isa(N_F, NumericalIrreducibleDecomposition)
+        N = decompose(W)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
+        @test isempty(witness_sets(N_fails))
+
+        N2 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
+        @test isa(N2, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
@@ -47,7 +53,7 @@
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
         W_TwistedCubicSphere = witness_sets(TwistedCubicSphere)
-        @test degree.(W_TwistedCubicSphere) == [0; 0; 3]
+        @test degree.(W_TwistedCubicSphere) == [3]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
         @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
@@ -63,7 +69,7 @@
         ThreeLines = System([f; g], variables = [x; y; z])
 
         W_ThreeLines = witness_sets(ThreeLines)
-        @test degree.(W_ThreeLines) == [0; 3]
+        @test degree.(W_ThreeLines) == [3]
 
         N_ThreeLines = nid(ThreeLines)
         @test degrees(N_ThreeLines) == Dict(1 => [1; 1; 1])
