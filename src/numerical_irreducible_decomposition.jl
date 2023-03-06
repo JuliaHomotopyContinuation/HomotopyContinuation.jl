@@ -136,7 +136,7 @@ function intersect_with_hypersurface!(
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
     progress::Union{WitnessSetsProgress, Nothing},
-    seed::UInt32
+    seed
 ) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
 
     !isnothing(seed) && Random.seed!(seed)
@@ -154,7 +154,8 @@ function intersect_with_hypersurface!(
     m = .!(is_contained!(W, H,
                             endgame_options,
                             tracker_options,
-                            progress)
+                            progress,
+                            seed)
             )
     P_next = P[m]
     deleteat!(P, m)
@@ -214,7 +215,7 @@ function remove_points!(
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
     progress::Union{WitnessSetsProgress, Nothing},
-    seed::UInt32
+    seed
 ) where {T1,T2,T3,T4,AS<:AbstractSystem}
     m = is_contained!(W, V, F,
                         endgame_options,
@@ -239,7 +240,7 @@ function is_contained!(
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
     progress::Union{WitnessSetsProgress, Nothing},
-    seed::UInt32
+    seed
 ) where {
     W₁<:Union{WitnessPoints,WitnessSet},
     W₂<:Union{WitnessPoints,WitnessSet},
@@ -333,7 +334,7 @@ function is_contained!(V::WitnessPoints, W::WitnessSet,
                         endgame_options::EndgameOptions,
                         tracker_options::TrackerOptions,
                         progress::Union{WitnessSetsProgress, Nothing},
-                        seed::UInt32)
+                        seed)
     is_contained!(V, W, system(W), 
                     endgame_options,
                     tracker_options,
@@ -341,7 +342,7 @@ function is_contained!(V::WitnessPoints, W::WitnessSet,
                     seed)
 end
 
-function initialize_linear_equations(n::Int, seed::UInt32)
+function initialize_linear_equations(n::Int, seed)
 
     !isnothing(seed) && Random.seed!(seed)
 
@@ -437,7 +438,7 @@ function regeneration!(F::System;
     endgame_options = EndgameOptions(; max_endgame_steps = 100,
                                        max_endgame_extended_steps = 100),
     threading::Bool = true,
-    seed::UInt32 = rand(UInt32)
+    seed = rand(UInt32)
     )
 
     # the algorithm is u-regeneration as proposed 
@@ -663,7 +664,7 @@ end
         max_iters::Int,
         threading::Bool,
         progress::Union{DecomposeProgress, Nothing},
-        seed::UInt32) 
+        seed) 
 
 The core function for decomposing a witness set into irreducible components.
 """
@@ -674,8 +675,14 @@ function decompose_with_monodromy!(
     max_iters::Int,
     threading::Bool,
     progress::Union{DecomposeProgress, Nothing},
-    seed::UInt32
+    seed
 ) where {T1,T2}
+
+
+    if isnothing(seed)
+        seed = rand(UInt32)
+    end
+
     P = points(W)
     L = linear_subspace(W)
     ℓ = length(P)
@@ -960,7 +967,7 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
                     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
                     max_iters::Int = 50,
                     threading::Bool = true,
-                    seed::UInt32 = rand(UInt32)
+                    seed = rand(UInt32)
                     ) where {T1,T2,T3<:Number}
 
         
@@ -1020,9 +1027,9 @@ Store the witness sets in a common data structure.
 """                                     
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
-    seed::UInt32
+    seed
 end
-function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed::UInt32)
+function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
     D = Dict{Int,Vector{WitnessSet}}()
     for W in Ws
         k = dim(W)
