@@ -19,12 +19,12 @@
         s = rand(UInt32)
         N = nid(F; seed = s)
         @test isa(N, NumericalIrreducibleDecomposition)
-        N = nid(FF; seed = nothing)
+        N = nid(F; seed = nothing)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         N = nid(F; show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
-        N = nid(FF; show_monodromy_progress = true)
+        N = nid(F; show_monodromy_progress = true)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
