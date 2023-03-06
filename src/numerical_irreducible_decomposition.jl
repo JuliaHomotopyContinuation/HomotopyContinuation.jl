@@ -559,12 +559,86 @@ witness_sets(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
 witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 
 
+
+Base.@kwdef mutable struct DecomposeProgress
+    codim::Int
+    current_dim::Int
+    degrees::Dict{Int,Vector{Int}}
+    is_solving::Bool
+    step::Int
+    progress_meter::PM.ProgressUnknown
+end
+DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) = DecomposeProgress(
+    codim = codim,
+    current_dim = n - 1,
+    degrees = Dict{Int,Vector{Int}}(),
+    is_solving = false,
+    step = 0,
+    progress_meter = progress_meter
+)
+update_progress_step!(progress::Nothing) = nothing
+function update_progress_step!(progress::DecomposeProgress)
+    progress.step += 1
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+function update_progress!(progress::DecomposeProgress, d::Int)
+    progress.is_solving = true
+    progress.current_dim = d
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+function update_progress!(progress::DecomposeProgress)
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
+function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
+    P = progress.degrees
+    for W in D
+        c = dim(W)
+        if haskey(P, c)
+            push!(P[dim(W)], ModelKit.degree(W))
+        else
+            P[dim(W)] = [ModelKit.degree(W)]
+        end
+    end
+    progress.is_solving = false
+
+    PM.update!(progress.progress_meter, 
+                    progress.step, 
+                    showvalues = showstatus(progress))
+end
+finish_progress!(progress::DecomposeProgress) = PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
+function showstatus(progress::DecomposeProgress)
+    text = [("Current status", "")]
+    degs = progress.degrees
+    k = sort(collect(keys(degs)), rev = true)
+    for key in k
+        push!(
+            text,
+            (
+                "Degrees of components of dim. $key",
+                "$(join(map(string, degs[key]), ','))",
+            ),
+        )
+    end
+
+    text
+end
+
+
 """
     decompose_with_monodromy!(
-        progress::Union{DecomposeProgress, Nothing},  
-        W::WitnessSet;
-        max_iters = 50,
-        threading = true) 
+        W::WitnessSet{T1,T2,Vector{ComplexF64}},
+        show_monodromy_progress::Bool,
+        options::MonodromyOptions,
+        max_iters::Int,
+        threading::Bool,
+        progress::Union{DecomposeProgress, Nothing}) 
 
 The core function for decomposing a witness set into irreducible components.
 """
@@ -803,80 +877,27 @@ function get_orbits_from_monodromy_permutations(
     orbits
 end
 
+function decompose_with_monodromy_options(M::MonodromyOptions)
 
+    MonodromyOptions(; permutations = true,
+                trace_test = true, 
+                single_loop_per_start_solution = true,
+                check_startsolutions = M.check_startsolutions,
+                group_actions = M.group_actions,
+                loop_finished_callback = M.loop_finished_callback,
+                parameter_sampler = M.parameter_sampler,
+                equivalence_classes = M.equivalence_classes,
+                trace_test_tol = M.trace_test_tol,
+                target_solutions_count = M.target_solutions_count,
+                timeout = M.timeout,
+                min_solutions = M.min_solutions,
+                max_loops_no_progress = M.max_loops_no_progress,
+                reuse_loops = M.reuse_loops,
+                distance = M.distance,
+                unique_points_atol = M.unique_points_atol,
+                unique_points_rtol = M.unique_points_rtol)
+end
 
-Base.@kwdef mutable struct DecomposeProgress
-    codim::Int
-    current_dim::Int
-    degrees::Dict{Int,Vector{Int}}
-    is_solving::Bool
-    step::Int
-    progress_meter::PM.ProgressUnknown
-end
-DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) = DecomposeProgress(
-    codim = codim,
-    current_dim = n - 1,
-    degrees = Dict{Int,Vector{Int}}(),
-    is_solving = false,
-    step = 0,
-    progress_meter = progress_meter
-)
-update_progress_step!(progress::Nothing) = nothing
-function update_progress_step!(progress::DecomposeProgress)
-    progress.step += 1
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
-end
-update_progress!(progress::Nothing, d::Int) = nothing
-function update_progress!(progress::DecomposeProgress, d::Int)
-    progress.is_solving = true
-    progress.current_dim = d
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
-end
-update_progress!(progress::Nothing) = nothing
-function update_progress!(progress::DecomposeProgress)
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
-end
-update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
-function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
-    P = progress.degrees
-    for W in D
-        c = dim(W)
-        if haskey(P, c)
-            push!(P[dim(W)], ModelKit.degree(W))
-        else
-            P[dim(W)] = [ModelKit.degree(W)]
-        end
-    end
-    progress.is_solving = false
-
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
-end
-finish_progress!(progress::Nothing) = nothing
-finish_progress!(progress::DecomposeProgress) = PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
-function showstatus(progress::DecomposeProgress)
-    text = [("Current status", "")]
-    degs = progress.degrees
-    k = sort(collect(keys(degs)), rev = true)
-    for key in k
-        push!(
-            text,
-            (
-                "Degrees of components of dim. $key",
-                "$(join(map(string, degs[key]), ','))",
-            ),
-        )
-    end
-
-    text
-end
 
 """
     decompose(Ws::Vector{WitnessPoints}; options...) 
@@ -904,16 +925,14 @@ Numerical irreducible decomposition with 2 components
 function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};       
                     show_progress::Bool = true,
                     show_monodromy_progress::Bool = false,
-                    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10,
-                                                                            permutations = true,
-                                                                            trace_test = true,
-                                                                            single_loop_per_start_solution = true
-                                                                            ),
+                    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
                     max_iters::Int = 50,
                     threading::Bool = true,
                     ) where {T1,T2,T3<:Number}
 
-
+        
+    options = decompose_with_monodromy_options(monodromy_options)
+    
     c = length(Ws)
     n = ambient_dim(linear_subspace(Ws[1]))
 
@@ -936,7 +955,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
 
             dec = decompose_with_monodromy!(W, 
                                             show_monodromy_progress,
-                                            monodromy_options,
+                                            options,
                                             max_iters,
                                             threading,
                                             progress)
