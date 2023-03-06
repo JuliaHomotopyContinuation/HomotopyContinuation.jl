@@ -408,8 +408,13 @@ end
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
 
+### Options
+
+* `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
-* `show_progress`: indicate if the progress of the computation should be displayed.
+* `endgame_options`: Pass [`EndgameOptions`](@ref) to the [`EndgameTracker`](@ref).
+* `tracker_options`: Pass [`TrackerOptions`](@ref) to the [`Tracker`](@ref).
+* `seed`: Choose the random seed.
 
 ### Example
 
@@ -570,10 +575,6 @@ end
     witness_sets(F::System; options...) 
 
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
-The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
-
-* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
-* `show_progress`: indicate if the progress of the computation should be displayed.
 
 Does the same as [`regeneration`](@ref).
 ```
@@ -925,7 +926,15 @@ end
 """
     decompose(Ws::Vector{WitnessPoints}; options...) 
 
-Calls [`decompose`](@ref) on the vector of witness points Ws.
+This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@ref) into irreducible components.
+
+### Options
+* `show_progress = true`: indicate whether the progress of the computation should be displayed.
+* `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
+* `monodromy_options`: pass [`MonodromyOptions`](@ref) to the [`MonodromySolver`](@ref).
+* `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `threading = true`: enables multiple threads.
+* `seed`: Choose the random seed.
 
 ### Example
 The following example decomposes the witness set for a union of two circles.
@@ -1113,7 +1122,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
 
     println(io, "\n degree table of components:")
     degree_table(io, N)
-    println(io, "seed: $(seed(N))")
+    println(io, "random seed: $(seed(N))")
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
@@ -1149,10 +1158,20 @@ end
 """
     numerical_irreducible_decomposition(F::System; options...)
 
-Computes the numerical irreducible of the variety defined by F=0. 
+Computes the numerical irreducible of the variety defined by `F=0``. 
 
+### Options
+
+
+* `show_progress = true`: indicate whether the progress of the computation should be displayed.
+* `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
-* `show_progress`: indicate if the progress of the computation should be displayed.
+* `endgame_options`: Pass [`EndgameOptions`](@ref) to the [`EndgameTracker`](@ref).
+* `tracker_options`: Pass [`TrackerOptions`](@ref) to the [`Tracker`](@ref).
+* `monodromy_options`: pass [`MonodromyOptions`](@ref) to the [`MonodromySolver`](@ref).
+* `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `threading = true`: enables multiple threads.
+* `seed`: Choose the random seed.
 
 ### Example
 The following example computes witness sets for a union of

@@ -46,6 +46,7 @@ NumericalIrreducibleDecomposition
 n_components
 witness_sets
 degrees
+seed
 ```
 
 
