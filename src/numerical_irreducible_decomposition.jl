@@ -418,7 +418,7 @@ end
     regeneration(F::System; options...) 
 
 A function that computes witness sets for the variety defined by `F=0` without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
-The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
+The implementation is based on the algorithm [u-regeneration](https://arxiv.org/abs/2206.02869) by Duff, Leykin and Rodriguez. 
 
 ### Options
 
@@ -435,7 +435,7 @@ The following example computes witness sets for a union of two circles.
 ```julia-repl
 julia> @var x y
 julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
-julia> W = witness_sets([f])
+julia> W = regeneration([f])
 1-element Vector{WitnessSet}:
     Witness set for dimension 1 of degree 4  
 ```         
@@ -962,7 +962,7 @@ The following example decomposes the witness set for a union of two circles.
 ```julia-repl
 julia> @var x y
 julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
-julia> W = witness_sets([f])
+julia> W = regeneration([f])
 julia> decompose(W)
 Numerical irreducible decomposition with 2 components
 • 2 component(s) of dimension 1.
