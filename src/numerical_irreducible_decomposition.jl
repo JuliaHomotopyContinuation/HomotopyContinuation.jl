@@ -5,7 +5,6 @@ export NumericalIrreducibleDecomposition,
     witness_sets,
     decompose,
     n_components,
-    degrees,
     seed
 
 """
@@ -1128,7 +1127,7 @@ Returns the degrees of the components in `N`.
 `dims` specifies the dimensions that should be considered.
 
 """
-function degrees(
+function ModelKit.degrees(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
 )
@@ -1151,7 +1150,7 @@ function degrees(
 
     out
 end
-degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
+ModelKit.degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
 
 function max_dim(N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
