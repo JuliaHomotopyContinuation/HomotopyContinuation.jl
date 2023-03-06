@@ -1,4 +1,12 @@
-export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, regeneration, witness_sets, decompose, n_components, degrees, seed
+export NumericalIrreducibleDecomposition,
+    nid,
+    numerical_irreducible_decomposition,
+    regeneration,
+    witness_sets,
+    decompose,
+    n_components,
+    degrees,
+    seed
 
 """
     WitnessPoints
@@ -21,10 +29,8 @@ points(W::WitnessSet{A,B,C}) where {A,B,C} = W.R
 codim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = dim(linear_subspace(W))
 dim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = codim(linear_subspace(W))
 ModelKit.degree(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = length(points(W))
-push!(
-    W::WitnessPoints{A,B,Vector{ComplexF64}},
-    R::Vector{T},
-) where {A,B,T<:Number} = push!(W.R, R)
+push!(W::WitnessPoints{A,B,Vector{ComplexF64}}, R::Vector{T}) where {A,B,T<:Number} =
+    push!(W.R, R)
 
 function u_transform(W::WitnessPoints)
     L = linear_subspace_u(W)
@@ -52,26 +58,31 @@ Base.@kwdef mutable struct WitnessSetsProgress
     current_npaths::Int
     progress_meter::PM.ProgressUnknown
 end
-WitnessSetsProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) = WitnessSetsProgress(
-    ambient_dim = n,
-    codim = codim,
-    current_codim = 1,
-    degrees = Dict{Int,Int}(),
-    is_solving = false,
-    is_removing_points = false,
-    is_computing_hypersurfaces = true,
-    current_path = 0,
-    current_npaths = 0,
-    progress_meter = progress_meter
-)
+WitnessSetsProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
+    WitnessSetsProgress(
+        ambient_dim = n,
+        codim = codim,
+        current_codim = 1,
+        degrees = Dict{Int,Int}(),
+        is_solving = false,
+        is_removing_points = false,
+        is_computing_hypersurfaces = true,
+        current_path = 0,
+        current_npaths = 0,
+        progress_meter = progress_meter,
+    )
 update_progress!(progress::Nothing) = nothing
 function update_progress!(progress::WitnessSetsProgress)
     progress.is_computing_hypersurfaces = false
 end
 update_progress!(progress::Nothing, i::Int) = nothing
-function update_progress!(progress::WitnessSetsProgress, i::Int) 
+function update_progress!(progress::WitnessSetsProgress, i::Int)
     progress.current_codim = i
-    PM.update!(progress.progress_meter, progress.current_codim, showvalues = showvalues(progress))
+    PM.update!(
+        progress.progress_meter,
+        progress.current_codim,
+        showvalues = showvalues(progress),
+    )
 end
 update_progress!(progress::Nothing, i::Int, m::Int) = nothing
 function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
@@ -79,14 +90,22 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
     progress.is_removing_points = false
     progress.current_path = i
     progress.current_npaths = m
-    PM.update!(progress.progress_meter, progress.current_codim, showvalues = showvalues(progress))
+    PM.update!(
+        progress.progress_meter,
+        progress.current_codim,
+        showvalues = showvalues(progress),
+    )
 end
 update_progress!(progress::Nothing, W::WitnessPoints) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
     progress.is_solving = false
     progress.is_removing_points = true
     progress.degrees[codim(W)] = length(points(W))
-    PM.update!(progress.progress_meter, progress.current_codim, showvalues = showvalues(progress))
+    PM.update!(
+        progress.progress_meter,
+        progress.current_codim,
+        showvalues = showvalues(progress),
+    )
 end
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
@@ -96,19 +115,17 @@ function finish_progress!(progress::WitnessSetsProgress)
 end
 function showvalues(progress::WitnessSetsProgress)
     if progress.is_computing_hypersurfaces
-        text = [
-            (
-                "Computing hypersurfaces",
-                "",
-            )]
+        text = [("Computing hypersurfaces", "")]
     else
-        text = [
-            (
-                "Intersect with hypersurface",
-                "$(progress.current_codim) / $(progress.codim)",
-            )]
+        text = [(
+            "Intersect with hypersurface",
+            "$(progress.current_codim) / $(progress.codim)",
+        )]
         if progress.is_solving
-            push!(text, ("Tracking paths", "$(progress.current_path)/$(progress.current_npaths)"))
+            push!(
+                text,
+                ("Tracking paths", "$(progress.current_path)/$(progress.current_npaths)"),
+            )
         elseif progress.is_removing_points
             push!(text, ("Removing junk points", "..."))
         end
@@ -135,8 +152,8 @@ function intersect_with_hypersurface!(
     u::Variable,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing},
-    seed
+    progress::Union{WitnessSetsProgress,Nothing},
+    seed,
 ) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
 
     !isnothing(seed) && Random.seed!(seed)
@@ -151,12 +168,7 @@ function intersect_with_hypersurface!(
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained!(W, H,
-                            endgame_options,
-                            tracker_options,
-                            progress,
-                            seed)
-            )
+    m = .!(is_contained!(W, H, endgame_options, tracker_options, progress, seed))
     P_next = P[m]
     deleteat!(P, m)
     update_progress!(progress, W)
@@ -172,13 +184,12 @@ function intersect_with_hypersurface!(
     # we end with the linear space K with u=0.
     L = linear_subspace_u(W)
     K = linear_subspace(X)
-    
-    F₀ = slice(System([f; g0], variables=vars), L; compile=false) 
-    G₀ = slice(System([f; g], variables=vars), K; compile=false)
+
+    F₀ = slice(System([f; g0], variables = vars), L; compile = false)
+    G₀ = slice(System([f; g], variables = vars), K; compile = false)
     Hom = StraightLineHomotopy(F₀, G₀)
-    tracker = EndgameTracker(Hom;
-                            tracker_options = tracker_options, 
-                            options = endgame_options)
+    tracker =
+        EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
 
     # Alternative code:
     #F₀ = System([f; g0; extrinsic(L).A * vars - extrinsic(L).b], variables = vars)
@@ -191,7 +202,7 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for tracking
     l_start = length(start)
-    for (i,s) in enumerate(start)
+    for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
@@ -214,14 +225,10 @@ function remove_points!(
     F::AS,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing},
-    seed
+    progress::Union{WitnessSetsProgress,Nothing},
+    seed,
 ) where {T1,T2,T3,T4,AS<:AbstractSystem}
-    m = is_contained!(W, V, F,
-                        endgame_options,
-                        tracker_options,
-                        progress,
-                        seed)
+    m = is_contained!(W, V, F, endgame_options, tracker_options, progress, seed)
     deleteat!(W.R, m)
 
     nothing
@@ -239,8 +246,8 @@ function is_contained!(
     F::AS,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing},
-    seed
+    progress::Union{WitnessSetsProgress,Nothing},
+    seed,
 ) where {
     W₁<:Union{WitnessPoints,WitnessSet},
     W₂<:Union{WitnessPoints,WitnessSet},
@@ -265,9 +272,11 @@ function is_contained!(
         # setup 
         P = points(Y)
         Hom = linear_subspace_homotopy(F, LY, LY)
-        tracker = EndgameTracker(Hom;
-                            tracker_options = tracker_options, 
-                            options = endgame_options)
+        tracker = EndgameTracker(
+            Hom;
+            tracker_options = tracker_options,
+            options = endgame_options,
+        )
         U = UniquePoints(first(P), 0)
 
         # to compute linear spaces through the points in X we first set up
@@ -330,16 +339,15 @@ function is_contained!(
 
     out
 end
-function is_contained!(V::WitnessPoints, W::WitnessSet,
-                        endgame_options::EndgameOptions,
-                        tracker_options::TrackerOptions,
-                        progress::Union{WitnessSetsProgress, Nothing},
-                        seed)
-    is_contained!(V, W, system(W), 
-                    endgame_options,
-                    tracker_options,
-                    progress,
-                    seed)
+function is_contained!(
+    V::WitnessPoints,
+    W::WitnessSet,
+    endgame_options::EndgameOptions,
+    tracker_options::TrackerOptions,
+    progress::Union{WitnessSetsProgress,Nothing},
+    seed,
+)
+    is_contained!(V, W, system(W), endgame_options, tracker_options, progress, seed)
 end
 
 function initialize_linear_equations(n::Int, seed)
@@ -387,12 +395,15 @@ end
 function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
-    
+
     for i = 1:c
         h = fixed(System([f[i]], variables = vars), compile = false)
-        res = solve(h, target_subspace = L;
-                         start_system = :total_degree,
-                         show_progress = false)
+        res = solve(
+            h,
+            target_subspace = L;
+            start_system = :total_degree,
+            show_progress = false,
+        )
         S = solutions(res, only_nonsingular = true)
 
         out[i] = WitnessSet(h, L, S)
@@ -431,15 +442,18 @@ julia> W = witness_sets([f])
 """
 regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}) = regeneration(System(F))
-function regeneration!(F::System; 
+function regeneration!(
+    F::System;
     sorted::Bool = true,
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(; max_endgame_steps = 100,
-                                       max_endgame_extended_steps = 100),
+    endgame_options = EndgameOptions(;
+        max_endgame_steps = 100,
+        max_endgame_extended_steps = 100,
+    ),
     threading::Bool = true,
-    seed = rand(UInt32)
-    )
+    seed = rand(UInt32),
+)
 
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
@@ -454,14 +468,18 @@ function regeneration!(F::System;
     c = length(f) # we can have witness sets of codimesion at most min(c,n)
     codim = min(c, n)
 
-    
+
     if show_progress
-        progress = WitnessSetsProgress(n, codim, PM.ProgressUnknown(
-            dt = 0.2,
-            desc = "Computing witness sets...",
-            enabled = true,
-            spinner = true,
-        ))
+        progress = WitnessSetsProgress(
+            n,
+            codim,
+            PM.ProgressUnknown(
+                dt = 0.2,
+                desc = "Computing witness sets...",
+                enabled = true,
+                spinner = true,
+            ),
+        )
     else
         progress = nothing
     end
@@ -518,11 +536,17 @@ function regeneration!(F::System;
                             # the next witness superset X is also passed to this function,
                             # because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
-                            intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u,
-                                                            endgame_options,
-                                                            tracker_options,
-                                                            progress, 
-                                                            seed)
+                            intersect_with_hypersurface!(
+                                W,
+                                X,
+                                Fᵢ,
+                                Hᵢ,
+                                u,
+                                endgame_options,
+                                tracker_options,
+                                progress,
+                                seed,
+                            )
                             update_progress!(progress, W)
                             update_progress!(progress, X)
                         end
@@ -537,14 +561,18 @@ function regeneration!(F::System;
                         if k > 1 && k <= i && degree(W) > 0
                             for j = 1:(k-1)
                                 X = out[j]
-                                    if degree(X) > 0
-                                        remove_points!(W, X, Fᵢ,
-                                                            endgame_options,
-                                                            tracker_options,
-                                                            progress,
-                                                            seed)
-                                        update_progress!(progress, W)
-                                    end
+                                if degree(X) > 0
+                                    remove_points!(
+                                        W,
+                                        X,
+                                        Fᵢ,
+                                        endgame_options,
+                                        tracker_options,
+                                        progress,
+                                        seed,
+                                    )
+                                    update_progress!(progress, W)
+                                end
                             end
                         end
                         update_progress!(progress, W)
@@ -552,20 +580,20 @@ function regeneration!(F::System;
                 end
 
             end
-            
+
 
         end
     end
     pop!(vars)
     finish_progress!(progress)
 
-    filter!(W -> degree(W)>0, out)
+    filter!(W -> degree(W) > 0, out)
 
     if !isempty(out)
         return map(out) do W
-                P, L = u_transform(W)
-                WitnessSet(fixed(F, compile = false), L, P)
-                end
+            P, L = u_transform(W)
+            WitnessSet(fixed(F, compile = false), L, P)
+        end
     else
         return Vector{WitnessSet}()
     end
@@ -593,32 +621,27 @@ Base.@kwdef mutable struct DecomposeProgress
     step::Int
     progress_meter::PM.ProgressUnknown
 end
-DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) = DecomposeProgress(
-    codim = codim,
-    current_dim = n - 1,
-    degrees = Dict{Int,Vector{Int}}(),
-    is_solving = false,
-    step = 0,
-    progress_meter = progress_meter
-)
+DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
+    DecomposeProgress(
+        codim = codim,
+        current_dim = n - 1,
+        degrees = Dict{Int,Vector{Int}}(),
+        is_solving = false,
+        step = 0,
+        progress_meter = progress_meter,
+    )
 update_progress_step!(progress::Nothing) = nothing
 function update_progress_step!(progress::DecomposeProgress)
     progress.step += 1
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 function update_progress!(progress::DecomposeProgress, d::Int)
     progress.is_solving = true
     progress.current_dim = d
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 function update_progress!(progress::DecomposeProgress)
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
 function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
@@ -633,11 +656,10 @@ function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
     end
     progress.is_solving = false
 
-    PM.update!(progress.progress_meter, 
-                    progress.step, 
-                    showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
-finish_progress!(progress::DecomposeProgress) = PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
+finish_progress!(progress::DecomposeProgress) =
+    PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
 function showstatus(progress::DecomposeProgress)
     text = [("Current status", "")]
     degs = progress.degrees
@@ -645,10 +667,7 @@ function showstatus(progress::DecomposeProgress)
     for key in k
         push!(
             text,
-            (
-                "Degrees of components of dim. $key",
-                "$(join(map(string, degs[key]), ','))",
-            ),
+            ("Degrees of components of dim. $key", "$(join(map(string, degs[key]), ','))"),
         )
     end
 
@@ -674,8 +693,8 @@ function decompose_with_monodromy!(
     options::MonodromyOptions,
     max_iters::Int,
     threading::Bool,
-    progress::Union{DecomposeProgress, Nothing},
-    seed
+    progress::Union{DecomposeProgress,Nothing},
+    seed,
 ) where {T1,T2}
 
 
@@ -694,12 +713,7 @@ function decompose_with_monodromy!(
 
     if dim(L) < n
 
-        MS = MonodromySolver(
-            G,
-            L;
-            compile = false,
-            options = options
-        )
+        MS = MonodromySolver(G, L; compile = false, options = options)
 
         non_complete_points = P
         non_complete_orbits = Vector{Set{Int}}()
@@ -713,9 +727,14 @@ function decompose_with_monodromy!(
                 break
             end
             # @show iter
-            res = monodromy_solve(MS, non_complete_points, L, seed; 
-                                    threading = threading,
-                                    show_progress = show_monodromy_progress)
+            res = monodromy_solve(
+                MS,
+                non_complete_points,
+                L,
+                seed;
+                threading = threading,
+                show_progress = show_monodromy_progress,
+            )
             if trace(res) > options.trace_test_tol
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
@@ -731,9 +750,14 @@ function decompose_with_monodromy!(
                 update_progress!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
-                res_orbit = monodromy_solve(MS, P_orbit, L, seed; 
-                                        threading = threading,
-                                        show_progress = show_monodromy_progress)
+                res_orbit = monodromy_solve(
+                    MS,
+                    P_orbit,
+                    L,
+                    seed;
+                    threading = threading,
+                    show_progress = show_monodromy_progress,
+                )
 
                 if trace(res_orbit) < options.trace_test_tol
                     push!(decomposition, WitnessSet(G, L, P_orbit))
@@ -910,23 +934,25 @@ end
 
 function decompose_with_monodromy_options(M::MonodromyOptions)
 
-    MonodromyOptions(; permutations = true,
-                trace_test = true, 
-                single_loop_per_start_solution = true,
-                check_startsolutions = M.check_startsolutions,
-                group_actions = M.group_actions,
-                loop_finished_callback = M.loop_finished_callback,
-                parameter_sampler = M.parameter_sampler,
-                equivalence_classes = M.equivalence_classes,
-                trace_test_tol = M.trace_test_tol,
-                target_solutions_count = M.target_solutions_count,
-                timeout = M.timeout,
-                min_solutions = M.min_solutions,
-                max_loops_no_progress = M.max_loops_no_progress,
-                reuse_loops = M.reuse_loops,
-                distance = M.distance,
-                unique_points_atol = M.unique_points_atol,
-                unique_points_rtol = M.unique_points_rtol)
+    MonodromyOptions(;
+        permutations = true,
+        trace_test = true,
+        single_loop_per_start_solution = true,
+        check_startsolutions = M.check_startsolutions,
+        group_actions = M.group_actions,
+        loop_finished_callback = M.loop_finished_callback,
+        parameter_sampler = M.parameter_sampler,
+        equivalence_classes = M.equivalence_classes,
+        trace_test_tol = M.trace_test_tol,
+        target_solutions_count = M.target_solutions_count,
+        timeout = M.timeout,
+        min_solutions = M.min_solutions,
+        max_loops_no_progress = M.max_loops_no_progress,
+        reuse_loops = M.reuse_loops,
+        distance = M.distance,
+        unique_points_atol = M.unique_points_atol,
+        unique_points_rtol = M.unique_points_rtol,
+    )
 end
 
 
@@ -961,16 +987,17 @@ Numerical irreducible decomposition with 2 components
 │     1     │        (2, 2)         │
 ╰───────────┴───────────────────────╯
 """
-function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{WitnessSet}};       
-                    show_progress::Bool = true,
-                    show_monodromy_progress::Bool = false,
-                    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
-                    max_iters::Int = 50,
-                    threading::Bool = true,
-                    seed = rand(UInt32)
-                    ) where {T1,T2,T3<:Number}
+function decompose(
+    Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
+    show_progress::Bool = true,
+    show_monodromy_progress::Bool = false,
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    max_iters::Int = 50,
+    threading::Bool = true,
+    seed = rand(UInt32),
+) where {T1,T2,T3<:Number}
 
-        
+
     options = decompose_with_monodromy_options(monodromy_options)
     out = Vector{WitnessSet}()
 
@@ -982,28 +1009,34 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
     n = ambient_dim(linear_subspace(Ws[1]))
 
     if show_progress
-        progress = DecomposeProgress(n, c, PM.ProgressUnknown(
-            dt = 0.2,
-            desc = "Decomposing $c witness sets",
-            enabled = true,
-            spinner = true,
-        ))
+        progress = DecomposeProgress(
+            n,
+            c,
+            PM.ProgressUnknown(
+                dt = 0.2,
+                desc = "Decomposing $c witness sets",
+                enabled = true,
+                spinner = true,
+            ),
+        )
     else
         progress = nothing
     end
-    
+
 
     for (i, W) in enumerate(Ws)
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
 
-            dec = decompose_with_monodromy!(W, 
-                                            show_monodromy_progress,
-                                            options,
-                                            max_iters,
-                                            threading,
-                                            progress, 
-                                            seed)
+            dec = decompose_with_monodromy!(
+                W,
+                show_monodromy_progress,
+                options,
+                max_iters,
+                threading,
+                progress,
+                seed,
+            )
             if !isnothing(dec)
                 append!(out, dec)
             end
@@ -1024,10 +1057,10 @@ decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
     NumericalIrreducibleDecomposition
 
 Store the witness sets in a common data structure.
-"""                                     
+"""
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
-    seed
+    seed::Any
 end
 function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
     D = Dict{Int,Vector{WitnessSet}}()
@@ -1127,7 +1160,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     end
     header = "\n Numerical irreducible decomposition with $total components"
     println(io, header)
-    
+
     mdim = max_dim(N)
     if mdim > 0
         for d = max_dim(N):-1:0
@@ -1223,17 +1256,32 @@ Numerical irreducible decomposition with 4 components
 ```
 
 """
-function numerical_irreducible_decomposition(F::System; 
+function numerical_irreducible_decomposition(
+    F::System;
     tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(; max_endgame_steps = 100,
-                                       max_endgame_extended_steps = 100),
+    endgame_options = EndgameOptions(;
+        max_endgame_steps = 100,
+        max_endgame_extended_steps = 100,
+    ),
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
-    kwargs...)
+    kwargs...,
+)
 
-    Ws = regeneration!(F; tracker_options=tracker_options, endgame_options= endgame_options, kwargs...)
-    decompose(Ws; monodromy_options=monodromy_options, max_iters=max_iters, show_monodromy_progress=show_monodromy_progress, kwargs...)
+    Ws = regeneration!(
+        F;
+        tracker_options = tracker_options,
+        endgame_options = endgame_options,
+        kwargs...,
+    )
+    decompose(
+        Ws;
+        monodromy_options = monodromy_options,
+        max_iters = max_iters,
+        show_monodromy_progress = show_monodromy_progress,
+        kwargs...,
+    )
 end
 """
     nid(F::System; options...)
