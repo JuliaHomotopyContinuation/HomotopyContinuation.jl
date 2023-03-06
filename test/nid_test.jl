@@ -39,7 +39,7 @@
         f = rand_poly(ComplexF64, x, 5)
         Hyp = System([f], variables = x)
 
-        N_Hyp = nid(Hyp)
+        N_Hyp = numerical_irreducible_decomposition(Hyp)
         @test degrees(N_Hyp) == Dict(3 => [5])
         @test n_components(N_Hyp) == 1
     end
