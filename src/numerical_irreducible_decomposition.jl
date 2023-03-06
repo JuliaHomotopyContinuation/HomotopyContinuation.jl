@@ -417,15 +417,15 @@ end
 """
     regeneration(F::System; options...) 
 
-A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
+A function that computes witness sets for the variety defined by `F=0` without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
 
 ### Options
 
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
-* `endgame_options`: Pass [`EndgameOptions`](@ref) to the [`EndgameTracker`](@ref).
-* `tracker_options`: Pass [`TrackerOptions`](@ref) to the [`Tracker`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `seed`: Choose the random seed.
 
 ### Example
@@ -438,7 +438,7 @@ julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
 julia> W = witness_sets([f])
 1-element Vector{WitnessSet}:
     Witness set for dimension 1 of degree 4  
-````          
+```         
 """
 regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}) = regeneration(System(F))
@@ -606,7 +606,6 @@ end
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 
 Does the same as [`regeneration`](@ref).
-```
 """
 witness_sets(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
 witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
@@ -964,7 +963,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 ### Options
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
-* `monodromy_options`: pass [`MonodromyOptions`](@ref) to the [`MonodromySolver`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `threading = true`: enables multiple threads.
 * `seed`: Choose the random seed.
@@ -986,6 +985,7 @@ Numerical irreducible decomposition with 2 components
 ├───────────┼───────────────────────┤
 │     1     │        (2, 2)         │
 ╰───────────┴───────────────────────╯
+```
 """
 function decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
@@ -1075,6 +1075,14 @@ function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
     NumericalIrreducibleDecomposition(D, seed)
 end
 
+"""
+    witness_sets(
+        N::NumericalIrreducibleDecomposition;
+        dims::Union{Vector{Int},Nothing} = nothing)
+
+Returns the witness sets in `N`. 
+`dims` specifies the dimensions that should be considered.
+"""
 function witness_sets(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
@@ -1096,6 +1104,14 @@ end
 witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N, [dim])
 seed(N::NumericalIrreducibleDecomposition) = N.seed
 
+"""
+    n_components(
+        N::NumericalIrreducibleDecomposition;
+        dims::Union{Vector{Int},Nothing} = nothing)
+
+Returns the total number of components in `N`. 
+`dims` specifies the dimensions that should be considered.
+"""
 function n_components(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
@@ -1116,6 +1132,16 @@ function n_components(
 end
 n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, [dim])
 
+"""
+
+    function degrees(
+        N::NumericalIrreducibleDecomposition;
+        dims::Union{Vector{Int},Nothing} = nothing)
+
+Returns the degrees of the components in `N`.
+`dims` specifies the dimensions that should be considered.
+
+"""
 function degrees(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
@@ -1219,9 +1245,9 @@ Computes the numerical irreducible of the variety defined by `F=0``.
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
-* `endgame_options`: Pass [`EndgameOptions`](@ref) to the [`EndgameTracker`](@ref).
-* `tracker_options`: Pass [`TrackerOptions`](@ref) to the [`Tracker`](@ref).
-* `monodromy_options`: pass [`MonodromyOptions`](@ref) to the [`MonodromySolver`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `threading = true`: enables multiple threads.
 * `seed`: Choose the random seed.
@@ -1254,7 +1280,6 @@ Numerical irreducible decomposition with 4 components
 │     0     │           8           │
 ╰───────────┴───────────────────────╯
 ```
-
 """
 function numerical_irreducible_decomposition(
     F::System;

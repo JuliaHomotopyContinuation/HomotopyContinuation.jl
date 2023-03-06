@@ -12,7 +12,7 @@ makedocs(
         ],
         "Solving Systems" => [
             "Solve (finitely many solutions)" => "solve.md",
-            "Witness Sets (infinitely many solutions)" => "witness_sets.md",
+            "Positive dimensional solution sets" => "witness_sets.md",
             "Monodromy" => "monodromy.md",
             "Results" => "result.md",
             "Certification" => "certification.md",
