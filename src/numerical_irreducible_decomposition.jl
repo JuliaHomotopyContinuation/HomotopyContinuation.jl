@@ -983,7 +983,7 @@ function decompose(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     threading::Bool = true,
-    seed = rand(UInt32),
+    seed = nothing,
 ) where {T1,T2,T3<:Number}
 
 
@@ -1187,7 +1187,6 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
         println(io, "\n degree table of components:")
         degree_table(io, N)
     end
-    println(io, "random seed: $(seed(N))")
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
