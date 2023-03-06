@@ -95,4 +95,5 @@ function ModelKit.evaluate_and_jacobian!(u, U, F::SlicedSystem, x, p = nothing)
     nothing
 end
 
-ModelKit.taylor!(u, v::Val, F::SlicedSystem, tx, p = nothing) = taylor!(u, v, F.system, tx, p)
+ModelKit.taylor!(u, v::Val, F::SlicedSystem, tx, p = nothing) =
+    taylor!(u, v, F.system, tx, p)
