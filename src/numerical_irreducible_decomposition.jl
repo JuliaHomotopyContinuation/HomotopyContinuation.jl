@@ -417,7 +417,8 @@ function regeneration!(F::System;
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(; max_endgame_steps = 100,
-                                       max_endgame_extended_steps = 100)
+                                       max_endgame_extended_steps = 100),
+    threading::Bool = true
     )
 
     # the algorithm is u-regeneration as proposed 
@@ -537,10 +538,16 @@ function regeneration!(F::System;
     finish_progress!(progress)
 
     filter!(W -> degree(W)>0, out)
-    map(out) do W
-        P, L = u_transform(W)
-        WitnessSet(fixed(F, compile = false), L, P)
+
+    if !isempty(out)
+        return map(out) do W
+                P, L = u_transform(W)
+                WitnessSet(fixed(F, compile = false), L, P)
+                end
+    else
+        return Vector{WitnessSet}()
     end
+
 end
 
 """
@@ -922,7 +929,7 @@ Numerical irreducible decomposition with 2 components
 │     1     │        (2, 2)         │
 ╰───────────┴───────────────────────╯
 """
-function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};       
+function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{WitnessSet}};       
                     show_progress::Bool = true,
                     show_monodromy_progress::Bool = false,
                     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
@@ -932,7 +939,12 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
 
         
     options = decompose_with_monodromy_options(monodromy_options)
-    
+    out = Vector{WitnessSet}()
+
+    if isempty(Ws)
+        return out
+    end
+
     c = length(Ws)
     n = ambient_dim(linear_subspace(Ws[1]))
 
@@ -948,7 +960,6 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
     end
     
 
-    out = Vector{WitnessSet}()
     for (i, W) in enumerate(Ws)
         if ModelKit.degree(W) > 0
             update_progress!(progress, n - i)
@@ -971,7 +982,7 @@ function decompose(Ws::Vector{WitnessSet{T1,T2, Vector{T3}}};
 
     NumericalIrreducibleDecomposition(out)
 end
-decompose(W::WitnessSet) = decompose([W])
+decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 
 
 
@@ -1048,9 +1059,11 @@ function degrees(
         end
     else
         out = Dict{Int,Vector{Int}}()
-        for k in dims
-            if haskey(D, k)
-                out[k] = degree.(D[k])
+        if !isempty(dims)
+            for k in dims
+                if haskey(D, k)
+                    out[k] = degree.(D[k])
+                end
             end
         end
     end
@@ -1151,17 +1164,16 @@ Numerical irreducible decomposition with 4 components
 
 """
 function numerical_irreducible_decomposition(F::System; 
-    sorted::Bool = true,
-    show_progress::Bool = true,
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(; max_endgame_steps = 100,
+                                       max_endgame_extended_steps = 100),
+    show_monodromy_progress::Bool = false,
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    max_iters::Int = 50,
     kwargs...)
 
-    Ws = regeneration!(F;
-                sorted = sorted,
-                show_progress = show_progress,
-                kwargs...)
-    decompose(Ws;
-                show_progress = show_progress,
-                kwargs...)
+    Ws = regeneration!(F; tracker_options=tracker_options, endgame_options= endgame_options, kwargs...)
+    decompose(Ws; monodromy_options=monodromy_options, max_iters=max_iters, show_monodromy_progress=show_monodromy_progress, kwargs...)
 end
 """
     nid(F::System; options...)
