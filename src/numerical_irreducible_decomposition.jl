@@ -1,4 +1,4 @@
-export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, regeneration, witness_sets, decompose, n_components, degrees
+export NumericalIrreducibleDecomposition, nid, numerical_irreducible_decomposition, regeneration, witness_sets, decompose, n_components, degrees, seed
 
 """
     WitnessPoints
@@ -645,7 +645,8 @@ end
         options::MonodromyOptions,
         max_iters::Int,
         threading::Bool,
-        progress::Union{DecomposeProgress, Nothing}) 
+        progress::Union{DecomposeProgress, Nothing},
+        seed::UInt32) 
 
 The core function for decomposing a witness set into irreducible components.
 """
@@ -655,7 +656,8 @@ function decompose_with_monodromy!(
     options::MonodromyOptions,
     max_iters::Int,
     threading::Bool,
-    progress::Union{DecomposeProgress, Nothing}
+    progress::Union{DecomposeProgress, Nothing},
+    seed::UInt32
 ) where {T1,T2}
     P = points(W)
     L = linear_subspace(W)
@@ -679,8 +681,6 @@ function decompose_with_monodromy!(
         non_complete_orbits = Vector{Set{Int}}()
 
         iter = 0
-
-        seed = 0x45625873
 
         while !isempty(non_complete_points)
             update_progress!(progress)
@@ -935,6 +935,7 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
                     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
                     max_iters::Int = 50,
                     threading::Bool = true,
+                    seed::UInt32 = rand(UInt32)
                     ) where {T1,T2,T3<:Number}
 
         
@@ -969,7 +970,8 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
                                             options,
                                             max_iters,
                                             threading,
-                                            progress)
+                                            progress, 
+                                            seed)
             if !isnothing(dec)
                 append!(out, dec)
             end
@@ -980,21 +982,22 @@ function decompose(Ws::Union{Vector{WitnessSet{T1,T2, Vector{T3}}}, Vector{Witne
     end
     finish_progress!(progress)
 
-    NumericalIrreducibleDecomposition(out)
+    NumericalIrreducibleDecomposition(out, seed)
 end
 decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 
 
 
 """
-    NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
+    NumericalIrreducibleDecomposition
 
 Store the witness sets in a common data structure.
 """                                     
 struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
+    seed::UInt32
 end
-function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
+function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed::UInt32)
     D = Dict{Int,Vector{WitnessSet}}()
     for W in Ws
         k = dim(W)
@@ -1004,7 +1007,7 @@ function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet})
             push!(D[k], W)
         end
     end
-    NumericalIrreducibleDecomposition(D)
+    NumericalIrreducibleDecomposition(D, seed)
 end
 
 function witness_sets(
@@ -1026,6 +1029,7 @@ function witness_sets(
     out
 end
 witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N, [dim])
+seed(N::NumericalIrreducibleDecomposition) = N.seed
 
 function n_components(
     N::NumericalIrreducibleDecomposition;
@@ -1093,6 +1097,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
 
     println(io, "\n degree table of components:")
     degree_table(io, N)
+    println(io, "seed: $(seed(N))")
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
