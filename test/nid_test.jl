@@ -10,9 +10,6 @@
             p * (z - 3) * (z - 5)
         ]
 
-        W = witness_sets(F)
-        @test degree.(W) == [2, 8, 8]
-
         W = regeneration(F)
         @test degree.(W) == [2, 8, 8]
 
@@ -52,9 +49,6 @@
         TwistedCubicSphere =
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
-        W_TwistedCubicSphere = witness_sets(TwistedCubicSphere)
-        @test degree.(W_TwistedCubicSphere) == [3]
-
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
         @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
         @test n_components(N_TwistedCubicSphere) == 1
@@ -67,9 +61,6 @@
         f = x * z + y
         g = y * z + x
         ThreeLines = System([f; g], variables = [x; y; z])
-
-        W_ThreeLines = witness_sets(ThreeLines)
-        @test degree.(W_ThreeLines) == [3]
 
         N_ThreeLines = nid(ThreeLines)
         @test degrees(N_ThreeLines) == Dict(1 => [1; 1; 1])

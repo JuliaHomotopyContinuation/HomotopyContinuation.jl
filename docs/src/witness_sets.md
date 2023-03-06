@@ -18,7 +18,6 @@ To compute witness sets for all possible dimensions use [`regeneration`](@ref) o
 
 ```@docs
 regeneration
-witness_sets
 ```
 
 Witness sets can be decomposed into [irreducible components](https://en.wikipedia.org/wiki/Irreducible_component) by using the [`decompose`](@ref) function.
@@ -46,7 +45,6 @@ NumericalIrreducibleDecomposition
 n_components
 witness_sets
 degrees
-seed
 ```
 
 

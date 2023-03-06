@@ -600,18 +600,6 @@ function regeneration!(
 
 end
 
-"""
-    witness_sets(F::System; options...) 
-
-A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
-
-Does the same as [`regeneration`](@ref).
-"""
-witness_sets(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
-witness_sets(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
-
-
-
 Base.@kwdef mutable struct DecomposeProgress
     codim::Int
     current_dim::Int
