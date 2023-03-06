@@ -133,6 +133,8 @@ function intersect_with_hypersurface!(
     F::AS,
     H::WitnessSet{T5,T6,Vector{ComplexF64}},
     u::Variable,
+    endgame_options::EndgameOptions,
+    tracker_options::TrackerOptions,
     progress::Union{WitnessSetsProgress, Nothing}
 ) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
 
@@ -146,7 +148,11 @@ function intersect_with_hypersurface!(
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained!(progress, W, H))
+    m = .!(is_contained!(W, H,
+                            endgame_options,
+                            tracker_options,
+                            progress)
+            )
     P_next = P[m]
     deleteat!(P, m)
     update_progress!(progress, W)
@@ -166,9 +172,11 @@ function intersect_with_hypersurface!(
     F₀ = slice(System([f; g0], variables=vars), L; compile=false) 
     G₀ = slice(System([f; g], variables=vars), K; compile=false)
     Hom = StraightLineHomotopy(F₀, G₀)
-    tracker = EndgameTracker(Hom)
+    tracker = EndgameTracker(Hom;
+                            tracker_options = tracker_options, 
+                            options = endgame_options)
 
-    # Previous unefficient code:
+    # Alternative code:
     #F₀ = System([f; g0; extrinsic(L).A * vars - extrinsic(L).b], variables = vars)
     #G₀ = System([f; g; extrinsic(K).A * vars - extrinsic(K).b], variables = vars)
     #Hom = StraightLineHomotopy(F₀, G₀; compile = false)
@@ -197,12 +205,17 @@ function intersect_with_hypersurface!(
 end
 
 function remove_points!(
-    progress::Union{WitnessSetsProgress, Nothing},
     W::WitnessPoints{T1,T2,Vector{ComplexF64}},
     V::WitnessPoints{T3,T4,Vector{ComplexF64}},
-    F::AS
+    F::AS,
+    endgame_options::EndgameOptions,
+    tracker_options::TrackerOptions,
+    progress::Union{WitnessSetsProgress, Nothing}
 ) where {T1,T2,T3,T4,AS<:AbstractSystem}
-    m = is_contained!(progress, W, V, F)
+    m = is_contained!(W, V, F,
+                        endgame_options,
+                        tracker_options,
+                        progress)
     deleteat!(W.R, m)
 
     nothing
@@ -210,15 +223,17 @@ end
 
 
 """
-    is_contained!(progress, X, Y, F)
+    is_contained!(X, Y, F, endgame_options, tracker_options, progress)
 
 Returns a boolean vector indicating whether the points of X are contained in the variety defined by (Y,F).
 """
 function is_contained!(
-    progress::Union{WitnessSetsProgress, Nothing},
     X::W₁,
     Y::W₂,
-    F::AS
+    F::AS,
+    endgame_options::EndgameOptions,
+    tracker_options::TrackerOptions,
+    progress::Union{WitnessSetsProgress, Nothing}
 ) where {
     W₁<:Union{WitnessPoints,WitnessSet},
     W₂<:Union{WitnessPoints,WitnessSet},
@@ -241,7 +256,9 @@ function is_contained!(
         # setup 
         P = points(Y)
         Hom = linear_subspace_homotopy(F, LY, LY)
-        tracker = EndgameTracker(Hom)
+        tracker = EndgameTracker(Hom;
+                            tracker_options = tracker_options, 
+                            options = endgame_options)
         U = UniquePoints(first(P), 0)
 
         # to compute linear spaces through the points in X we first set up
@@ -304,7 +321,15 @@ function is_contained!(
 
     out
 end
-is_contained!(progress::Union{WitnessSetsProgress, Nothing}, V::WitnessPoints, W::WitnessSet) = is_contained!(progress, V, W, system(W))
+function is_contained!(V::WitnessPoints, W::WitnessSet,
+                        endgame_options::EndgameOptions,
+                        tracker_options::TrackerOptions,
+                        progress::Union{WitnessSetsProgress, Nothing})
+    is_contained!(V, W, system(W), 
+                    endgame_options,
+                    tracker_options,
+                    progress)
+end
 
 function initialize_linear_equations(n::Int)
     A₀ = randn(ComplexF64, n - 1, n)
@@ -365,9 +390,7 @@ end
 
 
 """
-    regeneration(F::System; 
-                sorted::Bool = true,
-                show_progress::Bool = true) 
+    regeneration(F::System; options...) 
 
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
@@ -391,7 +414,11 @@ regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}) = regeneration(System(F))
 function regeneration!(F::System; 
     sorted::Bool = true,
-    show_progress::Bool = true)
+    show_progress::Bool = true,
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(; max_endgame_steps = 100,
+                                       max_endgame_extended_steps = 100)
+    )
 
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
@@ -434,6 +461,7 @@ function regeneration!(F::System;
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
+
     update_progress!(progress)
 
     # now comes the core loop of the algorithm.
@@ -469,7 +497,10 @@ function regeneration!(F::System;
                             # the next witness superset X is also passed to this function,
                             # because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
-                            intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u, progress)
+                            intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u,
+                                                            endgame_options,
+                                                            tracker_options,
+                                                            progress)
                             update_progress!(progress, W)
                             update_progress!(progress, X)
                         end
@@ -485,7 +516,10 @@ function regeneration!(F::System;
                             for j = 1:(k-1)
                                 X = out[j]
                                     if degree(X) > 0
-                                        remove_points!(progress, W, X, Fᵢ)
+                                        remove_points!(W, X, Fᵢ,
+                                                            endgame_options,
+                                                            tracker_options,
+                                                            progress)
                                         update_progress!(progress, W)
                                     end
                             end
@@ -510,9 +544,7 @@ function regeneration!(F::System;
 end
 
 """
-    witness_sets(F::System; 
-                sorted::Bool = true,
-                show_progress::Bool = true) 
+    witness_sets(F::System; options...) 
 
 A function that computes witness sets for the variety defined by F=0 without decomposing them into irreducible components (witness sets that are not decomposed are also called witness supersets).
 The implementation is based on the algorithm u-regeneration by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869. 
@@ -848,7 +880,7 @@ function showstatus(progress::DecomposeProgress)
 end
 
 """
-    decompose(Ws::Vector{WitnessPoints}) 
+    decompose(Ws::Vector{WitnessPoints}; options...) 
 
 Calls [`decompose`](@ref) on the vector of witness points Ws.
 
@@ -1048,9 +1080,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
 end
 
 """
-    numerical_irreducible_decomposition(F::System
-                                sorted::Bool = true,
-                                show_progress::Bool = true)
+    numerical_irreducible_decomposition(F::System; options...)
 
 Computes the numerical irreducible of the variety defined by F=0. 
 
@@ -1089,16 +1119,19 @@ Numerical irreducible decomposition with 4 components
 """
 function numerical_irreducible_decomposition(F::System; 
     sorted::Bool = true,
-    show_progress::Bool = true)
+    show_progress::Bool = true,
+    kwargs...)
 
     Ws = regeneration!(F;
                 sorted = sorted,
-                show_progress = show_progress)
+                show_progress = show_progress,
+                kwargs...)
     decompose(Ws;
-                show_progress = show_progress)
+                show_progress = show_progress,
+                kwargs...)
 end
 """
-    nid(F::System; kwargs...)
+    nid(F::System; options...)
 
 Calls [`numerical_irreducible_decomposition`](@ref).
 
