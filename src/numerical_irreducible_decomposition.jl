@@ -135,8 +135,11 @@ function intersect_with_hypersurface!(
     u::Variable,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing}
+    progress::Union{WitnessSetsProgress, Nothing},
+    seed::UInt32
 ) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
+
+    !isnothing(seed) && Random.seed!(seed)
 
     P = points(W)
     vars = variables(F)
@@ -210,12 +213,14 @@ function remove_points!(
     F::AS,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing}
+    progress::Union{WitnessSetsProgress, Nothing},
+    seed::UInt32
 ) where {T1,T2,T3,T4,AS<:AbstractSystem}
     m = is_contained!(W, V, F,
                         endgame_options,
                         tracker_options,
-                        progress)
+                        progress,
+                        seed)
     deleteat!(W.R, m)
 
     nothing
@@ -233,12 +238,15 @@ function is_contained!(
     F::AS,
     endgame_options::EndgameOptions,
     tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress, Nothing}
+    progress::Union{WitnessSetsProgress, Nothing},
+    seed::UInt32
 ) where {
     W₁<:Union{WitnessPoints,WitnessSet},
     W₂<:Union{WitnessPoints,WitnessSet},
     AS<:AbstractSystem,
 }
+
+    !isnothing(seed) && Random.seed!(seed)
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
 
@@ -324,14 +332,19 @@ end
 function is_contained!(V::WitnessPoints, W::WitnessSet,
                         endgame_options::EndgameOptions,
                         tracker_options::TrackerOptions,
-                        progress::Union{WitnessSetsProgress, Nothing})
+                        progress::Union{WitnessSetsProgress, Nothing},
+                        seed::UInt32)
     is_contained!(V, W, system(W), 
                     endgame_options,
                     tracker_options,
-                    progress)
+                    progress,
+                    seed)
 end
 
-function initialize_linear_equations(n::Int)
+function initialize_linear_equations(n::Int, seed::UInt32)
+
+    !isnothing(seed) && Random.seed!(seed)
+
     A₀ = randn(ComplexF64, n - 1, n)
     b₀ = randn(ComplexF64, n - 1)
     svd = LA.svd(A₀) # we orthogonalize A
@@ -418,7 +431,8 @@ function regeneration!(F::System;
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(; max_endgame_steps = 100,
                                        max_endgame_extended_steps = 100),
-    threading::Bool = true
+    threading::Bool = true,
+    seed::UInt32 = rand(UInt32)
     )
 
     # the algorithm is u-regeneration as proposed 
@@ -451,7 +465,7 @@ function regeneration!(F::System;
     push!(vars, u)
 
     # initialize the linear equations for witness sets
-    A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
+    A, b, Aᵤ, bᵤ = initialize_linear_equations(n, seed)
 
     # prepare c witness sets for the output
     # internally we represent a witness superset by WitnessPoints
@@ -501,7 +515,8 @@ function regeneration!(F::System;
                             intersect_with_hypersurface!(W, X, Fᵢ, Hᵢ, u,
                                                             endgame_options,
                                                             tracker_options,
-                                                            progress)
+                                                            progress, 
+                                                            seed)
                             update_progress!(progress, W)
                             update_progress!(progress, X)
                         end
@@ -520,7 +535,8 @@ function regeneration!(F::System;
                                         remove_points!(W, X, Fᵢ,
                                                             endgame_options,
                                                             tracker_options,
-                                                            progress)
+                                                            progress,
+                                                            seed)
                                         update_progress!(progress, W)
                                     end
                             end
