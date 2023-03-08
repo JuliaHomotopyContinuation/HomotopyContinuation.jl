@@ -25,7 +25,7 @@ Options controlling the behaviour of a [`EndgameTracker`](@ref).
   coordinates is zero should also be considered diverging.
 
 ### Parameters
-These parameters control the behaviour during the endgame. See [^BT20] for details.
+These parameters control the behaviour during the endgame.
 
 * `max_endgame_steps = 2000`: The maximal number of steps performed during the endgame.
 * `max_winding_number = 6`: The maximal winding number which is attempted in the
@@ -38,10 +38,9 @@ These parameters control the behaviour during the endgame. See [^BT20] for detai
   to be considered going to infininity (resp. zero).
 * `val_at_infinity_tol = 1e-3`: Tolerance on the valuation which has to be
   satisfied before a path is considered to diverge / go to infinity.
-* `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied
-  before the Cauchy endgame is started.
-
-[^BT20]: Breiding, P. and Timme, S. "Tropical Endgame", In preparation (2020)
+* `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the Cauchy endgame is started.
+* `sing_cond = 1e14`: value for the condition number above which a solution is considered singular.
+* `sing_accuracy = 1e-12`: value for the accuracy number above which a solution is considered singular.
 """
 Base.@kwdef mutable struct EndgameOptions
     endgame_start::Float64 = 0.1
@@ -54,13 +53,16 @@ Base.@kwdef mutable struct EndgameOptions
     zero_is_at_infinity::Bool = false
     at_infinity_check::Bool = true
     only_nonsingular::Bool = false
+    singular_min_accuracy::Float64 = 1e-6
+    max_winding_number::Int = 6
+
     # valuation etc
     val_finite_tol::Float64 = 0.05
     val_at_infinity_tol::Float64 = 0.01
 
     # singular solutions parameters
-    max_winding_number::Int = 6
-    singular_min_accuracy::Float64 = 1e-6
+    sing_cond::Float64 = 1e14
+    sing_accuracy::Float64 = 1e-12    
 end
 
 Base.show(io::IO, opts::EndgameOptions) = print_fieldnames(io, opts)
@@ -222,11 +224,8 @@ while a [`Tracker`](@ref) assumes that the solution path is non-singular and con
 allows to handle singular endpoints as well as diverging paths.
 To compute singular solutions the *Cauchy endgame* used, for divering paths a strategy
 based on the valuation of local Puiseux series expansion of the path is used.
-See [^BT20] for a detailed description.
 By convention, a `EndgameTracker` always tracks from ``t=1`` to ``t = 0``.
 See [`EndgameOptions`](@ref) for the possible options.
-
-[^BT20]: Breiding, P. and Timme, S. "Tropical Endgame", In preparation (2020)
 """
 struct EndgameTracker{H<:AbstractHomotopy,M<:AbstractMatrix{ComplexF64}} <:
        AbstractPathTracker
@@ -332,7 +331,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
         # check if we had previously a singular solution attempt and return this
         if all(!isnan, state.solution) &&
            !isnothing(state.winding_number) &&
-           state.accuracy < 1e-5
+           state.accuracy < options.singular_min_accuracy
             state.cond =
                 LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
             state.singular = true
@@ -704,7 +703,10 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
         )
         state.cond =
             LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
-        state.singular = state.cond > 1e14 || state.accuracy > 1e-12
+        state.singular = state.cond > options.sing_cond || state.accuracy > options.sing_accuracy
+        # if !isnothing(state.winding_number)
+        #     state.singular = state.singular || state.winding_number > 1
+        # end
     end
 end
 
