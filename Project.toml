@@ -1,6 +1,6 @@
 name = "HomotopyContinuation"
 uuid = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
-authors = ["Sascha Timme <sascha@timme.xyz>", "Paul Breiding <p.breiding@tu-berlin.de>"]
+authors = ["Sascha Timme <sascha@timme.xyz>", "Paul Breiding <pbrdng@gmail.com>"]
 version = "2.7.1"
 
 [deps]
