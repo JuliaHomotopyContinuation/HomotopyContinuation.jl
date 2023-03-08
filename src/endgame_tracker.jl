@@ -41,6 +41,7 @@ These parameters control the behaviour during the endgame.
 * `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the Cauchy endgame is started.
 * `sing_cond = 1e14`: value for the condition number above which a solution is considered singular.
 * `sing_accuracy = 1e-12`: value for the accuracy number above which a solution is considered singular.
+* `refine_steps = 3`: number of steps for refining solutions at the end.
 """
 Base.@kwdef mutable struct EndgameOptions
     endgame_start::Float64 = 0.1
@@ -62,7 +63,10 @@ Base.@kwdef mutable struct EndgameOptions
 
     # singular solutions parameters
     sing_cond::Float64 = 1e14
-    sing_accuracy::Float64 = 1e-12    
+    sing_accuracy::Float64 = 1e-12
+    
+    # refinement parameters
+    refine_steps::Int = 3
 end
 
 Base.show(io::IO, opts::EndgameOptions) = print_fieldnames(io, opts)
@@ -689,7 +693,7 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
 
     state.accuracy = tracker.state.accuracy
     if is_success(state.code) && state.accuracy > 1e-14
-        refine_current_solution!(tracker; min_tol = 1e-14)
+        refine_current_solution!(tracker; min_tol = 1e-14, nsteps = options.refine_steps)
     end
     state.solution .= tracker.state.x
     state.winding_number = nothing
