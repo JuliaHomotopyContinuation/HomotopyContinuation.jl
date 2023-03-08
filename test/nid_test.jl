@@ -22,6 +22,9 @@
         N = nid(F; seed = nothing)
         @test isa(N, NumericalIrreducibleDecomposition)
 
+        N = nid(F; sorted = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
         N = nid(F; show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
         N = nid(F; show_monodromy_progress = true)

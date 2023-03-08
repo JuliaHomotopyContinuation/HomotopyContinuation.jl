@@ -1272,6 +1272,7 @@ function numerical_irreducible_decomposition(
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
+    sorted::Bool = true,
     kwargs...,
 )
 
@@ -1279,6 +1280,7 @@ function numerical_irreducible_decomposition(
         F;
         tracker_options = tracker_options,
         endgame_options = endgame_options,
+        sorted = sorted,
         kwargs...,
     )
     decompose(
