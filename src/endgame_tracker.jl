@@ -64,7 +64,7 @@ Base.@kwdef mutable struct EndgameOptions
     # singular solutions parameters
     sing_cond::Float64 = 1e14
     sing_accuracy::Float64 = 1e-12
-    
+
     # refinement parameters
     refine_steps::Int = 3
 end
@@ -707,7 +707,8 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
         )
         state.cond =
             LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
-        state.singular = state.cond > options.sing_cond || state.accuracy > options.sing_accuracy
+        state.singular =
+            state.cond > options.sing_cond || state.accuracy > options.sing_accuracy
         # if !isnothing(state.winding_number)
         #     state.singular = state.singular || state.winding_number > 1
         # end
