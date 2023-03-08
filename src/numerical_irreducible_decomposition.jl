@@ -441,7 +441,7 @@ julia> W = regeneration([f])
 ```         
 """
 regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
-regeneration(F::Vector{Expression}) = regeneration(System(F))
+regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 function regeneration!(
     F::System;
     sorted::Bool = true,
