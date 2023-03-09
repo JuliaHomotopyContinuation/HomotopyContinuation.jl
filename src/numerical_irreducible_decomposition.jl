@@ -1194,7 +1194,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
     n = length(k)
 
     headers = ["dimension", "degrees of components"]
-    data = Matrix{Union{Int, String}}(undef, n, 2)
+    data = Matrix{Union{Int,String}}(undef, n, 2)
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
@@ -1203,7 +1203,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
             data[i, 2] = first(components)
         elseif length(components) <= 10
             data[i, 2] = string(components)
-        else 
+        else
             s = string(components[1:10])
             data[i, 2] = string("(", s[2:end-1], ", ...)")
         end
