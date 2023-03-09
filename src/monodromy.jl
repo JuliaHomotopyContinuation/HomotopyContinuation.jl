@@ -374,10 +374,13 @@ and `permutations(S, reduced = false)` returns
 """
 function permutations(r::MonodromyResult; reduced::Bool = true)
     π = r.statistics.permutations
+    N = nresults(r)
+
+    π = filter(πⱼ -> length(πⱼ) == N, π)
     if reduced
         π = unique(π)
     end
-    N = nresults(r)
+
     A = zeros(Int, N, length(π))
     for (j, πⱼ) in enumerate(π), i = 1:N
         A[i, j] = πⱼ[i]

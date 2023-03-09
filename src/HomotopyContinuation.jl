@@ -15,6 +15,7 @@ import MultivariatePolynomials
 const MP = MultivariatePolynomials
 using Parameters: @unpack
 import ProgressMeter
+const PM = ProgressMeter
 import Random
 import Printf
 import PrettyTables
@@ -22,6 +23,8 @@ using Reexport: @reexport
 import SemialgebraicSets
 import StructArrays
 import TreeViews
+import Base.Iterators: product, reverse
+import Base: push!
 
 const LA = LinearAlgebra
 
@@ -78,6 +81,7 @@ include("monodromy.jl")
 include("witness_set.jl")
 include("certification.jl")
 include("semialgebraic_sets.jl")
+include("numerical_irreducible_decomposition.jl")
 
 function __init__()
     # Overwrite default IJulia behaviour. See
