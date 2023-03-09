@@ -62,7 +62,7 @@
         #     result = monodromy_solve(F, [rand(6) for _ = 1:10], p₀)
         # )
         # @test result.returncode == :invalid_startvalue
-        
+
         result =
             monodromy_solve(F.expressions, [x₀, rand(6)], p₀, parameters = F.parameters)
         @test length(solutions(result)) == 21
