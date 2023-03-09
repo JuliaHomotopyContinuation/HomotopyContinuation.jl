@@ -679,6 +679,7 @@ function decompose_with_monodromy!(
     show_monodromy_progress::Bool,
     options::MonodromyOptions,
     max_iters::Int,
+    warning::Bool,
     threading::Bool,
     progress::Union{DecomposeProgress,Nothing},
     seed,
@@ -722,7 +723,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
-            if trace(res) > options.trace_test_tol
+            if warning && (trace(res) > options.trace_test_tol)
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
 
@@ -953,8 +954,10 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
 * `seed`: choose the random seed.
+
 
 ### Example
 The following example decomposes the witness set for a union of two circles.
@@ -981,6 +984,7 @@ function decompose(
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
+    warning::Bool = true,
     threading::Bool = true,
     seed = nothing,
 ) where {T1,T2,T3<:Number}
@@ -1021,6 +1025,7 @@ function decompose(
                 show_monodromy_progress,
                 options,
                 max_iters,
+                warning,
                 threading,
                 progress,
                 seed,
@@ -1235,6 +1240,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
 * `seed`: choose the random seed.
 
@@ -1275,6 +1281,7 @@ function numerical_irreducible_decomposition(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     sorted::Bool = true,
+    warning::Bool = true,
     kwargs...,
 )
 
@@ -1290,6 +1297,7 @@ function numerical_irreducible_decomposition(
         monodromy_options = monodromy_options,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
+        warning,
         kwargs...,
     )
 end

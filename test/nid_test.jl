@@ -16,25 +16,36 @@
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 
+        # seed
         s = rand(UInt32)
         N = nid(F; seed = s)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        @test seed(N) == s
+
         N = nid(F; seed = nothing)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        @test isnothing(seed(N))
 
-        N = nid(F; sorted = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
-
+        # progress
         N = nid(F; show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
+
         N = nid(F; show_monodromy_progress = true)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        N = nid(F; warning = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        # options
+        N = nid(F; sorted = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
         @test isempty(witness_sets(N_fails))
 
-        N2 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
+        N2 = nid(F; tracker_options = TrackerOptions(; extended_precision = false))
         @test isa(N2, NumericalIrreducibleDecomposition)
+
+        N3 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
+        @test isa(N3, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
@@ -176,5 +187,71 @@
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
         @test n_components(N_Bricard6R) == 1
+    end
+
+    @testset "426" begin
+        ### Example thanks to Julian Vill
+        @var a, b, c, d, e
+
+
+        f1 =
+            -18 * a^4 * c^5 + 27 * a^3 * b * c^5 - 9 * a^2 * b^2 * c^5 - 18 * a^4 * c^4 +
+            81 * a^3 * b * c^4 - 90 * a^2 * b^2 * c^4 + 27 * a * b^3 * c^4 - 9 * a^2 * c^6 +
+            c^8 - 18 * a^4 * c^3 + 81 * a^3 * b * c^3 - 126 * a^2 * b^2 * c^3 +
+            81 * a * b^3 * c^3 - 18 * b^4 * c^3 + 36 * a * b * c^5 - 9 * b^2 * c^5 +
+            c^7 +
+            27 * a^3 * b * c^2 - 90 * a^2 * b^2 * c^2 + 81 * a * b^3 * c^2 -
+            18 * b^4 * c^2 + 18 * a^2 * c^4 - 36 * a * b * c^4 - 8 * c^6 -
+            9 * a^2 * b^2 * c + 27 * a * b^3 * c - 18 * b^4 * c - 36 * a * b * c^3 +
+            18 * b^2 * c^3 +
+            7 * c^5 - 9 * a^2 * c^2 + 36 * a * b * c^2 - 2 * c^4 - 9 * b^2 * c + 7 * c^3 -
+            8 * c^2 +
+            c +
+            1
+
+        f2 =
+            -18 * a^4 * e^5 + 27 * a^3 * d * e^5 - 9 * a^2 * d^2 * e^5 - 18 * a^4 * e^4 +
+            81 * a^3 * d * e^4 - 90 * a^2 * d^2 * e^4 + 27 * a * d^3 * e^4 - 9 * a^2 * e^6 +
+            e^8 - 18 * a^4 * e^3 + 81 * a^3 * d * e^3 - 126 * a^2 * d^2 * e^3 +
+            81 * a * d^3 * e^3 - 18 * d^4 * e^3 + 36 * a * d * e^5 - 9 * d^2 * e^5 +
+            e^7 +
+            27 * a^3 * d * e^2 - 90 * a^2 * d^2 * e^2 + 81 * a * d^3 * e^2 -
+            18 * d^4 * e^2 + 18 * a^2 * e^4 - 36 * a * d * e^4 - 8 * e^6 -
+            9 * a^2 * d^2 * e + 27 * a * d^3 * e - 18 * d^4 * e - 36 * a * d * e^3 +
+            18 * d^2 * e^3 +
+            7 * e^5 - 9 * a^2 * e^2 + 36 * a * d * e^2 - 2 * e^4 - 9 * d^2 * e + 7 * e^3 -
+            8 * e^2 +
+            e +
+            1
+
+        f3 =
+            -9 * b^2 * c^5 * d^2 * e + 27 * b * c^5 * d^3 * e - 18 * c^5 * d^4 * e +
+            27 * b^3 * c^4 * d * e^2 - 90 * b^2 * c^4 * d^2 * e^2 +
+            81 * b * c^4 * d^3 * e^2 - 18 * c^4 * d^4 * e^2 - 18 * b^4 * c^3 * e^3 +
+            81 * b^3 * c^3 * d * e^3 - 126 * b^2 * c^3 * d^2 * e^3 +
+            81 * b * c^3 * d^3 * e^3 - 18 * c^3 * d^4 * e^3 - 18 * b^4 * c^2 * e^4 +
+            81 * b^3 * c^2 * d * e^4 - 90 * b^2 * c^2 * d^2 * e^4 +
+            27 * b * c^2 * d^3 * e^4 - 18 * b^4 * c * e^5 + 27 * b^3 * c * d * e^5 -
+            9 * b^2 * c * d^2 * e^5 - 9 * c^6 * d^2 * e - 9 * b^2 * c^5 * e^2 +
+            36 * b * c^5 * d * e^2 - 36 * b * c^4 * d * e^3 +
+            18 * c^4 * d^2 * e^3 +
+            18 * b^2 * c^3 * e^4 - 36 * b * c^3 * d * e^4 + 36 * b * c^2 * d * e^5 -
+            9 * c^2 * d^2 * e^5 - 9 * b^2 * c * e^6 +
+            c^8 +
+            c^7 * e - 8 * c^6 * e^2 + 7 * c^5 * e^3 - 2 * c^4 * e^4 + 7 * c^3 * e^5 -
+            8 * c^2 * e^6 +
+            c * e^7 +
+            e^8
+
+        F = System([f1; f2; f3], variables = [a, b, c, d, e])
+
+        N = nid(
+            F;
+            seed = 0xc7cca254,
+            endgame_options = EndgameOptions(; sing_accuracy = 1e-10),
+        )
+
+        @test n_components(N) == 1
+        @test degrees(N) == Dict(2 => [426])
     end
 end
