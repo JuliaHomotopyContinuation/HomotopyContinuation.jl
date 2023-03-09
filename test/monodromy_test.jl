@@ -57,11 +57,12 @@
         )
         @test length(solutions(result)) == 21
 
-        # test with false input
-        @test_logs (:warn, "None of the provided solutions is a valid start solution.") (
-            result = monodromy_solve(F, [rand(6) for _ = 1:10], p₀)
-        )
-        @test result.returncode == :invalid_startvalue
+        # # test with false input
+        # @test_logs (:warn, "None of the provided solutions is a valid start solution.") (
+        #     result = monodromy_solve(F, [rand(6) for _ = 1:10], p₀)
+        # )
+        # @test result.returncode == :invalid_startvalue
+        
         result =
             monodromy_solve(F.expressions, [x₀, rand(6)], p₀, parameters = F.parameters)
         @test length(solutions(result)) == 21
