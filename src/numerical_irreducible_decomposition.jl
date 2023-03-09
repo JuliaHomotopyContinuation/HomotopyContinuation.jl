@@ -1232,7 +1232,6 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 
 ### Options
 
-
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 

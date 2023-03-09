@@ -28,8 +28,7 @@ Options controlling the behaviour of a [`EndgameTracker`](@ref).
 These parameters control the behaviour during the endgame.
 
 * `max_endgame_steps = 2000`: The maximal number of steps performed during the endgame.
-* `max_winding_number = 6`: The maximal winding number which is attempted in the
- Cauchy endgame.
+* `max_winding_number = 6`: The maximal winding number which is attempted in the Cauchy endgame.
 * `min_cond = 1e6`: The minimal condition number after which an endgame strategy is
   considered to be applied.
 * `min_cond_growth = 1e4`: The minimal condition number growth after which an
@@ -38,7 +37,7 @@ These parameters control the behaviour during the endgame.
   to be considered going to infininity (resp. zero).
 * `val_at_infinity_tol = 1e-3`: Tolerance on the valuation which has to be
   satisfied before a path is considered to diverge / go to infinity.
-* `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the Cauchy endgame is started.
+* `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the endgame is started.
 * `sing_cond = 1e14`: value for the condition number above which a solution is considered singular.
 * `sing_accuracy = 1e-12`: value for the accuracy number above which a solution is considered singular.
 * `refine_steps = 3`: number of steps for refining solutions at the end.
