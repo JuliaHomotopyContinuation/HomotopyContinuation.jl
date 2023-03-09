@@ -952,7 +952,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 ### Options
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
-* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
@@ -1237,7 +1237,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
-* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
