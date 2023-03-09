@@ -450,6 +450,7 @@ function regeneration!(
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
+        sing_accuracy = 1e-10,
     ),
     threading::Bool = true,
     seed = rand(UInt32),
@@ -1275,6 +1276,7 @@ function numerical_irreducible_decomposition(
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
+        sing_accuracy = 1e-10,
     ),
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
