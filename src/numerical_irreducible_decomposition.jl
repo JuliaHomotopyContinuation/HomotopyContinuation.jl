@@ -1273,7 +1273,6 @@ Numerical irreducible decomposition with 4 components
 """
 function numerical_irreducible_decomposition(
     F::System;
-    sorted::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
@@ -1293,7 +1292,6 @@ function numerical_irreducible_decomposition(
         sorted = sorted,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
-        sorted = sorted,
         kwargs...,
     )
     decompose(
@@ -1301,7 +1299,7 @@ function numerical_irreducible_decomposition(
         monodromy_options = monodromy_options,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
-        warning,
+        warning = warning,
         kwargs...,
     )
 end
