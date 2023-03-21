@@ -71,9 +71,11 @@ WitnessSetsProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
         current_npaths = 0,
         progress_meter = progress_meter,
     )
-update_progress!(progress::Nothing) = nothing
-function update_progress!(progress::WitnessSetsProgress)
+update_progress!(progress::Nothing, is_solving::Bool) = nothing
+function update_progress!(progress::WitnessSetsProgress, is_solving::Bool)
     progress.is_computing_hypersurfaces = false
+    progress.is_solving = is_solving
+    progress.is_removing_points = !is_solving
 end
 update_progress!(progress::Nothing, i::Int) = nothing
 function update_progress!(progress::WitnessSetsProgress, i::Int)
@@ -86,8 +88,6 @@ function update_progress!(progress::WitnessSetsProgress, i::Int)
 end
 update_progress!(progress::Nothing, i::Int, m::Int) = nothing
 function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
-    progress.is_solving = true
-    progress.is_removing_points = false
     progress.current_path = i
     progress.current_npaths = m
     PM.update!(
@@ -98,8 +98,6 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
 end
 update_progress!(progress::Nothing, W::WitnessPoints) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
-    progress.is_solving = false
-    progress.is_removing_points = true
     progress.degrees[codim(W)] = length(points(W))
     PM.update!(
         progress.progress_meter,
@@ -502,7 +500,7 @@ function regeneration!(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
 
-    update_progress!(progress)
+    update_progress!(progress, true)
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -530,6 +528,7 @@ function regeneration!(
                     # we enumerate reversely, so that we can add points to witness sets that we have already
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
+                    update_progress!(progress, true)
                     for (k, W) in reverse(E) # k = codim(W) for W in Ws
                         if k < min(i, n)
                             X = out[k+1]
@@ -558,6 +557,7 @@ function regeneration!(
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
+                    update_progress!(progress, false)
                     for (k, W) in E # k = codim(W) for W in Ws
                         if k > 1 && k <= i && degree(W) > 0
                             for j = 1:(k-1)
