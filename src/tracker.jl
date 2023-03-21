@@ -800,7 +800,7 @@ function use_extended_precision!(tracker::Tracker)
     state.μ
 end
 
-function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps())
+function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps(), nsteps = 3)
     @unpack homotopy, corrector, state, options = tracker
     @unpack x, x̄, t, jacobian, norm = state
 
@@ -820,7 +820,7 @@ function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps())
         μ = μ̄
     end
     k = 1
-    while (μ > min_tol && k ≤ 3)
+    while (μ > min_tol && k ≤ nsteps)
         μ̄ = extended_prec_refinement_step!(x̄, corrector, homotopy, x, t, jacobian, norm)
         if μ̄ < μ
             x .= x̄

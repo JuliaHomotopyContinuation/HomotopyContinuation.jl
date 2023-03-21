@@ -5,7 +5,6 @@ export NumericalIrreducibleDecomposition,
     witness_sets,
     decompose,
     n_components,
-    degrees,
     seed
 
 """
@@ -450,6 +449,7 @@ function regeneration!(
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
+        sing_accuracy = 1e-10,
     ),
     threading::Bool = true,
     seed = rand(UInt32),
@@ -681,6 +681,7 @@ function decompose_with_monodromy!(
     show_monodromy_progress::Bool,
     options::MonodromyOptions,
     max_iters::Int,
+    warning::Bool,
     threading::Bool,
     progress::Union{DecomposeProgress,Nothing},
     seed,
@@ -724,7 +725,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
-            if trace(res) > options.trace_test_tol
+            if warning && (trace(res) > options.trace_test_tol)
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
 
@@ -953,10 +954,12 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 ### Options
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
-* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
 * `seed`: choose the random seed.
+
 
 ### Example
 The following example decomposes the witness set for a union of two circles.
@@ -983,8 +986,9 @@ function decompose(
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
+    warning::Bool = true,
     threading::Bool = true,
-    seed = rand(UInt32),
+    seed = nothing,
 ) where {T1,T2,T3<:Number}
 
 
@@ -1023,6 +1027,7 @@ function decompose(
                 show_monodromy_progress,
                 options,
                 max_iters,
+                warning,
                 threading,
                 progress,
                 seed,
@@ -1129,7 +1134,7 @@ Returns the degrees of the components in `N`.
 `dims` specifies the dimensions that should be considered.
 
 """
-function degrees(
+function ModelKit.degrees(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
 )
@@ -1152,7 +1157,7 @@ function degrees(
 
     out
 end
-degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
+ModelKit.degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
 
 function max_dim(N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
@@ -1188,7 +1193,6 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
         println(io, "\n degree table of components:")
         degree_table(io, N)
     end
-    println(io, "random seed: $(seed(N))")
 end
 function degree_table(io, N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
@@ -1197,16 +1201,18 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
     n = length(k)
 
     headers = ["dimension", "degrees of components"]
-    data = Matrix{Union{Int,Tuple}}(undef, n, 2)
-
+    data = Matrix{Union{Int,String}}(undef, n, 2)
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
         components = Tuple(ModelKit.degree(W) for W in D[key])
         if length(components) == 1
             data[i, 2] = first(components)
+        elseif length(components) <= 10
+            data[i, 2] = string(components)
         else
-            data[i, 2] = components
+            s = string(components[1:10])
+            data[i, 2] = string("(", s[2:end-1], ", ...)")
         end
     end
 
@@ -1228,14 +1234,14 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 
 ### Options
 
-
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
-* `monodromy_options`: [`MonodromyOptions`](@ref) for the [`MonodromySolver`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads.
 * `seed`: choose the random seed.
 
@@ -1272,10 +1278,13 @@ function numerical_irreducible_decomposition(
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
+        sing_accuracy = 1e-10,
     ),
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
+    sorted::Bool = true,
+    warning::Bool = true,
     kwargs...,
 )
 
@@ -1284,6 +1293,7 @@ function numerical_irreducible_decomposition(
         sorted = sorted,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
+        sorted = sorted,
         kwargs...,
     )
     decompose(
@@ -1291,6 +1301,7 @@ function numerical_irreducible_decomposition(
         monodromy_options = monodromy_options,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
+        warning,
         kwargs...,
     )
 end

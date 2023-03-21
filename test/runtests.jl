@@ -25,6 +25,8 @@ end
 
 hc_testset = get(ENV, "HC_TESTSET", "none")
 
+Random.seed!(0x8b868a97)
+
 @testset "HomotopyContinuation" begin
     if (hc_testset == "none") || (hc_testset == "model_kit")
         include("model_kit_test.jl")
