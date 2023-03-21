@@ -13,11 +13,14 @@
         W = regeneration(F)
         @test degree.(W) == [2, 8, 8]
 
+        W = regeneration(F; sorted = false)
+        @test degree.(W) == [2, 8, 8]
+
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         # seed
-        s = rand(UInt32)
+        s = 0x42c9d504
         N = nid(F; seed = s)
         @test seed(N) == s
 
