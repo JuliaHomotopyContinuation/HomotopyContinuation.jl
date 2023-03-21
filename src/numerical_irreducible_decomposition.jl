@@ -105,6 +105,7 @@ function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
         showvalues = showvalues(progress),
     )
 end
+update_progress!(progress::Nothing) = nothing
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
     progress.is_solving = false
@@ -440,7 +441,7 @@ julia> W = regeneration([f])
 ```         
 """
 regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
-regeneration(F::Vector{Expression}) = regeneration(System(F))
+regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
 function regeneration!(
     F::System;
     sorted::Bool = true,
@@ -1266,6 +1267,7 @@ Numerical irreducible decomposition with 4 components
 """
 function numerical_irreducible_decomposition(
     F::System;
+    sorted::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
@@ -1279,6 +1281,7 @@ function numerical_irreducible_decomposition(
 
     Ws = regeneration!(
         F;
+        sorted = sorted,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
         kwargs...,
