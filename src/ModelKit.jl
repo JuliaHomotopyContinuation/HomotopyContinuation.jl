@@ -53,6 +53,8 @@ export @var,
 using ..DoubleDouble: ComplexDF64
 
 import Arblib: Arblib, Acb, AcbRef, AcbRefVector
+using Base: RefValue
+import NaturalSort
 import SimpleGraphs
 import LinearAlgebra
 import MultivariatePolynomials:
