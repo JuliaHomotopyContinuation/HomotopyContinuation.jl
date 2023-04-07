@@ -24,8 +24,7 @@ export PathResult,
 """
     PathResult
 
-A `PathResult` is the result of tracking of a path with [`track`](@ref) using an [`AbstractPathTracker`](@ref) (
-e.g. [`EndgameTracker`](@ref))
+A `PathResult` is the result of tracking of a path with [`track`](@ref).
 
 ## Fields
 
@@ -34,7 +33,7 @@ General solution information:
 * `solution::V`: The solution vector.
 * `t::Float64`: The value of `t` at which `solution` was computed. Note that if
   `return_code` is `:at_infinity`, then `t` is the value when this was decided.
-* `accuracy::Float64`: An estimate the (relative) accuracy of the computed solution.
+* `accuracy::Float64`: An estimate of the (relative) accuracy of the computed solution.
 * `residual::Float64`: The infinity norm of `H(solution,t)`.
 * `condition_jacobian::Float64`: This is the condition number of the Jacobian at the
   solution. A high condition number indicates a singular solution or a
@@ -73,7 +72,7 @@ Possible return codes are:
   modified which introduced artificial solutions and this solution is one of them.
 * various return codes indicating termination of the tracking
 """
-Base.@kwdef mutable struct PathResult
+Base.@kwdef struct PathResult
     return_code::Symbol
     solution::Vector{ComplexF64}
     t::Float64
@@ -97,7 +96,6 @@ Base.@kwdef mutable struct PathResult
     extended_precision_used::Bool
 end
 
-Base.show(io::IO, ::MIME"application/prs.juno.inline", r::PathResult) = r
 function Base.show(io::IO, r::PathResult)
     println(io, "PathResult:")
     println(io, " • return_code → :", r.return_code)
