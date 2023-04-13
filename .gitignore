@@ -9,3 +9,4 @@ docs/build/
 **/**/tmp_params.txt
 **/**/tmp_sols.txt
 **/**/tmp_cert.txt
+dev.jl

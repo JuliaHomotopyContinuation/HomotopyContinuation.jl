@@ -82,13 +82,12 @@ end
     Order::Val{M},
     H::InterpretedHomotopy,
     x,
-    t_,
+    t,
     p::Union{Nothing,AbstractVector} = nothing;
     assign_highest_order_only = u isa Vector,
 ) where {M}
     if M == 1
         quote
-            t = (t_, 1)
             I = H.taylor_ComplexF64.order_1
             if isnothing(I)
                 I′ = interpreter(TruncatedTaylorSeries{2,ComplexF64}, H.eval_ComplexF64)
@@ -117,7 +116,6 @@ end
         end
     elseif M == 2
         quote
-            t = (t_, 1)
             I = H.taylor_ComplexF64.order_2
             if isnothing(I)
                 I′ = interpreter(TruncatedTaylorSeries{3,ComplexF64}, H.eval_ComplexF64)
@@ -146,7 +144,6 @@ end
         end
     elseif M == 3
         quote
-            t = (t_, 1)
             I = H.taylor_ComplexF64.order_3
             if isnothing(I)
                 I′ = interpreter(TruncatedTaylorSeries{4,ComplexF64}, H.eval_ComplexF64)
@@ -175,7 +172,6 @@ end
         end
     elseif M == 4
         quote
-            t = (t_, 1)
             I = H.taylor_ComplexF64.order_4
             if isnothing(I)
                 I′ = interpreter(TruncatedTaylorSeries{5,ComplexF64}, H.eval_ComplexF64)

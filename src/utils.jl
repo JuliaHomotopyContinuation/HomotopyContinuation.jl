@@ -172,23 +172,6 @@ end
 end
 
 
-# Perform type piracy here until https://github.com/JuliaArrays/StructArrays.jl/issues/131
-# is fixed
-const _C64SA = StructArrays.StructArray{
-    Complex{Float64},
-    2,
-    NamedTuple{(:re, :im),Tuple{Array{Float64,2},Array{Float64,2}}},
-    Int64,
-}
-Base.@propagate_inbounds function Base.setindex!(s::_C64SA, vals, I::Int)
-    @boundscheck checkbounds(s, I)
-    StructArrays.foreachfield(
-        (col, val) -> (@inbounds col[I] = val),
-        s,
-        convert(ComplexF64, vals),
-    )
-    s
-end
 
 """
     rand_unitary_matrix(n::Int, T=ComplexF64)

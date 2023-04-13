@@ -8,24 +8,9 @@ const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i+1] for i = 0:9])
 const SUBSCRIPT_TO_INT_MAP = Dict([SUBSCRIPTS[i+1] => i for i = 0:9])
 map_subscripts(index) = join(SUBSCRIPT_MAP[c] for c in string(index))
 
-function sort_key(v::Variable)
-    name = string(ModelKit.name(v))
-    sub_start = findnext(c -> c in ModelKit.SUBSCRIPTS, name, 1)
-    if isnothing(sub_start)
-        return name, Int[]
-    end
-    var_base = name[1:prevind(name, sub_start)]
-    str_indices = split(name[sub_start:end], "₋")
-    indices = map(str_indices) do str_index
-        digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
-        n = length(digits)
-        sum([digits[n-k+1] * 10^(k - 1) for k = 1:n])
-    end
-    var_base, reverse(indices)
-end
-Base.isless(a::Variable, b::Variable) = isless(sort_key(a), sort_key(b))
+Base.isless(a::Variable, b::Variable) = NaturalSort.natural(string(a), string(b))
 Base.sort!(vs::AbstractVector{Variable}; kwargs...) =
-    permute!(vs, sortperm(sort_key.(vs); kwargs...))
+    permute!(vs, sortperm(vs; lt = NaturalSort.natural, by = string))
 
 Base.Symbol(v::Variable) = name(v)
 
@@ -196,7 +181,7 @@ function variables(exprs::AbstractArray{<:Basic}; parameters = Variable[])
     for expr in exprs
         union!(S, _variables(expr))
     end
-    setdiff!(sort!(collect(S)), parameters)
+    setdiff!(sort!(collect(S); lt = NaturalSort.natural), parameters)
 end
 
 """
@@ -943,7 +928,7 @@ struct System
     variables::Vector{Variable}
     parameters::Vector{Variable}
     variable_groups::Union{Nothing,Vector{Vector{Variable}}}
-    _jacobian::Ref{Union{Nothing,Matrix{Expression}}}
+    _jacobian::RefValue{Union{Nothing,Matrix{Expression}}}
 
     function System(
         exprs::Vector{Expression},

@@ -85,7 +85,7 @@ Base.@kwdef struct PathResult
     extended_precision::Bool
     path_number::Union{Nothing,Int}
     start_solution::Any
-    last_path_point::Tuple{Vector{ComplexF64},Float64}
+    last_path_point::Union{Nothing,Tuple{Vector{ComplexF64},Float64}}
     valuation::Union{Nothing,Vector{Float64}}
     ω::Float64
     μ::Float64

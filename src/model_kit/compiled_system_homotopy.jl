@@ -354,12 +354,11 @@ Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
     Order::Val{K},
     T::CompiledHomotopy,
     x::AbstractArray,
-    t_,
+    t,
     p::Union{Nothing,AbstractArray} = nothing;
     assign_highest_order_only::Bool = u isa Vector,
 ) where {K}
     quote
-        t = (t_, 1)
         $(_taylor!_impl(T))
     end
 end

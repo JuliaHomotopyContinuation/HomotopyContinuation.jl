@@ -35,7 +35,7 @@ function total_degree_variables(
     γ = cis(2π * rand()),
     gamma = γ,
     tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(),
+    # endgame_options=EndgameOptions(),
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     kwargs...,
 )
@@ -99,15 +99,18 @@ function total_degree_variables(
             compile = compile,
         )
     else
-        G = fixed(System(s .* (x .^ D .- 1), x, s); compile = compile)
+        G = fixed(System(scaling .* (x .^ D .- 1), x); compile = compile)
     end
-    G = fix_parameters(G, scaling)
 
     H = StraightLineHomotopy(G, F; γ = gamma)
     if homogeneous
         H = on_affine_chart(H)
     end
-    T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
+    T = EndgameTracker(
+        Tracker(H; options = tracker_options),
+        # options=endgame_options
+    )
+
     if overdetermined
         T = OverdeterminedTracker(T, F)
     end

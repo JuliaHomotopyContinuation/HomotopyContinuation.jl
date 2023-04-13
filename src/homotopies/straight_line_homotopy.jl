@@ -14,6 +14,7 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
 
     u::Vector{ComplexF64}
     ū::Vector{ComplexDF64}
+    v::Vector{ComplexF64}
     v̄::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
@@ -48,6 +49,7 @@ function StraightLineHomotopy(
     m, n = size(start)
     u = zeros(ComplexF64, m)
     ū = zeros(ComplexDF64, m)
+    v = zeros(ComplexF64, m)
     v̄ = zeros(ComplexDF64, m)
     U = zeros(ComplexF64, m, n)
 
@@ -60,6 +62,7 @@ function StraightLineHomotopy(
         ComplexF64(gamma),
         u,
         ū,
+        v,
         v̄,
         U,
         dv_start,
@@ -84,7 +87,7 @@ function ModelKit.evaluate!(
     x::Vector{ComplexDF64},
     t,
     p = nothing,
-)
+) where {T}
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t
@@ -127,27 +130,42 @@ ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::TaylorVector{1}, t) =
 ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::AbstractVector{<:Number}, t) =
     taylor_1!(u, H, x, t)
 
-function taylor_1!(u, H::StraightLineHomotopy, x, t)
+function taylor_1!(u::Vector, H::StraightLineHomotopy, x, tt)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
+    _, ṫ = tt
     for i = 1:size(H, 1)
-        @inbounds u[i] = H.γ * u[i] - H.u[i]
+        @inbounds u[i, 1] = ṫ * (H.γ * u[i] - H.u[i])
     end
     u
 end
+
+function taylor_1!(u::TaylorVector, H::StraightLineHomotopy, x, tt)
+    evaluate!(H.v, H.start, x)
+    evaluate!(H.u, H.target, x)
+    t, ṫ = tt
+    for i = 1:size(H, 1)
+        # t * γ * G + (1 - t) * F = t * (γ * G - F) + F
+        d = H.γ * H.v[i] - H.u[i]
+        @inbounds u[i] = (t * d + H.u[i], ṫ * d)
+    end
+    u
+end
+
 function ModelKit.taylor!(
     u,
     v::Val{K},
     H::StraightLineHomotopy,
     tx::TaylorVector,
-    t,
+    tt,
 ) where {K}
     taylor!(H.dv_start, v, H.start, tx)
     taylor!(H.dv_target, v, H.target, tx)
 
+    (t, ṫ) = tt
     for i = 1:size(H, 1)
-        start = H.γ * (H.dv_start[i, K] + t * H.dv_start[i, K+1])
-        target = (1 - t) * H.dv_target[i, K+1] - H.dv_target[i, K]
+        start = H.γ * (ṫ * H.dv_start[i, K] + t * H.dv_start[i, K+1])
+        target = (1 - t) * H.dv_target[i, K+1] - ṫ * H.dv_target[i, K]
         u[i] = start + target
     end
     u
