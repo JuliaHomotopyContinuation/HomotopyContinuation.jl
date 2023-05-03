@@ -10,12 +10,18 @@ See also [`slice`](@ref).
 struct SlicedSystem{S<:AbstractSystem,T} <: AbstractSystem
     system::S
     affine::LinearSubspace{T}
+    sliced::StackedSystem{S,LinearSystem}
 end
 SlicedSystem(
     F::System,
     A::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
 ) = SlicedSystem(fixed(F; compile = compile), A)
+SlicedSystem(
+    F::AbstractSystem,
+    A::LinearSubspace;
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+) = SlicedSystem(F, A, StackedSystem(F, LinearSystem(A; variables = variables(F))))
 
 """
     slice(F::System, L::LinearSubspace; compile = $(COMPILE_DEFAULT[]))
@@ -47,53 +53,10 @@ function Base.size(F::SlicedSystem)
     (m + codim(F.affine), n)
 end
 
-function (F::SlicedSystem)(x::AbstractVector, p = nothing)
-    u = F.system(x, p)
-    append!(u, extrinsic(F.affine)(x))
-    u
-end
-
-function ModelKit.evaluate!(u, F::SlicedSystem, x, p = nothing)
-    evaluate!(u, F.system, x, p)
-
-    @unpack A, b = extrinsic(F.affine)
-    m = size(F.system, 1)
-    n, N = size(A)
-    @inbounds for i = 1:n
-        u[m+i] = -b[i]
-    end
-    @inbounds for j = 1:N
-        xj = x[j]
-        for i = 1:n
-            u[m+i] += A[i, j] * xj
-        end
-    end
-
-    u
-end
-
-function ModelKit.evaluate_and_jacobian!(u, U, F::SlicedSystem, x, p = nothing)
-    evaluate_and_jacobian!(u, U, F.system, x, p)
-
-    @unpack A, b = extrinsic(F.affine)
-    m = size(F.system, 1)
-    n, N = size(A)
-    @inbounds for i = 1:n
-        u[m+i] = -b[i]
-    end
-    @inbounds for j = 1:N
-        xj = x[j]
-        for i = 1:n
-            u[m+i] += A[i, j] * xj
-        end
-    end
-
-    @inbounds for j = 1:N, i = 1:n
-        U[m+i, j] = A[i, j]
-    end
-
-    nothing
-end
-
+(F::SlicedSystem)(x::AbstractVector, p = nothing) = F.sliced(x, p)
+ModelKit.evaluate!(u, F::SlicedSystem, x::AbstractVector, p = nothing) =
+    evaluate!(u, F.sliced, x, p)
+ModelKit.evaluate_and_jacobian!(u, U, F::SlicedSystem, x, p = nothing) =
+    evaluate_and_jacobian!(u, U, F.sliced, x, p)
 ModelKit.taylor!(u, v::Val, F::SlicedSystem, tx, p = nothing) =
-    taylor!(u, v, F.system, tx, p)
+    taylor!(u, v, F.sliced, tx, p)

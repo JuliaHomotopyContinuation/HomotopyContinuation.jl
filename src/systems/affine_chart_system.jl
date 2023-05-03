@@ -10,6 +10,23 @@ system ``F′`` which operates on the affine chart defined by the vector
 struct AffineChartSystem{S<:AbstractSystem,N} <: AbstractSystem
     system::S
     chart::PVector{ComplexF64,N}
+    stacked::StackedSystem{S,LinearSystem}
+end
+
+function AffineChartSystem(system::AbstractSystem, v::PVector{ComplexF64,N}) where {N}
+    m, n = size(system)
+    A = zeros(ComplexF64, N, n)
+    b = ones(ComplexF64, N)
+    ranges = dimension_indices(v)
+    for (k, range) in enumerate(ranges)
+        for i in range
+            A[k, i] = v[i]
+        end
+    end
+    L = LinearSystem(A, b; variables = variables(system))
+    stacked = StackedSystem(system, L)
+
+    AffineChartSystem(system, v, stacked)
 end
 
 ModelKit.variables(F::AffineChartSystem) = variables(F.system)
@@ -52,71 +69,12 @@ function set_solution!(x, F::AffineChartSystem, y)
     x .= y
     on_chart!(x, F.chart)
 end
-@inline function evaluate_chart!(u, v::PVector{<:Any,N}, x::AbstractVector) where {N}
-    ranges = dimension_indices(v)
-    for (k, range) in enumerate(ranges)
-        out = zero(promote_type(eltype(u), eltype(x)))
-        @inbounds for i in range
-            out += v[i] * x[i]
-        end
-        u[k] = out - 1.0
-    end
-    nothing
-end
 
-@inline function jacobian_chart!(U, v::PVector{<:Any,N}, x::AbstractVector) where {N}
-    ranges = dimension_indices(v)
-    for j = 1:size(U, 2), i = 1:size(U, 1)
-        U[i, j] = zero(eltype(U))
-    end
-    for (k, range) in enumerate(ranges)
-        for j in range
-            U[k, j] = v[j]
-        end
-    end
-    nothing
-end
 
-function (F::AffineChartSystem{<:Any,N})(x::AbstractVector, p = nothing) where {N}
-    v = PVector(x, dims(F.chart))
-    u = F.system(x, p)
-    append!(u, zeros(N))
-    m = size(F.system, 1)
-    evaluate_chart!(view(u, m+1:m+N), F.chart, v)
-    u
-end
-function (F::AffineChartSystem{<:Any,N})(x, p = nothing) where {N}
-    u = F.system(x, p)
-    append!(u, zeros(N))
-    m = size(F.system, 1)
-    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
-    u
-end
-
-function ModelKit.evaluate!(u, F::AffineChartSystem{<:Any,N}, x, p = nothing) where {N}
-    evaluate!(u, F.system, x, p)
-    m = size(F.system, 1)
-    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
-    u
-end
-
-function ModelKit.evaluate_and_jacobian!(
-    u,
-    U,
-    F::AffineChartSystem{<:Any,N},
-    x,
-    p = nothing,
-) where {N}
-    evaluate_and_jacobian!(u, U, F.system, x, p)
-    m = size(F.system, 1)
-    evaluate_chart!(view(u, m+1:m+N), F.chart, x)
-    jacobian_chart!(view(U, m+1:m+N, :), F.chart, x)
-    nothing
-end
-
-function ModelKit.taylor!(u, v::Val, F::AffineChartSystem, tx, p = nothing)
-    u .= zero(ComplexF64)
-    taylor!(u, v, F.system, tx, p)
-    # affine chart part is always zero since it is an affine linear form
-    u
-end
+(F::AffineChartSystem)(x, p = nothing) = F.stacked(x, p)
+ModelKit.evaluate!(u, F::AffineChartSystem, x::AbstractVector, p = nothing) =
+    evaluate!(u, F.stacked, x, p)
+ModelKit.evaluate_and_jacobian!(u, U, F::AffineChartSystem, x, p = nothing) =
+    evaluate_and_jacobian!(u, U, F.stacked, x, p)
+ModelKit.taylor!(u, v::Val, F::AffineChartSystem, tx, p = nothing) =
+    taylor!(u, v, F.stacked, tx, p)

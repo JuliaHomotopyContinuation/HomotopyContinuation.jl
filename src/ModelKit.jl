@@ -56,6 +56,7 @@ import Arblib: Arblib, Acb, AcbRef, AcbRefVector
 using Base: RefValue
 import NaturalSort
 import SimpleGraphs
+import StaticArrays
 import LinearAlgebra
 import MultivariatePolynomials:
     MultivariatePolynomials,

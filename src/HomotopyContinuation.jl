@@ -14,6 +14,7 @@ import Printf
 import ProgressMeter
 import Random
 import SemialgebraicSets
+import StaticArrays
 import StructArrays
 import TreeViews
 
