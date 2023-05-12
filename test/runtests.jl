@@ -27,6 +27,9 @@ hc_testset = get(ENV, "HC_TESTSET", "none")
 
 Random.seed!(0x8b868a97)
 
+include("homotopies_test.jl")
+# include("systems_test.jl")
+
 @testset "HomotopyContinuation" begin
     if (hc_testset == "none") || (hc_testset == "model_kit")
         include("model_kit_test.jl")
@@ -39,8 +42,8 @@ Random.seed!(0x8b868a97)
         include("voronoi_tree_test.jl")
         include("unique_points_test.jl")
         include("linear_algebra_test.jl")
-        include("homotopies_test.jl")
         include("systems_test.jl")
+        include("homotopies_test.jl")
         include("tracker_test.jl")
         include("valuation_test.jl")
         include("linear_test.jl")

@@ -42,6 +42,34 @@ function Base.convert(::Type{TruncatedTaylorSeries{N,T}}, x::Tuple) where {N,T}
     convert(TruncatedTaylorSeries{N,T}, TruncatedTaylorSeries(x))
 end
 
+
+Base.:*(a::Number, x::TruncatedTaylorSeries) = TruncatedTaylorSeries(a .* x.val)
+Base.:*(x::TruncatedTaylorSeries, a::Number) = TruncatedTaylorSeries(a .* x.val)
+
+for i = 1:5, j = 1:5
+    i != j || continue
+    @eval Base.:+(
+        x::TruncatedTaylorSeries{$i,T1},
+        y::TruncatedTaylorSeries{$j,T2},
+    ) where {T1,T2} = TruncatedTaylorSeries(
+        convert(TruncatedTaylorSeries{$(max(i, j)),T1}, x).val .+
+        convert(TruncatedTaylorSeries{$(max(i, j)),T2}, y).val,
+    )
+    @eval Base.:-(
+        x::TruncatedTaylorSeries{$i,T1},
+        y::TruncatedTaylorSeries{$j,T2},
+    ) where {T1,T2} = TruncatedTaylorSeries(
+        convert(TruncatedTaylorSeries{$(max(i, j)),T1}, x).val .-
+        convert(TruncatedTaylorSeries{$(max(i, j)),T2}, y).val,
+    )
+end
+
+Base.:+(x::TruncatedTaylorSeries{N}, y::TruncatedTaylorSeries{N}) where {N} =
+    TruncatedTaylorSeries(x.val .+ y.val)
+Base.:-(x::TruncatedTaylorSeries{N}, y::TruncatedTaylorSeries{N}) where {N} =
+    TruncatedTaylorSeries(x.val .- y.val)
+
+
 expression(x, ε = Variable(:ε)) = x
 function expression(x::TruncatedTaylorSeries, ε = Variable(:ε))
     ex = zero(Expression)
@@ -101,7 +129,14 @@ end
         TruncatedTaylorSeries($(Expr(:tuple, (:(x[$k, i]) for k = 1:N)...)))
     end
 end
-Base.getindex(TV::TaylorVector, i::Integer, j::Integer) = getindex(TV.data, j, i)
+Base.getindex(TV::TaylorVector{N,T}, i::Integer, j::Integer) where {N,T} =
+    j <= N ? getindex(TV.data, j, i) : zero(T)
+
+Base.getindex(
+    TV::SubArray{<:TruncatedTaylorSeries{N,T}},
+    i::Integer,
+    j::Integer,
+) where {N,T} = j <= N ? TV[i][j-1] : zero(T)
 
 function Base.setindex!(TV::TaylorVector{N,T}, x, i::Integer) where {N,T}
     setindex!(TV, convert(TruncatedTaylorSeries{N,T}, x), i)
@@ -119,6 +154,22 @@ end
     end
 end
 Base.setindex!(TV::TaylorVector, x, i::Integer, j::Integer) = setindex!(TV.data, x, j, i)
+
+function Base.setindex!(
+    TV::SubArray{<:TruncatedTaylorSeries{N,T}},
+    x,
+    i::Integer,
+    j::Integer,
+) where {N,T}
+
+    if j <= N
+        d = StaticArrays.MVector{N}(TV[i].val)
+        d[j] = x
+
+        TV[i] = StaticArrays.SVector{N}(d).data
+    end
+    TV
+end
 
 # HIGHER ORDER DIFFERENTIATION
 # This follows Chapter 13 of Griewank & Walther - Evaluating derivatives

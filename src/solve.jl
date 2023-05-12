@@ -258,7 +258,7 @@ end
     linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace, intrinsic = nothing)
 
 Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
-`intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).
+`intrinsic = true`) or [`ExtrinsicLinearSubspaceHomotopy`](@ref).
 Compared to the direct constructor, this also takes care of homogeneous systems.
 """
 function linear_subspace_homotopy(
@@ -277,7 +277,7 @@ function linear_subspace_homotopy(
             IntrinsicSubspaceHomotopy(F, V, W; compile = compile)
         end
     else
-        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        H = ExtrinsicLinearSubspaceHomotopy(F, V, W; compile = compile)
         if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
             on_affine_chart(H)
         else

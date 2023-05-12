@@ -9,6 +9,7 @@ include("systems/fixed_parameter_system.jl")
 include("systems/randomized_system.jl")
 include("systems/sliced_system.jl")
 include("systems/start_pair_system.jl")
+include("systems/homotopy_system.jl")
 
 """
     fixed(F::System; compile::Union{Bool,Symbol} = $(COMPILE_DEFAULT[]))

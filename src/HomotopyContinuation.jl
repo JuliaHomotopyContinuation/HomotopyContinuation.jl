@@ -61,18 +61,21 @@ end
 
 include("utils.jl")
 include("norm.jl")
-# include("voronoi_tree.jl")
-# include("unique_points.jl")
 include("linear_algebra.jl")
 include("linear_solve_workspace.jl")
 include("linear_subspaces.jl")
 include("systems.jl")
 include("homotopies.jl")
+# include("voronoi_tree.jl")
+# include("unique_points.jl")
 # include("newton.jl")
-include("path_result.jl")
-include("tracking/tracker.jl")
-include("endgame/endgame.jl")
-include("total_degree.jl")
+# include("path_result.jl")
+# include("tracking/tracker.jl")
+# include("endgame/endgame.jl")
+# include("total_degree.jl")
+
+
+
 # include("binomial_system.jl")
 # include("polyhedral.jl")
 # include("overdetermined.jl")

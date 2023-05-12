@@ -1,13 +1,14 @@
 # Homotopies
 
 Homotopies ([`AbstractHomotopy`](@ref)) are at the heart of homotopy continuation.
-A homotopy is a parameterized family ``H(x,t)`` of polynomial systems.
-By convention, homotopies are tracked from ``t=1`` to ``t=0``, i.e., ``H(x,1)`` is considered
-the *start system* and ``H(x,0)`` is the *target system*.
+A homotopy is a parameterized family `H(x,t)` of polynomial systems.
+By convention, homotopies are tracked from `t=1` to `t=0`, i.e., `H(x,1)` is considered
+the _start system_ and `H(x,0)` is the _target system_.
 
 ```@docs
 AbstractHomotopy
 ```
+
 As for [`AbstractSystem`](@ref)s, [`AbstractHomotopy`](@ref) and [`Homotopy`](@ref) share different purposes.
 A [`Homotopy`](@ref) is intended for formulating your problem
 symbolically.
@@ -31,39 +32,46 @@ linear_subspace_homotopy
 ```
 
 ## AffineChartHomotopy
+
 ```@docs
 AffineChartHomotopy
 on_affine_chart(F::Homotopy, dims)
 ```
 
 ## CoefficientHomotopy
+
 ```@docs
 CoefficientHomotopy
 ```
 
 ## FixedParameterHomotopy
+
 ```@docs
 FixedParameterHomotopy
 fix_parameters(H::AbstractHomotopy, p)
 ```
 
-## ExtrinsicSubspaceHomotopy
+## ExtrinsicLinearSubspaceHomotopy
+
 ```@docs
-ExtrinsicSubspaceHomotopy
+ExtrinsicLinearSubspaceHomotopy
 ```
 
 ## IntrinsicSubspaceHomotopy
+
 ```@docs
 IntrinsicSubspaceHomotopy
 set_subspaces!
 ```
 
 ## ParameterHomotopy
+
 ```@docs
 ParameterHomotopy
 ```
 
 ## StraightLineHomotopy
+
 ```@docs
 StraightLineHomotopy
 ```

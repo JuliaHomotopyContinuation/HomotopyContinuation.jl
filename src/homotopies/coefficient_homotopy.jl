@@ -17,7 +17,7 @@ struct CoefficientHomotopy{T<:AbstractSystem} <: AbstractHomotopy
     #cache
     x::Vector{ComplexF64}
     t_cache::Base.RefValue{ComplexF64}
-    t_taylor_cache::Base.RefValue{ComplexF64}
+    t_taylor_cache::Base.RefValue{Tuple{ComplexF64,Float64}}
     coeffs::Vector{ComplexF64}
     dt_coeffs::Vector{ComplexF64}
     taylor_coeffs::TaylorVector{2,ComplexF64}
@@ -64,7 +64,7 @@ function CoefficientHomotopy(
         target_coeffs,
         zeros(ComplexF64, size(F, 2)),
         Ref(complex(NaN)),
-        Ref(complex(NaN)),
+        Ref((complex(NaN), 1.0)),
         zeros(ComplexF64, m),
         start_coeffs - target_coeffs,
         TaylorVector{2}(ComplexF64, length(target_coeffs)),
@@ -114,27 +114,20 @@ function ModelKit.evaluate_and_jacobian!(u, U, H::CoefficientHomotopy, x, t)
     evaluate_and_jacobian!(u, U, H.F, x, coeffs!(H, t))
 end
 
-function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x::AbstractVector, t)
-    evaluate!(u, H.F, x, H.dt_coeffs)
-end
-function ModelKit.taylor!(u, v::Val{1}, H::CoefficientHomotopy, x::TaylorVector{1}, t)
-    evaluate!(u, H.F, first(vectors(x)), H.dt_coeffs)
-end
 
-
-function taylor_coeffs!(H::CoefficientHomotopy, t::Union{ComplexF64,Float64})
-    t == H.t_taylor_cache[] && return H.taylor_coeffs
+function taylor_coeffs!(H::CoefficientHomotopy, t_)
+    t_ == H.t_taylor_cache[] && return H.taylor_coeffs
+    (t, dt) = t_
 
     coeffs!(H, t)
     for i = 1:length(H.taylor_coeffs)
         H.taylor_coeffs[i, 1] = H.coeffs[i]
-        H.taylor_coeffs[i, 2] = H.dt_coeffs[i]
+        H.taylor_coeffs[i, 2] = dt * H.dt_coeffs[i]
     end
-    H.t_taylor_cache[] = t
+    H.t_taylor_cache[] = t_
 
     H.taylor_coeffs
 end
-
 
 function ModelKit.taylor!(u, v::Val, H::CoefficientHomotopy, tx::TaylorVector, t)
     taylor!(u, v, H.F, tx, taylor_coeffs!(H, t))

@@ -146,7 +146,8 @@ function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) 
     )
 end
 
-(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b₀
+(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic} = Intrinsic) =
+    A.A * u + A.b₀
 (A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
 
 function stiefel_coordinates(A::AbstractMatrix, b::AbstractVector)

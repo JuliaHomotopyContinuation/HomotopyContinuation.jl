@@ -23,9 +23,21 @@ function LinearSystem(
         variables,
     )
 end
-function LinearSystem(L::LinearSubspace; variables = first(@var x[1:size(A, 2)]))
+function LinearSystem(
+    L::LinearSubspace,
+    ::Coordinates{:Intrinsic};
+    variables = first(@var x[1:codim(L)]),
+)
+    LinearSystem(intrinsic(L).A, -intrinsic(L).b₀; variables = variables)
+end
+function LinearSystem(
+    L::LinearSubspace,
+    ::Coordinates{:Extrinsic} = Extrinsic;
+    variables = first(@var x[1:dim(L)]),
+)
     LinearSystem(extrinsic(L).A, extrinsic(L).b; variables = variables)
 end
+
 
 (F::LinearSystem)(x, p = nothing) = F.A * x - F.b
 

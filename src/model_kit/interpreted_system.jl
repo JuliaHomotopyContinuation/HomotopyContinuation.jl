@@ -85,7 +85,7 @@ end
     F::InterpretedSystem,
     x,
     p = nothing;
-    assign_highest_order_only::Bool = u isa Vector,
+    assign_highest_order_only::Bool = !(u isa AbstractVector{<:TruncatedTaylorSeries}),
 ) where {M}
     if M == 1
         quote

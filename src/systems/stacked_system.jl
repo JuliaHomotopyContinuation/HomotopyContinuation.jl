@@ -11,7 +11,7 @@ struct StackedSystem{S1<:AbstractSystem,S2<:AbstractSystem} <: AbstractSystem
     parameters::Vector{Variable}
 end
 function StackedSystem(g::AbstractSystem, f::AbstractSystem)
-    variables(g) == variables(f) || throw(
+    length(variables(g)) == length(variables(f)) || throw(
         ArgumentError(
             "Cannot create the stacked system [F;g] F since the variabels of `F` and `G` don't match.",
         ),
@@ -19,7 +19,7 @@ function StackedSystem(g::AbstractSystem, f::AbstractSystem)
 
     pg = parameters(g)
     pf = parameters(f)
-    (isempty(pf) || isempty(pg) || pf == pg) || throw(
+    (isempty(pf) || isempty(pg) || length(pf) == length(pg)) || throw(
         ArgumentError(
             "Cannot construct a stack of two system with different sets of parameters.",
         ),

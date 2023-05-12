@@ -335,7 +335,7 @@
         l2 = rand_subspace(2; codim = 1)
 
         _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
-        @test _solver.trackers[1].tracker.homotopy isa ExtrinsicSubspaceHomotopy
+        @test _solver.trackers[1].tracker.homotopy isa ExtrinsicLinearSubspaceHomotopy
 
         @var x y
         r1 = solve(F; target_subspace = l1, compile = false)

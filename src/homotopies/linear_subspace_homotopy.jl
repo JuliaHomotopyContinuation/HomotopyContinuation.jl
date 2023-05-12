@@ -1,33 +1,15 @@
 export IntrinsicSubspaceHomotopy, set_subspaces!
 
-struct LinearSubspaceGeodesicInfo
-    Q::Matrix{ComplexF64}
-    Q_cos::Matrix{ComplexF64}
-    Θ::Vector{Float64}
-    U::Matrix{ComplexF64}
-    γ1::Matrix{ComplexF64}
+
+Base.@kwdef struct SubspaceHomotopy <: ModelKit.AbstractHomotopy
+    start::LinearSubspace{ComplexF64}
+    target::LinearSubspace{ComplexF64}
+    extrinsic::Bool
+    A::Matrix{ComplexF64}
+    b::Vector{ComplexF64}
+    ū::Vector{ComplexDF64}
 end
 
-function LinearSubspaceGeodesicInfo(start::LinearSubspace, target::LinearSubspace)
-    Q, Θ, U = geodesic_svd(target, start)
-    Q_cos = target.intrinsic.Y * U
-    γ1 = similar(Q_cos)
-    n, k = size(γ1)
-    for j = 1:k
-        s, c = sincos(Θ[j])
-        for i = 1:n
-            γ1[i, j] = Q_cos[i, j] * c + Q[i, j] * s
-        end
-    end
-    LinearSubspaceGeodesicInfo(Q, Q_cos, Θ, U, γ1)
-end
-
-const GEODESIC_LRU = LRU{
-    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
-    LinearSubspaceGeodesicInfo,
-}(
-    maxsize = 128,
-)
 
 """
     IntrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
@@ -44,7 +26,6 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
-    geodesic::LinearSubspaceGeodesicInfo
 
     J::Matrix{ComplexF64}
     x::Vector{ComplexF64}
@@ -53,7 +34,10 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     t_cache::Base.RefValue{ComplexF64}
     # For AD
     taylor_t_cache::Base.RefValue{ComplexF64}
-    taylor_γ::NTuple{5,Matrix{ComplexF64}}
+    A::Matrix{ComplexF64}
+    b::Vector{ComplexF64}
+    Ȧ::Matrix{ComplexF64}
+    ḃ::Vector{ComplexF64}
     v::Vector{ComplexF64}
     tx⁴::TaylorVector{5,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
@@ -95,23 +79,27 @@ function IntrinsicSubspaceHomotopy(
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64},
 )
-    geodesic = get!(GEODESIC_LRU, (start, target)) do
-        LinearSubspaceGeodesicInfo(start, target)
-    end
-    Q = geodesic.Q
+    A = copy(intrinsic(start).A)
+    b = copy(intrinsic(start).b)
+
+    Ȧ = intrinsic(start).A - intrinsic(target).A
+    ḃ = intrinsic(start).b - intrinsic(target).b
+
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
     IntrinsicSubspaceHomotopy(
         system = system,
         start = start,
         target = target,
-        geodesic = LinearSubspaceGeodesicInfo(start, target),
+        A = A,
+        b = b,
+        Ȧ = Ȧ,
+        ḃ = ḃ,
         J = zeros(ComplexF64, size(system) .+ (1, 1)),
         x = zeros(ComplexF64, size(Q, 1)),
         ẋ = zeros(ComplexF64, size(Q, 1)),
         x_high = zeros(ComplexDF64, size(Q, 1)),
         t_cache = Ref(complex(NaN, NaN)),
         taylor_t_cache = Ref(complex(NaN, NaN)),
-        taylor_γ = tuple((similar(Q) for i = 0:4)...),
         v = zeros(ComplexF64, size(Q, 2)),
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
@@ -119,7 +107,7 @@ function IntrinsicSubspaceHomotopy(
         tx¹ = TaylorVector{2}(tx⁴),
     )
 end
-Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1], dim(H.start))
 
 """
     set_subspaces!(H::IntrinsicSubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
@@ -133,9 +121,8 @@ function set_subspaces!(
 )
     H.start = start
     H.target = target
-    H.geodesic = get!(GEODESIC_LRU, (start, target)) do
-        LinearSubspaceGeodesicInfo(start, target)
-    end
+    H.Ȧ .= intrinsic(start).A .- intrinsic(target).A
+    H.ḃ .= intrinsic(start).b .- intrinsic(target).b
     H
 end
 start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
@@ -161,35 +148,17 @@ function γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     first(H.taylor_γ)
 end
 @inline function _γ!(H::IntrinsicSubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H.geodesic
-    γ = first(H.taylor_γ)
-    n, k = size(γ)
-    @inbounds for j = 1:k
-        Θⱼ = Θ[j]
-        s, c = sincos(t * Θⱼ)
-        for i = 1:n
-            γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
-        end
-    end
-    γ
+    A₁ = extrinsic(H.start).A
+    A₀ = extrinsic(H.target).A
+    b₁ = extrinsic(H.start).b
+    b₀ = extrinsic(H.target).b
+
+    H.A .= (1 .- t) .* A₁ .+ t .* A₀
+    H.b .= (1 .- t) .* b₁ .+ t .* b₀
+
+    H
 end
 
-γ̇!(H::IntrinsicSubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
-@inline function _γ̇!(H::IntrinsicSubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H.geodesic
-    _, γ̇ = H.taylor_γ
-    n, k = size(γ̇)
-    @inbounds for j = 1:k
-        Θⱼ = Θ[j]
-        s, c = sincos(t * Θⱼ)
-        ċ = -s * Θⱼ
-        ṡ = c * Θⱼ
-        for i = 1:n
-            γ̇[i, j] = Q_cos[i, j] * ċ + Q[i, j] * ṡ
-        end
-    end
-    γ̇
-end
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x) - 1) ||
@@ -219,19 +188,18 @@ function get_solution(H::IntrinsicSubspaceHomotopy, u::AbstractVector, t)
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::Vector{ComplexDF64}, t)
-    γ = γ!(H, t)
-    n = first(size(H.system))
-    LA.mul!(H.x_high, γ, v)
+    γ!(H, t)
+    LA.mul!(H.x_high, H.A, v)
+    H.x_high .+= H.b
     evaluate!(u, H.system, H.x_high)
-    u[n+1] = H.x_high[end] - 1.0
+    u
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::AbstractVector, t)
-    γ = γ!(H, t)
-    n = first(size(H.system))
-    LA.mul!(H.x, γ, v)
+    γ!(H, t)
+    LA.mul!(H.x, H.A, v)
+    H.x .+= H.b
     evaluate!(u, H.system, H.x)
-    u[n+1] = H.x[end] - 1.0
     u
 end
 
@@ -242,22 +210,24 @@ function ModelKit.evaluate_and_jacobian!(
     v::AbstractVector,
     t,
 )
-    γ = γ!(H, t)
+    γ!(H, t)
 
-    LA.mul!(H.x, γ, v)
+    LA.mul!(H.x, H.A, v)
+    H.x .+= H.b
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
 
-    n = first(size(H.system))
-    u[n+1] = H.x[end] - 1
-
-    m = length(v)
-    for j = 1:m
-        U[n+1, j] = γ[end, j]
-    end
-
     nothing
 end
+
+
+# function γ̇!(H::IntrinsicSubspaceHomotopy, t_)
+#     (t, dt) = t_
+
+#     H.A .+
+#     γ̇
+# end
+
 
 function ModelKit.taylor!(
     u,

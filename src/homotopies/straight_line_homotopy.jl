@@ -87,7 +87,7 @@ function ModelKit.evaluate!(
     x::Vector{ComplexDF64},
     t,
     p = nothing,
-) where {T}
+)
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t
@@ -125,12 +125,32 @@ function ModelKit.evaluate_and_jacobian!(
     end
     nothing
 end
-ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::TaylorVector{1}, t) =
-    taylor_1!(u, H, first(vectors(x)), t)
-ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::AbstractVector{<:Number}, t) =
-    taylor_1!(u, H, x, t)
+ModelKit.taylor!(
+    u,
+    ::Val{1},
+    H::StraightLineHomotopy,
+    x::TaylorVector{1},
+    t,
+    p::Nothing = nothing,
+) = taylor_1!(u, H, first(vectors(x)), t)
+ModelKit.taylor!(
+    u,
+    ::Val{1},
+    H::StraightLineHomotopy,
+    x::AbstractVector{<:Number},
+    t,
+    p::Nothing = nothing,
+) = taylor_1!(u, H, x, t)
+ModelKit.taylor!(
+    u::AbstractVector{<:TruncatedTaylorSeries},
+    ::Val{1},
+    H::StraightLineHomotopy,
+    x::TaylorVector{1},
+    t,
+    p::Nothing = nothing,
+) = taylor_1!(u, H, first(vectors(x)), t)
 
-function taylor_1!(u::Vector, H::StraightLineHomotopy, x, tt)
+function taylor_1!(u::AbstractVector, H::StraightLineHomotopy, x, tt, p::Nothing = nothing)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     _, ṫ = tt
@@ -140,7 +160,13 @@ function taylor_1!(u::Vector, H::StraightLineHomotopy, x, tt)
     u
 end
 
-function taylor_1!(u::TaylorVector, H::StraightLineHomotopy, x, tt)
+function taylor_1!(
+    u::AbstractVector{<:TruncatedTaylorSeries},
+    H::StraightLineHomotopy,
+    x,
+    tt,
+    p::Nothing = nothing,
+)
     evaluate!(H.v, H.start, x)
     evaluate!(H.u, H.target, x)
     t, ṫ = tt
@@ -152,12 +178,14 @@ function taylor_1!(u::TaylorVector, H::StraightLineHomotopy, x, tt)
     u
 end
 
+# TODO: Does not compute correctly full taylor series
 function ModelKit.taylor!(
     u,
     v::Val{K},
     H::StraightLineHomotopy,
     tx::TaylorVector,
     tt,
+    p::Nothing = nothing,
 ) where {K}
     taylor!(H.dv_start, v, H.start, tx)
     taylor!(H.dv_target, v, H.target, tx)
@@ -167,6 +195,29 @@ function ModelKit.taylor!(
         start = H.γ * (ṫ * H.dv_start[i, K] + t * H.dv_start[i, K+1])
         target = (1 - t) * H.dv_target[i, K+1] - ṫ * H.dv_target[i, K]
         u[i] = start + target
+    end
+    u
+end
+
+function ModelKit.taylor!(
+    u::AbstractVector{<:TruncatedTaylorSeries},
+    v::Val{K},
+    H::StraightLineHomotopy,
+    tx::TaylorVector,
+    tt,
+    p::Nothing = nothing,
+) where {K}
+    taylor!(H.dv_start, v, H.start, tx)
+    taylor!(H.dv_target, v, H.target, tx)
+
+    (t, ṫ) = tt
+    for j = 2:K+1, i = 1:size(H, 1)
+        start = H.γ * (ṫ * H.dv_start[i, j-1] + t * H.dv_start[i, j])
+        target = (1 - t) * H.dv_target[i, j] - ṫ * H.dv_target[i, j-1]
+        u[i, j] = start + target
+    end
+    for j = 2:K+1, i = 1:size(H, 1)
+        u[i, 1] = H.γ * t * H.dv_start[i, 1] + (1 - t) * H.dv_target[i, 1]
     end
     u
 end

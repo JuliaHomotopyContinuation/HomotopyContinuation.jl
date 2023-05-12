@@ -1,15 +1,24 @@
 # internal only
-include("homotopies/toric_homotopy.jl")
-
-# public, these should be linked on the top
-include("homotopies/mixed_homotopy.jl")
-include("homotopies/affine_chart_homotopy.jl")
+include("homotopies/t_embedding.jl")
+include("homotopies/general_parameter_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
-include("homotopies/coefficient_homotopy.jl")
-include("homotopies/extrinsic_subspace_homotopy.jl")
-include("homotopies/intrinsic_subspace_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
-include("homotopies/fixed_parameter_homotopy.jl")
+include("homotopies/system_homotopy_stack.jl")
+include("homotopies/extrinsic_linear_subspace_homotopy.jl")
+include("homotopies/system_homotopy.jl")
+include("homotopies/system_homotopy_composition.jl")
+include("homotopies/instrinsic_linear_subspace_homotopy.jl")
+include("homotopies/linear_subspace_geodesic_homotopy.jl")
+
+
+# include("homotopies/toric_homotopy.jl")
+
+# # public, these should be linked on the top
+# include("homotopies/affine_chart_homotopy.jl")
+# include("homotopies/coefficient_homotopy.jl")
+# # include("homotopies/intrinsic_subspace_homotopy.jl")
+# include("homotopies/mixed_homotopy.jl")
+# include("homotopies/parameter_homotopy.jl")
 
 """
     fixed(H::Homotopy; compile::Union{Bool,Symbol} = $(COMPILE_DEFAULT[]))
