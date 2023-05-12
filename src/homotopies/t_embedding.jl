@@ -30,6 +30,17 @@ function update!(H::StraightLineTEmbedding, p, q)
 end
 
 
+struct ToricEmbedding <: TEmbedding
+    # c[i]*t^w[i]
+    coeffs::Vector{ComplexF64}
+    weights::Vector{Float64}
+
+    t_weights::Vector{ComplexF64}
+
+    t_coeffs::Ref{ComplexF64}
+    dt_coeffs::Vector{ComplexF64}
+end
+
 struct CacheTEmbedding{E<:TEmbedding}
     embedding::E
     t_cache::Ref{ComplexF64}

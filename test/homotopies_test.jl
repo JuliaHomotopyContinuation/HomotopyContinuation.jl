@@ -199,55 +199,19 @@ end
     end
 
 
-    # @testset "MixedHomotopy" begin
-    #     @var x y t
-    #     a, b, c, = rand(3)
-    #     f = [(2 * x^2 + b^2 * y^3 + 2 * a * x * y)^3, (a + c)^4 * x + y^2]
-    #     F = System(f, [x, y])
-    #     g = [(2 * y^2 + b^2 * x^3 + 2 * a * x * y)^2, (a - c)^3 * y + x^2]
-    #     G = System(g, [x, y])
-    #     h = Homotopy(t .* F([x, y]) + (1 - t) .* G([x, y]), [x, y], t)
-    #     H = MixedHomotopy(h)
+    @testset "MixedHomotopy" begin
+        @var x y t
+        a, b, c, = rand(3)
+        f = [(2 * x^2 + b^2 * y^3 + 2 * a * x * y)^3, (a + c)^4 * x + y^2]
+        F = System(f, [x, y])
+        g = [(2 * y^2 + b^2 * x^3 + 2 * a * x * y)^2, (a - c)^3 * y + x^2]
+        G = System(g, [x, y])
+        h = Homotopy(t .* F([x, y]) + (1 - t) .* G([x, y]), [x, y], t)
+        H = MixedHomotopy(h)
+        test_homotopy(H, h)
 
-
-    #     test_homotopy(H, h)
-    # end
-
-
-    # @testset "ExtrinsicLinearSubspaceHomotopy" begin
-    #     @var x[1:4]
-    #     f1 = rand_poly(x, 2)
-    #     f2 = rand_poly(x, 2)
-    #     F = System([f1, f2], x)
-    #     A = rand_subspace(4; codim = 2)
-    #     B = rand_subspace(4, codim = 2)
-    #     H = ExtrinsicLinearSubspaceHomotopy(fixed(F; compile = false), A, B;)
-
-    #     @var t
-    #     h = Homotopy([F(x); t .* A(x) .+ (1 - t) .* B(x)], x, t)
-
-    #     test_homotopy(H, h)
-    # end
-
-    # @testset "CoefficientHomotopy" begin
-    #     @var x[1:4]
-    #     f1, c1 = dense_poly(x, 2)
-    #     f2, c2 = dense_poly(x, 2)
-    #     F = System([f1, f2]; parameters = [c1; c2])
-
-    #     p = randn(ComplexF64, 2 * length(c1))
-    #     q = randn(ComplexF64, 2 * length(c1))
-    #     H = CoefficientHomotopy(F, p, q; compile = false)
-
-    #     @var t
-    #     h = Homotopy(t .* F(x, p) .+ (1 - t) .* F(x, q), x, t)
-
-    #     test_homotopy(H, h)
-    # end
-
-    # @testset "MixedHomotopy" begin
-    #     @var x t
-    #     H = Homotopy([(1 - 2 * t) + (-2 + 2 * t) * x + x^2], [x], t)
-    #     test_homotopy(MixedHomotopy(H), H)
-    # end
+        @var x t
+        H = Homotopy([(1 - 2 * t) + (-2 + 2 * t) * x + x^2], [x], t)
+        test_homotopy(MixedHomotopy(H), H)
+    end
 end
