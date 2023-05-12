@@ -168,8 +168,7 @@ end
         @var x[1:4]
         f1 = rand_poly(x, 2)
         f2 = rand_poly(x, 2)
-        # F = System([f1, f2], x)
-        F = System(x[1:2], x)
+        F = System([f1, f2], x)
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
         H = LinearSubspaceGeodesicHomotopy(fixed(F; compile = false), A, B)
