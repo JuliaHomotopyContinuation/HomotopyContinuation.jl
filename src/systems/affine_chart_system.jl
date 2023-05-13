@@ -70,6 +70,20 @@ function set_solution!(x, F::AffineChartSystem, y)
     on_chart!(x, F.chart)
 end
 
+function on_chart!(x::AbstractVector, v::PVector)
+    ranges = dimension_indices(v)
+    for range in ranges
+        λ = zero(eltype(x))
+        @inbounds for i in range
+            λ += v[i] * x[i]
+        end
+        λ⁻¹ = @fastmath inv(λ)
+        for i in range
+            x[i] *= λ⁻¹
+        end
+    end
+    x
+end
 
 (F::AffineChartSystem)(x, p = nothing) = F.stacked(x, p)
 ModelKit.evaluate!(u, F::AffineChartSystem, x::AbstractVector, p = nothing) =

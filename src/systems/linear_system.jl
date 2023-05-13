@@ -41,6 +41,19 @@ end
 
 (F::LinearSystem)(x, p = nothing) = F.A * x - F.b
 
+function set_linear_subspace!(F::LinearSystem, L::LinearSubspace, coords = Extrinsic)
+    if coords == Extrinsic
+        F.A .= extrinsic(L).A
+        F.b .= extrinsic(L).b
+    elseif coords == Intrinsic
+        F.A .= intrinsic(L).A
+        F.b .-= intrinsic(L).b₀
+    else
+        error("Unknown coordinates: $coords")
+    end
+    F
+end
+
 ModelKit.variables(F::LinearSystem) = F.variables
 ModelKit.parameters(::LinearSystem) = Variable[]
 

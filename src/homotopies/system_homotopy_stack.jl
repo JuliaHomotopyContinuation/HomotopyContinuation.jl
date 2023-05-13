@@ -13,6 +13,7 @@ struct SystemHomotopyStack{S<:AbstractSystem,T<:AbstractHomotopy} <: AbstractHom
 end
 
 stack(F::AbstractSystem, H::AbstractHomotopy) = SystemHomotopyStack(F, H)
+homotopy(H::SystemHomotopyStack) = H.H
 Base.size(C::SystemHomotopyStack) = (size(C.F, 1) + size(C.H, 1), size(C.F, 2))
 
 function ModelKit.evaluate!(

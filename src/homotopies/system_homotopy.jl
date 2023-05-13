@@ -19,6 +19,10 @@ Base.size(H::SystemHomotopy) = size(H.system)
 
 (H::SystemHomotopy)(x, t, p::Nothing = nothing) = H.system(x, [t])
 
+function set_solution!(x::AbstractVector, H::SystemHomotopy, y::AbstractVector, t)
+    set_solution!(x, H.system, y)
+end
+
 function ModelKit.evaluate!(u, H::SystemHomotopy, x, t, p::Nothing = nothing)
     H.t[1] = t
     evaluate!(u, H.system, x, H.t)

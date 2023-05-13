@@ -25,41 +25,30 @@ function ExtrinsicLinearSubspaceHomotopy(
     target::LinearSubspace;
     kwargs...,
 )
-
     L₁ = LinearSystem(start)
     L₂ = LinearSystem(target)
-    H = stack(F, StraightLineHomotopy(L₁, L₂))
+    stack(F, StraightLineHomotopy(L₁, L₂))
 end
 
 
-# start_parameters!(H::ExtrinsicLinearSubspaceHomotopy, start) = parameters!(H, start, H.target)
-# target_parameters!(H::ExtrinsicLinearSubspaceHomotopy, target) = parameters!(H, H.start, target)
-# parameters!(H::ExtrinsicLinearSubspaceHomotopy, p, q) = set_subspaces!(H, p, q)
-
-# function set_subspaces!(
-#     H::ExtrinsicLinearSubspaceHomotopy,
-#     start::LinearSubspace,
-#     target::LinearSubspace,
-# )
-#     H.start = start
-#     H.target = target
-#     H.Ȧ .= extrinsic(start).A .- extrinsic(target).A
-#     H.ḃ .= extrinsic(start).b .- extrinsic(target).b
-#     H.t_cache[] = NaN
-#     H
-# end
-
-
-function ModelKit.evaluate!(u, H::ExtrinsicLinearSubspaceHomotopy, x, t)
-    evaluate!(u, H.H, x, t)
+start_parameters!(H::ExtrinsicLinearSubspaceHomotopy, p::LinearSubspace) =
+    set_linear_subspace!(homotopy(H.H).start, p)
+target_parameters!(H::ExtrinsicLinearSubspaceHomotopy, p::LinearSubspace) =
+    set_linear_subspace!(homotopy(H.H).target, p)
+function parameters!(
+    H::ExtrinsicLinearSubspaceHomotopy,
+    p::LinearSubspace,
+    q::LinearSubspace,
+)
+    set_linear_subspace!(homotopy(H.H).start, p)
+    set_linear_subspace!(homotopy(H.H).target, q)
 end
 
-function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicLinearSubspaceHomotopy, x, t)
+
+ModelKit.evaluate!(u, H::ExtrinsicLinearSubspaceHomotopy, x, t) = evaluate!(u, H.H, x, t)
+ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicLinearSubspaceHomotopy, x, t) =
     evaluate_and_jacobian!(u, U, H.H, x, t)
-    nothing
-end
-
-function ModelKit.taylor!(u, v, H::ExtrinsicLinearSubspaceHomotopy, tx, tṫ)
+ModelKit.taylor!(u, v, H::ExtrinsicLinearSubspaceHomotopy, tx, tṫ) =
     taylor!(u, v, H.H, tx, tṫ)
-    u
-end
+
+
