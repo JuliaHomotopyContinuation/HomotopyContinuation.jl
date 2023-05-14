@@ -10,15 +10,11 @@ include("homotopies/system_homotopy_composition.jl")
 include("homotopies/instrinsic_linear_subspace_homotopy.jl")
 include("homotopies/linear_subspace_geodesic_homotopy.jl")
 include("homotopies/mixed_homotopy.jl")
+include("homotopies/affine_chart_homotopy.jl")
 
 
 # include("homotopies/toric_homotopy.jl")
 
-# # public, these should be linked on the top
-# include("homotopies/affine_chart_homotopy.jl")
-# include("homotopies/coefficient_homotopy.jl")
-# # include("homotopies/intrinsic_subspace_homotopy.jl")
-# include("homotopies/parameter_homotopy.jl")
 
 """
     fixed(H::Homotopy; compile::Union{Bool,Symbol} = $(COMPILE_DEFAULT[]))
@@ -38,6 +34,7 @@ function fixed(H::Homotopy; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwa
         error("Unknown argument $compile for keyword `compile`.")
     end
 end
+ModelKit.variable_groups(::AbstractHomotopy) = nothing
 fixed(H::AbstractHomotopy; kwargs...) = H
 
 function set_solution!(x::AbstractVector, H::AbstractHomotopy, y::AbstractVector, t)

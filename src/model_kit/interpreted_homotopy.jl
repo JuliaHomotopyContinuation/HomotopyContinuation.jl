@@ -45,7 +45,7 @@ end
 Base.size(H::InterpretedHomotopy) = size(H.homotopy)
 variables(H::InterpretedHomotopy) = variables(H.homotopy)
 parameters(H::InterpretedHomotopy) = parameters(H.homotopy)
-variable_groups(H::InterpretedHomotopy) = variable_groups(H.homotopy)
+variable_groups(::InterpretedHomotopy) = nothing
 Base.:(==)(H::InterpretedHomotopy, G::InterpretedHomotopy) = H.homotopy == G.homotopy
 
 function Base.show(io::IO, H::InterpretedHomotopy)
@@ -78,14 +78,14 @@ function jacobian!(U, H::InterpretedHomotopy, x, t, p = nothing)
 end
 
 @generated function taylor!(
-    u::AbstractVector,
+    u::AbstractVector{T},
     Order::Val{M},
     H::InterpretedHomotopy,
     x,
     t,
     p::Union{Nothing,AbstractVector} = nothing;
-    assign_highest_order_only = u isa Vector,
-) where {M}
+    assign_highest_order_only::Bool = !(T <: TruncatedTaylorSeries),
+) where {M,T}
     if M == 1
         quote
             I = H.taylor_ComplexF64.order_1

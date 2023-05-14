@@ -30,6 +30,6 @@ ModelKit.evaluate!(u, F::HomotopySystem, x, p::AbstractVector) =
 ModelKit.evaluate_and_jacobian!(u, U, F::HomotopySystem, x, p::AbstractVector) =
     evaluate_and_jacobian!(u, U, F.homotopy, x, p[1])
 function ModelKit.taylor!(u, v::Val, F::HomotopySystem, tx, p::AbstractVector)
-    taylor!(u, v, F.homotopy, tx, p[1])
+    taylor!(u, v, F.homotopy, tx, (p[1, 1], p[1, 2]))
 end
 

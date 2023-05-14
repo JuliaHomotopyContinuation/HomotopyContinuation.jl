@@ -1492,6 +1492,7 @@ function evaluate(H::Homotopy, x::AbstractVector, t, p::AbstractVector)
 end
 (H::Homotopy)(x::AbstractVector, t) = evaluate(H, x, t)
 (H::Homotopy)(x::AbstractVector, t, p::AbstractVector) = evaluate(H, x, t, p)
+(H::Homotopy)(x::AbstractVector, t, ::Nothing) = evaluate(H, x, t)
 
 function Base.:(==)(H::Homotopy, G::Homotopy)
     H.expressions == G.expressions &&

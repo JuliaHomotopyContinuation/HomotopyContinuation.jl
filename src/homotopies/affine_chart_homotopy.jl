@@ -11,9 +11,9 @@ homotopy ``H̄`` which operates on the affine chart defined by the vector
 #     homotopy::H
 #     chart::PVector{ComplexF64,N}
 # end
-struct AffineChartHomotopy{T<:AbstractHomotopy} <: AbstractHomotopy
+struct AffineChartHomotopy{T<:AbstractHomotopy,N} <: AbstractHomotopy
     H::T
-    composed::SystemHomotopy{AffineChartSystem{HomotopySystem{T}}}
+    composed::SystemHomotopy{AffineChartSystem{HomotopySystem{T},N}}
 end
 AffineChartHomotopy(
     H::AbstractHomotopy,
@@ -35,6 +35,18 @@ end
 start_parameters!(H::AffineChartHomotopy, p) = start_parameters!(H.composed, p)
 target_parameters!(H::AffineChartHomotopy, p) = target_parameters!(H.composed, p)
 parameters!(H::AffineChartHomotopy, p, q) = parameters!(H.composed, p, q)
+
+function on_affine_chart(
+    H::Homotopy,
+    proj_dims = nothing;
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+)
+    on_affine_chart(fixed(H; compile = compile), proj_dims)
+end
+on_affine_chart(H::AbstractHomotopy, proj_dims = nothing) = AffineChartHomotopy(
+    H,
+    system_as_homotopy(on_affine_chart(homotopy_as_system(H), proj_dims)),
+)
 
 function ModelKit.evaluate!(u, H::AffineChartHomotopy, x, t, p::Nothing = nothing)
     evaluate!(u, H.composed, x, t)

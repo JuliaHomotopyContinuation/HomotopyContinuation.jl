@@ -19,6 +19,9 @@ Base.size(H::SystemHomotopy) = size(H.system)
 
 (H::SystemHomotopy)(x, t, p::Nothing = nothing) = H.system(x, [t])
 
+on_affine_chart(H::SystemHomotopy, proj_dims = nothing;) =
+    on_affine_chart(H.system, proj_dims)
+
 function set_solution!(x::AbstractVector, H::SystemHomotopy, y::AbstractVector, t)
     set_solution!(x, H.system, y)
 end
@@ -40,7 +43,9 @@ function ModelKit.evaluate_and_jacobian!(
 end
 
 function ModelKit.taylor!(u, v::Val, H::SystemHomotopy, tx, tt, p::Nothing = nothing)
-    H.tt[1] = tt
+    t, ṫ = tt
+    H.tt[1, 1] = t
+    H.tt[1, 2] = ṫ
     taylor!(u, v, H.system, tx, H.tt)
 end
 

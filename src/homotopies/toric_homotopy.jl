@@ -265,14 +265,14 @@ end
 
 
 function ModelKit.taylor!(u, v::Val{2}, H::ToricHomotopy, tx::TaylorVector, t)
-    taylor_coeffs!(H, real(t))
+    taylor_coeffs!(H, t)
     ModelKit.taylor!(u, v, H.system, tx, H.tc2)
 end
 function ModelKit.taylor!(u, v::Val{3}, H::ToricHomotopy, tx::TaylorVector, t)
-    taylor_coeffs!(H, real(t))
+    taylor_coeffs!(H, t)
     ModelKit.taylor!(u, v, H.system, tx, H.tc3)
 end
 function ModelKit.taylor!(u, v::Val{4}, H::ToricHomotopy, tx::TaylorVector, t)
-    taylor_coeffs!(H, real(t))
+    taylor_coeffs!(H, t)
     ModelKit.taylor!(u, v, H.system, tx, H.taylor_coeffs)
 end

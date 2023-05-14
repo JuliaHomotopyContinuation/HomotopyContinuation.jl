@@ -214,4 +214,11 @@ end
         H = Homotopy([(1 - 2 * t) + (-2 + 2 * t) * x + x^2], [x], t)
         test_homotopy(MixedHomotopy(H), H)
     end
+
+    @testset "AffineChartHomotopy" begin
+        @var x y b
+        h = Homotopy([x^2 + 3 * x * y + y^2 * b], [x, y], b)
+        H = on_affine_chart(h)
+        test_homotopy(H, Homotopy(H([x, y], b), [x, y], b))
+    end
 end

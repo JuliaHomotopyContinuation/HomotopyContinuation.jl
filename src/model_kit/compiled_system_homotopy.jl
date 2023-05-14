@@ -328,13 +328,13 @@ _taylor!_impl(T) = compiled_execute_impl(instruction_sequence(interpret(T)); tay
 Compute the Taylor series order order `K` of ``u = F(x,p)``.
 """
 @generated function taylor!(
-    u::AbstractArray,
+    u::AbstractArray{S},
     Order::Val{K},
     T::CompiledSystem,
     x::AbstractArray,
     p::Union{Nothing,AbstractArray} = nothing;
-    assign_highest_order_only::Bool = u isa Vector,
-) where {K}
+    assign_highest_order_only::Bool = !(S <: TruncatedTaylorSeries),
+) where {K,S}
     _taylor!_impl(T)
 end
 
@@ -350,14 +350,14 @@ end
 Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
 """
 @generated function taylor!(
-    u::AbstractArray,
+    u::AbstractArray{S},
     Order::Val{K},
     T::CompiledHomotopy,
     x::AbstractArray,
     t,
     p::Union{Nothing,AbstractArray} = nothing;
-    assign_highest_order_only::Bool = u isa Vector,
-) where {K}
+    assign_highest_order_only::Bool = !(S <: TruncatedTaylorSeries),
+) where {K,S}
     quote
         $(_taylor!_impl(T))
     end
