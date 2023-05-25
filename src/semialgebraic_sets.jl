@@ -57,6 +57,20 @@ SemialgebraicSetsHCSolver(;
     (compile = compile, options...),
 )
 
+function SemialgebraicSets.default_gröbner_basis_algorithm(
+    ::Any,
+    ::SemialgebraicSetsHCSolver,
+)
+    return SemialgebraicSets.NoAlgorithm()
+end
+
+function SemialgebraicSets.promote_for(
+    ::Type{T},
+    ::Type{SemialgebraicSetsHCSolver},
+) where {T}
+    return float(T)
+end
+
 function Base.show(io::IO, solver::SemialgebraicSetsHCSolver)
     print(io, "SemialgebraicSetsHCSolver(; ")
     if solver.excess_residual_tol !== nothing
@@ -87,7 +101,7 @@ function _reconsider_excess_solutions(tracker::OverdeterminedTracker, results, t
     end
 end
 
-function SemialgebraicSets.solvealgebraicequations(
+function SemialgebraicSets.solve(
     V::SemialgebraicSets.AbstractAlgebraicSet,
     hcsolver::SemialgebraicSetsHCSolver,
 )
