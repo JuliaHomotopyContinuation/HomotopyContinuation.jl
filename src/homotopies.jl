@@ -1,5 +1,4 @@
 # internal only
-include("homotopies/t_embedding.jl")
 include("homotopies/general_parameter_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/straight_line_homotopy.jl")
@@ -11,9 +10,7 @@ include("homotopies/instrinsic_linear_subspace_homotopy.jl")
 include("homotopies/linear_subspace_geodesic_homotopy.jl")
 include("homotopies/mixed_homotopy.jl")
 include("homotopies/affine_chart_homotopy.jl")
-
-
-# include("homotopies/toric_homotopy.jl")
+include("homotopies/toric_homotopy.jl")
 
 
 """

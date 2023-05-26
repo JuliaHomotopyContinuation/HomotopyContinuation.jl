@@ -1,5 +1,7 @@
 export GeneralParameterHomotopy
 
+include("general_parameter_homotopy/t_embedding.jl")
+
 """
     GeneralParameterHomotopy(F::Union{AbstractSystem,System}; start_parameters, target_parameters)
     GeneralParameterHomotopy(F::Union{AbstractSystem,System}, start_parameters, target_parameters)

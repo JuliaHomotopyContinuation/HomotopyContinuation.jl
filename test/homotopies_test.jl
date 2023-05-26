@@ -221,4 +221,44 @@ end
         H = on_affine_chart(h)
         test_homotopy(H, Homotopy(H([x, y], b), [x, y], b))
     end
+
+    @testset "ToricHomotopy" begin
+        function polyhedral_system(support)
+            m = 0
+            p = Variable[]
+            coeffs = map(support) do A
+                c = variables(:c, m+1:m+size(A, 2))
+                m += size(A, 2)
+                append!(p, c)
+                c
+            end
+
+            System(
+                support,
+                coeffs;
+                variables = variables(:x, 1:length(support)),
+                parameters = p,
+            )
+        end
+
+
+        @var x[1:4]
+        f = [rand_poly(x, 2) for k = 1:4]
+        F = System(f)
+        A, C = support_coefficients(F)
+        cells, lifting = MixedSubdivisions.fine_mixed_cells(A)
+        G = polyhedral_system(A)
+
+        H = ToricHomotopy(fixed(G), C, A)
+
+        cell = first(cells)
+
+        HC.update!(H, lifting, cell)
+        w = HC.γ(H.H).weights
+        @var t
+        h = Homotopy(G(x, reduce(vcat, C) .* t .^ w), x, t)
+
+        test_homotopy(H, h)
+    end
+
 end
