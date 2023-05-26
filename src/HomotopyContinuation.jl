@@ -76,8 +76,8 @@ include("total_degree.jl")
 
 
 
-# include("binomial_system.jl")
-# include("polyhedral.jl")
+include("binomial_system.jl")
+include("polyhedral.jl")
 # include("overdetermined.jl")
 # include("result.jl")
 # include("solve.jl")

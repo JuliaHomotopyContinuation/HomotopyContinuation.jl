@@ -104,9 +104,9 @@ end
 This tracker realises the two step approach of the polyhedral homotopy.
 See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,M} <: AbstractPathTracker
-    toric_tracker::Tracker{H1,M}
-    generic_tracker::EndgameTracker{H2,M}
+struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy} <: AbstractPathTracker
+    toric_tracker::Tracker{H1}
+    generic_tracker::EndgameTracker{H2}
     support::Vector{Matrix{Int32}}
     lifting::Vector{Vector{Int32}}
 end
