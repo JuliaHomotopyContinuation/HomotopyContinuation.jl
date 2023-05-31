@@ -114,7 +114,8 @@ function newton!(
                 return NewtonCorrectorResult(NEWT_CONVERGED, μ, iter, ω, θ, μ_low, norm_Δx₀)
             end
             norm_Δxᵢ₋₁ = norm_Δxᵢ
-        catch
+        catch e
+            rethrow(e)
             return NewtonCorrectorResult(
                 NEWT_SINGULARITY,
                 norm_Δxᵢ,

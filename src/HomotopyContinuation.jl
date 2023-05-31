@@ -9,6 +9,7 @@ import IntervalTrees
 import LinearAlgebra
 import LoopVectorization
 import MultivariatePolynomials
+import Richardson
 import PrettyTables
 import Printf
 import ProgressMeter

@@ -264,6 +264,26 @@ end
 ##########
 ## ldiv ##
 ##########
+function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
+    x === b || copyto!(x, b)
+    _ipiv!(LU, x)
+    ldiv_unit_lower!(LU.factors, x)
+    ldiv_upper!(LU.factors, x)
+    x
+end
+function lu_ldiv!(x, LU::AbstractMatrix, ipiv::AbstractVector, b::AbstractVector)
+    x === b || copyto!(x, b)
+    _ipiv!(ipiv, x)
+    ldiv_unit_lower!(LU, x)
+    ldiv_upper!(LU, x)
+    x
+end
+
+@inline _ipiv!(ipiv::AbstractVector, b::AbstractVector) =
+    apply_ipiv!(b, 1:length(ipiv), ipiv)
+@inline _inverse_ipiv!(ipiv::AbstractVector, b::StridedVecOrMat) =
+    apply_ipiv!(b, length(ipiv):-1:1, ipiv)
+
 @inline _ipiv!(A::LA.LU, b::AbstractVector) = apply_ipiv!(b, 1:length(A.ipiv), A.ipiv)
 @inline _inverse_ipiv!(A::LA.LU, b::StridedVecOrMat) =
     apply_ipiv!(b, length(A.ipiv):-1:1, A.ipiv)
@@ -303,14 +323,6 @@ end
             b[i] -= A[i, j] * xj
         end
     end
-    x
-end
-
-function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
-    x === b || copyto!(x, b)
-    _ipiv!(LU, x)
-    ldiv_unit_lower!(LU.factors, x)
-    ldiv_upper!(LU.factors, x)
     x
 end
 

@@ -51,6 +51,7 @@ end
 
 Base.last(S::PathSamplePoints) = last(S.samples)
 Base.length(S::PathSamplePoints) = length(S.samples)
+Base.isempty(S::PathSamplePoints) = isempty(S.samples)
 
 function extrapolate(S::PathSamplePoints; winding_number::Int, max_samples::Int = 10)
     n = length(S)
@@ -128,7 +129,7 @@ function init!(state::EndgameState)
     state.rcond = NaN
     state.singular = false
     init!(state.valuation)
-    empty!(state.sample_points)
+    init!(state.sample_points)
 end
 
 
@@ -195,6 +196,7 @@ Base.@kwdef mutable struct EndgameOptions
 
     # parameters
     singular_rcond_threshold::Float64 = 1e-12
+    diverging_rcond_threshold::Float64 = 1e-8
     valuation_accuracy_tol::Float64 = 0.01
     max_winding_number::Int = 6
 end
@@ -262,17 +264,27 @@ function endgame(eg::EndgameTracker; min_norm_diverging::Float64 = 1e4)
     # Check if path is diverging
     val_result = analyze_valuation(eg.state.valuation; zero_is_finite = true)
 
-    if val_result.verdict == ValuationVerdict.Diverging &&
-       # Check if the diverging coordinate is larger than our threshold
-       some(
-        k ->
-            val_result.coordinate_verdicts[k] == ValuationVerdict.Diverging &&
-                abs(x[k]) > min_norm_diverging,
-        1:n,
-    )
+    if val_result.verdict == ValuationVerdict.Diverging
+        # Check if the diverging coordinate is larger than our threshold
 
-        eg.state.code = EndgameCode.path_diverging
-        return
+        is_diverging = any(
+            k ->
+                val_result.coordinate_verdicts[k] == ValuationVerdict.Diverging &&
+                    abs(x[k]) > min_norm_diverging,
+            1:n,
+        )
+
+        if !is_diverging
+            state.rcond = rcond!(tracker.ws)
+            if state.rcond < eg.options.diverging_rcond_threshold
+                is_diverging = true
+            end
+        end
+
+        if is_diverging
+            eg.state.code = EndgameCode.path_diverging
+            return
+        end
     end
 
 
@@ -439,6 +451,7 @@ function PathResult(
         residual = LA.norm(tracker.corrector.r, InfNorm())
     end
 
+    last_path_point = nothing
     if !isempty(state.sample_points)
         last_path_point = last(state.sample_points)
     end
