@@ -559,9 +559,12 @@ function _certify(
     max_precision::Int = 256,
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
+    threading::Bool = true,
 )
+    N = length(solution_candidates)
     certificates =
-        extended_certificate ? ExtendedSolutionCertificate[] : SolutionCertificate[]
+        extended_certificate ? Vector{ExtendedSolutionCertificate}(undef, N) :
+        Vector{SolutionCertificate}(undef, N)
 
     m, n = size(F)
     m == n || throw(ArgumentError("We can only certify solutions to square systems."))
@@ -571,10 +574,25 @@ function _certify(
     end
 
     if !show_progress
-        for (i, s) in enumerate(solution_candidates)
-            push!(
-                certificates,
-                certify_solution(
+        if threading
+            Fs = [deepcopy(F) for _ = 1:Threads.nthreads()]
+            ccaches = [CertificationCache(Fs[k]) for k = 1:Threads.nthreads()]
+            Threads.@threads for i = 1:length(solution_candidates)
+                G = Fs[Threads.threadid()]
+                ccache = ccaches[Threads.threadid()]
+                certificates[i] = certify_solution(
+                    G,
+                    solution_candidates[i],
+                    p,
+                    ccache,
+                    i;
+                    extended_certificate = extended_certificate,
+                    max_precision = max_precision,
+                )
+            end
+        else
+            for (i, s) in enumerate(solution_candidates)
+                certificates[i] = certify_solution(
                     F,
                     s,
                     p,
@@ -582,8 +600,8 @@ function _certify(
                     i;
                     extended_certificate = extended_certificate,
                     max_precision = max_precision,
-                ),
-            )
+                )
+            end
         end
     else
         # Create progress meter
@@ -601,22 +619,55 @@ function _certify(
         progress.tlast += progress.dt
 
         # Go over all solution
-        ncertified = 0
-        nreal_certified = 0
-        for (i, s) in enumerate(solution_candidates)
-            r = certify_solution(
-                F,
-                s,
-                p,
-                cache,
-                i;
-                extended_certificate = extended_certificate,
-                max_precision = max_precision,
-            )
-            push!(certificates, r)
-            ncertified += is_certified(r)
-            nreal_certified += is_certified(r) && is_real(r)
-            update_certify_progress!(progress, i, ncertified, nreal_certified)
+
+        if threading
+            ncertified = Threads.Atomic{Int}(0)
+            nreal_certified = Threads.Atomic{Int}(0)
+            nconsidered = Threads.Atomic{Int}(0)
+            Fs = [deepcopy(F) for _ = 1:Threads.nthreads()]
+            caches = [deepcopy(cache) for _ = 1:Threads.nthreads()]
+            Threads.@threads for i = 1:length(solution_candidates)
+                F = Fs[Threads.threadid()]
+                cache = caches[Threads.threadid()]
+                r = certify_solution(
+                    F,
+                    solution_candidates[i],
+                    p,
+                    cache,
+                    i;
+                    extended_certificate = extended_certificate,
+                    max_precision = max_precision,
+                )
+                certificates[i] = r
+                Threads.atomic_add!(ncertified, Int(is_certified(r)))
+                Threads.atomic_add!(nreal_certified, Int(is_certified(r) && is_real(r)))
+                Threads.atomic_add!(nconsidered, 1)
+
+                update_certify_progress!(
+                    progress,
+                    nconsidered[],
+                    ncertified[],
+                    nreal_certified[],
+                )
+            end
+        else
+            ncertified = 0
+            nreal_certified = 0
+            for (i, s) in enumerate(solution_candidates)
+                r = certify_solution(
+                    F,
+                    s,
+                    p,
+                    cache,
+                    i;
+                    extended_certificate = extended_certificate,
+                    max_precision = max_precision,
+                )
+                certificates[i] = r
+                ncertified += is_certified(r)
+                nreal_certified += is_certified(r) && is_real(r)
+                update_certify_progress!(progress, i, ncertified, nreal_certified)
+            end
         end
     end
     if check_distinct
@@ -660,7 +711,6 @@ function certify_solution(
     extended_certificate::Bool = false,
 )
     @unpack C, arb_C, arb_x̃₀ = cert_cache
-    n = size(C, 1)
 
     # refine solution to machine precicision
     res = newton(
@@ -710,6 +760,32 @@ function certify_solution(
         end
     end
 
+    return extended_prec_certify_solution(
+        F,
+        solution_candidate,
+        x̃₀,
+        cert_params,
+        cert_cache,
+        index;
+        max_precision = max_precision,
+        extended_certificate = extended_certificate,
+    )
+end
+
+function extended_prec_certify_solution(
+    F::AbstractSystem,
+    solution_candidate::AbstractVector,
+    x̃₀::AbstractVector,
+    cert_params::Union{Nothing,CertificationParameters},
+    cert_cache::CertificationCache,
+    index::Int;
+    max_precision::Int = 256,
+    extended_certificate::Bool = false,
+)
+    @unpack C, arb_C, arb_x̃₀ = cert_cache
+
+    n = size(C, 1)
+
     # If not certified we do the computation in higher precision using Arb
     prec = 128
     set_arb_precision!(cert_cache, prec)
@@ -735,7 +811,7 @@ function certify_solution(
             Arblib.set!(x̃, arb_x̃₀)
             Arblib.set!(Y, arb_C)
             if extended_certificate
-                return ExtendedSolutionCertificate(
+                cert = ExtendedSolutionCertificate(
                     solution_candidate = solution_candidate,
                     certified = true,
                     real = is_real,
@@ -748,8 +824,10 @@ function certify_solution(
                     Y = Y,
                     solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
                 )
+                return cert
             else
-                return SolutionCertificate(
+
+                cert = SolutionCertificate(
                     solution_candidate = solution_candidate,
                     certified = true,
                     real = is_real,
@@ -759,6 +837,7 @@ function certify_solution(
                     I′ = I′,
                     solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
                 )
+                return cert
             end
         end
 
@@ -780,9 +859,7 @@ function certify_solution(
             index = index,
         )
     end
-
 end
-
 
 
 function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
