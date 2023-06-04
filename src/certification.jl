@@ -28,6 +28,8 @@ export certify,
     certified_solution
 
 
+abstract type AbstractSolutionCertificate end
+
 
 """
     SolutionCertificate
@@ -36,7 +38,21 @@ Result of [`certify`](@ref) for a single solution. Contains the initial solution
 and if the certification was successfull a vector of complex intervals where the true
 solution is contained in.
 """
-Base.@kwdef struct SolutionCertificate
+Base.@kwdef struct SolutionCertificate <: AbstractSolutionCertificate
+    solution_candidate::AbstractVector
+    certified::Bool
+    real::Bool = false
+    complex::Bool = false
+    index::Union{Nothing,Int} = nothing
+    prec::Int = 53
+    I′::Union{Nothing,AcbMatrix} = nothing
+
+    # We also store a double precision representation of the midpoint of x₁
+    # as the best available double precision estimate of the solution
+    solution::Union{Nothing,Vector{ComplexF64}} = nothing
+end
+
+Base.@kwdef struct ExtendedSolutionCertificate <: AbstractSolutionCertificate
     solution_candidate::AbstractVector
     certified::Bool
     real::Bool = false
@@ -56,45 +72,45 @@ end
 
 
 """
-    solution_candidate(certificate::SolutionCertificate)
+    solution_candidate(certificate::AbstractSolutionCertificate)
 
 Returns the given provided solution candidate.
 """
-solution_candidate(C::SolutionCertificate) = C.solution_candidate
-@deprecate initial_solution(cert::SolutionCertificate) solution_candidate(cert)
+solution_candidate(C::AbstractSolutionCertificate) = C.solution_candidate
+@deprecate initial_solution(cert::AbstractSolutionCertificate) solution_candidate(cert)
 
 """
-    is_certified(certificate::SolutionCertificate)
+    is_certified(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` is a certificate that `certified_solution_interval(certificate)`
 contains a unique zero.
 """
-is_certified(C::SolutionCertificate) = C.certified
+is_certified(C::AbstractSolutionCertificate) = C.certified
 
 """
-    is_real(certificate::SolutionCertificate)
+    is_real(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` certifies that the certified solution interval
 contains a true real zero of the system.
 If `false` is returned then this does not necessarily mean that the true solution is not real.
 """
-is_real(C::SolutionCertificate) = C.real
+is_real(C::AbstractSolutionCertificate) = C.real
 
 """
-    is_complex(certificate::SolutionCertificate)
+    is_complex(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` certifies that the certified solution interval
 contains a true complex zero of the system.
 """
-is_complex(C::SolutionCertificate) = C.complex
+is_complex(C::AbstractSolutionCertificate) = C.complex
 
 """
-    is_positive(certificate::SolutionCertificate)
+    is_positive(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `is_certified(certificate)` is `true` and the unique zero contained
 in `certified_solution_interval(certificate)` is real and positive.
 """
-function is_positive(C::SolutionCertificate)
+function is_positive(C::AbstractSolutionCertificate)
     if !is_certified(C) || !is_real(C)
         return false
     else
@@ -104,12 +120,12 @@ end
 
 
 """
-    is_positive(certificate::SolutionCertificate, i)
+    is_positive(certificate::AbstractSolutionCertificate, i)
 
 Returns `true` if `is_certified(certificate)` is `true` and `i`-th coordinate of the
 unique zero contained in `certified_solution_interval(certificate)` is real and positive.
 """
-function is_positive(C::SolutionCertificate, i::Integer)
+function is_positive(C::AbstractSolutionCertificate, i::Integer)
     if !is_certified(C) || !is_real(C)
         return false
     else
@@ -119,58 +135,58 @@ end
 
 
 """
-    certified_solution_interval(certificate::SolutionCertificate)
+    certified_solution_interval(certificate::AbstractSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval(certificate::SolutionCertificate) = certificate.I
+certified_solution_interval(certificate::AbstractSolutionCertificate) = certificate.I′
 @deprecate certified_solution(certificate) certified_solution_interval(certificate)
 
 """
-    certified_solution_interval_after_krawczyk(certificate::SolutionCertificate)
+    certified_solution_interval_after_krawczyk(certificate::AbstractSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval_after_krawczyk(certificate::SolutionCertificate) =
+certified_solution_interval_after_krawczyk(certificate::AbstractSolutionCertificate) =
     certificate.I′
 
 """
-    certificate_index(certificate::SolutionCertificate)
+    certificate_index(certificate::AbstractSolutionCertificate)
 
 Return the index of the solution certificate. Here the index refers to the index of the
 provided solution candidates.
 """
-certificate_index(certificate::SolutionCertificate) = C.index
+certificate_index(C::AbstractSolutionCertificate) = C.index
 
 """
-    precision(certificate::SolutionCertificate)
+    precision(certificate::AbstractSolutionCertificate)
 
 Returns the maximal precision used to produce the given `certificate`.
 """
-Base.precision(certificate::SolutionCertificate) = certificate.prec
+Base.precision(certificate::AbstractSolutionCertificate) = certificate.prec
 
 """
-    solution_approximation(certificate::SolutionCertificate)
+    solution_approximation(certificate::AbstractSolutionCertificate)
 
 If `is_certified(certificate)` is `true` this returns the midpoint of the
 [`certified_solution_interval`](@ref) of the given `certificate` as a `Vector{ComplexF64}`.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-solution_approximation(certificate::SolutionCertificate) = certificate.solution
+solution_approximation(certificate::AbstractSolutionCertificate) = certificate.solution
 
 """
-    krawczyk_operator_parameters(cert::SolutionCertificate)
+    krawczyk_operator_parameters(cert::ExtendedSolutionCertificate)
 
 Returns a `NamedTuple` `(x, Y)` with the parameters of the Krawczyk operator following [BRT20].
 """
-krawczyk_operator_parameters(cert::SolutionCertificate) = (x = cert.x̃, Y = cert.Y)
+krawczyk_operator_parameters(cert::ExtendedSolutionCertificate) = (x = cert.x̃, Y = cert.Y)
 
-function Base.show(f::IO, cert::SolutionCertificate)
+function Base.show(f::IO, cert::AbstractSolutionCertificate)
     println(f, "SolutionCertificate:")
     println(f, "solution_candidate = [")
     for z in solution_candidate(cert)
@@ -205,8 +221,8 @@ The result of [`certify`](@ref) for multiple solutions.
 Contains a vector of [`SolutionCertificate`](@ref) as well as a list of certificates
 which correspond to the same true solution.
 """
-struct CertificationResult
-    certificates::Vector{SolutionCertificate}
+struct CertificationResult{C<:AbstractSolutionCertificate}
+    certificates::Vector{C}
     duplicates::Vector{Vector{Int}}
     slp::ModelKit.Interpreter{Vector{IComplexF64}}
     slp_jacobian::ModelKit.Interpreter{Vector{IComplexF64}}
@@ -542,8 +558,10 @@ function _certify(
     show_progress::Bool = true,
     max_precision::Int = 256,
     check_distinct::Bool = true,
+    extended_certificate::Bool = false,
 )
-    certificates = SolutionCertificate[]
+    certificates =
+        extended_certificate ? ExtendedSolutionCertificate[] : SolutionCertificate[]
 
     m, n = size(F)
     m == n || throw(ArgumentError("We can only certify solutions to square systems."))
@@ -554,7 +572,18 @@ function _certify(
 
     if !show_progress
         for (i, s) in enumerate(solution_candidates)
-            push!(certificates, certify_solution(F, s, p, cache, i))
+            push!(
+                certificates,
+                certify_solution(
+                    F,
+                    s,
+                    p,
+                    cache,
+                    i;
+                    extended_certificate = extended_certificate,
+                    max_precision = max_precision,
+                ),
+            )
         end
     else
         # Create progress meter
@@ -575,7 +604,15 @@ function _certify(
         ncertified = 0
         nreal_certified = 0
         for (i, s) in enumerate(solution_candidates)
-            r = certify_solution(F, s, p, cache, i)
+            r = certify_solution(
+                F,
+                s,
+                p,
+                cache,
+                i;
+                extended_certificate = extended_certificate,
+                max_precision = max_precision,
+            )
             push!(certificates, r)
             ncertified += is_certified(r)
             nreal_certified += is_certified(r) && is_real(r)
@@ -617,9 +654,10 @@ function certify_solution(
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
-    index::Int,
+    index::Int;
     max_precision::Int = 256,
     refine_solution::Bool = true,
+    extended_certificate::Bool = false,
 )
     @unpack C, arb_C, arb_x̃₀ = cert_cache
     n = size(C, 1)
@@ -644,19 +682,32 @@ function certify_solution(
     certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
 
     if certified
-        return SolutionCertificate(
-            solution_candidate = solution_candidate,
-            certified = true,
-            real = is_real,
-            complex = any(xi -> !(0.0 in imag(xi)), x₁),
-            index = index,
-            prec = 53,
-            I = AcbMatrix(x₀; prec = 53),
-            I′ = AcbMatrix(x₁; prec = 53),
-            x̃ = AcbMatrix(x̃₀; prec = 53),
-            Y = AcbMatrix(C; prec = 53),
-            solution = mid.(x₁),
-        )
+        if extended_certificate
+            return ExtendedSolutionCertificate(
+                solution_candidate = solution_candidate,
+                certified = true,
+                real = is_real,
+                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                index = index,
+                prec = 53,
+                I = AcbMatrix(x₀; prec = 53),
+                I′ = AcbMatrix(x₁; prec = 53),
+                x̃ = AcbMatrix(x̃₀; prec = 53),
+                Y = AcbMatrix(C; prec = 53),
+                solution = mid.(x₁),
+            )
+        else
+            return SolutionCertificate(
+                solution_candidate = solution_candidate,
+                certified = true,
+                real = is_real,
+                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                index = index,
+                prec = 53,
+                I′ = AcbMatrix(x₁; prec = 53),
+                solution = mid.(x₁),
+            )
+        end
     end
 
     # If not certified we do the computation in higher precision using Arb
@@ -683,19 +734,32 @@ function certify_solution(
             Arblib.set!(I′, arb_x₁)
             Arblib.set!(x̃, arb_x̃₀)
             Arblib.set!(Y, arb_C)
-            return SolutionCertificate(
-                solution_candidate = solution_candidate,
-                certified = true,
-                real = is_real,
-                complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
-                index = index,
-                prec = prec,
-                I = I,
-                I′ = I′,
-                x̃ = x̃,
-                Y = Y,
-                solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
-            )
+            if extended_certificate
+                return ExtendedSolutionCertificate(
+                    solution_candidate = solution_candidate,
+                    certified = true,
+                    real = is_real,
+                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    index = index,
+                    prec = prec,
+                    I = I,
+                    I′ = I′,
+                    x̃ = x̃,
+                    Y = Y,
+                    solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
+                )
+            else
+                return SolutionCertificate(
+                    solution_candidate = solution_candidate,
+                    certified = true,
+                    real = is_real,
+                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    index = index,
+                    prec = prec,
+                    I′ = I′,
+                    solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
+                )
+            end
         end
 
         prec += 64
@@ -703,11 +767,20 @@ function certify_solution(
     end
 
     # certification failed
-    return SolutionCertificate(
-        solution_candidate = solution_candidate,
-        certified = false,
-        index = index,
-    )
+    if extended_certificate
+        return ExtendedSolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = false,
+            index = index,
+        )
+    else
+        return SolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = false,
+            index = index,
+        )
+    end
+
 end
 
 
@@ -892,7 +965,7 @@ end
 Find all duplicate solutions. A solution is considered to be duplicate if the unique
 region overlap.
 """
-function find_duplicates(certificates::AbstractVector{SolutionCertificate})
+function find_duplicates(certificates::AbstractVector{<:AbstractSolutionCertificate})
     # The strategy to indentify duplication candidates is as following.
     # We first compute the squared euclidean distance to a random point
     # in interval arithmetic. We then compute all overlapping intervals and return this
