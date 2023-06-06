@@ -994,6 +994,12 @@ function small_rational()
     )
 end
 
+function sqrt_parameters()
+    @var x y a b
+
+    System([sqrt(a + b) * x^2 - y, (x * y + a - sqrt(b))^2 - 3], [x, y], [a, b])
+end
+
 TEST_SYSTEM_COLLECTION = [
     ("moments3", moments3()),
     ("fano_quintic", fano_quintic()),
@@ -1008,4 +1014,5 @@ TEST_SYSTEM_COLLECTION = [
     ("steiner", steiner()),
     ("four_bar", four_bar()),
     ("small_rational", small_rational()),
+    ("sqrt_parameters", sqrt_parameters()),
 ]
