@@ -467,9 +467,10 @@ Base.abs(a::DoubleF64) = a.hi < 0.0 ? -a : a
 Base.eps(::DoubleF64) = double_eps
 Base.eps(::Type{DoubleF64}) = double_eps # 2^-104
 
+Base.floatmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
 # Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
-# Base.realmin(::Type{DoubleF64}) = 2.0041683600089728e-292 # = 2^(-1022 + 53)
-# Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
+Base.floatmax(::Type{DoubleF64}) =
+    DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291)
 # Base.realmax(::Type{DoubleF64}) = DoubleF64(1.79769313486231570815e+308, 9.97920154767359795037e+291);
 
 Base.isnan(a::DoubleF64) = isnan(a.hi) || isnan(a.lo)

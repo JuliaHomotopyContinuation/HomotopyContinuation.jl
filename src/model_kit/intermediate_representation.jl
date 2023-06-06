@@ -233,9 +233,9 @@ function pow!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b)
         return add_op!(ir, OP_POW_INT, a, k)
     elseif k == 1 // 2
         return add_op!(ir, OP_SQRT, a)
+    else
+        error("Cannot handle exponent: $b")
     end
-
-    return add_op!(ir, OP_POW, a, b)
 end
 
 function split_off_minus_one(ex)
@@ -379,16 +379,14 @@ function split_into_num_denom!(ir, ex, cse, pse)
         if class(e) == :Pow
             x, k_ex = args(e)
             xref = expr_to_ir_statements!(ir, x, cse, pse)
-            if class(k_ex) == :Integer
-                k = convert(Int32, k_ex)
-                if k < 0
-                    push!(denoms, pow!(ir, xref, -k))
-                else
-                    push!(nums, pow!(ir, xref, k))
-                end
+            k = to_number(k_ex)
+            if k isa Basic
+                throw(ExprError("Cannot handle non-constant exponents"))
+            end
+            if k < 0
+                push!(denoms, pow!(ir, xref, -k))
             else
-                kref = expr_to_ir_statements!(ir, k_ex, cse, pse)
-                push!(nums, add_op!(ir, OP_POW, xref, kref))
+                push!(nums, pow!(ir, xref, k))
             end
         else
             push!(nums, expr_to_ir_statements!(ir, e, cse, pse))

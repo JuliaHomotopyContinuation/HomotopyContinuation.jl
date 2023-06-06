@@ -399,8 +399,13 @@ end
     taylor_impl(K, M - 1) do list, D
         v₀ = add_op!(list, OP_SQRT, D[:x, 0])
         d = mul!(list, 2, v₀)
-        ids = [v₀]
-        for k = 1:K
+        ids = []
+        push!(ids, v₀)
+        if K >= 1
+            v₁ = div!(list, D[:x, 1], d)
+            push!(ids, v₁)
+        end
+        for k = 2:K
             s = nothing
             for j = 1:(k-1)
                 s = muladd!(list, ids[j+1], ids[k-j+1], s)
