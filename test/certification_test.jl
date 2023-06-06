@@ -32,7 +32,7 @@
 
         # Double solutions
         S = solutions(result)
-        cert = certify(F, [S; S])
+        cert = certify(F, [S; S]; extended_certificate = true)
         @test ncertified(cert) == 36
         @test ndistinct_certified(cert) == 18
         @test nreal_certified(cert) == 8
