@@ -1557,4 +1557,3 @@ function distinct_certified_solutions(
 
     return d
 end
-
