@@ -1498,5 +1498,3 @@ Return a vector of solutions in the DistinctSolutionCertificates object.
 function solutions(d::DistinctCertifiedSolutions)
     return map(solution_approximation, certificates(d))
 end
-
-
