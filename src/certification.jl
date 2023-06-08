@@ -1392,3 +1392,104 @@ function certify(
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
     _certify(F, X, cert_params, cache; max_precision = max_precision, kwargs...)
 end
+
+"""
+    mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
+
+A struct to create on the fly a list of distinct certified solutions.
+"""
+Base.@kwdef mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
+    system::Vector{S}
+    parameters::Union{Vector{Nothing},Vector{CertificationParameters}}
+    cache::Vector{CertificationCache}
+    access_lock::ReentrantLock
+    distinct_solution_certificates::DistinctSolutionCertificates
+end
+
+"""
+    DistinctCertifiedSolutions(F::System, params; thread_safe::Bool = false)
+
+Create a DistinctCertifiedSolutions object from a system and certification parameters.
+If `thread_safe` is `true`, the object will be thread-safe.
+"""
+DistinctCertifiedSolutions(F::System, params; thread_safe::Bool = false) =
+    DistinctCertifiedSolutions(fixed(F), params; thread_safe = thread_safe)
+
+"""
+    DistinctCertifiedSolutions(F::AbstractSystem, params; thread_safe::Bool = false)
+
+Create a DistinctCertifiedSolutions object from an abstract system and certification parameters.
+"""
+function DistinctCertifiedSolutions(F::AbstractSystem, params; thread_safe::Bool = false)
+    cache = CertificationCache(F)
+    distinct_solution_certificates = DistinctSolutionCertificates(length(F))
+    parameters = certification_parameters(params)
+    access_lock = ReentrantLock()
+    nthreads = thread_safe ? Threads.nthreads() : 1
+    return DistinctCertifiedSolutions(
+        [F; [deepcopy(F) for _ = 2:nthreads]],
+        [parameters; [deepcopy(parameters) for _ = 2:nthreads]],
+        [cache; [deepcopy(cache) for _ = 2:nthreads]],
+        access_lock,
+        distinct_solution_certificates,
+    )
+end
+
+"""
+    length(d::DistinctCertifiedSolutions)
+
+Return the number of distinct solution certificates in the DistinctSolutionCertificates object.
+"""
+Base.length(d::DistinctCertifiedSolutions) = length(d.distinct_solution_certificates)
+
+Base.show(io::IO, d::DistinctCertifiedSolutions) =
+    print(io, "DistinctCertifiedSolutions with $(length(d)) distinct solutions")
+
+"""
+    add_solution!(d::DistinctCertifiedSolutions, sol::Vector{ComplexF64}, i::Integer = 0)
+
+Add a solution to the DistinctSolutionCertificates object if it is not a duplicate.
+"""
+function add_solution!(
+    d::DistinctCertifiedSolutions,
+    sol::Vector{ComplexF64},
+    i::Integer = 0,
+)
+    @lock d.access_lock begin
+        if is_solution_candidate_guaranteed_duplicate(d.distinct_solution_certificates, sol)
+            return (false, :duplicate)
+        end
+    end
+    tid = length(d.system) === 1 ? 1 : Threads.threadid()
+    cert = certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i)
+    if is_certified(cert)
+        @lock d.access_lock begin
+            added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
+            if added
+                return (true, :certified_distinct)
+            end
+            return (false, :duplicate)
+        end
+    end
+    return (false, :not_certified)
+end
+
+"""
+    certificates(d::DistinctCertifiedSolutions)
+
+Return a vector of solution certificates in the DistinctSolutionCertificates object.
+"""
+function certificates(d::DistinctCertifiedSolutions)
+    return IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
+end
+
+"""
+    solutions(d::DistinctCertifiedSolutions)
+
+Return a vector of solutions in the DistinctSolutionCertificates object.
+"""
+function solutions(d::DistinctCertifiedSolutions)
+    return map(solution_approximation, certificates(d))
+end
+
+
