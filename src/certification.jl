@@ -1520,15 +1520,20 @@ function distinct_certified_solutions(
     d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
     progress = nothing
     if show_progress
-        progress =
-            ProgressMeter.Progress(length(S); desc = "Processing $(length(S)) solutions")
+        progress = ProgressMeter.Progress(
+            length(S);
+            desc = "Processing $(length(S)) solutions",
+            showspeed = true,
+        )
     end
     progress_lock = ReentrantLock()
     if threading
         ndistinct = Threads.Atomic{Int}(0)
+        processed = Threads.Atomic{Int}(0)
         Threads.@threads for i = 1:length(S)
             sol = S[i]
             added, = add_solution!(d, sol, i; kwargs...)
+            Threads.atomic_add!(processed, 1)
             if added
                 Threads.atomic_add!(ndistinct, 1)
             end
@@ -1536,20 +1541,27 @@ function distinct_certified_solutions(
                 @lock progress_lock begin
                     ProgressMeter.next!(
                         progress;
-                        showvalues = [(:distinct_certified, ndistinct[])],
+                        showvalues = [
+                            (:processed, processed[]),
+                            (:distinct_certified, ndistinct[]),
+                        ],
                     )
                 end
             end
         end
     else
-        ndistinct = 0
+        ndistinct = processed = 0
         for sol in S
             added, = add_solution!(d, sol; kwargs...)
+            processed += 1
             ndistinct += added
             if show_progress
                 ProgressMeter.next!(
                     progress;
-                    showvalues = [(:distinct_certified, ndistinct)],
+                    showvalues = [
+                        (:processed, processed),
+                        (:distinct_certified, ndistinct),
+                    ],
                 )
             end
         end
