@@ -192,6 +192,15 @@
             add_solution!(dcs, s, 1)
         end
         @test length(solutions(dcs)) == 3264
+
+        dcs2 = distinct_certified_solutions(
+            F,
+            [real_sols; real_sols[1:100]],
+            real_conics,
+            threading = true,
+            show_progress = false,
+        )
+        @test length(solutions(dcs2)) == 3264
     end
 
     @testset "certify uses complex inversion" begin

@@ -28,6 +28,7 @@ export certify,
     add_solution!,
     solutions,
     certificates,
+    distinct_certified_solutions,
     # deprecated
     initial_solution,
     certified_solution
@@ -1453,14 +1454,15 @@ Base.show(io::IO, d::DistinctCertifiedSolutions) =
     print(io, "DistinctCertifiedSolutions with $(length(d)) distinct solutions")
 
 """
-    add_solution!(d::DistinctCertifiedSolutions, sol::Vector{ComplexF64}, i::Integer = 0)
+    add_solution!(d::DistinctCertifiedSolutions, sol::Vector{ComplexF64}, i::Integer = 0; certify_solution_kwargs...)
 
 Add a solution to the DistinctSolutionCertificates object if it is not a duplicate.
 """
 function add_solution!(
     d::DistinctCertifiedSolutions,
     sol::Vector{ComplexF64},
-    i::Integer = 0,
+    i::Integer = 0;
+    kwargs...,
 )
     @lock d.access_lock begin
         if is_solution_candidate_guaranteed_duplicate(d.distinct_solution_certificates, sol)
@@ -1468,7 +1470,8 @@ function add_solution!(
         end
     end
     tid = length(d.system) === 1 ? 1 : Threads.threadid()
-    cert = certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i)
+    cert =
+        certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i; kwargs...)
     if is_certified(cert)
         @lock d.access_lock begin
             added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
@@ -1498,3 +1501,60 @@ Return a vector of solutions in the DistinctSolutionCertificates object.
 function solutions(d::DistinctCertifiedSolutions)
     return map(solution_approximation, certificates(d))
 end
+
+"""
+    distinct_certified_solutions(F, S, p = nothing; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+
+Return a `DistinctCertifiedSolutions` struct containing distinct certified solutions obtained from a vector of solutions `S` of a system `F`.
+Compared to `certify` this only keeps the distinct certified solutions and not all certificates. This in in particular
+useful if you want to merge multiple large solution sets into one set of distinct certified solutions.
+"""
+function distinct_certified_solutions(
+    F,
+    S,
+    p = nothing;
+    threading::Bool = true,
+    show_progress::Bool = true,
+    kwargs...,
+)
+    d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
+    progress = nothing
+    if show_progress
+        progress =
+            ProgressMeter.Progress(length(S); desc = "Processing $(length(S)) solutions")
+    end
+    progress_lock = ReentrantLock()
+    if threading
+        ndistinct = Threads.Atomic{Int}(0)
+        Threads.@threads for i = 1:length(S)
+            sol = S[i]
+            added, = add_solution!(d, sol, i; kwargs...)
+            if added
+                Threads.atomic_add!(ndistinct, 1)
+            end
+            if show_progress
+                @lock progress_lock begin
+                    ProgressMeter.next!(
+                        progress;
+                        showvalues = [(:distinct_certified, ndistinct[])],
+                    )
+                end
+            end
+        end
+    else
+        ndistinct = 0
+        for sol in S
+            added, = add_solution!(d, sol; kwargs...)
+            ndistinct += added
+            if show_progress
+                ProgressMeter.next!(
+                    progress;
+                    showvalues = [(:distinct_certified, ndistinct)],
+                )
+            end
+        end
+    end
+
+    return d
+end
+
