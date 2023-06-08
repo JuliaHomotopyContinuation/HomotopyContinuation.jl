@@ -45,7 +45,7 @@ Base.@kwdef struct SolutionCertificate <: AbstractSolutionCertificate
     complex::Bool = false
     index::Union{Nothing,Int} = nothing
     prec::Int = 53
-    I′::Union{Nothing,AcbMatrix} = nothing
+    I::Union{Nothing,AcbMatrix} = nothing
 
     # We also store a double precision representation of the midpoint of x₁
     # as the best available double precision estimate of the solution
@@ -114,7 +114,7 @@ function is_positive(C::AbstractSolutionCertificate)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        all(i -> Arblib.is_positive(real(Arblib.ref(C.I′, i, 1))), 1:length(C.I′))
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.I, i, 1))), 1:length(C.I))
     end
 end
 
@@ -129,7 +129,7 @@ function is_positive(C::AbstractSolutionCertificate, i::Integer)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        Arblib.is_positive(real(Arblib.ref(C.I′, i, 1)))
+        Arblib.is_positive(real(Arblib.ref(C.I, i, 1)))
     end
 end
 
@@ -141,18 +141,18 @@ Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a
 zero of the system is contained in.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval(certificate::AbstractSolutionCertificate) = certificate.I′
+certified_solution_interval(certificate::AbstractSolutionCertificate) = certificate.I
 @deprecate certified_solution(certificate) certified_solution_interval(certificate)
 
 """
-    certified_solution_interval_after_krawczyk(certificate::AbstractSolutionCertificate)
+    certified_solution_interval_after_krawczyk(certificate::ExtendedSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval_after_krawczyk(certificate::AbstractSolutionCertificate) =
+certified_solution_interval_after_krawczyk(certificate::ExtendedSolutionCertificate) =
     certificate.I′
 
 """
@@ -754,7 +754,7 @@ function certify_solution(
                 complex = any(xi -> !(0.0 in imag(xi)), x₁),
                 index = index,
                 prec = 53,
-                I′ = AcbMatrix(x₁; prec = 53),
+                I = AcbMatrix(x₁; prec = 53),
                 solution = mid.(x₁),
             )
         end
@@ -803,14 +803,15 @@ function extended_prec_certify_solution(
 
         if certified
             I = AcbMatrix(n, 1; prec = prec)
-            I′ = AcbMatrix(n, 1; prec = prec)
-            x̃ = AcbMatrix(n, 1; prec = prec)
-            Y = AcbMatrix(n, n; prec = prec)
             Arblib.set!(I, arb_x₀)
-            Arblib.set!(I′, arb_x₁)
-            Arblib.set!(x̃, arb_x̃₀)
-            Arblib.set!(Y, arb_C)
+
             if extended_certificate
+                I′ = AcbMatrix(n, 1; prec = prec)
+                x̃ = AcbMatrix(n, 1; prec = prec)
+                Y = AcbMatrix(n, n; prec = prec)
+                Arblib.set!(I′, arb_x₁)
+                Arblib.set!(x̃, arb_x̃₀)
+                Arblib.set!(Y, arb_C)
                 cert = ExtendedSolutionCertificate(
                     solution_candidate = solution_candidate,
                     certified = true,
@@ -826,7 +827,6 @@ function extended_prec_certify_solution(
                 )
                 return cert
             else
-
                 cert = SolutionCertificate(
                     solution_candidate = solution_candidate,
                     certified = true,
@@ -834,7 +834,7 @@ function extended_prec_certify_solution(
                     complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
                     index = index,
                     prec = prec,
-                    I′ = I′,
+                    I = I,
                     solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
                 )
                 return cert
@@ -1064,7 +1064,7 @@ function find_duplicates(certificates::AbstractVector{<:AbstractSolutionCertific
 
             d = zero(Interval{Float64})
             for i = 1:n
-                yᵢ = IComplexF64(cert.I′[i], a, b)
+                yᵢ = IComplexF64(cert.I[i], a, b)
                 d +=
                     IntervalArithmetic.sqr(real(yᵢ) - real(pt[i])) +
                     IntervalArithmetic.sqr(imag(yᵢ) - imag(pt[i]))
@@ -1134,7 +1134,7 @@ function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, c
     #If i and j are already in a duplicate cluster then there is no need to
     # check again overlapping by transitivity of our clustering
     i_is_dupl && j_is_dupl && return true
-    if Bool(Arblib.overlaps(certificates[i].I′, certificates[j].I′))
+    if Bool(Arblib.overlaps(certificates[i].I, certificates[j].I))
         if i_is_dupl
             duplicate_grouping[j] = duplicate_grouping[i]
             push!(duplicates_dict[duplicate_grouping[i]], j)
