@@ -267,9 +267,9 @@ end
 
 A struct that holds a reference point and an interval tree of distinct solution certificates.
 """
-struct DistinctSolutionCertificates
+struct DistinctSolutionCertificates{S<:AbstractSolutionCertificate}
     reference_point::Vector{ComplexF64}
-    distinct_tree::IntervalTrees.IntervalMap{Float64,SolutionCertificate}
+    distinct_tree::IntervalTrees.IntervalMap{Float64,S}
     acb_solution_candidate::AcbMatrix
 end
 
@@ -278,20 +278,25 @@ end
 
 Create a DistinctSolutionCertificates object with a random reference point of the given dimension.
 """
-DistinctSolutionCertificates(dim::Integer) =
-    DistinctSolutionCertificates(randn(ComplexF64, dim))
+DistinctSolutionCertificates(dim::Integer; kwargs...) =
+    DistinctSolutionCertificates(randn(ComplexF64, dim); kwargs...)
 
 """
     DistinctSolutionCertificates(reference_point::Vector{ComplexF64})
 
 Create a DistinctSolutionCertificates object with the given reference point.
 """
-DistinctSolutionCertificates(reference_point::Vector{ComplexF64}) =
-    DistinctSolutionCertificates(
-        reference_point,
-        IntervalTrees.IntervalMap{Float64,SolutionCertificate}(),
-        AcbMatrix(length(reference_point), length(reference_point)),
-    )
+DistinctSolutionCertificates(
+    reference_point::Vector{ComplexF64};
+    extended_certificate::Bool = false,
+) = DistinctSolutionCertificates(
+    reference_point,
+    IntervalTrees.IntervalMap{
+        Float64,
+        extended_certificate ? ExtendedSolutionCertificate : SolutionCertificate,
+    }(),
+    AcbMatrix(length(reference_point), length(reference_point)),
+)
 
 """
     length(d::DistinctSolutionCertificates)
@@ -310,7 +315,7 @@ Add a solution certificate to the interval tree if it is not a duplicate.
 """
 function add_certificate!(
     distinct_sols::DistinctSolutionCertificates,
-    cert::SolutionCertificate,
+    cert::AbstractSolutionCertificate,
 )
     d = squared_distance_interval(cert, distinct_sols.reference_point)
 
@@ -363,7 +368,9 @@ end
 
 Create a DistinctSolutionCertificates object from a vector of solution certificates.
 """
-function build_distinct_solution_certificates(certs::AbstractVector{SolutionCertificate})
+function build_distinct_solution_certificates(
+    certs::AbstractVector{<:AbstractSolutionCertificate},
+)
     distinct_sols = DistinctSolutionCertificates(length(solution_candidate(first(certs))))
     for cert in certs
         add_certificate!(distinct_sols, cert)
@@ -1403,7 +1410,7 @@ Base.@kwdef mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
     parameters::Union{Vector{Nothing},Vector{CertificationParameters}}
     cache::Vector{CertificationCache}
     access_lock::ReentrantLock
-    distinct_solution_certificates::DistinctSolutionCertificates
+    distinct_solution_certificates::DistinctSolutionCertificates{SolutionCertificate}
 end
 
 """
