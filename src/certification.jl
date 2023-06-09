@@ -1509,14 +1509,28 @@ Compared to `certify` this only keeps the distinct certified solutions and not a
 useful if you want to merge multiple large solution sets into one set of distinct certified solutions.
 """
 function distinct_certified_solutions(
-    F,
-    S,
+    F::Union{System,AbstractSystem},
+    S::AbstractVector{Vector{ComplexF64}},
     p = nothing;
+    threading::Bool = true,
+    kwargs...,
+)
+    d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
+    distinct_certified_solutions!(d, S; threading = threading, kwargs...)
+end
+
+"""
+    distinct_certified_solutions!(d::DistinctCertifiedSolutions, S; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+
+Add a vector of solutions `S` to a `DistinctCertifiedSolutions` struct `d`.
+"""
+function distinct_certified_solutions!(
+    d::DistinctCertifiedSolutions,
+    S::AbstractVector{Vector{ComplexF64}};
     threading::Bool = true,
     show_progress::Bool = true,
     kwargs...,
 )
-    d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
     progress = nothing
     if show_progress
         progress = ProgressMeter.Progress(
@@ -1550,8 +1564,8 @@ function distinct_certified_solutions(
         end
     else
         ndistinct = processed = 0
-        for sol in S
-            added, = add_solution!(d, sol; kwargs...)
+        for (i, sol) in enumerate(S)
+            added, = add_solution!(d, sol, i; kwargs...)
             processed += 1
             ndistinct += added
             if show_progress
