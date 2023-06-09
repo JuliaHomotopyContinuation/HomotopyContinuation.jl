@@ -296,7 +296,7 @@ DistinctSolutionCertificates(
         Float64,
         extended_certificate ? ExtendedSolutionCertificate : SolutionCertificate,
     }(),
-    AcbMatrix(length(reference_point), length(reference_point)),
+    AcbMatrix(length(reference_point), 1),
 )
 
 """
@@ -343,13 +343,12 @@ function is_solution_candidate_guaranteed_duplicate(
     s::Vector{ComplexF64},
 )
     d = squared_distance_interval(s, distinct_sols.reference_point)
-
     assigned = false
     for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
         certᵢ = IntervalTrees.value(match)
         if !assigned
             for (i, xᵢ) in enumerate(s)
-                distinct_sols.acb_solution_candidate[i][] = xᵢ
+                distinct_sols.acb_solution_candidate[i] = xᵢ
             end
         end
 
