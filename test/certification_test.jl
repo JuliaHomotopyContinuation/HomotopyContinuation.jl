@@ -32,7 +32,7 @@
 
         # Double solutions
         S = solutions(result)
-        cert = certify(F, [S; S])
+        cert = certify(F, [S; S]; extended_certificate = true)
         @test ncertified(cert) == 36
         @test ndistinct_certified(cert) == 18
         @test nreal_certified(cert) == 8
@@ -48,7 +48,7 @@
         result = solve(F)
 
         # Input: System(F)
-        cert = certify(System(F), result)
+        cert = certify(System(F), result; extended_certificate = true)
         @test nnonsingular(result) == 18
         @test ncertified(cert) == 18
         @test ndistinct_certified(cert) == 18
@@ -186,6 +186,21 @@
         @test ndistinct_real_certified(cert) == 3264
         @test_throws ArgumentError certify(F, real_sols; compile = false)
         @test_throws ArgumentError certify(F, real_sols; compile = true)
+
+        dcs = DistinctCertifiedSolutions(F, real_conics)
+        for s in real_sols
+            add_solution!(dcs, s, 1)
+        end
+        @test length(solutions(dcs)) == 3264
+
+        dcs2 = distinct_certified_solutions(
+            F,
+            [real_sols; real_sols[1:100]],
+            real_conics,
+            threading = true,
+            show_progress = false,
+        )
+        @test length(solutions(dcs2)) == 3264
     end
 
     @testset "certify uses complex inversion" begin

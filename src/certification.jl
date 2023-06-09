@@ -15,6 +15,7 @@ export certify,
     solution_approximation,
     certificates,
     distinct_certificates,
+    distinct_solutions,
     ncertified,
     nreal_certified,
     ncomplex_certified,
@@ -23,10 +24,17 @@ export certify,
     ndistinct_complex_certified,
     show_straight_line_program,
     save,
+    DistinctCertifiedSolutions,
+    add_solution!,
+    solutions,
+    certificates,
+    distinct_certified_solutions,
     # deprecated
     initial_solution,
     certified_solution
 
+
+abstract type AbstractSolutionCertificate end
 
 
 """
@@ -36,7 +44,21 @@ Result of [`certify`](@ref) for a single solution. Contains the initial solution
 and if the certification was successfull a vector of complex intervals where the true
 solution is contained in.
 """
-Base.@kwdef struct SolutionCertificate
+Base.@kwdef struct SolutionCertificate <: AbstractSolutionCertificate
+    solution_candidate::AbstractVector
+    certified::Bool
+    real::Bool = false
+    complex::Bool = false
+    index::Union{Nothing,Int} = nothing
+    prec::Int = 53
+    I::Union{Nothing,AcbMatrix} = nothing
+
+    # We also store a double precision representation of the midpoint of x₁
+    # as the best available double precision estimate of the solution
+    solution::Union{Nothing,Vector{ComplexF64}} = nothing
+end
+
+Base.@kwdef struct ExtendedSolutionCertificate <: AbstractSolutionCertificate
     solution_candidate::AbstractVector
     certified::Bool
     real::Bool = false
@@ -56,121 +78,121 @@ end
 
 
 """
-    solution_candidate(certificate::SolutionCertificate)
+    solution_candidate(certificate::AbstractSolutionCertificate)
 
 Returns the given provided solution candidate.
 """
-solution_candidate(C::SolutionCertificate) = C.solution_candidate
-@deprecate initial_solution(cert::SolutionCertificate) solution_candidate(cert)
+solution_candidate(C::AbstractSolutionCertificate) = C.solution_candidate
+@deprecate initial_solution(cert::AbstractSolutionCertificate) solution_candidate(cert)
 
 """
-    is_certified(certificate::SolutionCertificate)
+    is_certified(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` is a certificate that `certified_solution_interval(certificate)`
 contains a unique zero.
 """
-is_certified(C::SolutionCertificate) = C.certified
+is_certified(C::AbstractSolutionCertificate) = C.certified
 
 """
-    is_real(certificate::SolutionCertificate)
+    is_real(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` certifies that the certified solution interval
 contains a true real zero of the system.
 If `false` is returned then this does not necessarily mean that the true solution is not real.
 """
-is_real(C::SolutionCertificate) = C.real
+is_real(C::AbstractSolutionCertificate) = C.real
 
 """
-    is_complex(certificate::SolutionCertificate)
+    is_complex(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` certifies that the certified solution interval
 contains a true complex zero of the system.
 """
-is_complex(C::SolutionCertificate) = C.complex
+is_complex(C::AbstractSolutionCertificate) = C.complex
 
 """
-    is_positive(certificate::SolutionCertificate)
+    is_positive(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `is_certified(certificate)` is `true` and the unique zero contained
 in `certified_solution_interval(certificate)` is real and positive.
 """
-function is_positive(C::SolutionCertificate)
+function is_positive(C::AbstractSolutionCertificate)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        all(i -> Arblib.is_positive(real(Arblib.ref(C.I′, i, 1))), 1:length(C.I′))
+        all(i -> Arblib.is_positive(real(Arblib.ref(C.I, i, 1))), 1:length(C.I))
     end
 end
 
 
 """
-    is_positive(certificate::SolutionCertificate, i)
+    is_positive(certificate::AbstractSolutionCertificate, i)
 
 Returns `true` if `is_certified(certificate)` is `true` and `i`-th coordinate of the
 unique zero contained in `certified_solution_interval(certificate)` is real and positive.
 """
-function is_positive(C::SolutionCertificate, i::Integer)
+function is_positive(C::AbstractSolutionCertificate, i::Integer)
     if !is_certified(C) || !is_real(C)
         return false
     else
-        Arblib.is_positive(real(Arblib.ref(C.I′, i, 1)))
+        Arblib.is_positive(real(Arblib.ref(C.I, i, 1)))
     end
 end
 
 
 """
-    certified_solution_interval(certificate::SolutionCertificate)
+    certified_solution_interval(certificate::AbstractSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval(certificate::SolutionCertificate) = certificate.I
+certified_solution_interval(certificate::AbstractSolutionCertificate) = certificate.I
 @deprecate certified_solution(certificate) certified_solution_interval(certificate)
 
 """
-    certified_solution_interval_after_krawczyk(certificate::SolutionCertificate)
+    certified_solution_interval_after_krawczyk(certificate::ExtendedSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
 This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-certified_solution_interval_after_krawczyk(certificate::SolutionCertificate) =
+certified_solution_interval_after_krawczyk(certificate::ExtendedSolutionCertificate) =
     certificate.I′
 
 """
-    certificate_index(certificate::SolutionCertificate)
+    certificate_index(certificate::AbstractSolutionCertificate)
 
 Return the index of the solution certificate. Here the index refers to the index of the
 provided solution candidates.
 """
-certificate_index(certificate::SolutionCertificate) = C.index
+certificate_index(C::AbstractSolutionCertificate) = C.index
 
 """
-    precision(certificate::SolutionCertificate)
+    precision(certificate::AbstractSolutionCertificate)
 
 Returns the maximal precision used to produce the given `certificate`.
 """
-Base.precision(certificate::SolutionCertificate) = certificate.prec
+Base.precision(certificate::AbstractSolutionCertificate) = certificate.prec
 
 """
-    solution_approximation(certificate::SolutionCertificate)
+    solution_approximation(certificate::AbstractSolutionCertificate)
 
 If `is_certified(certificate)` is `true` this returns the midpoint of the
 [`certified_solution_interval`](@ref) of the given `certificate` as a `Vector{ComplexF64}`.
 Returns `nothing` if `is_certified(certificate)` is `false`.
 """
-solution_approximation(certificate::SolutionCertificate) = certificate.solution
+solution_approximation(certificate::AbstractSolutionCertificate) = certificate.solution
 
 """
-    krawczyk_operator_parameters(cert::SolutionCertificate)
+    krawczyk_operator_parameters(cert::ExtendedSolutionCertificate)
 
 Returns a `NamedTuple` `(x, Y)` with the parameters of the Krawczyk operator following [BRT20].
 """
-krawczyk_operator_parameters(cert::SolutionCertificate) = (x = cert.x̃, Y = cert.Y)
+krawczyk_operator_parameters(cert::ExtendedSolutionCertificate) = (x = cert.x̃, Y = cert.Y)
 
-function Base.show(f::IO, cert::SolutionCertificate)
+function Base.show(f::IO, cert::AbstractSolutionCertificate)
     println(f, "SolutionCertificate:")
     println(f, "solution_candidate = [")
     for z in solution_candidate(cert)
@@ -198,6 +220,166 @@ function Base.show(f::IO, cert::SolutionCertificate)
     end
 end
 
+
+
+"""
+    squared_distance_interval(cert, reference_point::Vector{ComplexF64})
+
+Calculate the squared distance between a solution certificate and a reference point.
+"""
+function squared_distance_interval(
+    cert::AbstractSolutionCertificate,
+    reference_point::Vector{ComplexF64},
+)
+    a, b = Arblib.Arf(prec = 53), Arblib.Arf(prec = 53)
+    n = length(solution_candidate(cert))
+    d = zero(IntervalArithmetic.Interval{Float64})
+    for i = 1:n
+        yᵢ = IComplexF64(cert.I[i], a, b)
+        d +=
+            IntervalArithmetic.sqr(real(yᵢ) - real(reference_point[i])) +
+            IntervalArithmetic.sqr(imag(yᵢ) - imag(reference_point[i]))
+    end
+    return IntervalTrees.Interval(d.lo, d.hi)
+end
+"""
+    squared_distance_interval(solution_candidate, reference_point::Vector{ComplexF64})
+
+Calculate the squared distance between a solution certificate and a reference point.
+"""
+function squared_distance_interval(
+    solution_candidate::AbstractVector{ComplexF64},
+    reference_point::Vector{ComplexF64},
+)
+    n = length(solution_candidate)
+    d = zero(IntervalArithmetic.Interval{Float64})
+    for i = 1:n
+        yᵢ = IComplexF64(solution_candidate[i])
+        d +=
+            IntervalArithmetic.sqr(real(yᵢ) - real(reference_point[i])) +
+            IntervalArithmetic.sqr(imag(yᵢ) - imag(reference_point[i]))
+    end
+    return IntervalTrees.Interval(d.lo, d.hi)
+end
+
+
+"""
+    struct DistinctSolutionCertificates
+
+A struct that holds a reference point and an interval tree of distinct solution certificates.
+"""
+struct DistinctSolutionCertificates{S<:AbstractSolutionCertificate}
+    reference_point::Vector{ComplexF64}
+    distinct_tree::IntervalTrees.IntervalMap{Float64,S}
+    acb_solution_candidate::AcbMatrix
+end
+
+"""
+    DistinctSolutionCertificates(dim::Integer)
+
+Create a DistinctSolutionCertificates object with a random reference point of the given dimension.
+"""
+DistinctSolutionCertificates(dim::Integer; kwargs...) =
+    DistinctSolutionCertificates(randn(ComplexF64, dim); kwargs...)
+
+"""
+    DistinctSolutionCertificates(reference_point::Vector{ComplexF64})
+
+Create a DistinctSolutionCertificates object with the given reference point.
+"""
+DistinctSolutionCertificates(
+    reference_point::Vector{ComplexF64};
+    extended_certificate::Bool = false,
+) = DistinctSolutionCertificates(
+    reference_point,
+    IntervalTrees.IntervalMap{
+        Float64,
+        extended_certificate ? ExtendedSolutionCertificate : SolutionCertificate,
+    }(),
+    AcbMatrix(length(reference_point), length(reference_point)),
+)
+
+"""
+    length(d::DistinctSolutionCertificates)
+
+Return the number of distinct solution certificates in the interval tree.
+"""
+Base.length(d::DistinctSolutionCertificates) = length(d.distinct_tree)
+
+Base.show(io::IO, d::DistinctSolutionCertificates) =
+    print(io, "DistinctSolutionCertificates with $(length(d)) certificates")
+
+"""
+    add_certificate!(distinct_sols::DistinctSolutionCertificates, cert::SolutionCertificate)
+
+Add a solution certificate to the interval tree if it is not a duplicate.
+"""
+function add_certificate!(
+    distinct_sols::DistinctSolutionCertificates,
+    cert::AbstractSolutionCertificate,
+)
+    d = squared_distance_interval(cert, distinct_sols.reference_point)
+
+    for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
+        certᵢ = IntervalTrees.value(match)
+        if Bool(Arblib.overlaps(cert.I, certᵢ.I))
+            return (false, certᵢ)
+            break
+        end
+
+    end
+
+    distinct_sols.distinct_tree[d] = cert
+    return (true, cert)
+end
+
+"""
+    is_solution_candidate_guaranteed_duplicate(distinct_sols::DistinctSolutionCertificates,  s::Vector{ComplexF64})
+
+Check if a solution candidate is a duplicate. This is the case if the point is within some certificate's interval.
+"""
+function is_solution_candidate_guaranteed_duplicate(
+    distinct_sols::DistinctSolutionCertificates,
+    s::Vector{ComplexF64},
+)
+    d = squared_distance_interval(s, distinct_sols.reference_point)
+
+    assigned = false
+    for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
+        certᵢ = IntervalTrees.value(match)
+        if !assigned
+            for (i, xᵢ) in enumerate(s)
+                distinct_sols.acb_solution_candidate[i][] = xᵢ
+            end
+        end
+
+        # Check if s is contained in certᵢ.I
+        if Bool(Arblib.contains(certᵢ.I, distinct_sols.acb_solution_candidate))
+            return true
+            break
+        end
+
+    end
+
+    return false
+end
+
+"""
+    build_distinct_solution_certificates(certs::AbstractVector{SolutionCertificate})
+
+Create a DistinctSolutionCertificates object from a vector of solution certificates.
+"""
+function build_distinct_solution_certificates(
+    certs::AbstractVector{<:AbstractSolutionCertificate},
+)
+    distinct_sols = DistinctSolutionCertificates(length(solution_candidate(first(certs))))
+    for cert in certs
+        add_certificate!(distinct_sols, cert)
+    end
+    return distinct_sols
+end
+
+
 """
     CertificationResult
 
@@ -205,8 +387,8 @@ The result of [`certify`](@ref) for multiple solutions.
 Contains a vector of [`SolutionCertificate`](@ref) as well as a list of certificates
 which correspond to the same true solution.
 """
-struct CertificationResult
-    certificates::Vector{SolutionCertificate}
+struct CertificationResult{C<:AbstractSolutionCertificate}
+    certificates::Vector{C}
     duplicates::Vector{Vector{Int}}
     slp::ModelKit.Interpreter{Vector{IComplexF64}}
     slp_jacobian::ModelKit.Interpreter{Vector{IComplexF64}}
@@ -233,6 +415,16 @@ function distinct_certificates(C::CertificationResult)
         indices[d[k]] = false
     end
     cs[indices]
+end
+
+
+"""
+    distinct_solutions(R::CertificationResult)
+
+Obtain the certificates corresponding to the determined distinct solution intervals.
+"""
+function distinct_solutions(C::CertificationResult)
+    solution_approximation.(distinct_certificates(C))
 end
 
 """
@@ -542,8 +734,13 @@ function _certify(
     show_progress::Bool = true,
     max_precision::Int = 256,
     check_distinct::Bool = true,
+    extended_certificate::Bool = false,
+    threading::Bool = true,
 )
-    certificates = SolutionCertificate[]
+    N = length(solution_candidates)
+    certificates =
+        extended_certificate ? Vector{ExtendedSolutionCertificate}(undef, N) :
+        Vector{SolutionCertificate}(undef, N)
 
     m, n = size(F)
     m == n || throw(ArgumentError("We can only certify solutions to square systems."))
@@ -552,17 +749,19 @@ function _certify(
         throw(ArgumentError("The given system expects parameters but none are given."))
     end
 
-    if !show_progress
-        for (i, s) in enumerate(solution_candidates)
-            push!(certificates, certify_solution(F, s, p, cache, i))
-        end
-    else
-        # Create progress meter
-        n = length(solution_candidates)
-        desc = "Certifying $n solutions... "
-        barlen = min(ProgressMeter.tty_width(desc, stdout, false), 40)
+    distinct_sols = DistinctSolutionCertificates(n)
+    ncertified = Threads.Atomic{Int}(0)
+    nreal_certified = Threads.Atomic{Int}(0)
+    nconsidered = Threads.Atomic{Int}(0)
+    ndistinct = Threads.Atomic{Int}(0)
+    ndistinct_real = Threads.Atomic{Int}(0)
+
+    desc = "Certifying $N solutions... "
+    barlen = min(ProgressMeter.tty_width(desc, stdout, false), 40)
+    progress = nothing
+    if show_progress
         progress = ProgressMeter.Progress(
-            n;
+            N;
             dt = 0.2,
             desc = desc,
             barlen = barlen,
@@ -570,23 +769,110 @@ function _certify(
             output = stdout,
         )
         progress.tlast += progress.dt
+    end
 
-        # Go over all solution
-        ncertified = 0
-        nreal_certified = 0
-        for (i, s) in enumerate(solution_candidates)
-            r = certify_solution(F, s, p, cache, i)
-            push!(certificates, r)
-            ncertified += is_certified(r)
-            nreal_certified += is_certified(r) && is_real(r)
-            update_certify_progress!(progress, i, ncertified, nreal_certified)
+    duplicates_dict = Dict{Int,Vector{Int}}()
+    certificates = Vector{SolutionCertificate}(undef, N)
+    if threading
+        distinct_lock = ReentrantLock()
+        nthreads = Threads.nthreads()
+
+        Tf = [F; [deepcopy(F) for _ = 2:nthreads]]
+        Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
+        Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
+
+        Threads.@threads for i = 1:N
+            tid = Threads.threadid()
+
+            s = solution_candidates[i]
+            cert = certify_solution(Tf[tid], s, Tp[tid], Tcache[tid], i)
+
+            certificates[i] = cert
+            Threads.atomic_add!(nconsidered, 1)
+            if is_certified(cert)
+                Threads.atomic_add!(ncertified, 1)
+                Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
+
+                @lock distinct_lock begin
+                    (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                    if is_distinct
+                        Threads.atomic_add!(ndistinct, 1)
+                        Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
+                    else
+                        if !haskey(duplicates_dict, distinct_cert.index)
+                            duplicates_dict[distinct_cert.index] =
+                                [distinct_cert.index, cert.index]
+                        else
+                            push!(duplicates_dict[distinct_cert.index], cert.index)
+                        end
+                    end
+
+                    if !isnothing(progress)
+                        update_certify_progress!(
+                            progress,
+                            nconsidered[],
+                            ncertified[],
+                            nreal_certified[],
+                            ndistinct[],
+                            ndistinct_real[],
+                        )
+                    end
+                end
+            else
+                @lock distinct_lock begin
+                    if !isnothing(progress)
+                        update_certify_progress!(
+                            progress,
+                            nconsidered[],
+                            ncertified[],
+                            nreal_certified[],
+                            ndistinct[],
+                            ndistinct_real[],
+                        )
+                    end
+                end
+            end
+        end
+
+    else
+        for i = 1:N
+            s = solution_candidates[i]
+            cert = certify_solution(F, s, p, cache, i)
+
+            certificates[i] = cert
+            Threads.atomic_add!(nconsidered, 1)
+            if is_certified(cert)
+                Threads.atomic_add!(ncertified, 1)
+                Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
+
+                (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                if is_distinct
+                    Threads.atomic_add!(ndistinct, 1)
+                    Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
+                else
+                    if !haskey(duplicates_dict, distinct_cert.index)
+                        duplicates_dict[distinct_cert.index] =
+                            [distinct_cert.index, cert.index]
+                    else
+                        push!(duplicates_dict[distinct_cert.index], cert.index)
+                    end
+                end
+            end
+
+            if !isnothing(progress)
+                update_certify_progress!(
+                    progress,
+                    nconsidered[],
+                    ncertified[],
+                    nreal_certified[],
+                    ndistinct[],
+                    ndistinct_real[],
+                )
+            end
         end
     end
-    if check_distinct
-        duplicates = find_duplicates(certificates)
-    else
-        duplicates = Vector{Vector{Int}}()
-    end
+
+    duplicates = isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
 
     CertificationResult(
         certificates,
@@ -596,18 +882,32 @@ function _certify(
     )
 end
 
-function update_certify_progress!(progress, k, ncertified, nreal_certified)
-    t = time()
-    if k == progress.n || t > progress.tlast + progress.dt
-        showvalues = make_certify_showvalues(k, ncertified, nreal_certified)
-        ProgressMeter.update!(progress, k; showvalues = showvalues)
-    end
+
+function update_certify_progress!(
+    progress,
+    k,
+    ncertified,
+    nreal_certified,
+    ndistinct,
+    ndistinct_real,
+)
+    showvalues =
+        make_certify_showvalues(k, ncertified, nreal_certified, ndistinct, ndistinct_real)
+    ProgressMeter.update!(progress, k; showvalues = showvalues)
+
     nothing
 end
-@noinline function make_certify_showvalues(k, ncertified, nreal_certified)
+@noinline function make_certify_showvalues(
+    k,
+    ncertified,
+    nreal_certified,
+    ndistinct,
+    ndistinct_real,
+)
     (
-        ("# solutions candidates considered", k),
-        ("# certified solution intervals (real)", "$(ncertified) ($nreal_certified)"),
+        ("# processed", "$k"),
+        ("# certified (real)", "$(ncertified) ($nreal_certified)"),
+        ("# distinct (real)", "$(ndistinct) ($ndistinct_real)"),
     )
 end
 
@@ -617,12 +917,12 @@ function certify_solution(
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
-    index::Int,
+    index::Int;
     max_precision::Int = 256,
     refine_solution::Bool = true,
+    extended_certificate::Bool = false,
 )
     @unpack C, arb_C, arb_x̃₀ = cert_cache
-    n = size(C, 1)
 
     # refine solution to machine precicision
     res = newton(
@@ -644,20 +944,59 @@ function certify_solution(
     certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
 
     if certified
-        return SolutionCertificate(
-            solution_candidate = solution_candidate,
-            certified = true,
-            real = is_real,
-            complex = any(xi -> !(0.0 in imag(xi)), x₁),
-            index = index,
-            prec = 53,
-            I = AcbMatrix(x₀; prec = 53),
-            I′ = AcbMatrix(x₁; prec = 53),
-            x̃ = AcbMatrix(x̃₀; prec = 53),
-            Y = AcbMatrix(C; prec = 53),
-            solution = mid.(x₁),
-        )
+        if extended_certificate
+            return ExtendedSolutionCertificate(
+                solution_candidate = solution_candidate,
+                certified = true,
+                real = is_real,
+                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                index = index,
+                prec = 53,
+                I = AcbMatrix(x₀; prec = 53),
+                I′ = AcbMatrix(x₁; prec = 53),
+                x̃ = AcbMatrix(x̃₀; prec = 53),
+                Y = AcbMatrix(C; prec = 53),
+                solution = mid.(x₁),
+            )
+        else
+            return SolutionCertificate(
+                solution_candidate = solution_candidate,
+                certified = true,
+                real = is_real,
+                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                index = index,
+                prec = 53,
+                I = AcbMatrix(x₁; prec = 53),
+                solution = mid.(x₁),
+            )
+        end
     end
+
+    return extended_prec_certify_solution(
+        F,
+        solution_candidate,
+        x̃₀,
+        cert_params,
+        cert_cache,
+        index;
+        max_precision = max_precision,
+        extended_certificate = extended_certificate,
+    )
+end
+
+function extended_prec_certify_solution(
+    F::AbstractSystem,
+    solution_candidate::AbstractVector,
+    x̃₀::AbstractVector,
+    cert_params::Union{Nothing,CertificationParameters},
+    cert_cache::CertificationCache,
+    index::Int;
+    max_precision::Int = 256,
+    extended_certificate::Bool = false,
+)
+    @unpack C, arb_C, arb_x̃₀ = cert_cache
+
+    n = size(C, 1)
 
     # If not certified we do the computation in higher precision using Arb
     prec = 128
@@ -676,26 +1015,42 @@ function certify_solution(
 
         if certified
             I = AcbMatrix(n, 1; prec = prec)
-            I′ = AcbMatrix(n, 1; prec = prec)
-            x̃ = AcbMatrix(n, 1; prec = prec)
-            Y = AcbMatrix(n, n; prec = prec)
             Arblib.set!(I, arb_x₀)
-            Arblib.set!(I′, arb_x₁)
-            Arblib.set!(x̃, arb_x̃₀)
-            Arblib.set!(Y, arb_C)
-            return SolutionCertificate(
-                solution_candidate = solution_candidate,
-                certified = true,
-                real = is_real,
-                complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
-                index = index,
-                prec = prec,
-                I = I,
-                I′ = I′,
-                x̃ = x̃,
-                Y = Y,
-                solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
-            )
+
+            if extended_certificate
+                I′ = AcbMatrix(n, 1; prec = prec)
+                x̃ = AcbMatrix(n, 1; prec = prec)
+                Y = AcbMatrix(n, n; prec = prec)
+                Arblib.set!(I′, arb_x₁)
+                Arblib.set!(x̃, arb_x̃₀)
+                Arblib.set!(Y, arb_C)
+                cert = ExtendedSolutionCertificate(
+                    solution_candidate = solution_candidate,
+                    certified = true,
+                    real = is_real,
+                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    index = index,
+                    prec = prec,
+                    I = I,
+                    I′ = I′,
+                    x̃ = x̃,
+                    Y = Y,
+                    solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
+                )
+                return cert
+            else
+                cert = SolutionCertificate(
+                    solution_candidate = solution_candidate,
+                    certified = true,
+                    real = is_real,
+                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    index = index,
+                    prec = prec,
+                    I = I,
+                    solution = [ComplexF64(arb_x₁[i]) for i = 1:n],
+                )
+                return cert
+            end
         end
 
         prec += 64
@@ -703,13 +1058,20 @@ function certify_solution(
     end
 
     # certification failed
-    return SolutionCertificate(
-        solution_candidate = solution_candidate,
-        certified = false,
-        index = index,
-    )
+    if extended_certificate
+        return ExtendedSolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = false,
+            index = index,
+        )
+    else
+        return SolutionCertificate(
+            solution_candidate = solution_candidate,
+            certified = false,
+            index = index,
+        )
+    end
 end
-
 
 
 function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
@@ -886,123 +1248,6 @@ function sqr_mul!(C, A, B)
     C
 end
 
-"""
-    find_duplicates(certificates)
-
-Find all duplicate solutions. A solution is considered to be duplicate if the unique
-region overlap.
-"""
-function find_duplicates(certificates::AbstractVector{SolutionCertificate})
-    # The strategy to indentify duplication candidates is as following.
-    # We first compute the squared euclidean distance to a random point
-    # in interval arithmetic. We then compute all overlapping intervals and return this
-    # list of tuples.
-    # The complexity of this is O(n log(n)) (we need to perform an array sort)
-
-    # 1 Compute squared euclidean distance to a random point
-    original_indices = Int[]
-
-    n = length(solution_candidate(first(certificates)))
-    pt = randn(ComplexF64, n)
-
-    sq_eucl_distances = Interval{Float64}[]
-
-    a, b = Arblib.Arf(prec = 53), Arblib.Arf(prec = 53)
-    for (i, cert) in enumerate(certificates)
-        if is_certified(cert)
-            push!(original_indices, i)
-
-            d = zero(Interval{Float64})
-            for i = 1:n
-                yᵢ = IComplexF64(cert.I′[i], a, b)
-                d +=
-                    IntervalArithmetic.sqr(real(yᵢ) - real(pt[i])) +
-                    IntervalArithmetic.sqr(imag(yᵢ) - imag(pt[i]))
-            end
-            push!(sq_eucl_distances, d)
-        end
-    end
-
-    # 2) Find all overlapping intervals
-
-    # strategy:
-    # Look at close and open of an interval separately and merge all these in one large vector
-    # (keeping track if open or close of an interval),
-    # sort this (first by value, then open, then close).
-    # Now iterate through sorted array and keep track of open intervals
-
-    # value, index, and false if opening and true if closing
-    interval_bounds = Tuple{Float64,Int,Bool}[]
-    for (i, d) in enumerate(sq_eucl_distances)
-        push!(interval_bounds, (d.lo, i, false), (d.hi, i, true))
-    end
-
-    sort!(interval_bounds; lt = (a, b) -> a[1] != b[1] ? a[1] < b[1] : !a[3])
-
-    current_open = Int[]
-    # dict to help group duplicates:
-    # Assume (1,3) and (3,5) overlap then we want to have entries 1=>1, 3=>1 and 5=>1
-    duplicate_grouping = Dict{Int,Int}()
-    # final duplicates. From our example: 1 => [1,3,5]
-    duplicates_dict = Dict{Int,Vector{Int}}()
-
-    for (_v, index, is_closing) in interval_bounds
-        if is_closing
-            if index == current_open[1]
-                popfirst!(current_open)
-            else
-                for (k, idx) in enumerate(current_open)
-                    if idx == index
-                        deleteat!(current_open, k)
-                        break
-                    end
-                end
-            end
-        else
-            if !isempty(current_open)
-                for idx in current_open
-                    # 3) Interval (idx, index) is overlapping. Check for duplicate
-                    check_duplicate_candidate!(
-                        duplicate_grouping,
-                        duplicates_dict,
-                        original_indices[idx],
-                        original_indices[index],
-                        certificates,
-                    )
-                end
-            end
-            push!(current_open, index)
-        end
-    end
-
-    isempty(duplicates_dict) ? Vector{Int}[] : collect(values(duplicates_dict))
-end
-
-function check_duplicate_candidate!(duplicate_grouping, duplicates_dict, i, j, certificates)
-    i_is_dupl = haskey(duplicate_grouping, i)
-    j_is_dupl = haskey(duplicate_grouping, j)
-    #If i and j are already in a duplicate cluster then there is no need to
-    # check again overlapping by transitivity of our clustering
-    i_is_dupl && j_is_dupl && return true
-    if Bool(Arblib.overlaps(certificates[i].I′, certificates[j].I′))
-        if i_is_dupl
-            duplicate_grouping[j] = duplicate_grouping[i]
-            push!(duplicates_dict[duplicate_grouping[i]], j)
-        elseif j_is_dupl
-            duplicate_grouping[i] = duplicate_grouping[j]
-            push!(duplicates_dict[duplicate_grouping[j]], i)
-        else
-            duplicate_grouping[i] = i
-            duplicate_grouping[j] = i
-            duplicates_dict[i] = [i, j]
-        end
-        true
-    else
-        false
-    end
-end
-
-
 function certify(
     F::AbstractVector{Expression},
     X,
@@ -1154,4 +1399,161 @@ function certify(
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
     _certify(F, X, cert_params, cache; max_precision = max_precision, kwargs...)
+end
+
+"""
+    mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
+
+A struct to create on the fly a list of distinct certified solutions.
+"""
+Base.@kwdef mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
+    system::Vector{S}
+    parameters::Union{Vector{Nothing},Vector{CertificationParameters}}
+    cache::Vector{CertificationCache}
+    access_lock::ReentrantLock
+    distinct_solution_certificates::DistinctSolutionCertificates{SolutionCertificate}
+end
+
+"""
+    DistinctCertifiedSolutions(F::System, params; thread_safe::Bool = false)
+
+Create a DistinctCertifiedSolutions object from a system and certification parameters.
+If `thread_safe` is `true`, the object will be thread-safe.
+"""
+DistinctCertifiedSolutions(F::System, params; thread_safe::Bool = false) =
+    DistinctCertifiedSolutions(fixed(F), params; thread_safe = thread_safe)
+
+"""
+    DistinctCertifiedSolutions(F::AbstractSystem, params; thread_safe::Bool = false)
+
+Create a DistinctCertifiedSolutions object from an abstract system and certification parameters.
+"""
+function DistinctCertifiedSolutions(F::AbstractSystem, params; thread_safe::Bool = false)
+    cache = CertificationCache(F)
+    distinct_solution_certificates = DistinctSolutionCertificates(length(F))
+    parameters = certification_parameters(params)
+    access_lock = ReentrantLock()
+    nthreads = thread_safe ? Threads.nthreads() : 1
+    return DistinctCertifiedSolutions(
+        [F; [deepcopy(F) for _ = 2:nthreads]],
+        [parameters; [deepcopy(parameters) for _ = 2:nthreads]],
+        [cache; [deepcopy(cache) for _ = 2:nthreads]],
+        access_lock,
+        distinct_solution_certificates,
+    )
+end
+
+"""
+    length(d::DistinctCertifiedSolutions)
+
+Return the number of distinct solution certificates in the DistinctSolutionCertificates object.
+"""
+Base.length(d::DistinctCertifiedSolutions) = length(d.distinct_solution_certificates)
+
+Base.show(io::IO, d::DistinctCertifiedSolutions) =
+    print(io, "DistinctCertifiedSolutions with $(length(d)) distinct solutions")
+
+"""
+    add_solution!(d::DistinctCertifiedSolutions, sol::Vector{ComplexF64}, i::Integer = 0; certify_solution_kwargs...)
+
+Add a solution to the DistinctSolutionCertificates object if it is not a duplicate.
+"""
+function add_solution!(
+    d::DistinctCertifiedSolutions,
+    sol::Vector{ComplexF64},
+    i::Integer = 0;
+    kwargs...,
+)
+    @lock d.access_lock begin
+        if is_solution_candidate_guaranteed_duplicate(d.distinct_solution_certificates, sol)
+            return (false, :duplicate)
+        end
+    end
+    tid = length(d.system) === 1 ? 1 : Threads.threadid()
+    cert =
+        certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i; kwargs...)
+    if is_certified(cert)
+        @lock d.access_lock begin
+            added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
+            if added
+                return (true, :certified_distinct)
+            end
+            return (false, :duplicate)
+        end
+    end
+    return (false, :not_certified)
+end
+
+"""
+    certificates(d::DistinctCertifiedSolutions)
+
+Return a vector of solution certificates in the DistinctSolutionCertificates object.
+"""
+function certificates(d::DistinctCertifiedSolutions)
+    return IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
+end
+
+"""
+    solutions(d::DistinctCertifiedSolutions)
+
+Return a vector of solutions in the DistinctSolutionCertificates object.
+"""
+function solutions(d::DistinctCertifiedSolutions)
+    return map(solution_approximation, certificates(d))
+end
+
+"""
+    distinct_certified_solutions(F, S, p = nothing; threading::Bool = true, show_progress::Bool = true, certify_solution_kwargs...)
+
+Return a `DistinctCertifiedSolutions` struct containing distinct certified solutions obtained from a vector of solutions `S` of a system `F`.
+Compared to `certify` this only keeps the distinct certified solutions and not all certificates. This in in particular
+useful if you want to merge multiple large solution sets into one set of distinct certified solutions.
+"""
+function distinct_certified_solutions(
+    F,
+    S,
+    p = nothing;
+    threading::Bool = true,
+    show_progress::Bool = true,
+    kwargs...,
+)
+    d = DistinctCertifiedSolutions(F, p; thread_safe = threading)
+    progress = nothing
+    if show_progress
+        progress =
+            ProgressMeter.Progress(length(S); desc = "Processing $(length(S)) solutions")
+    end
+    progress_lock = ReentrantLock()
+    if threading
+        ndistinct = Threads.Atomic{Int}(0)
+        Threads.@threads for i = 1:length(S)
+            sol = S[i]
+            added, = add_solution!(d, sol, i; kwargs...)
+            if added
+                Threads.atomic_add!(ndistinct, 1)
+            end
+            if show_progress
+                @lock progress_lock begin
+                    ProgressMeter.next!(
+                        progress;
+                        showvalues = [(:distinct_certified, ndistinct[])],
+                    )
+                end
+            end
+        end
+    else
+        ndistinct = 0
+        for sol in S
+            added, = add_solution!(d, sol; kwargs...)
+            ndistinct += added
+            if show_progress
+                ProgressMeter.next!(
+                    progress;
+                    showvalues = [(:distinct_certified, ndistinct)],
+                )
+            end
+        end
+    end
+
+    return d
 end
