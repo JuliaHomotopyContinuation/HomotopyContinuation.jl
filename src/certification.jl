@@ -591,6 +591,9 @@ function CertificationCache(F::AbstractSystem)
     jac_interpreter_acb = ModelKit.interpreter(AcbRefVector, jac_interpreter_F64)
 
     arb_prec = 128
+    ModelKit.setprecision!(eval_interpreter_acb, arb_prec)
+    ModelKit.setprecision!(jac_interpreter_acb, arb_prec)
+
     CertificationCache(;
         eval_interpreter_F64 = eval_interpreter_F64,
         jac_interpreter_F64 = jac_interpreter_F64,
@@ -1189,6 +1192,7 @@ function arb_ε_inflation_krawczyk(
         arb_interval_params(p),
     )
 
+
     # x₁ = (x̃₀ - C * F([x̃₀])) + (I - C * J(x₀)) * (x₀ - x̃₀)
     #    = (x̃₀ - C * F([x̃₀])) - (C * J(x₀) - I) * (x₀ - x̃₀)
     #    = (x̃₀ - Δx₀) - (C * J(x₀) - I) * (x₀ - x̃₀)
@@ -1223,8 +1227,14 @@ function arb_ε_inflation_krawczyk(
 
     if !certified
         # Update the approximation of the inverse
-        Arblib.get_mid!(J_x₀, J_x₀)
-        Arblib.inv!(C, J_x₀)
+        # We don't need an exact inverse to it suffices to use the "approximate inverse" from arb_x̃₀
+        # From arb docs for approx_inv!:
+        #   These methods perform approximate solving without any error control.
+        #   The radii in the input matrices are ignored, the computations are done numerically
+        #   with floating-point arithmetic (using ordinary Gaussian elimination and triangular solving,
+        #   accelerated through the use of block recursive strategies for large matrices), and the
+        #   output matrices are set to the approximate floating-point results with zeroed error bounds.
+        Arblib.approx_inv!(C, J_x₀)
     end
 
     certified, AcbMatrix(x₁), AcbMatrix(x₀), is_real

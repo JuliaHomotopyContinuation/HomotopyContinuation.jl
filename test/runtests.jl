@@ -1,4 +1,4 @@
-using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
+using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random, Combinatorics
 using HomotopyContinuation.DoubleDouble: ComplexDF64
 import Arblib
 using ProjectiveVectors: PVector, affine_chart
