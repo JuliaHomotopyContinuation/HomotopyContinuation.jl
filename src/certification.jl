@@ -734,10 +734,10 @@ function _certify(
     p::Union{Nothing,CertificationParameters},
     cache::CertificationCache;
     show_progress::Bool = true,
-    max_precision::Int = 256,
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
     threading::Bool = true,
+    certify_solution_kwargs...,
 )
     N = length(solution_candidates)
     certificates =
@@ -751,7 +751,8 @@ function _certify(
         throw(ArgumentError("The given system expects parameters but none are given."))
     end
 
-    distinct_sols = DistinctSolutionCertificates(n)
+    distinct_sols =
+        DistinctSolutionCertificates(n; extended_certificate = extended_certificate)
     ncertified = Threads.Atomic{Int}(0)
     nreal_certified = Threads.Atomic{Int}(0)
     nconsidered = Threads.Atomic{Int}(0)
@@ -774,7 +775,6 @@ function _certify(
     end
 
     duplicates_dict = Dict{Int,Vector{Int}}()
-    certificates = Vector{SolutionCertificate}(undef, N)
     if threading
         distinct_lock = ReentrantLock()
         nthreads = Threads.nthreads()
@@ -787,7 +787,15 @@ function _certify(
             tid = Threads.threadid()
 
             s = solution_candidates[i]
-            cert = certify_solution(Tf[tid], s, Tp[tid], Tcache[tid], i)
+            cert = certify_solution(
+                Tf[tid],
+                s,
+                Tp[tid],
+                Tcache[tid],
+                i;
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
 
             certificates[i] = cert
             Threads.atomic_add!(nconsidered, 1)
@@ -839,7 +847,15 @@ function _certify(
     else
         for i = 1:N
             s = solution_candidates[i]
-            cert = certify_solution(F, s, p, cache, i)
+            cert = certify_solution(
+                F,
+                s,
+                p,
+                cache,
+                i;
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
 
             certificates[i] = cert
             Threads.atomic_add!(nconsidered, 1)
@@ -927,20 +943,24 @@ function certify_solution(
     @unpack C, arb_C, arb_x̃₀ = cert_cache
 
     # refine solution to machine precicision
-    res = newton(
-        F,
-        solution_candidate,
-        complexF64_params(cert_params),
-        InfNorm(),
-        cert_cache.newton_cache;
-        rtol = 8 * eps(),
-        atol = 0.0,
-        # this should already be an approximate zero
-        extended_precision = true,
-        max_iters = 8,
-    )
+    if refine_solution
+        res = newton(
+            F,
+            solution_candidate,
+            complexF64_params(cert_params),
+            InfNorm(),
+            cert_cache.newton_cache;
+            rtol = 8 * eps(),
+            atol = 0.0,
+            # this should already be an approximate zero
+            extended_precision = true,
+            max_iters = 8,
+        )
+        x̃₀ = solution(res)
+    else
+        x̃₀ = solution_candidate
+    end
 
-    x̃₀ = solution(res)
     LA.inv!(C, cert_cache.newton_cache.J)
 
     certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
@@ -1320,17 +1340,9 @@ function certify(
     F::AbstractSystem,
     X::MonodromyResult,
     cache::CertificationCache = CertificationCache(F);
-    max_precision::Int = 256,
     kwargs...,
 )
-    _certify(
-        F,
-        solutions(X),
-        certification_parameters(parameters(X)),
-        cache;
-        max_precision = max_precision,
-        kwargs...,
-    )
+    _certify(F, solutions(X), certification_parameters(parameters(X)), cache; kwargs...)
 end
 
 function certify(
@@ -1339,12 +1351,11 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
-    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, [solution(r)], cert_params, cache; max_precision = max_precision, kwargs...)
+    _certify(F, [solution(r)], cert_params, cache, kwargs...)
 end
 
 function certify(
@@ -1353,12 +1364,11 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
-    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, solution.(r), cert_params, cache; max_precision = max_precision, kwargs...)
+    _certify(F, solution.(r), cert_params, cache; kwargs...)
 end
 
 function certify(
@@ -1367,12 +1377,11 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
-    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, [x], cert_params, cache; max_precision = max_precision, kwargs...)
+    _certify(F, [x], cert_params, cache; kwargs...)
 end
 
 function certify(
@@ -1415,12 +1424,15 @@ end
 
 A struct to create on the fly a list of distinct certified solutions.
 """
-Base.@kwdef mutable struct DistinctCertifiedSolutions{S<:AbstractSystem}
+Base.@kwdef mutable struct DistinctCertifiedSolutions{
+    S<:AbstractSystem,
+    C<:AbstractSolutionCertificate,
+}
     system::Vector{S}
     parameters::Union{Vector{Nothing},Vector{CertificationParameters}}
     cache::Vector{CertificationCache}
     access_lock::ReentrantLock
-    distinct_solution_certificates::DistinctSolutionCertificates{SolutionCertificate}
+    distinct_solution_certificates::DistinctSolutionCertificates{C}
 end
 
 """
@@ -1437,9 +1449,15 @@ DistinctCertifiedSolutions(F::System, params; thread_safe::Bool = false) =
 
 Create a DistinctCertifiedSolutions object from an abstract system and certification parameters.
 """
-function DistinctCertifiedSolutions(F::AbstractSystem, params; thread_safe::Bool = false)
+function DistinctCertifiedSolutions(
+    F::AbstractSystem,
+    params;
+    thread_safe::Bool = false,
+    extended_certificate::Bool = false,
+)
     cache = CertificationCache(F)
-    distinct_solution_certificates = DistinctSolutionCertificates(length(F))
+    distinct_solution_certificates =
+        DistinctSolutionCertificates(length(F); extended_certificate = extended_certificate)
     parameters = certification_parameters(params)
     access_lock = ReentrantLock()
     nthreads = thread_safe ? Threads.nthreads() : 1
