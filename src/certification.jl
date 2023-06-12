@@ -29,6 +29,7 @@ export certify,
     solutions,
     certificates,
     distinct_certified_solutions,
+    distinct_certified_solutions!,
     # deprecated
     initial_solution,
     certified_solution
@@ -1569,7 +1570,7 @@ function distinct_certified_solutions!(
     end
     progress_lock = ReentrantLock()
     if threading
-        ndistinct = Threads.Atomic{Int}(0)
+        ndistinct = Threads.Atomic{Int}(length(d))
         processed = Threads.Atomic{Int}(0)
         Threads.@threads for i = 1:length(S)
             sol = S[i]
