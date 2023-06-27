@@ -1,4 +1,5 @@
 @testset "Numerical Irreducible Decomposition" begin
+    Random.seed!(0x8b868a92)
 
     @testset "Union of 1 2-dim, 2 1-dim and 8 points" begin
         @var x, y, z

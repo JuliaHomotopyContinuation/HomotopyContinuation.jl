@@ -221,7 +221,7 @@
 
         n = size(M, 2)
 
-        S = collect(combinations(collect(1:n), 3))
+        S = collect(Combinatorics.combinations(collect(1:n), 3))
         nonconstant_minors = filter(s -> !ModelKit.is_number(s), [det(M[:, s]) for s in S])
 
         V = zeros(Expression, 6, 8)
