@@ -157,4 +157,10 @@ end
 
         test_homotopy(H, h)
     end
+
+    @testset "MixedHomotopy" begin
+        @var x t
+        H = Homotopy([(1 - 2 * t) + (-2 + 2 * t) * x + x^2], [x], t)
+        test_homotopy(MixedHomotopy(H), H)
+    end
 end

@@ -1,6 +1,6 @@
-using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random, Combinatorics
+using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
 using HomotopyContinuation.DoubleDouble: ComplexDF64
-import Arblib
+import Arblib, Combinatorics
 using ProjectiveVectors: PVector, affine_chart
 using TreeViews: TreeViews
 const HC = HomotopyContinuation

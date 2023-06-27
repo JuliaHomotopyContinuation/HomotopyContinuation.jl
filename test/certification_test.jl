@@ -221,7 +221,7 @@
 
         n = size(M, 2)
 
-        S = collect(combinations(collect(1:n), 3))
+        S = collect(Combinatorics.combinations(collect(1:n), 3))
         nonconstant_minors = filter(s -> !ModelKit.is_number(s), [det(M[:, s]) for s in S])
 
         V = zeros(Expression, 6, 8)
@@ -234,7 +234,8 @@
                 end
             end
         end
-        conics = [det(V[:, s]) for s in combinations(collect(1:size(V, 2)), 6)]
+        conics =
+            [det(V[:, s]) for s in Combinatorics.combinations(collect(1:size(V, 2)), 6)]
 
 
         @var s[1:length(nonconstant_minors)+length(conics)]

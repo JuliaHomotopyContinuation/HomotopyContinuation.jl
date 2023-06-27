@@ -1,4 +1,6 @@
 @testset "Monodromy" begin
+    Random.seed!(0x8b868323)
+
     function toric_ed(A)
         d, n = size(A)
         @var t[1:d] y[1:n] u[1:n]
@@ -232,8 +234,8 @@
             permutations = true,
             max_loops_no_progress = 20,
         )
-        A = permutations(S)
-        B = permutations(S, reduced = false)
+        A = HC.permutations(S)
+        B = HC.permutations(S, reduced = false)
 
         @test size(A) == (2, 2)
         @test A == [1 2; 2 1] || A == [2 1; 1 2]
