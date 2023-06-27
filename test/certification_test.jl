@@ -234,7 +234,8 @@
                 end
             end
         end
-        conics = [det(V[:, s]) for s in combinations(collect(1:size(V, 2)), 6)]
+        conics =
+            [det(V[:, s]) for s in Combinatorics.combinations(collect(1:size(V, 2)), 6)]
 
 
         @var s[1:length(nonconstant_minors)+length(conics)]
