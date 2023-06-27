@@ -427,10 +427,12 @@ function execute_taylor_instructions!_impl(K)
         instructions = sequence.instructions
         is_p_taylor = !isnothing(p) && !isempty(p) && length(p[1]) > 1
         is_x_taylor = !isempty(x) && length(x[1]) > 1
-        if !is_p_taylor && !is_x_taylor
+        if !is_p_taylor && !is_x_taylor && isnothing(sequence.continuation_parameter_index)
             constants_params_end = last(sequence.variables_range)
-        elseif !is_p_taylor
+        elseif !is_p_taylor && isnothing(sequence.continuation_parameter_index)
             constants_params_end = last(sequence.parameters_range)
+        elseif !is_p_taylor && !isnothing(sequence.continuation_parameter_index)
+            constants_params_end = max(sequence.continuation_parameter_index - 1, 0)
         else
             constants_params_end = last(sequence.constants_range)
         end
