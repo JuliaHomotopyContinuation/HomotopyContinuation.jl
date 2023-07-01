@@ -1337,14 +1337,14 @@ function certify(F::System, args...; compile::Union{Bool,Symbol} = false, kwargs
 end
 
 
-function certify(
-    F::AbstractSystem,
-    X::MonodromyResult,
-    cache::CertificationCache = CertificationCache(F);
-    kwargs...,
-)
-    _certify(F, solutions(X), certification_parameters(parameters(X)), cache; kwargs...)
-end
+# function certify(
+#     F::AbstractSystem,
+#     X::MonodromyResult,
+#     cache::CertificationCache = CertificationCache(F);
+#     kwargs...,
+# )
+#     _certify(F, solutions(X), certification_parameters(parameters(X)), cache; kwargs...)
+# end
 
 function certify(
     F::AbstractSystem,
@@ -1385,26 +1385,26 @@ function certify(
     _certify(F, [x], cert_params, cache; kwargs...)
 end
 
-function certify(
-    F::AbstractSystem,
-    X::Result,
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
-    target_parameters = nothing,
-    max_precision::Int = 256,
-    kwargs...,
-)
-    params = isnothing(p) ? target_parameters : p
-    cert_params = certification_parameters(params; prec = max_precision)
-    _certify(
-        F,
-        solutions(X; only_nonsingular = true),
-        cert_params,
-        cache;
-        max_precision = max_precision,
-        kwargs...,
-    )
-end
+# function certify(
+#     F::AbstractSystem,
+#     X::Result,
+#     p::Union{Nothing,AbstractArray} = nothing,
+#     cache::CertificationCache = CertificationCache(F);
+#     target_parameters = nothing,
+#     max_precision::Int = 256,
+#     kwargs...,
+# )
+#     params = isnothing(p) ? target_parameters : p
+#     cert_params = certification_parameters(params; prec = max_precision)
+#     _certify(
+#         F,
+#         solutions(X; only_nonsingular = true),
+#         cert_params,
+#         cache;
+#         max_precision = max_precision,
+#         kwargs...,
+#     )
+# end
 
 function certify(
     F::AbstractSystem,
