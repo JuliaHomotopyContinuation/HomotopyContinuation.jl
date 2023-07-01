@@ -85,15 +85,39 @@ is_tracking(code::EndgameCode.codes) = code == EndgameCode.tracking
 is_success(code::EndgameCode.codes) = code == EndgameCode.success
 
 
+Base.@kwdef mutable struct DivergingCheckState
+    diverging_starts::Vector{Float64}
+    diverging_abs_coords_at_start::Vector{Float64}
+    diverging_conds_at_start::Vector{Float64}
+end
+
+function DivergingCheckState(n::Integer)
+    DivergingCheckState(
+        diverging_starts = zeros(Float64, n),
+        diverging_abs_coords_at_start = zeros(Float64, n),
+        diverging_conds_at_start = zeros(Float64, n),
+    )
+end
+
+function init!(state::DivergingCheckState)
+    state.diverging_starts .= NaN
+    state.diverging_abs_coords_at_start .= NaN
+    state.diverging_conds_at_start .= NaN
+end
+
+
 Base.@kwdef mutable struct EndgameState
     code::EndgameCode.codes
     valuation::Valuation
     in_endgame_zone::Bool = false
+    endgame_zone_start_at::Float64 = NaN
+    norm_at_endgame_zone_start::Float64 = NaN
     steps_eg::Int = 0
     target_system_normalized_norm_derivative::Float64
     singular_check_row_scaling::Vector{Float64}
     projective_path_value::ProjectivePathValue
     sample_points::PathSamplePoints = PathSamplePoints()
+    diverging_check::DivergingCheckState
 
     # solution properties
     solution::Vector{ComplexF64}
@@ -114,6 +138,7 @@ function EndgameState(tracker::Tracker)
         singular_check_row_scaling = inv.(coordinate_norms),
         projective_path_value = ProjectivePathValue(tracker),
         solution = similar(tracker.state.x),
+        diverging_check = DivergingCheckState(length(tracker.state.x)),
     )
 end
 
@@ -122,6 +147,8 @@ Base.show(io::IO, S::EndgameState) = print_fieldnames(io, S)
 function init!(state::EndgameState)
     state.code = EndgameCode.tracking
     state.in_endgame_zone = false
+    state.endgame_zone_start_at = NaN
+    state.norm_at_endgame_zone_start = NaN
     state.steps_eg = 0
     state.solution .= NaN
     state.solution_accuracy = NaN
@@ -130,6 +157,7 @@ function init!(state::EndgameState)
     state.singular = false
     init!(state.valuation)
     init!(state.sample_points)
+    init!(state.diverging_check)
 end
 
 
@@ -197,6 +225,7 @@ Base.@kwdef mutable struct EndgameOptions
     # parameters
     singular_rcond_threshold::Float64 = 1e-12
     diverging_rcond_threshold::Float64 = 1e-8
+    min_norm_diverging_growth::Float64 = 1e4
     valuation_accuracy_tol::Float64 = 0.01
     max_winding_number::Int = 6
 end
@@ -236,6 +265,10 @@ function check_in_endgame_zone(eg::EndgameTracker; tol::Float64 = 1e-2)
 
     if dist < tol
         eg.state.in_endgame_zone = true
+        if eg.state.steps_eg == 0
+            eg.state.endgame_zone_start_at = t
+            eg.state.norm_at_endgame_zone_start = norm(tracker.state.x, Inf)
+        end
         eg.state.steps_eg += 1
     else
         eg.state.in_endgame_zone = false
@@ -244,8 +277,114 @@ function check_in_endgame_zone(eg::EndgameTracker; tol::Float64 = 1e-2)
     eg.state.in_endgame_zone
 end
 
-function endgame(eg::EndgameTracker; min_norm_diverging::Float64 = 1e4)
-    @unpack tracker, state = eg
+function check_diverging(eg::EndgameTracker, val_result::ValuationAnalyzeResult)
+    val_result.verdict == ValuationVerdict.Diverging || return false
+
+    for i in eachindex(val_result.coordinate_verdicts)
+        if check_diverging(eg, val_result, i)
+            eg.state.code = EndgameCode.path_diverging
+            return true
+        end
+    end
+
+    false
+end
+function check_diverging(eg::EndgameTracker, val_result::ValuationAnalyzeResult, i::Integer)
+    @unpack tracker, state, options = eg
+
+    verdict = val_result.coordinate_verdicts[i]
+
+    if verdict != ValuationVerdict.Diverging
+        state.diverging_check.diverging_starts[i] = NaN
+        return false
+    end
+
+    if isnan(state.diverging_check.diverging_starts[i])
+        t = real(tracker.state.t)
+        state.diverging_check.diverging_starts[i] = t
+        state.diverging_check.diverging_abs_coords_at_start[i] =
+            fast_abs(tracker.state.x[i])
+        return false
+    end
+
+    xᵢ = tracker.state.x[i]
+
+    coordinate_growth =
+        fast_abs(xᵢ) / state.diverging_check.diverging_abs_coords_at_start[i]
+
+    # Check if coordinate growth is larger than threshold
+    valᵢ = state.valuation.val_x[i]
+    # If a path is diverging and we are truly in the zone where the expansion as a Puiseux series holds
+    # then it holds that x(t) / x(t_start) ≈ (t/t_start)^valᵢ [dividing removes the coefficient] 
+    # If we require that coordinate growth holds for a period τ where τ = t/t_start, then we have
+    # that coordinate_growth ≈ τ^valᵢ
+
+    growth_base = options.min_norm_diverging_growth
+    min_growth = 32
+    min_growth_extended_prec = 2
+    base_growth_threshold = inv(growth_base)^valᵢ
+    growth_threshold = max(min_growth, base_growth_threshold)
+    growth_threshold_extended_prec = max(min_growth_extended_prec, base_growth_threshold)
+
+    if coordinate_growth > growth_threshold ||
+       (tracker.state.extended_prec && coordinate_growth > growth_threshold_extended_prec)
+        return true
+    end
+
+    false
+end
+
+function check_singular(eg::EndgameTracker, val_result::ValuationAnalyzeResult)
+    @unpack tracker, state, options = eg
+
+    (is_finite(val_result) && eg.tracker.state.extended_prec) || return false
+
+    m, _ = estimate_winding_number(eg.state.valuation; max_winding_number = 6)
+
+    if m > 1 &&
+       check_valuation_accuracy(eg.state.valuation, m) &&
+       length(eg.state.sample_points) >= 2m
+
+        _, err_1 = extrapolate(eg.state.sample_points; winding_number = 1, max_samples = 3m)
+        x0_m, err_m =
+            extrapolate(eg.state.sample_points; winding_number = m, max_samples = 3m)
+        # If m is correct than err_m should be meaningful smaller than err_1
+        # We have the rough estimate err_m = t^{N/m} whereas otherwise err_1 = t^{1/m}
+        if err_m < max(err_1^2, err_1 / 100)
+            eg.state.solution .= x0_m
+            eg.state.solution_accuracy = err_m
+            eg.state.code = EndgameCode.success
+            eg.state.singular = true
+            eg.state.winding_number = m
+            eg.state.rcond = compute_endpoint_rcond(eg, x0_m)
+            return
+        end
+
+        # See if we can find a singular solution with winding number 1 - this is
+        # the case if solution is on a positive dimensional component
+        # In this case val(ẋ[i]) ≈ 0 for all i
+    elseif m == 1 &&
+           (eg.tracker.state.statistics.failed_attempts_to_go_to_zero >= 3) &&
+           length(eg.state.sample_points) >= 3 &&
+           check_valuation_regular_finite(eg.state.valuation)
+
+        x0_1, err_1 = extrapolate(eg.state.sample_points; winding_number = 1)
+        rcond = compute_endpoint_rcond(eg, x0_1)
+        # Check if we have really a singular solution
+        if rcond < eg.options.singular_rcond_threshold
+            eg.state.solution .= s
+            eg.state.solution_accuracy = err_1
+            eg.state.code = EndgameCode.success_singular
+            eg.state.singular = true
+            eg.state.winding_number = 1
+            eg.state.rcond = rcond
+        end
+    end
+
+end
+
+function endgame(eg::EndgameTracker)
+    @unpack tracker, state, options = eg
 
     update!(state.projective_path_value, tracker)
     check_in_endgame_zone(eg) || return
@@ -257,82 +396,11 @@ function endgame(eg::EndgameTracker; min_norm_diverging::Float64 = 1e4)
     take_path_sample!(eg.state.sample_points, tracker)
     update!(state.valuation, tracker.predictor, real(tracker.state.t))
 
-    x = tracker.state.x
-    t = real(tracker.state.t)
-    n = length(x)
-
-    # Check if path is diverging
     val_result = analyze_valuation(eg.state.valuation; zero_is_finite = true)
 
-    if val_result.verdict == ValuationVerdict.Diverging
-        # Check if the diverging coordinate is larger than our threshold
+    check_diverging(eg, val_result)
 
-        is_diverging = any(
-            k ->
-                val_result.coordinate_verdicts[k] == ValuationVerdict.Diverging &&
-                    abs(x[k]) > min_norm_diverging,
-            1:n,
-        )
-
-        if !is_diverging
-            state.rcond = rcond!(tracker.ws)
-            if state.rcond < eg.options.diverging_rcond_threshold
-                is_diverging = true
-            end
-        end
-
-        if is_diverging
-            eg.state.code = EndgameCode.path_diverging
-            return
-        end
-    end
-
-
-    if is_finite(val_result) && eg.tracker.state.extended_prec
-
-        m, _ = estimate_winding_number(eg.state.valuation; max_winding_number = 6)
-
-        if m > 1 &&
-           check_valuation_accuracy(eg.state.valuation, m) &&
-           length(eg.state.sample_points) >= 2m
-
-            _, err_1 =
-                extrapolate(eg.state.sample_points; winding_number = 1, max_samples = 3m)
-            x0_m, err_m =
-                extrapolate(eg.state.sample_points; winding_number = m, max_samples = 3m)
-            # If m is correct than err_m should be meaningful smaller than err_1
-            # We have the rough estimate err_m = t^{N/m} whereas otherwise err_1 = t^{1/m}
-            if err_m < max(err_1^2, err_1 / 100)
-                eg.state.solution .= x0_m
-                eg.state.solution_accuracy = err_m
-                eg.state.code = EndgameCode.success
-                eg.state.singular = true
-                eg.state.winding_number = m
-                eg.state.rcond = compute_endpoint_rcond(eg, x0_m)
-                return
-            end
-
-            # See if we can find a singular solution with winding number 1 - this is
-            # the case if solution is on a positive dimensional component
-            # In this case val(ẋ[i]) ≈ 0 for all i
-        elseif m == 1 &&
-               (eg.tracker.state.statistics.failed_attempts_to_go_to_zero >= 3) &&
-               length(eg.state.sample_points) >= 3 &&
-               check_valuation_regular_finite(eg.state.valuation)
-
-            x0_1, err_1 = extrapolate(eg.state.sample_points; winding_number = 1)
-            rcond = compute_endpoint_rcond(eg, x0_1)
-            # Check if we have really a singular solution
-            if rcond < eg.options.singular_rcond_threshold
-                eg.state.solution .= s
-                eg.state.solution_accuracy = err_1
-                eg.state.code = EndgameCode.success_singular
-                eg.state.singular = true
-                eg.state.winding_number = 1
-                eg.state.rcond = rcond
-            end
-        end
-    end
+    check_singular(eg, val_result)
 end
 
 function compute_endpoint_rcond(eg::EndgameTracker, x = eg.tracker.state.x)
