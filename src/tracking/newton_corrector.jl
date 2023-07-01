@@ -51,6 +51,7 @@ function newton!(
     max_iters::Int,
     tol::Float64,
     extended_precision::Bool = false,
+    min_norm_Δx₀::Float64 = 0.01,
 )
     @unpack r, x_extended, ws, norm = NC
     x̄ .= x₀
@@ -79,6 +80,16 @@ function newton!(
             if isnan(norm_Δxᵢ)
                 return NewtonCorrectorResult(
                     NEWT_SINGULARITY,
+                    norm_Δxᵢ,
+                    iter + 1,
+                    ω,
+                    θ,
+                    μ_low,
+                    norm_Δx₀,
+                )
+            elseif iter == 0 && norm_Δxᵢ > min_norm_Δx₀
+                return NewtonCorrectorResult(
+                    NEWT_TERMINATED,
                     norm_Δxᵢ,
                     iter + 1,
                     ω,

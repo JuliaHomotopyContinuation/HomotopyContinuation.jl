@@ -104,6 +104,7 @@ Base.@kwdef mutable struct TrackerState
     ω_prev::Float64 = NaN
     μ::Float64 = NaN # limit accuracy
     τ::Float64 = NaN # trust region size
+    expected_norm_Δx₀::Float64 = NaN
     norm_Δx₀::Float64 = NaN# debug info only
     norm_Δx₀_prev::Float64 = NaN# debug info only
     extended_prec::Bool = false
@@ -158,6 +159,7 @@ function init!(
     state.ω_prev = NaN
     state.μ = NaN
     state.τ = NaN
+    state.expected_norm_Δx₀ = NaN
     state.norm_Δx₀ = state.norm_Δx₀_prev = NaN
     state.extended_prec = false
     state.used_extended_prec = false
@@ -473,8 +475,8 @@ function update_stepsize!(
 
     Δs = state.segment_stepper.Δs
     act_err = state.norm_Δx₀
-    η = state.norm_Δx₀_prev / abs(state.Δs_prev)^p
-    pred_err = η * abs(Δs)^p
+    η_prev = state.norm_Δx₀_prev / abs(state.Δs_prev)^p
+    pred_err = η_prev * abs(Δs)^p
     r = act_err / pred_err
     if isnan(r)
         r = 1.0
@@ -493,6 +495,8 @@ function update_stepsize!(
         Δs₁ = nthroot(min(δ1, δ2) / (α * result.norm_Δx₀), p) * abs(Δs)
         Δs₂ = 0.5trust_region(predictor)
         Δs′ = min(Δs₁, Δs₂)
+        η = result.norm_Δx₀ / abs(Δs)^p
+        expected_norm_Δx₀ = abs(Δs₁)^p * η
         # increase step size by a factor of at most 8 in one step
         if state.last_step_failed
             Δs′ = min(Δs′, 1.25Δs)
@@ -502,11 +506,14 @@ function update_stepsize!(
         step_success!(state.segment_stepper)
     else
         Δs′ = 0.5 * Δs
+        expected_norm_Δx₀ = state.expected_norm_Δx₀
     end
 
     state.Δs_prev = Δs
     propose_step!(state.segment_stepper, Δs′)
-    nothing
+
+
+    return expected_norm_Δx₀
 end
 
 
@@ -630,7 +637,6 @@ function step!(tracker::Tracker)
 
     # Correct the predicted value x̂ to obtain x̄.
     # If the correction is successfull we have x̄ ≈ x(t+Δt).
-
     result = newton!(
         x̄,
         corrector,
@@ -640,10 +646,12 @@ function step!(tracker::Tracker)
         max_iters = options.parameters.N,
         tol = current_tol(state),
         extended_precision = state.extended_prec,
+        min_norm_Δx₀ = isnan(state.expected_norm_Δx₀) ? 0.01 : 10 * state.expected_norm_Δx₀,
     )
 
     state.norm_Δx₀_prev = state.norm_Δx₀
     state.norm_Δx₀ = result.norm_Δx₀
+
     if is_converged(result)
 
         state.statistics.accepted_steps += 1
@@ -668,7 +676,7 @@ function step!(tracker::Tracker)
         state.statistics.last_steps_accepted = 0
     end
 
-    update_stepsize!(state, result, options, predictor)
+    state.expected_norm_Δx₀ = update_stepsize!(state, result, options, predictor)
 
     if is_converged(result)
         x .= x̄
