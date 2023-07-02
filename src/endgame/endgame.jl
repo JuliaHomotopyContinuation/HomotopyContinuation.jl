@@ -226,6 +226,9 @@ Base.@kwdef mutable struct EndgameOptions
     singular_rcond_threshold::Float64 = 1e-12
     diverging_rcond_threshold::Float64 = 1e-8
     min_norm_diverging_growth::Float64 = 1e4
+    diverging_base_growth::Float64 = 1e4
+    diverging_min_growth::Float64 = 128
+    diverging_min_growth_extended_prec::Float64 = 8
     valuation_accuracy_tol::Float64 = 0.01
     max_winding_number::Int = 6
 end
@@ -319,10 +322,10 @@ function check_diverging(eg::EndgameTracker, val_result::ValuationAnalyzeResult,
     # If we require that coordinate growth holds for a period τ where τ = t/t_start, then we have
     # that coordinate_growth ≈ τ^valᵢ
 
-    growth_base = options.min_norm_diverging_growth
-    min_growth = 32
-    min_growth_extended_prec = 2
-    base_growth_threshold = inv(growth_base)^valᵢ
+    base_growth = options.diverging_base_growth
+    min_growth = options.diverging_min_growth
+    min_growth_extended_prec = options.diverging_min_growth_extended_prec
+    base_growth_threshold = inv(base_growth)^valᵢ
     growth_threshold = max(min_growth, base_growth_threshold)
     growth_threshold_extended_prec = max(min_growth_extended_prec, base_growth_threshold)
 
