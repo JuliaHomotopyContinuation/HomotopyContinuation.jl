@@ -75,8 +75,6 @@ function path_info(
         push!(rconds, 1 / rcond!(eg.tracker.ws))
         step!(eg)
 
-        println("val = ", eg.state.valuation)
-
         push!(Δx_t, abs(Δs[end]) / state.norm_Δx₀^(1 / p))
 
         push!(accepted_rejected, !state.last_step_failed)

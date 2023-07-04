@@ -496,13 +496,16 @@ function update_stepsize!(
         Δs₂ = 0.5trust_region(predictor)
         Δs′ = min(Δs₁, Δs₂)
         η = result.norm_Δx₀ / abs(Δs)^p
-        expected_norm_Δx₀ = abs(Δs₁)^p * η
         # increase step size by a factor of at most 8 in one step
         if state.last_step_failed
             Δs′ = min(Δs′, 1.25Δs)
         else
             Δs′ = min(Δs′, 8Δs)
         end
+        # Keep track of the expected norm of the first correction step
+        # To avoid an excessively small norm we use a lower bound of sqrt(eps()) / ω
+        # since ≈ ||Δx₁|| = ω ||Δx₀||^2 
+        expected_norm_Δx₀ = max(abs(Δs₁)^p * η, 1.4901161193847656e-8 / ω)
         step_success!(state.segment_stepper)
     else
         Δs′ = 0.5 * Δs
@@ -646,9 +649,13 @@ function step!(tracker::Tracker)
         max_iters = options.parameters.N,
         tol = current_tol(state),
         extended_precision = state.extended_prec,
-        min_norm_Δx₀ = isnan(state.expected_norm_Δx₀) ? 0.01 : 10 * state.expected_norm_Δx₀,
+        min_norm_Δx₀ = max(
+            isnan(state.expected_norm_Δx₀) ? 0.01 : 10 * state.expected_norm_Δx₀,
+            1e-12,
+        ),
     )
 
+    @show result.norm_Δx₀, state.expected_norm_Δx₀
     state.norm_Δx₀_prev = state.norm_Δx₀
     state.norm_Δx₀ = result.norm_Δx₀
 
