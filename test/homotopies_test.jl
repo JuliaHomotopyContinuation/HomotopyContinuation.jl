@@ -1,19 +1,20 @@
-function test_homotopy_evaluate(homotopy, symbolic_homotopy)
+function test_homotopy_evaluate(homotopy, symbolic_homotopy; real_t = false, rtol = 1e-12)
     m, n = size(homotopy)
     u = zeros(ComplexF64, m)
     x = randn(ComplexF64, n)
-    t = randn(ComplexF64)
+    t = real_t ? -rand() + 0im : randn(ComplexF64)
 
     evaluate!(u, homotopy, x, t)
-    @test u ≈ symbolic_homotopy(x, t) rtol = 1e-12
+    s = real_t ? real(t) : t
+    @test u ≈ symbolic_homotopy(x, s) rtol = rtol
 end
 
-function test_homotopy_jacobian(homotopy, symbolic_homotopy)
+function test_homotopy_jacobian(homotopy, symbolic_homotopy; real_t = false)
     m, n = size(homotopy)
     u = zeros(ComplexF64, m)
     U = zeros(ComplexF64, m, n)
     x = randn(ComplexF64, n)
-    t = randn(ComplexF64)
+    t = real_t ? -rand() + 0im : randn(ComplexF64)
 
     evaluate_and_jacobian!(u, U, homotopy, x, t)
     H_x = differentiate(symbolic_homotopy.expressions, symbolic_homotopy.variables)
@@ -23,57 +24,57 @@ function test_homotopy_jacobian(homotopy, symbolic_homotopy)
         1e-12
 end
 
-function test_homotopy_taylor(homotopy, symbolic_homotopy)
+function test_homotopy_taylor(homotopy, symbolic_homotopy; real_t = false)
     m, n = size(homotopy)
     v = zeros(ComplexF64, m)
-    t = randn(ComplexF64)
+    t = real_t ? -rand() + 0im : randn(ComplexF64)
     ṫ = rand()
     X = TaylorVector{4}(randn(ComplexF64, 4, n))
 
-    for incr in [false, true]
-        for K = 1:4
-            @testset "Taylor, K = $K, incr = $incr" begin
-                k = K
-                x = TaylorVector{K}(X)
-                @var λ
-                tx = [sum(xi .* λ .^ (0:length(xi)-1)) for xi in eachcol(x.data[1:K, :])]
-                true_taylor_value =
-                    transpose.([
-                        (differentiate(
-                            Expression.(symbolic_homotopy(tx, t + ṫ * λ)),
-                            λ,
-                            j,
-                        )).(λ => 0) / factorial(j) for j = 0:K
-                    ])
-                v .= 0
+    @testset "Taylor" begin
+        for incr in [false]
+            for K = 1:4
+                @testset "Taylor, K = $K, incr = $incr" begin
+                    k = K
+                    x = TaylorVector{K}(X)
+                    @var λ
+                    tx =
+                        [sum(xi .* λ .^ (0:length(xi)-1)) for xi in eachcol(x.data[1:K, :])]
+                    true_taylor_value =
+                        transpose.([
+                            (differentiate(
+                                Expression.(symbolic_homotopy(tx, t + ṫ * λ)),
+                                λ,
+                                j,
+                            )).(λ => 0) / factorial(j) for j = 0:K
+                        ])
+                    v .= 0
 
-                w = TaylorVector{K + 1}(vcat(true_taylor_value...))
-                v .= 0
+                    w = TaylorVector{K + 1}(vcat(true_taylor_value...))
+                    v .= 0
 
-                taylor!(v, Val(k), homotopy, x, (t, ṫ))
-                @test v ≈ last(vectors(w)) rtol = 1e-12
+                    taylor!(v, Val(k), homotopy, x, (t, ṫ))
+                    @test v ≈ last(vectors(w)) rtol = 1e-12
 
-                u = TaylorVector{K + 1}(zeros(ComplexF64, K + 1, m))
-                taylor!(u, Val(k), homotopy, x, (t, ṫ))
+                    u = TaylorVector{K + 1}(zeros(ComplexF64, K + 1, m))
+                    taylor!(u, Val(k), homotopy, x, (t, ṫ))
 
-                j = 0
-                for (ui, wi) in zip(vectors(u), vectors(w))
-                    j += 1
-                    @test ui ≈ wi rtol = 1e-12
+                    j = 0
+                    for (ui, wi) in zip(vectors(u), vectors(w))
+                        j += 1
+                        @test ui ≈ wi rtol = 1e-12
+                    end
+
                 end
-
             end
         end
     end
-
 end
 
-function test_homotopy(homotopy, symbolic_homotopy)
-
-    test_homotopy_evaluate(homotopy, symbolic_homotopy)
-    test_homotopy_jacobian(homotopy, symbolic_homotopy)
-    test_homotopy_taylor(homotopy, symbolic_homotopy)
-
+function test_homotopy(homotopy, symbolic_homotopy; real_t = false)
+    test_homotopy_evaluate(homotopy, symbolic_homotopy; real_t = real_t)
+    test_homotopy_jacobian(homotopy, symbolic_homotopy; real_t = real_t)
+    test_homotopy_taylor(homotopy, symbolic_homotopy; real_t = real_t)
 end
 
 
@@ -253,12 +254,51 @@ end
 
         cell = first(cells)
 
-        HC.update!(H, lifting, cell)
+        HC.update!(H, lifting, cell; max_weight = 4.0)
         w = HC.γ(H.H).weights
         @var t
         h = Homotopy(G(x, reduce(vcat, C) .* t .^ w), x, t)
 
         test_homotopy(H, h)
+    end
+
+    @testset "ToricLogRealHomotopy" begin
+        function polyhedral_system(support)
+            m = 0
+            p = Variable[]
+            coeffs = map(support) do A
+                c = variables(:c, m+1:m+size(A, 2))
+                m += size(A, 2)
+                append!(p, c)
+                c
+            end
+
+            System(
+                support,
+                coeffs;
+                variables = variables(:x, 1:length(support)),
+                parameters = p,
+            )
+        end
+
+
+        @var x[1:4]
+        f = [rand_poly(x, 2) for k = 1:4]
+        F = System(f)
+        A, C = support_coefficients(F)
+        cells, lifting = MixedSubdivisions.fine_mixed_cells(A)
+        G = polyhedral_system(A)
+
+        H = ToricLogRealHomotopty(fixed(G), C, A)
+
+        cell = first(cells)
+
+        HC.update!(H, lifting, cell; max_weight = 4.0)
+        w = HC.γ(H.H).weights
+        @var s
+        h = Homotopy(G(x, reduce(vcat, C) .* exp.(w .* s)), x, s)
+
+        test_homotopy(H, h; real_t = true)
     end
 
 end

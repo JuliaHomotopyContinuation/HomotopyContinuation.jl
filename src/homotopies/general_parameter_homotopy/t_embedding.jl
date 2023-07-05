@@ -2,6 +2,7 @@ abstract type TEmbedding end
 
 include("straight_line_t_embedding.jl")
 include("toric_t_embedding.jl")
+include("toric_log_real_embedding.jl")
 
 struct CacheTEmbedding{E<:TEmbedding}
     embedding::E

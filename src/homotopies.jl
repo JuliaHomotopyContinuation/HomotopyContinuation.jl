@@ -11,6 +11,7 @@ include("homotopies/linear_subspace_geodesic_homotopy.jl")
 include("homotopies/mixed_homotopy.jl")
 include("homotopies/affine_chart_homotopy.jl")
 include("homotopies/toric_homotopy.jl")
+include("homotopies/toric_log_real_homotopy.jl")
 
 
 """

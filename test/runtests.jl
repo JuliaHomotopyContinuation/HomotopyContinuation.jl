@@ -1,3 +1,5 @@
+include("setup.jl")
+
 @testset "HomotopyContinuation" begin
     if (hc_testset == "none") || (hc_testset == "model_kit")
         include("model_kit_test.jl")

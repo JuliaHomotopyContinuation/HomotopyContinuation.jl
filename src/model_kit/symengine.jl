@@ -389,6 +389,12 @@ function Base.log(b::ModelKit.Basic)
     return a
 end
 
+function Base.exp(b::ModelKit.Basic)
+    a = Expression()
+    ccall((:basic_exp, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
+    return a
+end
+
 function Base.sqrt(b::Basic)
     a = Expression()
     ccall((:basic_sqrt, libsymengine), Nothing, (Ref{Expression}, Ref{ExpressionRef}), a, b)
