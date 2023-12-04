@@ -1180,7 +1180,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     println(io, header)
 
     mdim = max_dim(N)
-    if mdim > 0
+    if mdim >= 0
         for d = max_dim(N):-1:0
             if haskey(D, d)
                 ℓ = length(D[d])
