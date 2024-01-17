@@ -1,4 +1,4 @@
-export AbstractSystem, AbstractHomotopy, jacobian
+export AbstractSystem, AbstractHomotopy, jacobian, is_real
 
 """
     AbstractSystem
@@ -74,6 +74,20 @@ function jacobian(F::AbstractSystem, x, p = nothing)
     evaluate_and_jacobian!(u, U, F, x, p)
     ModelKit.to_smallest_eltype(U)
 end
+
+"""
+    is_real(F::AbstractSystem)
+
+Checks, if `F(ℝⁿ) ⊂ ℝᵐ`, where `(m,n) = size(F)`. 
+This is an algorithm that works with probability one:
+It randomly samples `x ∈ ℝⁿ` and checks if `F(x) ∈ ℝᵐ`.
+"""
+function is_real(F::T) where {T<:AbstractSystem}
+    x = randn(Float64, size(F, 2))
+    u = F(x)
+    all(ui -> imag(ui) == 0, u)
+end
+
 
 ##############
 ## Homotopy ##

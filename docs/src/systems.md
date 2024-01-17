@@ -72,3 +72,8 @@ fix_parameters(F::AbstractSystem, p)
 ```@docs
 RandomizedSystem
 ```
+
+## Real Systems
+```@docs
+is_real
+```

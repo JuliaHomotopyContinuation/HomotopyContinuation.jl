@@ -107,7 +107,7 @@ is_real(C::AbstractSolutionCertificate) = C.real
     is_complex(certificate::AbstractSolutionCertificate)
 
 Returns `true` if `certificate` certifies that the certified solution interval
-contains a true complex zero of the system.
+contains a non-real complex zero of the system.
 """
 is_complex(C::AbstractSolutionCertificate) = C.complex
 
@@ -236,6 +236,7 @@ function squared_distance_interval(
     n = length(solution_candidate(cert))
     d = zero(IntervalArithmetic.Interval{Float64})
     for i = 1:n
+        @show cert
         yᵢ = IComplexF64(cert.I[i], a, b)
         d +=
             IntervalArithmetic.sqr(real(yᵢ) - real(reference_point[i])) +
@@ -320,7 +321,6 @@ function add_certificate!(
     cert::AbstractSolutionCertificate,
 )
     d = squared_distance_interval(cert, distinct_sols.reference_point)
-
     for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
         certᵢ = IntervalTrees.value(match)
         if Bool(Arblib.overlaps(cert.I, certᵢ.I))
@@ -752,6 +752,8 @@ function _certify(
         throw(ArgumentError("The given system expects parameters but none are given."))
     end
 
+    is_real_system = ModelKit.is_real(F)
+
     distinct_sols =
         DistinctSolutionCertificates(n; extended_certificate = extended_certificate)
     ncertified = Threads.Atomic{Int}(0)
@@ -793,7 +795,8 @@ function _certify(
                 s,
                 Tp[tid],
                 Tcache[tid],
-                i;
+                i,
+                is_real_system;
                 extended_certificate = extended_certificate,
                 certify_solution_kwargs...,
             )
@@ -853,7 +856,8 @@ function _certify(
                 s,
                 p,
                 cache,
-                i;
+                i,
+                is_real_system;
                 extended_certificate = extended_certificate,
                 certify_solution_kwargs...,
             )
@@ -936,7 +940,8 @@ function certify_solution(
     solution_candidate::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
-    index::Int;
+    index::Int,
+    is_real_system::Bool;
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
@@ -966,13 +971,21 @@ function certify_solution(
 
     certified, x₁, x₀, is_real = ε_inflation_krawczyk(x̃₀, cert_params, C, cert_cache)
 
+    if !is_real_system
+        is_real = false
+    end
+
     if certified
+        is_complex = any(xi -> !(0.0 in imag(xi)), x₁)
+        if is_complex
+            is_real = false
+        end
         if extended_certificate
             return ExtendedSolutionCertificate(
                 solution_candidate = solution_candidate,
                 certified = true,
                 real = is_real,
-                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                complex = is_complex,
                 index = index,
                 prec = 53,
                 I = AcbMatrix(x₀; prec = 53),
@@ -986,7 +999,7 @@ function certify_solution(
                 solution_candidate = solution_candidate,
                 certified = true,
                 real = is_real,
-                complex = any(xi -> !(0.0 in imag(xi)), x₁),
+                complex = is_complex,
                 index = index,
                 prec = 53,
                 I = AcbMatrix(x₁; prec = 53),
@@ -1001,7 +1014,8 @@ function certify_solution(
         x̃₀,
         cert_params,
         cert_cache,
-        index;
+        index,
+        is_real_system;
         max_precision = max_precision,
         extended_certificate = extended_certificate,
     )
@@ -1013,7 +1027,8 @@ function extended_prec_certify_solution(
     x̃₀::AbstractVector,
     cert_params::Union{Nothing,CertificationParameters},
     cert_cache::CertificationCache,
-    index::Int;
+    index::Int,
+    is_real_system::Bool;
     max_precision::Int = 256,
     extended_certificate::Bool = false,
 )
@@ -1036,9 +1051,17 @@ function extended_prec_certify_solution(
         certified, arb_x₁, arb_x₀, is_real =
             arb_ε_inflation_krawczyk(arb_x̃₀, cert_params, arb_C, cert_cache; prec = prec)
 
+        if !is_real_system
+            is_real = false
+        end
+
         if certified
             I = AcbMatrix(n, 1; prec = prec)
             Arblib.set!(I, arb_x₀)
+            is_complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁)
+            if is_complex
+                is_real = false
+            end
 
             if extended_certificate
                 I′ = AcbMatrix(n, 1; prec = prec)
@@ -1051,7 +1074,7 @@ function extended_prec_certify_solution(
                     solution_candidate = solution_candidate,
                     certified = true,
                     real = is_real,
-                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    complex = is_complex,
                     index = index,
                     prec = prec,
                     I = I,
@@ -1066,7 +1089,7 @@ function extended_prec_certify_solution(
                     solution_candidate = solution_candidate,
                     certified = true,
                     real = is_real,
-                    complex = any(xi -> !Arblib.contains_zero(Arblib.imagref(xi)), arb_x₁),
+                    complex = is_complex,
                     index = index,
                     prec = prec,
                     I = I,
@@ -1152,6 +1175,8 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
         sqr_mul!(x₁, M, δx)
         x₁ .= (x̃₀ .- Δx₀) .- x₁
         certified = all2(isinterior, x₁, x₀)
+        @show x₀
+        @show x₁
         is_real =
             certified ? all2((x₁_i, x₀_i) -> isinterior(conj(x₁_i), x₀_i), x₁, x₀) : false
     else
