@@ -236,7 +236,6 @@ function squared_distance_interval(
     n = length(solution_candidate(cert))
     d = zero(IntervalArithmetic.Interval{Float64})
     for i = 1:n
-        @show cert
         yᵢ = IComplexF64(cert.I[i], a, b)
         d +=
             IntervalArithmetic.sqr(real(yᵢ) - real(reference_point[i])) +
@@ -1175,8 +1174,6 @@ function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}
         sqr_mul!(x₁, M, δx)
         x₁ .= (x̃₀ .- Δx₀) .- x₁
         certified = all2(isinterior, x₁, x₀)
-        @show x₀
-        @show x₁
         is_real =
             certified ? all2((x₁_i, x₀_i) -> isinterior(conj(x₁_i), x₀_i), x₁, x₀) : false
     else
