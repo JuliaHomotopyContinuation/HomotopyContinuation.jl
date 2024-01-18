@@ -82,11 +82,11 @@
 
         F = System([x - 1 + 1e-16 * im])
         certF = certify(F, [x0])
-        is_real(certificates(certF)[1]) == false
+        @test is_real(certificates(certF)[1]) == false
 
         G = System([x - 1])
         certG = certify(G, [x0])
-        is_real(certificates(certG)[1]) == true
+        @test is_real(certificates(certG)[1]) == true
     end
 
     @testset "Parameters: Input = Vector{Expression}" begin
