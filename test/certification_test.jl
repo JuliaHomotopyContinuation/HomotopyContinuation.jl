@@ -337,7 +337,7 @@
         f = fixed(F)
         c = HomotopyContinuation.CertificationCache(f)
         q = HomotopyContinuation.certification_parameters(p)
-        cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1)
+        cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1, false)
         @test is_certified(cert)
     end
 end

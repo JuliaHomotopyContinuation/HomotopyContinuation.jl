@@ -933,6 +933,28 @@ end
     )
 end
 
+function certify_solution(
+    F::AbstractSystem,
+    solution_candidate::AbstractVector,
+    cert_params::Union{Nothing,CertificationParameters},
+    cert_cache::CertificationCache,
+    index::Int;
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+)
+    certify_solution(
+        F,
+        solution_candidate,
+        cert_params,
+        cert_cache,
+        index,
+        ModelKit.is_real(F);
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+    )
+end
 
 function certify_solution(
     F::AbstractSystem,
