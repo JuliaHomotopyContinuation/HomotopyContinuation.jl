@@ -75,6 +75,20 @@
         @test ndistinct_real_certified(cert) == 4
     end
 
+    @testset "Reality Check" begin
+
+        @var x
+        x0 = [1.0]
+
+        F = System([x - 1 + 1e-16 * im])
+        certF = certify(F, [x0])
+        @test is_real(certificates(certF)[1]) == false
+
+        G = System([x - 1])
+        certG = certify(G, [x0])
+        @test is_real(certificates(certG)[1]) == true
+    end
+
     @testset "Parameters: Input = Vector{Expression}" begin
         @var x y
         f = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
@@ -337,7 +351,7 @@
         f = fixed(F)
         c = HomotopyContinuation.CertificationCache(f)
         q = HomotopyContinuation.certification_parameters(p)
-        cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1)
+        cert = HomotopyContinuation.certify_solution(f, sol, q, c, 1, false)
         @test is_certified(cert)
     end
 end

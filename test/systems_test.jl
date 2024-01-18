@@ -135,4 +135,12 @@ end
         G = SlicedSystem(g, L)
         test_system(G, System(G))
     end
+
+    @testset "is_real" begin
+        @var x
+        f = System([x - 1])
+        g = System([x - 1 + 1e-16 * im])
+        @test ModelKit.is_real(fixed(f)) == true
+        @test ModelKit.is_real(fixed(g)) == false
+    end
 end
