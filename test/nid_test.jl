@@ -28,6 +28,9 @@
         N = nid(F; seed = nothing)
         @test isnothing(seed(N))
 
+        # bad seed
+        N = nid(F; seed = 0xc770fa47)
+
         # progress
         N = nid(F; show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
