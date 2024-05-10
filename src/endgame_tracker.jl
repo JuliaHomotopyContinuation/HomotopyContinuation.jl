@@ -40,6 +40,7 @@ These parameters control the behaviour during the endgame.
 * `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the endgame is started.
 * `sing_cond = 1e14`: value for the condition number above which a solution is considered singular.
 * `sing_accuracy = 1e-12`: value for the accuracy number above which a solution is considered singular.
+* `scaling_threshold = -30.0`: Row scaling of matrices is only applied to rows with `e < scaling_threshold`, where is the norm of the row is estimated to be `2^e`. See [`skeel_row_scaling`](@skeel_row_scaling) for details.
 * `refine_steps = 3`: number of steps for refining solutions at the end.
 """
 Base.@kwdef mutable struct EndgameOptions
@@ -63,6 +64,7 @@ Base.@kwdef mutable struct EndgameOptions
     # singular solutions parameters
     sing_cond::Float64 = 1e14
     sing_accuracy::Float64 = 1e-12
+    scaling_threshold::Float64 = -30.0
 
     # refinement parameters
     refine_steps::Int = 3
@@ -386,7 +388,7 @@ function step!(endgame_tracker::EndgameTracker, debug::Bool = false)
     update!(state.val, tracker.predictor, t)
     debug && println(state.val)
     if check_finite!(state, options)
-        switch_to_singular!(state, tracker; debug = debug)
+        switch_to_singular!(state, tracker, options; debug = debug)
         return state.code
     elseif check_at_infinity!(state, tracker, options; debug = debug)
         return state.code
@@ -442,6 +444,7 @@ function check_at_infinity!(state, tracker, options; debug::Bool = false)
                         state.row_scaling,
                         workspace(tracker.state.jacobian),
                         state.col_scaling,
+                        options.scaling_threshold,
                     )
                 end
                 κ = LA.cond(tracker.state.jacobian, state.row_scaling, state.col_scaling)
@@ -494,7 +497,7 @@ function check_at_infinity!(state, tracker, options; debug::Bool = false)
     false
 end
 
-function switch_to_singular!(state, tracker; debug::Bool)
+function switch_to_singular!(state, tracker, options; debug::Bool)
     state.singular_endgame = true
     t = real(tracker.state.t)
     state.singular_start = t
@@ -506,6 +509,7 @@ function switch_to_singular!(state, tracker; debug::Bool)
             state.row_scaling,
             workspace(tracker.state.jacobian),
             state.col_scaling,
+            options.scaling_threshold,
         )
     end
     add_sample!(state, tracker, t)
@@ -703,6 +707,7 @@ function tracking_stopped!(endgame_tracker::EndgameTracker)
             state.row_scaling,
             workspace(tracker.state.jacobian),
             state.col_scaling,
+            options.scaling_threshold,
         )
         state.cond =
             LA.cond(tracker, state.solution, 0.0, state.row_scaling, state.col_scaling)
