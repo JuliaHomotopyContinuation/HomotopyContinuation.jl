@@ -442,9 +442,11 @@ function skeel_row_scaling!(
             d[i] += fast_abs(A[i, j]) * cj
         end
     end
+
+    m = maximum(d)
     @inbounds for i = 1:n
         e = last(frexp(d[i]))
-        if e < scaling_threshold
+        if e - m < scaling_threshold
             d[i] = 1.0
         else
             d[i] = exp2(-e)
