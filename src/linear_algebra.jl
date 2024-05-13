@@ -424,7 +424,7 @@ end
 Compute optimal scaling factors `d` for the matrix `A` following Skeel [^S79]
 if `c` is approximately of the order of the solution of the linear system
 of interest.
-The scaling factors are rounded to powers `e` of the base radix 2. Row scaling is only applied to rows with `e < scaling_threshold` to prevent zero rows from being scaled.
+The scaling factors are rounded to powers `e` of the base radix 2. Row scaling is only applied to rows with `e - m ≥ scaling_threshold` to prevent zero rows from being scaled, where `2^m` is approximately the maximum norm of a row of `A`. 
 
 [^S79]: Skeel, Robert D. "Scaling for numerical stability in Gaussian elimination." Journal of the ACM (JACM) 26.3 (1979): 494-526.
 """
