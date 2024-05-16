@@ -418,19 +418,21 @@ end
 
 """
     skeel_row_scaling!(W::MatrixWorkspace, c)
-    skeel_row_scaling!(d, A, c)
+    skeel_row_scaling!(d, A, c;
+    scaling_threshold = -30.0)
 
 Compute optimal scaling factors `d` for the matrix `A` following Skeel [^S79]
 if `c` is approximately of the order of the solution of the linear system
 of interest.
-The scaling factors are rounded to powers of the base radix 2.
+The scaling factors are rounded to powers `e` of the base radix 2. Row scaling is only applied to rows with `e - m ≥ scaling_threshold` (this is an inequality of norms at log-scale) to prevent zero rows from being scaled, where `2^m` is approximately the maximum norm of a row of `A`. 
 
 [^S79]: Skeel, Robert D. "Scaling for numerical stability in Gaussian elimination." Journal of the ACM (JACM) 26.3 (1979): 494-526.
 """
 function skeel_row_scaling!(
     d::AbstractVector{<:Real},
     A::AbstractMatrix{<:Complex},
-    c::AbstractVector{<:Real},
+    c::AbstractVector{<:Real};
+    scaling_threshold::Float64 = -30.0,
 )
     n = length(c)
     @inbounds d .= zero(eltype(d))
@@ -440,8 +442,16 @@ function skeel_row_scaling!(
             d[i] += fast_abs(A[i, j]) * cj
         end
     end
+
+    m = maximum(d)
+    s = scaling_threshold + m
     @inbounds for i = 1:n
-        d[i] = exp2(-last(frexp(d[i])))
+        e = last(frexp(d[i]))
+        if e < s
+            d[i] = 1.0
+        else
+            d[i] = exp2(-e)
+        end
     end
 
     d
@@ -456,10 +466,11 @@ function row_scaling!(
     d::AbstractVector{<:Real},
     WS::MatrixWorkspace,
     c::AbstractVector{<:Real},
+    scaling_threshold::Float64,
 )
     m, n = size(WS)
     if m == n
-        skeel_row_scaling!(d, WS.A, c)
+        skeel_row_scaling!(d, WS.A, c; scaling_threshold = scaling_threshold)
     else
         d .= 1.0
     end
@@ -754,6 +765,7 @@ function LA.cond(
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
         end
+        #@show (rmax, rmin)
         rmax / rmin
     else
         inverse_inf_norm_est(WS, d_l, d_r) * inf_norm(WS, d_l, d_r)

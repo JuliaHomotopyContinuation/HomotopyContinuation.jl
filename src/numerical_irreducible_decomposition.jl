@@ -449,7 +449,7 @@ function regeneration!(
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
-        sing_accuracy = 1e-10,
+        sing_cond = 1e12,
     ),
     threading::Bool = true,
     seed = rand(UInt32),
