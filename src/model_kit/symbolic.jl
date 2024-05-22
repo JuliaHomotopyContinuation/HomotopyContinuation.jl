@@ -164,8 +164,35 @@ function unique_variable(var, vars::Vector{Variable}, params::Vector{Variable})
 end
 
 
-Base.adjoint(expr::Basic) = expr
+"""
+    Base.conj(expr::Expression)
+
+This command returns back `expr`. This is intended, because complex conjugation is not algebraic. 
+
+## Example
+```julia-repl
+julia> @var x y ;
+julia> f = x + im*y
+julia> conj(f)
+x + im*y
+```
+
+## Polynomials with conjugated coefficients.
+If `f` is a polynomial, the polynomial obtained from `f` by conjugating its  coefficients can be obtained as in the following example.
+```julia-repl
+julia> @var x y ;
+julia> f = x + im*y
+julia> vars = variables(f)
+julia> n = length(vars)
+julia> e, c = exponents_coefficients(f, vars)
+julia> sum(conj(cj) * prod(vars[i]^e[i,j] for i in 1:n) for (j,cj) in enumerate(c))
+x - im*y
+```
+"""
 Base.conj(expr::Basic) = expr
+
+
+Base.adjoint(expr::Basic) = expr
 Base.transpose(expr::Basic) = expr
 Base.broadcastable(v::Basic) = Ref(v)
 
