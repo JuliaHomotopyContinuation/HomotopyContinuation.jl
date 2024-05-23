@@ -19,10 +19,12 @@ coeffs_as_dense_poly
 degree(f::Expression, vars::AbstractVector{Variable})
 degrees(::AbstractVector{Expression})
 differentiate(expr::ModelKit.Basic, vars::AbstractVector{Variable})
+Base.conj
 dense_poly
 evaluate(expr::AbstractArray{<:ModelKit.Basic}, args...)
 expand
 exponents_coefficients
+poly_from_exponents_coefficients
 horner
 nvariables(::Expression)
 monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer)

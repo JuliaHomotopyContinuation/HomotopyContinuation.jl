@@ -164,8 +164,34 @@ function unique_variable(var, vars::Vector{Variable}, params::Vector{Variable})
 end
 
 
-Base.adjoint(expr::Basic) = expr
+"""
+    Base.conj(expr::Expression)
+
+This command returns back `expr`. This is intended, because complex conjugation is not algebraic. 
+
+## Example
+```julia-repl
+julia> @var x y ;
+julia> f = x + im*y
+julia> conj(f)
+x + im*y
+```
+
+## Polynomials with conjugated coefficients.
+If `f` is a polynomial, the polynomial obtained from `f` by conjugating its  coefficients can be obtained as in the following example.
+```julia-repl
+julia> @var x y ;
+julia> f = x + im*y
+julia> vars = variables(f)
+julia> e, c = exponents_coefficients(f, vars)
+julia> poly_from_exponents_coefficients(e, conj.(c), vars)
+x - im*y
+```
+"""
 Base.conj(expr::Basic) = expr
+
+
+Base.adjoint(expr::Basic) = expr
 Base.transpose(expr::Basic) = expr
 Base.broadcastable(v::Basic) = Ref(v)
 
@@ -627,6 +653,41 @@ function exponents_coefficients(
     permute!(coeffs, perm)
     M, coeffs
 end
+
+"""
+    poly_from_exponents_coefficients(M::Matrix{T}, c::Vector{S}, vars::AbstractVector{Variable})
+
+Construct the polynomial from the matrix of exponent vectors `M`, coefficient vector `c` and variables `vars`.
+
+## Example
+julia> @var x y ;
+julia> f = x^2 + x*y - 1
+julia> vars = variables(f)
+julia> M, c = exponents_coefficients(f, vars)
+julia> poly_from_exponents_coefficients(M, c, vars)
+-1 + x*y + x^2
+"""
+
+function poly_from_exponents_coefficients(
+    M::Matrix{T},
+    c::Vector{S},
+    vars::AbstractVector{Variable},
+) where {T,S<:Number}
+    m, n = size(M)
+    if length(c) != n
+        error(
+            "Exponent matrix has $n columns, but the coefficient vector has length $(length(c)).",
+        )
+    end
+    if length(vars) != m
+        error(
+            "Exponent matrix has $m rows, but the variable vector has length $(length(vars)).",
+        )
+    end
+
+    sum(cj * prod(vars[i]^M[i, j] for i = 1:m) for (j, cj) in enumerate(c))
+end
+
 
 """
     coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)

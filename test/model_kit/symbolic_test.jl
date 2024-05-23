@@ -246,6 +246,24 @@
         @test subs(f, c => gc) == g
     end
 
+    @testset "Polynomial to exponents_coefficients and back" begin
+        @var x y
+
+        f = x^2 + x * y - 1
+        vars = variables(f)
+        M, c = exponents_coefficients(f, vars)
+        g = poly_from_exponents_coefficients(M, c, vars)
+        Mg, cg = exponents_coefficients(g, vars)
+        @test c == cg
+
+        f = x^2 + x * y - randn(ComplexF64)
+        vars = variables(f)
+        M, c = exponents_coefficients(f, vars)
+        g = poly_from_exponents_coefficients(M, c, vars)
+        @test isa(g, Expression)
+    end
+
+
     @testset "System" begin
         @var x y a b
         f = [(x + y)^3 + x^2 + x + 5y + 3a, 2 * x^2 + b]
