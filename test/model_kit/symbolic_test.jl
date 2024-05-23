@@ -247,19 +247,19 @@
     end
 
     @testset "Polynomial to exponents_coefficients and back" begin
-        @var x y;
+        @var x y
 
-        f = x^2 + x*y - 1
+        f = x^2 + x * y - 1
         vars = variables(f)
         M, c = exponents_coefficients(f, vars)
         g = poly_from_exponents_coefficients(M, c, vars)
-        @test expand(f-g) == 0
+        @test expand(f - g) == 0
 
-        f = x^2 + x*y - randn(ComplexF64)
+        f = x^2 + x * y - randn(ComplexF64)
         vars = variables(f)
         M, c = exponents_coefficients(f, vars)
         g = poly_from_exponents_coefficients(M, c, vars)
-        @test expand(f-g) == 0
+        @test expand(f - g) == 0
     end
 
 

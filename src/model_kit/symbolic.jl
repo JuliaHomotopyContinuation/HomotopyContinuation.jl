@@ -671,17 +671,21 @@ julia> poly_from_exponents_coefficients(M, c, vars)
 function poly_from_exponents_coefficients(
     M::Matrix{T},
     c::Vector{S},
-    vars::AbstractVector{Variable}
-) where {T,S <: Number}
+    vars::AbstractVector{Variable},
+) where {T,S<:Number}
     m, n = size(M)
     if length(c) != n
-        error("Exponent matrix has $n columns, but the coefficient vector has length $(length(c)).")
+        error(
+            "Exponent matrix has $n columns, but the coefficient vector has length $(length(c)).",
+        )
     end
     if length(vars) != m
-        error("Exponent matrix has $m rows, but the variable vector has length $(length(vars)).")
-    end 
+        error(
+            "Exponent matrix has $m rows, but the variable vector has length $(length(vars)).",
+        )
+    end
 
-    sum(cj * prod(vars[i]^M[i,j] for i in 1:m) for (j,cj) in enumerate(c))
+    sum(cj * prod(vars[i]^M[i, j] for i = 1:m) for (j, cj) in enumerate(c))
 end
 
 
