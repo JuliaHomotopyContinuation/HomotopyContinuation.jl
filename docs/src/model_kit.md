@@ -24,6 +24,7 @@ dense_poly
 evaluate(expr::AbstractArray{<:ModelKit.Basic}, args...)
 expand
 exponents_coefficients
+poly_from_exponents_coefficients
 horner
 nvariables(::Expression)
 monomials(vars::AbstractVector{<:Union{Variable,Expression}}, d::Integer)

@@ -183,9 +183,8 @@ If `f` is a polynomial, the polynomial obtained from `f` by conjugating its  coe
 julia> @var x y ;
 julia> f = x + im*y
 julia> vars = variables(f)
-julia> n = length(vars)
 julia> e, c = exponents_coefficients(f, vars)
-julia> sum(conj(cj) * prod(vars[i]^e[i,j] for i in 1:n) for (j,cj) in enumerate(c))
+julia> poly_from_exponents_coefficients(e, conj.(c), vars)
 x - im*y
 ```
 """
@@ -654,6 +653,37 @@ function exponents_coefficients(
     permute!(coeffs, perm)
     M, coeffs
 end
+
+"""
+    poly_from_exponents_coefficients(M::Matrix{T}, c::Vector{S}, vars::AbstractVector{Variable})
+
+Construct the polynomial from the matrix of exponent vectors `M`, coefficient vector `c` and variables `vars`.
+
+## Example
+julia> @var x y ;
+julia> f = x^2 + x*y - 1
+julia> vars = variables(f)
+julia> M, c = exponents_coefficients(f, vars)
+julia> poly_from_exponents_coefficients(M, c, vars)
+-1 + x*y + x^2
+"""
+
+function poly_from_exponents_coefficients(
+    M::Matrix{T},
+    c::Vector{S},
+    vars::AbstractVector{Variable}
+) where {T,S <: Number}
+    m, n = size(M)
+    if length(c) != n
+        error("Exponent matrix has $n columns, but the coefficient vector has length $(length(c)).")
+    end
+    if length(vars) != m
+        error("Exponent matrix has $m rows, but the variable vector has length $(length(vars)).")
+    end 
+
+    sum(cj * prod(vars[i]^M[i,j] for i in 1:m) for (j,cj) in enumerate(c))
+end
+
 
 """
     coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
