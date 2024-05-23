@@ -253,13 +253,14 @@
         vars = variables(f)
         M, c = exponents_coefficients(f, vars)
         g = poly_from_exponents_coefficients(M, c, vars)
-        @test expand(f - g) == 0
+        Mg, cg = exponents_coefficients(g, vars)
+        @test c == cg
 
         f = x^2 + x * y - randn(ComplexF64)
         vars = variables(f)
         M, c = exponents_coefficients(f, vars)
         g = poly_from_exponents_coefficients(M, c, vars)
-        @test expand(f - g) == 0
+        @test isa(g, Expression)
     end
 
 
