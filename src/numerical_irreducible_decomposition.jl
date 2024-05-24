@@ -452,8 +452,11 @@ function regeneration!(
         sing_cond = 1e12,
     ),
     threading::Bool = true,
-    seed = rand(UInt32),
+    seed = nothing,
 )
+    if isnothing(seed)
+        seed = rand(UInt32)
+    end
 
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
