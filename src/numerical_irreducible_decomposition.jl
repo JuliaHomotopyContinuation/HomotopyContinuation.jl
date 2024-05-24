@@ -96,8 +96,8 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
     )
 end
 update_progress!(progress::Nothing, W::WitnessPoints) = nothing
-function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
-    progress.degrees[codim(W)] = length(points(W))
+function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
+    progress.degrees[codim(W)] = length(solutions(W))
     PM.update!(
         progress.progress_meter,
         progress.current_codim,
@@ -130,7 +130,10 @@ function showvalues(progress::WitnessSetsProgress)
         push!(text, ("Current number of witness points", ""))
         for c = 1:progress.codim
             d = progress.ambient_dim - c
-            push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+            deg = get(progress.degrees, c, nothing)
+            if !isnothing(deg) && deg > 0
+                push!(text, ("Dimension $d", "$(deg)"))
+            end
         end
     end
 
@@ -477,7 +480,7 @@ function regeneration!(
             n,
             codim,
             PM.ProgressUnknown(
-                dt = 0.2,
+                dt = 1.0,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
@@ -590,7 +593,7 @@ function regeneration!(
         end
     end
     pop!(vars)
-    finish_progress!(progress)
+
 
     filter!(W -> degree(W) > 0, out)
 
@@ -598,6 +601,8 @@ function regeneration!(
         return map(out) do W
             P, L = u_transform(W)
 
+            # here comes an additional safety feature:
+            # after regeneration we apply one additional monodromy per witness set to find potential missing solutions
             if dim(L) < n
                 MS = MonodromySolver(F, L; compile = false)
                 res = monodromy_solve(
@@ -608,8 +613,14 @@ function regeneration!(
                     threading = threading,
                     show_progress = false,
                 )
-                return WitnessSet(fixed(F, compile = false), L, solutions(res))
+
+                W = WitnessSet(fixed(F, compile = false), L, solutions(res))
+                update_progress!(progress, W)
+
+                finish_progress!(progress)
+                return W
             else
+                finish_progress!(progress)
                 return WitnessSet(fixed(F, compile = false), L, P)
             end
 
