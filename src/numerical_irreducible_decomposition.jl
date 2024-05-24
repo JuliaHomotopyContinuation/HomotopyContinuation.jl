@@ -746,7 +746,7 @@ function decompose_with_monodromy!(
             )
 
             complete_orbits = Vector{Set{Int}}()
-                  
+               
             for orbit in orbits
                 update_progress!(progress)
 
@@ -761,6 +761,7 @@ function decompose_with_monodromy!(
                 )
 
                 if trace(res_orbit) < options.trace_test_tol
+
                     push!(decomposition, WitnessSet(G, L, P_orbit))
                     push!(complete_orbits, orbit)
                 end
@@ -828,7 +829,7 @@ function decompose_with_monodromy!(
                             setdiff(orbits, complete_orbits)
                         ],
                     )
-                )
+                )  
         end
     else
         push!(decomposition, WitnessSet(G, L, P))
@@ -995,7 +996,7 @@ function decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-6),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-12),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = true,
