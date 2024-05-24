@@ -594,16 +594,22 @@ function regeneration!(
     if !isempty(out)
         return map(out) do W
             P, L = u_transform(W)
-            MS = MonodromySolver(F, L; compile = false)
-            res = monodromy_solve(
-                MS,
-                P,
-                L,
-                seed;
-                threading = threading,
-                show_progress = false,
-            )
-            WitnessSet(fixed(F, compile = false), L, solutions(res))
+
+            if dim(L) < n
+                MS = MonodromySolver(F, L; compile = false)
+                res = monodromy_solve(
+                    MS,
+                    P,
+                    L,
+                    seed;
+                    threading = threading,
+                    show_progress = false,
+                )
+                return WitnessSet(fixed(F, compile = false), L, solutions(res))
+            else
+                return WitnessSet(fixed(F, compile = false), L, P)
+            end
+            
         end
     else
         return Vector{WitnessSet}()
@@ -999,7 +1005,7 @@ function decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-12),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = true,
