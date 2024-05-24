@@ -746,7 +746,7 @@ function decompose_with_monodromy!(
             )
 
             complete_orbits = Vector{Set{Int}}()
-            @show non_complete_orbits      
+                  
             for orbit in orbits
                 update_progress!(progress)
 
