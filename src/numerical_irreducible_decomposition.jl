@@ -594,7 +594,16 @@ function regeneration!(
     if !isempty(out)
         return map(out) do W
             P, L = u_transform(W)
-            WitnessSet(fixed(F, compile = false), L, P)
+            MS = MonodromySolver(F, L; compile = false)
+            res = monodromy_solve(
+                MS,
+                P,
+                L,
+                seed;
+                threading = threading,
+                show_progress = false,
+            )
+            WitnessSet(fixed(F, compile = false), L, solutions(res))
         end
     else
         return Vector{WitnessSet}()
@@ -716,7 +725,7 @@ function decompose_with_monodromy!(
             if iter > max_iters
                 break
             end
-            # @show iter
+
             res = monodromy_solve(
                 MS,
                 non_complete_points,
@@ -725,6 +734,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
+           
             if warning && (trace(res) > options.trace_test_tol)
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
@@ -736,6 +746,7 @@ function decompose_with_monodromy!(
             )
 
             complete_orbits = Vector{Set{Int}}()
+            @show non_complete_orbits      
             for orbit in orbits
                 update_progress!(progress)
 
@@ -984,7 +995,7 @@ function decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-6),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = true,
