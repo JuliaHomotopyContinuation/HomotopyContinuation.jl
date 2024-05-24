@@ -734,7 +734,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
-           
+
             if warning && (trace(res) > options.trace_test_tol)
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
@@ -746,7 +746,7 @@ function decompose_with_monodromy!(
             )
 
             complete_orbits = Vector{Set{Int}}()
-               
+
             for orbit in orbits
                 update_progress!(progress)
 
@@ -762,8 +762,11 @@ function decompose_with_monodromy!(
 
                 if trace(res_orbit) < options.trace_test_tol
 
-                    push!(decomposition, WitnessSet(G, L, P_orbit))
-                    push!(complete_orbits, orbit)
+                    # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
+                    if length(orbit) > 1 || iter ≥ 5
+                        push!(decomposition, WitnessSet(G, L, P_orbit))
+                        push!(complete_orbits, orbit)
+                    end
                 end
             end
 
@@ -829,7 +832,7 @@ function decompose_with_monodromy!(
                             setdiff(orbits, complete_orbits)
                         ],
                     )
-                )  
+                )
         end
     else
         push!(decomposition, WitnessSet(G, L, P))
