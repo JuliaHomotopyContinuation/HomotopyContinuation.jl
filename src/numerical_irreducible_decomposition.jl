@@ -609,7 +609,7 @@ function regeneration!(
             else
                 return WitnessSet(fixed(F, compile = false), L, P)
             end
-            
+
         end
     else
         return Vector{WitnessSet}()
