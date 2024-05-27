@@ -97,7 +97,7 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
 end
 update_progress!(progress::Nothing, W::WitnessPoints) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
-    progress.degrees[codim(W)] = length(solutions(W))
+    progress.degrees[codim(W)] = length(points(W))
     PM.update!(
         progress.progress_meter,
         progress.current_codim,
