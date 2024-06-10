@@ -596,34 +596,10 @@ function regeneration!(
 
 
     filter!(W -> degree(W) > 0, out)
-
     if !isempty(out)
         return map(out) do W
             P, L = u_transform(W)
-
-            # here comes an additional safety feature:
-            # after regeneration we apply one additional monodromy per witness set to find potential missing solutions
-            if dim(L) < n
-                MS = MonodromySolver(F, L; compile = false)
-                res = monodromy_solve(
-                    MS,
-                    P,
-                    L,
-                    seed;
-                    threading = threading,
-                    show_progress = false,
-                )
-
-                W = WitnessSet(fixed(F, compile = false), L, solutions(res))
-                update_progress!(progress, W)
-
-                finish_progress!(progress)
-                return W
-            else
-                finish_progress!(progress)
-                return WitnessSet(fixed(F, compile = false), L, P)
-            end
-
+            WitnessSet(fixed(F, compile = false), L, P)
         end
     else
         return Vector{WitnessSet}()
