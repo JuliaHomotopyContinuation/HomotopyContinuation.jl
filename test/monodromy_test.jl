@@ -73,6 +73,10 @@
         result = monodromy_solve(F, x₀, p₀, distance = (x, y) -> 0.0)
         @test length(solutions(result)) == 1
 
+        # don't use triangle inequality
+        result = monodromy_solve(F, x₀, p₀, triangle_inequality = false)
+        @test length(solutions(result)) == 21
+
         # Test stop heuristic with no target solutions count
         result = monodromy_solve(F, x₀, p₀)
         @test is_heuristic_stop(result)

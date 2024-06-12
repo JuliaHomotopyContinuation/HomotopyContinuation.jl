@@ -37,6 +37,7 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     permutations::Bool = false
     # unique points options
     distance::D = EuclideanNorm()
+    triangle_inequality::Bool = true
     unique_points_atol::Union{Nothing,Float64} = nothing
     unique_points_rtol::Union{Nothing,Float64} = nothing
     #
@@ -454,8 +455,13 @@ function MonodromySolver(
         end
     end
 
-    unique_points =
-        UniquePoints(x₀, 1; metric = options.distance, group_actions = group_actions)
+    unique_points = UniquePoints(
+        x₀,
+        1;
+        metric = options.distance,
+        group_actions = group_actions,
+        triangle_inequality = options.triangle_inequality,
+    )
 
     trace = zeros(ComplexF64, length(x₀) + 1, 3)
     MonodromySolver(
