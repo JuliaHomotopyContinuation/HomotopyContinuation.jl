@@ -128,11 +128,14 @@ Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
 
 A data structure for assessing quickly whether a point is close to an indexed point as
 determined by the given distances function `M`. The distance function has to be a *metric*.
-The indexed points are only stored by their identifiers `Id`.
+The indexed points are only stored by their identifiers `Id`. `triangle_inequality` should be set to `true`, if the metric satisfies the triangle inequality. Otherwise, it should be set to `false`.
 
     UniquePoints(v::AbstractVector{T}, id::Id;
                     metric = EuclideanNorm(),
+                    triangle_inequality = true,
                     group_actions = nothing)
+
+    
 
 Initialize the data structure. This *does not* initialize the data structure with the point.
 
@@ -165,6 +168,7 @@ function UniquePoints(
     v::AbstractVector,
     id;
     metric = EuclideanNorm(),
+    triangle_inequality = true,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
@@ -172,7 +176,7 @@ function UniquePoints(
         group_actions = GroupActions(group_actions)
     end
 
-    tree = VoronoiTree(v, id; metric = metric)
+    tree = VoronoiTree(v, id; metric = metric, triangle_inequality = triangle_inequality)
     UniquePoints(tree, group_actions, zeros(eltype(v), length(v)))
 end
 

@@ -36,7 +36,13 @@ function compute_distances!(node, x, metric::M) where {M}
     node.distances
 end
 
-function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,Id,M}
+function search_in_radius(
+    node::VTNode{T,Id},
+    x,
+    tol::Real,
+    metric::M,
+    triangle_inequality::Bool,
+) where {T,Id,M}
     !isempty(node) || return nothing
 
     n = length(node)
@@ -47,12 +53,14 @@ function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,
     # is closest (let's say with distance `d`) and all those
     # children for whose distance `dᵢ` we have |d-dᵢ| < 2*tol
     # This fact can be shown by using the triangle inequality.
-    # We therefore simply compute the distances to every point and sort
-    # afterwards
+    # However, if triangle_inequality=false, we do not have a triangle inequality. In this case, we check all children.
+
+    # We compute the distances to every point and sort afterwards
 
     # We go through the elements and compute the distances,
     # keeping track of the three smallest elements
     m₁ = m₂ = m₃ = (Inf, 1)
+
     # we have a distances cache per thread
     distances = compute_distances!(node, x, metric)
     for i = 1:n
@@ -86,21 +94,8 @@ function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,
 
     # Check smallest element first
     if isassigned(node.children, last(m₁))
-        retid = search_in_radius(node.children[last(m₁)], x, tol, metric)
-        if !isnothing(retid)
-            # we rely on the distances for insertion, so place the smallest element first
-            distances[1] = m₁
-            return retid::Id
-        end
-    end
-    # Case 1)
-    if m₂[1] - m₁[1] > 2tol
-        distances[1] = m₁
-        return nothing # already checked first tree
-    end
-    # Case 2) We know m₂[1] - m₁[1] ≤ 2tol
-    if isassigned(node.children, last(m₂))
-        retid = search_in_radius(node.children[last(m₂)], x, tol, metric)
+        retid =
+            search_in_radius(node.children[last(m₁)], x, tol, metric, triangle_inequality)
         if !isnothing(retid)
             # we rely on the distances for insertion, so place the smallest element first
             distances[1] = m₁
@@ -108,14 +103,32 @@ function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,
         end
     end
 
-    if m₃[1] - m₁[1] > 2tol
+    # Case 1)
+    if m₂[1] - m₁[1] > 2tol && triangle_inequality
+        distances[1] = m₁
+        return nothing # already checked first tree
+    end
+
+    # Case 2) If we have a triangle in equality, we know m₂[1] - m₁[1] ≤ 2tol 
+    if isassigned(node.children, last(m₂))
+        retid =
+            search_in_radius(node.children[last(m₂)], x, tol, metric, triangle_inequality)
+        if !isnothing(retid)
+            # we rely on the distances for insertion, so place the smallest element first
+            distances[1] = m₁
+            return retid::Id
+        end
+    end
+
+    if m₃[1] - m₁[1] > 2tol && triangle_inequality
         distances[1] = m₁
         return nothing # Checked first and second case
     end
 
     # Since we know also the third element, let's check it
     if isassigned(node.children, last(m₃))
-        retid = search_in_radius(node.children[last(m₃)], x, tol, metric)
+        retid =
+            search_in_radius(node.children[last(m₃)], x, tol, metric, triangle_inequality)
         if !isnothing(retid)
             # we rely on the distances for insertion, so place at the first place the smallest element
             distances[1] = m₁
@@ -131,9 +144,10 @@ function search_in_radius(node::VTNode{T,Id}, x, tol::Real, metric::M) where {T,
     d = m₃[1]
     for k ∈ 4:n
         dᵢ, i = distances[k]
-        if dᵢ - m₁[1] < 2tol
+        if dᵢ - m₁[1] < 2tol || !triangle_inequality
             if isassigned(node.children, i)
-                retid = search_in_radius(node.children[i], x, tol, metric)
+                retid =
+                    search_in_radius(node.children[i], x, tol, metric, triangle_inequality)
                 if !isnothing(retid)
                     return retid::Id
                 end
@@ -194,20 +208,27 @@ end
     id::Id;
     metric = EuclideanNorm(),
     capacity = 8,
+    triangle_inequality = true
 )
 
 Construct a Voronoi tree data structure for vector `v` of element type `T` and with identifiers
-`Id`. Each node has the given `capacity` and distances are measured by the given `metric`.
+`Id`. Each node has the given `capacity` and distances are measured by the given `metric`. `triangle_inequality` should be set to `true`, if `metric` satisfies the triangle inequality. Otherwise, it should be set to `false`.
 """
 mutable struct VoronoiTree{T,Id,M}
     root::VTNode{T,Id}
     nentries::Int
     metric::M
+    triangle_inequality::Bool
 end
 
-function VoronoiTree{T,Id}(d::Int; metric = EuclideanNorm(), capacity::Int = 8) where {T,Id}
+function VoronoiTree{T,Id}(
+    d::Int;
+    metric = EuclideanNorm(),
+    capacity::Int = 8,
+    triangle_inequality::Bool = true,
+) where {T,Id}
     root = VTNode(T, Id, d; capacity = capacity)
-    VoronoiTree(root, 0, metric)
+    VoronoiTree(root, 0, metric, triangle_inequality)
 end
 
 function VoronoiTree(v::AbstractVector{T}, id::Id; kwargs...) where {T,Id}
@@ -245,7 +266,7 @@ Search whether the given `tree` contains a point `p` with distances at most `tol
 Returns `nothing` if no point exists, otherwise the identifier of `p` is returned.
 """
 function search_in_radius(tree::VoronoiTree, v, tol::Real)
-    search_in_radius(tree.root, v, tol, tree.metric)
+    search_in_radius(tree.root, v, tol, tree.metric, tree.triangle_inequality)
 end
 
 
