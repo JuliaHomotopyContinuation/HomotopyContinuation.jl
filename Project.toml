@@ -30,7 +30,7 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
 Arblib = "0.7,0.8"
-DynamicPolynomials = "0.5"
+DynamicPolynomials = "0.5, 0.6"
 ElasticArrays = "1"
 FiniteDiff = "2.15"
 IntervalTrees = "1.1"
