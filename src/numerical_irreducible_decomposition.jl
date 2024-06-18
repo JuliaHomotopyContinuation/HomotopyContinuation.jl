@@ -95,8 +95,8 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
         showvalues = showvalues(progress),
     )
 end
-update_progress!(progress::Nothing, W::WitnessPoints) = nothing
-function update_progress!(progress::WitnessSetsProgress, W::WitnessPoints)
+update_progress!(progress::Nothing, W::Union{WitnessPoints,WitnessSet}) = nothing
+function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
     progress.degrees[codim(W)] = length(points(W))
     PM.update!(
         progress.progress_meter,
@@ -130,7 +130,10 @@ function showvalues(progress::WitnessSetsProgress)
         push!(text, ("Current number of witness points", ""))
         for c = 1:progress.codim
             d = progress.ambient_dim - c
-            push!(text, ("Dimension $d", "$(get(progress.degrees, c, "-"))"))
+            deg = get(progress.degrees, c, nothing)
+            if !isnothing(deg) && deg > 0
+                push!(text, ("Dimension $d", "$(deg)"))
+            end
         end
     end
 
@@ -452,8 +455,11 @@ function regeneration!(
         sing_cond = 1e12,
     ),
     threading::Bool = true,
-    seed = rand(UInt32),
+    seed = nothing,
 )
+    if isnothing(seed)
+        seed = rand(UInt32)
+    end
 
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
@@ -474,7 +480,7 @@ function regeneration!(
             n,
             codim,
             PM.ProgressUnknown(
-                dt = 0.2,
+                dt = 1.0,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
@@ -587,10 +593,9 @@ function regeneration!(
         end
     end
     pop!(vars)
-    finish_progress!(progress)
+
 
     filter!(W -> degree(W) > 0, out)
-
     if !isempty(out)
         return map(out) do W
             P, L = u_transform(W)
@@ -716,7 +721,7 @@ function decompose_with_monodromy!(
             if iter > max_iters
                 break
             end
-            # @show iter
+
             res = monodromy_solve(
                 MS,
                 non_complete_points,
@@ -725,6 +730,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
+
             if warning && (trace(res) > options.trace_test_tol)
                 @warn "Trying to decompose non-complete set of witness points (trace test failed)"
             end
@@ -736,6 +742,7 @@ function decompose_with_monodromy!(
             )
 
             complete_orbits = Vector{Set{Int}}()
+
             for orbit in orbits
                 update_progress!(progress)
 
@@ -750,8 +757,12 @@ function decompose_with_monodromy!(
                 )
 
                 if trace(res_orbit) < options.trace_test_tol
-                    push!(decomposition, WitnessSet(G, L, P_orbit))
-                    push!(complete_orbits, orbit)
+
+                    # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
+                    if length(orbit) > 1 || iter ≥ 5
+                        push!(decomposition, WitnessSet(G, L, P_orbit))
+                        push!(complete_orbits, orbit)
+                    end
                 end
             end
 

@@ -196,6 +196,47 @@
         @test n_components(N_Bricard6R) == 1
     end
 
+    @testset "ACR" begin
+        @var xx_Di, xx_Da, xx_Ya, xx_Yi
+        @var xx_CXY, xx_CXYp, xx_G, xx_CNA, xx_X
+        @var xx_A, xx_N, xx_CXA, xx_T, xx_CXT, xx_Xp
+
+
+        F_ACR = [
+            -(5 / 3) * xx_Di + (2 / 3) * xx_Da,
+            (5 / 3) * xx_Di - (2 / 3) * xx_Da,
+            -(1 / 3) * xx_Ya * xx_X - (2 / 3) * xx_Ya +
+            (5 / 6) * xx_Yi +
+            (6 / 5) * xx_CXY +
+            4 * xx_CXYp,
+            -8 * xx_Da * xx_Yi + (5 / 7) * xx_G * xx_CNA + (2 / 3) * xx_Ya -
+            (49 / 30) * xx_Yi,
+            8 * xx_Da * xx_Yi - (5 / 7) * xx_G * xx_CNA + (4 / 5) * xx_Yi,
+            8 * xx_Da * xx_Yi - (5 / 7) * xx_G * xx_CNA +
+            (2 / 3) * xx_A * xx_N +
+            (4 / 5) * xx_Yi - (8 / 3) * xx_CNA,
+            -(2 / 3) * xx_A * xx_N - (7 / 8) * xx_A * xx_X +
+            (8 / 3) * xx_CNA +
+            (5 / 7) * xx_CXA,
+            -(2 / 3) * xx_A * xx_N + (8 / 3) * xx_CNA - (5 / 2) * xx_N + 1,
+            -(1 / 3) * xx_Ya * xx_X - (7 / 8) * xx_A * xx_X - xx_X * xx_T - (4 / 3) * xx_X +
+            (6 / 5) * xx_CXY +
+            3 * xx_CXT +
+            (5 / 7) * xx_CXA +
+            1,
+            (1 / 3) * xx_Ya * xx_X - (26 / 5) * xx_CXY,
+            4 * xx_CXY - 4 * xx_CXYp,
+            4 * xx_CXYp - 5 * xx_Xp,
+            -xx_X * xx_T + 3 * xx_CXT,
+            xx_X * xx_T - 3 * xx_CXT,
+            (7 / 8) * xx_A * xx_X - (5 / 7) * xx_CXA,
+        ]
+
+        N_ACR = nid(F_ACR)
+        degrees(N_ACR) == Dict(4 => [7])
+    end
+
+
     #     @testset "426" begin
     #         ### Example thanks to Julian Vill
     #         @var a, b, c, d, e

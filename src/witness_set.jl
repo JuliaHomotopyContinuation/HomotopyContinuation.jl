@@ -48,6 +48,8 @@ Get the solutions stored in `W`.
 solutions(W::WitnessSet{A,B,PathResult}) where {A,B} = solutions(W.R)
 solutions(W::WitnessSet{A,B,Vector{ComplexF64}}) where {A,B} = W.R
 
+points(W::WitnessSet) = solutions(W)
+
 """
     results(W::WitnessSet)
 
