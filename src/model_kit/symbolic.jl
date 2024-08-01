@@ -1447,7 +1447,7 @@ function system_with_coefficents_as_params(
     param_name = gensym(:c)
     k = 1
     params = Variable[]
-    target_params = MP.coefficienttype(F)[]
+    target_params = MP.coefficient_type(F)[]
     G = map(F) do f
         sum(MP.terms(f)) do t
             c = Variable(param_name, k)
