@@ -8,8 +8,8 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     A::M # Matrix
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
-    lu::LA.LU{ComplexF64,M} # LU Factorization of D * J
-    qr::LA.QR{ComplexF64,Matrix{ComplexF64}}
+    lu::LA.LU{ComplexF64,M,Vector{Int}} # LU Factorization of D * J
+    qr::LA.QR{ComplexF64,Matrix{ComplexF64},Matrix{ComplexF64}}
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
@@ -38,8 +38,9 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     end
     row_scaling = ones(m)
     scaled = Ref(false)
-
-    lu = LinearAlgebra.LU{eltype(A),typeof(A)}(copy(A), zeros(Int, m), 0)
+    
+    ipiv = zeros(Int, m)
+    lu = LinearAlgebra.LU{eltype(A),typeof(A), typeof(ipiv)}(copy(A), ipiv, 0)
     r = zeros(ComplexF64, m)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)
