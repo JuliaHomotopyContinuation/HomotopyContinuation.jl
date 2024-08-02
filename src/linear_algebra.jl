@@ -9,7 +9,7 @@ struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
     lu::LA.LU{ComplexF64,M,Vector{Int}} # LU Factorization of D * J
-    qr::LA.QR{ComplexF64,Matrix{ComplexF64},Matrix{ComplexF64}}
+    qr::LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
