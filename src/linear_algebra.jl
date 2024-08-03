@@ -38,9 +38,9 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     end
     row_scaling = ones(m)
     scaled = Ref(false)
-    
+
     ipiv = zeros(Int, m)
-    lu = LinearAlgebra.LU{eltype(A),typeof(A), typeof(ipiv)}(copy(A), ipiv, 0)
+    lu = LinearAlgebra.LU{eltype(A),typeof(A),typeof(ipiv)}(copy(A), ipiv, 0)
     r = zeros(ComplexF64, m)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)

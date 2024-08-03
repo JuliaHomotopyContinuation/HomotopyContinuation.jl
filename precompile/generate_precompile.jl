@@ -8,5 +8,8 @@ dir = mktempdir()
 
 SnoopCompile.write(dir, pc)
 
-mv(joinpath(dir, "precompile_HomotopyContinuation.jl"),
-    joinpath(@__DIR__, "../src/precompile.jl"); force = true)
+mv(
+    joinpath(dir, "precompile_HomotopyContinuation.jl"),
+    joinpath(@__DIR__, "../src/precompile.jl");
+    force = true,
+)
