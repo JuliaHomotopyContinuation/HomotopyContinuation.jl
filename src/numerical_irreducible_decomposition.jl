@@ -1126,7 +1126,7 @@ function n_components(
     else
         out = 0
         for d in dims
-            if haskey(D, k)
+            if haskey(D, d)
                 out += sum(length(last(Ws)) for Ws in D[d])
             end
         end
@@ -1134,7 +1134,7 @@ function n_components(
 
     out
 end
-n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, [dim])
+n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, dims=[dim])
 
 """
 
