@@ -1134,7 +1134,7 @@ function n_components(
 
     out
 end
-n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, dims=[dim])
+n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, dims = [dim])
 
 """
 
