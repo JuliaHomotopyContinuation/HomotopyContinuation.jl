@@ -1127,7 +1127,7 @@ function n_components(
         out = 0
         for d in dims
             if haskey(D, d)
-                out += sum(length(last(Ws)) for Ws in D[d])
+                out += length(D[d])
             end
         end
     end
