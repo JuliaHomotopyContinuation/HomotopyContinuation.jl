@@ -1,0 +1,11 @@
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+*.jl.*.mem
+*.jld
+
+Manifest.toml
+docs/build/
+**/**/tmp_params.txt
+**/**/tmp_sols.txt
+**/**/tmp_cert.txt
