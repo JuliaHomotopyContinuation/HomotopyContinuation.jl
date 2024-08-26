@@ -53,6 +53,11 @@
 
         N3 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
         @test isa(N3, NumericalIrreducibleDecomposition)
+
+        # number of components
+        @test n_components(N3) == 4
+        @test n_components(N3, dims = [1, 2]) == 3
+        @test n_components(N3, 1) == 2
     end
 
     @testset "Hypersurface of degree 5" begin
