@@ -621,7 +621,7 @@ function CertificationCache(F::AbstractSystem)
     )
 end
 
-Base.setprecision(M::AcbRefMatrix, p::Int) = AcbRefMatrix(M.acb_mat; prec = p)
+Base.setprecision(M::AcbRefMatrix, p::Int) = AcbRefMatrix(M.acb_mat; shallow = true, prec = p)
 function set_arb_precision!(cache::CertificationCache, p::Int)
     cache.arb_prec == p && return cache
     cache.arb_prec = p
