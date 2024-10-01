@@ -42,7 +42,7 @@ NumericalIrreducibleDecomposition
 ```
 
 ```@docs
-n_components
+ncomponents
 witness_sets
 degrees
 ```

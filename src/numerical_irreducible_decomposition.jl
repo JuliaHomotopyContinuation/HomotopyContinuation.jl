@@ -4,6 +4,7 @@ export NumericalIrreducibleDecomposition,
     regeneration,
     witness_sets,
     decompose,
+    ncomponents,
     n_components,
     seed
 
@@ -104,6 +105,7 @@ function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,
         showvalues = showvalues(progress),
     )
 end
+update_progress!(progress::Union{Nothing,WitnessSetsProgress}, W::Nothing) = nothing
 update_progress!(progress::Nothing) = nothing
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
@@ -147,7 +149,7 @@ This is the core routine of the regeneration algorithm. It intersects a set of [
 """
 function intersect_with_hypersurface!(
     W::WitnessPoints{T1,T2,Vector{ComplexF64}},
-    X::WitnessPoints{T3,T4,Vector{ComplexF64}},
+    X::Union{WitnessPoints{T3,T4,Vector{ComplexF64}},Nothing},
     F::AS,
     H::WitnessSet{T5,T6,Vector{ComplexF64}},
     u::Variable,
@@ -173,6 +175,11 @@ function intersect_with_hypersurface!(
     P_next = P[m]
     deleteat!(P, m)
     update_progress!(progress, W)
+
+    if isnothing(X)
+        return nothing
+    end
+
 
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
@@ -203,9 +210,11 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for tracking
     l_start = length(start)
+
     for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+
 
         res = track(tracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
@@ -215,6 +224,7 @@ function intersect_with_hypersurface!(
         end
         update_progress!(progress, i, l_start)
     end
+
 
 
     nothing
@@ -330,6 +340,7 @@ function is_contained!(
             end
             # check if x is among the points in U
             _, added = add!(U, x, 0)
+
             if added
                 return false
             else
@@ -537,11 +548,14 @@ function regeneration!(
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
                     for (k, W) in reverse(E) # k = codim(W) for W in Ws
-                        if k < min(i, n)
-                            X = out[k+1]
+                        if k < i
+                            if k < n
+                                X = out[k+1]
+                            else
+                                X = nothing
+                            end
                             # here is the intersection step
-                            # the next witness superset X is also passed to this function,
-                            # because we add points that do not belong to W∩Hᵢ to X.
+                            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
                             intersect_with_hypersurface!(
                                 W,
@@ -559,7 +573,10 @@ function regeneration!(
                         end
                     end
 
+
+
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
+
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
@@ -1110,13 +1127,13 @@ witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N, [
 seed(N::NumericalIrreducibleDecomposition) = N.seed
 
 """
-    n_components(N::NumericalIrreducibleDecomposition;
+    ncomponents(N::NumericalIrreducibleDecomposition;
         dims::Union{Vector{Int},Nothing} = nothing)
 
 Returns the total number of components in `N`. 
 `dims` specifies the dimensions that should be considered.
 """
-function n_components(
+function ncomponents(
     N::NumericalIrreducibleDecomposition;
     dims::Union{Vector{Int},Nothing} = nothing,
 )
@@ -1134,7 +1151,9 @@ function n_components(
 
     out
 end
-n_components(N::NumericalIrreducibleDecomposition, dim::Int) = n_components(N, dims = [dim])
+ncomponents(N::NumericalIrreducibleDecomposition, dim::Int) = ncomponents(N; dims = [dim])
+n_components(N; dims = nothing) = ncomponents(N; dims = dims)
+n_components(N, dim) = ncomponents(N; dims = [dim])
 
 """
 
