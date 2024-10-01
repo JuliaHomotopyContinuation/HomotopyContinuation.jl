@@ -255,6 +255,7 @@
         NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
 
         @test ncomponents(NID, 0) == 1
+        @test degrees(NID)[0] == [1]
     end
 
     #     @testset "426" begin
