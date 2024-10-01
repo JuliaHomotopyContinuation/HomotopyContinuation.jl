@@ -5,6 +5,7 @@ export NumericalIrreducibleDecomposition,
     witness_sets,
     decompose,
     ncomponents,
+    n_components,
     seed
 
 """
