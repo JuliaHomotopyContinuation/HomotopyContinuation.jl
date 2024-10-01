@@ -1153,7 +1153,7 @@ function ncomponents(
 end
 ncomponents(N::NumericalIrreducibleDecomposition, dim::Int) = ncomponents(N; dims = [dim])
 n_components(N; dims = nothing) = ncomponents(N; dims = dims)
-
+n_components(N, dim) = ncomponents(N; dims = [dim])
 
 """
 
