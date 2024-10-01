@@ -58,6 +58,8 @@
         @test ncomponents(N3) == 4
         @test ncomponents(N3, dims = [1, 2]) == 3
         @test ncomponents(N3, 1) == 2
+        @test n_components(N3) == 4
+        @test n_components(N3, 1) == 2
     end
 
     @testset "Hypersurface of degree 5" begin

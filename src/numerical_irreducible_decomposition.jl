@@ -1150,7 +1150,9 @@ function ncomponents(
 
     out
 end
-ncomponents(N::NumericalIrreducibleDecomposition, dim::Int) = ncomponents(N, dims = [dim])
+ncomponents(N::NumericalIrreducibleDecomposition, dim::Int) = ncomponents(N; dims = [dim])
+n_components(N; dims = nothing) = ncomponents(N; dims = dims)
+
 
 """
 
