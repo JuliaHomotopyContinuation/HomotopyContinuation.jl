@@ -55,9 +55,9 @@
         @test isa(N3, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test n_components(N3) == 4
-        @test n_components(N3, dims = [1, 2]) == 3
-        @test n_components(N3, 1) == 2
+        @test ncomponents(N3) == 4
+        @test ncomponents(N3, dims = [1, 2]) == 3
+        @test ncomponents(N3, 1) == 2
     end
 
     @testset "Hypersurface of degree 5" begin
@@ -67,7 +67,7 @@
 
         N_Hyp = numerical_irreducible_decomposition(Hyp)
         @test degrees(N_Hyp) == Dict(3 => [5])
-        @test n_components(N_Hyp) == 1
+        @test ncomponents(N_Hyp) == 1
     end
 
     @testset "Curve of degree 6" begin
@@ -78,7 +78,7 @@
 
         N_Curve = nid(Curve)
         @test degrees(N_Curve) == Dict(1 => [6])
-        @test n_components(N_Curve) == 1
+        @test ncomponents(N_Curve) == 1
     end
 
     @testset "Overdetermined Test" begin
@@ -88,7 +88,7 @@
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
         @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
-        @test n_components(N_TwistedCubicSphere) == 1
+        @test ncomponents(N_TwistedCubicSphere) == 1
     end
 
     @testset "Three Lines" begin
@@ -101,7 +101,7 @@
 
         N_ThreeLines = nid(ThreeLines)
         @test degrees(N_ThreeLines) == Dict(1 => [1; 1; 1])
-        @test n_components(N_ThreeLines) == 3
+        @test ncomponents(N_ThreeLines) == 3
     end
 
     @testset "Bricard6R" begin
@@ -198,7 +198,7 @@
 
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
-        @test n_components(N_Bricard6R) == 1
+        @test ncomponents(N_Bricard6R) == 1
     end
 
     @testset "ACR" begin
@@ -241,6 +241,21 @@
         degrees(N_ACR) == Dict(4 => [7])
     end
 
+
+    @testset "Union of a sphere, a line, and a point" begin
+        @var x, y, z
+
+        S = [x^2 + y^2 + z^2 - 1] #The sphere
+        L = [2 * x - z, 2 * y - z] #The line (t,t,2t)
+        P = [x + y + 2 * z - 4, y - z, x - z] #The point (1,1,1)
+
+        F = System([s * l * p for s in S for l in L for p in P])
+
+        seed = rand(UInt32)
+        NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
+
+        @test ncomponents(NID, 0) == 1
+    end
 
     #     @testset "426" begin
     #         ### Example thanks to Julian Vill
@@ -304,7 +319,7 @@
     #             endgame_options = EndgameOptions(; sing_accuracy = 1e-10),
     #         )
 
-    #         @test n_components(N) == 1
+    #         @test ncomponents(N) == 1
     #         @test degrees(N) == Dict(2 => [426])
     #     end
 end
