@@ -104,6 +104,7 @@ function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,
         showvalues = showvalues(progress),
     )
 end
+update_progress!(progress::Union{Nothing,WitnessSetsProgress}, W::Nothing) = nothing
 update_progress!(progress::Nothing) = nothing
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
@@ -546,11 +547,14 @@ function regeneration!(
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
                     for (k, W) in reverse(E) # k = codim(W) for W in Ws
-                        if k < min(i, n)
-                            X = out[k+1]
+                        if k < i
+                            if k < n
+                                X = out[k+1]
+                            else
+                                X = nothing
+                            end
                             # here is the intersection step
-                            # the next witness superset X is also passed to this function,
-                            # because we add points that do not belong to W∩Hᵢ to X.
+                            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
                             # at this point the equation for W is f[1:(i-1)]
                             intersect_with_hypersurface!(
                                 W,
@@ -565,21 +569,6 @@ function regeneration!(
                             )
                             update_progress!(progress, W)
                             update_progress!(progress, X)
-
-                        elseif i >= n && k == n
-                            intersect_with_hypersurface!(
-                                W,
-                                nothing,
-                                Fᵢ,
-                                Hᵢ,
-                                u,
-                                endgame_options,
-                                tracker_options,
-                                progress,
-                                seed,
-                            )
-                            update_progress!(progress, W)
-
                         end
                     end
 
