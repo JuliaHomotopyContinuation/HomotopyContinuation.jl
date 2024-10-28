@@ -30,6 +30,7 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
 Arblib = "1.2"
+DelimitedFiles = "1"
 DynamicPolynomials = "0.5, 0.6"
 ElasticArrays = "1"
 FiniteDiff = "2.15"
