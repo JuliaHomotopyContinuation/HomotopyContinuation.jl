@@ -1015,14 +1015,22 @@ function threaded_monodromy_solve!(
     progress,
 )
     queue = Channel{LoopTrackingJob}(Inf)
-    Threads.resize_nthreads!(MS.trackers)
+
+    tracker = MS.trackers[1]
+    ntrackers = length(MS.trackers)
+    nthr = Threads.nthreads()
+    resize!(MS.trackers, nthr)
+    for i = ntrackers+1:nthr
+        MS.trackers[i] = deepcopy(tracker)
+    end
+
     data_lock = ReentrantLock()
     t₀ = time()
     retcode = :in_progress
     stats = MS.statistics
     notify_lock = ReentrantLock()
     cond_queue_emptied = Threads.Condition(notify_lock)
-    workers_idle = fill(true, Threads.nthreads())
+    workers_idle = fill(true, nthr)
     interrupted = Ref(false)
     queued = Ref(0)
     try

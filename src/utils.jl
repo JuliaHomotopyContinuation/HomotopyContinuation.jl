@@ -149,7 +149,7 @@ function KeywordArgumentException(key, given)
     KeywordArgumentException(key, given, "")
 end
 function Base.showerror(io::IO, E::KeywordArgumentException)
-    print(io, "Invalid argument $given for $key. ", E.msg)
+    print(io, "Invalid argument $(E.given) for $(E.key). ", E.msg)
 end
 
 struct FiniteException <: Exception
