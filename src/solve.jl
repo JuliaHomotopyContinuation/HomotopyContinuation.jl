@@ -592,7 +592,15 @@ function threaded_solve(
     started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
     try
-        Threads.resize_nthreads!(solver.trackers)
+        tracker = solver.trackers[1]
+        ntrackers = length(solver.trackers)
+        nthr = Threads.nthreads()
+
+        resize!(solver.trackers, nthr)
+        for i = ntrackers+1:nthr
+            solver.trackers[i] = deepcopy(tracker)
+        end
+
         tasks = map(enumerate(solver.trackers)) do (i, tracker)
             @tspawnat i begin
                 while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
