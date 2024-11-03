@@ -752,7 +752,7 @@ function many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
-        res = threaded_solve(solver, starts; catch_interrupt = false)
+        res = threaded_solve(solver, collect(starts); catch_interrupt = false)
     else
         res = serial_solve(solver, starts; catch_interrupt = false)
     end
@@ -771,7 +771,7 @@ function many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if threading
-                res = threaded_solve(solver, starts; catch_interrupt = false)
+                res = threaded_solve(solver, collect(starts); catch_interrupt = false)
             else
                 res = serial_solve(solver, starts; catch_interrupt = false)
             end
