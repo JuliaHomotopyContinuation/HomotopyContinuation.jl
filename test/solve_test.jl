@@ -584,7 +584,7 @@
         )
         @test all(r -> nsolutions(first(r)) == 2, result1)
 
-        @testset "total degree many parameters threaded #599" begin
+        @testset "total degree many parameters threaded" begin
             @var u1, v1, ω, α, γ, λ, ω0
 
             eqs = [
@@ -610,12 +610,18 @@
                 [0.9526315789473684, 1.0, 0.01, 0.01, 1.1],
             ]
 
-            r = HomotopyContinuation.solve(
-                F;
-                start_system = :total_degree,
+            generic_parameters = randn(ComplexF64, 5)
+
+            R0 = solve(F; target_parameters = generic_parameters, threading = true)
+            R1 = solve(
+                F,
+                solutions(R0);
+                start_parameters = generic_parameters,
                 target_parameters = input_array,
                 threading = true,
             )
+
+            @test length(R1) == 6
         end
     end
 end

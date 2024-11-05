@@ -130,6 +130,7 @@ function solver_startsolutions(
 )
     !isnothing(seed) && Random.seed!(seed)
 
+
     used_start_system = nothing
     if start_subspace !== nothing
         if target_parameters !== nothing
@@ -471,6 +472,7 @@ function solve(
     else
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
+
     if many_parameters
         solve(
             solver,
@@ -695,6 +697,7 @@ function solve(
     n = length(target_parameters)
 
     progress = show_progress ? make_many_progress(n; delay = 0.3) : nothing
+
     many_solve(
         S,
         starts,
@@ -749,6 +752,13 @@ function many_solve(
     threading::Bool,
     catch_interrupt::Bool,
 ) where {flatten}
+
+
+    if isa(starts, TotalDegreeStartSolutionsIterator)
+        @warn "Solving for many parameters with total degree start system is not recommended. Instead, one should use a two-step approach: first solve a system with generic parameters, and track its solutions to the desired parameters. See https://www.juliahomotopycontinuation.org/guides/many-systems/."
+    elseif isa(starts, PolyhedralStartSolutionsIterator)
+        @error "Solving for many parameters with polyhedral start system is not implemented and also not recommended. Instead, one should use a two-step approach: solve a system with generic parameters, and track its solutions to the desired parameters. See https://www.juliahomotopycontinuation.org/guides/many-systems/."
+    end
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
@@ -767,6 +777,9 @@ function many_solve(
     k = 1
     m = length(starts)
     update_many_progress!(progress, results, k, m; flatten = flatten)
+
+
+
     try
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
