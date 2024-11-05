@@ -583,5 +583,45 @@
             intrinsic = false,
         )
         @test all(r -> nsolutions(first(r)) == 2, result1)
+
+        @testset "Many parameters threaded" begin
+            @var u1, v1, ω, α, γ, λ, ω0
+
+            eqs = [
+                -u1 * ω^2 +
+                u1 * ω0^2 +
+                (3 / 4) * u1^3 * α +
+                (3 / 4) * u1 * v1^2 * α +
+                (-1 / 2) * u1 * λ * ω0^2 +
+                v1 * γ * ω,
+                -v1 * ω^2 + v1 * ω0^2 + (3 / 4) * v1^3 * α - u1 * γ * ω +
+                (3 / 4) * u1^2 * v1 * α +
+                (1 / 2) * v1 * λ * ω0^2,
+            ]
+
+            F = System(eqs, parameters = [ω, α, γ, λ, ω0], variables = [u1, v1])
+
+            input_array = [
+                [0.9, 1.0, 0.01, 0.01, 1.1],
+                [0.9105263157894737, 1.0, 0.01, 0.01, 1.1],
+                [0.9210526315789473, 1.0, 0.01, 0.01, 1.1],
+                [0.9315789473684211, 1.0, 0.01, 0.01, 1.1],
+                [0.9421052631578948, 1.0, 0.01, 0.01, 1.1],
+                [0.9526315789473684, 1.0, 0.01, 0.01, 1.1],
+            ]
+
+            generic_parameters = randn(ComplexF64, 5)
+
+            R0 = solve(F; target_parameters = generic_parameters, threading = true)
+            R1 = solve(
+                F,
+                solutions(R0);
+                start_parameters = generic_parameters,
+                target_parameters = input_array,
+                threading = true,
+            )
+
+            @test length(R1) == 6
+        end
     end
 end
