@@ -584,7 +584,7 @@
         )
         @test all(r -> nsolutions(first(r)) == 2, result1)
 
-        @testset "total degree many parameters threaded" begin
+        @testset "Many parameters threaded" begin
             @var u1, v1, ω, α, γ, λ, ω0
 
             eqs = [
