@@ -385,7 +385,9 @@ The `solve` routines takes the following options:
   for successfull paths. This is for example useful if you only want to compute one solution
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
 * `threading = true`: Enable multi-threading for the computation. The number of
-  available threads is controlled by the environment variable `JULIA_NUM_THREADS`.
+  available threads is controlled by the environment variable `JULIA_NUM_THREADS`. 
+  Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
+  interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
 * `tracker_options`: The options and parameters for the path tracker.
   See [`TrackerOptions`](@ref).
 
