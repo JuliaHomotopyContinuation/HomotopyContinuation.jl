@@ -848,7 +848,9 @@ function decompose_with_monodromy!(
                 )
         end
     else
-        push!(decomposition, WitnessSet(G, L, P))
+        for p in P 
+            push!(decomposition, WitnessSet(G, L, [p]))
+        end
     end
 
     update_progress!(progress)

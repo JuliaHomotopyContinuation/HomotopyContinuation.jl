@@ -55,10 +55,10 @@
         @test isa(N3, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test ncomponents(N3) == 4
+        @test ncomponents(N3) == 11
         @test ncomponents(N3, dims = [1, 2]) == 3
         @test ncomponents(N3, 1) == 2
-        @test n_components(N3) == 4
+        @test n_components(N3) == 11
         @test n_components(N3, dims = [1, 2]) == 3
         @test n_components(N3, 1) == 2
     end
@@ -90,8 +90,8 @@
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
-        @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
-        @test ncomponents(N_TwistedCubicSphere) == 1
+        @test degrees(N_TwistedCubicSphere) == Dict(0 => [1, 1, 1])
+        @test ncomponents(N_TwistedCubicSphere) == 3
     end
 
     @testset "Three Lines" begin
