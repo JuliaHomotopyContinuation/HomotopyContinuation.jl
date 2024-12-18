@@ -158,6 +158,24 @@ function perform_intersection!(X, tracker, p, progress)
     end
 end
 
+function set_up_u_homotopy(H, u, W, X, f, g, vars)
+
+    d = ModelKit.degree(H)
+    γ = exp(2 * pi * im * rand()) # gamma trick
+    g0 = γ * (u^d - 1)
+
+    # we start with the linear space L which does not use pose conditions on u, so that u^d=1
+    # we end with the linear space K with u=0.
+    L = linear_subspace_u(W)
+    K = linear_subspace(X)
+
+    F₀ = slice(System([f; g0], variables = vars), L; compile = false)
+    G₀ = slice(System([f; g], variables = vars), K; compile = false)
+    Hom = StraightLineHomotopy(F₀, G₀)
+
+    return Hom, d
+end
+
 """
     intersect_with_hypersurface!
 
@@ -178,7 +196,6 @@ function intersect_with_hypersurface!(
     !isnothing(seed) && Random.seed!(seed)
 
     P = points(W)
-    vars = variables(F)
     f = (System(F).expressions) # equations for W
     G = system(H) # H is the hypersurface
     g = System(G).expressions # equations for H
@@ -198,36 +215,20 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    d = ModelKit.degree(H)
-    γ = exp(2 * pi * im * rand()) # gamma trick
-    g0 = γ * (u^d - 1)
-
-    # we start with the linear space L which does not use pose conditions on u, so that u^d=1
-    # we end with the linear space K with u=0.
-    L = linear_subspace_u(W)
-    K = linear_subspace(X)
-
-    F₀ = slice(System([f; g0], variables = vars), L; compile = false)
-    G₀ = slice(System([f; g], variables = vars), K; compile = false)
-    Hom = StraightLineHomotopy(F₀, G₀)
+    Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
     tracker =
         EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
-
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
 
     # here comes the loop for tracking
     l_start = length(start)
-
     for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-
         perform_intersection!(X, tracker, p, progress)
         update_progress!(progress, i, l_start)
     end
-
-
 
     nothing
 end
@@ -247,6 +248,32 @@ function remove_points!(
     nothing
 end
 
+
+function is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
+    # set up the corresponding LinearSubspace L
+    E = ExtrinsicDescription(A, b; orthonormal = true)
+    L = LinearSubspace(E)
+    # set L as the target for homotopy continuation
+    target_parameters!(tracker, L)
+
+    # reuse U
+    empty!(U)
+    add!(U, x, 0)
+
+    # add the points in Y to U after we have moved them towards L 
+    for (i, p) in enumerate(P)
+        track!(tracker, p, 1)
+        q = solution(tracker)
+        _, added = add!(U, q, i)
+
+        if !added
+            return true
+        end
+        update_progress!(progress, X)
+    end
+
+    return false
+end
 
 """
     is_contained!(X, Y, F, endgame_options, tracker_options, progress)
@@ -283,27 +310,13 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
         # a matrix-vector pair of the correct size mY×n
         A = zeros(ComplexF64, mY, n)
         b = zeros(ComplexF64, mY)
-
-        # since we have used a subset of the equations for Y also for X,
-        # we can reuse them
-        AX = extrinsic(LX).A
-        bX = extrinsic(LX).b
-
         # the equation for u = 0
         A[1, n] = 1.0
         # new equations
-        for i = 2:(k+1)
+        for i = 2:mY
             for j = 1:n
                 A[i, j] = randn(ComplexF64)
             end
-        end
-        # equations from X, the overlap in linear equations is in the *last* mx-1 equations
-        for i = 2:mX
-            ℓ = k + i
-            for j = 1:n
-                A[ℓ, j] = AX[i, j]
-            end
-            b[ℓ] = bX[i]
         end
 
         # now we loop over the points in X and check if they are contained in Y
@@ -312,30 +325,8 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
             for i = 2:mY
                 b[i] = sum(A[i, j] * x[j] for j = 1:n)
             end
-            # set up the corresponding LinearSubspace L
-            E = ExtrinsicDescription(A, b; orthonormal = true)
-            L = LinearSubspace(E)
-            # set L as the target for homotopy continuation
-            target_parameters!(tracker, L)
-
-            # reuse U
-            empty!(U)
-            add!(U, x, 0)
-
-            # add the points in Y to U after we have moved them towards L 
-            for (i, p) in enumerate(P)
-
-                track!(tracker, p, 1)
-                q = solution(tracker)
-                _, added = add!(U, q, i)
-
-                if !added
-                    return true
-                end
-                update_progress!(progress, X)
-            end
-
-            return false
+            
+            is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
         end
     end
 
@@ -405,6 +396,68 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     end
 
     out
+end
+
+
+function intersect_all!(out, E, Fᵢ, Hᵢ, u, 
+    endgame_options,
+    tracker_options,
+    progress,
+    seed, i, n)
+
+    for (k, W) in reverse(E) # k = codim(W) for W in Ws
+        if k < i
+            if k < n
+                X = out[k+1]
+            else
+                X = nothing
+            end
+            # here is the intersection step
+            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
+            # at this point the equation for W is f[1:(i-1)]
+            intersect_with_hypersurface!(
+                W,
+                X,
+                Fᵢ,
+                Hᵢ,
+                u,
+                endgame_options,
+                tracker_options,
+                progress,
+                seed,
+            )
+            update_progress!(progress, W)
+            update_progress!(progress, X)
+        end
+    end
+end
+
+
+function remove_points_all!(out, E, Fᵢ,
+    endgame_options,
+    tracker_options,
+    progress,
+    seed, i)
+    for (k, W) in E # k = codim(W) for W in Ws
+        if k > 1 && k <= i && degree(W) > 0
+            for j = 1:(k-1)
+                X = out[j]
+                if degree(X) > 0
+                    remove_points!(
+                        W,
+                        X,
+                        Fᵢ,
+                        endgame_options,
+                        tracker_options,
+                        progress,
+                        seed,
+                    )
+                    update_progress!(progress, W)
+                end
+            end
+        end
+        update_progress!(progress, W)
+    end
 end
 
 
@@ -501,12 +554,11 @@ function regeneration!(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
 
-    update_progress!(progress, true)
-
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
     # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
+    update_progress!(progress, true)
     begin
         for i = 1:c
             update_progress!(progress, i)
@@ -524,67 +576,32 @@ function regeneration!(
                 begin
                     # the i-th step: for all W in out we intersect W with H[i]
                     Hᵢ = H[i]
-
                     E = enumerate(out)
                     # we enumerate reversely, so that we can add points to witness sets that we have already
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
-                    for (k, W) in reverse(E) # k = codim(W) for W in Ws
-                        if k < i
-                            if k < n
-                                X = out[k+1]
-                            else
-                                X = nothing
-                            end
-                            # here is the intersection step
-                            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
-                            # at this point the equation for W is f[1:(i-1)]
-                            intersect_with_hypersurface!(
-                                W,
-                                X,
-                                Fᵢ,
-                                Hᵢ,
-                                u,
-                                endgame_options,
-                                tracker_options,
-                                progress,
-                                seed,
-                            )
-                            update_progress!(progress, W)
-                            update_progress!(progress, X)
-                        end
-                    end
-
-
+                    intersect_all!(out, 
+                                    E, 
+                                    Fᵢ, 
+                                    Hᵢ,
+                                    u, 
+                                    endgame_options,
+                                    tracker_options,
+                                    progress,
+                                    seed, i, n)
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
-
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     update_progress!(progress, false)
-                    for (k, W) in E # k = codim(W) for W in Ws
-                        if k > 1 && k <= i && degree(W) > 0
-                            for j = 1:(k-1)
-                                X = out[j]
-                                if degree(X) > 0
-                                    remove_points!(
-                                        W,
-                                        X,
-                                        Fᵢ,
+                    remove_points_all!(out, E, Fᵢ,
                                         endgame_options,
                                         tracker_options,
                                         progress,
-                                        seed,
-                                    )
-                                    update_progress!(progress, W)
-                                end
-                            end
-                        end
-                        update_progress!(progress, W)
-                    end
+                                        seed, i)
                 end
 
             end
@@ -594,7 +611,7 @@ function regeneration!(
     end
     pop!(vars)
 
-
+    # prepare output
     filter!(W -> degree(W) > 0, out)
     if !isempty(out)
         return map(out) do W
