@@ -727,10 +727,22 @@ function decompose_with_monodromy!(
 
         MS = MonodromySolver(G, L; compile = false, options = options)
 
-        non_complete_points = P
-        non_complete_orbits = Vector{Set{Int}}()
+        res = monodromy_solve(
+                MS,
+                P,
+                L,
+                seed;
+                threading = threading,
+                show_progress = show_monodromy_progress,
+            )
+
+        if warning && (trace(res) > options.trace_test_tol)
+            @warn "Trying to decompose non-complete set of witness points (trace test failed)"
+        end
 
         iter = 0
+        non_complete_points = solutions(res)
+        non_complete_orbits = Vector{Set{Int}}()
 
         while !isempty(non_complete_points)
             update_progress!(progress)
@@ -739,6 +751,7 @@ function decompose_with_monodromy!(
                 break
             end
 
+            # for safety and additional monodromy
             res = monodromy_solve(
                 MS,
                 non_complete_points,
@@ -747,10 +760,6 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
-
-            if warning && (trace(res) > options.trace_test_tol)
-                @warn "Trying to decompose non-complete set of witness points (trace test failed)"
-            end
 
             # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
