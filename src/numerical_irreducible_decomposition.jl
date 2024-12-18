@@ -331,21 +331,22 @@ function is_contained!(
 
             # reuse U
             empty!(U)
+            add!(U, x, 0)
+               
             # add the points in Y to U after we have moved them towards L 
             for (i, p) in enumerate(P)
+                
                 track!(tracker, p, 1)
                 q = solution(tracker)
-                add!(U, q, i)
+                _, added = add!(U, q, i)
+                
+                if !added
+                    return true
+                end
                 update_progress!(progress, X)
             end
-            # check if x is among the points in U
-            _, added = add!(U, x, 0)
 
-            if added
-                return false
-            else
-                return true
-            end
+            return false
         end
     end
 
