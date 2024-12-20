@@ -142,48 +142,24 @@ function showvalues(progress::WitnessSetsProgress)
     text
 end
 
-"""
-    intersect_with_hypersurface!
-
-This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
-"""
-function intersect_with_hypersurface!(
-    W::WitnessPoints{T1,T2,Vector{ComplexF64}},
-    X::Union{WitnessPoints{T3,T4,Vector{ComplexF64}},Nothing},
-    F::AS,
-    H::WitnessSet{T5,T6,Vector{ComplexF64}},
-    u::Variable,
-    endgame_options::EndgameOptions,
-    tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress,Nothing},
-    seed,
-) where {T1,T2,T3,T4,T5,T6,AS<:AbstractSystem}
-
-    !isnothing(seed) && Random.seed!(seed)
-
-    P = points(W)
-    vars = variables(F)
-    f = (System(F).expressions) # equations for W
-    G = system(H) # H is the hypersurface
-    g = System(G).expressions # equations for H
-
-    # Step 1:
-    # we check which points of W are also contained in H
-    # the rest is removed from P = points(W) and added to P_next
-    # for further processing
-    m = .!(is_contained!(W, H, endgame_options, tracker_options, progress, seed))
+function manage_initial_points!(P, m, W, progress)
     P_next = P[m]
     deleteat!(P, m)
     update_progress!(progress, W)
+    return P_next
+end
 
-    if isnothing(X)
-        return nothing
+function perform_intersection!(X, tracker, p, progress)
+    res = track(tracker, p, 1)
+    if is_success(res) && is_finite(res) && is_nonsingular(res)
+        new = copy(tracker.state.solution)
+        push!(X, new)
+        update_progress!(progress, X)
     end
+end
 
+function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
-    # Step 2:
-    # the points in P_next are used as starting points for a homotopy.
-    # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
     d = ModelKit.degree(H)
     γ = exp(2 * pi * im * rand()) # gamma trick
     g0 = γ * (u^d - 1)
@@ -196,14 +172,51 @@ function intersect_with_hypersurface!(
     F₀ = slice(System([f; g0], variables = vars), L; compile = false)
     G₀ = slice(System([f; g], variables = vars), K; compile = false)
     Hom = StraightLineHomotopy(F₀, G₀)
+
+    return Hom, d
+end
+
+"""
+    intersect_with_hypersurface!
+
+This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
+"""
+function intersect_with_hypersurface!(
+    W,
+    X,
+    F,
+    H,
+    u,
+    endgame_options,
+    tracker_options,
+    progress,
+    seed,
+) 
+    !isnothing(seed) && Random.seed!(seed)
+
+    P = points(W)
+    f = (System(F).expressions) # equations for W
+    G = system(H) # H is the hypersurface
+    g = System(G).expressions # equations for H
+
+    # Step 1:
+    # we check which points of W are also contained in H
+    # the rest is removed from P = points(W) and added to P_next
+    # for further processing
+    m = .!(is_contained!(W, H, endgame_options, tracker_options, progress, seed))
+    P_next = manage_initial_points!(P, m, W, progress)
+
+    if isnothing(X)
+        return nothing
+    end
+
+
+    # Step 2:
+    # the points in P_next are used as starting points for a homotopy.
+    # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
+    Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
     tracker =
         EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
-
-    # Alternative code:
-    #F₀ = System([f; g0; extrinsic(L).A * vars - extrinsic(L).b], variables = vars)
-    #G₀ = System([f; g; extrinsic(K).A * vars - extrinsic(K).b], variables = vars)
-    #Hom = StraightLineHomotopy(F₀, G₀; compile = false)
-
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
@@ -215,13 +228,7 @@ function intersect_with_hypersurface!(
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
-
-        res = track(tracker, p, 1)
-        if is_success(res) && is_finite(res) && is_nonsingular(res)
-            new = copy(tracker.state.solution)
-            push!(X, new)
-            update_progress!(progress, X)
-        end
+        perform_intersection!(X, tracker, p, progress)
         update_progress!(progress, i, l_start)
     end
 
@@ -246,25 +253,46 @@ function remove_points!(
 end
 
 
+function is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
+    # set up the corresponding LinearSubspace L
+    E = ExtrinsicDescription(A, b; orthonormal = true)
+    L = LinearSubspace(E)
+    # set L as the target for homotopy continuation
+    target_parameters!(tracker, L)
+
+    # reuse U
+    empty!(U)
+    add!(U, x, 0)
+
+    # add the points in Y to U after we have moved them towards L 
+    for (i, p) in enumerate(P)
+        track!(tracker, p, 1)
+        q = solution(tracker)
+        _, added = add!(U, q, i)
+
+        if !added
+            return true
+        end
+        update_progress!(progress, X)
+    end
+
+    return false
+end
+
 """
     is_contained!(X, Y, F, endgame_options, tracker_options, progress)
 
 Returns a boolean vector indicating whether the points of X are contained in the variety defined by (Y,F).
 """
 function is_contained!(
-    X::W₁,
-    Y::W₂,
-    F::AS,
-    endgame_options::EndgameOptions,
-    tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress,Nothing},
+    X,
+    Y,
+    F,
+    endgame_options,
+    tracker_options,
+    progress,
     seed,
-) where {
-    W₁<:Union{WitnessPoints,WitnessSet},
-    W₂<:Union{WitnessPoints,WitnessSet},
-    AS<:AbstractSystem,
-}
-
+) 
     !isnothing(seed) && Random.seed!(seed)
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
@@ -278,7 +306,7 @@ function is_contained!(
 
     if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
         # if dim X > dim Y return only false
-        out = [false for _ = 1:length(points(X))]
+        out = falses(length(points(X)))
     else
         # setup 
         P = points(Y)
@@ -320,31 +348,10 @@ function is_contained!(
         # now we loop over the points in X and check if they are contained in Y
         out = map(points(X)) do x
             # first, adjust the linear equations so that they are satisfies by x
-            for i = 2:mY
+            for i = 2:(k+1)
                 b[i] = sum(A[i, j] * x[j] for j = 1:n)
             end
-            # set up the corresponding LinearSubspace L
-            E = ExtrinsicDescription(A, b; orthonormal = true)
-            L = LinearSubspace(E)
-            # set L as the target for homotopy continuation
-            target_parameters!(tracker, L)
-
-            # reuse U
-            empty!(U)
-            add!(U, x, 0)
-            
-            # add the points in Y to U after we have moved them towards L 
-            for (i, p) in enumerate(P)
-                track!(tracker, p, 1)
-                q = solution(tracker)
-                _, added = add!(U, q, i)
-                
-                if !added
-                    return true
-                end
-            end
-            
-            return false
+            is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
         end
     end
 
@@ -361,7 +368,7 @@ function is_contained!(
     is_contained!(V, W, system(W), endgame_options, tracker_options, progress, seed)
 end
 
-function initialize_linear_equations(n::Int, seed)
+function initialize_linear_equations(n, seed)
 
     !isnothing(seed) && Random.seed!(seed)
 
@@ -381,12 +388,12 @@ function initialize_linear_equations(n::Int, seed)
     (A, b, Aᵤ, bᵤ)
 end
 function initialize_witness_sets(
-    codim::Int,
-    n::Int,
-    A::Matrix,
-    b::Vector,
-    Aᵤ::Matrix,
-    bᵤ::Vector,
+    codim,
+    n,
+    A,
+    b,
+    Aᵤ,
+    bᵤ,
 )
     out = Vector{WitnessPoints}(undef, codim)
     for i = 1:codim
@@ -687,24 +694,24 @@ end
 
 """
     decompose_with_monodromy!(
-        W::WitnessSet{T1,T2,Vector{ComplexF64}},
-        show_monodromy_progress::Bool,
-        options::MonodromyOptions,
-        max_iters::Int,
-        threading::Bool,
-        progress::Union{DecomposeProgress, Nothing},
+        W,
+        show_monodromy_progress,
+        options,
+        max_iters,
+        threading,
+        progress,
         seed) 
 
 The core function for decomposing a witness set into irreducible components.
 """
 function decompose_with_monodromy!(
-    W::WitnessSet{T1,T2,Vector{ComplexF64}},
-    show_monodromy_progress::Bool,
-    options::MonodromyOptions,
-    max_iters::Int,
-    warning::Bool,
-    threading::Bool,
-    progress::Union{DecomposeProgress,Nothing},
+    W,
+    show_monodromy_progress,
+    options,
+    max_iters,
+    warning,
+    threading,
+    progress,
     seed,
 ) where {T1,T2}
 
