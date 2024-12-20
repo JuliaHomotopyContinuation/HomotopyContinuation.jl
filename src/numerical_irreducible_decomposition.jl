@@ -430,6 +430,66 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
+function intersect_all!(out, E, Fᵢ, Hᵢ, u, 
+    endgame_options,
+    tracker_options,
+    progress,
+    seed, i, n)
+
+    for (k, W) in reverse(E) # k = codim(W) for W in Ws
+        if k < i
+            if k < n
+                X = out[k+1]
+            else
+                X = nothing
+            end
+            # here is the intersection step
+            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
+            # at this point the equation for W is f[1:(i-1)]
+            intersect_with_hypersurface!(
+                W,
+                X,
+                Fᵢ,
+                Hᵢ,
+                u,
+                endgame_options,
+                tracker_options,
+                progress,
+                seed,
+            )
+            update_progress!(progress, W)
+            update_progress!(progress, X)
+        end
+    end
+end
+
+
+function remove_points_all!(out, E, Fᵢ,
+    endgame_options,
+    tracker_options,
+    progress,
+    seed, i)
+    for (k, W) in E # k = codim(W) for W in Ws
+        if k > 1 && k <= i && degree(W) > 0
+            for j = 1:(k-1)
+                X = out[j]
+                if degree(X) > 0
+                    remove_points!(
+                        W,
+                        X,
+                        Fᵢ,
+                        endgame_options,
+                        tracker_options,
+                        progress,
+                        seed,
+                    )
+                    update_progress!(progress, W)
+                end
+            end
+        end
+        update_progress!(progress, W)
+    end
+end
 
 
 """
@@ -524,12 +584,12 @@ function regeneration!(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
 
-    update_progress!(progress, true)
-
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
     # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
+
+    update_progress!(progress, true)
     begin
         for i = 1:c
             update_progress!(progress, i)
@@ -553,33 +613,15 @@ function regeneration!(
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
-                    for (k, W) in reverse(E) # k = codim(W) for W in Ws
-                        if k < i
-                            if k < n
-                                X = out[k+1]
-                            else
-                                X = nothing
-                            end
-                            # here is the intersection step
-                            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
-                            # at this point the equation for W is f[1:(i-1)]
-                            intersect_with_hypersurface!(
-                                W,
-                                X,
-                                Fᵢ,
-                                Hᵢ,
-                                u,
-                                endgame_options,
-                                tracker_options,
-                                progress,
-                                seed,
-                            )
-                            update_progress!(progress, W)
-                            update_progress!(progress, X)
-                        end
-                    end
-
-
+                    intersect_all!(out, 
+                                    E, 
+                                    Fᵢ, 
+                                    Hᵢ,
+                                    u, 
+                                    endgame_options,
+                                    tracker_options,
+                                    progress,
+                                    seed, i, n)
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
 
@@ -588,31 +630,13 @@ function regeneration!(
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     update_progress!(progress, false)
-                    for (k, W) in E # k = codim(W) for W in Ws
-                        if k > 1 && k <= i && degree(W) > 0
-                            for j = 1:(k-1)
-                                X = out[j]
-                                if degree(X) > 0
-                                    remove_points!(
-                                        W,
-                                        X,
-                                        Fᵢ,
+                    remove_points_all!(out, E, Fᵢ,
                                         endgame_options,
                                         tracker_options,
-                                        progress,
-                                        seed,
-                                    )
-                                    update_progress!(progress, W)
-                                end
-                            end
-                        end
-                        update_progress!(progress, W)
-                    end
+                                        progress,seed, i)
+                            
                 end
-
             end
-
-
         end
     end
     pop!(vars)
