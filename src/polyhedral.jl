@@ -122,9 +122,9 @@ of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
 coefficient-parameter homotopy towards `F`.
 This returns a path tracker ([`PolyhedralTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
 
-If `only_non_zero` is `true`, then only the solutions with non-zero coordinates are computed.
-In this case the number of paths to track is equal to the
-mixed volume of the Newton polytopes of `F`.
+If `only_non_zero` is true, then the algorithm will set up a start system that tracks fewer paths compared to `only_non_zero = false`. 
+In this case the number of paths to track is equal to the mixed volume of the Newton polytopes of `F`. 
+The computed solutions will include all solutions with non-zero coordinates.
 
 If `only_non_zero` is `false`, then all isolated solutions of `F` are computed.
 In this case the number of paths to track is equal to the
