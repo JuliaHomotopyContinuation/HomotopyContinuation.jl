@@ -701,19 +701,29 @@ function Base.convert(::Type{BigInt}, c::Basic)
 end
 
 function Base.convert(::Type{BigFloat}, c::Basic)
-    a = BigFloat()
-    ccall(
-        (:real_mpfr_get, libsymengine),
-        Nothing,
-        (Ref{BigFloat}, Ref{ExpressionRef}),
-        a,
-        c,
-    )
-    return a
+    if class(c) == :Integer
+        c1 = convert(Int, c)
+        return convert(BigFloat, c1)
+    else
+        a = BigFloat()
+        ccall(
+            (:real_mpfr_get, libsymengine),
+            Nothing,
+            (Ref{BigFloat}, Ref{ExpressionRef}),
+            a,
+            c,
+        )
+        return a
+    end
 end
 
 function Base.convert(::Type{Float64}, c::Basic)
-    return ccall((:real_double_get_d, libsymengine), Cdouble, (Ref{ExpressionRef},), c)
+    if class(c) == :Integer
+        c1 = convert(Int, c)
+        return convert(Float64, c1)
+    else
+        return ccall((:real_double_get_d, libsymengine), Cdouble, (Ref{ExpressionRef},), c)
+    end
 end
 
 function Base.real(x::Basic)
