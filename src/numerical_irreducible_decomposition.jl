@@ -191,7 +191,7 @@ function intersect_with_hypersurface!(
     tracker_options,
     progress,
     seed,
-) 
+)
     !isnothing(seed) && Random.seed!(seed)
 
     P = points(W)
@@ -284,15 +284,7 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in the variety defined by (Y,F).
 """
-function is_contained!(
-    X,
-    Y,
-    F,
-    endgame_options,
-    tracker_options,
-    progress,
-    seed,
-) 
+function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed)
     !isnothing(seed) && Random.seed!(seed)
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
@@ -387,14 +379,7 @@ function initialize_linear_equations(n, seed)
 
     (A, b, Aᵤ, bᵤ)
 end
-function initialize_witness_sets(
-    codim,
-    n,
-    A,
-    b,
-    Aᵤ,
-    bᵤ,
-)
+function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
     out = Vector{WitnessPoints}(undef, codim)
     for i = 1:codim
         j = i + 1
@@ -430,11 +415,19 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
-function intersect_all!(out, E, Fᵢ, Hᵢ, u, 
+function intersect_all!(
+    out,
+    E,
+    Fᵢ,
+    Hᵢ,
+    u,
     endgame_options,
     tracker_options,
     progress,
-    seed, i, n)
+    seed,
+    i,
+    n,
+)
 
     for (k, W) in reverse(E) # k = codim(W) for W in Ws
         if k < i
@@ -464,11 +457,7 @@ function intersect_all!(out, E, Fᵢ, Hᵢ, u,
 end
 
 
-function remove_points_all!(out, E, Fᵢ,
-    endgame_options,
-    tracker_options,
-    progress,
-    seed, i)
+function remove_points_all!(out, E, Fᵢ, endgame_options, tracker_options, progress, seed, i)
     for (k, W) in E # k = codim(W) for W in Ws
         if k > 1 && k <= i && degree(W) > 0
             for j = 1:(k-1)
@@ -613,15 +602,19 @@ function regeneration!(
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
-                    intersect_all!(out, 
-                                    E, 
-                                    Fᵢ, 
-                                    Hᵢ,
-                                    u, 
-                                    endgame_options,
-                                    tracker_options,
-                                    progress,
-                                    seed, i, n)
+                    intersect_all!(
+                        out,
+                        E,
+                        Fᵢ,
+                        Hᵢ,
+                        u,
+                        endgame_options,
+                        tracker_options,
+                        progress,
+                        seed,
+                        i,
+                        n,
+                    )
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
 
@@ -630,11 +623,17 @@ function regeneration!(
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     update_progress!(progress, false)
-                    remove_points_all!(out, E, Fᵢ,
-                                        endgame_options,
-                                        tracker_options,
-                                        progress,seed, i)
-                            
+                    remove_points_all!(
+                        out,
+                        E,
+                        Fᵢ,
+                        endgame_options,
+                        tracker_options,
+                        progress,
+                        seed,
+                        i,
+                    )
+
                 end
             end
         end
@@ -888,7 +887,7 @@ function decompose_with_monodromy!(
                 )
         end
     else
-        for p in P 
+        for p in P
             push!(decomposition, WitnessSet(G, L, [p]))
         end
     end
