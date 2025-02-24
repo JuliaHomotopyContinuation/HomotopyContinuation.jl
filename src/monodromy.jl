@@ -805,7 +805,7 @@ function monodromy_solve(
     reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
     if isempty(results)
-        @warn "None of the provided solutions is a valid start solution."
+        @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
         retcode = :invalid_startvalue
     else
         retcode = :default
