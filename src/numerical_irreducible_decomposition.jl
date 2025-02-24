@@ -252,6 +252,42 @@ function remove_points!(
     nothing
 end
 
+function set_up_linear_spaces(LX, LY)
+
+    n = ambient_dim(LY)
+    mX = codim(LX)
+    mY = codim(LY)
+    k = codim(LY) - codim(LX)
+
+    # to compute linear spaces through the points in X we first set up
+    # a matrix-vector pair of the correct size mY×n
+    A = zeros(ComplexF64, mY, n)
+    b = zeros(ComplexF64, mY)
+
+    # since we have used a subset of the equations for Y also for X,
+    # we can reuse them
+    AX = extrinsic(LX).A
+    bX = extrinsic(LX).b
+
+    # the equation for u = 0
+    A[1, n] = 1.0
+    # new equations
+    for i = 2:(k+1)
+        for j = 1:n
+            A[i, j] = randn(ComplexF64)
+        end
+    end
+    # equations from X, the overlap in linear equations is in the *last* mx-1 equations
+    for i = 2:mX
+        ℓ = k + i
+        for j = 1:n
+            A[ℓ, j] = AX[i, j]
+        end
+        b[ℓ] = bX[i]
+    end
+
+    A, b
+end
 
 function is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
     # set up the corresponding LinearSubspace L
@@ -291,17 +327,15 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
 
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
-    mX = codim(LX)
-    mY = codim(LY)
     n = ambient_dim(LY)
-    k = mY - mX # k≥0 iff dim X ≤ dim Y
+    k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
     if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
         # if dim X > dim Y return only false
         out = falses(length(points(X)))
     else
         # setup 
-        P = points(Y)
+        P = points(Y) 
         Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
             Hom;
@@ -310,40 +344,24 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
         )
         U = UniquePoints(first(P), 0)
 
-        # to compute linear spaces through the points in X we first set up
-        # a matrix-vector pair of the correct size mY×n
-        A = zeros(ComplexF64, mY, n)
-        b = zeros(ComplexF64, mY)
-
-        # since we have used a subset of the equations for Y also for X,
-        # we can reuse them
-        AX = extrinsic(LX).A
-        bX = extrinsic(LX).b
-
-        # the equation for u = 0
-        A[1, n] = 1.0
-        # new equations
-        for i = 2:(k+1)
-            for j = 1:n
-                A[i, j] = randn(ComplexF64)
-            end
-        end
-        # equations from X, the overlap in linear equations is in the *last* mx-1 equations
-        for i = 2:mX
-            ℓ = k + i
-            for j = 1:n
-                A[ℓ, j] = AX[i, j]
-            end
-            b[ℓ] = bX[i]
-        end
-
         # now we loop over the points in X and check if they are contained in Y
+        A, b = set_up_linear_spaces(LX, LY)
         out = map(points(X)) do x
-            # first, adjust the linear equations so that they are satisfies by x
+
+            # first check
+            x0 = randn(ComplexF64, n)
+            LA.normalize!(x0)
+            x0 = norm(x, Inf) .* x0
+            if norm(F(x), Inf) > 1e-2 * norm(F(x0), Inf)
+                return false
+            end
+
+            # second check
             for i = 2:(k+1)
                 b[i] = sum(A[i, j] * x[j] for j = 1:n)
             end
             is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
+            
         end
     end
 
