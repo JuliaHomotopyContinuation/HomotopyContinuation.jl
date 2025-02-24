@@ -59,11 +59,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     progress_meter::PM.ProgressUnknown
 end
 WitnessSetsProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
-    WitnessSetsProgress(
-        ambient_dim = n,
-        codim = codim,
-        progress_meter = progress_meter,
-    )
+    WitnessSetsProgress(ambient_dim = n, codim = codim, progress_meter = progress_meter)
 update_progress!(progress::Nothing, is_solving::Bool) = nothing
 function update_progress!(progress::WitnessSetsProgress, is_solving::Bool)
     progress.is_computing_hypersurfaces = false
@@ -135,7 +131,35 @@ function showvalues(progress::WitnessSetsProgress)
     text
 end
 
+"""
+    RegenerationCache
 
+A cache for [`regeneration`](@ref).
+"""
+mutable struct RegenerationCache{Sys<:AbstractSystem}
+    out::Vector{WitnessPoints}
+    H::Vector{WitnessSet}
+
+    A::Matrix
+    b::Vector
+    x0::Vector
+    U::UniquePoints
+
+    EO::EndgameOptions
+    TO::TrackerOptions
+
+    Fᵢ::Sys
+    u::Variable
+end
+
+function RegenerationCache(out, H, EO, TO, Fᵢ, u, n)
+    A = zeros(ComplexF64, n + 1, n + 1)
+    b = zeros(ComplexF64, n + 1)
+    x0 = zeros(ComplexF64, n)
+    U = UniquePoints(x0, 0)
+
+    RegenerationCache(out, H, A, b, x0, U, EO, TO, Fᵢ, u)
+end
 
 """
     regeneration(F::System; options...) 
@@ -146,8 +170,9 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 
 ### Options
 
-* `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `max_codim`: the maximal codimension until which witness supersets should be computed.
+* `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `seed`: choose the random seed.
@@ -169,6 +194,7 @@ regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs.
 function regeneration!(
     F::System;
     sorted::Bool = true,
+    max_codim = nothing,
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(;
@@ -179,9 +205,8 @@ function regeneration!(
     threading::Bool = true,
     seed = nothing,
 )
-    if isnothing(seed)
-        seed = rand(UInt32)
-    end
+
+    !isnothing(seed) && Random.seed!(seed)
 
     # the algorithm is u-regeneration as proposed 
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
@@ -194,8 +219,11 @@ function regeneration!(
     end
     n = length(vars) # ambient dimension
     c = length(f) # we can have witness sets of codimesion at most min(c,n)
-    codim = min(c, n)
-
+    if isnothing(max_codim)
+        codim = min(c, n)
+    else
+        codim = min(c, n, max_codmin)
+    end
 
     if show_progress
         progress = WitnessSetsProgress(
@@ -229,11 +257,13 @@ function regeneration!(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
 
+    # Initialize a cache
+    Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
+    cache = RegenerationCache(out, H, endgame_options, tracker_options, Fᵢ, u, n)
+
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
     # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
-    Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
-
     update_progress!(progress, true)
     begin
         for i = 1:c
@@ -258,9 +288,22 @@ function regeneration!(
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
                     update_progress!(progress, true)
-                    intersect_all!(out, E, Fᵢ, Hᵢ, u, endgame_options, tracker_options, progress, seed, i, n)
+                    intersect_all!(
+                        out,
+                        E,
+                        Fᵢ,
+                        Hᵢ,
+                        u,
+                        endgame_options,
+                        tracker_options,
+                        progress,
+                        seed,
+                        i,
+                        n,
+                    )
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
+                    cache.Fᵢ = Fᵢ
 
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
@@ -284,7 +327,6 @@ function regeneration!(
     end
     pop!(vars)
 
-
     filter!(W -> degree(W) > 0, out)
     if !isempty(out)
         return map(out) do W
@@ -299,8 +341,6 @@ end
 
 
 function initialize_linear_equations(n, seed)
-
-    !isnothing(seed) && Random.seed!(seed)
 
     A₀ = randn(ComplexF64, n - 1, n)
     b₀ = randn(ComplexF64, n - 1)
@@ -435,7 +475,6 @@ function intersect_with_hypersurface!(
     progress,
     seed,
 )
-    !isnothing(seed) && Random.seed!(seed)
 
     P = points(W)
     f = (System(F).expressions) # equations for W
@@ -522,7 +561,6 @@ end
 Returns a boolean vector indicating whether the points of X are contained in the variety defined by (Y,F).
 """
 function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed)
-    !isnothing(seed) && Random.seed!(seed)
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
 
@@ -672,11 +710,7 @@ Base.@kwdef mutable struct DecomposeProgress
     progress_meter::PM.ProgressUnknown
 end
 DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
-    DecomposeProgress(
-        codim = codim,
-        current_dim = n - 1,
-        progress_meter = progress_meter,
-    )
+    DecomposeProgress(codim = codim, current_dim = n - 1, progress_meter = progress_meter)
 update_progress_step!(progress::Nothing) = nothing
 function update_progress_step!(progress::DecomposeProgress)
     progress.step += 1
