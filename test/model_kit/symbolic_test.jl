@@ -329,4 +329,28 @@
         H_any = Homotopy(convert(Vector{Any}, h), [x, y, z], t)
         @test H_any isa Homotopy
     end
+
+    @testset "Convert" begin
+
+        @var x
+
+        s = x + 1 - x
+        @test convert(Int, s) == 1
+        @test convert(Int32, s) == Int32(1)
+        @test convert(Int64, s) == Int64(1)
+        @test convert(BigInt, s) == BigInt(1)
+        @test convert(BigFloat, s) == BigFloat(1)
+        @test convert(Float64, s) == Float64(1)
+        @test convert(ComplexF64, s) == ComplexF64(1)
+
+        r = x + 1.0 - x
+        @test convert(Float64, r) == Float64(1)
+        @test convert(ComplexF64, r) == ComplexF64(1)
+
+        u = x + BigFloat(1.0) - x
+        @test convert(BigFloat, u) == BigFloat(1.0)
+
+        t = x + (1.0 + 0.0im) - x
+        @test convert(ComplexF64, t) == ComplexF64(1)
+    end
 end
