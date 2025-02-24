@@ -335,7 +335,7 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
         out = falses(length(points(X)))
     else
         # setup 
-        P = points(Y) 
+        P = points(Y)
         Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
             Hom;
@@ -361,7 +361,7 @@ function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed
                 b[i] = sum(A[i, j] * x[j] for j = 1:n)
             end
             is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
-            
+
         end
     end
 
