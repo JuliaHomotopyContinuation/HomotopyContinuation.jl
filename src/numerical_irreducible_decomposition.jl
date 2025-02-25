@@ -137,8 +137,8 @@ end
 A cache for [`regeneration`](@ref).
 """
 mutable struct RegenerationCache{Sys<:AbstractSystem}
-    A::Matrix
-    b::Vector
+    As::Vector
+    bs::Vector
     x0::Vector
     U::UniquePoints
 
@@ -153,16 +153,23 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::WitnessSetsProgress
 end
 
-function RegenerationCache(Fᵢ, u, n, EO, TO, progress)
-    A = zeros(ComplexF64, n + 1, n + 1)
-    b = zeros(ComplexF64, n + 1)
-    x0 = zeros(ComplexF64, n)
+function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
+    As = [zeros(ComplexF64, i, n + 1) for i in 1:codim]
+    bs = [zeros(ComplexF64, i) for i in 1:codim]
+    x0 = [zeros(ComplexF64, n); 0.0]
     U = UniquePoints(x0, 0)
 
-    RegenerationCache(A, b, x0, U, Fᵢ, u, n, 0, EO, TO, progress)
+    RegenerationCache(As, bs, x0, U, Fᵢ, u, n, 0, EO, TO, progress)
 end
 update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
 update_i!(cache, i) = cache.i = i
+function update_x0!(x0)
+    for i in 1:length(x0)
+        x0[i] = randn(ComplexF64)
+    end
+    LA.normalize!(x0)
+    x0
+end
 
 """
     regeneration(F::System; options...) 
@@ -262,7 +269,7 @@ function regeneration!(
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
-    cache = RegenerationCache(Fᵢ, u, n, endgame_options, tracker_options, progress)
+    cache = RegenerationCache(Fᵢ, u, n, codim, endgame_options, tracker_options, progress)
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -293,11 +300,11 @@ function regeneration!(
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
+                    update_progress!(progress, false)
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
-                    update_progress!(progress, false)
                     remove_points_all!(out, cache)
 
                 end
@@ -527,11 +534,13 @@ function is_contained!(X, Y, F, cache)
     progress = cache.progress
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
+    x0 = cache.x0
 
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
+    mY = codim(LY)
     n = ambient_dim(LY)
     k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
@@ -540,6 +549,9 @@ function is_contained!(X, Y, F, cache)
         out = falses(length(points(X)))
     else
         # setup 
+        U = cache.U
+        empty!(U)
+
         P = points(Y)
         Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
@@ -547,15 +559,14 @@ function is_contained!(X, Y, F, cache)
             tracker_options = tracker_options,
             options = endgame_options,
         )
-        U = UniquePoints(first(P), 0)
-
+        
         # now we loop over the points in X and check if they are contained in Y
-        A, b = set_up_linear_spaces(LX, LY)
-        out = map(points(X)) do x
+        set_up_linear_spaces!(cache, LX, LY)
+        A, b = cache.As[mY], cache.bs[mY]
 
+        out = map(points(X)) do x
             # first check
-            x0 = randn(ComplexF64, n)
-            LA.normalize!(x0)
+            update_x0!(x0)
             x0 = norm(x, Inf) .* x0
             if norm(F(x), Inf) > 1e-2 * norm(F(x0), Inf)
                 return false
@@ -581,17 +592,17 @@ function is_contained!(
 end
 
 function remove_points!(
-    W::WitnessPoints{T1,T2,Vector{ComplexF64}},
-    V::WitnessPoints{T3,T4,Vector{ComplexF64}},
+    W::WitnessPoints,
+    V::WitnessPoints,
     cache::RegenerationCache
-) where {T1,T2,T3,T4<:AbstractSystem}
+) 
     m = is_contained!(W, V, cache.Fᵢ, cache)
     deleteat!(W.R, m)
 
     nothing
 end
 
-function set_up_linear_spaces(LX, LY)
+function set_up_linear_spaces!(cache, LX, LY)
 
     n = ambient_dim(LY)
     mX = codim(LX)
@@ -600,8 +611,8 @@ function set_up_linear_spaces(LX, LY)
 
     # to compute linear spaces through the points in X we first set up
     # a matrix-vector pair of the correct size mY×n
-    A = zeros(ComplexF64, mY, n)
-    b = zeros(ComplexF64, mY)
+    A = cache.As[mY]
+    b = cache.bs[mY]
 
     # since we have used a subset of the equations for Y also for X,
     # we can reuse them
@@ -624,8 +635,6 @@ function set_up_linear_spaces(LX, LY)
         end
         b[ℓ] = bX[i]
     end
-
-    A, b
 end
 
 function is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
