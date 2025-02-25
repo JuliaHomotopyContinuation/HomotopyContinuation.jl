@@ -137,33 +137,32 @@ end
 A cache for [`regeneration`](@ref).
 """
 mutable struct RegenerationCache{Sys<:AbstractSystem}
-    out::Vector{WitnessPoints}
-    H::Vector{WitnessSet}
-
     A::Matrix
     b::Vector
     x0::Vector
     U::UniquePoints
 
-    EO::EndgameOptions
-    TO::TrackerOptions
-
     Fᵢ::Sys
     u::Variable
     n::Int
+    i::Int
+
+    EO::EndgameOptions
+    TO::TrackerOptions
 
     progress::WitnessSetsProgress
 end
 
-function RegenerationCache(out, H, EO, TO, Fᵢ, u, n, progress)
+function RegenerationCache(Fᵢ, u, n, EO, TO, progress)
     A = zeros(ComplexF64, n + 1, n + 1)
     b = zeros(ComplexF64, n + 1)
     x0 = zeros(ComplexF64, n)
     U = UniquePoints(x0, 0)
 
-    RegenerationCache(out, H, A, b, x0, U, EO, TO, Fᵢ, u, n, progress)
+    RegenerationCache(A, b, x0, U, Fᵢ, u, n, 0, EO, TO, progress)
 end
 update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
+update_i!(cache, i) = cache.i = i
 
 """
     regeneration(F::System; options...) 
@@ -263,7 +262,7 @@ function regeneration!(
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
-    cache = RegenerationCache(out, H, endgame_options, tracker_options, Fᵢ, u, n, progress)
+    cache = RegenerationCache(Fᵢ, u, n, endgame_options, tracker_options, progress)
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -285,12 +284,12 @@ function regeneration!(
             else
                 begin
                     update_progress!(progress, true)
-                    # the i-th step: for all W in out we intersect W with H[i]
-                    # we enumerate reversely, so that we can add points to witness sets that we have already
-                    # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
-                    # we have already intersected X ∩ Hᵢ.
-                    intersect_all!(cache, i)
+                    update_i!(cache, i)
 
+                    # for all W in out we intersect W with H[i]
+                    intersect_all!(out, H, cache)
+
+                    # update Fᵢ
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
@@ -383,18 +382,24 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
-function intersect_all!(cache, i)
+function intersect_all!(out, H, cache)
 
-    H = cache.H
-    out = cache.out
-    n = cache.n
+    
+    i = cache.i
     progress = cache.progress
 
+    # the i-th hypersurface
     Hᵢ = H[i]
+
+    # we enumerate reversely, so that we can add points to witness sets that we have already
+    # taken care of; i.e., if we intersect Wₖ₋₁∩Hᵢ below in the intersect_with_hypersurface function,
+    # we have already intersected Wₖ ∩ Hᵢ.
     E = reverse(enumerate(out))
-    current = iterate(E)
+
+    # we iterate over E using two variables: one for Wₖ and one for Wₖ₋₁  
+    current = iterate(E) # the variable for Wₖ
     ((k, Wₖ), state) = current  # k = codim(W)
-    next = iterate(E, state)
+    next = iterate(E, state) # the variable for Wₖ₋₁
 
     while !isnothing(next) #
         ((_, Wₖ₋₁), _) = next
