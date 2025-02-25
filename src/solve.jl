@@ -5,6 +5,9 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
+export
+    ResultIterator
+
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
@@ -51,6 +54,100 @@ Solver(
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
+
+
+
+struct ResultIterator{Iter}
+    starts :: Iter
+    S :: Solver
+    bitmask :: Union{Iter,Vector{Bool},Nothing}
+end
+
+
+function Base.show(io::IO, iter::ResultIterator{Iter}) where {Iter} 
+    print(io, "ResultIterator induced by $Iter")
+end
+
+function Base.IteratorSize(iter::ResultIterator) 
+    if typeof(iter.bitmask) == Nothing
+        return(Base.SizeUnknown())
+    else
+        return(Base.HasLength())
+    end
+end
+Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
+Base.eltype(iter::ResultIterator) = PathResult
+
+#=
+    To do: figure out how to iterate wrt bitmask
+    i = 0
+    if state === nothing
+        i = findfirst(x->bitmask(x),1:length(bitmask))
+        next = iterate(iter.starts)
+        for j in 1:i-1
+            next = iterate(iter.starts,next)
+        end
+        return(track(iter.S.trackers[1],next[1]),(next[2],i))
+    end
+    i = findfirst(x->bitmask(x), state[2]+1:length(bitmask))
+ =#
+function Base.iterate(iter::ResultIterator{Iter}, state = nothing) where {Iter}
+    next = state === nothing ? iterate(iter.starts) : iterate(iter.starts, state)
+    next === nothing && return nothing
+    (val, new_state) = next
+    return(track(iter.S.trackers[1],val), new_state)
+end
+
+function nsolutions(iter::ResultIterator)
+    mapreduce(x->x.return_code==:success,+,iter,init=0)
+end
+nat_infinity(R::ResultIterator) = count(is_at_infinity, R)
+nexcess_solutions(R::ResultIterator) = count(is_excess_solution, R)
+nfailed(R::ResultIterator) = count(is_failed, R)
+nnonsingular(R::ResultIterator) = count(is_nonsingular, R)
+nreal(R::ResultIterator; tol = 1e-6) = count(r->is_real(r, tol), R)
+
+
+function Base.length(iter::ResultIterator)
+    if Base.IteratorSize(iter) == Base.SizeUnknown()
+        k = 0
+        for s in iter.starts
+            k += 1
+        end
+        k
+    elseif Base.IteratorSize(iter) == Base.HasLength()
+        return(sum(iter.bitmask))
+    end
+end
+
+
+function bitmask(iter::ResultIterator,f)
+    return([f(s) for s in iter])
+end
+
+function bitmask_filter(iter::ResultIterator,f) 
+    bm = bitmask(iter,f)
+    return(ResultIterator(iter.starts,iter.S,bm))
+end
+
+#function real_solutions(iter::ResultIterator)
+#    bitmask_filter(iter,x->is_real(x))
+#end
+
+function trace(iter::ResultIterator)
+    s = solution(first(iter))
+    mapreduce(x->solution(x),+,iter,init=0.0.*s)
+end
+
+function Result(iter::ResultIterator) 
+    C = collect(iter)
+    for i in 1:length(C)
+        C[i].path_number = i
+    end
+    Result(C; seed = iter.S.seed, start_system = iter.S.start_system)
+end
+
+
 
 """
     solver_startsolutions(args...; kwargs...)
@@ -444,6 +541,7 @@ function solve(
     transform_parameters = identity,
     flatten = nothing,
     target_subspaces = nothing,
+    iterator_only = false,
     kwargs...,
 )
     many_parameters = false
@@ -495,6 +593,7 @@ function solve(
             show_progress = show_progress,
             threading = threading,
             catch_interrupt = catch_interrupt,
+            iterator_only = iterator_only,
         )
     end
 end
@@ -502,7 +601,21 @@ end
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+#solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+function solve(
+    S::Solver,
+    starts; 
+    iterator_only = false, 
+    threading::Bool = Threads.nthreads() > 1, 
+    kwargs...)
+    if iterator_only && threading == false
+        return(ResultIterator(starts,S,nothing))
+        return(Base.Iterators.map(x->track(S.trackers[1],x),starts))
+    else
+        return(solve(S, collect(starts); threading = threading, kwargs...))
+    end
+end
+
 function solve(
     S::Solver,
     starts::AbstractArray;
@@ -511,6 +624,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
 )
+
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
