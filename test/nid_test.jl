@@ -17,6 +17,9 @@
         W = regeneration(F; sorted = false)
         @test degree.(W) == [2, 8, 8]
 
+        W = regeneration(F; max_codim = 2)
+        @test degree.(W) == [2, 8]
+
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 

@@ -154,8 +154,8 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
 end
 
 function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
-    As = [zeros(ComplexF64, i, n + 1) for i = 1:codim]
-    bs = [zeros(ComplexF64, i) for i = 1:codim]
+    As = [zeros(ComplexF64, n + 1 - i, n + 1) for i = 0:codim]
+    bs = [zeros(ComplexF64, n + 1 - i) for i = 0:codim]
     x0 = [zeros(ComplexF64, n); 0.0]
     U = UniquePoints(x0, 0)
 
@@ -204,7 +204,7 @@ regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs.
 function regeneration!(
     F::System;
     sorted::Bool = true,
-    max_codim = nothing,
+    max_codim::Union{Int,Nothing} = nothing,
     show_progress::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(;
@@ -229,10 +229,12 @@ function regeneration!(
     end
     n = length(vars) # ambient dimension
     c = length(f) # we can have witness sets of codimesion at most min(c,n)
-    if isnothing(max_codim)
-        codim = min(c, n)
+    expected_max_codim = min(c, n)
+    if !isnothing(max_codim) && max_codim < expected_max_codim
+        # if max_codim is smaller than the expected codimension we must compute witness points for one more codimension, so that we can remove spurious points
+        codim = max_codim + 1
     else
-        codim = min(c, n, max_codmin)
+        codim = expected_max_codim
     end
 
     if show_progress
@@ -312,6 +314,11 @@ function regeneration!(
         end
     end
     pop!(vars)
+
+    if !isnothing(max_codim) && max_codim < expected_max_codim
+        # If max_codim < expected_max_codim we have computed one additional set of witness points. Here we remove them again.
+        pop!(out)
+    end
 
     filter!(W -> degree(W) > 0, out)
     if !isempty(out)
@@ -543,7 +550,7 @@ function is_contained!(X, Y, F, cache)
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
-    mY = codim(LY)
+    dY = dim(LY)
     n = ambient_dim(LY)
     k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
@@ -565,7 +572,7 @@ function is_contained!(X, Y, F, cache)
 
         # now we loop over the points in X and check if they are contained in Y
         set_up_linear_spaces!(cache, LX, LY)
-        A, b = cache.As[mY], cache.bs[mY]
+        A, b = cache.As[dY+1], cache.bs[dY+1]
 
         out = map(points(X)) do x
             # first check
@@ -606,14 +613,14 @@ end
 function set_up_linear_spaces!(cache, LX, LY)
 
     n = ambient_dim(LY)
-    mX = codim(LX)
-    mY = codim(LY)
+    cX = codim(LX)
+    dY = dim(LY)
     k = codim(LY) - codim(LX)
 
     # to compute linear spaces through the points in X we first set up
-    # a matrix-vector pair of the correct size mY×n
-    A = cache.As[mY]
-    b = cache.bs[mY]
+    # a matrix-vector pair of the correct size cY×n
+    A = cache.As[dY+1]
+    b = cache.bs[dY+1]
 
     # since we have used a subset of the equations for Y also for X,
     # we can reuse them
@@ -629,7 +636,7 @@ function set_up_linear_spaces!(cache, LX, LY)
         end
     end
     # equations from X, the overlap in linear equations is in the *last* mx-1 equations
-    for i = 2:mX
+    for i = 2:cX
         ℓ = k + i
         for j = 1:n
             A[ℓ, j] = AX[i, j]
