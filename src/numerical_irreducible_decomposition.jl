@@ -150,7 +150,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
 
-    progress::WitnessSetsProgress
+    progress::Union{WitnessSetsProgress, Nothing}
 end
 
 function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
@@ -553,7 +553,7 @@ function is_contained!(X, Y, F, cache)
         empty!(U)
 
         P = points(Y)
-        Hom = linear_subspace_homotopy(F, LY, LY)
+        Hom = linear_subspace_homotopy(F, LY, LY; intrinsic = true)
         tracker = EndgameTracker(
             Hom;
             tracker_options = tracker_options,
