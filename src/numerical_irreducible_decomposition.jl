@@ -576,7 +576,13 @@ function is_contained!(X, Y, F, cache)
             for i = 2:(k+1)
                 b[i] = sum(A[i, j] * x[j] for j = 1:n)
             end
-            is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
+            # set up the corresponding LinearSubspace L
+            E = ExtrinsicDescription(A, b; orthonormal = true)
+            L = LinearSubspace(E)
+            # set L as the target for homotopy continuation
+            target_parameters!(tracker, L)
+
+            is_tracked_to_x!(cache, x, X, P, tracker)
 
         end
     end
@@ -637,12 +643,10 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-function is_tracked_to_x(x, X, P, A, b, tracker, U, progress)
-    # set up the corresponding LinearSubspace L
-    E = ExtrinsicDescription(A, b; orthonormal = true)
-    L = LinearSubspace(E)
-    # set L as the target for homotopy continuation
-    target_parameters!(tracker, L)
+function is_tracked_to_x!(cache, x, X, P, tracker)
+
+    U = cache.U
+    progress = cache.progress
 
     # reuse U
     empty!(U)
