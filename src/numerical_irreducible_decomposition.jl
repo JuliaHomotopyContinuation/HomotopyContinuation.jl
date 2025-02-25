@@ -147,8 +147,8 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     n::Int
     i::Int
 
-    EO::EndgameOptions
-    TO::TrackerOptions
+    endgame_options::EndgameOptions
+    tracker_options::TrackerOptions
 
     progress::WitnessSetsProgress
 end
@@ -298,17 +298,7 @@ function regeneration!(
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     update_progress!(progress, false)
-                    E = enumerate(out)
-                    remove_points_all!(
-                        out,
-                        E,
-                        Fᵢ,
-                        endgame_options,
-                        tracker_options,
-                        progress,
-                        seed,
-                        i,
-                    )
+                    remove_points_all!(out, cache)
 
                 end
             end
@@ -406,19 +396,8 @@ function intersect_all!(out, H, cache)
         
         if k-1 < i 
             # here is the intersection step
-            # if k-1 < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
-            # at this point the equation for W is f[1:(i-1)]
-            intersect_with_hypersurface!(
-                Wₖ₋₁,
-                Wₖ,
-                cache.Fᵢ,
-                Hᵢ,
-                cache.u,
-                cache.EO,
-                cache.TO,
-                progress,
-                seed,
-            )
+            # we add points that do not belong to Wₖ₋₁∩Hᵢ to Wₖ.
+            intersect_with_hypersurface!(Wₖ₋₁, Hᵢ, Wₖ, cache)
             update_progress!(progress, Wₖ₋₁)
             update_progress!(progress, Wₖ)
         end
@@ -431,21 +410,18 @@ function intersect_all!(out, H, cache)
 end
 
 
-function remove_points_all!(out, E, Fᵢ, endgame_options, tracker_options, progress, seed, i)
+function remove_points_all!(out, cache)
+
+    i = cache.i
+    progress = cache.progress
+
+    E = enumerate(out)
     for (k, W) in E # k = codim(W) for W in Ws
         if k > 1 && k <= i && degree(W) > 0
             for j = 1:(k-1)
                 X = out[j]
                 if degree(X) > 0
-                    remove_points!(
-                        W,
-                        X,
-                        Fᵢ,
-                        endgame_options,
-                        tracker_options,
-                        progress,
-                        seed,
-                    )
+                    remove_points!(W, X, cache)
                     update_progress!(progress, W)
                 end
             end
@@ -460,17 +436,11 @@ end
 
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
-function intersect_with_hypersurface!(
-    W,
-    X,
-    F,
-    H,
-    u,
-    endgame_options,
-    tracker_options,
-    progress,
-    seed,
-)
+function intersect_with_hypersurface!(W, H, X, cache)
+
+    F = cache.Fᵢ
+    progress = cache.progress
+    u = cache.u
 
     P = points(W)
     f = (System(F).expressions) # equations for W
@@ -481,7 +451,7 @@ function intersect_with_hypersurface!(
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained!(W, H, endgame_options, tracker_options, progress, seed))
+    m = .!(is_contained!(W, H, cache))
     P_next = manage_initial_points!(P, m, W, progress)
 
 
@@ -490,7 +460,7 @@ function intersect_with_hypersurface!(
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
     Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
     tracker =
-        EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
+        EndgameTracker(Hom; tracker_options = cache.tracker_options, options = cache.endgame_options)
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
@@ -548,14 +518,18 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 end
 
 """
-    is_contained!(X, Y, F, endgame_options, tracker_options, progress)
+    is_contained!(X, Y, cache)
 
-Returns a boolean vector indicating whether the points of X are contained in the variety defined by (Y,F).
+Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained!(X, Y, F, endgame_options, tracker_options, progress, seed)
+function is_contained!(X, Y, F, cache)
+
+    progress = cache.progress
+    tracker_options = cache.tracker_options
+    endgame_options = cache.endgame_options
+
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
-
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
@@ -601,24 +575,17 @@ end
 function is_contained!(
     V::WitnessPoints,
     W::WitnessSet,
-    endgame_options::EndgameOptions,
-    tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress,Nothing},
-    seed,
+    cache::RegenerationCache,
 )
-    is_contained!(V, W, system(W), endgame_options, tracker_options, progress, seed)
+    is_contained!(V, W, system(W), cache)
 end
 
 function remove_points!(
     W::WitnessPoints{T1,T2,Vector{ComplexF64}},
     V::WitnessPoints{T3,T4,Vector{ComplexF64}},
-    F::AS,
-    endgame_options::EndgameOptions,
-    tracker_options::TrackerOptions,
-    progress::Union{WitnessSetsProgress,Nothing},
-    seed,
-) where {T1,T2,T3,T4,AS<:AbstractSystem}
-    m = is_contained!(W, V, F, endgame_options, tracker_options, progress, seed)
+    cache::RegenerationCache
+) where {T1,T2,T3,T4<:AbstractSystem}
+    m = is_contained!(W, V, cache.Fᵢ, cache)
     deleteat!(W.R, m)
 
     nothing
@@ -769,7 +736,7 @@ function decompose_with_monodromy!(
     threading,
     progress,
     seed,
-) where {T1,T2}
+)
 
 
     if isnothing(seed)
