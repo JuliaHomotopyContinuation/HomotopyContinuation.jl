@@ -33,6 +33,9 @@
 
         # bad seed
         N = nid(F; seed = 0xc770fa47)
+        degs = degrees(N)
+        @test degs[2] == [2]
+        @test degs[1] == [4, 4]
 
         # progress
         N = nid(F; show_progress = false)
@@ -57,9 +60,6 @@
         N3 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
         @test isa(N3, NumericalIrreducibleDecomposition)
 
-        N3 = nid(F; max_codim = 1)
-        @test isa(N3, NumericalIrreducibleDecomposition)
-
         # number of components
         @test ncomponents(N3) == 11
         @test ncomponents(N3, dims = [1, 2]) == 3
@@ -67,6 +67,10 @@
         @test n_components(N3) == 11
         @test n_components(N3, dims = [1, 2]) == 3
         @test n_components(N3, 1) == 2
+
+        # max_codim = 1
+        N4 = nid(F; max_codim = 1)
+        @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
