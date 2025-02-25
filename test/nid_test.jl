@@ -17,6 +17,9 @@
         W = regeneration(F; sorted = false)
         @test degree.(W) == [2, 8, 8]
 
+        W = regeneration(F; max_codim = 2)
+        @test degree.(W) == [2, 8]
+
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 
@@ -30,6 +33,9 @@
 
         # bad seed
         N = nid(F; seed = 0xc770fa47)
+        degs = degrees(N)
+        @test degs[2] == [2]
+        @test degs[1] == [4, 4]
 
         # progress
         N = nid(F; show_progress = false)
@@ -55,12 +61,16 @@
         @test isa(N3, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test ncomponents(N3) == 4
+        @test ncomponents(N3) == 11
         @test ncomponents(N3, dims = [1, 2]) == 3
         @test ncomponents(N3, 1) == 2
-        @test n_components(N3) == 4
+        @test n_components(N3) == 11
         @test n_components(N3, dims = [1, 2]) == 3
         @test n_components(N3, 1) == 2
+
+        # max_codim = 1
+        N4 = nid(F; max_codim = 1)
+        @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
@@ -90,8 +100,8 @@
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
-        @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
-        @test ncomponents(N_TwistedCubicSphere) == 1
+        @test degrees(N_TwistedCubicSphere) == Dict(0 => [1, 1, 1])
+        @test ncomponents(N_TwistedCubicSphere) == 3
     end
 
     @testset "Three Lines" begin
@@ -202,6 +212,9 @@
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
         @test ncomponents(N_Bricard6R) == 1
+
+        N_Bricard6R_c4 = nid(Bricard6R, max_codim = 4)
+        @test ncomponents(N_Bricard6R_c4) == 0
     end
 
     @testset "ACR" begin
@@ -254,7 +267,6 @@
 
         F = System([s * l * p for s in S for l in L for p in P])
 
-        seed = rand(UInt32)
         NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
 
         @test ncomponents(NID, 0) == 1
