@@ -146,6 +146,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     u::Variable
     n::Int
     i::Int
+    codim::Int
 
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
@@ -159,7 +160,7 @@ function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
     x0 = [zeros(ComplexF64, n); 0.0]
     U = UniquePoints(x0, 0)
 
-    RegenerationCache(As, bs, x0, U, Fᵢ, u, n, 0, EO, TO, progress)
+    RegenerationCache(As, bs, x0, U, Fᵢ, u, n, 0, codim, EO, TO, progress)
 end
 update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
 update_i!(cache, i) = cache.i = i
@@ -389,8 +390,8 @@ end
 
 function intersect_all!(out, H, cache)
 
-    n = cache.n
     i = cache.i
+    codim = cache.codim
     progress = cache.progress
 
     # the i-th hypersurface
@@ -403,7 +404,7 @@ function intersect_all!(out, H, cache)
     update_progress!(progress, true)
     for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
         if k < i
-            if k < n
+            if k < codim
                 Wₖ₊₁ = out[k+1]
             else
                 Wₖ₊₁ = nothing
@@ -1192,7 +1193,9 @@ function ncomponents(
     dims::Union{Vector{Int},Nothing} = nothing,
 )
     D = witness_sets(N)
-    if isnothing(dims)
+    if isempty(D)
+        return 0
+    elseif isnothing(dims)
         out = sum(length(last(Ws)) for Ws in D)
     else
         out = 0
@@ -1321,6 +1324,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
@@ -1367,6 +1371,7 @@ function numerical_irreducible_decomposition(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     sorted::Bool = true,
+    max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,
     kwargs...,
 )
@@ -1374,6 +1379,7 @@ function numerical_irreducible_decomposition(
     Ws = regeneration!(
         F;
         sorted = sorted,
+        max_codim = max_codim,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
         kwargs...,

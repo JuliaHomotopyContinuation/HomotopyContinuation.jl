@@ -57,6 +57,9 @@
         N3 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
         @test isa(N3, NumericalIrreducibleDecomposition)
 
+        N3 = nid(F; max_codim = 1)
+        @test isa(N3, NumericalIrreducibleDecomposition)
+
         # number of components
         @test ncomponents(N3) == 11
         @test ncomponents(N3, dims = [1, 2]) == 3
@@ -205,6 +208,9 @@
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
         @test ncomponents(N_Bricard6R) == 1
+
+        N_Bricard6R_c4 = nid(Bricard6R, max_codim = 4)
+        @test ncomponents(N_Bricard6R_c4) == 0
     end
 
     @testset "ACR" begin
