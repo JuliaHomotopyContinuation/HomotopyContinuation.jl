@@ -414,30 +414,6 @@ function intersect_all!(out, H, cache)
             update_progress!(progress, Wₖ₊₁)
         end
     end
-
-    # E = reverse(enumerate(out))
-
-    # # we iterate over E using two variables: one for Wₖ and one for Wₖ₋₁  
-    # current = iterate(E) # the variable for Wₖ
-    # ((k, Wₖ), state) = current  # k = codim(W)
-    # next = iterate(E, state) # the variable for Wₖ₋₁
-
-    # while !isnothing(next) #
-    #     ((_, Wₖ₋₁), _) = next
-
-    #     if k - 1 < i
-    #         # here is the intersection step
-    #         # we add points that do not belong to Wₖ₋₁∩Hᵢ to Wₖ.
-    #         intersect_with_hypersurface!(Wₖ₋₁, Hᵢ, Wₖ, cache)
-    #         update_progress!(progress, Wₖ₋₁)
-    #         update_progress!(progress, Wₖ)
-    #     end
-
-    #     current = iterate(E, state)
-    #     ((k, Wₖ), state) = current
-
-    #     next = iterate(E, state)
-    # end
 end
 
 
