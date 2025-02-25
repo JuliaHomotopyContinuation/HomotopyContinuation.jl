@@ -388,7 +388,7 @@ end
 
 function intersect_all!(out, H, cache)
 
-
+    n = cache.n
     i = cache.i
     progress = cache.progress
 
@@ -396,31 +396,48 @@ function intersect_all!(out, H, cache)
     Hᵢ = H[i]
 
     # we enumerate reversely, so that we can add points to witness sets that we have already
-    # taken care of; i.e., if we intersect Wₖ₋₁∩Hᵢ below in the intersect_with_hypersurface function,
-    # we have already intersected Wₖ ∩ Hᵢ.
-    E = reverse(enumerate(out))
-
-    # we iterate over E using two variables: one for Wₖ and one for Wₖ₋₁  
-    current = iterate(E) # the variable for Wₖ
-    ((k, Wₖ), state) = current  # k = codim(W)
-    next = iterate(E, state) # the variable for Wₖ₋₁
-
-    while !isnothing(next) #
-        ((_, Wₖ₋₁), _) = next
-
-        if k - 1 < i
+    # taken care of; i.e., if we intersect Wₖ∩Hᵢ below in the intersect_with_hypersurface function,
+    # we have already intersected Wₖ₊₁ ∩ Hᵢ.
+    E = enumerate(out)
+    update_progress!(progress, true)
+    for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
+        if k < i
+            if k < n
+                Wₖ₊₁ = out[k+1]
+            else
+                Wₖ₊₁ = nothing
+            end
             # here is the intersection step
-            # we add points that do not belong to Wₖ₋₁∩Hᵢ to Wₖ.
-            intersect_with_hypersurface!(Wₖ₋₁, Hᵢ, Wₖ, cache)
-            update_progress!(progress, Wₖ₋₁)
+            # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
+            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache)
             update_progress!(progress, Wₖ)
+            update_progress!(progress, Wₖ₊₁)
         end
-
-        current = iterate(E, state)
-        ((k, Wₖ), state) = current
-
-        next = iterate(E, state)
     end
+
+    # E = reverse(enumerate(out))
+
+    # # we iterate over E using two variables: one for Wₖ and one for Wₖ₋₁  
+    # current = iterate(E) # the variable for Wₖ
+    # ((k, Wₖ), state) = current  # k = codim(W)
+    # next = iterate(E, state) # the variable for Wₖ₋₁
+
+    # while !isnothing(next) #
+    #     ((_, Wₖ₋₁), _) = next
+
+    #     if k - 1 < i
+    #         # here is the intersection step
+    #         # we add points that do not belong to Wₖ₋₁∩Hᵢ to Wₖ.
+    #         intersect_with_hypersurface!(Wₖ₋₁, Hᵢ, Wₖ, cache)
+    #         update_progress!(progress, Wₖ₋₁)
+    #         update_progress!(progress, Wₖ)
+    #     end
+
+    #     current = iterate(E, state)
+    #     ((k, Wₖ), state) = current
+
+    #     next = iterate(E, state)
+    # end
 end
 
 
@@ -468,6 +485,10 @@ function intersect_with_hypersurface!(W, H, X, cache)
     m = .!(is_contained!(W, H, cache))
     P_next = manage_initial_points!(P, m, W, progress)
 
+    if isnothing(X)
+        return nothing
+    end
+
 
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
@@ -484,7 +505,6 @@ function intersect_with_hypersurface!(W, H, X, cache)
 
     # here comes the loop for tracking
     l_start = length(start)
-
     for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
@@ -578,9 +598,11 @@ function is_contained!(X, Y, F, cache)
             # first check
             update_x0!(x0)
             x0 = norm(x, Inf) .* x0
+            @show cache.i, codim(X), codim(Y), norm(F(x), Inf), 1e-2 * norm(F(x0), Inf), x
             if norm(F(x), Inf) > 1e-2 * norm(F(x0), Inf)
                 return false
             end
+
 
             # second check
             for i = 2:(k+1)

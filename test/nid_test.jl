@@ -257,7 +257,6 @@
 
         F = System([s * l * p for s in S for l in L for p in P])
 
-        seed = rand(UInt32)
         NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
 
         @test ncomponents(NID, 0) == 1
