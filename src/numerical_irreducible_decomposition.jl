@@ -595,7 +595,7 @@ function is_contained!(X, Y, F, cache)
         A, b = cache.As[dY+1], cache.bs[dY+1]
 
         out = map(points(X)) do x
-            
+
             # first check
             update_x0!(x0)
             x0 = norm(x, Inf) .* x0
