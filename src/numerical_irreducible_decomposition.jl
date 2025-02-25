@@ -150,12 +150,12 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     endgame_options::EndgameOptions
     tracker_options::TrackerOptions
 
-    progress::Union{WitnessSetsProgress, Nothing}
+    progress::Union{WitnessSetsProgress,Nothing}
 end
 
 function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
-    As = [zeros(ComplexF64, i, n + 1) for i in 1:codim]
-    bs = [zeros(ComplexF64, i) for i in 1:codim]
+    As = [zeros(ComplexF64, i, n + 1) for i = 1:codim]
+    bs = [zeros(ComplexF64, i) for i = 1:codim]
     x0 = [zeros(ComplexF64, n); 0.0]
     U = UniquePoints(x0, 0)
 
@@ -164,7 +164,7 @@ end
 update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
 update_i!(cache, i) = cache.i = i
 function update_x0!(x0)
-    for i in 1:length(x0)
+    for i = 1:length(x0)
         x0[i] = randn(ComplexF64)
     end
     LA.normalize!(x0)
@@ -381,7 +381,7 @@ end
 
 function intersect_all!(out, H, cache)
 
-    
+
     i = cache.i
     progress = cache.progress
 
@@ -400,8 +400,8 @@ function intersect_all!(out, H, cache)
 
     while !isnothing(next) #
         ((_, Wₖ₋₁), _) = next
-        
-        if k-1 < i 
+
+        if k - 1 < i
             # here is the intersection step
             # we add points that do not belong to Wₖ₋₁∩Hᵢ to Wₖ.
             intersect_with_hypersurface!(Wₖ₋₁, Hᵢ, Wₖ, cache)
@@ -410,7 +410,7 @@ function intersect_all!(out, H, cache)
         end
 
         current = iterate(E, state)
-        ((k, Wₖ), state) = current 
+        ((k, Wₖ), state) = current
 
         next = iterate(E, state)
     end
@@ -466,8 +466,11 @@ function intersect_with_hypersurface!(W, H, X, cache)
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
     Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
-    tracker =
-        EndgameTracker(Hom; tracker_options = cache.tracker_options, options = cache.endgame_options)
+    tracker = EndgameTracker(
+        Hom;
+        tracker_options = cache.tracker_options,
+        options = cache.endgame_options,
+    )
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
@@ -559,7 +562,7 @@ function is_contained!(X, Y, F, cache)
             tracker_options = tracker_options,
             options = endgame_options,
         )
-        
+
         # now we loop over the points in X and check if they are contained in Y
         set_up_linear_spaces!(cache, LX, LY)
         A, b = cache.As[mY], cache.bs[mY]
@@ -589,19 +592,11 @@ function is_contained!(X, Y, F, cache)
 
     out
 end
-function is_contained!(
-    V::WitnessPoints,
-    W::WitnessSet,
-    cache::RegenerationCache,
-)
+function is_contained!(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache)
     is_contained!(V, W, system(W), cache)
 end
 
-function remove_points!(
-    W::WitnessPoints,
-    V::WitnessPoints,
-    cache::RegenerationCache
-) 
+function remove_points!(W::WitnessPoints, V::WitnessPoints, cache::RegenerationCache)
     m = is_contained!(W, V, cache.Fᵢ, cache)
     deleteat!(W.R, m)
 
