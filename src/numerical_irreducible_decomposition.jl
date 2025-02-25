@@ -227,6 +227,7 @@ function regeneration!(
     else
         f = expressions(F)
     end
+
     n = length(vars) # ambient dimension
     c = length(f) # we can have witness sets of codimesion at most min(c,n)
     expected_max_codim = min(c, n)
