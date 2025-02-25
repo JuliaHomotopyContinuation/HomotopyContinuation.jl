@@ -150,16 +150,20 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
 
     Fᵢ::Sys
     u::Variable
+    n::Int
+
+    progress::WitnessSetsProgress
 end
 
-function RegenerationCache(out, H, EO, TO, Fᵢ, u, n)
+function RegenerationCache(out, H, EO, TO, Fᵢ, u, n, progress)
     A = zeros(ComplexF64, n + 1, n + 1)
     b = zeros(ComplexF64, n + 1)
     x0 = zeros(ComplexF64, n)
     U = UniquePoints(x0, 0)
 
-    RegenerationCache(out, H, A, b, x0, U, EO, TO, Fᵢ, u)
+    RegenerationCache(out, H, A, b, x0, U, EO, TO, Fᵢ, u, n, progress)
 end
+update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
 
 """
     regeneration(F::System; options...) 
@@ -259,7 +263,7 @@ function regeneration!(
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
-    cache = RegenerationCache(out, H, endgame_options, tracker_options, Fᵢ, u, n)
+    cache = RegenerationCache(out, H, endgame_options, tracker_options, Fᵢ, u, n, progress)
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -280,36 +284,22 @@ function regeneration!(
                 end
             else
                 begin
+                    update_progress!(progress, true)
                     # the i-th step: for all W in out we intersect W with H[i]
-                    Hᵢ = H[i]
-
-                    E = enumerate(out)
                     # we enumerate reversely, so that we can add points to witness sets that we have already
                     # taken care of; i.e., if we intersect W∩Hᵢ below in the intersect_with_hypersurface function,
                     # we have already intersected X ∩ Hᵢ.
-                    update_progress!(progress, true)
-                    intersect_all!(
-                        out,
-                        E,
-                        Fᵢ,
-                        Hᵢ,
-                        u,
-                        endgame_options,
-                        tracker_options,
-                        progress,
-                        seed,
-                        i,
-                        n,
-                    )
+                    intersect_all!(cache, i)
 
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
-                    cache.Fᵢ = Fᵢ
+                    update_Fᵢ!(cache, Fᵢ)
 
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
                     update_progress!(progress, false)
+                    E = enumerate(out)
                     remove_points_all!(
                         out,
                         E,
@@ -393,44 +383,45 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
-function intersect_all!(
-    out,
-    E,
-    Fᵢ,
-    Hᵢ,
-    u,
-    endgame_options,
-    tracker_options,
-    progress,
-    seed,
-    i,
-    n,
-)
+function intersect_all!(cache, i)
 
-    for (k, W) in reverse(E) # k = codim(W) for W in Ws
-        if k < i
-            if k < n
-                X = out[k+1]
-            else
-                X = nothing
-            end
+    H = cache.H
+    out = cache.out
+    n = cache.n
+    progress = cache.progress
+
+    Hᵢ = H[i]
+    E = reverse(enumerate(out))
+    current = iterate(E)
+    ((k, Wₖ), state) = current  # k = codim(W)
+    next = iterate(E, state)
+
+    while !isnothing(next) #
+        ((_, Wₖ₋₁), _) = next
+        
+        if k-1 < i 
             # here is the intersection step
-            # if k < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
+            # if k-1 < min(i,n), the next witness superset X is also passed to this function, because we add points that do not belong to W∩Hᵢ to X.
             # at this point the equation for W is f[1:(i-1)]
             intersect_with_hypersurface!(
-                W,
-                X,
-                Fᵢ,
+                Wₖ₋₁,
+                Wₖ,
+                cache.Fᵢ,
                 Hᵢ,
-                u,
-                endgame_options,
-                tracker_options,
+                cache.u,
+                cache.EO,
+                cache.TO,
                 progress,
                 seed,
             )
-            update_progress!(progress, W)
-            update_progress!(progress, X)
+            update_progress!(progress, Wₖ₋₁)
+            update_progress!(progress, Wₖ)
         end
+
+        current = iterate(E, state)
+        ((k, Wₖ), state) = current 
+
+        next = iterate(E, state)
     end
 end
 
@@ -487,10 +478,6 @@ function intersect_with_hypersurface!(
     # for further processing
     m = .!(is_contained!(W, H, endgame_options, tracker_options, progress, seed))
     P_next = manage_initial_points!(P, m, W, progress)
-
-    if isnothing(X)
-        return nothing
-    end
 
 
     # Step 2:
