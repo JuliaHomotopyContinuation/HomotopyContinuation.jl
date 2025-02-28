@@ -1344,19 +1344,19 @@ julia> F = [p * q * (x - 3) * (x - 5);
             p * (z - 3) * (z - 5)]
 
 julia> N = numerical_irreducible_decomposition(F)
-Numerical irreducible decomposition with 4 components
+Numerical irreducible decomposition with 11 components
 • 1 component(s) of dimension 2.
 • 2 component(s) of dimension 1.
-• 1 component(s) of dimension 0.
+• 8 component(s) of dimension 0.
 
  degree table of components:
-╭───────────┬───────────────────────╮
-│ dimension │ degrees of components │
-├───────────┼───────────────────────┤
-│     2     │           2           │
-│     1     │        (4, 4)         │
-│     0     │           8           │
-╰───────────┴───────────────────────╯
+╭───────────┬──────────────────────────╮
+│ dimension │  degrees of components   │
+├───────────┼──────────────────────────┤
+│     2     │            2             │
+│     1     │          (4, 4)          │
+│     0     │ (1, 1, 1, 1, 1, 1, 1, 1) │
+╰───────────┴──────────────────────────╯
 ```
 """
 function numerical_irreducible_decomposition(
