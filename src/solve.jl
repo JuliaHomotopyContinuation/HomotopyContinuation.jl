@@ -106,7 +106,7 @@ nexcess_solutions(R::ResultIterator) = count(is_excess_solution, R)
 nfailed(R::ResultIterator) = count(is_failed, R)
 nnonsingular(R::ResultIterator) = count(is_nonsingular, R)
 nreal(R::ResultIterator; tol = 1e-6) = count(r->is_real(r, tol), R)
-
+paths_to_track(R::ResultIterator) = length(R.starts)
 
 function Base.length(iter::ResultIterator)
     if Base.IteratorSize(iter) == Base.SizeUnknown()
@@ -610,7 +610,6 @@ function solve(
     kwargs...)
     if iterator_only && threading == false
         return(ResultIterator(starts,S,nothing))
-        return(Base.Iterators.map(x->track(S.trackers[1],x),starts))
     else
         return(solve(S, collect(starts); threading = threading, kwargs...))
     end

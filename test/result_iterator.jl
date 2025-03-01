@@ -12,7 +12,7 @@
         @test nsolutions(tsi_total_degree) == 3
         @test length(tsi_polyhedral) == 3
         @test length(tsi_total_degree) == 6
-        @test bitmask(tsi_total_degree,isfinite) == Vector{Bool}([1,1,1,0,0,0])
+        @test bitmask(tsi_total_degree,isfinite) == Vector{Bool}([1,1,1,0,0,0]) #! Why is this not deterministic?!
         
     end
 
