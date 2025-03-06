@@ -10,6 +10,9 @@ export
     bitmask,
     bitmask_filter
 
+
+using IterTools: imap
+
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
@@ -109,11 +112,6 @@ end
 
 
 
-
-function nsolutions(iter::ResultIterator)
-    mapreduce(x->x.return_code==:success,+,iter,init=0)
-end
-
 function Base.length(ri::ResultIterator)
     if Base.IteratorSize(ri) == Base.SizeUnknown()
         k = 0
@@ -149,12 +147,12 @@ function trace(iter::ResultIterator)
     mapreduce(x->solution(x),+,iter,init=0.0.*s)
 end
 
-function Result(iter::ResultIterator) 
-    C = collect(iter)
+function Result(ri::ResultIterator) 
+    C = collect(ri)
     for i in 1:length(C)
         C[i].path_number = i
     end
-    Result(C; seed = iter.S.seed, start_system = iter.S.start_system)
+    Result(C; seed = ri.S.seed, start_system = ri.S.start_system)
 end
 
 

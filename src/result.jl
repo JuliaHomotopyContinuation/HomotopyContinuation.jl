@@ -203,7 +203,7 @@ Statistic about the number of (real) singular and non-singular solutions etc.
 """
 statistics(r; kwargs...) = ResultStatistics(r; kwargs...)
 
-const Results = Union{Result,AbstractVector{<:PathResult}}
+const Results = Union{AbstractResult,AbstractVector{<:PathResult}}
 
 """
     results(
@@ -231,13 +231,12 @@ function results(
     only_finite::Bool = true,
     multiple_results::Bool = false,
 )
-    [
-        f(r) for r in R if (!only_real || is_real(r, real_tol)) &&
-            (!only_nonsingular || is_nonsingular(r)) &&
-            (!only_singular || is_singular(r)) &&
-            (!only_finite || is_finite(r)) &&
-            (multiple_results || !is_multiple_result(r, R))
-    ]
+    filter_function = r -> (!only_real || is_real(r, real_tol)) &&
+    (!only_nonsingular || is_nonsingular(r)) &&
+    (!only_singular || is_singular(r)) &&
+    (!only_finite || is_finite(r)) &&
+    (multiple_results || !is_multiple_result(r, R))
+    imap(f,Iterators.filter(filter_function,R))
 end
 
 """
