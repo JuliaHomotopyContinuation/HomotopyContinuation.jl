@@ -6,7 +6,9 @@ export solve,
     linear_subspace_homotopy
 
 export
-    ResultIterator
+    ResultIterator,
+    bitmask,
+    bitmask_filter
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -57,77 +59,85 @@ Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
 
 
 
-struct ResultIterator{Iter}
-    starts :: Iter
-    S :: Solver
-    bitmask :: Union{Iter,Vector{Bool},Nothing}
+struct ResultIterator{Iter} <: AbstractResult
+    starts :: Iter                       # The start solution iterator
+    S :: Solver                         
+    bitmask :: Union{BitVector,Nothing}  # `nothing` means no filtering
+end
+
+function ResultIterator(starts::Iter, S::Solver; predicate=nothing) where Iter
+    bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+    return(ResultIterator{Iter}(starts, S, bitmask))
 end
 
 
-function Base.show(io::IO, iter::ResultIterator{Iter}) where {Iter} 
+function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter} 
     print(io, "ResultIterator induced by $Iter")
+    !isnothing(ri.bitmask) && print(" and a filtering bitmask")
 end
 
-function Base.IteratorSize(iter::ResultIterator) 
-    if typeof(iter.bitmask) == Nothing
-        return(Base.SizeUnknown())
-    else
-        return(Base.HasLength())
-    end
+function Base.IteratorSize(ri::ResultIterator)
+    ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
 end
 Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
-Base.eltype(iter::ResultIterator) = PathResult
+Base.eltype(::ResultIterator) = PathResult
 
-#=
-    To do: figure out how to iterate wrt bitmask
-    i = 0
-    if state === nothing
-        i = findfirst(x->bitmask(x),1:length(bitmask))
-        next = iterate(iter.starts)
-        for j in 1:i-1
-            next = iterate(iter.starts,next)
+
+
+function Base.iterate(ri::ResultIterator, state=nothing) #States of the induced iterator are pairs (i::Int,state)
+    native_state = state === nothing ? 0 : state[1]
+    next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
+    next_ss === nothing && return nothing  # End of iteration
+    
+    start_value, new_ss_state = next_ss
+    new_state = (native_state+1,new_ss_state)
+
+    if ri.bitmask === nothing
+        return (track(ri.S.trackers[1],start_value), new_state)
+    else
+        # Apply the filter by checking the bitmask
+        while !ri.bitmask[new_state[1]] && next_ss !== nothing
+            next_ss = iterate(ri.starts, new_state[2])
+            next_ss === nothing && return nothing  # End of iteration
+            start_value, new_ss_state = next_ss
+            new_state = (new_state[1]+1,new_ss_state)
         end
-        return(track(iter.S.trackers[1],next[1]),(next[2],i))
+    
+        return (track(ri.S.trackers[1],start_value), new_state)
     end
-    i = findfirst(x->bitmask(x), state[2]+1:length(bitmask))
- =#
-function Base.iterate(iter::ResultIterator{Iter}, state = nothing) where {Iter}
-    next = state === nothing ? iterate(iter.starts) : iterate(iter.starts, state)
-    next === nothing && return nothing
-    (val, new_state) = next
-    return(track(iter.S.trackers[1],val), new_state)
 end
+
+
+
 
 function nsolutions(iter::ResultIterator)
     mapreduce(x->x.return_code==:success,+,iter,init=0)
 end
-nat_infinity(R::ResultIterator) = count(is_at_infinity, R)
-nexcess_solutions(R::ResultIterator) = count(is_excess_solution, R)
-nfailed(R::ResultIterator) = count(is_failed, R)
-nnonsingular(R::ResultIterator) = count(is_nonsingular, R)
-nreal(R::ResultIterator; tol = 1e-6) = count(r->is_real(r, tol), R)
-paths_to_track(R::ResultIterator) = length(R.starts)
 
-function Base.length(iter::ResultIterator)
-    if Base.IteratorSize(iter) == Base.SizeUnknown()
+function Base.length(ri::ResultIterator)
+    if Base.IteratorSize(ri) == Base.SizeUnknown()
         k = 0
-        for s in iter.starts
+        for _ in ri.starts
             k += 1
         end
         k
-    elseif Base.IteratorSize(iter) == Base.HasLength()
-        return(sum(iter.bitmask))
+    elseif Base.IteratorSize(ri) == Base.HasLength() 
+        if ri.bitmask !== nothing
+            return(sum(ri.bitmask))
+        else
+            return(length(ri.starts))
+        end
     end
 end
 
 
-function bitmask(iter::ResultIterator,f)
-    return([f(s) for s in iter])
+function bitmask(f::Function, ri::ResultIterator)
+    BitVector(map(f, ri))
 end
 
-function bitmask_filter(iter::ResultIterator,f) 
-    bm = bitmask(iter,f)
-    return(ResultIterator(iter.starts,iter.S,bm))
+function bitmask_filter(f::Function, ri::ResultIterator) 
+    bm = bitmask(f,ri)
+    return(ResultIterator(ri.starts,ri.S,bm))
 end
 
 #function real_solutions(iter::ResultIterator)

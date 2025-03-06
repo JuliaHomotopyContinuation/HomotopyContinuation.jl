@@ -80,6 +80,9 @@ function assign_multiplicities!(path_results::Vector{<:PathResult}, I::Multiplic
 end
 
 
+abstract type AbstractResult end
+
+
 """
     Result
 
@@ -87,7 +90,7 @@ The result of [`solve`](@ref). This is a wrapper around the results of each sing
 ([`PathResult`](@ref)) and it contains some additional information like a random seed to
 replicate the result.
 """
-struct Result
+struct Result <: AbstractResult
     path_results::Vector{PathResult}
     tracked_paths::Int
     seed::Union{Nothing,UInt32}
@@ -130,9 +133,10 @@ Returns the stored [`PathResult`](@ref)s.
 """
 path_results(R::Result) = R.path_results
 
-
-is_multiple_result(r::PathResult, R::Result) =
-    path_number(r) ∈ R.multiplicity_info.multiple_indicator
+multiple_indicator(::AbstractResult) = error("[`multiple_indicator`] Not defined for abstract results yet")
+multiple_indicator(R::Result) = R.multiplicity_info.multiple_indicator
+is_multiple_result(r::PathResult, R::AbstractResult) =
+    path_number(r) ∈ multiple_indicator(R)
 is_multiple_result(r::PathResult, R::AbstractVector{PathResult}) = false
 
 
@@ -251,7 +255,7 @@ Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
 """
 function nresults(
-    R::Results;
+    R::AbstractResult;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -268,6 +272,7 @@ function nresults(
             (multiple_results || !is_multiple_result(r, R))
     end
 end
+
 
 """
     solutions(result; only_nonsingular = true, conditions...)
@@ -385,35 +390,35 @@ end
 
 The number of solutions at infinity.
 """
-nat_infinity(R::Results) = count(is_at_infinity, R)
+nat_infinity(R::AbstractResult) = count(is_at_infinity, R)
 
 """
     nexcess_solutions(result)
 
 The number of exess solutions. See also [`excess_solution_check`](@ref).
 """
-nexcess_solutions(R::Results) = count(is_excess_solution, R)
+nexcess_solutions(R::AbstractResult) = count(is_excess_solution, R)
 
 """
     nfailed(result)
 
 The number of failed paths.
 """
-nfailed(R::Results) = count(is_failed, R)
+nfailed(R::AbstractResult) = count(is_failed, R)
 
 """
     nnonsingular(result)
 
 The number of non-singular solutions. See also [`is_singular`](@ref).
 """
-nnonsingular(R::Result) = count(is_nonsingular, R)
+nnonsingular(R::AbstractResult) = count(is_nonsingular, R)
 
 """
     nreal(result; tol=1e-6)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::Results; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
+nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
 
 
 """
@@ -421,6 +426,7 @@ nreal(R::Results; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
 
 Returns the total number of paths tracked.
 """
+ntracked(R::AbstractResult) = length(R) #error("ntracked not implemented for abstract results")
 ntracked(R::Result) = R.tracked_paths
 
 ###
