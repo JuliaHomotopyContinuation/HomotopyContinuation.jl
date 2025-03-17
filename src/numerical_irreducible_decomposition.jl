@@ -140,6 +140,8 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     As::Vector
     bs::Vector
     x0::Vector
+    y0::Vector
+    y::Vector
     U::UniquePoints
 
     Fᵢ::Sys
@@ -157,12 +159,20 @@ end
 function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
     As = [zeros(ComplexF64, n + 1 - i, n + 1) for i = 0:codim]
     bs = [zeros(ComplexF64, n + 1 - i) for i = 0:codim]
-    x0 = [zeros(ComplexF64, n); 0.0]
+    x0 = zeros(ComplexF64, n + 1)
+    y0 = zeros(ComplexF64, length(Fᵢ))
+    y = zeros(ComplexF64, length(Fᵢ))
     U = UniquePoints(x0, 0)
 
-    RegenerationCache(As, bs, x0, U, Fᵢ, u, n, 0, codim, EO, TO, progress)
+    RegenerationCache(As, bs, x0, y0, y, U, Fᵢ, u, n, 0, codim, EO, TO, progress)
 end
-update_Fᵢ!(cache, Fᵢ) = cache.Fᵢ = Fᵢ
+function update_Fᵢ!(cache, Fᵢ)
+    cache.Fᵢ = Fᵢ
+    cache.y0 = zeros(ComplexF64, length(Fᵢ))
+    cache.y = zeros(ComplexF64, length(Fᵢ))
+
+    nothing
+end
 update_i!(cache, i) = cache.i = i
 function update_x0!(x0)
     for i = 1:length(x0)
@@ -543,6 +553,8 @@ function is_contained!(X, Y, F, cache)
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
     x0 = cache.x0
+    y0 = cache.y0
+    y = cache.y
 
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
@@ -577,7 +589,9 @@ function is_contained!(X, Y, F, cache)
             # first check
             update_x0!(x0)
             x0 = norm(x, Inf) .* x0
-            if norm(F(x), Inf) > 1e-2 * norm(F(x0), Inf)
+            evaluate!(y0, F, x0)
+            evaluate!(y, F, x)
+            if norm(y, Inf) > 1e-2 * norm(y0, Inf)
                 return false
             end
 
