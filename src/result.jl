@@ -220,10 +220,10 @@ const Results = Union{AbstractResult,AbstractVector{<:PathResult}}
 Return all [`PathResult`](@ref)s for which satisfy the given conditions and apply,
 if provided, the function `f`.
 """
-results(R::Results; kwargs...) = results(identity, R; kwargs...)
+results(R::AbstractResult; kwargs...) = results(identity, R; kwargs...)
 function results(
     f::Function,
-    R::Results;
+    R::AbstractResult;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -231,12 +231,21 @@ function results(
     only_finite::Bool = true,
     multiple_results::Bool = false,
 )
+    if multiple_results == false && typeof(R)!=Result
+        println("Warning: Since result is a ResultIterator, counting multiple results") 
+        multiple_results = true   
+    end
     filter_function = r -> (!only_real || is_real(r, real_tol)) &&
     (!only_nonsingular || is_nonsingular(r)) &&
     (!only_singular || is_singular(r)) &&
     (!only_finite || is_finite(r)) &&
     (multiple_results || !is_multiple_result(r, R))
-    imap(f,Iterators.filter(filter_function,R))
+    return_iter = imap(f,Iterators.filter(filter_function,R))
+    if typeof(R) == Result
+        return(collect(return_iter))
+    else
+        return(return_iter)
+    end
 end
 
 """
@@ -289,7 +298,7 @@ julia> solutions(solve(F))
  [-3.0 + 0.0im, 0.0 + 0.0im]
 ```
 """
-solutions(result::Results; only_nonsingular = true, kwargs...) =
+solutions(result::AbstractResult; only_nonsingular = true, kwargs...) =
     results(solution, result; only_nonsingular = only_nonsingular, kwargs...)
 
 """
@@ -309,7 +318,7 @@ julia> real_solutions(solve(F))
  [-3.0, 0.0]
 ```
 """
-function real_solutions(result::Results; tol::Float64 = 1e-6, kwargs...)
+function real_solutions(result::AbstractResult; tol::Float64 = 1e-6, kwargs...)
     results(real ∘ solution, result; only_real = true, real_tol = tol, kwargs...)
 end
 
@@ -321,7 +330,7 @@ Return all [`PathResult`](@ref)s for which the solution is non-singular.
 This is just a shorthand for `results(R; only_nonsingular=true, conditions...)`.
 For the possible `conditions` see [`results`](@ref).
 """
-nonsingular(R::Results; kwargs...) = results(R; only_nonsingular = true, kwargs...)
+nonsingular(R::AbstractResult; kwargs...) = results(R; only_nonsingular = true, kwargs...)
 
 """
     singular(result; multiple_results=false, kwargs...)
@@ -331,7 +340,7 @@ If `multiple_results=false` only one point from each cluster of multiple solutio
 returned. If `multiple_results = true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Results; kwargs...)
+function singular(R::AbstractResult; kwargs...)
     results(R; only_singular = true, kwargs...)
 end
 
@@ -361,7 +370,7 @@ at_infinity(R::Results) = filter(is_at_infinity, path_results(R))
 
 The number of solutions. See [`results`](@ref) for the possible options.
 """
-nsolutions(R::Results; only_nonsingular = true, options...) =
+nsolutions(R::AbstractResult; only_nonsingular = true, options...) =
     nresults(R; only_nonsingular = only_nonsingular, options...)
 
 """
@@ -376,11 +385,12 @@ larger than 1 or the condition number is larger than `tol`.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
 """
-function nsingular(R::Results; counting_multiplicities::Bool = false, kwargs...)
-    S = results(R; only_singular = true, multiple_results = false, kwargs...)
-    isempty(S) && return 0
-    counting_multiplicities && return sum(multiplicity, S)
-    length(S)
+function nsingular(R::AbstractResult; counting_multiplicities::Bool = false, kwargs...)
+    if counting_multiplicities
+        return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
+    else
+        return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
+    end
 end
 
 
@@ -417,8 +427,8 @@ nnonsingular(R::AbstractResult) = count(is_nonsingular, R)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
-
+nreal(R::AbstractResult; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
+nreal(R::ResultIterator; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol, multiple_results=true)
 
 """
     ntracked(result)
