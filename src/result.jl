@@ -272,6 +272,10 @@ function nresults(
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
+    if multiple_results == false && typeof(R)!=Result
+        println("Warning: Since result is a ResultIterator, counting multiple results") 
+        multiple_results = true   
+    end
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
