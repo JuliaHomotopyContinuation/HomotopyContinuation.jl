@@ -431,8 +431,8 @@ nnonsingular(R::AbstractResult) = count(is_nonsingular, R)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::AbstractResult; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
-nreal(R::ResultIterator; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol, multiple_results=true)
+nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
+nreal(R::AbstractResult; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol, multiple_results=true)
 
 """
     ntracked(result)
