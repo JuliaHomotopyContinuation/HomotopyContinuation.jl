@@ -393,7 +393,7 @@ function nsingular(R::AbstractResult; counting_multiplicities::Bool = false, kwa
     if counting_multiplicities
         return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
     else
-        return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
+        return(nresults(R; only_singular = true, multiple_results = false, kwargs...))
     end
 end
 
