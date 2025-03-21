@@ -80,6 +80,9 @@ function assign_multiplicities!(path_results::Vector{<:PathResult}, I::Multiplic
 end
 
 
+abstract type AbstractResult end
+
+
 """
     Result
 
@@ -87,7 +90,7 @@ The result of [`solve`](@ref). This is a wrapper around the results of each sing
 ([`PathResult`](@ref)) and it contains some additional information like a random seed to
 replicate the result.
 """
-struct Result
+struct Result <: AbstractResult
     path_results::Vector{PathResult}
     tracked_paths::Int
     seed::Union{Nothing,UInt32}
@@ -130,9 +133,10 @@ Returns the stored [`PathResult`](@ref)s.
 """
 path_results(R::Result) = R.path_results
 
-
-is_multiple_result(r::PathResult, R::Result) =
-    path_number(r) ∈ R.multiplicity_info.multiple_indicator
+multiple_indicator(::AbstractResult) = error("[`multiple_indicator`] Not defined for abstract results yet")
+multiple_indicator(R::Result) = R.multiplicity_info.multiple_indicator
+is_multiple_result(r::PathResult, R::AbstractResult) =
+    path_number(r) ∈ multiple_indicator(R)
 is_multiple_result(r::PathResult, R::AbstractVector{PathResult}) = false
 
 
@@ -199,7 +203,7 @@ Statistic about the number of (real) singular and non-singular solutions etc.
 """
 statistics(r; kwargs...) = ResultStatistics(r; kwargs...)
 
-const Results = Union{Result,AbstractVector{<:PathResult}}
+const Results = Union{AbstractResult,AbstractVector{<:PathResult}}
 
 """
     results(
@@ -216,10 +220,10 @@ const Results = Union{Result,AbstractVector{<:PathResult}}
 Return all [`PathResult`](@ref)s for which satisfy the given conditions and apply,
 if provided, the function `f`.
 """
-results(R::Results; kwargs...) = results(identity, R; kwargs...)
+results(R::AbstractResult; kwargs...) = results(identity, R; kwargs...)
 function results(
     f::Function,
-    R::Results;
+    R::AbstractResult;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -227,13 +231,21 @@ function results(
     only_finite::Bool = true,
     multiple_results::Bool = false,
 )
-    [
-        f(r) for r in R if (!only_real || is_real(r, real_tol)) &&
-            (!only_nonsingular || is_nonsingular(r)) &&
-            (!only_singular || is_singular(r)) &&
-            (!only_finite || is_finite(r)) &&
-            (multiple_results || !is_multiple_result(r, R))
-    ]
+    if multiple_results == false && typeof(R)!=Result
+        println("Warning: Since result is a ResultIterator, counting multiple results") 
+        multiple_results = true   
+    end
+    filter_function = r -> (!only_real || is_real(r, real_tol)) &&
+    (!only_nonsingular || is_nonsingular(r)) &&
+    (!only_singular || is_singular(r)) &&
+    (!only_finite || is_finite(r)) &&
+    (multiple_results || !is_multiple_result(r, R))
+    return_iter = imap(f,Iterators.filter(filter_function,R))
+    if typeof(R) == Result
+        return(collect(return_iter))
+    else
+        return(return_iter)
+    end
 end
 
 """
@@ -251,7 +263,7 @@ Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
 """
 function nresults(
-    R::Results;
+    R::AbstractResult;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -260,6 +272,10 @@ function nresults(
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
+    if multiple_results == false && typeof(R)!=Result
+        println("Warning: Since result is a ResultIterator, counting multiple results") 
+        multiple_results = true   
+    end
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
@@ -268,6 +284,7 @@ function nresults(
             (multiple_results || !is_multiple_result(r, R))
     end
 end
+
 
 """
     solutions(result; only_nonsingular = true, conditions...)
@@ -285,7 +302,7 @@ julia> solutions(solve(F))
  [-3.0 + 0.0im, 0.0 + 0.0im]
 ```
 """
-solutions(result::Results; only_nonsingular = true, kwargs...) =
+solutions(result::AbstractResult; only_nonsingular = true, kwargs...) =
     results(solution, result; only_nonsingular = only_nonsingular, kwargs...)
 
 """
@@ -305,7 +322,7 @@ julia> real_solutions(solve(F))
  [-3.0, 0.0]
 ```
 """
-function real_solutions(result::Results; tol::Float64 = 1e-6, kwargs...)
+function real_solutions(result::AbstractResult; tol::Float64 = 1e-6, kwargs...)
     results(real ∘ solution, result; only_real = true, real_tol = tol, kwargs...)
 end
 
@@ -317,7 +334,7 @@ Return all [`PathResult`](@ref)s for which the solution is non-singular.
 This is just a shorthand for `results(R; only_nonsingular=true, conditions...)`.
 For the possible `conditions` see [`results`](@ref).
 """
-nonsingular(R::Results; kwargs...) = results(R; only_nonsingular = true, kwargs...)
+nonsingular(R::AbstractResult; kwargs...) = results(R; only_nonsingular = true, kwargs...)
 
 """
     singular(result; multiple_results=false, kwargs...)
@@ -327,7 +344,7 @@ If `multiple_results=false` only one point from each cluster of multiple solutio
 returned. If `multiple_results = true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::Results; kwargs...)
+function singular(R::AbstractResult; kwargs...)
     results(R; only_singular = true, kwargs...)
 end
 
@@ -357,7 +374,7 @@ at_infinity(R::Results) = filter(is_at_infinity, path_results(R))
 
 The number of solutions. See [`results`](@ref) for the possible options.
 """
-nsolutions(R::Results; only_nonsingular = true, options...) =
+nsolutions(R::AbstractResult; only_nonsingular = true, options...) =
     nresults(R; only_nonsingular = only_nonsingular, options...)
 
 """
@@ -372,11 +389,12 @@ larger than 1 or the condition number is larger than `tol`.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
 """
-function nsingular(R::Results; counting_multiplicities::Bool = false, kwargs...)
-    S = results(R; only_singular = true, multiple_results = false, kwargs...)
-    isempty(S) && return 0
-    counting_multiplicities && return sum(multiplicity, S)
-    length(S)
+function nsingular(R::AbstractResult; counting_multiplicities::Bool = false, kwargs...)
+    if counting_multiplicities
+        return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
+    else
+        return(nresults(R; only_singular = true, multiple_results = false, kwargs...))
+    end
 end
 
 
@@ -385,42 +403,43 @@ end
 
 The number of solutions at infinity.
 """
-nat_infinity(R::Results) = count(is_at_infinity, R)
+nat_infinity(R::AbstractResult) = count(is_at_infinity, R)
 
 """
     nexcess_solutions(result)
 
 The number of exess solutions. See also [`excess_solution_check`](@ref).
 """
-nexcess_solutions(R::Results) = count(is_excess_solution, R)
+nexcess_solutions(R::AbstractResult) = count(is_excess_solution, R)
 
 """
     nfailed(result)
 
 The number of failed paths.
 """
-nfailed(R::Results) = count(is_failed, R)
+nfailed(R::AbstractResult) = count(is_failed, R)
 
 """
     nnonsingular(result)
 
 The number of non-singular solutions. See also [`is_singular`](@ref).
 """
-nnonsingular(R::Result) = count(is_nonsingular, R)
+nnonsingular(R::AbstractResult) = count(is_nonsingular, R)
 
 """
     nreal(result; tol=1e-6)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::Results; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
-
+nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
+nreal(R::AbstractResult; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol, multiple_results=true)
 
 """
     ntracked(result)
 
 Returns the total number of paths tracked.
 """
+ntracked(R::AbstractResult) = length(R) #error("ntracked not implemented for abstract results")
 ntracked(R::Result) = R.tracked_paths
 
 ###
