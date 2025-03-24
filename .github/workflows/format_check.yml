@@ -15,7 +15,7 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: "^1.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install JuliaFormatter and format
         run: |
           julia  -e 'using Pkg; Pkg.add(PackageSpec(name="JuliaFormatter", version="1.0.33"))'
