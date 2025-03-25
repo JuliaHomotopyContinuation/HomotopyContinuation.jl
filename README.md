@@ -1,6 +1,7 @@
 <img src="https://www.juliahomotopycontinuation.org/images/logo_transparent_bg.png" width="320px">
 
-[![][docs-stable-img]][docs-stable-url] ![Run tests](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/workflows/Run%20tests/badge.svg?branch=main)
+[![][docs-stable-img]][docs-stable-url] [![Run tests](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/actions/workflows/run_tests.yml/badge.svg)](https://github.com/JuliaHomotopyContinuation/HomotopyContinuation.jl/actions/workflows/run_tests.yml)
+
 
 **HomotopyContinuation.jl** is a Julia package for solving systems of polynomial equations by numerical homotopy continuation.
 
