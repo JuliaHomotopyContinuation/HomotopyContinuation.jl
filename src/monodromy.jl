@@ -458,7 +458,7 @@ function MonodromySolver(
     unique_points = UniquePoints(
         x₀,
         1;
-        metric = options.distance,
+        distance = options.distance,
         group_actions = group_actions,
         triangle_inequality = options.triangle_inequality,
     )

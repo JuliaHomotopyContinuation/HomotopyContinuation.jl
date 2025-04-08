@@ -338,7 +338,7 @@ end
     M = multiplicities(V)
     @test length(M) == 0
 
-    N = multiplicities(W, metric = InfNorm(), atol = 1e-5)
+    N = multiplicities(W, distance = InfNorm(), atol = 1e-5)
     sort!(N, by = first)
     @test length(N) == 10
     @test unique([length(m) for m in N]) == [2]
@@ -347,7 +347,11 @@ end
     O = multiplicities([U; U])
     @test length(O) == 20
 
-    P = multiplicities(X, metric = (x, y) -> 1 - abs(LinearAlgebra.dot(x, y)), atol = 1e-5)
+    P = multiplicities(
+        X,
+        distance = (x, y) -> 1 - abs(LinearAlgebra.dot(x, y)),
+        atol = 1e-5,
+    )
     @test length(P) == 3
 
     # Test with group action
