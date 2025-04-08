@@ -338,7 +338,7 @@ end
     M = multiplicities(V)
     @test length(M) == 0
 
-    N = multiplicities(W, distance = InfNorm(), atol = 1e-5)
+    N = multiplicities(W, distance = EuclideanNorm(), atol = 1e-5)
     sort!(N, by = first)
     @test length(N) == 10
     @test unique([length(m) for m in N]) == [2]

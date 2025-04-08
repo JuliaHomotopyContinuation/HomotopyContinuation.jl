@@ -36,7 +36,7 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     reuse_loops::Symbol = :all
     permutations::Bool = false
     # unique points options
-    distance::D = EuclideanNorm()
+    distance::D = InfNorm()
     triangle_inequality::Union{Nothing,Bool} = nothing
     unique_points_atol::Union{Nothing,Float64} = nothing
     unique_points_rtol::Union{Nothing,Float64} = nothing
@@ -533,7 +533,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   for evaluation. This induces a compilation overhead. If `false` then the generated program
   is only interpreted ([`InterpretedSystem`](@ref) resp. [`InterpretedHomotopy`](@ref)).
   This is slower than the compiled version, but does not introduce compilation overhead.
-* `distance = EuclideanNorm()`: The distance function used for [`UniquePoints`](@ref).
+* `distance = InfNorm()`: The distance function used for [`UniquePoints`](@ref).
 * `loop_finished_callback = always_false`: A callback to end the computation. This function is
   called with all current [`PathResult`](@ref)s after a loop is exhausted.
   2 arguments. Return `true` if the compuation should be stopped.
