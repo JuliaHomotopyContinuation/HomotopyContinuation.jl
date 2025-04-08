@@ -178,8 +178,6 @@ function UniquePoints(
         group_actions = GroupActions(group_actions)
     end
 
-
-
     if isnothing(triangle_inequality)
         if d == EuclideanNorm()
             triangle_inequality = true
