@@ -186,7 +186,6 @@ function UniquePoints(
             v₁ = randn(ComplexF64, n)
             v₂ = randn(ComplexF64, n)
             v₃ = randn(ComplexF64, n)
-            @show d(v₁, v₂), d(v₁, v₃) + d(v₃, v₂)
             if d(v₁, v₂) ≤ d(v₁, v₃) + d(v₃, v₂) &&
                d(v₁, 4 .* v₁) ≤ d(v₁, 2 .* v₁) + d(2 .* v₁, 4 .* v₁)
                 triangle_inequality = true
