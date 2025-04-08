@@ -128,11 +128,12 @@ Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
 
 A data structure for assessing quickly whether a point is close to an indexed point as
 determined by the given distances function `M`. The distance function has to be a *metric*.
-The indexed points are only stored by their identifiers `Id`. `triangle_inequality` should be set to `true`, if the metric satisfies the triangle inequality. Otherwise, it should be set to `false`.
+The indexed points are only stored by their identifiers `Id`. 
+`triangle_inequality` should be set to `true`, if the metric satisfies the triangle inequality. Otherwise, it should be set to `false`. If `triangle_inequality` is nothing the algorithm will try to detect whether the triangle is satisfied.
 
     UniquePoints(v::AbstractVector{T}, id::Id;
                     metric = EuclideanNorm(),
-                    triangle_inequality = true,
+                    triangle_inequality = nothing,
                     group_actions = nothing)
 
     
@@ -168,12 +169,32 @@ function UniquePoints(
     v::AbstractVector,
     id;
     metric = EuclideanNorm(),
-    triangle_inequality = true,
+    triangle_inequality = nothing,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
     if (group_actions isa Tuple) || (group_actions isa AbstractVector)
         group_actions = GroupActions(group_actions)
+    end
+
+
+
+    if isnothing(triangle_inequality)
+        if metric == EuclideanNorm()
+            triangle_inequality = true
+        else
+            n = length(v)
+            v₁ = randn(ComplexF64, n)
+            v₂ = randn(ComplexF64, n)
+            v₃ = randn(ComplexF64, n)
+            @show metric(v₁, v₂), metric(v₁, v₃) + metric(v₃, v₂)
+            if metric(v₁, v₂) ≤ metric(v₁, v₃) + metric(v₃, v₂) &&
+               metric(v₁, 4 .* v₁) ≤ metric(v₁, 2 .* v₁) + metric(2 .* v₁, 4 .* v₁)
+                triangle_inequality = true
+            else
+                triangle_inequality = false
+            end
+        end
     end
 
     tree = VoronoiTree(v, id; metric = metric, triangle_inequality = triangle_inequality)

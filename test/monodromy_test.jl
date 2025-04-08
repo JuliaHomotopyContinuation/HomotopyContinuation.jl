@@ -69,12 +69,20 @@
             monodromy_solve(F.expressions, [x₀, rand(6)], p₀, parameters = F.parameters)
         @test length(solutions(result)) == 21
 
-        # different distance function
+        # distance function that satisfies triangle inequality
         result = monodromy_solve(F, x₀, p₀, distance = (x, y) -> 0.0)
         @test length(solutions(result)) == 1
 
+        # distance function that does not satisfy triangle inequality
+        result = monodromy_solve(F, x₀, p₀, distance = (x, y) -> norm(x - y, 2)^2)
+        @test length(solutions(result)) == 21
+
         # don't use triangle inequality
         result = monodromy_solve(F, x₀, p₀, triangle_inequality = false)
+        @test length(solutions(result)) == 21
+
+        # use triangle inequality
+        result = monodromy_solve(F, x₀, p₀, triangle_inequality = true)
         @test length(solutions(result)) == 21
 
         # Test stop heuristic with no target solutions count
