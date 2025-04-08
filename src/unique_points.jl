@@ -169,7 +169,7 @@ end
 function UniquePoints(
     v::AbstractVector,
     id;
-    d = EuclideanNorm(),
+    distance = EuclideanNorm(),
     triangle_inequality = nothing,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
@@ -177,6 +177,8 @@ function UniquePoints(
     if (group_actions isa Tuple) || (group_actions isa AbstractVector)
         group_actions = GroupActions(group_actions)
     end
+
+    d = distance
 
     if isnothing(triangle_inequality)
         if d == EuclideanNorm()
