@@ -133,7 +133,7 @@ The indexed points are only stored by their identifiers `Id`.
 Otherwise, it should be set to `false`. If `triangle_inequality` is nothing the algorithm will try to detect whether the triangle is satisfied.
 
     UniquePoints(v::AbstractVector{T}, id::Id;
-                    distance = InfNorm(),
+                    distance = EuclideanNorm(),
                     triangle_inequality = nothing,
                     group_actions = nothing)
 
@@ -169,7 +169,7 @@ end
 function UniquePoints(
     v::AbstractVector,
     id;
-    distance = InfNorm(),
+    distance = EuclideanNorm(),
     triangle_inequality = nothing,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
@@ -287,7 +287,7 @@ end
 ## Multiplicities ##
 ####################
 """
-    multiplicities(vectors; distance = InfNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    multiplicities(vectors; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
 Returns a `Vector{Vector{Int}}` `v`. Each vector `w` in 'v' contains all indices `i`,`j`
 such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * distance(0,w[i]))`.
@@ -310,7 +310,7 @@ julia> m = multiplicities(X, group_action = permutation)
 ```
 """
 multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
-function multiplicities(f::F, v; distance = InfNorm(), kwargs...) where {F<:Function}
+function multiplicities(f::F, v; distance = EuclideanNorm(), kwargs...) where {F<:Function}
     isempty(v) && return Vector{Vector{Int}}()
     _multiplicities(f, v, distance; kwargs...)
 end
@@ -338,13 +338,13 @@ function _multiplicities(
     collect(values(mults))
 end
 """
-    unique_points(vectors; distance = InfNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    unique_points(vectors; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
 Returns all elements in `vector` for which two elements have `distance` at most `max(atol, rtol * distance(0,w[i]))`.
 Note that the output can depend on the order of elements in vectors.
 The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
 """
-function unique_points(V; distance = InfNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+function unique_points(V; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
     unique_points = UniquePoints(first(V), 1; distance = distance, kwargs...)
     out = Vector{eltype(V)}()
     for (i, vᵢ) in enumerate(V)
