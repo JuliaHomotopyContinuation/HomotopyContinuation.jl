@@ -5,6 +5,14 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
+export
+    ResultIterator,
+    bitmask,
+    bitmask_filter
+
+
+using IterTools: imap
+
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
@@ -51,6 +59,103 @@ Solver(
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
+
+
+
+struct ResultIterator{Iter} <: AbstractResult
+    starts :: Iter                       # The start solution iterator
+    S :: Solver                         
+    bitmask :: Union{BitVector,Nothing}  # `nothing` means no filtering
+end
+
+function ResultIterator(starts::Iter, S::Solver; predicate=nothing) where Iter
+    bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+    return(ResultIterator{Iter}(starts, S, bitmask))
+end
+
+
+function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter} 
+    print(io, "ResultIterator induced by $Iter")
+    !isnothing(ri.bitmask) && print(" and a filtering bitmask")
+end
+
+function Base.IteratorSize(ri::ResultIterator)
+    ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
+end
+Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
+Base.eltype(::ResultIterator) = PathResult
+
+
+
+function Base.iterate(ri::ResultIterator, state=nothing) #States of the induced iterator are pairs (i::Int,state)
+    native_state = state === nothing ? 0 : state[1]
+    next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
+    next_ss === nothing && return nothing  # End of iteration
+    
+    start_value, new_ss_state = next_ss
+    new_state = (native_state+1,new_ss_state)
+
+    if ri.bitmask === nothing
+        return (track(ri.S.trackers[1],start_value), new_state)
+    else
+        # Apply the filter by checking the bitmask
+        while !ri.bitmask[new_state[1]] && next_ss !== nothing
+            next_ss = iterate(ri.starts, new_state[2])
+            next_ss === nothing && return nothing  # End of iteration
+            start_value, new_ss_state = next_ss
+            new_state = (new_state[1]+1,new_ss_state)
+        end
+    
+        return (track(ri.S.trackers[1],start_value), new_state)
+    end
+end
+
+
+
+function Base.length(ri::ResultIterator)
+    if Base.IteratorSize(ri) == Base.SizeUnknown()
+        k = 0
+        for _ in ri.starts
+            k += 1
+        end
+        k
+    elseif Base.IteratorSize(ri) == Base.HasLength() 
+        if ri.bitmask !== nothing
+            return(sum(ri.bitmask))
+        else
+            return(length(ri.starts))
+        end
+    end
+end
+
+
+function bitmask(f::Function, ri::ResultIterator)
+    BitVector(map(f, ri))
+end
+
+function bitmask_filter(f::Function, ri::ResultIterator) 
+    bm = bitmask(f,ri)
+    return(ResultIterator(ri.starts,ri.S,bm))
+end
+
+#function real_solutions(iter::ResultIterator)
+#    bitmask_filter(iter,x->is_real(x))
+#end
+
+function trace(iter::ResultIterator)
+    s = solution(first(iter))
+    mapreduce(x->solution(x),+,iter,init=0.0.*s)
+end
+
+function Result(ri::ResultIterator) 
+    C = collect(ri)
+    for i in 1:length(C)
+        C[i].path_number = i
+    end
+    Result(C; seed = ri.S.seed, start_system = ri.S.start_system)
+end
+
+
 
 """
     solver_startsolutions(args...; kwargs...)
@@ -444,6 +549,7 @@ function solve(
     transform_parameters = identity,
     flatten = nothing,
     target_subspaces = nothing,
+    iterator_only = false,
     kwargs...,
 )
     many_parameters = false
@@ -495,6 +601,7 @@ function solve(
             show_progress = show_progress,
             threading = threading,
             catch_interrupt = catch_interrupt,
+            iterator_only = iterator_only,
         )
     end
 end
@@ -502,7 +609,20 @@ end
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+#solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+function solve(
+    S::Solver,
+    starts; 
+    iterator_only = false, 
+    threading::Bool = Threads.nthreads() > 1, 
+    kwargs...)
+    if iterator_only && threading == false
+        return(ResultIterator(starts,S,nothing))
+    else
+        return(solve(S, collect(starts); threading = threading, kwargs...))
+    end
+end
+
 function solve(
     S::Solver,
     starts::AbstractArray;
@@ -511,6 +631,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
 )
+
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
