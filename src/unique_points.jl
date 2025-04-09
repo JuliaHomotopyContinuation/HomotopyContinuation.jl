@@ -127,12 +127,14 @@ Base.iterate(p::SymmetricGroup, s) = iterate(p.permutations, s)
     UniquePoints{T, Id, M}
 
 A data structure for assessing quickly whether a point is close to an indexed point as
-determined by the given distances function `M`. The distance function has to be a *metric*.
-The indexed points are only stored by their identifiers `Id`. `triangle_inequality` should be set to `true`, if the metric satisfies the triangle inequality. Otherwise, it should be set to `false`.
+determined by the given distance function `M`. 
+The indexed points are only stored by their identifiers `Id`. 
+`triangle_inequality` should be set to `true`, if the distance function satisfies the triangle inequality. 
+Otherwise, it should be set to `false`. If `triangle_inequality` is nothing the algorithm will try to detect whether the triangle is satisfied.
 
     UniquePoints(v::AbstractVector{T}, id::Id;
-                    metric = EuclideanNorm(),
-                    triangle_inequality = true,
+                    distance = EuclideanNorm(),
+                    triangle_inequality = nothing,
                     group_actions = nothing)
 
     
@@ -167,8 +169,8 @@ end
 function UniquePoints(
     v::AbstractVector,
     id;
-    metric = EuclideanNorm(),
-    triangle_inequality = true,
+    distance = EuclideanNorm(),
+    triangle_inequality = nothing,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
 )
@@ -176,7 +178,26 @@ function UniquePoints(
         group_actions = GroupActions(group_actions)
     end
 
-    tree = VoronoiTree(v, id; metric = metric, triangle_inequality = triangle_inequality)
+    d = distance
+
+    if isnothing(triangle_inequality)
+        if typeof(d) <: AbstractNorm
+            triangle_inequality = true
+        else
+            n = length(v)
+            v₁ = randn(ComplexF64, n)
+            v₂ = randn(ComplexF64, n)
+            v₃ = randn(ComplexF64, n)
+            if d(v₁, v₂) ≤ d(v₁, v₃) + d(v₃, v₂) &&
+               d(v₁, 4 .* v₁) ≤ d(v₁, 2 .* v₁) + d(2 .* v₁, 4 .* v₁)
+                triangle_inequality = true
+            else
+                triangle_inequality = false
+            end
+        end
+    end
+
+    tree = VoronoiTree(v, id; distance = d, triangle_inequality = triangle_inequality)
     UniquePoints(tree, group_actions, zeros(eltype(v), length(v)))
 end
 
@@ -257,7 +278,7 @@ function add!(
     atol::Float64 = 1e-14,
     rtol::Float64 = sqrt(eps()),
 ) where {T,Id,M,GA}
-    n = UP.tree.metric(v, UP.zero_vec)
+    n = UP.tree.distance(v, UP.zero_vec)
     rad = max(atol, rtol * n)
     add!(UP, v, id, rad)
 end
@@ -266,10 +287,10 @@ end
 ## Multiplicities ##
 ####################
 """
-    multiplicities(vectors; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    multiplicities(vectors; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
 Returns a `Vector{Vector{Int}}` `v`. Each vector `w` in 'v' contains all indices `i`,`j`
-such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
+such that `w[i]` and `w[j]` have `distance` at most `max(atol, rtol * distance(0,w[i]))`.
 The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
 
 ```julia-repl
@@ -289,19 +310,19 @@ julia> m = multiplicities(X, group_action = permutation)
 ```
 """
 multiplicities(v; kwargs...) = multiplicities(identity, v; kwargs...)
-function multiplicities(f::F, v; metric = EuclideanNorm(), kwargs...) where {F<:Function}
+function multiplicities(f::F, v; distance = EuclideanNorm(), kwargs...) where {F<:Function}
     isempty(v) && return Vector{Vector{Int}}()
-    _multiplicities(f, v, metric; kwargs...)
+    _multiplicities(f, v, distance; kwargs...)
 end
 function _multiplicities(
     f::F,
     V,
-    metric;
+    distance;
     atol::Float64 = 1e-14,
     rtol::Float64 = 1e-8,
     kwargs...,
 ) where {F<:Function}
-    unique_points = UniquePoints(f(first(V)), 1; metric = metric, kwargs...)
+    unique_points = UniquePoints(f(first(V)), 1; distance = distance, kwargs...)
     mults = Dict{Int,Vector{Int}}()
     for (i, vᵢ) in enumerate(V)
         wᵢ = f(vᵢ)
@@ -317,14 +338,14 @@ function _multiplicities(
     collect(values(mults))
 end
 """
-    unique_points(vectors; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    unique_points(vectors; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
 
-Returns all elements in `vector` for which two elements have `distance` at most `max(atol, rtol * metric(0,w[i]))`.
+Returns all elements in `vector` for which two elements have `distance` at most `max(atol, rtol * distance(0,w[i]))`.
 Note that the output can depend on the order of elements in vectors.
 The remaining `kwargs` are things that can be passed to [`UniquePoints`](@ref).
 """
-function unique_points(V; metric = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
-    unique_points = UniquePoints(first(V), 1; metric = metric, kwargs...)
+function unique_points(V; distance = EuclideanNorm(), atol = 1e-14, rtol = 1e-8, kwargs...)
+    unique_points = UniquePoints(first(V), 1; distance = distance, kwargs...)
     out = Vector{eltype(V)}()
     for (i, vᵢ) in enumerate(V)
         _, new_point = add!(unique_points, vᵢ, i; atol = atol, rtol = rtol)
