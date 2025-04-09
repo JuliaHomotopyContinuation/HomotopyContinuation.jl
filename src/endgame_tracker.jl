@@ -35,6 +35,7 @@ These parameters control the behaviour during the endgame.
    endgame strategy is considered to be applied.
 * `min_coord_growth = 100`: The minimal relative growth of a coordinate necessary to
   to be considered going to infininity (resp. zero).
+* `singular_min_accuracy = 1e-6`: if the accuracy number of a solution is above this number, the solution is labeled to be treated by a singular endgame method.
 * `val_at_infinity_tol = 1e-3`: Tolerance on the valuation which has to be
   satisfied before a path is considered to diverge / go to infinity.
 * `val_finite_tol = 1e-3`: Tolerance on the valuation which has to be satisfied before the endgame is started.
