@@ -193,7 +193,7 @@ Returns a `NamedTuple` `(x, Y)` with the parameters of the Krawczyk operator fol
 """
 krawczyk_operator_parameters(cert::ExtendedSolutionCertificate) = (x = cert.x̃, Y = cert.Y)
 
-function Base.show(f::IO, cert::AbstractSolutionCertificate; digits::Int = 6)
+function Base.show(f::IO, cert::AbstractSolutionCertificate; digits::Int = 16)
     println(f, "SolutionCertificate:")
     println(f, "solution_candidate = [")
     for z in solution_candidate(cert)
