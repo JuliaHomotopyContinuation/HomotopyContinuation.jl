@@ -1397,6 +1397,7 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
@@ -1410,6 +1411,7 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
@@ -1423,6 +1425,7 @@ function certify(
     p::Union{Nothing,AbstractArray} = nothing,
     cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
+    max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
