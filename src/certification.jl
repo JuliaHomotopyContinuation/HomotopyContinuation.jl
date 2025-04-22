@@ -47,7 +47,7 @@ The `Arblib.AcbMatrix` is printed in the default format of `Arblib`. This means,
 ```julia
 Base.show(certificate::SolutionCertificate; digits = 16, more= true)
 ```
-This uses the [`ARB_STR_MORE`](https://flintlib.org/doc/arb.html#c.arb_get_str) functionality in `Flint` using `16` digits.
+This uses the [`ARB_STR_MORE`](https://flintlib.org/doc/arb.html#c.arb_get_str) functionality in `Flint` with `16` digits.
 """
 Base.@kwdef struct SolutionCertificate <: AbstractSolutionCertificate
     solution_candidate::AbstractVector
