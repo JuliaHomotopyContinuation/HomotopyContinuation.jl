@@ -41,9 +41,13 @@ abstract type AbstractSolutionCertificate end
 """
     SolutionCertificate
 
-Result of [`certify`](@ref) for a single solution. Contains the initial solutions
-and if the certification was successfull a vector of complex intervals where the true
-solution is contained in.
+Result of [`certify`](@ref) for a single solution. Contains the initial solutions and if the certification was successfull a vector of complex intervals where the true solution is contained in.
+The complex intervals are given as an `Arblib.AcbMatrix`.
+The `Arblib.AcbMatrix` is printed in the default format of `Arblib`. This means, if the midpoint of an interval can't be represented with sufficiently many correct digits, `Arblib` will not print the midpoint. Instead, it will print an interval of the form `[+/- r]`, where `r` will be an upper bound for the absolute value of the ball. An enclosure of the correct interval can be printed as follows.
+```julia
+Base.show(certificate::SolutionCertificate; digits = 16, more= true)
+```
+This uses the [`ARB_STR_MORE`](https://flintlib.org/doc/arb.html#c.arb_get_str) functionality in `Flint` using `16` digits.
 """
 Base.@kwdef struct SolutionCertificate <: AbstractSolutionCertificate
     solution_candidate::AbstractVector
@@ -145,8 +149,7 @@ end
     certified_solution_interval(certificate::AbstractSolutionCertificate)
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
-zero of the system is contained in.
-Returns `nothing` if `is_certified(certificate)` is `false`.
+zero of the system is contained in. Returns `nothing` if `is_certified(certificate)` is `false`.
 """
 certified_solution_interval(certificate::AbstractSolutionCertificate) = certificate.I
 @deprecate certified_solution(certificate) certified_solution_interval(certificate)
@@ -156,8 +159,7 @@ certified_solution_interval(certificate::AbstractSolutionCertificate) = certific
 
 Returns an `Arblib.AcbMatrix` representing a vector of complex intervals where a unique
 zero of the system is contained in.
-This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`.
-Returns `nothing` if `is_certified(certificate)` is `false`.
+This is the result of applying the Krawczyk operator to `certified_solution_interval(certificate)`. Returns `nothing` if `is_certified(certificate)` is `false`.
 """
 certified_solution_interval_after_krawczyk(certificate::ExtendedSolutionCertificate) =
     certificate.I′
@@ -193,7 +195,14 @@ Returns a `NamedTuple` `(x, Y)` with the parameters of the Krawczyk operator fol
 """
 krawczyk_operator_parameters(cert::ExtendedSolutionCertificate) = (x = cert.x̃, Y = cert.Y)
 
-function Base.show(f::IO, cert::AbstractSolutionCertificate; digits::Int = 16)
+Base.show(cert::AbstractSolutionCertificate; digits::Int = 16, more::Bool = false) =
+    Base.show(stdout, cert; digits = digits, more = more)
+function Base.show(
+    f::IO,
+    cert::AbstractSolutionCertificate;
+    digits::Int = 16,
+    more::Bool = false,
+)
     println(f, "SolutionCertificate:")
     println(f, "solution_candidate = [")
     for z in solution_candidate(cert)
@@ -208,7 +217,7 @@ function Base.show(f::IO, cert::AbstractSolutionCertificate; digits::Int = 16)
         println(f, "certified_solution_interval = [")
         for z in certified_solution_interval(cert)
             print(f, "  ")
-            print(f, string(z; digits = digits, more = true))
+            print(f, string(z; digits = digits, more = more))
             println(f, ",")
         end
         println(f, "]")
