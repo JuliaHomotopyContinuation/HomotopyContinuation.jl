@@ -549,7 +549,7 @@ function solve(
     transform_parameters = identity,
     flatten = nothing,
     target_subspaces = nothing,
-    iterator_only = false,
+    iterator_only::Bool = false,
     kwargs...,
 )
     many_parameters = false
@@ -594,15 +594,18 @@ function solve(
             flatten = flatten,
         )
     else
-        solve(
-            solver,
-            starts;
-            stop_early_cb = stop_early_cb,
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-            iterator_only = iterator_only,
-        )
+        if iterator_only && threading == false
+                ResultIterator(starts, solver, nothing)
+        else
+            solve(
+                solver,
+                starts;
+                stop_early_cb = stop_early_cb,
+                show_progress = show_progress,
+                threading = threading,
+                catch_interrupt = catch_interrupt,
+            )
+        end
     end
 end
 
@@ -613,14 +616,10 @@ solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs.
 function solve(
     S::Solver,
     starts; 
-    iterator_only = false, 
+    iterator_only::Bool = false, 
     threading::Bool = Threads.nthreads() > 1, 
     kwargs...)
-    if iterator_only && threading == false
-        return(ResultIterator(starts,S,nothing))
-    else
-        return(solve(S, collect(starts); threading = threading, kwargs...))
-    end
+    return iterator_only && threading == false ? ResultIterator(starts, S, nothing) : solve(S, collect(starts); threading=threading, kwargs...)
 end
 
 function solve(
