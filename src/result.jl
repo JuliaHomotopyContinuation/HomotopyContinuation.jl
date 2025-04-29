@@ -273,7 +273,7 @@ function nresults(
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
-    if multiple_results == false && !typeof(R)<:Results
+    if multiple_results == false && !(typeof(R)<:Results)
         println("Warning: Since result is a ResultIterator, counting multiple results") 
         multiple_results = true   
     end
