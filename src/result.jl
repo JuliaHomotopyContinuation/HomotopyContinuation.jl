@@ -203,7 +203,8 @@ Statistic about the number of (real) singular and non-singular solutions etc.
 """
 statistics(r; kwargs...) = ResultStatistics(r; kwargs...)
 
-const Results = Union{AbstractResult,AbstractVector{<:PathResult}}
+const Results = Union{Result,AbstractVector{<:PathResult}}
+const AbstractResults = Union{AbstractResult,AbstractVector{<:PathResult}}
 
 """
     results(
@@ -220,10 +221,10 @@ const Results = Union{AbstractResult,AbstractVector{<:PathResult}}
 Return all [`PathResult`](@ref)s for which satisfy the given conditions and apply,
 if provided, the function `f`.
 """
-results(R::AbstractResult; kwargs...) = results(identity, R; kwargs...)
+results(R::AbstractResults; kwargs...) = results(identity, R; kwargs...)
 function results(
     f::Function,
-    R::AbstractResult;
+    R::AbstractResults;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -231,7 +232,7 @@ function results(
     only_finite::Bool = true,
     multiple_results::Bool = false,
 )
-    if multiple_results == false && typeof(R)!=Result
+    if multiple_results == false && !(typeof(R)<:Results)
         println("Warning: Since result is a ResultIterator, counting multiple results") 
         multiple_results = true   
     end
@@ -241,7 +242,7 @@ function results(
     (!only_finite || is_finite(r)) &&
     (multiple_results || !is_multiple_result(r, R))
     return_iter = imap(f,Iterators.filter(filter_function,R))
-    if typeof(R) == Result
+    if typeof(R) <: Results
         return(collect(return_iter))
     else
         return(return_iter)
@@ -263,7 +264,7 @@ Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
 """
 function nresults(
-    R::AbstractResult;
+    R::AbstractResults;
     only_real::Bool = false,
     real_tol::Float64 = 1e-6,
     only_nonsingular::Bool = false,
@@ -272,7 +273,7 @@ function nresults(
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
-    if multiple_results == false && typeof(R)!=Result
+    if multiple_results == false && !typeof(R)<:Results
         println("Warning: Since result is a ResultIterator, counting multiple results") 
         multiple_results = true   
     end
@@ -302,7 +303,7 @@ julia> solutions(solve(F))
  [-3.0 + 0.0im, 0.0 + 0.0im]
 ```
 """
-solutions(result::AbstractResult; only_nonsingular = true, kwargs...) =
+solutions(result::AbstractResults; only_nonsingular = true, kwargs...) =
     results(solution, result; only_nonsingular = only_nonsingular, kwargs...)
 
 """
@@ -322,7 +323,7 @@ julia> real_solutions(solve(F))
  [-3.0, 0.0]
 ```
 """
-function real_solutions(result::AbstractResult; tol::Float64 = 1e-6, kwargs...)
+function real_solutions(result::AbstractResults; tol::Float64 = 1e-6, kwargs...)
     results(real ∘ solution, result; only_real = true, real_tol = tol, kwargs...)
 end
 
@@ -334,7 +335,7 @@ Return all [`PathResult`](@ref)s for which the solution is non-singular.
 This is just a shorthand for `results(R; only_nonsingular=true, conditions...)`.
 For the possible `conditions` see [`results`](@ref).
 """
-nonsingular(R::AbstractResult; kwargs...) = results(R; only_nonsingular = true, kwargs...)
+nonsingular(R::AbstractResults; kwargs...) = results(R; only_nonsingular = true, kwargs...)
 
 """
     singular(result; multiple_results=false, kwargs...)
@@ -344,7 +345,7 @@ If `multiple_results=false` only one point from each cluster of multiple solutio
 returned. If `multiple_results = true` all singular solutions in `R` are returned.
 For the possible `kwargs` see [`results`](@ref).
 """
-function singular(R::AbstractResult; kwargs...)
+function singular(R::AbstractResults; kwargs...)
     results(R; only_singular = true, kwargs...)
 end
 
@@ -374,7 +375,7 @@ at_infinity(R::Results) = filter(is_at_infinity, path_results(R))
 
 The number of solutions. See [`results`](@ref) for the possible options.
 """
-nsolutions(R::AbstractResult; only_nonsingular = true, options...) =
+nsolutions(R::AbstractResults; only_nonsingular = true, options...) =
     nresults(R; only_nonsingular = only_nonsingular, options...)
 
 """
@@ -403,28 +404,28 @@ end
 
 The number of solutions at infinity.
 """
-nat_infinity(R::AbstractResult) = count(is_at_infinity, R)
+nat_infinity(R::AbstractResults) = count(is_at_infinity, R)
 
 """
     nexcess_solutions(result)
 
 The number of exess solutions. See also [`excess_solution_check`](@ref).
 """
-nexcess_solutions(R::AbstractResult) = count(is_excess_solution, R)
+nexcess_solutions(R::AbstractResults) = count(is_excess_solution, R)
 
 """
     nfailed(result)
 
 The number of failed paths.
 """
-nfailed(R::AbstractResult) = count(is_failed, R)
+nfailed(R::AbstractResults) = count(is_failed, R)
 
 """
     nnonsingular(result)
 
 The number of non-singular solutions. See also [`is_singular`](@ref).
 """
-nnonsingular(R::AbstractResult) = count(is_nonsingular, R)
+nnonsingular(R::AbstractResults) = count(is_nonsingular, R)
 
 """
     nreal(result; tol=1e-6)
