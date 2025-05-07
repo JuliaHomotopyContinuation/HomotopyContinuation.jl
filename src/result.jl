@@ -133,7 +133,8 @@ Returns the stored [`PathResult`](@ref)s.
 """
 path_results(R::Result) = R.path_results
 
-multiple_indicator(::AbstractResult) = error("[`multiple_indicator`] Not defined for abstract results yet")
+multiple_indicator(::AbstractResult) =
+    error("[`multiple_indicator`] Not defined for abstract results yet")
 multiple_indicator(R::Result) = R.multiplicity_info.multiple_indicator
 is_multiple_result(r::PathResult, R::AbstractResult) =
     path_number(r) ∈ multiple_indicator(R)
@@ -233,19 +234,21 @@ function results(
     multiple_results::Bool = false,
 )
     if multiple_results == false && !(typeof(R)<:Results)
-        println("Warning: Since result is a ResultIterator, counting multiple results") 
-        multiple_results = true   
+        println("Warning: Since result is a ResultIterator, counting multiple results")
+        multiple_results = true
     end
-    filter_function = r -> (!only_real || is_real(r, real_tol)) &&
-    (!only_nonsingular || is_nonsingular(r)) &&
-    (!only_singular || is_singular(r)) &&
-    (!only_finite || is_finite(r)) &&
-    (multiple_results || !is_multiple_result(r, R))
-    return_iter = imap(f,Iterators.filter(filter_function,R))
+    filter_function =
+        r ->
+            (!only_real || is_real(r, real_tol)) &&
+            (!only_nonsingular || is_nonsingular(r)) &&
+            (!only_singular || is_singular(r)) &&
+            (!only_finite || is_finite(r)) &&
+            (multiple_results || !is_multiple_result(r, R))
+    return_iter = imap(f, Iterators.filter(filter_function, R))
     if typeof(R) <: Results
-        return(collect(return_iter))
+        return (collect(return_iter))
     else
-        return(return_iter)
+        return (return_iter)
     end
 end
 
@@ -274,8 +277,8 @@ function nresults(
     multiple_results::Bool = false,
 )
     if multiple_results == false && !(typeof(R)<:Results)
-        println("Warning: Since result is a ResultIterator, counting multiple results") 
-        multiple_results = true   
+        println("Warning: Since result is a ResultIterator, counting multiple results")
+        multiple_results = true
     end
     count(R) do r
         (!only_real || is_real(r, real_tol)) &&
@@ -392,9 +395,9 @@ multiplicities is returned.
 """
 function nsingular(R::AbstractResult; counting_multiplicities::Bool = false, kwargs...)
     if counting_multiplicities
-        return(nresults(R; only_singular = true, multiple_results = true, kwargs...))
+        return (nresults(R; only_singular = true, multiple_results = true, kwargs...))
     else
-        return(nresults(R; only_singular = true, multiple_results = false, kwargs...))
+        return (nresults(R; only_singular = true, multiple_results = false, kwargs...))
     end
 end
 
@@ -433,7 +436,8 @@ nnonsingular(R::AbstractResults) = count(is_nonsingular, R)
 The number of real solutions. See also [`is_real`](@ref).
 """
 nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
-nreal(R::AbstractResult; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol, multiple_results=true)
+nreal(R::AbstractResult; tol = 1e-6) =
+    nresults(R, only_real = true, real_tol = tol, multiple_results = true)
 
 """
     ntracked(result)

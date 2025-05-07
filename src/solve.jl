@@ -5,10 +5,7 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
-export
-    ResultIterator,
-    bitmask,
-    bitmask_filter
+export ResultIterator, bitmask, bitmask_filter
 
 
 using IterTools: imap
@@ -63,18 +60,18 @@ Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
 
 
 struct ResultIterator{Iter} <: AbstractResult
-    starts :: Iter                       # The start solution iterator
-    S :: Solver                         
-    bitmask :: Union{BitVector,Nothing}  # `nothing` means no filtering
+    starts::Iter                       # The start solution iterator
+    S::Solver
+    bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
 end
 
-function ResultIterator(starts::Iter, S::Solver; predicate=nothing) where Iter
+function ResultIterator(starts::Iter, S::Solver; predicate = nothing) where {Iter}
     bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
-    return(ResultIterator{Iter}(starts, S, bitmask))
+    return (ResultIterator{Iter}(starts, S, bitmask))
 end
 
 
-function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter} 
+function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     print(io, "ResultIterator induced by $Iter")
     !isnothing(ri.bitmask) && print(" and a filtering bitmask")
 end
@@ -87,26 +84,26 @@ Base.eltype(::ResultIterator) = PathResult
 
 
 
-function Base.iterate(ri::ResultIterator, state=nothing) #States of the induced iterator are pairs (i::Int,state)
+function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state)
     native_state = state === nothing ? 0 : state[1]
     next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
     next_ss === nothing && return nothing  # End of iteration
-    
+
     start_value, new_ss_state = next_ss
-    new_state = (native_state+1,new_ss_state)
+    new_state = (native_state+1, new_ss_state)
 
     if ri.bitmask === nothing
-        return (track(ri.S.trackers[1],start_value), new_state)
+        return (track(ri.S.trackers[1], start_value), new_state)
     else
         # Apply the filter by checking the bitmask
         while !ri.bitmask[new_state[1]] && next_ss !== nothing
             next_ss = iterate(ri.starts, new_state[2])
             next_ss === nothing && return nothing  # End of iteration
             start_value, new_ss_state = next_ss
-            new_state = (new_state[1]+1,new_ss_state)
+            new_state = (new_state[1]+1, new_ss_state)
         end
-    
-        return (track(ri.S.trackers[1],start_value), new_state)
+
+        return (track(ri.S.trackers[1], start_value), new_state)
     end
 end
 
@@ -119,11 +116,11 @@ function Base.length(ri::ResultIterator)
             k += 1
         end
         k
-    elseif Base.IteratorSize(ri) == Base.HasLength() 
+    elseif Base.IteratorSize(ri) == Base.HasLength()
         if ri.bitmask !== nothing
-            return(sum(ri.bitmask))
+            return (sum(ri.bitmask))
         else
-            return(length(ri.starts))
+            return (length(ri.starts))
         end
     end
 end
@@ -133,9 +130,9 @@ function bitmask(f::Function, ri::ResultIterator)
     BitVector(map(f, ri))
 end
 
-function bitmask_filter(f::Function, ri::ResultIterator) 
-    bm = bitmask(f,ri)
-    return(ResultIterator(ri.starts,ri.S,bm))
+function bitmask_filter(f::Function, ri::ResultIterator)
+    bm = bitmask(f, ri)
+    return (ResultIterator(ri.starts, ri.S, bm))
 end
 
 #function real_solutions(iter::ResultIterator)
@@ -144,12 +141,12 @@ end
 
 function trace(iter::ResultIterator)
     s = solution(first(iter))
-    mapreduce(x->solution(x),+,iter,init=0.0.*s)
+    mapreduce(x->solution(x), +, iter, init = 0.0 .* s)
 end
 
-function Result(ri::ResultIterator) 
+function Result(ri::ResultIterator)
     C = collect(ri)
-    for i in 1:length(C)
+    for i = 1:length(C)
         C[i].path_number = i
     end
     Result(C; seed = ri.S.seed, start_system = ri.S.start_system)
@@ -351,7 +348,7 @@ function parameter_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -431,7 +428,7 @@ function start_target_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -595,7 +592,7 @@ function solve(
         )
     else
         if iterator_only && threading == false
-                ResultIterator(starts, solver, nothing)
+            ResultIterator(starts, solver, nothing)
         else
             solve(
                 solver,
@@ -615,11 +612,13 @@ solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs.
 #solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
 function solve(
     S::Solver,
-    starts; 
-    iterator_only::Bool = false, 
-    threading::Bool = Threads.nthreads() > 1, 
-    kwargs...)
-    return iterator_only && threading == false ? ResultIterator(starts, S, nothing) : solve(S, collect(starts); threading=threading, kwargs...)
+    starts;
+    iterator_only::Bool = false,
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+)
+    return iterator_only && threading == false ? ResultIterator(starts, S, nothing) :
+           solve(S, collect(starts); threading = threading, kwargs...)
 end
 
 function solve(
@@ -721,7 +720,7 @@ function threaded_solve(
         nthr = Threads.nthreads()
 
         resize!(solver.trackers, nthr)
-        for i = ntrackers+1:nthr
+        for i = (ntrackers+1):nthr
             solver.trackers[i] = deepcopy(tracker)
         end
 
