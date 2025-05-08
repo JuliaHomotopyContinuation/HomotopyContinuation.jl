@@ -5,6 +5,9 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
+export ResultIterator, bitmask, bitmask_filter
+
+
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
@@ -38,7 +41,7 @@ A struct containing multiple copies of `path_tracker`. This contains all pre-all
 data structures to call [`solve`]. The most convenient way to construct a `Solver` is
 via [`solver_startsolutions`](@ref).
 """
-struct Solver{T<:AbstractPathTracker}
+struct Solver{T<:AbstractPathTracker} <: AbstractSolver
     trackers::Vector{T}
     seed::Union{Nothing,UInt32}
     stats::SolveStats
@@ -51,6 +54,8 @@ Solver(
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
+
+
 
 """
     solver_startsolutions(args...; kwargs...)
@@ -246,7 +251,7 @@ function parameter_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -326,7 +331,7 @@ function start_target_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -444,8 +449,11 @@ function solve(
     transform_parameters = identity,
     flatten = nothing,
     target_subspaces = nothing,
+    iterator_only::Bool = false,
     kwargs...,
 )
+
+
     many_parameters = false
     if target_subspaces !== nothing
         many_parameters = true
@@ -474,7 +482,6 @@ function solve(
     else
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
-
     if many_parameters
         solve(
             solver,
@@ -488,21 +495,38 @@ function solve(
             flatten = flatten,
         )
     else
-        solve(
-            solver,
-            starts;
-            stop_early_cb = stop_early_cb,
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        if iterator_only
+            ResultIterator(starts, solver, nothing)
+        else
+            solve(
+                solver,
+                starts;
+                stop_early_cb = stop_early_cb,
+                show_progress = show_progress,
+                threading = threading,
+                catch_interrupt = catch_interrupt,
+            )
+        end
     end
 end
 
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+function solve(
+    S::Solver,
+    starts;
+    iterator_only::Bool = false,
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+)
+    if iterator_only
+        return ResultIterator(starts, S, nothing)
+    else
+        return solve(S, collect(starts); threading = threading, kwargs...)
+    end
+end
+
 function solve(
     S::Solver,
     starts::AbstractArray;
@@ -511,6 +535,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
 )
+
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
@@ -601,7 +626,7 @@ function threaded_solve(
         nthr = Threads.nthreads()
 
         resize!(solver.trackers, nthr)
-        for i = ntrackers+1:nthr
+        for i = (ntrackers+1):nthr
             solver.trackers[i] = deepcopy(tracker)
         end
 
