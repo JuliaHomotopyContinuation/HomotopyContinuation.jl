@@ -689,6 +689,3 @@ function singular_multiplicities_table(io, result::Result, stats = statistics(re
         border_crayon = PrettyTables.Crayon(faint = true),
     )
 end
-
-
-

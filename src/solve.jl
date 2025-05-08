@@ -497,7 +497,7 @@ function solve(
             flatten = flatten,
         )
     else
-        if iterator_only 
+        if iterator_only
             ResultIterator(starts, solver, nothing)
         else
             solve(
@@ -522,7 +522,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
-    if iterator_only 
+    if iterator_only
         return ResultIterator(starts, S, nothing)
     else
         return solve(S, collect(starts); threading = threading, kwargs...)
