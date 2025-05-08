@@ -549,6 +549,8 @@ function solve(
     iterator_only::Bool = false,
     kwargs...,
 )
+
+
     many_parameters = false
     if target_subspaces !== nothing
         many_parameters = true
@@ -577,7 +579,6 @@ function solve(
     else
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
-
     if many_parameters
         solve(
             solver,
@@ -591,7 +592,7 @@ function solve(
             flatten = flatten,
         )
     else
-        if iterator_only && threading == false
+        if iterator_only 
             ResultIterator(starts, solver, nothing)
         else
             solve(
@@ -609,7 +610,6 @@ end
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-#solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
 function solve(
     S::Solver,
     starts;
@@ -617,8 +617,11 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
-    return iterator_only && threading == false ? ResultIterator(starts, S, nothing) :
-           solve(S, collect(starts); threading = threading, kwargs...)
+    if iterator_only 
+        return ResultIterator(starts, S, nothing)
+    else
+        return solve(S, collect(starts); threading = threading, kwargs...)
+    end
 end
 
 function solve(
