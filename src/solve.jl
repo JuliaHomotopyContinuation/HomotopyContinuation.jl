@@ -8,8 +8,6 @@ export solve,
 export ResultIterator, bitmask, bitmask_filter
 
 
-using IterTools: imap
-
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}

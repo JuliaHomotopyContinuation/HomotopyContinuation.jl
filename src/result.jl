@@ -21,6 +21,8 @@ export Result,
     nreal,
     ntracked
 
+import IterTools: imap
+
 abstract type AbstractResult end
 abstract type AbstractSolver end
 
@@ -244,7 +246,7 @@ function results(
             (!only_singular || is_singular(r)) &&
             (!only_finite || is_finite(r)) &&
             (multiple_results || !is_multiple_result(r, R))
-    return_iter = imap(f, Iterators.filter(filter_function, R))
+    return_iter = IterTools.imap(f, Iterators.filter(filter_function, R))
     if typeof(R) <: Results
         return (collect(return_iter))
     else
