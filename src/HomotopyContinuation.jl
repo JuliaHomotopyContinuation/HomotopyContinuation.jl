@@ -26,6 +26,7 @@ import StructArrays
 import TreeViews
 import Base.Iterators: product, reverse
 import Base: push!
+using PrecompileTools: @compile_workload
 
 const LA = LinearAlgebra
 
@@ -89,6 +90,15 @@ function __init__()
     # https://github.com/timholy/ProgressMeter.jl/issues/162
     if isdefined(ProgressMeter, :ijulia_behavior)
         ProgressMeter.ijulia_behavior(:clear)
+    end
+end
+
+let
+    @compile_workload begin
+        ModelKit.__init__()  # init is not automatically called during precompilation
+        @var x y
+        F = System([x^2+2y, y^2-2])
+        real_solutions(solve(F))
     end
 end
 
