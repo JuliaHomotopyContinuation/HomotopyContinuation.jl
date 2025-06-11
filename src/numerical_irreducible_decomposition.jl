@@ -905,17 +905,18 @@ function decompose_with_monodromy!(
 
             shift_orbit(orbit) = Set(orbit_indices_mapping[i] for i in orbit)
             # 1. shift existing non complete orbits to new mapping
-            non_complete_orbits = shift_orbit.(
-                merge_sets(
-                    [
-                        # Remove all orbits that are contained in a complete orbit
-                        filter(non_complete_orbits) do o
-                            all(co -> isdisjoint(co, o), complete_orbits)
-                        end
-                        setdiff(orbits, complete_orbits)
-                    ],
-                ),
-            )
+            non_complete_orbits =
+                shift_orbit.(
+                    merge_sets(
+                        [
+                            # Remove all orbits that are contained in a complete orbit
+                            filter(non_complete_orbits) do o
+                                all(co -> isdisjoint(co, o), complete_orbits)
+                            end
+                            setdiff(orbits, complete_orbits)
+                        ],
+                    ),
+                )
         end
     else
         for p in P
