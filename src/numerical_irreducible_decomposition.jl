@@ -798,7 +798,7 @@ function decompose_with_monodromy!(
         )
 
         if warning && (trace(res) > options.trace_test_tol)
-            @warn "Trying to decompose non-complete set of witness points (trace test failed)"
+            @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
         end
 
         iter = 0
@@ -812,7 +812,7 @@ function decompose_with_monodromy!(
                 break
             end
 
-            # for safety and additional monodromy
+            # for safety an additional monodromy
             res = monodromy_solve(
                 MS,
                 non_complete_points,
