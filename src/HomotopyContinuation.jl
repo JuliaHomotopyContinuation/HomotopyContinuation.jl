@@ -26,6 +26,7 @@ import StructArrays
 import TreeViews
 import Base.Iterators: product, reverse
 import Base: push!
+import IterTools: imap
 
 const LA = LinearAlgebra
 
