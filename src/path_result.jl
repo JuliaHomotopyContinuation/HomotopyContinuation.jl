@@ -291,8 +291,9 @@ function is_real(
     end
     return true
 end
-is_real(r::PathResult, tol::Float64) = is_real(r; tol = tol)
-is_real(r::PathResult, tol::Float64, rtol::Float64) = is_real(r; tol = tol, rtol = rtol)
+is_real(r::PathResult, tol::Union{Float64,Nothing}) = is_real(r; tol = tol)
+is_real(r::PathResult, tol::Union{Float64,Nothing}, rtol::Union{Float64,Nothing}) =
+    is_real(r; tol = tol, rtol = rtol)
 # provide fallback since this in in Base
 Base.isreal(r::PathResult, tol) = is_real(r, tol)
 Base.isreal(r::PathResult, tol, rtol) = is_real(r, tol, rtol)
