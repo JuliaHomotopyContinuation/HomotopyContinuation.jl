@@ -271,22 +271,25 @@ is_nonsingular(r::PathResult) = !is_singular(r) && is_success(r)
 We consider a result as `real` if all of the following conditions hold:
 
 - the infinity-norm of the imaginary part of the solution is at most `tol`
-- the infinity-norm of the imaginary part of the solution is at most `rtol * norm(solution, 1)`
+- the infinity-norm of the imaginary part of the solution is at most `rtol * norm(s, 1)`, where s is the solution in `PathResult`.
 
 `tol` and `rtol` must either be a `Float64` or `nothing`.
 Conditions with their corresponding parameters set to `nothing` are ignored.
 """
 function is_real(r::PathResult; tol::Union{Float64,Nothing} = 1e-6, rtol::Union{Float64,Nothing}=nothing)
+    m = maximum(abs ∘ imag, r.solution)
     if tol !== nothing
-        maximum(abs ∘ imag, r.solution) < tol || return false
+        m < tol || return false
     end
     if rtol !== nothing
         thresh = rtol * norm(r.solution, 1)
-        maximum(abs ∘ imag, r.solution) < thresh || return false
+        m < thresh || return false
     end
     return true
 end
-is_real(r::PathResult, tol::Float64) = is_real(r; tol)
+is_real(r::PathResult, tol::Float64) = is_real(r; tol = tol)
+is_real(r::PathResult, tol::Float64, rtol::Float64) = is_real(r; tol = tol, rtol = rtol)
 # provide fallback since this in in Base
 Base.isreal(r::PathResult, tol) = is_real(r, tol)
+Base.isreal(r::PathResult, tol, rtol) = is_real(r, tol, rtol)
 Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)
