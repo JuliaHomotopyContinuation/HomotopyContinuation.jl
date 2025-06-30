@@ -37,9 +37,9 @@ function u_transform(W::WitnessPoints)
     A = extrinsic(L).A
     b = extrinsic(L).b
 
-    E = ExtrinsicDescription(A[:, 1:end-1], b; orthonormal = false)
+    E = ExtrinsicDescription(A[:, 1:(end-1)], b; orthonormal = false)
     P = map(points(W)) do p
-        p[1:end-1]
+        p[1:(end-1)]
     end
 
     P, LinearSubspace(E)
@@ -48,8 +48,8 @@ end
 
 Base.@kwdef mutable struct WitnessSetsProgress
     ambient_dim::Int
-    codim::Int
-    current_codim::Int = 1
+    nhypersurfaces::Int
+    current_hypersurface::Int = 1
     degrees::Dict{Int,Int} = Dict{Int,Int}()
     is_solving::Bool = false
     is_removing_points::Bool = false
@@ -58,8 +58,12 @@ Base.@kwdef mutable struct WitnessSetsProgress
     current_npaths::Int = 0
     progress_meter::PM.ProgressUnknown
 end
-WitnessSetsProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
-    WitnessSetsProgress(ambient_dim = n, codim = codim, progress_meter = progress_meter)
+WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
+    WitnessSetsProgress(
+        ambient_dim = n,
+        nhypersurfaces = nhypersurfaces,
+        progress_meter = progress_meter,
+    )
 update_progress!(progress::Nothing, is_solving::Bool) = nothing
 function update_progress!(progress::WitnessSetsProgress, is_solving::Bool)
     progress.is_computing_hypersurfaces = false
@@ -68,10 +72,10 @@ function update_progress!(progress::WitnessSetsProgress, is_solving::Bool)
 end
 update_progress!(progress::Nothing, i::Int) = nothing
 function update_progress!(progress::WitnessSetsProgress, i::Int)
-    progress.current_codim = i
+    progress.current_hypersurface = i
     PM.update!(
         progress.progress_meter,
-        progress.current_codim,
+        progress.current_hypersurface,
         showvalues = showvalues(progress),
     )
 end
@@ -81,7 +85,7 @@ function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
     progress.current_npaths = m
     PM.update!(
         progress.progress_meter,
-        progress.current_codim,
+        progress.current_hypersurface,
         showvalues = showvalues(progress),
     )
 end
@@ -90,7 +94,7 @@ function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,
     progress.degrees[codim(W)] = length(points(W))
     PM.update!(
         progress.progress_meter,
-        progress.current_codim,
+        progress.current_hypersurface,
         showvalues = showvalues(progress),
     )
 end
@@ -108,7 +112,7 @@ function showvalues(progress::WitnessSetsProgress)
     else
         text = [(
             "Intersect with hypersurface",
-            "$(progress.current_codim) / $(progress.codim)",
+            "$(progress.current_hypersurface) / $(progress.nhypersurfaces)",
         )]
         if progress.is_solving
             push!(
@@ -119,7 +123,7 @@ function showvalues(progress::WitnessSetsProgress)
             push!(text, ("Removing junk points", "..."))
         end
         push!(text, ("Current number of witness points", ""))
-        for c = 1:progress.codim
+        for c = 1:progress.current_hypersurface
             d = progress.ambient_dim - c
             deg = get(progress.degrees, c, nothing)
             if !isnothing(deg) && deg > 0
@@ -252,7 +256,7 @@ function regeneration!(
     if show_progress
         progress = WitnessSetsProgress(
             n,
-            codim,
+            c,
             PM.ProgressUnknown(
                 dt = 1.0,
                 desc = "Computing witness sets...",
@@ -489,7 +493,7 @@ function intersect_with_hypersurface!(W, H, X, cache)
     )
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
-    start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:d-1])
+    start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
     # here comes the loop for tracking
     l_start = length(start)
@@ -794,7 +798,7 @@ function decompose_with_monodromy!(
         )
 
         if warning && (trace(res) > options.trace_test_tol)
-            @warn "Trying to decompose non-complete set of witness points (trace test failed)"
+            @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
         end
 
         iter = 0
@@ -808,7 +812,7 @@ function decompose_with_monodromy!(
                 break
             end
 
-            # for safety and additional monodromy
+            # for safety an additional monodromy
             res = monodromy_solve(
                 MS,
                 non_complete_points,
@@ -911,7 +915,7 @@ function decompose_with_monodromy!(
                             end
                             setdiff(orbits, complete_orbits)
                         ],
-                    )
+                    ),
                 )
         end
     else
@@ -1313,7 +1317,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
             data[i, 2] = string(components)
         else
             s = string(components[1:10])
-            data[i, 2] = string("(", s[2:end-1], ", ...)")
+            data[i, 2] = string("(", s[2:(end-1)], ", ...)")
         end
     end
 

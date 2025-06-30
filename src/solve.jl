@@ -246,7 +246,7 @@ function parameter_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -326,7 +326,7 @@ function start_target_homotopy(
             H = on_affine_chart(H)
         else
             m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups,) .- 1)
+            H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
         m ≥ n || throw(FiniteException(n - m))
@@ -384,10 +384,7 @@ The `solve` routines takes the following options:
   then no further paths are tracked and the computation is finished. This is only called
   for successfull paths. This is for example useful if you only want to compute one solution
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
-* `threading = true`: Enable multi-threading for the computation. The number of
-  available threads is controlled by the environment variable `JULIA_NUM_THREADS`. 
-  Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
-  interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `tracker_options`: The options and parameters for the path tracker.
   See [`TrackerOptions`](@ref).
 
@@ -601,7 +598,7 @@ function threaded_solve(
         nthr = Threads.nthreads()
 
         resize!(solver.trackers, nthr)
-        for i = ntrackers+1:nthr
+        for i = (ntrackers+1):nthr
             solver.trackers[i] = deepcopy(tracker)
         end
 
