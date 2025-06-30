@@ -151,7 +151,11 @@ Base.@kwdef struct ResultStatistics
 end
 Base.show(io::IO, stats::ResultStatistics) = print_fieldnames(io, stats)
 
-function ResultStatistics(result::Result; real_tol::Union{Float64, Nothing} = 1e-6, real_rtol::Union{Float64, Nothing} = nothing)
+function ResultStatistics(
+    result::Result;
+    real_tol::Union{Float64,Nothing} = 1e-6,
+    real_rtol::Union{Float64,Nothing} = nothing,
+)
     failed = at_infinity = excess_solution = 0
     nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -222,8 +226,8 @@ function results(
     f::Function,
     R::Results;
     only_real::Bool = false,
-    real_tol::Union{Float64, Nothing} = 1e-6,
-    real_rtol::Union{Float64, Nothing} = nothing,
+    real_tol::Union{Float64,Nothing} = 1e-6,
+    real_rtol::Union{Float64,Nothing} = nothing,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
     only_finite::Bool = true,
@@ -255,8 +259,8 @@ Count the number of results which satisfy the corresponding conditions. See also
 function nresults(
     R::Results;
     only_real::Bool = false,
-    real_tol::Union{Float64, Nothing} = 1e-6,
-    real_rtol::Union{Float64, Nothing} = nothing,
+    real_tol::Union{Float64,Nothing} = 1e-6,
+    real_rtol::Union{Float64,Nothing} = nothing,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
     onlyfinite::Bool = true, # deprecated
@@ -308,8 +312,20 @@ julia> real_solutions(solve(F))
  [-3.0, 0.0]
 ```
 """
-function real_solutions(result::Results; tol::Union{Float64, Nothing} = 1e-6, rtol::Union{Float64, Nothing} = nothing, kwargs...)
-    results(real ∘ solution, result; only_real = true, real_tol = tol, real_rtol = rtol,  kwargs...)
+function real_solutions(
+    result::Results;
+    tol::Union{Float64,Nothing} = 1e-6,
+    rtol::Union{Float64,Nothing} = nothing,
+    kwargs...,
+)
+    results(
+        real ∘ solution,
+        result;
+        only_real = true,
+        real_tol = tol,
+        real_rtol = rtol,
+        kwargs...,
+    )
 end
 
 
@@ -340,7 +356,11 @@ end
 Get all results where the solutions are real with the given tolerance `tol`.
 See [`is_real`](@ref) for details regarding the determination of 'realness'.
 """
-Base.real(R::Results; tol::Union{Float64, Nothing} = 1e-6, rtol::Union{Float64, Nothing} = nothing) = filter(r -> is_real(r, tol, rtol), path_results(R))
+Base.real(
+    R::Results;
+    tol::Union{Float64,Nothing} = 1e-6,
+    rtol::Union{Float64,Nothing} = nothing,
+) = filter(r -> is_real(r, tol, rtol), path_results(R))
 
 """
     failed(result)

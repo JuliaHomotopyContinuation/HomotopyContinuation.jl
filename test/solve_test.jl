@@ -174,11 +174,11 @@
         @test length(findall(is_success, res)) == 3
         @test real_solutions(res) isa Vector{Vector{Float64}}
         @test length(real_solutions(res)) == nreal(res) == 1
-        @test length(real_solutions(res; tol=1e-16)) == 1
-        @test length(real_solutions(res; tol=0.0)) == 0
-        @test length(real_solutions(res; tol=nothing, rtol = 1e-16)) == 1
-        @test length(real_solutions(res; tol=nothing, rtol = nothing)) == 3
-        @test length(real_solutions(res; tol=1.0, rtol = 1e-16)) == 1
+        @test length(real_solutions(res; tol = 1e-16)) == 1
+        @test length(real_solutions(res; tol = 0.0)) == 0
+        @test length(real_solutions(res; tol = nothing, rtol = 1e-16)) == 1
+        @test length(real_solutions(res; tol = nothing, rtol = nothing)) == 3
+        @test length(real_solutions(res; tol = 1.0, rtol = 1e-16)) == 1
         @test length(nonsingular(res)) == nnonsingular(res) == 3
         @test isempty(singular(res))
         @test nsingular(res) == 0

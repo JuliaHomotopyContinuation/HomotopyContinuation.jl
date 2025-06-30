@@ -276,7 +276,11 @@ We consider a result as `real` if all of the following conditions hold:
 `tol` and `rtol` must either be a `Float64` or `nothing`.
 Conditions with their corresponding parameters set to `nothing` are ignored.
 """
-function is_real(r::PathResult; tol::Union{Float64,Nothing} = 1e-6, rtol::Union{Float64,Nothing}=nothing)
+function is_real(
+    r::PathResult;
+    tol::Union{Float64,Nothing} = 1e-6,
+    rtol::Union{Float64,Nothing} = nothing,
+)
     m = maximum(abs ∘ imag, r.solution)
     if tol !== nothing
         m < tol || return false
