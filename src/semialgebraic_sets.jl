@@ -5,13 +5,13 @@ function ModelKit.System(V::SemialgebraicSets.AbstractAlgebraicSet; kwargs...)
 end
 
 """
-    SemialgebraicSetsHCSolver(; excess_residual_tol = nothing, real_tol = 1e-6, compile = false, options...)
+    SemialgebraicSetsHCSolver(; excess_residual_tol = nothing, real_atol = 1e-6, real_rtol = 0.0, compile = false, options...)
 
 Construct a `SemialgebraicSets.AbstractAlgebraicSolver` to be used in `SemialgebraicSets`.
 `options` are all valid options for [`solve`](@ref).
 
-Solutions with imaginary part of absolute value larger than `real_tol` are
-filtered out.
+Solutions with imaginary part larger than the specified tolerances are
+filtered out (see [`is_real`](@ref) for details).
 
 For overdetermined systems, `excess_residual_tol` can be set to a `Float64`
 value. Excess solutions that have a residual smaller than `excess_residual_tol`
@@ -43,19 +43,32 @@ julia> collect(V)
 """
 struct SemialgebraicSetsHCSolver <: SemialgebraicSets.AbstractAlgebraicSolver
     excess_residual_tol::Union{Nothing,Float64}
-    real_tol::Float64
+    real_atol::Float64
+    real_rtol::Float64
     options::Any
 end
-SemialgebraicSetsHCSolver(;
+function SemialgebraicSetsHCSolver(;
     excess_residual_tol = nothing,
-    real_tol = 1e-6,
+    real_atol = 1e-6,
+    real_rtol = 0.0,
+    real_tol = nothing,
     compile = :none,
     options...,
-) = SemialgebraicSetsHCSolver(
-    excess_residual_tol,
-    real_tol,
-    (compile = compile, options...),
 )
+    if real_tol !== nothing
+        Base.depwarn(
+            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
+            :SemialgebraicSetsHCSolver,
+        )
+        real_atol = real_tol
+    end
+    SemialgebraicSetsHCSolver(
+        excess_residual_tol,
+        real_atol,
+        real_rtol,
+        (compile = compile, options...),
+    )
+end
 
 function SemialgebraicSets.default_gröbner_basis_algorithm(
     ::Any,
@@ -77,7 +90,9 @@ function Base.show(io::IO, solver::SemialgebraicSetsHCSolver)
         print(io, "excess_residual_tol = ", solver.excess_residual_tol)
         print(io, ", ")
     end
-    print(io, "real_tol = ", solver.real_tol)
+    print(io, "real_atol = ", solver.real_atol)
+    print(io, ", ")
+    print(io, "real_rtol = ", solver.real_rtol)
     print(io, ", ")
     join(
         io,
@@ -117,5 +132,5 @@ function SemialgebraicSets.solve(
         hcsolver.excess_residual_tol,
     )
     # Only return real, non-singular solutions
-    return real_solutions(results; real_tol = hcsolver.real_tol, only_nonsingular = true)
+    return real_solutions(results; real_atol = hcsolver.real_atol, real_rtol = hcsolver.real_rtol, only_nonsingular = true)
 end
