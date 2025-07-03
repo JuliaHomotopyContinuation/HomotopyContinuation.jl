@@ -40,7 +40,7 @@
         @test all(is_real, res)
         @test !any(pr -> isreal(pr; atol = 0.0), res)  # there's a tiny imaginary part
         @test all(pr -> isreal(pr; atol = 1e-16), res)
-        @test all(pr -> isreal(pr; tol = 0.0, rtol = 1e-16), res)
+        @test all(pr -> isreal(pr; atol = 0.0, rtol = 1e-16), res)
         @test all(isreal, res)
         @test all(is_singular, res)
     end
