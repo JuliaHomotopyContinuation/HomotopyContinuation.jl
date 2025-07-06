@@ -499,7 +499,14 @@ end
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-solve(S::Solver, starts; kwargs...) = solve(S, collect(starts); kwargs...)
+function solve(S::Solver, starts; kwargs...)
+    try
+        s = collect(start)
+        solve(S, s; kwargs...)
+    catch
+        nothing
+    end
+end
 function solve(
     S::Solver,
     starts::AbstractArray;
@@ -508,6 +515,7 @@ function solve(
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
 )
+
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
