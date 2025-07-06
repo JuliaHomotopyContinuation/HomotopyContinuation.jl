@@ -504,6 +504,7 @@ function solve(S::Solver, starts; kwargs...)
         s = collect(start)
         solve(S, s; kwargs...)
     catch
+        @warn "No solutions were found."
         nothing
     end
 end
