@@ -501,7 +501,7 @@ solve(S::Solver, R::Result; kwargs...) =
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
 function solve(S::Solver, starts; kwargs...)
     try
-        s = collect(start)
+        s = collect(starts)
         solve(S, s; kwargs...)
     catch
         @warn "No solutions were found."
