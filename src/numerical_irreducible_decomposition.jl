@@ -284,6 +284,9 @@ function regeneration!(
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
+    if any(H .== nothing)
+        return nothing
+    end
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
@@ -394,6 +397,9 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
             start_system = :total_degree,
             show_progress = false,
         )
+        if isnothing(res)
+            return nothing
+        end
         S = solutions(res, only_nonsingular = true)
 
         out[i] = WitnessSet(h, L, S)
@@ -1402,6 +1408,9 @@ function numerical_irreducible_decomposition(
         endgame_options = endgame_options,
         kwargs...,
     )
+    if isnothing(Ws)
+        return nothing
+    end
     decompose(
         Ws;
         monodromy_options = monodromy_options,
