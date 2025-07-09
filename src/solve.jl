@@ -483,20 +483,28 @@ function solve(
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
     if many_parameters
-        solve(
-            solver,
-            starts,
-            target_parameters;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-            transform_result = transform_result,
-            transform_parameters = transform_parameters,
-            flatten = flatten,
-        )
+        if iterator_only
+            map(target_parameters) do p
+                solverᵢ = copy(solver)
+                target_parameters!(solverᵢ, p)
+                ResultIterator(starts, solver; predicate = nothing)
+            end
+        else
+            solve(
+                solver,
+                starts,
+                target_parameters;
+                show_progress = show_progress,
+                threading = threading,
+                catch_interrupt = catch_interrupt,
+                transform_result = transform_result,
+                transform_parameters = transform_parameters,
+                flatten = flatten,
+            )
+        end
     else
         if iterator_only
-            ResultIterator(starts, solver, nothing)
+            ResultIterator(starts, solver; predicate = nothing)
         else
             solve(
                 solver,
