@@ -485,7 +485,7 @@ function solve(
     if many_parameters
         if iterator_only
             map(target_parameters) do p
-                solverᵢ = copy(solver)
+                solverᵢ = deepcopy(solver)
                 target_parameters!(solverᵢ, p)
                 ResultIterator(starts, solver; predicate = nothing)
             end
