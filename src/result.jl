@@ -160,7 +160,7 @@ function ResultStatistics(
     if real_tol !== nothing
         Base.depwarn(
             "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :ResultStatistics
+            :ResultStatistics,
         )
         real_atol = real_tol
     end
@@ -251,7 +251,7 @@ function results(
     if real_tol !== nothing
         Base.depwarn(
             "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :results
+            :results,
         )
         real_atol = real_tol
     end
@@ -299,7 +299,7 @@ function nresults(
     if real_tol !== nothing
         Base.depwarn(
             "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :nresults
+            :nresults,
         )
         real_atol = real_tol
     end
@@ -363,7 +363,7 @@ function real_solutions(
     if tol !== nothing
         Base.depwarn(
             "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
-            :real_solutions
+            :real_solutions,
         )
         atol = tol
     end
@@ -405,10 +405,7 @@ end
 Get all results where the solutions are real with the given tolerance `tol`.
 See [`is_real`](@ref) for details regarding how `kwargs` affect the determination of 'realness'.
 """
-Base.real(
-    R::Results;
-    kwargs...,
-) = filter(r -> is_real(r; kwargs...), path_results(R))
+Base.real(R::Results; kwargs...) = filter(r -> is_real(r; kwargs...), path_results(R))
 
 """
     failed(result)

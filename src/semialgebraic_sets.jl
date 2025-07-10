@@ -132,5 +132,10 @@ function SemialgebraicSets.solve(
         hcsolver.excess_residual_tol,
     )
     # Only return real, non-singular solutions
-    return real_solutions(results; real_atol = hcsolver.real_atol, real_rtol = hcsolver.real_rtol, only_nonsingular = true)
+    return real_solutions(
+        results;
+        real_atol = hcsolver.real_atol,
+        real_rtol = hcsolver.real_rtol,
+        only_nonsingular = true,
+    )
 end

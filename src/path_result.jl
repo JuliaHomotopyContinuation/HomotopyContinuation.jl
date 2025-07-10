@@ -281,13 +281,13 @@ function is_real(
     r::PathResult;
     atol::Float64 = 1e-6,
     rtol::Float64 = 0.0,
-    tol::Union{Float64,Nothing} = nothing
+    tol::Union{Float64,Nothing} = nothing,
 )
     m = maximum(abs ∘ imag, r.solution)
     if tol !== nothing
         Base.depwarn(
             "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
-            :is_real
+            :is_real,
         )
         atol = tol
     end
@@ -297,8 +297,7 @@ function is_real(
     return m < thresh
 end
 is_real(r::PathResult, atol::Float64) = is_real(r; atol = atol)
-is_real(r::PathResult, atol::Float64, rtol::Float64) =
-    is_real(r; atol, rtol)
+is_real(r::PathResult, atol::Float64, rtol::Float64) = is_real(r; atol, rtol)
 # provide fallback since this in in Base
 Base.isreal(r::PathResult, atol) = is_real(r, atol)
 Base.isreal(r::PathResult, atol, rtol) = is_real(r, atol, rtol)
