@@ -89,6 +89,23 @@ end
         @test startswith(sprint(show, res), "ResultIterator")
         @test seed(res) isa UInt32
         @test !isempty(sprint(show, res))
+
+        # pass iterator as start solutions
+        R = solve(
+            F,
+            [[1, 1], [-1, 1]];
+            iterator_only = true,
+            start_parameters = [0],
+            target_parameters = [-1],
+        )
+        RR = solve(
+            F,
+            R;
+            iterator_only = true,
+            start_parameters = [-1],
+            target_parameters = [-2],
+        )
+         @test length(collect(RR)) == 2
     end
 
     @testset "Basic functionality of ResultIterator" begin
