@@ -276,8 +276,18 @@ path_results(ri::ResultIterator) = collect(ri)
 
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
-    print(io, "ResultIterator induced by $Iter")
+    header = "ResultIterator"
+    println(io, header)
+    println(io, "="^(length(header)))
     !isnothing(ri.bitmask) && print(" and a filtering bitmask")
+    println(io, "•  start solutions: $(Iter.name.name)")
+    tracker = ri.S.trackers[1]
+    if tracker isa EndgameTracker
+        n = typeof(tracker.tracker.homotopy)
+        println(io, "•  homotopy: $(n.name.name)")
+    elseif tracker isa PolyhedralTracker
+        println(io, "•  homotopy: Polyhedral")
+    end
 end
 
 function Base.IteratorSize(ri::ResultIterator)
