@@ -56,3 +56,11 @@ multiplicity(::PathResult)
 last_path_point(::PathResult)
 valuation(::PathResult)
 ```
+
+## ResultIterators
+
+```@docs
+ResultIterator
+bitmask_filter
+trace
+```
