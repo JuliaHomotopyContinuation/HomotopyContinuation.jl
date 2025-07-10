@@ -255,7 +255,49 @@ end
 
 
 """
-    ResultIterator
+    ResultIterator{Iter} <: AbstractResult
+
+A struct which represents a result. Its fields are 
+* `starts`: An iterator over the start solutions of a solver.
+* `S`: The solver which was used to compute the results.
+* `bitmask` (optional): A `BitVector` which is used to filter the results.
+It is an iterator over the start solutions of a solver, which may also be passed as an iterator. Objects of this type can be treated
+just like a [`Result`](@ref) object, i.e. you can iterate over it, get the length, etc. The distinction is that it does not store the results but rather computes them on-the-fly when iterated over. This is useful for large sets of results or when you want to apply a filter to the results without storing them all in memory.
+
+## Example
+```julia
+julia> @var x y a[1:6];
+julia> F = System(
+        [
+            (a[1] * x^2 + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+            (a[1] * x^2 + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+        ];
+        parameters = a,
+    )
+julia> P = randn(ComplexF64,6)
+julia> res = solve(
+        F;
+        iterator_only = true,
+        target_parameters = P,
+    )
+ResultIterator
+==============
+•  start solutions: PolyhedralStartSolutionsIterator
+•  homotopy: Polyhedral
+```
+You may collect `res` to obtain the results. Doing so actually tracks the paths.
+```julia
+collect(res)
+```
+Now, `res` may be passed along to [`solve`](@ref) as
+a set of start solutions.
+```julia 
+solve(F, res; 
+    iterator_only = true, 
+    target_parameters = randn(ComplexF64,6)
+)
+``` 
+ 
 
 """
 struct ResultIterator{Iter} <: AbstractResult
@@ -344,19 +386,58 @@ function Base.length(ri::ResultIterator)
     end
 end
 
-
 function bitmask(f::Function, ri::ResultIterator)
     BitVector(map(f, ri))
 end
 
+
+"""
+    bitmask_filter(f::Function, ri::ResultIterator)
+
+Given a boolean valued function `f` and a [`ResultIterator`](@ref) `ri`, this function
+returns a new [`ResultIterator`](@ref) which 
+represents the results for which `f` returns `true`.
+It does this by iterating through `ri` and applying `f`
+to each result to create a `BitVector` that serves to 
+cache the results of `f` for each solution in `ri`.
+
+
+
+```julia
+julia> @var x y;
+julia> F = System([x^3 + y^3 - 1, x + y - 1])
+julia> res = solve(F; iterator_only = true)
+julia> bm = bitmask_filter(is_real, res)
+ResultIterator
+==============
+•  start solutions: PolyhedralStartSolutionsIterator
+•  homotopy: Polyhedral
+•  filtering bitmask
+```
+"""
 function bitmask_filter(f::Function, ri::ResultIterator)
     bm = bitmask(f, ri)
     return (ResultIterator(ri.starts, ri.S, bm))
 end
 
+"""
+    trace(ri::ResultIterator)
+
+This function computes the coordinate-wise sum, or trace, of the solutions in a `ResultIterator` by iterating through the solutions and summing them up one at a time. 
+
+```julia
+julia> @var x y;
+julia> F = System([x^3 + y^3 - 1, x + y - 1])
+julia> res = solve(F; iterator_only = true)
+julia> tr = trace(res)
+2-element Vector{ComplexF64}:
+ 1.0 + 0.0im
+ 1.0 + 0.0im
+```
+"""
 function trace(iter::ResultIterator)
     s = solution(first(iter))
-    mapreduce(x->solution(x), +, iter, init = 0.0 .* s)
+    mapreduce(x -> isfinite(x) ? solution(x) : zeros(ComplexF64, length(s)), +, iter, init = 0.0 .* s)
 end
 
 function Result(ri::ResultIterator)
