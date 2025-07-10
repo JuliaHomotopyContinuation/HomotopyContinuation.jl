@@ -105,14 +105,14 @@ end
             start_parameters = [-1],
             target_parameters = [-2],
         )
-         @test length(collect(RR)) == 2
+        @test length(collect(RR)) == 2
     end
 
     @testset "Basic functionality of ResultIterator" begin
         @var x y
         # define the polynomials
-        f₁ = y-x^2
-        f₂ = y-x^3
+        f₁ = y - x^2
+        f₂ = y - x^3
         F = [f₁, f₂]
         tsi_polyhedral = solve(F; iterator_only = true, start_system = :polyhedral)
         tsi_total_degree = solve(F; iterator_only = true, start_system = :total_degree)
@@ -128,7 +128,7 @@ end
         @test nsolutions(tsi_total_degree; multiple_results = true) == 1
         @test length(tsi_polyhedral) == 3
         @test length(tsi_total_degree) == 6
-        
+
         BM = bitmask_filter(isfinite, tsi_total_degree)
         @test length(BM) == sum(bitmask(isfinite, tsi_total_degree)) == 3
 
@@ -186,7 +186,7 @@ end
             target_parameters = params,
             parameters = [a, b, c],
             threading = true,
-            iterator_only = true
+            iterator_only = true,
         )
         r1 = collect.(result1)
         @test !isempty(r1)
@@ -200,7 +200,7 @@ end
             parameters = [a, b, c],
             show_progress = false,
             threading = false,
-            iterator_only = true
+            iterator_only = true,
         )
         r1 = collect.(result1)
         @test !isempty(r1)
@@ -215,7 +215,7 @@ end
             parameters = [a, b, c],
             transform_result = (r, p) -> real_solutions(r),
             threading = true,
-            iterator_only = true
+            iterator_only = true,
         )
         r2 = collect.(result2)
         @test !isempty(r2)
@@ -232,7 +232,7 @@ end
             transform_result = (r, p) -> real_solutions(r),
             flatten = true,
             threading = false,
-            iterator_only = true
+            iterator_only = true,
         )
         r3 = collect.(result3)
         @test !isempty(r3)
@@ -248,7 +248,7 @@ end
             parameters = [a, b, c],
             transform_result = (r, p) -> (real_solutions(r), p),
             transform_parameters = _ -> rand(3),
-            iterator_only = true
+            iterator_only = true,
         )
         r4 = collect.(result4)
         @test !isempty(r4)
@@ -260,24 +260,13 @@ end
         l1 = rand_subspace(2; codim = 1)
         l2 = rand_subspace(2; codim = 1)
 
-        r1 = solve(
-            F;
-            target_subspace = l1,
-            intrinsic = true,
-            iterator_only = true
-        )
+        r1 = solve(F; target_subspace = l1, intrinsic = true, iterator_only = true)
 
         w1 = collect(r1)
         @test length(w1) == 2
         @test w1 isa Vector{PathResult}
 
-        r2 = solve(
-            F,
-            r2;
-            start_subspace = l1,
-            target_subspace = l2,
-            iterator_only = true
-        )
+        r2 = solve(F, r2; start_subspace = l1, target_subspace = l2, iterator_only = true)
 
         w2 = collect(r2)
         @test length(w2) == 2

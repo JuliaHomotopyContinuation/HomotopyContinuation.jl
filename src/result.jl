@@ -233,17 +233,17 @@ function results(
     only_finite::Bool = true,
     multiple_results::Bool = false,
 )
-    if multiple_results == false && !(typeof(R)<:Results)
+    if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
     end
     filter_function =
         r ->
             (!only_real || is_real(r, real_tol)) &&
-            (!only_nonsingular || is_nonsingular(r)) &&
-            (!only_singular || is_singular(r)) &&
-            (!only_finite || is_finite(r)) &&
-            (multiple_results || !is_multiple_result(r, R))
+                (!only_nonsingular || is_nonsingular(r)) &&
+                (!only_singular || is_singular(r)) &&
+                (!only_finite || is_finite(r)) &&
+                (multiple_results || !is_multiple_result(r, R))
     return_iter = imap(f, Iterators.filter(filter_function, R))
     if typeof(R) <: Results
         return (collect(return_iter))
@@ -305,7 +305,7 @@ struct ResultIterator{Iter} <: AbstractResult
     S::AbstractSolver
     bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
 end
-function ResultIterator(s::Vector{T}, S::AbstractSolver; kwargs...) where {T<:Number}  
+function ResultIterator(s::Vector{T}, S::AbstractSolver; kwargs...) where {T<:Number}
     ResultIterator([s], S; kwargs...)
 end
 function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) where {Iter}
@@ -333,7 +333,7 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
 end
 
 function Base.IteratorSize(ri::ResultIterator)
-    if ri.starts isa Vector 
+    if ri.starts isa Vector
         return Base.HasLength()
     else
         ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
@@ -350,8 +350,8 @@ function Base.iterate(ri::ResultIterator, state = nothing) #States of the induce
     next_ss === nothing && return nothing  # End of iteration
 
     start_value, new_ss_state = next_ss
-    new_state = (native_state+1, new_ss_state)
- 
+    new_state = (native_state + 1, new_ss_state)
+
     if ri.bitmask === nothing
         return (track(ri.S.trackers[1], start_value), new_state)
     else
@@ -360,7 +360,7 @@ function Base.iterate(ri::ResultIterator, state = nothing) #States of the induce
             next_ss = iterate(ri.starts, new_state[2])
             next_ss === nothing && return nothing  # End of iteration
             start_value, new_ss_state = next_ss
-            new_state = (new_state[1]+1, new_ss_state)
+            new_state = (new_state[1] + 1, new_ss_state)
         end
 
         return (track(ri.S.trackers[1], start_value), new_state)
@@ -437,7 +437,12 @@ julia> tr = trace(res)
 """
 function trace(iter::ResultIterator)
     s = solution(first(iter))
-    mapreduce(x -> isfinite(x) ? solution(x) : zeros(ComplexF64, length(s)), +, iter, init = 0.0 .* s)
+    mapreduce(
+        x -> isfinite(x) ? solution(x) : zeros(ComplexF64, length(s)),
+        +,
+        iter,
+        init = 0.0 .* s,
+    )
 end
 
 function Result(ri::ResultIterator)
@@ -476,7 +481,7 @@ function nresults(
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
 )
-    if multiple_results == false && !(typeof(R)<:Results)
+    if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
     end
