@@ -263,7 +263,9 @@ struct ResultIterator{Iter} <: AbstractResult
     S::AbstractSolver
     bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
 end
-
+function ResultIterator(s::Vector{T}, S::AbstractSolver; kwargs...) where {T<:Number}  
+    ResultIterator([s], S; kwargs...)
+end
 function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) where {Iter}
     bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
     return (ResultIterator{Iter}(starts, S, bitmask))
@@ -279,21 +281,25 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
 end
 
 function Base.IteratorSize(ri::ResultIterator)
-    ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
+    if ri.starts isa Vector 
+        return Base.HasLength()
+    else
+        ri.bitmask === nothing ? Base.IteratorSize(ri.starts) : Base.HasLength()
+    end
 end
 Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
 Base.eltype(::ResultIterator) = PathResult
 
 
 
-function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state)
+function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state) 
     native_state = state === nothing ? 0 : state[1]
     next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
     next_ss === nothing && return nothing  # End of iteration
 
     start_value, new_ss_state = next_ss
     new_state = (native_state+1, new_ss_state)
-
+ 
     if ri.bitmask === nothing
         return (track(ri.S.trackers[1], start_value), new_state)
     else
@@ -323,6 +329,8 @@ function Base.length(ri::ResultIterator)
         else
             return (length(ri.starts))
         end
+    elseif ri.starts isa Vector
+        return length(ri.starts)
     end
 end
 
