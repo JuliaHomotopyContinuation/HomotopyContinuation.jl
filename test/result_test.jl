@@ -128,7 +128,9 @@ end
         @test nsolutions(tsi_total_degree; multiple_results = true) == 1
         @test length(tsi_polyhedral) == 3
         @test length(tsi_total_degree) == 6
-        @test sum(bitmask(isfinite, tsi_total_degree)) == 3
+        
+        BM = bitmask_filter(isfinite, tsi_total_degree)
+        @test length(BM) == sum(bitmask(isfinite, tsi_total_degree)) == 3
     end
 
     @testset "Manual start solutions" begin
