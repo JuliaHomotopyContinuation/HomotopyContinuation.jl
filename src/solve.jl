@@ -177,6 +177,9 @@ function solver_startsolutions(
                 target_parameters = target_parameters,
                 kwargs...,
             )
+            if length(starts) == 0
+                throw("The number of start solutions is zero.")
+            end
         else
             throw(
                 KeywordArgumentException(
