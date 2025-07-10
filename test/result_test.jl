@@ -141,4 +141,125 @@ end
         @test isa(R2, ResultIterator)
         @test nsolutions(R2) == 2
     end
+
+    @testset "Many parameters" begin
+        ## these tests are the same in in solve_test.jl
+        @var x y
+        f = x^2 + y^2 - 1
+
+        @var a b c
+        l = a * x + b * y + c
+        F = [f, l]
+
+        p₀ = randn(ComplexF64, 3)
+        S₀ = solutions(solve(subs(F, [a, b, c] => p₀)))
+        # The parameters we are intersted in
+        params = [rand(3) for i = 1:100]
+
+        result1 = solve(
+            F,
+            S₀,
+            ;
+            start_parameters = p₀,
+            target_parameters = params,
+            parameters = [a, b, c],
+            threading = true,
+            iterator_only = true
+        )
+        r1 = collect.(result1)
+        @test !isempty(r1)
+
+        result1 = solve(
+            F,
+            S₀,
+            ;
+            start_parameters = p₀,
+            target_parameters = params,
+            parameters = [a, b, c],
+            show_progress = false,
+            threading = false,
+            iterator_only = true
+        )
+        r1 = collect.(result1)
+        @test !isempty(r1)
+
+        # Only keep real solutions
+        result2 = solve(
+            F,
+            S₀,
+            ;
+            start_parameters = p₀,
+            target_parameters = params,
+            parameters = [a, b, c],
+            transform_result = (r, p) -> real_solutions(r),
+            threading = true,
+            iterator_only = true
+        )
+        r2 = collect.(result2)
+        @test !isempty(r2)
+
+        # Now instead of an Array{Array{Array{Float64,1},1},1} we want to have an
+        # Array{Array{Float64,1},1}
+        result3 = solve(
+            F,
+            S₀,
+            ;
+            start_parameters = p₀,
+            target_parameters = params,
+            parameters = [a, b, c],
+            transform_result = (r, p) -> real_solutions(r),
+            flatten = true,
+            threading = false,
+            iterator_only = true
+        )
+        r3 = collect.(result3)
+        @test !isempty(r3)
+
+        # The passed `params` do not directly need to be the target parameters.
+        # Instead they can be some more concrete informations (e.g. an index)
+        result4 = solve(
+            F,
+            S₀,
+            ;
+            start_parameters = p₀,
+            target_parameters = 1:100,
+            parameters = [a, b, c],
+            transform_result = (r, p) -> (real_solutions(r), p),
+            transform_parameters = _ -> rand(3),
+            iterator_only = true
+        )
+        r4 = collect.(result4)
+        @test !isempty(r4)
+    end
+
+    @testset "Target subspaces" begin
+        @var x y
+        F = System([x^2 + y^2 - 5], [x, y])
+        l1 = rand_subspace(2; codim = 1)
+        l2 = rand_subspace(2; codim = 1)
+
+        r1 = solve(
+            F;
+            target_subspace = l1,
+            intrinsic = true,
+            iterator_only = true
+        )
+
+        w1 = collect(r1)
+        @test length(w1) == 2
+        @test w1 isa Vector{PathResult}
+
+        r2 = solve(
+            F,
+            solution.(w1);
+            start_subspace = l1,
+            target_subspace = l2,
+            iterator_only = true
+        )
+
+        w2 = collect(r2)
+        @test length(w2) == 2
+        pt = solution(w2[1])
+        @test norm(l2(pt)) < 1e-12
+    end
 end
