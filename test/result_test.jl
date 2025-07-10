@@ -131,6 +131,9 @@ end
         
         BM = bitmask_filter(isfinite, tsi_total_degree)
         @test length(BM) == sum(bitmask(isfinite, tsi_total_degree)) == 3
+
+        t = trace(BM)
+        @test norm([1.0 + 0.0im, 1.0 + 0.0im] - t) < 1e-12
     end
 
     @testset "Manual start solutions" begin
