@@ -271,6 +271,9 @@ function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) wh
     return (ResultIterator{Iter}(starts, S, bitmask))
 end
 
+seed(ri::ResultIterator) = ri.S.seed
+path_results(ri::ResultIterator) = collect(ri)
+
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     print(io, "ResultIterator induced by $Iter")
