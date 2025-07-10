@@ -17,6 +17,9 @@
         W = regeneration(F; sorted = false)
         @test degree.(W) == [2, 8, 8]
 
+        W = regeneration(F; max_codim = 2)
+        @test degree.(W) == [2, 8]
+
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 
@@ -30,6 +33,9 @@
 
         # bad seed
         N = nid(F; seed = 0xc770fa47)
+        degs = degrees(N)
+        @test degs[2] == [2]
+        @test degs[1] == [4, 4]
 
         # progress
         N = nid(F; show_progress = false)
@@ -55,12 +61,16 @@
         @test isa(N3, NumericalIrreducibleDecomposition)
 
         # number of components
-        @test ncomponents(N3) == 4
+        @test ncomponents(N3) == 11
         @test ncomponents(N3, dims = [1, 2]) == 3
         @test ncomponents(N3, 1) == 2
-        @test n_components(N3) == 4
+        @test n_components(N3) == 11
         @test n_components(N3, dims = [1, 2]) == 3
         @test n_components(N3, 1) == 2
+
+        # max_codim = 1
+        N4 = nid(F; max_codim = 1)
+        @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
     @testset "Hypersurface of degree 5" begin
@@ -90,8 +100,8 @@
             [x * z - y^2; y - z^2; x - y * z; rand_poly(ComplexF64, [x; y; z], 1)]
 
         N_TwistedCubicSphere = nid(TwistedCubicSphere)
-        @test degrees(N_TwistedCubicSphere) == Dict(0 => [3])
-        @test ncomponents(N_TwistedCubicSphere) == 1
+        @test degrees(N_TwistedCubicSphere) == Dict(0 => [1, 1, 1])
+        @test ncomponents(N_TwistedCubicSphere) == 3
     end
 
     @testset "Three Lines" begin
@@ -202,6 +212,9 @@
         N_Bricard6R = nid(Bricard6R)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
         @test ncomponents(N_Bricard6R) == 1
+
+        N_Bricard6R_c4 = nid(Bricard6R, max_codim = 4)
+        @test ncomponents(N_Bricard6R_c4) == 0
     end
 
     @testset "ACR" begin
@@ -254,76 +267,28 @@
 
         F = System([s * l * p for s in S for l in L for p in P])
 
-        seed = rand(UInt32)
         NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
 
         @test ncomponents(NID, 0) == 1
         @test degrees(NID)[0] == [1]
     end
 
-    #     @testset "426" begin
-    #         ### Example thanks to Julian Vill
-    #         @var a, b, c, d, e
+    @testset "solve a system without solutions" begin
+        using HomotopyContinuation
+        @var x[1:4]
 
-
-    #         f1 =
-    #             -18 * a^4 * c^5 + 27 * a^3 * b * c^5 - 9 * a^2 * b^2 * c^5 - 18 * a^4 * c^4 +
-    #             81 * a^3 * b * c^4 - 90 * a^2 * b^2 * c^4 + 27 * a * b^3 * c^4 - 9 * a^2 * c^6 +
-    #             c^8 - 18 * a^4 * c^3 + 81 * a^3 * b * c^3 - 126 * a^2 * b^2 * c^3 +
-    #             81 * a * b^3 * c^3 - 18 * b^4 * c^3 + 36 * a * b * c^5 - 9 * b^2 * c^5 +
-    #             c^7 +
-    #             27 * a^3 * b * c^2 - 90 * a^2 * b^2 * c^2 + 81 * a * b^3 * c^2 -
-    #             18 * b^4 * c^2 + 18 * a^2 * c^4 - 36 * a * b * c^4 - 8 * c^6 -
-    #             9 * a^2 * b^2 * c + 27 * a * b^3 * c - 18 * b^4 * c - 36 * a * b * c^3 +
-    #             18 * b^2 * c^3 +
-    #             7 * c^5 - 9 * a^2 * c^2 + 36 * a * b * c^2 - 2 * c^4 - 9 * b^2 * c + 7 * c^3 -
-    #             8 * c^2 +
-    #             c +
-    #             1
-
-    #         f2 =
-    #             -18 * a^4 * e^5 + 27 * a^3 * d * e^5 - 9 * a^2 * d^2 * e^5 - 18 * a^4 * e^4 +
-    #             81 * a^3 * d * e^4 - 90 * a^2 * d^2 * e^4 + 27 * a * d^3 * e^4 - 9 * a^2 * e^6 +
-    #             e^8 - 18 * a^4 * e^3 + 81 * a^3 * d * e^3 - 126 * a^2 * d^2 * e^3 +
-    #             81 * a * d^3 * e^3 - 18 * d^4 * e^3 + 36 * a * d * e^5 - 9 * d^2 * e^5 +
-    #             e^7 +
-    #             27 * a^3 * d * e^2 - 90 * a^2 * d^2 * e^2 + 81 * a * d^3 * e^2 -
-    #             18 * d^4 * e^2 + 18 * a^2 * e^4 - 36 * a * d * e^4 - 8 * e^6 -
-    #             9 * a^2 * d^2 * e + 27 * a * d^3 * e - 18 * d^4 * e - 36 * a * d * e^3 +
-    #             18 * d^2 * e^3 +
-    #             7 * e^5 - 9 * a^2 * e^2 + 36 * a * d * e^2 - 2 * e^4 - 9 * d^2 * e + 7 * e^3 -
-    #             8 * e^2 +
-    #             e +
-    #             1
-
-    #         f3 =
-    #             -9 * b^2 * c^5 * d^2 * e + 27 * b * c^5 * d^3 * e - 18 * c^5 * d^4 * e +
-    #             27 * b^3 * c^4 * d * e^2 - 90 * b^2 * c^4 * d^2 * e^2 +
-    #             81 * b * c^4 * d^3 * e^2 - 18 * c^4 * d^4 * e^2 - 18 * b^4 * c^3 * e^3 +
-    #             81 * b^3 * c^3 * d * e^3 - 126 * b^2 * c^3 * d^2 * e^3 +
-    #             81 * b * c^3 * d^3 * e^3 - 18 * c^3 * d^4 * e^3 - 18 * b^4 * c^2 * e^4 +
-    #             81 * b^3 * c^2 * d * e^4 - 90 * b^2 * c^2 * d^2 * e^4 +
-    #             27 * b * c^2 * d^3 * e^4 - 18 * b^4 * c * e^5 + 27 * b^3 * c * d * e^5 -
-    #             9 * b^2 * c * d^2 * e^5 - 9 * c^6 * d^2 * e - 9 * b^2 * c^5 * e^2 +
-    #             36 * b * c^5 * d * e^2 - 36 * b * c^4 * d * e^3 +
-    #             18 * c^4 * d^2 * e^3 +
-    #             18 * b^2 * c^3 * e^4 - 36 * b * c^3 * d * e^4 + 36 * b * c^2 * d * e^5 -
-    #             9 * c^2 * d^2 * e^5 - 9 * b^2 * c * e^6 +
-    #             c^8 +
-    #             c^7 * e - 8 * c^6 * e^2 + 7 * c^5 * e^3 - 2 * c^4 * e^4 + 7 * c^3 * e^5 -
-    #             8 * c^2 * e^6 +
-    #             c * e^7 +
-    #             e^8
-
-    #         F = System([f1; f2; f3], variables = [a, b, c, d, e])
-
-    #         N = nid(
-    #             F;
-    #             seed = 0xc7cca254,
-    #             endgame_options = EndgameOptions(; sing_accuracy = 1e-10),
-    #         )
-
-    #         @test ncomponents(N) == 1
-    #         @test degrees(N) == Dict(2 => [426])
-    #     end
+        I = [
+            13 * (x[1] + x[2]) - 61 * (x[2] + x[3]) + 48 * (x[1] + x[3]) -
+            61 * (x[1] + x[4]) +
+            48 * (x[2] + x[4]) +
+            13 * (x[3] + x[4]) +
+            1,
+            13 * (x[2]x[1] + x[1]^2 + x[2]^2) - 61(x[4]x[1] + x[1]^2 + x[4]^2) +
+            48(x[4]x[2] + x[2]^2 + x[4]^2) +
+            48(x[3]x[1] + x[1]^2 + x[3]^2) - 61(x[2]x[3] + x[2]^2 + x[3]^2) +
+            13(x[4] * x[3] + x[3]^2 + x[4]^2),
+        ]
+        b = nid(I)
+        @test isnothing(b)
+    end
 end

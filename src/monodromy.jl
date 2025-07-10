@@ -37,7 +37,7 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     permutations::Bool = false
     # unique points options
     distance::D = EuclideanNorm()
-    triangle_inequality::Bool = true
+    triangle_inequality::Union{Nothing,Bool} = nothing
     unique_points_atol::Union{Nothing,Float64} = nothing
     unique_points_rtol::Union{Nothing,Float64} = nothing
     #
@@ -458,7 +458,7 @@ function MonodromySolver(
     unique_points = UniquePoints(
         x₀,
         1;
-        metric = options.distance,
+        distance = options.distance,
         group_actions = group_actions,
         triangle_inequality = options.triangle_inequality,
     )
@@ -805,7 +805,7 @@ function monodromy_solve(
     reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
     if isempty(results)
-        @warn "None of the provided solutions is a valid start solution."
+        @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
         retcode = :invalid_startvalue
     else
         retcode = :default
