@@ -279,7 +279,6 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     header = "ResultIterator"
     println(io, header)
     println(io, "="^(length(header)))
-    !isnothing(ri.bitmask) && print(" and a filtering bitmask")
     println(io, "•  start solutions: $(Iter.name.name)")
     tracker = ri.S.trackers[1]
     if tracker isa EndgameTracker
@@ -288,6 +287,7 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     elseif tracker isa PolyhedralTracker
         println(io, "•  homotopy: Polyhedral")
     end
+    !isnothing(ri.bitmask) && println("•  filtering bitmask")
 end
 
 function Base.IteratorSize(ri::ResultIterator)
