@@ -269,12 +269,12 @@ function results(
     filter_function =
         r ->
             (!only_real || is_real(r, real_atol, real_rtol)) &&
-            (!only_nonsingular || is_nonsingular(r)) &&
-            (!only_singular || is_singular(r)) &&
-            (!only_finite || is_finite(r)) &&
-            (multiple_results || !is_multiple_result(r, R))
+                (!only_nonsingular || is_nonsingular(r)) &&
+                (!only_singular || is_singular(r)) &&
+                (!only_finite || is_finite(r)) &&
+                (multiple_results || !is_multiple_result(r, R))
     return_iter = imap(f, Iterators.filter(filter_function, R))
-    
+
     if typeof(R) <: Results
         return (collect(return_iter))
     else
@@ -530,7 +530,7 @@ function nresults(
         )
         real_atol = real_tol
     end
-    
+
     count(R) do r
         (!only_real || is_real(r, real_atol, real_rtol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
@@ -712,7 +712,8 @@ nnonsingular(R::AbstractResults) = count(is_nonsingular, R)
 The number of real solutions. See also [`is_real`](@ref).
 """
 nreal(R::Results; kwargs...) = nresults(R, only_real = true, kwargs...)
-nreal(R::AbstractResult; kwargs...) = nresults(R, only_real = true, multiple_results = true, kwargs...)
+nreal(R::AbstractResult; kwargs...) =
+    nresults(R, only_real = true, multiple_results = true, kwargs...)
 
 """
     ntracked(result)
