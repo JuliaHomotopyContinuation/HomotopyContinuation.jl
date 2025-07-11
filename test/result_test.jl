@@ -266,7 +266,7 @@ end
         @test length(w1) == 2
         @test w1 isa Vector{PathResult}
 
-        r2 = solve(F, r2; start_subspace = l1, target_subspace = l2, iterator_only = true)
+        r2 = solve(F, r1; start_subspace = l1, target_subspace = l2, iterator_only = true)
 
         w2 = collect(r2)
         @test length(w2) == 2

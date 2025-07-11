@@ -325,7 +325,7 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     tracker = ri.S.trackers[1]
     if tracker isa EndgameTracker
         n = typeof(tracker.tracker.homotopy)
-        println(io, "•  homotopy: $(n.name.name)")
+        println(io, "•  homotopy: $(nameof(n))")
     elseif tracker isa PolyhedralTracker
         println(io, "•  homotopy: Polyhedral")
     end
