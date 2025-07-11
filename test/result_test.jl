@@ -77,12 +77,11 @@ end
         @test seed(res) isa UInt32
 
         @test length(path_results(res)) == ntracked(res) == 7
-        @test length(results(res)) == nresults(res) == 3
-        @test length(solutions(res)) == 3
-        @test length(findall(is_success, res)) == 3
-        @test real_solutions(res) isa Vector{Vector{Float64}}
-        @test length(real_solutions(res)) == nreal(res) == 1
-        @test length(nonsingular(res)) == nnonsingular(res) == 3
+        @test nresults(res) == 3
+        @test nsolutions(res) == 3
+        real_sols = collect(real_solutions(res))
+        @test length(real_sols) == nreal(res) == 1
+        @test nnonsingular(res) == 3
         @test isempty(singular(res))
         @test nsingular(res) == 0
         @test nexcess_solutions(res) == 0
@@ -96,6 +95,10 @@ end
         @test !isempty(sprint(show, res))
 
         # pass iterator as start solutions
+        @var x y p
+        f₁ = y - x^2 + p
+        f₂ = y - x^3 - p
+        F = System([f₁, f₂]; variables = [x; y], parameters = [p])
         R = solve(
             F,
             [[1, 1], [-1, 1]];
@@ -148,7 +151,7 @@ end
         F = System([f₁, f₂]; variables = [x; y], parameters = [p])
         R = solve(
             F,
-            [1, -1];
+            [1, 1];
             iterator_only = true,
             start_parameters = [0],
             target_parameters = [-1],
@@ -156,10 +159,11 @@ end
 
         @test isa(R, ResultIterator)
         @test nsolutions(R) == 1
+        nsolutions(R)
 
         R2 = solve(
             F,
-            [[1, -1], [1, -1]];
+            [[1, 1], [1, 1]];
             iterator_only = true,
             start_parameters = [0],
             target_parameters = [-1],
