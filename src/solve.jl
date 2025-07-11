@@ -5,6 +5,9 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
+export ResultIterator, bitmask, bitmask_filter
+
+
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
@@ -38,7 +41,7 @@ A struct containing multiple copies of `path_tracker`. This contains all pre-all
 data structures to call [`solve`]. The most convenient way to construct a `Solver` is
 via [`solver_startsolutions`](@ref).
 """
-struct Solver{T<:AbstractPathTracker}
+struct Solver{T<:AbstractPathTracker} <: AbstractSolver
     trackers::Vector{T}
     seed::Union{Nothing,UInt32}
     stats::SolveStats
@@ -51,6 +54,8 @@ Solver(
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
+
+
 
 """
     solver_startsolutions(args...; kwargs...)
@@ -172,6 +177,11 @@ function solver_startsolutions(
                 target_parameters = target_parameters,
                 kwargs...,
             )
+            try
+                first(starts)
+            catch
+                throw("The number of start solutions is zero (total degree is zero).")
+            end
         else
             throw(
                 KeywordArgumentException(
@@ -441,8 +451,10 @@ function solve(
     transform_parameters = identity,
     flatten = nothing,
     target_subspaces = nothing,
+    iterator_only::Bool = false,
     kwargs...,
 )
+
     many_parameters = false
     if target_subspaces !== nothing
         many_parameters = true
@@ -471,43 +483,60 @@ function solve(
     else
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
-
     if many_parameters
-        solve(
-            solver,
-            starts,
-            target_parameters;
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-            transform_result = transform_result,
-            transform_parameters = transform_parameters,
-            flatten = flatten,
-        )
+        if iterator_only
+            map(target_parameters) do p
+                solverᵢ = deepcopy(solver)
+                target_parameters!(solverᵢ, p)
+                ResultIterator(starts, solver; predicate = nothing)
+            end
+        else
+            solve(
+                solver,
+                starts,
+                target_parameters;
+                show_progress = show_progress,
+                threading = threading,
+                catch_interrupt = catch_interrupt,
+                transform_result = transform_result,
+                transform_parameters = transform_parameters,
+                flatten = flatten,
+            )
+        end
     else
-        solve(
-            solver,
-            starts;
-            stop_early_cb = stop_early_cb,
-            show_progress = show_progress,
-            threading = threading,
-            catch_interrupt = catch_interrupt,
-        )
+        if iterator_only
+            ResultIterator(starts, solver; predicate = nothing)
+        else
+            solve(
+                solver,
+                starts;
+                stop_early_cb = stop_early_cb,
+                show_progress = show_progress,
+                threading = threading,
+                catch_interrupt = catch_interrupt,
+            )
+        end
     end
 end
 
 solve(S::Solver, R::Result; kwargs...) =
     solve(S, solutions(R; only_nonsingular = true); kwargs...)
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
-function solve(S::Solver, starts; kwargs...)
-    try
-        s = collect(starts)
-        solve(S, s; kwargs...)
-    catch
-        @warn "No solutions were found."
-        nothing
+
+function solve(
+    S::Solver,
+    starts;
+    iterator_only::Bool = false,
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+)
+    if iterator_only
+        return ResultIterator(starts, S, nothing)
+    else
+        return solve(S, collect(starts); threading = threading, kwargs...)
     end
 end
+
 function solve(
     S::Solver,
     starts::AbstractArray;

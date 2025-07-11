@@ -1,4 +1,5 @@
-using HomotopyContinuation, LinearAlgebra, Test, Parameters, Random
+using HomotopyContinuation
+using LinearAlgebra, Test, Parameters, Random
 using HomotopyContinuation.DoubleDouble: ComplexDF64
 import Arblib, Combinatorics
 using ProjectiveVectors: PVector, affine_chart
@@ -47,6 +48,7 @@ Random.seed!(0x8b868a97)
         include("endgame_tracker_test.jl")
         include("polyhedral_test.jl")
         include("solve_test.jl")
+        include("result_test.jl")
         include("endgame_test.jl")
         include("monodromy_test.jl")
         include("witness_set_test.jl")

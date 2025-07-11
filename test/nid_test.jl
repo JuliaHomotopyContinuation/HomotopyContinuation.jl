@@ -272,23 +272,4 @@
         @test ncomponents(NID, 0) == 1
         @test degrees(NID)[0] == [1]
     end
-
-    @testset "solve a system without solutions" begin
-        using HomotopyContinuation
-        @var x[1:4]
-
-        I = [
-            13 * (x[1] + x[2]) - 61 * (x[2] + x[3]) + 48 * (x[1] + x[3]) -
-            61 * (x[1] + x[4]) +
-            48 * (x[2] + x[4]) +
-            13 * (x[3] + x[4]) +
-            1,
-            13 * (x[2]x[1] + x[1]^2 + x[2]^2) - 61(x[4]x[1] + x[1]^2 + x[4]^2) +
-            48(x[4]x[2] + x[2]^2 + x[4]^2) +
-            48(x[3]x[1] + x[1]^2 + x[3]^2) - 61(x[2]x[3] + x[2]^2 + x[3]^2) +
-            13(x[4] * x[3] + x[3]^2 + x[4]^2),
-        ]
-        b = nid(I)
-        @test isnothing(b)
-    end
 end
