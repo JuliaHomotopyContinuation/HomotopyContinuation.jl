@@ -266,13 +266,39 @@ is_nonsingular(r::PathResult) = !is_singular(r) && is_success(r)
 
 
 """
-    is_real(r::PathResult; tol::Float64 = 1e-6)
+    is_real(r::PathResult; atol::Float64 = 1e-6, rtol::Float64 = 0.0)
 
-We consider a result as `real` if the infinity-norm of the imaginary part of the solution
-is at most `tol`.
+We consider a result as `real` if either:
+
+- the infinity-norm of the imaginary part of the solution is less than `atol`
+- the infinity-norm of the imaginary part of the solution is less than `rtol * norm(s, 1)`, where s is the solution in `PathResult`.
+
+!!! warning
+    `tol` is a deprecated alias for `atol` and will be removed in a future version.
+    For backwards compatibility, setting `tol` overrides `atol`, but users should switch now to using `atol` directly.
 """
-is_real(r::PathResult; tol::Float64 = 1e-6) = is_real(r, tol)
-is_real(r::PathResult, tol::Real) = maximum(abs ∘ imag, r.solution) < tol
+function is_real(
+    r::PathResult;
+    atol::Float64 = 1e-6,
+    rtol::Float64 = 0.0,
+    tol::Union{Float64,Nothing} = nothing,
+)
+    m = maximum(abs ∘ imag, r.solution)
+    if tol !== nothing
+        Base.depwarn(
+            "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
+            :is_real,
+        )
+        atol = tol
+    end
+    m < atol && return true
+    iszero(rtol) && return false
+    thresh = rtol * norm(r.solution, 1)
+    return m < thresh
+end
+is_real(r::PathResult, atol::Float64) = is_real(r; atol = atol)
+is_real(r::PathResult, atol::Float64, rtol::Float64) = is_real(r; atol, rtol)
 # provide fallback since this in in Base
-Base.isreal(r::PathResult, tol) = is_real(r, tol)
+Base.isreal(r::PathResult, atol) = is_real(r, atol)
+Base.isreal(r::PathResult, atol, rtol) = is_real(r, atol, rtol)
 Base.isreal(r::PathResult; kwargs...) = is_real(r; kwargs...)
