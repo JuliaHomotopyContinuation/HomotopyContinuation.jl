@@ -156,7 +156,19 @@ Base.@kwdef struct ResultStatistics
 end
 Base.show(io::IO, stats::ResultStatistics) = print_fieldnames(io, stats)
 
-function ResultStatistics(result::Result; real_tol::Float64 = 1e-6)
+function ResultStatistics(
+    result::Result;
+    real_atol::Float64 = 1e-6,
+    real_rtol::Float64 = 0.0,
+    real_tol::Union{Float64,Nothing} = nothing,
+)
+    if real_tol !== nothing
+        Base.depwarn(
+            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
+            :ResultStatistics,
+        )
+        real_atol = real_tol
+    end
     failed = at_infinity = excess_solution = 0
     nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -169,14 +181,14 @@ function ResultStatistics(result::Result; real_tol::Float64 = 1e-6)
         elseif is_excess_solution(r)
             excess_solution += 1
         elseif is_singular(r)
-            if is_real(r, real_tol)
+            if is_real(r, real_atol, real_rtol)
                 real_singular += 1
                 real_singular_with_multiplicity += something(multiplicity(r), 1)
             end
             singular += 1
             singular_with_multiplicity += something(multiplicity(r), 1)
         else # finite, nonsingular
-            if is_real(r, real_tol)
+            if is_real(r, real_atol, real_rtol)
                 real_nonsingular += 1
             end
             nonsingular += 1
@@ -198,7 +210,7 @@ function ResultStatistics(result::Result; real_tol::Float64 = 1e-6)
 end
 
 """
-    statistics(R::Result; real_tol = 1e-6)
+    statistics(R::Result; real_atol = 1e-6)
 
 Statistic about the number of (real) singular and non-singular solutions etc.
 """
@@ -211,7 +223,8 @@ const AbstractResults = Union{AbstractResult,AbstractVector{<:PathResult}}
     results(
         result;
         only_real = false,
-        real_tol = 1e-6,
+        real_atol = 1e-6,
+        real_rtol = 0.0,
         only_nonsingular = false,
         only_singular = false,
         only_finite = true,
@@ -221,30 +234,47 @@ const AbstractResults = Union{AbstractResult,AbstractVector{<:PathResult}}
 
 Return all [`PathResult`](@ref)s for which satisfy the given conditions and apply,
 if provided, the function `f`.
+
+!!! warning
+
+    `real_tol` is a deprecated alias for `real_atol` and will be removed in a future version.
+    For backwards compatibility, setting `real_tol` overrides `real_atol`, but users should
+    switch now to using `real_atol` directly.
 """
 results(R::AbstractResults; kwargs...) = results(identity, R; kwargs...)
 function results(
     f::Function,
     R::AbstractResults;
     only_real::Bool = false,
-    real_tol::Float64 = 1e-6,
+    real_atol::Float64 = 1e-6,
+    real_rtol::Float64 = 0.0,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
     only_finite::Bool = true,
     multiple_results::Bool = false,
+    real_tol::Union{Float64,Nothing} = nothing,
 )
+    if real_tol !== nothing
+        Base.depwarn(
+            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
+            :results,
+        )
+        real_atol = real_tol
+    end
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
     end
+
     filter_function =
         r ->
-            (!only_real || is_real(r, real_tol)) &&
-                (!only_nonsingular || is_nonsingular(r)) &&
-                (!only_singular || is_singular(r)) &&
-                (!only_finite || is_finite(r)) &&
-                (multiple_results || !is_multiple_result(r, R))
+            (!only_real || is_real(r, real_atol, real_rtol)) &&
+            (!only_nonsingular || is_nonsingular(r)) &&
+            (!only_singular || is_singular(r)) &&
+            (!only_finite || is_finite(r)) &&
+            (multiple_results || !is_multiple_result(r, R))
     return_iter = imap(f, Iterators.filter(filter_function, R))
+    
     if typeof(R) <: Results
         return (collect(return_iter))
     else
@@ -461,7 +491,8 @@ end
     nresults(
         result;
         only_real = false,
-        real_tol = 1e-6,
+        real_atol = 1e-6,
+        real_rtol = 0.0,
         only_nonsingular = false,
         only_singular = false,
         only_finite = true,
@@ -470,23 +501,38 @@ end
 
 Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
+
+!!! warning
+    `real_tol` is a deprecated alias for `real_atol` and will be removed in a future version.
+    For backwards compatibility, setting `real_tol` overrides `real_atol`, but users should
+    switch now to using `real_atol` directly.
 """
 function nresults(
     R::AbstractResults;
     only_real::Bool = false,
-    real_tol::Float64 = 1e-6,
+    real_atol::Float64 = 1e-6,
+    real_rtol::Float64 = 0.0,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
     onlyfinite::Bool = true, # deprecated
     only_finite::Bool = onlyfinite,
     multiple_results::Bool = false,
+    real_tol::Union{Float64,Nothing} = nothing,
 )
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
     end
+    if real_tol !== nothing
+        Base.depwarn(
+            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
+            :nresults,
+        )
+        real_atol = real_tol
+    end
+    
     count(R) do r
-        (!only_real || is_real(r, real_tol)) &&
+        (!only_real || is_real(r, real_atol, real_rtol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
             (!only_singular || is_singular(r)) &&
             (!only_finite || isfinite(r)) &&
@@ -515,11 +561,11 @@ solutions(result::AbstractResults; only_nonsingular = true, kwargs...) =
     results(solution, result; only_nonsingular = only_nonsingular, kwargs...)
 
 """
-    real_solutions(result; tol=1e-6, conditions...)
+    real_solutions(result; atol=1e-6, rtol = 0.0, conditions...)
 
 Return all real solution for which the given conditions apply.
 For the possible `conditions` see [`results`](@ref).
-Note that `only_real` is always `true` and `real_tol` is now `tol`.
+Note that `only_real` is always `true`, `real_atol` is now `atol` and  `real_rtol` is now `rtol`.
 
 ## Example
 ```julia-repl
@@ -530,9 +576,34 @@ julia> real_solutions(solve(F))
  [2.0, -5.0]
  [-3.0, 0.0]
 ```
+
+!!! warning
+    The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.
+    For backwards compatibility, setting `tol` overrides `atol`, but users should switch now to using
+    `atol` directly.
 """
-function real_solutions(result::AbstractResults; tol::Float64 = 1e-6, kwargs...)
-    results(real ∘ solution, result; only_real = true, real_tol = tol, kwargs...)
+function real_solutions(
+    result::AbstractResults;
+    atol::Float64 = 1e-6,
+    rtol::Float64 = 0.0,
+    tol::Union{Float64,Nothing} = nothing,
+    kwargs...,
+)
+    if tol !== nothing
+        Base.depwarn(
+            "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
+            :real_solutions,
+        )
+        atol = tol
+    end
+    results(
+        real ∘ solution,
+        result;
+        only_real = true,
+        real_atol = atol,
+        real_rtol = rtol,
+        kwargs...,
+    )
 end
 
 
@@ -558,12 +629,12 @@ function singular(R::AbstractResults; kwargs...)
 end
 
 """
-    real(result, tol=1e-6)
+    real(result; kwargs...)
 
 Get all results where the solutions are real with the given tolerance `tol`.
-See [`is_real`](@ref) for details regarding the determination of 'realness'.
+See [`is_real`](@ref) for details regarding how `kwargs` affect the determination of 'realness'.
 """
-Base.real(R::Results; tol::Float64 = 1e-6) = filter(r -> is_real(r, tol), path_results(R))
+Base.real(R::Results; kwargs...) = filter(r -> is_real(r; kwargs...), path_results(R))
 
 """
     failed(result)
@@ -636,13 +707,12 @@ The number of non-singular solutions. See also [`is_singular`](@ref).
 nnonsingular(R::AbstractResults) = count(is_nonsingular, R)
 
 """
-    nreal(result; tol=1e-6)
+    nreal(result; kwargs...)
 
 The number of real solutions. See also [`is_real`](@ref).
 """
-nreal(R::Result; tol = 1e-6) = nresults(R, only_real = true, real_tol = tol)
-nreal(R::AbstractResult; tol = 1e-6) =
-    nresults(R, only_real = true, real_tol = tol, multiple_results = true)
+nreal(R::Results; kwargs...) = nresults(R, only_real = true, kwargs...)
+nreal(R::AbstractResult; kwargs...) = nresults(R, only_real = true, multiple_results = true, kwargs...)
 
 """
     ntracked(result)

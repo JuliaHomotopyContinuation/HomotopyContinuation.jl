@@ -38,6 +38,9 @@
         @test last_path_point(res[1]) isa Tuple{Vector{ComplexF64},Float64}
         @test 0 < last(last_path_point(res[1])) < 0.1
         @test all(is_real, res)
+        @test !any(pr -> isreal(pr; atol = 0.0), res)  # there's a tiny imaginary part
+        @test all(pr -> isreal(pr; atol = 1e-16), res)
+        @test all(pr -> isreal(pr; atol = 0.0, rtol = 1e-16), res)
         @test all(isreal, res)
         @test all(is_singular, res)
     end
