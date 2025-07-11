@@ -29,6 +29,9 @@ import Base: push!
 
 const LA = LinearAlgebra
 
+# To ensure that ModelKit and HomotopyContinuation define methods of the same `is_real` function:
+function is_real end
+
 include("DoubleDouble.jl")
 using .DoubleDouble
 
