@@ -21,6 +21,8 @@ export Result,
     nreal,
     ntracked
 
+export ResultIterator, bitmask, bitmask_filter, solver, start_solutions
+
 abstract type AbstractResult end
 abstract type AbstractSolver end
 
@@ -344,8 +346,33 @@ function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) wh
 end
 
 seed(ri::ResultIterator) = ri.S.seed
+"""
+    path_results(ri::ResultIterator)
+
+Iterates through `ri` and collects all the path results in a vector.
+"""
 path_results(ri::ResultIterator) = collect(ri)
 
+"""
+    start_solutions(ri::ResultIterator)
+
+Returns the start solutions of `ri`.
+"""
+start_solutions(ri::ResultIterator) = ri.starts
+
+"""
+    solver(ri::ResultIterator)
+
+Returns the solver of `ri`.
+"""
+solver(ri::ResultIterator) = ri.S
+
+"""
+    bitmask(ri::ResultIterator)
+
+Returns the bitmask of `ri`.
+"""
+bitmask(ri::ResultIterator) = ri.bitmask
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     header = "ResultIterator"

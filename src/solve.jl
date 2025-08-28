@@ -5,9 +5,6 @@ export solve,
     parameter_homotopy,
     linear_subspace_homotopy
 
-export ResultIterator, bitmask, bitmask_filter
-
-
 struct SolveStats
     regular::Threads.Atomic{Int}
     regular_real::Threads.Atomic{Int}
