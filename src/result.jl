@@ -348,14 +348,20 @@ function ResultIterator(
     bitmask = nothing,
     predicate = nothing,
 ) where {Iter}
+
+    if first(starts) isa Number # to allow passing a single start solution
+        return ResultIterator([starts], S; bitmask = bitmask, predicate = predicate)
+    end
+
     if isnothing(bitmask)
         bitmask =
             isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+    else
+        if !isnothing(predicate)
+            @warn "The keyword predicate will be ignored, since both bitmask and predicate are given."
+        end
     end
     ResultIterator{Iter}(starts, S, bitmask)
-end
-function ResultIterator(starts::Vector{T}, S; kwargs...) where {T<:Number}
-    ResultIterator([starts], S; kwargs...)
 end
 
 seed(ri::ResultIterator) = ri.S.seed
