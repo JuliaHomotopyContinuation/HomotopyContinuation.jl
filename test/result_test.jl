@@ -162,7 +162,6 @@ end
 
         @test isa(R, ResultIterator)
         @test nsolutions(R) == 1
-        nsolutions(R)
 
         R2 = solve(
             F,

@@ -346,11 +346,14 @@ function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) wh
     bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
     return (ResultIterator{Iter}(starts, S, bitmask))
 end
-function ResultIterator(s::Vector{T}, S, bitmask) where {T<:Number}
-    ResultIterator([s], S, bitmask)
-end
 function ResultIterator(s::Vector{T}, S; kwargs...) where {T<:Number}
     ResultIterator([s], S; kwargs...)
+end
+function ResultIterator(s, S; bitmask = nothing)
+    ResultIterator(s, S, bitmask)
+end
+function ResultIterator(s::Vector{T}, S; bitmask = nothing) where {T<:Number}
+    ResultIterator([s], S, bitmask)
 end
 
 seed(ri::ResultIterator) = ri.S.seed

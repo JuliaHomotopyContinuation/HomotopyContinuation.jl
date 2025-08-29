@@ -486,7 +486,7 @@ function solve(
             map(target_parameters) do p
                 solverᵢ = deepcopy(solver)
                 target_parameters!(solverᵢ, p)
-                ResultIterator(starts, solver, bitmask)
+                ResultIterator(starts, solver; bitmask = bitmask)
             end
         else
             solve(
@@ -503,7 +503,7 @@ function solve(
         end
     else
         if iterator_only
-            ResultIterator(starts, solver, bitmask)
+            ResultIterator(starts, solver; bitmask = bitmask)
         else
             solve(
                 solver,
@@ -530,7 +530,7 @@ function solve(
     kwargs...,
 )
     if iterator_only
-        return ResultIterator(starts, S, bitmask)
+        return ResultIterator(starts, S; bitmask = bitmask)
     else
         return solve(S, collect(starts); threading = threading, kwargs...)
     end
