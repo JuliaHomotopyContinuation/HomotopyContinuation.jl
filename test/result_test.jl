@@ -67,11 +67,8 @@ end
             ];
             parameters = a,
         )
-        res = solve(
-            F;
-            iterator_only = true,
-            target_parameters = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32],
-        )
+        param = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        res = solve(F; iterator_only = true, target_parameters = param)
 
         @test startswith(sprint(show, res), "ResultIterator")
         @test seed(res) isa UInt32
@@ -86,6 +83,11 @@ end
         @test nsingular(res) == 0
         @test nexcess_solutions(res) == 0
 
+        # pass bit-vector 
+        B = BitVector([1, 0, 0, 0, 0, 0, 0])
+        res_B = solve(F; iterator_only = true, bitmask = B, target_parameters = param)
+        @test length(res_B) == 1
+
         # singular result
         @var x y
         g = System([(29 / 16) * x^3 - 2 * x * y, x^2 - y])
@@ -93,6 +95,7 @@ end
         @test startswith(sprint(show, res), "ResultIterator")
         @test seed(res) isa UInt32
         @test !isempty(sprint(show, res))
+
 
         # pass iterator as start solutions
         @var x y p
@@ -159,7 +162,6 @@ end
 
         @test isa(R, ResultIterator)
         @test nsolutions(R) == 1
-        nsolutions(R)
 
         R2 = solve(
             F,
@@ -281,5 +283,38 @@ end
         @test length(w2) == 2
         pt = solution(w2[1])
         @test norm(l2(pt)) < 1e-12
+    end
+
+    @testset "Compression" begin
+        F = cyclic(5)
+        R = solve(F)
+        # this function encodes the zeros R of F as an iterator with total degree start system 
+        function compress(F, R; gamma = cis(rand() * 2pi))
+            d = degrees(F)
+            v = variables(F)
+            k = length(R)
+            S = total_degree_start_solutions(d)
+            G = System(gamma .* [vi^di - 1 for (vi, di) in zip(v, d)], variables = v)
+            T = solutions(solve(F, G, R))
+
+            U = UniquePoints(first(T), 0)
+            for (i, t) in enumerate(T)
+                add!(U, t, i)
+            end
+            B = BitVector()
+            for (i, s) in enumerate(S)
+                _, j = add!(U, s, i + k)
+                push!(B, !j)
+            end
+
+            solve(G, F, S; iterator_only = true, bitmask = B)
+        end
+
+        C = compress(F, R)
+
+        @test C isa ResultIterator
+        R_test = collect(C)
+        @test length(R_test) == 70
+        @test all(is_success, R_test)
     end
 end

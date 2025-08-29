@@ -61,6 +61,9 @@ valuation(::PathResult)
 
 ```@docs
 ResultIterator
-bitmask_filter
-trace
+bitmask_filter(::ResultIterator)
+trace(::ResultIterator)
+solver(::ResultIterator)
+start_solutions(::ResultIterator)
+bitmask(::ResultIterator)
 ```

@@ -21,6 +21,8 @@ export Result,
     nreal,
     ntracked
 
+export ResultIterator, bitmask, bitmask_filter, solver, start_solutions
+
 abstract type AbstractResult end
 abstract type AbstractSolver end
 
@@ -327,25 +329,69 @@ solve(F, res;
     target_parameters = randn(ComplexF64,6)
 )
 ``` 
- 
-
+It is possible to pass a bit-vector `B` directly to solve as bitmask: 
+```julia 
+solve(F; 
+    iterator_only = true, 
+    bitmask = B
+)
+``` 
 """
 struct ResultIterator{Iter} <: AbstractResult
     starts::Iter                       # The start solution iterator
     S::AbstractSolver
     bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
 end
-function ResultIterator(s::Vector{T}, S::AbstractSolver; kwargs...) where {T<:Number}
-    ResultIterator([s], S; kwargs...)
-end
-function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) where {Iter}
-    bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
-    return (ResultIterator{Iter}(starts, S, bitmask))
+function ResultIterator(
+    starts::Iter,
+    S::AbstractSolver;
+    bitmask = nothing,
+    predicate = nothing,
+) where {Iter}
+
+    if first(starts) isa Number # to allow passing a single start solution
+        return ResultIterator([starts], S; bitmask = bitmask, predicate = predicate)
+    end
+
+    if isnothing(bitmask)
+        bitmask =
+            isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
+    else
+        if !isnothing(predicate)
+            @warn "The keyword predicate will be ignored, since both bitmask and predicate are given."
+        end
+    end
+    ResultIterator{Iter}(starts, S, bitmask)
 end
 
 seed(ri::ResultIterator) = ri.S.seed
+"""
+    path_results(ri::ResultIterator)
+
+Iterates through `ri` and collects all the path results in a vector.
+"""
 path_results(ri::ResultIterator) = collect(ri)
 
+"""
+    start_solutions(ri::ResultIterator)
+
+Returns the start solutions of `ri`.
+"""
+start_solutions(ri::ResultIterator) = ri.starts
+
+"""
+    solver(ri::ResultIterator)
+
+Returns the solver of `ri`.
+"""
+solver(ri::ResultIterator) = ri.S
+
+"""
+    bitmask(ri::ResultIterator)
+
+Returns the bitmask of `ri`.
+"""
+bitmask(ri::ResultIterator) = ri.bitmask
 
 function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     header = "ResultIterator"
