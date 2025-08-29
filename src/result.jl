@@ -342,12 +342,15 @@ struct ResultIterator{Iter} <: AbstractResult
     S::AbstractSolver
     bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
 end
-function ResultIterator(s::Vector{T}, S::AbstractSolver; kwargs...) where {T<:Number}
-    ResultIterator([s], S; kwargs...)
-end
 function ResultIterator(starts::Iter, S::AbstractSolver; predicate = nothing) where {Iter}
     bitmask = isnothing(predicate) ? nothing : BitVector([predicate(S(x)) for x in starts])
     return (ResultIterator{Iter}(starts, S, bitmask))
+end
+function ResultIterator(s::Vector{T}, S, bitmask) where {T<:Number}
+    ResultIterator([s], S, bitmask)
+end
+function ResultIterator(s::Vector{T}, S; kwargs...) where {T<:Number}
+    ResultIterator([s], S; kwargs...)
 end
 
 seed(ri::ResultIterator) = ri.S.seed
