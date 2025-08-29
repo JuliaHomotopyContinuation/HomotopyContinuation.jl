@@ -282,4 +282,37 @@ end
         pt = solution(w2[1])
         @test norm(l2(pt)) < 1e-12
     end
+
+    @testset "Compression" begin
+        F = cyclic(5)
+        R = solve(F)
+        # this function encodes the zeros R of F as an iterator with total degree start system 
+        function compress(F, R; gamma = cis(rand() * 2pi))
+            d = degrees(F)
+            v = variables(F)
+            k = length(R)
+            S = total_degree_start_solutions(d)
+            G = System(gamma .* [vi^di - 1 for (vi, di) in zip(v, d)], variables = v)
+            T = solutions(solve(F, G, R))
+
+            U = UniquePoints(first(T), 0)
+            for (i, t) in enumerate(T)
+                add!(U, t, i)
+            end
+            B = BitVector()
+            for (i, s) in enumerate(S)
+                _, j = add!(U, s, i + k)
+                push!(B, !j)
+            end
+
+            solve(G, F, S; iterator_only = true, bitmask = B)
+        end
+
+        C = compress(F, R)
+
+        @test C isa ResultIterator
+        R_test = collect(C)
+        @test length(R_test) == 70
+        @test all(is_success, R_test)
+    end
 end

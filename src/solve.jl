@@ -449,6 +449,7 @@ function solve(
     flatten = nothing,
     target_subspaces = nothing,
     iterator_only::Bool = false,
+    bitmask = nothing,
     kwargs...,
 )
 
@@ -485,7 +486,7 @@ function solve(
             map(target_parameters) do p
                 solverᵢ = deepcopy(solver)
                 target_parameters!(solverᵢ, p)
-                ResultIterator(starts, solver; predicate = nothing)
+                ResultIterator(starts, solver, bitmask)
             end
         else
             solve(
@@ -502,7 +503,7 @@ function solve(
         end
     else
         if iterator_only
-            ResultIterator(starts, solver; predicate = nothing)
+            ResultIterator(starts, solver, bitmask)
         else
             solve(
                 solver,
@@ -524,11 +525,12 @@ function solve(
     S::Solver,
     starts;
     iterator_only::Bool = false,
+    bitmask = nothing,
     threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
     if iterator_only
-        return ResultIterator(starts, S, nothing)
+        return ResultIterator(starts, S, bitmask)
     else
         return solve(S, collect(starts); threading = threading, kwargs...)
     end
