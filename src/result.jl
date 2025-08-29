@@ -329,8 +329,13 @@ solve(F, res;
     target_parameters = randn(ComplexF64,6)
 )
 ``` 
- 
-
+It is possible to pass a bit-vector `B` directly to solve as bitmask: 
+```julia 
+solve(F; 
+    iterator_only = true, 
+    bitmask = B
+)
+``` 
 """
 struct ResultIterator{Iter} <: AbstractResult
     starts::Iter                       # The start solution iterator

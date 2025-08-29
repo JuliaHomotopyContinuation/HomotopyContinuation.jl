@@ -67,11 +67,8 @@ end
             ];
             parameters = a,
         )
-        res = solve(
-            F;
-            iterator_only = true,
-            target_parameters = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32],
-        )
+        param = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        res = solve(F; iterator_only = true, target_parameters = param)
 
         @test startswith(sprint(show, res), "ResultIterator")
         @test seed(res) isa UInt32
@@ -86,6 +83,11 @@ end
         @test nsingular(res) == 0
         @test nexcess_solutions(res) == 0
 
+        # pass bit-vector 
+        B = BitVector([1, 0, 0, 0, 0, 0, 0])
+        res_B = solve(F; iterator_only = true, bitmask = B, target_parameters = param)
+        @test length(res_B) == 1
+
         # singular result
         @var x y
         g = System([(29 / 16) * x^3 - 2 * x * y, x^2 - y])
@@ -93,6 +95,7 @@ end
         @test startswith(sprint(show, res), "ResultIterator")
         @test seed(res) isa UInt32
         @test !isempty(sprint(show, res))
+
 
         # pass iterator as start solutions
         @var x y p
