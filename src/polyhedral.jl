@@ -6,11 +6,11 @@ export polyhedral, PolyhedralTracker, PolyhedralStartSolutionsIterator, mixed_vo
 
 An iterator providing start solutions for the polyhedral homotopy.
 """
-struct PolyhedralStartSolutionsIterator
+struct PolyhedralStartSolutionsIterator{Iter}
     support::Vector{Matrix{Int32}}
     start_coefficients::Vector{Vector{ComplexF64}}
     lifting::Vector{Vector{Int32}}
-    mixed_cells::Vector{MixedCell}
+    mixed_cells::Iter
     BSS::BinomialSystemSolver
 end
 
@@ -42,7 +42,8 @@ Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype
 Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
-    if isempty(iter.mixed_cells)
+    first_cell = iterate(iter.mixed_cells)
+    if isnothing(first_cell)
         res = MixedSubdivisions.fine_mixed_cells(iter.support)
         if isnothing(res) || isempty(res[1])
             throw(OverflowError("Cannot compute a start system."))
@@ -59,29 +60,42 @@ function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     iter
 end
 
+
 function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     compute_mixed_cells!(iter)
 
-    isempty(iter.mixed_cells) && return nothing
+    first_cell = iterate(iter.mixed_cells)
+    isnothing(first_cell) && return nothing
+    cell, inner_state = first_cell
 
-    cell = iter.mixed_cells[1]
     solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-
     x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
-    el = (cell, x)
-    next_state = size(iter.BSS.X, 2) == 1 ? (2, 1) : (1, 2)
-    el, next_state
+
+    # return the value _and_ the combined state:
+    # (cell, inner_state, column_index)
+    return (cell, x), (cell, inner_state, 1)
 end
 
-function Base.iterate(iter::PolyhedralStartSolutionsIterator, (i, j)::Tuple{Int,Int})
-    i > length(iter.mixed_cells) && return nothing
+function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any,Any,Int})
+    cell, inner_state, j = state
+    ncol = size(iter.BSS.X, 2)
 
-    cell = iter.mixed_cells[i]
-    j == 1 && solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-    x = [iter.BSS.X[i, j] for i = 1:length(iter.support)]
-    el = (cell, x)
-    next_state = size(iter.BSS.X, 2) == j ? (i + 1, 1) : (i, j + 1)
-    return el, next_state
+    if j < ncol
+        # we still have more columns to emit for the current cell
+        new_j = j + 1
+        x = [iter.BSS.X[i, new_j] for i = 1:length(iter.support)]
+        return (cell, x), (cell, inner_state, new_j)
+    else
+        # we finished the last column for `cell`, advance to the next cell
+        next_cell = iterate(iter.mixed_cells, inner_state)
+        next_cell === nothing && return nothing
+        cell2, new_inner_state = next_cell
+
+        solve(iter.BSS, iter.support, iter.start_coefficients, cell2)
+        x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+
+        return (cell2, x), (cell2, new_inner_state, 1)
+    end
 end
 
 # Tracker
