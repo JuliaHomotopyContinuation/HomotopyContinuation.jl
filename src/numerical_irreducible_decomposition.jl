@@ -828,7 +828,6 @@ function decompose_with_monodromy!(
                 show_progress = show_monodromy_progress,
             )
             non_complete_points = solutions(res)
-            @show length(non_complete_points)
 
             # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
@@ -911,7 +910,6 @@ function decompose_with_monodromy!(
             end
 
             shift_orbit(orbit) = Set(orbit_indices_mapping[i] for i in orbit)
-            @show 376 in keys(orbit_indices_mapping)
             # 1. shift existing non complete orbits to new mapping
             non_complete_orbits =
                 shift_orbit.(
