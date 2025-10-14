@@ -747,6 +747,7 @@ function _certify(
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
     threading::Bool = true,
+    tasks_per_thread::Int = 2,
     certify_solution_kwargs...,
 )
     N = length(solution_candidates)
@@ -796,7 +797,6 @@ function _certify(
         Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
         Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
 
-        tasks_per_thread = 2
         chunk_size = max(1, N ÷ (tasks_per_thread * nthreads))
         data_chunks = Base.Iterators.partition(1:N, chunk_size)
 

@@ -945,6 +945,7 @@ function serial_monodromy_solve!(
                     add_permutation!(stats, job.loop_id, job.id, id)
                 end
 
+
                 got_added || @goto _update
                 # 2) doesn't exist, so add to results
                 push!(results, res)
@@ -1014,7 +1015,8 @@ function threaded_monodromy_solve!(
     MS::MonodromySolver,
     p,
     seed,
-    progress,
+    progress;
+    tasks_per_thread::Int = 2,
 )
 
     tracker = MS.trackers[1]
@@ -1071,7 +1073,6 @@ function threaded_monodromy_solve!(
         end
 
         # Partition jobs for threading
-        tasks_per_thread = 2
         chunk_size = max(1, length(queue) ÷ (tasks_per_thread * nthr))
         data_chunks = Base.Iterators.partition(1:length(queue), chunk_size)
 
@@ -1157,13 +1158,36 @@ function threaded_monodromy_solve!(
             end
         catch e
             interrupted[] = true
+            retcode = :interrupted
             rethrow(e)
         end
 
         # Remove processed jobs from queue
         filter!(job -> !interrupted[], queue)
 
-        if interrupted[]
+        # Check global stopping conditions and set retcode
+        if MS.options.loop_finished_callback(results)
+            retcode = :terminated_callback
+            break
+        elseif p isa LinearSubspace &&
+               nloops(MS) > 0 &&
+               MS.options.trace_test &&
+               trace_colinearity(MS) < MS.options.trace_test_tol
+            retcode = :success
+            break
+        elseif isnothing(MS.options.target_solutions_count) &&
+               loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
+            retcode = :heuristic_stop
+            break
+        elseif length(results) == something(MS.options.target_solutions_count, -1)
+            retcode = :success
+            break
+        elseif nloops(MS) > 0 && MS.options.single_loop_per_start_solution
+            retcode = :success
+            break
+        elseif interrupted[]
+            # If interrupted by worker, set retcode appropriately
+            retcode = :interrupted
             break
         end
     end
