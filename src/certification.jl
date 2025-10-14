@@ -1630,43 +1630,58 @@ function distinct_certified_solutions!(
     S::AbstractVector{Vector{ComplexF64}};
     threading::Bool = true,
     show_progress::Bool = true,
-    kwargs...,
+    tasks_per_thread::Int = 2,
+    certify_solution_kwargs...,
 )
     progress = nothing
+    N = length(S)
     if show_progress
-        progress = ProgressMeter.Progress(
-            length(S);
-            desc = "Processing $(length(S)) solutions",
-            showspeed = true,
-        )
+        progress =
+            ProgressMeter.Progress(N; desc = "Processing $N solutions", showspeed = true)
     end
     progress_lock = ReentrantLock()
     if threading
         ndistinct = Threads.Atomic{Int}(length(d))
         processed = Threads.Atomic{Int}(0)
-        Threads.@threads for i = 1:length(S)
-            sol = S[i]
-            added, = add_solution!(d, sol, i; kwargs...)
-            Threads.atomic_add!(processed, 1)
-            if added
-                Threads.atomic_add!(ndistinct, 1)
-            end
-            if show_progress
-                @lock progress_lock begin
-                    ProgressMeter.next!(
-                        progress;
-                        showvalues = [
-                            (:processed, processed[]),
-                            (:distinct_certified, ndistinct[]),
-                        ],
-                    )
+        nthreads = Threads.nthreads()
+        chunk_size = max(1, N ÷ (tasks_per_thread * nthreads))
+        data_chunks = Base.Iterators.partition(1:N, chunk_size)
+
+        data_lock = ReentrantLock()
+        tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
+            Threads.@spawn begin
+                for i in chunk
+                    sol = S[i]
+                    added = false
+                    lock(data_lock) do
+                        added, = add_solution!(d, sol, i; certify_solution_kwargs...)
+                    end
+                    Threads.atomic_add!(processed, 1)
+                    if added
+                        Threads.atomic_add!(ndistinct, 1)
+                    end
+                    if show_progress
+                        lock(progress_lock) do
+                            ProgressMeter.next!(
+                                progress;
+                                showvalues = [
+                                    (:processed, processed[]),
+                                    (:distinct_certified, ndistinct[]),
+                                ],
+                            )
+                        end
+                    end
                 end
             end
+        end
+
+        for task in tasks
+            fetch(task)
         end
     else
         ndistinct = processed = 0
         for (i, sol) in enumerate(S)
-            added, = add_solution!(d, sol, i; kwargs...)
+            added, = add_solution!(d, sol, i; certify_solution_kwargs...)
             processed += 1
             ndistinct += added
             if show_progress
