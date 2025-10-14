@@ -807,7 +807,7 @@ function decompose_with_monodromy!(
 
         iter = 0
         non_complete_points = solutions(res)
-        d = length(non_complete_points)
+        d = length(non_complete_points) # the total degree (i.e., number of points on all irreducible components)
         non_complete_orbits = Vector{Set{Int}}()
 
         while !isempty(non_complete_points)
@@ -826,6 +826,7 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
+            d += nresults(res) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = solutions(res)
             ℓ = length(non_complete_points)
 
