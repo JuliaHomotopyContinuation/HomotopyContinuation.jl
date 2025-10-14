@@ -791,72 +791,86 @@ function _certify(
         distinct_lock = ReentrantLock()
         nthreads = Threads.nthreads()
 
+        # Prepare thread-local copies
         Tf = [F; [deepcopy(F) for _ = 2:nthreads]]
         Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
         Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
 
-        Threads.@threads for i = 1:N
-            tid = Threads.threadid()
+        tasks_per_thread = 2
+        chunk_size = max(1, N ÷ (tasks_per_thread * nthreads))
+        data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
-            s = solution_candidates[i]
-            cert = certify_solution(
-                Tf[tid],
-                s,
-                Tp[tid],
-                Tcache[tid],
-                i,
-                is_real_system;
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
+        tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
+            local_F = Tf[(chunk_idx - 1) % nthreads + 1]
+            local_cache = Tcache[(chunk_idx - 1) % nthreads + 1]
+            local_p = Tp[(chunk_idx - 1) % nthreads + 1]
+            Threads.@spawn begin
+                for i in chunk
+                    s = solution_candidates[i]
+                    cert = certify_solution(
+                        local_F,
+                        s,
+                        local_p,
+                        local_cache,
+                        i,
+                        is_real_system;
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
 
-            certificates[i] = cert
-            Threads.atomic_add!(nconsidered, 1)
-            if is_certified(cert)
-                Threads.atomic_add!(ncertified, 1)
-                Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
+                    certificates[i] = cert
+                    Threads.atomic_add!(nconsidered, 1)
+                    if is_certified(cert)
+                        Threads.atomic_add!(ncertified, 1)
+                        Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
 
-                @lock distinct_lock begin
-                    (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
-                    if is_distinct
-                        Threads.atomic_add!(ndistinct, 1)
-                        Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
-                    else
-                        if !haskey(duplicates_dict, distinct_cert.index)
-                            duplicates_dict[distinct_cert.index] =
-                                [distinct_cert.index, cert.index]
-                        else
-                            push!(duplicates_dict[distinct_cert.index], cert.index)
+                        lock(distinct_lock) do
+                            (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                            if is_distinct
+                                Threads.atomic_add!(ndistinct, 1)
+                                Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
+                            else
+                                if !haskey(duplicates_dict, distinct_cert.index)
+                                    duplicates_dict[distinct_cert.index] =
+                                        [distinct_cert.index, cert.index]
+                                else
+                                    push!(duplicates_dict[distinct_cert.index], cert.index)
+                                end
+                            end
+
+                            if !isnothing(progress)
+                                update_certify_progress!(
+                                    progress,
+                                    nconsidered[],
+                                    ncertified[],
+                                    nreal_certified[],
+                                    ndistinct[],
+                                    ndistinct_real[],
+                                )
+                            end
                         end
-                    end
-
-                    if !isnothing(progress)
-                        update_certify_progress!(
-                            progress,
-                            nconsidered[],
-                            ncertified[],
-                            nreal_certified[],
-                            ndistinct[],
-                            ndistinct_real[],
-                        )
-                    end
-                end
-            else
-                @lock distinct_lock begin
-                    if !isnothing(progress)
-                        update_certify_progress!(
-                            progress,
-                            nconsidered[],
-                            ncertified[],
-                            nreal_certified[],
-                            ndistinct[],
-                            ndistinct_real[],
-                        )
+                    else
+                        lock(distinct_lock) do
+                            if !isnothing(progress)
+                                update_certify_progress!(
+                                    progress,
+                                    nconsidered[],
+                                    ncertified[],
+                                    nreal_certified[],
+                                    ndistinct[],
+                                    ndistinct_real[],
+                                )
+                            end
+                        end
                     end
                 end
             end
         end
 
+        # Wait for all tasks to finish
+        for task in tasks
+            fetch(task)
+        end
     else
         for i = 1:N
             s = solution_candidates[i]
