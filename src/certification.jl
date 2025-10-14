@@ -789,7 +789,7 @@ function _certify(
     duplicates_dict = Dict{Int,Vector{Int}}()
     if threading
         distinct_lock = ReentrantLock()
-        nthreads = Threads.nthreads()
+        nthreads = Threads.nthreads() + 1
 
         Tf = [F; [deepcopy(F) for _ = 2:nthreads]]
         Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
@@ -797,8 +797,8 @@ function _certify(
 
         Threads.@threads for i = 1:N
             tid = Threads.threadid()
-
             s = solution_candidates[i]
+
             cert = certify_solution(
                 Tf[tid],
                 s,
