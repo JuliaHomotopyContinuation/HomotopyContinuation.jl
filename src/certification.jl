@@ -801,9 +801,9 @@ function _certify(
         data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
         tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
-            local_F = Tf[(chunk_idx - 1) % nthreads + 1]
-            local_cache = Tcache[(chunk_idx - 1) % nthreads + 1]
-            local_p = Tp[(chunk_idx - 1) % nthreads + 1]
+            local_F = Tf[(chunk_idx-1)%nthreads+1]
+            local_cache = Tcache[(chunk_idx-1)%nthreads+1]
+            local_p = Tp[(chunk_idx-1)%nthreads+1]
             Threads.@spawn begin
                 for i in chunk
                     s = solution_candidates[i]
@@ -825,7 +825,8 @@ function _certify(
                         Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
 
                         lock(distinct_lock) do
-                            (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                            (is_distinct, distinct_cert) =
+                                add_certificate!(distinct_sols, cert)
                             if is_distinct
                                 Threads.atomic_add!(ndistinct, 1)
                                 Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))

@@ -1076,7 +1076,7 @@ function threaded_monodromy_solve!(
         data_chunks = Base.Iterators.partition(1:length(queue), chunk_size)
 
         tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
-            local_tracker = MS.trackers[(chunk_idx - 1) % nthr + 1]
+            local_tracker = MS.trackers[(chunk_idx-1)%nthr+1]
             Threads.@spawn begin
                 for idx in chunk
                     job = queue[idx]

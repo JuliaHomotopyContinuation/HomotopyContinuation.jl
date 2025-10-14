@@ -623,7 +623,7 @@ function threaded_solve(
     progress = nothing,
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
-    tasks_per_thread::Int = 2
+    tasks_per_thread::Int = 2,
 )
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
@@ -646,7 +646,7 @@ function threaded_solve(
 
     # Each chunk gets its own tracker (cycling through available trackers)
     tasks = map(enumerate(data_chunks)) do (i, chunk)
-        local_tracker = solver.trackers[(i - 1) % nthr + 1]
+        local_tracker = solver.trackers[(i-1)%nthr+1]
         Threads.@spawn begin
             for k in chunk
                 if interrupted[]
