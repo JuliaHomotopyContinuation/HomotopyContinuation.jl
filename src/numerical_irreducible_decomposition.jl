@@ -828,7 +828,7 @@ function decompose_with_monodromy!(
             )
             non_complete_points = solutions(res)
             ℓ = length(non_complete_points)
-            
+
             # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
                 res;
