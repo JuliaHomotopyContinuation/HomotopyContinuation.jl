@@ -623,52 +623,66 @@ function threaded_solve(
     progress = nothing,
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
+    tasks_per_thread::Int = 2
 )
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
-    interrupted = false
+    interrupted = Threads.Atomic{Bool}(false)
     started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
-    try
-        tracker = solver.trackers[1]
-        ntrackers = length(solver.trackers)
-        nthr = Threads.nthreads()
 
-        resize!(solver.trackers, nthr)
-        for i = (ntrackers+1):nthr
-            solver.trackers[i] = deepcopy(tracker)
-        end
+    # partition S into chunks that
+    # individual tasks will deal with
+    chunk_size = max(1, N ÷ (tasks_per_thread * Threads.nthreads()))
+    data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
-        tasks = map(enumerate(solver.trackers)) do (i, tracker)
-            @tspawnat i begin
-                while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
-                    r = track(tracker, S[k]; path_number = k)
-                    path_results[k] = r
-                    nfinished = Threads.atomic_add!(finished, 1) + 1
-                    update!(solver.stats, r)
-                    update_progress!(progress, solver.stats, nfinished[])
-                    if is_success(r) && stop_early_cb(r)
-                        interrupted = true
-                    end
+    tracker = solver.trackers[1]
+    ntrackers = length(solver.trackers)
+    nthr = Threads.nthreads()
+    resize!(solver.trackers, nthr)
+    for i = (ntrackers+1):nthr
+        solver.trackers[i] = deepcopy(tracker)
+    end
+
+    # Each chunk gets its own tracker (cycling through available trackers)
+    tasks = map(enumerate(data_chunks)) do (i, chunk)
+        local_tracker = solver.trackers[(i - 1) % nthr + 1]
+        Threads.@spawn begin
+            for k in chunk
+                if interrupted[]
+                    break
+                end
+                r = track(local_tracker, S[k]; path_number = k)
+                path_results[k] = r
+                Threads.atomic_add!(started, 1)
+                nfinished = Threads.atomic_add!(finished, 1)
+                update!(solver.stats, r)
+                update_progress!(progress, solver.stats, nfinished[])
+                if is_success(r) && stop_early_cb(r)
+                    interrupted[] = true
+                    break
                 end
             end
         end
+    end
+
+    try
         for task in tasks
-            wait(task)
+            fetch(task)
         end
     catch e
         if (
             isa(e, InterruptException) ||
             (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
         )
-            interrupted = true
+            interrupted[] = true
         end
-        if !interrupted || !catch_interrupt
+        if !interrupted[] || !catch_interrupt
             rethrow(e)
         end
     end
-    # if we got interrupted we need to remove the unassigned filedds
-    if interrupted
+
+    if interrupted[]
         assigned_results = Vector{PathResult}()
         for i = 1:started[]
             if isassigned(path_results, i)
