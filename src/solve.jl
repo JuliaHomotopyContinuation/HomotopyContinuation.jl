@@ -392,6 +392,9 @@ The `solve` routines takes the following options:
   for successfull paths. This is for example useful if you only want to compute one solution
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
+* `tasks_per_thread = 2`: When using multi-threading, this controls how many tasks are
+  spawned per thread. Increasing this number increases the load balancing, but also
+  increases the overhead. 
 * `tracker_options`: The options and parameters for the path tracker.
   See [`TrackerOptions`](@ref).
 
@@ -440,6 +443,7 @@ function solve(
     args...;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
     target_parameters = nothing,
     stop_early_cb = always_false,
@@ -495,6 +499,7 @@ function solve(
                 target_parameters;
                 show_progress = show_progress,
                 threading = threading,
+                tasks_per_thread = tasks_per_thread,
                 catch_interrupt = catch_interrupt,
                 transform_result = transform_result,
                 transform_parameters = transform_parameters,
@@ -511,6 +516,7 @@ function solve(
                 stop_early_cb = stop_early_cb,
                 show_progress = show_progress,
                 threading = threading,
+                tasks_per_thread = tasks_per_thread,
                 catch_interrupt = catch_interrupt,
             )
         end
@@ -527,12 +533,13 @@ function solve(
     iterator_only::Bool = false,
     bitmask = nothing,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2,
     kwargs...,
 )
     if iterator_only
         return ResultIterator(starts, S; bitmask = bitmask)
     else
-        return solve(S, collect(starts); threading = threading, kwargs...)
+        return solve(S, collect(starts); threading = threading, tasks_per_thread = tasks_per_thread, kwargs...)
     end
 end
 
@@ -542,6 +549,7 @@ function solve(
     stop_early_cb = always_false,
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
 )
 
@@ -552,6 +560,7 @@ function solve(
         threaded_solve(
             S,
             starts,
+            tasks_per_thread,
             progress,
             stop_early_cb;
             catch_interrupt = catch_interrupt,
@@ -620,10 +629,10 @@ end
 function threaded_solve(
     solver::Solver,
     S::AbstractArray,
+    tasks_per_thread,
     progress = nothing,
     stop_early_cb = always_false;
-    catch_interrupt::Bool = true,
-    tasks_per_thread::Int = 2,
+    catch_interrupt::Bool = true
 )
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
@@ -743,6 +752,7 @@ function solve(
     target_parameters;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
     transform_result = nothing,
     transform_parameters = nothing,
@@ -766,6 +776,7 @@ function solve(
         Val(flatten);
         catch_interrupt = catch_interrupt,
         threading = threading,
+        tasks_per_thread = tasks_per_thread
     )
 end
 
@@ -808,6 +819,7 @@ function many_solve(
     transform_parameters,
     ::Val{flatten};
     threading::Bool,
+    tasks_per_thread::Int = 2,
     catch_interrupt::Bool,
 ) where {flatten}
 
@@ -820,7 +832,7 @@ function many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
-        res = threaded_solve(solver, collect(starts); catch_interrupt = false)
+        res = threaded_solve(solver, collect(starts), tasks_per_thread; catch_interrupt = false)
     else
         res = serial_solve(solver, starts; catch_interrupt = false)
     end
@@ -842,7 +854,7 @@ function many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if threading
-                res = threaded_solve(solver, collect(starts); catch_interrupt = false)
+                res = threaded_solve(solver, collect(starts), tasks_per_thread; catch_interrupt = false)
             else
                 res = serial_solve(solver, starts; catch_interrupt = false)
             end

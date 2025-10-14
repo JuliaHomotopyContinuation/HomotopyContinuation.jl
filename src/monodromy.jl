@@ -563,6 +563,9 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 * `threading = true`: Enable multithreading of the path tracking.
   Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
   interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
+* `tasks_per_thread = 2`: When using multi-threading, this controls how many tasks are
+  spawned per thread. Increasing this number increases the load balancing, but also
+  increases the overhead.
 * `timeout`: The maximal number of *seconds* the computation is allowed to run.
 * `trace_test = true`: If `true` a trace test is performed to check whether all solutions
   are found. This is only applicable if monodromy is performed with a linear subspace.
