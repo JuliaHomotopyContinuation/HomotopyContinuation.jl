@@ -783,9 +783,7 @@ function decompose_with_monodromy!(
 
     P = points(W)
     L = linear_subspace(W)
-    ℓ = length(P)
     G = system(W)
-
     n = ambient_dim(L)
 
     decomposition = Vector{WitnessSet}()
@@ -809,6 +807,7 @@ function decompose_with_monodromy!(
 
         iter = 0
         non_complete_points = solutions(res)
+        d = length(non_complete_points)
         non_complete_orbits = Vector{Set{Int}}()
 
         while !isempty(non_complete_points)
@@ -828,7 +827,8 @@ function decompose_with_monodromy!(
                 show_progress = show_monodromy_progress,
             )
             non_complete_points = solutions(res)
-
+            ℓ = length(non_complete_points)
+            
             # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
                 res;
@@ -861,7 +861,7 @@ function decompose_with_monodromy!(
             end
 
             # Check if we are done
-            if sum(degree, decomposition; init = 0) == ℓ
+            if sum(degree, decomposition; init = 0) == d
                 break
             end
 
@@ -891,6 +891,7 @@ function decompose_with_monodromy!(
                 complete_orbit_indices,
             )]
 
+
             orbit_indices_mapping = Dict{Int,Int}()
             # We need to map the orbit indices to the new indices of the non_complete_points
             i = 1
@@ -904,7 +905,7 @@ function decompose_with_monodromy!(
                 delta += 1
                 i += 1
             end
-            while i <= length(non_complete_points)
+            while i <= ℓ
                 orbit_indices_mapping[i] = i - delta
                 i += 1
             end
