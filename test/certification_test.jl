@@ -28,7 +28,10 @@
         @test ndistinct_real_certified(cert) == 4
 
         # Control Display
-        cert = certify(F, result, show_progress = false)
+        cert = certify(F, result; show_progress = false)
+
+        # Threading
+        cert = certify(F, result; threading = false)
 
         # Double solutions
         S = solutions(result)
