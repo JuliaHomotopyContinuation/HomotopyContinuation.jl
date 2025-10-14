@@ -1,6 +1,4 @@
 @testset "Numerical Irreducible Decomposition" begin
-    Random.seed!(0x8b868a92)
-
     @testset "Union of 1 2-dim, 2 1-dim and 8 points" begin
         @var x, y, z
         p = (x * y - x^2) + 1 - z
@@ -71,6 +69,32 @@
         # max_codim = 1
         N4 = nid(F; max_codim = 1)
         @test isa(N4, NumericalIrreducibleDecomposition)
+    end
+
+    @testset "Non complete superwitness set after regeneration" begin 
+        @var p1,p2,p3,p4,p5,p6,p7,p8,u1,u2,u3,u4,u5,u6,u7,u8,λ1,λ2,λ3
+        p=[p1, p2, p3, p4, p5, p6, p7, p8]
+        u=[u1, u2, u3, u4, u5, u6, u7, u8]
+        λ=[λ1, λ2, λ3]
+        E = System([u1 - p1*(λ3 - p6*λ1 - p7*λ2),
+                    u2 - p2*(λ3 + p5*λ1 + p8*λ2),
+                    u3 - p3*(λ3 + p5*λ2 + p8*λ1),
+                    u4 - p4*(λ3 - p6*λ2 - p7*λ1),
+                    u5 - p5*(λ3 + p2*λ1 + p3*λ2),
+                    u6 - p6*(λ3 - p1*λ1 - p4*λ2),
+                    u7 - p7*(λ3 - p1*λ2 - p4*λ1),
+                    u8 - p8*(λ3 + p2*λ2 + p3*λ1),
+                    p2*p5 + p3*p8 - (p1*p6 + p4*p7),
+                    p2*p8 + p5*p3 - (p1*p7 + p6*p4),
+                    -1 + p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8,
+                    u2*u5 + u8*u3 - (u1*u6 + u7*u4),
+                    u3*u5 + u8*u2 - (u1*u7 + u6*u4),
+                    -1 + u1 + u2 + u3 + u4 + u5 + u6 + u7 + u8],
+                variables=[p;u;λ])
+        s=0x7eec3900
+        R = regeneration(E; seed = s)
+        D = decompose(R; seed = s)
+        @test ncomponents(D) == 6
     end
 
     @testset "Hypersurface of degree 5" begin
