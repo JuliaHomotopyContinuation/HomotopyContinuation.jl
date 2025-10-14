@@ -539,7 +539,13 @@ function solve(
     if iterator_only
         return ResultIterator(starts, S; bitmask = bitmask)
     else
-        return solve(S, collect(starts); threading = threading, tasks_per_thread = tasks_per_thread, kwargs...)
+        return solve(
+            S,
+            collect(starts);
+            threading = threading,
+            tasks_per_thread = tasks_per_thread,
+            kwargs...,
+        )
     end
 end
 
@@ -632,7 +638,7 @@ function threaded_solve(
     tasks_per_thread,
     progress = nothing,
     stop_early_cb = always_false;
-    catch_interrupt::Bool = true
+    catch_interrupt::Bool = true,
 )
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
@@ -776,7 +782,7 @@ function solve(
         Val(flatten);
         catch_interrupt = catch_interrupt,
         threading = threading,
-        tasks_per_thread = tasks_per_thread
+        tasks_per_thread = tasks_per_thread,
     )
 end
 
@@ -832,7 +838,12 @@ function many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
-        res = threaded_solve(solver, collect(starts), tasks_per_thread; catch_interrupt = false)
+        res = threaded_solve(
+            solver,
+            collect(starts),
+            tasks_per_thread;
+            catch_interrupt = false,
+        )
     else
         res = serial_solve(solver, starts; catch_interrupt = false)
     end
@@ -854,7 +865,12 @@ function many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if threading
-                res = threaded_solve(solver, collect(starts), tasks_per_thread; catch_interrupt = false)
+                res = threaded_solve(
+                    solver,
+                    collect(starts),
+                    tasks_per_thread;
+                    catch_interrupt = false,
+                )
             else
                 res = serial_solve(solver, starts; catch_interrupt = false)
             end
