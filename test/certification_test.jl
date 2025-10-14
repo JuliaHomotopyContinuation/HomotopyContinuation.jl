@@ -6,9 +6,10 @@
         f₂ = x^2 + 2x * y^2 - 2 * y^2 - 1 / 2
         F = [f₁, f₂]
         result = solve(F)
+        threading = false
 
         # Input: System(F)
-        cert = certify(System(F), result)
+        cert = certify(System(F), result; threading = threading)
         @test nnonsingular(result) == 18
         @test ncertified(cert) == 18
         @test ndistinct_certified(cert) == 18
@@ -20,7 +21,7 @@
         @test !isempty(read("tmp_cert.txt", String))
 
         # Input: F
-        cert = certify(F, result)
+        cert = certify(F, result; threading = threading)
         @test nnonsingular(result) == 18
         @test ncertified(cert) == 18
         @test ndistinct_certified(cert) == 18
@@ -28,11 +29,11 @@
         @test ndistinct_real_certified(cert) == 4
 
         # Control Display
-        cert = certify(F, result, show_progress = false)
+        cert = certify(F, result; show_progress = false, threading = threading)
 
         # Double solutions
         S = solutions(result)
-        cert = certify(F, [S; S]; extended_certificate = true)
+        cert = certify(F, [S; S]; extended_certificate = true, threading = threading)
         @test ncertified(cert) == 36
         @test ndistinct_certified(cert) == 18
         @test nreal_certified(cert) == 8
