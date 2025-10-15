@@ -640,6 +640,7 @@ function threaded_solve(
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
 )
+
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
@@ -660,27 +661,37 @@ function threaded_solve(
     end
 
     # Each chunk gets its own tracker (cycling through available trackers)
+    progress_lock = ReentrantLock()
     tasks = map(enumerate(data_chunks)) do (i, chunk)
         local_tracker = solver.trackers[(i-1)%nthr+1]
         Threads.@spawn begin
-            for k in chunk
-                if interrupted[]
-                    break
+            try
+                for k in chunk
+                    if interrupted[]
+                        break
+                    end
+                    lock(progress_lock) do
+                        r = track(local_tracker, S[k]; path_number = k)
+                        path_results[k] = r
+                    end
+                    Threads.atomic_add!(started, 1)
+                    nfinished = Threads.atomic_add!(finished, 1)
+                    lock(progress_lock) do
+                        update!(solver.stats, r)
+                        update_progress!(progress, solver.stats, nfinished[])
+                    end
+                    if is_success(r) && stop_early_cb(r)
+                        interrupted[] = true
+                        break
+                    end
                 end
-                r = track(local_tracker, S[k]; path_number = k)
-                path_results[k] = r
-                Threads.atomic_add!(started, 1)
-                nfinished = Threads.atomic_add!(finished, 1)
-                update!(solver.stats, r)
-                update_progress!(progress, solver.stats, nfinished[])
-                if is_success(r) && stop_early_cb(r)
-                    interrupted[] = true
-                    break
-                end
+            catch e
+                @error "Exception in threaded_solve task: $e"
             end
+
         end
     end
-
+    
     try
         for task in tasks
             fetch(task)
@@ -699,7 +710,7 @@ function threaded_solve(
 
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for i = 1:started[]
+        for i = 1:length(path_results)
             if isassigned(path_results, i)
                 push!(assigned_results, path_results[i])
             end
