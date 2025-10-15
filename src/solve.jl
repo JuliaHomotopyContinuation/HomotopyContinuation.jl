@@ -392,9 +392,6 @@ The `solve` routines takes the following options:
   for successfull paths. This is for example useful if you only want to compute one solution
   of a polynomial system. For this `stop_early_cb = _ -> true` would be sufficient.
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
-* `tasks_per_thread = 2`: When using multi-threading, this controls how many tasks are
-  spawned per thread. Increasing this number increases the load balancing, but also
-  increases the overhead. 
 * `tracker_options`: The options and parameters for the path tracker.
   See [`TrackerOptions`](@ref).
 
@@ -443,7 +440,6 @@ function solve(
     args...;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
     target_parameters = nothing,
     stop_early_cb = always_false,
@@ -499,7 +495,6 @@ function solve(
                 target_parameters;
                 show_progress = show_progress,
                 threading = threading,
-                tasks_per_thread = tasks_per_thread,
                 catch_interrupt = catch_interrupt,
                 transform_result = transform_result,
                 transform_parameters = transform_parameters,
@@ -516,7 +511,6 @@ function solve(
                 stop_early_cb = stop_early_cb,
                 show_progress = show_progress,
                 threading = threading,
-                tasks_per_thread = tasks_per_thread,
                 catch_interrupt = catch_interrupt,
             )
         end
@@ -533,7 +527,6 @@ function solve(
     iterator_only::Bool = false,
     bitmask = nothing,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     kwargs...,
 )
     if iterator_only
@@ -543,7 +536,6 @@ function solve(
             S,
             collect(starts);
             threading = threading,
-            tasks_per_thread = tasks_per_thread,
             kwargs...,
         )
     end
@@ -555,7 +547,6 @@ function solve(
     stop_early_cb = always_false,
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
 )
 
@@ -566,7 +557,6 @@ function solve(
         threaded_solve(
             S,
             starts,
-            tasks_per_thread,
             progress,
             stop_early_cb;
             catch_interrupt = catch_interrupt,
@@ -635,7 +625,6 @@ end
 function threaded_solve(
     solver::Solver,
     S::AbstractArray,
-    tasks_per_thread,
     progress = nothing,
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
@@ -650,13 +639,6 @@ function threaded_solve(
     finished = Threads.Atomic{Int}(0)
     next_k = Threads.Atomic{Int}(1)  # next index k to process
 
-    # track which indices were actually produced (for partial runs)
-    assigned = falses(N)
-
-    # partition S into chunks that
-    # individual tasks will deal with
-    chunk_size = max(1, N ÷ (tasks_per_thread * Threads.nthreads()))
-    data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
     # Each chunk gets its own tracker (cycling through available trackers)
     tracker = solver.trackers[1]
@@ -674,8 +656,7 @@ function threaded_solve(
     # If you rely on existing tracker setup, just use the current solver.trackers.
 
     try Threads.@sync begin
-            for i in 1:ntrackers
-                local_tracker = solver.trackers[i]
+            for local_tracker in solver.trackers
                 Threads.@spawn begin
                     while true
                         idx = Threads.atomic_add!(next_k, 1)
@@ -685,19 +666,13 @@ function threaded_solve(
                         end
                         r = track(local_tracker, S[k]; path_number = k)
                         path_results[k] = r
-                        assigned[k] = true
-
-                        Threads.atomic_add!(started, 1)
-                        Threads.atomic_add!(finished, 1)
-                        nfinished = finished[]
-
+                        nfinished = Threads.atomic_add!(finished, 1) + 1
                         lock(progress_lock) do
                             update!(solver.stats, r)
                             update_progress!(progress, solver.stats, nfinished)
                         end
-
                         if is_success(r) && stop_early_cb(r)
-                            atomic_store!(interrupted, true)
+                            interrupted[] = true
                         end
                     end
                 end
@@ -777,7 +752,6 @@ function solve(
     target_parameters;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
     transform_result = nothing,
     transform_parameters = nothing,
@@ -801,7 +775,6 @@ function solve(
         Val(flatten);
         catch_interrupt = catch_interrupt,
         threading = threading,
-        tasks_per_thread = tasks_per_thread,
     )
 end
 
@@ -844,7 +817,6 @@ function many_solve(
     transform_parameters,
     ::Val{flatten};
     threading::Bool,
-    tasks_per_thread::Int = 2,
     catch_interrupt::Bool,
 ) where {flatten}
 
@@ -859,8 +831,7 @@ function many_solve(
     if threading
         res = threaded_solve(
             solver,
-            collect(starts),
-            tasks_per_thread;
+            collect(starts);
             catch_interrupt = false,
         )
     else
@@ -886,8 +857,7 @@ function many_solve(
             if threading
                 res = threaded_solve(
                     solver,
-                    collect(starts),
-                    tasks_per_thread;
+                    collect(starts);
                     catch_interrupt = false,
                 )
             else
