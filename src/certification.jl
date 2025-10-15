@@ -1440,7 +1440,7 @@ function certify(
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
@@ -1460,7 +1460,7 @@ function certify(
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
@@ -1480,7 +1480,7 @@ function certify(
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
@@ -1500,7 +1500,7 @@ function certify(
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     params = isnothing(p) ? target_parameters : p
     cert_params = certification_parameters(params; prec = max_precision)
@@ -1528,7 +1528,7 @@ function certify(
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
