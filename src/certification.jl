@@ -1570,7 +1570,8 @@ Add a solution to the DistinctSolutionCertificates object if it is not a duplica
 function add_solution!(
     d::DistinctCertifiedSolutions,
     sol::Vector{ComplexF64},
-    i::Integer = 0;
+    i::Integer = 0,
+    tid::Int = 1;
     kwargs...,
 )
     @lock d.access_lock begin
@@ -1578,7 +1579,8 @@ function add_solution!(
             return (false, :duplicate)
         end
     end
-    cert = certify_solution(d.system[i], sol, d.parameters[i], d.cache[i], i; kwargs...)
+    cert =
+        certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i; kwargs...)
     if is_certified(cert)
         @lock d.access_lock begin
             added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
@@ -1640,6 +1642,7 @@ function distinct_certified_solutions!(
     tasks_per_thread::Int = 2,
     certify_solution_kwargs...,
 )
+
     progress = nothing
     N = length(S)
     if show_progress
@@ -1661,7 +1664,9 @@ function distinct_certified_solutions!(
                     sol = S[i]
                     added = false
                     lock(data_lock) do
-                        added, = add_solution!(d, sol, i; certify_solution_kwargs...)
+                        tid = (chunk_idx - 1) % nthreads + 1
+                        added, =
+                            add_solution!(d, sol, i, tid; certify_solution_kwargs...)
                     end
                     Threads.atomic_add!(processed, 1)
                     if added
@@ -1688,7 +1693,7 @@ function distinct_certified_solutions!(
     else
         ndistinct = processed = 0
         for (i, sol) in enumerate(S)
-            added, = add_solution!(d, sol, i; certify_solution_kwargs...)
+            added, = add_solution!(d, sol, i, 1; certify_solution_kwargs...)
             processed += 1
             ndistinct += added
             if show_progress
