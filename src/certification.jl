@@ -770,7 +770,9 @@ function _certify(
     nconsidered = Threads.Atomic{Int}(0)
     ndistinct = Threads.Atomic{Int}(0)
     ndistinct_real = Threads.Atomic{Int}(0)
+    next_k = Threads.Atomic{Int}(1)  # next index k to process
 
+    # progress
     desc = "Certifying $N solutions... "
     barlen = min(ProgressMeter.tty_width(desc, stdout, false), 40)
     progress = nothing
@@ -791,67 +793,78 @@ function _certify(
         distinct_lock = ReentrantLock()
         nthreads = Threads.nthreads()
 
+        # Each thread gets its F, cache and p
         Tf = [F; [deepcopy(F) for _ = 2:nthreads]]
         Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
         Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
 
-        Threads.@threads for i = 1:N
-            tid = Threads.threadid()
-
-            s = solution_candidates[i]
-            cert = certify_solution(
-                Tf[tid],
-                s,
-                Tp[tid],
-                Tcache[tid],
-                i,
-                is_real_system;
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-
-            certificates[i] = cert
-            Threads.atomic_add!(nconsidered, 1)
-            if is_certified(cert)
-                Threads.atomic_add!(ncertified, 1)
-                Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
-
-                @lock distinct_lock begin
-                    (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
-                    if is_distinct
-                        Threads.atomic_add!(ndistinct, 1)
-                        Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
-                    else
-                        if !haskey(duplicates_dict, distinct_cert.index)
-                            duplicates_dict[distinct_cert.index] =
-                                [distinct_cert.index, cert.index]
-                        else
-                            push!(duplicates_dict[distinct_cert.index], cert.index)
+        Threads.@sync begin
+            for tid = 1:nthreads
+                Threads.@spawn begin
+                    while true
+                        # get current index
+                        idx = Threads.atomic_add!(next_k, 1)
+                        i = idx
+                        if i > N 
+                            break
                         end
-                    end
+                        s = solution_candidates[i]
+                        cert = certify_solution(
+                            Tf[tid],
+                            s,
+                            Tp[tid],
+                            Tcache[tid],
+                            i,
+                            is_real_system;
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
 
-                    if !isnothing(progress)
-                        update_certify_progress!(
-                            progress,
-                            nconsidered[],
-                            ncertified[],
-                            nreal_certified[],
-                            ndistinct[],
-                            ndistinct_real[],
-                        )
-                    end
-                end
-            else
-                @lock distinct_lock begin
-                    if !isnothing(progress)
-                        update_certify_progress!(
-                            progress,
-                            nconsidered[],
-                            ncertified[],
-                            nreal_certified[],
-                            ndistinct[],
-                            ndistinct_real[],
-                        )
+                        certificates[i] = cert
+                        Threads.atomic_add!(nconsidered, 1)
+                        if is_certified(cert)
+                            Threads.atomic_add!(ncertified, 1)
+                            Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
+
+                            lock(distinct_lock) do
+                                (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                                if is_distinct
+                                    Threads.atomic_add!(ndistinct, 1)
+                                    Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
+                                else
+                                    if !haskey(duplicates_dict, distinct_cert.index)
+                                        duplicates_dict[distinct_cert.index] =
+                                            [distinct_cert.index, cert.index]
+                                    else
+                                        push!(duplicates_dict[distinct_cert.index], cert.index)
+                                    end
+                                end
+
+                                if !isnothing(progress)
+                                    update_certify_progress!(
+                                        progress,
+                                        nconsidered[],
+                                        ncertified[],
+                                        nreal_certified[],
+                                        ndistinct[],
+                                        ndistinct_real[],
+                                    )
+                                end
+                            end
+                        else
+                            lock(distinct_lock) do
+                                if !isnothing(progress)
+                                    update_certify_progress!(
+                                        progress,
+                                        nconsidered[],
+                                        ncertified[],
+                                        nreal_certified[],
+                                        ndistinct[],
+                                        ndistinct_real[],
+                                    )
+                                end
+                            end
+                        end
                     end
                 end
             end
