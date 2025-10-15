@@ -673,8 +673,7 @@ function threaded_solve(
     # Ensure trackers exist for each thread (optional, depending on your setup)
     # If you rely on existing tracker setup, just use the current solver.trackers.
 
-    try
-        Threads.@sync begin
+    try Threads.@sync begin
             for i in 1:ntrackers
                 local_tracker = solver.trackers[i]
                 Threads.@spawn begin
@@ -705,26 +704,29 @@ function threaded_solve(
             end
         end
     catch e
-        if isa(e, InterruptException) || (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
-            atomic_store!(interrupted, true)
+            if (
+                isa(e, InterruptException) ||
+                (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+            )
+                interrupted[] = true
+            end
+            if !interrupted[] || !catch_interrupt
+                rethrow(e)
+            end
         end
-        if !atomic_load(interrupted) || !catch_interrupt
-            rethrow(e)
-        end
-    end
-
-    # After the barrier, all tasks have finished.
+    # if we got interrupted we need to remove the unassigned filedds
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for k in 1:N
-            if assigned[k]
-                push!(assigned_results, path_results[k])
+        for i = 1:started[]
+            if isassigned(path_results, i)
+                push!(assigned_results, path_results[i])
             end
         end
         Result(assigned_results; seed = solver.seed, start_system = solver.start_system)
     else
         Result(path_results; seed = solver.seed, start_system = solver.start_system)
     end
+
 end
 
 function start_parameters!(solver::Solver, p)
