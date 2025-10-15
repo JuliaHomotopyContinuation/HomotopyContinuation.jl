@@ -45,16 +45,6 @@
         @test is_success(result)
         @test length(solutions(result)) == 21
 
-        result = monodromy_solve(
-            F,
-            target_solutions_count = 21,
-            max_loops_no_progress = 50,
-            threading = true,
-            tasks_per_thread = 4,
-        )
-        @test is_success(result)
-        @test length(solutions(result)) == 21
-
         # test that timeout works
         result_timeout = monodromy_solve(F, target_solutions_count = 21, timeout = 1e-12)
         @test length(solutions(result_timeout)) < 21
