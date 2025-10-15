@@ -596,6 +596,7 @@ function monodromy_solve(
     tracker_options = TrackerOptions(),
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
     dim = nothing,
@@ -670,6 +671,7 @@ function monodromy_solve(
         seed;
         show_progress = show_progress,
         threading = threading,
+        tasks_per_thread = tasks_per_thread,
         catch_interrupt = catch_interrupt,
     )
 end
@@ -789,6 +791,7 @@ function monodromy_solve(
     seed;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
+    tasks_per_thread::Int = 2
     catch_interrupt::Bool = true,
 )
     if !show_progress
@@ -820,7 +823,7 @@ function monodromy_solve(
                 cp = convert(Vector{ComplexF64}, p)
             end
             if threading
-                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress)
+                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress; tasks_per_thread = tasks_per_thread)
             else
                 retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
