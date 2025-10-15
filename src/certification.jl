@@ -1588,7 +1588,7 @@ function DistinctCertifiedSolutions(
     return DistinctCertifiedSolutions(
         [F; [deepcopy(F) for _ = 2:nthreads]],
         [parameters; [deepcopy(parameters) for _ = 2:nthreads]],
-        [cache; [deepcopy(cache) for _ = 2:nthreads]],
+        [CertificationCache(F) for _ = 1:nthreads],
         access_lock,
         distinct_solution_certificates,
     )
