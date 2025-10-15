@@ -742,7 +742,7 @@ function _certify(
     F::AbstractSystem,
     solution_candidates::AbstractArray{<:AbstractArray{<:Number}},
     p::Union{Nothing,CertificationParameters},
-    cache::CertificationCache;
+    cache;
     show_progress::Bool = true,
     check_distinct::Bool = true,
     extended_certificate::Bool = false,
@@ -791,13 +791,12 @@ function _certify(
 
     # threading as discussed at https://julialang.org/blog/2023/07/PSA-dont-use-threadid/
     if threading
-        certify_lock = ReentrantLock()
         distinct_lock = ReentrantLock()
         nthreads = Threads.nthreads()
 
         # Prepare thread-local copies
         Tf = [F; [deepcopy(F) for _ = 2:nthreads]]
-        Tcache = [cache; [deepcopy(cache) for _ = 2:nthreads]]
+        Tcache = cache
         Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
 
         chunk_size = max(1, N ÷ (tasks_per_thread * nthreads))
@@ -810,22 +809,18 @@ function _certify(
             Threads.@spawn begin
                 for i in chunk
                     s = solution_candidates[i]
-                    # certify in a locked state so that threads don't interfere
-                    lock(certify_lock) do
-                        cert = certify_solution(
-                            local_F,
-                            s,
-                            local_p,
-                            local_cache,
-                            i,
-                            is_real_system;
-                            extended_certificate = extended_certificate,
-                            certify_solution_kwargs...,
-                        )
-                        certificates[i] = cert
-                    end
-                    # call the certificate cert outside of the lock
-                    cert = certificates[i]
+                    cert = certify_solution(
+                        local_F,
+                        s,
+                        local_p,
+                        local_cache,
+                        i,
+                        is_real_system;
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+                    certificates[i] = cert
+
                     Threads.atomic_add!(nconsidered, 1)
                     if is_certified(cert)
                         Threads.atomic_add!(ncertified, 1)
@@ -933,8 +928,8 @@ function _certify(
     CertificationResult(
         certificates,
         duplicates,
-        cache.eval_interpreter_F64,
-        cache.jac_interpreter_F64,
+        cache[1].eval_interpreter_F64,
+        cache[1].jac_interpreter_F64,
     )
 end
 
@@ -1415,66 +1410,98 @@ function certify(F::System, args...; compile::Union{Bool,Symbol} = false, kwargs
 end
 
 
-function certify(
-    F::AbstractSystem,
-    X::MonodromyResult,
-    cache::CertificationCache = CertificationCache(F);
-    kwargs...,
-)
-    _certify(F, solutions(X), certification_parameters(parameters(X)), cache; kwargs...)
+function certify(F::AbstractSystem, X::MonodromyResult; threading::Bool = true, kwargs...)
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
+    _certify(
+        F,
+        solutions(X),
+        certification_parameters(parameters(X)),
+        cache;
+        threading = threading,
+        kwargs...,
+    )
 end
 
 function certify(
     F::AbstractSystem,
     r::PathResult,
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,AbstractArray} = nothing;
+    threading::Bool = true,
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, [solution(r)], cert_params, cache, kwargs...)
+    _certify(F, [solution(r)], cert_params, cache; threading = threading, kwargs...)
 end
 
 function certify(
     F::AbstractSystem,
     r::AbstractVector{PathResult},
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,AbstractArray} = nothing;
+    threading::Bool = true,
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, solution.(r), cert_params, cache; kwargs...)
+    _certify(F, solution.(r), cert_params, cache; threading = threading, kwargs...)
 end
 
 function certify(
     F::AbstractSystem,
     x::AbstractVector{<:Number},
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,AbstractArray} = nothing;
+    threading::Bool = true,
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, [x], cert_params, cache; kwargs...)
+    _certify(F, [x], cert_params, cache; threading = threading, kwargs...)
 end
 
 function certify(
     F::AbstractSystem,
     X::Result,
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,AbstractArray} = nothing;
+    threading::Bool = true,
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
     params = isnothing(p) ? target_parameters : p
     cert_params = certification_parameters(params; prec = max_precision)
     _certify(
@@ -1483,6 +1510,7 @@ function certify(
         cert_params,
         cache;
         max_precision = max_precision,
+        threading = threading,
         kwargs...,
     )
 end
@@ -1490,15 +1518,29 @@ end
 function certify(
     F::AbstractSystem,
     X,
-    p::Union{Nothing,AbstractArray} = nothing,
-    cache::CertificationCache = CertificationCache(F);
+    p::Union{Nothing,AbstractArray} = nothing;
+    threading::Bool = true,
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
+    if threading
+        nthr = Threads.nthreads()
+        cache = [CertificationCache(F) for _ = 1:nthr]
+    else
+        cache = CertificationCache(F)
+    end
     cert_params =
         certification_parameters(isnothing(p) ? target_parameters : p; prec = max_precision)
-    _certify(F, X, cert_params, cache; max_precision = max_precision, kwargs...)
+    _certify(
+        F,
+        X,
+        cert_params,
+        cache;
+        max_precision = max_precision,
+        threading = threading,
+        kwargs...,
+    )
 end
 
 """
@@ -1578,9 +1620,7 @@ function add_solution!(
             return (false, :duplicate)
         end
     end
-    tid = length(d.system) === 1 ? 1 : Threads.threadid()
-    cert =
-        certify_solution(d.system[tid], sol, d.parameters[tid], d.cache[tid], i; kwargs...)
+    cert = certify_solution(d.system[i], sol, d.parameters[i], d.cache[i], i; kwargs...)
     if is_certified(cert)
         @lock d.access_lock begin
             added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
@@ -1656,15 +1696,14 @@ function distinct_certified_solutions!(
         chunk_size = max(1, N ÷ (tasks_per_thread * nthreads))
         data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
-        data_lock = ReentrantLock()
+
         tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
             Threads.@spawn begin
                 for i in chunk
                     sol = S[i]
                     added = false
-                    lock(data_lock) do
-                        added, = add_solution!(d, sol, i; certify_solution_kwargs...)
-                    end
+                    added, = add_solution!(d, sol, i; certify_solution_kwargs...)
+
                     Threads.atomic_add!(processed, 1)
                     if added
                         Threads.atomic_add!(ndistinct, 1)
