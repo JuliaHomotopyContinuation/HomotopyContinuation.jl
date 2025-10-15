@@ -1087,22 +1087,17 @@ function threaded_monodromy_solve!(
                     if interrupted[]
                         break
                     end
-
-                    lock(data_lock) do
-                        res = track(
-                            local_tracker,
-                            results[job.id],
-                            loop(MS, job.loop_id),
-                            MS.trace,
-                            MS.trace_lock;
-                            collect_trace = MS.options.trace_test &&
-                                            nloops(MS) == job.loop_id,
-                        )
-
-
-                        if !isnothing(res)
-                            loop_tracked!(stats)
-
+                    res = track(
+                        local_tracker,
+                        results[job.id],
+                        loop(MS, job.loop_id),
+                        MS.trace,
+                        MS.trace_lock;
+                        collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+                    )
+                    if !isnothing(res)
+                        loop_tracked!(stats)
+                        lock(data_lock) do
                             id, got_added = add!(MS, res, length(results) + 1)
                             if MS.options.permutations
                                 add_permutation!(stats, job.loop_id, job.id, id)
@@ -1127,22 +1122,22 @@ function threaded_monodromy_solve!(
                                     push!(queue, LoopTrackingJob(id, k))
                                 end
                             end
-
-                        else
-                            loop_failed!(stats)
-                            if MS.options.permutations
+                        end
+                    else
+                        loop_failed!(stats)
+                        if MS.options.permutations
+                            lock(data_lock) do
                                 add_permutation!(stats, job.loop_id, job.id, 0)
                             end
                         end
-
-                        # Update progress
-                        update_progress!(
-                            progress,
-                            stats;
-                            solutions = length(results),
-                            queued = length(queue),
-                        )
                     end
+                    # Update progress
+                    update_progress!(
+                        progress,
+                        stats;
+                        solutions = length(results),
+                        queued = length(queue),
+                    )
 
                     if length(results) ==
                        something(MS.options.target_solutions_count, -1) &&
