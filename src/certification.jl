@@ -1415,7 +1415,7 @@ function certify(F::AbstractSystem, X::MonodromyResult; threading::Bool = true, 
         nthr = Threads.nthreads()
         cache = [CertificationCache(F) for _ = 1:nthr]
     else
-        [cache = CertificationCache(F)]
+        cache = [CertificationCache(F)]
     end
     _certify(
         F,
@@ -1579,7 +1579,6 @@ function DistinctCertifiedSolutions(
     thread_safe::Bool = false,
     extended_certificate::Bool = false,
 )
-    cache = CertificationCache(F)
     distinct_solution_certificates =
         DistinctSolutionCertificates(length(F); extended_certificate = extended_certificate)
     parameters = certification_parameters(params)
