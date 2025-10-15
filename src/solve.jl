@@ -630,8 +630,6 @@ function threaded_solve(
     catch_interrupt::Bool = true,
 )
 
-    # threading as discussed at https://julialang.org/blog/2023/07/PSA-dont-use-threadid/
-
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
@@ -639,8 +637,7 @@ function threaded_solve(
     finished = Threads.Atomic{Int}(0)
     next_k = Threads.Atomic{Int}(1)  # next index k to process
 
-
-    # Each chunk gets its own tracker (cycling through available trackers)
+    # Each thread gets its own tracker
     tracker = solver.trackers[1]
     ntrackers = length(solver.trackers)
     nthr = Threads.nthreads()
@@ -657,14 +654,17 @@ function threaded_solve(
             for local_tracker in solver.trackers
                 Threads.@spawn begin
                     while true
+                        # get current index
                         idx = Threads.atomic_add!(next_k, 1)
                         k = idx
                         if k > N || interrupted[]
                             break
                         end
+                        # track
                         r = track(local_tracker, S[k]; path_number = k)
                         path_results[k] = r
                         nfinished = Threads.atomic_add!(finished, 1) + 1
+                        # update progress and stats in a locked state
                         lock(progress_lock) do
                             update!(solver.stats, r)
                             update_progress!(progress, solver.stats, nfinished)
