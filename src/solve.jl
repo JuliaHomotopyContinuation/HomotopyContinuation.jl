@@ -652,9 +652,7 @@ function threaded_solve(
     # Use a lock for progress
     progress_lock = ReentrantLock()
 
-    # Ensure trackers exist for each thread (optional, depending on your setup)
-    # If you rely on existing tracker setup, just use the current solver.trackers.
-
+    # threading block
     try Threads.@sync begin
             for local_tracker in solver.trackers
                 Threads.@spawn begin
