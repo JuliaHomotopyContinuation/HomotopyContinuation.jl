@@ -791,7 +791,7 @@ function monodromy_solve(
     seed;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2
+    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
 )
     if !show_progress
