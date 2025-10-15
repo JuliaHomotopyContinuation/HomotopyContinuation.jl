@@ -823,7 +823,14 @@ function monodromy_solve(
                 cp = convert(Vector{ComplexF64}, p)
             end
             if threading
-                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress; tasks_per_thread = tasks_per_thread)
+                retcode = threaded_monodromy_solve!(
+                    results,
+                    MS,
+                    cp,
+                    seed,
+                    progress;
+                    tasks_per_thread = tasks_per_thread,
+                )
             else
                 retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
