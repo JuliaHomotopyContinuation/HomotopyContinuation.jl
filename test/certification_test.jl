@@ -34,7 +34,13 @@
         cert = certify(F, result; show_progress = false, threading = false)
 
         # Tasks per thread
-        cert = certify(F, result; show_progress = false, threading = true, tasks_per_thread = 4)
+        cert = certify(
+            F,
+            result;
+            show_progress = false,
+            threading = true,
+            tasks_per_thread = 4,
+        )
 
         # Double solutions
         S = solutions(result)

@@ -1095,9 +1095,10 @@ function threaded_monodromy_solve!(
                             loop(MS, job.loop_id),
                             MS.trace,
                             MS.trace_lock;
-                            collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id,
+                            collect_trace = MS.options.trace_test &&
+                                            nloops(MS) == job.loop_id,
                         )
-                        
+
 
                         if !isnothing(res)
                             loop_tracked!(stats)
@@ -1126,14 +1127,14 @@ function threaded_monodromy_solve!(
                                     push!(queue, LoopTrackingJob(id, k))
                                 end
                             end
-                
+
                         else
                             loop_failed!(stats)
                             if MS.options.permutations
                                 add_permutation!(stats, job.loop_id, job.id, 0)
                             end
                         end
-                    
+
                         # Update progress
                         update_progress!(
                             progress,

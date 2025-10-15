@@ -696,7 +696,7 @@ function threaded_solve(
 
         end
     end
-    
+
     try
         for task in tasks
             fetch(task)
