@@ -563,9 +563,6 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
 * `threading = true`: Enable multithreading of the path tracking.
   Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
   interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
-* `tasks_per_thread = 2`: When using multi-threading, this controls how many tasks are
-  spawned per thread. Increasing this number increases the load balancing, but also
-  increases the overhead.
 * `timeout`: The maximal number of *seconds* the computation is allowed to run.
 * `trace_test = true`: If `true` a trace test is performed to check whether all solutions
   are found. This is only applicable if monodromy is performed with a linear subspace.
@@ -596,7 +593,6 @@ function monodromy_solve(
     tracker_options = TrackerOptions(),
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     catch_interrupt::Bool = true,
     dim = nothing,
@@ -671,7 +667,6 @@ function monodromy_solve(
         seed;
         show_progress = show_progress,
         threading = threading,
-        tasks_per_thread = tasks_per_thread,
         catch_interrupt = catch_interrupt,
     )
 end
@@ -791,7 +786,6 @@ function monodromy_solve(
     seed;
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
-    tasks_per_thread::Int = 2,
     catch_interrupt::Bool = true,
 )
     if !show_progress
@@ -823,14 +817,7 @@ function monodromy_solve(
                 cp = convert(Vector{ComplexF64}, p)
             end
             if threading
-                retcode = threaded_monodromy_solve!(
-                    results,
-                    MS,
-                    cp,
-                    seed,
-                    progress;
-                    tasks_per_thread = tasks_per_thread,
-                )
+                retcode = threaded_monodromy_solve!(results, MS, cp, seed, progress)
             else
                 retcode = serial_monodromy_solve!(results, MS, cp, seed, progress)
             end
@@ -958,7 +945,6 @@ function serial_monodromy_solve!(
                     add_permutation!(stats, job.loop_id, job.id, id)
                 end
 
-
                 got_added || @goto _update
                 # 2) doesn't exist, so add to results
                 push!(results, res)
@@ -1028,9 +1014,9 @@ function threaded_monodromy_solve!(
     MS::MonodromySolver,
     p,
     seed,
-    progress;
-    tasks_per_thread::Int = 2,
+    progress,
 )
+    queue = Channel{LoopTrackingJob}(Inf)
 
     tracker = MS.trackers[1]
     ntrackers = length(MS.trackers)
@@ -1040,65 +1026,38 @@ function threaded_monodromy_solve!(
         MS.trackers[i] = deepcopy(tracker)
     end
 
+    data_lock = ReentrantLock()
     t₀ = time()
     retcode = :in_progress
     stats = MS.statistics
-    interrupted = Threads.Atomic{Bool}(false)
-    data_lock = ReentrantLock()
-
-    queue = LoopTrackingJob[]
-    # Main loop logic
-    while true
-        loop_finished!(stats, length(results))
-
-        if MS.options.loop_finished_callback(results)
-            retcode = :terminated_callback
-            break
-        end
-        if p isa LinearSubspace &&
-           nloops(MS) > 0 &&
-           MS.options.trace_test &&
-           trace_colinearity(MS) < MS.options.trace_test_tol
-            retcode = :success
-            break
-        end
-        if isnothing(MS.options.target_solutions_count) &&
-           loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
-            retcode = :heuristic_stop
-            break
-        end
-        if length(results) == something(MS.options.target_solutions_count, -1)
-            retcode = :success
-            break
-        end
-
-        if nloops(MS) > 0 && MS.options.single_loop_per_start_solution
-            retcode = :success
-            break
-        end
-
-        add_loop!(MS, p)
-        reset_trace!(MS)
-        # schedule all jobs
-        new_loop_id = nloops(MS)
-        for i = 1:length(results)
-            push!(queue, LoopTrackingJob(i, new_loop_id))
-        end
-
-        # Partition jobs for threading
-        chunk_size = max(1, length(queue) ÷ (tasks_per_thread * nthr))
-        data_chunks = Base.Iterators.partition(1:length(queue), chunk_size)
-
-        tasks = map(enumerate(data_chunks)) do (chunk_idx, chunk)
-            local_tracker = MS.trackers[(chunk_idx-1)%nthr+1]
-            Threads.@spawn begin
-                for idx in chunk
-                    job = queue[idx]
-                    if interrupted[]
+    notify_lock = ReentrantLock()
+    cond_queue_emptied = Threads.Condition(notify_lock)
+    workers_idle = fill(true, nthr)
+    interrupted = Ref(false)
+    queued = Ref(0)
+    try
+        workers = map(enumerate(MS.trackers)) do (tid, tracker)
+            @tspawnat tid begin
+                for job in queue
+                    stop_queue = false
+                    Base.@lock notify_lock begin
+                        if interrupted[]
+                            # mark worker as idle
+                            workers_idle[tid] = true
+                            # if all idle notify that we want a new low
+                            if all(workers_idle)
+                                notify(cond_queue_emptied)
+                            end
+                            stop_queue = true
+                        else
+                            workers_idle[tid] = false
+                        end
+                    end
+                    if stop_queue
                         break
                     end
                     res = track(
-                        local_tracker,
+                        tracker,
                         results[job.id],
                         loop(MS, job.loop_id),
                         MS.trace,
@@ -1107,102 +1066,140 @@ function threaded_monodromy_solve!(
                     )
                     if !isnothing(res)
                         loop_tracked!(stats)
-                        lock(data_lock) do
-                            id, got_added = add!(MS, res, length(results) + 1)
-                            if MS.options.permutations
-                                add_permutation!(stats, job.loop_id, job.id, id)
+
+                        # 1) check whether solutions already exists
+                        lock(data_lock)
+                        id, got_added = add!(MS, res, length(results) + 1)
+
+                        if MS.options.permutations
+                            add_permutation!(stats, job.loop_id, job.id, id)
+                        end
+
+                        if !got_added
+                            unlock(data_lock)
+                            @goto _update
+                        end
+                        # 2) doesn't exist, so add to results
+                        push!(results, res)
+                        unlock(data_lock)
+
+                        # 3) schedule on same loop again
+                        if !MS.options.single_loop_per_start_solution
+                            push!(queue, LoopTrackingJob(id, job.loop_id))
+                        end
+                        # 4) schedule on other loops
+                        if MS.options.reuse_loops == :all
+                            for k = 1:nloops(MS)
+                                k != job.loop_id || continue
+                                push!(queue, LoopTrackingJob(id, k))
                             end
-                            if got_added
-                                push!(results, res)
-                                # schedule on same loop again
-                                if !MS.options.single_loop_per_start_solution
-                                    push!(queue, LoopTrackingJob(id, job.loop_id))
-                                end
-                                # schedule on other loops
-                                if MS.options.reuse_loops == :all
-                                    for k = 1:nloops(MS)
-                                        k != job.loop_id || continue
-                                        push!(queue, LoopTrackingJob(id, k))
-                                    end
-                                elseif MS.options.reuse_loops == :random && nloops(MS) ≥ 2
-                                    k = rand(2:nloops(MS))
-                                    if k ≤ job.loop_id
-                                        k -= 1
-                                    end
-                                    push!(queue, LoopTrackingJob(id, k))
-                                end
+                        elseif MS.options.reuse_loops == :random && nloops(MS) ≥ 2
+                            k = rand(2:nloops(MS))
+                            if k ≤ job.loop_id
+                                k -= 1
                             end
+                            push!(queue, LoopTrackingJob(id, k))
                         end
                     else
                         loop_failed!(stats)
                         if MS.options.permutations
-                            lock(data_lock) do
-                                add_permutation!(stats, job.loop_id, job.id, 0)
-                            end
+                            add_permutation!(stats, job.loop_id, job.id, 0)
                         end
                     end
                     # Update progress
+                    @label _update
                     update_progress!(
                         progress,
                         stats;
                         solutions = length(results),
-                        queued = length(queue),
+                        queued = Base.n_avail(queue),
                     )
+
+                    # mark worker as idle
+                    Base.@lock notify_lock begin
+                        workers_idle[tid] = true
+                        # if queue is empty, check whether all other are also waiting
+                        if !isready(queue) && all(workers_idle)
+                            notify(cond_queue_emptied)
+                        end
+                    end
 
                     if length(results) ==
                        something(MS.options.target_solutions_count, -1) &&
+                       # only terminate after a completed loop to ensure that we collect proper
+                       # permutation informations
                        !MS.options.permutations
-                        interrupted[] = true
-                        break
+                        retcode = :success
+                        Base.@lock notify_lock begin
+                            interrupted[] = true
+                        end
+
                     elseif !isnothing(MS.options.timeout) &&
                            time() - t₀ > (MS.options.timeout::Float64)
                         retcode = :timeout
-                        interrupted[] = true
-                        break
+                        Base.@lock notify_lock begin
+                            interrupted[] = true
+                        end
                     end
                 end
             end
         end
 
-        # Wait for all tasks to finish
-        try
-            for task in tasks
-                fetch(task)
+        t = Threads.@spawn begin
+            Base.@lock notify_lock begin
+                while true
+                    if interrupted[]
+                        break
+                    end
+                    loop_finished!(stats, length(results))
+
+                    if MS.options.loop_finished_callback(results)
+                        retcode = :terminated_callback
+                        break
+                    end
+                    if loops_no_change(stats, length(results)) ≥
+                       MS.options.max_loops_no_progress
+                        retcode = :heuristic_stop
+                        break
+                    end
+                    if length(results) == something(MS.options.target_solutions_count, -1)
+                        retcode = :success
+                        break
+                    end
+                    if p isa LinearSubspace &&
+                       nloops(MS) > 0 &&
+                       MS.options.trace_test &&
+                       trace_colinearity(MS) < MS.options.trace_test_tol
+                        retcode = :success
+                        break
+                    end
+
+                    add_loop!(MS, p)
+                    reset_trace!(MS)
+                    # schedule all jobs
+                    new_loop_id = nloops(MS)
+                    for i = 1:length(results)
+                        push!(queue, LoopTrackingJob(i, new_loop_id))
+                    end
+
+                    wait(cond_queue_emptied)
+                    if (MS.options.single_loop_per_start_solution)
+                        retcode = :success
+                        break
+                    end
+                    retcode == :in_progress || break
+                end
             end
-        catch e
-            interrupted[] = true
-            retcode = :interrupted
-            rethrow(e)
         end
 
-        # Remove processed jobs from queue
-        filter!(job -> !interrupted[], queue)
-
-        # Check global stopping conditions and set retcode
-        if MS.options.loop_finished_callback(results)
-            retcode = :terminated_callback
-            break
-        elseif p isa LinearSubspace &&
-               nloops(MS) > 0 &&
-               MS.options.trace_test &&
-               trace_colinearity(MS) < MS.options.trace_test_tol
-            retcode = :success
-            break
-        elseif isnothing(MS.options.target_solutions_count) &&
-               loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
-            retcode = :heuristic_stop
-            break
-        elseif length(results) == something(MS.options.target_solutions_count, -1)
-            retcode = :success
-            break
-        elseif nloops(MS) > 0 && MS.options.single_loop_per_start_solution
-            retcode = :success
-            break
-        elseif interrupted[]
-            # If interrupted by worker, set retcode appropriately
-            retcode = :interrupted
-            break
-        end
+        wait(t)
+    catch e
+        close(queue)
+        interrupted[] = true
+        rethrow(e)
+    finally
+        queued[] = Base.n_avail(queue)
+        close(queue)
     end
 
     update_progress!(
@@ -1210,7 +1207,7 @@ function threaded_monodromy_solve!(
         stats;
         finish = true,
         solutions = length(results),
-        queued = length(queue),
+        queued = queued[],
     )
 
     return retcode
