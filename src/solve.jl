@@ -648,12 +648,17 @@ function threaded_solve(
     interrupted = Threads.Atomic{Bool}(false)
     started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
+    next_k = Threads.Atomic{Int}(1)  # next index k to process
+
+    # track which indices were actually produced (for partial runs)
+    assigned = falses(N)
 
     # partition S into chunks that
     # individual tasks will deal with
     chunk_size = max(1, N ÷ (tasks_per_thread * Threads.nthreads()))
     data_chunks = Base.Iterators.partition(1:N, chunk_size)
 
+    # Each chunk gets its own tracker (cycling through available trackers)
     tracker = solver.trackers[1]
     ntrackers = length(solver.trackers)
     nthr = Threads.nthreads()
@@ -662,62 +667,58 @@ function threaded_solve(
         solver.trackers[i] = deepcopy(tracker)
     end
 
-    # Each chunk gets its own tracker (cycling through available trackers)
+    # Use a lock for progress
     progress_lock = ReentrantLock()
-    tasks = map(enumerate(data_chunks)) do (i, chunk)
-        local_tracker = solver.trackers[(i-1)%nthr+1]
-        Threads.@spawn begin
-            try
-                for k in chunk
-                    if interrupted[]
-                        break
-                    end
-                    # track in a locked state so that threads don't interfere
-                    lock(progress_lock) do
-                        r = track(local_tracker, S[k]; path_number = k)
-                        path_results[k] = r
-                    end
-                    # call the path result outside of the lock r for further processing
-                    r = path_results[k]
-                    Threads.atomic_add!(started, 1)
-                    nfinished = Threads.atomic_add!(finished, 1)
-                    lock(progress_lock) do
-                        update!(solver.stats, r)
-                        update_progress!(progress, solver.stats, nfinished[])
-                    end
-                    if is_success(r) && stop_early_cb(r)
-                        interrupted[] = true
-                        break
-                    end
-                end
-            catch e
-                @error "Exception in threaded_solve task: $e"
-            end
 
-        end
-    end
+    # Ensure trackers exist for each thread (optional, depending on your setup)
+    # If you rely on existing tracker setup, just use the current solver.trackers.
 
     try
-        for task in tasks
-            fetch(task)
+        Threads.@sync begin
+            for i in 1:ntrackers
+                local_tracker = solver.trackers[i]
+                Threads.@spawn begin
+                    while true
+                        idx = Threads.atomic_add!(next_k, 1)
+                        k = idx
+                        if k > N || interrupted[]
+                            break
+                        end
+                        r = track(local_tracker, S[k]; path_number = k)
+                        path_results[k] = r
+                        assigned[k] = true
+
+                        Threads.atomic_add!(started, 1)
+                        Threads.atomic_add!(finished, 1)
+                        nfinished = finished[]
+
+                        lock(progress_lock) do
+                            update!(solver.stats, r)
+                            update_progress!(progress, solver.stats, nfinished)
+                        end
+
+                        if is_success(r) && stop_early_cb(r)
+                            atomic_store!(interrupted, true)
+                        end
+                    end
+                end
+            end
         end
     catch e
-        if (
-            isa(e, InterruptException) ||
-            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
-        )
-            interrupted[] = true
+        if isa(e, InterruptException) || (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+            atomic_store!(interrupted, true)
         end
-        if !interrupted[] || !catch_interrupt
+        if !atomic_load(interrupted) || !catch_interrupt
             rethrow(e)
         end
     end
 
+    # After the barrier, all tasks have finished.
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for i = 1:length(path_results)
-            if isassigned(path_results, i)
-                push!(assigned_results, path_results[i])
+        for k in 1:N
+            if assigned[k]
+                push!(assigned_results, path_results[k])
             end
         end
         Result(assigned_results; seed = solver.seed, start_system = solver.start_system)
