@@ -381,6 +381,8 @@
     @testset "solve (threading)" begin
         res = solve(cyclic(7), threading = true, show_progress = false)
         @test nsolutions(res) == 924
+        res = solve(cyclic(7), threading = true, tasks_per_thread = 4, show_progress = false)
+        @test nsolutions(res) == 924
     end
 
     @testset "stop early callback" begin
