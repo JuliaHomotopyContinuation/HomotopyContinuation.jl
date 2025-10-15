@@ -641,6 +641,8 @@ function threaded_solve(
     catch_interrupt::Bool = true,
 )
 
+    # threading as discussed at https://julialang.org/blog/2023/07/PSA-dont-use-threadid/
+
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
@@ -670,10 +672,13 @@ function threaded_solve(
                     if interrupted[]
                         break
                     end
+                    # track in a locked state so that threads don't interfere
                     lock(progress_lock) do
                         r = track(local_tracker, S[k]; path_number = k)
                         path_results[k] = r
                     end
+                    # call the path result outside of the lock r for further processing
+                    r = path_results[k]
                     Threads.atomic_add!(started, 1)
                     nfinished = Threads.atomic_add!(finished, 1)
                     lock(progress_lock) do

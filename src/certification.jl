@@ -788,7 +788,10 @@ function _certify(
     end
 
     duplicates_dict = Dict{Int,Vector{Int}}()
+
+    # threading as discussed at https://julialang.org/blog/2023/07/PSA-dont-use-threadid/
     if threading
+        certify_lock = ReentrantLock()
         distinct_lock = ReentrantLock()
         nthreads = Threads.nthreads()
 
@@ -807,23 +810,28 @@ function _certify(
             Threads.@spawn begin
                 for i in chunk
                     s = solution_candidates[i]
-                    cert = certify_solution(
-                        local_F,
-                        s,
-                        local_p,
-                        local_cache,
-                        i,
-                        is_real_system;
-                        extended_certificate = extended_certificate,
-                        certify_solution_kwargs...,
-                    )
-
-                    certificates[i] = cert
+                    # certify in a locked state so that threads don't interfere
+                    lock(certify_lock) do
+                        cert = certify_solution(
+                            local_F,
+                            s,
+                            local_p,
+                            local_cache,
+                            i,
+                            is_real_system;
+                            extended_certificate = extended_certificate,
+                            certify_solution_kwargs...,
+                        )
+                        certificates[i] = cert
+                    end
+                    # call the certificate cert outside of the lock
+                    cert = certificates[i]
                     Threads.atomic_add!(nconsidered, 1)
                     if is_certified(cert)
                         Threads.atomic_add!(ncertified, 1)
                         Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
 
+                        # add certificates to distinct_sols in a locked state so that threads don't interfere
                         lock(distinct_lock) do
                             (is_distinct, distinct_cert) =
                                 add_certificate!(distinct_sols, cert)
@@ -851,6 +859,7 @@ function _certify(
                             end
                         end
                     else
+                        # add certificates to distinct_sols in a locked state so that threads don't interfere
                         lock(distinct_lock) do
                             if !isnothing(progress)
                                 update_certify_progress!(
