@@ -32,7 +32,7 @@
 
         # No threading
         cert = certify(F, result; show_progress = false, threading = false)
-        
+
         # Double solutions
         S = solutions(result)
         cert = certify(F, [S; S]; extended_certificate = true)

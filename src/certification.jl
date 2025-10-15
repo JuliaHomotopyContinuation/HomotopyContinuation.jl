@@ -805,7 +805,7 @@ function _certify(
                         # get current index
                         idx = Threads.atomic_add!(next_k, 1)
                         i = idx
-                        if i > N 
+                        if i > N
                             break
                         end
                         s = solution_candidates[i]
@@ -827,7 +827,8 @@ function _certify(
                             Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
 
                             lock(distinct_lock) do
-                                (is_distinct, distinct_cert) = add_certificate!(distinct_sols, cert)
+                                (is_distinct, distinct_cert) =
+                                    add_certificate!(distinct_sols, cert)
                                 if is_distinct
                                     Threads.atomic_add!(ndistinct, 1)
                                     Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
@@ -836,7 +837,10 @@ function _certify(
                                         duplicates_dict[distinct_cert.index] =
                                             [distinct_cert.index, cert.index]
                                     else
-                                        push!(duplicates_dict[distinct_cert.index], cert.index)
+                                        push!(
+                                            duplicates_dict[distinct_cert.index],
+                                            cert.index,
+                                        )
                                     end
                                 end
 
@@ -1633,11 +1637,8 @@ function distinct_certified_solutions!(
     progress = nothing
     N = length(S)
     if show_progress
-        progress = ProgressMeter.Progress(
-            N;
-            desc = "Processing $N solutions",
-            showspeed = true,
-        )
+        progress =
+            ProgressMeter.Progress(N; desc = "Processing $N solutions", showspeed = true)
     end
     progress_lock = ReentrantLock()
     if threading
@@ -1648,7 +1649,7 @@ function distinct_certified_solutions!(
 
         # threading block
         Threads.@sync begin
-            for tid in 1:nthr
+            for tid = 1:nthr
                 Threads.@spawn begin
                     while true
                         # get current index

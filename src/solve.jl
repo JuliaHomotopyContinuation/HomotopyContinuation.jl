@@ -532,12 +532,7 @@ function solve(
     if iterator_only
         return ResultIterator(starts, S; bitmask = bitmask)
     else
-        return solve(
-            S,
-            collect(starts);
-            threading = threading,
-            kwargs...,
-        )
+        return solve(S, collect(starts); threading = threading, kwargs...)
     end
 end
 
@@ -650,7 +645,8 @@ function threaded_solve(
     progress_lock = ReentrantLock()
 
     # threading block
-    try Threads.@sync begin
+    try
+        Threads.@sync begin
             for local_tracker in solver.trackers
                 Threads.@spawn begin
                     while true
@@ -677,16 +673,16 @@ function threaded_solve(
             end
         end
     catch e
-            if (
-                isa(e, InterruptException) ||
-                (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
-            )
-                interrupted[] = true
-            end
-            if !interrupted[] || !catch_interrupt
-                rethrow(e)
-            end
+        if (
+            isa(e, InterruptException) ||
+            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+        )
+            interrupted[] = true
         end
+        if !interrupted[] || !catch_interrupt
+            rethrow(e)
+        end
+    end
     # if we got interrupted we need to remove the unassigned filedds
     if interrupted[]
         assigned_results = Vector{PathResult}()
@@ -827,11 +823,7 @@ function many_solve(
     q = first(many_target_parameters)
     target_parameters!(solver, transform_parameters(q))
     if threading
-        res = threaded_solve(
-            solver,
-            collect(starts);
-            catch_interrupt = false,
-        )
+        res = threaded_solve(solver, collect(starts); catch_interrupt = false)
     else
         res = serial_solve(solver, starts; catch_interrupt = false)
     end
@@ -853,11 +845,7 @@ function many_solve(
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
             if threading
-                res = threaded_solve(
-                    solver,
-                    collect(starts);
-                    catch_interrupt = false,
-                )
+                res = threaded_solve(solver, collect(starts); catch_interrupt = false)
             else
                 res = serial_solve(solver, starts; catch_interrupt = false)
             end
