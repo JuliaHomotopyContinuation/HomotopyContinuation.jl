@@ -1161,6 +1161,11 @@ function threaded_monodromy_solve!(
                         if length(results) ==
                            something(MS.options.target_solutions_count, -1)
                             retcode = :success
+                            try
+                                close(queue)
+                            catch e
+                                # ignore if already closed
+                            end
                             break
                         end
                         if p isa LinearSubspace &&
@@ -1168,6 +1173,11 @@ function threaded_monodromy_solve!(
                            MS.options.trace_test &&
                            trace_colinearity(MS) < MS.options.trace_test_tol
                             retcode = :success
+                            try
+                                close(queue)
+                            catch e
+                                # ignore if already closed
+                            end
                             break
                         end
 
@@ -1180,6 +1190,11 @@ function threaded_monodromy_solve!(
 
                         if (MS.options.single_loop_per_start_solution)
                             retcode = :success
+                            try
+                                close(queue)
+                            catch e
+                                # ignore if already closed
+                            end
                             break
                         end
                         sleep(0.001)
