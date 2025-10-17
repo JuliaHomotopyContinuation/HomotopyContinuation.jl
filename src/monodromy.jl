@@ -1194,12 +1194,6 @@ function threaded_monodromy_solve!(
                             break
                         end
 
-                        if (MS.options.single_loop_per_start_solution)
-                            retcode = :success
-                            close(queue)
-                            break
-                        end
-
                         # if we arrive here, add a new loop
                         add_loop!(MS, p)
                         new_loop_id = nloops(MS)
@@ -1212,6 +1206,11 @@ function threaded_monodromy_solve!(
                             reset_trace!(MS)
                         end
 
+                        if (MS.options.single_loop_per_start_solution)
+                            retcode = :success
+                            close(queue)
+                            break
+                        end
                         sleep(0.001)
 
                         retcode == :in_progress || break
