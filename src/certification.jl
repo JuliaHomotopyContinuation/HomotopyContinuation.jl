@@ -799,73 +799,75 @@ function _certify(
         Tp = [p; [deepcopy(p) for _ = 2:nthreads]]
 
         Threads.@sync begin
-            for tid = 1:nthreads
-                Threads.@spawn begin
-                    while true
-                        # get current index
-                        idx = Threads.atomic_add!(next_k, 1)
-                        i = idx
-                        if i > N
-                            break
-                        end
-                        s = solution_candidates[i]
-                        cert = certify_solution(
-                            Tf[tid],
-                            s,
-                            Tp[tid],
-                            Tcache[tid],
-                            i,
-                            is_real_system;
-                            extended_certificate = extended_certificate,
-                            certify_solution_kwargs...,
-                        )
+            for t = 1:nthreads
+                let tid = t
+                    Threads.@spawn begin
+                        while true
+                            # get current index
+                            idx = Threads.atomic_add!(next_k, 1)
+                            i = idx
+                            if i > N
+                                break
+                            end
+                            s = solution_candidates[i]
+                            cert = certify_solution(
+                                Tf[tid],
+                                s,
+                                Tp[tid],
+                                Tcache[tid],
+                                i,
+                                is_real_system;
+                                extended_certificate = extended_certificate,
+                                certify_solution_kwargs...,
+                            )
 
-                        certificates[i] = cert
-                        Threads.atomic_add!(nconsidered, 1)
-                        if is_certified(cert)
-                            Threads.atomic_add!(ncertified, 1)
-                            Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
+                            certificates[i] = cert
+                            Threads.atomic_add!(nconsidered, 1)
+                            if is_certified(cert)
+                                Threads.atomic_add!(ncertified, 1)
+                                Threads.atomic_add!(nreal_certified, Int(is_real(cert)))
 
-                            lock(distinct_lock) do
-                                (is_distinct, distinct_cert) =
-                                    add_certificate!(distinct_sols, cert)
-                                if is_distinct
-                                    Threads.atomic_add!(ndistinct, 1)
-                                    Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
-                                else
-                                    if !haskey(duplicates_dict, distinct_cert.index)
-                                        duplicates_dict[distinct_cert.index] =
-                                            [distinct_cert.index, cert.index]
+                                lock(distinct_lock) do
+                                    (is_distinct, distinct_cert) =
+                                        add_certificate!(distinct_sols, cert)
+                                    if is_distinct
+                                        Threads.atomic_add!(ndistinct, 1)
+                                        Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
                                     else
-                                        push!(
-                                            duplicates_dict[distinct_cert.index],
-                                            cert.index,
+                                        if !haskey(duplicates_dict, distinct_cert.index)
+                                            duplicates_dict[distinct_cert.index] =
+                                                [distinct_cert.index, cert.index]
+                                        else
+                                            push!(
+                                                duplicates_dict[distinct_cert.index],
+                                                cert.index,
+                                            )
+                                        end
+                                    end
+
+                                    if !isnothing(progress)
+                                        update_certify_progress!(
+                                            progress,
+                                            nconsidered[],
+                                            ncertified[],
+                                            nreal_certified[],
+                                            ndistinct[],
+                                            ndistinct_real[],
                                         )
                                     end
                                 end
-
-                                if !isnothing(progress)
-                                    update_certify_progress!(
-                                        progress,
-                                        nconsidered[],
-                                        ncertified[],
-                                        nreal_certified[],
-                                        ndistinct[],
-                                        ndistinct_real[],
-                                    )
-                                end
-                            end
-                        else
-                            lock(distinct_lock) do
-                                if !isnothing(progress)
-                                    update_certify_progress!(
-                                        progress,
-                                        nconsidered[],
-                                        ncertified[],
-                                        nreal_certified[],
-                                        ndistinct[],
-                                        ndistinct_real[],
-                                    )
+                            else
+                                lock(distinct_lock) do
+                                    if !isnothing(progress)
+                                        update_certify_progress!(
+                                            progress,
+                                            nconsidered[],
+                                            ncertified[],
+                                            nreal_certified[],
+                                            ndistinct[],
+                                            ndistinct_real[],
+                                        )
+                                    end
                                 end
                             end
                         end
@@ -1649,31 +1651,33 @@ function distinct_certified_solutions!(
 
         # threading block
         Threads.@sync begin
-            for tid = 1:nthr
-                Threads.@spawn begin
-                    while true
-                        # get current index
-                        idx = Threads.atomic_add!(next_k, 1)
-                        i = idx
-                        if i > N
-                            break
-                        end
+            for t = 1:nthr
+                let tid = t
+                    Threads.@spawn begin
+                        while true
+                            # get current index
+                            idx = Threads.atomic_add!(next_k, 1)
+                            i = idx
+                            if i > N
+                                break
+                            end
 
-                        sol = S[i]
-                        added, = add_solution!(d, sol, i, tid; kwargs...)
-                        Threads.atomic_add!(processed, 1)
-                        if added
-                            Threads.atomic_add!(ndistinct, 1)
-                        end
-                        if show_progress
-                            @lock progress_lock begin
-                                ProgressMeter.next!(
-                                    progress;
-                                    showvalues = [
-                                        (:processed, processed[]),
-                                        (:distinct_certified, ndistinct[]),
-                                    ],
-                                )
+                            sol = S[i]
+                            added, = add_solution!(d, sol, i, tid; kwargs...)
+                            Threads.atomic_add!(processed, 1)
+                            if added
+                                Threads.atomic_add!(ndistinct, 1)
+                            end
+                            if show_progress
+                                @lock progress_lock begin
+                                    ProgressMeter.next!(
+                                        progress;
+                                        showvalues = [
+                                            (:processed, processed[]),
+                                            (:distinct_certified, ndistinct[]),
+                                        ],
+                                    )
+                                end
                             end
                         end
                     end
