@@ -1102,6 +1102,7 @@ function threaded_monodromy_solve!(
                                 catch e
                                     # ignore if already closed
                                 end
+                                break
                             elseif !isnothing(MS.options.timeout) &&
                                    time() - t₀ > (MS.options.timeout::Float64)
                                 retcode = :timeout
@@ -1113,6 +1114,7 @@ function threaded_monodromy_solve!(
                                 catch e
                                     # ignore if already closed
                                 end
+                                break
                             end
                         end
 
@@ -1158,6 +1160,7 @@ function threaded_monodromy_solve!(
                             break
                         end
 
+                        @show length(results), something(MS.options.target_solutions_count, -1)
                         if length(results) ==
                            something(MS.options.target_solutions_count, -1)
                             retcode = :success
