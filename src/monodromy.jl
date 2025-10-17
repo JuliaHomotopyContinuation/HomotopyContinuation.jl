@@ -1047,7 +1047,9 @@ function threaded_monodromy_solve!(
                 let local_tracker = tracker
                     Threads.@spawn begin
                         for job in queue
+                            # if interrupted end the run
                             if interrupted[]
+                                close(queue)
                                 break
                             end
 
@@ -1084,31 +1086,31 @@ function threaded_monodromy_solve!(
                                                 nloops(MS) == job.loop_id,
                             )
 
-
-                            # we only keep at most target_solutions_count many results
                             lock(data_lock)
+                            # we only keep at most target_solutions_count many results
                             if length(results) <
                                something(MS.options.target_solutions_count, Inf)
+                                # only add if the computation was successfull
                                 if !isnothing(res)
                                     loop_tracked!(stats)
                                     id, added = add!(MS, res, length(results) + 1)
                                     if MS.options.permutations
                                         add_permutation!(stats, job.loop_id, job.id, id)
                                     end
-                                    if added
-                                        # add solution results
+                                    if added # only proceed when we found a new solution
+                                        # add new solution results
                                         push!(results, res)
-                                        # a) schedule on same loop again
+                                        # a) schedule new solution on same loop again
                                         if !MS.options.single_loop_per_start_solution
                                             push!(queue, LoopTrackingJob(id, job.loop_id))
                                         end
-                                        # b) schedule on other loops
+                                        # b) schedule new solution on other loops
                                         if MS.options.reuse_loops == :all
                                             for k = 1:nloops(MS)
                                                 k != job.loop_id || continue
                                                 push!(queue, LoopTrackingJob(id, k))
                                             end
-                                            # c) add to random loops
+                                            # c) schedule new solution on random loops
                                         elseif MS.options.reuse_loops == :random &&
                                                nloops(MS) ≥ 2
                                             k = rand(2:nloops(MS))
@@ -1118,7 +1120,6 @@ function threaded_monodromy_solve!(
                                             push!(queue, LoopTrackingJob(id, k))
                                         end
                                     end
-                                    # Schedule new work as needed
                                 else
                                     loop_failed!(stats)
                                     if MS.options.permutations
@@ -1155,15 +1156,17 @@ function threaded_monodromy_solve!(
                         if interrupted[]
                             break
                         end
+                        # update stats
                         lock(data_lock) do
                             loop_finished!(stats, length(results))
                         end
 
+                        # termination criteria
                         if MS.options.loop_finished_callback(results)
                             retcode = :terminated_callback
+                            close(queue)
                             break
                         end
-
 
                         if loops_no_change(stats, length(results)) >=
                            MS.options.max_loops_no_progress
@@ -1171,38 +1174,33 @@ function threaded_monodromy_solve!(
                             Base.@lock notify_lock begin
                                 interrupted[] = true
                             end
-                            try
-                                close(queue)
-                            catch e
-                                # ignore if already closed
-                            end
+                            close(queue)
                             break
                         end
-
 
                         if length(results) ==
                            something(MS.options.target_solutions_count, -1)
                             retcode = :success
-                            try
-                                close(queue)
-                            catch e
-                                # ignore if already closed
-                            end
+                            close(queue)
                             break
                         end
+
                         if p isa LinearSubspace &&
                            nloops(MS) > 0 &&
                            MS.options.trace_test &&
                            trace_colinearity(MS) < MS.options.trace_test_tol
                             retcode = :success
-                            try
-                                close(queue)
-                            catch e
-                                # ignore if already closed
-                            end
+                            close(queue)
                             break
                         end
 
+                        if (MS.options.single_loop_per_start_solution)
+                            retcode = :success
+                            close(queue)
+                            break
+                        end
+
+                        # if we arrive here, add a new loop
                         add_loop!(MS, p)
                         new_loop_id = nloops(MS)
                         for i = 1:length(results)
@@ -1214,15 +1212,6 @@ function threaded_monodromy_solve!(
                             reset_trace!(MS)
                         end
 
-                        if (MS.options.single_loop_per_start_solution)
-                            retcode = :success
-                            try
-                                close(queue)
-                            catch e
-                                # ignore if already closed
-                            end
-                            break
-                        end
                         sleep(0.001)
 
                         retcode == :in_progress || break
