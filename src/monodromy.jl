@@ -1061,10 +1061,9 @@ function threaded_monodromy_solve!(
                                 collect_trace = MS.options.trace_test &&
                                                 nloops(MS) == job.loop_id,
                             )
-
-                            if !isnothing(r)
-                                loop_tracked!(stats)
-                                lock(data_lock) do
+                            lock(data_lock) do
+                                if !isnothing(r)
+                                    loop_tracked!(stats)
                                     id, added = add!(MS, r, length(results) + 1)
                                     if MS.options.permutations
                                         add_permutation!(stats, job.loop_id, job.id, id)
@@ -1072,12 +1071,12 @@ function threaded_monodromy_solve!(
                                     if added
                                         push!(results, r)
                                     end
-                                end
-                                # Schedule new work as needed
-                            else
-                                loop_failed!(stats)
-                                if MS.options.permutations
-                                    add_permutation!(stats, job.loop_id, job.id, 0)
+                                    # Schedule new work as needed
+                                else
+                                    loop_failed!(stats)
+                                    if MS.options.permutations
+                                        add_permutation!(stats, job.loop_id, job.id, 0)
+                                    end
                                 end
                             end
 
@@ -1127,27 +1126,22 @@ function threaded_monodromy_solve!(
             # Controller thread block - adds loops and schedules work
             Threads.@spawn begin
                 Base.@lock notify_lock begin
-                    no_progress_count = 0
                     while true
                         if interrupted[]
                             break
                         end
-                        loop_finished!(stats, length(results))
+                        lock(data_lock) do
+                            loop_finished!(stats, length(results))
+                        end
 
                         if MS.options.loop_finished_callback(results)
                             retcode = :terminated_callback
                             break
                         end
 
-                        loops_no_change_val = loops_no_change(stats, length(results))
 
-                        if loops_no_change_val > 0
-                            no_progress_count += 1
-                        else
-                            no_progress_count = 0
-                        end
-
-                        if no_progress_count >= MS.options.max_loops_no_progress
+                        if loops_no_change(stats, length(results)) >=
+                           MS.options.max_loops_no_progress
                             retcode = :heuristic_stop
                             Base.@lock notify_lock begin
                                 interrupted[] = true
@@ -1160,8 +1154,7 @@ function threaded_monodromy_solve!(
                             break
                         end
 
-                        @show length(results), something(MS.options.target_solutions_count, -1)
-                        if length(results) ==
+                        if length(results) >=
                            something(MS.options.target_solutions_count, -1)
                             retcode = :success
                             try
