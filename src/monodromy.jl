@@ -1038,7 +1038,6 @@ function threaded_monodromy_solve!(
     queued = Ref(0)
 
     progress_lock = ReentrantLock()
-    terminated = Threads.Atomic{Bool}(false)
 
     # Single barrier: spawn workers and controller inside
     try
@@ -1048,11 +1047,34 @@ function threaded_monodromy_solve!(
                 let local_tracker = tracker
                     Threads.@spawn begin
                         for job in queue
-                            if terminated[]
+                            if interrupted[]
                                 break
                             end
 
-                            r = track(
+                            # check termination conditions
+                            # 1: enough solutions
+                            if length(results) >=
+                               something(MS.options.target_solutions_count, Inf) &&
+                               !MS.options.permutations
+                                retcode = :success
+                                Base.@lock notify_lock begin
+                                    interrupted[] = true
+                                end
+                                close(queue)
+                                break
+                                # 2: timeout
+                            elseif !isnothing(MS.options.timeout) &&
+                                   time() - t₀ > (MS.options.timeout::Float64)
+                                retcode = :timeout
+                                Base.@lock notify_lock begin
+                                    interrupted[] = true
+                                end
+                                close(queue)
+                                break
+                            end
+
+                            # track over a loop
+                            res = track(
                                 local_tracker,
                                 results[job.id],
                                 loop(MS, job.loop_id),
@@ -1062,27 +1084,51 @@ function threaded_monodromy_solve!(
                                                 nloops(MS) == job.loop_id,
                             )
 
-                            lock(data_lock) do
-                                if length(results) <
-                                   something(MS.options.target_solutions_count, Inf)
-                                    if !isnothing(r)
-                                        loop_tracked!(stats)
-                                        id, added = add!(MS, r, length(results) + 1)
-                                        if MS.options.permutations
-                                            add_permutation!(stats, job.loop_id, job.id, id)
+
+                            # we only keep at most target_solutions_count many results
+                            lock(data_lock)
+                            if length(results) <
+                               something(MS.options.target_solutions_count, Inf)
+                                if !isnothing(res)
+                                    loop_tracked!(stats)
+                                    id, added = add!(MS, res, length(results) + 1)
+                                    if MS.options.permutations
+                                        add_permutation!(stats, job.loop_id, job.id, id)
+                                    end
+                                    if added
+                                        # add solution results
+                                        push!(results, res)
+                                        # a) schedule on same loop again
+                                        if !MS.options.single_loop_per_start_solution
+                                            push!(queue, LoopTrackingJob(id, job.loop_id))
                                         end
-                                        if added
-                                            push!(results, r)
-                                        end
-                                        # Schedule new work as needed
-                                    else
-                                        loop_failed!(stats)
-                                        if MS.options.permutations
-                                            add_permutation!(stats, job.loop_id, job.id, 0)
+                                        # b) schedule on other loops
+                                        if MS.options.reuse_loops == :all
+                                            for k = 1:nloops(MS)
+                                                k != job.loop_id || continue
+                                                push!(queue, LoopTrackingJob(id, k))
+                                            end
+                                            # c) add to random loops
+                                        elseif MS.options.reuse_loops == :random &&
+                                               nloops(MS) ≥ 2
+                                            k = rand(2:nloops(MS))
+                                            if k ≤ job.loop_id
+                                                k -= 1
+                                            end
+                                            push!(queue, LoopTrackingJob(id, k))
                                         end
                                     end
+                                    # Schedule new work as needed
+                                else
+                                    loop_failed!(stats)
+                                    if MS.options.permutations
+                                        add_permutation!(stats, job.loop_id, job.id, 0)
+                                    end
+
                                 end
                             end
+                            unlock(data_lock)
+
 
                             @lock progress_lock begin
                                 update_progress!(
@@ -1093,32 +1139,7 @@ function threaded_monodromy_solve!(
                                 )
                             end
 
-                            if length(results) ==
-                               something(MS.options.target_solutions_count, -1) &&
-                               !MS.options.permutations
-                                retcode = :success
-                                Base.@lock notify_lock begin
-                                    interrupted[] = true
-                                end
-                                try
-                                    close(queue)
-                                catch e
-                                    # ignore if already closed
-                                end
-                                break
-                            elseif !isnothing(MS.options.timeout) &&
-                                   time() - t₀ > (MS.options.timeout::Float64)
-                                retcode = :timeout
-                                Base.@lock notify_lock begin
-                                    interrupted[] = true
-                                end
-                                try
-                                    close(queue)
-                                catch e
-                                    # ignore if already closed
-                                end
-                                break
-                            end
+
                         end
 
                     end
