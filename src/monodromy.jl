@@ -165,6 +165,7 @@ function loops_no_change(stats::MonodromyStatistics, nsolutions)
     return max(k - 1, 0)
 end
 
+
 @noinline function make_showvalues(stats::MonodromyStatistics; queued::Int, solutions::Int)
     [
         ("tracked loops (queued)", "$(stats.tracked_loops[]) ($queued)"),
@@ -1114,13 +1115,17 @@ function threaded_monodromy_solve!(
                                 end
                             end
                         end
+
                     end
+
                 end
+
             end
 
             # Controller thread block - adds loops and schedules work
             Threads.@spawn begin
                 Base.@lock notify_lock begin
+                    no_progress_count = 0
                     while true
                         if interrupted[]
                             break
@@ -1131,11 +1136,28 @@ function threaded_monodromy_solve!(
                             retcode = :terminated_callback
                             break
                         end
-                        if loops_no_change(stats, length(results)) ≥
-                           MS.options.max_loops_no_progress
+
+                        loops_no_change_val = loops_no_change(stats, length(results))
+
+                        if loops_no_change_val > 0
+                            no_progress_count += 1
+                        else
+                            no_progress_count = 0
+                        end
+
+                        if no_progress_count >= MS.options.max_loops_no_progress
                             retcode = :heuristic_stop
+                            Base.@lock notify_lock begin
+                                interrupted[] = true
+                            end
+                            try
+                                close(queue)
+                            catch e
+                                # ignore if already closed
+                            end
                             break
                         end
+
                         if length(results) ==
                            something(MS.options.target_solutions_count, -1)
                             retcode = :success
@@ -1156,15 +1178,13 @@ function threaded_monodromy_solve!(
                             push!(queue, LoopTrackingJob(i, new_loop_id))
                         end
 
-
                         if (MS.options.single_loop_per_start_solution)
                             retcode = :success
                             break
                         end
-                        if retcode != :in_progress
-                            break
-                        end
                         sleep(0.001)
+
+                        retcode == :in_progress || break
                     end
                 end
             end
