@@ -647,26 +647,28 @@ function threaded_solve(
     # threading block
     try
         Threads.@sync begin
-            for local_tracker in solver.trackers
-                Threads.@spawn begin
-                    while true
-                        # get current index
-                        idx = Threads.atomic_add!(next_k, 1)
-                        k = idx
-                        if k > N || interrupted[]
-                            break
-                        end
-                        # track
-                        r = track(local_tracker, S[k]; path_number = k)
-                        path_results[k] = r
-                        nfinished = Threads.atomic_add!(finished, 1) + 1
-                        # update progress and stats in a locked state
-                        lock(progress_lock) do
-                            update!(solver.stats, r)
-                            update_progress!(progress, solver.stats, nfinished)
-                        end
-                        if is_success(r) && stop_early_cb(r)
-                            interrupted[] = true
+            for lt in solver.trackers
+                let tracker = lt
+                    Threads.@spawn begin
+                        while true
+                            # get current index
+                            idx = Threads.atomic_add!(next_k, 1)
+                            k = idx
+                            if k > N || interrupted[]
+                                break
+                            end
+                            # track
+                            r = track(tracker, S[k]; path_number = k)
+                            path_results[k] = r
+                            nfinished = Threads.atomic_add!(finished, 1) + 1
+                            # update progress and stats in a locked state
+                            lock(progress_lock) do
+                                update!(solver.stats, r)
+                                update_progress!(progress, solver.stats, nfinished)
+                            end
+                            if is_success(r) && stop_early_cb(r)
+                                interrupted[] = true
+                            end
                         end
                     end
                 end
