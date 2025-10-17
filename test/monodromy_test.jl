@@ -14,6 +14,12 @@
     @testset "monodromy_solve" begin
         F = toric_ed([3 2 1 0; 0 1 2 3])
 
+        # out of the box 
+        result = monodromy_solve(F)
+        @test is_success(result)
+        @test length(solutions(result)) == 21
+
+        # control run time
         result = monodromy_solve(
             F,
             target_solutions_count = 21,
