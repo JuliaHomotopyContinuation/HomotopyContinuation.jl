@@ -1057,7 +1057,8 @@ function threaded_monodromy_solve!(
                                 loop(MS, job.loop_id),
                                 MS.trace,
                                 MS.trace_lock;
-                                collect_trace = MS.options.trace_test && nloops(MS) == job.loop_id
+                                collect_trace = MS.options.trace_test &&
+                                                nloops(MS) == job.loop_id,
                             )
 
                             if !isnothing(r)
@@ -1071,7 +1072,7 @@ function threaded_monodromy_solve!(
                                         push!(results, r)
                                     end
                                 end
-                            # Schedule new work as needed
+                                # Schedule new work as needed
                             else
                                 loop_failed!(stats)
                                 if MS.options.permutations
@@ -1080,11 +1081,17 @@ function threaded_monodromy_solve!(
                             end
 
                             @lock progress_lock begin
-                                update_progress!(progress, stats; solutions = length(results), queued = Base.n_avail(queue))
+                                update_progress!(
+                                    progress,
+                                    stats;
+                                    solutions = length(results),
+                                    queued = Base.n_avail(queue),
+                                )
                             end
 
-                            if length(results) == something(MS.options.target_solutions_count, -1) &&
-                            !MS.options.permutations
+                            if length(results) ==
+                               something(MS.options.target_solutions_count, -1) &&
+                               !MS.options.permutations
                                 retcode = :success
                                 Base.@lock notify_lock begin
                                     interrupted[] = true
@@ -1092,10 +1099,10 @@ function threaded_monodromy_solve!(
                                 try
                                     close(queue)
                                 catch e
-                                # ignore if already closed
+                                    # ignore if already closed
                                 end
                             elseif !isnothing(MS.options.timeout) &&
-                                time() - t₀ > (MS.options.timeout::Float64)
+                                   time() - t₀ > (MS.options.timeout::Float64)
                                 retcode = :timeout
                                 Base.@lock notify_lock begin
                                     interrupted[] = true
@@ -1103,9 +1110,9 @@ function threaded_monodromy_solve!(
                                 try
                                     close(queue)
                                 catch e
-                                # ignore if already closed
+                                    # ignore if already closed
                                 end
-                        end
+                            end
                         end
                     end
                 end
@@ -1124,18 +1131,20 @@ function threaded_monodromy_solve!(
                             retcode = :terminated_callback
                             break
                         end
-                        if loops_no_change(stats, length(results)) ≥ MS.options.max_loops_no_progress
+                        if loops_no_change(stats, length(results)) ≥
+                           MS.options.max_loops_no_progress
                             retcode = :heuristic_stop
                             break
                         end
-                        if length(results) == something(MS.options.target_solutions_count, -1)
+                        if length(results) ==
+                           something(MS.options.target_solutions_count, -1)
                             retcode = :success
                             break
                         end
                         if p isa LinearSubspace &&
-                        nloops(MS) > 0 &&
-                        MS.options.trace_test &&
-                        trace_colinearity(MS) < MS.options.trace_test_tol
+                           nloops(MS) > 0 &&
+                           MS.options.trace_test &&
+                           trace_colinearity(MS) < MS.options.trace_test_tol
                             retcode = :success
                             break
                         end
@@ -1147,7 +1156,7 @@ function threaded_monodromy_solve!(
                             push!(queue, LoopTrackingJob(i, new_loop_id))
                         end
 
-        
+
                         if (MS.options.single_loop_per_start_solution)
                             retcode = :success
                             break

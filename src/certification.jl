@@ -832,7 +832,10 @@ function _certify(
                                         add_certificate!(distinct_sols, cert)
                                     if is_distinct
                                         Threads.atomic_add!(ndistinct, 1)
-                                        Threads.atomic_add!(ndistinct_real, Int(is_real(cert)))
+                                        Threads.atomic_add!(
+                                            ndistinct_real,
+                                            Int(is_real(cert)),
+                                        )
                                     else
                                         if !haskey(duplicates_dict, distinct_cert.index)
                                             duplicates_dict[distinct_cert.index] =
