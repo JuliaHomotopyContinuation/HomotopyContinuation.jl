@@ -1154,8 +1154,9 @@ function threaded_monodromy_solve!(
                             break
                         end
 
-                        if length(results) >=
-                           something(MS.options.target_solutions_count, -1)
+                        l = something(MS.options.target_solutions_count, -1)
+                        if l > 0 && length(results) >=
+                           l
                             retcode = :success
                             try
                                 close(queue)
