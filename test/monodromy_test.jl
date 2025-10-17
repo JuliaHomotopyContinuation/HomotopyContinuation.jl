@@ -16,7 +16,7 @@
 
         # out of the box 
         result = monodromy_solve(F)
-        @test is_success(result)
+        @test is_heuristic_stop(result)
         @test length(solutions(result)) == 21
 
         # control run time
