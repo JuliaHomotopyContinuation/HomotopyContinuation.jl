@@ -560,7 +560,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   propagates a new solution through all other loops, `:random` picks a random loop, `:none`
   doesn't reuse a loop.
 * `target_solutions_count`: The computation is stopped if this number of solutions is
-  reached.
+  reached. When `threading = true` and `target_solutions_count` is smaller than the actual number of solutions, then the result can contain more solutions than `target_solutions_count` due to threading.
 * `threading = true`: Enable multithreading of the path tracking.
   Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
   interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
