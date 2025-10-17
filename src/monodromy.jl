@@ -560,7 +560,7 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   propagates a new solution through all other loops, `:random` picks a random loop, `:none`
   doesn't reuse a loop.
 * `target_solutions_count`: The computation is stopped if this number of solutions is
-  reached. When `threading = true` and `target_solutions_count` is smaller than the actual number of solutions, then the result can contain more solutions than `target_solutions_count` due to threading.
+  reached.
 * `threading = true`: Enable multithreading of the path tracking.
   Careful: Some CPUs hang when using multiple threads. To avoid this run Julia with 1 
   interactive thread for the REPL and `n` threads for other tasks (e.g., `julia -t 8,1` for `n=8`).
@@ -1061,21 +1061,25 @@ function threaded_monodromy_solve!(
                                 collect_trace = MS.options.trace_test &&
                                                 nloops(MS) == job.loop_id,
                             )
+
                             lock(data_lock) do
-                                if !isnothing(r)
-                                    loop_tracked!(stats)
-                                    id, added = add!(MS, r, length(results) + 1)
-                                    if MS.options.permutations
-                                        add_permutation!(stats, job.loop_id, job.id, id)
-                                    end
-                                    if added
-                                        push!(results, r)
-                                    end
-                                    # Schedule new work as needed
-                                else
-                                    loop_failed!(stats)
-                                    if MS.options.permutations
-                                        add_permutation!(stats, job.loop_id, job.id, 0)
+                                if length(results) <
+                                   something(MS.options.target_solutions_count, Inf)
+                                    if !isnothing(r)
+                                        loop_tracked!(stats)
+                                        id, added = add!(MS, r, length(results) + 1)
+                                        if MS.options.permutations
+                                            add_permutation!(stats, job.loop_id, job.id, id)
+                                        end
+                                        if added
+                                            push!(results, r)
+                                        end
+                                        # Schedule new work as needed
+                                    else
+                                        loop_failed!(stats)
+                                        if MS.options.permutations
+                                            add_permutation!(stats, job.loop_id, job.id, 0)
+                                        end
                                     end
                                 end
                             end
@@ -1154,8 +1158,9 @@ function threaded_monodromy_solve!(
                             break
                         end
 
-                        l = something(MS.options.target_solutions_count, -1)
-                        if l > 0 && length(results) >= l
+
+                        if length(results) ==
+                           something(MS.options.target_solutions_count, -1)
                             retcode = :success
                             try
                                 close(queue)
@@ -1178,10 +1183,14 @@ function threaded_monodromy_solve!(
                         end
 
                         add_loop!(MS, p)
-                        reset_trace!(MS)
                         new_loop_id = nloops(MS)
                         for i = 1:length(results)
                             push!(queue, LoopTrackingJob(i, new_loop_id))
+                        end
+
+                        # reset trace
+                        lock(data_lock) do
+                            reset_trace!(MS)
                         end
 
                         if (MS.options.single_loop_per_start_solution)
