@@ -1017,10 +1017,8 @@ function threaded_monodromy_solve!(
     seed,
     progress,
 )
-    # Shared queue of work
     queue = Channel{LoopTrackingJob}(Inf)
 
-    # Ensure we have one per-thread tracker
     tracker = MS.trackers[1]
     ntrackers = length(MS.trackers)
     nthr = Threads.nthreads()
@@ -1034,190 +1032,181 @@ function threaded_monodromy_solve!(
     retcode = :in_progress
     stats = MS.statistics
     notify_lock = ReentrantLock()
+    cond_queue_emptied = Threads.Condition(notify_lock)
+    workers_idle = fill(true, nthr)
     interrupted = Ref(false)
     queued = Ref(0)
 
-    progress_lock = ReentrantLock()
-
     # Single barrier: spawn workers and controller inside
     try
-        Threads.@sync begin
-            # Spawn one worker per tracker, but capture a fresh copy per iteration
-            for tracker in MS.trackers
-                let local_tracker = tracker
-                    Threads.@spawn begin
-                        for job in queue
-                            # if interrupted end the run
+        for tr in MS.trackers
+            let tracker = tr
+                Threads.@spawn begin
+                    tid = Threads.threadid()
+                    for job in queue
+                        stop_queue = false
+                        Base.@lock notify_lock begin
                             if interrupted[]
-                                close(queue)
-                                break
-                            end
-
-                            # check termination conditions
-                            # 1: enough solutions
-                            if length(results) >=
-                               something(MS.options.target_solutions_count, Inf) &&
-                               !MS.options.permutations
-                                retcode = :success
-                                Base.@lock notify_lock begin
-                                    interrupted[] = true
+                                # mark worker as idle
+                                workers_idle[tid] = true
+                                # if all idle notify that queue is empty
+                                if all(workers_idle)
+                                    notify(cond_queue_emptied)
                                 end
-                                close(queue)
-                                break
-                                # 2: timeout
-                            elseif !isnothing(MS.options.timeout) &&
-                                   time() - t₀ > (MS.options.timeout::Float64)
-                                retcode = :timeout
-                                Base.@lock notify_lock begin
-                                    interrupted[] = true
-                                end
-                                close(queue)
-                                break
+                                stop_queue = true
+                            else
+                                workers_idle[tid] = false
                             end
+                        end
+                        if stop_queue
+                            break
+                        end
 
-                            # track over a loop
-                            res = track(
-                                local_tracker,
-                                results[job.id],
-                                loop(MS, job.loop_id),
-                                MS.trace,
-                                MS.trace_lock;
-                                collect_trace = MS.options.trace_test &&
-                                                nloops(MS) == job.loop_id,
-                            )
+                        res = track(
+                            tracker,
+                            results[job.id],
+                            loop(MS, job.loop_id),
+                            MS.trace,
+                            MS.trace_lock;
+                            collect_trace = MS.options.trace_test &&
+                                            nloops(MS) == job.loop_id,
+                        )
 
+                        if !isnothing(res)
+                            loop_tracked!(stats)
+
+                            # 1) check whether solutions already exists
                             lock(data_lock)
-                            # we only keep at most target_solutions_count many results
                             if length(results) <
                                something(MS.options.target_solutions_count, Inf)
-                                # only add if the computation was successfull
-                                if !isnothing(res)
-                                    loop_tracked!(stats)
-                                    id, added = add!(MS, res, length(results) + 1)
-                                    if MS.options.permutations
-                                        add_permutation!(stats, job.loop_id, job.id, id)
-                                    end
-                                    if added # only proceed when we found a new solution
-                                        # add new solution results
-                                        push!(results, res)
-                                        # a) schedule new solution on same loop again
-                                        if !MS.options.single_loop_per_start_solution
-                                            push!(queue, LoopTrackingJob(id, job.loop_id))
-                                        end
-                                        # b) schedule new solution on other loops
-                                        if MS.options.reuse_loops == :all
-                                            for k = 1:nloops(MS)
-                                                k != job.loop_id || continue
-                                                push!(queue, LoopTrackingJob(id, k))
-                                            end
-                                            # c) schedule new solution on random loops
-                                        elseif MS.options.reuse_loops == :random &&
-                                               nloops(MS) ≥ 2
-                                            k = rand(2:nloops(MS))
-                                            if k ≤ job.loop_id
-                                                k -= 1
-                                            end
-                                            push!(queue, LoopTrackingJob(id, k))
-                                        end
-                                    end
-                                else
-                                    loop_failed!(stats)
-                                    if MS.options.permutations
-                                        add_permutation!(stats, job.loop_id, job.id, 0)
-                                    end
+                                id, got_added = add!(MS, res, length(results) + 1)
 
+                                if MS.options.permutations
+                                    add_permutation!(stats, job.loop_id, job.id, id)
                                 end
+                            else
+                                got_added = false
                             end
+
+                            if !got_added
+                                unlock(data_lock)
+                                @goto _update
+                            end
+                            # 2) doesn't exist, so add to results
+                            push!(results, res)
                             unlock(data_lock)
 
-
-                            @lock progress_lock begin
-                                update_progress!(
-                                    progress,
-                                    stats;
-                                    solutions = length(results),
-                                    queued = Base.n_avail(queue),
-                                )
+                            # 3) schedule on same loop again
+                            if !MS.options.single_loop_per_start_solution
+                                push!(queue, LoopTrackingJob(id, job.loop_id))
                             end
+                            # 4) schedule on other loops
+                            if MS.options.reuse_loops == :all
+                                for k = 1:nloops(MS)
+                                    k != job.loop_id || continue
+                                    push!(queue, LoopTrackingJob(id, k))
+                                end
+                            elseif MS.options.reuse_loops == :random && nloops(MS) ≥ 2
+                                k = rand(2:nloops(MS))
+                                if k ≤ job.loop_id
+                                    k -= 1
+                                end
+                                push!(queue, LoopTrackingJob(id, k))
+                            end
+                        else
+                            loop_failed!(stats)
+                            if MS.options.permutations
+                                add_permutation!(stats, job.loop_id, job.id, 0)
+                            end
+                        end
+                        # Update progress
+                        @label _update
+                        update_progress!(
+                            progress,
+                            stats;
+                            solutions = length(results),
+                            queued = Base.n_avail(queue),
+                        )
 
-
+                        # mark worker as idle
+                        Base.@lock notify_lock begin
+                            workers_idle[tid] = true
+                            # if queue is empty, check whether all other are also waiting
+                            if !isready(queue) && all(workers_idle)
+                                notify(cond_queue_emptied)
+                            end
                         end
 
-                    end
-
-                end
-
-            end
-
-            # Controller thread block - adds loops and schedules work
-            Threads.@spawn begin
-                Base.@lock notify_lock begin
-                    while true
-                        if interrupted[]
-                            break
-                        end
-                        # update stats
-                        lock(data_lock) do
-                            loop_finished!(stats, length(results))
-                        end
-
-                        # termination criteria
-                        if MS.options.loop_finished_callback(results)
-                            retcode = :terminated_callback
-                            close(queue)
-                            break
-                        end
-
-                        if loops_no_change(stats, length(results)) >=
-                           MS.options.max_loops_no_progress
-                            retcode = :heuristic_stop
+                        if length(results) >=
+                           something(MS.options.target_solutions_count, Inf) &&
+                           # only terminate after a completed loop to ensure that we collect proper
+                           # permutation informations
+                           !MS.options.permutations
+                            retcode = :success
                             Base.@lock notify_lock begin
                                 interrupted[] = true
                             end
-                            close(queue)
-                            break
-                        end
 
-                        if length(results) ==
-                           something(MS.options.target_solutions_count, -1)
-                            retcode = :success
-                            close(queue)
-                            break
+                        elseif !isnothing(MS.options.timeout) &&
+                               time() - t₀ > (MS.options.timeout::Float64)
+                            retcode = :timeout
+                            Base.@lock notify_lock begin
+                                interrupted[] = true
+                            end
                         end
-
-                        if p isa LinearSubspace &&
-                           nloops(MS) > 0 &&
-                           MS.options.trace_test &&
-                           trace_colinearity(MS) < MS.options.trace_test_tol
-                            retcode = :success
-                            close(queue)
-                            break
-                        end
-
-                        # if we arrive here, add a new loop
-                        add_loop!(MS, p)
-                        new_loop_id = nloops(MS)
-                        for i = 1:length(results)
-                            push!(queue, LoopTrackingJob(i, new_loop_id))
-                        end
-
-                        # reset trace
-                        lock(data_lock) do
-                            reset_trace!(MS)
-                        end
-
-                        if (MS.options.single_loop_per_start_solution)
-                            retcode = :success
-                            close(queue)
-                            break
-                        end
-                        sleep(0.001)
-
-                        retcode == :in_progress || break
                     end
                 end
             end
         end
+
+        t = Threads.@spawn begin
+            Base.@lock notify_lock begin
+                while true
+                    if interrupted[]
+                        break
+                    end
+                    loop_finished!(stats, length(results))
+
+                    if MS.options.loop_finished_callback(results)
+                        retcode = :terminated_callback
+                        break
+                    end
+                    if loops_no_change(stats, length(results)) ≥
+                       MS.options.max_loops_no_progress
+                        retcode = :heuristic_stop
+                        break
+                    end
+                    if length(results) >= something(MS.options.target_solutions_count, Inf)
+                        retcode = :success
+                        break
+                    end
+                    if p isa LinearSubspace &&
+                       nloops(MS) > 0 &&
+                       MS.options.trace_test &&
+                       trace_colinearity(MS) < MS.options.trace_test_tol
+                        retcode = :success
+                        break
+                    end
+
+                    add_loop!(MS, p)
+                    reset_trace!(MS)
+                    # schedule all jobs
+                    new_loop_id = nloops(MS)
+                    for i = 1:length(results)
+                        push!(queue, LoopTrackingJob(i, new_loop_id))
+                    end
+
+                    wait(cond_queue_emptied)
+                    if (MS.options.single_loop_per_start_solution)
+                        retcode = :success
+                        break
+                    end
+                    retcode == :in_progress || break
+                end
+            end
+        end
+
+        wait(t)
     catch e
         close(queue)
         interrupted[] = true
