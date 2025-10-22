@@ -1029,7 +1029,7 @@ function threaded_monodromy_solve!(
 
     data_lock = ReentrantLock()
     t₀ = time()
-    retcode = :in_progress
+    retcode = Ref(:in_progress)
     stats = MS.statistics
     notify_lock = ReentrantLock()
     cond_queue_emptied = Threads.Condition(notify_lock)
@@ -1039,10 +1039,9 @@ function threaded_monodromy_solve!(
 
     # Single barrier: spawn workers and controller inside
     try
-        for tr in MS.trackers
-            let tracker = tr
+        for (j, tr) in enumerate(MS.trackers)
+            let tracker = tr, tid = j
                 Threads.@spawn begin
-                    tid = Threads.threadid()
                     for job in queue
                         stop_queue = false
                         Base.@lock notify_lock begin
@@ -1061,7 +1060,6 @@ function threaded_monodromy_solve!(
                         if stop_queue
                             break
                         end
-
                         res = track(
                             tracker,
                             results[job.id],
@@ -1142,14 +1140,14 @@ function threaded_monodromy_solve!(
                            # only terminate after a completed loop to ensure that we collect proper
                            # permutation informations
                            !MS.options.permutations
-                            retcode = :success
+                            retcode[] = :success
                             Base.@lock notify_lock begin
                                 interrupted[] = true
                             end
 
                         elseif !isnothing(MS.options.timeout) &&
                                time() - t₀ > (MS.options.timeout::Float64)
-                            retcode = :timeout
+                            retcode[] = :timeout
                             Base.@lock notify_lock begin
                                 interrupted[] = true
                             end
@@ -1168,23 +1166,26 @@ function threaded_monodromy_solve!(
                     loop_finished!(stats, length(results))
 
                     if MS.options.loop_finished_callback(results)
-                        retcode = :terminated_callback
+                        retcode[] = :terminated_callback
                         break
                     end
+
                     if loops_no_change(stats, length(results)) ≥
                        MS.options.max_loops_no_progress
-                        retcode = :heuristic_stop
+                        retcode[] = :heuristic_stop
                         break
                     end
+
                     if length(results) >= something(MS.options.target_solutions_count, Inf)
-                        retcode = :success
+                        retcode[] = :success
                         break
                     end
+
                     if p isa LinearSubspace &&
                        nloops(MS) > 0 &&
                        MS.options.trace_test &&
                        trace_colinearity(MS) < MS.options.trace_test_tol
-                        retcode = :success
+                        retcode[] = :success
                         break
                     end
 
@@ -1198,10 +1199,10 @@ function threaded_monodromy_solve!(
 
                     wait(cond_queue_emptied)
                     if (MS.options.single_loop_per_start_solution)
-                        retcode = :success
+                        retcode[] = :success
                         break
                     end
-                    retcode == :in_progress || break
+                    retcode[] == :in_progress || break
                 end
             end
         end
@@ -1224,7 +1225,7 @@ function threaded_monodromy_solve!(
         queued = queued[],
     )
 
-    return retcode
+    return retcode[]
 end
 
 function uniqueness_rtol(res::PathResult)
