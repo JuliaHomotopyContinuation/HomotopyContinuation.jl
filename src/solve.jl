@@ -624,51 +624,69 @@ function threaded_solve(
     stop_early_cb = always_false;
     catch_interrupt::Bool = true,
 )
+
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
-    interrupted = false
+    interrupted = Threads.Atomic{Bool}(false)
     started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
+    next_k = Threads.Atomic{Int}(1)  # next index k to process
+
+    # Each thread gets its own tracker
+    tracker = solver.trackers[1]
+    ntrackers = length(solver.trackers)
+    nthr = Threads.nthreads()
+    resize!(solver.trackers, nthr)
+    for i = (ntrackers+1):nthr
+        solver.trackers[i] = deepcopy(tracker)
+    end
+
+    # Use a lock for progress
+    progress_lock = ReentrantLock()
+
+    # threading block
     try
-        tracker = solver.trackers[1]
-        ntrackers = length(solver.trackers)
-        nthr = Threads.nthreads()
-
-        resize!(solver.trackers, nthr)
-        for i = (ntrackers+1):nthr
-            solver.trackers[i] = deepcopy(tracker)
-        end
-
-        tasks = map(enumerate(solver.trackers)) do (i, tracker)
-            @tspawnat i begin
-                while (k = Threads.atomic_add!(started, 1) + 1) ≤ N && !interrupted
-                    r = track(tracker, S[k]; path_number = k)
-                    path_results[k] = r
-                    nfinished = Threads.atomic_add!(finished, 1) + 1
-                    update!(solver.stats, r)
-                    update_progress!(progress, solver.stats, nfinished[])
-                    if is_success(r) && stop_early_cb(r)
-                        interrupted = true
+        Threads.@sync begin
+            for lt in solver.trackers
+                let tracker = lt
+                    Threads.@spawn begin
+                        while true
+                            # get current index
+                            idx = Threads.atomic_add!(next_k, 1)
+                            k = idx
+                            if k > N || interrupted[]
+                                break
+                            end
+                            # track
+                            r = track(tracker, S[k]; path_number = k)
+                            path_results[k] = r
+                            nfinished = Threads.atomic_add!(finished, 1) + 1
+                            # update progress and stats in a locked state
+                            lock(progress_lock) do
+                                update!(solver.stats, r)
+                                update_progress!(progress, solver.stats, nfinished)
+                            end
+                            if is_success(r) && stop_early_cb(r)
+                                interrupted[] = true
+                            end
+                        end
                     end
                 end
             end
-        end
-        for task in tasks
-            wait(task)
         end
     catch e
         if (
             isa(e, InterruptException) ||
             (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
         )
-            interrupted = true
+            interrupted[] = true
         end
-        if !interrupted || !catch_interrupt
+        if !interrupted[] || !catch_interrupt
             rethrow(e)
         end
     end
     # if we got interrupted we need to remove the unassigned filedds
-    if interrupted
+    if interrupted[]
         assigned_results = Vector{PathResult}()
         for i = 1:started[]
             if isassigned(path_results, i)
@@ -679,6 +697,7 @@ function threaded_solve(
     else
         Result(path_results; seed = solver.seed, start_system = solver.start_system)
     end
+
 end
 
 function start_parameters!(solver::Solver, p)

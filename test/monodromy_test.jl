@@ -14,6 +14,12 @@
     @testset "monodromy_solve" begin
         F = toric_ed([3 2 1 0; 0 1 2 3])
 
+        # out of the box 
+        result = monodromy_solve(F)
+        @test is_heuristic_stop(result)
+        @test length(solutions(result)) == 21
+
+        # control run time
         result = monodromy_solve(
             F,
             target_solutions_count = 21,
@@ -35,6 +41,7 @@
         )
         @test result2.statistics.tracked_loops[] == result.statistics.tracked_loops[]
 
+        # threading
         result = monodromy_solve(
             F,
             target_solutions_count = 21,
@@ -190,7 +197,7 @@
                 show_progress = false,
                 max_loops_no_progress = 20,
                 target_solutions_count = 225,
-                threading = false,
+                threading = threading,
             )
             @test nsolutions(R) == 225
         end
