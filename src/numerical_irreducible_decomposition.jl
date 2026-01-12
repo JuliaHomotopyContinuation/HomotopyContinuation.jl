@@ -626,7 +626,6 @@ function is_contained(X, Y, F, cache)
         U = cache.U
         empty!(U)
 
-        P = points(Y)
         Hom = linear_subspace_homotopy(F, LY, LY; intrinsic = true)
         tracker = EndgameTracker(
             Hom;
@@ -639,6 +638,8 @@ function is_contained(X, Y, F, cache)
         A, b = cache.As[dY+1], cache.bs[dY+1]
         
         out = map(points(X)) do x
+
+            update_progress!(progress, X)
 
             # first check
             update_x0!(x0)
@@ -659,7 +660,7 @@ function is_contained(X, Y, F, cache)
             # set L as the target for homotopy continuation
             target_parameters!(tracker, L)
 
-            is_tracked_to_x(cache, x, X, P, tracker)
+            return x_in_Y(x, Y, tracker, cache)
         end
     end
 
@@ -711,17 +712,16 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-function is_tracked_to_x(cache, x, X, P, tracker)
+function x_in_Y(x, Y, tracker, cache)
 
     U = cache.U
-    progress = cache.progress
 
     # reuse U
     empty!(U)
     add!(U, x, 0)
 
     # add the points in Y to U after we have moved them towards L 
-    for (i, p) in enumerate(P)
+    for (i, p) in enumerate(points(Y))
         track!(tracker, p, 1)
         q = solution(tracker)
         _, added = add!(U, q, i)
@@ -729,7 +729,6 @@ function is_tracked_to_x(cache, x, X, P, tracker)
         if !added
             return true
         end
-        update_progress!(progress, X)
     end
 
     return false
