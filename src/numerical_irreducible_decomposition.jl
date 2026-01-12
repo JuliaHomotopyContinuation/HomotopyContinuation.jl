@@ -545,34 +545,45 @@ function threaded_intersection!(X, start, tracker, progress)
     l_start = length(start)
     start_vec = collect(start)
     
-    # Use a lock for thread-safe operations on X and progress
-    lock = ReentrantLock()
+    # Pre-allocate one tracker per thread
+    nthr = Threads.nthreads()
+    trackers = [deepcopy(tracker) for _ in 1:nthr]
     
-    Threads.@threads for i in eachindex(start_vec)
-        s = start_vec[i]
-        p = copy(s[1])
-        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-        
-        # Create a local copy of the tracker for thread-safety
-        local_tracker = deepcopy(tracker)
-        res = track(local_tracker, p, 1)
-        
-        if is_success(res) && is_finite(res) && is_nonsingular(res)
-            new = copy(local_tracker.state.solution)
-            Threads.lock(lock)
-            try
-                push!(X, new)
-                update_progress!(progress, X)
-            finally
-                Threads.unlock(lock)
+    # Use a lock for thread-safe operations on X and progress
+    progress_lock = ReentrantLock()
+    
+    next_idx = Threads.Atomic{Int}(1)
+
+    Threads.@sync begin
+        for tid in 1:nthr
+            let local_tracker = trackers[tid]
+                Threads.@spawn begin
+                    while true
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > length(start_vec)
+                            break
+                        end
+                        
+                        s = start_vec[idx]
+                        p = copy(s[1])
+                        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+                        
+                        res = track(local_tracker, p, 1)
+                        
+                        if is_success(res) && is_finite(res) && is_nonsingular(res)
+                            new = copy(local_tracker.state.solution)
+                            lock(progress_lock) do
+                                push!(X, new)
+                                update_progress!(progress, X)
+                            end
+                        end
+                        
+                        lock(progress_lock) do
+                            update_progress!(progress, idx, l_start)
+                        end
+                    end
+                end
             end
-        end
-        
-        Threads.lock(lock)
-        try
-            update_progress!(progress, i, l_start)
-        finally
-            Threads.unlock(lock)
         end
     end
 
