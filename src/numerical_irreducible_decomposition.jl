@@ -326,7 +326,7 @@ function _regeneration(
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
                     # we only need to do this for witness sets of codimensions 0<k<n.
-                    remove_points_all!(out, cache)
+                    remove_points_all!(out, cache; threading = threading)
 
                 end
             end
@@ -440,7 +440,7 @@ function intersect_all!(out, H, cache, threading)
 end
 
 
-function remove_points_all!(out, cache)
+function remove_points_all!(out, cache; threading::Bool = true)
 
     i = cache.i
     progress = cache.progress
@@ -451,7 +451,7 @@ function remove_points_all!(out, cache)
             for j = 1:(k-1)
                 X = out[j]
                 if degree(X) > 0
-                    remove_points!(W, X, cache)
+                    remove_points!(W, X, cache; threading = threading)
                     update_progress!(progress, W)
                 end
             end
@@ -466,7 +466,8 @@ end
 
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
-function intersect_with_hypersurface!(W, H, X, cache; threading::Bool = true)
+function intersect_with_hypersurface!(W, H, X, cache; 
+                                        threading::Bool = true)
 
     F = cache.Fᵢ
     progress = cache.progress
@@ -481,7 +482,7 @@ function intersect_with_hypersurface!(W, H, X, cache; threading::Bool = true)
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained(W, H, cache))
+    m = .!(is_contained(W, H, cache; threading = threading))
     P_next = manage_initial_points!(P, m, W, progress)
 
     if isnothing(X)
@@ -601,21 +602,15 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained(X, Y, F, cache)
+function is_contained(X, Y, F, cache; threading::Bool = true)
 
-    progress = cache.progress
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
-    x0 = cache.x0
-    y0 = cache.y0
-    y = cache.y
 
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
-    dY = dim(LY)
-    n = ambient_dim(LY)
     k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
     if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
@@ -632,46 +627,23 @@ function is_contained(X, Y, F, cache)
             tracker_options = tracker_options,
             options = endgame_options,
         )
-
-        # now we loop over the points in X and check if they are contained in Y
         set_up_linear_spaces!(cache, LX, LY)
-        A, b = cache.As[dY+1], cache.bs[dY+1]
         
-        out = map(points(X)) do x
-
-            update_progress!(progress, X)
-
-            # first check
-            update_x0!(x0)
-            x0 = norm(x, Inf) .* x0
-            evaluate!(y0, F, x0)
-            evaluate!(y, F, x)
-            if norm(y, Inf) > 1e-2 * norm(y0, Inf)
-                return false
-            end
-
-            # second check
-            for i = 2:(k+1)
-                b[i] = sum(A[i, j] * x[j] for j = 1:n)
-            end
-            # set up the corresponding LinearSubspace L
-            E = ExtrinsicDescription(A, b; orthonormal = true)
-            L = LinearSubspace(E)
-            # set L as the target for homotopy continuation
-            target_parameters!(tracker, L)
-
-            return x_in_Y(x, Y, tracker, cache)
+        if threading 
+            out = threaded_x_in_Y(X, Y, F, tracker, cache)
+        else
+            out = serial_x_in_Y(X, Y, F, tracker, cache)
         end
     end
 
     out
 end
-function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache)
-    is_contained(V, W, system(W), cache)
+function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache; threading::Bool = true)
+    is_contained(V, W, system(W), cache; threading = threading)
 end
 
-function remove_points!(W::WitnessPoints, V::WitnessPoints, cache::RegenerationCache)
-    m = is_contained(W, V, cache.Fᵢ, cache)
+function remove_points!(W::WitnessPoints, V::WitnessPoints, cache::RegenerationCache; threading::Bool = true)
+    m = is_contained(W, V, cache.Fᵢ, cache; threading = threading)
     deleteat!(W.R, m)
 
     nothing
@@ -712,28 +684,132 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-function x_in_Y(x, Y, tracker, cache)
+function serial_x_in_Y(X, Y, F, tracker, cache)
+    progress = cache.progress
+    x0 = cache.x0
+    update_x0!(x0)
+    y0 = cache.y0
+    y = cache.y
 
-    U = cache.U
+    LX = linear_subspace(X)
+    LY = linear_subspace(Y)
+    n = ambient_dim(LY)
+    k = codim(LY) - codim(LX)
+    
+    dY = dim(LY)
+    A, b = cache.As[dY+1], cache.bs[dY+1]
 
-    # reuse U
-    empty!(U)
-    add!(U, x, 0)
+    #we loop over the points in X and check if they are contained in Y
+    map(points(X)) do x
+        update_progress!(progress, X)
 
-    # add the points in Y to U after we have moved them towards L 
-    for (i, p) in enumerate(points(Y))
-        track!(tracker, p, 1)
-        q = solution(tracker)
-        _, added = add!(U, q, i)
+        # first check
+        evaluate!(y0, F, norm(x, Inf) .* x0)
+        evaluate!(y, F, x)
+        if norm(y, Inf) > 1e-2 * norm(y0, Inf)
+            return false
+        end
 
-        if !added
-            return true
+        # second check
+        for i = 2:(k+1)
+            b[i] = sum(A[i, j] * x[j] for j = 1:n)
+        end
+        # set up the corresponding LinearSubspace L
+        E = ExtrinsicDescription(A, b; orthonormal = true)
+        L = LinearSubspace(E)
+        # set L as the target for homotopy continuation
+        target_parameters!(tracker, L)
+
+        U = cache.U
+
+        # reuse U
+        empty!(U)
+        add!(U, x, 0)
+
+        # add the points in Y to U after we have moved them towards L 
+        for (i, p) in enumerate(points(Y))
+            track!(tracker, p, 1)
+            q = solution(tracker)
+            _, added = add!(U, q, i)
+
+            if !added
+                return true
+            end
+        end
+
+        return false
+    end
+end
+
+function threaded_x_in_Y(X, Y, F, tracker, cache)
+    progress = cache.progress
+    x0 = cache.x0
+    update_x0!(x0)
+    
+    LX = linear_subspace(X)
+    LY = linear_subspace(Y)
+    n = ambient_dim(LY)
+    k = codim(LY) - codim(LX)
+    
+    dY = dim(LY)
+    A, b = cache.As[dY+1], cache.bs[dY+1]
+
+    P = points(X)
+    out = Vector{Bool}(undef, length(P))
+    lock = ReentrantLock()
+
+    Threads.@threads for idx in eachindex(P)
+        x = P[idx]
+        
+        # Create local copies for thread safety
+        local_y0 = zeros(ComplexF64, length(cache.y0))
+        local_y = zeros(ComplexF64, length(cache.y))
+        local_b = copy(b)
+        local_tracker = deepcopy(tracker)
+
+        # first check
+        evaluate!(local_y0, F, norm(x, Inf) .* x0)
+        evaluate!(local_y, F, x)
+        
+        result = false
+        if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
+            # second check
+            for i = 2:(k+1)
+                local_b[i] = sum(A[i, j] * x[j] for j = 1:n)
+            end
+            # set up the corresponding LinearSubspace L
+            E = ExtrinsicDescription(A, local_b; orthonormal = true)
+            L = LinearSubspace(E)
+            # set L as the target for homotopy continuation
+            target_parameters!(local_tracker, L)
+
+            local_U = UniquePoints(copy(x), 0)
+            add!(local_U, x, 0)
+
+            # add the points in Y to U after we have moved them towards L 
+            for (i, p) in enumerate(points(Y))
+                track!(local_tracker, p, 1)
+                q = solution(local_tracker)
+                _, added = add!(local_U, q, i)
+
+                if !added
+                    result = true
+                    break
+                end
+            end
+        end
+
+        Threads.lock(lock)
+        try
+            out[idx] = result
+            update_progress!(progress, X)
+        finally
+            Threads.unlock(lock)
         end
     end
 
-    return false
+    return out
 end
-
 
 """
     DecomposeProgress
