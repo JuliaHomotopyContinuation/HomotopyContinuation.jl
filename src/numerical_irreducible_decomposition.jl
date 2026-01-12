@@ -740,7 +740,6 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
         return false
     end
 end
-
 function threaded_x_in_Y(X, Y, F, tracker, cache)
     progress = cache.progress
     x0 = cache.x0
@@ -756,55 +755,71 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
 
     P = points(X)
     out = Vector{Bool}(undef, length(P))
-    lock = ReentrantLock()
+    
+    # Pre-allocate one tracker and buffers per thread
+    nthr = Threads.nthreads()
+    trackers = [deepcopy(tracker) for _ in 1:nthr]
+    y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ in 1:nthr]
+    y_bufs = [zeros(ComplexF64, length(cache.y)) for _ in 1:nthr]
+    b_bufs = [copy(b) for _ in 1:nthr]
+    
+    progress_lock = ReentrantLock()
+    next_idx = Threads.Atomic{Int}(1)
 
-    Threads.@threads for idx in eachindex(P)
-        x = P[idx]
-        
-        # Create local copies for thread safety
-        local_y0 = zeros(ComplexF64, length(cache.y0))
-        local_y = zeros(ComplexF64, length(cache.y))
-        local_b = copy(b)
-        local_tracker = deepcopy(tracker)
+    Threads.@sync begin
+        for tid in 1:nthr
+            let local_tracker = trackers[tid],
+                local_y0 = y0_bufs[tid],
+                local_y = y_bufs[tid],
+                local_b = b_bufs[tid]
+                Threads.@spawn begin
+                    while true
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > length(P)
+                            break
+                        end
+                        
+                        x = P[idx]
+                        
+                        # first check
+                        evaluate!(local_y0, F, norm(x, Inf) .* x0)
+                        evaluate!(local_y, F, x)
+                        
+                        result = false
+                        if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
+                            # second check
+                            for i = 2:(k+1)
+                                local_b[i] = sum(A[i, j] * x[j] for j = 1:n)
+                            end
+                            # set up the corresponding LinearSubspace L
+                            E = ExtrinsicDescription(A, local_b; orthonormal = true)
+                            L = LinearSubspace(E)
+                            # set L as the target for homotopy continuation
+                            target_parameters!(local_tracker, L)
 
-        # first check
-        evaluate!(local_y0, F, norm(x, Inf) .* x0)
-        evaluate!(local_y, F, x)
-        
-        result = false
-        if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
-            # second check
-            for i = 2:(k+1)
-                local_b[i] = sum(A[i, j] * x[j] for j = 1:n)
-            end
-            # set up the corresponding LinearSubspace L
-            E = ExtrinsicDescription(A, local_b; orthonormal = true)
-            L = LinearSubspace(E)
-            # set L as the target for homotopy continuation
-            target_parameters!(local_tracker, L)
+                            local_U = UniquePoints(copy(x), 0)
+                            add!(local_U, x, 0)
 
-            local_U = UniquePoints(copy(x), 0)
-            add!(local_U, x, 0)
+                            # add the points in Y to U after we have moved them towards L 
+                            for (i, p) in enumerate(points(Y))
+                                track!(local_tracker, p, 1)
+                                q = solution(local_tracker)
+                                _, added = add!(local_U, q, i)
 
-            # add the points in Y to U after we have moved them towards L 
-            for (i, p) in enumerate(points(Y))
-                track!(local_tracker, p, 1)
-                q = solution(local_tracker)
-                _, added = add!(local_U, q, i)
+                                if !added
+                                    result = true
+                                    break
+                                end
+                            end
+                        end
 
-                if !added
-                    result = true
-                    break
+                        lock(progress_lock) do
+                            out[idx] = result
+                            update_progress!(progress, X)
+                        end
+                    end
                 end
             end
-        end
-
-        Threads.lock(lock)
-        try
-            out[idx] = result
-            update_progress!(progress, X)
-        finally
-            Threads.unlock(lock)
         end
     end
 
