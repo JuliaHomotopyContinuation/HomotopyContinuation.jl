@@ -396,7 +396,7 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L; threading::Boo
             target_subspace = L;
             start_system = :total_degree,
             show_progress = false,
-            threading = threading
+            threading = threading,
         )
         if isnothing(res)
             return nothing
@@ -466,8 +466,7 @@ end
 
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
-function intersect_with_hypersurface!(W, H, X, cache; 
-                                        threading::Bool = true)
+function intersect_with_hypersurface!(W, H, X, cache; threading::Bool = true)
 
     F = cache.Fᵢ
     progress = cache.progress
@@ -504,9 +503,9 @@ function intersect_with_hypersurface!(W, H, X, cache;
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
-    
+
     # here comes the loop for tracking
-    if threading 
+    if threading
         threaded_intersection!(X, start, tracker, progress)
     else
         serial_intersection!(X, start, tracker, progress)
@@ -523,7 +522,7 @@ function manage_initial_points!(P, m, W, progress)
 end
 
 function serial_intersection!(X, start, tracker, progress)
-    
+
     l_start = length(start)
     for (i, s) in enumerate(start)
         p = s[1]
@@ -538,24 +537,24 @@ function serial_intersection!(X, start, tracker, progress)
         update_progress!(progress, i, l_start)
     end
 
-    nothing    
+    nothing
 end
 
 function threaded_intersection!(X, start, tracker, progress)
     l_start = length(start)
     start_vec = collect(start)
-    
+
     # Pre-allocate one tracker per thread
     nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker) for _ in 1:nthr]
-    
+    trackers = [deepcopy(tracker) for _ = 1:nthr]
+
     # Use a lock for thread-safe operations on X and progress
     progress_lock = ReentrantLock()
-    
+
     next_idx = Threads.Atomic{Int}(1)
 
     Threads.@sync begin
-        for tid in 1:nthr
+        for tid = 1:nthr
             let local_tracker = trackers[tid]
                 Threads.@spawn begin
                     while true
@@ -563,13 +562,13 @@ function threaded_intersection!(X, start, tracker, progress)
                         if idx > length(start_vec)
                             break
                         end
-                        
+
                         s = start_vec[idx]
                         p = copy(s[1])
                         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-                        
+
                         res = track(local_tracker, p, 1)
-                        
+
                         if is_success(res) && is_finite(res) && is_nonsingular(res)
                             new = copy(local_tracker.state.solution)
                             lock(progress_lock) do
@@ -577,7 +576,7 @@ function threaded_intersection!(X, start, tracker, progress)
                                 update_progress!(progress, X)
                             end
                         end
-                        
+
                         lock(progress_lock) do
                             update_progress!(progress, idx, l_start)
                         end
@@ -639,8 +638,8 @@ function is_contained(X, Y, F, cache; threading::Bool = true)
             options = endgame_options,
         )
         set_up_linear_spaces!(cache, LX, LY)
-        
-        if threading 
+
+        if threading
             out = threaded_x_in_Y(X, Y, F, tracker, cache)
         else
             out = serial_x_in_Y(X, Y, F, tracker, cache)
@@ -649,11 +648,21 @@ function is_contained(X, Y, F, cache; threading::Bool = true)
 
     out
 end
-function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache; threading::Bool = true)
+function is_contained(
+    V::WitnessPoints,
+    W::WitnessSet,
+    cache::RegenerationCache;
+    threading::Bool = true,
+)
     is_contained(V, W, system(W), cache; threading = threading)
 end
 
-function remove_points!(W::WitnessPoints, V::WitnessPoints, cache::RegenerationCache; threading::Bool = true)
+function remove_points!(
+    W::WitnessPoints,
+    V::WitnessPoints,
+    cache::RegenerationCache;
+    threading::Bool = true,
+)
     m = is_contained(W, V, cache.Fᵢ, cache; threading = threading)
     deleteat!(W.R, m)
 
@@ -706,7 +715,7 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
     k = codim(LY) - codim(LX)
-    
+
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
@@ -755,47 +764,48 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
-    
+
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
     k = codim(LY) - codim(LX)
-    
+
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
     P = points(X)
     out = Vector{Bool}(undef, length(P))
-    
+
     # Pre-allocate one tracker and buffers per thread
     nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker) for _ in 1:nthr]
-    y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ in 1:nthr]
-    y_bufs = [zeros(ComplexF64, length(cache.y)) for _ in 1:nthr]
-    b_bufs = [copy(b) for _ in 1:nthr]
-    
+    trackers = [deepcopy(tracker) for _ = 1:nthr]
+    y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ = 1:nthr]
+    y_bufs = [zeros(ComplexF64, length(cache.y)) for _ = 1:nthr]
+    b_bufs = [copy(b) for _ = 1:nthr]
+
     progress_lock = ReentrantLock()
     next_idx = Threads.Atomic{Int}(1)
 
     Threads.@sync begin
-        for tid in 1:nthr
+        for tid = 1:nthr
             let local_tracker = trackers[tid],
                 local_y0 = y0_bufs[tid],
                 local_y = y_bufs[tid],
                 local_b = b_bufs[tid]
+
                 Threads.@spawn begin
                     while true
                         idx = Threads.atomic_add!(next_idx, 1)
                         if idx > length(P)
                             break
                         end
-                        
+
                         x = P[idx]
-                        
+
                         # first check
                         evaluate!(local_y0, F, norm(x, Inf) .* x0)
                         evaluate!(local_y, F, x)
-                        
+
                         result = false
                         if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
                             # second check
@@ -1270,21 +1280,21 @@ function decompose(
         progress = nothing
     end
 
-    if threading 
-        
+    if threading
+
         # Thread over witness sets
         progress_lock = ReentrantLock()
         next_idx = Threads.Atomic{Int}(1)
 
         Threads.@sync begin
-            for _ in 1:Threads.nthreads()
+            for _ = 1:Threads.nthreads()
                 Threads.@spawn begin
                     while true
                         idx = Threads.atomic_add!(next_idx, 1)
                         if idx > length(Ws)
                             break
                         end
-                        
+
                         W = Ws[idx]
                         if ModelKit.degree(W) > 0
                             lock(progress_lock) do
@@ -1308,7 +1318,7 @@ function decompose(
                                 end
                             end
                         end
-                        
+
                         lock(progress_lock) do
                             update_progress_step!(progress)
                         end
