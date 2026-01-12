@@ -1259,28 +1259,75 @@ function decompose(
         progress = nothing
     end
 
+    if threading 
+        
+        # Thread over witness sets
+        progress_lock = ReentrantLock()
+        next_idx = Threads.Atomic{Int}(1)
 
-    for (i, W) in enumerate(Ws)
-        if ModelKit.degree(W) > 0
-            update_progress!(progress, n - i)
+        Threads.@sync begin
+            for _ in 1:Threads.nthreads()
+                Threads.@spawn begin
+                    while true
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > length(Ws)
+                            break
+                        end
+                        
+                        W = Ws[idx]
+                        if ModelKit.degree(W) > 0
+                            lock(progress_lock) do
+                                update_progress!(progress, n - idx)
+                            end
 
-            dec = decompose_with_monodromy!(
-                W,
-                show_monodromy_progress,
-                options,
-                max_iters,
-                warning,
-                threading,
-                progress,
-                seed,
-            )
-            if !isnothing(dec)
-                append!(out, dec)
+                            dec = decompose_with_monodromy!(
+                                W,
+                                show_monodromy_progress,
+                                options,
+                                max_iters,
+                                warning,
+                                threading,
+                                progress,
+                                seed,
+                            )
+                            if !isnothing(dec)
+                                lock(progress_lock) do
+                                    append!(out, dec)
+                                    update_progress!(progress, dec)
+                                end
+                            end
+                        end
+                        
+                        lock(progress_lock) do
+                            update_progress_step!(progress)
+                        end
+                    end
+                end
             end
-
-            update_progress!(progress, dec)
         end
-        update_progress_step!(progress)
+    else
+        for (i, W) in enumerate(Ws)
+            if ModelKit.degree(W) > 0
+                update_progress!(progress, n - i)
+
+                dec = decompose_with_monodromy!(
+                    W,
+                    show_monodromy_progress,
+                    options,
+                    max_iters,
+                    warning,
+                    threading,
+                    progress,
+                    seed,
+                )
+                if !isnothing(dec)
+                    append!(out, dec)
+                end
+
+                update_progress!(progress, dec)
+            end
+            update_progress_step!(progress)
+        end
     end
     finish_progress!(progress)
 
