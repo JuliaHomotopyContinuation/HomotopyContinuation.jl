@@ -214,9 +214,9 @@ julia> W = regeneration([f])
     Witness set for dimension 1 of degree 4  
 ```         
 """
-regeneration(F::System; kwargs...) = regeneration!(deepcopy(F); kwargs...)
+regeneration(F::System; kwargs...) = _regeneration(deepcopy(F); kwargs...)
 regeneration(F::Vector{Expression}; kwargs...) = regeneration(System(F); kwargs...)
-function regeneration!(
+function _regeneration(
     F::System;
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
@@ -283,7 +283,7 @@ function regeneration!(
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
-    H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]))
+    H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]); threading = threading)
     if any(H .== nothing)
         return nothing
     end
@@ -315,7 +315,7 @@ function regeneration!(
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
-                    intersect_all!(out, H, cache)
+                    intersect_all!(out, H, cache, threading)
 
                     # update Fᵢ
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
@@ -385,7 +385,7 @@ function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
 
     out
 end
-function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
+function initialize_hypersurfaces(f::Vector{Expression}, vars, L; threading::Bool = true)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
 
@@ -396,6 +396,7 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
             target_subspace = L;
             start_system = :total_degree,
             show_progress = false,
+            threading = threading
         )
         if isnothing(res)
             return nothing
@@ -408,7 +409,7 @@ function initialize_hypersurfaces(f::Vector{Expression}, vars, L)
     out
 end
 
-function intersect_all!(out, H, cache)
+function intersect_all!(out, H, cache, threading)
 
     i = cache.i
     codim = cache.codim
@@ -431,7 +432,7 @@ function intersect_all!(out, H, cache)
             end
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
-            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache)
+            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; threading = threading)
             update_progress!(progress, Wₖ)
             update_progress!(progress, Wₖ₊₁)
         end
@@ -465,7 +466,7 @@ end
 
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
-function intersect_with_hypersurface!(W, H, X, cache)
+function intersect_with_hypersurface!(W, H, X, cache; threading::Bool = true)
 
     F = cache.Fᵢ
     progress = cache.progress
@@ -480,7 +481,7 @@ function intersect_with_hypersurface!(W, H, X, cache)
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained!(W, H, cache))
+    m = .!(is_contained(W, H, cache))
     P_next = manage_initial_points!(P, m, W, progress)
 
     if isnothing(X)
@@ -492,6 +493,7 @@ function intersect_with_hypersurface!(W, H, X, cache)
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
     Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
+
     tracker = EndgameTracker(
         Hom;
         tracker_options = cache.tracker_options,
@@ -501,22 +503,16 @@ function intersect_with_hypersurface!(W, H, X, cache)
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
+    
     # here comes the loop for tracking
-    l_start = length(start)
-    for (i, s) in enumerate(start)
-        p = s[1]
-        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
-
-        perform_intersection!(X, tracker, p, progress)
-        update_progress!(progress, i, l_start)
+    if threading 
+        threaded_intersection!(X, start, tracker, progress)
+    else
+        serial_intersection!(X, start, tracker, progress)
     end
-
-
 
     nothing
 end
-
-
 
 function manage_initial_points!(P, m, W, progress)
     P_next = P[m]
@@ -525,13 +521,61 @@ function manage_initial_points!(P, m, W, progress)
     return P_next
 end
 
-function perform_intersection!(X, tracker, p, progress)
-    res = track(tracker, p, 1)
-    if is_success(res) && is_finite(res) && is_nonsingular(res)
-        new = copy(tracker.state.solution)
-        push!(X, new)
-        update_progress!(progress, X)
+function serial_intersection!(X, start, tracker, progress)
+    
+    l_start = length(start)
+    for (i, s) in enumerate(start)
+        p = s[1]
+        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+
+        res = track(tracker, p, 1)
+        if is_success(res) && is_finite(res) && is_nonsingular(res)
+            new = copy(tracker.state.solution)
+            push!(X, new)
+            update_progress!(progress, X)
+        end
+        update_progress!(progress, i, l_start)
     end
+
+    nothing    
+end
+
+function threaded_intersection!(X, start, tracker, progress)
+    l_start = length(start)
+    start_vec = collect(start)
+    
+    # Use a lock for thread-safe operations on X and progress
+    lock = ReentrantLock()
+    
+    Threads.@threads for i in eachindex(start_vec)
+        s = start_vec[i]
+        p = copy(s[1])
+        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+        
+        # Create a local copy of the tracker for thread-safety
+        local_tracker = deepcopy(tracker)
+        res = track(local_tracker, p, 1)
+        
+        if is_success(res) && is_finite(res) && is_nonsingular(res)
+            new = copy(local_tracker.state.solution)
+            Threads.lock(lock)
+            try
+                push!(X, new)
+                update_progress!(progress, X)
+            finally
+                Threads.unlock(lock)
+            end
+        end
+        
+        Threads.lock(lock)
+        try
+            update_progress!(progress, i, l_start)
+        finally
+            Threads.unlock(lock)
+        end
+    end
+
+    nothing
 end
 
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
@@ -553,11 +597,11 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 end
 
 """
-    is_contained!(X, Y, cache)
+    is_contained(X, Y, F, cache)
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained!(X, Y, F, cache)
+function is_contained(X, Y, F, cache)
 
     progress = cache.progress
     tracker_options = cache.tracker_options
@@ -593,7 +637,7 @@ function is_contained!(X, Y, F, cache)
         # now we loop over the points in X and check if they are contained in Y
         set_up_linear_spaces!(cache, LX, LY)
         A, b = cache.As[dY+1], cache.bs[dY+1]
-
+        
         out = map(points(X)) do x
 
             # first check
@@ -615,19 +659,18 @@ function is_contained!(X, Y, F, cache)
             # set L as the target for homotopy continuation
             target_parameters!(tracker, L)
 
-            is_tracked_to_x!(cache, x, X, P, tracker)
-
+            is_tracked_to_x(cache, x, X, P, tracker)
         end
     end
 
     out
 end
-function is_contained!(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache)
-    is_contained!(V, W, system(W), cache)
+function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache)
+    is_contained(V, W, system(W), cache)
 end
 
 function remove_points!(W::WitnessPoints, V::WitnessPoints, cache::RegenerationCache)
-    m = is_contained!(W, V, cache.Fᵢ, cache)
+    m = is_contained(W, V, cache.Fᵢ, cache)
     deleteat!(W.R, m)
 
     nothing
@@ -668,7 +711,7 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-function is_tracked_to_x!(cache, x, X, P, tracker)
+function is_tracked_to_x(cache, x, X, P, tracker)
 
     U = cache.U
     progress = cache.progress
@@ -1402,7 +1445,7 @@ function numerical_irreducible_decomposition(
     kwargs...,
 )
 
-    Ws = regeneration!(
+    Ws = regeneration(
         F;
         sorted = sorted,
         max_codim = max_codim,
