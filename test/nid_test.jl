@@ -21,6 +21,10 @@
         N = decompose(W)
         @test isa(N, NumericalIrreducibleDecomposition)
 
+        # no threading 
+        N = nid(F; threading = false)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
         # seed
         s = 0x42c9d504
         N = nid(F; seed = s)
