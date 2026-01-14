@@ -795,6 +795,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                 local_y0 = y0_bufs[tid],
                 local_y = y_bufs[tid],
                 local_b = b_bufs[tid]
+
                 local_F = F_bufs[tid]
 
                 Threads.@spawn begin
@@ -1248,11 +1249,7 @@ function decompose(
     seed = nothing,
     kwargs...,
 ) where {T1,T2,T3<:Number}
-    out = _decompose(
-        Ws;
-        seed = seed,
-        kwargs...,
-    )
+    out = _decompose(Ws; seed = seed, kwargs...)
 
     NumericalIrreducibleDecomposition(out, seed)
 end
