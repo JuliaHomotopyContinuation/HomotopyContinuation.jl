@@ -1522,11 +1522,13 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
-        components = Tuple(ModelKit.degree(W) for W in D[key], rev in true)
+        components = [ModelKit.degree(W) for W in D[key]]
+        sort!(components, rev = true)
         if length(components) == 1
             data[i, 2] = first(components)
         elseif length(components) <= 10
-            data[i, 2] = string(components)
+            s = string(components)
+            data[i, 2] = string("(", s[2:(end-1)], ")")
         else
             s = string(components[1:10])
             data[i, 2] = string("(", s[2:(end-1)], ", ...)")
