@@ -933,10 +933,6 @@ function decompose_with_monodromy!(
 )
 
 
-    if isnothing(seed)
-        seed = rand(UInt32)
-    end
-
     P = points(W)
     L = linear_subspace(W)
     G = system(W)
@@ -1247,6 +1243,19 @@ Numerical irreducible decomposition with 2 components
 """
 function decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
+    seed = nothing,
+    kwargs...,
+) where {T1,T2,T3<:Number}
+    out = _decompose(
+        Ws;
+        seed = seed,
+        kwargs...,
+    )
+
+    NumericalIrreducibleDecomposition(out, seed)
+end
+function _decompose(
+    Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
@@ -1256,6 +1265,10 @@ function decompose(
     seed = nothing,
 ) where {T1,T2,T3<:Number}
 
+    if isnothing(seed)
+        seed = rand(UInt32)
+    end
+    Random.seed!(seed)
 
     options = decompose_with_monodromy_options(monodromy_options)
     out = Vector{WitnessSet}()
@@ -1355,7 +1368,7 @@ function decompose(
     end
     finish_progress!(progress)
 
-    NumericalIrreducibleDecomposition(out, seed)
+    out
 end
 decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 
@@ -1607,8 +1620,11 @@ function numerical_irreducible_decomposition(
     max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,
     threading::Union{Bool,Symbol} = true,
+    seed = nothing,
     kwargs...,
 )
+
+    !isnothing(seed) && Random.seed!(seed)
 
     Ws = regeneration(
         F;
@@ -1617,20 +1633,24 @@ function numerical_irreducible_decomposition(
         tracker_options = tracker_options,
         endgame_options = endgame_options,
         threading = threading == :all || threading,
+        seed = nothing,
         kwargs...,
     )
     if isnothing(Ws)
         return nothing
     end
-    decompose(
+    dec = _decompose(
         Ws;
         monodromy_options = monodromy_options,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
         threading = threading,
         warning = warning,
+        seed = seed,
         kwargs...,
     )
+
+    NumericalIrreducibleDecomposition(dec, seed)
 end
 """
     nid(F::System; options...)
