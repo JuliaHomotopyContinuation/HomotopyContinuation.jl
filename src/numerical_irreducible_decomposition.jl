@@ -783,7 +783,8 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
     trackers = [deepcopy(tracker) for _ = 1:nthr]
     y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ = 1:nthr]
     y_bufs = [zeros(ComplexF64, length(cache.y)) for _ = 1:nthr]
-    b_bufs = [copy(b) for _ = 1:nthr]
+    b_bufs = [deepcopy(b) for _ = 1:nthr]
+    F_bufs = [deepcopy(F) for _ = 1:nthr]
 
     progress_lock = ReentrantLock()
     next_idx = Threads.Atomic{Int}(1)
@@ -794,6 +795,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                 local_y0 = y0_bufs[tid],
                 local_y = y_bufs[tid],
                 local_b = b_bufs[tid]
+                local_F = F_bufs[tid]
 
                 Threads.@spawn begin
                     while true
@@ -805,8 +807,8 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                         x = P[idx]
 
                         # first check
-                        evaluate!(local_y0, F, norm(x, Inf) .* x0)
-                        evaluate!(local_y, F, x)
+                        evaluate!(local_y0, local_F, norm(x, Inf) .* x0)
+                        evaluate!(local_y, local_F, x)
 
                         result = false
                         if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
