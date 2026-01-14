@@ -1282,8 +1282,9 @@ function decompose(
         progress = nothing
     end
 
+    ## if threading == :all we parallelize the outer loop *and* the inner monodromy loops.
+    ## this can potentially lead to race conditions, so we dont make this the default option.
     if threading == :all
-
         # Thread over witness sets
         progress_lock = ReentrantLock()
         next_idx = Threads.Atomic{Int}(1)
