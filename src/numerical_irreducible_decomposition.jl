@@ -1273,7 +1273,7 @@ function _decompose(
     out = Vector{WitnessSet}()
 
     if isempty(Ws)
-        return NumericalIrreducibleDecomposition(out, seed)
+        return out
     end
 
     c = length(Ws)
