@@ -273,7 +273,7 @@ function _regeneration(
     push!(vars, u)
 
     # initialize the linear equations for witness sets
-    A, b, Aᵤ, bᵤ = initialize_linear_equations(n, seed)
+    A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
 
     # prepare c witness sets for the output
     # internally we represent a witness superset by WitnessPoints
@@ -352,7 +352,7 @@ function _regeneration(
 end
 
 
-function initialize_linear_equations(n, seed)
+function initialize_linear_equations(n)
 
     A₀ = randn(ComplexF64, n - 1, n)
     b₀ = randn(ComplexF64, n - 1)
@@ -720,7 +720,7 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
     #we loop over the points in X and check if they are contained in Y
-    map(points(X)) do x
+    out = map(points(X)) do x
         update_progress!(progress, X)
 
         # first check
@@ -759,6 +759,8 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
 
         return false
     end
+
+    out
 end
 function threaded_x_in_Y(X, Y, F, tracker, cache)
     progress = cache.progress
@@ -818,7 +820,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                             # set L as the target for homotopy continuation
                             target_parameters!(local_tracker, L)
 
-                            local_U = UniquePoints(copy(x), 0)
+                            local_U = UniquePoints(x, 0)
                             add!(local_U, x, 0)
 
                             # add the points in Y to U after we have moved them towards L 
@@ -925,9 +927,9 @@ function decompose_with_monodromy!(
     options,
     max_iters,
     warning,
-    threading,
     progress,
-    seed,
+    seed;
+    threading::Bool = true,
 )
 
 
@@ -1220,7 +1222,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading = true`: enables multiple threads.
+* `threading = true`: enables multiple threads. One can set `threading = :all` and then each witness set will be decomposed in parallel by [`decompose`](@ref). Since monodromy inside [`decompose`](@ref) is also parallelized, this can potentially lead to race conditions. We advise to be careful when using this option
 * `seed`: choose the random seed.
 
 
@@ -1250,7 +1252,7 @@ function decompose(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     warning::Bool = true,
-    threading::Bool = true,
+    threading::Union{Bool,Symbol} = true,
     seed = nothing,
 ) where {T1,T2,T3<:Number}
 
@@ -1280,7 +1282,7 @@ function decompose(
         progress = nothing
     end
 
-    if threading
+    if threading == :all
 
         # Thread over witness sets
         progress_lock = ReentrantLock()
@@ -1307,9 +1309,9 @@ function decompose(
                                 options,
                                 max_iters,
                                 warning,
-                                threading,
                                 progress,
-                                seed,
+                                seed;
+                                threading = true,
                             )
                             if !isnothing(dec)
                                 lock(progress_lock) do
@@ -1337,9 +1339,9 @@ function decompose(
                     options,
                     max_iters,
                     warning,
-                    threading,
                     progress,
-                    seed,
+                    seed;
+                    threading = threading,
                 )
                 if !isnothing(dec)
                     append!(out, dec)
@@ -1519,7 +1521,7 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
 
     for (i, key) in enumerate(k)
         data[i, 1] = key
-        components = Tuple(ModelKit.degree(W) for W in D[key])
+        components = Tuple(ModelKit.degree(W) for W in D[key], rev in true)
         if length(components) == 1
             data[i, 2] = first(components)
         elseif length(components) <= 10
@@ -1557,7 +1559,8 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading = true`: enables multiple threads.
+* `threading = true`: enables multiple threads. 
+  One can set `threading = :all` and then each witness set will be decomposed in parallel. Since monodromy inside the decomposition is also parallelized, this can potentially lead to race conditions. We advise to be careful when using this option
 * `seed`: choose the random seed.
 
 ### Example
@@ -1600,6 +1603,7 @@ function numerical_irreducible_decomposition(
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,
+    threading::Union{Bool,Symbol} = true,
     kwargs...,
 )
 
@@ -1609,6 +1613,7 @@ function numerical_irreducible_decomposition(
         max_codim = max_codim,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
+        threading = threading == :all || threading,
         kwargs...,
     )
     if isnothing(Ws)
@@ -1619,6 +1624,7 @@ function numerical_irreducible_decomposition(
         monodromy_options = monodromy_options,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
+        threading = threading,
         warning = warning,
         kwargs...,
     )
