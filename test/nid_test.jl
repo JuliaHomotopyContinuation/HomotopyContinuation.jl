@@ -18,7 +18,8 @@
         W = regeneration(F; max_codim = 2)
         @test degree.(W) == [2, 8]
 
-        N = decompose(W)
+        dec = decompose(W)
+        N = NumericalIrreducibleDecomposition(dec)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         # no threading 
@@ -102,6 +103,7 @@
         s = 0x7eec3900
         R = regeneration(E; seed = s)
         D = decompose(R; seed = s)
+        N = NumericalIrreducibleDecomposition(D, s)
         @test ncomponents(D) == 6
     end
 
