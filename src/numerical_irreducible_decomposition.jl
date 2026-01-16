@@ -47,16 +47,18 @@ end
 
 
 Base.@kwdef mutable struct WitnessSetsProgress
+    progress_meter::PM.ProgressUnknown
     ambient_dim::Int
-    nhypersurfaces::Int
-    current_hypersurface::Int = 1
     degrees::Dict{Int,Int} = Dict{Int,Int}()
     is_solving::Bool = false
     is_removing_points::Bool = false
     is_computing_hypersurfaces::Bool = true
-    current_path::Int = 0
-    current_npaths::Int = 0
-    progress_meter::PM.ProgressUnknown
+    current_task::Int = 0
+    ntasks::Int = 0
+    current_hypersurface::Int = 1
+    nhypersurfaces::Int
+    current_dim::Int = 0
+    next_dim::Int = 0
 end
 WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
     WitnessSetsProgress(
@@ -64,14 +66,25 @@ WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnkn
         nhypersurfaces = nhypersurfaces,
         progress_meter = progress_meter,
     )
-update_progress!(progress::Nothing, is_solving::Bool) = nothing
-function update_progress!(progress::WitnessSetsProgress, is_solving::Bool)
-    progress.is_computing_hypersurfaces = false
+update_progress!(progress::Nothing; 
+                is_computing_hypersurfaces::Bool = true,
+                is_solving::Bool = false,
+                is_removing_points::Bool = false) = nothing
+function update_progress!(progress::WitnessSetsProgress; 
+                is_computing_hypersurfaces::Bool = false,
+                is_solving::Bool = false,
+                is_removing_points::Bool = false) 
+    progress.is_computing_hypersurfaces = is_computing_hypersurfaces
     progress.is_solving = is_solving
-    progress.is_removing_points = !is_solving
+    progress.is_removing_points = is_removing_points
+    PM.update!(
+        progress.progress_meter,
+        progress.current_hypersurface,
+        showvalues = showvalues(progress),
+    )
 end
-update_progress!(progress::Nothing, i::Int) = nothing
-function update_progress!(progress::WitnessSetsProgress, i::Int)
+update_progress_hypersurface!(progress::Nothing, i::Int) = nothing
+function update_progress_hypersurface!(progress::WitnessSetsProgress, i::Int)
     progress.current_hypersurface = i
     PM.update!(
         progress.progress_meter,
@@ -79,10 +92,19 @@ function update_progress!(progress::WitnessSetsProgress, i::Int)
         showvalues = showvalues(progress),
     )
 end
-update_progress!(progress::Nothing, i::Int, m::Int) = nothing
-function update_progress!(progress::WitnessSetsProgress, i::Int, m::Int)
-    progress.current_path = i
-    progress.current_npaths = m
+update_progress_tasks!(progress::Nothing, i::Int, m::Int) = nothing
+function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
+    progress.current_task = i
+    progress.ntasks = m
+    PM.update!(
+        progress.progress_meter,
+        progress.current_hypersurface,
+        showvalues = showvalues(progress),
+    )
+end
+update_progress_dim!(progress::Nothing, d::Int) = nothing
+function update_progress_dim!(progress::WitnessSetsProgress, d::Int)
+    progress.current_dim = d
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -99,7 +121,6 @@ function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,
     )
 end
 update_progress!(progress::Union{Nothing,WitnessSetsProgress}, W::Nothing) = nothing
-update_progress!(progress::Nothing) = nothing
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
     progress.is_solving = false
@@ -114,14 +135,18 @@ function showvalues(progress::WitnessSetsProgress)
             "Intersect with hypersurface",
             "$(progress.current_hypersurface) / $(progress.nhypersurfaces)",
         )]
-        if progress.is_solving
+        if progress.is_removing_points
             push!(
                 text,
-                ("Tracking paths", "$(progress.current_path)/$(progress.current_npaths)"),
+                ("Remove junk points from dim. $(progress.current_dim)", "$(progress.current_task)/$(progress.ntasks)"),
             )
-        elseif progress.is_removing_points
-            push!(text, ("Removing junk points", "..."))
+        elseif progress.is_solving
+            push!(
+                text,
+                ("Tracking paths", "$(progress.current_task)/$(progress.ntasks)"),
+            )
         end
+                   
         push!(text, ("Current number of witness points", ""))
         for c = 1:progress.current_hypersurface
             d = progress.ambient_dim - c
@@ -267,6 +292,7 @@ function _regeneration(
     else
         progress = nothing
     end
+    
 
     # u-regeneration adds another variable u to F
     @unique_var u
@@ -280,9 +306,11 @@ function _regeneration(
     # the i-th witness superset out[i] is for codimension i
     out = initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
 
+
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
+    update_progress!(progress; is_computing_hypersurfaces = true)
     H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]); threading = threading)
     if any(H .== nothing)
         return nothing
@@ -295,10 +323,12 @@ function _regeneration(
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
     # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
-    update_progress!(progress, true)
+    update_progress!(progress;
+        is_computing_hypersurfaces = false,
+        is_solving = true)
     begin
         for i = 1:c
-            update_progress!(progress, i)
+            update_progress_hypersurface!(progress, i)
             if i == 1
                 # the first step: take the witness superset H[1] as initial witness superset
                 begin
@@ -311,7 +341,9 @@ function _regeneration(
                 end
             else
                 begin
-                    update_progress!(progress, true)
+                    update_progress!(progress;
+                                    is_solving = true,
+                                    is_removing_points = false)
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
@@ -321,7 +353,9 @@ function _regeneration(
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
-                    update_progress!(progress, false)
+                    update_progress!(progress;
+                                    is_solving = false,
+                                    is_removing_points = true)
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
@@ -421,8 +455,10 @@ function intersect_all!(out, H, cache, threading)
     # we enumerate reversely, so that we can add points to witness sets that we have already
     # taken care of; i.e., if we intersect Wₖ∩Hᵢ below in the intersect_with_hypersurface function,
     # we have already intersected Wₖ₊₁ ∩ Hᵢ.
+    update_progress!(progress;
+                    is_solving = true,
+                    is_removing_points = false)
     E = enumerate(out)
-    update_progress!(progress, true)
     for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
         if k < i
             if k < codim
@@ -444,11 +480,16 @@ function remove_points_all!(out, cache; threading::Bool = true)
 
     i = cache.i
     progress = cache.progress
+    current_task = 0
 
     E = enumerate(out)
     for (k, W) in E # k = codim(W) for W in Ws
+        update_progress_dim!(progress, dim(W))
         if k > 1 && k <= i && degree(W) > 0
             for j = 1:(k-1)
+                current_task +=1
+                update_progress_tasks!(progress, current_task, k-1)
+
                 X = out[j]
                 if degree(X) > 0
                     remove_points!(W, X, cache; threading = threading)
@@ -456,6 +497,7 @@ function remove_points_all!(out, cache; threading::Bool = true)
                 end
             end
         end
+        current_task = 0
         update_progress!(progress, W)
     end
 end
@@ -534,7 +576,7 @@ function serial_intersection!(X, start, tracker, progress)
             push!(X, new)
             update_progress!(progress, X)
         end
-        update_progress!(progress, i, l_start)
+        update_progress_tasks!(progress, i, l_start)
     end
 
     nothing
@@ -578,7 +620,7 @@ function threaded_intersection!(X, start, tracker, progress)
                         end
 
                         lock(progress_lock) do
-                            update_progress!(progress, idx, l_start)
+                            update_progress_tasks!(progress, idx, l_start)
                         end
                     end
                 end
