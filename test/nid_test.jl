@@ -18,7 +18,12 @@
         W = regeneration(F; max_codim = 2)
         @test degree.(W) == [2, 8]
 
-        N = decompose(W)
+        dec = decompose(W)
+        N = NumericalIrreducibleDecomposition(dec)
+        @test isa(N, NumericalIrreducibleDecomposition)
+
+        # no threading 
+        N = nid(F; threading = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         # seed
@@ -49,7 +54,7 @@
         N = nid(F; sorted = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
-        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
+        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 0))
         @test isempty(witness_sets(N_fails))
 
         N2 = nid(F; tracker_options = TrackerOptions(; extended_precision = false))
@@ -98,7 +103,8 @@
         s = 0x7eec3900
         R = regeneration(E; seed = s)
         D = decompose(R; seed = s)
-        @test ncomponents(D) == 6
+        N = NumericalIrreducibleDecomposition(D, s)
+        @test ncomponents(N) == 6
     end
 
     @testset "Hypersurface of degree 5" begin
