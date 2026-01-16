@@ -1260,7 +1260,7 @@ function decompose(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     warning::Bool = true,
-    threading::Union{Bool,Symbol} = true,
+    threading::Bool = true,
     seed = nothing,
 ) where {T1,T2,T3<:Number}
 
@@ -1570,7 +1570,7 @@ function numerical_irreducible_decomposition(
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,
-    threading::Union{Bool,Symbol} = true,
+    threading::Bool = true,
     seed = nothing,
     kwargs...,
 )
