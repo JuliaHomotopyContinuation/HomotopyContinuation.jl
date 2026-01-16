@@ -104,7 +104,7 @@
         R = regeneration(E; seed = s)
         D = decompose(R; seed = s)
         N = NumericalIrreducibleDecomposition(D, s)
-        @test ncomponents(D) == 6
+        @test ncomponents(N) == 6
     end
 
     @testset "Hypersurface of degree 5" begin
