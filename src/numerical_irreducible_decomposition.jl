@@ -858,47 +858,50 @@ end
 """
 
 Base.@kwdef mutable struct DecomposeProgress
-    codim::Int
-    current_dim::Int
-    degrees::Dict{Int,Vector{Int}} = Dict{Int,Vector{Int}}()
-    is_solving::Bool = false
-    step::Int = 0
     progress_meter::PM.ProgressUnknown
-end
-DecomposeProgress(n::Int, codim::Int, progress_meter::PM.ProgressUnknown) =
-    DecomposeProgress(codim = codim, current_dim = n - 1, progress_meter = progress_meter)
-update_progress_step!(progress::Nothing) = nothing
-function update_progress_step!(progress::DecomposeProgress)
-    progress.step += 1
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
-end
-function update_progress!(progress::DecomposeProgress, d::Int)
-    progress.is_solving = true
-    progress.current_dim = d
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+    n_witness_sets::Int
+    n_working_on::Int = 0
+    degrees::Dict{Int,Vector{Int}} = Dict{Int,Vector{Int}}()
+    npts::Int = 0
+    step::Int = 0
 end
 function update_progress!(progress::DecomposeProgress)
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
-function update_progress!(progress::DecomposeProgress, D::Vector{WitnessSet})
+update_progress_step!(progress::Nothing) = nothing
+function update_progress_step!(progress::DecomposeProgress)
+    progress.step += 1
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+end
+function update_progress!(progress::DecomposeProgress, W::WitnessSet)
     P = progress.degrees
-    for W in D
-        c = dim(W)
-        if haskey(P, c)
-            push!(P[dim(W)], ModelKit.degree(W))
-        else
-            P[dim(W)] = [ModelKit.degree(W)]
-        end
+    c = dim(W)
+    if haskey(P, c)
+        push!(P[dim(W)], ModelKit.degree(W))
+    else
+        P[dim(W)] = [ModelKit.degree(W)]
     end
-    progress.is_solving = false
 
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+end
+update_progress_n!(progress::Nothing) = nothing
+function update_progress_n!(progress::DecomposeProgress)
+    progress.n_working_on += 1
+end
+update_progress_npts!(progress::Nothing, ℓ::Int) = nothing
+function update_progress_npts!(progress::DecomposeProgress, ℓ::Int) 
+    progress.npts = ℓ
 end
 finish_progress!(progress::DecomposeProgress) =
     PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
 function showstatus(progress::DecomposeProgress)
-    text = [("Current status", "")]
+    ℓ = progress.npts
+    if ℓ > 0
+        text = [("Progress", " Decomposing witness set $(progress.n_working_on) / $(progress.n_witness_sets) ($ℓ points left to classify)")]
+    else
+        text = [("Progress", " Decomposing witness set $(progress.n_working_on) / $(progress.n_witness_sets)")]
+    end
     degs = progress.degrees
     k = sort(collect(keys(degs)), rev = true)
     for key in k
@@ -967,6 +970,8 @@ function decompose_with_monodromy!(
 
         while !isempty(non_complete_points)
             update_progress!(progress)
+            update_progress_step!(progress)
+
             iter += 1
             if iter > max_iters
                 break
@@ -983,7 +988,9 @@ function decompose_with_monodromy!(
             )
             d += nresults(res) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = solutions(res)
-            ℓ = length(non_complete_points)
+            ℓ = length(non_complete_points) # once for a later check
+            k = length(non_complete_points) # and once for counting progress
+            update_progress_npts!(progress, k)
 
             # Get orbits from monodromy result
             orbits = get_orbits_from_monodromy_permutations(
@@ -995,6 +1002,7 @@ function decompose_with_monodromy!(
 
             for orbit in orbits
                 update_progress!(progress)
+                update_progress_step!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(
@@ -1010,8 +1018,14 @@ function decompose_with_monodromy!(
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5
-                        push!(decomposition, WitnessSet(G, L, P_orbit))
+                        W_new = WitnessSet(G, L, P_orbit)
+
+                        push!(decomposition, )
                         push!(complete_orbits, orbit)
+                        k = k - length(orbit)
+
+                        update_progress!(progress, W_new)
+                        update_progress_npts!(progress, k)
                     end
                 end
             end
@@ -1081,6 +1095,8 @@ function decompose_with_monodromy!(
                     ),
                 )
         end
+
+        update_progress_npts!(progress, 0)
     else
         for p in P
             push!(decomposition, WitnessSet(G, L, [p]))
@@ -1281,22 +1297,24 @@ function decompose(
 
     if show_progress
         progress = DecomposeProgress(
-            n,
-            c,
+            progress_meter =
             PM.ProgressUnknown(
-                dt = 0.2,
+                dt = 0.1,
                 desc = "Decomposing $c witness sets",
                 enabled = true,
                 spinner = true,
             ),
+            n_witness_sets = c
         )
     else
         progress = nothing
     end
 
-    for (i, W) in enumerate(Ws)
+    for W in Ws
         if ModelKit.degree(W) > 0
-            update_progress!(progress, n - i)
+
+            update_progress_n!(progress)
+            update_progress_step!(progress)
 
             dec = decompose_with_monodromy!(
                 W,
@@ -1311,10 +1329,9 @@ function decompose(
             if !isnothing(dec)
                 append!(out, dec)
             end
-
-            update_progress!(progress, dec)
+            
         end
-        update_progress_step!(progress)
+        
     end
     finish_progress!(progress)
 
