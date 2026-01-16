@@ -1221,7 +1221,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading = true`: enables multiple threads. One can set `threading = :all` and then each witness set will be decomposed in parallel by [`decompose`](@ref). Since monodromy inside [`decompose`](@ref) is also parallelized, this can potentially lead to race conditions. We advise to be careful when using this option
+* `threading = true`: enables multiple threads. 
 * `seed`: choose the random seed.
 
 
@@ -1294,76 +1294,27 @@ function _decompose(
         progress = nothing
     end
 
-    ## if threading == :all we parallelize the outer loop *and* the inner monodromy loops.
-    ## this can potentially lead to race conditions, so we dont make this the default option.
-    if threading == :all
-        # Thread over witness sets
-        progress_lock = ReentrantLock()
-        next_idx = Threads.Atomic{Int}(1)
+    for (i, W) in enumerate(Ws)
+        if ModelKit.degree(W) > 0
+            update_progress!(progress, n - i)
 
-        Threads.@sync begin
-            for _ = 1:Threads.nthreads()
-                Threads.@spawn begin
-                    while true
-                        idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > length(Ws)
-                            break
-                        end
-
-                        W = Ws[idx]
-                        if ModelKit.degree(W) > 0
-                            lock(progress_lock) do
-                                update_progress!(progress, n - idx)
-                            end
-
-                            dec = decompose_with_monodromy!(
-                                W,
-                                show_monodromy_progress,
-                                options,
-                                max_iters,
-                                warning,
-                                progress,
-                                seed;
-                                threading = true,
-                            )
-                            if !isnothing(dec)
-                                lock(progress_lock) do
-                                    append!(out, dec)
-                                    update_progress!(progress, dec)
-                                end
-                            end
-                        end
-
-                        lock(progress_lock) do
-                            update_progress_step!(progress)
-                        end
-                    end
-                end
+            dec = decompose_with_monodromy!(
+                W,
+                show_monodromy_progress,
+                options,
+                max_iters,
+                warning,
+                progress,
+                seed;
+                threading = threading,
+            )
+            if !isnothing(dec)
+                append!(out, dec)
             end
-        end
-    else
-        for (i, W) in enumerate(Ws)
-            if ModelKit.degree(W) > 0
-                update_progress!(progress, n - i)
 
-                dec = decompose_with_monodromy!(
-                    W,
-                    show_monodromy_progress,
-                    options,
-                    max_iters,
-                    warning,
-                    progress,
-                    seed;
-                    threading = threading,
-                )
-                if !isnothing(dec)
-                    append!(out, dec)
-                end
-
-                update_progress!(progress, dec)
-            end
-            update_progress_step!(progress)
+            update_progress!(progress, dec)
         end
+        update_progress_step!(progress)
     end
     finish_progress!(progress)
 
@@ -1575,7 +1526,6 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads. 
-  One can set `threading = :all` and then each witness set will be decomposed in parallel. Since monodromy inside the decomposition is also parallelized, this can potentially lead to race conditions. We advise to be careful when using this option
 * `seed`: choose the random seed.
 
 ### Example
@@ -1631,7 +1581,7 @@ function numerical_irreducible_decomposition(
         max_codim = max_codim,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
-        threading = threading == :all || threading,
+        threading = threading,
         seed = nothing,
         kwargs...,
     )
