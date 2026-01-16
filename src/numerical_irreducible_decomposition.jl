@@ -1333,6 +1333,7 @@ struct NumericalIrreducibleDecomposition
     Witness_Sets::Dict
     seed::Any
 end
+NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}) = NumericalIrreducibleDecomposition(Ws, nothing)
 function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
     D = Dict{Int,Vector{WitnessSet}}()
     for W in Ws
