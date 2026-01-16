@@ -54,7 +54,7 @@
         N = nid(F; sorted = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
-        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
+        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 0))
         @test isempty(witness_sets(N_fails))
 
         N2 = nid(F; tracker_options = TrackerOptions(; extended_precision = false))
