@@ -1232,7 +1232,15 @@ The following example decomposes the witness set for a union of two circles.
 julia> @var x y
 julia> f = (x^2 + y^2 - 1) * ((x-1)^2 + (y-1)^2 - 1)
 julia> W = regeneration([f])
-julia> decompose(W)
+julia> dec = decompose(W)
+2-element Vector{WitnessSet}:
+ Witness set for dimension 1 of degree 2
+ Witness set for dimension 1 of degree 2
+```
+
+The decomposition can be stored in a [`NumericalIrreducibleDecomposition`](@ref) data structure.
+```julia-repl
+julia> N = NumericalIrreducibleDecomposition(dec)
 Numerical irreducible decomposition with 2 components
 • 2 component(s) of dimension 1.
 
@@ -1243,17 +1251,9 @@ Numerical irreducible decomposition with 2 components
 │     1     │        (2, 2)         │
 ╰───────────┴───────────────────────╯
 ```
+
 """
 function decompose(
-    Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
-    seed = nothing,
-    kwargs...,
-) where {T1,T2,T3<:Number}
-    out = _decompose(Ws; seed = seed, kwargs...)
-
-    NumericalIrreducibleDecomposition(out, seed)
-end
-function _decompose(
     Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
@@ -1589,7 +1589,7 @@ function numerical_irreducible_decomposition(
     if isnothing(Ws)
         return nothing
     end
-    dec = _decompose(
+    dec = decompose(
         Ws;
         monodromy_options = monodromy_options,
         max_iters = max_iters,
