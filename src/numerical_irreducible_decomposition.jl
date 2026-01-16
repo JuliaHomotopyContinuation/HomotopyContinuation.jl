@@ -1020,7 +1020,7 @@ function decompose_with_monodromy!(
                     if length(orbit) > 1 || iter ≥ 5
                         W_new = WitnessSet(G, L, P_orbit)
 
-                        push!(decomposition, )
+                        push!(decomposition, W_new)
                         push!(complete_orbits, orbit)
                         k = k - length(orbit)
 
