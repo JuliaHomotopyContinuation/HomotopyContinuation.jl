@@ -940,9 +940,9 @@ finish_progress!(progress::DecomposeProgress) =
 function showstatus(progress::DecomposeProgress)
     ℓ = progress.npts
     if ℓ > 0
-        text = [("Progress", " Decomposing witness set $(progress.n_working_on) / $(progress.n_witness_sets) ($ℓ points left to classify)")]
+        text = [("Decomposing witness set", "$(progress.n_working_on)/$(progress.n_witness_sets) ($ℓ points left to classify)")]
     else
-        text = [("Progress", " Decomposing witness set $(progress.n_working_on) / $(progress.n_witness_sets)")]
+        text = [("Decomposing witness set", "$(progress.n_working_on)/$(progress.n_witness_sets)")]
     end
     degs = progress.degrees
     k = sort(collect(keys(degs)), rev = true)
