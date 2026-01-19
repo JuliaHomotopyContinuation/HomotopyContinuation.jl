@@ -68,20 +68,27 @@ WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnkn
         nhypersurfaces = nhypersurfaces,
         progress_meter = progress_meter,
     )
-update_progress!(progress::Nothing; 
-                is_computing_hypersurfaces::Union{Nothing, Bool} = nothing,
-                is_solving::Union{Nothing, Bool} = nothing,
-                is_removing_points::Union{Nothing, Bool} = nothing,
-                is_membership_test::Union{Nothing, Bool} = nothing) = nothing
-function update_progress!(progress::WitnessSetsProgress; 
-                is_computing_hypersurfaces::Union{Nothing, Bool} = nothing,
-                is_solving::Union{Nothing, Bool} = nothing,
-                is_removing_points::Union{Nothing, Bool} = nothing,
-                is_membership_test::Union{Nothing, Bool} = nothing)
-    isnothing(is_computing_hypersurfaces) ? nothing : progress.is_computing_hypersurfaces = is_computing_hypersurfaces  
-    isnothing(is_solving) ? nothing : progress.is_solving = is_solving  
-    isnothing(is_removing_points) ? nothing : progress.is_removing_points = is_removing_points  
-    isnothing(is_membership_test) ? nothing : progress.is_membership_test = is_membership_test              
+update_progress!(
+    progress::Nothing;
+    is_computing_hypersurfaces::Union{Nothing,Bool} = nothing,
+    is_solving::Union{Nothing,Bool} = nothing,
+    is_removing_points::Union{Nothing,Bool} = nothing,
+    is_membership_test::Union{Nothing,Bool} = nothing,
+) = nothing
+function update_progress!(
+    progress::WitnessSetsProgress;
+    is_computing_hypersurfaces::Union{Nothing,Bool} = nothing,
+    is_solving::Union{Nothing,Bool} = nothing,
+    is_removing_points::Union{Nothing,Bool} = nothing,
+    is_membership_test::Union{Nothing,Bool} = nothing,
+)
+    isnothing(is_computing_hypersurfaces) ? nothing :
+    progress.is_computing_hypersurfaces = is_computing_hypersurfaces
+    isnothing(is_solving) ? nothing : progress.is_solving = is_solving
+    isnothing(is_removing_points) ? nothing :
+    progress.is_removing_points = is_removing_points
+    isnothing(is_membership_test) ? nothing :
+    progress.is_membership_test = is_membership_test
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -147,20 +154,23 @@ function showvalues(progress::WitnessSetsProgress)
         if progress.is_removing_points
             push!(
                 text,
-                ("Remove points", "from dim. $(progress.current_dim) that are in dim. $(progress.remove_dim) ($(progress.current_task)/$(progress.ntasks) checked)"),
+                (
+                    "Remove points",
+                    "from dim. $(progress.current_dim) that are in dim. $(progress.remove_dim) ($(progress.current_task)/$(progress.ntasks) checked)",
+                ),
             )
         elseif progress.is_solving
+            push!(text, ("Tracking paths", "$(progress.current_task)/$(progress.ntasks)"))
+        elseif progress.is_membership_test
             push!(
                 text,
-                ("Tracking paths", "$(progress.current_task)/$(progress.ntasks)"),
-            )
-        elseif progress.is_membership_test 
-            push!(
-                text,
-                ("Membership test", "$(progress.current_task)/$(progress.ntasks) points checked"),
+                (
+                    "Membership test",
+                    "$(progress.current_task)/$(progress.ntasks) points checked",
+                ),
             )
         end
-                   
+
         push!(text, ("Current number of witness points", ""))
         for c = 1:progress.current_hypersurface
             d = progress.ambient_dim - c
@@ -306,7 +316,7 @@ function _regeneration(
     else
         progress = nothing
     end
-    
+
 
     # u-regeneration adds another variable u to F
     @unique_var u
@@ -337,9 +347,7 @@ function _regeneration(
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
     # then, we for i in 2:c we iteratively intersect all current witness sets with f[i]=0
-    update_progress!(progress;
-        is_computing_hypersurfaces = false,
-        is_solving = true)
+    update_progress!(progress; is_computing_hypersurfaces = false, is_solving = true)
     begin
         for i = 1:c
             update_progress_hypersurface!(progress, i)
@@ -364,7 +372,7 @@ function _regeneration(
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
-                   
+
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
@@ -460,9 +468,7 @@ function intersect_all!(out, H, cache, threading)
     codim = cache.codim
     progress = cache.progress
 
-    update_progress!(progress;
-                    is_solving = true,
-                    is_removing_points = false)
+    update_progress!(progress; is_solving = true, is_removing_points = false)
 
     # the i-th hypersurface
     Hᵢ = H[i]
@@ -470,9 +476,7 @@ function intersect_all!(out, H, cache, threading)
     # we enumerate reversely, so that we can add points to witness sets that we have already
     # taken care of; i.e., if we intersect Wₖ∩Hᵢ below in the intersect_with_hypersurface function,
     # we have already intersected Wₖ₊₁ ∩ Hᵢ.
-    update_progress!(progress;
-                    is_solving = true,
-                    is_removing_points = false)
+    update_progress!(progress; is_solving = true, is_removing_points = false)
     E = enumerate(out)
     for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
         if k < i
@@ -496,9 +500,7 @@ function remove_points_all!(out, cache; threading::Bool = true)
     i = cache.i
     progress = cache.progress
 
-    update_progress!(progress;
-                        is_solving = false,
-                        is_removing_points = true)
+    update_progress!(progress; is_solving = false, is_removing_points = true)
 
     E = enumerate(out)
     for (k, W) in E # k = codim(W) for W in Ws
@@ -873,7 +875,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                         lock(progress_lock) do
                             update_progress_tasks!(progress, idx, l_X)
                         end
-     
+
                         # first check
                         evaluate!(local_y0, local_F, norm(x, Inf) .* x0)
                         evaluate!(local_y, local_F, x)
@@ -956,7 +958,7 @@ function update_progress_n!(progress::DecomposeProgress)
     progress.n_working_on += 1
 end
 update_progress_npts!(progress::Nothing, ℓ::Int) = nothing
-function update_progress_npts!(progress::DecomposeProgress, ℓ::Int) 
+function update_progress_npts!(progress::DecomposeProgress, ℓ::Int)
     progress.npts = ℓ
 end
 finish_progress!(progress::DecomposeProgress) =
@@ -964,9 +966,15 @@ finish_progress!(progress::DecomposeProgress) =
 function showstatus(progress::DecomposeProgress)
     ℓ = progress.npts
     if ℓ > 0
-        text = [("Decomposing witness set", "$(progress.n_working_on)/$(progress.n_witness_sets) ($ℓ points left to classify)")]
+        text = [(
+            "Decomposing witness set",
+            "$(progress.n_working_on)/$(progress.n_witness_sets) ($ℓ points left to classify)",
+        )]
     else
-        text = [("Decomposing witness set", "$(progress.n_working_on)/$(progress.n_witness_sets)")]
+        text = [(
+            "Decomposing witness set",
+            "$(progress.n_working_on)/$(progress.n_witness_sets)",
+        )]
     end
     degs = progress.degrees
     k = sort(collect(keys(degs)), rev = true)
@@ -1363,14 +1371,13 @@ function decompose(
 
     if show_progress
         progress = DecomposeProgress(
-            progress_meter =
-            PM.ProgressUnknown(
+            progress_meter = PM.ProgressUnknown(
                 dt = 0.1,
                 desc = "Decomposing $c witness sets",
                 enabled = true,
                 spinner = true,
             ),
-            n_witness_sets = c
+            n_witness_sets = c,
         )
     else
         progress = nothing
@@ -1395,9 +1402,9 @@ function decompose(
             if !isnothing(dec)
                 append!(out, dec)
             end
-            
+
         end
-        
+
     end
     finish_progress!(progress)
 
