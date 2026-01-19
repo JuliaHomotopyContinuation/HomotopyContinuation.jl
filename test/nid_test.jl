@@ -12,55 +12,63 @@
         W = regeneration(F)
         @test degree.(W) == [2, 8, 8]
 
-        W = regeneration(F; sorted = false)
-        @test degree.(W) == [2, 8, 8]
-
-        W = regeneration(F; max_codim = 2)
-        @test degree.(W) == [2, 8]
-
         dec = decompose(W)
         N = NumericalIrreducibleDecomposition(dec)
         @test isa(N, NumericalIrreducibleDecomposition)
 
+        # sorting
+        W = regeneration(F; sorted = false, show_progress = false)
+        @test degree.(W) == [2, 8, 8]
+
+        # limited codimension
+        W = regeneration(F; max_codim = 2, show_progress = false)
+        @test degree.(W) == [2, 8]
+
         # no threading 
-        N = nid(F; threading = false)
+        N = nid(F; threading = false, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         # seed
         s = 0x42c9d504
-        N = nid(F; seed = s)
+        N = nid(F; seed = s, show_progress = false)
         @test seed(N) == s
 
-        N = nid(F; seed = nothing)
+        N = nid(F; seed = nothing, show_progress = false)
         @test isnothing(seed(N))
 
         # bad seed
-        N = nid(F; seed = 0xc770fa47)
+        N = nid(F; seed = 0xc770fa47, show_progress = false)
         degs = degrees(N)
         @test degs[2] == [2]
         @test degs[1] == [4, 4]
 
-        # progress
-        N = nid(F; show_progress = false)
+
+        N = nid(F; show_monodromy_progress = true, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
-        N = nid(F; show_monodromy_progress = true)
-        @test isa(N, NumericalIrreducibleDecomposition)
-
-        N = nid(F; warning = false)
+        N = nid(F; warning = false, show_progress = false)
         @test isa(N, NumericalIrreducibleDecomposition)
 
         # options
-        N = nid(F; sorted = false)
-        @test isa(N, NumericalIrreducibleDecomposition)
-
-        N_fails = nid(F; endgame_options = EndgameOptions(; max_endgame_steps = 1))
+        N_fails = nid(
+            F;
+            endgame_options = EndgameOptions(; max_endgame_steps = 1),
+            show_progress = false,
+        )
         @test isempty(witness_sets(N_fails))
 
-        N2 = nid(F; tracker_options = TrackerOptions(; extended_precision = false))
+        N2 = nid(
+            F;
+            tracker_options = TrackerOptions(; extended_precision = false),
+            show_progress = false,
+        )
         @test isa(N2, NumericalIrreducibleDecomposition)
 
-        N3 = nid(F; monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12))
+        N3 = nid(
+            F;
+            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12),
+            show_progress = false,
+        )
         @test isa(N3, NumericalIrreducibleDecomposition)
 
         # number of components
@@ -72,7 +80,7 @@
         @test n_components(N3, 1) == 2
 
         # max_codim = 1
-        N4 = nid(F; max_codim = 1)
+        N4 = nid(F; max_codim = 1, show_progress = false)
         @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
@@ -101,8 +109,8 @@
             variables = [p; u; λ],
         )
         s = 0x7eec3900
-        R = regeneration(E; seed = s)
-        D = decompose(R; seed = s)
+        R = regeneration(E; seed = s, show_progress = false)
+        D = decompose(R; seed = s, show_progress = false)
         N = NumericalIrreducibleDecomposition(D, s)
         @test ncomponents(N) == 6
     end
@@ -112,7 +120,7 @@
         f = rand_poly(ComplexF64, x, 5)
         Hyp = System([f], variables = x)
 
-        N_Hyp = numerical_irreducible_decomposition(Hyp)
+        N_Hyp = numerical_irreducible_decomposition(Hyp, show_progress = false)
         @test degrees(N_Hyp) == Dict(3 => [5])
         @test ncomponents(N_Hyp) == 1
     end
@@ -123,7 +131,7 @@
         g = rand_poly(ComplexF64, x, 3)
         Curve = System([f; g], variables = x)
 
-        N_Curve = nid(Curve)
+        N_Curve = nid(Curve, show_progress = false)
         @test degrees(N_Curve) == Dict(1 => [6])
         @test ncomponents(N_Curve) == 1
     end
@@ -146,7 +154,7 @@
         g = y * z + x
         ThreeLines = System([f; g], variables = [x; y; z])
 
-        N_ThreeLines = nid(ThreeLines)
+        N_ThreeLines = nid(ThreeLines, show_progress = false)
         @test degrees(N_ThreeLines) == Dict(1 => [1; 1; 1])
         @test ncomponents(N_ThreeLines) == 3
     end
@@ -243,11 +251,11 @@
             variables = [z2x, z2y, z2z, z3x, z3y, z3z, z4x, z4y, z4z, z5x, z5y, z5z],
         )
 
-        N_Bricard6R = nid(Bricard6R)
+        N_Bricard6R = nid(Bricard6R, show_progress = false)
         @test degrees(N_Bricard6R) == Dict(1 => [8])
         @test ncomponents(N_Bricard6R) == 1
 
-        N_Bricard6R_c4 = nid(Bricard6R, max_codim = 4)
+        N_Bricard6R_c4 = nid(Bricard6R, max_codim = 4, show_progress = false)
         @test ncomponents(N_Bricard6R_c4) == 0
     end
 
@@ -287,7 +295,7 @@
             (7 / 8) * xx_A * xx_X - (5 / 7) * xx_CXA,
         ]
 
-        N_ACR = nid(F_ACR)
+        N_ACR = nid(F_ACR, show_progress = false)
         degrees(N_ACR) == Dict(4 => [7])
     end
 
@@ -301,7 +309,8 @@
 
         F = System([s * l * p for s in S for l in L for p in P])
 
-        NID = numerical_irreducible_decomposition(F; seed = 0x7a4845b9)
+        NID =
+            numerical_irreducible_decomposition(F; seed = 0x7a4845b9, show_progress = false)
 
         @test ncomponents(NID, 0) == 1
         @test degrees(NID)[0] == [1]

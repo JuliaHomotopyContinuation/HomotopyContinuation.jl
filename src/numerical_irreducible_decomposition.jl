@@ -114,7 +114,7 @@ function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
         showvalues = showvalues(progress),
     )
 end
-update_progress_dim!(progress::Nothing, d::Int) = nothing
+update_progress_dim!(progress::Nothing, c1::Int, c2::Int) = nothing
 function update_progress_dim!(progress::WitnessSetsProgress, c1::Int, c2::Int)
     n = progress.ambient_dim
     progress.current_dim = n - c1
