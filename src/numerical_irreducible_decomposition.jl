@@ -53,6 +53,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_solving::Bool = false
     is_removing_points::Bool = false
     is_computing_hypersurfaces::Bool = true
+    is_membership_test::Bool = false
     current_task::Int = 0
     ntasks::Int = 0
     current_hypersurface::Int = 1
@@ -67,16 +68,19 @@ WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnkn
         progress_meter = progress_meter,
     )
 update_progress!(progress::Nothing; 
-                is_computing_hypersurfaces::Bool = true,
-                is_solving::Bool = false,
-                is_removing_points::Bool = false) = nothing
+                is_computing_hypersurfaces::Union{Nothing, Bool} = nothing,
+                is_solving::Union{Nothing, Bool} = nothing,
+                is_removing_points::Union{Nothing, Bool} = nothing,
+                is_membership_test::Union{Nothing, Bool} = nothing) = nothing
 function update_progress!(progress::WitnessSetsProgress; 
-                is_computing_hypersurfaces::Bool = false,
-                is_solving::Bool = false,
-                is_removing_points::Bool = false) 
-    progress.is_computing_hypersurfaces = is_computing_hypersurfaces
-    progress.is_solving = is_solving
-    progress.is_removing_points = is_removing_points
+                is_computing_hypersurfaces::Union{Nothing, Bool} = nothing,
+                is_solving::Union{Nothing, Bool} = nothing,
+                is_removing_points::Union{Nothing, Bool} = nothing,
+                is_membership_test::Union{Nothing, Bool} = nothing)
+    isnothing(is_computing_hypersurfaces) ? nothing : progress.is_computing_hypersurfaces = is_computing_hypersurfaces  
+    isnothing(is_solving) ? nothing : progress.is_solving = is_solving  
+    isnothing(is_removing_points) ? nothing : progress.is_removing_points = is_removing_points  
+    isnothing(is_membership_test) ? nothing : progress.is_membership_test = is_membership_test              
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -103,8 +107,8 @@ function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
     )
 end
 update_progress_dim!(progress::Nothing, d::Int) = nothing
-function update_progress_dim!(progress::WitnessSetsProgress, d::Int)
-    progress.current_dim = d
+function update_progress_dim!(progress::WitnessSetsProgress, c::Int)
+    progress.current_dim = progress.ambient_dim - c
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -123,8 +127,10 @@ end
 update_progress!(progress::Union{Nothing,WitnessSetsProgress}, W::Nothing) = nothing
 finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
+    progress.is_computing_hypersurfaces = false
     progress.is_solving = false
     progress.is_removing_points = false
+    progress.is_membership_test = false
     PM.finish!(progress.progress_meter, showvalues = showvalues(progress))
 end
 function showvalues(progress::WitnessSetsProgress)
@@ -138,12 +144,17 @@ function showvalues(progress::WitnessSetsProgress)
         if progress.is_removing_points
             push!(
                 text,
-                ("Remove junk points from dim. $(progress.current_dim)", "$(progress.current_task)/$(progress.ntasks)"),
+                ("Remove junk points from dim. $(progress.current_dim)", "$(progress.current_task)/$(progress.ntasks) points checked"),
             )
         elseif progress.is_solving
             push!(
                 text,
                 ("Tracking paths", "$(progress.current_task)/$(progress.ntasks)"),
+            )
+        elseif progress.is_membership_test 
+            push!(
+                text,
+                ("Membership test", "$(progress.current_task)/$(progress.ntasks) points checked"),
             )
         end
                    
@@ -283,7 +294,7 @@ function _regeneration(
             n,
             c,
             PM.ProgressUnknown(
-                dt = 1.0,
+                dt = 0.4,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
@@ -341,9 +352,6 @@ function _regeneration(
                 end
             else
                 begin
-                    update_progress!(progress;
-                                    is_solving = true,
-                                    is_removing_points = false)
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
@@ -353,9 +361,7 @@ function _regeneration(
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
-                    update_progress!(progress;
-                                    is_solving = false,
-                                    is_removing_points = true)
+                   
                     # after the first loop that takes care of intersecting with Hᵢ
                     # we now check if we have added points that are already contained in 
                     # witness sets of higher dimension.
@@ -375,14 +381,16 @@ function _regeneration(
 
     filter!(W -> degree(W) > 0, out)
     if !isempty(out)
-        return map(out) do W
+        witness_sets = map(out) do W
             P, L = u_transform(W)
             WitnessSet(fixed(F, compile = false), L, P)
         end
     else
-        return Vector{WitnessSet}()
+        return witness_sets = Vector{WitnessSet}()
     end
+    finish_progress!(progress)
 
+    return witness_sets
 end
 
 
@@ -449,6 +457,10 @@ function intersect_all!(out, H, cache, threading)
     codim = cache.codim
     progress = cache.progress
 
+    update_progress!(progress;
+                    is_solving = true,
+                    is_removing_points = false)
+
     # the i-th hypersurface
     Hᵢ = H[i]
 
@@ -480,16 +492,16 @@ function remove_points_all!(out, cache; threading::Bool = true)
 
     i = cache.i
     progress = cache.progress
-    current_task = 0
+
+    update_progress!(progress;
+                        is_solving = false,
+                        is_removing_points = true)
 
     E = enumerate(out)
     for (k, W) in E # k = codim(W) for W in Ws
-        update_progress_dim!(progress, dim(W))
+        update_progress_dim!(progress, k)
         if k > 1 && k <= i && degree(W) > 0
             for j = 1:(k-1)
-                current_task +=1
-                update_progress_tasks!(progress, current_task, k-1)
-
                 X = out[j]
                 if degree(X) > 0
                     remove_points!(W, X, cache; threading = threading)
@@ -497,7 +509,6 @@ function remove_points_all!(out, cache; threading::Bool = true)
                 end
             end
         end
-        current_task = 0
         update_progress!(progress, W)
     end
 end
@@ -658,7 +669,8 @@ function is_contained(X, Y, F, cache; threading::Bool = true)
 
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
-
+    progress = cache.progress
+    update_progress!(progress; is_membership_test = true)
 
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
@@ -687,6 +699,7 @@ function is_contained(X, Y, F, cache; threading::Bool = true)
             out = serial_x_in_Y(X, Y, F, tracker, cache)
         end
     end
+    update_progress!(progress; is_membership_test = false)
 
     out
 end
@@ -757,13 +770,16 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
     k = codim(LY) - codim(LX)
-
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
+    l_X = length(points(X))
+    idx = 0
+
     #we loop over the points in X and check if they are contained in Y
     out = map(points(X)) do x
-        update_progress!(progress, X)
+        idx += 1
+        update_progress_tasks!(progress, idx, l_X)
 
         # first check
         evaluate!(y0, F, norm(x, Inf) .* x0)
@@ -818,6 +834,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
     P = points(X)
+    l_X = length(P)
     out = Vector{Bool}(undef, length(P))
 
     # Pre-allocate one tracker and buffers per thread
@@ -843,12 +860,15 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                 Threads.@spawn begin
                     while true
                         idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > length(P)
+                        if idx > l_X
                             break
                         end
 
                         x = P[idx]
-
+                        lock(progress_lock) do
+                            update_progress_tasks!(progress, idx, l_X)
+                        end
+     
                         # first check
                         evaluate!(local_y0, local_F, norm(x, Inf) .* x0)
                         evaluate!(local_y, local_F, x)
@@ -883,7 +903,6 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
 
                         lock(progress_lock) do
                             out[idx] = result
-                            update_progress!(progress, X)
                         end
                     end
                 end
