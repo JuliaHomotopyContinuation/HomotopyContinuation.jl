@@ -52,7 +52,7 @@
         # options
         N_fails = nid(
             F;
-            endgame_options = EndgameOptions(; max_endgame_steps = 1),
+            endgame_options = EndgameOptions(; max_endgame_steps = 0),
             show_progress = false,
         )
         @test isempty(witness_sets(N_fails))
