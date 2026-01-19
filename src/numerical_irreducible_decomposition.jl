@@ -276,7 +276,7 @@ function _regeneration(
         max_endgame_extended_steps = 100,
         sing_cond = 1e12,
     ),
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
 )
 
@@ -438,7 +438,12 @@ function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
 
     out
 end
-function initialize_hypersurfaces(f::Vector{Expression}, vars, L; threading::Bool = true)
+function initialize_hypersurfaces(
+    f::Vector{Expression},
+    vars,
+    L;
+    threading::Bool = Threads.nthreads() > 1,
+)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
 
@@ -495,7 +500,7 @@ function intersect_all!(out, H, cache, threading)
 end
 
 
-function remove_points_all!(out, cache; threading::Bool = true)
+function remove_points_all!(out, cache; threading::Bool = Threads.nthreads() > 1)
 
     i = cache.i
     progress = cache.progress
@@ -526,7 +531,13 @@ end
 
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
-function intersect_with_hypersurface!(W, H, X, cache; threading::Bool = true)
+function intersect_with_hypersurface!(
+    W,
+    H,
+    X,
+    cache;
+    threading::Bool = Threads.nthreads() > 1,
+)
 
     F = cache.Fᵢ
     progress = cache.progress
@@ -672,7 +683,7 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained(X, Y, F, cache; threading::Bool = true)
+function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
 
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
@@ -714,7 +725,7 @@ function is_contained(
     V::WitnessPoints,
     W::WitnessSet,
     cache::RegenerationCache;
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
 )
     is_contained(V, W, system(W), cache; threading = threading)
 end
@@ -723,7 +734,7 @@ function remove_points!(
     W::WitnessPoints,
     V::WitnessPoints,
     cache::RegenerationCache;
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
 )
     m = is_contained(W, V, cache.Fᵢ, cache; threading = threading)
     deleteat!(W.R, m)
@@ -1009,7 +1020,7 @@ function decompose_with_monodromy!(
     warning,
     progress,
     seed;
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
 )
 
 
@@ -1311,7 +1322,7 @@ This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@r
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading = true`: enables multiple threads. 
+* `threading`: enables multiple threads. 
 * `seed`: choose the random seed.
 
 
@@ -1350,7 +1361,7 @@ function decompose(
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     warning::Bool = true,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
 ) where {T1,T2,T3<:Number}
 
@@ -1660,7 +1671,7 @@ function numerical_irreducible_decomposition(
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
     warning::Bool = true,
-    threading::Bool = true,
+    threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
     kwargs...,
 )
