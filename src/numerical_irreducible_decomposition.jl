@@ -59,6 +59,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     current_hypersurface::Int = 1
     nhypersurfaces::Int
     current_dim::Int = 0
+    remove_dim::Int = 0
     next_dim::Int = 0
 end
 WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
@@ -107,8 +108,10 @@ function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
     )
 end
 update_progress_dim!(progress::Nothing, d::Int) = nothing
-function update_progress_dim!(progress::WitnessSetsProgress, c::Int)
-    progress.current_dim = progress.ambient_dim - c
+function update_progress_dim!(progress::WitnessSetsProgress, c1::Int, c2::Int)
+    n = progress.ambient_dim
+    progress.current_dim = n - c1
+    progress.remove_dim = n - c2
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -144,7 +147,7 @@ function showvalues(progress::WitnessSetsProgress)
         if progress.is_removing_points
             push!(
                 text,
-                ("Remove junk points from dim. $(progress.current_dim)", "$(progress.current_task)/$(progress.ntasks) points checked"),
+                ("Remove points", "from dim. $(progress.current_dim) that are in dim. $(progress.remove_dim) ($(progress.current_task)/$(progress.ntasks) checked)"),
             )
         elseif progress.is_solving
             push!(
@@ -499,10 +502,12 @@ function remove_points_all!(out, cache; threading::Bool = true)
 
     E = enumerate(out)
     for (k, W) in E # k = codim(W) for W in Ws
-        update_progress_dim!(progress, k)
         if k > 1 && k <= i && degree(W) > 0
             for j = 1:(k-1)
+
                 X = out[j]
+                update_progress_dim!(progress, k, codim(X))
+
                 if degree(X) > 0
                     remove_points!(W, X, cache; threading = threading)
                     update_progress!(progress, W)
