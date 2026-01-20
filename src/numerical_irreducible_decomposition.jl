@@ -1561,7 +1561,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     end
     header = "\n Numerical irreducible decomposition with $total components"
     println(io, header)
-
+    println(io, "="^(length(header)))
     mdim = max_dim(N)
     if mdim >= 0
         for d = max_dim(N):-1:0
