@@ -144,7 +144,6 @@ function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) 
     IntrinsicDescription(
         convert(Matrix{T}, A.A),
         convert(Vector{T}, A.b),
-        convert(Matrix{T}, A.Y),
     )
 end
 
