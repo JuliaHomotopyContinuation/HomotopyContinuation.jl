@@ -1,6 +1,34 @@
 export IntrinsicSubspaceHomotopy, set_subspaces!
 
 
+struct GrassmannianGeodesic
+    Q::Matrix{ComplexF64}
+    Q_cos::Matrix{ComplexF64}
+    Θ::Vector{Float64}
+    U::Matrix{ComplexF64}
+    γ1::Matrix{ComplexF64}
+end
+
+function GrassmannianGeodesic(start::LinearSubspace, target::LinearSubspace; affine::Bool = true)
+    Q, Θ, U = grassmannian_svd(target, start; affine = affine)
+    if affine 
+        Q_cos = target.intrinsic.X * U
+    else
+        Q_cos = target.intrinsic.Y * U
+    end
+    γ1 = similar(Q_cos)
+    n, k = size(γ1)
+    for j = 1:k
+        s, c = sincos(Θ[j])
+        for i = 1:n
+            γ1[i, j] = Q_cos[i, j] * c + Q[i, j] * s
+        end
+    end
+    G = GrassmannianGeodesic(Q, Q_cos, Θ, U, γ1)
+    G
+end
+
+
 const PROJECTIVE_INTRINSIC_LRU = LRU{
     Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
     GrassmannianGeodesic,
@@ -8,6 +36,12 @@ const PROJECTIVE_INTRINSIC_LRU = LRU{
     maxsize = 128,
 )
 
+const AFFINE_INTRINSIC_LRU = LRU{
+    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
+    GrassmannianGeodesic,
+}(
+    maxsize = 128,
+)
 """
     IntrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
     IntrinsicSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
@@ -38,7 +72,11 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tx³::TaylorVector{4,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
+
+    affine::Bool
 end
+is_affine(H::IntrinsicSubspaceHomotopy) = H.affine
+get_b(H::IntrinsicSubspaceHomotopy) = H.start.intrinsic.b
 
 ## Implementation details
 
@@ -53,7 +91,8 @@ IntrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target)
+    kwargs...
+) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 
 function IntrinsicSubspaceHomotopy(
@@ -61,30 +100,39 @@ function IntrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    kwargs...
 )
     IntrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target),
+        convert(LinearSubspace{ComplexF64}, target);
+        kwargs...
     )
 end
 
 function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
-    target::LinearSubspace{ComplexF64},
+    target::LinearSubspace{ComplexF64};
+    affine::Bool = true
 )
-    path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
-        GrassmannianGeodesic(start, target; affine = false)
+    if affine
+        LRU = AFFINE_INTRINSIC_LRU
+    else
+        LRU = PROJECTIVE_INTRINSIC_LRU
+    end
+    path = get!(LRU, (start, target)) do
+        GrassmannianGeodesic(start, target; affine = affine)
     end
     Q = path.Q
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
+    J = affine ? zeros(ComplexF64, size(system)) : zeros(ComplexF64, size(system) .+ (1, 1))
     IntrinsicSubspaceHomotopy(
         system = system,
         start = start,
         target = target,
-        path = GrassmannianGeodesic(start, target; affine = false),
-        J = zeros(ComplexF64, size(system) .+ (1, 1)),
+        path = GrassmannianGeodesic(start, target; affine = affine),
+        J = J,
         x = zeros(ComplexF64, size(Q, 1)),
         ẋ = zeros(ComplexF64, size(Q, 1)),
         x_high = zeros(ComplexDF64, size(Q, 1)),
@@ -96,9 +144,12 @@ function IntrinsicSubspaceHomotopy(
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
         tx¹ = TaylorVector{2}(tx⁴),
+        affine = affine
     )
 end
-Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+@inline function Base.size(H::IntrinsicSubspaceHomotopy)
+    is_affine(H) ? (size(H.system)[1], dim(H.start)) : (size(H.system)[1] + 1, dim(H.start) + 1)
+end
 
 """
     set_subspaces!(H::IntrinsicSubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
@@ -112,7 +163,13 @@ function set_subspaces!(
 )
     H.start = start
     H.target = target
-    H.path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
+    if is_affine(H)
+        LRU = AFFINE_INTRINSIC_LRU
+    else
+        LRU = PROJECTIVE_INTRINSIC_LRU
+    end
+
+    H.path = get!(LRU, (start, target)) do
         GrassmannianGeodesic(start, target)
     end
     H
@@ -171,11 +228,21 @@ end
 end
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVector, t)
-    (length(x) == length(H.x) - 1) ||
+
+    if is_affine(H)
+        (length(x) == length(H.x)) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
-    set_solution!(view(H.x, 1:length(x)), H.system, x)
-    H.x[end] = 1
+        set_solution!(H.x, H.system, x)
+        b = get_b(H)
+        H.x .= H.x - b
+    else
+        (length(x) == length(H.x) - 1) ||
+            throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
+
+        set_solution!(view(H.x, 1:length(x)), H.system, x)
+        H.x[end] = 1
+    end
 
     if isone(t)
         LA.mul!(u, H.path.γ1', H.x)
@@ -187,30 +254,60 @@ function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVecto
 end
 
 function get_solution(H::IntrinsicSubspaceHomotopy, u::AbstractVector, t)
-    if isone(t)
-        (@view H.path.γ1[1:end-1, :]) * u
-    elseif iszero(t)
-        (@view H.path.Q_cos[1:end-1, :]) * u
+
+    if is_affine(H)
+        b = get_b(H)
+        if isone(t)
+            out = (H.path.γ1 * u) + b
+        elseif iszero(t)
+            out = (H.path.Q_cos * u) + b
+        else
+            γ = γ!(H, t)
+            out = (γ * u) + b    
+        end
     else
-        γ = γ!(H, t)
-        (@view γ[1:end-1, :]) * u
+        if isone(t)
+            out = (@view H.path.γ1[1:end-1, :]) * u
+        elseif iszero(t)
+            out = (@view H.path.Q_cos[1:end-1, :]) * u
+        else
+            γ = γ!(H, t)
+            out = (@view γ[1:end-1, :]) * u
+        end
     end
+
+    out
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::Vector{ComplexDF64}, t)
     γ = γ!(H, t)
-    n = first(size(H.system))
     LA.mul!(H.x_high, γ, v)
+
+    if is_affine(H)
+        b = get_b(H)
+        H.x_high .= H.x_high .+ b
+    else
+        n = first(size(H.system))
+        u[n+1] = H.x_high[end] - 1.0
+    end
     evaluate!(u, H.system, H.x_high)
-    u[n+1] = H.x_high[end] - 1.0
+   
+    u
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
-    n = first(size(H.system))
     LA.mul!(H.x, γ, v)
+
+    if is_affine(H)
+        b = get_b(H)
+        H.x .= H.x .+ b
+    else
+        n = first(size(H.system))
+        u[n+1] = H.x[end] - 1.0
+    end
     evaluate!(u, H.system, H.x)
-    u[n+1] = H.x[end] - 1.0
+   
     u
 end
 
@@ -222,16 +319,22 @@ function ModelKit.evaluate_and_jacobian!(
     t,
 )
     γ = γ!(H, t)
-
     LA.mul!(H.x, γ, v)
+
+    if is_affine(H)
+        b = get_b(H)
+        H.x .= H.x .+ b
+    end
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
-
-    n = first(size(H.system))
-    u[n+1] = H.x[end] - 1
-    m = length(v)
-    for j = 1:m
-        U[n+1, j] = γ[end, j]
+    
+    if !is_affine(H)
+        n = first(size(H.system))
+        u[n+1] = H.x[end] - 1
+        m = length(v)
+        for j = 1:m
+            U[n+1, j] = γ[end, j]
+        end
     end
 
     nothing
@@ -249,16 +352,23 @@ function ModelKit.taylor!(
     γ̇ = γ̇!(H, t)
 
     # apply chain rule
-    #    d/dt [F(γ(t)v); (γ(t)v)[end] - 1] = [J_F(γ(t)v)* γ̇(t)*v;  (γ̇(t)v)[end]]
+    #    d/dt F(γ(t)v) = J_F(γ(t)v)* γ̇(t)*v
 
     H.v .= first.(v)
     LA.mul!(H.x, γ, H.v)
     LA.mul!(H.ẋ, γ̇, H.v)
 
+    if is_affine(H)
+        b = get_b(H)
+        H.x .= H.x .+ b
+    end
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
-    M = size(H, 1)
-    u[M] = H.ẋ[end]
+
+    if !is_affine(H)
+        M = size(H, 1)
+        u[M] = H.ẋ[end]
+    end
 
     u
 end
@@ -339,8 +449,10 @@ function ModelKit.taylor!(
 
     taylor!(u, Val(2), H.system, H.tx²)
 
-    n = first(size(H.system))
-    u[n+1] = x²[end]
+    if !is_affine(H)
+        n = first(size(H.system))
+        u[n+1] = x²[end]
+    end
 
     u
 end
@@ -378,8 +490,10 @@ function ModelKit.taylor!(
 
     taylor!(u, Val(3), H.system, H.tx³)
 
-    n = first(size(H.system))
-    u[n+1] = x³[end]
+    if !is_affine(H)
+        n = first(size(H.system))
+        u[n+1] = x³[end]
+    end
 
     u
 end
@@ -419,8 +533,10 @@ function ModelKit.taylor!(
 
     taylor!(u, Val(4), H.system, H.tx⁴)
 
-    n = first(size(H.system))
-    u[n+1] = x⁴[end]
+    if !is_affine(H)
+        n = first(size(H.system))
+        u[n+1] = x⁴[end]
+    end
 
     u
 end
