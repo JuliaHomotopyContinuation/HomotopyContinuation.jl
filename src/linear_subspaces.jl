@@ -760,3 +760,4 @@ function Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
     ext₂ = extrinsic(L₂)
     LinearSubspace([ext₁.A; ext₂.A], [ext₁.b; ext₂.b])
 end
+

@@ -674,7 +674,6 @@ parameters!(H::IntrinsicSubspaceOffsetHomotopy, p::LinearSubspace, q::LinearSubs
 offset_at_t(H::IntrinsicSubspaceOffsetHomotopy, t::Number) = t .* H.a_minus_b .+ H.target.intrinsic.b
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceOffsetHomotopy, x::AbstractVector, t)
-
     (length(x) == length(H.x)) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
