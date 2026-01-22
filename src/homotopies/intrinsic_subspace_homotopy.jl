@@ -578,6 +578,8 @@ Base.@kwdef mutable struct IntrinsicSubspaceOffsetHomotopy{S<:AbstractSystem} <:
     target::LinearSubspace{ComplexF64}
 
     a_minus_b::Vector{ComplexF64}
+    offset::Vector{ComplexF64}  # Cached offset
+    t_cache::Base.RefValue{ComplexF64}  # Cache for last computed t
 
     J::Matrix{ComplexF64}
     x::Vector{ComplexF64}
@@ -628,6 +630,8 @@ function IntrinsicSubspaceOffsetHomotopy(
         start = start,
         target = target,
         a_minus_b = a - b,
+        offset = copy(b),
+        t_cache = Ref(complex(NaN, NaN)),
         J = J,
         x = zeros(ComplexF64, n),
         x_high = zeros(ComplexDF64, n),
@@ -671,15 +675,27 @@ parameters!(H::IntrinsicSubspaceOffsetHomotopy, p::LinearSubspace, q::LinearSubs
     )
 
 # Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
-offset_at_t(H::IntrinsicSubspaceOffsetHomotopy, t::Number) = t .* H.a_minus_b .+ H.target.intrinsic.b
+# Uses caching to avoid repeated allocations
+@inline function _compute_offset!(H::IntrinsicSubspaceOffsetHomotopy, t::Number)
+    H.offset .= H.target.intrinsic.b
+    LA.axpy!(t, H.a_minus_b, H.offset)
+    H.t_cache[] = t
+end
+
+@inline function offset_at_t!(H::IntrinsicSubspaceOffsetHomotopy, t::Number)
+    if H.t_cache[] != t
+        _compute_offset!(H, t)
+    end
+    H.offset
+end
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceOffsetHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x)) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
     set_solution!(H.x, H.system, x)
-    b = offset_at_t(H, t)
-    H.x .= H.x - b
+    offset_at_t!(H, t)
+    H.x .= H.x .- H.offset
     X = get_X(H)
     LA.mul!(u, X', H.x)
 
@@ -689,19 +705,19 @@ end
 function get_solution(H::IntrinsicSubspaceOffsetHomotopy, u::AbstractVector, t)
     # u are coordinates in the subspace
     # Return x in the ambient space via x = X*u + b(t)
-    b = offset_at_t(H, t)
+    offset_at_t!(H, t)
     X = get_X(H)
-    out = X * u + b
+    out = X * u + H.offset
     
     out
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceOffsetHomotopy, v::Vector{ComplexDF64}, t)
-    b = offset_at_t(H, t)
+    offset_at_t!(H, t)
     X = get_X(H)
 
     LA.mul!(H.x_high, X, v)
-    H.x_high .+= b
+    LA.axpy!(1, H.offset, H.x_high)
 
     evaluate!(u, H.system, H.x_high)
 
@@ -709,11 +725,11 @@ function ModelKit.evaluate!(u, H::IntrinsicSubspaceOffsetHomotopy, v::Vector{Com
 end
 
 function ModelKit.evaluate!(u, H::IntrinsicSubspaceOffsetHomotopy, v::AbstractVector, t)
-    b = offset_at_t(H, t)
+    offset_at_t!(H, t)
     X = get_X(H)
 
     LA.mul!(H.x, X, v)
-    H.x .+= b
+    LA.axpy!(1, H.offset, H.x)
 
     evaluate!(u, H.system, H.x)
 
@@ -727,11 +743,11 @@ function ModelKit.evaluate_and_jacobian!(
     v::AbstractVector,
     t,
 )
-    b = offset_at_t(H, t)
+    offset_at_t!(H, t)
     X = get_X(H)
 
     LA.mul!(H.x, X, v)
-    H.x .+= b
+    LA.axpy!(1, H.offset, H.x)
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, X)
 
@@ -750,11 +766,11 @@ function ModelKit.taylor!(
     #             = J_F(X*v + t*a + (1-t)*b) * (a - b)
 
     H.v .= first.(v)
-    b = offset_at_t(H, t)
+    offset_at_t!(H, t)
     X = get_X(H)
 
     LA.mul!(H.x, X, H.v)
-    H.x .= H.x .+ b
+    LA.axpy!(1, H.offset, H.x)
 
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
 
@@ -779,16 +795,16 @@ function ModelKit.taylor!(
     if incr
         x .= H.x
     else
-        b = offset_at_t(H, t)
+        offset_at_t!(H, t)
        
         LA.mul!(x, X, v)
-        x .+= b
+        LA.axpy!(1, H.offset, x)
     end
 
     # x¹ = B * v¹ + d/dt[offset]
     H.v .= v¹
     LA.mul!(x¹, X, H.v)
-    x¹ .+= H.a_minus_b  # derivative of offset with respect to t
+    LA.axpy!(1, H.a_minus_b, x¹)  # derivative of offset with respect to t
 
     # x² = B * v
     H.v .= v
@@ -812,11 +828,11 @@ function ModelKit.taylor!(
     X = get_X(H)
 
     if !incr
-        b = offset_at_t(H, t)    
+        offset_at_t!(H, t)    
         LA.mul!(x, X, v)
-        x .+= b
+        LA.axpy!(1, H.offset, x)
         LA.mul!(x¹, X, v¹)
-        x¹ .+= H.a_minus_b
+        LA.axpy!(1, H.a_minus_b, x¹)
     end
 
     # x² = B * v²
@@ -845,11 +861,11 @@ function ModelKit.taylor!(
     X = get_X(H)
 
     if !incr
-        b = offset_at_t(H, t)
+        offset_at_t!(H, t)
         LA.mul!(x, X, v)
-        x .+= b
+        LA.axpy!(1, H.offset, x)
         LA.mul!(x¹, X, v¹)
-        x¹ .+= H.a_minus_b
+        LA.axpy!(1, H.a_minus_b, x¹)
     end
 
     # Higher order derivatives
