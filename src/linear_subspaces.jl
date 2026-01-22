@@ -122,45 +122,60 @@ end
 Base.broadcastable(A::ExtrinsicDescription) = Ref(A)
 
 """
-    IntrinsicDescription(A, b₀)
+    IntrinsicDescription(A, b)
 
 Intrinsic description of an ``m``-dimensional (affine) linear subspace ``L`` in ``n``-dimensional space.
-That is ``L = \\{ u | A u + b₀ \\}``. Here, ``A`` and ``b₀`` are in orthogonal coordinates.
-That is, the columns of ``A`` are orthonormal and ``A' b₀ = 0``.
+That is ``L = \\{ u | A u + b \\}``. Here, ``A`` and ``b`` are in orthogonal coordinates.
+That is, the columns of ``A`` are orthonormal and ``A' b = 0``.
 """
 struct IntrinsicDescription{T}
     # orthogonal coordinates
     A::Matrix{T}
-    b₀::Vector{T}
-    # stiefel coordinates
+    b::Vector{T}
+    # stiefel coordinates for A
+    X::Matrix{T}
+    # stiefel coordinates for [A b]
     Y::Matrix{T}
 end
-IntrinsicDescription(A::Matrix{T1}, b₀::Vector{T2}) where {T1,T2} =
-    IntrinsicDescription(A, b₀, stiefel_coordinates(A, b₀))
+IntrinsicDescription(A::Matrix{T1}, b::Vector{T2}) where {T1,T2} =
+    IntrinsicDescription(A, b, stiefel_coordinates_intrinsic(A), stiefel_coordinates_intrinsic(A, b))
 
 function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) where {T}
     IntrinsicDescription(
         convert(Matrix{T}, A.A),
-        convert(Vector{T}, A.b₀),
+        convert(Vector{T}, A.b),
         convert(Matrix{T}, A.Y),
     )
 end
 
-(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b₀
+(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b
 (A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
 
-function stiefel_coordinates(A::AbstractMatrix, b::AbstractVector)
+function stiefel_coordinates_intrinsic(A::AbstractMatrix)
+    n, k = size(A)
+    SVD = LA.svd!(A)
+    SVD.U
+end
+function stiefel_coordinates_intrinsic!(X, A::AbstractMatrix)
+    n, k = size(A)
+    SVD = LA.svd!(A)
+    X .= SVD.U
+    X
+end
+function stiefel_coordinates_intrinsic(A::AbstractMatrix, b::AbstractVector)
     n, k = size(A)
     Y = zeros(eltype(A), n + 1, k + 1)
-    stiefel_coordinates!(Y, A, b)
+    stiefel_coordinates_intrinsic!(Y, A, b)
     Y
 end
-function stiefel_coordinates!(Y, A::AbstractMatrix, b::AbstractVector)
+function stiefel_coordinates_intrinsic!(Y, A::AbstractMatrix, b::AbstractVector)
     γ = sqrt(1 + sum(abs2, b))
     n, k = size(A)
     Y[1:n, 1:k] .= A
     Y[1:n, k+1] .= b ./ γ
     Y[n+1, k+1] = 1 / γ
+    SVD = LA.svd!(Y)
+    Y .= SVD.U
     Y
 end
 
@@ -179,24 +194,24 @@ Codimension of the (affine) linear subspace `A`.
 codim(I::IntrinsicDescription) = size(I.A, 1) - size(I.A, 2)
 
 function Base.:(==)(A::IntrinsicDescription, B::IntrinsicDescription)
-    A.A == B.A && A.b₀ == B.b₀ && A.Y == B.Y
+    A.A == B.A && A.b == B.b && A.Y == B.Y
 end
 
 function Base.show(io::IO, A::IntrinsicDescription{T}) where {T}
     println(io, "IntrinsicDescription{$T}:")
     println(io, "A:")
     show(io, A.A)
-    println(io, "\nb₀:")
-    show(io, A.b₀)
+    println(io, "\nb:")
+    show(io, A.b)
 end
 
 function Base.copy!(A::IntrinsicDescription, B::IntrinsicDescription)
     copy!(A.A, B.A)
-    copy!(A.b₀, B.b₀)
+    copy!(A.b, B.b)
     copy!(A.Y, B.Y)
     A
 end
-Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b₀), copy(A.Y))
+Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b), copy(A.Y))
 
 Base.broadcastable(A::IntrinsicDescription) = Ref(A)
 
@@ -205,21 +220,21 @@ function IntrinsicDescription(E::ExtrinsicDescription)
     m, n = size(E.A)
     A = Matrix((@view svd.Vt[m+1:end, :])')
     if iszero(E.b)
-        b₀ = zeros(eltype(E.b), size(A, 1))
+        b = zeros(eltype(E.b), size(A, 1))
     else
-        b₀ = svd \ E.b
+        b = svd \ E.b
     end
-    IntrinsicDescription(A, b₀)
+    IntrinsicDescription(A, b)
 end
 
 function ExtrinsicDescription(I::IntrinsicDescription)
     svd = LA.svd(I.A; full = true)
     m, n = size(I.A)
     A = Matrix((@view svd.U[:, n+1:end])')
-    if iszero(I.b₀)
+    if iszero(I.b)
         b = zeros(eltype(A), size(A, 1))
     else
-        b = A * I.b₀
+        b = A * I.b
     end
     ExtrinsicDescription(A, b; orthonormal = true)
 end
@@ -264,7 +279,7 @@ A:
  -0.6882472016116853
   0.6882472016116853
   0.22941573387056186
-b₀:
+b:
 3-element Array{Float64,1}:
  -3.0526315789473677
  -3.947368421052632
@@ -563,7 +578,7 @@ function coord_change(
 end
 
 coord_change(A::LinearSubspace, ::Coordinates{:Extrinsic}, ::Coordinates{:Intrinsic}, x) =
-    A.intrinsic.A' * (x - A.intrinsic.b₀)
+    A.intrinsic.A' * (x - A.intrinsic.b)
 function coord_change(
     A::LinearSubspace,
     ::Coordinates{:Extrinsic},
@@ -657,24 +672,32 @@ These values are necessary to construct the geodesic between `A` and `B`.
 
 [^LKK19]: $_LKK19
 """
-geodesic_svd(A::LinearSubspace, B::LinearSubspace) = geodesic_svd(A.intrinsic, B.intrinsic)
-function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
-    U, Σ, V = LA.svd!(A.Y' * B.Y)
+grassmannian_svd(A::LinearSubspace, B::LinearSubspace; kwargs...) = grassmannian_svd(A.intrinsic, B.intrinsic; kwargs...)
+function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; affine::Bool = true)
+    if affine
+        n, k = size(A.X)
+        U, Σ, V = LA.svd!(A.X' * B.X)
+        # M = (LA.I - A.X * A.X') * B.X * inv(A.X' * B.X)
+        # Have to compute an SVD of M s.t. M = Q tanΘ U'
+        # Equivalently M * U = Q tan(Θ)
+        # We can achieve this by using a *pivoted* QR
+        # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
+
+        # inv(A.X' * B.X) * U = V * LA.diagm(inv.(Σ))
+        MU = (LA.I - A.X * A.X') * B.X * V * LA.diagm(inv.(Σ))
+    else
+        n, k = size(A.Y)
+        U, Σ, V = LA.svd!(A.Y' * B.Y)
+        MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
+    end
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
     # We try to correct this fact by treating σ >= 1 - 2eps() as 1.0
     Θ = map(σ -> σ + 2 * eps() > 1.0 ? 0.0 : acos(σ), Σ)
 
-    n, k = size(A.Y)
-    # M = (LA.I - A.Y * A.Y') * B.Y * inv(A.Y' * B.Y)
-    # Have to compute an SVD of M s.t. M = Q tanΘ U'
-    # Equivalently M * U = Q tan(Θ)
-    # We can achieve this by using a *pivoted* QR
-    # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
-
-    # inv(A.Y' * B.Y) * U = V * LA.diagm(inv.(Σ))
-    MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
+    
+    
     Q, R = qr_col_norm!(MU)
     # correct signs and ordering of Q
     Q′ = Q[:, k:-1:1]
@@ -716,8 +739,9 @@ function translate!(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsi
     ext = extrinsic(L)
     ext.b .+= δb
     int = intrinsic(L)
-    LA.mul!(int.b₀, ext.A', δb, true, true)
-    stiefel_coordinates!(int.Y, int.A, int.b₀)
+    LA.mul!(int.b, ext.A', δb, true, true)
+    stiefel_coordinates_intrinsic!(int.X, int.A)
+    stiefel_coordinates_intrinsic!(int.Y, int.A, int.b)
     L
 end
 
