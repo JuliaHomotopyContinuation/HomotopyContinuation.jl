@@ -1,6 +1,4 @@
-export IntrinsicSubspaceHomotopy, IntrinsicSubspaceStiefelHomotopy, IntrinsicSubspaceOffsetHomotopy, set_subspaces!
-
-
+export IntrinsicSubspaceHomotopy, set_subspaces!
 
 
 struct GrassmannianGeodesic
@@ -11,9 +9,9 @@ struct GrassmannianGeodesic
     γ1::Matrix{ComplexF64}
 end
 
-function GrassmannianGeodesic(start::LinearSubspace, target::LinearSubspace; affine::Bool = true)
-    Q, Θ, U = grassmannian_svd(target, start; affine = affine)
-    if affine 
+function GrassmannianGeodesic(start::LinearSubspace, target::LinearSubspace; embedded_projective::Bool = false)
+    Q, Θ, U = grassmannian_svd(target, start; embedded_projective = embedded_projective)
+    if !embedded_projective 
         Q_cos = target.intrinsic.X * U
     else
         Q_cos = target.intrinsic.Y * U
@@ -44,28 +42,41 @@ const AFFINE_INTRINSIC_LRU = LRU{
 }(
     maxsize = 128,
 )
-"""
-    IntrinsicSubspaceStiefelHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
-    IntrinsicSubspaceStiefelHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
 
-Creates a homotopy ``H(x,t) = F(γ(t)x)`` where ``γ(t)`` is a family of affine subspaces
-such that ``γ(1) = V`` and ``γ(0) = W``.
-Here ``γ(t)`` is the geodesic between `V` and `W` in the affine Grassmanian, i.e.,
-it is the curve of minimal length connecting `V` and `W`.
-See also [`LinearSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
 """
-Base.@kwdef mutable struct IntrinsicSubspaceStiefelHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+    IntrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
+    IntrinsicSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
+
+Creates a homotopy ``H(x,t) = F(γ(t)x + b(t))`` where both the matrix part and the offset
+are interpolated simultaneously.
+
+At ``t=1``, we have ``H(x,1) = F(Ax + a)`` where ``V = {Ax + a}``.
+At ``t=0``, we have ``H(x,0) = F(Bx + b)`` where ``W = {Bx + b}``.
+
+The matrix part ``γ(t)`` follows a geodesic in the Grassmannian from ``A`` to ``B``,
+while the offset ``b(t)`` interpolates linearly from ``a`` to ``b``.
+
+See also [`LinearSubspace`](@ref).
+"""
+Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
+    
+    # For the matrix part (geodesic interpolation)
     path::GrassmannianGeodesic
+
+    # For the offset part (linear interpolation)
+    a_minus_b::Union{Nothing, Vector{ComplexF64}}
+    offset::Union{Nothing, Vector{ComplexF64}}
+    t_cache::Base.RefValue{ComplexF64}
+    offset_t_cache::Base.RefValue{ComplexF64}
 
     J::Matrix{ComplexF64}
     x::Vector{ComplexF64}
-    ẋ::Vector{ComplexF64}
+    ẋ::Vector{ComplexF64}
     x_high::Vector{ComplexDF64}
-    t_cache::Base.RefValue{ComplexF64}
     # For AD
     taylor_t_cache::Base.RefValue{ComplexF64}
     taylor_γ::NTuple{5,Matrix{ComplexF64}}
@@ -75,76 +86,87 @@ Base.@kwdef mutable struct IntrinsicSubspaceStiefelHomotopy{S<:AbstractSystem} <
     tx²::TaylorVector{3,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
 
-    affine::Bool
+    embedded_projective::Bool
 end
-is_affine(H::IntrinsicSubspaceStiefelHomotopy) = H.affine
-get_b(H::IntrinsicSubspaceStiefelHomotopy) = H.start.intrinsic.b
+is_embedded_projective(H::IntrinsicSubspaceHomotopy) = H.embedded_projective
 
 ## Implementation details
 
 # The computation is performed using (implicit) Stiefel coordinates. If `size(F) = m, n`
-# and `V` and `W` are affine subspaces of dimension `k, then the computation is performed in
-# the affine Grassmanian Graff(k,n) embedded in the Grassmanian(k+1,n+1) using the system
-# ``[F(γ(t)v); (γ(t)v)[end] - 1]``. Here the `(γ(t)v)[k+1] - 1` condition ensures that
-# we are in the affine Grassmanian and that `(γ(t)v)[1:k]` is the correct value in \C^n.
+# and `V` and `W` are embedded_projective subspaces of dimension `k, then the computation is performed in
+# the Grassmanian using the system
+# ``[F(γ(t) v + b(t)]``. Here the `γ(t)` is a geodesic in the Grassmannian and `b(t)` interpolates linearly between the offsets of `V` and `W`.
 
 IntrinsicSubspaceHomotopy(
     F::ModelKit.System,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
-) = IntrinsicSubspaceStiefelHomotopy(fixed(F; compile = compile), start, target; affine = false)
-IntrinsicSubspaceStiefelHomotopy(
-    F::ModelKit.System,
-    start::LinearSubspace,
-    target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...
-) = IntrinsicSubspaceStiefelHomotopy(fixed(F; compile = compile), start, target; kwargs...)
+    embedded_projective::Bool = false
+) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; embedded_projective = embedded_projective)
 
-
-function IntrinsicSubspaceStiefelHomotopy(
+function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...
+    embedded_projective::Bool = false
 )
-    IntrinsicSubspaceStiefelHomotopy(
+    IntrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
         convert(LinearSubspace{ComplexF64}, target);
-        kwargs...
+        embedded_projective = embedded_projective
     )
 end
 
-function IntrinsicSubspaceStiefelHomotopy(
+function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    affine::Bool = true
+    embedded_projective::Bool = false
 )
-    if affine
+    # Create geodesic path for the matrix part
+    if !embedded_projective
         LRU = AFFINE_INTRINSIC_LRU
     else
         LRU = PROJECTIVE_INTRINSIC_LRU
     end
     path = get!(LRU, (start, target)) do
-        GrassmannianGeodesic(start, target; affine = affine)
+        GrassmannianGeodesic(start, target; embedded_projective = embedded_projective)
     end
     Q = path.Q
+    
+    # Prepare offset data for linear interpolation
+    a = start.intrinsic.b
+    b = target.intrinsic.b
+    if !embedded_projective
+        a_minus_b = a - b
+        offset = copy(b)
+        J = zeros(ComplexF64, size(system))
+    else
+        a_minus_b = nothing
+        offset = nothing
+        J = zeros(ComplexF64, size(system) .+ (1, 1))
+    end
+    
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
-    J = affine ? zeros(ComplexF64, size(system)) : zeros(ComplexF64, size(system) .+ (1, 1))
-    IntrinsicSubspaceStiefelHomotopy(
+    
+    
+
+    IntrinsicSubspaceHomotopy(
         system = system,
         start = start,
         target = target,
-        path = GrassmannianGeodesic(start, target; affine = affine),
+        path = path,
+        a_minus_b = a_minus_b,
+        offset = offset,
+        t_cache = Ref(complex(NaN, NaN)),
+        offset_t_cache = Ref(complex(NaN, NaN)),
         J = J,
         x = zeros(ComplexF64, size(Q, 1)),
-        ẋ = zeros(ComplexF64, size(Q, 1)),
+        ẋ = zeros(ComplexF64, size(Q, 1)),
         x_high = zeros(ComplexDF64, size(Q, 1)),
-        t_cache = Ref(complex(NaN, NaN)),
         taylor_t_cache = Ref(complex(NaN, NaN)),
         taylor_γ = tuple((similar(Q) for i = 0:4)...),
         v = zeros(ComplexF64, size(Q, 2)),
@@ -152,50 +174,67 @@ function IntrinsicSubspaceStiefelHomotopy(
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
         tx¹ = TaylorVector{2}(tx⁴),
-        affine = affine
+        embedded_projective = embedded_projective
     )
 end
-@inline function Base.size(H::IntrinsicSubspaceStiefelHomotopy)
-    is_affine(H) ? (size(H.system)[1], dim(H.start)) : (size(H.system)[1] + 1, dim(H.start) + 1)
+
+@inline function Base.size(H::IntrinsicSubspaceHomotopy)
+    if !is_embedded_projective(H)
+        (size(H.system)[1], dim(H.start))
+    else
+        (size(H.system)[1] + 1, dim(H.start) + 1)
+    end
 end
 
-
-
 """
-    set_subspaces!(H::IntrinsicSubspaceStiefelHomotopy, start::LinearSubspace, target::LinearSubspace)
+    set_subspaces!(H::IntrinsicSubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
 
-Update the homotopy `H` to track from the affine subspace `start` to `target`.
+Update the homotopy `H` to track from the embedded_projective subspace `start` to `target`.
 """
 function set_subspaces!(
-    H::IntrinsicSubspaceStiefelHomotopy,
+    H::IntrinsicSubspaceHomotopy,
     start::LinearSubspace,
     target::LinearSubspace,
 )
     H.start = start
     H.target = target
-    if is_affine(H)
+    if !is_embedded_projective(H)
         LRU = AFFINE_INTRINSIC_LRU
     else
         LRU = PROJECTIVE_INTRINSIC_LRU
     end
 
     H.path = get!(LRU, (start, target)) do
-        GrassmannianGeodesic(start, target)
+        GrassmannianGeodesic(start, target; embedded_projective = is_embedded_projective(H))
     end
+    
+    # Update the offsets
+    if !is_embedded_projective(H)
+        a = start.intrinsic.b
+        b = target.intrinsic.b
+        H.a_minus_b .= a .- b
+        H.offset .= b
+    end
+    H.t_cache[] = complex(0.0)
+    H.offset_t_cache[] = complex(0.0)
+    H.taylor_t_cache[] = complex(0.0)
+    
     H
 end
-start_parameters!(H::IntrinsicSubspaceStiefelHomotopy, p::LinearSubspace) =
+
+start_parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace) =
     set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
-target_parameters!(H::IntrinsicSubspaceStiefelHomotopy, q::LinearSubspace) =
+target_parameters!(H::IntrinsicSubspaceHomotopy, q::LinearSubspace) =
     set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
-parameters!(H::IntrinsicSubspaceStiefelHomotopy, p::LinearSubspace, q::LinearSubspace) =
+parameters!(H::IntrinsicSubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
     set_subspaces!(
         H,
         convert(LinearSubspace{ComplexF64}, p),
         convert(LinearSubspace{ComplexF64}, q),
     )
 
-function γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
+# Helper function for computing γ at parameter t
+function γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     H.t_cache[] != t || return first(H.taylor_γ)
     if isreal(t)
         _γ!(H, real(t))
@@ -206,7 +245,8 @@ function γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
 
     first(H.taylor_γ)
 end
-@inline function _γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
+
+@inline function _γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ = H.path
     γ = first(H.taylor_γ)
     n, k = size(γ)
@@ -220,33 +260,47 @@ end
     γ
 end
 
-γ̇!(H::IntrinsicSubspaceStiefelHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
-@inline function _γ̇!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
+γ̇!(H::IntrinsicSubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
+
+@inline function _γ̇!(H::IntrinsicSubspaceHomotopy, t::Number)
     @unpack Q, Q_cos, Θ = H.path
     _, γ̇ = H.taylor_γ
     n, k = size(γ̇)
     @inbounds for j = 1:k
         Θⱼ = Θ[j]
         s, c = sincos(t * Θⱼ)
-        ċ = -s * Θⱼ
-        ṡ = c * Θⱼ
+        ċ = -s * Θⱼ
+        ṡ = c * Θⱼ
         for i = 1:n
-            γ̇[i, j] = Q_cos[i, j] * ċ + Q[i, j] * ṡ
+            γ̇[i, j] = Q_cos[i, j] * ċ + Q[i, j] * ṡ
         end
     end
     γ̇
 end
 
-function set_solution!(u::Vector, H::IntrinsicSubspaceStiefelHomotopy, x::AbstractVector, t)
+# Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
+@inline function _compute_offset!(H::IntrinsicSubspaceHomotopy, t::Number)
+    H.offset .= H.target.intrinsic.b
+    LA.axpy!(t, H.a_minus_b, H.offset)
+    H.offset_t_cache[] = t
+end
 
-    if is_affine(H)
+@inline function offset_at_t!(H::IntrinsicSubspaceHomotopy, t::Number)
+    if H.offset_t_cache[] != t
+        _compute_offset!(H, t)
+    end
+    H.offset
+end
+
+function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVector, t)
+    if !is_embedded_projective(H)
         (length(x) == length(H.x)) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
         set_solution!(H.x, H.system, x)
-        b = get_b(H)
-        H.x .= H.x - b
-    else
+        offset_at_t!(H, t)
+        H.x .= H.x .- H.offset
+     else
         (length(x) == length(H.x) - 1) ||
             throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
@@ -263,17 +317,16 @@ function set_solution!(u::Vector, H::IntrinsicSubspaceStiefelHomotopy, x::Abstra
     end
 end
 
-function get_solution(H::IntrinsicSubspaceStiefelHomotopy, u::AbstractVector, t)
-
-    if is_affine(H)
-        b = get_b(H)
+function get_solution(H::IntrinsicSubspaceHomotopy, u::AbstractVector, t)
+    if !is_embedded_projective(H)
+        offset_at_t!(H, t)
         if isone(t)
-            out = (H.path.γ1 * u) + b
+            out = (H.path.γ1 * u) + H.offset
         elseif iszero(t)
-            out = (H.path.Q_cos * u) + b
+            out = (H.path.Q_cos * u) + H.offset
         else
             γ = γ!(H, t)
-            out = (γ * u) + b    
+            out = (γ * u) + H.offset
         end
     else
         if isone(t)
@@ -285,60 +338,67 @@ function get_solution(H::IntrinsicSubspaceStiefelHomotopy, u::AbstractVector, t)
             out = (@view γ[1:end-1, :]) * u
         end
     end
-
+    
     out
 end
 
-function ModelKit.evaluate!(u, H::IntrinsicSubspaceStiefelHomotopy, v::Vector{ComplexDF64}, t)
+function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::Vector{ComplexDF64}, t)
     γ = γ!(H, t)
     LA.mul!(H.x_high, γ, v)
 
-    if is_affine(H)
-        b = get_b(H)
-        H.x_high .= H.x_high .+ b
-    else
+    if !is_embedded_projective(H)
+        offset_at_t!(H, t)
+        LA.axpy!(1, H.offset, H.x_high)        
+    end
+
+    evaluate!(u, H.system, H.x_high)
+
+    if is_embedded_projective(H)
         n = first(size(H.system))
         u[n+1] = H.x_high[end] - 1.0
     end
-    evaluate!(u, H.system, H.x_high)
    
     u
 end
 
-function ModelKit.evaluate!(u, H::IntrinsicSubspaceStiefelHomotopy, v::AbstractVector, t)
+function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::AbstractVector, t)
     γ = γ!(H, t)
     LA.mul!(H.x, γ, v)
 
-    if is_affine(H)
-        b = get_b(H)
-        H.x .= H.x .+ b
-    else
+    if !is_embedded_projective(H)
+        offset_at_t!(H, t)
+        LA.axpy!(1, H.offset, H.x)
+    end
+
+    evaluate!(u, H.system, H.x)
+   
+    if is_embedded_projective(H)
         n = first(size(H.system))
         u[n+1] = H.x[end] - 1.0
     end
-    evaluate!(u, H.system, H.x)
-   
+
     u
 end
 
 function ModelKit.evaluate_and_jacobian!(
     u,
     U,
-    H::IntrinsicSubspaceStiefelHomotopy,
+    H::IntrinsicSubspaceHomotopy,
     v::AbstractVector,
     t,
 )
     γ = γ!(H, t)
     LA.mul!(H.x, γ, v)
 
-    if is_affine(H)
-        b = get_b(H)
-        H.x .= H.x .+ b
+    if !is_embedded_projective(H)
+        offset_at_t!(H, t)
+        LA.axpy!(1, H.offset, H.x)        
     end
+    
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
-    
-    if !is_affine(H)
+
+    if is_embedded_projective(H)
         n = first(size(H.system))
         u[n+1] = H.x[end] - 1
         m = length(v)
@@ -353,29 +413,31 @@ end
 function ModelKit.taylor!(
     u,
     ::Val{1},
-    H::IntrinsicSubspaceStiefelHomotopy,
+    H::IntrinsicSubspaceHomotopy,
     v,
     t,
     incr::Bool = true,
 )
+    # d/dt H(v,t) = d/dt F(γ(t)v + b(t))
+    #             = J_F(γ(t)v + b(t)) * (γ̇(t)v + db/dt)
+
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
-    # apply chain rule
-    #    d/dt F(γ(t)v) = J_F(γ(t)v)* γ̇(t)*v
-
     H.v .= first.(v)
     LA.mul!(H.x, γ, H.v)
-    LA.mul!(H.ẋ, γ̇, H.v)
+    LA.mul!(H.ẋ, γ̇, H.v)
 
-    if is_affine(H)
-        b = get_b(H)
-        H.x .= H.x .+ b
+    if !is_embedded_projective(H)
+        offset_at_t!(H, t)
+        LA.axpy!(1, H.offset, H.x)
+        LA.axpy!(1, H.a_minus_b, H.ẋ)  # derivative of offset with respect to t       
     end
+    
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
-    LA.mul!(u, H.J, H.ẋ)
+    LA.mul!(u, H.J, H.ẋ)
 
-    if !is_affine(H)
+    if is_embedded_projective(H)
         M = size(H, 1)
         u[M] = H.ẋ[end]
     end
@@ -383,7 +445,144 @@ function ModelKit.taylor!(
     u
 end
 
-function _taylor_γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
+function ModelKit.taylor!(
+    u,
+    ::Val{2},
+    H::IntrinsicSubspaceHomotopy,
+    tv::TaylorVector,
+    t,
+    incr::Bool = false,
+)
+    γ, γ¹, γ² = taylor_γ!(H, t)
+    x, x¹, x² = vectors(H.tx²)
+    v, v¹ = vectors(tv)
+
+    if incr
+        x .= H.x
+        x¹ .= H.ẋ
+    else
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
+        if !is_embedded_projective(H)
+            offset_at_t!(H, t)
+            LA.axpy!(1, H.offset, x)
+            LA.axpy!(1, H.a_minus_b, x¹)    
+        end
+    end
+
+    H.v .= v¹
+    LA.mul!(H.x, γ, H.v)
+    x¹ .+= H.x
+
+    LA.mul!(H.x, γ¹, H.v)
+    H.v .= v
+    LA.mul!(H.x, γ², H.v, true, true)
+    x² .= H.x
+
+    taylor!(u, Val(2), H.system, H.tx²)
+
+    if is_embedded_projective(H)
+        n = first(size(H.system))
+        u[n+1] = x²[end]
+    end
+
+    u
+end
+
+function ModelKit.taylor!(
+    u,
+    ::Val{3},
+    H::IntrinsicSubspaceHomotopy,
+    tv::TaylorVector,
+    t,
+    incr::Bool = false,
+)
+    γ, γ¹, γ², γ³ = taylor_γ!(H, t)
+    x, x¹, x², x³ = vectors(H.tx³)
+    v, v¹, v² = vectors(tv)
+
+    if !incr
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
+        if !is_embedded_projective(H)
+            offset_at_t!(H, t)
+            LA.axpy!(1, H.offset, x)
+            LA.axpy!(1, H.a_minus_b, x¹)
+        end
+        LA.mul!(x¹, γ, v¹, true, true)
+        LA.mul!(x², γ², v)
+        LA.mul!(x², γ¹, v¹, true, true)
+    end
+
+    H.v .= v²
+    LA.mul!(H.x, γ, H.v)
+    x² .+= H.x
+
+    LA.mul!(H.x, γ¹, H.v)
+    H.v .= v
+    LA.mul!(H.x, γ³, H.v, true, true)
+    H.v .= v¹
+    LA.mul!(H.x, γ², H.v, true, true)
+    x³ .= H.x
+
+    taylor!(u, Val(3), H.system, H.tx³)
+
+    if is_embedded_projective(H)
+        n = first(size(H.system))
+        u[n+1] = x³[end]
+    end
+
+    u
+end
+
+function ModelKit.taylor!(
+    u,
+    ::Val{4},
+    H::IntrinsicSubspaceHomotopy,
+    tv::TaylorVector,
+    t,
+    incr::Bool = false,
+)
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    x, x¹, x², x³, x⁴ = vectors(H.tx⁴)
+    v, v¹, v², v³ = vectors(tv)
+
+    if !incr
+        LA.mul!(x, γ, v)
+        LA.mul!(x¹, γ¹, v)
+        if !is_embedded_projective(H)
+            offset_at_t!(H, t)
+            LA.axpy!(1, H.offset, x)
+            LA.axpy!(1, H.a_minus_b, x¹)
+        end
+        LA.mul!(x¹, γ, v¹, true, true)
+        LA.mul!(x², γ², v)
+        LA.mul!(x², γ¹, v¹, true, true)
+        LA.mul!(x², γ, v², true, true)
+
+        LA.mul!(x³, γ³, v)
+        LA.mul!(x³, γ², v¹, true, true)
+        LA.mul!(x³, γ¹, v², true, true)
+    end
+
+    LA.mul!(x³, γ, v³, true, true)
+
+    LA.mul!(x⁴, γ¹, v³)
+    LA.mul!(x⁴, γ², v², true, true)
+    LA.mul!(x⁴, γ³, v¹, true, true)
+    LA.mul!(x⁴, γ⁴, v, true, true)
+
+    taylor!(u, Val(4), H.system, H.tx⁴)
+
+    if is_embedded_projective(H)
+        n = first(size(H.system))
+        u[n+1] = x⁴[end]
+    end
+
+    u
+end
+
+function _taylor_γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     @unpack path, taylor_γ = H
     @unpack Q, Q_cos, Θ, U = path
 
@@ -411,10 +610,9 @@ function _taylor_γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
             γ⁴[i, j] = Q_cos[i, j] * c⁴ + Q[i, j] * s⁴
         end
     end
-
 end
 
-function taylor_γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
+function taylor_γ!(H::IntrinsicSubspaceHomotopy, t::Number)
     H.taylor_t_cache[] != t || return H.taylor_γ
 
     if isreal(t)
@@ -426,460 +624,3 @@ function taylor_γ!(H::IntrinsicSubspaceStiefelHomotopy, t::Number)
 
     H.taylor_γ
 end
-
-
-function ModelKit.taylor!(
-    u,
-    ::Val{2},
-    H::IntrinsicSubspaceStiefelHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    γ, γ¹, γ² = taylor_γ!(H, t)
-    x, x¹, x² = vectors(H.tx²)
-    v, v¹ = vectors(tv)
-
-    if incr
-        x .= H.x
-        x¹ .= H.ẋ
-    else
-        LA.mul!(x, γ, v)
-        LA.mul!(x¹, γ¹, v)
-    end
-
-    H.v .= v¹
-    LA.mul!(H.x, γ, v¹)
-    x¹ .+= H.x
-
-    LA.mul!(H.x, γ¹, H.v)
-    H.v .= v
-    LA.mul!(H.x, γ², H.v, true, true)
-    x² .= H.x
-
-    taylor!(u, Val(2), H.system, H.tx²)
-
-    if !is_affine(H)
-        n = first(size(H.system))
-        u[n+1] = x²[end]
-    end
-
-    u
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{3},
-    H::IntrinsicSubspaceStiefelHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    γ, γ¹, γ², γ³ = taylor_γ!(H, t)
-    x, x¹, x², x³ = vectors(H.tx³)
-    v, v¹, v² = vectors(tv)
-
-    if !incr
-        LA.mul!(x, γ, v)
-        LA.mul!(x¹, γ¹, v)
-        LA.mul!(x¹, γ, v¹, true, true)
-        LA.mul!(x², γ², v)
-        LA.mul!(x², γ¹, v¹, true, true)
-    end
-
-    H.v .= v²
-    LA.mul!(H.x, γ, H.v)
-    x² .+= H.x
-
-    LA.mul!(H.x, γ¹, H.v)
-    H.v .= v
-    LA.mul!(H.x, γ³, H.v, true, true)
-    H.v .= v¹
-    LA.mul!(H.x, γ², H.v, true, true)
-    x³ .= H.x
-
-    taylor!(u, Val(3), H.system, H.tx³)
-
-    if !is_affine(H)
-        n = first(size(H.system))
-        u[n+1] = x³[end]
-    end
-
-    u
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{4},
-    H::IntrinsicSubspaceStiefelHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
-    x, x¹, x², x³, x⁴ = vectors(H.tx⁴)
-    v, v¹, v², v³ = vectors(tv)
-
-    if !incr
-        LA.mul!(x, γ, v)
-        LA.mul!(x¹, γ¹, v)
-        LA.mul!(x¹, γ, v¹, true, true)
-        LA.mul!(x², γ², v)
-        LA.mul!(x², γ¹, v¹, true, true)
-        LA.mul!(x², γ, v², true, true)
-
-        LA.mul!(x³, γ³, v)
-        LA.mul!(x³, γ², v¹, true, true)
-        LA.mul!(x³, γ¹, v², true, true)
-    end
-
-    LA.mul!(x³, γ, v³, true, true)
-
-    # Currently H.v .= v³
-    LA.mul!(x⁴, γ¹, v³)
-    LA.mul!(x⁴, γ², v², true, true)
-    LA.mul!(x⁴, γ³, v¹, true, true)
-    LA.mul!(x⁴, γ⁴, v, true, true)
-
-    taylor!(u, Val(4), H.system, H.tx⁴)
-
-    if !is_affine(H)
-        n = first(size(H.system))
-        u[n+1] = x⁴[end]
-    end
-
-    u
-end
-
-
-"""
-    IntrinsicSubspaceOffsetHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
-    IntrinsicSubspaceOffsetHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
-
-Creates a homotopy ``H(x,t) = F(Bx + ta + (1-t)b)`` where the matrix part `B` is kept fixed
-and the offset interpolates linearly from `a` (start) to `b` (target).
-
-The affine subspaces `V` and `W` represent the start and target configurations:
-- `V` represents the subspace `Bx + a`
-- `W` represents the subspace `Bx + b`
-
-At ``t=1``, we have ``H(x,1) = F(Bx + a)`` (start configuration).
-At ``t=0``, we have ``H(x,0) = F(Bx + b)`` (target configuration).
-
-Unlike `IntrinsicSubspaceStiefelHomotopy` which moves the matrix part `A` to `B`,
-this homotopy moves the offset part from `a` to `b` while keeping the matrix fixed.
-
-See also [`LinearSubspace`](@ref).
-"""
-Base.@kwdef mutable struct IntrinsicSubspaceOffsetHomotopy{S<:AbstractSystem} <: AbstractHomotopy
-    system::S
-
-    start::LinearSubspace{ComplexF64}
-    target::LinearSubspace{ComplexF64}
-
-    a_minus_b::Vector{ComplexF64}
-    offset::Vector{ComplexF64}  # Cached offset
-    t_cache::Base.RefValue{ComplexF64}  # Cache for last computed t
-
-    J::Matrix{ComplexF64}
-    x::Vector{ComplexF64}
-    x_high::Vector{ComplexDF64}
-    v::Vector{ComplexF64}
-    # For AD
-    tx⁴::TaylorVector{5,ComplexF64}
-    tx³::TaylorVector{4,ComplexF64}
-    tx²::TaylorVector{3,ComplexF64}
-    tx¹::TaylorVector{2,ComplexF64}
-end
-
-IntrinsicSubspaceOffsetHomotopy(
-    F::ModelKit.System,
-    start::LinearSubspace,
-    target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-) = IntrinsicSubspaceOffsetHomotopy(fixed(F; compile = compile), start, target)
-
-
-function IntrinsicSubspaceOffsetHomotopy(
-    system::AbstractSystem,
-    start::LinearSubspace,
-    target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
-)
-    IntrinsicSubspaceOffsetHomotopy(
-        system,
-        convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target);
-    )
-end
-
-function IntrinsicSubspaceOffsetHomotopy(
-    system::AbstractSystem,
-    start::LinearSubspace{ComplexF64},
-    target::LinearSubspace{ComplexF64}
-)
-    X = target.intrinsic.X
-    n = size(X, 1)
-    J = zeros(ComplexF64, size(system)) 
-    tx⁴ = TaylorVector{5}(ComplexF64, n)
-    a = start.intrinsic.b
-    b = target.intrinsic.b
-    
-    IntrinsicSubspaceOffsetHomotopy(
-        system = system,
-        start = start,
-        target = target,
-        a_minus_b = a - b,
-        offset = copy(b),
-        t_cache = Ref(complex(NaN, NaN)),
-        J = J,
-        x = zeros(ComplexF64, n),
-        x_high = zeros(ComplexDF64, n),
-        v = zeros(ComplexF64, size(X, 2)),
-        tx⁴ = tx⁴,
-        tx³ = TaylorVector{4}(tx⁴),
-        tx² = TaylorVector{3}(tx⁴),
-        tx¹ = TaylorVector{2}(tx⁴)
-    )
-end
-
-Base.size(H::IntrinsicSubspaceOffsetHomotopy) = (size(H.system)[1], dim(H.start)) 
-get_X(H::IntrinsicSubspaceOffsetHomotopy) = H.target.intrinsic.X
-
-"""
-    set_subspaces!(H::IntrinsicSubspaceOffsetHomotopy, start::LinearSubspace, target::LinearSubspace)
-
-Update the homotopy `H` to track from the affine subspace `start` to `target`,
-updating both the matrix part `B` and the offsets `a` and `b`.
-"""
-function set_subspaces!(
-    H::IntrinsicSubspaceOffsetHomotopy,
-    start::LinearSubspace,
-    target::LinearSubspace,
-)
-    H.start = start
-    H.target = target
-
-    H
-end
-
-start_parameters!(H::IntrinsicSubspaceOffsetHomotopy, p::LinearSubspace) =
-    set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
-target_parameters!(H::IntrinsicSubspaceOffsetHomotopy, q::LinearSubspace) =
-    set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
-parameters!(H::IntrinsicSubspaceOffsetHomotopy, p::LinearSubspace, q::LinearSubspace) =
-    set_subspaces!(
-        H,
-        convert(LinearSubspace{ComplexF64}, p),
-        convert(LinearSubspace{ComplexF64}, q),
-    )
-
-# Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
-# Uses caching to avoid repeated allocations
-@inline function _compute_offset!(H::IntrinsicSubspaceOffsetHomotopy, t::Number)
-    H.offset .= H.target.intrinsic.b
-    LA.axpy!(t, H.a_minus_b, H.offset)
-    H.t_cache[] = t
-end
-
-@inline function offset_at_t!(H::IntrinsicSubspaceOffsetHomotopy, t::Number)
-    if H.t_cache[] != t
-        _compute_offset!(H, t)
-    end
-    H.offset
-end
-
-function set_solution!(u::Vector, H::IntrinsicSubspaceOffsetHomotopy, x::AbstractVector, t)
-    (length(x) == length(H.x)) ||
-        throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
-
-    set_solution!(H.x, H.system, x)
-    offset_at_t!(H, t)
-    H.x .= H.x .- H.offset
-    X = get_X(H)
-    LA.mul!(u, X', H.x)
-
-    nothing
-end
-
-function get_solution(H::IntrinsicSubspaceOffsetHomotopy, u::AbstractVector, t)
-    # u are coordinates in the subspace
-    # Return x in the ambient space via x = X*u + b(t)
-    offset_at_t!(H, t)
-    X = get_X(H)
-    out = X * u + H.offset
-    
-    out
-end
-
-function ModelKit.evaluate!(u, H::IntrinsicSubspaceOffsetHomotopy, v::Vector{ComplexDF64}, t)
-    offset_at_t!(H, t)
-    X = get_X(H)
-
-    LA.mul!(H.x_high, X, v)
-    LA.axpy!(1, H.offset, H.x_high)
-
-    evaluate!(u, H.system, H.x_high)
-
-    u
-end
-
-function ModelKit.evaluate!(u, H::IntrinsicSubspaceOffsetHomotopy, v::AbstractVector, t)
-    offset_at_t!(H, t)
-    X = get_X(H)
-
-    LA.mul!(H.x, X, v)
-    LA.axpy!(1, H.offset, H.x)
-
-    evaluate!(u, H.system, H.x)
-
-    u
-end
-
-function ModelKit.evaluate_and_jacobian!(
-    u,
-    U,
-    H::IntrinsicSubspaceOffsetHomotopy,
-    v::AbstractVector,
-    t,
-)
-    offset_at_t!(H, t)
-    X = get_X(H)
-
-    LA.mul!(H.x, X, v)
-    LA.axpy!(1, H.offset, H.x)
-    evaluate_and_jacobian!(u, H.J, H.system, H.x)
-    LA.mul!(U, H.J, X)
-
-    nothing
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{1},
-    H::IntrinsicSubspaceOffsetHomotopy,
-    v,
-    t,
-    incr::Bool = true,
-)
-    # d/dt H(v,t) = d/dt F(X*v + t*a + (1-t)*b)
-    #             = J_F(X*v + t*a + (1-t)*b) * (a - b)
-
-    H.v .= first.(v)
-    offset_at_t!(H, t)
-    X = get_X(H)
-
-    LA.mul!(H.x, X, H.v)
-    LA.axpy!(1, H.offset, H.x)
-
-    evaluate_and_jacobian!(u, H.J, H.system, H.x)
-
-    # u = J_F * (a - b)
-    LA.mul!(u, H.J, H.a_minus_b)
-
-    u
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{2},
-    H::IntrinsicSubspaceOffsetHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    x, x¹, x² = vectors(H.tx²)
-    v, v¹ = vectors(tv)
-    X = get_X(H)
-
-    if incr
-        x .= H.x
-    else
-        offset_at_t!(H, t)
-       
-        LA.mul!(x, X, v)
-        LA.axpy!(1, H.offset, x)
-    end
-
-    # x¹ = B * v¹ + d/dt[offset]
-    H.v .= v¹
-    LA.mul!(x¹, X, H.v)
-    LA.axpy!(1, H.a_minus_b, x¹)  # derivative of offset with respect to t
-
-    # x² = B * v
-    H.v .= v
-    LA.mul!(x², X, H.v)
-
-    taylor!(u, Val(2), H.system, H.tx²)
-
-    u
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{3},
-    H::IntrinsicSubspaceOffsetHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    x, x¹, x², x³ = vectors(H.tx³)
-    v, v¹, v² = vectors(tv)
-    X = get_X(H)
-
-    if !incr
-        offset_at_t!(H, t)    
-        LA.mul!(x, X, v)
-        LA.axpy!(1, H.offset, x)
-        LA.mul!(x¹, X, v¹)
-        LA.axpy!(1, H.a_minus_b, x¹)
-    end
-
-    # x² = B * v²
-    H.v .= v²
-    LA.mul!(x², X, H.v)
-
-    # x³ = B * v
-    H.v .= v
-    LA.mul!(x³, X, H.v)
-
-    taylor!(u, Val(3), H.system, H.tx³)
-
-    u
-end
-
-function ModelKit.taylor!(
-    u,
-    ::Val{4},
-    H::IntrinsicSubspaceOffsetHomotopy,
-    tv::TaylorVector,
-    t,
-    incr::Bool = false,
-)
-    x, x¹, x², x³, x⁴ = vectors(H.tx⁴)
-    v, v¹, v², v³ = vectors(tv)
-    X = get_X(H)
-
-    if !incr
-        offset_at_t!(H, t)
-        LA.mul!(x, X, v)
-        LA.axpy!(1, H.offset, x)
-        LA.mul!(x¹, X, v¹)
-        LA.axpy!(1, H.a_minus_b, x¹)
-    end
-
-    # Higher order derivatives
-    H.v .= v²
-    LA.mul!(x², X, H.v)
-
-    H.v .= v³
-    LA.mul!(x³, X, H.v)
-
-    H.v .= v
-    LA.mul!(x⁴, X, H.v)
-
-    taylor!(u, Val(4), H.system, H.tx⁴)
-
-    u
-end
-

@@ -672,8 +672,8 @@ These values are necessary to construct the geodesic between `A` and `B`.
 [^LKK19]: $_LKK19
 """
 grassmannian_svd(A::LinearSubspace, B::LinearSubspace; kwargs...) = grassmannian_svd(A.intrinsic, B.intrinsic; kwargs...)
-function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; affine::Bool = true)
-    if affine
+function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; embedded_projective::Bool = true)
+    if !embedded_projective
         n, k = size(A.X)
         U, Σ, V = LA.svd!(A.X' * B.X)
         # M = (LA.I - A.X * A.X') * B.X * inv(A.X' * B.X)
