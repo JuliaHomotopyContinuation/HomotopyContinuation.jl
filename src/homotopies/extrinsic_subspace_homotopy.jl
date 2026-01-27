@@ -54,6 +54,10 @@ function ExtrinsicSubspaceHomotopy(
     ExtrinsicSubspaceHomotopy(F, start, target, A, b, Ȧ, ḃ, ū, Ref(complex(NaN)))
 end
 
+
+
+
+
 Base.size(H::ExtrinsicSubspaceHomotopy) = (first(size(H.F)) + size(H.A, 1), last(size(H.F)))
 
 start_parameters!(H::ExtrinsicSubspaceHomotopy, start) = parameters!(H, start, H.target)
@@ -103,55 +107,61 @@ function tAb!(H::ExtrinsicSubspaceHomotopy, t)
 end
 
 
-function ModelKit.evaluate!(u, H::ExtrinsicSubspaceHomotopy, x, t)
-    tAb!(H, t)
+function ModelKit.evaluate!(u, H::ExtrinsicSubspaceHomotopy, x::AbstractVector, t)
+    γ = γ!(H, t)
+    offset_at_t!(H, t)
+
     evaluate!(u, H.F, x)
     m = first(size(H.F))
-    for i = 1:length(H.b)
-        u[m+i] = -H.b[i]
+    for i = 1:length(H.offset)
+        u[m+i] = -H.offset[i]
     end
     for j = 1:size(H.A, 2)
         xj = x[j]
         for i = 1:size(H.A, 1)
-            u[m+i] = muladd(H.A[i, j], xj, u[m+i])
+            u[m+i] = muladd(γ[j, i], xj, u[m+i])
         end
     end
     u
 end
 function ModelKit.evaluate!(u, H::ExtrinsicSubspaceHomotopy, x::Vector{ComplexDF64}, t)
-    tAb!(H, t)
+    γ = γ!(H, t)
+    offset_at_t!(H, t)
+    n, k = size(γ) # linear equation is: tranpose(γ) x - offset
+
     evaluate!(u, H.F, x)
     m = first(size(H.F))
-    for i = 1:length(H.b)
-        H.ū[i] = -H.b[i]
+    for i = 1:k
+        H.ū[i] = -H.offset[i]
     end
-    for j = 1:size(H.A, 2)
+    for j = 1:n
         xj = x[j]
-        for i = 1:size(H.A, 1)
-            H.ū[i] = muladd(H.A[i, j], xj, H.ū[i])
+        for i = 1:k
+            H.ū[i] = muladd(γ[j, i], xj, H.ū[i])
         end
     end
-    for i = 1:length(H.b)
+    for i = 1:k
         u[m+i] = H.ū[i]
     end
 
     u
 end
 
-function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x, t)
-    tAb!(H, t)
+function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x::AbstractVector, t)
+    γ = γ!(H, t)
+    n, k = size(γ) # linear equation is: tranpose(γ) x - offset
     evaluate_and_jacobian!(u, U, H.F, x)
     m = first(size(H.F))
-    for i = 1:length(H.b)
-        u[m+i] = -H.b[i]
+    for i = 1:length(H.offset)
+        u[m+i] = -H.offset[i]
     end
-    for j = 1:size(H.A, 2)
+    for j = 1:n
         xj = x[j]
-        for i = 1:size(H.A, 1)
-            u[m+i] = muladd(H.A[i, j], xj, u[m+i])
+        for i = 1:k
+            u[m+i] = muladd(γ[j, i], xj, u[m+i])
         end
     end
-    for j = 1:size(H.A, 2), i = 1:size(H.A, 1)
+    for j = 1:n, i = 1:k
         U[m+i, j] = H.A[i, j]
     end
     u
