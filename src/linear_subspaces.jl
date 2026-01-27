@@ -673,7 +673,7 @@ These values are necessary to construct the geodesic between `A` and `B`.
 """
 geodesic_svd(A::LinearSubspace, B::LinearSubspace) = geodesic_svd(extrinsic(A), extrinsic(B))
 
-grassmannian_svd(A::ExtrinsicDescription, B::ExtrinsicDescription) = grassmannian_svd(A.A', B.A')
+grassmannian_svd(A::ExtrinsicDescription, B::ExtrinsicDescription) = grassmannian_svd(transpose(A.A), transpose(B.A))
 function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; embedded_projective::Bool = false)
          if !embedded_projective
             grassmannian_svd(A.X, B.X)
