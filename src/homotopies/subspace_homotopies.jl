@@ -157,6 +157,11 @@ function ExtrinsicSubspaceHomotopy(
     target::LinearSubspace{ComplexF64};
     c::ComplexF64 = cis(2 * pi * rand())
 )
+
+    c = c / abs(c) # make sure |c| = 1
+    # multiply with random complex number to get generic paths
+    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
+
     # multiply with random complex number to get generic paths
     start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
 
@@ -283,8 +288,9 @@ function IntrinsicSubspaceHomotopy(
     c::ComplexF64 = cis(2 * pi * rand())
 )
 
+    c = c / abs(c) # make sure |c| = 1
     # multiply with random complex number to get generic paths
-    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
 
     # Create geodesic path for the matrix part
     path = get!(AFFINE_INTRINSIC_LRU, (start, target)) do
@@ -397,8 +403,9 @@ function IntrinsicSubspaceProjectiveHomotopy(
     c::ComplexF64 = cis(2 * pi * rand())
 )
 
+    c = c / abs(c) # make sure |c| = 1
     # multiply with random complex number to get generic paths
-    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
 
     # Create geodesic path for the matrix part
     path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
