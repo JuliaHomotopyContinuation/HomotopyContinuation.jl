@@ -671,32 +671,38 @@ These values are necessary to construct the geodesic between `A` and `B`.
 
 [^LKK19]: $_LKK19
 """
-grassmannian_svd(A::LinearSubspace, B::LinearSubspace; kwargs...) = grassmannian_svd(A.intrinsic, B.intrinsic; kwargs...)
-function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; embedded_projective::Bool = true)
-    if !embedded_projective
-        n, k = size(A.X)
-        U, Σ, V = LA.svd!(A.X' * B.X)
-        # M = (LA.I - A.X * A.X') * B.X * inv(A.X' * B.X)
-        # Have to compute an SVD of M s.t. M = Q tanΘ U'
-        # Equivalently M * U = Q tan(Θ)
-        # We can achieve this by using a *pivoted* QR
-        # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
+geodesic_svd(A::LinearSubspace, B::LinearSubspace) = geodesic_svd(extrinsic(A), extrinsic(B))
 
-        # inv(A.X' * B.X) * U = V * LA.diagm(inv.(Σ))
-        MU = (LA.I - A.X * A.X') * B.X * V * LA.diagm(inv.(Σ))
-    else
-        n, k = size(A.Y)
-        U, Σ, V = LA.svd!(A.Y' * B.Y)
-        MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
-    end
+grassmannian_svd(A::ExtrinsicDescription, B::ExtrinsicDescription) = grassmannian_svd(A.A', B.A')
+function grassmannian_svd(A::IntrinsicDescription, B::IntrinsicDescription; embedded_projective::Bool = false)
+         if !embedded_projective
+            grassmannian_svd(A.X, B.X)
+         else
+            grassmannian_svd(A.Y, B.Y)
+         end
+end
+
+function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
+
+    # here A and B are assumed to be Stiefel matrices representing linear spaces.
+
+    n, k = size(A)
+    U, Σ, V = LA.svd!(A' * B)
+    # M = (LA.I - A * A') * B * inv(A' * B)
+    # Have to compute an SVD of M s.t. M = Q tanΘ U'
+    # Equivalently M * U = Q tan(Θ)
+    # We can achieve this by using a *pivoted* QR
+    # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
+
+    # inv(A' * B) * U = V * LA.diagm(inv.(Σ))
+    MU = (LA.I - A * A') * B * V * LA.diagm(inv.(Σ))
+
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
     # We try to correct this fact by treating σ >= 1 - 2eps() as 1.0
     Θ = map(σ -> σ + 2 * eps() > 1.0 ? 0.0 : acos(σ), Σ)
 
-    
-    
     Q, R = qr_col_norm!(MU)
     # correct signs and ordering of Q
     Q′ = Q[:, k:-1:1]

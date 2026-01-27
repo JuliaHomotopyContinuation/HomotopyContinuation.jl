@@ -1,6 +1,5 @@
-export ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, set_subspaces!
+export ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy, set_subspaces!
 
-const SubspaceHomotopy = Union{ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy}
 
 ## Implementation details
 
@@ -19,15 +18,21 @@ struct GrassmannianGeodesic
     γ1::Matrix{ComplexF64}
 end
 
-function GrassmannianGeodesic(start::LinearSubspace, 
-                             target::LinearSubspace; 
+function GrassmannianGeodesic(start, target; 
                              embedded_projective::Bool = false)
-    Q, Θ, U = grassmannian_svd(target, start; embedded_projective = embedded_projective)
-    if !embedded_projective 
-        Q_cos = target.intrinsic.X * U
-    else
-        Q_cos = target.intrinsic.Y * U
-    end
+    if isa(start, ExtrinsicDescription)
+        Q, Θ, U = grassmannian_svd(target, start)
+        Q_cos = target.A' * U
+    elseif isa(start, IntrinsicDescription)    
+        Q, Θ, U = grassmannian_svd(target, start; embedded_projective = embedded_projective) 
+        if !embedded_projective 
+            Q_cos = target.X * U
+        else
+            Q_cos = target.Y * U
+        end
+    end                  
+    
+    
     γ1 = similar(Q_cos)
     n, k = size(γ1)
     for j = 1:k
@@ -60,165 +65,6 @@ const PROJECTIVE_INTRINSIC_LRU = LRU{
 }(
     maxsize = 128,
 )
-
-
-
-"""
-    set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
-
-Update the homotopy `H` to track from the linear subspace `start` to `target`, where `H`. 
-"""
-function set_subspaces!(
-    H::SubspaceHomotopy,
-    start::LinearSubspace,
-    target::LinearSubspace,
-)
-    H.start = start
-    H.target = target
-
-    if isa(ExtrinsicSubspaceHomotopy, H)
-        LRU = AFFINE_EXTRINSIC_LRU
-    elseif isa(IntrinsicSubspaceHomotopy, H)
-        LRU = AFFINE_INTRINSIC_LRU
-    elseif isa(IntrinsicSubspaceProjectiveHomotopy, H)
-        LRU = PROJECTIVE_INTRINSIC_LRU
-    end
-
-    H.path = get!(LRU, (start, target)) do
-            GrassmannianGeodesic(start, target)
-        end
-
-    if !isa(IntrinsicSubspaceProjectiveHomotopy, H)
-        # Update the offsets
-        a = start.intrinsic.b
-        b = target.intrinsic.b
-        H.a_minus_b .= a .- b
-        H.offset .= b
-    end
-
-    # set caches
-    H.t_cache[] = complex(0.0)
-    H.offset_t_cache[] = complex(0.0)
-    H.taylor_t_cache[] = complex(0.0)
-    
-    H
-end
-
-start_parameters!(H::SubspaceHomotopy, p::LinearSubspace) =
-    set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
-target_parameters!(H::SubspaceHomotopy, q::LinearSubspace) =
-    set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
-parameters!(H::SubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
-    set_subspaces!(
-        H,
-        convert(LinearSubspace{ComplexF64}, p),
-        convert(LinearSubspace{ComplexF64}, q),
-    )
-
-# Helper function for computing the geodesic γ(t) at parameter t
-function γ!(H::SubspaceHomotopy, t::Number)
-    H.t_cache[] != t || return first(H.taylor_γ)
-    if isreal(t)
-        _γ!(H, real(t))
-    else
-        _γ!(H, t)
-    end
-    H.t_cache[] = t
-
-    first(H.taylor_γ)
-end
-
-@inline function _γ!(H::SubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H.path
-    γ = first(H.taylor_γ)
-    n, k = size(γ)
-    @inbounds for j = 1:k
-        Θⱼ = Θ[j]
-        s, c = sincos(t * Θⱼ)
-        for i = 1:n
-            γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
-        end
-    end
-    γ
-end
-
-γ̇!(H::SubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
-
-@inline function _γ̇!(H::SubspaceHomotopy, t::Number)
-    @unpack Q, Q_cos, Θ = H.path
-    _, γ̇ = H.taylor_γ
-    n, k = size(γ̇)
-    @inbounds for j = 1:k
-        Θⱼ = Θ[j]
-        s, c = sincos(t * Θⱼ)
-        ċ = -s * Θⱼ
-        ṡ = c * Θⱼ
-        for i = 1:n
-            γ̇[i, j] = Q_cos[i, j] * ċ + Q[i, j] * ṡ
-        end
-    end
-    γ̇
-end
-
-
-# Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
-@inline function _compute_offset!(H::SubspaceHomotopy, t::Number)
-    H.offset .= H.target.intrinsic.b
-    LA.axpy!(t, H.a_minus_b, H.offset)
-    H.offset_t_cache[] = t
-end
-
-@inline function offset_at_t!(H::SubspaceHomotopy, t::Number)
-    if H.offset_t_cache[] != t
-        _compute_offset!(H, t)
-    end
-    H.offset
-end
-
-
-# Helper functions to compute taylor series
-function _taylor_γ!(H::SubspaceHomotopy, t::Number)
-    @unpack path, taylor_γ = H
-    @unpack Q, Q_cos, Θ, U = path
-
-    γ, γ¹, γ², γ³, γ⁴ = taylor_γ
-    n, k = size(γ)
-    @inbounds for j = 1:k
-        Θⱼ = Θ[j]
-        s, c = sincos(t * Θⱼ)
-        c¹ = -s * Θⱼ
-        s¹ = c * Θⱼ
-        Θⱼ_2 = 0.5 * Θⱼ^2
-        c² = -c * Θⱼ_2
-        s² = -s * Θⱼ_2
-        Θⱼ_3 = Θⱼ_2 * Θⱼ / 3
-        c³ = s * Θⱼ_3
-        s³ = -c * Θⱼ_3
-        Θⱼ_4 = 0.25 * Θⱼ_3 * Θⱼ
-        c⁴ = c * Θⱼ_4
-        s⁴ = s * Θⱼ_4
-        for i = 1:n
-            γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
-            γ¹[i, j] = Q_cos[i, j] * c¹ + Q[i, j] * s¹
-            γ²[i, j] = Q_cos[i, j] * c² + Q[i, j] * s²
-            γ³[i, j] = Q_cos[i, j] * c³ + Q[i, j] * s³
-            γ⁴[i, j] = Q_cos[i, j] * c⁴ + Q[i, j] * s⁴
-        end
-    end
-end
-
-function taylor_γ!(H::SubspaceHomotopy, t::Number)
-    H.taylor_t_cache[] != t || return H.taylor_γ
-
-    if isreal(t)
-        _taylor_γ!(H, real(t))
-    else
-        _taylor_γ!(H, t)
-    end
-    H.taylor_t_cache[] = t
-
-    H.taylor_γ
-end
 
 
 """
@@ -281,7 +127,7 @@ function ExtrinsicSubspaceHomotopy(
 )
     # Create geodesic path for the matrix part
     path = get!(AFFINE_EXTRINSIC_LRU, (start, target)) do
-        GrassmannianGeodesic(start, target)
+        GrassmannianGeodesic(extrinsic(start), extrinsic(target))
     end
     Q = path.Q
     
@@ -394,13 +240,13 @@ function IntrinsicSubspaceHomotopy(
 )
     # Create geodesic path for the matrix part
     path = get!(AFFINE_INTRINSIC_LRU, (start, target)) do
-        GrassmannianGeodesic(start, target)
+        GrassmannianGeodesic(intrinsic(start), intrinsic(target))
     end
     Q = path.Q
     
     # Prepare offset data for linear interpolation
-    a = start.intrinsic.b
-    b = target.intrinsic.b
+    a = intrinsic(start).b
+    b = intrinsic(target).b
     a_minus_b = a - b
     offset = copy(b)
     J = zeros(ComplexF64, size(system))
@@ -490,16 +336,14 @@ function IntrinsicSubspaceProjectiveHomotopy(
 )
     # Create geodesic path for the matrix part
     path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
-        GrassmannianGeodesic(start, target)
+        GrassmannianGeodesic(intrinsic(start), intrinsic(target); embedded_projective = true)
     end
     Q = path.Q
-    
-    # Prepare offset data for linear interpolation
-    J = zeros(ComplexF64, size(system))
-    
+ 
+    J = zeros(ComplexF64, size(system) .+ (1, 1))
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
 
-    IntrinsicSubspaceHomotopy(
+    IntrinsicSubspaceProjectiveHomotopy(
         system = system,
         start = start,
         target = target,
@@ -520,7 +364,183 @@ function IntrinsicSubspaceProjectiveHomotopy(
     )
 end
 
-Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+Base.size(H::IntrinsicSubspaceProjectiveHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+
+
+
+const SubspaceHomotopy = Union{ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy}
+
+"""
+    set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
+
+Update the homotopy `H` to track from the linear subspace `start` to `target`, where `H`. 
+"""
+function set_subspaces!(
+    H::SubspaceHomotopy,
+    start::LinearSubspace,
+    target::LinearSubspace,
+)
+    H.start = start
+    H.target = target
+
+    if isa(H, ExtrinsicSubspaceHomotopy)
+        LRU = AFFINE_EXTRINSIC_LRU
+    elseif isa(H, IntrinsicSubspaceHomotopy)
+        LRU = AFFINE_INTRINSIC_LRU
+    elseif isa(H, IntrinsicSubspaceProjectiveHomotopy)
+        LRU = PROJECTIVE_INTRINSIC_LRU
+    end
+
+    if isa(H, ExtrinsicSubspaceHomotopy)
+        H.path = get!(LRU, (start, target)) do
+                GrassmannianGeodesic(extrinsic(start), intrinsic(target))
+            end
+    else
+        H.path = get!(LRU, (start, target)) do
+                GrassmannianGeodesic(intrinsic(start), intrinsic(target))
+            end
+    end
+
+    # Update the offsets
+    if isa(H, ExtrinsicSubspaceHomotopy) 
+        a = extrinsic(start).b
+        b = extrinsic(target).b
+        H.a_minus_b .= a .- b
+        H.offset .= b
+    elseif isa(H, IntrinsicSubspaceHomotopy)
+        a = intrinsic(start).b
+        b = intrinsic(target).b
+        H.a_minus_b .= a .- b
+        H.offset .= b
+    end
+
+    # set caches
+    H.t_cache[] = complex(0.0)
+    H.offset_t_cache[] = complex(0.0)
+    H.taylor_t_cache[] = complex(0.0)
+    
+    H
+end
+
+start_parameters!(H::SubspaceHomotopy, p::LinearSubspace) =
+    set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
+target_parameters!(H::SubspaceHomotopy, q::LinearSubspace) =
+    set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
+parameters!(H::SubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
+    set_subspaces!(
+        H,
+        convert(LinearSubspace{ComplexF64}, p),
+        convert(LinearSubspace{ComplexF64}, q),
+    )
+
+# Helper function for computing the geodesic γ(t) at parameter t
+function γ!(H::SubspaceHomotopy, t::Number)
+    H.t_cache[] != t || return first(H.taylor_γ)
+    if isreal(t)
+        _γ!(H, real(t))
+    else
+        _γ!(H, t)
+    end
+    H.t_cache[] = t
+
+    first(H.taylor_γ)
+end
+
+@inline function _γ!(H::SubspaceHomotopy, t::Number)
+    @unpack Q, Q_cos, Θ = H.path
+    γ = first(H.taylor_γ)
+    n, k = size(γ)
+    @inbounds for j = 1:k
+        Θⱼ = Θ[j]
+        s, c = sincos(t * Θⱼ)
+        for i = 1:n
+            γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
+        end
+    end
+    γ
+end
+
+γ̇!(H::SubspaceHomotopy, t::Number) = isreal(t) ? _γ̇!(H, real(t)) : _γ̇!(H, t)
+
+@inline function _γ̇!(H::SubspaceHomotopy, t::Number)
+    @unpack Q, Q_cos, Θ = H.path
+    _, γ̇ = H.taylor_γ
+    n, k = size(γ̇)
+    @inbounds for j = 1:k
+        Θⱼ = Θ[j]
+        s, c = sincos(t * Θⱼ)
+        ċ = -s * Θⱼ
+        ṡ = c * Θⱼ
+        for i = 1:n
+            γ̇[i, j] = Q_cos[i, j] * ċ + Q[i, j] * ṡ
+        end
+    end
+    γ̇
+end
+
+
+# Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
+@inline function _compute_offset!(H::SubspaceHomotopy, t::Number)
+    if isa(H, ExtrinsicSubspaceHomotopy)
+        H.offset .= extrinsic(H.target).b
+    elseif isa(H, IntrinsicSubspaceHomotopy)
+        H.offset .= intrinsic(H.target).b
+    end
+    LA.axpy!(t, H.a_minus_b, H.offset)
+    H.offset_t_cache[] = t
+end
+
+@inline function offset_at_t!(H::SubspaceHomotopy, t::Number)
+    if H.offset_t_cache[] != t
+        _compute_offset!(H, t)
+    end
+    H.offset
+end
+
+
+# Helper functions to compute taylor series
+function _taylor_γ!(H::SubspaceHomotopy, t::Number)
+    @unpack path, taylor_γ = H
+    @unpack Q, Q_cos, Θ, U = path
+
+    γ, γ¹, γ², γ³, γ⁴ = taylor_γ
+    n, k = size(γ)
+    @inbounds for j = 1:k
+        Θⱼ = Θ[j]
+        s, c = sincos(t * Θⱼ)
+        c¹ = -s * Θⱼ
+        s¹ = c * Θⱼ
+        Θⱼ_2 = 0.5 * Θⱼ^2
+        c² = -c * Θⱼ_2
+        s² = -s * Θⱼ_2
+        Θⱼ_3 = Θⱼ_2 * Θⱼ / 3
+        c³ = s * Θⱼ_3
+        s³ = -c * Θⱼ_3
+        Θⱼ_4 = 0.25 * Θⱼ_3 * Θⱼ
+        c⁴ = c * Θⱼ_4
+        s⁴ = s * Θⱼ_4
+        for i = 1:n
+            γ[i, j] = Q_cos[i, j] * c + Q[i, j] * s
+            γ¹[i, j] = Q_cos[i, j] * c¹ + Q[i, j] * s¹
+            γ²[i, j] = Q_cos[i, j] * c² + Q[i, j] * s²
+            γ³[i, j] = Q_cos[i, j] * c³ + Q[i, j] * s³
+            γ⁴[i, j] = Q_cos[i, j] * c⁴ + Q[i, j] * s⁴
+        end
+    end
+end
+
+function taylor_γ!(H::SubspaceHomotopy, t::Number)
+    H.taylor_t_cache[] != t || return H.taylor_γ
+
+    if isreal(t)
+        _taylor_γ!(H, real(t))
+    else
+        _taylor_γ!(H, t)
+    end
+    H.taylor_t_cache[] = t
+
+    H.taylor_γ
+end
 
 
 ############################
@@ -570,7 +590,9 @@ end
 
 function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x::AbstractVector, t)
     γ = γ!(H, t)
+    offset_at_t!(H, t)
     n, k = size(γ) # linear equation is: tranpose(γ) x - offset
+    
     evaluate_and_jacobian!(u, U, H.system, x)
     m = first(size(H.system))
     for i = 1:k
@@ -585,7 +607,8 @@ function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x::
     for j = 1:n, i = 1:k
         U[m+i, j] = γ[j, i]
     end
-    u
+
+    nothing
 end
 
 
@@ -969,6 +992,7 @@ end
 
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceProjectiveHomotopy, x::AbstractVector, t)
+
     (length(x) == length(H.x) - 1) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
