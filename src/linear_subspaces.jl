@@ -46,9 +46,6 @@ const Intrinsic = Coordinates{:Intrinsic}()
 Indicates the use of the extrinsic description of an (affine) linear subspace. See also [`ExtrinsicDescription`](@ref).
 """
 const Extrinsic = Coordinates{:Extrinsic}()
-# These are not part of the public API
-const IntrinsicStiefel = Coordinates{:IntrinsicStiefel}()
-const ExtrinsicStiefel = Coordinates{:ExtrinsicStiefel}()
 
 """
     ExtrinsicDescription(A, b)
@@ -148,7 +145,6 @@ function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) 
 end
 
 (A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b
-(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
 
 function stiefel_coordinates_intrinsic(A::AbstractMatrix)
     n, k = size(A)
@@ -415,9 +411,6 @@ Base.isequal(A::LinearSubspace, B::LinearSubspace) = A === B
 function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:Intrinsic})
     intrinsic(A)(x, Intrinsic)
 end
-function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:IntrinsicStiefel})
-    intrinsic(A)(x, IntrinsicStiefel)
-end
 function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:Extrinsic} = Extrinsic)
     extrinsic(A)(x)
 end
@@ -549,97 +542,9 @@ julia> x - A(u, Intrinsic)
 coord_change(A::LinearSubspace, ::C, ::C, x) where {C<:Coordinates} = x
 coord_change(A::LinearSubspace, ::Coordinates{:Intrinsic}, ::Coordinates{:Extrinsic}, u) =
     A(u, Intrinsic)
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Intrinsic},
-    ::Coordinates{:IntrinsicStiefel},
-    u,
-)
-    [
-        u
-        1 / A.intrinsic.Y[end, end]
-    ]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Intrinsic},
-    ::Coordinates{:ExtrinsicStiefel},
-    u,
-)
-    v = coord_change(A, Intrinsic, IntrinsicStiefel, u)
-    coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, v)
-end
-
 coord_change(A::LinearSubspace, ::Coordinates{:Extrinsic}, ::Coordinates{:Intrinsic}, x) =
     A.intrinsic.A' * (x - A.intrinsic.b)
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Extrinsic},
-    ::Coordinates{:IntrinsicStiefel},
-    x,
-)
-    u = coord_change(A, Extrinsic, Intrinsic, x)
-    coord_change(A, Intrinsic, IntrinsicStiefel, u)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Extrinsic},
-    ::Coordinates{:ExtrinsicStiefel},
-    x,
-)
-    [x; 1]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:Intrinsic},
-    u,
-)
-    γ = A.intrinsic.Y[end, end]
-    [u[i] / (γ * u[end]) for i = 1:(length(u)-1)]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:Extrinsic},
-    u,
-)
-    x = coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, u)
-    coord_change(A, ExtrinsicStiefel, Extrinsic, x)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:ExtrinsicStiefel},
-    u,
-)
-    A(u, IntrinsicStiefel)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:Intrinsic},
-    x,
-)
-    u = coord_change(A, ExtrinsicStiefel, IntrinsicStiefel, x)
-    coord_change(A, IntrinsicStiefel, Intrinsic, u)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:Extrinsic},
-    x,
-)
-    x[1:end-1] ./ x[end]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:IntrinsicStiefel},
-    x,
-)
-    A.intrinsic.Y' * x
-end
+
 
 """
     geodesic_distance(A::LinearSubspace, B::LinearSubspace)
