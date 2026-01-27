@@ -3,10 +3,21 @@ export ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspacePr
 
 ## Implementation details
 
-# The computation is performed using (implicit) Stiefel coordinates. If `size(F) = m, n`
-# and `V` and `W` are linear subspaces of dimension `k, then the computation is performed in
-# the Grassmanian using the system
-# ``[F(γ(t) v + b(t)]``. Here the `γ(t)` is a geodesic in the Grassmannian and `b(t)` interpolates linearly between the offsets of `V` and `W`.
+# The computation is performed using Stiefel coordinates for the Grassmanian. There are three homotopies moving a linear space V to W:
+# * ExtrinsicSubspaceHomotopy
+#       for V = {x | Ax - a = 0} and W = {x | Bx - b = 0}
+#       moves [F; Ax - a] to [F; Bx - b] by taking a geodesic in the 
+#       Grassmannian from A to B and interpolating a and b linearly
+# * IntrinsicSubspaceHomotopy
+#       for V = {x = Av + a} and W = {x = Bx + b}
+#       moves F(Av + a) to F(Bx + b) by taking a geodesic in the 
+#       Grassmannian from A to B and interpolating a and b linearly
+# * IntrinsicSubspaceProjectiveHomotopy
+#       for V = {x = Av + a} and W = {x = Bx + b}
+#       moves F(Av + a) to F(Bx + b) by taking a geodesic in the 
+#       Grassmannian from colspan[A a] to colspan[B b] 
+#       (i.e., it embeds V and W in projective space)
+
 
 ## Data structure for geodesics in the Grassmannian
 
@@ -68,7 +79,13 @@ const PROJECTIVE_INTRINSIC_LRU = LRU{
 
 
 """
-    ExtrinsicSubspaceHomotopy
+    ExtrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
+    ExtrinsicSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
+
+Creates a homotopy ``H(x,t) = [F(x); A(t)x - a(t)]`` from ``V`` to ``W``.
+At ``t=1``, we have ``H(v,1) = [F(x); Ax - a]`` where ``V = {x | Ax = a}`` and ``A`` is a Stiefel matrix.
+At ``t=0``, we have ``H(v,0) = [F(x); Bx - b]`` where ``W = {x | Bx = b}`` and ``B`` is a Stiefel matrix.
+The matrix part ``A(t)`` follows a geodesic in the Grassmannian in Stiefel coordinates from ``A`` to ``B``, while the offset ``b(t)`` interpolates linearly from ``a`` to ``b``. See also [`LinearSubspace`](@ref).
 """
 Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
@@ -184,16 +201,10 @@ Base.size(H::ExtrinsicSubspaceHomotopy) = (first(size(H.system)) + size(H.path.�
     IntrinsicSubspaceHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
     IntrinsicSubspaceHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
 
-Creates a homotopy ``H(x,t) = F(γ(t)x + b(t))`` where both the matrix part and the offset
-are interpolated simultaneously.
-
-At ``t=1``, we have ``H(x,1) = F(Ax + a)`` where ``V = {Ax + a}``.
-At ``t=0``, we have ``H(x,0) = F(Bx + b)`` where ``W = {Bx + b}``.
-
-The matrix part ``γ(t)`` follows a geodesic in the Grassmannian from ``A`` to ``B``,
-while the offset ``b(t)`` interpolates linearly from ``a`` to ``b``.
-
-See also [`LinearSubspace`](@ref).
+Creates a homotopy ``H(v,t) = F(A(t)v + a(t))`` from ``V`` to ``W``.
+At ``t=1``, we have ``H(v,1) = F(Av + a)`` where ``V = {x = Av + a}`` and ``A`` is a Stiefel matrix.
+At ``t=0``, we have ``H(v,0) = F(Bv + b)`` where ``W = {x = Bv + b}`` and ``B`` is a Stiefel matrix.
+The matrix part ``A(t)`` follows a geodesic in the Grassmannian in Stiefel coordinates from ``A`` to ``B``, while the offset ``b(t)`` interpolates linearly from ``a`` to ``b``. See also [`LinearSubspace`](@ref).
 """
 Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
@@ -294,7 +305,13 @@ Base.size(H::IntrinsicSubspaceHomotopy) = (size(H.system)[1], dim(H.start))
 
 
 """
-    IntrinsicSubspaceProjectiveHomotopy
+    IntrinsicSubspaceProjectiveHomotopy(F::System, V::LinearSubspace, W::LinearSubspace)
+    IntrinsicSubspaceProjectiveHomotopy(F::AbstractSystem, V::LinearSubspace, W::LinearSubspace)
+
+Creates a homotopy ``H(x,t) = F(γ(t)x)`` where ``γ(t)`` is a family of linear subspaces
+such that ``γ(1) = V`` and ``γ(0) = W``.
+Here ``γ(t)`` is the geodesic between ``V`` and ``W`` in the Grassmanian after embedding ``V`` and ``W`` in projective space via ``x -> [x; 1]``.
+See also [`LinearSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
 """
 Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem} <: AbstractHomotopy
     system::S
