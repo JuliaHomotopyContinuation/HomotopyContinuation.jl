@@ -570,7 +570,8 @@ These values are necessary to construct the path from `A` and `B`.
 """
 grassmannian_svd(A::LinearSubspace, B::LinearSubspace) = grassmannian_svd(extrinsic(A), extrinsic(B))
 grassmannian_svd(A::E1, B::E2) where {E1, E2 <: ExtrinsicDescription}  = grassmannian_svd(transpose(A.A), transpose(B.A))
-function grassmannian_svd(A::I1, B::I2; embedded_projective::Bool = false) where {I1, I2 <: IntrinsicDescription}
+function grassmannian_svd(A::I1, B::I2; 
+                        embedded_projective::Bool = false) where {I1, I2 <: IntrinsicDescription}
          if !embedded_projective
             grassmannian_svd(A.X, B.X)
          else
@@ -581,7 +582,6 @@ end
 function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
 
     # here A and B are assumed to be Stiefel matrices representing linear spaces.
-
     n, k = size(A)
     U, Σ, V = LA.svd!(A' * B)
     # M = (LA.I - A * A') * B
@@ -608,6 +608,7 @@ function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
         end
     end
 
+    # scale with c (if c is random complex, then we get generic homotopies)
     Q′, Θ, U
 end
 

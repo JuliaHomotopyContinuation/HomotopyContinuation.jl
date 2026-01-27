@@ -121,6 +121,9 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tL⁴::TaylorVector{5,ComplexF64}
     tL³::TaylorVector{4,ComplexF64}
     tL²::TaylorVector{3,ComplexF64}
+
+    # c
+    c::ComplexF64
 end
 
 
@@ -129,27 +132,34 @@ ExtrinsicSubspaceHomotopy(
     F::ModelKit.System,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
-) = ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target)
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
+) = ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; c = c)
 
 function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
 )
     ExtrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target)
+        convert(LinearSubspace{ComplexF64}, target);
+        c = c
     )
 end
 
 function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
-    target::LinearSubspace{ComplexF64}
+    target::LinearSubspace{ComplexF64};
+    c::ComplexF64 = cis(2 * pi * rand())
 )
+    # multiply with random complex number to get generic paths
+    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+
     # Create geodesic path for the matrix part
     path = get!(AFFINE_EXTRINSIC_LRU, (start, target)) do
         GrassmannianGeodesic(extrinsic(start), extrinsic(target))
@@ -189,7 +199,8 @@ function ExtrinsicSubspaceHomotopy(
         taylor_γ = tuple((similar(Q) for i = 0:4)...),
         tL⁴ = tL⁴,
         tL³ = TaylorVector{4}(tL⁴),
-        tL² = TaylorVector{3}(tL⁴)
+        tL² = TaylorVector{3}(tL⁴),
+        c = c
     )
 
 end
@@ -236,6 +247,9 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tx⁴::TaylorVector{5,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
+
+    # c 
+    c::ComplexF64
 end
 
 
@@ -243,27 +257,35 @@ IntrinsicSubspaceHomotopy(
     F::ModelKit.System,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
-) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target)
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
+) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; c = c)
 
 function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
 )
     IntrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target)
+        convert(LinearSubspace{ComplexF64}, target),
+        c = c
     )
 end
 
 function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
-    target::LinearSubspace{ComplexF64}
+    target::LinearSubspace{ComplexF64};
+    c::ComplexF64 = cis(2 * pi * rand())
 )
+
+    # multiply with random complex number to get generic paths
+    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+
     # Create geodesic path for the matrix part
     path = get!(AFFINE_INTRINSIC_LRU, (start, target)) do
         GrassmannianGeodesic(intrinsic(start), intrinsic(target))
@@ -297,7 +319,8 @@ function IntrinsicSubspaceHomotopy(
         v = zeros(ComplexF64, size(Q, 2)),
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
-        tx² = TaylorVector{3}(tx⁴)
+        tx² = TaylorVector{3}(tx⁴),
+        c = c
     )
 end
 
@@ -329,6 +352,7 @@ Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem
     x::Vector{ComplexF64}
     ẋ::Vector{ComplexF64}
     x_high::Vector{ComplexDF64}
+
     # For AD
     taylor_t_cache::Base.RefValue{ComplexF64}
     taylor_γ::NTuple{5,Matrix{ComplexF64}}
@@ -337,6 +361,9 @@ Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem
     tx³::TaylorVector{4,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx¹::TaylorVector{2,ComplexF64}
+
+    # c 
+    c::ComplexF64
 end
 
 
@@ -344,27 +371,35 @@ IntrinsicSubspaceProjectiveHomotopy(
     F::ModelKit.System,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
-) = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = compile), start, target)
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
+) = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = compile), start, target; c = c)
 
 function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[]
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+    c::ComplexF64 = cis(2 * pi * rand())
 )
     IntrinsicSubspaceProjectiveHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target)
+        convert(LinearSubspace{ComplexF64}, target),
+        c = c
     )
 end
 
 function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
-    target::LinearSubspace{ComplexF64}
+    target::LinearSubspace{ComplexF64};
+    c::ComplexF64 = cis(2 * pi * rand())
 )
+
+    # multiply with random complex number to get generic paths
+    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+
     # Create geodesic path for the matrix part
     path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
         GrassmannianGeodesic(intrinsic(start), intrinsic(target); embedded_projective = true)
@@ -391,7 +426,8 @@ function IntrinsicSubspaceProjectiveHomotopy(
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
-        tx¹ = TaylorVector{2}(tx⁴)
+        tx¹ = TaylorVector{2}(tx⁴),
+        c = c
     )
 end
 
