@@ -84,17 +84,28 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     # For the offset part (linear interpolation)
     a_minus_b::Union{Nothing, Vector{ComplexF64}}
     offset::Union{Nothing, Vector{ComplexF64}}
+
+    # caches for t
     t_cache::Base.RefValue{ComplexF64}
     offset_t_cache::Base.RefValue{ComplexF64}
 
+    # cache for Jacobian
     J::Matrix{ComplexF64}
+
+    # cache for DF
     ū::Vector{ComplexDF64}
 
-    # For AD
+    # for taylor
+    v::Vector{ComplexF64}
+    L::Vector{ComplexF64}
+    L̇::Vector{ComplexF64}
     taylor_t_cache::Base.RefValue{ComplexF64}
     taylor_γ::NTuple{5,Matrix{ComplexF64}}
-    v::Vector{ComplexF64}
+    tL⁴::TaylorVector{5,ComplexF64}
+    tL³::TaylorVector{4,ComplexF64}
+    tL²::TaylorVector{3,ComplexF64}
 end
+
 
 
 ExtrinsicSubspaceHomotopy(
@@ -138,6 +149,9 @@ function ExtrinsicSubspaceHomotopy(
     J = zeros(ComplexF64, size(system))
     ū = zeros(ComplexDF64, length(a0))
     
+    k = length(a0)
+    tL⁴ = TaylorVector{5}(ComplexF64, k)
+
     ExtrinsicSubspaceHomotopy(
         system = system,
         start = start,
@@ -151,10 +165,16 @@ function ExtrinsicSubspaceHomotopy(
         offset_t_cache = Ref(complex(NaN, NaN)),
         J = J,
         ū = ū,
+        v = zeros(ComplexF64, size(system, 2)),
+        L = zeros(ComplexF64, k),
+        L̇ = zeros(ComplexF64, k),
         taylor_t_cache = Ref(complex(NaN, NaN)),
         taylor_γ = tuple((similar(Q) for i = 0:4)...),
-        v = zeros(ComplexF64, size(Q, 1)),
+        tL⁴ = tL⁴,
+        tL³ = TaylorVector{4}(tL⁴),
+        tL² = TaylorVector{3}(tL⁴)
     )
+
 end
 
 Base.size(H::ExtrinsicSubspaceHomotopy) = (first(size(H.system)) + size(H.path.γ1, 2), last(size(H.system)))
@@ -187,21 +207,24 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     # For the offset part (linear interpolation)
     a_minus_b::Union{Nothing, Vector{ComplexF64}}
     offset::Union{Nothing, Vector{ComplexF64}}
+
+    # cache for t 
     t_cache::Base.RefValue{ComplexF64}
     offset_t_cache::Base.RefValue{ComplexF64}
 
+    # caches for Jacobian, point x and its derivative ẋ
     J::Matrix{ComplexF64}
     x::Vector{ComplexF64}
     ẋ::Vector{ComplexF64}
     x_high::Vector{ComplexDF64}
-    # For AD
+
+    # for taylor
     taylor_t_cache::Base.RefValue{ComplexF64}
     taylor_γ::NTuple{5,Matrix{ComplexF64}}
     v::Vector{ComplexF64}
     tx⁴::TaylorVector{5,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
-    tx¹::TaylorVector{2,ComplexF64}
 end
 
 
@@ -263,8 +286,7 @@ function IntrinsicSubspaceHomotopy(
         v = zeros(ComplexF64, size(Q, 2)),
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
-        tx² = TaylorVector{3}(tx⁴),
-        tx¹ = TaylorVector{2}(tx⁴)
+        tx² = TaylorVector{3}(tx⁴)
     )
 end
 
@@ -612,23 +634,29 @@ function ModelKit.taylor!(
     t,
     incr::Bool = true,
 )
-    # d/dt [F(x); A(t) x - b(t)]
-    # = [0; dA(t)/dt * x - db/dt]  (since x is independent of t)
-    
+    # d/dt H(x,t) 
+    # = d/dt [F(x); L(t)], where L(t) = A(t) x - b(t)
+    # = [0; L̇(t)]  (since x is independent of t)
+
     γ̇ = γ̇!(H, t)
-    
+
     m = first(size(H.system))
-    k = size(γ̇, 2) # recall that A(t) = transpose(γ(t))
-    
+    k = size(γ̇, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
+
+    H.v .= first.(v)
+
+    LA.mul!(H.L̇, transpose(γ̇), H.v)
+    offset_at_t!(H, t)
+    LA.axpy!(-1, H.a_minus_b, H.L̇)  # -H.a_minus_b = ḃ = derivative of offset with respect to t 
+
     # F part is zero
     for i = 1:m
         u[i] = zero(eltype(u))
     end
-
-    # Constraint part: dA(t)/dt * x - db/dt
-    H.v .= first.(v)
-    LA.mul!(view(u, m+1:m+k), transpose(γ̇), H.v)
-    LA.axpy!(-1.0, H.a_minus_b, view(u, m+1:m+k))
+    # rest is H.L̇
+    for i = 1:k
+        u[m+i] = H.L̇[i]
+    end
     
     u
 end
@@ -642,24 +670,40 @@ function ModelKit.taylor!(
     incr::Bool = false,
 )
     γ, γ¹, γ² = taylor_γ!(H, t)
-    m = first(size(H.system))
-    n, k = size(γ) # recall that A(t) = transpose(γ(t))
-    
-    # F part: all derivatives are 0 since F(const x)
-    if !incr
-        taylor!(u, Val(2), H.system, tv)
+    L, L¹, L² = vectors(H.tL²)
+    v, v¹ = vectors(tv)
+
+    if incr
+        L .= H.L
+        L¹ .= H.L̇
+    else
+        LA.mul!(L, transpose(γ), v)
+        LA.mul!(L¹, transpose(γ¹), v)
+        offset_at_t!(H, t)
+        LA.axpy!(-1, H.offset, L)
+        LA.axpy!(-1, H.a_minus_b, L¹) 
     end
-    
-    # Constraint part: [A(t) x - b(t)]
-    # ModelKit stores Taylor coefficients of a vector-valued function in u with a specific layout
-    # For Val{2}, we compute up to 1st derivative
-    offset_at_t!(H, t)
-    x  = first(vectors(tv))
-    
-    # 1st order: dA(t)/dt * x - d/dt = transpose(γ¹(t)) * x - a_minus_b
-    # This goes after the F derivatives
-    LA.mul!(view(u, m+1:m+k), transpose(γ¹), x)
-    LA.axpy!(-1.0, H.a_minus_b, view(u, m+1:m+k))
+
+    H.v .= v¹
+    LA.mul!(H.L, transpose(γ), v¹)
+    L¹ .+= H.L
+
+    LA.mul!(H.L, transpose(γ¹), H.v)
+    H.v .= v
+    LA.mul!(H.L, transpose(γ²), H.v, true, true)
+    L² .= H.L
+
+    m = first(size(H.system))
+    k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
+
+    # F part is zero
+    for i = 1:m
+        u[i] = zero(eltype(u))
+    end
+    # rest is L²
+    for i = 1:k
+        u[m+i] = L²[i]
+    end
     
     u
 end
@@ -673,24 +717,43 @@ function ModelKit.taylor!(
     incr::Bool = false,
 )
     γ, γ¹, γ², γ³ = taylor_γ!(H, t)
-    m = first(size(H.system))
-    k = size(γ, 2) # recall that A(t) = transpose(γ(t))
-    
-    
-    # F part: all derivatives are 0
-    if !incr
-        taylor!(u, Val(3), H.system, tv)
-    end
-    
-    # Constraint part: [A(t) x - b(t)]
-    # For Val{3}, compute up to 2nd order derivatives
-    offset_at_t!(H, t)
+    L, L¹, L², L³ = vectors(H.tL³)
+    v, v¹, v² = vectors(tv)
 
-    x = first(vectors(tv))
+    if !incr
+        LA.mul!(L, transpose(γ), v)
+        LA.mul!(L¹, transpose(γ¹), v)
+        offset_at_t!(H, t)
+        LA.axpy!(-1, H.offset, L)
+        LA.axpy!(-1, H.a_minus_b, L¹)
+        LA.mul!(L¹, transpose(γ), v¹, true, true)
+        LA.mul!(L², transpose(γ²), v)
+        LA.mul!(L², transpose(γ¹), v¹, true, true)
+    end
+
+    H.v .= v²
+    LA.mul!(H.L, transpose(γ), H.v)
+    L² .+= H.L
+
+    LA.mul!(H.L, transpose(γ¹), H.v)
+    H.v .= v
+    LA.mul!(H.L, transpose(γ³), H.v, true, true)
+    H.v .= v¹
+    LA.mul!(H.L, transpose(γ²), H.v, true, true)
+    L³ .= H.L
     
-    # 2nd order: transpose(γ²)*x (a_minus_b has no second derivative)
-    LA.mul!(view(u, m+1:m+k), transpose(γ²), x)
-    
+    m = first(size(H.system))
+    k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
+
+    # F part is zero
+    for i = 1:m
+        u[i] = zero(eltype(u))
+    end
+    # rest is L³
+    for i = 1:k
+        u[m+i] = L³[i]
+    end
+
     u
 end
 
@@ -703,25 +766,44 @@ function ModelKit.taylor!(
     incr::Bool = false,
 )
     γ, γ¹, γ², γ³, γ⁴ = taylor_γ!(H, t)
+    L, L¹, L², L³, L⁴ = vectors(H.tL⁴)
+    v, v¹, v², v³ = vectors(tv)
+
+    if !incr
+        LA.mul!(L, transpose(γ), v)
+        LA.mul!(L¹, transpose(γ¹), v)
+        offset_at_t!(H, t)
+        LA.axpy!(-1, H.offset, L)
+        LA.axpy!(-1, H.a_minus_b, L¹)
+        LA.mul!(L¹, transpose(γ), v¹, true, true)
+        LA.mul!(L², transpose(γ²), v)
+        LA.mul!(L², transpose(γ¹), v¹, true, true)
+        LA.mul!(L², transpose(γ), v², true, true)
+
+        LA.mul!(L³, transpose(γ³), v)
+        LA.mul!(L³, transpose(γ²), v¹, true, true)
+        LA.mul!(L³, transpose(γ¹), v², true, true)
+    end
+
+    LA.mul!(L³, transpose(γ), v³, true, true)
+
+    LA.mul!(L⁴, transpose(γ¹), v³)
+    LA.mul!(L⁴, transpose(γ²), v², true, true)
+    LA.mul!(L⁴, transpose(γ³), v¹, true, true)
+    LA.mul!(L⁴, transpose(γ⁴), v, true, true)
     
     m = first(size(H.system))
-    k = size(γ, 2) # recall that A(t) = transpose(γ(t))
-    
-    
-    # F part: all derivatives are 0
-    if !incr
-        taylor!(u, Val(4), H.system, tv)
-    end
-    
-    # Constraint part: [A(t) x - b(t)]
-    # For Val{4}, compute up to 3rd order derivatives
-    offset_at_t!(H, t)
+    k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
-    # 0th order: A(t)*x - b(t)
-    x = first(vectors(tv))
-    
-    LA.mul!(view(u, m+1:m+k), transpose(γ³), x)
-    
+    # F part is zero
+    for i = 1:m
+        u[i] = zero(eltype(u))
+    end
+    # rest is L⁴
+    for i = 1:k
+        u[m+i] = L⁴[i]
+    end
+
     u
 end
 
@@ -812,8 +894,8 @@ function ModelKit.taylor!(
     t,
     incr::Bool = true,
 )
-    # d/dt H(v,t) = d/dt F(γ(t)v + b(t))
-    #             = J_F(γ(t)v + b(t)) * (γ̇(t)v + db/dt)
+    # d/dt H(v,t) = d/dt F(A(t)v + b(t))
+    #             = J_F(A(t)v + b(t)) * (Ȧ(t)v + ḃ(t))
 
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
@@ -824,7 +906,7 @@ function ModelKit.taylor!(
 
     offset_at_t!(H, t)
     LA.axpy!(1, H.offset, H.x)
-    LA.axpy!(1, H.a_minus_b, H.ẋ)  # derivative of offset with respect to t 
+    LA.axpy!(1, H.a_minus_b, H.ẋ)  # H.a_minus_b = ḃ = derivative of offset with respect to t 
     
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
@@ -856,7 +938,7 @@ function ModelKit.taylor!(
     end
 
     H.v .= v¹
-    LA.mul!(H.x, γ, H.v)
+    LA.mul!(H.x, γ, v¹)
     x¹ .+= H.x
 
     LA.mul!(H.x, γ¹, H.v)
@@ -1039,19 +1121,18 @@ function ModelKit.taylor!(
     t,
     incr::Bool = true,
 )
-    # d/dt H(v,t) = d/dt F(γ(t)v + b(t))
-    #             = J_F(γ(t)v + b(t)) * (γ̇(t)v + db/dt)
+    # d/dt H(v,t) = d/dt F(A(t)v)
+    #             = J_F(A(t)) * (Ȧ(t)v)
 
     γ = γ!(H, t)
     γ̇ = γ̇!(H, t)
 
     H.v .= first.(v)
     LA.mul!(H.x, γ, H.v)
-    LA.mul!(H.ẋ, γ̇, H.v)
+    LA.mul!(H.ẋ, γ̇, H.v)
     
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
-    LA.mul!(u, H.J, H.ẋ)
-
+    LA.mul!(u, H.J, H.ẋ)
     M = size(H, 1)
     u[M] = H.ẋ[end]
 
@@ -1072,14 +1153,14 @@ function ModelKit.taylor!(
 
     if incr
         x .= H.x
-        x¹ .= H.ẋ
+        x¹ .= H.ẋ
     else
         LA.mul!(x, γ, v)
         LA.mul!(x¹, γ¹, v)
     end
 
     H.v .= v¹
-    LA.mul!(H.x, γ, H.v)
+    LA.mul!(H.x, γ, v¹)
     x¹ .+= H.x
 
     LA.mul!(H.x, γ¹, H.v)
@@ -1161,6 +1242,7 @@ function ModelKit.taylor!(
 
     LA.mul!(x³, γ, v³, true, true)
 
+    # Currently H.v .= v³
     LA.mul!(x⁴, γ¹, v³)
     LA.mul!(x⁴, γ², v², true, true)
     LA.mul!(x⁴, γ³, v¹, true, true)
