@@ -547,11 +547,9 @@ coord_change(A::LinearSubspace, ::Coordinates{:Extrinsic}, ::Coordinates{:Intrin
 
 
 """
-    geodesic_distance(A::LinearSubspace, B::LinearSubspace)
+    geodesic_distance(V::LinearSubspace, W::LinearSubspace)
 
-Compute the geodesic distance between `A` and `B` in the affine Grassmanian `Graff(k, n)`
-where `k = dim(A)` and `n` is the amebient dimension.
-This follows the derivation in [^LKK19].
+Compute the geodesic distance between `V = {x | Ax = a}` and `W= {x | Bx = b}` as `sqrt(d^2 + ||a-b||^2)`, where `d` is the distance from the columnspan of `A` to the columnspan of `B` in the Grassmannian. This follows the derivation in [^LKK19].
 
 [^LKK19]: $_LKK19.
 """
@@ -566,7 +564,7 @@ end
     grassmannian_svd(A::LinearSubspace, B::LinearSubspace)
 
 Computes the factors ``Q``, ``Θ`` and ``U`` from Corollary 4.3 in [^LKK19].
-These values are necessary to construct the geodesic between `A` and `B`.
+These values are necessary to construct the path from `A` and `B`.
 
 [^LKK19]: $_LKK19
 """
@@ -614,11 +612,11 @@ function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
 end
 
 """
-    geodesic(A::LinearSubspace, B::LinearSubspace)
+    geodesic(V::LinearSubspace, W::LinearSubspace)
 
-Returns the geodesic ``γ(t)`` connecting `A` and `B` in the Grassmanian ``Gr(k+1,n+1)``
-where ``k`` is the dimension of ``A`` and ``n`` is the ambient dimension.
-See also Corollary 4.3 in [^LKK19].
+    Compute the geodesic distance between `V = {x | Ax = a}` and `W= {x | Bx = b}` as `sqrt(d^2 + ||a-b||^2)`, where `d` is the distance from the columnspan of `A` to the columnspan of `B` in the Grassmannian. This follows the derivation in [^LKK19].
+
+Returns the geodesic ``γ(t)`` by connecting `V = {x | Ax = a}` and `W= {x | Bx = b}`. `A` and `B` are interpolated in the Grassmannian using Stiefel coordinates. See also Corollary 4.3 in [^LKK19]. `a` and `b` are interpolated linearly. Thus, ``γ(t)`` is a geodesic in the Euclidean group.
 
 [^LKK19]: $_LKK19
 """
