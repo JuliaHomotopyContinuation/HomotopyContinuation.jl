@@ -654,9 +654,9 @@ function ModelKit.taylor!(
     # ModelKit stores Taylor coefficients of a vector-valued function in u with a specific layout
     # For Val{2}, we compute up to 1st derivative
     offset_at_t!(H, t)
-    x, _ = vectors(tv)
+    x  = first(vectors(tv))
     
-    # 1st order: dA(t)/dt * x - db/dt = transpose(γ¹(t)) * x - a_minus_b
+    # 1st order: dA(t)/dt * x - d/dt = transpose(γ¹(t)) * x - a_minus_b
     # This goes after the F derivatives
     LA.mul!(view(u, m+1:m+k), transpose(γ¹), x)
     LA.axpy!(-1.0, H.a_minus_b, view(u, m+1:m+k))
@@ -686,7 +686,7 @@ function ModelKit.taylor!(
     # For Val{3}, compute up to 2nd order derivatives
     offset_at_t!(H, t)
 
-    x, _, _ = vectors(tv)
+    x = first(vectors(tv))
     
     # 2nd order: transpose(γ²)*x (a_minus_b has no second derivative)
     LA.mul!(view(u, m+1:m+k), transpose(γ²), x)
@@ -716,9 +716,9 @@ function ModelKit.taylor!(
     # Constraint part: [A(t) x - b(t)]
     # For Val{4}, compute up to 3rd order derivatives
     offset_at_t!(H, t)
-     @show size(u), 4
+
     # 0th order: A(t)*x - b(t)
-    x, _, _, _ = vectors(tv)
+    x = first(vectors(tv))
     
     LA.mul!(view(u, m+1:m+k), transpose(γ³), x)
     
