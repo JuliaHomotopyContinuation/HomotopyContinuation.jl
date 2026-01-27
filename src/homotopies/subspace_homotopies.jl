@@ -78,6 +78,8 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     
     # For the matrix part (geodesic interpolation)
     path::GrassmannianGeodesic
+    a0::Vector{ComplexF64}
+    b0::Vector{ComplexF64}
 
     # For the offset part (linear interpolation)
     a_minus_b::Union{Nothing, Vector{ComplexF64}}
@@ -125,23 +127,26 @@ function ExtrinsicSubspaceHomotopy(
         GrassmannianGeodesic(extrinsic(start), extrinsic(target))
     end
     Q = path.Q
-    U_tr = transpose(path.U)
+    # get correct coordinates for A and b in the Stiefel homotopy
+    Uʰ_start = transpose(path.γ1) * start.extrinsic.A'
+    Uʰ_target = transpose(path.Q_cos) * target.extrinsic.A'
     
     # Prepare offset data for linear interpolation
-    a = U_tr * extrinsic(start).b
-    b = U_tr * extrinsic(target).b
-    a_minus_b = a - b
-    offset = copy(b)
+    a0 = Uʰ_start * extrinsic(start).b
+    b0 = Uʰ_target * extrinsic(target).b
+    a_minus_b = a0 - b0
     J = zeros(ComplexF64, size(system))
-    ū = zeros(ComplexDF64, length(a))
+    ū = zeros(ComplexDF64, length(a0))
     
     ExtrinsicSubspaceHomotopy(
         system = system,
         start = start,
         target = target,
         path = path,
+        a0 = a0,
+        b0 = b0,
         a_minus_b = a_minus_b,
-        offset = offset,
+        offset = copy(b0),
         t_cache = Ref(complex(NaN, NaN)),
         offset_t_cache = Ref(complex(NaN, NaN)),
         J = J,
@@ -390,9 +395,8 @@ function set_subspaces!(
 
     # Update the offsets
     if isa(H, ExtrinsicSubspaceHomotopy) 
-        U_tr = transpose(H.path.U)
-        a = U_tr * extrinsic(start).b
-        b = U_tr * extrinsic(target).b
+        a = H.a0
+        b = H.b0
         H.a_minus_b .= a .- b
         H.offset .= b
     elseif isa(H, IntrinsicSubspaceHomotopy)
@@ -470,7 +474,7 @@ end
 # Compute the offset at parameter t: offset(t) = t*a + (1-t)*b = t(a-b) + b
 @inline function _compute_offset!(H::SubspaceHomotopy, t::Number)
     if isa(H, ExtrinsicSubspaceHomotopy)
-        H.offset .= extrinsic(H.target).b
+        H.offset .= H.b0
     elseif isa(H, IntrinsicSubspaceHomotopy)
         H.offset .= intrinsic(H.target).b
     end
