@@ -695,8 +695,9 @@ function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
     # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
 
     # inv(A' * B) * U = V * LA.diagm(inv.(Σ))
-    MU = (LA.I - A * A') * B * V * LA.diagm(inv.(Σ))
-
+    #MU = (LA.I - A * A') * B * V * LA.diagm(inv.(Σ))
+    MU = (LA.I - A * A') * B * V
+    
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
