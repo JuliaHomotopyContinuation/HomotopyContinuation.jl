@@ -103,8 +103,8 @@ end
         H = ExtrinsicSubspaceHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
 
         @unpack Q, Q_cos, Θ = H.path
-        a = extrinsic(H.start).b
-        b = extrinsic(H.start).b
+        a = H.a0
+        b = H.b0
 
         @var t
         s = sin.(t .* Θ)
@@ -124,6 +124,7 @@ end
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
         H = IntrinsicSubspaceHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
+
         @unpack Q, Q_cos, Θ = H.path
         a = intrinsic(H.start).b
         b = intrinsic(H.start).b
@@ -160,6 +161,7 @@ end
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
         H = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
+        
         @unpack Q, Q_cos, Θ = H.path
 
         @var v[1:3] t
