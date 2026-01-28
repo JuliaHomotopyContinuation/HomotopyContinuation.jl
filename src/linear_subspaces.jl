@@ -203,10 +203,11 @@ end
 function Base.copy!(A::IntrinsicDescription, B::IntrinsicDescription)
     copy!(A.A, B.A)
     copy!(A.b, B.b)
+    copy!(A.X, B.X)
     copy!(A.Y, B.Y)
     A
 end
-Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b), copy(A.Y))
+Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b), copy(A.X), copy(A.Y))
 
 Base.broadcastable(A::IntrinsicDescription) = Ref(A)
 

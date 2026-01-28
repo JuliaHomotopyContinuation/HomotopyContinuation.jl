@@ -123,7 +123,7 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tL²::TaylorVector{3,ComplexF64}
 
     # c
-    c::ComplexF64
+    gamma::Union{Nothing, ComplexF64}
 end
 
 
@@ -154,13 +154,13 @@ function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    if !isnothing(c)
-        c = c / abs(c) # make sure |c| = 1
+    if !isnothing(gamma)
+        gamma = gamma / abs(gamma) # make sure |gamma| = 1
         # multiply with random complex number to get generic paths
-        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+        start = LinearSubspace(gamma .* extrinsic(start).A, gamma .* extrinsic(start).b)
     end
 
     # Create geodesic path for the matrix part
@@ -203,7 +203,7 @@ function ExtrinsicSubspaceHomotopy(
         tL⁴ = tL⁴,
         tL³ = TaylorVector{4}(tL⁴),
         tL² = TaylorVector{3}(tL⁴),
-        c = c
+        gamma = gamma
     )
 
 end
@@ -252,7 +252,7 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tx²::TaylorVector{3,ComplexF64}
 
     # c 
-    c::ComplexF64
+    gamma::Union{Nothing, ComplexF64}
 end
 
 
@@ -282,13 +282,13 @@ function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    if !isnothing(c)
-        c = c / abs(c) # make sure |c| = 1
+    if !isnothing(gamma)
+        gamma = gamma / abs(gamma) # make sure |gamma| = 1
         # multiply with random complex number to get generic paths
-        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+        start = LinearSubspace(gamma .* extrinsic(start).A, gamma .* extrinsic(start).b)
     end
 
     # Create geodesic path for the matrix part
@@ -325,7 +325,7 @@ function IntrinsicSubspaceHomotopy(
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
-        c = c
+        gamma = gamma
     )
 end
 
@@ -368,7 +368,7 @@ Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem
     tx¹::TaylorVector{2,ComplexF64}
 
     # c 
-    c::ComplexF64
+    gamma::Union{Nothing, ComplexF64}
 end
 
 
@@ -398,13 +398,13 @@ function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    if !isnothing(c)
-        c = c / abs(c) # make sure |c| = 1
+    if !isnothing(gamma)
+        gamma = gamma / abs(gamma) # make sure |gamma| = 1
         # multiply with random complex number to get generic paths
-        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+        start = LinearSubspace(gamma .* extrinsic(start).A, gamma .* extrinsic(start).b)
     end
 
     # Create geodesic path for the matrix part
@@ -434,7 +434,7 @@ function IntrinsicSubspaceProjectiveHomotopy(
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
         tx¹ = TaylorVector{2}(tx⁴),
-        c = c
+        gamma = gamma
     )
 end
 

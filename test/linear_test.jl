@@ -35,11 +35,13 @@
         C = rand_subspace(3, dim = 1, real = true)
         @test geodesic_distance(A, C) > 0
         γ = geodesic(A, C)
-        @test size(γ(1)) == size(intrinsic(A).Y)
+        γ1 = γ(1)
+        @test ambient_dim(γ1) == ambient_dim(A)
+        @test dim(γ1) == dim(A)           
 
         A2 = translate(A, [1, 1], Extrinsic)
         A3 = LinearSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
-        @test A2.intrinsic.Y ≈ A3.intrinsic.Y
+        @test A2.intrinsic.X ≈ A3.intrinsic.X
 
         # rand subspace through a point
         x = randn(ComplexF64, 5)
@@ -101,5 +103,39 @@
         @test all(
             isapprox.(solution.(graff_path_result), solution.(graff_result), rtol = 1e-12),
         )
+    end
+
+    @testset "SubspaceHomotopy between perpendicular spaces" begin
+        @var x, y, z
+        p = (x * y - x^2) + 1 - z
+        q = x^4 + x^2 - y - 1
+        f = [
+            p * q * (x - 3) * (x - 5)
+            p * q * (y - 3) * (y - 5)
+            p * (z - 3) * (z - 5)
+        ]
+        F = System(f, variables = [x, y, z])
+
+        L1 = LinearSubspace(reshape([1; 0; 0.0], 1 ,3), [1.0])
+        L2 = LinearSubspace(reshape([0; 1; 0.0], 1, 3), [1.0])
+
+        W = witness_set(F, L1; show_progress = false, start_system = :total_degree)
+        start = solutions(W)[1]
+
+        H1 = ExtrinsicSubspaceHomotopy(F, L1, L2);
+        H2 = IntrinsicSubspaceHomotopy(F, L1, L2);
+        H3 = IntrinsicSubspaceProjectiveHomotopy(F, L1, L2);
+
+        T1 = EndgameTracker(H1);
+        T2 = EndgameTracker(H2);
+        T3 = EndgameTracker(H3);
+
+        res1 = track(T1, start)
+        res2 = track(T2, start)
+        res3 = track(T3, start)
+
+        @test is_success(res1)
+        @test is_success(res2)
+        @test is_success(res3)
     end
 end

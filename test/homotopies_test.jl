@@ -93,6 +93,29 @@ end
         test_homotopy(H, h)
     end
 
+    @testset "ExtrinsicSubspaceHomotopy" begin
+        @var x[1:4]
+        f1 = rand_poly(x, 2)
+        f2 = rand_poly(x, 2)
+        F = System([f1, f2], x)
+        A = rand_subspace(4; codim = 2)
+        B = rand_subspace(4, codim = 2)
+        H = ExtrinsicSubspaceHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
+
+        @unpack Q, Q_cos, Θ = H.path
+        a = extrinsic(H.start).b
+        b = extrinsic(H.start).b
+
+        @var t
+        s = sin.(t .* Θ)
+        c = cos.(t .* Θ)
+        γ = Q_cos .* c' .+ Q .* s'
+
+        h = Homotopy([f1; f2; transpose(γ)*x - (t .* a + (1-t) .* b)], x, t)
+
+        test_homotopy(H, h)
+    end
+
     @testset "IntrinsicSubspaceHomotopy" begin
         @var x[1:4]
         f1 = rand_poly(x, 2)
@@ -100,8 +123,44 @@ end
         F = System([f1, f2], x)
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
-        H = IntrinsicSubspaceHomotopy(fixed(F; compile = false), A, B)
-        @unpack Q, Q_cos, Θ = H.geodesic
+        H = IntrinsicSubspaceHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
+        @unpack Q, Q_cos, Θ = H.path
+        a = intrinsic(H.start).b
+        b = intrinsic(H.start).b
+
+        @var v[1:2] t
+        s = sin.(t .* Θ)
+        c = cos.(t .* Θ)
+        γ = Q_cos .* c' .+ Q .* s'
+
+        h = Homotopy(F(γ*v + t .* a + (1-t) .* b), v, t)
+
+        x0 = randn(ComplexF64, 4)
+        t0 = ComplexF64(rand())
+        v0 = zeros(ComplexF64, 2)
+        HomotopyContinuation.set_solution!(v0, H, x0, t0)
+
+        out0 = zeros(ComplexF64, 3)
+        evaluate!(out0, H, v0, t0)
+
+        out1 = zeros(ComplexF64, 3)
+        evaluate!(out1, InterpretedHomotopy(h), v0, t0)
+
+        @test out0 ≈ out1 rtol = 1e-12
+
+
+        test_homotopy(H, h)
+    end
+
+    @testset "IntrinsicSubspaceProjectiveHomotopy" begin
+        @var x[1:4]
+        f1 = rand_poly(x, 2)
+        f2 = rand_poly(x, 2)
+        F = System([f1, f2], x)
+        A = rand_subspace(4; codim = 2)
+        B = rand_subspace(4, codim = 2)
+        H = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
+        @unpack Q, Q_cos, Θ = H.path
 
         @var v[1:3] t
         s = sin.(t .* Θ)
@@ -123,21 +182,6 @@ end
 
         @test out0 ≈ out1 rtol = 1e-12
 
-
-        test_homotopy(H, h)
-    end
-
-    @testset "ExtrinsicSubspaceHomotopy" begin
-        @var x[1:4]
-        f1 = rand_poly(x, 2)
-        f2 = rand_poly(x, 2)
-        F = System([f1, f2], x)
-        A = rand_subspace(4; codim = 2)
-        B = rand_subspace(4, codim = 2)
-        H = ExtrinsicSubspaceHomotopy(fixed(F; compile = false), A, B;)
-
-        @var t
-        h = Homotopy([F(x); t .* A(x) .+ (1 - t) .* B(x)], x, t)
 
         test_homotopy(H, h)
     end
