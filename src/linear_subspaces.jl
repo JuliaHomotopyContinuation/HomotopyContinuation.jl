@@ -633,10 +633,12 @@ Returns the geodesic ``γ(t)`` by connecting `V = {x | Ax = a}` and `W= {x | Bx 
 geodesic(A::LinearSubspace, B::LinearSubspace) = geodesic(A.intrinsic, B.intrinsic)
 function geodesic(A::IntrinsicDescription, B::IntrinsicDescription)
     Q, Θ, U = grassmannian_svd(A, B)
-    t -> LinearSubspace(IntrinsicDescription(
-        A.X * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U',
-        t .* A.b + (1 - t) .* B.b,
-    ))
+    t -> LinearSubspace(
+        IntrinsicDescription(
+            A.X * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U',
+            t .* A.b + (1 - t) .* B.b,
+        ),
+    )
 end
 #
 """
