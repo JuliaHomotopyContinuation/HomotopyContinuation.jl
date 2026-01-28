@@ -55,7 +55,11 @@ ExtrinsicSubspaceHomotopy
 ## IntrinsicSubspaceHomotopy
 ```@docs
 IntrinsicSubspaceHomotopy
-set_subspaces!
+```
+
+## IntrinsicSubspaceProjectiveHomotopy
+```@docs
+IntrinsicSubspaceProjectiveHomotopy
 ```
 
 ## ParameterHomotopy

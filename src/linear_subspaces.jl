@@ -46,9 +46,6 @@ const Intrinsic = Coordinates{:Intrinsic}()
 Indicates the use of the extrinsic description of an (affine) linear subspace. See also [`ExtrinsicDescription`](@ref).
 """
 const Extrinsic = Coordinates{:Extrinsic}()
-# These are not part of the public API
-const IntrinsicStiefel = Coordinates{:IntrinsicStiefel}()
-const ExtrinsicStiefel = Coordinates{:ExtrinsicStiefel}()
 
 """
     ExtrinsicDescription(A, b)
@@ -122,45 +119,60 @@ end
 Base.broadcastable(A::ExtrinsicDescription) = Ref(A)
 
 """
-    IntrinsicDescription(A, b₀)
+    IntrinsicDescription(A, b)
 
 Intrinsic description of an ``m``-dimensional (affine) linear subspace ``L`` in ``n``-dimensional space.
-That is ``L = \\{ u | A u + b₀ \\}``. Here, ``A`` and ``b₀`` are in orthogonal coordinates.
-That is, the columns of ``A`` are orthonormal and ``A' b₀ = 0``.
+That is ``L = \\{ u | A u + b \\}``. Here, ``A`` and ``b`` are in orthogonal coordinates.
+That is, the columns of ``A`` are orthonormal and ``A' b = 0``.
 """
 struct IntrinsicDescription{T}
     # orthogonal coordinates
     A::Matrix{T}
-    b₀::Vector{T}
-    # stiefel coordinates
+    b::Vector{T}
+    # stiefel coordinates for A
+    X::Matrix{T}
+    # stiefel coordinates for [A b]
     Y::Matrix{T}
 end
-IntrinsicDescription(A::Matrix{T1}, b₀::Vector{T2}) where {T1,T2} =
-    IntrinsicDescription(A, b₀, stiefel_coordinates(A, b₀))
+IntrinsicDescription(A::Matrix{T1}, b::Vector{T2}) where {T1,T2} = IntrinsicDescription(
+    A,
+    b,
+    stiefel_coordinates_intrinsic(A),
+    stiefel_coordinates_intrinsic(A, b),
+)
 
 function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) where {T}
-    IntrinsicDescription(
-        convert(Matrix{T}, A.A),
-        convert(Vector{T}, A.b₀),
-        convert(Matrix{T}, A.Y),
-    )
+    IntrinsicDescription(convert(Matrix{T}, A.A), convert(Vector{T}, A.b))
 end
 
-(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b₀
-(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:IntrinsicStiefel}) = A.Y * u
+(A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b
 
-function stiefel_coordinates(A::AbstractMatrix, b::AbstractVector)
+function stiefel_coordinates_intrinsic(A::AbstractMatrix)
+    n, k = size(A)
+    SVD = LA.svd(A)
+    SVD.U
+end
+function stiefel_coordinates_intrinsic!(X, A::AbstractMatrix)
+    n, k = size(A)
+    X .= A
+    SVD = LA.svd!(X)
+    X .= SVD.U
+    X
+end
+function stiefel_coordinates_intrinsic(A::AbstractMatrix, b::AbstractVector)
     n, k = size(A)
     Y = zeros(eltype(A), n + 1, k + 1)
-    stiefel_coordinates!(Y, A, b)
+    stiefel_coordinates_intrinsic!(Y, A, b)
     Y
 end
-function stiefel_coordinates!(Y, A::AbstractMatrix, b::AbstractVector)
+function stiefel_coordinates_intrinsic!(Y, A::AbstractMatrix, b::AbstractVector)
     γ = sqrt(1 + sum(abs2, b))
     n, k = size(A)
     Y[1:n, 1:k] .= A
     Y[1:n, k+1] .= b ./ γ
     Y[n+1, k+1] = 1 / γ
+    SVD = LA.svd!(Y)
+    Y .= SVD.U
     Y
 end
 
@@ -179,24 +191,26 @@ Codimension of the (affine) linear subspace `A`.
 codim(I::IntrinsicDescription) = size(I.A, 1) - size(I.A, 2)
 
 function Base.:(==)(A::IntrinsicDescription, B::IntrinsicDescription)
-    A.A == B.A && A.b₀ == B.b₀ && A.Y == B.Y
+    A.A == B.A && A.b == B.b && A.Y == B.Y
 end
 
 function Base.show(io::IO, A::IntrinsicDescription{T}) where {T}
     println(io, "IntrinsicDescription{$T}:")
     println(io, "A:")
     show(io, A.A)
-    println(io, "\nb₀:")
-    show(io, A.b₀)
+    println(io, "\nb:")
+    show(io, A.b)
 end
 
 function Base.copy!(A::IntrinsicDescription, B::IntrinsicDescription)
     copy!(A.A, B.A)
-    copy!(A.b₀, B.b₀)
+    copy!(A.b, B.b)
+    copy!(A.X, B.X)
     copy!(A.Y, B.Y)
     A
 end
-Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b₀), copy(A.Y))
+Base.copy(A::IntrinsicDescription) =
+    IntrinsicDescription(copy(A.A), copy(A.b), copy(A.X), copy(A.Y))
 
 Base.broadcastable(A::IntrinsicDescription) = Ref(A)
 
@@ -205,21 +219,21 @@ function IntrinsicDescription(E::ExtrinsicDescription)
     m, n = size(E.A)
     A = Matrix((@view svd.Vt[m+1:end, :])')
     if iszero(E.b)
-        b₀ = zeros(eltype(E.b), size(A, 1))
+        b = zeros(eltype(E.b), size(A, 1))
     else
-        b₀ = svd \ E.b
+        b = svd \ E.b
     end
-    IntrinsicDescription(A, b₀)
+    IntrinsicDescription(A, b)
 end
 
 function ExtrinsicDescription(I::IntrinsicDescription)
     svd = LA.svd(I.A; full = true)
     m, n = size(I.A)
     A = Matrix((@view svd.U[:, n+1:end])')
-    if iszero(I.b₀)
+    if iszero(I.b)
         b = zeros(eltype(A), size(A, 1))
     else
-        b = A * I.b₀
+        b = A * I.b
     end
     ExtrinsicDescription(A, b; orthonormal = true)
 end
@@ -264,7 +278,7 @@ A:
  -0.6882472016116853
   0.6882472016116853
   0.22941573387056186
-b₀:
+b:
 3-element Array{Float64,1}:
  -3.0526315789473677
  -3.947368421052632
@@ -401,9 +415,6 @@ Base.isequal(A::LinearSubspace, B::LinearSubspace) = A === B
 function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:Intrinsic})
     intrinsic(A)(x, Intrinsic)
 end
-function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:IntrinsicStiefel})
-    intrinsic(A)(x, IntrinsicStiefel)
-end
 function (A::LinearSubspace)(x::AbstractVector, ::Coordinates{:Extrinsic} = Extrinsic)
     extrinsic(A)(x)
 end
@@ -415,8 +426,8 @@ Generate a random [`LinearSubspace`](@ref) with given dimension `dim` or codimen
 (one of them has to be provided) in ambient space of dimension `n`.
 If `real` is `true`, then the extrinsic description is real.
 If `affine` then an affine linear subspace is generated.
-The subspace is generated by drawing each entry of the extrinsic description indepdently
-from a normal distribuation using `randn`.
+The subspace is generated by drawing the matrix `A` the extrinsic description independently
+from a normal distribuation using `randn`. The offset is drawn from the normal distribution scaled by `sqrt(n)`, where `n` is the number of columns of `A`. 
 
     rand_subspace(x::AbstractVector; dim | codim, affine = true)
 
@@ -429,24 +440,18 @@ the given point `x`.
 Construction of a general random subspace:
 ```julia-repl
 julia> rand_subspace(3; dim = 1)
-1-dim. (affine) linear subspace {x|Ax=b} with eltype Complex{Float64}:
+1-dim. affine linear subspace {x | Ax=b} with eltype ComplexF64:
 A:
-2×3 Array{Complex{Float64},2}:
-  -1.73825+1.27987im   -0.0871343+0.840408im  -0.551957+0.106397im
- -0.597132-0.343965im   -0.122543-0.172715im   -1.04949+0.370917im
+ComplexF64[-0.18709056988162928 - 0.021159068437462684im 0.3448082517062497 - 0.5619954950326371im 0.12814427601487394 + 0.716517124796854im; 0.6274330537397367 + 0.4327848781661207im 0.3433265716931795 - 0.4388117939096428im -0.09290449999579178 - 0.3161721696818136im]
 b:
-2-element Array{Complex{Float64},1}:
-  0.47083334430689394 + 0.8099804422599071im
- -0.12018696822943896 + 0.11723026326952792im
+ComplexF64[0.1568834271069519 - 0.7893604951164849im, -1.068448434670914 + 3.422846499360692im]
 
 julia> rand_subspace(4; codim = 1)
-3-dim. (affine) linear subspace {x|Ax=b} with eltype Complex{Float64}:
+3-dim. affine linear subspace {x | Ax=b} with eltype ComplexF64:
 A:
-1×4 Array{Complex{Float64},2}:
- 0.345705+0.0893881im  -0.430867-0.663249im  0.979969-0.569378im  -0.29722-0.192493im
+ComplexF64[-0.16031107752943963 - 0.6372670776364352im 0.4895718108240883 + 0.4093061519132399im -0.32944285959791164 + 0.12384710749057845im -0.17790282756300982 - 0.07388387107969129im]
 b:
-1-element Array{Complex{Float64},1}:
- 0.7749708228192062 + 0.9762873764567546im
+ComplexF64[-0.09372015908519082 + 0.3051873249600184im]
 ```
 """
 function rand_subspace(
@@ -470,7 +475,7 @@ function rand_subspace(
     T = real ? Float64 : ComplexF64
     A = randn(T, n - k, n)
     if affine
-        LinearSubspace(A, randn(T, n - k))
+        LinearSubspace(A, sqrt(n) .* randn(T, n - k))
     else
         LinearSubspace(A)
     end
@@ -541,104 +546,14 @@ julia> x - A(u, Intrinsic)
 coord_change(A::LinearSubspace, ::C, ::C, x) where {C<:Coordinates} = x
 coord_change(A::LinearSubspace, ::Coordinates{:Intrinsic}, ::Coordinates{:Extrinsic}, u) =
     A(u, Intrinsic)
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Intrinsic},
-    ::Coordinates{:IntrinsicStiefel},
-    u,
-)
-    [
-        u
-        1 / A.intrinsic.Y[end, end]
-    ]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Intrinsic},
-    ::Coordinates{:ExtrinsicStiefel},
-    u,
-)
-    v = coord_change(A, Intrinsic, IntrinsicStiefel, u)
-    coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, v)
-end
-
 coord_change(A::LinearSubspace, ::Coordinates{:Extrinsic}, ::Coordinates{:Intrinsic}, x) =
-    A.intrinsic.A' * (x - A.intrinsic.b₀)
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Extrinsic},
-    ::Coordinates{:IntrinsicStiefel},
-    x,
-)
-    u = coord_change(A, Extrinsic, Intrinsic, x)
-    coord_change(A, Intrinsic, IntrinsicStiefel, u)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:Extrinsic},
-    ::Coordinates{:ExtrinsicStiefel},
-    x,
-)
-    [x; 1]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:Intrinsic},
-    u,
-)
-    γ = A.intrinsic.Y[end, end]
-    [u[i] / (γ * u[end]) for i = 1:(length(u)-1)]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:Extrinsic},
-    u,
-)
-    x = coord_change(A, IntrinsicStiefel, ExtrinsicStiefel, u)
-    coord_change(A, ExtrinsicStiefel, Extrinsic, x)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:IntrinsicStiefel},
-    ::Coordinates{:ExtrinsicStiefel},
-    u,
-)
-    A(u, IntrinsicStiefel)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:Intrinsic},
-    x,
-)
-    u = coord_change(A, ExtrinsicStiefel, IntrinsicStiefel, x)
-    coord_change(A, IntrinsicStiefel, Intrinsic, u)
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:Extrinsic},
-    x,
-)
-    x[1:end-1] ./ x[end]
-end
-function coord_change(
-    A::LinearSubspace,
-    ::Coordinates{:ExtrinsicStiefel},
-    ::Coordinates{:IntrinsicStiefel},
-    x,
-)
-    A.intrinsic.Y' * x
-end
+    A.intrinsic.A' * (x - A.intrinsic.b)
+
 
 """
-    geodesic_distance(A::LinearSubspace, B::LinearSubspace)
+    geodesic_distance(V::LinearSubspace, W::LinearSubspace)
 
-Compute the geodesic distance between `A` and `B` in the affine Grassmanian `Graff(k, n)`
-where `k = dim(A)` and `n` is the amebient dimension.
-This follows the derivation in [^LKK19].
+Compute the geodesic distance between `V = {x | Ax = a}` and `W= {x | Bx = b}` as `sqrt(d^2 + ||a-b||^2)`, where `d` is the distance from the columnspan of `A` to the columnspan of `B` in the Grassmannian. This follows the derivation in [^LKK19].
 
 [^LKK19]: $_LKK19.
 """
@@ -650,32 +565,48 @@ end
 
 # geodesic
 """
-    geodesic_svd(A::LinearSubspace, B::LinearSubspace)
+    grassmannian_svd(A::LinearSubspace, B::LinearSubspace)
 
 Computes the factors ``Q``, ``Θ`` and ``U`` from Corollary 4.3 in [^LKK19].
-These values are necessary to construct the geodesic between `A` and `B`.
+These values are necessary to construct the path from `A` and `B`.
 
 [^LKK19]: $_LKK19
 """
-geodesic_svd(A::LinearSubspace, B::LinearSubspace) = geodesic_svd(A.intrinsic, B.intrinsic)
-function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
-    U, Σ, V = LA.svd!(A.Y' * B.Y)
+grassmannian_svd(A::LinearSubspace, B::LinearSubspace) =
+    grassmannian_svd(extrinsic(A), extrinsic(B))
+grassmannian_svd(A::E1, B::E2) where {E1,E2<:ExtrinsicDescription} =
+    grassmannian_svd(transpose(A.A), transpose(B.A))
+function grassmannian_svd(
+    A::I1,
+    B::I2;
+    embedded_projective::Bool = false,
+) where {I1,I2<:IntrinsicDescription}
+    if !embedded_projective
+        grassmannian_svd(A.X, B.X)
+    else
+        grassmannian_svd(A.Y, B.Y)
+    end
+end
+
+function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
+
+    # here A and B are assumed to be Stiefel matrices representing linear spaces.
+    n, k = size(A)
+    U, Σ, V = LA.svd!(A' * B)
+    # M = (LA.I - A * A') * B
+    # Have to compute an SVD of M s.t. M = Q sinΘ V'
+    # Equivalently M * V = Q sin(Θ)
+    # We can achieve this by using a *pivoted* QR
+    # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
+    MV = (LA.I - A * A') * B * V
+
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
     # We try to correct this fact by treating σ >= 1 - 2eps() as 1.0
     Θ = map(σ -> σ + 2 * eps() > 1.0 ? 0.0 : acos(σ), Σ)
 
-    n, k = size(A.Y)
-    # M = (LA.I - A.Y * A.Y') * B.Y * inv(A.Y' * B.Y)
-    # Have to compute an SVD of M s.t. M = Q tanΘ U'
-    # Equivalently M * U = Q tan(Θ)
-    # We can achieve this by using a *pivoted* QR
-    # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
-
-    # inv(A.Y' * B.Y) * U = V * LA.diagm(inv.(Σ))
-    MU = (LA.I - A.Y * A.Y') * B.Y * V * LA.diagm(inv.(Σ))
-    Q, R = qr_col_norm!(MU)
+    Q, R = qr_col_norm!(MV)
     # correct signs and ordering of Q
     Q′ = Q[:, k:-1:1]
     for j = 1:k
@@ -686,22 +617,28 @@ function geodesic_svd(A::IntrinsicDescription, B::IntrinsicDescription)
         end
     end
 
+    # scale with c (if c is random complex, then we get generic homotopies)
     Q′, Θ, U
 end
 
 """
-    geodesic(A::LinearSubspace, B::LinearSubspace)
+    geodesic(V::LinearSubspace, W::LinearSubspace)
 
-Returns the geodesic ``γ(t)`` connecting `A` and `B` in the Grassmanian ``Gr(k+1,n+1)``
-where ``k`` is the dimension of ``A`` and ``n`` is the ambient dimension.
-See also Corollary 4.3 in [^LKK19].
+    Compute the geodesic distance between `V = {x | Ax = a}` and `W= {x | Bx = b}` as `sqrt(d^2 + ||a-b||^2)`, where `d` is the distance from the columnspan of `A` to the columnspan of `B` in the Grassmannian. This follows the derivation in [^LKK19].
+
+Returns the geodesic ``γ(t)`` by connecting `V = {x | Ax = a}` and `W= {x | Bx = b}`. `A` and `B` are interpolated in the Grassmannian using Stiefel coordinates. See also Corollary 4.3 in [^LKK19]. `a` and `b` are interpolated linearly. Thus, ``γ(t)`` is a geodesic in the Euclidean group.
 
 [^LKK19]: $_LKK19
 """
 geodesic(A::LinearSubspace, B::LinearSubspace) = geodesic(A.intrinsic, B.intrinsic)
 function geodesic(A::IntrinsicDescription, B::IntrinsicDescription)
-    Q, Θ, U = geodesic_svd(A, B)
-    t -> A.Y * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U'
+    Q, Θ, U = grassmannian_svd(A, B)
+    t -> LinearSubspace(
+        IntrinsicDescription(
+            A.X * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U',
+            t .* A.b + (1 - t) .* B.b,
+        ),
+    )
 end
 #
 """
@@ -716,8 +653,9 @@ function translate!(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsi
     ext = extrinsic(L)
     ext.b .+= δb
     int = intrinsic(L)
-    LA.mul!(int.b₀, ext.A', δb, true, true)
-    stiefel_coordinates!(int.Y, int.A, int.b₀)
+    LA.mul!(int.b, ext.A', δb, true, true)
+    stiefel_coordinates_intrinsic!(int.X, int.A)
+    stiefel_coordinates_intrinsic!(int.Y, int.A, int.b)
     L
 end
 
