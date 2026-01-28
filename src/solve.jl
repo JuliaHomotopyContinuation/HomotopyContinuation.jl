@@ -275,17 +275,18 @@ function linear_subspace_homotopy(
     W::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     intrinsic = nothing,
+    gamma = cis(2 * pi * randn())
 )
-    # Intrinsic: m+1,dim(V)+1
-    # Extrinsic: m+codim(V), dim(V) + codim(V)
-    if dim(V) < codim(V) || something(intrinsic, false)
+
+
+    if dim(V) <= codim(V) || something(intrinsic, false)
         if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
-            IntrinsicSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W)
+            IntrinsicSubspaceHomotopy(on_affine_chart(F; compile = compile), V, W; gamma = gamma)
         else
-            IntrinsicSubspaceHomotopy(F, V, W; compile = compile)
+            IntrinsicSubspaceHomotopy(F, V, W; compile = compile, gamma = gamma)
         end
     else
-        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile)
+        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile, gamma = gamma)
         if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
             on_affine_chart(H)
         else
