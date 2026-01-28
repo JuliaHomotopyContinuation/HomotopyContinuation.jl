@@ -154,6 +154,7 @@ function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
@@ -282,6 +283,7 @@ function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
@@ -398,6 +400,7 @@ function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
@@ -467,7 +470,7 @@ function set_subspaces!(
 
     if isa(H, ExtrinsicSubspaceHomotopy)
         H.path = get!(LRU, (start, target)) do
-                GrassmannianGeodesic(extrinsic(start), intrinsic(target))
+                GrassmannianGeodesic(extrinsic(start), extrinsic(target))
             end
     else
         H.path = get!(LRU, (start, target)) do

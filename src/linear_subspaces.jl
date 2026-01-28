@@ -584,6 +584,7 @@ function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
 
     # here A and B are assumed to be Stiefel matrices representing linear spaces.
     n, k = size(A)
+    @show size(A), size(B)
     U, Σ, V = LA.svd!(A' * B)
     # M = (LA.I - A * A') * B
     # Have to compute an SVD of M s.t. M = Q sinΘ V'
