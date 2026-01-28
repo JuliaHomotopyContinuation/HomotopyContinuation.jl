@@ -37,7 +37,7 @@
         γ = geodesic(A, C)
         γ1 = γ(1)
         @test ambient_dim(γ1) == ambient_dim(A)
-        @test dim(γ1) == dim(A)           
+        @test dim(γ1) == dim(A)
 
         A2 = translate(A, [1, 1], Extrinsic)
         A3 = LinearSubspace(extrinsic(A).A, extrinsic(A).b + [1, 1])
@@ -116,19 +116,19 @@
         ]
         F = System(f, variables = [x, y, z])
 
-        L1 = LinearSubspace(reshape([1; 0; 0.0], 1 ,3), [1.0])
+        L1 = LinearSubspace(reshape([1; 0; 0.0], 1, 3), [1.0])
         L2 = LinearSubspace(reshape([0; 1; 0.0], 1, 3), [1.0])
 
         W = witness_set(F, L1; show_progress = false, start_system = :total_degree)
         start = solutions(W)[1]
 
-        H1 = ExtrinsicSubspaceHomotopy(F, L1, L2);
-        H2 = IntrinsicSubspaceHomotopy(F, L1, L2);
-        H3 = IntrinsicSubspaceProjectiveHomotopy(F, L1, L2);
+        H1 = ExtrinsicSubspaceHomotopy(F, L1, L2)
+        H2 = IntrinsicSubspaceHomotopy(F, L1, L2)
+        H3 = IntrinsicSubspaceProjectiveHomotopy(F, L1, L2)
 
-        T1 = EndgameTracker(H1);
-        T2 = EndgameTracker(H2);
-        T3 = EndgameTracker(H3);
+        T1 = EndgameTracker(H1)
+        T2 = EndgameTracker(H2)
+        T3 = EndgameTracker(H3)
 
         res1 = track(T1, start)
         res2 = track(T2, start)

@@ -134,14 +134,15 @@ struct IntrinsicDescription{T}
     # stiefel coordinates for [A b]
     Y::Matrix{T}
 end
-IntrinsicDescription(A::Matrix{T1}, b::Vector{T2}) where {T1,T2} =
-    IntrinsicDescription(A, b, stiefel_coordinates_intrinsic(A), stiefel_coordinates_intrinsic(A, b))
+IntrinsicDescription(A::Matrix{T1}, b::Vector{T2}) where {T1,T2} = IntrinsicDescription(
+    A,
+    b,
+    stiefel_coordinates_intrinsic(A),
+    stiefel_coordinates_intrinsic(A, b),
+)
 
 function Base.convert(::Type{IntrinsicDescription{T}}, A::IntrinsicDescription) where {T}
-    IntrinsicDescription(
-        convert(Matrix{T}, A.A),
-        convert(Vector{T}, A.b),
-    )
+    IntrinsicDescription(convert(Matrix{T}, A.A), convert(Vector{T}, A.b))
 end
 
 (A::IntrinsicDescription)(u::AbstractVector, ::Coordinates{:Intrinsic}) = A.A * u + A.b
@@ -208,7 +209,8 @@ function Base.copy!(A::IntrinsicDescription, B::IntrinsicDescription)
     copy!(A.Y, B.Y)
     A
 end
-Base.copy(A::IntrinsicDescription) = IntrinsicDescription(copy(A.A), copy(A.b), copy(A.X), copy(A.Y))
+Base.copy(A::IntrinsicDescription) =
+    IntrinsicDescription(copy(A.A), copy(A.b), copy(A.X), copy(A.Y))
 
 Base.broadcastable(A::IntrinsicDescription) = Ref(A)
 
@@ -570,15 +572,20 @@ These values are necessary to construct the path from `A` and `B`.
 
 [^LKK19]: $_LKK19
 """
-grassmannian_svd(A::LinearSubspace, B::LinearSubspace) = grassmannian_svd(extrinsic(A), extrinsic(B))
-grassmannian_svd(A::E1, B::E2) where {E1, E2 <: ExtrinsicDescription}  = grassmannian_svd(transpose(A.A), transpose(B.A))
-function grassmannian_svd(A::I1, B::I2; 
-                        embedded_projective::Bool = false) where {I1, I2 <: IntrinsicDescription}
-         if !embedded_projective
-            grassmannian_svd(A.X, B.X)
-         else
-            grassmannian_svd(A.Y, B.Y)
-         end
+grassmannian_svd(A::LinearSubspace, B::LinearSubspace) =
+    grassmannian_svd(extrinsic(A), extrinsic(B))
+grassmannian_svd(A::E1, B::E2) where {E1,E2<:ExtrinsicDescription} =
+    grassmannian_svd(transpose(A.A), transpose(B.A))
+function grassmannian_svd(
+    A::I1,
+    B::I2;
+    embedded_projective::Bool = false,
+) where {I1,I2<:IntrinsicDescription}
+    if !embedded_projective
+        grassmannian_svd(A.X, B.X)
+    else
+        grassmannian_svd(A.Y, B.Y)
+    end
 end
 
 function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
@@ -592,7 +599,7 @@ function grassmannian_svd(A::AbstractMatrix, B::AbstractMatrix)
     # We can achieve this by using a *pivoted* QR
     # since then R will be a diagonal matrix s.t. the absolute value of R_ii is θ_{k-i}
     MV = (LA.I - A * A') * B * V
-    
+
     # Θ = acos.(min.(Σ, 1.0))
     # We have acos(1-eps()) = 2.1073424255447017e-8
     # So this is numerically super unstable if the singular value is off by only eps()
@@ -626,10 +633,10 @@ Returns the geodesic ``γ(t)`` by connecting `V = {x | Ax = a}` and `W= {x | Bx 
 geodesic(A::LinearSubspace, B::LinearSubspace) = geodesic(A.intrinsic, B.intrinsic)
 function geodesic(A::IntrinsicDescription, B::IntrinsicDescription)
     Q, Θ, U = grassmannian_svd(A, B)
-    t -> IntrinsicDescription(
-            A.X * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U', 
-            t .* A.b + (1-t) .* B.b
-            ) |> LinearSubspace
+    t -> LinearSubspace(IntrinsicDescription(
+        A.X * U * LA.diagm(cos.(t .* Θ,)) * U' + Q * LA.diagm(sin.(t .* Θ,)) * U',
+        t .* A.b + (1 - t) .* B.b,
+    ))
 end
 #
 """
@@ -665,4 +672,3 @@ function Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
     ext₂ = extrinsic(L₂)
     LinearSubspace([ext₁.A; ext₂.A], [ext₁.b; ext₂.b])
 end
-

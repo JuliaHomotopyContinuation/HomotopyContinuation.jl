@@ -111,7 +111,7 @@ end
         c = cos.(t .* Θ)
         γ = Q_cos .* c' .+ Q .* s'
 
-        h = Homotopy([f1; f2; transpose(γ)*x - (t .* a + (1-t) .* b)], x, t)
+        h = Homotopy([f1; f2; transpose(γ) * x - (t .* a + (1 - t) .* b)], x, t)
 
         test_homotopy(H, h)
     end
@@ -134,7 +134,7 @@ end
         c = cos.(t .* Θ)
         γ = Q_cos .* c' .+ Q .* s'
 
-        h = Homotopy(F(γ*v + t .* a + (1-t) .* b), v, t)
+        h = Homotopy(F(γ * v + t .* a + (1 - t) .* b), v, t)
 
         x0 = randn(ComplexF64, 4)
         t0 = ComplexF64(rand())
@@ -160,8 +160,13 @@ end
         F = System([f1, f2], x)
         A = rand_subspace(4; codim = 2)
         B = rand_subspace(4, codim = 2)
-        H = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = false), A, B; gamma = nothing)
-        
+        H = IntrinsicSubspaceProjectiveHomotopy(
+            fixed(F; compile = false),
+            A,
+            B;
+            gamma = nothing,
+        )
+
         @unpack Q, Q_cos, Θ = H.path
 
         @var v[1:3] t

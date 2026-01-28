@@ -1,4 +1,5 @@
-export ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy, set_subspaces!
+export ExtrinsicSubspaceHomotopy,
+    IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy, set_subspaces!
 
 
 ## Implementation details
@@ -27,25 +28,24 @@ struct GrassmannianGeodesic
     Θ::Vector{Float64}
     U::Matrix{ComplexF64}
     γ1::Matrix{ComplexF64}
-    B_start::Union{Nothing, Matrix{ComplexF64}} ## for base change
-    B_target::Union{Nothing, Matrix{ComplexF64}}
+    B_start::Union{Nothing,Matrix{ComplexF64}} ## for base change
+    B_target::Union{Nothing,Matrix{ComplexF64}}
 end
 
-function GrassmannianGeodesic(start, target; 
-                             embedded_projective::Bool = false)
+function GrassmannianGeodesic(start, target; embedded_projective::Bool = false)
     if isa(start, ExtrinsicDescription)
         Q, Θ, U = grassmannian_svd(target, start)
         Q_cos = transpose(target.A) * U
-    elseif isa(start, IntrinsicDescription)    
-        Q, Θ, U = grassmannian_svd(target, start; embedded_projective = embedded_projective) 
-        if !embedded_projective 
+    elseif isa(start, IntrinsicDescription)
+        Q, Θ, U = grassmannian_svd(target, start; embedded_projective = embedded_projective)
+        if !embedded_projective
             Q_cos = target.X * U
         else
             Q_cos = target.Y * U
         end
-    end                  
-    
-    
+    end
+
+
     γ1 = similar(Q_cos)
     n, k = size(γ1)
     for j = 1:k
@@ -67,26 +67,20 @@ function GrassmannianGeodesic(start, target;
     G
 end
 
-const AFFINE_EXTRINSIC_LRU = LRU{
-    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
-    GrassmannianGeodesic,
-}(
-    maxsize = 128,
-)
+const AFFINE_EXTRINSIC_LRU =
+    LRU{Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},GrassmannianGeodesic}(
+        maxsize = 128,
+    )
 
-const AFFINE_INTRINSIC_LRU = LRU{
-    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
-    GrassmannianGeodesic,
-}(
-    maxsize = 128,
-)
+const AFFINE_INTRINSIC_LRU =
+    LRU{Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},GrassmannianGeodesic}(
+        maxsize = 128,
+    )
 
-const PROJECTIVE_INTRINSIC_LRU = LRU{
-    Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},
-    GrassmannianGeodesic,
-}(
-    maxsize = 128,
-)
+const PROJECTIVE_INTRINSIC_LRU =
+    LRU{Tuple{LinearSubspace{ComplexF64},LinearSubspace{ComplexF64}},GrassmannianGeodesic}(
+        maxsize = 128,
+    )
 
 
 """
@@ -103,15 +97,15 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
-    
+
     # For the matrix part (geodesic interpolation)
     path::GrassmannianGeodesic
     a0::Vector{ComplexF64}
     b0::Vector{ComplexF64}
 
     # For the offset part (linear interpolation)
-    a_minus_b::Union{Nothing, Vector{ComplexF64}}
-    offset::Union{Nothing, Vector{ComplexF64}}
+    a_minus_b::Union{Nothing,Vector{ComplexF64}}
+    offset::Union{Nothing,Vector{ComplexF64}}
 
     # caches for t
     t_cache::Base.RefValue{ComplexF64}
@@ -134,7 +128,7 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tL²::TaylorVector{3,ComplexF64}
 
     # c
-    gamma::Union{Nothing, ComplexF64}
+    gamma::Union{Nothing,ComplexF64}
 end
 
 
@@ -144,20 +138,20 @@ ExtrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...
+    kwargs...,
 ) = ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    kwargs...
+    kwargs...,
 )
     ExtrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
         convert(LinearSubspace{ComplexF64}, target);
-        kwargs...
+        kwargs...,
     )
 end
 
@@ -166,7 +160,7 @@ function ExtrinsicSubspaceHomotopy(
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing,ComplexF64} = cis(2 * pi * rand()),
 )
 
     if !isnothing(gamma)
@@ -185,7 +179,7 @@ function ExtrinsicSubspaceHomotopy(
     # extrinsic(target).A is replaced by transpose(path.Q_cos)    
     a0 = path.B_start * extrinsic(start).b
     b0 = path.B_target * extrinsic(target).b
-    
+
     # Prepare offset data for linear interpolation
     a_minus_b = a0 - b0
     J = zeros(ComplexF64, size(system))
@@ -215,12 +209,13 @@ function ExtrinsicSubspaceHomotopy(
         tL⁴ = tL⁴,
         tL³ = TaylorVector{4}(tL⁴),
         tL² = TaylorVector{3}(tL⁴),
-        gamma = gamma
+        gamma = gamma,
     )
 
 end
 
-Base.size(H::ExtrinsicSubspaceHomotopy) = (first(size(H.system)) + size(H.path.γ1, 2), last(size(H.system)))
+Base.size(H::ExtrinsicSubspaceHomotopy) =
+    (first(size(H.system)) + size(H.path.γ1, 2), last(size(H.system)))
 
 
 """
@@ -237,13 +232,13 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
-    
+
     # For the matrix part (geodesic interpolation)
     path::GrassmannianGeodesic
 
     # For the offset part (linear interpolation)
-    a_minus_b::Union{Nothing, Vector{ComplexF64}}
-    offset::Union{Nothing, Vector{ComplexF64}}
+    a_minus_b::Union{Nothing,Vector{ComplexF64}}
+    offset::Union{Nothing,Vector{ComplexF64}}
 
     # cache for t 
     t_cache::Base.RefValue{ComplexF64}
@@ -264,7 +259,7 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     tx²::TaylorVector{3,ComplexF64}
 
     # c 
-    gamma::Union{Nothing, ComplexF64}
+    gamma::Union{Nothing,ComplexF64}
 end
 
 
@@ -273,20 +268,20 @@ IntrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...
+    kwargs...,
 ) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    kwargs...
+    kwargs...,
 )
     IntrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
         convert(LinearSubspace{ComplexF64}, target);
-        kwargs...        
+        kwargs...,
     )
 end
 
@@ -295,7 +290,7 @@ function IntrinsicSubspaceHomotopy(
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing,ComplexF64} = cis(2 * pi * rand()),
 )
 
     if !isnothing(gamma)
@@ -309,14 +304,14 @@ function IntrinsicSubspaceHomotopy(
         GrassmannianGeodesic(intrinsic(start), intrinsic(target))
     end
     Q = path.Q
-    
+
     # Prepare offset data for linear interpolation
     a = intrinsic(start).b
     b = intrinsic(target).b
     a_minus_b = a - b
     offset = copy(b)
     J = zeros(ComplexF64, size(system))
-    
+
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
 
     IntrinsicSubspaceHomotopy(
@@ -338,7 +333,7 @@ function IntrinsicSubspaceHomotopy(
         tx⁴ = tx⁴,
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
-        gamma = gamma
+        gamma = gamma,
     )
 end
 
@@ -354,12 +349,13 @@ such that ``γ(1) = V`` and ``γ(0) = W``.
 Here ``γ(t)`` is the geodesic between ``V`` and ``W`` in the Grassmanian after embedding ``V`` and ``W`` in projective space via ``x -> [x; 1]``.
 See also [`LinearSubspace`](@ref) and [`geodesic`](@ref) and the references therein.
 """
-Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem} <: AbstractHomotopy
+Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem} <:
+                           AbstractHomotopy
     system::S
 
     start::LinearSubspace{ComplexF64}
     target::LinearSubspace{ComplexF64}
-    
+
     # For the matrix part (geodesic interpolation)
     path::GrassmannianGeodesic
 
@@ -381,7 +377,7 @@ Base.@kwdef mutable struct IntrinsicSubspaceProjectiveHomotopy{S<:AbstractSystem
     tx¹::TaylorVector{2,ComplexF64}
 
     # c 
-    gamma::Union{Nothing, ComplexF64}
+    gamma::Union{Nothing,ComplexF64}
 end
 
 
@@ -390,20 +386,25 @@ IntrinsicSubspaceProjectiveHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...
-) = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = compile), start, target; kwargs...)
+    kwargs...,
+) = IntrinsicSubspaceProjectiveHomotopy(
+    fixed(F; compile = compile),
+    start,
+    target;
+    kwargs...,
+)
 
 function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    kwargs...
+    kwargs...,
 )
     IntrinsicSubspaceProjectiveHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
         convert(LinearSubspace{ComplexF64}, target);
-        kwargs...
+        kwargs...,
     )
 end
 
@@ -412,7 +413,7 @@ function IntrinsicSubspaceProjectiveHomotopy(
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    gamma::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
+    gamma::Union{Nothing,ComplexF64} = cis(2 * pi * rand()),
 )
 
     if !isnothing(gamma)
@@ -426,7 +427,7 @@ function IntrinsicSubspaceProjectiveHomotopy(
         GrassmannianGeodesic(intrinsic(start), intrinsic(target); embedded_projective = true)
     end
     Q = path.Q
- 
+
     J = zeros(ComplexF64, size(system) .+ (1, 1))
     tx⁴ = TaylorVector{5}(ComplexF64, size(Q, 1))
 
@@ -448,26 +449,27 @@ function IntrinsicSubspaceProjectiveHomotopy(
         tx³ = TaylorVector{4}(tx⁴),
         tx² = TaylorVector{3}(tx⁴),
         tx¹ = TaylorVector{2}(tx⁴),
-        gamma = gamma
+        gamma = gamma,
     )
 end
 
-Base.size(H::IntrinsicSubspaceProjectiveHomotopy) = (size(H.system)[1] + 1, dim(H.start) + 1)
+Base.size(H::IntrinsicSubspaceProjectiveHomotopy) =
+    (size(H.system)[1] + 1, dim(H.start) + 1)
 
 
 
-const SubspaceHomotopy = Union{ExtrinsicSubspaceHomotopy, IntrinsicSubspaceHomotopy, IntrinsicSubspaceProjectiveHomotopy}
+const SubspaceHomotopy = Union{
+    ExtrinsicSubspaceHomotopy,
+    IntrinsicSubspaceHomotopy,
+    IntrinsicSubspaceProjectiveHomotopy,
+}
 
 """
     set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
 
 Update the homotopy `H` to track from the linear subspace `start` to `target`, where `H`. 
 """
-function set_subspaces!(
-    H::SubspaceHomotopy,
-    start::LinearSubspace,
-    target::LinearSubspace,
-)
+function set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::LinearSubspace)
     H.start = start
     H.target = target
 
@@ -481,12 +483,12 @@ function set_subspaces!(
 
     if isa(H, ExtrinsicSubspaceHomotopy)
         H.path = get!(LRU, (start, target)) do
-                GrassmannianGeodesic(extrinsic(start), extrinsic(target))
-            end
+            GrassmannianGeodesic(extrinsic(start), extrinsic(target))
+        end
     else
         H.path = get!(LRU, (start, target)) do
-                GrassmannianGeodesic(intrinsic(start), intrinsic(target))
-            end
+            GrassmannianGeodesic(intrinsic(start), intrinsic(target))
+        end
     end
 
     # Update the offsets
@@ -506,7 +508,7 @@ function set_subspaces!(
     H.t_cache[] = complex(0.0)
     H.offset_t_cache[] = complex(0.0)
     H.taylor_t_cache[] = complex(0.0)
-    
+
     H
 end
 
@@ -514,12 +516,11 @@ start_parameters!(H::SubspaceHomotopy, p::LinearSubspace) =
     set_subspaces!(H, convert(LinearSubspace{ComplexF64}, p), H.target)
 target_parameters!(H::SubspaceHomotopy, q::LinearSubspace) =
     set_subspaces!(H, H.start, convert(LinearSubspace{ComplexF64}, q))
-parameters!(H::SubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) =
-    set_subspaces!(
-        H,
-        convert(LinearSubspace{ComplexF64}, p),
-        convert(LinearSubspace{ComplexF64}, q),
-    )
+parameters!(H::SubspaceHomotopy, p::LinearSubspace, q::LinearSubspace) = set_subspaces!(
+    H,
+    convert(LinearSubspace{ComplexF64}, p),
+    convert(LinearSubspace{ComplexF64}, q),
+)
 
 # Helper function for computing the geodesic γ(t) at parameter t
 function γ!(H::SubspaceHomotopy, t::Number)
@@ -676,11 +677,17 @@ function ModelKit.evaluate!(u, H::ExtrinsicSubspaceHomotopy, x::Vector{ComplexDF
     u
 end
 
-function ModelKit.evaluate_and_jacobian!(u, U, H::ExtrinsicSubspaceHomotopy, x::AbstractVector, t)
+function ModelKit.evaluate_and_jacobian!(
+    u,
+    U,
+    H::ExtrinsicSubspaceHomotopy,
+    x::AbstractVector,
+    t,
+)
     γ = γ!(H, t)
     offset_at_t!(H, t)
     n, k = size(γ) # linear equation is: tranpose(γ) x - offset
-    
+
     evaluate_and_jacobian!(u, U, H.system, x)
     m = first(size(H.system))
     for i = 1:k
@@ -731,7 +738,7 @@ function ModelKit.taylor!(
     for i = 1:k
         u[m+i] = H.L̇[i]
     end
-    
+
     u
 end
 
@@ -755,7 +762,7 @@ function ModelKit.taylor!(
         LA.mul!(L¹, transpose(γ¹), v)
         offset_at_t!(H, t)
         LA.axpy!(-1, H.offset, L)
-        LA.axpy!(-1, H.a_minus_b, L¹) 
+        LA.axpy!(-1, H.a_minus_b, L¹)
     end
 
     H.v .= v¹
@@ -778,7 +785,7 @@ function ModelKit.taylor!(
     for i = 1:k
         u[m+i] = L²[i]
     end
-    
+
     u
 end
 
@@ -815,7 +822,7 @@ function ModelKit.taylor!(
     H.v .= v¹
     LA.mul!(H.L, transpose(γ²), H.v, true, true)
     L³ .= H.L
-    
+
     m = first(size(H.system))
     k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
@@ -865,7 +872,7 @@ function ModelKit.taylor!(
     LA.mul!(L⁴, transpose(γ²), v², true, true)
     LA.mul!(L⁴, transpose(γ³), v¹, true, true)
     LA.mul!(L⁴, transpose(γ⁴), v, true, true)
-    
+
     m = first(size(H.system))
     k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
@@ -888,7 +895,7 @@ end
 
 function set_solution!(u::Vector, H::IntrinsicSubspaceHomotopy, x::AbstractVector, t)
     (length(x) == length(H.x)) ||
-    throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
+        throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
 
     set_solution!(H.x, H.system, x)
     offset_at_t!(H, t)
@@ -913,7 +920,7 @@ function get_solution(H::IntrinsicSubspaceHomotopy, u::AbstractVector, t)
         γ = γ!(H, t)
         out = (γ * u) + H.offset
     end
-    
+
     out
 end
 
@@ -925,7 +932,7 @@ function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::Vector{ComplexDF
     LA.axpy!(1, H.offset, H.x_high)
 
     evaluate!(u, H.system, H.x_high)
-   
+
     u
 end
 
@@ -937,7 +944,7 @@ function ModelKit.evaluate!(u, H::IntrinsicSubspaceHomotopy, v::AbstractVector, 
     LA.axpy!(1, H.offset, H.x)
 
     evaluate!(u, H.system, H.x)
-   
+
     u
 end
 
@@ -952,8 +959,8 @@ function ModelKit.evaluate_and_jacobian!(
     LA.mul!(H.x, γ, v)
 
     offset_at_t!(H, t)
-    LA.axpy!(1, H.offset, H.x)  
-    
+    LA.axpy!(1, H.offset, H.x)
+
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
 
@@ -981,7 +988,7 @@ function ModelKit.taylor!(
     offset_at_t!(H, t)
     LA.axpy!(1, H.offset, H.x)
     LA.axpy!(1, H.a_minus_b, H.ẋ)  # H.a_minus_b = ḃ = derivative of offset with respect to t 
-    
+
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
 
@@ -1008,7 +1015,7 @@ function ModelKit.taylor!(
         LA.mul!(x¹, γ¹, v)
         offset_at_t!(H, t)
         LA.axpy!(1, H.offset, x)
-        LA.axpy!(1, H.a_minus_b, x¹) 
+        LA.axpy!(1, H.a_minus_b, x¹)
     end
 
     H.v .= v¹
@@ -1110,7 +1117,12 @@ end
 ######################################
 
 
-function set_solution!(u::Vector, H::IntrinsicSubspaceProjectiveHomotopy, x::AbstractVector, t)
+function set_solution!(
+    u::Vector,
+    H::IntrinsicSubspaceProjectiveHomotopy,
+    x::AbstractVector,
+    t,
+)
 
     (length(x) == length(H.x) - 1) ||
         throw(ArgumentError("Cannot set solution. Expected extrinsic coordinates."))
@@ -1128,7 +1140,7 @@ function set_solution!(u::Vector, H::IntrinsicSubspaceProjectiveHomotopy, x::Abs
 end
 
 function get_solution(H::IntrinsicSubspaceProjectiveHomotopy, u::AbstractVector, t)
-    
+
     if isone(t)
         out = (@view H.path.γ1[1:end-1, :]) * u
     elseif iszero(t)
@@ -1141,14 +1153,19 @@ function get_solution(H::IntrinsicSubspaceProjectiveHomotopy, u::AbstractVector,
     out
 end
 
-function ModelKit.evaluate!(u, H::IntrinsicSubspaceProjectiveHomotopy, v::Vector{ComplexDF64}, t)
+function ModelKit.evaluate!(
+    u,
+    H::IntrinsicSubspaceProjectiveHomotopy,
+    v::Vector{ComplexDF64},
+    t,
+)
     γ = γ!(H, t)
     LA.mul!(H.x_high, γ, v)
     evaluate!(u, H.system, H.x_high)
 
     n = first(size(H.system))
     u[n+1] = H.x_high[end] - 1.0
- 
+
     u
 end
 
@@ -1157,7 +1174,7 @@ function ModelKit.evaluate!(u, H::IntrinsicSubspaceProjectiveHomotopy, v::Abstra
     LA.mul!(H.x, γ, v)
 
     evaluate!(u, H.system, H.x)
-   
+
     n = first(size(H.system))
     u[n+1] = H.x[end] - 1.0
 
@@ -1173,7 +1190,7 @@ function ModelKit.evaluate_and_jacobian!(
 )
     γ = γ!(H, t)
     LA.mul!(H.x, γ, v)
-    
+
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(U, H.J, γ)
 
@@ -1204,7 +1221,7 @@ function ModelKit.taylor!(
     H.v .= first.(v)
     LA.mul!(H.x, γ, H.v)
     LA.mul!(H.ẋ, γ̇, H.v)
-    
+
     evaluate_and_jacobian!(u, H.J, H.system, H.x)
     LA.mul!(u, H.J, H.ẋ)
     M = size(H, 1)
