@@ -133,21 +133,20 @@ ExtrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
-) = ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; c = c)
+    kwargs...
+) = ExtrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
+    kwargs...
 )
     ExtrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
         convert(LinearSubspace{ComplexF64}, target);
-        c = c
+        kwargs...
     )
 end
 
@@ -155,15 +154,14 @@ function ExtrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::ComplexF64 = cis(2 * pi * rand())
+    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    c = c / abs(c) # make sure |c| = 1
-    # multiply with random complex number to get generic paths
-    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
-
-    # multiply with random complex number to get generic paths
-    start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    if !isnothing(c)
+        c = c / abs(c) # make sure |c| = 1
+        # multiply with random complex number to get generic paths
+        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    end
 
     # Create geodesic path for the matrix part
     path = get!(AFFINE_EXTRINSIC_LRU, (start, target)) do
@@ -263,21 +261,20 @@ IntrinsicSubspaceHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
-) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; c = c)
+    kwargs...
+) = IntrinsicSubspaceHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
+    kwargs...
 )
     IntrinsicSubspaceHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target),
-        c = c
+        convert(LinearSubspace{ComplexF64}, target);
+        kwargs...        
     )
 end
 
@@ -285,12 +282,14 @@ function IntrinsicSubspaceHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::ComplexF64 = cis(2 * pi * rand())
+    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    c = c / abs(c) # make sure |c| = 1
-    # multiply with random complex number to get generic paths
-    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
+    if !isnothing(c)
+        c = c / abs(c) # make sure |c| = 1
+        # multiply with random complex number to get generic paths
+        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    end
 
     # Create geodesic path for the matrix part
     path = get!(AFFINE_INTRINSIC_LRU, (start, target)) do
@@ -378,21 +377,20 @@ IntrinsicSubspaceProjectiveHomotopy(
     start::LinearSubspace,
     target::LinearSubspace;
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
-) = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = compile), start, target; c = c)
+    kwargs...
+) = IntrinsicSubspaceProjectiveHomotopy(fixed(F; compile = compile), start, target; kwargs...)
 
 function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace,
     target::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    c::ComplexF64 = cis(2 * pi * rand())
+    kwargs...
 )
     IntrinsicSubspaceProjectiveHomotopy(
         system,
         convert(LinearSubspace{ComplexF64}, start),
-        convert(LinearSubspace{ComplexF64}, target),
-        c = c
+        convert(LinearSubspace{ComplexF64}, target);
+        kwargs...
     )
 end
 
@@ -400,12 +398,14 @@ function IntrinsicSubspaceProjectiveHomotopy(
     system::AbstractSystem,
     start::LinearSubspace{ComplexF64},
     target::LinearSubspace{ComplexF64};
-    c::ComplexF64 = cis(2 * pi * rand())
+    c::Union{Nothing, ComplexF64} = cis(2 * pi * rand())
 )
 
-    c = c / abs(c) # make sure |c| = 1
-    # multiply with random complex number to get generic paths
-    start = ExtrinsicDescription(c .* extrinsic(start).A, c .* extrinsic(start).b; orthonormal = true) |> LinearSubspace
+    if !isnothing(c)
+        c = c / abs(c) # make sure |c| = 1
+        # multiply with random complex number to get generic paths
+        start = LinearSubspace(c .* extrinsic(start).A, c .* extrinsic(start).b)
+    end
 
     # Create geodesic path for the matrix part
     path = get!(PROJECTIVE_INTRINSIC_LRU, (start, target)) do
