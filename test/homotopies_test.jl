@@ -127,7 +127,7 @@ end
 
         @unpack Q, Q_cos, Θ = H.path
         a = intrinsic(H.start).b
-        b = intrinsic(H.start).b
+        b = intrinsic(H.target).b
 
         @var v[1:2] t
         s = sin.(t .* Θ)
