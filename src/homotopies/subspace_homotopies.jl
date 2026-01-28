@@ -777,10 +777,8 @@ function ModelKit.taylor!(
     m = first(size(H.system))
     k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
-    # F part is zero
-    for i = 1:m
-        u[i] = zero(eltype(u))
-    end
+    # F part 
+    taylor!(u, Val(2), H.system, tv)
     # rest is L²
     for i = 1:k
         u[m+i] = L²[i]
@@ -826,10 +824,8 @@ function ModelKit.taylor!(
     m = first(size(H.system))
     k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
-    # F part is zero
-    for i = 1:m
-        u[i] = zero(eltype(u))
-    end
+    # F part 
+    taylor!(u, Val(3), H.system, tv)
     # rest is L³
     for i = 1:k
         u[m+i] = L³[i]
@@ -876,10 +872,8 @@ function ModelKit.taylor!(
     m = first(size(H.system))
     k = size(γ, 2) # recall that A(t) = transpose(γ(t)), so A(t) is kxn
 
-    # F part is zero
-    for i = 1:m
-        u[i] = zero(eltype(u))
-    end
+    # F part 
+    taylor!(u, Val(4), H.system, tv)
     # rest is L⁴
     for i = 1:k
         u[m+i] = L⁴[i]
