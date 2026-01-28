@@ -148,12 +148,13 @@ end
 
 function stiefel_coordinates_intrinsic(A::AbstractMatrix)
     n, k = size(A)
-    SVD = LA.svd!(A)
+    SVD = LA.svd(A)
     SVD.U
 end
 function stiefel_coordinates_intrinsic!(X, A::AbstractMatrix)
     n, k = size(A)
-    SVD = LA.svd!(A)
+    X .= A
+    SVD = LA.svd!(X)
     X .= SVD.U
     X
 end

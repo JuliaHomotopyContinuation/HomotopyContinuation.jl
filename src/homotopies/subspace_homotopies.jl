@@ -27,6 +27,8 @@ struct GrassmannianGeodesic
     Θ::Vector{Float64}
     U::Matrix{ComplexF64}
     γ1::Matrix{ComplexF64}
+    B_start::Union{Nothing, Matrix{ComplexF64}} ## for base change
+    B_target::Union{Nothing, Matrix{ComplexF64}}
 end
 
 function GrassmannianGeodesic(start, target; 
@@ -52,7 +54,16 @@ function GrassmannianGeodesic(start, target;
             γ1[i, j] = Q_cos[i, j] * c + Q[i, j] * s
         end
     end
-    G = GrassmannianGeodesic(Q, Q_cos, Θ, U, γ1)
+
+    if isa(start, ExtrinsicDescription)
+        B_start = transpose(γ1) * start.A'
+        B_target = transpose(Q_cos) * target.A'
+    else
+        B_start = nothing
+        B_target = nothing
+    end
+
+    G = GrassmannianGeodesic(Q, Q_cos, Θ, U, γ1, B_start, B_target)
     G
 end
 
@@ -170,17 +181,17 @@ function ExtrinsicSubspaceHomotopy(
     end
     Q = path.Q
     # get correct coordinates for A and b in the Stiefel homotopy
-    Uʰ_start = transpose(path.γ1) * start.extrinsic.A'
-    Uʰ_target = transpose(path.Q_cos) * target.extrinsic.A'
+    # extrinsic(start).A is replaced by transpose(path.γ1)
+    # extrinsic(target).A is replaced by transpose(path.Q_cos)    
+    a0 = path.B_start * extrinsic(start).b
+    b0 = path.B_target * extrinsic(target).b
     
     # Prepare offset data for linear interpolation
-    a0 = Uʰ_start * extrinsic(start).b
-    b0 = Uʰ_target * extrinsic(target).b
     a_minus_b = a0 - b0
     J = zeros(ComplexF64, size(system))
     ū = zeros(ComplexDF64, length(a0))
-    
-    k = length(a0)
+
+    k = size(path.γ1, 2)
     tL⁴ = TaylorVector{5}(ComplexF64, k)
 
     ExtrinsicSubspaceHomotopy(
@@ -479,11 +490,11 @@ function set_subspaces!(
     end
 
     # Update the offsets
-    if isa(H, ExtrinsicSubspaceHomotopy) 
-        a = H.a0
-        b = H.b0
-        H.a_minus_b .= a .- b
-        H.offset .= b
+    if isa(H, ExtrinsicSubspaceHomotopy)
+        LA.mul!(H.a0, H.path.B_start, extrinsic(start).b)
+        LA.mul!(H.b0, H.path.B_target, extrinsic(target).b)
+        H.a_minus_b .= H.a0 .- H.b0
+        H.offset .= H.b0
     elseif isa(H, IntrinsicSubspaceHomotopy)
         a = intrinsic(start).b
         b = intrinsic(target).b
