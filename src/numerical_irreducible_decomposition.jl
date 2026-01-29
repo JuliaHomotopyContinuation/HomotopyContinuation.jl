@@ -51,6 +51,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_removing_points::Bool = false
     is_computing_hypersurfaces::Bool = true
     is_membership_test::Bool = false
+    is_monodromy::Bool = false
     is_finished::Bool = false
     current_task::Int = 0
     ntasks::Int = 0
@@ -72,6 +73,7 @@ update_progress!(
     is_solving::Union{Nothing,Bool} = nothing,
     is_removing_points::Union{Nothing,Bool} = nothing,
     is_membership_test::Union{Nothing,Bool} = nothing,
+    is_monodromy::Union{Nothing,Bool} = nothing
 ) = nothing
 function update_progress!(
     progress::WitnessSetsProgress;
@@ -79,6 +81,7 @@ function update_progress!(
     is_solving::Union{Nothing,Bool} = nothing,
     is_removing_points::Union{Nothing,Bool} = nothing,
     is_membership_test::Union{Nothing,Bool} = nothing,
+    is_monodromy::Union{Nothing,Bool} = nothing
 )
     isnothing(is_computing_hypersurfaces) ? nothing :
     progress.is_computing_hypersurfaces = is_computing_hypersurfaces
@@ -87,6 +90,8 @@ function update_progress!(
     progress.is_removing_points = is_removing_points
     isnothing(is_membership_test) ? nothing :
     progress.is_membership_test = is_membership_test
+    isnothing(is_monodromy) ? nothing :
+    progress.is_monodromy = is_monodromy
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -139,6 +144,7 @@ function finish_progress!(progress::WitnessSetsProgress)
     progress.is_solving = false
     progress.is_removing_points = false
     progress.is_membership_test = false
+    progress.is_monodromy = false
     progress.is_finished = true
     PM.finish!(progress.progress_meter, showvalues = showvalues(progress))
 end
@@ -172,6 +178,11 @@ function showvalues(progress::WitnessSetsProgress)
                     text,
                     ("Membership test", "$(progress.current_task)/$(progress.ntasks) points checked"),
                 )
+            elseif progress.is_monodromy
+            push!(
+                text,
+                ("Finding missing points", "$(progress.current_task)/$(progress.ntasks) witness sets checked"),
+            )
             end
         end
     else
@@ -362,11 +373,11 @@ function _regeneration(
                 # the first step: take the witness superset H[1] as initial witness superset
                 begin
                     P = solutions(H[1])
-                    X = out[1]
+                    W = out[1]
                     for p in P
-                        push!(X, p)
+                        push!(W, p)
                     end
-                    update_progress!(progress, X)
+                    update_progress!(progress, W)
                 end
             else
                 begin
@@ -389,12 +400,19 @@ function _regeneration(
         pop!(out)
     end
 
+    update_progress!(progress; is_solving = false, 
+                               is_removing_points = false, 
+                               is_monodromy = true)
     filter!(W -> degree(W) > 0, out)
     if !isempty(out)
+        l = length(out)
+        idx = 0
         witness_sets = map(out) do W
+            idx += 1
+            update_progress_tasks!(progress, idx, l)
             P, L = u_transform(W)
             # running a safety monodrom
-            if dim(L) > 0
+            if dim(L) < n
                 res = monodromy_solve(
                     F, P, L;
                     threading = threading,
@@ -508,8 +526,8 @@ function intersect_all!(out, H, cache; kwargs...)
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
             update_progress!(progress; is_solving = true, is_removing_points = false)
             new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
-            update_progress!(progress, Wₖ)
-   
+            
+
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
             # we only need to do this for witness sets of codimensions 1≤j≤k.
@@ -526,12 +544,12 @@ function intersect_all!(out, H, cache; kwargs...)
                     push!(Wₖ₊₁, p)
                 end
             end
+        
             update_progress!(progress, Wₖ₊₁)
         end
+        update_progress!(progress, Wₖ)
     end
 end
-
-
 
 """
     intersect_with_hypersurface!
@@ -561,7 +579,6 @@ function intersect_with_hypersurface!(
     # for further processing
     m = .!(is_contained(W, H, cache; threading = threading, kwargs...))
     P_next = manage_initial_points!(P, m, W, progress)
-    update_progress!(progress, W)
     if isempty(P_next)
         return nothing
     end
@@ -599,7 +616,6 @@ end
 function manage_initial_points!(P, m, W, progress)
     P_next = P[m]
     deleteat!(P, m)
-    update_progress!(progress, W)
     return P_next
 end
 
@@ -750,7 +766,7 @@ function remove_points!(
 )
     m = is_contained(P, W, V, cache.Fᵢ, cache; kwargs...)
     deleteat!(P, m)
-
+    
     nothing
 end
 
