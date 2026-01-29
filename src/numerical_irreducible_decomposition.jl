@@ -54,6 +54,7 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_removing_points::Bool = false
     is_computing_hypersurfaces::Bool = true
     is_membership_test::Bool = false
+    is_finished::Bool = false
     current_task::Int = 0
     ntasks::Int = 0
     current_hypersurface::Int = 1
@@ -141,45 +142,54 @@ function finish_progress!(progress::WitnessSetsProgress)
     progress.is_solving = false
     progress.is_removing_points = false
     progress.is_membership_test = false
+    progress.is_finished = true
     PM.finish!(progress.progress_meter, showvalues = showvalues(progress))
 end
 function showvalues(progress::WitnessSetsProgress)
-    if progress.is_computing_hypersurfaces
-        text = [("Computing hypersurfaces", "")]
-    else
-        text = [(
-            "Intersect with hypersurface",
-            "$(progress.current_hypersurface) / $(progress.nhypersurfaces)",
-        )]
-        if progress.is_removing_points
-            push!(
-                text,
-                (
-                    "Remove points",
-                    "from dim. $(progress.current_dim) that are in dim. $(progress.remove_dim) ($(progress.current_task)/$(progress.ntasks) checked)",
-                ),
-            )
-        elseif progress.is_solving
-            push!(text, ("Tracking paths", "$(progress.current_task)/$(progress.ntasks)"))
-        elseif progress.is_membership_test
-            push!(
-                text,
-                (
-                    "Membership test",
-                    "$(progress.current_task)/$(progress.ntasks) points checked",
-                ),
-            )
-        end
 
-        push!(text, ("Current number of witness points", ""))
-        for c = 1:progress.current_hypersurface
-            d = progress.ambient_dim - c
-            deg = get(progress.degrees, c, nothing)
-            if !isnothing(deg) && deg > 0
-                push!(text, ("Dimension $d", "$(deg)"))
+    if !progress.is_finished
+        text = [("Status", "")]
+        if progress.is_computing_hypersurfaces
+            push!(
+                text, 
+                ("Computing hypersurfaces", " ")
+            )
+        else
+            push!(
+                text,
+                ("Intersect with hypersurface",
+                "$(progress.current_hypersurface) / $(progress.nhypersurfaces)")
+            )
+            if progress.is_removing_points
+                push!(
+                    text,
+                    ( "Remove points dim. $(progress.current_dim) vs. $(progress.remove_dim)", "$(progress.current_task)/$(progress.ntasks) points checked"),
+                )
+            elseif progress.is_solving
+                push!(
+                    text, 
+                    ("Tracking paths", "$(progress.current_task)/$(progress.ntasks) paths tracked")
+                )
+            elseif progress.is_membership_test
+                push!(
+                    text,
+                    ("Membership test", "$(progress.current_task)/$(progress.ntasks) points checked"),
+                )
             end
         end
+    else
+        text = [("Status", "Done")]
     end
+
+    push!(text, ("Current number of witness points", " "))
+    for c = 1:progress.current_hypersurface
+        d = progress.ambient_dim - c
+        deg = get(progress.degrees, c, nothing)
+        if !isnothing(deg) && deg > 0
+            push!(text, ("Dimension $d", "$(deg)"))
+        end
+    end
+
 
     text
 end
