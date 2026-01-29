@@ -1009,8 +1009,7 @@ function decompose_with_monodromy!(
             L,
             seed;
             threading = threading,
-            show_progress = show_monodromy_progress,
-            max_loops_no_progress = 1
+            show_progress = show_monodromy_progress
         )
 
         if warning && (trace(res) > options.trace_test_tol)
@@ -1327,7 +1326,7 @@ function decompose(
     Ws::Union{Vector{WP}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10, max_loops_no_progress = 1),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
