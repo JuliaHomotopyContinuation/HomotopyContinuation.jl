@@ -406,9 +406,9 @@ end
 
 function initialize_linear_equations(n)
 
-    sqrtn = sqrt(n)
-    A₀ = randn(ComplexF64, n - 1, n)
-    b₀ = sqrtn .* randn(ComplexF64, n - 1)
+    sqrtn = min(sqrt(n), 1e3)
+    A₀ = randn(ComplexF64, n - 1, n) ./ sqrtn
+    b₀ = randn(ComplexF64, n - 1)
     svd = LA.svd(A₀) # we orthogonalize A
     Aᵥ = svd.Vt
 
@@ -494,7 +494,7 @@ function intersect_all!(out, H, cache; kwargs...)
             update_progress!(progress; is_solving = true, is_removing_points = false)
             new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
             update_progress!(progress, Wₖ)
-        
+   
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
             # we only need to do this for witness sets of codimensions 1≤j≤k.
@@ -660,8 +660,7 @@ end
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
     d = ModelKit.degree(H)
-    γ = exp(2 * pi * im * rand()) # gamma trick
-    g0 = γ * (u^d - 1)
+    g0 = u^d - 1
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space K with u=c.
@@ -670,7 +669,7 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
     F₀ = slice(System([f; g0], variables = vars), L; compile = false)
     G₀ = slice(System([f; g], variables = vars), K; compile = false)
-    Hom = StraightLineHomotopy(F₀, G₀)
+    Hom = StraightLineHomotopy(F₀, G₀; gamma = cis(2 * pi * rand()))
 
     return Hom, d
 end
