@@ -494,7 +494,6 @@ function intersect_all!(out, H, cache; kwargs...)
             update_progress!(progress; is_solving = true, is_removing_points = false)
             new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
             update_progress!(progress, Wₖ)
-            update_progress!(progress, Wₖ₊₁)
 
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
@@ -512,7 +511,6 @@ function intersect_all!(out, H, cache; kwargs...)
                     push!(Wₖ₊₁, p)
                 end
             end
-            update_progress!(progress, Wₖ)
             update_progress!(progress, Wₖ₊₁)
         end
     end
@@ -553,6 +551,7 @@ function intersect_with_hypersurface!(
     # for further processing
     m = .!(is_contained(W, H, cache; threading = threading, kwargs...))
     P_next = manage_initial_points!(P, m, W, progress)
+    update_progress!(progress, W)
     if isempty(P_next)
         return nothing
     end
