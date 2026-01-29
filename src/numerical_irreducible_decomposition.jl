@@ -283,6 +283,8 @@ function _regeneration(
     ),
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
+    atol = 1e-14, 
+    rtol = sqrt(eps())
 )
 
     !isnothing(seed) && Random.seed!(seed)
@@ -371,7 +373,7 @@ function _regeneration(
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
-                    intersect_all!(out, H, cache, threading)
+                    intersect_all!(out, H, cache; threading = threading, atol = atol, rtol = rtol)
 
                     # update Fᵢ
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
@@ -464,7 +466,7 @@ function initialize_hypersurfaces(
     out
 end
 
-function intersect_all!(out, H, cache, threading)
+function intersect_all!(out, H, cache; kwargs...)
 
     i = cache.i
     codim = cache.codim
@@ -488,7 +490,7 @@ function intersect_all!(out, H, cache, threading)
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
             update_progress!(progress; is_solving = true, is_removing_points = false)
-            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; threading = threading)
+            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
 
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
@@ -498,7 +500,7 @@ function intersect_all!(out, H, cache, threading)
                 update_progress_dim!(progress, k+1, j)
                 if degree(X) > 0
                     update_progress!(progress; is_solving = false, is_removing_points = true)
-                    remove_points!(Wₖ₊₁, X, cache; threading = threading)
+                    remove_points!(Wₖ₊₁, X, cache; kwargs...)
                     update_progress!(progress, Wₖ₊₁)
                 end
             end
@@ -521,6 +523,7 @@ function intersect_with_hypersurface!(
     X,
     cache;
     threading::Bool = Threads.nthreads() > 1,
+    kwargs...
 )
 
     if isnothing(X)
@@ -540,7 +543,7 @@ function intersect_with_hypersurface!(
     # we check which points of W are also contained in H
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
-    m = .!(is_contained(W, H, cache; threading = threading))
+    m = .!(is_contained(W, H, cache; threading = threading, kwargs...))
     P_next = manage_initial_points!(P, m, W, progress)
     if isempty(P_next)
         return nothing
@@ -670,7 +673,7 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
+function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
 
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
@@ -697,32 +700,31 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
         set_up_linear_spaces!(cache, LX, LY)
 
         if threading
-            out = threaded_x_in_Y(X, Y, F, tracker, cache)
+            out = threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...)
         else
-            out = serial_x_in_Y(X, Y, F, tracker, cache)
+            out = serial_x_in_Y(X, Y, F, tracker, cache; kwargs...)
         end
     end
     update_progress!(progress; is_membership_test = false)
 
-    @show sum(out)
     out
 end
 function is_contained(
     V::WitnessPoints,
     W::WitnessSet,
     cache::RegenerationCache;
-    threading::Bool = Threads.nthreads() > 1,
+    kwargs...
 )
-    is_contained(V, W, system(W), cache; threading = threading)
+    is_contained(V, W, system(W), cache; kwargs...)
 end
 
 function remove_points!(
     W::WitnessPoints,
     V::WitnessPoints,
     cache::RegenerationCache;
-    threading::Bool = Threads.nthreads() > 1,
+    kwargs...
 )
-    m = is_contained(W, V, cache.Fᵢ, cache; threading = threading)
+    m = is_contained(W, V, cache.Fᵢ, cache; kwargs...)
     deleteat!(W.R, m)
 
     nothing
@@ -763,10 +765,7 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-function serial_x_in_Y(X, Y, F, tracker, cache)
-
-    atol = 1e-14
-    rtol = sqrt(eps())
+function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -781,11 +780,14 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
-    l_X = length(points(X))
+    P = points(X)
+    l_X = length(P)
     out = Vector{Bool}(undef, l_X)
+    idx = 0
 
     #we loop over the points in X and check if they are contained in Y
-    for idx in 1:l_X
+    out = map(P) do x
+        idx +=1
         update_progress_tasks!(progress, idx, l_X)
 
         # first check
@@ -812,19 +814,19 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
             track!(tracker, p, 1)
             q = solution(tracker)
             if distance(q, x, InfNorm()) < rad
-                out[idx] = true
+                return true
             end
         end
 
-        out[idx] = false
+        return false
     end
 
     out
 end
-function threaded_x_in_Y(X, Y, F, tracker, cache)
+function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
-    atol = 1e-14
-    rtol = sqrt(eps())
+    @show "threading"
+    @show atol, rtol 
 
     progress = cache.progress
     x0 = cache.x0
@@ -1657,6 +1659,8 @@ function numerical_irreducible_decomposition(
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
+    atol = 1e-14, 
+    rtol = sqrt(eps()),
     kwargs...,
 )
 
@@ -1670,6 +1674,8 @@ function numerical_irreducible_decomposition(
         endgame_options = endgame_options,
         threading = threading,
         seed = nothing,
+        atol = atol,
+        rtol = rtol,
         kwargs...,
     )
     if isnothing(Ws)
