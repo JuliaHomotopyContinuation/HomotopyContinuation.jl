@@ -728,7 +728,7 @@ function is_contained(
     is_contained(V, W, system(W), cache; kwargs...)
 end
 
-remove_points!(P::Nothing, W, V, cache, kwargs...) = nothing
+remove_points!(P::Nothing, W, V, cache; kwargs...) = nothing
 function remove_points!(
     P::Vector{Vector{ComplexF64}},
     W::WitnessPoints,
