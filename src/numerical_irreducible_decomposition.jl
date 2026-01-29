@@ -1343,7 +1343,7 @@ Numerical irreducible decomposition with 2 components
 
 """
 function decompose(
-    Ws::Union{Vector{WitnessSet{T1,T2,Vector{T3}}},Vector{WitnessSet}};
+    Ws::Union{Vector{WP}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
@@ -1351,7 +1351,7 @@ function decompose(
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
-) where {T1,T2,T3<:Number}
+) where {WP<:WitnessSet}
 
     if isnothing(seed)
         seed = rand(UInt32)
