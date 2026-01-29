@@ -494,7 +494,7 @@ function intersect_all!(out, H, cache; kwargs...)
             update_progress!(progress; is_solving = true, is_removing_points = false)
             new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
             update_progress!(progress, Wₖ)
-
+        
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
             # we only need to do this for witness sets of codimensions 1≤j≤k.
@@ -531,11 +531,6 @@ function intersect_with_hypersurface!(
     threading::Bool = Threads.nthreads() > 1,
     kwargs...
 )
-
-    if isnothing(X)
-        return nothing
-    end
-
     F = cache.Fᵢ
     progress = cache.progress
     u = cache.u
@@ -556,7 +551,10 @@ function intersect_with_hypersurface!(
         return nothing
     end
 
-
+    # is isnothing(X), then we should not add points to X
+    if isnothing(X)
+        return nothing
+    end
 
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
