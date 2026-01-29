@@ -15,22 +15,19 @@ A wrapper for storing data about witness points.
 """
 mutable struct WitnessPoints{
     Sub1<:AbstractSubspace,
-    Sub2<:AbstractSubspace,
-    R<:Vector{ComplexF64},
+    Sub2<:AbstractSubspace
 }
     L::Sub1
     Lᵤ::Sub2
-    R::Vector{R}
+    R::Vector{Vector{ComplexF64}}
 end
-linear_subspace(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = W.L
-linear_subspace_u(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = W.Lᵤ
-points(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = W.R
-points(W::WitnessSet{A,B,C}) where {A,B,C} = W.R
-codim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = dim(linear_subspace(W))
-dim(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = codim(linear_subspace(W))
-ModelKit.degree(W::WitnessPoints{A,B,Vector{ComplexF64}}) where {A,B} = length(points(W))
-push!(W::WitnessPoints{A,B,Vector{ComplexF64}}, R::Vector{T}) where {A,B,T<:Number} =
-    push!(W.R, R)
+linear_subspace(W::WP) where {WP <: WitnessPoints} = W.L
+linear_subspace_u(W::WP) where {WP <: WitnessPoints} = W.Lᵤ
+points(W::WP) where {WP <: WitnessPoints} = W.R
+codim(W::WP) where {WP <: WitnessPoints} = dim(linear_subspace(W))
+dim(W::WP) where {WP <: WitnessPoints} = codim(linear_subspace(W))
+ModelKit.degree(W::WP) where {WP <: WitnessPoints} = length(points(W))
+push!(W::WP, R::Vector{ComplexF64}) where {WP <: WitnessPoints} = push!(W.R, R)
 
 function u_transform(W::WitnessPoints)
     L = linear_subspace_u(W)
@@ -381,14 +378,6 @@ function _regeneration(
                     # update Fᵢ
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
-
-
-                    # after the first loop that takes care of intersecting with Hᵢ
-                    # we now check if we have added points that are already contained in 
-                    # witness sets of higher dimension.
-                    # we only need to do this for witness sets of codimensions 0<k<n.
-                    remove_points_all!(out, cache; threading = threading)
-
                 end
             end
         end
@@ -483,15 +472,13 @@ function intersect_all!(out, H, cache, threading)
     codim = cache.codim
     progress = cache.progress
 
-    update_progress!(progress; is_solving = true, is_removing_points = false)
-
     # the i-th hypersurface
     Hᵢ = H[i]
 
     # we enumerate reversely, so that we can add points to witness sets that we have already
     # taken care of; i.e., if we intersect Wₖ∩Hᵢ below in the intersect_with_hypersurface function,
     # we have already intersected Wₖ₊₁ ∩ Hᵢ.
-    update_progress!(progress; is_solving = true, is_removing_points = false)
+    
     E = enumerate(out)
     for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
         if k < i
@@ -502,38 +489,27 @@ function intersect_all!(out, H, cache, threading)
             end
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
+            update_progress!(progress; is_solving = true, is_removing_points = false)
             intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; threading = threading)
+
+            # we now check if we have added points that are already contained in 
+            # witness sets of higher dimension.
+            # we only need to do this for witness sets of codimensions 1≤j≤k.
+            for j = 1:k
+                X = out[j]
+                update_progress_dim!(progress, k+1, j)
+                if degree(X) > 0
+                    update_progress!(progress; is_solving = false, is_removing_points = true)
+                    remove_points!(Wₖ₊₁, X, cache; threading = threading)
+                    update_progress!(progress, Wₖ₊₁)
+                end
+            end
             update_progress!(progress, Wₖ)
             update_progress!(progress, Wₖ₊₁)
         end
     end
 end
 
-
-function remove_points_all!(out, cache; threading::Bool = Threads.nthreads() > 1)
-
-    i = cache.i
-    progress = cache.progress
-
-    update_progress!(progress; is_solving = false, is_removing_points = true)
-
-    E = enumerate(out)
-    for (k, W) in E # k = codim(W) for W in Ws
-        if k > 1 && k <= i && degree(W) > 0
-            for j = 1:(k-1)
-
-                X = out[j]
-                update_progress_dim!(progress, k, codim(X))
-
-                if degree(X) > 0
-                    remove_points!(W, X, cache; threading = threading)
-                    update_progress!(progress, W)
-                end
-            end
-        end
-        update_progress!(progress, W)
-    end
-end
 
 
 """
@@ -548,6 +524,10 @@ function intersect_with_hypersurface!(
     cache;
     threading::Bool = Threads.nthreads() > 1,
 )
+
+    if isnothing(X)
+        return nothing
+    end
 
     F = cache.Fᵢ
     progress = cache.progress
@@ -564,10 +544,10 @@ function intersect_with_hypersurface!(
     # for further processing
     m = .!(is_contained(W, H, cache; threading = threading))
     P_next = manage_initial_points!(P, m, W, progress)
-
-    if isnothing(X)
+    if isempty(P_next)
         return nothing
     end
+
 
 
     # Step 2:
@@ -603,7 +583,6 @@ function manage_initial_points!(P, m, W, progress)
 end
 
 function serial_intersection!(X, start, tracker, progress)
-
     l_start = length(start)
     for (i, s) in enumerate(start)
         p = s[1]
@@ -622,6 +601,7 @@ function serial_intersection!(X, start, tracker, progress)
 end
 
 function threaded_intersection!(X, start, tracker, progress)
+
     l_start = length(start)
     start_vec = collect(start)
 
@@ -633,7 +613,6 @@ function threaded_intersection!(X, start, tracker, progress)
     progress_lock = ReentrantLock()
 
     next_idx = Threads.Atomic{Int}(1)
-
     Threads.@sync begin
         for tid = 1:nthr
             let local_tracker = trackers[tid]
@@ -802,11 +781,10 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
     l_X = length(points(X))
-    idx = 0
+    out = Vector{Bool}(undef, l_X)
 
     #we loop over the points in X and check if they are contained in Y
-    out = map(points(X)) do x
-        idx += 1
+    for idx in 1:l_X
         update_progress_tasks!(progress, idx, l_X)
 
         # first check
@@ -839,11 +817,11 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
             _, added = add!(U, q, i)
 
             if !added
-                return true
+                out[idx] = true
             end
         end
 
-        return false
+        out[idx] = false
     end
 
     out
@@ -863,7 +841,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
 
     P = points(X)
     l_X = length(P)
-    out = Vector{Bool}(undef, length(P))
+    out = Vector{Bool}(undef, l_X)
 
     # Pre-allocate one tracker and buffers per thread
     nthr = Threads.nthreads()
@@ -892,7 +870,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                             break
                         end
 
-                        x = P[idx]
+                        x = P[idx] 
                         lock(progress_lock) do
                             update_progress_tasks!(progress, idx, l_X)
                         end
