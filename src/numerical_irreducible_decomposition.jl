@@ -825,9 +825,6 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 end
 function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
-    @show "threading"
-    @show atol, rtol 
-
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
