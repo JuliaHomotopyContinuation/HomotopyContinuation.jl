@@ -492,7 +492,9 @@ function intersect_all!(out, H, cache; kwargs...)
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
             update_progress!(progress; is_solving = true, is_removing_points = false)
-            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
+            new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
+            update_progress!(progress, Wₖ)
+            update_progress!(progress, Wₖ₊₁)
 
             # we now check if we have added points that are already contained in 
             # witness sets of higher dimension.
@@ -502,8 +504,12 @@ function intersect_all!(out, H, cache; kwargs...)
                 update_progress_dim!(progress, k+1, j)
                 if degree(X) > 0
                     update_progress!(progress; is_solving = false, is_removing_points = true)
-                    remove_points!(Wₖ₊₁, X, cache; kwargs...)
-                    update_progress!(progress, Wₖ₊₁)
+                    remove_points!(new, Wₖ₊₁, X, cache; kwargs...)
+                end
+            end
+            if !isnothing(new)
+                for p in new 
+                    push!(Wₖ₊₁, p)
                 end
             end
             update_progress!(progress, Wₖ)
@@ -570,12 +576,12 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for tracking
     if threading
-        threaded_intersection!(X, start, tracker, progress)
+        new = threaded_intersection(start, tracker, progress)
     else
-        serial_intersection!(X, start, tracker, progress)
+        new = serial_intersection(start, tracker, progress)
     end
 
-    nothing
+    new
 end
 
 function manage_initial_points!(P, m, W, progress)
@@ -585,8 +591,10 @@ function manage_initial_points!(P, m, W, progress)
     return P_next
 end
 
-function serial_intersection!(X, start, tracker, progress)
+function serial_intersection(start, tracker, progress)
     l_start = length(start)
+    out = Vector{Vector{ComplexF64}}()
+
     for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
@@ -594,16 +602,15 @@ function serial_intersection!(X, start, tracker, progress)
         res = track(tracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
             new = copy(tracker.state.solution)
-            push!(X, new)
-            update_progress!(progress, X)
+            push!(out, new)
         end
         update_progress_tasks!(progress, i, l_start)
     end
 
-    nothing
+    out
 end
 
-function threaded_intersection!(X, start, tracker, progress)
+function threaded_intersection(start, tracker, progress)
 
     l_start = length(start)
     start_vec = collect(start)
@@ -614,6 +621,8 @@ function threaded_intersection!(X, start, tracker, progress)
 
     # Use a lock for thread-safe operations on X and progress
     progress_lock = ReentrantLock()
+
+    out = Vector{Vector{ComplexF64}}()
 
     next_idx = Threads.Atomic{Int}(1)
     Threads.@sync begin
@@ -635,8 +644,7 @@ function threaded_intersection!(X, start, tracker, progress)
                         if is_success(res) && is_finite(res) && is_nonsingular(res)
                             new = copy(local_tracker.state.solution)
                             lock(progress_lock) do
-                                push!(X, new)
-                                update_progress!(progress, X)
+                                push!(out, new)
                             end
                         end
 
@@ -649,7 +657,7 @@ function threaded_intersection!(X, start, tracker, progress)
         end
     end
 
-    nothing
+    out
 end
 
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
@@ -675,7 +683,8 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
+is_contained(X, Y, F, cache; kwargs...) = is_contained(points(X), X, Y, F, cache; kwargs...)
+function is_contained(P, X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
 
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
@@ -687,9 +696,9 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, 
     LY = linear_subspace(Y)
     k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
-    if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
+    if k < 0 || length(points(Y)) == 0 || length(P) == 0
         # if dim X > dim Y return only false
-        out = falses(length(points(X)))
+        out = falses(length(P))
     else
         # setup 
 
@@ -702,9 +711,9 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, 
         set_up_linear_spaces!(cache, LX, LY)
 
         if threading
-            out = threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...)
+            out = threaded_x_in_Y(P, X, Y, F, tracker, cache; kwargs...)
         else
-            out = serial_x_in_Y(X, Y, F, tracker, cache; kwargs...)
+            out = serial_x_in_Y(P, X, Y, F, tracker, cache; kwargs...)
         end
     end
     update_progress!(progress; is_membership_test = false)
@@ -720,14 +729,16 @@ function is_contained(
     is_contained(V, W, system(W), cache; kwargs...)
 end
 
+remove_points!(P::Nothing, W, V, cache, kwargs...) = nothing
 function remove_points!(
+    P::Vector{Vector{ComplexF64}},
     W::WitnessPoints,
     V::WitnessPoints,
     cache::RegenerationCache;
     kwargs...
 )
-    m = is_contained(W, V, cache.Fᵢ, cache; kwargs...)
-    deleteat!(W.R, m)
+    m = is_contained(P, W, V, cache.Fᵢ, cache; kwargs...)
+    deleteat!(P, m)
 
     nothing
 end
@@ -767,8 +778,8 @@ function set_up_linear_spaces!(cache, LX, LY)
         b[ℓ] = bX[i]
     end
 end
-
-function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+serial_x_in_Y(X, Y, F, tracker, cache; kwargs...) = serial_x_in_Y(points(X), X, Y, F, tracker, cache; kwargs...)
+function serial_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -783,7 +794,6 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
-    P = points(X)
     l_X = length(P)
     out = Vector{Bool}(undef, l_X)
     idx = 0
@@ -827,7 +837,8 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 
     out
 end
-function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...) = threaded_x_in_Y(points(X), X, Y, F, tracker, cache; kwargs...)
+function threaded_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -841,7 +852,6 @@ function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
-    P = points(X)
     l_X = length(P)
     out = Vector{Bool}(undef, l_X)
 
