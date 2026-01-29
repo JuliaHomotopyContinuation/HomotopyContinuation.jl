@@ -202,7 +202,6 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     x0::Vector
     y0::Vector
     y::Vector
-    U::UniquePoints
 
     Fᵢ::Sys
     u::Variable
@@ -222,9 +221,8 @@ function RegenerationCache(Fᵢ, u, n, codim, EO, TO, progress)
     x0 = zeros(ComplexF64, n + 1)
     y0 = zeros(ComplexF64, length(Fᵢ))
     y = zeros(ComplexF64, length(Fᵢ))
-    U = UniquePoints(x0, 0)
 
-    RegenerationCache(As, bs, x0, y0, y, U, Fᵢ, u, n, 0, codim, EO, TO, progress)
+    RegenerationCache(As, bs, x0, y0, y, Fᵢ, u, n, 0, codim, EO, TO, progress)
 end
 function update_Fᵢ!(cache, Fᵢ)
     cache.Fᵢ = Fᵢ
@@ -689,8 +687,6 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
         out = falses(length(points(X)))
     else
         # setup 
-        U = cache.U
-        empty!(U)
 
         Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
@@ -708,6 +704,7 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
     end
     update_progress!(progress; is_membership_test = false)
 
+    @show sum(out)
     out
 end
 function is_contained(
@@ -767,6 +764,10 @@ function set_up_linear_spaces!(cache, LX, LY)
 end
 
 function serial_x_in_Y(X, Y, F, tracker, cache)
+
+    atol = 1e-14
+    rtol = sqrt(eps())
+
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
@@ -804,19 +805,13 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
         # set L as the target for homotopy continuation
         target_parameters!(tracker, L)
 
-        U = cache.U
-
-        # reuse U
-        empty!(U)
-        add!(U, x, 0)
+        rad = max(atol, norm(x, Inf) * rtol)
 
         # add the points in Y to U after we have moved them towards L 
         for (i, p) in enumerate(points(Y))
             track!(tracker, p, 1)
             q = solution(tracker)
-            _, added = add!(U, q, i)
-
-            if !added
+            if distance(q, x, InfNorm()) < rad
                 out[idx] = true
             end
         end
@@ -827,6 +822,10 @@ function serial_x_in_Y(X, Y, F, tracker, cache)
     out
 end
 function threaded_x_in_Y(X, Y, F, tracker, cache)
+
+    atol = 1e-14
+    rtol = sqrt(eps())
+
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
@@ -890,17 +889,14 @@ function threaded_x_in_Y(X, Y, F, tracker, cache)
                             L = LinearSubspace(E)
                             # set L as the target for homotopy continuation
                             target_parameters!(local_tracker, L)
-
-                            local_U = UniquePoints(x, 0)
-                            add!(local_U, x, 0)
+                            
+                            rad = max(atol, norm(x, Inf) * rtol)
 
                             # add the points in Y to U after we have moved them towards L 
                             for (i, p) in enumerate(points(Y))
                                 track!(local_tracker, p, 1)
                                 q = solution(local_tracker)
-                                _, added = add!(local_U, q, i)
-
-                                if !added
+                                if distance(q, x, InfNorm()) < rad
                                     result = true
                                     break
                                 end
