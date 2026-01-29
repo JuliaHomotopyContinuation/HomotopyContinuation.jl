@@ -48,7 +48,6 @@ Base.@kwdef mutable struct WitnessSetsProgress
     ambient_dim::Int
     degrees::Dict{Int,Int} = Dict{Int,Int}()
     is_solving::Bool = false
-    is_removing_points::Bool = false
     is_computing_hypersurfaces::Bool = true
     is_membership_test::Bool = false
     is_monodromy::Bool = false
@@ -57,9 +56,6 @@ Base.@kwdef mutable struct WitnessSetsProgress
     ntasks::Int = 0
     current_hypersurface::Int = 1
     nhypersurfaces::Int
-    current_dim::Int = 0
-    remove_dim::Int = 0
-    next_dim::Int = 0
 end
 WitnessSetsProgress(n::Int, nhypersurfaces::Int, progress_meter::PM.ProgressUnknown) =
     WitnessSetsProgress(
@@ -79,15 +75,12 @@ function update_progress!(
     progress::WitnessSetsProgress;
     is_computing_hypersurfaces::Union{Nothing,Bool} = nothing,
     is_solving::Union{Nothing,Bool} = nothing,
-    is_removing_points::Union{Nothing,Bool} = nothing,
     is_membership_test::Union{Nothing,Bool} = nothing,
     is_monodromy::Union{Nothing,Bool} = nothing
 )
     isnothing(is_computing_hypersurfaces) ? nothing :
     progress.is_computing_hypersurfaces = is_computing_hypersurfaces
     isnothing(is_solving) ? nothing : progress.is_solving = is_solving
-    isnothing(is_removing_points) ? nothing :
-    progress.is_removing_points = is_removing_points
     isnothing(is_membership_test) ? nothing :
     progress.is_membership_test = is_membership_test
     isnothing(is_monodromy) ? nothing :
@@ -117,17 +110,6 @@ function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
         showvalues = showvalues(progress),
     )
 end
-update_progress_dim!(progress::Nothing, c1::Int, c2::Int) = nothing
-function update_progress_dim!(progress::WitnessSetsProgress, c1::Int, c2::Int)
-    n = progress.ambient_dim
-    progress.current_dim = n - c1
-    progress.remove_dim = n - c2
-    PM.update!(
-        progress.progress_meter,
-        progress.current_hypersurface,
-        showvalues = showvalues(progress),
-    )
-end
 update_progress!(progress::Nothing, W::Union{WitnessPoints,WitnessSet}) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
     progress.degrees[codim(W)] = degree(W)
@@ -142,7 +124,6 @@ finish_progress!(progress::Nothing) = nothing
 function finish_progress!(progress::WitnessSetsProgress)
     progress.is_computing_hypersurfaces = false
     progress.is_solving = false
-    progress.is_removing_points = false
     progress.is_membership_test = false
     progress.is_monodromy = false
     progress.is_finished = true
@@ -163,15 +144,10 @@ function showvalues(progress::WitnessSetsProgress)
                 ("Intersect with hypersurface",
                 "$(progress.current_hypersurface) / $(progress.nhypersurfaces)")
             )
-            if progress.is_removing_points
-                push!(
-                    text,
-                    ( "Remove points dim. $(progress.current_dim) vs. $(progress.remove_dim)", "$(progress.current_task)/$(progress.ntasks) points checked"),
-                )
-            elseif progress.is_solving
+            if progress.is_solving
                 push!(
                     text, 
-                    ("Tracking paths", "$(progress.current_task)/$(progress.ntasks) paths tracked")
+                    ("Track paths", "$(progress.current_task)/$(progress.ntasks)")
                 )
             elseif progress.is_membership_test
                 push!(
@@ -181,7 +157,7 @@ function showvalues(progress::WitnessSetsProgress)
             elseif progress.is_monodromy
             push!(
                 text,
-                ("Finding missing points", "$(progress.current_task)/$(progress.ntasks) witness sets checked"),
+                ("Find missing points", "check witness set $(progress.current_task)/$(progress.ntasks)"),
             )
             end
         end
@@ -400,16 +376,17 @@ function _regeneration(
         pop!(out)
     end
 
-    update_progress!(progress; is_solving = false, 
-                               is_removing_points = false, 
-                               is_monodromy = true)
     filter!(W -> degree(W) > 0, out)
+    l = length(out)
+    update_progress!(progress; is_solving = false, 
+                               is_monodromy = true)
+    idx = 1
+    update_progress_tasks!(progress, idx, l)  
     if !isempty(out)
-        l = length(out)
-        idx = 0
         witness_sets = map(out) do W
-            idx += 1
+            sleep(0.5) # so that progress gets updated
             update_progress_tasks!(progress, idx, l)
+            idx += 1
             P, L = u_transform(W)
             # running a safety monodrom
             if dim(L) < n
@@ -417,7 +394,8 @@ function _regeneration(
                     F, P, L;
                     threading = threading,
                     show_progress = false,
-                    max_loops_no_progress = 2)
+                    trace_test = true,
+                    max_loops_no_progress = 1)
                 W = WitnessSet(fixed(F, compile = false), L, solutions(res))
                 update_progress!(progress, W)
 
@@ -524,27 +502,8 @@ function intersect_all!(out, H, cache; kwargs...)
             end
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
-            update_progress!(progress; is_solving = true, is_removing_points = false)
-            new = intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
-            
-
-            # we now check if we have added points that are already contained in 
-            # witness sets of higher dimension.
-            # we only need to do this for witness sets of codimensions 1≤j≤k.
-            for j = 1:k
-                X = out[j]
-                update_progress_dim!(progress, k+1, j)
-                if degree(X) > 0
-                    update_progress!(progress; is_solving = false, is_removing_points = true)
-                    remove_points!(new, Wₖ₊₁, X, cache; kwargs...)
-                end
-            end
-            if !isnothing(new)
-                for p in new 
-                    push!(Wₖ₊₁, p)
-                end
-            end
-        
+            update_progress!(progress; is_solving = true)
+            intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
             update_progress!(progress, Wₖ₊₁)
         end
         update_progress!(progress, Wₖ)
@@ -605,12 +564,12 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for tracking
     if threading
-        new = threaded_intersection(start, tracker, progress)
+        threaded_intersection!(X, start, tracker, progress)
     else
-        new = serial_intersection(start, tracker, progress)
+        serial_intersection!(X, start, tracker, progress)
     end
 
-    new
+    nothing
 end
 
 function manage_initial_points!(P, m, W, progress)
@@ -619,9 +578,8 @@ function manage_initial_points!(P, m, W, progress)
     return P_next
 end
 
-function serial_intersection(start, tracker, progress)
+function serial_intersection!(X, start, tracker, progress)
     l_start = length(start)
-    out = Vector{Vector{ComplexF64}}()
 
     for (i, s) in enumerate(start)
         p = s[1]
@@ -630,7 +588,7 @@ function serial_intersection(start, tracker, progress)
         res = track(tracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
             new = copy(tracker.state.solution)
-            push!(out, new)
+            push!(X, new)
         end
         update_progress_tasks!(progress, i, l_start)
     end
@@ -638,7 +596,7 @@ function serial_intersection(start, tracker, progress)
     out
 end
 
-function threaded_intersection(start, tracker, progress)
+function threaded_intersection!(X, start, tracker, progress)
 
     l_start = length(start)
     start_vec = collect(start)
@@ -649,8 +607,6 @@ function threaded_intersection(start, tracker, progress)
 
     # Use a lock for thread-safe operations on X and progress
     progress_lock = ReentrantLock()
-
-    out = Vector{Vector{ComplexF64}}()
 
     next_idx = Threads.Atomic{Int}(1)
     Threads.@sync begin
@@ -672,7 +628,7 @@ function threaded_intersection(start, tracker, progress)
                         if is_success(res) && is_finite(res) && is_nonsingular(res)
                             new = copy(local_tracker.state.solution)
                             lock(progress_lock) do
-                                push!(out, new)
+                                push!(X, new)
                             end
                         end
 
@@ -685,7 +641,7 @@ function threaded_intersection(start, tracker, progress)
         end
     end
 
-    out
+    nothing
 end
 
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
@@ -710,8 +666,7 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-is_contained(X, Y, F, cache; kwargs...) = is_contained(points(X), X, Y, F, cache; kwargs...)
-function is_contained(P, X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
+function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
 
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
@@ -723,9 +678,10 @@ function is_contained(P, X, Y, F, cache; threading::Bool = Threads.nthreads() > 
     LY = linear_subspace(Y)
     k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
 
-    if k < 0 || length(points(Y)) == 0 || length(P) == 0
+
+    if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
         # if dim X > dim Y return only false
-        out = falses(length(P))
+        out = falses(length(points(X)))
     else
         # setup 
 
@@ -738,9 +694,9 @@ function is_contained(P, X, Y, F, cache; threading::Bool = Threads.nthreads() > 
         set_up_linear_spaces!(cache, LX, LY)
 
         if threading
-            out = threaded_x_in_Y(P, X, Y, F, tracker, cache; kwargs...)
+            out = threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...)
         else
-            out = serial_x_in_Y(P, X, Y, F, tracker, cache; kwargs...)
+            out = serial_x_in_Y(X, Y, F, tracker, cache; kwargs...)
         end
     end
     update_progress!(progress; is_membership_test = false)
@@ -754,20 +710,6 @@ function is_contained(
     kwargs...
 )
     is_contained(V, W, system(W), cache; kwargs...)
-end
-
-remove_points!(P::Nothing, W, V, cache; kwargs...) = nothing
-function remove_points!(
-    P::Vector{Vector{ComplexF64}},
-    W::WitnessPoints,
-    V::WitnessPoints,
-    cache::RegenerationCache;
-    kwargs...
-)
-    m = is_contained(P, W, V, cache.Fᵢ, cache; kwargs...)
-    deleteat!(P, m)
-    
-    nothing
 end
 
 function set_up_linear_spaces!(cache, LX, LY)
@@ -805,8 +747,9 @@ function set_up_linear_spaces!(cache, LX, LY)
         b[ℓ] = bX[i]
     end
 end
-serial_x_in_Y(X, Y, F, tracker, cache; kwargs...) = serial_x_in_Y(points(X), X, Y, F, tracker, cache; kwargs...)
-function serial_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+
+
+function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -821,6 +764,7 @@ function serial_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
+    P = points(X)
     l_X = length(P)
     out = Vector{Bool}(undef, l_X)
     idx = 0
@@ -864,8 +808,7 @@ function serial_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps
 
     out
 end
-threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...) = threaded_x_in_Y(points(X), X, Y, F, tracker, cache; kwargs...)
-function threaded_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -879,6 +822,7 @@ function threaded_x_in_Y(P, X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(e
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
+    P = points(X)
     l_X = length(P)
     out = Vector{Bool}(undef, l_X)
 
@@ -1066,6 +1010,7 @@ function decompose_with_monodromy!(
             seed;
             threading = threading,
             show_progress = show_monodromy_progress,
+            max_loops_no_progress = 1
         )
 
         if warning && (trace(res) > options.trace_test_tol)
