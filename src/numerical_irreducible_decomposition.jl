@@ -692,7 +692,7 @@ function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1)
         U = cache.U
         empty!(U)
 
-        Hom = linear_subspace_homotopy(F, LY, LY; intrinsic = true)
+        Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
             Hom;
             tracker_options = tracker_options,
