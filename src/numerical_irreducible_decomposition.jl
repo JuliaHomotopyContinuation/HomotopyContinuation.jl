@@ -125,7 +125,7 @@ function update_progress_dim!(progress::WitnessSetsProgress, c1::Int, c2::Int)
 end
 update_progress!(progress::Nothing, W::Union{WitnessPoints,WitnessSet}) = nothing
 function update_progress!(progress::WitnessSetsProgress, W::Union{WitnessPoints,WitnessSet})
-    progress.degrees[codim(W)] = length(points(W))
+    progress.degrees[codim(W)] = degree(W)
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -393,11 +393,26 @@ function _regeneration(
     if !isempty(out)
         witness_sets = map(out) do W
             P, L = u_transform(W)
-            WitnessSet(fixed(F, compile = false), L, P)
+            # running a safety monodrom
+            if dim(L) > 0
+                res = monodromy_solve(
+                    F, P, L;
+                    threading = threading,
+                    show_progress = false,
+                    max_loops_no_progress = 2)
+                W = WitnessSet(fixed(F, compile = false), L, solutions(res))
+                update_progress!(progress, W)
+
+                W
+            else
+                WitnessSet(fixed(F, compile = false), L, P)
+            end
         end
     else
         return witness_sets = Vector{WitnessSet}()
     end
+
+    
     finish_progress!(progress)
 
     return witness_sets
