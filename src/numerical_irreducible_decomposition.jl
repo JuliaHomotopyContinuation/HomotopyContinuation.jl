@@ -406,8 +406,9 @@ end
 
 function initialize_linear_equations(n)
 
+    sqrtn = sqrt(n)
     A₀ = randn(ComplexF64, n - 1, n)
-    b₀ = randn(ComplexF64, n - 1)
+    b₀ = sqrtn .* randn(ComplexF64, n - 1)
     svd = LA.svd(A₀) # we orthogonalize A
     Aᵥ = svd.Vt
 
@@ -415,9 +416,10 @@ function initialize_linear_equations(n)
     # type 1 does not use u, so we set the last column to zero
     Aᵤ = [Aᵥ zeros(n - 1)]
     bᵤ = inv.(svd.S) .* (svd.U' * b₀)
-    # type 2 sets the linear equation u=0. We add this as the first equation
+    # type 2 sets the linear equation u=c. We add this as the first equation
+    c = randn(ComplexF64)
     A = [zeros(1, n) 1.0; Aᵥ zeros(n - 1)]
-    b = [0; bᵤ]
+    b = [c; bᵤ]
 
     (A, b, Aᵤ, bᵤ)
 end
@@ -657,7 +659,7 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
     g0 = γ * (u^d - 1)
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
-    # we end with the linear space K with u=0.
+    # we end with the linear space K with u=c.
     L = linear_subspace_u(W)
     K = linear_subspace(X)
 
@@ -750,6 +752,7 @@ function set_up_linear_spaces!(cache, LX, LY)
     # the equation for u = 0
     A[1, n] = 1.0
     # new equations
+    b[1] = bX[1]
     for i = 2:(k+1)
         for j = 1:n
             A[i, j] = randn(ComplexF64)
@@ -801,6 +804,7 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
         for i = 2:(k+1)
             b[i] = sum(A[i, j] * x[j] for j = 1:n)
         end
+       
         # set up the corresponding LinearSubspace L
         E = ExtrinsicDescription(A, b; orthonormal = true)
         L = LinearSubspace(E)
