@@ -418,8 +418,8 @@ end
 function initialize_linear_equations(n)
 
     sqrtn = min(sqrt(n), 1e3)
-    A₀ = randn(ComplexF64, n - 1, n) ./ sqrtn
-    b₀ = randn(ComplexF64, n - 1)
+    A₀ = randn(ComplexF64, n - 1, n) 
+    b₀ = randn(ComplexF64, n - 1) .* sqrtn
     svd = LA.svd(A₀) # we orthogonalize A
     Aᵥ = svd.Vt
 
