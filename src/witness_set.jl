@@ -200,7 +200,7 @@ function witness_set(W::WitnessSet, L::LinearSubspace; options...)
         )
     end
     res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
-    WitnessSet(W.F, L, results(res; only_nonsingular = true), is_linear(L) && W.projective)
+    WitnessSet(W.F, L, results(res; only_nonsingular = true); projective = is_linear(L) && W.projective)
 end
 
 """

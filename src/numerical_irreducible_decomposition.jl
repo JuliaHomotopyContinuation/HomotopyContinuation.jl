@@ -591,7 +591,7 @@ function serial_intersection!(X, start, tracker, progress)
         update_progress_tasks!(progress, i, l_start)
     end
 
-    out
+    nothing
 end
 
 function threaded_intersection!(X, start, tracker, progress)
