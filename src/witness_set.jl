@@ -1,4 +1,5 @@
-export WitnessSet, witness_set, linear_subspace, system, dim, codim, trace_test, is_irreducible
+export WitnessSet,
+    witness_set, linear_subspace, system, dim, codim, trace_test, is_irreducible
 
 """
     WitnessSet(F, L, S)
@@ -8,7 +9,7 @@ Store solutions `S` of the polynomial system `F(x) = L(x) = 0` into a witness se
 struct WitnessSet{
     S<:AbstractSystem,
     Sub<:AbstractSubspace,
-    R<:Union{Vector{ComplexF64},PathResult}
+    R<:Union{Vector{ComplexF64},PathResult},
 }
     F::S
     L::Sub
@@ -16,7 +17,7 @@ struct WitnessSet{
     R::Vector{R}
     projective::Bool
     # is_irreducible is being set by decompose
-    is_irreducible::Union{Nothing, Bool}
+    is_irreducible::Union{Nothing,Bool}
 end
 
 function WitnessSet(
@@ -24,7 +25,7 @@ function WitnessSet(
     L::LinearSubspace,
     R;
     projective::Bool = is_linear(L) && is_homogeneous(System(F)),
-    is_irreducible::Union{Nothing, Bool} = nothing
+    is_irreducible::Union{Nothing,Bool} = nothing,
 )
     WitnessSet(F, L, R, projective, is_irreducible)
 end
@@ -108,7 +109,7 @@ end
 """
 function is_irreducible(W::WitnessSet)
     if isnothing(W.is_irreducible)
-        :undecided 
+        :undecided
     else
         W.is_irreducible
     end
@@ -200,7 +201,12 @@ function witness_set(W::WitnessSet, L::LinearSubspace; options...)
         )
     end
     res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
-    WitnessSet(W.F, L, results(res; only_nonsingular = true); projective = is_linear(L) && W.projective)
+    WitnessSet(
+        W.F,
+        L,
+        results(res; only_nonsingular = true);
+        projective = is_linear(L) && W.projective,
+    )
 end
 
 """
