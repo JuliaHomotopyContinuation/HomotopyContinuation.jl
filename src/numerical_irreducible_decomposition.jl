@@ -67,7 +67,6 @@ update_progress!(
     progress::Nothing;
     is_computing_hypersurfaces::Union{Nothing,Bool} = nothing,
     is_solving::Union{Nothing,Bool} = nothing,
-    is_removing_points::Union{Nothing,Bool} = nothing,
     is_membership_test::Union{Nothing,Bool} = nothing,
     is_monodromy::Union{Nothing,Bool} = nothing
 ) = nothing
@@ -904,21 +903,23 @@ end
 
 Base.@kwdef mutable struct DecomposeProgress
     progress_meter::PM.ProgressUnknown
+    current_dim::Int = 0
     n_witness_sets::Int
     n_working_on::Int = 0
     degrees::Dict{Int,Vector{Int}} = Dict{Int,Vector{Int}}()
     npts::Int = 0
     step::Int = 0
+    is_monodromy::Bool = true
+    is_finished::Bool = false
 end
-function update_progress!(progress::DecomposeProgress)
+
+function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
+    isnothing(is_monodromy) ? nothing :
+    progress.is_monodromy = is_monodromy
+  
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
-update_progress_step!(progress::Nothing) = nothing
-function update_progress_step!(progress::DecomposeProgress)
-    progress.step += 1
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
-end
 function update_progress!(progress::DecomposeProgress, W::WitnessSet)
     P = progress.degrees
     c = dim(W)
@@ -928,6 +929,13 @@ function update_progress!(progress::DecomposeProgress, W::WitnessSet)
         P[dim(W)] = [ModelKit.degree(W)]
     end
 
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+end
+update_progress_dim!(progress::DecomposeProgress, d::Int) = (progress.current_dim = d)
+update_progress_dim!(progress::Nothing, d::Int) = nothing
+update_progress_step!(progress::Nothing) = nothing
+function update_progress_step!(progress::DecomposeProgress)
+    progress.step += 1
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 update_progress_n!(progress::Nothing) = nothing
@@ -944,8 +952,12 @@ function update_progress_npts!(progress::DecomposeProgress, ℓ::Int)
 
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
-finish_progress!(progress::DecomposeProgress) =
+function finish_progress!(progress::DecomposeProgress)
+    progress.is_monodromy = false
+    progress.is_finished = true
+    progress.current_dim = -1
     PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
+end
 function showstatus(progress::DecomposeProgress)
     ℓ = progress.npts
     if ℓ > 0
@@ -959,12 +971,28 @@ function showstatus(progress::DecomposeProgress)
             "$(progress.n_working_on)/$(progress.n_witness_sets)",
         )]
     end
+    if !progress.is_finished
+        if progress.is_monodromy
+            push!(text, ("Status", "Running monodromy..."))
+        else
+            push!(text, ("Status", "Partitioning points..."))
+        end
+    else
+        push!(text, ("Status", "Done"))
+    end
     degs = progress.degrees
     k = sort(collect(keys(degs)), rev = true)
+    if progress.is_finished
+        @show k
+    end
     for key in k
+        degskey = join(map(string, degs[key]), ',')
+        if key == progress.current_dim
+            degskey = string(degskey, ", ...")
+        end
         push!(
             text,
-            ("Degrees of components of dim. $key", "$(join(map(string, degs[key]), ','))"),
+            ("Degrees of components of dim. $key", degskey),
         )
     end
 
@@ -994,15 +1022,15 @@ function decompose_with_monodromy!(
     seed;
     threading::Bool = Threads.nthreads() > 1,
 )
-
-
     P = points(W)
     L = linear_subspace(W)
     G = system(W)
     n = ambient_dim(L)
 
-    decomposition = Vector{WitnessSet}()
+    update_progress_dim!(progress, dim(L))
 
+    decomposition = Vector{WitnessSet}()
+    
     if dim(L) < n
         update_progress!(progress)
         update_progress_step!(progress)
@@ -1158,7 +1186,9 @@ function decompose_with_monodromy!(
         update_progress_npts!(progress, 0)
     else
         for p in P
-            push!(decomposition, WitnessSet(G, L, [p]; is_irreducible = true))
+            W_new = WitnessSet(G, L, [p]; is_irreducible = true)
+            update_progress!(progress, W_new)
+            push!(decomposition, W_new)
         end
     end
 
@@ -1339,11 +1369,15 @@ function decompose(
     seed = nothing,
 ) where {WP<:WitnessSet}
 
+    if isempty(Ws)
+        return nothing 
+    end 
     if isnothing(seed)
         seed = rand(UInt32)
     end
     Random.seed!(seed)
 
+    sort!(Ws; by = dim)
     options = decompose_with_monodromy_options(monodromy_options)
     out = Vector{WitnessSet}()
 
@@ -1371,7 +1405,7 @@ function decompose(
     sleep(0.5) # to update progress
     update_progress_n!(progress)
     update_progress_step!(progress)
-    for W in Ws
+    for W in reverse(Ws)
         if ModelKit.degree(W) > 0
 
             dec = decompose_with_monodromy!(
