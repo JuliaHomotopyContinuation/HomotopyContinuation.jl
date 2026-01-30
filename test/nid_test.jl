@@ -109,7 +109,7 @@
         )
         R = regeneration(E; show_progress = false)
         D = decompose(R; show_progress = false)
-        N = NumericalIrreducibleDecomposition(D, s)
+        N = NumericalIrreducibleDecomposition(D)
         @test ncomponents(N) == 6
     end
 
