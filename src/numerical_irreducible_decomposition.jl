@@ -1382,7 +1382,7 @@ function decompose(
     Ws::Union{Vector{WP}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10, max_loops_no_progress = 1),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
