@@ -396,7 +396,7 @@ function _regeneration(
                     show_progress = false,
                     trace_test = true,
                     max_loops_no_progress = 3,
-                    target_solutions_count = length(P) + 10, # in case a singular solution slips through
+                    target_solutions_count = Int(floot(1.5 * length(P))), # in case a singular solution slips through
                     parameter_sampler = weighted_normal
                 )
                 W = WitnessSet(fixed(F, compile = false), L, solutions(res))
