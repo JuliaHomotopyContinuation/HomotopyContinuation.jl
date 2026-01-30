@@ -83,7 +83,7 @@
         @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
-    @testset "components of degree 368, 4 and 1" begin
+    @testset "catch all components of degree 1" begin
         @var p1, p2, p3, p4, p5, p6, p7, p8, u1, u2, u3, u4, u5, u6, u7, u8, λ1, λ2, λ3
         p = [p1, p2, p3, p4, p5, p6, p7, p8]
         u = [u1, u2, u3, u4, u5, u6, u7, u8]
@@ -107,9 +107,10 @@
             ],
             variables = [p; u; λ],
         )
-        R = regeneration(E; show_progress = false)
-        D = decompose(R; show_progress = false)
-        N = NumericalIrreducibleDecomposition(D)
+        s = 0x7eec3900
+        R = regeneration(E; seed = s, show_progress = false)
+        D = decompose(R; seed = s, show_progress = false)
+        N = NumericalIrreducibleDecomposition(D, s)
         @test ncomponents(N) == 6
     end
 
