@@ -1077,7 +1077,7 @@ function decompose_with_monodromy!(
 
                     # We do not want to add orbits of length 1 in the beginning. Even if they are on an irreducible component of degree > 1, they tend to have small trace.
                     if length(orbit) > 1 || iter ≥ 5
-                        W_new = WitnessSet(G, L, P_orbit)
+                        W_new = WitnessSet(G, L, P_orbit; is_irreducible = true)
 
                         push!(decomposition, W_new)
                         push!(complete_orbits, orbit)
@@ -1158,7 +1158,7 @@ function decompose_with_monodromy!(
         update_progress_npts!(progress, 0)
     else
         for p in P
-            push!(decomposition, WitnessSet(G, L, [p]))
+            push!(decomposition, WitnessSet(G, L, [p]; is_irreducible = true))
         end
     end
 
