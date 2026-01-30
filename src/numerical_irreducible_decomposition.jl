@@ -931,7 +931,10 @@ function update_progress!(progress::DecomposeProgress, W::WitnessSet)
 
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
-update_progress_dim!(progress::DecomposeProgress, d::Int) = (progress.current_dim = d)
+function update_progress_dim!(progress::DecomposeProgress, d::Int)
+    sleep(0.5) # make sure progress gets updated
+    progress.current_dim = d
+end
 update_progress_dim!(progress::Nothing, d::Int) = nothing
 update_progress_step!(progress::Nothing) = nothing
 function update_progress_step!(progress::DecomposeProgress)
@@ -982,13 +985,10 @@ function showstatus(progress::DecomposeProgress)
     end
     degs = progress.degrees
     k = sort(collect(keys(degs)), rev = true)
-    if progress.is_finished
-        @show k
-    end
     for key in k
         degskey = join(map(string, degs[key]), ',')
         if key == progress.current_dim
-            degskey = string(degskey, ", ...")
+            degskey = string(degskey, ",...")
         end
         push!(
             text,
@@ -1022,21 +1022,22 @@ function decompose_with_monodromy!(
     seed;
     threading::Bool = Threads.nthreads() > 1,
 )
+    update_progress_dim!(progress, dim(W))
+
     P = points(W)
     L = linear_subspace(W)
     G = system(W)
     n = ambient_dim(L)
-
-    update_progress_dim!(progress, dim(L))
 
     decomposition = Vector{WitnessSet}()
     
     if dim(L) < n
         update_progress!(progress)
         update_progress_step!(progress)
-
+    
         MS = MonodromySolver(G, L; compile = false, options = options)
 
+        update_progress!(progress; is_monodromy = true)
         res = monodromy_solve(
             MS,
             P,
@@ -1045,6 +1046,8 @@ function decompose_with_monodromy!(
             threading = threading,
             show_progress = show_monodromy_progress
         )
+        update_progress!(progress; is_monodromy = false)
+        update_progress_npts!(progress, nsolutions(res))
 
         if warning && (trace(res) > options.trace_test_tol)
             @warn "Trying to decompose non-complete set of witness points for codimension $(dim(L)) (trace test failed). Will try to compute the missing points. The output will contain all components, for which the trace test was successfull."
@@ -1065,6 +1068,7 @@ function decompose_with_monodromy!(
             end
 
             # for safety an additional monodromy
+            update_progress!(progress; is_monodromy = true)
             res = monodromy_solve(
                 MS,
                 non_complete_points,
@@ -1073,13 +1077,16 @@ function decompose_with_monodromy!(
                 threading = threading,
                 show_progress = show_monodromy_progress,
             )
+            update_progress!(progress; is_monodromy = false)
             d += nresults(res) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = solutions(res)
             ℓ = length(non_complete_points) # once for a later check
             k = length(non_complete_points) # and once for counting progress
             update_progress_npts!(progress, k)
 
+
             # Get orbits from monodromy result
+            
             orbits = get_orbits_from_monodromy_permutations(
                 res;
                 initial_orbits = non_complete_orbits,
@@ -1092,6 +1099,8 @@ function decompose_with_monodromy!(
                 update_progress_step!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
+
+                update_progress!(progress; is_monodromy = true)
                 res_orbit = monodromy_solve(
                     MS,
                     P_orbit,
@@ -1100,6 +1109,7 @@ function decompose_with_monodromy!(
                     threading = threading,
                     show_progress = show_monodromy_progress,
                 )
+                update_progress!(progress; is_monodromy = false)
 
                 if trace(res_orbit) < options.trace_test_tol
 
@@ -1377,7 +1387,7 @@ function decompose(
     end
     Random.seed!(seed)
 
-    sort!(Ws; by = dim)
+    sort!(Ws; by = dim, rev = true)
     options = decompose_with_monodromy_options(monodromy_options)
     out = Vector{WitnessSet}()
 
@@ -1405,7 +1415,7 @@ function decompose(
     sleep(0.5) # to update progress
     update_progress_n!(progress)
     update_progress_step!(progress)
-    for W in reverse(Ws)
+    for W in Ws
         if ModelKit.degree(W) > 0
 
             dec = decompose_with_monodromy!(
