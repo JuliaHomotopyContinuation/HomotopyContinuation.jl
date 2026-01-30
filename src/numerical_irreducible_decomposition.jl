@@ -1320,7 +1320,7 @@ function decompose_with_monodromy_options(M::MonodromyOptions)
         check_startsolutions = M.check_startsolutions,
         group_actions = M.group_actions,
         loop_finished_callback = M.loop_finished_callback,
-        parameter_sampler = weighted_normal,
+        parameter_sampler = M.parameter_sampler,
         equivalence_classes = M.equivalence_classes,
         trace_test_tol = M.trace_test_tol,
         target_solutions_count = M.target_solutions_count,
@@ -1382,7 +1382,7 @@ function decompose(
     Ws::Union{Vector{WP}};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10, parameter_sampler = weighted_normal),
     max_iters::Int = 50,
     warning::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
