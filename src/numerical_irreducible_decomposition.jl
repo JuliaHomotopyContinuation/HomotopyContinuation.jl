@@ -395,7 +395,9 @@ function _regeneration(
                     threading = threading,
                     show_progress = false,
                     trace_test = true,
-                    max_loops_no_progress = 1)
+                    max_loops_no_progress = 1,
+                    target_solutions_count = length(P) + 5 # in case a singular solution slips through
+                )
                 W = WitnessSet(fixed(F, compile = false), L, solutions(res))
                 update_progress!(progress, W)
 
@@ -1387,9 +1389,6 @@ function decompose(
     seed = nothing,
 ) where {WP<:WitnessSet}
 
-    if isempty(Ws)
-        return nothing 
-    end 
     if isnothing(seed)
         seed = rand(UInt32)
     end
