@@ -87,7 +87,8 @@ function update_progress!(
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
-        showvalues = showvalues(progress),
+        showvalues = showvalues(progress);
+        force = true
     )
 end
 update_progress_hypersurface!(progress::Nothing, i::Int) = nothing
@@ -383,8 +384,8 @@ function _regeneration(
     update_progress_tasks!(progress, idx, l)  
     if !isempty(out)
         witness_sets = map(out) do W
-            sleep(0.5) # so that progress gets updated
             update_progress_tasks!(progress, idx, l)
+            update_progress!(progress)
             idx += 1
             P, L = u_transform(W)
             # running a safety monodrom
@@ -499,9 +500,9 @@ function intersect_all!(out, H, cache; kwargs...)
             end
             # here is the intersection step
             # we add points that do not belong to Wₖ∩Hᵢ to Wₖ₊₁.
-            update_progress!(progress; is_solving = true)
             intersect_with_hypersurface!(Wₖ, Hᵢ, Wₖ₊₁, cache; kwargs...)
             update_progress!(progress, Wₖ₊₁)
+            update_progress!(progress)
         end
         update_progress!(progress, Wₖ)
     end
@@ -917,7 +918,7 @@ function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
     isnothing(is_monodromy) ? nothing :
     progress.is_monodromy = is_monodromy
   
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress); force = true)
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
 function update_progress!(progress::DecomposeProgress, W::WitnessSet)
@@ -931,15 +932,12 @@ function update_progress!(progress::DecomposeProgress, W::WitnessSet)
 
     PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
-function update_progress_dim!(progress::DecomposeProgress, d::Int)
-    sleep(0.5) # make sure progress gets updated
-    progress.current_dim = d
-end
+update_progress_dim!(progress::DecomposeProgress, d::Int) = (progress.current_dim = d)
 update_progress_dim!(progress::Nothing, d::Int) = nothing
 update_progress_step!(progress::Nothing) = nothing
 function update_progress_step!(progress::DecomposeProgress)
     progress.step += 1
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress); force = true)
 end
 update_progress_n!(progress::Nothing) = nothing
 function update_progress_n!(progress::DecomposeProgress)
@@ -976,23 +974,36 @@ function showstatus(progress::DecomposeProgress)
     end
     if !progress.is_finished
         if progress.is_monodromy
-            push!(text, ("Status", "Running monodromy..."))
+            push!(text, ("Status", "Running monodromy"))
         else
-            push!(text, ("Status", "Partitioning points..."))
+            push!(text, ("Status", "Partitioning points"))
         end
     else
         push!(text, ("Status", "Done"))
     end
     degs = progress.degrees
-    k = sort(collect(keys(degs)), rev = true)
-    for key in k
-        degskey = join(map(string, degs[key]), ',')
-        if key == progress.current_dim
-            degskey = string(degskey, ",...")
+    dims = collect(keys(degs))
+    if progress.current_dim ≥ 0 && !in(progress.current_dim, dims)
+        push!(dims, progress.current_dim)
+    end
+    sort!(dims; rev = true)
+    for d in dims
+        deg = get(degs, d, nothing)
+        if isnothing(deg)
+            if d == progress.current_dim
+                deg_string = "..."
+            else
+                deg_string = ""
+            end
+        else
+            deg_string = join(map(string, deg), ',')
+            if d == progress.current_dim
+                deg_string = string(deg_string, ",...")
+            end
         end
         push!(
             text,
-            ("Degrees of components of dim. $key", degskey),
+            ("Degrees of components of dim. $d", deg_string),
         )
     end
 
@@ -1032,12 +1043,10 @@ function decompose_with_monodromy!(
     decomposition = Vector{WitnessSet}()
     
     if dim(L) < n
-        update_progress!(progress)
         update_progress_step!(progress)
-    
-        MS = MonodromySolver(G, L; compile = false, options = options)
-
         update_progress!(progress; is_monodromy = true)
+        
+        MS = MonodromySolver(G, L; compile = false, options = options)
         res = monodromy_solve(
             MS,
             P,
@@ -1059,7 +1068,6 @@ function decompose_with_monodromy!(
         non_complete_orbits = Vector{Set{Int}}()
 
         while !isempty(non_complete_points)
-            update_progress!(progress)
             update_progress_step!(progress)
 
             iter += 1
@@ -1067,17 +1075,20 @@ function decompose_with_monodromy!(
                 break
             end
 
-            # for safety an additional monodromy
-            update_progress!(progress; is_monodromy = true)
-            res = monodromy_solve(
-                MS,
-                non_complete_points,
-                L,
-                seed;
-                threading = threading,
-                show_progress = show_monodromy_progress,
-            )
-            update_progress!(progress; is_monodromy = false)
+            if iter > 1
+                # for safety an additional monodromy when iter > 1
+                update_progress!(progress; is_monodromy = true)
+                res = monodromy_solve(
+                    MS,
+                    non_complete_points,
+                    L,
+                    seed;
+                    threading = threading,
+                    show_progress = show_monodromy_progress,
+                )
+                update_progress!(progress; is_monodromy = false)
+            end
+
             d += nresults(res) - length(non_complete_points) # update total degree in case we found new points.
             non_complete_points = solutions(res)
             ℓ = length(non_complete_points) # once for a later check
@@ -1085,8 +1096,7 @@ function decompose_with_monodromy!(
             update_progress_npts!(progress, k)
 
 
-            # Get orbits from monodromy result
-            
+            # Get orbits from monodromy result            
             orbits = get_orbits_from_monodromy_permutations(
                 res;
                 initial_orbits = non_complete_orbits,
@@ -1095,12 +1105,10 @@ function decompose_with_monodromy!(
             complete_orbits = Vector{Set{Int}}()
 
             for orbit in orbits
-                update_progress!(progress)
+                update_progress!(progress; is_monodromy = true)
                 update_progress_step!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
-
-                update_progress!(progress; is_monodromy = true)
                 res_orbit = monodromy_solve(
                     MS,
                     P_orbit,
@@ -1412,9 +1420,9 @@ function decompose(
         progress = nothing
     end
 
-    sleep(0.5) # to update progress
     update_progress_n!(progress)
     update_progress_step!(progress)
+
     for W in Ws
         if ModelKit.degree(W) > 0
 
