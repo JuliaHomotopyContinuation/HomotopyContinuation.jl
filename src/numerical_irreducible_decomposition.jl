@@ -395,8 +395,9 @@ function _regeneration(
                     threading = threading,
                     show_progress = false,
                     trace_test = true,
-                    max_loops_no_progress = 1,
-                    target_solutions_count = length(P) + 5 # in case a singular solution slips through
+                    max_loops_no_progress = 3,
+                    target_solutions_count = length(P) + 10, # in case a singular solution slips through
+                    parameter_sampler = weighted_normal
                 )
                 W = WitnessSet(fixed(F, compile = false), L, solutions(res))
                 update_progress!(progress, W)
@@ -920,7 +921,9 @@ function update_progress!(progress::DecomposeProgress; is_monodromy = nothing)
     isnothing(is_monodromy) ? nothing :
     progress.is_monodromy = is_monodromy
   
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress); force = true)
+    if !isnothing(is_monodromy)
+        PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress); force = true)
+    end
 end
 update_progress!(progress::Nothing, D::Vector{WitnessSet}) = nothing
 function update_progress!(progress::DecomposeProgress, W::WitnessSet)
@@ -939,7 +942,6 @@ update_progress_dim!(progress::Nothing, d::Int) = nothing
 update_progress_step!(progress::Nothing) = nothing
 function update_progress_step!(progress::DecomposeProgress)
     progress.step += 1
-    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress); force = true)
 end
 update_progress_n!(progress::Nothing) = nothing
 function update_progress_n!(progress::DecomposeProgress)
@@ -1045,7 +1047,6 @@ function decompose_with_monodromy!(
     decomposition = Vector{WitnessSet}()
     
     if dim(L) < n
-        update_progress_step!(progress)
         update_progress!(progress; is_monodromy = true)
         
         MS = MonodromySolver(G, L; compile = false, options = options)
@@ -1070,8 +1071,6 @@ function decompose_with_monodromy!(
         non_complete_orbits = Vector{Set{Int}}()
 
         while !isempty(non_complete_points)
-            update_progress_step!(progress)
-
             iter += 1
             if iter > max_iters
                 break
@@ -1108,7 +1107,6 @@ function decompose_with_monodromy!(
 
             for orbit in orbits
                 update_progress!(progress; is_monodromy = true)
-                update_progress_step!(progress)
 
                 P_orbit = non_complete_points[collect(orbit)]
                 res_orbit = monodromy_solve(
@@ -1139,6 +1137,7 @@ function decompose_with_monodromy!(
 
             # Check if we are done
             if sum(degree, decomposition; init = 0) == d
+                update_progress_step!(progress)
                 break
             end
 
@@ -1202,7 +1201,7 @@ function decompose_with_monodromy!(
                     ),
                 )
         end
-
+        update_progress_step!(progress)
         update_progress_npts!(progress, 0)
     else
         for p in P
@@ -1210,6 +1209,7 @@ function decompose_with_monodromy!(
             update_progress!(progress, W_new)
             push!(decomposition, W_new)
         end
+        update_progress_step!(progress)
     end
 
     update_progress!(progress)
@@ -1440,7 +1440,6 @@ function decompose(
             end
 
             update_progress_n!(progress)
-            update_progress_step!(progress)
         end
 
     end
