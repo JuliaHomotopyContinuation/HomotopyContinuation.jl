@@ -157,12 +157,12 @@ function showvalues(progress::WitnessSetsProgress)
             elseif progress.is_monodromy
             push!(
                 text,
-                ("Find missing points", "via monodromy"),
+                ("Fill up points", "via monodromy"),
             )
             end
         end
     else
-        text = [("Status", "Done")]
+        text = [("Status", "done")]
     end
 
     push!(text, ("Current number of witness points", " "))
@@ -360,6 +360,7 @@ function _regeneration(
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
+                    update_progress!(progress; is_solving = true, is_monodromy = false)
                     intersect_all!(out, H, cache; threading = threading, atol = atol, rtol = rtol)
 
                     # update Fᵢ
@@ -974,12 +975,12 @@ function showstatus(progress::DecomposeProgress)
     end
     if !progress.is_finished
         if progress.is_monodromy
-            push!(text, ("Status", "Running monodromy"))
+            push!(text, ("Status", "running monodromy"))
         else
-            push!(text, ("Status", "Partitioning points"))
+            push!(text, ("Status", "partitioning points"))
         end
     else
-        push!(text, ("Status", "Done"))
+        push!(text, ("Status", "done"))
     end
     degs = progress.degrees
     dims = collect(keys(degs))
