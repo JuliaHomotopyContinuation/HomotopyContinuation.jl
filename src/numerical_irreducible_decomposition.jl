@@ -417,20 +417,18 @@ end
 
 function initialize_linear_equations(n)
 
-    sqrtn = min(sqrt(n), 1e3)
-    A₀ = randn(ComplexF64, n - 1, n) 
-    b₀ = randn(ComplexF64, n - 1) .* sqrtn
-    svd = LA.svd(A₀) # we orthogonalize A
-    Aᵥ = svd.Vt
+    L₀ = rand_subspace(n; dim = 1)
+    A₀ = extrinsic(L₀).A # per constructor, A₀ has orthonormal rows
+    b₀ = extrinsic(L₀).b
 
     # u regenerates operates on 2 types of linear equations Ax=b
     # type 1 does not use u, so we set the last column to zero
-    Aᵤ = [Aᵥ zeros(n - 1)]
-    bᵤ = inv.(svd.S) .* (svd.U' * b₀)
+    Aᵤ = [A₀ zeros(n - 1)]
+    bᵤ = b₀
     # type 2 sets the linear equation u=c. We add this as the first equation
     c = randn(ComplexF64)
-    A = [zeros(1, n) 1.0; Aᵥ zeros(n - 1)]
-    b = [c; bᵤ]
+    A = [zeros(1, n) 1.0; A₀ zeros(n - 1)]
+    b = [c; b₀]
 
     (A, b, Aᵤ, bᵤ)
 end
@@ -934,11 +932,17 @@ function update_progress!(progress::DecomposeProgress, W::WitnessSet)
 end
 update_progress_n!(progress::Nothing) = nothing
 function update_progress_n!(progress::DecomposeProgress)
-    progress.n_working_on += 1
+    if progress.n_working_on < progress.n_witness_sets
+        progress.n_working_on += 1
+    end
+
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 update_progress_npts!(progress::Nothing, ℓ::Int) = nothing
 function update_progress_npts!(progress::DecomposeProgress, ℓ::Int)
     progress.npts = ℓ
+
+    PM.update!(progress.progress_meter, progress.step, showvalues = showstatus(progress))
 end
 finish_progress!(progress::DecomposeProgress) =
     PM.finish!(progress.progress_meter, showvalues = showstatus(progress))
@@ -1000,6 +1004,8 @@ function decompose_with_monodromy!(
     decomposition = Vector{WitnessSet}()
 
     if dim(L) < n
+        update_progress!(progress)
+        update_progress_step!(progress)
 
         MS = MonodromySolver(G, L; compile = false, options = options)
 
@@ -1362,11 +1368,11 @@ function decompose(
         progress = nothing
     end
 
+    sleep(0.5) # to update progress
+    update_progress_n!(progress)
+    update_progress_step!(progress)
     for W in Ws
         if ModelKit.degree(W) > 0
-
-            update_progress_n!(progress)
-            update_progress_step!(progress)
 
             dec = decompose_with_monodromy!(
                 W,
@@ -1382,6 +1388,8 @@ function decompose(
                 append!(out, dec)
             end
 
+            update_progress_n!(progress)
+            update_progress_step!(progress)
         end
 
     end

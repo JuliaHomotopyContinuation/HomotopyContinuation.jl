@@ -474,9 +474,8 @@ function rand_subspace(
     end
     T = real ? Float64 : ComplexF64
     A = randn(T, n - k, n)
-    sqrtn = min(sqrt(n), 1e3)
     if affine
-        LinearSubspace(A, randn(T, n - k) .* sqrtn)
+        LinearSubspace(A, randn(T, n - k))
     else
         LinearSubspace(A)
     end
