@@ -157,7 +157,7 @@ function showvalues(progress::WitnessSetsProgress)
             elseif progress.is_monodromy
             push!(
                 text,
-                ("Find missing points", "check witness set $(progress.current_task)/$(progress.ntasks)"),
+                ("Find missing points", "via monodromy"),
             )
             end
         end
@@ -365,6 +365,25 @@ function _regeneration(
                     # update Fᵢ
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
+
+                    # running a safety monodromy
+                    update_progress!(progress; is_solving = false, is_monodromy = true)
+                    for W in out 
+                        if dim(W) > 0 && degree(W) > 0
+                            res = monodromy_solve(
+                                Fᵢ, W.R, linear_subspace(W);
+                                threading = threading,
+                                show_progress = false,
+                                trace_test = true,
+                                max_loops_no_progress = 2,
+                                target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
+                                parameter_sampler = weighted_normal
+                            )
+                            W.R = solutions(res)
+                            update_progress!(progress, W)
+                        end
+                    end
+                    update_progress!(progress) 
                 end
             end
         end
@@ -377,35 +396,12 @@ function _regeneration(
     end
 
     filter!(W -> degree(W) > 0, out)
-    l = length(out)
-    update_progress!(progress; is_solving = false, 
-                               is_monodromy = true)
-    idx = 1
-    update_progress_tasks!(progress, idx, l)  
+    update_progress!(progress; is_solving = false, is_monodromy = false)
     if !isempty(out)
         witness_sets = map(out) do W
-            update_progress_tasks!(progress, idx, l)
             update_progress!(progress)
-            idx += 1
             P, L = u_transform(W)
-            # running a safety monodrom
-            if dim(L) < n
-                res = monodromy_solve(
-                    F, P, L;
-                    threading = threading,
-                    show_progress = false,
-                    trace_test = true,
-                    max_loops_no_progress = 3,
-                    target_solutions_count = Int(floor(1.5 * length(P))), # in case a singular solution slips through
-                    parameter_sampler = weighted_normal
-                )
-                W = WitnessSet(fixed(F, compile = false), L, solutions(res))
-                update_progress!(progress, W)
-
-                W
-            else
-                WitnessSet(fixed(F, compile = false), L, P)
-            end
+            WitnessSet(fixed(F, compile = false), L, P)
         end
     else
         return witness_sets = Vector{WitnessSet}()
