@@ -13,8 +13,7 @@
         @test degree.(W) == [2, 8, 8]
 
         dec = decompose(W)
-        N = NumericalIrreducibleDecomposition(dec)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        @test all(is_irreducible, dec)
 
         # sorting
         W = regeneration(F; sorted = false, show_progress = false)
