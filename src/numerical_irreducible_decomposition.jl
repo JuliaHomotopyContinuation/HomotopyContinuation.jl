@@ -141,6 +141,8 @@ function showvalues(progress::WitnessSetsProgress)
             )
             if progress.is_solving
                 push!(text, ("Track paths", "$(progress.current_task)/$(progress.ntasks)"))
+            elseif progress.is_monodromy
+                push!(text, ("Track paths", "$(progress.ntasks)/$(progress.ntasks) (fill up points...)"))
             elseif progress.is_membership_test
                 push!(
                     text,
@@ -149,8 +151,6 @@ function showvalues(progress::WitnessSetsProgress)
                         "$(progress.current_task)/$(progress.ntasks) points checked",
                     ),
                 )
-            elseif progress.is_monodromy
-                push!(text, ("Fill up points", "via monodromy"))
             end
         end
     else
