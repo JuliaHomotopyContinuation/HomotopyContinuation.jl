@@ -590,9 +590,12 @@ function serial_intersection!(X, start, egtracker, progress)
         res = track(egtracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
             q = copy(egtracker.state.solution)
+            # we only want nonsingular solutions q
+            # an additional check is whether q can be tracked the reverse homotopy from 0 to 1
+            # it's enough to go from t = 0 to t = 0.1, since singularities can only be expected at t = 0.
             tracker = egtracker.tracker
             track!(tracker, q, 0.0, 0.1)
-            if is_success(status(local_tracker))
+            if is_success(status(tracker))
                 lock(progress_lock) do
                     push!(new, q)
                 end
@@ -636,6 +639,9 @@ function threaded_intersection!(X, start, tracker, progress)
 
                         if is_success(res) && is_finite(res) && is_nonsingular(res)
                             q = copy(local_egtracker.state.solution)
+                            # we only want nonsingular solutions q
+                            # an additional check is whether q can be tracked the reverse homotopy from 0 to 1
+                            # it's enough to go from t = 0 to t = 0.1, since singularities can only be expected at t = 0.
                             local_tracker = local_egtracker.tracker
                             track!(local_tracker, q, 0.0, 0.1)
                             if is_success(status(local_tracker))
