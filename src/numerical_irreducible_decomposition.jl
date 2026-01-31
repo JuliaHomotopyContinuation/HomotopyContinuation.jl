@@ -233,6 +233,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `seed`: choose the random seed.
 
 ### Example
@@ -259,6 +260,10 @@ function _regeneration(
         max_endgame_steps = 100,
         max_endgame_extended_steps = 100,
         sing_cond = 1e12,
+    ),
+    monodromy_options::MonodromyOptions = MonodromyOptions(;
+        trace_test = true,
+        parameter_sampler = weighted_normal,
     ),
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
@@ -374,11 +379,10 @@ function _regeneration(
                                 Fᵢ,
                                 W.R,
                                 linear_subspace(W);
-                                threading = threading,
+                                options = monodromy_options,
                                 show_progress = false,
-                                trace_test = true,
+                                threading = threading,
                                 target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
-                                parameter_sampler = weighted_normal,
                             )
                             W.R = unique_points(solutions(res))
                             update_progress!(progress, W)
@@ -1653,12 +1657,13 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 ### Options
 
 * `show_progress = true`: indicate whether the progress of the computation should be displayed.
-* `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
-* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
+* `monodromy_options_for_regeneration`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`regeneration`](@ref).
+* `monodromy_options_for_decompose`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`decompose`](@ref).
+* `show_monodromy_decompose_progress = false`: indicate whether the progress of the monodromy computation in [`decompose`](@ref) should be displayed.
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads. 
@@ -1698,8 +1703,14 @@ function numerical_irreducible_decomposition(
         max_endgame_extended_steps = 100,
         sing_accuracy = 1e-10,
     ),
-    show_monodromy_progress::Bool = false,
-    monodromy_options::MonodromyOptions = MonodromyOptions(; trace_test_tol = 1e-10),
+    monodromy_options_for_regeneration = MonodromyOptions(;
+        trace_test = true,
+        parameter_sampler = weighted_normal,
+    ),
+    monodromy_options_for_decompose::MonodromyOptions = MonodromyOptions(;
+        trace_test_tol = 1e-10,
+    ),
+    show_monodromy_decompose_progress::Bool = false,
     max_iters::Int = 50,
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
@@ -1719,6 +1730,7 @@ function numerical_irreducible_decomposition(
         max_codim = max_codim,
         tracker_options = tracker_options,
         endgame_options = endgame_options,
+        monodromy_options = monodromy_options_for_regeneration,
         threading = threading,
         seed = nothing,
         atol = atol,
@@ -1730,7 +1742,7 @@ function numerical_irreducible_decomposition(
     end
     dec = decompose(
         Ws;
-        monodromy_options = monodromy_options,
+        monodromy_options = monodromy_options_for_decompose,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_progress,
         threading = threading,
