@@ -377,7 +377,6 @@ function _regeneration(
                                 threading = threading,
                                 show_progress = false,
                                 trace_test = true,
-                                max_loops_no_progress = 2,
                                 target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
                                 parameter_sampler = weighted_normal,
                             )
