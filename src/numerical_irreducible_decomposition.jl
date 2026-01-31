@@ -142,7 +142,13 @@ function showvalues(progress::WitnessSetsProgress)
             if progress.is_solving
                 push!(text, ("Track paths", "$(progress.current_task)/$(progress.ntasks)"))
             elseif progress.is_monodromy
-                push!(text, ("Track paths", "$(progress.ntasks)/$(progress.ntasks) (fill up points...)"))
+                push!(
+                    text,
+                    (
+                        "Track paths",
+                        "$(progress.ntasks)/$(progress.ntasks) (fill up points...)",
+                    ),
+                )
             elseif progress.is_membership_test
                 push!(
                     text,
@@ -626,11 +632,8 @@ function serial_intersection!(X, start, egtracker, progress)
             tracker = egtracker.tracker
             track!(tracker, q, 0.0, 0.1)
             if is_success(status(tracker))
-                lock(progress_lock) do
-                    push!(new, q)
-                end
+                push!(X, q)
             end
-            push!(X, new)
         end
         update_progress_tasks!(progress, i, l_start)
     end
