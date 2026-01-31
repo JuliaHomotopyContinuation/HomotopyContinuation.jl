@@ -1784,7 +1784,7 @@ function numerical_irreducible_decomposition(
         Ws;
         monodromy_options = monodromy_options_for_decompose,
         max_iters = max_iters,
-        show_monodromy_progress = show_monodromy_progress,
+        show_monodromy_progress = show_monodromy_decompose_progress,
         threading = threading,
         warning = warning,
         seed = seed,
