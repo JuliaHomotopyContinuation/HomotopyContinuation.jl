@@ -381,7 +381,7 @@ function _regeneration(
                                 target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
                                 parameter_sampler = weighted_normal,
                             )
-                            W.R = solutions(res)
+                            W.R = unique_points(solutions(res))
                             update_progress!(progress, W)
                         end
                     end
@@ -577,16 +577,23 @@ function manage_initial_points!(P, m, W, progress)
     return P_next
 end
 
-function serial_intersection!(X, start, tracker, progress)
+function serial_intersection!(X, start, egtracker, progress)
     l_start = length(start)
 
     for (i, s) in enumerate(start)
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
-        res = track(tracker, p, 1)
+        res = track(egtracker, p, 1)
         if is_success(res) && is_finite(res) && is_nonsingular(res)
-            new = copy(tracker.state.solution)
+            q = copy(egtracker.state.solution)
+            tracker = egtracker.tracker
+            track!(tracker, q, 0.0, 0.1)
+            if is_success(status(local_tracker))
+                lock(progress_lock) do
+                    push!(new, q)
+                end
+            end
             push!(X, new)
         end
         update_progress_tasks!(progress, i, l_start)
@@ -610,7 +617,7 @@ function threaded_intersection!(X, start, tracker, progress)
     next_idx = Threads.Atomic{Int}(1)
     Threads.@sync begin
         for tid = 1:nthr
-            let local_tracker = trackers[tid]
+            let local_egtracker = trackers[tid]
                 Threads.@spawn begin
                     while true
                         idx = Threads.atomic_add!(next_idx, 1)
@@ -622,12 +629,16 @@ function threaded_intersection!(X, start, tracker, progress)
                         p = copy(s[1])
                         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
-                        res = track(local_tracker, p, 1)
+                        res = track(local_egtracker, p, 1)
 
                         if is_success(res) && is_finite(res) && is_nonsingular(res)
-                            new = copy(local_tracker.state.solution)
-                            lock(progress_lock) do
-                                push!(X, new)
+                            q = copy(local_egtracker.state.solution)
+                            local_tracker = local_egtracker.tracker
+                            track!(local_tracker, q, 0.0, 0.1)
+                            if is_success(status(local_tracker))
+                                lock(progress_lock) do
+                                    push!(X, q)
+                                end
                             end
                         end
 
