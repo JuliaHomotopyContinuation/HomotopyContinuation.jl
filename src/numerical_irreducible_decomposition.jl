@@ -240,6 +240,7 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
+* `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
 * `seed`: choose the random seed.
 
 ### Example
@@ -271,6 +272,7 @@ function _regeneration(
         trace_test = true,
         parameter_sampler = weighted_normal,
     ),
+    show_monodromy_progress::Bool = false,
     threading::Bool = Threads.nthreads() > 1,
     seed = nothing,
     atol = 1e-14,
@@ -378,7 +380,13 @@ function _regeneration(
                     update_Fᵢ!(cache, Fᵢ)
 
                     # running one monodromy per witness set to fill up point
-                    fill_up!(out, monodromy_options, cache, threading)
+                    fill_up!(
+                        out,
+                        monodromy_options,
+                        cache,
+                        show_monodromy_progress,
+                        threading,
+                    )
 
                     update_progress!(progress)
                 end
@@ -504,7 +512,7 @@ function intersect_all!(out, H, cache; kwargs...)
     end
 end
 
-function fill_up!(out, monodromy_options, cache, threading)
+function fill_up!(out, monodromy_options, cache, show_monodromy_progress, threading)
     progress = cache.progress
     Fᵢ = cache.Fᵢ
 
@@ -516,7 +524,7 @@ function fill_up!(out, monodromy_options, cache, threading)
                 W.R,
                 linear_subspace(W);
                 options = regeneration_monodromy_options(monodromy_options, W),
-                show_progress = false,
+                show_progress = show_monodromy_progress,
                 threading = threading,
             )
             W.R = unique_points(solutions(res))
@@ -1703,7 +1711,9 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `monodromy_options_for_regeneration`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`regeneration`](@ref).
 * `monodromy_options_for_decompose`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`decompose`](@ref).
-* `show_monodromy_decompose_progress = false`: indicate whether the progress of the monodromy computation in [`decompose`](@ref) should be displayed.
+* `show_progresss = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`.
+* `show_monodromy_for_regeneration_progress = false`: indicate whether the progress of the monodromy computation in [`regeneration`](@ref) should be displayed.
+* `show_monodromy_for_decompose_progress = false`: indicate whether the progress of the monodromy computation in [`decompose`](@ref) should be displayed.
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
 * `threading = true`: enables multiple threads. 
@@ -1750,7 +1760,9 @@ function numerical_irreducible_decomposition(
     monodromy_options_for_decompose::MonodromyOptions = MonodromyOptions(;
         trace_test_tol = 1e-10,
     ),
-    show_monodromy_decompose_progress::Bool = false,
+    show_monodromy_progress::Bool = false,
+    show_monodromy_for_regeneration_progress::Bool = false,
+    show_monodromy_for_decompose_progress::Bool = false,
     max_iters::Int = 50,
     sorted::Bool = true,
     max_codim::Union{Int,Nothing} = nothing,
@@ -1761,6 +1773,10 @@ function numerical_irreducible_decomposition(
     rtol = sqrt(eps()),
     kwargs...,
 )
+    if show_monodromy_progress
+        show_monodromy_for_regeneration_progress = true
+        show_monodromy_for_decompose_progress = true
+    end
 
     !isnothing(seed) && Random.seed!(seed)
 
@@ -1771,6 +1787,7 @@ function numerical_irreducible_decomposition(
         tracker_options = tracker_options,
         endgame_options = endgame_options,
         monodromy_options = monodromy_options_for_regeneration,
+        show_monodromy_progress = show_monodromy_for_regeneration_progress,
         threading = threading,
         seed = nothing,
         atol = atol,
@@ -1784,7 +1801,7 @@ function numerical_irreducible_decomposition(
         Ws;
         monodromy_options = monodromy_options_for_decompose,
         max_iters = max_iters,
-        show_monodromy_progress = show_monodromy_decompose_progress,
+        show_monodromy_progress = show_monodromy_for_decompose_progress,
         threading = threading,
         warning = warning,
         seed = seed,
