@@ -371,23 +371,9 @@ function _regeneration(
                     Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
                     update_Fᵢ!(cache, Fᵢ)
 
-                    # running a safety monodromy
-                    update_progress!(progress; is_solving = false, is_monodromy = true)
-                    for W in out
-                        if dim(W) > 0 && degree(W) > 0
-                            res = monodromy_solve(
-                                Fᵢ,
-                                W.R,
-                                linear_subspace(W);
-                                options = monodromy_options,
-                                show_progress = false,
-                                threading = threading,
-                                target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
-                            )
-                            W.R = unique_points(solutions(res))
-                            update_progress!(progress, W)
-                        end
-                    end
+                    # running one monodromy per witness set to fill up point
+                    fill_up!(out, monodromy_options, cache, threading)
+
                     update_progress!(progress)
                 end
             end
@@ -510,6 +496,50 @@ function intersect_all!(out, H, cache; kwargs...)
         end
         update_progress!(progress, Wₖ)
     end
+end
+
+function fill_up!(out, monodromy_options, cache, threading)
+    progress = cache.progress
+    Fᵢ = cache.Fᵢ
+
+    update_progress!(progress; is_solving = false, is_monodromy = true)
+    for W in out
+        if dim(W) > 0 && degree(W) > 0
+            res = monodromy_solve(
+                Fᵢ,
+                W.R,
+                linear_subspace(W);
+                options = regeneration_monodromy_options(monodromy_options, W),
+                show_progress = false,
+                threading = threading,
+            )
+            W.R = unique_points(solutions(res))
+            update_progress!(progress, W)
+        end
+    end
+end
+
+function regeneration_monodromy_options(M::MonodromyOptions, W)
+
+    MonodromyOptions(;
+        permutations = false,
+        trace_test = true,
+        single_loop_per_start_solution = M.single_loop_per_start_solution,
+        check_startsolutions = M.check_startsolutions,
+        group_actions = M.group_actions,
+        loop_finished_callback = M.loop_finished_callback,
+        parameter_sampler = M.parameter_sampler,
+        equivalence_classes = M.equivalence_classes,
+        trace_test_tol = M.trace_test_tol,
+        target_solutions_count = Int(floor(1.5 * degree(W))), # in case a singular solution slips through
+        timeout = M.timeout,
+        min_solutions = M.min_solutions,
+        max_loops_no_progress = M.max_loops_no_progress,
+        reuse_loops = M.reuse_loops,
+        distance = M.distance,
+        unique_points_atol = M.unique_points_atol,
+        unique_points_rtol = M.unique_points_rtol,
+    )
 end
 
 """
@@ -679,6 +709,7 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
     return Hom, d
 end
+
 
 """
     is_contained(X, Y, F, cache)
