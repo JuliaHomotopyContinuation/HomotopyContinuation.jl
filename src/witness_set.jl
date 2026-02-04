@@ -1,4 +1,5 @@
-export WitnessSet, witness_set, linear_subspace, system, dim, codim, trace_test
+export WitnessSet,
+    witness_set, linear_subspace, system, dim, codim, trace_test, is_irreducible
 
 """
     WitnessSet(F, L, S)
@@ -15,6 +16,8 @@ struct WitnessSet{
     # only non-singular results or solutions
     R::Vector{R}
     projective::Bool
+    # is_irreducible is being set by decompose
+    is_irreducible::Union{Nothing,Bool}
 end
 
 function WitnessSet(
@@ -22,8 +25,9 @@ function WitnessSet(
     L::LinearSubspace,
     R;
     projective::Bool = is_linear(L) && is_homogeneous(System(F)),
+    is_irreducible::Union{Nothing,Bool} = nothing,
 )
-    WitnessSet(F, L, R, projective)
+    WitnessSet(F, L, R, projective, is_irreducible)
 end
 
 """
@@ -81,6 +85,36 @@ codim(W::WitnessSet) = dim(W.L)
 function Base.show(io::IO, W::WitnessSet)
     print(io, "Witness set for dimension $(dim(W)) of degree $(degree(W))")
 end
+
+
+"""
+    is_irreducible(W::WitnessSet)
+
+Return `true`, if it was computed that `W` is irreducible, `false` if it was computed that `W` is not irreducible, and `:undecided` otherwise.
+
+### Example 
+```julia
+julia> @var x[1:2]
+julia> f = System([sum(x.^2) - 1])
+julia> W = witness_set(f; dim = 1);
+julia> is_irreducible(W)
+:undecided
+
+julia> dec = decompose(W);
+julia> W_irred = first(dec);
+julia> is_irreducible(W_irred)
+true
+end
+```
+"""
+function is_irreducible(W::WitnessSet)
+    if isnothing(W.is_irreducible)
+        :undecided
+    else
+        W.is_irreducible
+    end
+end
+
 
 ### Construct witness sets
 """
@@ -167,7 +201,12 @@ function witness_set(W::WitnessSet, L::LinearSubspace; options...)
         )
     end
     res = solve(W.F, W.R; start_subspace = W.L, target_subspace = L, options...)
-    WitnessSet(W.F, L, results(res; only_nonsingular = true), is_linear(L) && W.projective)
+    WitnessSet(
+        W.F,
+        L,
+        results(res; only_nonsingular = true);
+        projective = is_linear(L) && W.projective,
+    )
 end
 
 """

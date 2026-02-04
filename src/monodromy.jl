@@ -57,6 +57,26 @@ Creates a random linear subspace by calling [`rand_subspace`](@ref).
 independent_normal(p::AbstractVector{T}) where {T} = randn(ComplexF64, length(p))
 independent_normal(L::LinearSubspace) = rand_subspace(ambient_dim(L); dim = dim(L))
 
+"""
+    weighted_normal(p::AbstractVector)
+
+Sample a vector `q` where each entry `q[i]` is drawn independently from the complex Normal distribution with variance `|p[i]|^2`,
+by calling [`randn(ComplexF64)`](@ref).
+
+    weighted_normal(L::LinearSubspace)
+
+Creates a random linear subspace `Ax = a` by sampling the entries `A[i,j]` from the complex Normal distribution with variance `|B[i,j]|^2` using [`randn(ComplexF64)`](@ref), and `a[i]` from the complex Normal distribution with variance `|b[i]|^2`, where `L = {Bx = b}`  
+"""
+weighted_normal(p::AbstractVector{T}) where {T} = randn(ComplexF64, length(p)) .* abs.(p)
+function weighted_normal(L::LinearSubspace)
+    B = extrinsic(L).A
+    b = extrinsic(L).b
+    m, n = size(B)
+    A = randn(ComplexF64, m, n)
+    a = randn(ComplexF64, m)
+    LinearSubspace(A .* abs.(B), a .* abs.(b))
+end
+
 #############################
 # Loops and Data Structures #
 #############################

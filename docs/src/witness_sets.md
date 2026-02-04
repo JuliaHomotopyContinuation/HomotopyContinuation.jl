@@ -14,6 +14,11 @@ To compute a [`WitnessSet`](@ref) call [`witness_set`](@ref).
 witness_set
 ```
 
+A [`WitnessSet`](@ref) carries information about irreducibility.
+```@docs
+is_irreducible
+```
+
 To compute witness sets for all possible dimensions use [`regeneration`](@ref) or [`witness_sets`](@ref).
 
 ```@docs

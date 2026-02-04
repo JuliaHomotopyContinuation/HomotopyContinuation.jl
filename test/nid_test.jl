@@ -13,8 +13,7 @@
         @test degree.(W) == [2, 8, 8]
 
         dec = decompose(W)
-        N = NumericalIrreducibleDecomposition(dec)
-        @test isa(N, NumericalIrreducibleDecomposition)
+        @test all(is_irreducible, dec)
 
         # sorting
         W = regeneration(F; sorted = false, show_progress = false)
@@ -84,7 +83,7 @@
         @test isa(N4, NumericalIrreducibleDecomposition)
     end
 
-    @testset "Non complete superwitness set after regeneration" begin
+    @testset "catch all components of degree 1" begin
         @var p1, p2, p3, p4, p5, p6, p7, p8, u1, u2, u3, u4, u5, u6, u7, u8, λ1, λ2, λ3
         p = [p1, p2, p3, p4, p5, p6, p7, p8]
         u = [u1, u2, u3, u4, u5, u6, u7, u8]

@@ -475,7 +475,7 @@ function rand_subspace(
     T = real ? Float64 : ComplexF64
     A = randn(T, n - k, n)
     if affine
-        LinearSubspace(A, sqrt(n) .* randn(T, n - k))
+        LinearSubspace(A, randn(T, n - k))
     else
         LinearSubspace(A)
     end
@@ -654,10 +654,10 @@ function translate!(L::LinearSubspace, δb, ::Coordinates{:Extrinsic} = Extrinsi
     ext.b .+= δb
     int = intrinsic(L)
     LA.mul!(int.b, ext.A', δb, true, true)
-    stiefel_coordinates_intrinsic!(int.X, int.A)
     stiefel_coordinates_intrinsic!(int.Y, int.A, int.b)
     L
 end
+
 
 """
     Base.intersect(L₁::LinearSubspace, L₂::LinearSubspace)
