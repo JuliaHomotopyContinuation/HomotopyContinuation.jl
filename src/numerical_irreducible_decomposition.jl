@@ -234,13 +234,15 @@ The implementation is based on the algorithm [u-regeneration](https://arxiv.org/
 
 ### Options
 
-* `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
+* `sorted = true`: if `true`, the polynomials in F will be sorted by degree in decreasing order. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
-* `show_progress = true`: indicate whether the progress of the computation should be displayed.
-* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `show_progress = true`: indicate whether a progress bar should be displayed.
+* `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed.
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
 ### Example
@@ -1397,12 +1399,12 @@ end
 This function decomposes a [`WitnessSet`](@ref) or a vector of [`WitnessSet`](@ref) into irreducible components.
 
 ### Options
-* `show_progress = true`: indicate whether the progress of the computation should be displayed.
-* `show_monodromy_progress = false`: indicate whether the progress of the monodromy computation should be displayed.
+* `show_progress = true`: indicate whether a progress bar should be displayed.
+* `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed.
 * `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading`: enables multiple threads. 
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
 
@@ -1423,6 +1425,7 @@ The decomposition can be stored in a [`NumericalIrreducibleDecomposition`](@ref)
 ```julia-repl
 julia> N = NumericalIrreducibleDecomposition(dec)
 Numerical irreducible decomposition with 2 components
+=====================================================
 • 2 component(s) of dimension 1.
 
  degree table of components:
@@ -1644,7 +1647,11 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     else
         total = 0
     end
-    header = "\n Numerical irreducible decomposition with $total components"
+    if total == 1
+        header = "Numerical irreducible decomposition with 1 component"
+    else
+        header = "Numerical irreducible decomposition with $total components"
+    end
     println(io, header)
     println(io, "="^(length(header)))
     mdim = max_dim(N)
@@ -1704,7 +1711,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 
 ### Options
 
-* `show_progress = true`: indicate whether the progress of the computation should be displayed.
+* `show_progress = true`: indicate whether a progress bar should be displayed.
 * `sorted = true`: the polynomials in F will be sorted by degree in decreasing order. 
 * `max_codim`: the maximal codimension until which witness supersets should be computed.
 * `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
@@ -1712,11 +1719,12 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `monodromy_options_for_regeneration`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`regeneration`](@ref).
 * `monodromy_options_for_decompose`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`decompose`](@ref).
 * `show_progresss = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`.
-* `show_monodromy_for_regeneration_progress = false`: indicate whether the progress of the monodromy computation in [`regeneration`](@ref) should be displayed.
-* `show_monodromy_for_decompose_progress = false`: indicate whether the progress of the monodromy computation in [`decompose`](@ref) should be displayed.
+* `show_monodromy_for_regeneration_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`regeneration`](@ref) should be displayed.
+* `show_monodromy_for_decompose_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`decompose`](@ref) should be displayed.
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
+* `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).` This option is used for [`regeneration`](@ref).
 * `warning = true`: if `true` prints a warning when the [`trace_test`](@ref) fails. 
-* `threading = true`: enables multiple threads. 
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 * `seed`: choose the random seed.
 
 ### Example
@@ -1731,6 +1739,7 @@ julia> F = [p * q * (x - 3) * (x - 5);
 
 julia> N = numerical_irreducible_decomposition(F)
 Numerical irreducible decomposition with 11 components
+======================================================
 • 1 component(s) of dimension 2.
 • 2 component(s) of dimension 1.
 • 8 component(s) of dimension 0.
@@ -1820,8 +1829,8 @@ Calls [`numerical_irreducible_decomposition`](@ref).
 julia> @var x, y
 julia> f = [x^2 + y^2 - 1]
 julia> N = nid(f)
-
-Numerical irreducible decomposition with 1 components
+Numerical irreducible decomposition with 1 component
+====================================================
 • 1 component(s) of dimension 1.
 
  degree table of components:
