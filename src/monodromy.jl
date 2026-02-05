@@ -828,8 +828,10 @@ function monodromy_solve(
     reset_trace!(MS)
     reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
-    if isempty(results) && warning
-        @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
+    if isempty(results)
+        if warning
+            @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
+        end
         retcode = :invalid_startvalue
     else
         retcode = :default
@@ -1087,7 +1089,6 @@ function threaded_monodromy_solve!(
                         end
                         # Count this job
                         Threads.atomic_add!(inflight_count, 1)
-
                         try
                             res = track(
                                 tracker,
@@ -1146,14 +1147,17 @@ function threaded_monodromy_solve!(
                                     add_permutation!(stats, job.loop_id, job.id, 0)
                                 end
                             end
-                            # Update progress
                             @label _update
+
+                            # Update progress
+                            lock(data_lock)
                             update_progress!(
                                 progress,
                                 stats;
                                 solutions = length(results),
                                 queued = Base.n_avail(queue),
                             )
+                            unlock(data_lock)
 
                             # mark worker as idle
                             Base.@lock notify_lock begin
