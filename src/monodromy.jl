@@ -1089,6 +1089,7 @@ function threaded_monodromy_solve!(
                         end
                         # Count this job
                         Threads.atomic_add!(inflight_count, 1)
+
                         try
                             res = track(
                                 tracker,
@@ -1147,17 +1148,15 @@ function threaded_monodromy_solve!(
                                     add_permutation!(stats, job.loop_id, job.id, 0)
                                 end
                             end
-                            @label _update
 
+                            @label _update
                             # Update progress
-                            lock(data_lock)
                             update_progress!(
                                 progress,
                                 stats;
                                 solutions = length(results),
                                 queued = Base.n_avail(queue),
                             )
-                            unlock(data_lock)
 
                             # mark worker as idle
                             Base.@lock notify_lock begin
