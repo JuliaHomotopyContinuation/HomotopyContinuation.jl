@@ -623,6 +623,7 @@ function monodromy_solve(
     options = nothing,
     group_action = nothing,
     group_actions = isnothing(group_action) ? nothing : GroupActions(group_action),
+    warning::Bool = true,
     kwargs...,
 )
     if isnothing(options)
@@ -689,6 +690,7 @@ function monodromy_solve(
         show_progress = show_progress,
         threading = threading,
         catch_interrupt = catch_interrupt,
+        warning = warning,
     )
 end
 
@@ -808,6 +810,7 @@ function monodromy_solve(
     show_progress::Bool = true,
     threading::Bool = Threads.nthreads() > 1,
     catch_interrupt::Bool = true,
+    warning::Bool = true,
 )
     if !show_progress
         progress = nothing
@@ -825,7 +828,7 @@ function monodromy_solve(
     reset_trace!(MS)
     reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
-    if isempty(results)
+    if isempty(results) && warning
         @warn "None of the provided solutions is a valid start solution (Newton's method did not converge)."
         retcode = :invalid_startvalue
     else
