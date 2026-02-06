@@ -528,8 +528,14 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
                 options = regeneration_monodromy_options(monodromy_options, W),
                 show_progress = show_monodromy_progress,
                 threading = threading,
+                warning = false,
             )
-            W.R = unique_points(solutions(res))
+            # check if solutions remain, and if yes, take unique_points
+            if nsolutions(res) == 0
+                W.R = Vector{Vector{ComplexF64}}()
+            else
+                W.R = unique_points(solutions(res))
+            end
             update_progress!(progress, W)
         end
     end
