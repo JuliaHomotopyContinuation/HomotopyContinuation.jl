@@ -13,24 +13,24 @@ Solve the system `F` using a total degree homotopy.
 This returns a path tracker ([`EndgameTracker`](@ref)) and an iterator to compute the start solutions.
 """
 function total_degree(
-    F::Union{System,AbstractSystem};
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+        F::Union{System, AbstractSystem};
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
     return total_degree_variables(F; compile = compile, kwargs...)
 end
 
 
 function total_degree_variables(
-    F::Union{System,AbstractSystem};
-    target_parameters = nothing,
-    γ = cis(2π * rand()),
-    gamma = γ,
-    tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(),
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+        F::Union{System, AbstractSystem};
+        target_parameters = nothing,
+        γ = cis(2π * rand()),
+        gamma = γ,
+        tracker_options = TrackerOptions(),
+        endgame_options = EndgameOptions(),
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
     unsupported_kwargs(kwargs)
     m, n = size(F)
 
@@ -48,9 +48,9 @@ function total_degree_variables(
     D = zeros(Int, length(support))
     for (k, A) in enumerate(support)
         d = 0
-        for j = 1:size(A, 2)
+        for j in 1:size(A, 2)
             dⱼ = 0
-            for i = 1:size(A, 1)
+            for i in 1:size(A, 1)
                 dⱼ += A[i, j]
             end
             d = max(d, dⱼ)
@@ -82,7 +82,7 @@ function total_degree_variables(
     T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
     starts = total_degree_start_solutions(D)
 
-    T, starts
+    return T, starts
 end
 
 struct TotalDegreeStartSolutionsIterator{Iter}
@@ -90,25 +90,25 @@ struct TotalDegreeStartSolutionsIterator{Iter}
     iterator::Iter
 end
 function TotalDegreeStartSolutionsIterator(degrees)
-    iterator = Iterators.product(map(d -> 0:(d-1), degrees)...)
-    TotalDegreeStartSolutionsIterator(degrees, iterator)
+    iterator = Iterators.product(map(d -> 0:(d - 1), degrees)...)
+    return TotalDegreeStartSolutionsIterator(degrees, iterator)
 end
 function Base.show(io::IO, iter::TotalDegreeStartSolutionsIterator)
-    print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
+    return print(io, "$(length(iter)) total degree start solutions for degrees $(iter.degrees)")
 end
 
 function Base.iterate(iter::TotalDegreeStartSolutionsIterator)
     indices, state = iterate(iter.iterator)
-    _value(iter, indices), state
+    return _value(iter, indices), state
 end
 function Base.iterate(iter::TotalDegreeStartSolutionsIterator, state)
     it = iterate(iter.iterator, state)
     it === nothing && return nothing
-    _value(iter, first(it)), last(it)
+    return _value(iter, first(it)), last(it)
 end
 
 function _value(iter::TotalDegreeStartSolutionsIterator, indices)
-    map((k, d) -> cis(2π * k / d), indices, iter.degrees)
+    return map((k, d) -> cis(2π * k / d), indices, iter.degrees)
 end
 
 
@@ -150,7 +150,7 @@ total_degree_start_solutions(
 function paths_to_track(f, ::Val{:total_degree})
     target_parameters = nparameters(f) > 0 ? zeros(nparameters(f)) : nothing
     _, starts = total_degree(f; target_parameters = target_parameters)
-    if Base.IteratorSize(typeof(starts)) == Base.SizeUnknown()
+    return if Base.IteratorSize(typeof(starts)) == Base.SizeUnknown()
         k = 0
         for s in starts
             k += 1

@@ -40,7 +40,7 @@ Construct a (symbolic) [`System`](@ref) from `F`.
 """
 function System(F::AbstractSystem)
     x, p = variables(F), parameters(F)
-    System(F(x, p), x, p)
+    return System(F(x, p), x, p)
 end
 
 (F::AbstractSystem)(x, p = nothing) = evaluate(F, x, p)
@@ -53,7 +53,7 @@ Evaluate the given system.
 function evaluate(F::AbstractSystem, x, p = nothing)
     u = Vector{Any}(undef, size(F, 1))
     evaluate!(u, F, x, p)
-    ModelKit.to_smallest_eltype(u)
+    return ModelKit.to_smallest_eltype(u)
 end
 
 """
@@ -65,7 +65,7 @@ function jacobian(F::AbstractSystem, x, p = nothing)
     u = Vector{Any}(undef, size(F, 1))
     U = Matrix{Any}(undef, size(F))
     evaluate_and_jacobian!(u, U, F, x, p)
-    ModelKit.to_smallest_eltype(U)
+    return ModelKit.to_smallest_eltype(U)
 end
 
 """
@@ -75,10 +75,10 @@ Checks, if `F(ℝⁿ) ⊂ ℝᵐ`, where `(m,n) = size(F)`.
 This is an algorithm that works with probability one:
 It randomly samples `x ∈ ℝⁿ` and checks if `F(x) ∈ ℝᵐ`.
 """
-function is_real(F::T) where {T<:AbstractSystem}
+function is_real(F::T) where {T <: AbstractSystem}
     x = randn(Float64, size(F, 2))
     u = F(x)
-    all(ui -> imag(ui) == 0, u)
+    return all(ui -> imag(ui) == 0, u)
 end
 
 
@@ -101,7 +101,7 @@ nvariables(F::AbstractHomotopy) = size(F, 2)
 (H::AbstractHomotopy)(x, t, p = nothing) = evaluate(H, x, t, p)
 function evaluate(H::AbstractHomotopy, x, t, p = nothing)
     U = Vector{Any}(undef, first(size(H)))
-    to_smallest_eltype(evaluate!(U, H, x, t, p))
+    return to_smallest_eltype(evaluate!(U, H, x, t, p))
 end
 
 function jacobian(H::AbstractHomotopy, x, t, p = nothing)
@@ -109,5 +109,5 @@ function jacobian(H::AbstractHomotopy, x, t, p = nothing)
     u = Vector{Any}(undef, size(H, 1))
     U = Matrix{Any}(undef, size(H))
     evaluate_and_jacobian!(u, U, H, x, t, p)
-    to_smallest_eltype(U)
+    return to_smallest_eltype(U)
 end

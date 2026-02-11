@@ -49,48 +49,48 @@ function NewtonCorrector(a::Float64, x::AbstractVector{ComplexF64}, m::Int)
     r = zeros(ComplexF64, m)
     r̄ = zero(r)
     x_extended = ComplexDF64.(x)
-    NewtonCorrector(a, h_a, Δx, r, r̄, x_extended)
+    return NewtonCorrector(a, h_a, Δx, r, r̄, x_extended)
 end
 
 function extended_prec_refinement_step!(
-    x̄::AbstractVector,
-    NC::NewtonCorrector,
-    H::AbstractHomotopy,
-    x::AbstractVector,
-    t::Number,
-    J::Jacobian,
-    norm::AbstractNorm;
-    simple_newton_step::Bool = true,
-)
+        x̄::AbstractVector,
+        NC::NewtonCorrector,
+        H::AbstractHomotopy,
+        x::AbstractVector,
+        t::Number,
+        J::Jacobian,
+        norm::AbstractNorm;
+        simple_newton_step::Bool = true,
+    )
     @unpack Δx, r, x_extended = NC
     evaluate_and_jacobian!(r, matrix(J), H, x, t)
     x_extended .= x
     evaluate!(r, H, x_extended, t)
     LA.ldiv!(Δx, updated!(J), r, norm)
-    iterative_refinement!(Δx, J, r, norm; tol = 1e-8, max_iters = 3)
+    iterative_refinement!(Δx, J, r, norm; tol = 1.0e-8, max_iters = 3)
     x̄ .= x .- Δx
     if simple_newton_step
         x_extended .= x̄
         evaluate!(r, H, x_extended, t)
         LA.ldiv!(Δx, J, r, norm)
     end
-    norm(Δx)
+    return norm(Δx)
 end
 
 function newton!(
-    x̄::AbstractVector,
-    NC::NewtonCorrector,
-    H::AbstractHomotopy,
-    x₀::AbstractVector,
-    t::Number,
-    J::Jacobian,
-    norm::AbstractNorm;
-    μ::Float64 = throw(UndefKeywordError(:μ)),
-    ω::Float64 = throw(UndefKeywordError(:ω)),
-    extended_precision::Bool = false,
-    accurate_μ::Bool = false,
-    first_correction::Bool = false,
-)
+        x̄::AbstractVector,
+        NC::NewtonCorrector,
+        H::AbstractHomotopy,
+        x₀::AbstractVector,
+        t::Number,
+        J::Jacobian,
+        norm::AbstractNorm;
+        μ::Float64 = throw(UndefKeywordError(:μ)),
+        ω::Float64 = throw(UndefKeywordError(:ω)),
+        extended_precision::Bool = false,
+        accurate_μ::Bool = false,
+        first_correction::Bool = false,
+    )
     @unpack a, h_a, Δx, r, r̄, x_extended = NC
 
     x̄ .= x₀
@@ -98,7 +98,7 @@ function newton!(
     Δxᵢ = Δx
     μ_low = θ = norm_Δxᵢ = norm_Δxᵢ₋₁ = norm_Δx₀ = NaN
     ā = a
-    for i = 0:10
+    for i in 0:10
         evaluate_and_jacobian!(r, matrix(J), H, xᵢ, t)
         if extended_precision
             x_extended .= xᵢ
@@ -205,16 +205,16 @@ function newton!(
 end
 
 function init_newton!(
-    x̄::AbstractVector,
-    NC::NewtonCorrector,
-    H::AbstractHomotopy,
-    x₀::AbstractVector,
-    t::Number,
-    J::Jacobian,
-    norm::WeightedNorm;
-    a::Float64,
-    extended_precision::Bool = true,
-)
+        x̄::AbstractVector,
+        NC::NewtonCorrector,
+        H::AbstractHomotopy,
+        x₀::AbstractVector,
+        t::Number,
+        J::Jacobian,
+        norm::WeightedNorm;
+        a::Float64,
+        extended_precision::Bool = true,
+    )
     x₂ = x₁ = x̄ # alias to make logic easier
     @unpack a, Δx, r, x_extended = NC
 
@@ -228,7 +228,7 @@ function init_newton!(
     valid = false
     ω = μ = NaN
     ε = sqrt(v)
-    for k = 1:3
+    for k in 1:3
         x̄ .= x₀ .+ ε .* weights(norm)
 
         evaluate_and_jacobian!(r, matrix(J), H, x̄, t)
@@ -282,5 +282,5 @@ function init_newton!(
         end
     end
 
-    (valid = valid, ω = ω, μ = μ)
+    return (valid = valid, ω = ω, μ = μ)
 end

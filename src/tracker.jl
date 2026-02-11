@@ -103,16 +103,16 @@ mutable struct TrackerOptions
     parameters::TrackerParameters
 end
 function TrackerOptions(;
-    automatic_differentiation::Int = 1,
-    max_steps::Int = 10_000,
-    max_step_size::Float64 = Inf,
-    max_initial_step_size::Float64 = Inf,
-    extended_precision::Bool = true,
-    min_step_size::Float64 = 1e-48,
-    min_rel_step_size::Float64 = 0.0,
-    terminate_cond::Float64 = 1e13,
-    parameters::Union{Symbol,TrackerParameters} = :default,
-)
+        automatic_differentiation::Int = 1,
+        max_steps::Int = 10_000,
+        max_step_size::Float64 = Inf,
+        max_initial_step_size::Float64 = Inf,
+        extended_precision::Bool = true,
+        min_step_size::Float64 = 1.0e-48,
+        min_rel_step_size::Float64 = 0.0,
+        terminate_cond::Float64 = 1.0e13,
+        parameters::Union{Symbol, TrackerParameters} = :default,
+    )
 
     if parameters isa Symbol
         if parameters == :default
@@ -126,7 +126,7 @@ function TrackerOptions(;
         end
     end
 
-    TrackerOptions(
+    return TrackerOptions(
         automatic_differentiation,
         max_steps,
         max_step_size,
@@ -198,7 +198,7 @@ Returns `true` if `code` indicates that the path tracking got terminated since t
 value was not a regular zero.
 """
 function is_invalid_startvalue(S::TrackerCode.codes)
-    S == TrackerCode.terminated_invalid_startvalue ||
+    return S == TrackerCode.terminated_invalid_startvalue ||
         S == TrackerCode.terminated_invalid_startvalue_singular_jacobian
 end
 
@@ -268,7 +268,7 @@ if `is_invalid_startvalue(result) == true` are
   close to a solution of the homotopy.
 """
 function is_invalid_startvalue(R::TrackerResult)
-    R.return_code == :terminated_invalid_startvalue ||
+    return R.return_code == :terminated_invalid_startvalue ||
         R.return_code == :terminated_invalid_startvalue_singular_jacobian
 end
 
@@ -304,7 +304,7 @@ rejected_steps(result::TrackerResult) = result.rejected_steps
 ### STATE
 ###
 
-mutable struct TrackerState{M<:AbstractMatrix{ComplexF64}}
+mutable struct TrackerState{M <: AbstractMatrix{ComplexF64}}
     x::Vector{ComplexF64} # current x
     x̂::Vector{ComplexF64} # last prediction
     x̄::Vector{ComplexF64} # candidate for new x
@@ -359,7 +359,7 @@ function TrackerState(H, x₁::AbstractVector, norm::WeightedNorm{InfNorm})
     accepted_steps = rejected_steps = ext_accepted_steps = ext_rejected_steps = 0
     last_steps_failed = 0
 
-    TrackerState(
+    return TrackerState(
         x,
         x̂,
         x̄,
@@ -449,7 +449,7 @@ We see that we tracked all 4 paths successfully.
 # successfull: 4
 ```
 """
-struct Tracker{H<:AbstractHomotopy,M<:AbstractMatrix{ComplexF64}}
+struct Tracker{H <: AbstractHomotopy, M <: AbstractMatrix{ComplexF64}}
     homotopy::H
     predictor::Predictor
     corrector::NewtonCorrector
@@ -458,14 +458,14 @@ struct Tracker{H<:AbstractHomotopy,M<:AbstractMatrix{ComplexF64}}
     options::TrackerOptions
 end
 
-Tracker(H::ModelKit.Homotopy; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...) =
+Tracker(H::ModelKit.Homotopy; compile::Union{Bool, Symbol} = COMPILE_DEFAULT[], kwargs...) =
     Tracker(fixed(H; compile = compile); kwargs...)
 function Tracker(
-    H::AbstractHomotopy,
-    x::AbstractVector = zeros(size(H, 2));
-    weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
-    options = TrackerOptions(),
-)
+        H::AbstractHomotopy,
+        x::AbstractVector = zeros(size(H, 2));
+        weighted_norm_options::WeightedNormOptions = WeightedNormOptions(),
+        options = TrackerOptions(),
+    )
     if !isa(options, TrackerOptions)
         options = TrackerOptions(; options...)
     else
@@ -475,7 +475,7 @@ function Tracker(
     state = TrackerState(H, x, norm)
     predictor = Predictor(H)
     corrector = NewtonCorrector(options.parameters.a, state.x, size(H, 1))
-    Tracker(H, predictor, corrector, state, options)
+    return Tracker(H, predictor, corrector, state, options)
 end
 
 Base.show(io::IO, C::Tracker) = print(io, typeof(C), "()")
@@ -510,7 +510,7 @@ function LA.cond(tracker::Tracker, x, t, d_l = nothing, d_r = nothing)
     J = tracker.state.jacobian
     evaluate_and_jacobian!(tracker.corrector.r, matrix(J), tracker.homotopy, x, t)
     updated!(J)
-    LA.cond(J, d_l, d_r)
+    return LA.cond(J, d_l, d_r)
 end
 # Step Size
 
@@ -518,10 +518,10 @@ _h(a) = 2a * (√(4 * a^2 + 1) - 2a)
 
 # intial step size
 function initial_step_size(
-    state::TrackerState,
-    predictor::Predictor,
-    options::TrackerOptions,
-)
+        state::TrackerState,
+        predictor::Predictor,
+        options::TrackerOptions,
+    )
     a = options.parameters.β_a * options.parameters.a
     p = order(predictor)
     ω = state.ω
@@ -529,22 +529,22 @@ function initial_step_size(
     if isinf(e)
         # don't have anything we can use, so just use a conservative number
         # (in all well-behaved cases)
-        e = 1e5
+        e = 1.0e5
     end
     τ = trust_region(predictor)
     Δs₁ = nthroot((√(1 + 2 * _h(a)) - 1) / (ω * e), p) / options.parameters.β_ω_p
     Δs₂ = options.parameters.β_τ * τ
     Δs = nanmin(Δs₁, Δs₂)
-    min(Δs, options.max_step_size, options.max_initial_step_size)
+    return min(Δs, options.max_step_size, options.max_initial_step_size)
 end
 
 function update_stepsize!(
-    state::TrackerState,
-    result::NewtonCorrectorResult,
-    options::TrackerOptions,
-    predictor::Predictor;
-    ad_for_error_estimate::Bool = true,
-)
+        state::TrackerState,
+        result::NewtonCorrectorResult,
+        options::TrackerOptions,
+        predictor::Predictor;
+        ad_for_error_estimate::Bool = true,
+    )
     a = options.parameters.β_a * options.parameters.a
     p = order(predictor)
     ω = clamp(state.ω + 2(state.ω - state.ω_prev), state.ω, 8state.ω)
@@ -571,10 +571,10 @@ function update_stepsize!(
         h_Θ_j = _h(Θ_j)
         h_a = _h(0.5a)
         if isnan(Θ_j) ||
-           result.return_code == NEWT_SINGULARITY ||
-           isnan(result.accuracy) ||
-           result.iters == 1 ||
-           h_Θ_j < h_a
+                result.return_code == NEWT_SINGULARITY ||
+                isnan(result.accuracy) ||
+                result.iters == 1 ||
+                h_Θ_j < h_a
 
             Δs = 0.25 * state.segment_stepper.Δs
         else
@@ -584,7 +584,7 @@ function update_stepsize!(
         end
     end
     propose_step!(state.segment_stepper, Δs)
-    nothing
+    return nothing
 end
 
 
@@ -611,16 +611,16 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
     elseif fast_abs(t′ - t) ≤ 2eps(fast_abs(t))
         state.code = TrackerCode.terminated_step_size_too_small
     elseif options.min_rel_step_size > 0 &&
-           t′ != state.segment_stepper.target &&
-           fast_abs(t′ - t) < fast_abs(t) * options.min_rel_step_size
+            t′ != state.segment_stepper.target &&
+            fast_abs(t′ - t) < fast_abs(t) * options.min_rel_step_size
         state.code = TrackerCode.terminated_step_size_too_small
     end
-    nothing
+    return nothing
 end
 
 function update_predictor!(tracker::Tracker, x̂ = nothing, Δs = nothing, t_prev = NaN)
     @unpack predictor, homotopy, state = tracker
-    update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
+    return update!(predictor, homotopy, state.x, state.t, state.jacobian, state.norm, x̂)
 end
 
 """
@@ -637,17 +637,17 @@ init!(tracker::Tracker, r::TrackerResult, t₁::Number = 1.0, t₀::Number = 0.0
     init!(tracker, solution(r), t₁, t₀; ω = r.ω, μ = r.μ)
 
 function init!(
-    tracker::Tracker,
-    x₁::AbstractVector,
-    t₁::Number = 1.0,
-    t₀::Number = 0.0;
-    ω::Float64 = NaN,
-    μ::Float64 = NaN,
-    τ::Float64 = Inf,
-    max_initial_step_size::Float64 = Inf,
-    keep_steps::Bool = false,
-    extended_precision::Bool = false,
-)
+        tracker::Tracker,
+        x₁::AbstractVector,
+        t₁::Number = 1.0,
+        t₀::Number = 0.0;
+        ω::Float64 = NaN,
+        μ::Float64 = NaN,
+        τ::Float64 = Inf,
+        max_initial_step_size::Float64 = Inf,
+        keep_steps::Bool = false,
+        extended_precision::Bool = false,
+    )
     @unpack state, predictor, corrector, homotopy, options = tracker
     @unpack x, x̄, norm, jacobian = state
 
@@ -712,9 +712,9 @@ function init!(
         evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, x, t)
         J = matrix(workspace(jacobian))
         if J isa StructArrays.StructArray
-            corank = size(J, 2) - LA.rank(Matrix(J), rtol = 1e-14)
+            corank = size(J, 2) - LA.rank(Matrix(J), rtol = 1.0e-14)
         else
-            corank = size(J, 2) - LA.rank(J, rtol = 1e-14)
+            corank = size(J, 2) - LA.rank(J, rtol = 1.0e-14)
         end
         if corank > 0
             state.code = TrackerCode.terminated_invalid_startvalue_singular_jacobian
@@ -738,7 +738,7 @@ function init!(
     propose_step!(state.segment_stepper, Δs)
     state.ω_prev = state.ω
 
-    is_tracking(state.code)
+    return is_tracking(state.code)
 end
 
 function init!(tracker::Tracker, t₀::Number; max_initial_step_size::Float64 = Inf)
@@ -750,7 +750,7 @@ function init!(tracker::Tracker, t₀::Number; max_initial_step_size::Float64 = 
     propose_step!(state.segment_stepper, Δs)
     state.Δs_prev = 0.0
 
-    tracker
+    return tracker
 end
 
 function update_precision!(tracker::Tracker, μ_low)
@@ -770,7 +770,7 @@ function update_precision!(tracker::Tracker, μ_low)
         use_extended_precision!(tracker)
     end
 
-    state.extended_prec
+    return state.extended_prec
 end
 
 function use_extended_precision!(tracker::Tracker)
@@ -784,7 +784,7 @@ function use_extended_precision!(tracker::Tracker)
     state.extended_prec = true
     state.used_extended_prec = true
     # do two refinement steps
-    for i = 1:2
+    for i in 1:2
         μ = extended_prec_refinement_step!(
             x,
             corrector,
@@ -797,7 +797,7 @@ function use_extended_precision!(tracker::Tracker)
         )
     end
     state.μ = max(μ, eps())
-    state.μ
+    return state.μ
 end
 
 function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps(), nsteps = 3)
@@ -828,7 +828,7 @@ function refine_current_solution!(tracker; min_tol::Float64 = 4 * eps(), nsteps 
         end
         k += 1
     end
-    μ
+    return μ
 end
 
 """
@@ -887,9 +887,9 @@ function step!(tracker::Tracker, debug::Bool = false)
         update_precision!(tracker, result.μ_low)
 
         if is_done(state.segment_stepper) &&
-           options.extended_precision &&
-           state.accuracy > 1e-14
-            state.accuracy = refine_current_solution!(tracker; min_tol = 1e-14)
+                options.extended_precision &&
+                state.accuracy > 1.0e-14
+            state.accuracy = refine_current_solution!(tracker; min_tol = 1.0e-14)
             state.refined_extended_prec = true
         end
         update_predictor!(tracker, x̂, state.Δs_prev, t)
@@ -910,7 +910,7 @@ function step!(tracker::Tracker, debug::Bool = false)
     check_terminated!(state, options)
 
 
-    !state.last_step_failed
+    return !state.last_step_failed
 end
 
 """
@@ -923,18 +923,18 @@ The same as [`track`](@ref) but only returns the final [`TrackerCode`](@ref).
 Track with `tracker` the current solution to `t₀`. This keeps the current state.
 """
 function track!(
-    tracker::Tracker,
-    x::AbstractVector,
-    t₁ = 1.0,
-    t₀ = 0.0;
-    ω::Float64 = NaN,
-    μ::Float64 = NaN,
-    extended_precision::Bool = false,
-    τ::Float64 = Inf,
-    keep_steps::Bool = false,
-    max_initial_step_size::Float64 = Inf,
-    debug::Bool = false,
-)
+        tracker::Tracker,
+        x::AbstractVector,
+        t₁ = 1.0,
+        t₀ = 0.0;
+        ω::Float64 = NaN,
+        μ::Float64 = NaN,
+        extended_precision::Bool = false,
+        τ::Float64 = Inf,
+        keep_steps::Bool = false,
+        max_initial_step_size::Float64 = Inf,
+        debug::Bool = false,
+    )
     init!(
         tracker,
         x,
@@ -952,11 +952,11 @@ function track!(
         step!(tracker, debug)
     end
 
-    tracker.state.code
+    return tracker.state.code
 end
 
 function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debug::Bool = false)
-    track!(
+    return track!(
         tracker,
         solution(r),
         t₁,
@@ -969,22 +969,22 @@ function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debu
     )
 end
 function track!(
-    tracker::Tracker,
-    t₀;
-    debug::Bool = false,
-    max_initial_step_size::Float64 = Inf,
-)
+        tracker::Tracker,
+        t₀;
+        debug::Bool = false,
+        max_initial_step_size::Float64 = Inf,
+    )
     init!(tracker, t₀; max_initial_step_size = max_initial_step_size)
 
     while is_tracking(tracker.state.code)
         step!(tracker, debug)
     end
 
-    tracker.state.code
+    return tracker.state.code
 end
 
 function TrackerResult(H::AbstractHomotopy, state::TrackerState)
-    TrackerResult(
+    return TrackerResult(
         Symbol(state.code),
         get_solution(H, state.x, state.t),
         state.t,
@@ -1010,7 +1010,7 @@ Track the solution of the result `r` from `t₁` to `t₀`.
 """
 @inline function track(tracker::Tracker, x, t₁ = 1.0, t₀ = 0.0; kwargs...)
     track!(tracker, x, t₁, t₀; kwargs...)
-    TrackerResult(tracker.homotopy, tracker.state)
+    return TrackerResult(tracker.homotopy, tracker.state)
 end
 
 """
@@ -1030,7 +1030,7 @@ target_parameters!(T::Tracker, p) = (target_parameters!(T.homotopy, p); T)
 parameters!(T::Tracker, p, q) = (parameters!(T.homotopy, p, q); T)
 
 # PathIterator #
-struct PathIterator{T<:Tracker}
+struct PathIterator{T <: Tracker}
     tracker::T
     t_real::Bool
 end
@@ -1062,12 +1062,12 @@ println("Success: ", is_success(status(tracker)))
 """
 function iterator(tracker::Tracker, x₁, t₁ = 1.0, t₀ = 0.0; kwargs...)
     init!(tracker, x₁, t₁, t₀; kwargs...)
-    PathIterator(tracker, typeof(t₁ - t₀) <: Real)
+    return PathIterator(tracker, typeof(t₁ - t₀) <: Real)
 end
 
 function current_x_t(iter::PathIterator)
     @unpack x, t = iter.tracker.state
-    (copy(x), iter.t_real ? real(t) : t)
+    return (copy(x), iter.t_real ? real(t) : t)
 end
 
 function Base.iterate(iter::PathIterator, state = nothing)
@@ -1078,5 +1078,5 @@ function Base.iterate(iter::PathIterator, state = nothing)
         step_failed = !step!(iter.tracker)
         step_failed || break
     end
-    current_x_t(iter), state + 1
+    return current_x_t(iter), state + 1
 end

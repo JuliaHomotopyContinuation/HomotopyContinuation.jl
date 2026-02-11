@@ -1,11 +1,11 @@
 ## Variable construction
 
-Variable(name::Union{Symbol,AbstractString}, indices::Int...) =
+Variable(name::Union{Symbol, AbstractString}, indices::Int...) =
     Variable("$(name)$(join(map_subscripts.(indices), "₋"))")
 
 const SUBSCRIPTS = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
-const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i+1] for i = 0:9])
-const SUBSCRIPT_TO_INT_MAP = Dict([SUBSCRIPTS[i+1] => i for i = 0:9])
+const SUBSCRIPT_MAP = Dict([first(string(i)) => SUBSCRIPTS[i + 1] for i in 0:9])
+const SUBSCRIPT_TO_INT_MAP = Dict([SUBSCRIPTS[i + 1] => i for i in 0:9])
 map_subscripts(index) = join(SUBSCRIPT_MAP[c] for c in string(index))
 
 function sort_key(v::Variable)
@@ -19,9 +19,9 @@ function sort_key(v::Variable)
     indices = map(str_indices) do str_index
         digits = map(s -> ModelKit.SUBSCRIPT_TO_INT_MAP[s], collect(str_index))
         n = length(digits)
-        sum([digits[n-k+1] * 10^(k - 1) for k = 1:n])
+        sum([digits[n - k + 1] * 10^(k - 1) for k in 1:n])
     end
-    var_base, reverse(indices)
+    return var_base, reverse(indices)
 end
 Base.isless(a::Variable, b::Variable) = isless(sort_key(a), sort_key(b))
 Base.sort!(vs::AbstractVector{Variable}; kwargs...) =
@@ -61,8 +61,10 @@ julia> y
 """
 macro var(args...)
     vars, exprs = buildvars(args; unique = false)
-    :($(foldl((x, y) -> :($x; $y), exprs, init = :()));
-    $(Expr(:tuple, esc.(vars)...)))
+    return :(
+        $(foldl((x, y) -> :($x; $y), exprs, init = :()));
+        $(Expr(:tuple, esc.(vars)...))
+    )
 end
 
 """
@@ -88,8 +90,10 @@ b#592
 """
 macro unique_var(args...)
     vars, exprs = buildvars(args; unique = true)
-    :($(foldl((x, y) -> :($x; $y), exprs, init = :()));
-    $(Expr(:tuple, esc.(vars)...)))
+    return :(
+        $(foldl((x, y) -> :($x; $y), exprs, init = :()));
+        $(Expr(:tuple, esc.(vars)...))
+    )
 end
 
 """
@@ -98,12 +102,12 @@ end
 Create an `Array` of variables with the given `prefix` and indices.
 The expression  `@var x[1:3, 1:2]` is equivalent to  `x = variables(:x, 1:3, 1:2)`.
 """
-function MP.variables(prefix::Union{Symbol,String}, indices...)
-    map(i -> Variable(prefix, i...), Iterators.product(indices...))
+function MP.variables(prefix::Union{Symbol, String}, indices...)
+    return map(i -> Variable(prefix, i...), Iterators.product(indices...))
 end
 
 function buildvar(var; unique::Bool = false)
-    if isa(var, Symbol)
+    return if isa(var, Symbol)
         if unique
             # drop the first two ## from the gensym var
             varname = Symbol(String(gensym(var))[3:end])
@@ -142,7 +146,7 @@ function buildvars(args; unique::Bool = false)
             push!(exprs, expr)
         end
     end
-    vars, exprs
+    return vars, exprs
 end
 
 """
@@ -160,7 +164,7 @@ function unique_variable(var, vars::Vector{Variable}, params::Vector{Variable})
         v = Variable("$var##$k")
         k += 1
     end
-    v
+    return v
 end
 
 
@@ -222,7 +226,7 @@ function variables(exprs::AbstractArray{<:Basic}; parameters = Variable[])
     for expr in exprs
         union!(S, _variables(expr))
     end
-    setdiff!(sort!(collect(S)), parameters)
+    return setdiff!(sort!(collect(S)), parameters)
 end
 
 """
@@ -302,7 +306,7 @@ function evaluate(expr::AbstractArray{<:Basic}, args...; bits::Int = 53)
     end
 end
 evaluate(expr::Basic, args...; bits::Int = 53) = to_number(evalf(subs(expr, args...), bits))
-(f::Union{Basic,AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
+(f::Union{Basic, AbstractArray{<:Basic}})(args...) = evaluate(f, args...)
 
 """
     evaluate!(u, expr::AbstractArray{Expression}, subs...)
@@ -310,7 +314,7 @@ evaluate(expr::Basic, args...; bits::Int = 53) = to_number(evalf(subs(expr, args
 Inplace form of [`evaluate`](@ref).
 """
 function evaluate!(u::AbstractArray, expr::AbstractArray{<:Basic}, args...)
-    map!(to_number, u, subs(expr, args...))
+    return map!(to_number, u, subs(expr, args...))
 end
 
 """
@@ -330,13 +334,13 @@ Compute the partial derivatives of `exprs` with respect to the given variable va
 Returns a `Matrix` where the each row contains the partial derivatives for a given expression.
 """
 function differentiate(expr::Basic, vars::AbstractVector{Variable})
-    [differentiate(expr, v) for v in vars]
+    return [differentiate(expr, v) for v in vars]
 end
 function differentiate(exprs::AbstractVector{<:Basic}, var::Variable, k::Int = 1)
-    [differentiate(e, var, k) for e in exprs]
+    return [differentiate(e, var, k) for e in exprs]
 end
 function differentiate(exprs::AbstractVector{<:Basic}, vars::AbstractVector{Variable})
-    [differentiate(e, v) for e in exprs, v in vars]
+    return [differentiate(e, v) for e in exprs, v in vars]
 end
 
 """
@@ -356,14 +360,14 @@ julia> monomials([x,y], 2; affine = false)
 ```
 """
 function monomials(
-    vars::AbstractVector{<:Union{Variable,Expression}},
-    d::Integer;
-    affine::Bool = true,
-    homogeneous::Bool = !affine,
-)
+        vars::AbstractVector{<:Union{Variable, Expression}},
+        d::Integer;
+        affine::Bool = true,
+        homogeneous::Bool = !affine,
+    )
     n = length(vars)
     exps = monomials_exponents(n, d; affine = !homogeneous)
-    map(exps) do exp
+    return map(exps) do exp
         prod(i -> vars[i]^exp[i], 1:n)
     end
 end
@@ -378,24 +382,24 @@ function monomials_exponents(n, d; affine::Bool)
     end
 
     sort!(E, lt = td_order)
-    E
+    return E
 end
 
 function td_order(x, y)
     sx = sum(x)
     sy = sum(y)
-    sx == sy ? x > y : sx > sy
+    return sx == sy ? x > y : sx > sy
 end
 function monomials(
-    vars::AbstractVector{<:Union{Variable,Expression}},
-    D::AbstractVector{<:Integer},
-)
+        vars::AbstractVector{<:Union{Variable, Expression}},
+        D::AbstractVector{<:Integer},
+    )
     D = sort(D; rev = true)
     M = monomials(vars, D[1]; affine = false)
-    for i = 2:length(D)
+    for i in 2:length(D)
         append!(M, monomials(vars, D[i]; affine = false))
     end
-    M
+    return M
 end
 
 """
@@ -426,14 +430,14 @@ julia> c
 ```
 """
 function dense_poly(
-    vars::AbstractVector{<:Union{Variable,Expression}},
-    d::Integer;
-    homogeneous::Bool = false,
-    coeff_name::Symbol = gensym(:c),
-)
+        vars::AbstractVector{<:Union{Variable, Expression}},
+        d::Integer;
+        homogeneous::Bool = false,
+        coeff_name::Symbol = gensym(:c),
+    )
     M = monomials(vars, d; affine = !homogeneous)
     c = Variable.(coeff_name, 1:length(M))
-    sum(c .* M), c
+    return sum(c .* M), c
 end
 
 """
@@ -456,20 +460,22 @@ true
 ```
 """
 function coeffs_as_dense_poly(
-    f::Expression,
-    vars::AbstractVector{<:Union{Variable,Expression}},
-    d::Integer;
-    homogeneous::Bool = false,
-)
+        f::Expression,
+        vars::AbstractVector{<:Union{Variable, Expression}},
+        d::Integer;
+        homogeneous::Bool = false,
+    )
     exps = monomials_exponents(length(vars), d; affine = !homogeneous)
     D = to_dict(expand(f), vars)
-    to_smallest_eltype(map(exps) do exp
-        if haskey(D, exp)
-            to_number(D[exp])
-        else
-            false
+    return to_smallest_eltype(
+        map(exps) do exp
+            if haskey(D, exp)
+                to_number(D[exp])
+            else
+                false
+            end
         end
-    end)
+    )
 end
 
 
@@ -488,11 +494,11 @@ julia> rand_poly(Float64, [x, y], 2)
 ```
 """
 function rand_poly(vars::AbstractVector, d::Integer; kwargs...)
-    rand_poly(ComplexF64, vars, d; kwargs...)
+    return rand_poly(ComplexF64, vars, d; kwargs...)
 end
 function rand_poly(T, vars::AbstractVector, d::Integer; homogeneous::Bool = false)
     M = monomials(vars, d; affine = !homogeneous)
-    sum(randn(T, length(M)) .* M)
+    return sum(randn(T, length(M)) .* M)
 end
 
 
@@ -513,7 +519,7 @@ expand(e::Basic) = symengine_expand(e)
 
 struct PolynomialError <: Exception end
 function Base.showerror(io::IO, ::PolynomialError)
-    print(io, "Encountered an unexpected rational expression.")
+    return print(io, "Encountered an unexpected rational expression.")
 end
 
 """
@@ -525,7 +531,7 @@ Throws a `PolynomialError` if a rational expression is encountered.
 """
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
-    dict = Dict{Vector{Int},Expression}()
+    dict = Dict{Vector{Int}, Expression}()
 
     if class(expr) == :Add
         for op in args(expr)
@@ -535,7 +541,7 @@ function to_dict(expr::Expression, vars::AbstractVector{Variable})
         to_dict_op!(dict, expr, vars, mul_args, pow_args)
     end
 
-    dict
+    return dict
 end
 
 function to_dict_op!(dict, op, vars, mul_args, pow_args)
@@ -614,7 +620,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
     else
         dict[d] = coeff
     end
-    dict
+    return dict
 end
 
 """
@@ -626,11 +632,11 @@ Expands the given expression `f` unless `expanded = true`.
 Throws a `PolynomialError` if a rational expression is encountered.
 """
 function exponents_coefficients(
-    f::Expression,
-    vars::AbstractVector{Variable};
-    expanded::Bool = false,
-    unpack_coeffs::Bool = true,
-)
+        f::Expression,
+        vars::AbstractVector{Variable};
+        expanded::Bool = false,
+        unpack_coeffs::Bool = true,
+    )
     expanded || (f = expand(f))
     D = to_dict(f, vars)
     # make exponents to matrix
@@ -651,7 +657,7 @@ function exponents_coefficients(
         coeffs = collect(values(D))
     end
     permute!(coeffs, perm)
-    M, coeffs
+    return M, coeffs
 end
 
 """
@@ -669,10 +675,10 @@ julia> poly_from_exponents_coefficients(M, c, vars)
 """
 
 function poly_from_exponents_coefficients(
-    M::Matrix{T},
-    c::Vector{S},
-    vars::AbstractVector{Variable},
-) where {T,S<:Number}
+        M::Matrix{T},
+        c::Vector{S},
+        vars::AbstractVector{Variable},
+    ) where {T, S <: Number}
     m, n = size(M)
     if length(c) != n
         error(
@@ -685,7 +691,7 @@ function poly_from_exponents_coefficients(
         )
     end
 
-    sum(cj * prod(vars[i]^M[i, j] for i = 1:m) for (j, cj) in enumerate(c))
+    return sum(cj * prod(vars[i]^M[i, j] for i in 1:m) for (j, cj) in enumerate(c))
 end
 
 
@@ -710,7 +716,7 @@ function coefficients(f::Expression, vars::AbstractVector{Variable}; expanded::B
         end
     end
 
-    if make_to_number
+    return if make_to_number
         permute!(to_number.(values(D)), perm)
     else
         permute!(collect(values(D)), perm)
@@ -725,15 +731,15 @@ Compute the degree of the expression `f`  in `vars`.
 Unless `expanded` is `true` the expression is first expanded.
 """
 function degree(
-    f::Expression,
-    vars::AbstractVector{Variable} = variables(f);
-    expanded::Bool = false,
-)
+        f::Expression,
+        vars::AbstractVector{Variable} = variables(f);
+        expanded::Bool = false,
+    )
     if !expanded
         f = ModelKit.expand(f)
     end
     dicts = ModelKit.to_dict(f, vars)
-    maximum(sum, keys(dicts))
+    return maximum(sum, keys(dicts))
 end
 
 """
@@ -743,24 +749,24 @@ Compute the degrees of the expressions `f` in `vars`.
 Unless `expanded` is `true` the expressions are first expanded.
 """
 function degrees(
-    f::AbstractVector{Expression},
-    vars::AbstractVector{Variable} = variables(f);
-    expanded::Bool = false,
-)
+        f::AbstractVector{Expression},
+        vars::AbstractVector{Variable} = variables(f);
+        expanded::Bool = false,
+    )
     if !expanded
         f = expand.(f)
     end
     dicts = to_dict.(f, Ref(vars))
-    maximum.(sum, keys.(dicts))
+    return maximum.(sum, keys.(dicts))
 end
 
 
-function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
+function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable, Expression}})
     m, n = size(M)
     m == n || error("Cannot take determinant of non-square matrix.")
     if m > 2
         return sum(
-            (-1)^(i - 1) * M[i, 1] * LinearAlgebra.det(M[1:end.!=i, 2:end]) for i = 1:m
+            (-1)^(i - 1) * M[i, 1] * LinearAlgebra.det(M[1:end .!= i, 2:end]) for i in 1:m
         )
     elseif m == 2
         return M[1, 1] * M[2, 2] - M[2, 1] * M[1, 2]
@@ -768,14 +774,14 @@ function LinearAlgebra.det(M::AbstractMatrix{<:Union{Variable,Expression}})
         return M[1, 1]
     end
 end
-LinearAlgebra.det(M::LinearAlgebra.Symmetric{<:Union{Variable,Expression}}) =
+LinearAlgebra.det(M::LinearAlgebra.Symmetric{<:Union{Variable, Expression}}) =
     LinearAlgebra.det(Matrix(M))
 
 function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = false)
     if !expanded
         f = expand(f)
     end
-    try
+    return try
         exponents = keys(to_dict(f, vars))
 
         d = sum(first(exponents))
@@ -810,7 +816,7 @@ c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
 function horner(f::Expression, vars = variables(f))
-    try
+    return try
         M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
         multivariate_horner(M, coeffs, vars)
     catch err
@@ -824,19 +830,19 @@ end
 
 function horner(coeffs::AbstractVector, var::Variable)
     d = length(coeffs) - 1
-    h = copy(coeffs[d+1])
-    @inbounds for k = d:-1:1
+    h = copy(coeffs[d + 1])
+    @inbounds for k in d:-1:1
         mul!(h, h, var)
         add!(h, h, coeffs[k])
     end
-    h
+    return h
 end
 
 function multivariate_horner(
-    M::AbstractMatrix,
-    coeffs::AbstractVector,
-    vars::AbstractVector{Variable},
-)
+        M::AbstractMatrix,
+        coeffs::AbstractVector,
+        vars::AbstractVector{Variable},
+    )
     n, m = size(M)
     if m == 1
         fast_c = coeffs[1]
@@ -852,9 +858,9 @@ function multivariate_horner(
         return fast_c::Expression
     elseif n == 1
         d = maximum(M)
-        uni_coeff_indices = Union{Nothing,Int}[nothing for _ = 0:d]
-        for j = 1:size(M, 2)
-            uni_coeff_indices[M[1, j]+1] = j
+        uni_coeff_indices = Union{Nothing, Int}[nothing for _ in 0:d]
+        for j in 1:size(M, 2)
+            uni_coeff_indices[M[1, j] + 1] = j
         end
 
         var_coeffs = map(uni_coeff_indices) do ind
@@ -868,7 +874,7 @@ function multivariate_horner(
         horner(var_coeffs, vars[1])
     else
         counts = zeros(Int, n)
-        @inbounds for j = 1:size(M, 2), i = 1:size(M, 1)
+        @inbounds for j in 1:size(M, 2), i in 1:size(M, 1)
             counts[i] += M[i, j] > 0
         end
 
@@ -877,18 +883,18 @@ function multivariate_horner(
 
         # compute degree in vars[var_ind]
         d = 0
-        for j = 1:size(M, 2)
+        for j in 1:size(M, 2)
             d = max(d, M[var_ind, j])
         end
 
         # find coefficients
-        coeff_indices = [Int[] for _ = 0:d]
-        for j = 1:size(M, 2)
-            push!(coeff_indices[M[var_ind, j]+1], j)
+        coeff_indices = [Int[] for _ in 0:d]
+        for j in 1:size(M, 2)
+            push!(coeff_indices[M[var_ind, j] + 1], j)
         end
 
         reduced_vars_ind = Int[]
-        for i = 1:n
+        for i in 1:n
             if counts[i] > 0 && i != var_ind
                 push!(reduced_vars_ind, i)
             end
@@ -920,7 +926,6 @@ function multivariate_horner(
 end
 
 
-
 #########################
 ## System and Homotopy ##
 #########################
@@ -936,7 +941,7 @@ function check_vars_params(f, vars, params)
     isempty(Δ) || throw(
         ArgumentError(
             "Not all variables or parameters of the system are given. Missing: " *
-            join(Δ, ", "),
+                join(Δ, ", "),
         ),
     )
     if params !== nothing
@@ -945,7 +950,7 @@ function check_vars_params(f, vars, params)
             error("$(join(both, ", ")) appear as parameters and variables")
         end
     end
-    nothing
+    return nothing
 end
 
 """
@@ -1003,37 +1008,37 @@ struct System
     expressions::Vector{Expression}
     variables::Vector{Variable}
     parameters::Vector{Variable}
-    _jacobian::Ref{Union{Nothing,Matrix{Expression}}}
+    _jacobian::Ref{Union{Nothing, Matrix{Expression}}}
 
     function System(
-        exprs::Vector{Expression},
-        vars::Vector{Variable},
-        params::Vector{Variable},
-    )
+            exprs::Vector{Expression},
+            vars::Vector{Variable},
+            params::Vector{Variable},
+        )
         check_vars_params(exprs, vars, params)
-        new(
+        return new(
             exprs,
             vars,
             params,
-            Ref{Union{Nothing,Matrix{Expression}}}(nothing),
+            Ref{Union{Nothing, Matrix{Expression}}}(nothing),
         )
     end
 end
 
 System(exprs; kwargs...) = System(convert(Vector{Expression}, exprs); kwargs...)
 function System(
-    exprs::AbstractVector{Expression};
-    parameters::Union{Nothing,Vector{Variable}} = nothing,
-    variables::Union{Nothing,Vector{Variable}} = nothing,
-)
+        exprs::AbstractVector{Expression};
+        parameters::Union{Nothing, Vector{Variable}} = nothing,
+        variables::Union{Nothing, Vector{Variable}} = nothing,
+    )
     vars, params = _default_vars_params(exprs, variables, parameters)
-    System(convert(Vector{Expression}, exprs), vars, params)
+    return System(convert(Vector{Expression}, exprs), vars, params)
 end
 
 function _default_vars_params(exprs, vars, parameters)
     all_vars = variables(exprs)
     parameters = something(parameters, Variable[])
-    if isnothing(vars)
+    return if isnothing(vars)
         setdiff(all_vars, parameters), parameters
     else
         vars, parameters
@@ -1042,25 +1047,25 @@ end
 
 
 function System(
-    exprs::AbstractVector,
-    variables::Vector{Variable};
-    parameters::Vector{Variable} = Variable[],
-)
-    System(convert(Vector{Expression}, exprs), variables, parameters)
+        exprs::AbstractVector,
+        variables::Vector{Variable};
+        parameters::Vector{Variable} = Variable[],
+    )
+    return System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 function System(
-    exprs::AbstractVector,
-    variables::Vector{Variable},
-    parameters::Vector{Variable},
-)
-    System(convert(Vector{Expression}, exprs), variables, parameters)
+        exprs::AbstractVector,
+        variables::Vector{Variable},
+        parameters::Vector{Variable},
+    )
+    return System(convert(Vector{Expression}, exprs), variables, parameters)
 end
 
 function System(
-    F::AbstractVector{<:MP.AbstractPolynomial};
-    parameters = similar(MP.variables(F), 0),
-    variables = setdiff(MP.variables(F), parameters),
-)
+        F::AbstractVector{<:MP.AbstractPolynomial};
+        parameters = similar(MP.variables(F), 0),
+        variables = setdiff(MP.variables(F), parameters),
+    )
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
@@ -1078,19 +1083,19 @@ function System(
             c * prod(w^MP.degree(t, v) for (v, w) in zip(variables_parameters, vars_params))
         end
     end
-    System(G, variables = vars, parameters = params)
+    return System(G, variables = vars, parameters = params)
 end
 
 System(F::System) = F
 
 function System(
-    support::AbstractVector{<:AbstractMatrix{<:Integer}},
-    coefficients::AbstractVector{<:AbstractVector};
-    variables::AbstractVector{Variable},
-    parameters::AbstractVector{Variable} = Variable[],
-)
+        support::AbstractVector{<:AbstractMatrix{<:Integer}},
+        coefficients::AbstractVector{<:AbstractVector};
+        variables::AbstractVector{Variable},
+        parameters::AbstractVector{Variable} = Variable[],
+    )
 
-    System(
+    return System(
         map(support, coefficients) do A, c
             fi = Expression(0)
             for (k, a) in enumerate(eachcol(A))
@@ -1107,20 +1112,20 @@ Base.hash(S::System, u::UInt64) =
     hash(S.expressions, hash(S.variables, hash(S.parameters, u)))
 
 function Base.show(io::IO, F::System)
-    if !get(io, :compact, false)
+    return if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
         print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
         if !isempty(F.parameters)
             print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
         end
         print(io, "\n\n")
-        for i = 1:length(F)
+        for i in 1:length(F)
             print(io, " ", F.expressions[i])
             i < length(F) && print(io, "\n")
         end
     else
         print(io, "[")
-        for i = 1:length(F)
+        for i in 1:length(F)
             print(io, F.expressions[i])
             i < length(F) && print(io, ", ")
         end
@@ -1149,7 +1154,7 @@ evaluate(F, [2, 3])
 
 evaluate(F::System, x::AbstractVector) = evaluate(F.expressions, F.variables => x)
 function evaluate(F::System, x::AbstractVector, p::AbstractVector)
-    if isempty(F.parameters)
+    return if isempty(F.parameters)
         evaluate(F.expressions, F.variables => x)
     else
         evaluate(F.expressions, F.variables => x, F.parameters => p)
@@ -1180,7 +1185,7 @@ function jacobian(F::System)
     if isnothing(F._jacobian[])
         F._jacobian[] = differentiate(F.expressions, F.variables)
     end
-    F._jacobian[]::Matrix{Expression}
+    return F._jacobian[]::Matrix{Expression}
 end
 
 """
@@ -1202,7 +1207,7 @@ jacobian(F, [2, 3])
 ```
 """
 function jacobian(F::System, x, p = nothing)
-    if p isa Nothing
+    return if p isa Nothing
         evaluate(jacobian(F), F.variables => x)
     else
         evaluate(jacobian(F), F.variables => x, F.parameters => p)
@@ -1210,7 +1215,7 @@ function jacobian(F::System, x, p = nothing)
 end
 
 function Base.:(==)(F::System, G::System)
-    F.expressions == G.expressions &&
+    return F.expressions == G.expressions &&
         F.variables == G.variables &&
         F.parameters == G.parameters
 end
@@ -1269,7 +1274,7 @@ Return the support of the system and the corresponding coefficients.
 """
 function support_coefficients(F::System)
     supp_coeffs = exponents_coefficients.(F.expressions, Ref(F.variables))
-    first.(supp_coeffs), last.(supp_coeffs)
+    return first.(supp_coeffs), last.(supp_coeffs)
 end
 
 """
@@ -1299,7 +1304,7 @@ function Base.intersect(F::System, G::System)
         F.parameters
         setdiff(G.parameters, F.parameters)
     ]
-    System(exprs, vars, params)
+    return System(exprs, vars, params)
 end
 function Base.intersect(F::System, G::AbstractVector{<:Expression})
     exprs = [F.expressions; G]
@@ -1307,7 +1312,7 @@ function Base.intersect(F::System, G::AbstractVector{<:Expression})
         F.variables
         setdiff(variables(G), F.variables)
     ]
-    System(exprs, vars, F.parameters)
+    return System(exprs, vars, F.parameters)
 end
 Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
 
@@ -1340,7 +1345,7 @@ System of length 4
 ```
 """
 function optimize(F::System)
-    System(
+    return System(
         horner.(F.expressions, Ref(F.variables)),
         F.variables,
         F.parameters,
@@ -1350,9 +1355,9 @@ end
 
 ## Conversion from MultivariatePolynomials
 function system_with_coefficents_as_params(
-    F::AbstractVector{<:MP.AbstractPolynomial};
-    variables = MP.variables(F),
-)
+        F::AbstractVector{<:MP.AbstractPolynomial};
+        variables = MP.variables(F),
+    )
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
@@ -1371,7 +1376,7 @@ function system_with_coefficents_as_params(
         end
     end
     sys = System(G, variables = vars, parameters = params)
-    sys, target_params
+    return sys, target_params
 end
 
 ##############
@@ -1430,43 +1435,43 @@ struct Homotopy
     parameters::Vector{Variable}
 
     function Homotopy(
-        exprs::Vector{Expression},
-        vars::Vector{Variable},
-        t::Variable,
-        params::Vector{Variable},
-    )
+            exprs::Vector{Expression},
+            vars::Vector{Variable},
+            t::Variable,
+            params::Vector{Variable},
+        )
         check_vars_params(exprs, [vars; t], params)
-        new(exprs, vars, t, params)
+        return new(exprs, vars, t, params)
     end
 end
 
 function Homotopy(
-    exprs::AbstractVector{Expression},
-    variables::Vector{Variable},
-    t::Variable;
-    parameters::Vector{Variable} = Variable[],
-)
-    Homotopy(convert(Vector{Expression}, exprs), variables, t, parameters)
+        exprs::AbstractVector{Expression},
+        variables::Vector{Variable},
+        t::Variable;
+        parameters::Vector{Variable} = Variable[],
+    )
+    return Homotopy(convert(Vector{Expression}, exprs), variables, t, parameters)
 end
 function Homotopy(exprs, variables::Vector{Variable}, t::Variable; kwargs...)
-    Homotopy(convert(Vector{Expression}, exprs), variables, t; kwargs...)
+    return Homotopy(convert(Vector{Expression}, exprs), variables, t; kwargs...)
 end
 
 function Base.show(io::IO, H::Homotopy)
-    if !get(io, :compact, false)
+    return if !get(io, :compact, false)
         println(io, "Homotopy in ", H.t, " of length ", length(H.expressions))
         print(io, " $(length(H.variables)) variables: ", join(H.variables, ", "))
         if !isempty(H.parameters)
             print(io, "\n $(length(H.parameters)) parameters: ", join(H.parameters, ", "))
         end
         print(io, "\n\n")
-        for i = 1:length(H)
+        for i in 1:length(H)
             print(io, " ", H.expressions[i])
             i < length(H) && print(io, "\n")
         end
     else
         print(io, "[")
-        for i = 1:length(H)
+        for i in 1:length(H)
             print(io, H.expressions[i])
             i < length(H) && print(io, ", ")
         end
@@ -1477,13 +1482,13 @@ end
 evaluate(H::Homotopy, x::AbstractVector, t) =
     evaluate(H.expressions, H.variables => x, H.t => t)
 function evaluate(H::Homotopy, x::AbstractVector, t, p::AbstractVector)
-    evaluate(H.expressions, H.variables => x, H.t => t, H.parameters => p)
+    return evaluate(H.expressions, H.variables => x, H.t => t, H.parameters => p)
 end
 (H::Homotopy)(x::AbstractVector, t) = evaluate(H, x, t)
 (H::Homotopy)(x::AbstractVector, t, p::AbstractVector) = evaluate(H, x, t, p)
 
 function Base.:(==)(H::Homotopy, G::Homotopy)
-    H.expressions == G.expressions &&
+    return H.expressions == G.expressions &&
         H.variables == G.variables &&
         H.parameters == G.parameters
 end
@@ -1544,10 +1549,10 @@ function to_smallest_eltype(A::AbstractArray)
             T = promote_type(T, typeof(a))
         end
     end
-    convert.(T, A)
+    return convert.(T, A)
 end
 
 
 function optimize(H::Homotopy)
-    Homotopy(horner.(H.expressions, Ref(H.variables)), H.variables, H.t, H.parameters)
+    return Homotopy(horner.(H.expressions, Ref(H.variables)), H.variables, H.t, H.parameters)
 end

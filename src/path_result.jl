@@ -82,12 +82,12 @@ Base.@kwdef mutable struct PathResult
     singular::Bool
     multiplicity::Int = 1
     condition_jacobian::Float64
-    winding_number::Union{Nothing,Int}
+    winding_number::Union{Nothing, Int}
     extended_precision::Bool
-    path_number::Union{Nothing,Int}
+    path_number::Union{Nothing, Int}
     start_solution::Any
-    last_path_point::Tuple{Vector{ComplexF64},Float64}
-    valuation::Union{Nothing,Vector{Float64}}
+    last_path_point::Tuple{Vector{ComplexF64}, Float64}
+    valuation::Union{Nothing, Vector{Float64}}
     ω::Float64
     μ::Float64
     # performance stats
@@ -113,6 +113,7 @@ function Base.show(io::IO, r::PathResult)
     for f in [:extended_precision, :path_number]
         print_fieldname(io, r, f)
     end
+    return
 end
 
 
@@ -274,10 +275,10 @@ We consider a result as `real` if either:
 - the infinity-norm of the imaginary part of the solution is less than `rtol * norm(s, 1)`, where s is the solution in `PathResult`.
 """
 function is_real(
-    r::PathResult;
-    atol::Float64 = 1e-6,
-    rtol::Float64 = 0.0,
-)
+        r::PathResult;
+        atol::Float64 = 1.0e-6,
+        rtol::Float64 = 0.0,
+    )
     m = maximum(abs ∘ imag, r.solution)
     m < atol && return true
     iszero(rtol) && return false

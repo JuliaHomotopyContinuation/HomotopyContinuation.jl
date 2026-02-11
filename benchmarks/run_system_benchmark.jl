@@ -28,7 +28,7 @@ function benchsystem!(suite, T, f, mode)
         BenchmarkTools.@benchmarkable evaluate_and_jacobian!($u, $U, ($I)[], $x, $p)
     suite["taylor_1"] =
         BenchmarkTools.@benchmarkable taylor!($v1, $(Val(1)), ($I)[], $tx0, $p)
-    suite["taylor_2"] =
+    return suite["taylor_2"] =
         BenchmarkTools.@benchmarkable taylor!($v2, $(Val(2)), ($I)[], $tx1, $tp1)
 end
 

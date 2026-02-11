@@ -9,26 +9,26 @@ struct KeywordArgumentException <: Exception
     msg::String
 end
 function KeywordArgumentException(key, given)
-    KeywordArgumentException(key, given, "")
+    return KeywordArgumentException(key, given, "")
 end
 function Base.showerror(io::IO, E::KeywordArgumentException)
-    print(io, "Invalid argument $(E.given) for $(E.key). ", E.msg)
+    return print(io, "Invalid argument $(E.given) for $(E.key). ", E.msg)
 end
 
 struct FiniteException <: Exception
     dim::Int
 end
 function Base.showerror(io::IO, E::FiniteException)
-    print(
+    return print(
         io,
         "FiniteException: The solution set of the given system has at least dimension " *
-        "$(E.dim) > 0. Consider intersecting with an (affine) subspace of codimension " *
-        "$(E.dim) to reduce to (possibly) finitely many solutions.",
+            "$(E.dim) > 0. Consider intersecting with an (affine) subspace of codimension " *
+            "$(E.dim) to reduce to (possibly) finitely many solutions.",
     )
 end
 
 @noinline function unsupported_kwargs(kwargs)
-    if !(isempty(kwargs))
+    return if !(isempty(kwargs))
         msg = join(["$k = $v" for (k, v) in pairs(kwargs)], ", ")
         @warn "Ingored unsupported keyword arguments: $msg"
     end
@@ -40,7 +40,7 @@ end
 const _C64SA = StructArrays.StructArray{
     Complex{Float64},
     2,
-    NamedTuple{(:re, :im),Tuple{Array{Float64,2},Array{Float64,2}}},
+    NamedTuple{(:re, :im), Tuple{Array{Float64, 2}, Array{Float64, 2}}},
     Int64,
 }
 Base.@propagate_inbounds function Base.setindex!(s::_C64SA, vals, I::Int)
@@ -50,7 +50,7 @@ Base.@propagate_inbounds function Base.setindex!(s::_C64SA, vals, I::Int)
         s,
         convert(ComplexF64, vals),
     )
-    s
+    return s
 end
 
 fast_abs(z::Complex) = sqrt(abs2(z))
@@ -72,7 +72,7 @@ function all2(f::F, a::AbstractVector, b::AbstractVector) where {F}
     for (ai, bi) in zip(a, b)
         f(ai, bi) || return false
     end
-    true
+    return true
 end
 
 
@@ -81,23 +81,24 @@ end
 
 Returns `a` if it is not `nothing`, otherwise `b`.
 """
-unpack(a::Union{Nothing,T}, b::T) where {T} = a === nothing ? b : a
+unpack(a::Union{Nothing, T}, b::T) where {T} = a === nothing ? b : a
 
 plural(singularstr, n) = n == 1 ? singularstr : singularstr * "s"
 
 """
-     print_fieldnames(io::IO, obj)
+    print_fieldnames(io::IO, obj)
 
- A better default printing for structs.
- """
+A better default printing for structs.
+"""
 function print_fieldnames(io::IO, obj)
     println(io, typeof(obj), ":")
     for name in fieldnames(typeof(obj))
         print_fieldname(io, obj, name)
     end
+    return
 end
 function print_fieldname(io::IO, obj, name)
-    if getfield(obj, name) !== nothing
+    return if getfield(obj, name) !== nothing
         val = getfield(obj, name)
         print(io, " • ", name, " → ")
         if val isa AbstractFloat
@@ -131,7 +132,7 @@ function init!(S::SegmentStepper, start::ComplexF64, target::ComplexF64)
     S.abs_Δ = abs(target - start)
     S.forward = abs(start) < abs(target)
     S.s = S.s′ = S.forward ? 0.0 : S.abs_Δ
-    S
+    return S
 end
 
 is_done(S::SegmentStepper) = S.forward ? S.s == S.abs_Δ : S.s == 0.0
@@ -143,7 +144,7 @@ function propose_step!(S::SegmentStepper, Δs::Real)
     else
         S.s′ = max(S.s - Δs, 0.0)
     end
-    S
+    return S
 end
 dist_to_target(S::SegmentStepper) = S.forward ? S.abs_Δ - S.s : S.s
 
@@ -185,7 +186,7 @@ function Base.getproperty(S::SegmentStepper, sym::Symbol)
     end
 end
 function _t_helper(start, target, s, Δ, forward)
-    if forward
+    return if forward
         if s == 0.0
             return start
         elseif s == Δ
@@ -209,6 +210,7 @@ function Base.show(io::IO, val::SegmentStepper)
     for field in [:start, :target, :t, :Δt]
         print(io, "\n • ", field, " → ", getproperty(val, field))
     end
+    return
 end
 
 """
@@ -217,7 +219,7 @@ end
 Compute the `n`-th root of `x`.
 """
 function nthroot(x::Real, N::Integer)
-    if N == 4
+    return if N == 4
         √(√(x))
     elseif N == 2
         √(x)
@@ -246,7 +248,7 @@ function set!(x::BigFloat, y::BigFloat, r::MPFRRoundingMode = MPFR.ROUNDING_MODE
         y,
         r,
     )
-    x
+    return x
 end
 
 
@@ -259,7 +261,7 @@ function set!(x::BigFloat, d::Float64, r::MPFRRoundingMode = MPFR.ROUNDING_MODE[
         d,
         r,
     )
-    x
+    return x
 end
 
 

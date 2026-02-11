@@ -15,13 +15,13 @@ struct PolyhedralStartSolutionsIterator{Iter}
 end
 
 function PolyhedralStartSolutionsIterator(
-    support::AbstractVector{<:AbstractMatrix{<:Integer}},
-    coeffs::AbstractVector{<:AbstractVector{<:Number}},
-    lifting = map(c -> zeros(Int32, length(c)), coeffs),
-    mixed_cells = MixedCell[],
-)
+        support::AbstractVector{<:AbstractMatrix{<:Integer}},
+        coeffs::AbstractVector{<:AbstractVector{<:Number}},
+        lifting = map(c -> zeros(Int32, length(c)), coeffs),
+        mixed_cells = MixedCell[],
+    )
     BSS = BinomialSystemSolver(length(support))
-    PolyhedralStartSolutionsIterator(
+    return PolyhedralStartSolutionsIterator(
         convert(Vector{Matrix{Int32}}, support),
         coeffs,
         lifting,
@@ -39,7 +39,7 @@ Base.show(
 ) = x
 Base.IteratorSize(::Type{<:PolyhedralStartSolutionsIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{<:PolyhedralStartSolutionsIterator}) = Base.HasEltype()
-Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell,Vector{ComplexF64}}
+Base.eltype(iter::PolyhedralStartSolutionsIterator) = Tuple{MixedCell, Vector{ComplexF64}}
 
 function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
     first_cell = iterate(iter.mixed_cells)
@@ -57,7 +57,7 @@ function compute_mixed_cells!(iter::PolyhedralStartSolutionsIterator)
             append!(iter.lifting[i], w)
         end
     end
-    iter
+    return iter
 end
 
 
@@ -69,21 +69,21 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     cell, inner_state = first_cell
 
     solve(iter.BSS, iter.support, iter.start_coefficients, cell)
-    x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+    x = [iter.BSS.X[i, 1] for i in 1:length(iter.support)]
 
     # return the value _and_ the combined state:
     # (cell, inner_state, column_index)
     return (cell, x), (cell, inner_state, 1)
 end
 
-function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any,Any,Int})
+function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any, Any, Int})
     cell, inner_state, j = state
     ncol = size(iter.BSS.X, 2)
 
     if j < ncol
         # we still have more columns to emit for the current cell
         new_j = j + 1
-        x = [iter.BSS.X[i, new_j] for i = 1:length(iter.support)]
+        x = [iter.BSS.X[i, new_j] for i in 1:length(iter.support)]
         return (cell, x), (cell, inner_state, new_j)
     else
         # we finished the last column for `cell`, advance to the next cell
@@ -92,7 +92,7 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any,A
         cell2, new_inner_state = next_cell
 
         solve(iter.BSS, iter.support, iter.start_coefficients, cell2)
-        x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
+        x = [iter.BSS.X[i, 1] for i in 1:length(iter.support)]
 
         return (cell2, x), (cell2, new_inner_state, 1)
     end
@@ -103,13 +103,13 @@ function polyhedral_system(support)
     m = 0
     p = Variable[]
     coeffs = map(support) do A
-        c = variables(:c, m+1:m+size(A, 2))
+        c = variables(:c, (m + 1):(m + size(A, 2)))
         m += size(A, 2)
         append!(p, c)
         c
     end
 
-    System(support, coeffs; variables = variables(:x, 1:length(support)), parameters = p)
+    return System(support, coeffs; variables = variables(:x, 1:length(support)), parameters = p)
 end
 
 """
@@ -118,9 +118,9 @@ end
 This tracker realises the two step approach of the polyhedral homotopy.
 See also [`polyhedral`].
 """
-struct PolyhedralTracker{H1<:ToricHomotopy,H2<:AbstractHomotopy,M} <: AbstractPathTracker
-    toric_tracker::Tracker{H1,M}
-    generic_tracker::EndgameTracker{H2,M}
+struct PolyhedralTracker{H1 <: ToricHomotopy, H2 <: AbstractHomotopy, M} <: AbstractPathTracker
+    toric_tracker::Tracker{H1, M}
+    generic_tracker::EndgameTracker{H2, M}
     support::Vector{Matrix{Int32}}
     lifting::Vector{Vector{Int32}}
 end
@@ -176,14 +176,14 @@ count(is_success, track.(tracker, starts)) # 3
 function polyhedral(F::AbstractSystem; kwargs...)
     _, n = size(F)
     @var x[1:n]
-    polyhedral(System(F(x), x); kwargs...)
+    return polyhedral(System(F(x), x); kwargs...)
 end
 function polyhedral(
-    f::System;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    target_parameters = nothing,
-    kwargs...,
-)
+        f::System;
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        target_parameters = nothing,
+        kwargs...,
+    )
     if is_homogeneous(f)
         throw(
             ArgumentError(
@@ -209,13 +209,13 @@ function polyhedral(
     end
     support, target_coeffs = support_coefficients(f)
     tracker, starts = polyhedral(support, target_coeffs; compile = compile, kwargs...)
-    tracker, starts
+    return tracker, starts
 end
 
 function has_zero_col(A)
-    for j = 1:size(A, 2)
+    for j in 1:size(A, 2)
         has_non_zero = false
-        for i = 1:size(A, 1)
+        for i in 1:size(A, 1)
             if !iszero(A[i, j])
                 has_non_zero = true
                 break
@@ -223,16 +223,16 @@ function has_zero_col(A)
         end
         has_non_zero || return true
     end
-    false
+    return false
 end
 
 paths_to_track(f::AbstractSystem, val::Val{:polyhedral}) = paths_to_track(System(f), val)
 function paths_to_track(
-    f::System,
-    ::Val{:polyhedral};
-    only_torus::Bool = false,
-    only_non_zero::Bool = only_torus,
-)
+        f::System,
+        ::Val{:polyhedral};
+        only_torus::Bool = false,
+        only_non_zero::Bool = only_torus,
+    )
     if is_homogeneous(f)
         throw(
             ArgumentError(
@@ -252,23 +252,23 @@ function paths_to_track(
     end
     supp, _ = support_coefficients(f)
 
-    if only_non_zero
+    return if only_non_zero
         MixedSubdivisions.mixed_volume(supp)
     else
         supp′ = map(A -> has_zero_col(A) ? A : [A zeros(Int32, size(A, 1), 1)], supp)
         MixedSubdivisions.mixed_volume(supp′)
     end
 end
-MixedSubdivisions.mixed_volume(f::Union{System,AbstractSystem}) =
+MixedSubdivisions.mixed_volume(f::Union{System, AbstractSystem}) =
     paths_to_track(f; start_system = :polyhedral, only_torus = true)
 
 function polyhedral(
-    support::AbstractVector{<:AbstractMatrix},
-    target_coeffs::AbstractVector;
-    kwargs...,
-)
+        support::AbstractVector{<:AbstractMatrix},
+        target_coeffs::AbstractVector;
+        kwargs...,
+    )
     start_coeffs = map(c -> rand_approx_unit(length(c)) .* LA.norm(c, Inf), target_coeffs)
-    polyhedral(support, start_coeffs, target_coeffs; kwargs...)
+    return polyhedral(support, start_coeffs, target_coeffs; kwargs...)
 end
 
 """
@@ -282,16 +282,16 @@ rand_approx_unit(n) = map(_ -> (0.9 + 0.2 * rand()) * cis2pi(rand()), 1:n)
 cis2pi(x) = complex(cospi(2x), sinpi(2x))
 
 function polyhedral(
-    support::AbstractVector{<:AbstractMatrix},
-    start_coeffs::AbstractVector,
-    target_coeffs::AbstractVector;
-    endgame_options = EndgameOptions(),
-    tracker_options = TrackerOptions(),
-    only_torus::Bool = false,
-    only_non_zero::Bool = only_torus,
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+        support::AbstractVector{<:AbstractMatrix},
+        start_coeffs::AbstractVector,
+        target_coeffs::AbstractVector;
+        endgame_options = EndgameOptions(),
+        tracker_options = TrackerOptions(),
+        only_torus::Bool = false,
+        only_non_zero::Bool = only_torus,
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
     unsupported_kwargs(kwargs)
     size.(support, 2) == length.(start_coeffs) == length.(target_coeffs) ||
         throw(ArgumentError("Number of terms do not coincide."))
@@ -334,15 +334,15 @@ function polyhedral(
     S = PolyhedralStartSolutionsIterator(support, start_coeffs)
     tracker = PolyhedralTracker(toric_tracker, generic_tracker, S.support, S.lifting)
 
-    tracker, S
+    return tracker, S
 end
 
 function track(
-    PT::PolyhedralTracker,
-    start_solution::Tuple{MixedCell,<:AbstractVector{ComplexF64}};
-    path_number::Union{Nothing,Int} = nothing,
-    debug::Bool = false,
-)
+        PT::PolyhedralTracker,
+        start_solution::Tuple{MixedCell, <:AbstractVector{ComplexF64}};
+        path_number::Union{Nothing, Int} = nothing,
+        debug::Bool = false,
+    )
     cell, x∞ = start_solution
     H = PT.toric_tracker.homotopy
     # The tracker works in two stages
@@ -372,20 +372,20 @@ function track(
             0.0,
             1.0;
             ω = 20.0,
-            μ = 1e-12,
+            μ = 1.0e-12,
             max_initial_step_size = 0.2,
             debug = debug,
         )
         @unpack μ, ω = PT.toric_tracker.state
     else
-        t₀ = clamp(0.1^(10 / max_weight), 0.9, 1 - 1e-6)
+        t₀ = clamp(0.1^(10 / max_weight), 0.9, 1 - 1.0e-6)
         retcode = track!(
             PT.toric_tracker,
             x∞,
             0.0,
             t₀;
             ω = 20.0,
-            μ = 1e-12,
+            μ = 1.0e-12,
             max_initial_step_size = 0.2,
             debug = debug,
         )
@@ -452,5 +452,5 @@ function track(
     r.accepted_steps += PT.toric_tracker.state.accepted_steps
     r.rejected_steps += PT.toric_tracker.state.rejected_steps
 
-    r
+    return r
 end

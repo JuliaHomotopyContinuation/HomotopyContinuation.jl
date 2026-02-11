@@ -1,5 +1,5 @@
 struct Instruction
-    input::NTuple{4,Int32}
+    input::NTuple{4, Int32}
     op::OpType
     output::Int32
 end
@@ -10,21 +10,21 @@ struct InstructionSequence
     constants_range::UnitRange{Int}
     parameters_range::UnitRange{Int}
     variables_range::UnitRange{Int}
-    continuation_parameter_index::Union{Nothing,Int}
+    continuation_parameter_index::Union{Nothing, Int}
     # tape_index, assignment_index
-    assignments::Vector{Tuple{Int,Int}}
+    assignments::Vector{Tuple{Int, Int}}
     output_dim::Int
     tape_space_needed::Int
 end
 
 function sequence_to_expr(
-    seq::InstructionSequence;
-    op_call = op_call,
-    instr_symbol = :τ,
-    unique_variable_names = true,
-    order = nothing,
-)
-    tape_index_symbol_map = Dict{Int32,Symbol}()
+        seq::InstructionSequence;
+        op_call = op_call,
+        instr_symbol = :τ,
+        unique_variable_names = true,
+        order = nothing,
+    )
+    tape_index_symbol_map = Dict{Int32, Symbol}()
 
     r = (k) -> begin
         if k in seq.constants_range
@@ -79,9 +79,9 @@ function sequence_to_expr(
             )
         end
     end
-    quote
-        $(exprs...)
-    end, r
+    return quote
+            $(exprs...)
+        end, r
 end
 
 function Base.show(io::IO, instr::Instruction)
@@ -95,16 +95,16 @@ function Base.show(io::IO, instr::Instruction)
     end
 
     join(io, args, ",")
-    print(io, ")")
+    return print(io, ")")
 end
 
 function Base.show(io::IO, seq::InstructionSequence)
-    print(io, first(sequence_to_expr(seq; unique_variable_names = false)))
+    return print(io, first(sequence_to_expr(seq; unique_variable_names = false)))
 end
 
 
 function should_use_index_not_reference(instr::Instruction, index)
-    should_use_index_not_reference(instr.op, index)
+    return should_use_index_not_reference(instr.op, index)
 end
 
 
@@ -121,11 +121,11 @@ getconstants(i::IRStatement) = (
     number_or_nothing(i.args[4]),
 )
 
-function instruction_sequence(F::Union{System,Homotopy}; output_dim::Integer = length(F))
+function instruction_sequence(F::Union{System, Homotopy}; output_dim::Integer = length(F))
     vars = Symbol.(variables(F))
     params = Symbol.(parameters(F))
     continuation_parameter = F isa Homotopy ? Symbol(F.t) : nothing
-    instruction_sequence(
+    return instruction_sequence(
         intermediate_representation(expressions(F); output_dim = output_dim);
         variables = vars,
         parameters = params,
@@ -134,12 +134,12 @@ function instruction_sequence(F::Union{System,Homotopy}; output_dim::Integer = l
 end
 
 function instruction_sequence(
-    ir::IntermediateRepresentation;
-    variables::Vector{Symbol},
-    parameters::Vector{Symbol} = Symbol[],
-    continuation_parameter::Union{Symbol,Nothing} = nothing,
-)
-    arg_index_map = Dict{IRStatementArg,Int32}()
+        ir::IntermediateRepresentation;
+        variables::Vector{Symbol},
+        parameters::Vector{Symbol} = Symbol[],
+        continuation_parameter::Union{Symbol, Nothing} = nothing,
+    )
+    arg_index_map = Dict{IRStatementArg, Int32}()
     tape_index = 0
     # Find all constants
     constants = Number[]
@@ -220,7 +220,7 @@ function instruction_sequence(
     n = tape_space_needed
     push!(instructions, Instruction((n, n, n, n), OP_STOP, n))
 
-    InstructionSequence(
+    return InstructionSequence(
         instructions,
         constants,
         constants_range,
@@ -239,7 +239,7 @@ function jacobian_instruction_sequence(F::System, ; kwargs...)
         variables = variables(F),
         parameters = parameters(F),
     )
-    instruction_sequence(JF; output_dim = length(F))
+    return instruction_sequence(JF; output_dim = length(F))
 end
 function jacobian_instruction_sequence(H::Homotopy, ; kwargs...)
     JH = Homotopy(
@@ -248,7 +248,7 @@ function jacobian_instruction_sequence(H::Homotopy, ; kwargs...)
         H.t,
         parameters(H),
     )
-    instruction_sequence(JH; output_dim = length(H))
+    return instruction_sequence(JH; output_dim = length(H))
 end
 
 
@@ -261,7 +261,7 @@ function optimize(instructions::Vector{Instruction}, input_block_size::Int, assi
     instructions = optimize_instruction_order(instructions)
     instructions, space_needed, updated_assignments =
         reduce_space(instructions, input_block_size, assignments)
-    instructions, space_needed, updated_assignments
+    return instructions, space_needed, updated_assignments
 end
 
 
@@ -295,9 +295,9 @@ function optimize_instruction_order(instructions::Vector{Instruction})
             if isempty(unlisted_nodes_without_parent)
                 is_unlisted =
                     v ->
-                        SimpleGraphs.in_deg(g, v) == 0 &&
-                            SimpleGraphs.out_deg(g, v) > 0 &&
-                            v ∉ roots
+                SimpleGraphs.in_deg(g, v) == 0 &&
+                    SimpleGraphs.out_deg(g, v) > 0 &&
+                    v ∉ roots
                 unlisted_nodes_without_parent = filter(is_unlisted, SimpleGraphs.vlist(g))
             end
         end
@@ -311,11 +311,11 @@ end
 Build a directed graph from the instructions.
 """
 function dag_from_instructions(instructions::Vector{Instruction}; start_from_inputs = false)
-    index_to_instr = Dict{Int32,Instruction}()
+    index_to_instr = Dict{Int32, Instruction}()
     g = SimpleGraphs.DirectedGraph{Int32}()
     for instr in instructions
         index_to_instr[instr.output] = instr
-        for k = 1:arity(instr.op)
+        for k in 1:arity(instr.op)
             should_use_index_not_reference(instr.op, k) && continue
             if start_from_inputs
                 SimpleGraphs.add_edges!(g, [(instr.input[k], instr.output)])
@@ -324,9 +324,8 @@ function dag_from_instructions(instructions::Vector{Instruction}; start_from_inp
             end
         end
     end
-    g, index_to_instr
+    return g, index_to_instr
 end
-
 
 
 # Reduce tape space
@@ -350,7 +349,7 @@ function reduce_space(instructions::Vector{Instruction}, input_block_size::Int, 
         )
     end
 
-    instructions, space_needed, updated_assignments
+    return instructions, space_needed, updated_assignments
 end
 
 """
@@ -361,15 +360,15 @@ but the number of different instruction output indices is reduced. `ignored` is 
 of indices whose output index will not be changed
 """
 function index_compactification_mapping(
-    instructions::Vector{Instruction},
-    input_block_size::Int,
-    assignments,
-)
+        instructions::Vector{Instruction},
+        input_block_size::Int,
+        assignments,
+    )
     used_indices = Set{Int32}()
     unused_indices = Vector{Int32}()
 
-    index_map = Dict{Int32,Int32}()
-    for idx = 1:input_block_size
+    index_map = Dict{Int32, Int32}()
+    for idx in 1:input_block_size
         index_map[idx] = idx
     end
 
@@ -383,10 +382,10 @@ function index_compactification_mapping(
     end
 
     # compute lifetime intervals of output
-    output_lifetime_end = Dict{Int32,Int32}()
-    for instr_idx = length(instructions):-1:1
+    output_lifetime_end = Dict{Int32, Int32}()
+    for instr_idx in length(instructions):-1:1
         instr = instructions[instr_idx]
-        for i = 1:arity(instr.op)
+        for i in 1:arity(instr.op)
             should_use_index_not_reference(instr.op, i) && continue
             idx = instr.input[i]
             if !haskey(output_lifetime_end, idx)
@@ -400,12 +399,12 @@ function index_compactification_mapping(
             index_map[instr.output] = get_register!()
         end
 
-        for i = 1:arity(instr.op)
+        for i in 1:arity(instr.op)
             should_use_index_not_reference(instr.op, i) && continue
 
             input_idx = instr.input[i]
             if input_idx > input_block_size &&
-               instr_idx == get(output_lifetime_end, input_idx, 0)
+                    instr_idx == get(output_lifetime_end, input_idx, 0)
 
                 mapped_idx = get(index_map, input_idx, input_idx)
                 if (mapped_idx ∈ used_indices)
@@ -426,5 +425,5 @@ function index_compactification_mapping(
 
     index_compactification_mapping = last(updated_assignments)
 
-    index_map, index_compactification_mapping, updated_assignments
+    return index_map, index_compactification_mapping, updated_assignments
 end

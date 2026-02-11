@@ -2,33 +2,41 @@
 
     @testset "total degree (simple)" begin
         @var x y
-        affine_sqr = System([
-            2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
-            2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
-        ])
+        affine_sqr = System(
+            [
+                2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
+                2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
+            ]
+        )
         @test count(is_success, track.(total_degree(affine_sqr; compile = false)...)) == 2
 
         @var x y
-        affine_ov = System([
-            (x^2 + y^2 + x * y - 3) * (x + 3),
-            (x^2 + y^2 + x * y - 3) * (y - x + 2),
-            2x + 5y - 3,
-        ])
+        affine_ov = System(
+            [
+                (x^2 + y^2 + x * y - 3) * (x + 3),
+                (x^2 + y^2 + x * y - 3) * (y - x + 2),
+                2x + 5y - 3,
+            ]
+        )
         @test_throws ArgumentError total_degree(affine_ov; compile = false)
 
         @var x y
-        affine_ov_reordering = System([
-            (x^2 + y^2 + x * y - 3) * (x + 3),
-            2x + 5y - 3,
-            (x^2 + y^2 + x * y - 3) * (y^2 - x + 2),
-        ])
+        affine_ov_reordering = System(
+            [
+                (x^2 + y^2 + x * y - 3) * (x + 3),
+                2x + 5y - 3,
+                (x^2 + y^2 + x * y - 3) * (y^2 - x + 2),
+            ]
+        )
         @test_throws ArgumentError total_degree(affine_ov_reordering; compile = false)
 
         @var x y z
-        homogeneous = System([
-            x^2 + y^2 + z^2,
-            x * z + y * z,
-        ])
+        homogeneous = System(
+            [
+                x^2 + y^2 + z^2,
+                x * z + y * z,
+            ]
+        )
         @test_throws ArgumentError total_degree(homogeneous; compile = false)
 
         @var x y
@@ -38,25 +46,31 @@
 
     @testset "polyhedral" begin
         @var x y
-        affine_sqr = System([
-            2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
-            2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
-        ])
+        affine_sqr = System(
+            [
+                2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3,
+                2.3 * x^2 + 1.2 * y^2 + 5x + 2y - 5,
+            ]
+        )
         @test count(is_success, track.(polyhedral(affine_sqr; compile = false)...)) == 2
 
         @var x y z
-        homogeneous = System([
-            x^2 + y^2 + z^2,
-            x * z + y * z,
-        ])
+        homogeneous = System(
+            [
+                x^2 + y^2 + z^2,
+                x * z + y * z,
+            ]
+        )
         @test_throws ArgumentError polyhedral(homogeneous; compile = false)
 
         @var x y
-        affine_ov = System([
-            (x^2 + y^2 + x * y - 3) * (x + 3),
-            (x^2 + y^2 + x * y - 3) * (y - x + 2),
-            2x + 5y - 3,
-        ])
+        affine_ov = System(
+            [
+                (x^2 + y^2 + x * y - 3) * (x + 3),
+                (x^2 + y^2 + x * y - 3) * (y - x + 2),
+                2x + 5y - 3,
+            ]
+        )
         @test_throws ArgumentError polyhedral(affine_ov; compile = false)
 
         @var x y
@@ -269,7 +283,7 @@
         p₀ = randn(ComplexF64, 3)
         S₀ = solutions(solve(subs(F, [a, b, c] => p₀)))
         # The parameters we are intersted in
-        params = [rand(3) for i = 1:100]
+        params = [rand(3) for i in 1:100]
 
         result1 = solve(
             F,
@@ -280,7 +294,7 @@
             parameters = [a, b, c],
             threading = true,
         )
-        @test typeof(result1) == Vector{Tuple{Result,Vector{Float64}}}
+        @test typeof(result1) == Vector{Tuple{Result, Vector{Float64}}}
         result1 = solve(
             F,
             S₀,
@@ -291,7 +305,7 @@
             show_progress = false,
             threading = false,
         )
-        @test typeof(result1) == Vector{Tuple{Result,Vector{Float64}}}
+        @test typeof(result1) == Vector{Tuple{Result, Vector{Float64}}}
 
         # Only keep real solutions
         result2 = solve(
@@ -336,7 +350,7 @@
             transform_result = (r, p) -> (real_solutions(r), p),
             transform_parameters = _ -> rand(3),
         )
-        @test typeof(result4) == Vector{Tuple{Vector{Vector{Float64}},Int64}}
+        @test typeof(result4) == Vector{Tuple{Vector{Vector{Float64}}, Int64}}
 
 
         @testset "Many parameters threaded" begin
@@ -344,14 +358,14 @@
 
             eqs = [
                 -u1 * ω^2 +
-                u1 * ω0^2 +
-                (3 / 4) * u1^3 * α +
-                (3 / 4) * u1 * v1^2 * α +
-                (-1 / 2) * u1 * λ * ω0^2 +
-                v1 * γ * ω,
+                    u1 * ω0^2 +
+                    (3 / 4) * u1^3 * α +
+                    (3 / 4) * u1 * v1^2 * α +
+                    (-1 / 2) * u1 * λ * ω0^2 +
+                    v1 * γ * ω,
                 -v1 * ω^2 + v1 * ω0^2 + (3 / 4) * v1^3 * α - u1 * γ * ω +
-                (3 / 4) * u1^2 * v1 * α +
-                (1 / 2) * v1 * λ * ω0^2,
+                    (3 / 4) * u1^2 * v1 * α +
+                    (1 / 2) * v1 * λ * ω0^2,
             ]
 
             F = System(eqs, parameters = [ω, α, γ, λ, ω0], variables = [u1, v1])

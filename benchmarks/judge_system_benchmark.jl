@@ -19,7 +19,6 @@ function judge_results(result1_name, result2_name)
     )
 
 
-
     println("Compiled [PR / main]:")
     data = vcat(
         map(res["CompiledSystem"]) do (system, group)
@@ -27,7 +26,6 @@ function judge_results(result1_name, result2_name)
         end...,
     )
     pretty_table(data; header = ["System", "evaluate", "evaluate_and_jacobian"])
-
 
 
     println("Compiled / Interpreted [main]:")
@@ -49,4 +47,3 @@ function judge_results(result1_name, result2_name)
     pretty_table(data; header = ["System", "evaluate", "evaluate_and_jacobian"])
     return r1, r2
 end
-

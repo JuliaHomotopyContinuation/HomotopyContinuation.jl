@@ -14,7 +14,7 @@ SolveStats() = SolveStats(Threads.Atomic{Int}.((0, 0, 0, 0))...)
 
 function init!(SS::SolveStats)
     SS.regular[] = SS.regular_real[] = SS.singular[] = SS.singular_real[] = 0
-    SS
+    return SS
 end
 
 function update!(stats::SolveStats, R::PathResult)
@@ -27,7 +27,7 @@ function update!(stats::SolveStats, R::PathResult)
         Threads.atomic_add!(stats.regular_real, Int(is_real(R)))
         Threads.atomic_add!(stats.regular, 1)
     end
-    stats
+    return stats
 end
 
 """
@@ -37,20 +37,19 @@ A struct containing multiple copies of `path_tracker`. This contains all pre-all
 data structures to call [`solve`]. The most convenient way to construct a `Solver` is
 via [`solver_startsolutions`](@ref).
 """
-struct Solver{T<:AbstractPathTracker} <: AbstractSolver
+struct Solver{T <: AbstractPathTracker} <: AbstractSolver
     trackers::Vector{T}
-    seed::Union{Nothing,UInt32}
+    seed::Union{Nothing, UInt32}
     stats::SolveStats
-    start_system::Union{Nothing,Symbol}
+    start_system::Union{Nothing, Symbol}
 end
 Solver(
     tracker::AbstractPathTracker;
-    seed::Union{Nothing,UInt32} = nothing,
+    seed::Union{Nothing, UInt32} = nothing,
     start_system = nothing,
 ) = Solver([tracker], seed, SolveStats(), start_system)
 
 Base.show(io::IO, solver::Solver) = print(io, typeof(solver), "()")
-
 
 
 """
@@ -68,29 +67,29 @@ solve(solver, starts)
 ```
 """
 function solver_startsolutions(
-    F::AbstractVector{Expression},
-    starts = nothing;
-    parameters = Variable[],
-    variables = setdiff(variables(F), parameters),
-    variable_ordering = variables,
-    kwargs...,
-)
+        F::AbstractVector{Expression},
+        starts = nothing;
+        parameters = Variable[],
+        variables = setdiff(variables(F), parameters),
+        variable_ordering = variables,
+        kwargs...,
+    )
     sys = System(
         F,
         variables = variable_ordering,
         parameters = parameters,
     )
-    solver_startsolutions(sys, starts; kwargs...)
+    return solver_startsolutions(sys, starts; kwargs...)
 end
 function solver_startsolutions(
-    F::AbstractVector{<:MP.AbstractPolynomial},
-    starts = nothing;
-    parameters = similar(MP.variables(F), 0),
-    variables = setdiff(MP.variables(F), parameters),
-    variable_ordering = variables,
-    target_parameters = nothing,
-    kwargs...,
-)
+        F::AbstractVector{<:MP.AbstractPolynomial},
+        starts = nothing;
+        parameters = similar(MP.variables(F), 0),
+        variables = setdiff(MP.variables(F), parameters),
+        variable_ordering = variables,
+        target_parameters = nothing,
+        kwargs...,
+    )
     # handle special case that we have no parameters
     # to shift the coefficients of the polynomials to the parameters
     # this was the behaviour of HC.jl v1
@@ -106,21 +105,21 @@ function solver_startsolutions(
             parameters = parameters,
         )
     end
-    solver_startsolutions(sys, starts; target_parameters = target_parameters, kwargs...)
+    return solver_startsolutions(sys, starts; target_parameters = target_parameters, kwargs...)
 end
 function solver_startsolutions(
-    F::Union{System,AbstractSystem},
-    starts = nothing;
-    seed = rand(UInt32),
-    start_system = :polyhedral,
-    generic_parameters = nothing,
-    p₁ = generic_parameters,
-    start_parameters = p₁,
-    p₀ = generic_parameters,
-    target_parameters = p₀,
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+        F::Union{System, AbstractSystem},
+        starts = nothing;
+        seed = rand(UInt32),
+        start_system = :polyhedral,
+        generic_parameters = nothing,
+        p₁ = generic_parameters,
+        start_parameters = p₁,
+        p₀ = generic_parameters,
+        target_parameters = p₀,
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
     !isnothing(seed) && Random.seed!(seed)
 
     used_start_system = nothing
@@ -163,17 +162,17 @@ function solver_startsolutions(
         )
     end
 
-    Solver(tracker; seed = seed, start_system = used_start_system), starts
+    return Solver(tracker; seed = seed, start_system = used_start_system), starts
 end
 
 function parameter_homotopy_tracker(
-    F::Union{System,AbstractSystem};
-    tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(),
-    kwargs...,
-)
+        F::Union{System, AbstractSystem};
+        tracker_options = TrackerOptions(),
+        endgame_options = EndgameOptions(),
+        kwargs...,
+    )
     H = parameter_homotopy(F; kwargs...)
-    EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
+    return EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
 end
 
 """
@@ -182,15 +181,15 @@ end
 Construct a [`ParameterHomotopy`](@ref).
 """
 function parameter_homotopy(
-    F::Union{System,AbstractSystem};
-    generic_parameters = randn(ComplexF64, nparameters(F)),
-    p₁ = generic_parameters,
-    start_parameters = p₁,
-    p₀ = generic_parameters,
-    target_parameters = p₀,
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
+        F::Union{System, AbstractSystem};
+        generic_parameters = randn(ComplexF64, nparameters(F)),
+        p₁ = generic_parameters,
+        start_parameters = p₁,
+        p₀ = generic_parameters,
+        target_parameters = p₀,
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
     unsupported_kwargs(kwargs)
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
@@ -212,18 +211,18 @@ function parameter_homotopy(
         )
     end
 
-    H
+    return H
 end
 
 function solver_startsolutions(
-    H::Union{Homotopy,AbstractHomotopy},
-    starts = nothing;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    seed = nothing,
-    kwargs...,
-)
+        H::Union{Homotopy, AbstractHomotopy},
+        starts = nothing;
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        seed = nothing,
+        kwargs...,
+    )
     !isnothing(seed) && Random.seed!(seed)
-    Solver(EndgameTracker(fixed(H; compile = compile)); seed = seed), starts
+    return Solver(EndgameTracker(fixed(H; compile = compile)); seed = seed), starts
 end
 
 """
@@ -304,20 +303,20 @@ Result with 2 solutions
 ```
 """
 function solve(
-    args...;
-    show_progress::Bool = true,
-    threading::Bool = Threads.nthreads() > 1,
-    catch_interrupt::Bool = true,
-    target_parameters = nothing,
-    stop_early_cb = always_false,
-    # many parameter options,
-    transform_result = nothing,
-    transform_parameters = identity,
-    flatten = nothing,
-    iterator_only::Bool = false,
-    bitmask = nothing,
-    kwargs...,
-)
+        args...;
+        show_progress::Bool = true,
+        threading::Bool = Threads.nthreads() > 1,
+        catch_interrupt::Bool = true,
+        target_parameters = nothing,
+        stop_early_cb = always_false,
+        # many parameter options,
+        transform_result = nothing,
+        transform_parameters = identity,
+        flatten = nothing,
+        iterator_only::Bool = false,
+        bitmask = nothing,
+        kwargs...,
+    )
 
     many_parameters = false
     if target_parameters !== nothing
@@ -339,7 +338,7 @@ function solve(
     else
         solver, starts = solver_startsolutions(args...; kwargs...)
     end
-    if many_parameters
+    return if many_parameters
         if iterator_only
             map(target_parameters) do p
                 solverᵢ = deepcopy(solver)
@@ -380,13 +379,13 @@ solve(S::Solver, R::Result; kwargs...) =
 solve(S::Solver, s::AbstractVector{<:Number}; kwargs...) = solve(S, [s]; kwargs...)
 
 function solve(
-    S::Solver,
-    starts;
-    iterator_only::Bool = false,
-    bitmask = nothing,
-    threading::Bool = Threads.nthreads() > 1,
-    kwargs...,
-)
+        S::Solver,
+        starts;
+        iterator_only::Bool = false,
+        bitmask = nothing,
+        threading::Bool = Threads.nthreads() > 1,
+        kwargs...,
+    )
     if iterator_only
         return ResultIterator(starts, S; bitmask = bitmask)
     else
@@ -395,18 +394,18 @@ function solve(
 end
 
 function solve(
-    S::Solver,
-    starts::AbstractArray;
-    stop_early_cb = always_false,
-    show_progress::Bool = true,
-    threading::Bool = Threads.nthreads() > 1,
-    catch_interrupt::Bool = true,
-)
+        S::Solver,
+        starts::AbstractArray;
+        stop_early_cb = always_false,
+        show_progress::Bool = true,
+        threading::Bool = Threads.nthreads() > 1,
+        catch_interrupt::Bool = true,
+    )
 
     n = length(starts)
     progress = show_progress ? make_progress(n; delay = 0.3) : nothing
     init!(S.stats)
-    if threading
+    return if threading
         threaded_solve(
             S,
             starts,
@@ -427,7 +426,7 @@ function make_progress(n::Integer; delay::Float64 = 0.0)
     progress =
         ProgressMeter.Progress(n; dt = 0.2, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay
-    progress
+    return progress
 end
 function update_progress!(progress, stats, ntracked)
     t = time()
@@ -435,12 +434,12 @@ function update_progress!(progress, stats, ntracked)
         showvalues = make_showvalues(stats, ntracked)
         ProgressMeter.update!(progress, ntracked; showvalues = showvalues)
     end
-    nothing
+    return nothing
 end
 @noinline function make_showvalues(stats, ntracked)
     nsols = stats.regular[] + stats.singular[]
     nreal = stats.regular_real[] + stats.singular_real[]
-    (
+    return (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular[]) ($(stats.regular_real[]))"),
         ("# singular endpoints (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
@@ -450,12 +449,12 @@ end
 update_progress!(::Nothing, stats, ntracked) = nothing
 
 function serial_solve(
-    solver::Solver,
-    starts,
-    progress = nothing,
-    stop_early_cb = always_false;
-    catch_interrupt::Bool = true,
-)
+        solver::Solver,
+        starts,
+        progress = nothing,
+        stop_early_cb = always_false;
+        catch_interrupt::Bool = true,
+    )
     path_results = Vector{PathResult}()
     tracker = solver.trackers[1]
     try
@@ -472,15 +471,15 @@ function serial_solve(
         (catch_interrupt && isa(e, InterruptException)) || rethrow(e)
     end
 
-    Result(path_results; seed = solver.seed, start_system = solver.start_system)
+    return Result(path_results; seed = solver.seed, start_system = solver.start_system)
 end
 function threaded_solve(
-    solver::Solver,
-    S::AbstractArray,
-    progress = nothing,
-    stop_early_cb = always_false;
-    catch_interrupt::Bool = true,
-)
+        solver::Solver,
+        S::AbstractArray,
+        progress = nothing,
+        stop_early_cb = always_false;
+        catch_interrupt::Bool = true,
+    )
 
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
@@ -493,7 +492,7 @@ function threaded_solve(
     ntrackers = length(solver.trackers)
     nthr = Threads.nthreads()
     resize!(solver.trackers, nthr)
-    for i = (ntrackers+1):nthr
+    for i in (ntrackers + 1):nthr
         solver.trackers[i] = deepcopy(tracker)
     end
 
@@ -532,9 +531,9 @@ function threaded_solve(
         end
     catch e
         if (
-            isa(e, InterruptException) ||
-            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
-        )
+                isa(e, InterruptException) ||
+                    (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+            )
             interrupted[] = true
         end
         if !interrupted[] || !catch_interrupt
@@ -542,7 +541,7 @@ function threaded_solve(
         end
     end
     # if we got interrupted we need to remove the unassigned filedds
-    if interrupted[]
+    return if interrupted[]
         assigned_results = Vector{PathResult}()
         for i in eachindex(path_results)
             if isassigned(path_results, i)
@@ -560,20 +559,20 @@ function start_parameters!(solver::Solver, p)
     for tracker in solver.trackers
         start_parameters!(tracker, p)
     end
-    solver
+    return solver
 end
 
 function target_parameters!(solver::Solver, p)
     for tracker in solver.trackers
         target_parameters!(tracker, p)
     end
-    solver
+    return solver
 end
 function parameters!(solver::Solver, p, q)
     for tracker in solver.trackers
         parameters!(tracker, p, q)
     end
-    solver
+    return solver
 end
 
 """
@@ -582,11 +581,11 @@ end
 Returns the number of paths tracked when calling [`solve`](@ref) with the given arguments.
 """
 function paths_to_track(
-    f::Union{System,AbstractSystem};
-    start_system::Symbol = :polyhedral,
-    kwargs...,
-)
-    paths_to_track(f, Val(start_system); kwargs...)
+        f::Union{System, AbstractSystem};
+        start_system::Symbol = :polyhedral,
+        kwargs...,
+    )
+    return paths_to_track(f, Val(start_system); kwargs...)
 end
 
 #############################
@@ -595,16 +594,16 @@ end
 
 
 function solve(
-    S::Solver,
-    starts,
-    target_parameters;
-    show_progress::Bool = true,
-    threading::Bool = Threads.nthreads() > 1,
-    catch_interrupt::Bool = true,
-    transform_result = nothing,
-    transform_parameters = nothing,
-    flatten = nothing,
-)
+        S::Solver,
+        starts,
+        target_parameters;
+        show_progress::Bool = true,
+        threading::Bool = Threads.nthreads() > 1,
+        catch_interrupt::Bool = true,
+        transform_result = nothing,
+        transform_parameters = nothing,
+        flatten = nothing,
+    )
     transform_result = something(transform_result, tuple) # (solutions ∘ first) ∘ tuple
     transform_parameters = something(transform_parameters, identity)
     flatten = something(flatten, false)
@@ -613,7 +612,7 @@ function solve(
 
     progress = show_progress ? make_many_progress(n; delay = 0.3) : nothing
 
-    many_solve(
+    return many_solve(
         S,
         starts,
         target_parameters,
@@ -633,7 +632,7 @@ function make_many_progress(n::Integer; delay::Float64 = 0.0)
     progress =
         ProgressMeter.Progress(n; dt = 0.3, desc = desc, barlen = barlen, output = stdout)
     progress.tlast += delay
-    progress
+    return progress
 end
 function update_many_progress!(progress, results, k, paths_per_param; flatten::Bool)
     t = time()
@@ -641,10 +640,10 @@ function update_many_progress!(progress, results, k, paths_per_param; flatten::B
         showvalues = make_many_showvalues(results, k, paths_per_param; flatten = flatten)
         ProgressMeter.update!(progress, k; showvalues = showvalues)
     end
-    nothing
+    return nothing
 end
 @noinline function make_many_showvalues(results, k, paths_per_param; flatten::Bool)
-    if flatten
+    return if flatten
         [
             ("# parameters solved", k),
             ("# paths tracked", paths_per_param * k),
@@ -657,16 +656,16 @@ end
 update_many_progress!(::Nothing, results, k, paths_per_param; kwargs...) = nothing
 
 function many_solve(
-    solver::Solver,
-    starts,
-    many_target_parameters,
-    progress,
-    transform_result,
-    transform_parameters,
-    ::Val{flatten};
-    threading::Bool,
-    catch_interrupt::Bool,
-) where {flatten}
+        solver::Solver,
+        starts,
+        many_target_parameters,
+        progress,
+        transform_result,
+        transform_parameters,
+        ::Val{flatten};
+        threading::Bool,
+        catch_interrupt::Bool,
+    ) where {flatten}
 
 
     if isa(starts, TotalDegreeStartSolutionsIterator)
@@ -694,7 +693,6 @@ function many_solve(
     update_many_progress!(progress, results, k, m; flatten = flatten)
 
 
-
     try
         for q in Iterators.drop(many_target_parameters, 1)
             target_parameters!(solver, transform_parameters(q))
@@ -714,12 +712,12 @@ function many_solve(
         end
     catch e
         if !(
-            isa(e, InterruptException) ||
-            (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
-        )
+                isa(e, InterruptException) ||
+                    (isa(e, TaskFailedException) && isa(e.task.exception, InterruptException))
+            )
             rethrow(e)
         end
     end
 
-    results
+    return results
 end

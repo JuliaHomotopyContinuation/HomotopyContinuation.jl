@@ -27,11 +27,11 @@
         @test length(findall(is_success, res)) == 3
         @test real_solutions(res) isa Vector{Vector{Float64}}
         @test length(real_solutions(res)) == nreal(res) == 1
-        @test length(real_solutions(res; atol = 1e-16)) == 1
+        @test length(real_solutions(res; atol = 1.0e-16)) == 1
         @test length(real_solutions(res; atol = 0.0)) == 0
-        @test length(real_solutions(res; atol = 0.0, rtol = 1e-16)) == 1
+        @test length(real_solutions(res; atol = 0.0, rtol = 1.0e-16)) == 1
         @test length(real_solutions(res; atol = Inf, rtol = Inf)) == 3
-        @test length(real_solutions(res; atol = 1.0, rtol = 1e-16)) == 1
+        @test length(real_solutions(res; atol = 1.0, rtol = 1.0e-16)) == 1
         @test length(nonsingular(res)) == nnonsingular(res) == 3
         @test isempty(singular(res))
         @test nsingular(res) == 0
@@ -80,7 +80,7 @@ end
         @test nsingular(res) == 0
         @test nexcess_solutions(res) == 0
 
-        # pass bit-vector 
+        # pass bit-vector
         B = BitVector([1, 0, 0, 0, 0, 0, 0])
         res_B = solve(F; iterator_only = true, bitmask = B, target_parameters = param)
         @test length(res_B) == 1
@@ -141,7 +141,7 @@ end
         @test length(BM) == sum(bitmask(isfinite, tsi_total_degree)) == 3
 
         t = trace(BM)
-        @test norm([1.0 + 0.0im, 1.0 + 0.0im] - t) < 1e-12
+        @test norm([1.0 + 0.0im, 1.0 + 0.0im] - t) < 1.0e-12
     end
 
     @testset "Manual start solutions" begin
@@ -184,7 +184,7 @@ end
         p₀ = randn(ComplexF64, 3)
         S₀ = solutions(solve(subs(F, [a, b, c] => p₀)))
         # The parameters we are intersted in
-        params = [rand(3) for i = 1:100]
+        params = [rand(3) for i in 1:100]
 
         result1 = solve(
             F,

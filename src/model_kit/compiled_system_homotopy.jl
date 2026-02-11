@@ -1,4 +1,4 @@
-const TSYSTEM_TABLE = Dict{UInt,Vector{System}}()
+const TSYSTEM_TABLE = Dict{UInt, Vector{System}}()
 
 """
     CompiledSystem <: AbstractSystem
@@ -58,7 +58,7 @@ function CompiledSystem(F::System)
 end
 function Base.show(io::IO, TS::CompiledSystem)
     print(io, "Compiled: ")
-    show(io, TS.system)
+    return show(io, TS.system)
 end
 
 (F::CompiledSystem)(x, p = nothing) = F.system(x, p)
@@ -76,13 +76,13 @@ variables(F::CompiledSystem) = variables(F.system)
 parameters(F::CompiledSystem) = parameters(F.system)
 System(F::CompiledSystem) = F.system
 
-Base.:(==)(::CompiledSystem{A}, ::CompiledSystem{B}) where {A,B} = A == B
+Base.:(==)(::CompiledSystem{A}, ::CompiledSystem{B}) where {A, B} = A == B
 
 ######################
 ## CompiledHomotopy ##
 ######################
 
-const THOMOTOPY_TABLE = Dict{UInt,Vector{Homotopy}}()
+const THOMOTOPY_TABLE = Dict{UInt, Vector{Homotopy}}()
 
 """
     CompiledHomotopy <: AbstractHomotopy
@@ -151,7 +151,7 @@ nvariables(CH::CompiledHomotopy) = CH.nvariables
 
 function Base.show(io::IO, TH::CompiledHomotopy)
     print(io, "Compiled: ")
-    show(io, TH.homotopy)
+    return show(io, TH.homotopy)
 end
 
 interpret(CH::CompiledHomotopy) = CH.homotopy
@@ -170,15 +170,15 @@ function boundschecks(; nexpressions::Int, nvariables, nparameters, has_second_o
     push!(checks, :(@boundscheck checkbounds(x, 1:$nvariables)))
     push!(checks, :(@boundscheck p === nothing || checkbounds(p, 1:$nparameters)))
 
-    Expr(:block, checks...)
+    return Expr(:block, checks...)
 end
 
 
 function compiled_execute_impl(
-    seq::InstructionSequence;
-    has_second_output = false,
-    taylor = false,
-)
+        seq::InstructionSequence;
+        has_second_output = false,
+        taylor = false,
+    )
     if taylor
         expr, get_var_name = sequence_to_expr(seq; op_call = taylor_op_call, order = :Order)
     else
@@ -188,34 +188,42 @@ function compiled_execute_impl(
         quote
             zero!(U)
             if isnothing(u)
-                $(map(seq.assignments) do (i, k)
-                    if i > seq.output_dim
-                        :(U[$(i - seq.output_dim)] = $(get_var_name(k)))
-                    end
-                end...)
+                $(
+                    map(seq.assignments) do (i, k)
+                        if i > seq.output_dim
+                            :(U[$(i - seq.output_dim)] = $(get_var_name(k)))
+                        end
+                    end...
+                )
             else
                 zero!(u)
                 idx = CartesianIndices(($(seq.output_dim), size(U, 2)))
-                $(map(seq.assignments) do (i, k)
-                    if i <= seq.output_dim
-                        :(u[$(i)] = $(get_var_name(k)))
-                    else
-                        :(U[idx[$(i - seq.output_dim)]] = $(get_var_name(k)))
-                    end
-                end...)
+                $(
+                    map(seq.assignments) do (i, k)
+                        if i <= seq.output_dim
+                            :(u[$(i)] = $(get_var_name(k)))
+                        else
+                            :(U[idx[$(i - seq.output_dim)]] = $(get_var_name(k)))
+                        end
+                    end...
+                )
             end
         end
     elseif taylor
         quote
             zero!(u)
             if (assign_highest_order_only)
-                $(map(seq.assignments) do (i, k)
-                    :(u[$(i)] = $(get_var_name(k))[K])
-                end...)
+                $(
+                    map(seq.assignments) do (i, k)
+                        :(u[$(i)] = $(get_var_name(k))[K])
+                    end...
+                )
             else
-                $(map(seq.assignments) do (i, k)
-                    :(u[$(i)] = $(get_var_name(k)))
-                end...)
+                $(
+                    map(seq.assignments) do (i, k)
+                        :(u[$(i)] = $(get_var_name(k)))
+                    end...
+                )
             end
 
 
@@ -224,19 +232,23 @@ function compiled_execute_impl(
     else
         quote
             zero!(u)
-            $(map(seq.assignments) do (i, k)
-                :(u[$(i)] = $(get_var_name(k)))
-            end...)
+            $(
+                map(seq.assignments) do (i, k)
+                    :(u[$(i)] = $(get_var_name(k)))
+                end...
+            )
         end
     end
 
-    quote
-        $(boundschecks(
-            nexpressions = seq.output_dim,
-            has_second_output = has_second_output,
-            nparameters = length(seq.parameters_range),
-            nvariables = length(seq.variables_range),
-        ))
+    return quote
+        $(
+            boundschecks(
+                nexpressions = seq.output_dim,
+                has_second_output = has_second_output,
+                nparameters = length(seq.parameters_range),
+                nvariables = length(seq.variables_range),
+            )
+        )
         @inbounds begin
             $(expr)
             $(assignments)
@@ -254,7 +266,7 @@ _evaluate!_impl(T) = compiled_execute_impl(instruction_sequence(interpret(T)))
 Evaluate `T` for variables `x` and parameters `p` and store result in `u`.
 """
 @generated function evaluate!(u, T::CompiledSystem, x, p = nothing)
-    _evaluate!_impl(T)
+    return _evaluate!_impl(T)
 end
 
 """
@@ -263,7 +275,7 @@ end
 Evaluate `T` for variables `x`, `t` and parameters `p` and store result in `u`.
 """
 @generated function evaluate!(u, T::CompiledHomotopy, x, t, p = nothing)
-    _evaluate!_impl(T)
+    return _evaluate!_impl(T)
 end
 
 _evaluate_and_jacobian!_impl(T) = compiled_execute_impl(
@@ -278,7 +290,7 @@ Evaluate `T` and its Jacobian for variables `x` and parameters `p` and
 store result in `u`.
 """
 @generated function evaluate_and_jacobian!(u, U, T::CompiledSystem, x, p = nothing)
-    _evaluate_and_jacobian!_impl(T)
+    return _evaluate_and_jacobian!_impl(T)
 end
 #
 """
@@ -288,7 +300,7 @@ Evaluate `T` and its Jacobian for variables `x`, `t` and parameters `p` and
 store result in `u`.
 """
 @generated function evaluate_and_jacobian!(u, U, T::CompiledHomotopy, x, t, p = nothing)
-    _evaluate_and_jacobian!_impl(T)
+    return _evaluate_and_jacobian!_impl(T)
 end
 
 #
@@ -299,7 +311,7 @@ Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p`
 and store result in `u`.
 """
 function jacobian!(U, T::CompiledSystem, x, p = nothing)
-    evaluate_and_jacobian!(nothing, U, T, x, p)
+    return evaluate_and_jacobian!(nothing, U, T, x, p)
 end
 
 """
@@ -309,7 +321,7 @@ Evaluate the Jacobian of `T` for variables `x`, `t` and parameters `p` and
 store result in `u`.
 """
 function jacobian!(U, T::CompiledHomotopy, x, t, p = nothing)
-    evaluate_and_jacobian!(nothing, U, T, x, t, p)
+    return evaluate_and_jacobian!(nothing, U, T, x, t, p)
 end
 
 
@@ -327,14 +339,14 @@ _taylor!_impl(T) = compiled_execute_impl(instruction_sequence(interpret(T)); tay
 Compute the Taylor series order order `K` of ``u = F(x,p)``.
 """
 @generated function taylor!(
-    u::AbstractArray,
-    Order::Val{K},
-    T::CompiledSystem,
-    x::AbstractArray,
-    p::Union{Nothing,AbstractArray} = nothing;
-    assign_highest_order_only::Bool = u isa Vector,
-) where {K}
-    _taylor!_impl(T)
+        u::AbstractArray,
+        Order::Val{K},
+        T::CompiledSystem,
+        x::AbstractArray,
+        p::Union{Nothing, AbstractArray} = nothing;
+        assign_highest_order_only::Bool = u isa Vector,
+    ) where {K}
+    return _taylor!_impl(T)
 end
 
 """
@@ -349,15 +361,15 @@ end
 Compute the Taylor series order order `K` of ``u = H(x,t,p)``.
 """
 @generated function taylor!(
-    u::AbstractArray,
-    Order::Val{K},
-    T::CompiledHomotopy,
-    x::AbstractArray,
-    t_,
-    p::Union{Nothing,AbstractArray} = nothing;
-    assign_highest_order_only::Bool = u isa Vector,
-) where {K}
-    quote
+        u::AbstractArray,
+        Order::Val{K},
+        T::CompiledHomotopy,
+        x::AbstractArray,
+        t_,
+        p::Union{Nothing, AbstractArray} = nothing;
+        assign_highest_order_only::Bool = u isa Vector,
+    ) where {K}
+    return quote
         t = (t_, 1)
         $(_taylor!_impl(T))
     end

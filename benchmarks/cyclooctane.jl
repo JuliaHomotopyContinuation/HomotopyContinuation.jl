@@ -7,8 +7,8 @@ z_vec = vec(z)[1:17] # the 17 variables in a vector
 Z = [zeros(3) z[:, 1:5] [z[1, 6]; z[2, 6]; 0] [√c²; 0; 0]] # the eight points in a matrix
 
 # define the functions for cyclooctane:
-F1 = [(Z[:, i] - Z[:, i+1]) ⋅ (Z[:, i] - Z[:, i+1]) - c² for i = 1:7]
-F2 = [(Z[:, i] - Z[:, i+2]) ⋅ (Z[:, i] - Z[:, i+2]) - 8c² / 3 for i = 1:6]
+F1 = [(Z[:, i] - Z[:, i + 1]) ⋅ (Z[:, i] - Z[:, i + 1]) - c² for i in 1:7]
+F2 = [(Z[:, i] - Z[:, i + 2]) ⋅ (Z[:, i] - Z[:, i + 2]) - 8c² / 3 for i in 1:6]
 F3 = (Z[:, 7] - Z[:, 1]) ⋅ (Z[:, 7] - Z[:, 1]) - 8c² / 3
 F4 = (Z[:, 8] - Z[:, 2]) ⋅ (Z[:, 8] - Z[:, 2]) - 8c² / 3
 f = [F1; F2; F3; F4]

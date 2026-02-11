@@ -63,7 +63,7 @@ function NewtonCache(F::AbstractSystem; optimize_data_structure = true)
         J = zeros(ComplexF64, m, n)
     end
     r = zeros(ComplexF64, m)
-    NewtonCache(x, Δx, x_ext, J, r)
+    return NewtonCache(x, Δx, x_ext, J, r)
 end
 
 """
@@ -102,23 +102,23 @@ This is useful if the method is called repeatedly.
 * `max_rel_norm_first_update::Float64 = max_abs_norm_first_update`: The initial guess `x₀`
   is rejected if `norm(x₁ - x₀) >  max_rel_norm_first_update * norm(x₀)`
 """
-newton(f::System, args...; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...) =
+newton(f::System, args...; compile::Union{Bool, Symbol} = COMPILE_DEFAULT[], kwargs...) =
     newton(fixed(f; compile = compile), args...; kwargs...)
 function newton(
-    F::AbstractSystem,
-    x₀::AbstractVector,
-    p = nothing,
-    norm::AbstractNorm = InfNorm(),
-    cache::NewtonCache = NewtonCache(F);
-    extended_precision::Bool = false,
-    atol::Float64 = 1e-8,
-    rtol::Float64 = atol,
-    max_iters::Int = 20,
-    contraction_factor::Float64 = 1.0,
-    min_contraction_iters::Int = typemax(Int),
-    max_abs_norm_first_update::Float64 = Inf,
-    max_rel_norm_first_update::Float64 = max_abs_norm_first_update,
-)
+        F::AbstractSystem,
+        x₀::AbstractVector,
+        p = nothing,
+        norm::AbstractNorm = InfNorm(),
+        cache::NewtonCache = NewtonCache(F);
+        extended_precision::Bool = false,
+        atol::Float64 = 1.0e-8,
+        rtol::Float64 = atol,
+        max_iters::Int = 20,
+        contraction_factor::Float64 = 1.0,
+        min_contraction_iters::Int = typemax(Int),
+        max_abs_norm_first_update::Float64 = Inf,
+        max_rel_norm_first_update::Float64 = max_abs_norm_first_update,
+    )
     @unpack x, Δx, x_ext, J, r = cache
     x .= x₀
     a = contraction_factor
@@ -126,7 +126,7 @@ function newton(
     norm_Δxᵢ = norm_Δxᵢ₋₁ = NaN
     res = NaN
     m, n = size(F)
-    for i = 1:max_iters
+    for i in 1:max_iters
         evaluate_and_jacobian!(r, matrix(J), F, x, p)
         if extended_precision
             x_ext .= x
@@ -167,9 +167,9 @@ function newton(
                 )
             end
         elseif i == 1 && (
-            norm_Δxᵢ > max_rel_norm_first_update * norm_x ||
-            norm_Δxᵢ > max_abs_norm_first_update
-        )
+                norm_Δxᵢ > max_rel_norm_first_update * norm_x ||
+                    norm_Δxᵢ > max_abs_norm_first_update
+            )
             return NewtonResult(:rejected, x, norm(r), norm_Δxᵢ, i, NaN)
         else
             norm_Δxᵢ₋₁ = norm_Δxᵢ

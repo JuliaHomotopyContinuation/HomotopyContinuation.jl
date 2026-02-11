@@ -7,7 +7,7 @@ export StraightLineHomotopy
 Constructs the straight line homotopy ``H(x, t) = γ t G(x) + (1-t) F(x)`` where
 ``γ`` is `gamma`.
 """
-struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomotopy
+struct StraightLineHomotopy{S <: AbstractSystem, T <: AbstractSystem} <: AbstractHomotopy
     start::S
     target::T
     γ::ComplexF64
@@ -17,28 +17,28 @@ struct StraightLineHomotopy{S<:AbstractSystem,T<:AbstractSystem} <: AbstractHomo
     v̄::Vector{ComplexDF64}
     U::Matrix{ComplexF64}
 
-    dv_start::TaylorVector{5,ComplexF64}
-    dv_target::TaylorVector{5,ComplexF64}
+    dv_start::TaylorVector{5, ComplexF64}
+    dv_target::TaylorVector{5, ComplexF64}
 end
 
 function StraightLineHomotopy(
-    start::System,
-    target::System;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    kwargs...,
-)
-    StraightLineHomotopy(
+        start::System,
+        target::System;
+        compile::Union{Bool, Symbol} = COMPILE_DEFAULT[],
+        kwargs...,
+    )
+    return StraightLineHomotopy(
         fixed(start; compile = compile),
         fixed(target; compile = compile);
         kwargs...,
     )
 end
 function StraightLineHomotopy(
-    start::AbstractSystem,
-    target::AbstractSystem;
-    γ = 1.0,
-    gamma = γ,
-)
+        start::AbstractSystem,
+        target::AbstractSystem;
+        γ = 1.0,
+        gamma = γ,
+    )
     size(start) == size(target) || throw(
         ArgumentError(
             "Start and target do not have the same size, got $(size(start)) and $(size(target))",
@@ -54,7 +54,7 @@ function StraightLineHomotopy(
     dv_start = TaylorVector{5}(ComplexF64, m)
     dv_target = TaylorVector{5}(ComplexF64, m)
 
-    StraightLineHomotopy(
+    return StraightLineHomotopy(
         start,
         target,
         ComplexF64(gamma),
@@ -75,52 +75,53 @@ function Base.show(io::IO, mime::MIME"text/plain", H::StraightLineHomotopy)
     println(io, "\nG: ")
     show(io, mime, H.start)
     println(io, "\n\nF:")
-    show(io, mime, H.target)
+    return show(io, mime, H.target)
 end
 
 function ModelKit.evaluate!(
-    u,
-    H::StraightLineHomotopy,
-    x::Vector{ComplexDF64},
-    t,
-    p = nothing,
-)
+        u,
+        H::StraightLineHomotopy,
+        x::Vector{ComplexDF64},
+        t,
+        p = nothing,
+    )
     evaluate!(H.v̄, H.start, x)
     evaluate!(H.ū, H.target, x)
     ts, tt = H.γ .* t, 1 - t
-    for i = 1:size(H, 1)
+    for i in 1:size(H, 1)
         @inbounds u[i] = ts * H.v̄[i] + tt * H.ū[i]
     end
+    return
 end
 
 function ModelKit.evaluate!(u, H::StraightLineHomotopy, x, t, p = nothing)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
     ts, tt = H.γ .* t, 1 - t
-    for i = 1:size(H, 1)
+    for i in 1:size(H, 1)
         @inbounds u[i] = ts * u[i] + tt * H.u[i]
     end
-    u
+    return u
 end
 
 function ModelKit.evaluate_and_jacobian!(
-    u,
-    U,
-    H::StraightLineHomotopy,
-    x::AbstractVector{T},
-    t,
-    p = nothing,
-) where {T}
+        u,
+        U,
+        H::StraightLineHomotopy,
+        x::AbstractVector{T},
+        t,
+        p = nothing,
+    ) where {T}
     evaluate_and_jacobian!(u, U, H.start, x)
     evaluate_and_jacobian!(H.u, H.U, H.target, x)
     ts, tt = H.γ .* t, 1 - t
-    for i = 1:size(H, 1)
+    for i in 1:size(H, 1)
         @inbounds u[i] = ts * u[i] + tt * H.u[i]
     end
-    for j = 1:size(H, 2), i = 1:size(H, 1)
+    for j in 1:size(H, 2), i in 1:size(H, 1)
         @inbounds U[i, j] = ts * U[i, j] + tt * H.U[i, j]
     end
-    nothing
+    return nothing
 end
 ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::TaylorVector{1}, t) =
     taylor_1!(u, H, first(vectors(x)), t)
@@ -130,25 +131,25 @@ ModelKit.taylor!(u, ::Val{1}, H::StraightLineHomotopy, x::AbstractVector{<:Numbe
 function taylor_1!(u, H::StraightLineHomotopy, x, t)
     evaluate!(u, H.start, x)
     evaluate!(H.u, H.target, x)
-    for i = 1:size(H, 1)
+    for i in 1:size(H, 1)
         @inbounds u[i] = H.γ * u[i] - H.u[i]
     end
-    u
+    return u
 end
 function ModelKit.taylor!(
-    u,
-    v::Val{K},
-    H::StraightLineHomotopy,
-    tx::TaylorVector,
-    t,
-) where {K}
+        u,
+        v::Val{K},
+        H::StraightLineHomotopy,
+        tx::TaylorVector,
+        t,
+    ) where {K}
     taylor!(H.dv_start, v, H.start, tx)
     taylor!(H.dv_target, v, H.target, tx)
 
-    for i = 1:size(H, 1)
-        start = H.γ * (H.dv_start[i, K] + t * H.dv_start[i, K+1])
-        target = (1 - t) * H.dv_target[i, K+1] - H.dv_target[i, K]
+    for i in 1:size(H, 1)
+        start = H.γ * (H.dv_start[i, K] + t * H.dv_start[i, K + 1])
+        target = (1 - t) * H.dv_target[i, K + 1] - H.dv_target[i, K]
         u[i] = start + target
     end
-    u
+    return u
 end

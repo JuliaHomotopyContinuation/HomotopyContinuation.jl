@@ -14,7 +14,7 @@ Computes `s = fl(a+b)` and `e = err(a+b)`. Assumes `|a| ≥ |b|`.
 @inline function quick_two_sum(a::Float64, b::Float64)
     s = a + b
     e = b - (s - a)
-    s, e
+    return s, e
 end
 
 """
@@ -27,7 +27,7 @@ Computes `s = fl(a+b)` and `e = err(a+b)`.
     v = s - a
     e = (a - (s - v)) + (b - v)
 
-    s, e
+    return s, e
 end
 
 """
@@ -40,7 +40,7 @@ Computes `s = fl(a-b)` and `e = err(a-b)`.
     v = s - a
     e = (a - (s - v)) - (b + v)
 
-    s, e
+    return s, e
 end
 
 """
@@ -51,7 +51,7 @@ Computes `s = fl(a*b)` and `e = err(a*b)`.
 @inline function two_prod(a::Float64, b::Float64)
     p = a * b
     e = fma(a, b, -p)
-    p, e
+    return p, e
 end
 
 """
@@ -62,7 +62,7 @@ Computes `s = fl(a*a)` and `e = err(a*a)`. Faster than [`two_prod(a, a)`](@ref).
 @inline function two_square(a::Float64)
     p = a * a
     e = fma(a, a, -p)
-    p, e
+    return p, e
 end
 
 
@@ -76,27 +76,27 @@ end
 
 DoubleF64(x::DoubleF64) = DoubleF64(x.hi, x.lo)
 function DoubleF64(x::Float64)
-    DoubleF64(x, isinf(x) ? Inf : 0.0)
+    return DoubleF64(x, isinf(x) ? Inf : 0.0)
 end
 
 function DoubleF64(x::Float32)
-    DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
+    return DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
 end
 function DoubleF64(x::Float16)
-    DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
+    return DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
 end
 function DoubleF64(x::Integer)
-    DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
+    return DoubleF64(convert(Float64, x), isinf(x) ? Inf : 0.0)
 end
 function DoubleF64(x::BigFloat)
     z = convert(Float64, x)
-    DoubleF64(z, convert(Float64, x - z))
+    return DoubleF64(z, convert(Float64, x - z))
 end
 function DoubleF64(x::Irrational)
-    DoubleF64(big(x))
+    return DoubleF64(big(x))
 end
 function DoubleF64(x::Rational)
-    DoubleF64(numerator(x)) / DoubleF64(denominator(x))
+    return DoubleF64(numerator(x)) / DoubleF64(denominator(x))
 end
 
 const ComplexDF64 = Complex{DoubleF64}
@@ -113,11 +113,11 @@ Base.zero(::Type{DoubleF64}) = DoubleF64(0.0, 0.0)
 Base.one(::DoubleF64) = DoubleF64(1.0, 0.0)
 Base.one(::Type{DoubleF64}) = DoubleF64(1.0, 0.0)
 
-(::Type{T})(a::DoubleF64) where {T<:AbstractFloat} = convert(T, a)
-Base.convert(::Type{T}, a::DoubleF64) where {T<:AbstractFloat} = convert(T, a.hi)
+(::Type{T})(a::DoubleF64) where {T <: AbstractFloat} = convert(T, a)
+Base.convert(::Type{T}, a::DoubleF64) where {T <: AbstractFloat} = convert(T, a.hi)
 Base.convert(::Type{BigFloat}, a::DoubleF64) = big(a.hi) + big(a.lo)
 Base.BigFloat(a::DoubleF64) = convert(BigFloat, a)
-Base.convert(::Type{T}, a::DoubleF64) where {T<:Integer} = convert(T, a.hi)
+Base.convert(::Type{T}, a::DoubleF64) where {T <: Integer} = convert(T, a.hi)
 Base.convert(::Type{Integer}, a::DoubleF64) = convert(Int64, a.hi)
 Base.convert(::Type{BigInt}, a::DoubleF64) = convert(BigInt, big(a.hi) + big(a.lo))
 
@@ -166,7 +166,7 @@ Add two `Float64`s with `DoubleF64` precision.
 @inline function wide_add(a::Float64, b::Float64)
     hi, lo = two_sum(a, b)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function +(a::DoubleF64, b::Float64)
@@ -174,7 +174,7 @@ end
     lo += a.lo
     hi, lo = quick_two_sum(hi, lo)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 +(a::Float64, b::DoubleF64) = b + a
 +(a::Integer, b::DoubleF64) = b + float(a)
@@ -187,7 +187,7 @@ end
     lo += (a.lo + b.lo)
     hi, lo = quick_two_sum(hi, lo)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 #
@@ -201,7 +201,7 @@ Subtract two `Float64`s with `DoubleF64` precision.
 @inline function wide_sub(a::Float64, b::Float64)
     hi, lo = two_diff(a, b)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function -(a::DoubleF64, b::Float64)
@@ -209,7 +209,7 @@ end
     lo += a.lo
     hi, lo = quick_two_sum(hi, lo)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function -(a::Float64, b::DoubleF64)
@@ -217,7 +217,7 @@ end
     lo -= b.lo
     hi, lo = quick_two_sum(hi, lo)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function -(a::DoubleF64, b::DoubleF64)
@@ -226,7 +226,7 @@ end
     lo -= b.lo
     hi, lo = quick_two_sum(hi, lo)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 -(a::DoubleF64) = DoubleF64(-a.hi, -a.lo)
 
@@ -241,7 +241,7 @@ Multiply two `Float64`s with `DoubleF64` precision.
 """
 @inline function wide_mul(a::Float64, b::Float64)
     hi, lo = two_prod(a, b)
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function *(a::DoubleF64, b::Float64)
@@ -249,7 +249,7 @@ end
     p2 += a.lo * b
     p1, p2 = quick_two_sum(p1, p2)
 
-    DoubleF64(p1, p2)
+    return DoubleF64(p1, p2)
 end
 *(a::Float64, b::DoubleF64) = b * a
 *(a::Integer, b::DoubleF64) = b * float(a)
@@ -262,7 +262,7 @@ end
     p2 += a.hi * b.lo + a.lo * b.hi
     p1, p2 = quick_two_sum(p1, p2)
 
-    DoubleF64(p1, p2)
+    return DoubleF64(p1, p2)
 end
 
 
@@ -286,7 +286,7 @@ Divide two `Float64`s with `DoubleF64` precision.
 
     s, e = quick_two_sum(q1, q2)
 
-    DoubleF64(s, e)
+    return DoubleF64(s, e)
 end
 
 @inline function /(a::DoubleF64, b::Float64)
@@ -304,7 +304,7 @@ end
     # renormalize
     hi, lo = quick_two_sum(q1, q2)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 
@@ -323,7 +323,7 @@ end
     # renormalize
     hi, lo = quick_two_sum(q1, q2)
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 /(a::Float64, b::DoubleF64) = DoubleF64(a) / b
@@ -335,16 +335,16 @@ Base.inv(a::DoubleF64) = 1.0 / a
 
 Base.rem(
     a::DoubleF64,
-    b::Union{Float64,DoubleF64},
+    b::Union{Float64, DoubleF64},
     r::RoundingMode{:ToZero} = RoundToZero,
 ) = a - round(a / b, r) * b
-Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode{:Nearest}) =
+Base.rem(a::DoubleF64, b::Union{Float64, DoubleF64}, r::RoundingMode{:Nearest}) =
     a - round(a / b, r) * b
-Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode) =
+Base.rem(a::DoubleF64, b::Union{Float64, DoubleF64}, r::RoundingMode) =
     a - round(a / b, r) * b
 @inline function Base.divrem(a::DoubleF64, b::DoubleF64)
     n = round(a / b)
-    n, a - n * b
+    return n, a - n * b
 end
 
 function Base.mod(x::DoubleF64, y::DoubleF64)
@@ -405,7 +405,7 @@ end
     if (p < 0)
         return 1.0 / y
     end
-    y
+    return y
 end
 
 ^(a::DoubleF64, p::Integer) = power_by_squaring(a, p)
@@ -434,7 +434,7 @@ end
     x = inv(sqrt(a.hi))
     ax = a.hi * x
 
-    wide_add(ax, (a - square(ax)).hi * (x * 0.5))
+    return wide_add(ax, (a - square(ax)).hi * (x * 0.5))
 end
 
 """
@@ -498,7 +498,7 @@ Base.isfinite(a::DoubleF64) = isfinite(a.hi)
         end
     end
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
 @inline function Base.floor(a::DoubleF64)
@@ -510,10 +510,10 @@ end
         hi, lo = quick_two_sum(hi, lo)
     end
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
-@inline function Base.floor(::Type{I}, a::DoubleF64) where {I<:Integer}
+@inline function Base.floor(::Type{I}, a::DoubleF64) where {I <: Integer}
     hi = floor(I, a.hi)
     lo = zero(I)
 
@@ -521,7 +521,7 @@ end
         lo = floor(I, a.lo)
     end
 
-    hi + lo
+    return hi + lo
 end
 
 
@@ -534,10 +534,10 @@ end
         hi, lo = quick_two_sum(hi, lo)
     end
 
-    DoubleF64(hi, lo)
+    return DoubleF64(hi, lo)
 end
 
-@inline function Base.ceil(::Type{I}, a::DoubleF64) where {I<:Integer}
+@inline function Base.ceil(::Type{I}, a::DoubleF64) where {I <: Integer}
     hi = ceil(I, a.hi)
     lo = zero(I)
 
@@ -545,11 +545,11 @@ end
         lo = ceil(I, a.lo)
     end
 
-    hi + lo
+    return hi + lo
 end
 
 Base.trunc(a::DoubleF64) = a.hi ≥ 0.0 ? floor(a) : ceil(a)
-Base.trunc(::Type{I}, a::DoubleF64) where {I<:Integer} =
+Base.trunc(::Type{I}, a::DoubleF64) where {I <: Integer} =
     a.hi ≥ 0.0 ? floor(I, a) : ceil(I, a)
 Base.isinteger(x::DoubleF64) = iszero(x - trunc(x))
 
@@ -577,7 +577,7 @@ Base.isinteger(x::DoubleF64) = iszero(x - trunc(x))
 # Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}) = rand(rng, Complex{DoubleF64})
 # Base.rand(rng::AbstractRNG, ::Type{Complex{DoubleF64}}, dims::Vararg{Int, N}) where N = rand(rng, Complex{DoubleF64}, dims)
 
-function Base.decompose(a::DoubleF64)::Tuple{Int128,Int,Int}
+function Base.decompose(a::DoubleF64)::Tuple{Int128, Int, Int}
     hi, lo = a.hi, a.lo
     num1, pow1, den1 = Base.decompose(hi)
     num2, pow2, den2 = Base.decompose(lo)
@@ -593,11 +593,11 @@ function Base.decompose(a::DoubleF64)::Tuple{Int128,Int,Int}
     den = signed_num ≥ 0 ? 1 : -1
     pow = pow1 - shift
 
-    num, pow, den
+    return num, pow, den
 end
 
 # Precomputed valuee
-const inv_fact = [DoubleF64(1.0 / BigFloat(factorial(Int64(k)))) for k = 3:17]
+const inv_fact = [DoubleF64(1.0 / BigFloat(factorial(Int64(k)))) for k in 3:17]
 const ninv_fact = length(inv_fact)
 
 
@@ -705,12 +705,12 @@ function Base.log(a::DoubleF64)
 
     x = DoubleF64(log(a.hi)) # Initial approximation
 
-    x + a * exp(-x) - 1.0
+    return x + a * exp(-x) - 1.0
 end
 
 
-const sin_table = [DoubleF64(sin(k * big(π) * 0.0625)) for k = 1:4]
-const cos_table = [DoubleF64(cos(k * big(π) * 0.0625)) for k = 1:4]
+const sin_table = [DoubleF64(sin(k * big(π) * 0.0625)) for k in 1:4]
+const cos_table = [DoubleF64(cos(k * big(π) * 0.0625)) for k in 1:4]
 
 
 """
@@ -740,7 +740,7 @@ function sin_taylor(a::DoubleF64)
         end
     end
 
-    s
+    return s
 end
 
 """
@@ -769,7 +769,7 @@ function cos_taylor(a::DoubleF64)
         end
     end
 
-    s
+    return s
 end
 
 function sincos_taylor(a::DoubleF64)
@@ -780,7 +780,7 @@ function sincos_taylor(a::DoubleF64)
     sin_a = sin_taylor(a)
     cos_a = sqrt(1.0 - square(sin_a))
 
-    sin_a, cos_a
+    return sin_a, cos_a
 end
 
 function Base.sin(a::DoubleF64)
@@ -849,7 +849,7 @@ function Base.sin(a::DoubleF64)
         r = k > 0 ? -u * sin_t - v * cos_t : v * cos_t - u * sin_t
     end
 
-    r
+    return r
 end
 
 function Base.cos(a::DoubleF64)
@@ -907,7 +907,7 @@ function Base.cos(a::DoubleF64)
         r = k > 0 ? v * sin_t - u * cos_t : -u * cos_t - v * sin_t
     end
 
-    r
+    return r
 end
 
 
@@ -953,7 +953,7 @@ function Base.sincos(a::DoubleF64)
         c = k > 0 ? u * cos_t - v * sin_t : u * cos_t + v * sin_t
     end
 
-    if j == 0
+    return if j == 0
         s, c
     elseif j == 1
         c, -s
@@ -1017,12 +1017,12 @@ function Base.atan(y::DoubleF64, x::DoubleF64)
         z -= (xx - cos_z) / sin_z
     end
 
-    z
+    return z
 end
 
 function Base.tan(a::DoubleF64)
     s, c = sincos(a)
-    s / c
+    return s / c
 end
 
 function Base.asin(a::DoubleF64)
@@ -1036,7 +1036,7 @@ function Base.asin(a::DoubleF64)
         return a.hi > 0.0 ? double_pi2 : -double_pi2
     end
 
-    atan(a, sqrt(1.0 - square(a)))
+    return atan(a, sqrt(1.0 - square(a)))
 end
 
 function Base.acos(a::DoubleF64)
@@ -1050,11 +1050,11 @@ function Base.acos(a::DoubleF64)
         return a.hi > 0.0 ? zero(a) : -double_pi
     end
 
-    atan(sqrt(1.0 - square(a)), a)
+    return atan(sqrt(1.0 - square(a)), a)
 end
 
 function Base.show(io::IO, x::DoubleF64)
-    Printf.@printf io "%.32g" big(x)  # crude approximation to valid number of digits
+    return Printf.@printf io "%.32g" big(x)  # crude approximation to valid number of digits
 end
 
 end # module

@@ -34,8 +34,8 @@ LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, 
 ##################
 
 Base.@kwdef struct WeightedNormOptions
-    scale_min::Float64 = 1e-4
-    scale_abs_min::Float64 = 1e-6
+    scale_min::Float64 = 1.0e-4
+    scale_abs_min::Float64 = 1.0e-6
     scale_max::Float64 = exp2(div(1023, 2))
 end
 
@@ -62,17 +62,17 @@ The weights can be accessed and changed by indexing.
 * `scale_max = 1.0 / eps() / sqrt(2)`: The absolute maximal size of `dᵢ`
 
 """
-struct WeightedNorm{N<:AbstractNorm} <: AbstractNorm
+struct WeightedNorm{N <: AbstractNorm} <: AbstractNorm
     weights::Vector{Float64}
     norm::N
     options::WeightedNormOptions
 end
 function WeightedNorm(
-    weights::Vector{Float64},
-    norm::AbstractNorm,
-    opts = WeightedNormOptions(),
-)
-    WeightedNorm(weights, norm, opts)
+        weights::Vector{Float64},
+        norm::AbstractNorm,
+        opts = WeightedNormOptions(),
+    )
+    return WeightedNorm(weights, norm, opts)
 end
 WeightedNorm(norm::AbstractNorm, x::AbstractVector) = WeightedNorm(norm, length(x))
 WeightedNorm(norm::AbstractNorm, n::Integer) = WeightedNorm(ones(n), norm)
@@ -100,7 +100,7 @@ Setup the weighted norm `w` for `x`.
 """
 function init!(w::WeightedNorm, x)
     point_norm = w.norm(x)
-    for i = 1:length(w)
+    for i in 1:length(w)
         wᵢ = fast_abs(x[i])
         if wᵢ < w.options.scale_min * point_norm
             wᵢ = w.options.scale_min * point_norm
@@ -109,7 +109,7 @@ function init!(w::WeightedNorm, x)
         end
         w[i] = max(wᵢ, w.options.scale_abs_min)
     end
-    w
+    return w
 end
 init!(n::AbstractNorm, ::Any) = n
 
@@ -121,7 +121,7 @@ and the norm of `x`.
 """
 function update!(w::WeightedNorm, x)
     norm_x = w(x)
-    for i = 1:length(x)
+    for i in 1:length(x)
         wᵢ = (fast_abs(x[i]) + w[i]) / 2
         if wᵢ < w.options.scale_min * norm_x
             wᵢ = w.options.scale_min * norm_x
@@ -132,7 +132,7 @@ function update!(w::WeightedNorm, x)
             w[i] = max(wᵢ, w.options.scale_abs_min)
         end
     end
-    w
+    return w
 end
 update!(n::AbstractNorm, ::Any) = n
 
@@ -151,14 +151,14 @@ function distance(x, y, ::InfNorm)
     n = length(x)
     @boundscheck n == length(y)
     @inbounds dmax = abs2(x[1] - y[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds dᵢ = abs2(x[i] - y[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
     d = sqrt(dmax)
     if isinf(d)
         @inbounds dmax = abs(x[1] - y[1])
-        for i = 2:n
+        for i in 2:n
             @inbounds dᵢ = abs2(x[i] - y[i])
             dmax = max(dmax, dᵢ)
         end
@@ -168,20 +168,20 @@ function distance(x, y, ::InfNorm)
     end
 end
 function distance(x, y, w::WeightedNorm{InfNorm})
-    inf_distance(x, y, weights(w))
+    return inf_distance(x, y, weights(w))
 end
 function inf_distance(x, y, w)
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2((x[1] - y[1]) / w[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds dᵢ = abs2((x[i] - y[i]) / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
     d = sqrt(dmax)
     if isinf(d)
         @inbounds dmax = abs((x[1] - y[1]) / w[1])
-        for i = 2:n
+        for i in 2:n
             @inbounds dᵢ = abs((x[i] - y[i]) / w[i])
             dmax = max(dmax, dᵢ)
         end
@@ -194,7 +194,7 @@ end
 function norm(x, ::InfNorm)
     n = length(x)
     @inbounds dmax = abs2(x[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds dᵢ = abs2(x[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
@@ -202,7 +202,7 @@ function norm(x, ::InfNorm)
 
     if isinf(d)
         @inbounds dmax = abs(x[1])
-        for i = 2:n
+        for i in 2:n
             @inbounds dᵢ = abs(x[i])
             dmax = max(dmax, dᵢ)
         end
@@ -215,7 +215,7 @@ function norm(x, w::WeightedNorm{InfNorm})
     n = length(x)
     @boundscheck n == length(w)
     @inbounds dmax = abs2(x[1] / w[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds dᵢ = abs2(x[i] / w[i])
         dmax = Base.FastMath.max_fast(dmax, dᵢ)
     end
@@ -223,7 +223,7 @@ function norm(x, w::WeightedNorm{InfNorm})
 
     if isinf(d)
         @inbounds dmax = abs(x[1] / w[1])
-        for i = 2:n
+        for i in 2:n
             @inbounds dᵢ = abs(x[i] / w[i])
             dmax = max(dmax, dᵢ)
         end
@@ -244,16 +244,16 @@ struct EuclideanNorm <: AbstractNorm end
     n = length(x)
     @boundscheck n == length(y)
     @inbounds d = abs2(x[1] - y[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds d += abs2(x[i] - y[i])
     end
-    sqrt(d)
+    return sqrt(d)
 end
 @inline function norm(x, ::EuclideanNorm)
     n = length(x)
     @inbounds d = abs2(x[1])
-    for i = 2:n
+    for i in 2:n
         @inbounds d += abs2(x[i])
     end
-    sqrt(d)
+    return sqrt(d)
 end

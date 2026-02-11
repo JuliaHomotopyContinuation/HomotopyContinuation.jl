@@ -17,30 +17,30 @@
         @test multiplicity(res[1]) == 1
         @test winding_number(res[1]) === nothing
         @test !is_failed(res[1])
-        @test accuracy(res[1]) < 1e-12
-        @test residual(res[1]) < 1e-12
+        @test accuracy(res[1]) < 1.0e-12
+        @test residual(res[1]) < 1.0e-12
         @test steps(res[1]) < 20
         @test accepted_steps(res[1]) < 20
         @test rejected_steps(res[1]) == 0
         @test is_success(res[2])
         @test is_nonsingular(res[2])
-        @test cond(res[2]) < 1e3
+        @test cond(res[2]) < 1.0e3
         @test is_at_infinity(res[3])
         @test is_at_infinity(res[4])
         @test !isempty(sprint(show, res[1]))
-        @test valuation(res[3]) ≈ [-1, -1] rtol = 1e-3
+        @test valuation(res[3]) ≈ [-1, -1] rtol = 1.0e-3
         # singular stuff
         @var x
         f = [(x - 10)^2]
         tracker, starts = total_degree(System(f))
         res = track.(tracker, starts)
         @test winding_number(res[1]) == 2
-        @test last_path_point(res[1]) isa Tuple{Vector{ComplexF64},Float64}
+        @test last_path_point(res[1]) isa Tuple{Vector{ComplexF64}, Float64}
         @test 0 < last(last_path_point(res[1])) < 0.1
         @test all(is_real, res)
         @test !any(pr -> isreal(pr; atol = 0.0), res)  # there's a tiny imaginary part
-        @test all(pr -> isreal(pr; atol = 1e-16), res)
-        @test all(pr -> isreal(pr; atol = 0.0, rtol = 1e-16), res)
+        @test all(pr -> isreal(pr; atol = 1.0e-16), res)
+        @test all(pr -> isreal(pr; atol = 0.0, rtol = 1.0e-16), res)
         @test all(isreal, res)
         @test all(is_singular, res)
     end

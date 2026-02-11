@@ -42,36 +42,36 @@
 end
 
 function arity(op_type::OpType)
-    if op_type === OP_STOP
+    return if op_type === OP_STOP
         0
     elseif op_type == OP_CB ||
-           op_type == OP_COS ||
-           op_type == OP_IDENTITY ||
-           op_type == OP_INV ||
-           op_type == OP_INV_NOT_ZERO ||
-           op_type == OP_INVSQR ||
-           op_type == OP_NEG ||
-           op_type == OP_SIN ||
-           op_type == OP_SQR ||
-           op_type == OP_SQRT
+            op_type == OP_COS ||
+            op_type == OP_IDENTITY ||
+            op_type == OP_INV ||
+            op_type == OP_INV_NOT_ZERO ||
+            op_type == OP_INVSQR ||
+            op_type == OP_NEG ||
+            op_type == OP_SIN ||
+            op_type == OP_SQR ||
+            op_type == OP_SQRT
         1
     elseif op_type == OP_ADD ||
-           op_type == OP_DIV ||
-           op_type == OP_MUL ||
-           op_type == OP_SUB ||
-           op_type == OP_POW_INT
+            op_type == OP_DIV ||
+            op_type == OP_MUL ||
+            op_type == OP_SUB ||
+            op_type == OP_POW_INT
         # || op_type == OP_POW
         2
     elseif op_type == OP_ADD3 ||
-           op_type == OP_MUL3 ||
-           op_type == OP_MULADD ||
-           op_type == OP_MULSUB ||
-           op_type == OP_SUBMUL
+            op_type == OP_MUL3 ||
+            op_type == OP_MULADD ||
+            op_type == OP_MULSUB ||
+            op_type == OP_SUBMUL
         3
     elseif op_type == OP_ADD4 ||
-           op_type == OP_MUL4 ||
-           op_type == OP_MULMULADD ||
-           op_type == OP_MULMULSUB
+            op_type == OP_MUL4 ||
+            op_type == OP_MULMULADD ||
+            op_type == OP_MULMULSUB
         4
     else
         error("Unexpected OpType $(op_type)")
@@ -80,7 +80,7 @@ end
 
 
 function op_call(op_type::OpType)
-    if op_type == OP_STOP
+    return if op_type == OP_STOP
         :op_stop
 
         # Arity 1
@@ -148,7 +148,7 @@ function op_call(op_type::OpType)
 end
 
 function should_use_index_not_reference(op::OpType, index::Integer)
-    (op == OP_POW_INT && index == 2)
+    return (op == OP_POW_INT && index == 2)
 end
 
 
@@ -158,7 +158,7 @@ op_stop() = nothing
 op_cb(x) = x * x * x
 @inline function op_sqr(z::Complex)
     x, y = reim(z)
-    Complex((x + y) * (x - y), (x + x) * y)
+    return Complex((x + y) * (x - y), (x + x) * y)
 end
 op_cos(x) = cos(x)
 op_identity(x) = identity(x)

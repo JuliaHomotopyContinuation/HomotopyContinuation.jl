@@ -9,8 +9,8 @@ include("systems/fixed_parameter_system.jl")
 Constructs either a [`CompiledSystem`](@ref) (if `compile = :all`), an
 [`InterpretedSystem`](@ref) (if `compile = :none`) or a [`MixedSystem`](@ref) (`compile = :mixed`).
 """
-function fixed(F::System; compile::Union{Bool,Symbol} = COMPILE_DEFAULT[], kwargs...)
-    if compile == true || compile == :all
+function fixed(F::System; compile::Union{Bool, Symbol} = COMPILE_DEFAULT[], kwargs...)
+    return if compile == true || compile == :all
         CompiledSystem(F; kwargs...)
     elseif compile == false || compile == :none
         InterpretedSystem(F; kwargs...)

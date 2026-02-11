@@ -19,7 +19,7 @@ ModelKit.Homotopy(H::MixedHomotopy) = Homotopy(H.interpreted)
 
 function Base.show(io::IO, H::MixedHomotopy)
     print(io, "Hybrid: ")
-    show(io, Homotopy(H))
+    return show(io, Homotopy(H))
 end
 
 (H::MixedHomotopy)(x, t, p = nothing) = H.interpreted(x, t, p)

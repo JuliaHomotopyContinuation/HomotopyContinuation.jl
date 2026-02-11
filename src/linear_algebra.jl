@@ -4,12 +4,12 @@
 This is a data structure for the efficient repeated solution of a square or
 overdetermined linear system `Ax=b`.
 """
-struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
+struct MatrixWorkspace{M <: AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
     A::M # Matrix
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
-    lu::LA.LU{ComplexF64,M,Vector{Int}} # LU Factorization of D * J
-    qr::LA.QR{ComplexF64,Matrix{ComplexF64},Vector{ComplexF64}}
+    lu::LA.LU{ComplexF64, M, Vector{Int}} # LU Factorization of D * J
+    qr::LA.QR{ComplexF64, Matrix{ComplexF64}, Vector{ComplexF64}}
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
@@ -40,7 +40,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     scaled = Ref(false)
 
     ipiv = zeros(Int, m)
-    lu = LinearAlgebra.LU{eltype(A),typeof(A),typeof(ipiv)}(copy(A), ipiv, 0)
+    lu = LinearAlgebra.LU{eltype(A), typeof(A), typeof(ipiv)}(copy(A), ipiv, 0)
     r = zeros(ComplexF64, m)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)
@@ -48,7 +48,7 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     inf_norm_est_work = Vector{ComplexF64}(undef, n)
     inf_norm_est_rwork = Vector{Float64}(undef, n)
 
-    MatrixWorkspace(
+    return MatrixWorkspace(
         A,
         d,
         factorized,
@@ -94,7 +94,7 @@ function updated!(MW::MatrixWorkspace)
     else
         @inbounds copyto!(MW.qr.factors, MW.A)
     end
-    MW
+    return MW
 end
 updated!(M::AbstractMatrix) = M
 
@@ -106,7 +106,7 @@ Update the matrix in `MW` with `A`.
 @inline function update!(MW::AbstractMatrix, A::Matrix)
     @boundscheck (size(MW.A) == size(A) || throw(ArgumentError("Matrix of invalid size.")))
     @inbounds copyto!(MW.A, A)
-    updated!(MW)
+    return updated!(MW)
 end
 
 ##################
@@ -128,14 +128,14 @@ end
 #    the pivot vector anymore and also avoid the allocations
 #    coming from the LU wrapper
 function lu!(
-    A::AbstractMatrix{T},
-    ipiv::Union{Vector{I},Nothing} = nothing,
-) where {T,I<:Integer}
+        A::AbstractMatrix{T},
+        ipiv::Union{Vector{I}, Nothing} = nothing,
+    ) where {T, I <: Integer}
     m, n = size(A)
     minmn = min(m, n)
     # LU Factorization
     @inbounds begin
-        for k = 1:minmn
+        for k in 1:minmn
             # find index max
             kp = k
             if T <: Complex
@@ -143,7 +143,7 @@ function lu!(
             else
                 amax = abs(A[k, k])
             end
-            for i = k+1:m
+            for i in (k + 1):m
                 if T <: Complex
                     absi = abs2(A[i, k])
                 else
@@ -157,7 +157,7 @@ function lu!(
             if !iszero(amax)
                 if k != kp
                     # Interchange
-                    for i = 1:n
+                    for i in 1:n
                         tmp = A[k, i]
                         A[k, i] = A[kp, i]
                         A[kp, i] = tmp
@@ -165,22 +165,22 @@ function lu!(
                 end
                 # Scale first column
                 Akk = A[k, k]
-                for i = k+1:m
+                for i in (k + 1):m
                     # we assume the matrix is decently scaled
                     # so that the naive division algorithm doesn't overflow
                     @fastmath A[i, k] = A[i, k] / Akk
                 end
             end
             # Update the rest
-            for j = k+1:n
+            for j in (k + 1):n
                 A_kj = A[k, j]
-                for i = k+1:m
+                for i in (k + 1):m
                     A[i, j] -= A[i, k] * A_kj
                 end
             end
         end
     end
-    A
+    return A
 end
 
 
@@ -197,7 +197,7 @@ end
     @inbounds begin
         ξ1 = x[1]
         normu = abs2(ξ1)
-        for i = 2:n
+        for i in 2:n
             normu += abs2(x[i])
         end
         if iszero(normu)
@@ -207,21 +207,21 @@ end
         ν = copysign(normu, real(ξ1))
         ξ1 += ν
         x[1] = -ν
-        for i = 2:n
+        for i in 2:n
             @fastmath x[i] = x[i] / ξ1
         end
     end
-    ξ1 / ν
+    return ξ1 / ν
 end
 
 # apply reflector from left
 @inline function reflectorApply!(x::AbstractVector, τ::Number, A::StridedMatrix)
     m, n = size(A)
     @inbounds begin
-        for j = 1:n
+        for j in 1:n
             # dot
             vAj = A[1, j]
-            for i = 2:m
+            for i in 2:m
                 vAj += x[i]' * A[i, j]
             end
 
@@ -229,7 +229,7 @@ end
 
             # ger
             A[1, j] -= vAj
-            for i = 2:m
+            for i in 2:m
                 A[i, j] -= x[i] * vAj
             end
         end
@@ -241,13 +241,13 @@ function qr!(qr::LA.QR{T}) where {T}
     A = qr.factors
     τ = qr.τ
     m, n = size(A)
-    for k = 1:min(m - 1 + !(T <: Real), n)
+    for k in 1:min(m - 1 + !(T <: Real), n)
         x = view(A, k:m, k)
         τk = reflector!(x)
         τ[k] = τk
-        reflectorApply!(x, τk, view(A, k:m, k+1:n))
+        reflectorApply!(x, τk, view(A, k:m, (k + 1):n))
     end
-    qr
+    return qr
 end
 
 
@@ -259,7 +259,7 @@ function factorize!(WS::MatrixWorkspace)
         qr!(WS.qr)
     end
     WS.factorized[] = true
-    WS
+    return WS
 end
 
 ##########
@@ -274,37 +274,37 @@ end
             _swap_rows!(b, i, ipiv[i])
         end
     end
-    b
+    return b
 end
 @propagate_inbounds function _swap_rows!(B::StridedVector, i::Integer, j::Integer)
     B[i], B[j] = B[j], B[i]
-    B
+    return B
 end
 
 @inline function ldiv_upper!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 2)
-    @inbounds for j = n:-1:1
+    @inbounds for j in n:-1:1
         # singular_exception && iszero(A[j, j]) && throw(LA.SingularException(j))
         xj = x[j] = (@fastmath A[j, j] \ b[j])
-        for i = 1:(j-1)
+        for i in 1:(j - 1)
             b[i] -= A[i, j] * xj
         end
     end
-    b
+    return b
 end
 @inline function ldiv_unit_lower!(
-    A::AbstractMatrix,
-    b::AbstractVector,
-    x::AbstractVector = b,
-)
+        A::AbstractMatrix,
+        b::AbstractVector,
+        x::AbstractVector = b,
+    )
     n = size(A, 2)
-    @inbounds for j = 1:n
+    @inbounds for j in 1:n
         xj = x[j] = b[j]
-        for i = j+1:n
+        for i in (j + 1):n
             b[i] -= A[i, j] * xj
         end
     end
-    x
+    return x
 end
 
 function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
@@ -312,37 +312,37 @@ function lu_ldiv!(x, LU::LA.LU, b::AbstractVector)
     _ipiv!(LU, x)
     ldiv_unit_lower!(LU.factors, x)
     ldiv_upper!(LU.factors, x)
-    x
+    return x
 end
 
 function ldiv_adj_unit_lower!(A::AbstractMatrix, b::AbstractVector, x::AbstractVector = b)
     n = size(A, 1)
-    @inbounds for j = n:-1:1
+    @inbounds for j in n:-1:1
         z = b[j]
-        for i = n:-1:j+1
+        for i in n:-1:(j + 1)
             z -= conj(A[i, j]) * x[i]
         end
         x[j] = z
     end
-    x
+    return x
 end
 
 function ldiv_adj_upper!(
-    A::AbstractMatrix,
-    b::AbstractVector,
-    x::AbstractVector = b;
-    singular_exception::Bool = false,
-)
+        A::AbstractMatrix,
+        b::AbstractVector,
+        x::AbstractVector = b;
+        singular_exception::Bool = false,
+    )
     n = size(A, 1)
-    @inbounds for j = 1:n
+    @inbounds for j in 1:n
         z = b[j]
-        for i = 1:j-1
+        for i in 1:(j - 1)
             z -= conj(A[i, j]) * x[i]
         end
         iszero(A[j, j]) && singular_exception && throw(SingularException(j))
         x[j] = @fastmath conj(A[j, j]) \ z
     end
-    x
+    return x
 end
 
 function lu_ldiv_adj!(x, LU::LA.LU, b::AbstractVector; check::Bool = false)
@@ -350,7 +350,7 @@ function lu_ldiv_adj!(x, LU::LA.LU, b::AbstractVector; check::Bool = false)
     ldiv_adj_upper!(LU.factors, x; singular_exception = check)
     ldiv_adj_unit_lower!(LU.factors, x)
     _inverse_ipiv!(LU, x)
-    x
+    return x
 end
 
 
@@ -361,25 +361,25 @@ function lmul_Q_adj!(A::LA.QR, b::AbstractVector)
     mB = length(b)
     Afactors = A.factors
     @inbounds begin
-        for k = 1:min(mA, nA)
+        for k in 1:min(mA, nA)
             vBj = b[k]
-            for i = k+1:mB
+            for i in (k + 1):mB
                 vBj += conj(Afactors[i, k]) * b[i]
             end
             vBj = conj(A.τ[k]) * vBj
             b[k] -= vBj
-            for i = k+1:mB
+            for i in (k + 1):mB
                 b[i] -= Afactors[i, k] * vBj
             end
         end
     end
-    b
+    return b
 end
 function qr_ldiv!(x, QR::LA.QR, b::AbstractVector)
     # overwrites b
     # assumes QR is a tall matrix
     lmul_Q_adj!(QR, b)
-    @inbounds for i = 1:length(x)
+    @inbounds for i in 1:length(x)
         x[i] = b[i]
     end
     ldiv_upper!(QR.factors, x)
@@ -404,7 +404,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
         WS.r .= b
         qr_ldiv!(x, WS.qr, WS.r)
     end
-    x
+    return x
 end
 
 function LA.inv!(B::AbstractMatrix, M::MatrixWorkspace)
@@ -430,23 +430,23 @@ The scaling factors are rounded to powers `e` of the base radix 2. Row scaling i
 [^S79]: Skeel, Robert D. "Scaling for numerical stability in Gaussian elimination." Journal of the ACM (JACM) 26.3 (1979): 494-526.
 """
 function skeel_row_scaling!(
-    d::AbstractVector{<:Real},
-    A::AbstractMatrix{<:Complex},
-    c::AbstractVector{<:Real};
-    scaling_threshold::Float64 = -30.0,
-)
+        d::AbstractVector{<:Real},
+        A::AbstractMatrix{<:Complex},
+        c::AbstractVector{<:Real};
+        scaling_threshold::Float64 = -30.0,
+    )
     n = length(c)
     @inbounds d .= zero(eltype(d))
-    @inbounds for j = 1:n
+    @inbounds for j in 1:n
         cj = c[j]
-        for i = 1:n
+        for i in 1:n
             d[i] += fast_abs(A[i, j]) * cj
         end
     end
 
     m = maximum(d)
     s = scaling_threshold + m
-    @inbounds for i = 1:n
+    @inbounds for i in 1:n
         e = last(frexp(d[i]))
         if e < s
             d[i] = 1.0
@@ -455,30 +455,28 @@ function skeel_row_scaling!(
         end
     end
 
-    d
+    return d
 end
 
 function skeel_row_scaling!(W::MatrixWorkspace, c::AbstractVector{<:Real})
     skeel_row_scaling!(W.row_scaling, W.A, c)
-    W
+    return W
 end
 
 function row_scaling!(
-    d::AbstractVector{<:Real},
-    WS::MatrixWorkspace,
-    c::AbstractVector{<:Real},
-    scaling_threshold::Float64,
-)
+        d::AbstractVector{<:Real},
+        WS::MatrixWorkspace,
+        c::AbstractVector{<:Real},
+        scaling_threshold::Float64,
+    )
     m, n = size(WS)
     if m == n
         skeel_row_scaling!(d, WS.A, c; scaling_threshold = scaling_threshold)
     else
         d .= 1.0
     end
-    d
+    return d
 end
-
-
 
 
 """
@@ -489,11 +487,11 @@ Apply the computed row scaling.
 function apply_row_scaling!(W::MatrixWorkspace)
     A, d = W.lu.factors, W.row_scaling
     m, n = size(A)
-    @inbounds for j = 1:n, i = 1:m
+    @inbounds for j in 1:n, i in 1:m
         A[i, j] = A[i, j] * d[i]
     end
     W.scaled[] = true
-    W
+    return W
 end
 
 ## Iterative Refinement
@@ -506,16 +504,16 @@ function residual!(r::AbstractVector, A::AbstractMatrix, x::AbstractVector, b)
     m, n = size(A)
     @boundscheck m == length(b) == length(r) && n == length(x)
     r .= 0
-    @inbounds for j = 1:n
+    @inbounds for j in 1:n
         x_j = x[j]
-        for i = 1:m
+        for i in 1:m
             r[i] += A[i, j] * x_j
         end
     end
-    @inbounds for i = 1:m
+    @inbounds for i in 1:m
         r[i] -= b[i]
     end
-    r
+    return r
 end
 
 """
@@ -526,17 +524,17 @@ If `norm` is an `AbstractNorm` then the normwise relative error before
 the refinement step is returned otherwise `x` is returned.
 """
 function mixed_precision_iterative_refinement!(
-    x::AbstractVector,
-    M::MatrixWorkspace,
-    b::AbstractVector,
-    norm::Union{AbstractNorm,Nothing} = nothing,
-)
+        x::AbstractVector,
+        M::MatrixWorkspace,
+        b::AbstractVector,
+        norm::Union{AbstractNorm, Nothing} = nothing,
+    )
     M.x̄ .= x
     residual!(M.r̄, M.A, M.x̄, b)
     M.r .= M.r̄
     LA.ldiv!(M.δx, M, M.r)
     x .-= M.δx
-    if norm isa Nothing
+    return if norm isa Nothing
         x
     else
         norm(M.δx) / norm(x)
@@ -551,21 +549,20 @@ If `norm` is an `AbstractNorm` then the normwise relative error before
 the refinement step is returned otherwise `x` is returned.
 """
 function fixed_precision_iterative_refinement!(
-    x::AbstractVector,
-    M::MatrixWorkspace,
-    b::AbstractVector,
-    norm::Union{AbstractNorm,Nothing} = nothing,
-)
+        x::AbstractVector,
+        M::MatrixWorkspace,
+        b::AbstractVector,
+        norm::Union{AbstractNorm, Nothing} = nothing,
+    )
     residual!(M.r, M.A, x, b)
     LA.ldiv!(M.δx, M, M.r)
     x .-= M.δx
-    if norm isa Nothing
+    return if norm isa Nothing
         x
     else
         norm(M.δx) / norm(x)
     end
 end
-
 
 
 # CONDITION NUMBERS
@@ -583,26 +580,26 @@ This uses the 1-norm lapack condition estimator described by Highahm in [^H88].
 [^H88]: Higham, Nicholas J. "FORTRAN codes for estimating the one-norm of a real or complex matrix, with applications to condition estimation." ACM Transactions on Mathematical Software (TOMS) 14.4 (1988): 381-396.
 """
 function inverse_inf_norm_est(
-    WS::MatrixWorkspace,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
+        WS::MatrixWorkspace,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
     WS.factorized[] || factorize!(WS)
     work, rwork = WS.inf_norm_est_work, WS.inf_norm_est_rwork
-    if !WS.scaled[]
+    return if !WS.scaled[]
         inverse_inf_norm_est(WS.lu, d_l, d_r, nothing, work, rwork)
     else
         inverse_inf_norm_est(WS.lu, d_l, d_r, WS.row_scaling, work, rwork)
     end
 end
 function inverse_inf_norm_est(
-    lu::LA.LU,
-    d_l::Union{Nothing,Vector{<:Real}},
-    d_r::Union{Nothing,Vector{<:Real}},
-    row_scaling::Union{Nothing,Vector{<:Real}},
-    work::Vector{<:Complex},
-    rwork::Vector{<:Real},
-)
+        lu::LA.LU,
+        d_l::Union{Nothing, Vector{<:Real}},
+        d_r::Union{Nothing, Vector{<:Real}},
+        row_scaling::Union{Nothing, Vector{<:Real}},
+        work::Vector{<:Complex},
+        rwork::Vector{<:Real},
+    )
     z = ξ = y = work
     x = rwork
 
@@ -636,7 +633,7 @@ function inverse_inf_norm_est(
     k = 2
     while true
         j, max_xᵢ = 1, abs(x[1])
-        for i = 2:n
+        for i in 2:n
             abs_xᵢ = abs(x[i])
             if abs_xᵢ > max_xᵢ
                 j, max_xᵢ = i, abs_xᵢ
@@ -678,20 +675,20 @@ function inverse_inf_norm_est(
             break
         end
     end
-    nanmin(γ, Inf)
+    return nanmin(γ, Inf)
 end
 
 function inf_norm(
-    WS::MatrixWorkspace,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
+        WS::MatrixWorkspace,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
     norm = -Inf
     A = WS.A
     n, m = size(A)
-    @inbounds for i = 1:n
+    @inbounds for i in 1:n
         normᵢ = 0.0
-        for j = 1:m
+        for j in 1:m
             if d_r isa Nothing
                 normᵢ += fast_abs(A[i, j])
             else
@@ -703,21 +700,21 @@ function inf_norm(
         end
         norm = @fastmath max(norm, normᵢ)
     end
-    norm
+    return norm
 end
 
 function max_min_row(
-    WS::MatrixWorkspace,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
+        WS::MatrixWorkspace,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
     max_row = -Inf
     min_row = Inf
     A = WS.A
     n, m = size(A)
-    @inbounds for i = 1:n
+    @inbounds for i in 1:n
         normᵢ = 0.0
-        for j = 1:m
+        for j in 1:m
             if d_r isa Nothing
                 normᵢ += fast_abs(A[i, j])
             else
@@ -730,7 +727,7 @@ function max_min_row(
         max_row = @fastmath max(max_row, normᵢ)
         min_row = @fastmath min(min_row, normᵢ)
     end
-    max_row, min_row
+    return max_row, min_row
 end
 
 """
@@ -743,12 +740,12 @@ If `d_l` or `d_r` is `nothing` the all one vector is used.
 If `size(A) == (1,1)` then just the norm of the inverse is returned.
 """
 function LA.cond(
-    WS::MatrixWorkspace,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
+        WS::MatrixWorkspace,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
     m, n = size(WS)
-    if m == n == 1
+    return if m == n == 1
         if isa(d_l, Nothing) && isa(d_r, Nothing)
             inv(abs(WS.A[1, 1]))
         elseif isa(d_l, Nothing)
@@ -761,7 +758,7 @@ function LA.cond(
     elseif m > n
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
-        for i = 1:n
+        for i in 1:n
             rᵢ = fast_abs(WS.qr.factors[i, i]) * d_r[i]
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
@@ -774,12 +771,12 @@ function LA.cond(
 end
 
 function egcond(
-    WS::MatrixWorkspace,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
+        WS::MatrixWorkspace,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
     m, n = size(WS)
-    if m == n == 1
+    return if m == n == 1
         a = abs(WS.A[1, 1])
         if d_l !== nothing
             a *= d_l[1]
@@ -791,7 +788,7 @@ function egcond(
     elseif m > n
         WS.factorized[] || factorize!(WS)
         rmax, rmin = -Inf, Inf
-        for i = 1:n
+        for i in 1:n
             rᵢ = abs(WS.qr.factors[i, i]) * d_r[i]
             rmax = max(rmax, rᵢ)
             rmin = min(rmin, rᵢ)
@@ -822,7 +819,7 @@ matrix(J::Jacobian) = matrix(workspace(J))
 function Base.show(io::IO, J::Jacobian{T}) where {T}
     println(io, "Jacobian{$T}:")
     println(io, " • # factorizations → ", J.factorizations[])
-    println(io, " • # ldivs → ", J.ldivs[])
+    return println(io, " • # ldivs → ", J.ldivs[])
 end
 
 """
@@ -831,25 +828,25 @@ end
 solve the linear system `matrix(J)x̂=b`.
 """
 function LA.ldiv!(
-    x̂::AbstractVector,
-    J::Jacobian,
-    b::AbstractVector,
-    norm = nothing;
-    row_scaling::Bool = true,
-)
+        x̂::AbstractVector,
+        J::Jacobian,
+        b::AbstractVector,
+        norm = nothing;
+        row_scaling::Bool = true,
+    )
     # stats update
     J.factorizations[] += !workspace(J).factorized[]
     J.ldivs[] += 1
     LA.ldiv!(x̂, workspace(J), b)
-    x̂
+    return x̂
 end
 function LA.ldiv!(
-    x̂::AbstractVector,
-    J::Jacobian,
-    b::AbstractVector,
-    norm::WeightedNorm;
-    row_scaling::Bool = true,
-)
+        x̂::AbstractVector,
+        J::Jacobian,
+        b::AbstractVector,
+        norm::WeightedNorm;
+        row_scaling::Bool = true,
+    )
     if !workspace(J).factorized[] && row_scaling
         skeel_row_scaling!(workspace(J), weights(norm))
         apply_row_scaling!(workspace(J))
@@ -858,20 +855,20 @@ function LA.ldiv!(
     J.factorizations[] += !workspace(J).factorized[]
     J.ldivs[] += 1
     LA.ldiv!(x̂, workspace(J), b)
-    x̂
+    return x̂
 end
 
 function iterative_refinement!(
-    x::AbstractVector,
-    J::Jacobian,
-    b::AbstractVector,
-    norm::AbstractNorm;
-    max_iters::Int = 3,
-    tol::Float64 = sqrt(eps()),
-)
+        x::AbstractVector,
+        J::Jacobian,
+        b::AbstractVector,
+        norm::AbstractNorm;
+        max_iters::Int = 3,
+        tol::Float64 = sqrt(eps()),
+    )
     J.ldivs[] += 1
     δ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
-    for i = 2:max_iters
+    for i in 2:max_iters
         J.ldivs[] += 1
         δ′ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
         if δ′ < tol
@@ -881,7 +878,7 @@ function iterative_refinement!(
         end
         δ = δ′
     end
-    (accuracy = δ, diverged = false)
+    return (accuracy = δ, diverged = false)
 end
 
 
@@ -893,23 +890,23 @@ end
 function init!(J::Jacobian; keep_stats::Bool = false)
     J.factorizations[] = 0
     J.ldivs[] = 0
-    J
+    return J
 end
 
 function LA.cond(
-    J::Jacobian,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
-    LA.cond(workspace(J), d_l, d_r)
+        J::Jacobian,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
+    return LA.cond(workspace(J), d_l, d_r)
 end
 
 function egcond(
-    J::Jacobian,
-    d_l::Union{Nothing,Vector{<:Real}} = nothing,
-    d_r::Union{Nothing,Vector{<:Real}} = nothing,
-)
-    egcond(workspace(J), d_l, d_r)
+        J::Jacobian,
+        d_l::Union{Nothing, Vector{<:Real}} = nothing,
+        d_r::Union{Nothing, Vector{<:Real}} = nothing,
+    )
+    return egcond(workspace(J), d_l, d_r)
 end
 
 @static if VERSION ≥ v"1.7.0-"

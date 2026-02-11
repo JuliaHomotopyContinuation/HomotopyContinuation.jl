@@ -2,18 +2,18 @@ struct IRStatementRef
     i::Int
 end
 
-const IRStatementArg = Union{Nothing,Number,Symbol,IRStatementRef}
+const IRStatementArg = Union{Nothing, Number, Symbol, IRStatementRef}
 
 struct IRStatement
     op::OpType
     target::IRStatementRef
-    args::NTuple{4,IRStatementArg}
+    args::NTuple{4, IRStatementArg}
 end
 
 struct IntermediateRepresentation
     statements::Vector{IRStatement}
     # tape_index, assignment_ref
-    assignments::Vector{Tuple{Int,IRStatementArg}}
+    assignments::Vector{Tuple{Int, IRStatementArg}}
     output_dim::Int
 end
 IntermediateRepresentation() = IntermediateRepresentation([], [], 0)
@@ -22,39 +22,39 @@ IntermediateRepresentation() = IntermediateRepresentation([], [], 0)
 Base.show(io::IO, i::IRStatementRef) = print(io, "ι_", i.i)
 
 # ## IRStatement
-function IRStatement(op::OpType, target::Union{Symbol,IRStatementRef}, a::IRStatementArg)
+function IRStatement(op::OpType, target::Union{Symbol, IRStatementRef}, a::IRStatementArg)
     arity(op) == 1 || error("IRStatement has arity $(arity(op)) but called with 1 arg")
-    IRStatement(op, target, (a, nothing, nothing, nothing))
+    return IRStatement(op, target, (a, nothing, nothing, nothing))
 end
 function IRStatement(
-    op::OpType,
-    target::Union{Symbol,IRStatementRef},
-    a::IRStatementArg,
-    b::IRStatementArg,
-)
+        op::OpType,
+        target::Union{Symbol, IRStatementRef},
+        a::IRStatementArg,
+        b::IRStatementArg,
+    )
     arity(op) == 2 || error("IRStatement has arity $(arity(op)) but called with 2 args")
-    IRStatement(op, target, (a, b, nothing, nothing))
+    return IRStatement(op, target, (a, b, nothing, nothing))
 end
 function IRStatement(
-    op::OpType,
-    target::Union{Symbol,IRStatementRef},
-    a::IRStatementArg,
-    b::IRStatementArg,
-    c::IRStatementArg,
-)
+        op::OpType,
+        target::Union{Symbol, IRStatementRef},
+        a::IRStatementArg,
+        b::IRStatementArg,
+        c::IRStatementArg,
+    )
     arity(op) == 3 || error("IRStatement has arity $(arity(op)) but called with 3 args")
-    IRStatement(op, target, (a, b, c, nothing))
+    return IRStatement(op, target, (a, b, c, nothing))
 end
 function IRStatement(
-    op::OpType,
-    target::Union{Symbol,IRStatementRef},
-    a::IRStatementArg,
-    b::IRStatementArg,
-    c::IRStatementArg,
-    d::IRStatementArg,
-)
+        op::OpType,
+        target::Union{Symbol, IRStatementRef},
+        a::IRStatementArg,
+        b::IRStatementArg,
+        c::IRStatementArg,
+        d::IRStatementArg,
+    )
     arity(op) == 4 || error("IRStatement has arity $(arity(op)) but called with 4 args")
-    IRStatement(op, target, (a, b, c, d))
+    return IRStatement(op, target, (a, b, c, d))
 end
 Base.getindex(I::IRStatement, i) = I.args[i]
 
@@ -65,25 +65,28 @@ IntermediateRepresentation(output_dim) =
     IntermediateRepresentation(IRStatement[], IRStatementRef[], output_dim)
 Base.length(v::IntermediateRepresentation) = length(v.statements)
 function Base.iterate(I::IntermediateRepresentation, state = nothing)
-    isnothing(state) ? iterate(I.statements) : iterate(I.statements, state)
+    return isnothing(state) ? iterate(I.statements) : iterate(I.statements, state)
 end
 
 function Base.show(io::IO, ir::IntermediateRepresentation)
     for stmt in ir
         println(
             io,
-            "$(stmt.target) <- $(Expr(
-                :call,
-                Symbol(stmt.op),
-                filter(!isnothing, stmt.args)...,
-            ))",
+            "$(stmt.target) <- $(
+                Expr(
+                    :call,
+                    Symbol(stmt.op),
+                    filter(!isnothing, stmt.args)...,
+                )
+            )",
         )
     end
+    return
 end
 
 function Base.push!(ir::IntermediateRepresentation, x::IRStatement)
     push!(ir.statements, x)
-    IRStatementRef(length(ir))
+    return IRStatementRef(length(ir))
 end
 
 function add_op!(ir::IntermediateRepresentation, op::OpType, args::IRStatementArg...)
@@ -92,9 +95,8 @@ function add_op!(ir::IntermediateRepresentation, op::OpType, args::IRStatementAr
     stmt = IRStatement(op, ref, args...)
     push!(ir.statements, stmt)
 
-    IRStatementRef(n)
+    return IRStatementRef(n)
 end
-
 
 
 ## Convert to IntermediateRepresentation
@@ -102,11 +104,11 @@ end
 intermediate_representation(ex::Expression; kwargs...) =
     intermediate_representation([ex]; kwargs...)
 function intermediate_representation(
-    exprs::Vector{Expression};
-    output_dim = length(exprs),
-    subexpressions::Dict{Expression,Expression} = Dict{Expression,Expression}(),
-    perform_cse::Bool = true,
-)
+        exprs::Vector{Expression};
+        output_dim = length(exprs),
+        subexpressions::Dict{Expression, Expression} = Dict{Expression, Expression}(),
+        perform_cse::Bool = true,
+    )
     ir = IntermediateRepresentation(output_dim)
     if perform_cse
         exprs, CSE = cse(exprs)
@@ -114,11 +116,11 @@ function intermediate_representation(
     else
         CSE = subexpressions
     end
-    symb_cse = Dict{Symbol,Expression}()
+    symb_cse = Dict{Symbol, Expression}()
     for (k, v) in CSE
         push!(symb_cse, Symbol(to_string(k)) => v)
     end
-    pse = Dict{Symbol,IRStatementRef}()
+    pse = Dict{Symbol, IRStatementRef}()
     for (k, ex) in enumerate(exprs)
         iszero(ex) && continue
         n = length(ir.statements)
@@ -131,23 +133,23 @@ function intermediate_representation(
             push!(ir.assignments, (k, assignment))
         end
     end
-    ir
+    return ir
 end
 
 
 # Helpers
 function add!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b))
-    if a === nothing
+    return if a === nothing
         b === nothing ? nothing : b
     else
         b === nothing ? a : add_op!(ir, OP_ADD, a, b)
     end
 end
 function neg!(ir::IntermediateRepresentation, @nospecialize(a))
-    a === nothing ? nothing : add_op!(ir, OP_NEG, a)
+    return a === nothing ? nothing : add_op!(ir, OP_NEG, a)
 end
 function sub!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b))
-    if a === nothing
+    return if a === nothing
         b === nothing ? nothing : add_op!(ir, OP_NEG, b)
     else
         b === nothing ? a : add_op!(ir, OP_SUB, a, b)
@@ -156,7 +158,7 @@ end
 
 function mul!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b))
     (a === nothing || b === nothing) && return nothing
-    if is_one(a)
+    return if is_one(a)
         b
     elseif is_one(b)
         a
@@ -172,54 +174,54 @@ function mul!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b)
 end
 
 function muladd!(
-    ir::IntermediateRepresentation,
-    @nospecialize(a),
-    @nospecialize(b),
-    @nospecialize(c),
-)
+        ir::IntermediateRepresentation,
+        @nospecialize(a),
+        @nospecialize(b),
+        @nospecialize(c),
+    )
     (a === nothing || b === nothing) && return c
     c === nothing && return mul!(ir, a, b)
     is_one(a) && return add!(ir, b, c)
     is_one(b) && return add!(ir, a, c)
-    add_op!(ir, OP_MULADD, a, b, c)
+    return add_op!(ir, OP_MULADD, a, b, c)
 end
 function mulsub!(
-    ir::IntermediateRepresentation,
-    @nospecialize(a),
-    @nospecialize(b),
-    @nospecialize(c),
-)
+        ir::IntermediateRepresentation,
+        @nospecialize(a),
+        @nospecialize(b),
+        @nospecialize(c),
+    )
     (a === nothing || b === nothing) && return neg!(ir, c)
     c === nothing && return mul!(ir, a, b)
     is_one(a) && return sub!(ir, b, c)
     is_one(b) && return sub!(ir, a, c)
-    add_op!(ir, OP_MULSUB, a, b, c)
+    return add_op!(ir, OP_MULSUB, a, b, c)
 end
 function submul!(
-    ir::IntermediateRepresentation,
-    @nospecialize(a),
-    @nospecialize(b),
-    @nospecialize(c),
-)
+        ir::IntermediateRepresentation,
+        @nospecialize(a),
+        @nospecialize(b),
+        @nospecialize(c),
+    )
     # c - a * b
     (a === nothing || b === nothing) && return c
     c === nothing && return neg!(ir, mul!(ir, a, b))
     is_one(a) && return sub!(ir, c, b)
     is_one(b) && return sub!(ir, c, a)
-    add_op!(ir, OP_SUBMUL, a, b, c)
+    return add_op!(ir, OP_SUBMUL, a, b, c)
 end
 
 function mulmuladd!(ir::IntermediateRepresentation, a, b, c, d)
-    add_op!(ir, OP_MULMULADD, a, b, c, d)
+    return add_op!(ir, OP_MULMULADD, a, b, c, d)
 end
 function div!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b))
     a === nothing && return nothing
-    is_one(b) ? a : add_op!(ir, OP_DIV, a, b)
+    return is_one(b) ? a : add_op!(ir, OP_DIV, a, b)
 end
 
 function sqr!(ir::IntermediateRepresentation, @nospecialize(a))
     a === nothing && return nothing
-    add_op!(ir, OP_SQR, a)
+    return add_op!(ir, OP_SQR, a)
 end
 function pow!(ir::IntermediateRepresentation, @nospecialize(a), @nospecialize(b))
     is_zero(b) && return Int32(1)
@@ -261,7 +263,7 @@ function split_into_positives_negatives(ex)
             push!(positives, val)
         end
     end
-    positives, negatives
+    return positives, negatives
 end
 
 function reduce_to_at_most_two_multiplicants!(ir, ex, cse, pse)
@@ -275,7 +277,7 @@ function reduce_to_at_most_two_multiplicants!(ir, ex, cse, pse)
         elseif length(v) == 1
             return (expr_to_ir_statements!(ir, v[1], cse, pse), nothing)
         elseif length(v) > 2
-            v2 = expr_to_ir_statements!(ir, prod(@view v[1:end-1]), cse, pse)
+            v2 = expr_to_ir_statements!(ir, prod(@view v[1:(end - 1)]), cse, pse)
             return (expr_to_ir_statements!(ir, v[end], cse, pse), v2)
         end
     end
@@ -289,9 +291,9 @@ function sum_products!(ir, tuples::Vector)
     singles = convert(Vector{IRStatementArg}, first.(filter(t -> isnothing(t[2]), tuples)))
     pairs = filter(t -> !isnothing(t[2]), tuples)
     n = length(pairs)
-    for k = 1:2:(n-1)
+    for k in 1:2:(n - 1)
         (a, b) = pairs[k]
-        (c, d) = pairs[k+1]
+        (c, d) = pairs[k + 1]
         ref = mulmuladd!(ir, a, b, c, d)
         push!(singles, ref)
     end
@@ -367,7 +369,7 @@ function process_sum!(ir, ex::Basic, cse, pse)
 
     pos_sum = sum_products!(ir, pos_reduced)
     neg_sum = sum_products!(ir, neg_reduced)
-    sub!(ir, pos_sum, neg_sum)
+    return sub!(ir, pos_sum, neg_sum)
 end
 
 
@@ -392,7 +394,7 @@ function split_into_num_denom!(ir, ex, cse, pse)
             push!(nums, expr_to_ir_statements!(ir, e, cse, pse))
         end
     end
-    nums, denoms
+    return nums, denoms
 end
 
 function prod_parts!(ir, exs, cse, pse)
@@ -422,7 +424,7 @@ function prod_parts!(ir, exs, cse, pse)
             push!(parts, ref)
         end
     end
-    parts[1]
+    return parts[1]
 end
 
 function process_mul!(ir, ex, cse, pse)
@@ -441,19 +443,19 @@ function process_mul!(ir, ex, cse, pse)
     else
         ref = div!(ir, num_prod, denom_prod)
     end
-    mul!(ir, m, ref)
+    return mul!(ir, m, ref)
 end
 
 
 function expr_to_ir_statements!(
-    ir::IntermediateRepresentation,
-    ex::Basic,
-    # common sub expression
-    cse::Dict{Symbol,Expression},
-    # processed sub expression
-    # mapping of the cse var with the instruction used
-    pse::Dict{Symbol,IRStatementRef},
-)
+        ir::IntermediateRepresentation,
+        ex::Basic,
+        # common sub expression
+        cse::Dict{Symbol, Expression},
+        # processed sub expression
+        # mapping of the cse var with the instruction used
+        pse::Dict{Symbol, IRStatementRef},
+    )
     t = class(ex)
     if t == :Symbol
         s = Symbol(to_string(ex))
@@ -506,14 +508,16 @@ to_expr_arg(x) = x
 function to_julia_expr(ir::IntermediateRepresentation)
     exprs = map(ir.statements) do stmt
         :(
-            $(to_expr_arg(stmt.target)) = $(Expr(
-                :call,
-                op_call(stmt.op),
-                to_expr_arg.(filter(!isnothing, stmt.args))...,
-            ))
+            $(to_expr_arg(stmt.target)) = $(
+                Expr(
+                    :call,
+                    op_call(stmt.op),
+                    to_expr_arg.(filter(!isnothing, stmt.args))...,
+                )
+            )
         )
     end
-    quote
+    return quote
         $(exprs...)
     end
 end

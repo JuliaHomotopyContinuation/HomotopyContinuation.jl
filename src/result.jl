@@ -38,7 +38,7 @@ This contains information about the multiplicities of the solutions.
 """
 struct MultiplicityInfo
     # indices of multiple solutions grouped by multiplicity
-    multiplicities::Dict{Int,Vector{Vector{Int}}}
+    multiplicities::Dict{Int, Vector{Vector{Int}}}
     # This set stores all path numbers which we want to ignore
     # if we don't show multiple results
     multiple_indicator::Set{Int}
@@ -48,7 +48,7 @@ function MultiplicityInfo(pathresults::Vector{PathResult})
     multiple_indicator = Set{Int32}()
     multiplicities = compute_multiplicities(pathresults)
     for clusters in values(multiplicities), cluster in clusters
-        for i = 2:length(cluster)
+        for i in 2:length(cluster)
             push!(multiple_indicator, path_number(pathresults[cluster[i]]))
         end
     end
@@ -60,11 +60,11 @@ function MultiplicityInfo(pathresults::Vector{PathResult})
             map(i -> path_number(pathresults[i]), cluster)
         end
     end
-    MultiplicityInfo(multiplicities, multiple_indicator)
+    return MultiplicityInfo(multiplicities, multiple_indicator)
 end
 
 function compute_multiplicities(result::Vector{<:PathResult}; kwargs...)
-    D = Dict{Int,Vector{Vector{Int}}}()
+    D = Dict{Int, Vector{Vector{Int}}}()
     for m in _multiplicity_clusters(solution, result)
         if haskey(D, length(m))
             push!(D[length(m)], m)
@@ -72,18 +72,18 @@ function compute_multiplicities(result::Vector{<:PathResult}; kwargs...)
             D[length(m)] = [m]
         end
     end
-    D
+    return D
 end
 
 # Minimal clustering for repeated singular solutions used by Result statistics.
 # This keeps multiplicity handling self-contained in the trimmed build.
 function _multiplicity_clusters(
-    f::F,
-    values;
-    distance_metric = EuclideanNorm(),
-    atol::Float64 = 1e-14,
-    rtol::Float64 = 1e-8,
-) where {F<:Function}
+        f::F,
+        values;
+        distance_metric = EuclideanNorm(),
+        atol::Float64 = 1.0e-14,
+        rtol::Float64 = 1.0e-8,
+    ) where {F <: Function}
     isempty(values) && return Vector{Vector{Int}}()
 
     mapped = map(f, values)
@@ -105,7 +105,7 @@ function _multiplicity_clusters(
     end
 
     filter!(c -> length(c) > 1, clusters)
-    clusters
+    return clusters
 end
 
 _point_distance(metric::AbstractNorm, x, y) = distance(x, y, metric)
@@ -120,9 +120,8 @@ function assign_multiplicities!(path_results::Vector{<:PathResult}, I::Multiplic
         path_results[vᵢ].multiplicity =
             max(k, something(path_results[vᵢ].winding_number, 1))
     end
-    path_results
+    return path_results
 end
-
 
 
 """
@@ -135,19 +134,19 @@ replicate the result.
 struct Result <: AbstractResult
     path_results::Vector{PathResult}
     tracked_paths::Int
-    seed::Union{Nothing,UInt32}
-    start_system::Union{Nothing,Symbol}
+    seed::Union{Nothing, UInt32}
+    start_system::Union{Nothing, Symbol}
     multiplicity_info::MultiplicityInfo
 end
 function Result(
-    path_results::Vector{PathResult};
-    seed::Union{Nothing,UInt32} = nothing,
-    tracked_paths = length(path_results),
-    start_system = nothing,
-)
+        path_results::Vector{PathResult};
+        seed::Union{Nothing, UInt32} = nothing,
+        tracked_paths = length(path_results),
+        start_system = nothing,
+    )
     multiplicity_info = MultiplicityInfo(filter(is_singular, path_results))
     assign_multiplicities!(path_results, multiplicity_info)
-    Result(path_results, tracked_paths, seed, start_system, multiplicity_info)
+    return Result(path_results, tracked_paths, seed, start_system, multiplicity_info)
 end
 
 Base.size(r::Result) = (length(r),)
@@ -199,10 +198,10 @@ end
 Base.show(io::IO, stats::ResultStatistics) = print_fieldnames(io, stats)
 
 function ResultStatistics(
-    result::Result;
-    real_atol::Float64 = 1e-6,
-    real_rtol::Float64 = 0.0,
-)
+        result::Result;
+        real_atol::Float64 = 1.0e-6,
+        real_rtol::Float64 = 0.0,
+    )
     failed = at_infinity = excess_solution = 0
     nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -228,7 +227,7 @@ function ResultStatistics(
             nonsingular += 1
         end
     end
-    ResultStatistics(
+    return ResultStatistics(
         nonsingular = nonsingular,
         singular = singular,
         singular_with_multiplicity = singular_with_multiplicity,
@@ -250,8 +249,8 @@ Statistic about the number of (real) singular and non-singular solutions etc.
 """
 statistics(r; kwargs...) = ResultStatistics(r; kwargs...)
 
-const Results = Union{Result,AbstractVector{<:PathResult}}
-const AbstractResults = Union{AbstractResult,AbstractVector{<:PathResult}}
+const Results = Union{Result, AbstractVector{<:PathResult}}
+const AbstractResults = Union{AbstractResult, AbstractVector{<:PathResult}}
 
 """
     results(
@@ -271,16 +270,16 @@ if provided, the function `f`.
 """
 results(R::AbstractResults; kwargs...) = results(identity, R; kwargs...)
 function results(
-    f::Function,
-    R::AbstractResults;
-    only_real::Bool = false,
-    real_atol::Float64 = 1e-6,
-    real_rtol::Float64 = 0.0,
-    only_nonsingular::Bool = false,
-    only_singular::Bool = false,
-    only_finite::Bool = true,
-    multiple_results::Bool = false,
-)
+        f::Function,
+        R::AbstractResults;
+        only_real::Bool = false,
+        real_atol::Float64 = 1.0e-6,
+        real_rtol::Float64 = 0.0,
+        only_nonsingular::Bool = false,
+        only_singular::Bool = false,
+        only_finite::Bool = true,
+        multiple_results::Bool = false,
+    )
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
@@ -288,11 +287,11 @@ function results(
 
     filter_function =
         r ->
-            (!only_real || is_real(r, real_atol, real_rtol)) &&
-                (!only_nonsingular || is_nonsingular(r)) &&
-                (!only_singular || is_singular(r)) &&
-                (!only_finite || is_finite(r)) &&
-                (multiple_results || !is_multiple_result(r, R))
+    (!only_real || is_real(r, real_atol, real_rtol)) &&
+        (!only_nonsingular || is_nonsingular(r)) &&
+        (!only_singular || is_singular(r)) &&
+        (!only_finite || is_finite(r)) &&
+        (multiple_results || !is_multiple_result(r, R))
     return_iter = Iterators.map(f, Iterators.filter(filter_function, R))
 
     if typeof(R) <: Results
@@ -301,7 +300,6 @@ function results(
         return (return_iter)
     end
 end
-
 
 
 """
@@ -358,14 +356,14 @@ solve(F;
 struct ResultIterator{Iter} <: AbstractResult
     starts::Iter                       # The start solution iterator
     S::AbstractSolver
-    bitmask::Union{BitVector,Nothing}  # `nothing` means no filtering
+    bitmask::Union{BitVector, Nothing}  # `nothing` means no filtering
 end
 function ResultIterator(
-    starts::Iter,
-    S::AbstractSolver;
-    bitmask = nothing,
-    predicate = nothing,
-) where {Iter}
+        starts::Iter,
+        S::AbstractSolver;
+        bitmask = nothing,
+        predicate = nothing,
+    ) where {Iter}
 
     if first(starts) isa Number # to allow passing a single start solution
         return ResultIterator([starts], S; bitmask = bitmask, predicate = predicate)
@@ -379,7 +377,7 @@ function ResultIterator(
             @warn "The keyword predicate will be ignored, since both bitmask and predicate are given."
         end
     end
-    ResultIterator{Iter}(starts, S, bitmask)
+    return ResultIterator{Iter}(starts, S, bitmask)
 end
 
 seed(ri::ResultIterator) = ri.S.seed
@@ -423,7 +421,7 @@ function Base.show(io::IO, ri::ResultIterator{Iter}) where {Iter}
     elseif tracker isa PolyhedralTracker
         println(io, "•  homotopy: Polyhedral")
     end
-    !isnothing(ri.bitmask) && println("•  filtering bitmask")
+    return !isnothing(ri.bitmask) && println("•  filtering bitmask")
 end
 
 function Base.IteratorSize(ri::ResultIterator)
@@ -437,8 +435,7 @@ Base.IteratorEltype(::ResultIterator) = Base.HasEltype()
 Base.eltype(::ResultIterator) = PathResult
 
 
-
-function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state) 
+function Base.iterate(ri::ResultIterator, state = nothing) #States of the induced iterator are pairs (i::Int,state)
     native_state = state === nothing ? 0 : state[1]
     next_ss = state === nothing ? iterate(ri.starts) : iterate(ri.starts, state[2])
     next_ss === nothing && return nothing  # End of iteration
@@ -481,7 +478,7 @@ function Base.length(ri::ResultIterator)
 end
 
 function bitmask(f::Function, ri::ResultIterator)
-    BitVector(map(f, ri))
+    return BitVector(map(f, ri))
 end
 
 
@@ -531,7 +528,7 @@ julia> tr = trace(res)
 """
 function trace(iter::ResultIterator)
     s = solution(first(iter))
-    mapreduce(
+    return mapreduce(
         x -> isfinite(x) ? solution(x) : zeros(ComplexF64, length(s)),
         +,
         iter,
@@ -541,10 +538,10 @@ end
 
 function Result(ri::ResultIterator)
     C = collect(ri)
-    for i = 1:length(C)
+    for i in 1:length(C)
         C[i].path_number = i
     end
-    Result(C; seed = ri.S.seed, start_system = ri.S.start_system)
+    return Result(C; seed = ri.S.seed, start_system = ri.S.start_system)
 end
 
 ######################
@@ -567,21 +564,21 @@ Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
 """
 function nresults(
-    R::AbstractResults;
-    only_real::Bool = false,
-    real_atol::Float64 = 1e-6,
-    real_rtol::Float64 = 0.0,
-    only_nonsingular::Bool = false,
-    only_singular::Bool = false,
-    only_finite::Bool = true,
-    multiple_results::Bool = false,
-)
+        R::AbstractResults;
+        only_real::Bool = false,
+        real_atol::Float64 = 1.0e-6,
+        real_rtol::Float64 = 0.0,
+        only_nonsingular::Bool = false,
+        only_singular::Bool = false,
+        only_finite::Bool = true,
+        multiple_results::Bool = false,
+    )
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
     end
 
-    count(R) do r
+    return count(R) do r
         (!only_real || is_real(r, real_atol, real_rtol)) &&
             (!only_nonsingular || is_nonsingular(r)) &&
             (!only_singular || is_singular(r)) &&
@@ -628,12 +625,12 @@ julia> real_solutions(solve(F))
 ```
 """
 function real_solutions(
-    result::AbstractResults;
-    atol::Float64 = 1e-6,
-    rtol::Float64 = 0.0,
-    kwargs...,
-)
-    results(
+        result::AbstractResults;
+        atol::Float64 = 1.0e-6,
+        rtol::Float64 = 0.0,
+        kwargs...,
+    )
+    return results(
         real ∘ solution,
         result;
         only_real = true,
@@ -662,7 +659,7 @@ returned. If `multiple_results = true` all singular solutions in `R` are returne
 For the possible `kwargs` see [`results`](@ref).
 """
 function singular(R::AbstractResults; kwargs...)
-    results(R; only_singular = true, kwargs...)
+    return results(R; only_singular = true, kwargs...)
 end
 
 """
@@ -789,7 +786,7 @@ function Base.show(io::IO, x::Result)
         "• $(s.excess_solution) excess $(plural("solution", s.excess_solution))",
     )
     println(io, "• random_seed: ", sprint(show, seed(x)))
-    if !isnothing(x.start_system)
+    return if !isnothing(x.start_system)
         println(io, "• start_system: :", x.start_system)
     end
 end

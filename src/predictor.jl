@@ -53,10 +53,10 @@ All APIs expect input in t-coordinates and return results in t-coordinates.
 =#
 
 module PredictionMethod
-@enum methods begin
-    Pade21
-    Hermite
-end
+    @enum methods begin
+        Pade21
+        Hermite
+    end
 end
 using .PredictionMethod: PredictionMethod
 
@@ -77,10 +77,10 @@ Base.@kwdef mutable struct Predictor
     local_error::Float64 = Inf
     cond_H_ẋ::Float64 = Inf
 
-    tx⁰::TaylorVector{1,ComplexF64}
-    tx¹::TaylorVector{2,ComplexF64}
-    tx²::TaylorVector{3,ComplexF64}
-    tx³::TaylorVector{4,ComplexF64}
+    tx⁰::TaylorVector{1, ComplexF64}
+    tx¹::TaylorVector{2, ComplexF64}
+    tx²::TaylorVector{3, ComplexF64}
+    tx³::TaylorVector{4, ComplexF64}
     t::ComplexF64 = complex(NaN)
     tx_norm::Vector{Float64} = zeros(4)
 
@@ -91,22 +91,22 @@ Base.@kwdef mutable struct Predictor
     u₂::Vector{ComplexF64}
 
     # for interpolation
-    prev_tx¹::TaylorVector{2,ComplexF64}
+    prev_tx¹::TaylorVector{2, ComplexF64}
     prev_t::ComplexF64 = complex(NaN)
 
     # endgame predictor
     winding_number::Int = 1
     s::ComplexF64 = complex(NaN)
     prev_s::ComplexF64 = complex(NaN)
-    ty¹::TaylorVector{2,ComplexF64}
-    prev_ty¹::TaylorVector{2,ComplexF64}
+    ty¹::TaylorVector{2, ComplexF64}
+    prev_ty¹::TaylorVector{2, ComplexF64}
 end
 
 
 function Predictor(H::AbstractHomotopy)
     m, n = size(H)
     tx³ = TaylorVector{4}(ComplexF64, n)
-    Predictor(
+    return Predictor(
         tx⁰ = TaylorVector{1}(tx³),
         tx¹ = TaylorVector{2}(tx³),
         tx² = TaylorVector{3}(tx³),
@@ -129,7 +129,7 @@ function init!(predictor::Predictor)
     predictor.s = predictor.prev_s = NaN
     predictor.trust_region = predictor.local_error = NaN
     predictor.use_hermite = true
-    predictor
+    return predictor
 end
 
 order(predictor::Predictor) = predictor.order
@@ -138,7 +138,7 @@ trust_region(predictor::Predictor) = predictor.trust_region
 
 function winding_number!(P::Predictor, m)
     P.winding_number = m
-    P
+    return P
 end
 
 """
@@ -156,14 +156,14 @@ Upadte the predictor with the new solution `(x,t)` of `H(x,t) = 0`.
 This computes new local derivatives and chooses an appriopriate prediction method.
 """
 function update!(
-    predictor::Predictor,
-    H::AbstractHomotopy,
-    x,
-    t,
-    J::Jacobian,
-    norm::AbstractNorm,
-    x̂ = nothing, # the predicted value
-)
+        predictor::Predictor,
+        H::AbstractHomotopy,
+        x,
+        t,
+        J::Jacobian,
+        norm::AbstractNorm,
+        x̂ = nothing, # the predicted value
+    )
     # The general strategy is as follows:
     #
     # If m = winding_number > 1 then we only use a hermite predictor.
@@ -179,7 +179,7 @@ function update!(
     y⁰, y¹ = vectors(ty¹)
 
     m = predictor.winding_number
-    @inbounds for i = 1:length(xtemp)
+    @inbounds for i in 1:length(xtemp)
         predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
         predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
     end
@@ -212,7 +212,7 @@ function update!(
     # Check error made in the linear algebra
     δ = fixed_precision_iterative_refinement!(xtemp, workspace(J), u, norm)
     predictor.cond_H_ẋ = cond_H_ẋ = δ / eps()
-    tol_δ₁ = 1e-10
+    tol_δ₁ = 1.0e-10
 
     δ > tol_δ₁ && iterative_refinement!(xtemp, J, u, InfNorm(); tol = tol_δ₁, max_iters = 5)
     tx_norm[2] = norm(xtemp)
@@ -238,7 +238,7 @@ function update!(
     taylor!(u, Val(2), H, tx¹, t, true)
     u .= .-u
     LA.ldiv!(xtemp, J, u)
-    tol_δ₂ = 1e-10
+    tol_δ₂ = 1.0e-10
     δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
     tx_norm[3] = norm(xtemp)
     x² .= xtemp
@@ -246,7 +246,7 @@ function update!(
     taylor!(u, Val(3), H, tx², t, true)
     u .= .-u
     LA.ldiv!(xtemp, J, u)
-    tol_δ₃ = 1e-4
+    tol_δ₃ = 1.0e-4
     δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
     tx_norm[4] = norm(xtemp)
     x³ .= xtemp
@@ -254,11 +254,11 @@ function update!(
     τ = Inf
     for (i, (x, x¹, x², x³)) in enumerate(tx³)
         c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
-        λ = max(1e-6, c¹)
+        λ = max(1.0e-6, c¹)
         c¹ /= λ
         c² /= λ^2
         c³ /= λ^3
-        tol = 1e-14 * max(c¹, c², c³)
+        tol = 1.0e-14 * max(c¹, c², c³)
         if !((c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol)
             τᵢ = (c² / c³) / λ
             if τᵢ < τ
@@ -280,7 +280,7 @@ function update!(
         predictor.local_error = ((inv(τ))^2)^2
     end
 
-    predictor
+    return predictor
 end
 
 predict!(x̂, pred::Predictor, H, x, t, Δt) = predict!(x̂, pred, pred.method, H, x, t, Δt)
@@ -291,7 +291,7 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
         λ = pred.trust_region
         λ² = λ^2
         λ³ = λ^3
-        tol = 1e-12
+        tol = 1.0e-12
         for (i, (x, x¹, x², x³)) in enumerate(pred.tx³)
             c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
             # check if only taylor series is used
@@ -314,18 +314,18 @@ function predict!(x̂, pred::Predictor, method::PredictionMethod.methods, H, x, 
             prev_sm = m * prev_s^(m - 1)
             sm = m * s^(m - 1)
         end
-        for i = 1:length(pred.prev_tx¹)
+        for i in 1:length(pred.prev_tx¹)
             pred.prev_ty¹[i, 1] = pred.prev_tx¹[i, 1]
             pred.prev_ty¹[i, 2] = prev_sm * pred.prev_tx¹[i, 2]
         end
-        for i = 1:length(pred.prev_tx¹)
+        for i in 1:length(pred.prev_tx¹)
             pred.ty¹[i, 1] = pred.tx¹[i, 1]
             pred.ty¹[i, 2] = sm * pred.tx¹[i, 2]
         end
         cubic_hermite!(x̂, pred.prev_ty¹, prev_s, pred.ty¹, s, s′)
     end
 
-    x̂
+    return x̂
 end
 
 """
@@ -352,7 +352,7 @@ end
 
 
 function cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
-    if isreal(t₀) && isreal(t₁) && isreal(t)
+    return if isreal(t₀) && isreal(t₁) && isreal(t)
         _cubic_hermite!(x̂, tx¹₀, real(t₀), tx¹₁, real(t₁), real(t))
     else
         _cubic_hermite!(x̂, tx¹₀, t₀, tx¹₁, t₁, t)
@@ -367,5 +367,5 @@ end
     @inbounds for i in eachindex(x̂)
         x̂[i] = h₀₀ * tx¹₀[i, 1] + h₁₀ * tx¹₀[i, 2] + h₀₁ * tx¹₁[i, 1] + h₁₁ * tx¹₁[i, 2]
     end
-    x̂
+    return x̂
 end

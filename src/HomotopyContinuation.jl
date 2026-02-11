@@ -44,7 +44,7 @@ Possible values are `:mixed` (default), `:all` and `:none`.
 function set_default_compile(mode::Symbol)
     mode ∈ [:mixed, :all, :none] ||
         error("Invalid value `:$mode`, valid values are `:mixed`, `:all`, `:none`.")
-    COMPILE_DEFAULT[] = mode
+    return COMPILE_DEFAULT[] = mode
 end
 
 include("utils.jl")

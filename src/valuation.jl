@@ -10,16 +10,16 @@ mutable struct Valuation
     Δval_tẋ::Vector{Float64}
 
     # Data for computing the val_x and val_tẋ and ν̈ by finite differences
-    val_x_data::NTuple{2,Vector{Float64}}
-    val_ẋ_data::NTuple{2,Vector{Float64}}
-    logx_data::NTuple{2,Vector{Float64}}
-    logẋ_data::NTuple{2,Vector{Float64}}
-    logt_data::NTuple{2,Float64}
+    val_x_data::NTuple{2, Vector{Float64}}
+    val_ẋ_data::NTuple{2, Vector{Float64}}
+    logx_data::NTuple{2, Vector{Float64}}
+    logẋ_data::NTuple{2, Vector{Float64}}
+    logt_data::NTuple{2, Float64}
 end
 
 Valuation(x::AbstractVector) = Valuation(length(x))
 Valuation(n::Integer) =
-    Valuation((zeros(n) for i = 1:4)..., ((zeros(n), zeros(n)) for i = 1:4)..., (NaN, NaN))
+    Valuation((zeros(n) for i in 1:4)..., ((zeros(n), zeros(n)) for i in 1:4)..., (NaN, NaN))
 
 function Base.show(io::IO, val::Valuation)
     print(io, "Valuation :")
@@ -27,6 +27,7 @@ function Base.show(io::IO, val::Valuation)
         vs = [Printf.@sprintf("%#.4g", v) for v in getfield(val, field)]
         print(io, "\n • ", field, " → ", "[", join(vs, ", "), "]")
     end
+    return
 end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", v::Valuation) = v
 
@@ -45,7 +46,7 @@ function init!(val::Valuation)
     val.logx_data[1] .= val.logx_data[2] .= 0.0
     val.logẋ_data[1] .= val.logẋ_data[2] .= 0.0
     val.logt_data = (NaN, NaN)
-    val
+    return val
 end
 
 
@@ -57,7 +58,7 @@ function ν(x, ẋ, t)
     μ = u * u¹ + v * v¹
     l = μ / xx
 
-    t * l
+    return t * l
 end
 
 function ν_ν¹(x, ẋ, x², t)
@@ -73,7 +74,7 @@ function ν_ν¹(x, ẋ, x², t)
     μ¹ = u * u² + u¹^2 + v * v² + v¹^2
     l¹ = μ¹ / xx - 2 * l^2
 
-    t * l, t * l¹ + l
+    return t * l, t * l¹ + l
 end
 
 
@@ -120,7 +121,7 @@ function update!(val::Valuation, pred::Predictor, t::Real)
 
     val.logt_data = (logt, logt₂)
 
-    val
+    return val
 end
 
 """
@@ -137,15 +138,15 @@ The implementation follows the formulas derived in [^BS05].
 """
 function finite_diff(ν, s, ν₂, s₂, ν₁, s₁)
     Δ₁, Δ₂, Δ₁₂ = s - s₁, s - s₂, s₁ - s₂
-    (Δ₂ * ν₁) / (Δ₁₂ * Δ₁) - ((Δ₁₂ + Δ₂) * ν₂) / (Δ₁₂ * Δ₂) - (Δ₁₂ * ν) / (Δ₁ * Δ₂)
+    return (Δ₂ * ν₁) / (Δ₁₂ * Δ₁) - ((Δ₁₂ + Δ₂) * ν₂) / (Δ₁₂ * Δ₂) - (Δ₁₂ * ν) / (Δ₁ * Δ₂)
 end
 
 function at_infinity_tol!(
-    at_infinity_tols,
-    val::Valuation;
-    finite_tol::Float64,
-    zero_is_finite::Bool,
-)
+        at_infinity_tols,
+        val::Valuation;
+        finite_tol::Float64,
+        zero_is_finite::Bool,
+    )
     @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
     for (i, val_xᵢ) in enumerate(val_x)
@@ -169,15 +170,15 @@ function at_infinity_tol!(
             at_infinity_tols[i] = Inf
         end
     end
-    at_infinity_tols
+    return at_infinity_tols
 end
 
 function is_finite(
-    val::Valuation;
-    finite_tol::Float64,
-    zero_is_finite::Bool,
-    max_winding_number::Int,
-)
+        val::Valuation;
+        finite_tol::Float64,
+        zero_is_finite::Bool,
+        max_winding_number::Int,
+    )
     @unpack val_x, val_tẋ, Δval_x, Δval_tẋ = val
 
     δ = inv(max_winding_number)
@@ -207,14 +208,14 @@ end
 function estimate_winding_number(val::Valuation; max_winding_number::Int)
     m = 1
     min_err = Inf
-    for k = 1:max_winding_number
+    for k in 1:max_winding_number
         err = check_winding_number(val, k)
         if err < min_err
             m = k
             min_err = err
         end
     end
-    m, min_err
+    return m, min_err
 end
 
 function check_winding_number(val::Valuation, m::Int)
@@ -224,5 +225,5 @@ function check_winding_number(val::Valuation, m::Int)
         errᵢ = abs(round(mvᵢ) - mvᵢ)
         err = ifelse(errᵢ > err, errᵢ, err)
     end
-    err
+    return err
 end

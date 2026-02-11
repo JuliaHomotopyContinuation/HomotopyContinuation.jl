@@ -8,19 +8,23 @@ using HomotopyContinuation
 end
 res = solve(affine_sqr; compile = false, start_system = :total_degree)
 @var x y z
-proj_square = System([
-    2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + (3 + 0im) * z^2,
-    2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - (5 + 0im) * z^2,
-])
+proj_square = System(
+    [
+        2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + (3 + 0im) * z^2,
+        2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - (5 + 0im) * z^2,
+    ]
+)
 solve(proj_square; compile = false)
 solve(affine_sqr; compile = false, start_system = :total_degree)
 
 @var x y
-affine_ov = System([
-    (x^2 + y^2 + x * y - 3) * (x + 3),
-    (x^2 + y^2 + x * y - 3) * (y - x + 2.1),
-    2x + 5y - 3,
-])
+affine_ov = System(
+    [
+        (x^2 + y^2 + x * y - 3) * (x + 3),
+        (x^2 + y^2 + x * y - 3) * (y - x + 2.1),
+        2x + 5y - 3,
+    ]
+)
 solve(affine_ov; compile = false)
 
 
@@ -29,9 +33,9 @@ function toric_ed(A)
     @var t[1:d] y[1:n] u[1:n]
 
     φ = map(j -> prod(i -> t[i]^A[i, j], 1:d), 1:n)
-    Dφ = [differentiate(φ[i], t[j]) for i = 1:n, j = 1:d]
+    Dφ = [differentiate(φ[i], t[j]) for i in 1:n, j in 1:d]
 
-    System([φ + y - u; Dφ' * y], parameters = u)
+    return System([φ + y - u; Dφ' * y], parameters = u)
 end
 
 F = toric_ed([3 2 1 0; 0 1 2 3])

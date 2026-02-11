@@ -3,7 +3,7 @@ import Base: div
 
 function __init__()
     __init_constants()
-    __init_type_ids()
+    return __init_type_ids()
 end
 
 ###########
@@ -119,14 +119,14 @@ struct Variable <: Number
 
     function Variable(ex::Expression)
         @assert class(ex) == :Symbol
-        new(ex)
+        return new(ex)
     end
-    Variable(s::Union{String,Symbol}) = new(Expression(s))
+    Variable(s::Union{String, Symbol}) = new(Expression(s))
 end
 
 name(v::Variable) = Symbol(to_string(v))
 
-const Basic = Union{Expression,ExpressionRef,Variable}
+const Basic = Union{Expression, ExpressionRef, Variable}
 
 Base.convert(::Type{Expression}, v::Variable) = v.ex
 Base.convert(::Type{Expression}, e::ExpressionRef) = copy(e)
@@ -154,12 +154,12 @@ Base.show(io::IO, b::Basic) = print(io, to_string(b))
 function Base.show(io::IO, mime::MIME"text/latex", b::Basic)
     print(io, "\$\$ ")
     print(io, to_string(b))
-    print(io, " \$\$")
+    return print(io, " \$\$")
 end
 
 function Base.hash(ex::Basic, h::UInt)
     h2 = ccall((:basic_hash, libsymengine), UInt, (Ref{ExpressionRef},), ex)
-    Base.hash_uint(3h - h2)
+    return Base.hash_uint(3h - h2)
 end
 
 function _copy(x::Basic)
@@ -171,7 +171,7 @@ function _copy(x::Basic)
         y,
         x,
     )
-    y
+    return y
 end
 function set!(y::Basic, x::Basic)
     ccall(
@@ -181,13 +181,13 @@ function set!(y::Basic, x::Basic)
         y,
         x,
     )
-    y
+    return y
 end
 Base.copy(x::Basic) = _copy(x)
 Base.copy(x::Variable) = Variable(_copy(x))
 
 function Base.:(==)(b1::Basic, b2::Basic)
-    ccall(
+    return ccall(
         (:basic_eq, libsymengine),
         Int,
         (Ref{ExpressionRef}, Ref{ExpressionRef}),
@@ -204,15 +204,15 @@ Base.zero(::Basic) = zero(Expression)
 Base.zero(::Type{<:Basic}) = Expression(0)
 function Base.iszero(x::Basic)
     is_number(x::Basic) || return false
-    ccall((:number_is_zero, libsymengine), Int32, (Ref{Expression},), x) == 1
+    return ccall((:number_is_zero, libsymengine), Int32, (Ref{Expression},), x) == 1
 end
 Base.one(::Basic) = one(Expression)
 Base.one(::Type{<:Basic}) = Expression(1)
 Base.isone(x::Basic) = x == EXPR_1
 
-is_one(x::Union{Number,Basic}) = isone(x)
+is_one(x::Union{Number, Basic}) = isone(x)
 is_one(x) = false
-is_zero(x::Union{Number,Basic}) = iszero(x)
+is_zero(x::Union{Number, Basic}) = iszero(x)
 is_zero(x) = false
 is_minus_one(x::Basic) = x == EXPR_M1
 is_minus_one(x) = x == -1
@@ -222,7 +222,7 @@ for op in [:im, :π, :ℯ, :γ, :catalan]
         const $(Symbol("__", op)) = Expression(C_NULL)
     end
 end
-const SYMENGINE_CONSTANTS = Dict{Expression,Irrational}()
+const SYMENGINE_CONSTANTS = Dict{Expression, Irrational}()
 
 macro init_constant(op, libnm)
     tup = (Base.Symbol("basic_const_$libnm"), libsymengine)
@@ -234,10 +234,10 @@ macro init_constant(op, libnm)
         finalizer(free!, $op_name)
         $(
             op != :im ? :(SYMENGINE_CONSTANTS[$op_name] = Base.MathConstants.$op) :
-            :(nothing)
+                :(nothing)
         )
     end
-    c
+    return c
 end
 
 function __init_constants()
@@ -257,7 +257,7 @@ function __init_constants()
 
     ccall((:basic_new_stack, libsymengine), Nothing, (Ref{Expression},), EXPR_M1)
     ccall((:integer_set_si, libsymengine), Nothing, (Ref{Expression}, Int), EXPR_M1, -1)
-    finalizer(free!, EXPR_M1)
+    return finalizer(free!, EXPR_M1)
 end
 
 ################
@@ -266,12 +266,12 @@ end
 
 ## main ops
 for (op, inplace, libnm) in [
-    (:+, :add!, :add),
-    (:-, :sub!, :sub),
-    (:*, :mul!, :mul),
-    (:/, :div!, :div),
-    (:^, :pow!, :pow),
-]
+        (:+, :add!, :add),
+        (:-, :sub!, :sub),
+        (:*, :mul!, :mul),
+        (:/, :div!, :div),
+        (:^, :pow!, :pow),
+    ]
     # $(Expr(:., :Base, QuoteNode(op)))
     @eval begin
         function $(inplace)(a::Expression, b1::Basic, b2::Basic)
@@ -287,10 +287,10 @@ for (op, inplace, libnm) in [
             return a
         end
         function Base.$op(b1::Basic, b2::Basic)
-            $inplace(Expression(), b1, b2)
+            return $inplace(Expression(), b1, b2)
         end
         function Base.$op(b1::Expression, b2::Expression)
-            $inplace(Expression(), b1, b2)
+            return $inplace(Expression(), b1, b2)
         end
     end
 end
@@ -354,7 +354,7 @@ Base.:-(b::Basic) = Expression(0) - b
 
 # Functions
 macro make_func(arg1, arg2)
-    quote
+    return quote
         function $(esc(arg1))(b::Basic)
             a = Expression()
             ccall(
@@ -449,7 +449,7 @@ function Base.convert(::Type{Expression}, x::BigInt)
 end
 
 
-Base.convert(::Type{Expression}, x::Union{Float16,Float32}) =
+Base.convert(::Type{Expression}, x::Union{Float16, Float32}) =
     convert(Expression, convert(Float64, x))
 Base.convert(::Type{Expression}, x::AbstractFloat) =
     convert(Expression, convert(BigFloat, x))
@@ -490,7 +490,7 @@ mutable struct ExpressionSet
     function ExpressionSet()
         z = new(ccall((:setbasic_new, libsymengine), Ptr{Cvoid}, ()))
         finalizer(free!, z)
-        z
+        return z
     end
 end
 
@@ -499,7 +499,7 @@ function free!(x::ExpressionSet)
         ccall((:setbasic_free, libsymengine), Nothing, (Ptr{Cvoid},), x.ptr)
         x.ptr = C_NULL
     end
-    nothing
+    return nothing
 end
 
 Base.length(s::ExpressionSet) =
@@ -515,7 +515,7 @@ function Base.getindex(s::ExpressionSet, n::Int)
         n - 1,
         result,
     )
-    result
+    return result
 end
 
 _variables(ex::Variable) = [ex]
@@ -528,7 +528,7 @@ function _variables(ex::Expression)
         ex,
         syms.ptr,
     )
-    sort!([Variable(syms[i]) for i = 1:length(syms)])
+    return sort!([Variable(syms[i]) for i in 1:length(syms)])
 end
 
 function differentiate(f::Basic, v::Variable)
@@ -547,7 +547,7 @@ function differentiate(f::Basic, v::Variable, n::Int)
     n < 0 && throw(DomainError("n must be non-negative integer"))
     n == 0 && return f
     n == 1 && return differentiate(f, v)
-    n > 1 && return differentiate(differentiate(f, v), v, n - 1)
+    return n > 1 && return differentiate(differentiate(f, v), v, n - 1)
 end
 
 # Get class of an Expression
@@ -560,18 +560,18 @@ const NUMBER_TYPES = [
 ]
 
 function type_id(s::Basic)
-    ccall((:basic_get_type, libsymengine), UInt, (Ref{ExpressionRef},), s)
+    return ccall((:basic_get_type, libsymengine), UInt, (Ref{ExpressionRef},), s)
 end
 
 function get_class_from_type_id(id::UInt)
     a = ccall((:basic_get_class_from_id, libsymengine), Ptr{UInt8}, (Int,), id)
     str = unsafe_string(a)
     ccall((:basic_str_free, libsymengine), Nothing, (Ptr{UInt8},), a)
-    Symbol(str)
+    return Symbol(str)
 end
 
 # prepopulate the dict
-const TYPE_IDS = Dict{UInt,Symbol}()
+const TYPE_IDS = Dict{UInt, Symbol}()
 
 function __init_type_ids()
     x = Expression("x")
@@ -591,12 +591,12 @@ function __init_type_ids()
     for v in values
         class(v)
     end
-    nothing
+    return nothing
 end
 
 function class(e::Basic)
     id = type_id(e)
-    if haskey(TYPE_IDS, id)
+    return if haskey(TYPE_IDS, id)
         TYPE_IDS[id]
     else
         # add for futurue fast lookup
@@ -609,22 +609,22 @@ end
 
 mutable struct ExprVec <: AbstractVector{ExpressionRef}
     ptr::Ptr{Cvoid}
-    m::Union{Nothing,Ptr{ModelKit.ExpressionRef}}
+    m::Union{Nothing, Ptr{ModelKit.ExpressionRef}}
 
     function ExprVec()
         ptr = ccall((:vecbasic_new, libsymengine), Ptr{Cvoid}, ())
         z = new(ptr, nothing)
         finalizer(free!, z)
-        z
+        return z
     end
 end
 function vec_set_ptr!(v::ExprVec)
     v.m = unsafe_load(Ptr{Ptr{ModelKit.ExpressionRef}}(v.ptr))
-    v
+    return v
 end
 
 function free!(x::ExprVec)
-    if x.ptr != C_NULL
+    return if x.ptr != C_NULL
         ccall((:vecbasic_free, libsymengine), Nothing, (Ptr{Cvoid},), x.ptr)
         x.ptr = C_NULL
     end
@@ -636,7 +636,7 @@ Base.size(s::ExprVec) = (length(s),)
 
 function Base.getindex(v::ExprVec, n)
     @boundscheck checkbounds(v, n)
-    if v.m === nothing
+    return if v.m === nothing
         vec_set_ptr!(v)
         unsafe_load(v.m, n)
     else
@@ -652,7 +652,7 @@ function Base.push!(v::ExprVec, x::Basic)
         v.ptr,
         x,
     )
-    v
+    return v
 end
 
 
@@ -666,7 +666,7 @@ function args!(vec::ExprVec, ex::Basic)
         ex,
         vec.ptr,
     )
-    vec_set_ptr!(vec)
+    return vec_set_ptr!(vec)
 end
 
 
@@ -772,7 +772,7 @@ end
 
 # is_number(ex::Expression) = class(ex) in NUMBER_TYPES
 function is_number(x::Basic)
-    ccall((:is_a_Number, libsymengine), Int32, (Ref{Expression},), x) == 1
+    return ccall((:is_a_Number, libsymengine), Int32, (Ref{Expression},), x) == 1
 end
 
 """
@@ -819,9 +819,9 @@ function to_number(x::Basic)
 end
 to_number(x) = x
 
-function (::Type{T})(x::Basic) where {T<:Union{AbstractFloat,Rational,Complex,Integer}}
+function (::Type{T})(x::Basic) where {T <: Union{AbstractFloat, Rational, Complex, Integer}}
     y = to_number(x)
-    if y isa Basic
+    return if y isa Basic
         # Throw error to avoid endless loop
         # The T.name.name part is done the same way in Base
         throw(InexactError(T.name.name, T, x))
@@ -840,12 +840,12 @@ mutable struct ExpressionMap
     function ExpressionMap()
         x = new(ccall((:mapbasicbasic_new, libsymengine), Ptr{Cvoid}, ()))
         finalizer(free!, x)
-        x
+        return x
     end
 end
 
 function free!(x::ExpressionMap)
-    if x.ptr != C_NULL
+    return if x.ptr != C_NULL
         ccall((:mapbasicbasic_free, libsymengine), Nothing, (Ptr{Cvoid},), x.ptr)
         x.ptr = C_NULL
     end
@@ -861,25 +861,25 @@ function ExpressionMap(dict::Dict)
     return c
 end
 function ExpressionMap(
-    D::ExpressionMap,
-    (xs, ys)::Pair{<:AbstractArray{<:Basic},<:AbstractArray},
-    args...,
-)
+        D::ExpressionMap,
+        (xs, ys)::Pair{<:AbstractArray{<:Basic}, <:AbstractArray},
+        args...,
+    )
     size(xs) == size(ys) ||
         throw(ArgumentError("Substitution arguments don't have the same size."))
     for (x, y) in zip(xs, ys)
         D[x] = y
     end
-    ExpressionMap(D, args...)
+    return ExpressionMap(D, args...)
 end
 function ExpressionMap(D::ExpressionMap, (x, y), args...)
     D[Expression(x)] = Expression(y)
-    ExpressionMap(D, args...)
+    return ExpressionMap(D, args...)
 end
 
 
 function Base.length(s::ExpressionMap)
-    ccall((:mapbasicbasic_size, libsymengine), Int, (Ptr{Cvoid},), s.ptr)
+    return ccall((:mapbasicbasic_size, libsymengine), Int, (Ptr{Cvoid},), s.ptr)
 end
 
 Base.setindex!(s::ExpressionMap, v::Number, k::Basic) = setindex!(s, Expression(v), k)
@@ -892,7 +892,7 @@ function Base.setindex!(s::ExpressionMap, v::Basic, k::Basic)
         k,
         v,
     )
-    v
+    return v
 end
 
 function subs(ex::Basic, d::ExpressionMap)
@@ -932,7 +932,7 @@ function cse(exprs::Vector{Expression})
     # We don't want these since we can handle them with no overhead directly,
     # so we remove these again.
     bad_subs = ExpressionMap()
-    substs = Dict{Expression,Expression}()
+    substs = Dict{Expression, Expression}()
     for (sᵢ, exᵢ) in zip(replacement_syms, replacement_exprs)
         if class(exᵢ) == :Mul
             exs = args(exᵢ)
@@ -947,7 +947,7 @@ function cse(exprs::Vector{Expression})
     end
 
 
-    map(e -> subs(e, bad_subs), reduced_exprs), substs
+    return map(e -> subs(e, bad_subs), reduced_exprs), substs
 end
 
 function evalf(e::Basic, bits::Int)
