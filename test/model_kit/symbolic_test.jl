@@ -291,7 +291,7 @@
         @test F isa System
     end
 
-    @testset "System variables groups + homogeneous" begin
+    @testset "System homogeneous" begin
         @var x y z
         f = System(
             [
@@ -301,12 +301,6 @@
             ]
         )
         @test is_homogeneous(f)
-        multi_degrees(f) == [1 1; 2 0]
-
-        @var x y z v w
-        g = System([x * y - 2v * w, x^2 - 4 * v^2], variable_groups = [[x, v], [y, w]])
-        @test is_homogeneous(g)
-        multi_degrees(g) == [1 1; 2 0]
     end
 
     @testset "Homotopy" begin

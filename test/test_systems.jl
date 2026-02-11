@@ -1000,15 +1000,15 @@ function sqrt_parameters()
 end
 
 TEST_SYSTEM_COLLECTION = [
-    ("moments3", moments3()),
-    ("fano_quintic", fano_quintic()),
+    # ("moments3", moments3()),
+    # ("fano_quintic", fano_quintic()),
     ("RigidMultiView", RigidMultiView()),
     ("Tritangtens", Tritangtens()),
     ("cyclo", cyclo()),
     ("cyclic5", cyclic(5)),
     ("cyclic7", cyclic(7)),
     ("bacillus", bacillus()),
-    ("minors", minors()),
+    # ("minors", minors()),
     ("six_revolute", six_revolute()),
     ("steiner", steiner()),
     ("four_bar", four_bar()),

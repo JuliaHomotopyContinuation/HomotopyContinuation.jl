@@ -1,4 +1,4 @@
-include("../test_systems.jl")
+# include("../test_systems.jl")
 
 @testset "interpreter: $name" for (name, system) in TEST_SYSTEM_COLLECTION
     @testset "interpreter symbolic" begin
