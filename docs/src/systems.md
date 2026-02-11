@@ -50,12 +50,6 @@ implement
 taylor!(u, ::Val{1}, F::AbstractSystem, x, p::TaylorVector{2})
 ```
 
-## AffineChartSystem
-```@docs
-AffineChartSystem
-on_affine_chart(F::System, dims)
-```
-
 ## FixedParameterSystem
 ```@docs
 FixedParameterSystem

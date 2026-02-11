@@ -8,13 +8,6 @@
         ])
         @test count(is_success, track.(total_degree(affine_sqr; compile = false)...)) == 2
 
-        @var x y z
-        proj_square = System([
-            2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + 3 * z^2,
-            2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - 5 * z^2,
-        ])
-        @test count(is_success, track.(total_degree(proj_square; compile = false)...)) == 4
-
         @var x y
         affine_ov = System([
             (x^2 + y^2 + x * y - 3) * (x + 3),
@@ -32,57 +25,15 @@
         @test_throws ArgumentError total_degree(affine_ov_reordering; compile = false)
 
         @var x y z
-        proj_ov = System([
-            (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
-            (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
-            2x + 5y - 3z,
+        homogeneous = System([
+            x^2 + y^2 + z^2,
+            x * z + y * z,
         ])
-        @test_throws ArgumentError total_degree(proj_ov; compile = false)
-
-        @var x y
-        proj_ov_reordering = System([
-            (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
-            2x + 5y - 3z,
-            (x^2 + y^2 + x * y - 3 * z^2) * (y^2 - x * z + 2 * z^2),
-        ])
-        @test_throws ArgumentError total_degree(proj_ov_reordering; compile = false)
+        @test_throws ArgumentError total_degree(homogeneous; compile = false)
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
         @test_throws HC.FiniteException total_degree(affine_underdetermined)
-
-        @var x y z
-        proj_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x * z])
-        @test_throws HC.FiniteException total_degree(proj_underdetermined)
-    end
-
-    @testset "total degree (variable groups)" begin
-        @var x y v w
-        affine_sqr = System([x * y - 2, x^2 - 4], variable_groups = [[x], [y]])
-        tracker, starts = total_degree(affine_sqr; compile = false)
-        @test length(collect(starts)) == 2
-        @test count(is_success, track.(tracker, starts)) == 2
-        @test nsolutions(solve(affine_sqr, start_system = :total_degree)) == 2
-
-        @var x y v w
-        proj_sqr =
-            System([x * y - 2v * w, x^2 - 4 * v^2], variable_groups = [[x, v], [y, w]])
-        tracker, starts = total_degree(proj_sqr)
-        @test length(collect(starts)) == 2
-        @test count(is_success, track.(tracker, starts)) == 2
-
-        @var x y v w
-        affine_ov = System(
-            [(x^2 - 4) * (x * y - 2), x * y - 2, x^2 - 4],
-            variable_groups = [[x], [y]],
-        )
-        @test_throws ArgumentError total_degree(affine_ov; compile = false)
-        @var x y v w
-        proj_ov = System(
-            [(x^2 - 4 * v^2) * (x * y - v * w), x * y - v * w, x^2 - v^2],
-            variable_groups = [[x, v], [y, w]],
-        )
-        @test_throws ArgumentError total_degree(proj_ov; compile = false)
     end
 
     @testset "polyhedral" begin
@@ -94,11 +45,11 @@
         @test count(is_success, track.(polyhedral(affine_sqr; compile = false)...)) == 2
 
         @var x y z
-        proj_square = System([
-            2.3 * x^2 + 1.2 * y^2 + 3x * z - 2y * z + 3 * z^2,
-            2.3 * x^2 + 1.2 * y^2 + 5x * z + 2y * z - 5 * z^2,
+        homogeneous = System([
+            x^2 + y^2 + z^2,
+            x * z + y * z,
         ])
-        @test count(is_success, track.(polyhedral(proj_square; compile = false)...)) == 4
+        @test_throws ArgumentError polyhedral(homogeneous; compile = false)
 
         @var x y
         affine_ov = System([
@@ -108,21 +59,9 @@
         ])
         @test_throws ArgumentError polyhedral(affine_ov; compile = false)
 
-        @var x y z
-        proj_ov = System([
-            (x^2 + y^2 + x * y - 3 * z^2) * (x + 3z),
-            (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
-            2x + 5y - 3z,
-        ])
-        @test_throws ArgumentError polyhedral(proj_ov; compile = false)
-
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
         @test_throws HC.FiniteException polyhedral(affine_underdetermined)
-
-        @var x y z
-        proj_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x * z])
-        @test_throws HC.FiniteException polyhedral(proj_underdetermined)
     end
 
     @testset "paths to track" begin
@@ -178,50 +117,29 @@
             target_parameters = [2, 4],
         )
 
-        # proj
         @var x a y b z
-        F_proj = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
-        s = [1, 1, 1]
-        res = solve(F_proj, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
-        @test nsolutions(res) == 1
-        res = solve(InterpretedSystem(F_proj), [s]; p₁ = [1, 0], p₀ = [2, 4])
-        @test nsolutions(res) == 1
+        F_homogeneous = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
+        s_homogeneous = [1, 1, 1]
+        @test_throws ArgumentError solve(
+            F_homogeneous,
+            [s_homogeneous];
+            start_parameters = [1, 0],
+            target_parameters = [2, 4],
+        )
 
-        F_proj_err = System([x * y + (b - a) * z^2], [x, y, z], [a, b])
-        @test_throws FiniteException solve(F_proj_err, [s]; p₁ = [1, 0], p₀ = [2, 4])
-
-        # multi-proj
         @var x y v w a b
-        F_multi_proj = System(
+        F_variable_groups = System(
             [x * y - a * v * w, x^2 - b * v^2],
             parameters = [a, b],
             variable_groups = [[x, v], [y, w]],
         )
-        S = [
-            [
-                -1.808683149843597 + 0.2761582523875564im,
-                -0.9043415749217985 + 0.1380791261937782im,
-                -0.0422893850686111 - 0.7152002569359284im,
-                -0.0422893850686111 - 0.7152002569359283im,
-            ],
-            [
-                -0.36370464807054353 + 0.6777414371333245im,
-                0.18185232403527177 - 0.33887071856666223im,
-                -0.3348980281838583 - 0.7759382220656511im,
-                0.3348980281838583 + 0.7759382220656511im,
-            ],
-        ]
-        res = solve(F_multi_proj, S; start_parameters = [2, 4], target_parameters = [3, 5])
-        @test nsolutions(res) == 2
-        res = solve(InterpretedSystem(F_multi_proj), S; p₁ = [2, 4], p₀ = [3, 5])
-        @test nsolutions(res) == 2
-
-        F_multi_proj_err = System(
-            [x * y - a * v * w],
-            parameters = [a, b],
-            variable_groups = [[x, v], [y, w]],
+        S_variable_groups = [[1.0, 1.0, 1.0, 1.0]]
+        @test_throws ArgumentError solve(
+            F_variable_groups,
+            S_variable_groups;
+            start_parameters = [2, 4],
+            target_parameters = [3, 5],
         )
-        @test_throws FiniteException(1) solve(F_multi_proj_err, S; p₁ = [2, 4], p₀ = [3, 5])
     end
 
     @testset "solve (Homotopy)" begin

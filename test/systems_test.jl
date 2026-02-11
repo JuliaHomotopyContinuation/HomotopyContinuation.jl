@@ -65,13 +65,6 @@ end
         test_system(MixedSystem(g), g)
     end
 
-    @testset "AffineChartSystem" begin
-        @var x y a b
-        g = System([x^2 + 3 * x * y + y^2 * b], parameters = [a, b])
-        G = on_affine_chart(g)
-        test_system(G, System(G))
-    end
-
     @testset "FixedParameterSystem" begin
         @var x y a b
         g = System([x^2 + 3 * x * y + y^2 * b], parameters = [a, b])

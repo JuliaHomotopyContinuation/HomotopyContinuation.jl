@@ -31,8 +31,6 @@ using .DoubleDouble
 include("ModelKit.jl")
 export @polyvar
 
-using ProjectiveVectors: PVector, dims, dimension_indices
-
 const COMPILE_DEFAULT = Ref(:mixed)
 
 export set_default_compile

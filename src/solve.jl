@@ -117,7 +117,7 @@ function solver_startsolutions(
     F::Union{System,AbstractSystem},
     starts = nothing;
     seed = rand(UInt32),
-    start_system = isnothing(variable_groups(F)) ? :polyhedral : :total_degree,
+    start_system = :polyhedral,
     generic_parameters = nothing,
     p₁ = generic_parameters,
     start_parameters = p₁,
@@ -193,8 +193,7 @@ end
 """
     parameter_homotopy(F; start_parameters, target_parameters)
 
-Construct a [`ParameterHomotopy`](@ref). If `F` is homogeneous, then a random affine chart
-is chosen (via [`AffineChartHomotopy`](@ref)).
+Construct a [`ParameterHomotopy`](@ref).
 """
 function parameter_homotopy(
     F::Union{System,AbstractSystem};
@@ -212,43 +211,28 @@ function parameter_homotopy(
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
+    if !isnothing(variable_groups(f))
+        throw(
+            ArgumentError(
+                "Variable groups are not supported in affine-only mode.",
+            ),
+        )
+    end
     if is_homogeneous(f)
-        vargroups = variable_groups(f)
-        if vargroups === nothing
-            expected_m = n - 1
-            if m < expected_m
-                throw(FiniteException(expected_m - m))
-            elseif m > expected_m
-                throw(
-                    ArgumentError(
-                        "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m for a homogeneous system.",
-                    ),
-                )
-            end
-            H = on_affine_chart(H)
-        else
-            expected_m = n - length(vargroups)
-            if m < expected_m
-                throw(FiniteException(expected_m - m))
-            elseif m > expected_m
-                throw(
-                    ArgumentError(
-                        "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m for a homogeneous system.",
-                    ),
-                )
-            end
-            H = on_affine_chart(H, length.(vargroups) .- 1)
-        end
-    else
-        if m < n
-            throw(FiniteException(n - m))
-        elseif m > n
-            throw(
-                ArgumentError(
-                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
-                ),
-            )
-        end
+        throw(
+            ArgumentError(
+                "Homogeneous/projective systems are not supported in affine-only mode.",
+            ),
+        )
+    end
+    if m < n
+        throw(FiniteException(n - m))
+    elseif m > n
+        throw(
+            ArgumentError(
+                "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+            ),
+        )
     end
 
     H
@@ -290,8 +274,6 @@ then a parameter homotopy is performed.
 For a given homotopy `homotopy` ``H(x,t)`` with solutions at ``t=1`` the solutions
 at ``t=0`` are computed.
 See the documentation for examples.
-If the input is a *homogeneous* polynomial system, solutions on a random affine chart of
-projective space are computed.
 
 ## General Options
 The `solve` routines takes the following options:

@@ -184,40 +184,37 @@ function polyhedral(
     target_parameters = nothing,
     kwargs...,
 )
+    if !isnothing(variable_groups(f))
+        throw(
+            ArgumentError(
+                "Variable groups are not supported in affine-only mode.",
+            ),
+        )
+    end
+    if is_homogeneous(f)
+        throw(
+            ArgumentError(
+                "Homogeneous/projective systems are not supported in affine-only mode.",
+            ),
+        )
+    end
     if target_parameters !== nothing
         return polyhedral(
             FixedParameterSystem(fixed(f; compile = compile), target_parameters);
             kwargs...,
         )
     end
-    homogeneous = is_homogeneous(f)
-    if homogeneous
-        F = on_affine_chart(f; compile = compile)
-        m, n = size(F)
-        if m < n
-            throw(FiniteException(n - m))
-        elseif m > n
-            throw(
-                ArgumentError(
-                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
-                ),
-            )
-        end
-        @var x[1:n]
-        support, target_coeffs = support_coefficients(System(F(x), x))
-    else
-        m, n = size(f)
-        if m < n
-            throw(FiniteException(n - m))
-        elseif m > n
-            throw(
-                ArgumentError(
-                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
-                ),
-            )
-        end
-        support, target_coeffs = support_coefficients(f)
+    m, n = size(f)
+    if m < n
+        throw(FiniteException(n - m))
+    elseif m > n
+        throw(
+            ArgumentError(
+                "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+            ),
+        )
     end
+    support, target_coeffs = support_coefficients(f)
     tracker, starts = polyhedral(support, target_coeffs; compile = compile, kwargs...)
     tracker, starts
 end
@@ -243,35 +240,31 @@ function paths_to_track(
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
 )
-    supp, coeffs = begin
-        if is_homogeneous(f)
-            F = on_affine_chart(f)
-            m, n = size(F)
-            if m < n
-                throw(FiniteException(n - m))
-            elseif m > n
-                throw(
-                    ArgumentError(
-                        "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
-                    ),
-                )
-            end
-            @var x[1:n]
-            support_coefficients(System(F(x), x))
-        else
-            m, n = size(f)
-            if m < n
-                throw(FiniteException(n - m))
-            elseif m > n
-                throw(
-                    ArgumentError(
-                        "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
-                    ),
-                )
-            end
-            support_coefficients(f)
-        end
+    if !isnothing(variable_groups(f))
+        throw(
+            ArgumentError(
+                "Variable groups are not supported in affine-only mode.",
+            ),
+        )
     end
+    if is_homogeneous(f)
+        throw(
+            ArgumentError(
+                "Homogeneous/projective systems are not supported in affine-only mode.",
+            ),
+        )
+    end
+    m, n = size(f)
+    if m < n
+        throw(FiniteException(n - m))
+    elseif m > n
+        throw(
+            ArgumentError(
+                "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+            ),
+        )
+    end
+    supp, _ = support_coefficients(f)
 
     if only_non_zero
         MixedSubdivisions.mixed_volume(supp)

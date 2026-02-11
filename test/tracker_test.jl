@@ -26,26 +26,6 @@
         @test is_success(track(tracker, s0, 0, 1, μ = μ, ω = ω))
     end
 
-    @testset "projective tracking $mode - AD: $AD" for mode in
-                                                       [InterpretedSystem, CompiledSystem],
-        AD = 0:3
-
-        @var x a y b z
-        F = System([x^2 - a * z^2, x * y + (b - a) * z^2], [x, y, z], [a, b])
-        H = ParameterHomotopy(mode(F), [1, 0], [2, 4])
-        tracker = Tracker(
-            on_affine_chart(H, (2,)),
-            options = TrackerOptions(automatic_differentiation = AD),
-        )
-
-        s = [1, 1, 1]
-        res = track(tracker, s, 1, 0)
-        @test is_success(res)
-        @test isa(solution(res), Vector{ComplexF64})
-        x₀ = abs(solution(res)[end])
-        @test affine_chart(PVector(solution(res))) ≈ [sqrt(2), -sqrt(2)] rtol = 1e-12 / x₀
-    end
-
     @testset "iterator" begin
         @var x a y b
         F = System([x^2 - a, x * y - a + b], [x, y], [a, b])

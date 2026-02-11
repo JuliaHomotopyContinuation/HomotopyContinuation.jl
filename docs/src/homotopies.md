@@ -29,12 +29,6 @@ higher level constructors are exported.
 parameter_homotopy
 ```
 
-## AffineChartHomotopy
-```@docs
-AffineChartHomotopy
-on_affine_chart(F::Homotopy, dims)
-```
-
 ## CoefficientHomotopy
 ```@docs
 CoefficientHomotopy

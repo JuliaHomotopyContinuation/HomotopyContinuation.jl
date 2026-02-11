@@ -1,7 +1,6 @@
 export fixed
 
 include("systems/mixed_system.jl")
-include("systems/affine_chart_system.jl")
 include("systems/fixed_parameter_system.jl")
 
 """

@@ -1,7 +1,6 @@
 using HomotopyContinuation
 using LinearAlgebra, Test, Parameters, Random
 using HomotopyContinuation.DoubleDouble: ComplexDF64
-using ProjectiveVectors: PVector, affine_chart
 const HC = HomotopyContinuation
 
 set_default_compile(:none)
