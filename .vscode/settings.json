@@ -1,5 +1,6 @@
 {
   "julia.lint.call": false,
   "julia.lint.datadecl": false,
-  "julia.lint.iter": false
+  "julia.lint.iter": false,
+  "julia.environmentPath": "/var/home/oameye/Documents/MinimalHomotopyContinuation.jl"
 }

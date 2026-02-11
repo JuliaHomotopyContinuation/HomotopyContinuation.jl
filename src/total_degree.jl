@@ -10,7 +10,7 @@ export total_degree, bezout_number, total_degree_start_solutions
     )
 
 Solve the system `F` using a total degree homotopy.
-This returns a path tracker ([`EndgameTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
+This returns a path tracker ([`EndgameTracker`](@ref)) and an iterator to compute the start solutions.
 If the system `F` has declared `variable_groups` then a multi-homogeneous
 a start system following [^Wam93] will be constructed.
 
@@ -61,16 +61,15 @@ function total_degree_variables(
     end
     scaling = maximum.(abs ∘ float, coeffs)
 
-    m ≥ (n - homogeneous) || throw(FiniteException(n - homogeneous - m))
-
-    overdetermined = m > n - homogeneous
-    # sort by descending degree for overdetermined systems
-    if overdetermined && F isa System
-        F = deepcopy(F)
-        perm = sortperm(D; rev = true)
-        permute!(F.expressions, perm)
-        permute!(D, perm)
-        permute!(scaling, perm)
+    expected_m = n - Int(homogeneous)
+    if m < expected_m
+        throw(FiniteException(expected_m - m))
+    elseif m > expected_m
+        throw(
+            ArgumentError(
+                "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m.",
+            ),
+        )
     end
 
     if F isa System
@@ -78,20 +77,6 @@ function total_degree_variables(
     end
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters; compile = compile)
-    end
-    # if homogeneous put on on an affine chart
-    if homogeneous && overdetermined
-        F = on_affine_chart(F)
-        push!(D, 1)
-        push!(scaling, 1.0)
-        homogeneous = false
-        F = square_up(F)
-        scaling = [LA.I F.A] * scaling
-        D = D[1:n]
-    elseif overdetermined
-        F = square_up(F)
-        scaling = [LA.I F.A] * scaling
-        D = D[1:n]
     end
     if homogeneous
         G = fixed(
@@ -108,9 +93,6 @@ function total_degree_variables(
         H = on_affine_chart(H)
     end
     T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
-    if overdetermined
-        T = OverdeterminedTracker(T, F)
-    end
     starts = total_degree_start_solutions(D; homogeneous = homogeneous)
 
     T, starts
@@ -135,25 +117,20 @@ function total_degree_variable_groups(
     projective_dims = length.(vargroups) .- homogeneous
     M = length(projective_dims)
 
-    m ≥ (n - M * homogeneous) || throw(FiniteException(n - M * homogeneous - m))
-
-    overdetermined = m > n - M * homogeneous
+    expected_m = n - M * Int(homogeneous)
+    if m < expected_m
+        throw(FiniteException(expected_m - m))
+    elseif m > expected_m
+        throw(
+            ArgumentError(
+                "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m.",
+            ),
+        )
+    end
 
     F = fixed(F; compile = compile)
     if target_parameters !== nothing
         F = fix_parameters(F, target_parameters; compile = compile)
-    end
-
-    if homogeneous && overdetermined
-        F = on_affine_chart(F, projective_dims)
-        D = [D LA.I]
-        homogeneous = false
-        F = square_up(F)
-        D = max.(D[:, 1:n], maximum(D[:, n+1:end], dims = 2))
-        projective_dims .+= 1
-    elseif overdetermined
-        F = square_up(F)
-        D = max.(D[:, 1:n], maximum(D[:, n+1:end], dims = 2))
     end
 
     g, C = multi_homogeneous_system(D, vargroups; homogeneous = homogeneous)
@@ -171,9 +148,6 @@ function total_degree_variable_groups(
         H = on_affine_chart(H, projective_dims)
     end
     T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
-    if overdetermined
-        T = OverdeterminedTracker(T, F)
-    end
     T, starts
 end
 

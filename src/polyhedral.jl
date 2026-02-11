@@ -134,7 +134,7 @@ end
 Solve the system `F` in two steps: first solve a generic system derived from the support
 of `F` using a polyhedral homotopy as proposed in [^HS95], then perform a
 coefficient-parameter homotopy towards `F`.
-This returns a path tracker ([`PolyhedralTracker`](@ref) or [`OverdeterminedTracker`](@ref)) and an iterator to compute the start solutions.
+This returns a path tracker ([`PolyhedralTracker`](@ref)) and an iterator to compute the start solutions.
 
 If `only_non_zero` is true, then the algorithm will set up a start system that tracks fewer paths compared to `only_non_zero = false`. 
 In this case the number of paths to track is equal to the mixed volume of the Newton polytopes of `F`. 
@@ -194,27 +194,31 @@ function polyhedral(
     if homogeneous
         F = on_affine_chart(f; compile = compile)
         m, n = size(F)
-        m ≥ n || throw(FiniteException(n - m))
-        if m > n
-            F = square_up(F; compile = compile)
+        if m < n
+            throw(FiniteException(n - m))
+        elseif m > n
+            throw(
+                ArgumentError(
+                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+                ),
+            )
         end
         @var x[1:n]
         support, target_coeffs = support_coefficients(System(F(x), x))
     else
         m, n = size(f)
-        m ≥ n || throw(FiniteException(n - m))
-        if m > n
-            F = square_up(f; compile = compile)
-            @var x[1:n]
-            support, target_coeffs = support_coefficients(System(F(x), x))
-        else
-            support, target_coeffs = support_coefficients(f)
+        if m < n
+            throw(FiniteException(n - m))
+        elseif m > n
+            throw(
+                ArgumentError(
+                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+                ),
+            )
         end
+        support, target_coeffs = support_coefficients(f)
     end
     tracker, starts = polyhedral(support, target_coeffs; compile = compile, kwargs...)
-    if m > n
-        tracker = OverdeterminedTracker(tracker, F)
-    end
     tracker, starts
 end
 
@@ -243,22 +247,29 @@ function paths_to_track(
         if is_homogeneous(f)
             F = on_affine_chart(f)
             m, n = size(F)
-            m ≥ n || throw(FiniteException(n - m))
-            if m > n
-                F = square_up(F)
+            if m < n
+                throw(FiniteException(n - m))
+            elseif m > n
+                throw(
+                    ArgumentError(
+                        "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+                    ),
+                )
             end
             @var x[1:n]
             support_coefficients(System(F(x), x))
         else
             m, n = size(f)
-            m ≥ n || throw(FiniteException(n - m))
-            if m > n
-                F = square_up(f)
-                @var x[1:n]
-                support_coefficients(System(F(x), x))
-            else
-                support_coefficients(f)
+            if m < n
+                throw(FiniteException(n - m))
+            elseif m > n
+                throw(
+                    ArgumentError(
+                        "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+                    ),
+                )
             end
+            support_coefficients(f)
         end
     end
 

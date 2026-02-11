@@ -2,11 +2,7 @@ export fixed
 
 include("systems/mixed_system.jl")
 include("systems/affine_chart_system.jl")
-include("systems/composition_system.jl")
 include("systems/fixed_parameter_system.jl")
-include("systems/randomized_system.jl")
-include("systems/sliced_system.jl")
-include("systems/start_pair_system.jl")
 
 """
     fixed(F::System; compile::Union{Bool,Symbol} = $(COMPILE_DEFAULT[]))

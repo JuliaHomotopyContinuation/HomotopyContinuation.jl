@@ -57,34 +57,6 @@ end
 
 
 @testset "System" begin
-    @testset "CompositionSystem" begin
-        @var x y a b
-        f = System([y^2 + 2x + 3, x - 1])
-        g = System([(x^4 + y * a)^3 - 3y, x - 1 * b^2], parameters = [a, b])
-        comp = compose(g, f; compile = false)
-
-        test_system(comp, System(comp))
-    end
-    @testset "CompositionSystem - Compose" begin
-        @var x y a b
-
-        f = System([y^2 + 2x + 3, x - 1])
-        g = System([x + y * a, x - 1 * b], parameters = [a, b])
-        @test parameters(g ∘ f) == [a, b]
-        @test nparameters(g ∘ f) == 2
-
-        @test parameters(g ∘ g) == [a, b]
-        @test nparameters(g ∘ g) == 2
-
-        @test parameters(f ∘ g) == [a, b]
-        @test nparameters(f ∘ g) == 2
-
-        @test parameters(f ∘ f) == []
-        @test nparameters(f ∘ f) == 0
-
-        @test parameters(f ∘ g ∘ f) == [a, b]
-        @test nparameters(f ∘ g ∘ f) == 2
-    end
 
     @testset "MixedSystem" begin
         @var x y a b
@@ -104,35 +76,6 @@ end
         @var x y a b
         g = System([x^2 + 3 * x * y + y^2 * b], parameters = [a, b])
         G = FixedParameterSystem(g, [2.3, 4.1])
-        test_system(G, System(G))
-    end
-
-    @testset "RandomizedSystem" begin
-        @var x y a b
-        g = System(
-            [
-                x^2 + 3 * x * y + y^2 * b,
-                (x + 3y - 2)^2 / 2,
-                3 * a * b * (2x - y + y^3 - 4x^2),
-            ],
-            parameters = [a, b],
-        )
-        G = RandomizedSystem(g, 2)
-        test_system(G, System(G))
-    end
-
-    @testset "SlicedSystem" begin
-        @var x y a b
-        g = System(
-            [
-                x^2 + 3 * x * y + y^2 * b,
-                (x + 3y - 2)^2 / 2,
-                3 * a * b * (2x - y + y^3 - 4x^2),
-            ],
-            parameters = [a, b],
-        )
-        L = rand_subspace(2; dim = 1)
-        G = SlicedSystem(g, L)
         test_system(G, System(G))
     end
 

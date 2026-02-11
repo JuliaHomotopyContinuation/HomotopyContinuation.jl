@@ -21,7 +21,7 @@
             (x^2 + y^2 + x * y - 3) * (y - x + 2),
             2x + 5y - 3,
         ])
-        @test count(is_success, track.(total_degree(affine_ov; compile = false)...)) == 2
+        @test_throws ArgumentError total_degree(affine_ov; compile = false)
 
         @var x y
         affine_ov_reordering = System([
@@ -29,9 +29,7 @@
             2x + 5y - 3,
             (x^2 + y^2 + x * y - 3) * (y^2 - x + 2),
         ])
-        tracker, starts = total_degree(affine_ov_reordering; compile = false)
-        @test length(starts) == 4 * 3
-        @test count(is_success, track.(tracker, starts)) == 2
+        @test_throws ArgumentError total_degree(affine_ov_reordering; compile = false)
 
         @var x y z
         proj_ov = System([
@@ -39,7 +37,7 @@
             (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
             2x + 5y - 3z,
         ])
-        @test count(is_success, track.(total_degree(proj_ov; compile = false)...)) == 2
+        @test_throws ArgumentError total_degree(proj_ov; compile = false)
 
         @var x y
         proj_ov_reordering = System([
@@ -47,9 +45,7 @@
             2x + 5y - 3z,
             (x^2 + y^2 + x * y - 3 * z^2) * (y^2 - x * z + 2 * z^2),
         ])
-        tracker, starts = total_degree(proj_ov_reordering; compile = false)
-        @test length(starts) == 4 * 3
-        @test count(is_success, track.(tracker, starts)) == 2
+        @test_throws ArgumentError total_degree(proj_ov_reordering; compile = false)
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
@@ -80,15 +76,13 @@
             [(x^2 - 4) * (x * y - 2), x * y - 2, x^2 - 4],
             variable_groups = [[x], [y]],
         )
-        tracker, starts = total_degree(affine_ov; compile = false)
-        @test count(is_success, track.(tracker, starts)) == 2
+        @test_throws ArgumentError total_degree(affine_ov; compile = false)
         @var x y v w
         proj_ov = System(
             [(x^2 - 4 * v^2) * (x * y - v * w), x * y - v * w, x^2 - v^2],
             variable_groups = [[x, v], [y, w]],
         )
-        tracker, starts = total_degree(proj_ov; compile = false)
-        @test count(is_success, track.(tracker, starts)) == 2
+        @test_throws ArgumentError total_degree(proj_ov; compile = false)
     end
 
     @testset "polyhedral" begin
@@ -112,7 +106,7 @@
             (x^2 + y^2 + x * y - 3) * (y - x + 2),
             2x + 5y - 3,
         ])
-        @test count(is_success, track.(polyhedral(affine_ov; compile = false)...)) == 2
+        @test_throws ArgumentError polyhedral(affine_ov; compile = false)
 
         @var x y z
         proj_ov = System([
@@ -120,7 +114,7 @@
             (x^2 + y^2 + x * y - 3 * z^2) * (y - x + 2z),
             2x + 5y - 3z,
         ])
-        @test count(is_success, track.(polyhedral(proj_ov; compile = false)...)) == 2
+        @test_throws ArgumentError polyhedral(proj_ov; compile = false)
 
         @var x y
         affine_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x - 2y + 3])
@@ -129,32 +123,6 @@
         @var x y z
         proj_underdetermined = System([2.3 * x^2 + 1.2 * y^2 + 3x * z])
         @test_throws HC.FiniteException polyhedral(proj_underdetermined)
-    end
-
-    @testset "overdetermined" begin
-        @testset "3 by 5 minors" begin
-            res = solve(
-                minors();
-                start_system = :total_degree,
-                compile = false,
-                show_progress = false,
-            )
-            @test count(is_success, res) == 80
-            @test count(is_excess_solution, res) == 136
-        end
-    end
-
-    @testset "composition" begin
-        @var a b c x y z u v
-        e = System([u + 1, v - 2])
-        f = System([a * b - 2, a * c - 1])
-        g = System([x + y, y + 3, x + 2])
-
-        res = solve(e ∘ f ∘ g; start_system = :total_degree, compile = false)
-        @test nsolutions(res) == 2
-
-        res = solve(e ∘ f ∘ g; start_system = :polyhedral)
-        @test nsolutions(res) == 2
     end
 
     @testset "paths to track" begin
@@ -263,60 +231,6 @@
         H = ParameterHomotopy(F, [1, 0], [2, 4])
         res = solve(H, [s])
         @test nsolutions(res) == 1
-    end
-
-    @testset "solve (start target)" begin
-        @var x a y b
-        f = System([x^2 - a, x * y - a + b], parameters = [a, b])
-        s = [1, 1]
-        res = solve(f, f, [s]; start_parameters = [1, 0], target_parameters = [2, 4])
-        @test nsolutions(res) == 1
-
-        G = FixedParameterSystem(f, [1, 0])
-        F = FixedParameterSystem(f, [2, 4])
-        res = solve(G, F, [s];)
-        @test nsolutions(res) == 1
-    end
-
-    @testset "solve (affine sliced)" begin
-        @var x y
-        F = System([x^2 + y^2 - 5], [x, y])
-        l1 = rand_subspace(2; codim = 1)
-        l2 = rand_subspace(2; codim = 1)
-
-        _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
-        @test _solver.trackers[1].tracker.homotopy isa IntrinsicSubspaceHomotopy
-
-        @var x y
-        r1 = solve(F; target_subspace = l1, compile = false)
-        @test nsolutions(r1) == 2
-        r2 = solve(
-            F,
-            solutions(r1);
-            start_subspace = l1,
-            target_subspace = l2,
-            compile = false,
-            threading = false,
-            intrinsic = true,
-        )
-        @test nsolutions(r2) == 2
-        r3 = solve(
-            F,
-            solutions(r1);
-            start_subspace = l1,
-            target_subspace = l2,
-            compile = false,
-            intrinsic = false,
-        )
-        @test nsolutions(r3) == 2
-
-        @var x y z
-        F = System([x^2 + y^2 - 5; x * y + 1], [x, y, z])
-        l1 = rand_subspace(3; dim = 2)
-        l2 = rand_subspace(3; dim = 2)
-
-        _solver, starts = solver_startsolutions(slice(F, l1), slice(F, l2))
-        @test _solver.trackers[1].tracker.homotopy isa ExtrinsicSubspaceHomotopy
     end
 
     @testset "solve (Vector{Expression})" begin
@@ -514,25 +428,6 @@
         )
         @test typeof(result4) == Vector{Tuple{Vector{Vector{Float64}},Int64}}
 
-
-        @var x y
-        f = System([x^2 + y^2 - 1])
-
-
-        # Compute start solutions S₀ for given start parameters p₀
-        l₀ = rand_subspace(2; dim = 1)
-        S₀ = solutions(solve(f, target_subspace = l₀))
-        # The parameters we are intersted in
-        subspaces = [rand_subspace(2; dim = 1) for i = 1:100]
-        result1 = solve(
-            f,
-            S₀;
-            start_subspace = l₀,
-            target_subspaces = subspaces,
-            threading = false,
-            intrinsic = false,
-        )
-        @test all(r -> nsolutions(first(r)) == 2, result1)
 
         @testset "Many parameters threaded" begin
             @var u1, v1, ω, α, γ, λ, ω0

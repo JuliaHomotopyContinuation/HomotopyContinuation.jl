@@ -6,7 +6,6 @@ include("homotopies/mixed_homotopy.jl")
 include("homotopies/affine_chart_homotopy.jl")
 include("homotopies/parameter_homotopy.jl")
 include("homotopies/coefficient_homotopy.jl")
-include("homotopies/subspace_homotopies.jl")
 include("homotopies/straight_line_homotopy.jl")
 include("homotopies/fixed_parameter_homotopy.jl")
 

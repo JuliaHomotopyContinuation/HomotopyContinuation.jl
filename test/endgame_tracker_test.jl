@@ -45,22 +45,4 @@
         @test all(is_singular, res)
     end
 
-    @testset "Overdetermined tracking" begin
-        @var x y z
-
-        p₁ = (x^2 + y^2 + z^2 - 1) * (x - 0.5)
-        p₂ = (x^2 + y^2 + z^2 - 1) * (y - 0.5)
-        p₃ = (z - x^2 - 2) * (x^2 + y^2 + z^2 - 1) * (z - 0.5)
-        F = System([p₁, p₂, p₃])
-
-        L₁ = rand_subspace(3; codim = 2)
-        L₂ = rand_subspace(3; codim = 2)
-        F_L₁ = System([x^2 + y^2 + z^2 - 1]) ∩ extrinsic(L₁)([x, y, z])
-        res = track.(total_degree(F_L₁)...)
-        @test all(is_success, res)
-
-        H = IntrinsicSubspaceHomotopy(F, L₁, L₂)
-        res2 = track.(EndgameTracker(H), solution.(res))
-        @test all(is_success, res2)
-    end
 end

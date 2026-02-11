@@ -12,7 +12,6 @@ You can find tutorials, examples, how-to guides and explanations on our homepage
 ```@contents
 Pages = [
     "model_kit.md",
-    "linear_affine.md",
     "systems.md",
     "homotopies.md"
 ]
@@ -23,10 +22,7 @@ Depth = 2
 ```@contents
 Pages = [
     "solve.md",
-    "witness_sets.md",
-    "monodromy.md",
     "result.md",
-    "certification.md",
     "solve_examples.md",
     "start_systems.md",
 ]

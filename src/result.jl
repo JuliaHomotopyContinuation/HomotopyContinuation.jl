@@ -22,6 +22,7 @@ export Result,
     ntracked
 
 export ResultIterator, bitmask, bitmask_filter, solver, start_solutions
+export trace
 
 abstract type AbstractResult end
 abstract type AbstractSolver end
@@ -64,7 +65,7 @@ end
 
 function compute_multiplicities(result::Vector{<:PathResult}; kwargs...)
     D = Dict{Int,Vector{Vector{Int}}}()
-    for m in multiplicities(solution, result)
+    for m in _multiplicity_clusters(solution, result)
         if haskey(D, length(m))
             push!(D[length(m)], m)
         else
@@ -73,6 +74,45 @@ function compute_multiplicities(result::Vector{<:PathResult}; kwargs...)
     end
     D
 end
+
+# Minimal clustering for repeated singular solutions used by Result statistics.
+# This keeps multiplicity handling self-contained in the trimmed build.
+function _multiplicity_clusters(
+    f::F,
+    values;
+    distance_metric = EuclideanNorm(),
+    atol::Float64 = 1e-14,
+    rtol::Float64 = 1e-8,
+) where {F<:Function}
+    isempty(values) && return Vector{Vector{Int}}()
+
+    mapped = map(f, values)
+    clusters = Vector{Vector{Int}}()
+
+    for i in eachindex(mapped)
+        w = mapped[i]
+        tol = max(atol, rtol * _point_norm(distance_metric, w))
+        assigned = false
+        for cluster in clusters
+            w_ref = mapped[first(cluster)]
+            if _point_distance(distance_metric, w, w_ref) <= tol
+                push!(cluster, i)
+                assigned = true
+                break
+            end
+        end
+        assigned || push!(clusters, [i])
+    end
+
+    filter!(c -> length(c) > 1, clusters)
+    clusters
+end
+
+_point_distance(metric::AbstractNorm, x, y) = distance(x, y, metric)
+_point_distance(metric, x, y) = metric(x, y)
+
+_point_norm(metric::AbstractNorm, x) = norm(x, metric)
+_point_norm(metric, x) = metric(x, zero(x))
 
 function assign_multiplicities!(path_results::Vector{<:PathResult}, I::MultiplicityInfo)
     #assign multiplicities
@@ -275,7 +315,7 @@ function results(
                 (!only_singular || is_singular(r)) &&
                 (!only_finite || is_finite(r)) &&
                 (multiple_results || !is_multiple_result(r, R))
-    return_iter = imap(f, Iterators.filter(filter_function, R))
+    return_iter = Iterators.map(f, Iterators.filter(filter_function, R))
 
     if typeof(R) <: Results
         return (collect(return_iter))
@@ -734,7 +774,7 @@ nat_infinity(R::AbstractResults) = count(is_at_infinity, R)
 """
     nexcess_solutions(result)
 
-The number of exess solutions. See also [`excess_solution_check`](@ref).
+The number of excess solutions.
 """
 nexcess_solutions(R::AbstractResults) = count(is_excess_solution, R)
 
@@ -801,115 +841,4 @@ function Base.show(io::IO, x::Result)
     if !isnothing(x.start_system)
         println(io, "• start_system: :", x.start_system)
     end
-    if s.singular > 0
-        println(io, "• multiplicity table of singular solutions:")
-        singular_multiplicities_table(io, x, s)
-    end
-end
-
-function TreeViews.treelabel(io::IO, x::Result, ::MIME"application/prs.juno.inline")
-    s = statistics(x)
-    total = s.nonsingular + s.singular
-    print(
-        io,
-        "<span><span class=\"syntax--support syntax--type syntax--julia\">Result</span>" *
-        " with $total $(plural("solution", total))<span>",
-    )
-end
-TreeViews.hastreeview(::Result) = true
-TreeViews.numberofnodes(::Result) = 10
-function TreeViews.nodelabel(io::IO, x::Result, i::Int, ::MIME"application/prs.juno.inline")
-    s = statistics(x)
-    if i == 1
-        print(io, "Paths tracked")
-    elseif i == 2 && s.nonsingular > 0
-        print(io, "$(s.nonsingular) non-singular ($(s.real_nonsingular) real)")
-    elseif i == 3 && s.singular > 0
-        print(io, "$(s.singular) singular ($(s.real_singular) real)")
-    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
-        print(io, "$(s.real_nonsingular+s.real_singular) real")
-    elseif i == 5 && s.excess_solution > 0
-        print(io, "$(s.excess_solution) excess $(plural("solution", s.excess_solution))")
-    elseif i == 6 && s.at_infinity > 0
-        print(io, "$(s.at_infinity) at_infinity")
-    elseif i == 7 && s.failed > 0
-        print(io, "$(s.failed) failed")
-    elseif i == 8
-        print(io, "Random seed used")
-    elseif i == 9 && !isnothing(x.start_system)
-        print(io, "start_system")
-    elseif i == 10 && s.singular > 0
-        print(io, "  multiplicity table of singular solutions: \n")
-        singular_multiplicities_table(io, x, s)
-    end
-end
-
-function TreeViews.treenode(r::Result, i::Integer)
-    s = statistics(r)
-    if i == 1
-        return ntracked(r)
-    elseif i == 2 && s.nonsingular > 0
-        return results(r, only_nonsingular = true)
-    elseif i == 3 && s.singular > 0
-        return results(r, only_singular = true)
-    elseif i == 4 && (s.real_nonsingular + s.real_singular) > 0
-        return results(r, only_real = true)
-    elseif i == 5 && s.excess_solution > 0
-        return filter(is_excess_solution, path_results(r))
-    elseif i == 6 && s.at_infinity > 0
-        return at_infinity(r)
-    elseif i == 7 && s.failed > 0
-        return failed(r)
-    elseif i == 8
-        return seed(r)
-    elseif i == 9 && !isnothing(r.start_system)
-        return r.start_system
-    elseif i == 10 && s.singular > 0
-        return missing
-    end
-    missing
-end
-
-
-function singular_multiplicities_table(io, result::Result, stats = statistics(result))
-    M = result.multiplicity_info.multiplicities
-    if isempty(M)
-        n_higher_mults_total = 0
-    else
-        n_higher_mults_total = sum(length, values(M))
-    end
-
-    headers = ["mult.", "total", "# real", "# non-real"]
-    mult_1_exists = n_higher_mults_total < stats.singular
-    data = Matrix{Int}(undef, mult_1_exists + length(M), 4)
-
-    n_higher_real = 0
-    i = mult_1_exists + 1
-    for k in sort(collect(keys(M)))
-        data[i, 1] = k
-        n_real_solsᵢ = count(Mᵢ -> is_real(result.path_results[Mᵢ[1]]), M[k])
-        n_solsᵢ = length(M[k])
-        data[i, 2] = n_solsᵢ
-        data[i, 3] = n_real_solsᵢ
-        data[i, 4] = n_solsᵢ - n_real_solsᵢ
-        n_higher_real += n_real_solsᵢ
-        i += 1
-    end
-
-    if mult_1_exists
-        data[1, 1] = 1
-        data[1, 2] = stats.singular - n_higher_mults_total
-        data[1, 3] = stats.real_singular - n_higher_real
-        data[1, 4] = data[1, 2] - data[1, 3]
-    end
-
-    PrettyTables.pretty_table(
-        io,
-        data;
-        header = headers,
-        tf = PrettyTables.tf_unicode_rounded,
-        alignment = :c,
-        header_crayon = PrettyTables.Crayon(bold = false),
-        border_crayon = PrettyTables.Crayon(faint = true),
-    )
 end

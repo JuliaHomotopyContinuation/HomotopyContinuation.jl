@@ -12,12 +12,3 @@ total_degree
 polyhedral
 PolyhedralTracker
 ```
-
-## Overdetermined
-
-```@docs
-OverdeterminedTracker
-square_up
-excess_solution_check!
-excess_solution_check
-```

@@ -32,7 +32,7 @@ ModelKit.evaluate_and_jacobian!(u, U, F::FixedParameterSystem, x, p = nothing) =
 ModelKit.taylor!(u, v::Val, F::FixedParameterSystem, tx, p = nothing) =
     taylor!(u, v, F.system, tx, F.parameters)
 
-# Only for certification
+# Compatibility helper for fixed-parameter wrappers.
 ModelKit.jacobian!(U, F::FixedParameterSystem{<:InterpretedSystem}, x, p = nothing) =
     ModelKit.jacobian!(U, F.system, x, F.parameters)
 ModelKit.jacobian!(U, F::FixedParameterSystem{<:InterpretedSystem}, x, p, cache) =

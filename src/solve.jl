@@ -2,8 +2,7 @@ export solve,
     Solver,
     solver_startsolutions,
     paths_to_track,
-    parameter_homotopy,
-    linear_subspace_homotopy
+    parameter_homotopy
 
 struct SolveStats
     regular::Threads.Atomic{Int}
@@ -125,93 +124,60 @@ function solver_startsolutions(
     p₀ = generic_parameters,
     target_parameters = p₀,
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    start_subspace = nothing,
-    target_subspace = nothing,
-    intrinsic = nothing,
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
+    if haskey(kwargs, :start_subspace) || haskey(kwargs, :target_subspace) ||
+       haskey(kwargs, :intrinsic)
+        throw(
+            ArgumentError(
+                "Subspace-based solve options (`start_subspace`, `target_subspace`, `intrinsic`) are not supported in this minimal build.",
+            ),
+        )
+    end
 
 
     used_start_system = nothing
-    if start_subspace !== nothing
-        if target_parameters !== nothing
-            F = fix_parameters(F, target_parameters; compile = compile)
-        end
-        H = linear_subspace_homotopy(
-            F,
-            start_subspace,
-            target_subspace;
-            intrinsic = intrinsic,
+    if start_parameters !== nothing
+        tracker = parameter_homotopy_tracker(
+            F;
+            start_parameters = start_parameters,
+            target_parameters = target_parameters,
             compile = compile,
+            kwargs...,
         )
-        tracker = EndgameTracker(H; kwargs...)
+    elseif start_system == :polyhedral
+        used_start_system = :polyhedral
+        tracker, starts = polyhedral(
+            F;
+            compile = compile,
+            target_parameters = target_parameters,
+            kwargs...,
+        )
+    elseif start_system == :total_degree
+        used_start_system = :total_degree
+        tracker, starts = total_degree(
+            F;
+            compile = compile,
+            target_parameters = target_parameters,
+            kwargs...,
+        )
+        try
+            first(starts)
+        catch
+            throw("The number of start solutions is zero (total degree is zero).")
+        end
     else
-        if target_subspace !== nothing
-            F = slice(F, target_subspace, compile = compile)
-        end
-        if start_parameters !== nothing
-            tracker = parameter_homotopy_tracker(
-                F;
-                start_parameters = start_parameters,
-                target_parameters = target_parameters,
-                compile = compile,
-                kwargs...,
-            )
-        elseif start_system == :polyhedral
-            used_start_system = :polyhedral
-            tracker, starts = polyhedral(
-                F;
-                compile = compile,
-                target_parameters = target_parameters,
-                kwargs...,
-            )
-        elseif start_system == :total_degree
-            used_start_system = :total_degree
-            tracker, starts = total_degree(
-                F;
-                compile = compile,
-                target_parameters = target_parameters,
-                kwargs...,
-            )
-            try
-                first(starts)
-            catch
-                throw("The number of start solutions is zero (total degree is zero).")
-            end
-        else
-            throw(
-                KeywordArgumentException(
-                    :start_system,
-                    start_system,
-                    "Possible values are: `:polyhedral` and `:total_degree`.",
-                ),
-            )
-        end
+        throw(
+            KeywordArgumentException(
+                :start_system,
+                start_system,
+                "Possible values are: `:polyhedral` and `:total_degree`.",
+            ),
+        )
     end
 
     Solver(tracker; seed = seed, start_system = used_start_system), starts
-end
-
-function solver_startsolutions(
-    G::Union{System,AbstractSystem},
-    F::Union{System,AbstractSystem},
-    starts = nothing;
-    seed = rand(UInt32),
-    tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(),
-    kwargs...,
-)
-    !isnothing(seed) && Random.seed!(seed)
-    if F isa SlicedSystem && G isa SlicedSystem && system(F) == system(G)
-        H = linear_subspace_homotopy(system(F), linear_subspace(F), linear_subspace(G))
-    else
-        H = start_target_homotopy(G, F; kwargs...)
-    end
-    tracker =
-        EndgameTracker(H; tracker_options = tracker_options, options = endgame_options)
-
-    Solver(tracker; seed = seed), starts
 end
 
 function parameter_homotopy_tracker(
@@ -249,100 +215,40 @@ function parameter_homotopy(
     if is_homogeneous(f)
         vargroups = variable_groups(f)
         if vargroups === nothing
-            m ≥ (n - 1) || throw(FiniteException(n - 1 - m))
+            expected_m = n - 1
+            if m < expected_m
+                throw(FiniteException(expected_m - m))
+            elseif m > expected_m
+                throw(
+                    ArgumentError(
+                        "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m for a homogeneous system.",
+                    ),
+                )
+            end
             H = on_affine_chart(H)
         else
-            m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
+            expected_m = n - length(vargroups)
+            if m < expected_m
+                throw(FiniteException(expected_m - m))
+            elseif m > expected_m
+                throw(
+                    ArgumentError(
+                        "Only square systems are supported in this minimal build. Got $m equations, expected $expected_m for a homogeneous system.",
+                    ),
+                )
+            end
             H = on_affine_chart(H, length.(vargroups) .- 1)
         end
     else
-        m ≥ n || throw(FiniteException(n - m))
-    end
-
-    H
-end
-
-"""
-    linear_subspace_homotopy(F, V::LinearSubspace, W::LinearSubspace, intrinsic = nothing)
-
-Constructs an [`IntrinsicSubspaceHomotopy`](@ref) (if `dim(V) < codim(V)` or
-`intrinsic = true`) or [`ExtrinsicSubspaceHomotopy`](@ref).
-Compared to the direct constructor, this also takes care of homogeneous systems.
-"""
-function linear_subspace_homotopy(
-    F::Union{System,AbstractSystem},
-    V::LinearSubspace,
-    W::LinearSubspace;
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    intrinsic = nothing,
-    gamma = cis(2 * pi * randn()),
-)
-
-
-    if dim(V) <= codim(V) || something(intrinsic, false)
-        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
-            IntrinsicSubspaceHomotopy(
-                on_affine_chart(F; compile = compile),
-                V,
-                W;
-                gamma = gamma,
+        if m < n
+            throw(FiniteException(n - m))
+        elseif m > n
+            throw(
+                ArgumentError(
+                    "Only square systems are supported in this minimal build. Got $m equations, expected $n.",
+                ),
             )
-        else
-            IntrinsicSubspaceHomotopy(F, V, W; compile = compile, gamma = gamma)
         end
-    else
-        H = ExtrinsicSubspaceHomotopy(F, V, W; compile = compile, gamma = gamma)
-        if is_linear(V) && is_linear(W) && is_homogeneous(System(F))
-            on_affine_chart(H)
-        else
-            H
-        end
-    end
-end
-
-function start_target_homotopy(
-    G::Union{System,AbstractSystem},
-    F::Union{System,AbstractSystem};
-    start_parameters = nothing,
-    target_parameters = nothing,
-    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
-    γ = 1.0,
-    gamma = γ,
-    kwargs...,
-)
-    unsupported_kwargs(kwargs)
-    f, g = System(F), System(G)
-
-    size(F) == size(G) || error("The provided systems don't have the same size.")
-    is_homogeneous(f) == is_homogeneous(g) ||
-        error("The provided systems are not both homogeneous.")
-    variable_groups(f) == variable_groups(g) ||
-        error("The provided systems don't decalare the same variable groups.")
-
-    m, n = size(F)
-
-    G = fixed(G; compile = compile)
-    if !isnothing(start_parameters)
-        G = FixedParameterSystem(G, start_parameters)
-    end
-
-    F = fixed(F; compile = compile)
-    if !isnothing(target_parameters)
-        F = FixedParameterSystem(F, target_parameters)
-    end
-
-    H = StraightLineHomotopy(G, F; gamma = gamma)
-    if is_homogeneous(f)
-        vargroups = variable_groups(f)
-        if vargroups === nothing
-            m ≥ (n - 1) || throw(FiniteException(n - 1 - m))
-            H = on_affine_chart(H)
-        else
-            m ≥ (n - length(vargroups)) || throw(FiniteException(n - length(vargroups) - m))
-            H = on_affine_chart(H, length.(vargroups) .- 1)
-        end
-    else
-        m ≥ n || throw(FiniteException(n - m))
     end
 
     H
@@ -359,20 +265,29 @@ function solver_startsolutions(
     Solver(EndgameTracker(fixed(H; compile = compile)); seed = seed), starts
 end
 
+function solver_startsolutions(
+    G::Union{System,AbstractSystem},
+    F::Union{System,AbstractSystem},
+    starts = nothing;
+    kwargs...,
+)
+    throw(
+        ArgumentError(
+            "Start-target system deformation `solve(G, F, starts; ...)` is not supported in this minimal build.",
+        ),
+    )
+end
+
 """
     solve(f; options...)
     solve(f, start_solutions; start_parameters, target_parameters, options...)
-    solve(f, start_solutions; start_subspace, target_subspace, options...)
-    solve(g, f, start_solutions; options...)
     solve(homotopy, start_solutions; options...)
 
 Solve the given problem. If only a single polynomial system `f` is given, then all
 (complex) isolated solutions are computed.
 If a system `f` depending on parameters together with start and target parameters is given
 then a parameter homotopy is performed.
-If two systems `g` and `f` with solutions of `g` are given then the solutions are tracked
-during the deformation of `g` to `f`.
-Similarly, for a given homotopy `homotopy` ``H(x,t)`` with solutions at ``t=1`` the solutions
+For a given homotopy `homotopy` ``H(x,t)`` with solutions at ``t=1`` the solutions
 at ``t=0`` are computed.
 See the documentation for examples.
 If the input is a *homogeneous* polynomial system, solutions on a random affine chart of
@@ -408,8 +323,8 @@ If only a polynomial system is given:
   choice furhter options are possible. See also [`total_degree`](@ref) and
   [`polyhedral`](@ref).
 
-If a system `f` depending on parameters together with start parameters (or start subspace),
-start solutions and *multiple* target parameters (or target subspaces) then the following
+If a system `f` depending on parameters together with start parameters,
+start solutions and *multiple* target parameters then the following
 options are also available:
 
 * `flatten`: Flatten the output of `transform_result`. This is useful for example if
@@ -459,16 +374,16 @@ function solve(
     kwargs...,
 )
 
-    many_parameters = false
     if target_subspaces !== nothing
-        many_parameters = true
-        solver, starts = solver_startsolutions(
-            args...;
-            target_subspace = first(target_subspaces),
-            kwargs...,
+        throw(
+            ArgumentError(
+                "Keyword `target_subspaces` is not supported in this minimal build.",
+            ),
         )
-        target_parameters = target_subspaces
-    elseif target_parameters !== nothing
+    end
+
+    many_parameters = false
+    if target_parameters !== nothing
         # check if we have many parameters solve
         if !isa(transform_parameters(first(target_parameters)), Number)
             many_parameters = true

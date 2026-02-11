@@ -71,14 +71,6 @@
         @test length(Xs) ≥ length(1:0.015625:2)
     end
 
-    @testset "path info" begin
-        @var x a y b
-        F = System([x^2 - a, x * y - a + b], [x, y], [a, b])
-        tracker = Tracker(ParameterHomotopy(F, [1, 0], [2, 4]))
-        info = path_info(tracker, [1, 1], 1, 0)
-        @test !isempty(sprint(show, info))
-    end
-
     @testset "Change parameters" begin
         @var x a y b
         F = System([x^2 - a, x * y - a + b]; parameters = [a, b])

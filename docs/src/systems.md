@@ -56,21 +56,10 @@ AffineChartSystem
 on_affine_chart(F::System, dims)
 ```
 
-## CompositionSystem
-```@docs
-CompositionSystem
-compose
-```
-
 ## FixedParameterSystem
 ```@docs
 FixedParameterSystem
 fix_parameters(F::AbstractSystem, p)
-```
-
-## RandomizedSystem
-```@docs
-RandomizedSystem
 ```
 
 ## Real Systems
