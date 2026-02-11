@@ -74,7 +74,6 @@ nvariables(CS::CompiledSystem) = CS.nvariables
 
 variables(F::CompiledSystem) = variables(F.system)
 parameters(F::CompiledSystem) = parameters(F.system)
-variable_groups(F::CompiledSystem) = variable_groups(F.system)
 System(F::CompiledSystem) = F.system
 
 Base.:(==)(::CompiledSystem{A}, ::CompiledSystem{B}) where {A,B} = A == B

@@ -1,4 +1,4 @@
-export total_degree, bezout_number, total_degree_start_solutions
+export total_degree, total_degree_start_solutions
 
 """
     total_degree(
@@ -17,13 +17,6 @@ function total_degree(
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     kwargs...,
 )
-    if F isa System && !isnothing(variable_groups(F))
-        throw(
-            ArgumentError(
-                "Variable groups are not supported in affine-only mode.",
-            ),
-        )
-    end
     return total_degree_variables(F; compile = compile, kwargs...)
 end
 
@@ -167,7 +160,3 @@ function paths_to_track(f, ::Val{:total_degree})
         length(starts)
     end
 end
-@deprecate bezout_number(f::Union{System,AbstractSystem}) paths_to_track(
-    f;
-    start_system = :total_degree,
-)

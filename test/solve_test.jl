@@ -73,7 +73,6 @@
         @test paths_to_track(f; start_system = :polyhedral) == 8
         @test paths_to_track(f; start_system = :polyhedral, only_non_zero = true) == 3
         @test paths_to_track(f) == 8
-        @test_deprecated bezout_number(f) == 16
         @test mixed_volume(f) == 3
 
         @var x y a
@@ -128,17 +127,10 @@
         )
 
         @var x y v w a b
-        F_variable_groups = System(
+        @test_throws MethodError System(
             [x * y - a * v * w, x^2 - b * v^2],
             parameters = [a, b],
             variable_groups = [[x, v], [y, w]],
-        )
-        S_variable_groups = [[1.0, 1.0, 1.0, 1.0]]
-        @test_throws ArgumentError solve(
-            F_variable_groups,
-            S_variable_groups;
-            start_parameters = [2, 4],
-            target_parameters = [3, 5],
         )
     end
 

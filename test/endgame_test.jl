@@ -5,7 +5,7 @@
     end
 
     @testset "Hyperbolic - 6,6" begin
-        # 2 solutions with multiplicity 6, projective
+        # 2 solutions with multiplicity 6
         @var x z
         y = 1
         # This has two roots of multiplicity 6 at the hyperplane z=0

@@ -722,7 +722,6 @@ function six_revolute()
     ## assign values to z₁ and z₆
     System(
         [subs(f, z[1, :] => [1, 0, 0], z[6, :] => [1, 0, 0]) for f in F′],
-        variable_groups = [[z[2, :]; z[4, :]], [z[3, :]; z[5, :]]],
     )
 end
 

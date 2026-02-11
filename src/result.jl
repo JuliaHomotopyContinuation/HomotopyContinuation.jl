@@ -91,11 +91,11 @@ function _multiplicity_clusters(
 
     for i in eachindex(mapped)
         w = mapped[i]
-        tol = max(atol, rtol * _point_norm(distance_metric, w))
+        threshold = max(atol, rtol * _point_norm(distance_metric, w))
         assigned = false
         for cluster in clusters
             w_ref = mapped[first(cluster)]
-            if _point_distance(distance_metric, w, w_ref) <= tol
+            if _point_distance(distance_metric, w, w_ref) <= threshold
                 push!(cluster, i)
                 assigned = true
                 break
@@ -202,15 +202,7 @@ function ResultStatistics(
     result::Result;
     real_atol::Float64 = 1e-6,
     real_rtol::Float64 = 0.0,
-    real_tol::Union{Float64,Nothing} = nothing,
 )
-    if real_tol !== nothing
-        Base.depwarn(
-            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :ResultStatistics,
-        )
-        real_atol = real_tol
-    end
     failed = at_infinity = excess_solution = 0
     nonsingular = singular = real_nonsingular = real_singular = 0
     singular_with_multiplicity = real_singular_with_multiplicity = 0
@@ -276,12 +268,6 @@ const AbstractResults = Union{AbstractResult,AbstractVector{<:PathResult}}
 
 Return all [`PathResult`](@ref)s for which satisfy the given conditions and apply,
 if provided, the function `f`.
-
-!!! warning
-
-    `real_tol` is a deprecated alias for `real_atol` and will be removed in a future version.
-    For backwards compatibility, setting `real_tol` overrides `real_atol`, but users should
-    switch now to using `real_atol` directly.
 """
 results(R::AbstractResults; kwargs...) = results(identity, R; kwargs...)
 function results(
@@ -294,15 +280,7 @@ function results(
     only_singular::Bool = false,
     only_finite::Bool = true,
     multiple_results::Bool = false,
-    real_tol::Union{Float64,Nothing} = nothing,
 )
-    if real_tol !== nothing
-        Base.depwarn(
-            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :results,
-        )
-        real_atol = real_tol
-    end
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
@@ -587,11 +565,6 @@ end
 
 Count the number of results which satisfy the corresponding conditions. See also
 [`results`](@ref).
-
-!!! warning
-    `real_tol` is a deprecated alias for `real_atol` and will be removed in a future version.
-    For backwards compatibility, setting `real_tol` overrides `real_atol`, but users should
-    switch now to using `real_atol` directly.
 """
 function nresults(
     R::AbstractResults;
@@ -600,21 +573,12 @@ function nresults(
     real_rtol::Float64 = 0.0,
     only_nonsingular::Bool = false,
     only_singular::Bool = false,
-    onlyfinite::Bool = true, # deprecated
-    only_finite::Bool = onlyfinite,
+    only_finite::Bool = true,
     multiple_results::Bool = false,
-    real_tol::Union{Float64,Nothing} = nothing,
 )
     if multiple_results == false && !(typeof(R) <: Results)
         println("Warning: Since result is a ResultIterator, counting multiple results")
         multiple_results = true
-    end
-    if real_tol !== nothing
-        Base.depwarn(
-            "The `real_tol` keyword argument is deprecated and will be removed in a future version. Use `real_atol` instead.",
-            :nresults,
-        )
-        real_atol = real_tol
     end
 
     count(R) do r
@@ -662,26 +626,13 @@ julia> real_solutions(solve(F))
  [2.0, -5.0]
  [-3.0, 0.0]
 ```
-
-!!! warning
-    The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.
-    For backwards compatibility, setting `tol` overrides `atol`, but users should switch now to using
-    `atol` directly.
 """
 function real_solutions(
     result::AbstractResults;
     atol::Float64 = 1e-6,
     rtol::Float64 = 0.0,
-    tol::Union{Float64,Nothing} = nothing,
     kwargs...,
 )
-    if tol !== nothing
-        Base.depwarn(
-            "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
-            :real_solutions,
-        )
-        atol = tol
-    end
     results(
         real ∘ solution,
         result;
@@ -717,7 +668,7 @@ end
 """
     real(result; kwargs...)
 
-Get all results where the solutions are real with the given tolerance `tol`.
+Get all results where the solutions are real.
 See [`is_real`](@ref) for details regarding how `kwargs` affect the determination of 'realness'.
 """
 Base.real(R::Results; kwargs...) = filter(r -> is_real(r; kwargs...), path_results(R))
@@ -751,7 +702,7 @@ nsolutions(R::AbstractResults; only_nonsingular = true, options...) =
     )
 
 The number of singular solutions. A solution is considered singular if its winding number is
-larger than 1 or the condition number is larger than `tol`.
+larger than 1 or the condition number is large.
 If `counting_multiplicities=true` the number of singular solutions times their
 multiplicities is returned.
 """

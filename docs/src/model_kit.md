@@ -44,13 +44,11 @@ jacobian(F::System, x, p = nothing)
 degrees(F::System)
 expressions(F::System)
 optimize(::System)
-multi_degrees(::System)
 nparameters(::System)
 nvariables(::System)
 parameters(::System)
 support_coefficients(::System)
 variables(::System)
-variable_groups(::System)
 ```
 
 ## Homotopy

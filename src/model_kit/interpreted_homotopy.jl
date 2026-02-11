@@ -45,7 +45,6 @@ end
 Base.size(H::InterpretedHomotopy) = size(H.homotopy)
 variables(H::InterpretedHomotopy) = variables(H.homotopy)
 parameters(H::InterpretedHomotopy) = parameters(H.homotopy)
-variable_groups(H::InterpretedHomotopy) = variable_groups(H.homotopy)
 Base.:(==)(H::InterpretedHomotopy, G::InterpretedHomotopy) = H.homotopy == G.homotopy
 
 function Base.show(io::IO, H::InterpretedHomotopy)

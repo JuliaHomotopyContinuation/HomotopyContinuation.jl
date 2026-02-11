@@ -184,13 +184,6 @@ function polyhedral(
     target_parameters = nothing,
     kwargs...,
 )
-    if !isnothing(variable_groups(f))
-        throw(
-            ArgumentError(
-                "Variable groups are not supported in affine-only mode.",
-            ),
-        )
-    end
     if is_homogeneous(f)
         throw(
             ArgumentError(
@@ -240,13 +233,6 @@ function paths_to_track(
     only_torus::Bool = false,
     only_non_zero::Bool = only_torus,
 )
-    if !isnothing(variable_groups(f))
-        throw(
-            ArgumentError(
-                "Variable groups are not supported in affine-only mode.",
-            ),
-        )
-    end
     if is_homogeneous(f)
         throw(
             ArgumentError(

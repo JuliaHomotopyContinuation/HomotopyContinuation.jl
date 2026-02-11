@@ -20,13 +20,6 @@ Returns the [`Variable`](@ref)s used in the system.
 parameters(F::AbstractSystem) = Variable[]
 
 """
-    variable_groups(F::AbstractSystem)
-
-Returns the variable groups of the system.
-"""
-variable_groups(::AbstractSystem) = nothing
-
-"""
     nvariables(F::AbstractSystem)
 
 Returns the number of variables of a given system `F`.
@@ -47,7 +40,7 @@ Construct a (symbolic) [`System`](@ref) from `F`.
 """
 function System(F::AbstractSystem)
     x, p = variables(F), parameters(F)
-    System(F(x, p), x, p, variable_groups(F))
+    System(F(x, p), x, p)
 end
 
 (F::AbstractSystem)(x, p = nothing) = evaluate(F, x, p)

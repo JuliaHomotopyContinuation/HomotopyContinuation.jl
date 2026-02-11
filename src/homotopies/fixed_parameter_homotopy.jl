@@ -21,7 +21,6 @@ Base.size(H::FixedParameterHomotopy) = size(H.homotopy)
 
 ModelKit.variables(H::FixedParameterHomotopy) = variables(H.homotopy)
 ModelKit.parameters(H::FixedParameterHomotopy) = Variable[]
-ModelKit.variable_groups(H::FixedParameterHomotopy) = variable_groups(H.homotopy)
 
 (H::FixedParameterHomotopy)(x, t, p = nothing) = H.homotopy(x, t, H.parameters)
 

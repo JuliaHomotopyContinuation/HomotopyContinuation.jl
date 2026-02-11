@@ -33,7 +33,6 @@ export @var,
     is_homogeneous,
     jacobian,
     jacobian!,
-    multi_degrees,
     parameters,
     nparameters,
     nvariables,
@@ -48,7 +47,6 @@ export @var,
     to_dict,
     to_number,
     variables,
-    variable_groups,
     vectors
 
 using ..DoubleDouble: ComplexDF64

@@ -16,7 +16,6 @@ MixedSystem(F::System; kwargs...) =
 Base.size(F::MixedSystem) = size(F.compiled)
 ModelKit.variables(F::MixedSystem) = variables(F.interpreted)
 ModelKit.parameters(F::MixedSystem) = parameters(F.interpreted)
-ModelKit.variable_groups(F::MixedSystem) = variable_groups(F.interpreted)
 ModelKit.System(F::MixedSystem) = System(F.interpreted)
 Base.:(==)(F::MixedSystem, G::MixedSystem) = F.interpreted == G.interpreted
 

@@ -272,25 +272,13 @@ We consider a result as `real` if either:
 
 - the infinity-norm of the imaginary part of the solution is less than `atol`
 - the infinity-norm of the imaginary part of the solution is less than `rtol * norm(s, 1)`, where s is the solution in `PathResult`.
-
-!!! warning
-    `tol` is a deprecated alias for `atol` and will be removed in a future version.
-    For backwards compatibility, setting `tol` overrides `atol`, but users should switch now to using `atol` directly.
 """
 function is_real(
     r::PathResult;
     atol::Float64 = 1e-6,
     rtol::Float64 = 0.0,
-    tol::Union{Float64,Nothing} = nothing,
 )
     m = maximum(abs ∘ imag, r.solution)
-    if tol !== nothing
-        Base.depwarn(
-            "The `tol` keyword argument is deprecated and will be removed in a future version. Use `atol` instead.",
-            :is_real,
-        )
-        atol = tol
-    end
     m < atol && return true
     iszero(rtol) && return false
     thresh = rtol * norm(r.solution, 1)

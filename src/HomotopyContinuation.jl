@@ -65,12 +65,4 @@ include("polyhedral.jl")
 include("result.jl")
 include("solve.jl")
 
-function __init__()
-    # Overwrite default IJulia behaviour. See
-    # https://github.com/timholy/ProgressMeter.jl/issues/162
-    if isdefined(ProgressMeter, :ijulia_behavior)
-        ProgressMeter.ijulia_behavior(:clear)
-    end
-end
-
 end #module

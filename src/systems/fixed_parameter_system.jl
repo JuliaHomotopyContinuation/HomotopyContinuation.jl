@@ -21,7 +21,6 @@ Base.size(F::FixedParameterSystem) = size(F.system)
 
 ModelKit.variables(F::FixedParameterSystem) = variables(F.system)
 ModelKit.parameters(F::FixedParameterSystem) = Variable[]
-ModelKit.variable_groups(F::FixedParameterSystem) = variable_groups(F.system)
 
 (F::FixedParameterSystem)(x, p = nothing) = F.system(x, F.parameters)
 

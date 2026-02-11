@@ -1003,25 +1003,18 @@ struct System
     expressions::Vector{Expression}
     variables::Vector{Variable}
     parameters::Vector{Variable}
-    variable_groups::Union{Nothing,Vector{Vector{Variable}}}
     _jacobian::Ref{Union{Nothing,Matrix{Expression}}}
 
     function System(
         exprs::Vector{Expression},
         vars::Vector{Variable},
         params::Vector{Variable},
-        variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
     )
         check_vars_params(exprs, vars, params)
-        if !isnothing(variable_groups)
-            vars == reduce(vcat, variable_groups) ||
-                throw(ArgumentError("Variable groups and variables don't match."))
-        end
         new(
             exprs,
             vars,
             params,
-            variable_groups,
             Ref{Union{Nothing,Matrix{Expression}}}(nothing),
         )
     end
@@ -1031,35 +1024,19 @@ System(exprs; kwargs...) = System(convert(Vector{Expression}, exprs); kwargs...)
 function System(
     exprs::AbstractVector{Expression};
     parameters::Union{Nothing,Vector{Variable}} = nothing,
-    variable_groups::Union{Nothing,Vector{Vector{Variable}}} = nothing,
     variables::Union{Nothing,Vector{Variable}} = nothing,
 )
-    vars, params = _default_vars_params(exprs, variables, parameters, variable_groups)
-    System(convert(Vector{Expression}, exprs), vars, params, variable_groups)
+    vars, params = _default_vars_params(exprs, variables, parameters)
+    System(convert(Vector{Expression}, exprs), vars, params)
 end
 
-function _default_vars_params(exprs, vars, parameters, variable_groups)
+function _default_vars_params(exprs, vars, parameters)
     all_vars = variables(exprs)
-    if isnothing(variable_groups)
-        parameters = something(parameters, Variable[])
-        if isnothing(vars)
-            setdiff(all_vars, parameters), parameters
-        else
-            vars, parameters
-        end
-    elseif isnothing(vars)
-        vars = reduce(vcat, variable_groups)
-        if isnothing(parameters)
-            vars, setdiff(all_vars, vars)
-        else
-            vars, parameters
-        end
+    parameters = something(parameters, Variable[])
+    if isnothing(vars)
+        setdiff(all_vars, parameters), parameters
     else
-        if isnothing(parameters)
-            vars, Variable[]
-        else
-            vars, parameters
-        end
+        vars, parameters
     end
 end
 
@@ -1083,7 +1060,6 @@ function System(
     F::AbstractVector{<:MP.AbstractPolynomial};
     parameters = similar(MP.variables(F), 0),
     variables = setdiff(MP.variables(F), parameters),
-    variable_groups = nothing,
 )
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
@@ -1094,16 +1070,6 @@ function System(
         name, ind = MP.name_base_indices(v)
         push!(params, Variable(name, ind...))
     end
-    if variable_groups === nothing
-        var_groups = nothing
-    else
-        var_groups = map(var_groups) do group
-            map(group) do v
-                name, ind = MP.name_base_indices(v)
-                Variable(name, ind...)
-            end
-        end
-    end
     variables_parameters = [variables; parameters]
     vars_params = [vars; params]
     G = map(F) do f
@@ -1112,7 +1078,7 @@ function System(
             c * prod(w^MP.degree(t, v) for (v, w) in zip(variables_parameters, vars_params))
         end
     end
-    System(G, variables = vars, parameters = params, variable_groups = var_groups)
+    System(G, variables = vars, parameters = params)
 end
 
 System(F::System) = F
@@ -1143,18 +1109,7 @@ Base.hash(S::System, u::UInt64) =
 function Base.show(io::IO, F::System)
     if !get(io, :compact, false)
         println(io, "System of length $(length(F.expressions))")
-        if isnothing(F.variable_groups)
-            print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
-        else
-            print(
-                io,
-                length(F.variables),
-                " variables (",
-                length(F.variable_groups),
-                " groups): ",
-                join("[" .* join.(F.variable_groups, Ref(", ")) .* "]", ", "),
-            )
-        end
+        print(io, " $(length(F.variables)) variables: ", join(F.variables, ", "))
         if !isempty(F.parameters)
             print(io, "\n $(length(F.parameters)) parameters: ", join(F.parameters, ", "))
         end
@@ -1294,13 +1249,6 @@ Returns the variables of the given system `F`.
 variables(F::System) = F.variables
 
 """
-    variable_groups(F::System)
-
-Returns the variable groups of the given system `F`.
-"""
-variable_groups(F::System) = F.variable_groups
-
-"""
     parameters(F::System)
 
 Returns the parameters of the given system `F`.
@@ -1315,19 +1263,6 @@ Return the degrees of the given system.
 degrees(F::System) = degrees(F.expressions, F.variables)
 
 """
-    multi_degrees(F::System)
-
-Return the degrees with respect to the given variable groups.
-"""
-function multi_degrees(F::System)
-    if isnothing(F.variable_groups)
-        reshape(degrees(F.expressions, F.variables), 1, nvariables(F))
-    else
-        reduce(vcat, map(vars -> degrees(F.expressions, vars)', F.variable_groups))
-    end
-end
-
-"""
     support_coefficients(F::System)
 
 Return the support of the system and the corresponding coefficients.
@@ -1340,19 +1275,9 @@ end
 """
     is_homogeneous(F::System)
 
-Checks whether a given system is homogeneous w.r.t to its variables
-(resp. variable groups).
+Checks whether a given system is homogeneous w.r.t to its variables.
 """
-function is_homogeneous(F::System)
-    if isnothing(F.variable_groups)
-        all(f -> is_homogeneous(f, F.variables), F.expressions)
-    else
-        all(F.expressions) do f
-            g = expand(f)
-            all(vars -> is_homogeneous(g, vars; expanded = true), F.variable_groups)
-        end
-    end
-end
+is_homogeneous(F::System) = all(f -> is_homogeneous(f, F.variables), F.expressions)
 
 Base.iterate(F::System) = iterate(F.expressions)
 Base.iterate(F::System, state) = iterate(F.expressions, state)
@@ -1374,7 +1299,7 @@ function Base.intersect(F::System, G::System)
         F.parameters
         setdiff(G.parameters, F.parameters)
     ]
-    System(exprs, vars, params, F.variable_groups)
+    System(exprs, vars, params)
 end
 function Base.intersect(F::System, G::AbstractVector{<:Expression})
     exprs = [F.expressions; G]
@@ -1382,7 +1307,7 @@ function Base.intersect(F::System, G::AbstractVector{<:Expression})
         F.variables
         setdiff(variables(G), F.variables)
     ]
-    System(exprs, vars, F.parameters, F.variable_groups)
+    System(exprs, vars, F.parameters)
 end
 Base.intersect(F::AbstractVector{<:Expression}, G::System) = intersect(G, F)
 
@@ -1419,7 +1344,6 @@ function optimize(F::System)
         horner.(F.expressions, Ref(F.variables)),
         F.variables,
         F.parameters,
-        F.variable_groups,
     )
 end
 
@@ -1428,21 +1352,10 @@ end
 function system_with_coefficents_as_params(
     F::AbstractVector{<:MP.AbstractPolynomial};
     variables = MP.variables(F),
-    variable_groups = nothing,
 )
     vars = map(variables) do v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
-    end
-    if variable_groups === nothing
-        var_groups = nothing
-    else
-        var_groups = map(var_groups) do group
-            map(group) do v
-                name, ind = MP.name_base_indices(v)
-                Variable(name, ind...)
-            end
-        end
     end
     param_name = gensym(:c)
     k = 1
@@ -1457,7 +1370,7 @@ function system_with_coefficents_as_params(
             c * prod(w^MP.degree(t, v) for (v, w) in zip(variables, vars))
         end
     end
-    sys = System(G, variables = vars, parameters = params, variable_groups = var_groups)
+    sys = System(G, variables = vars, parameters = params)
     sys, target_params
 end
 

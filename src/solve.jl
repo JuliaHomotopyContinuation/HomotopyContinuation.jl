@@ -73,14 +73,12 @@ function solver_startsolutions(
     parameters = Variable[],
     variables = setdiff(variables(F), parameters),
     variable_ordering = variables,
-    variable_groups = nothing,
     kwargs...,
 )
     sys = System(
         F,
         variables = variable_ordering,
         parameters = parameters,
-        variable_groups = variable_groups,
     )
     solver_startsolutions(sys, starts; kwargs...)
 end
@@ -90,7 +88,6 @@ function solver_startsolutions(
     parameters = similar(MP.variables(F), 0),
     variables = setdiff(MP.variables(F), parameters),
     variable_ordering = variables,
-    variable_groups = nothing,
     target_parameters = nothing,
     kwargs...,
 )
@@ -101,14 +98,12 @@ function solver_startsolutions(
         sys, target_parameters = ModelKit.system_with_coefficents_as_params(
             F,
             variables = variable_ordering,
-            variable_groups = variable_groups,
         )
     else
         sys = System(
             F,
             variables = variable_ordering,
             parameters = parameters,
-            variable_groups = variable_groups,
         )
     end
     solver_startsolutions(sys, starts; target_parameters = target_parameters, kwargs...)
@@ -127,15 +122,6 @@ function solver_startsolutions(
     kwargs...,
 )
     !isnothing(seed) && Random.seed!(seed)
-    if haskey(kwargs, :start_subspace) || haskey(kwargs, :target_subspace) ||
-       haskey(kwargs, :intrinsic)
-        throw(
-            ArgumentError(
-                "Subspace-based solve options (`start_subspace`, `target_subspace`, `intrinsic`) are not supported in this minimal build.",
-            ),
-        )
-    end
-
 
     used_start_system = nothing
     if start_parameters !== nothing
@@ -202,8 +188,6 @@ function parameter_homotopy(
     start_parameters = p₁,
     p₀ = generic_parameters,
     target_parameters = p₀,
-    tracker_options = TrackerOptions(),
-    endgame_options = EndgameOptions(),
     compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
     kwargs...,
 )
@@ -211,13 +195,6 @@ function parameter_homotopy(
     m, n = size(F)
     H = ParameterHomotopy(fixed(F; compile = compile), start_parameters, target_parameters)
     f = System(F)
-    if !isnothing(variable_groups(f))
-        throw(
-            ArgumentError(
-                "Variable groups are not supported in affine-only mode.",
-            ),
-        )
-    end
     if is_homogeneous(f)
         throw(
             ArgumentError(
@@ -247,19 +224,6 @@ function solver_startsolutions(
 )
     !isnothing(seed) && Random.seed!(seed)
     Solver(EndgameTracker(fixed(H; compile = compile)); seed = seed), starts
-end
-
-function solver_startsolutions(
-    G::Union{System,AbstractSystem},
-    F::Union{System,AbstractSystem},
-    starts = nothing;
-    kwargs...,
-)
-    throw(
-        ArgumentError(
-            "Start-target system deformation `solve(G, F, starts; ...)` is not supported in this minimal build.",
-        ),
-    )
 end
 
 """
@@ -350,19 +314,10 @@ function solve(
     transform_result = nothing,
     transform_parameters = identity,
     flatten = nothing,
-    target_subspaces = nothing,
     iterator_only::Bool = false,
     bitmask = nothing,
     kwargs...,
 )
-
-    if target_subspaces !== nothing
-        throw(
-            ArgumentError(
-                "Keyword `target_subspaces` is not supported in this minimal build.",
-            ),
-        )
-    end
 
     many_parameters = false
     if target_parameters !== nothing
@@ -388,8 +343,8 @@ function solve(
         if iterator_only
             map(target_parameters) do p
                 solverᵢ = deepcopy(solver)
-                target_parameters!(solverᵢ, p)
-                ResultIterator(starts, solver; bitmask = bitmask)
+                target_parameters!(solverᵢ, transform_parameters(p))
+                ResultIterator(starts, solverᵢ; bitmask = bitmask)
             end
         else
             solve(
@@ -483,14 +438,13 @@ function update_progress!(progress, stats, ntracked)
     nothing
 end
 @noinline function make_showvalues(stats, ntracked)
-    showvalues = (("# paths tracked", ntracked),)
     nsols = stats.regular[] + stats.singular[]
     nreal = stats.regular_real[] + stats.singular_real[]
     (
         ("# paths tracked", ntracked),
         ("# non-singular solutions (real)", "$(stats.regular[]) ($(stats.regular_real[]))"),
         ("# singular endpoints (real)", "$(stats.singular[]) ($(stats.singular_real[]))"),
-        ("# total solutions (real)", "$(nsols[]) ($(nreal[]))"),
+        ("# total solutions (real)", "$nsols ($nreal)"),
     )
 end
 update_progress!(::Nothing, stats, ntracked) = nothing
@@ -531,7 +485,6 @@ function threaded_solve(
     N = length(S)
     path_results = Vector{PathResult}(undef, N)
     interrupted = Threads.Atomic{Bool}(false)
-    started = Threads.Atomic{Int}(0)
     finished = Threads.Atomic{Int}(0)
     next_k = Threads.Atomic{Int}(1)  # next index k to process
 
@@ -591,7 +544,7 @@ function threaded_solve(
     # if we got interrupted we need to remove the unassigned filedds
     if interrupted[]
         assigned_results = Vector{PathResult}()
-        for i = 1:started[]
+        for i in eachindex(path_results)
             if isassigned(path_results, i)
                 push!(assigned_results, path_results[i])
             end
@@ -624,7 +577,7 @@ function parameters!(solver::Solver, p, q)
 end
 
 """
-    paths_to_track(f; optopms..)
+    paths_to_track(f; options...)
 
 Returns the number of paths tracked when calling [`solve`](@ref) with the given arguments.
 """
@@ -640,10 +593,6 @@ end
 ### Many parameter solver ###
 #############################
 
-
-struct ManySolveStats
-    solutions::Threads.Atomic{Int}
-end
 
 function solve(
     S::Solver,
