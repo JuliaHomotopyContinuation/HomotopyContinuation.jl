@@ -1704,12 +1704,14 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
         data;
         column_labels = headers,
         backend = :text,
-        table_format = PrettyTables.TextTableFormat(borders = PrettyTables.text_table_borders__unicode_rounded),
+        table_format = PrettyTables.TextTableFormat(
+            borders = PrettyTables.text_table_borders__unicode_rounded,
+        ),
         alignment = :c,
         style = PrettyTables.TextTableStyle(
-                                            column_label = PrettyTables.Crayon(bold = false),
-                                            table_border = PrettyTables.Crayon(faint = true),
-                                           ),
+            column_label = PrettyTables.Crayon(bold = false),
+            table_border = PrettyTables.Crayon(faint = true),
+        ),
     )
 end
 
