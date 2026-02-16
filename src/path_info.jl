@@ -86,21 +86,21 @@ end
 path_table(info::PathInfo) = path_table(stdout, info)
 function path_table(io::IO, info::PathInfo)
     header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "μ", "τ", "Δx_t", "Δpred ", "|x|"]
-    h1 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
-        crayon = PrettyTables.crayon"red",
+    h1 = PrettyTables.TextHighlighter(
+        (data, i, j) -> j == 1 && data[i, 1] == :✗,
+        PrettyTables.crayon"red",
     )
-    h2 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 1 && data[i, 1] == :✓,
-        crayon = PrettyTables.crayon"green",
+    h2 = PrettyTables.TextHighlighter(
+        (data, i, j) -> j == 1 && data[i, 1] == :✓,
+        PrettyTables.crayon"green",
     )
-    h3 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 3 && data[i, 3] ≈ -data[i, 9],
-        crayon = PrettyTables.crayon"blue",
+    h3 = PrettyTables.TextHighlighter(
+        (data, i, j) -> j == 3 && data[i, 3] ≈ -data[i, 9],
+        PrettyTables.crayon"blue",
     )
-    h4 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 8 && info.high_prec[i],
-        crayon = PrettyTables.crayon"blue",
+    h4 = PrettyTables.TextHighlighter(
+        (data, i, j) -> j == 8 && info.high_prec[i],
+        PrettyTables.crayon"blue",
     )
 
     ✓✗ = map(v -> v ? :✓ : :✗, info.accepted_rejected)
@@ -119,17 +119,18 @@ function path_table(io::IO, info::PathInfo)
         info.norm_x,
     )
 
-    ft1 = PrettyTables.ft_printf("%5.2g", [4, 5, 6, 7, 8, 10, 11, 12])
-    ft2 = PrettyTables.ft_printf("%5.2g", [3, 9])
-    ft4 = PrettyTables.ft_printf("%3.3g", [2, 4])
+    ft1 = PrettyTables.fmt__printf("%5.2g", [4, 5, 6, 7, 8, 10, 11, 12])
+    ft2 = PrettyTables.fmt__printf("%5.2g", [3, 9])
+    ft4 = PrettyTables.fmt__printf("%3.3g", [2, 4])
 
     PrettyTables.pretty_table(
         io,
         data;
-        header = header,
-        crop = :none,
-        formatters = (ft1, ft2, ft4),
-        highlighters = (h1, h2, h3, h4),
+        column_labels = header,
+        fit_table_in_display_horizontally = false,
+        fit_table_in_display_vertically = false,
+        formatters = [ft1, ft2, ft4],
+        highlighters = [h1, h2, h3, h4],
     )
 end
 
