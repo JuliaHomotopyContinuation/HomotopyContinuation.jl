@@ -1702,11 +1702,16 @@ function degree_table(io, N::NumericalIrreducibleDecomposition)
     PrettyTables.pretty_table(
         io,
         data;
-        header = headers,
-        tf = PrettyTables.tf_unicode_rounded,
+        column_labels = headers,
+        backend = :text,
+        table_format = PrettyTables.TextTableFormat(
+            borders = PrettyTables.text_table_borders__unicode_rounded,
+        ),
         alignment = :c,
-        header_crayon = PrettyTables.Crayon(bold = false),
-        border_crayon = PrettyTables.Crayon(faint = true),
+        style = PrettyTables.TextTableStyle(
+            column_label = PrettyTables.Crayon(bold = false),
+            table_border = PrettyTables.Crayon(faint = true),
+        ),
     )
 end
 
