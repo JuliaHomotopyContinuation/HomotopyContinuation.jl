@@ -287,14 +287,8 @@ function _regeneration(
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
     vars = variables(F)
-    if sorted
-        f = sort(expressions(F), by = ModelKit.degree, rev = true)
-    else
-        f = expressions(F)
-    end
-
-    n = length(vars) # ambient dimension
-    c = length(f) # we can have witness sets of codimesion at most min(c,n)
+    n = size(F, 2) # ambient dimension
+    c = size(F, 1) # we can have witness sets of codimesion at most min(c,n)
     expected_max_codim = min(c, n)
     if !isnothing(max_codim) && max_codim < expected_max_codim
         # if max_codim is smaller than the expected codimension we must compute witness points for one more codimension, so that we can remove spurious points
@@ -302,7 +296,11 @@ function _regeneration(
     else
         codim = expected_max_codim
     end
+    # u-regeneration adds another variable u to F
+    @unique_var u
+    push!(vars, u)
 
+    # progress bar
     if show_progress
         progress = WitnessSetsProgress(
             n,
@@ -319,10 +317,6 @@ function _regeneration(
     end
 
 
-    # u-regeneration adds another variable u to F
-    @unique_var u
-    push!(vars, u)
-
     # initialize the linear equations for witness sets
     A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
 
@@ -336,9 +330,19 @@ function _regeneration(
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]); threading = threading)
+    H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
+    @show map(ModelKit.degree, H)
     if any(H .== nothing)
         return nothing
+    end
+
+    # sort expressions by degree
+    if sorted
+        σ = sortperm(H, by = ModelKit.degree, rev = true)
+        f = expressions(F)[σ]
+        H = H[σ]
+    else
+        f = expressions(F)
     end
 
     # Initialize a cache
@@ -455,23 +459,45 @@ function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
     out
 end
 function initialize_hypersurfaces(
-    f::Vector{Expression},
+    F::System,
     vars,
     L;
     threading::Bool = Threads.nthreads() > 1,
 )
+    f = expressions(F)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
 
     for i = 1:c
-        h = fixed(System([f[i]], variables = vars), compile = false)
-        res = solve(
-            h,
-            target_subspace = L;
-            start_system = :total_degree,
-            show_progress = false,
-            threading = threading,
-        )
+        fᵢ = f[i]
+        h = fixed(System([fᵢ], variables = vars), compile = false)
+        if ModelKit.is_rational(fᵢ, vars)
+            mon_res = monodromy_solve(
+                h;
+                codim = 1,
+                show_progress = false,
+                threading = threading,
+            )
+            @show nsolutions(mon_res)
+            res = solve(
+                h,
+                solutions(mon_res),
+                start_subspace = parameters(mon_res),
+                target_subspace = L;
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+            @show nsolutions(res)
+        else
+            res = solve(
+                h,
+                target_subspace = L;
+                start_system = :total_degree,
+                show_progress = false,
+                threading = threading,
+            )
+        end
         if isnothing(res)
             return nothing
         end

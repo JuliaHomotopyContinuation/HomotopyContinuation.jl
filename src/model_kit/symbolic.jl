@@ -524,19 +524,36 @@ is expanded and representing a polynomial.
 Throws a `PolynomialError` if a rational expression is encountered.
 """
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
+    out = _to_dict(expr, vars)
+    if isnothing(out)
+        throw(PolynomialError())
+    else
+        return out
+    end
+end
+
+function _to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
     dict = Dict{Vector{Int},Expression}()
+    is_rational = false 
 
     if class(expr) == :Add
         for op in args(expr)
-            to_dict_op!(dict, op, vars, mul_args, pow_args)
+            is_poly = to_dict_op!(dict, op, vars, mul_args, pow_args)
+            if !is_poly
+                is_rational = true 
+            end
         end
     else
-        to_dict_op!(dict, expr, vars, mul_args, pow_args)
+        is_poly = to_dict_op!(dict, expr, vars, mul_args, pow_args)
+        if !is_poly
+            is_rational = true 
+        end
     end
 
-    dict
+    is_rational ? nothing : dict
 end
+
 
 function to_dict_op!(dict, op, vars, mul_args, pow_args)
     cls = class(op)
@@ -560,7 +577,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
                 x = vec[1]
                 k = convert(Int, vec[2])
                 if k < 0
-                    throw(PolynomialError())
+                    return false
                 end
                 for (i, v) in enumerate(vars)
                     if x == v
@@ -593,7 +610,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         is_var_pow = false
         k = convert(Int, vec[2])
         if k < 0
-            throw(PolynomialError())
+            return false
         end
         for (i, v) in enumerate(vars)
             if x == v
@@ -614,8 +631,15 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
     else
         dict[d] = coeff
     end
-    dict
+    
+    return true
 end
+
+function is_rational(expr::Expression, vars::AbstractVector{Variable})
+    t = _to_dict(expr, vars)
+    isnothing(t) ? true : false
+end
+is_rational(f::Vector{Expression}) = any(is_rational, f)
 
 """
     exponents_coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
