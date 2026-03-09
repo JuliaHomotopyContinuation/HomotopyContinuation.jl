@@ -627,9 +627,11 @@ Computes numerator and denominator of `expr`.
 
 ## Example
 julia> @var x y ;
-julia> expr = (y+1/(x-1))^2 * ((x^2+1)/(y-1) + 1)
+julia> expr = (y+1)*(x-1)/(x-1)^2 * ((x^2+1)/(y-1) + 1)
 julia> P, Q = get_num_den(expr)
-((y + x^2)*(1 + y*(-1 + x))^2, (-1 + x)^2*(-1 + y))
+((1 + y)*(y + x^2), (-1 + x)*(-1 + y))
+
+(Careful: `get_num_den` is a simple implementation based on comparing polynomial symbolically. For instance, `(x-1)^2` and `x^2 + 2x + 1` are considered different by the implementation, so that `get_num_den((x-1)^2 / (x^2 + 2x + 1))` will return `x^2 + 2x + 1` as denominator.)
 """
 function get_num_den(expr::Expression)
     cls = class(expr)
