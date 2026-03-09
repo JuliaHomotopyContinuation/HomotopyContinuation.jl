@@ -331,7 +331,6 @@ function _regeneration(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
     H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
-    @show map(ModelKit.degree, H)
     if any(H .== nothing)
         return nothing
     end
@@ -467,7 +466,6 @@ function initialize_hypersurfaces(
     f = expressions(F)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
-    @show vars 
     for i = 1:c
         fᵢ = f[i]
         h = fixed(System([fᵢ], variables = vars), compile = false)
@@ -1781,6 +1779,23 @@ Numerical irreducible decomposition with 11 components
 │     1     │          (4, 4)          │
 │     0     │ (1, 1, 1, 1, 1, 1, 1, 1) │
 ╰───────────┴──────────────────────────╯
+```
+
+`numerical_irreducible_decomposition` also works for systems of rational functions:
+```julia-repl
+julia> @var x y z
+julia> g = [x^2 + y^2 - z; x/(y-1) + y + z - 1]
+julia> N = numerical_irreducible_decomposition(g)
+Numerical irreducible decomposition with 1 component
+====================================================
+• 1 component(s) of dimension 1.
+
+ degree table of components:
+╭───────────┬───────────────────────╮
+│ dimension │ degrees of components │
+├───────────┼───────────────────────┤
+│     1     │           4           │
+╰───────────┴───────────────────────╯
 ```
 """
 function numerical_irreducible_decomposition(
