@@ -364,8 +364,7 @@
         @test is_polynomial(h) == false
 
         P, Q = get_num_den(h)
-        R = h - P / Q
-        a = subs(R, [x, y, z] => randn(3))
-        @test abs(to_number(a)) < 1e-14
+        @test expand(P) == expand(f * (x + (y - 1)*(y + z - 1)))
+        @test Q == -1 + y
     end
 end
