@@ -634,59 +634,77 @@ julia> P, Q = get_num_den(expr)
 function get_num_den(expr::Expression)
     cls = class(expr)
 
-    # Handle Addition: find common denominator
     if cls == :Add
-        args_list = args(expr)
-        # Start with the first term
-        P_total, Q_total = get_num_den(args_list[1])
+        # 1. Collect (num, den) for every term
+        terms = [get_num_den(arg) for arg in args(expr)]
         
-        for i in 2:length(args_list)
-            p_next, q_next = get_num_den(args_list[i])
-            # Rule: P1/Q1 + P2/Q2 = (P1*Q2 + P2*Q1) / (Q1*Q2)
-            new_P = Expression(0)
-            term1 = Expression(1); mul!(term1, P_total, q_next)
-            term2 = Expression(1); mul!(term2, p_next, Q_total)
-            add!(new_P, term1, term2)
-            
-            new_Q = Expression(1)
-            mul!(new_Q, Q_total, q_next)
-            
-            P_total, Q_total = new_P, new_Q
+        # 2. Identify all unique base factors in the denominators and their max power
+        # We assume denominators are products of powers: (x-1)^2 * x^1
+        max_powers = Dict{Expression, Int}() 
+        
+        for (_, den) in terms
+            factors = (class(den) == :Mul) ? args(den) : [den]
+            for f in factors
+                base, exp = (class(f) == :Pow) ? (args(f)[1], Int(to_number(args(f)[2]))) : (f, 1)
+                max_powers[base] = max(get(max_powers, base, 0), exp)
+            end
         end
-        return P_total, Q_total
 
-    # Handle Multiplication: multiply nums and dens separately
+        # 3. Construct the Common Denominator Q
+        Q = Expression(1)
+        for (base, pwr) in max_powers
+            if pwr != 0
+                term_q = (pwr == 1) ? base : base^pwr
+                mul!(Q, Q, term_q)
+            end
+        end
+
+        # 4. Construct the Numerator P
+        P = Expression(0)
+        for (n, d) in terms
+            # Calculate what's missing: missing = Q / d
+            missing = Expression(1)
+            for (base, pwr) in max_powers
+                # Find the power of this base in the current denominator 'd'
+                # (Simple check: search through factors of d)
+                d_factors = (class(d) == :Mul) ? args(d) : [d]
+                current_pwr = 0
+                for df in d_factors
+                    dbase, dexp = (class(df) == :Pow) ? (args(df)[1], Int(to_number(args(df)[2]))) : (df, 1)
+                    if dbase == base
+                        current_pwr = dexp
+                        break
+                    end
+                end
+                
+                needed_pwr = pwr - current_pwr
+                if needed_pwr > 0
+                    mul!(missing, missing, base^needed_pwr)
+                end
+            end
+            
+            term_p = Expression(1)
+            mul!(term_p, n, missing)
+            add!(P, P, term_p)
+        end
+        return P, Q
+
     elseif cls == :Mul
-        P_total = Expression(1)
-        Q_total = Expression(1)
+        P, Q = Expression(1), Expression(1)
         for arg in args(expr)
             p, q = get_num_den(arg)
-            mul!(P_total, P_total, p)
-            mul!(Q_total, Q_total, q)
+            mul!(P, P, p)
+            mul!(Q, Q, q)
         end
-        return P_total, Q_total
+        return P, Q
 
-    # Handle Powers
     elseif cls == :Pow
         v = args(expr)
-        base_p, base_q = get_num_den(v[1])
-        exponent = v[2]
-        
-        if exponent isa Number
-            val = to_number(exponent)
-            if val >= 0
-                return base_p^val, base_q^val
-            else
-                # Flip for negative exponents: (p/q)^-1 = q/p
-                return base_q^(-val), base_p^(-val)
-            end
-        else
-            # For non-numeric exponents, treat the whole thing as a numerator
-            return expr, Expression(1)
-        end
+        p, q = get_num_den(v[1])
+        n = Int(to_number(v[2]))
+        return (n >= 0) ? (p^n, q^n) : (q^(-n), p^(-n))
 
-    # Fallback for any other types
-    else
+    else # Symbol, Constant, or None
         return expr, Expression(1)
     end
 end
