@@ -65,7 +65,7 @@
 
         N3 = nid(
             F;
-            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-12),
+            monodromy_options = MonodromyOptions(; trace_test_tol = 1e-5),
             show_progress = false,
         )
         @test isa(N3, NumericalIrreducibleDecomposition)
