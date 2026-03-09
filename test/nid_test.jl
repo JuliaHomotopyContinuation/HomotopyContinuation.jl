@@ -85,11 +85,11 @@
 
     @testset "rational systems" begin
         @var x y z
-        g = System([x^2 + y^2 - z; x/(y-1) + y + z - 1], variables = [x,y,z])
+        g = System([x^2 + y^2 - z; x / (y - 1) + y + z - 1], variables = [x, y, z])
         N = nid(g)
         @test degrees(N)[1] == [4]
     end
-    
+
     @testset "catch all components of degree 1" begin
         @var p1, p2, p3, p4, p5, p6, p7, p8, u1, u2, u3, u4, u5, u6, u7, u8, λ1, λ2, λ3
         p = [p1, p2, p3, p4, p5, p6, p7, p8]

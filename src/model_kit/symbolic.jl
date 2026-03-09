@@ -637,15 +637,16 @@ function get_num_den(expr::Expression)
     if cls == :Add
         # 1. Collect (num, den) for every term
         terms = [get_num_den(arg) for arg in args(expr)]
-        
+
         # 2. Identify all unique base factors in the denominators and their max power
         # We assume denominators are products of powers: (x-1)^2 * x^1
-        max_powers = Dict{Expression, Int}() 
-        
+        max_powers = Dict{Expression,Int}()
+
         for (_, den) in terms
             factors = (class(den) == :Mul) ? args(den) : [den]
             for f in factors
-                base, exp = (class(f) == :Pow) ? (args(f)[1], Int(to_number(args(f)[2]))) : (f, 1)
+                base, exp =
+                    (class(f) == :Pow) ? (args(f)[1], Int(to_number(args(f)[2]))) : (f, 1)
                 max_powers[base] = max(get(max_powers, base, 0), exp)
             end
         end
@@ -670,19 +671,21 @@ function get_num_den(expr::Expression)
                 d_factors = (class(d) == :Mul) ? args(d) : [d]
                 current_pwr = 0
                 for df in d_factors
-                    dbase, dexp = (class(df) == :Pow) ? (args(df)[1], Int(to_number(args(df)[2]))) : (df, 1)
+                    dbase, dexp =
+                        (class(df) == :Pow) ? (args(df)[1], Int(to_number(args(df)[2]))) :
+                        (df, 1)
                     if dbase == base
                         current_pwr = dexp
                         break
                     end
                 end
-                
+
                 needed_pwr = pwr - current_pwr
                 if needed_pwr > 0
                     mul!(missing, missing, base^needed_pwr)
                 end
             end
-            
+
             term_p = Expression(1)
             mul!(term_p, n, missing)
             add!(P, P, term_p)

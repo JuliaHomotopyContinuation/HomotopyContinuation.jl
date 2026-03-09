@@ -471,15 +471,16 @@ function initialize_hypersurfaces(
         h = fixed(System([fᵢ], variables = vars), compile = false)
         pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
         res = solve(
-                System([pᵢ], variables = vars),
-                target_subspace = L;
-                start_system = :total_degree,
-                show_progress = false,
-                threading = threading,
-            )
+            System([pᵢ], variables = vars),
+            target_subspace = L;
+            start_system = :total_degree,
+            show_progress = false,
+            threading = threading,
+        )
         # if fᵢ is rational we check which zeros of pᵢ are also zeros of fᵢ
-        if qᵢ != 1 
-            res = solve(h,
+        if qᵢ != 1
+            res = solve(
+                h,
                 solutions(res);
                 start_subspace = L,
                 target_subspace = L,
@@ -597,7 +598,7 @@ function intersect_with_hypersurface!(
     P = points(W)
     f = (System(F).expressions) # equations for W
     G = system(H) # H is the hypersurface
-    g = expressions(System(G)) |> first # equations for H
+    g = first(expressions(System(G))) # equations for H
 
     # Step 1:
     # we check which points of W are also contained in H

@@ -354,17 +354,17 @@
         @test convert(ComplexF64, t) == ComplexF64(1)
     end
 
-    @testset "rational functions" begin 
+    @testset "rational functions" begin
         @var x y z
         f = x^2 + y^2 - z # a polynomial 
-        g = x/(y-1) + y + z - 1 # a sum of rational expressions
+        g = x / (y - 1) + y + z - 1 # a sum of rational expressions
         h = f * g # product form 
-        @test is_polynomial(f) == true 
+        @test is_polynomial(f) == true
         @test is_polynomial(g) == false
         @test is_polynomial(h) == false
 
         P, Q = get_num_den(h)
-        R = h - P/Q
+        R = h - P / Q
         a = subs(R, [x, y, z] => randn(3))
         @test abs(to_number(a)) < 1e-14
     end
