@@ -621,89 +621,74 @@ end
 
 
 """
-    get_num_den_of_term(op)
-
-"""
-function get_num_den_of_term(op)
-    cls = ModelKit.class(op)
-    num = Expression(1)
-    den = Expression(1)
-    if cls == :Pow
-        v =  ModelKit.args(op)
-        # if exponent is negative, the denominator is base^(-exponent)
-        if v[2] isa Number 
-            if to_number(v[2]) < 0
-                ModelKit.mul!(den, den, v[1]^(-v[2]))
-            else
-                ModelKit.mul!(num, num, v[1]^(v[2]))
-            end
-        end
-    elseif cls == :Mul
-        for arg in ModelKit.args(op)
-            num_op, den_op = get_num_den_of_term(arg)
-            ModelKit.mul!(den, den, den_op)
-            ModelKit.mul!(num, num, num_op)
-        end
-    else
-        ModelKit.mul!(num, num, op)
-    end
-    return num, den
-end
-
-"""
     get_num_den(expr::Expression)
 
 Computes numerator and denominator of `expr`.
 
 ## Example
 julia> @var x y ;
-julia> expr = (x^2+1)/(y-1) + 1
-julia> P,Q = get_num_den(expr)
-(y + x^2, -1 + y)
+julia> expr = (y+1/(x-1))^2 * ((x^2+1)/(y-1) + 1)
+julia> P, Q = get_num_den(expr)
+((y + x^2)*(1 + y*(-1 + x))^2, (-1 + x)^2*(-1 + y))
 """
 function get_num_den(expr::Expression)
-    # compute all numerator and denominator of all terms
-    numerators = Vector{Expression}()
-    denominators = Vector{Expression}()
-    if ModelKit.class(expr) == :Add
-        a = ModelKit.args(expr)
-        for op in a
-            num, den = get_num_den_of_term(op)
-            push!(numerators, num)
-            push!(denominators, den)
+    cls = class(expr)
+
+    # Handle Addition: find common denominator
+    if cls == :Add
+        args_list = args(expr)
+        # Start with the first term
+        P_total, Q_total = get_num_den(args_list[1])
+        
+        for i in 2:length(args_list)
+            p_next, q_next = get_num_den(args_list[i])
+            # Rule: P1/Q1 + P2/Q2 = (P1*Q2 + P2*Q1) / (Q1*Q2)
+            new_P = Expression(0)
+            term1 = Expression(1); mul!(term1, P_total, q_next)
+            term2 = Expression(1); mul!(term2, p_next, Q_total)
+            add!(new_P, term1, term2)
+            
+            new_Q = Expression(1)
+            mul!(new_Q, Q_total, q_next)
+            
+            P_total, Q_total = new_P, new_Q
         end
-    else
-        num, den = get_num_den(expr)
-        push!(numerators, num)
-        push!(denominators, den)
-    end
+        return P_total, Q_total
 
-    # compute unique denominators
-    unique_denominators = unique(denominators)
+    # Handle Multiplication: multiply nums and dens separately
+    elseif cls == :Mul
+        P_total = Expression(1)
+        Q_total = Expression(1)
+        for arg in args(expr)
+            p, q = get_num_den(arg)
+            mul!(P_total, P_total, p)
+            mul!(Q_total, Q_total, q)
+        end
+        return P_total, Q_total
 
-    # we have expr = P / Q
-    # Form the denominator Q
-    Q = Expression(1)
-    for d in unique_denominators
-        ModelKit.mul!(Q, Q, d)
-    end
-    # Form the Numerator P
-    P = Expression(0)
-    P0 = Expression(1)
-    P1 = Expression(1)
-    for (num, den) in zip(numerators, denominators)
-        for d in denominators 
-            if d != den
-                ModelKit.mul!(P0, P0, d)
+    # Handle Powers
+    elseif cls == :Pow
+        v = args(expr)
+        base_p, base_q = get_num_den(v[1])
+        exponent = v[2]
+        
+        if exponent isa Number
+            val = to_number(exponent)
+            if val >= 0
+                return base_p^val, base_q^val
+            else
+                # Flip for negative exponents: (p/q)^-1 = q/p
+                return base_q^(-val), base_p^(-val)
             end
+        else
+            # For non-numeric exponents, treat the whole thing as a numerator
+            return expr, Expression(1)
         end
-        ModelKit.mul!(P1, P0, num)
-        ModelKit.add!(P, P, P1)
-        P0 = Expression(1)
-        P1 = Expression(1)
+
+    # Fallback for any other types
+    else
+        return expr, Expression(1)
     end
-    
-    P, Q
 end
 
 """

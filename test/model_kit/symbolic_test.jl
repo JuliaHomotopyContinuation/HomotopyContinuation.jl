@@ -356,16 +356,16 @@
 
     @testset "rational functions" begin 
         @var x y z
-        g = [x^2 + y^2 - z; x/(y-1) + y + z - 1]
-        @test is_polynomial(g) == false 
-        @test is_polynomial.(g) == [true, false] 
+        f = x^2 + y^2 - z # a polynomial 
+        g = x/(y-1) + y + z - 1 # a sum of rational expressions
+        h = f * g # product form 
+        @test is_polynomial(f) == true 
+        @test is_polynomial(g) == false
+        @test is_polynomial(h) == false
 
-        P, Q = get_num_den(g[1])
-        @test P == -z + x^2 + y^2
-        @test Q == 1
-
-        P, Q = get_num_den(g[2])
-        @test P == x + y*(-1 + y) + z*(-1 + y) - (-1 + y)
-        @test Q == -1 + y
+        P, Q = get_num_den(h)
+        R = h - P/Q
+        a = subs(R, [x, y, z] => randn(3))
+        @test abs(to_number(a)) < 1e-14
     end
 end

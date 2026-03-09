@@ -491,10 +491,8 @@ function initialize_hypersurfaces(
             return nothing
         end
         S = solutions(res, only_nonsingular = true)
-
         out[i] = WitnessSet(h, L, S)
     end
-
     out
 end
 
