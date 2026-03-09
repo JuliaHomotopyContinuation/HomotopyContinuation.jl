@@ -516,6 +516,7 @@ function Base.showerror(io::IO, ::PolynomialError)
     print(io, "Encountered an unexpected rational expression.")
 end
 
+
 """
     to_dict(expr::Expression, vars::AbstractVector{Variable})
 
@@ -524,36 +525,19 @@ is expanded and representing a polynomial.
 Throws a `PolynomialError` if a rational expression is encountered.
 """
 function to_dict(expr::Expression, vars::AbstractVector{Variable})
-    out = _to_dict(expr, vars)
-    if isnothing(out)
-        throw(PolynomialError())
-    else
-        return out
-    end
-end
-
-function _to_dict(expr::Expression, vars::AbstractVector{Variable})
     mul_args, pow_args = ExprVec(), ExprVec()
     dict = Dict{Vector{Int},Expression}()
-    is_rational = false 
 
     if class(expr) == :Add
         for op in args(expr)
-            is_poly = to_dict_op!(dict, op, vars, mul_args, pow_args)
-            if !is_poly
-                is_rational = true 
-            end
+            to_dict_op!(dict, op, vars, mul_args, pow_args)
         end
     else
-        is_poly = to_dict_op!(dict, expr, vars, mul_args, pow_args)
-        if !is_poly
-            is_rational = true 
-        end
+        to_dict_op!(dict, expr, vars, mul_args, pow_args)
     end
 
-    is_rational ? nothing : dict
+    dict
 end
-
 
 function to_dict_op!(dict, op, vars, mul_args, pow_args)
     cls = class(op)
@@ -577,7 +561,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
                 x = vec[1]
                 k = convert(Int, vec[2])
                 if k < 0
-                    return false
+                    throw(PolynomialError())
                 end
                 for (i, v) in enumerate(vars)
                     if x == v
@@ -610,7 +594,7 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
         is_var_pow = false
         k = convert(Int, vec[2])
         if k < 0
-            return false
+            throw(PolynomialError())
         end
         for (i, v) in enumerate(vars)
             if x == v
@@ -631,15 +615,108 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
     else
         dict[d] = coeff
     end
-    
-    return true
+    dict
 end
 
-function is_rational(expr::Expression, vars::AbstractVector{Variable})
-    t = _to_dict(expr, vars)
-    isnothing(t) ? true : false
+
+
+"""
+    get_num_den_of_term(op)
+
+"""
+function get_num_den_of_term(op)
+    cls = ModelKit.class(op)
+    num = Expression(1)
+    den = Expression(1)
+    if cls == :Pow
+        v =  ModelKit.args(op)
+        # if exponent is negative, the denominator is base^(-exponent)
+        if v[2] isa Number 
+            if to_number(v[2]) < 0
+                ModelKit.mul!(den, den, v[1]^(-v[2]))
+            else
+                ModelKit.mul!(num, num, v[1]^(v[2]))
+            end
+        end
+    elseif cls == :Mul
+        for arg in ModelKit.args(op)
+            num_op, den_op = get_num_den_of_term(arg)
+            ModelKit.mul!(den, den, den_op)
+            ModelKit.mul!(num, num, num_op)
+        end
+    else
+        ModelKit.mul!(num, num, op)
+    end
+    return num, den
 end
-is_rational(f::Vector{Expression}) = any(is_rational, f)
+
+"""
+    get_num_den(expr::Expression)
+
+Computes numerator and denominator of `expr`.
+
+## Example
+julia> @var x y ;
+julia> expr = (x^2+1)/(y-1) + 1
+julia> P,Q = get_num_den(expr)
+(y + x^2, -1 + y)
+"""
+function get_num_den(expr::Expression)
+    # compute all numerator and denominator of all terms
+    numerators = Vector{Expression}()
+    denominators = Vector{Expression}()
+    if ModelKit.class(expr) == :Add
+        a = ModelKit.args(expr)
+        for op in a
+            num, den = get_num_den_of_term(op)
+            push!(numerators, num)
+            push!(denominators, den)
+        end
+    else
+        num, den = get_num_den(expr)
+        push!(numerators, num)
+        push!(denominators, den)
+    end
+
+    # compute unique denominators
+    unique_denominators = unique(denominators)
+
+    # we have expr = P / Q
+    # Form the denominator Q
+    Q = Expression(1)
+    for d in unique_denominators
+        ModelKit.mul!(Q, Q, d)
+    end
+    # Form the Numerator P
+    P = Expression(0)
+    P0 = Expression(1)
+    P1 = Expression(1)
+    for (num, den) in zip(numerators, denominators)
+        for d in denominators 
+            if d != den
+                ModelKit.mul!(P0, P0, d)
+            end
+        end
+        ModelKit.mul!(P1, P0, num)
+        ModelKit.add!(P, P, P1)
+        P0 = Expression(1)
+        P1 = Expression(1)
+    end
+    
+    P, Q
+end
+
+"""
+    is_polynomial(expr)
+
+
+Returns `true`, if `expr` is a polynomial (or vector of polynomials). Returns `false`, if `expr` is not a polynomial but a rational function.
+"""
+function is_polynomial(expr::Expression)
+    num, den = get_num_den(expr)
+    den == 1 ? true : false
+end
+is_polynomial(f::Vector{Expression}) = all(is_polynomial, f)
 
 """
     exponents_coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
