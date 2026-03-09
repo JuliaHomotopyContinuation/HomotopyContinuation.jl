@@ -364,7 +364,7 @@
         @test is_polynomial(h) == false
 
         P, Q = get_num_den(h)
-        @test expand(P) == expand(f * (x + (y - 1)*(y + z - 1)))
+        @test expand(P) == expand(f * (x + (y - 1) * (y + z - 1)))
         @test Q == -1 + y
     end
 end
