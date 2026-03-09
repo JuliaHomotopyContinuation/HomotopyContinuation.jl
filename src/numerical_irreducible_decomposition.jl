@@ -467,33 +467,24 @@ function initialize_hypersurfaces(
     f = expressions(F)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
-
+    @show vars 
     for i = 1:c
         fᵢ = f[i]
         h = fixed(System([fᵢ], variables = vars), compile = false)
-        if ModelKit.is_rational(fᵢ, vars)
-            mon_res = monodromy_solve(
-                h;
-                codim = 1,
-                show_progress = false,
-                threading = threading,
-            )
-            @show nsolutions(mon_res)
-            res = solve(
-                h,
-                solutions(mon_res),
-                start_subspace = parameters(mon_res),
+        pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
+        res = solve(
+                System([pᵢ], variables = vars),
                 target_subspace = L;
                 start_system = :total_degree,
                 show_progress = false,
                 threading = threading,
             )
-            @show nsolutions(res)
-        else
-            res = solve(
-                h,
-                target_subspace = L;
-                start_system = :total_degree,
+        # if fᵢ is rational we check which zeros of pᵢ are also zeros of fᵢ
+        if qᵢ != 1 
+            res = solve(h,
+                solutions(res);
+                start_subspace = L,
+                target_subspace = L,
                 show_progress = false,
                 threading = threading,
             )
@@ -610,7 +601,7 @@ function intersect_with_hypersurface!(
     P = points(W)
     f = (System(F).expressions) # equations for W
     G = system(H) # H is the hypersurface
-    g = System(G).expressions # equations for H
+    g = expressions(System(G)) |> first # equations for H
 
     # Step 1:
     # we check which points of W are also contained in H
@@ -740,8 +731,9 @@ end
 
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
-    d = ModelKit.degree(H)
-    g0 = u^d - 1
+    P, Q = get_num_den(g)
+    d = degree(P)
+    g0 = (u^d - 1) / Q
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space K with u=c.
