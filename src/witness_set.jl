@@ -246,7 +246,8 @@ function MembershipCache(W, EO, TO, progress)
     F = system(W)
     m, n = size(F)
     i = codim(W)
-    A = zeros(ComplexF64, n - i, n)
+    A0 = zeros(ComplexF64, n - i, n)
+    A = LA.svd(A0).Vt # need to orthonormalize A
     b = zeros(ComplexF64, n - i)
     x0 = zeros(ComplexF64, n)
     y0 = zeros(ComplexF64, m)
@@ -371,7 +372,8 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
         for p in points(Y)
             track!(tracker, p, 1)
             q = solution(tracker)
-            if distance(q, x, InfNorm()) < rad
+            d = distance(q, x, InfNorm())
+            if  d < rad
                 return true
             end
         end
@@ -383,7 +385,6 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 end
 function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
-    @show atol
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
