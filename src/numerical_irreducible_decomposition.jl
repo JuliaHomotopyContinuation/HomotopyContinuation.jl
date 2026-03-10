@@ -310,13 +310,11 @@ function _regeneration(
     end
 
 
-    # initialize the linear equations for witness sets
-    A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
-
+    
     # prepare c witness sets for the output
     # internally we represent a witness superset by WitnessPoints
     # the i-th witness superset out[i] is for codimension i
-    out = initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
+    out = initialize_witness_sets(codim, n)
 
 
     # we compute witness (super)sets for the hypersurfaces f[1]=0,...,f[c]=0.
@@ -417,9 +415,7 @@ function _regeneration(
 end
 
 
-function initialize_linear_equations(n)
-
-    L₀ = rand_subspace(n; dim = 1)
+function initialize_linear_equations(n, L₀)
     A₀ = extrinsic(L₀).A # per constructor, A₀ has orthonormal rows
     b₀ = extrinsic(L₀).b
 
@@ -434,18 +430,25 @@ function initialize_linear_equations(n)
 
     (A, b, Aᵤ, bᵤ)
 end
-function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
+function initialize_linear_subspace(A, b, Aᵤ, bᵤ; ignore = 0) # i = ignore the first `ignore` rows of A
+    i = ignore + 1
+    j = i + 1
+    # type 1 linear equation for out[i] takes the last i rows of Aᵤ
+    Eᵤ = ExtrinsicDescription(Aᵤ[i:end, :], bᵤ[i:end]; orthonormal = true)
+    Lᵤ = LinearSubspace(Eᵤ)
+    # type 2 linear equation for out[i] takes the last i-1 rows and the first row of A
+    E = ExtrinsicDescription(A[[1; j:n], :], b[[1; j:n]]; orthonormal = true)
+    L = LinearSubspace(E)
+    WitnessPoints(L, Lᵤ, Vector{Vector{ComplexF64}}())
+end
+function initialize_witness_sets(codim, n)
+    # initialize the linear equations for witness sets
+    L₀ = rand_subspace(n; dim = 1)
+    A, b, Aᵤ, bᵤ = initialize_linear_equations(n, L₀)
+
     out = Vector{WitnessPoints}(undef, codim)
     for i = 1:codim
-        j = i + 1
-        # type 1 linear equation for out[i] takes the last i rows of Aᵤ
-        Eᵤ = ExtrinsicDescription(Aᵤ[i:end, :], bᵤ[i:end]; orthonormal = true)
-        Lᵤ = LinearSubspace(Eᵤ)
-        # type 2 linear equation for out[i] takes the last i-1 rows and the first row of A
-        E = ExtrinsicDescription(A[[1; j:n], :], b[[1; j:n]]; orthonormal = true)
-        L = LinearSubspace(E)
-
-        out[i] = WitnessPoints(L, Lᵤ, Vector{Vector{ComplexF64}}())
+        out[i] = initialize_linear_subspace(A, b, Aᵤ, bᵤ; i = i)
     end
 
     out
@@ -1708,3 +1711,73 @@ nid(F::Vector{Expression}; kwargs...) = numerical_irreducible_decomposition(F; k
 nid(F::Expression; kwargs...) = numerical_irreducible_decomposition([F]; kwargs...)
 numerical_irreducible_decomposition(F::Vector{Expression}; kwargs...) =
     numerical_irreducible_decomposition(System(F); kwargs...)
+
+
+### intersecting witness sets with hypersurfaces 
+"""
+    IntersectCache
+
+A cache for [`intersect`](@ref).
+"""
+mutable struct IntersectCache
+    A::Vector
+    b::Vector
+    x0::Vector
+    y0::Vector
+    y::Vector
+
+    Fᵢ::Sys
+    u::Variable
+    n::Int
+    i::Int
+    codim::Int
+
+    endgame_options::EndgameOptions
+    tracker_options::TrackerOptions
+
+    progress::Union{WitnessSetsProgress,Nothing}
+end
+
+function IntersectCache(W, EO, TO, progress)
+    IntersectCache(EO, TO, progress)
+end
+
+
+"""
+    intersect
+
+"""
+function intersect(W::WitnessSet, H::WitnessSet; 
+                    show_progress::Bool = true,
+                    tracker_options = TrackerOptions(),
+                    endgame_options = EndgameOptions(;
+                        max_endgame_steps = 100,
+                        max_endgame_extended_steps = 100,
+                        sing_cond = 1e12,
+                    ),
+                    threading = Threads.nthreads() > 1,
+                    kwargs...)
+    @assert codim(H) == 1 "The second argument must be a hypersurface."
+
+    @unique_var u
+    FW, varsW, Wᵤ = prepare_for_u_homotopy(H, u)
+    FH, varsH, Hᵤ = prepare_for_u_homotopy(H, u)
+    X = Vector{Vector{ComplexF64}}()
+
+    intersect_with_hypersurface!(Wᵤ, Hᵤ, X, cache; threading = threading, kwargs...)
+    
+    P, L_ = u_transform(Wᵤ)
+    WitnessSet(F, L, P), WitnessSet(FX, L, X)
+end
+
+function prepare_for_u_homotopy(W, u)
+    # prepare polynomials
+    F = deepcopy(system(W))
+    vars = variables(F)
+    push!(vars, u)
+    # prepare linear equations
+    L = linear_subspace(W)
+    A, b, Aᵤ, bᵤ = initialize_linear_equations(n, L)
+    Wᵤ = initialize_linear_subspace(A, b, Aᵤ, bᵤ)
+    F, vars, Wᵤ
+end

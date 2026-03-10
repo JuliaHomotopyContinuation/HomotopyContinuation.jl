@@ -86,6 +86,9 @@ function Base.show(io::IO, W::WitnessSet)
     print(io, "Witness set for dimension $(dim(W)) of degree $(degree(W))")
 end
 
+copy(W::WitnessSet) =  WitnessSet(copy(W.F), copy(W.L), copy(W.R), copy(W.projective), copy(W.is_irreducible))
+
+
 
 """
     is_irreducible(W::WitnessSet)
@@ -225,7 +228,7 @@ end
 update_progress!(progress::Union{Nothing,MembershipProgress}, W::Nothing) = nothing
 
 """
-    Membership cache
+    MembershipCache
 
 A cache for [`membership`](@ref).
 """
@@ -536,3 +539,4 @@ function trace_test(W₀::WitnessSet; options...)
 
     trace
 end
+
