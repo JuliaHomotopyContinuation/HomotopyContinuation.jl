@@ -353,4 +353,18 @@
         t = x + (1.0 + 0.0im) - x
         @test convert(ComplexF64, t) == ComplexF64(1)
     end
+
+    @testset "rational functions" begin
+        @var x y z
+        f = x^2 + y^2 - z # a polynomial 
+        g = x / (y - 1) + y + z - 1 # a sum of rational expressions
+        h = f * g # product form 
+        @test is_polynomial(f) == true
+        @test is_polynomial(g) == false
+        @test is_polynomial(h) == false
+
+        P, Q = get_num_den(h)
+        @test expand(P) == expand(f * (x + (y - 1) * (y + z - 1)))
+        @test Q == -1 + y
+    end
 end

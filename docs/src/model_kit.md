@@ -33,7 +33,10 @@ rand_poly
 to_dict
 to_number
 variables(::Expression)
+is_polynomial(::Expression)
+get_num_den(::Expression)
 ```
+
 
 ## System
 ```@docs

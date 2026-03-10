@@ -287,14 +287,8 @@ function _regeneration(
     # by Duff, Leykin and Rodriguez in https://arxiv.org/abs/2206.02869
 
     vars = variables(F)
-    if sorted
-        f = sort(expressions(F), by = ModelKit.degree, rev = true)
-    else
-        f = expressions(F)
-    end
-
-    n = length(vars) # ambient dimension
-    c = length(f) # we can have witness sets of codimesion at most min(c,n)
+    n = size(F, 2) # ambient dimension
+    c = size(F, 1) # we can have witness sets of codimesion at most min(c,n)
     expected_max_codim = min(c, n)
     if !isnothing(max_codim) && max_codim < expected_max_codim
         # if max_codim is smaller than the expected codimension we must compute witness points for one more codimension, so that we can remove spurious points
@@ -302,7 +296,11 @@ function _regeneration(
     else
         codim = expected_max_codim
     end
+    # u-regeneration adds another variable u to F
+    @unique_var u
+    push!(vars, u)
 
+    # progress bar
     if show_progress
         progress = WitnessSetsProgress(
             n,
@@ -319,10 +317,6 @@ function _regeneration(
     end
 
 
-    # u-regeneration adds another variable u to F
-    @unique_var u
-    push!(vars, u)
-
     # initialize the linear equations for witness sets
     A, b, Aᵤ, bᵤ = initialize_linear_equations(n)
 
@@ -336,9 +330,18 @@ function _regeneration(
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H = initialize_hypersurfaces(f, vars, linear_subspace(out[1]); threading = threading)
+    H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
     if any(H .== nothing)
         return nothing
+    end
+
+    # sort expressions by degree
+    if sorted
+        σ = sortperm(H, by = ModelKit.degree, rev = true)
+        f = expressions(F)[σ]
+        H = H[σ]
+    else
+        f = expressions(F)
     end
 
     # Initialize a cache
@@ -455,31 +458,42 @@ function initialize_witness_sets(codim, n, A, b, Aᵤ, bᵤ)
     out
 end
 function initialize_hypersurfaces(
-    f::Vector{Expression},
+    F::System,
     vars,
     L;
     threading::Bool = Threads.nthreads() > 1,
 )
+    f = expressions(F)
     c = length(f)
     out = Vector{WitnessSet}(undef, c)
-
     for i = 1:c
-        h = fixed(System([f[i]], variables = vars), compile = false)
+        fᵢ = f[i]
+        h = fixed(System([fᵢ], variables = vars), compile = false)
+        pᵢ, qᵢ = get_num_den(fᵢ) # fᵢ = pᵢ / qᵢ
         res = solve(
-            h,
+            System([pᵢ], variables = vars),
             target_subspace = L;
             start_system = :total_degree,
             show_progress = false,
             threading = threading,
         )
+        # if fᵢ is rational we check which zeros of pᵢ are also zeros of fᵢ
+        if qᵢ != 1
+            res = solve(
+                h,
+                solutions(res);
+                start_subspace = L,
+                target_subspace = L,
+                show_progress = false,
+                threading = threading,
+            )
+        end
         if isnothing(res)
             return nothing
         end
         S = solutions(res, only_nonsingular = true)
-
         out[i] = WitnessSet(h, L, S)
     end
-
     out
 end
 
@@ -584,7 +598,7 @@ function intersect_with_hypersurface!(
     P = points(W)
     f = (System(F).expressions) # equations for W
     G = system(H) # H is the hypersurface
-    g = System(G).expressions # equations for H
+    g = first(expressions(System(G))) # equations for H
 
     # Step 1:
     # we check which points of W are also contained in H
@@ -714,8 +728,9 @@ end
 
 function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
-    d = ModelKit.degree(H)
-    g0 = u^d - 1
+    P, Q = get_num_den(g)
+    d = degree(P)
+    g0 = (u^d - 1) / Q
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space K with u=c.
@@ -1763,6 +1778,23 @@ Numerical irreducible decomposition with 11 components
 │     1     │          (4, 4)          │
 │     0     │ (1, 1, 1, 1, 1, 1, 1, 1) │
 ╰───────────┴──────────────────────────╯
+```
+
+`numerical_irreducible_decomposition` also works for systems of rational functions:
+```julia-repl
+julia> @var x y z
+julia> g = [x^2 + y^2 - z; x/(y-1) + y + z - 1]
+julia> N = numerical_irreducible_decomposition(g)
+Numerical irreducible decomposition with 1 component
+====================================================
+• 1 component(s) of dimension 1.
+
+ degree table of components:
+╭───────────┬───────────────────────╮
+│ dimension │ degrees of components │
+├───────────┼───────────────────────┤
+│     1     │           4           │
+╰───────────┴───────────────────────╯
 ```
 """
 function numerical_irreducible_decomposition(
