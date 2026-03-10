@@ -750,42 +750,43 @@ end
 
 Returns a boolean vector indicating whether the points of X are contained in (Y, F).
 """
-function is_contained(X, Y, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
-
-    tracker_options = cache.tracker_options
-    endgame_options = cache.endgame_options
+function is_contained(P::Vector{Vector{ComplexF64}}, Y::WitnessSet, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
     progress = cache.progress
     update_progress!(progress; is_membership_test = true)
-
-    # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
-    LX = linear_subspace(X)
+    
+    # set up homotopy
+    tracker_options = cache.tracker_options
+    endgame_options = cache.endgame_options
     LY = linear_subspace(Y)
-    k = codim(LY) - codim(LX) # k≥0 iff dim X ≤ dim Y
-
-
-    if k < 0 || length(points(Y)) == 0 || length(points(X)) == 0
-        # if dim X > dim Y return only false
-        out = falses(length(points(X)))
-    else
-        # setup 
-
-        Hom = linear_subspace_homotopy(F, LY, LY)
+    Hom = linear_subspace_homotopy(F, LY, LY)
         tracker = EndgameTracker(
             Hom;
             tracker_options = tracker_options,
             options = endgame_options,
         )
-        set_up_linear_spaces!(cache, LX, LY)
 
-        if threading
-            out = threaded_x_in_Y(X, Y, F, tracker, cache; kwargs...)
-        else
-            out = serial_x_in_Y(X, Y, F, tracker, cache; kwargs...)
-        end
+    # tracking
+    if threading
+        out = threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...)
+    else
+        out = serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
     end
+    
     update_progress!(progress; is_membership_test = false)
 
     out
+end
+function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
+    # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
+    LX = linear_subspace(X)
+    LY = linear_subspace(Y)
+
+    if length(points(Y)) == 0 || length(points(X)) == 0
+        return falses(length(points(X)))
+    end
+    
+    set_up_linear_spaces!(cache, LX, LY)
+    is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
 end
 function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache; kwargs...)
     is_contained(V, W, system(W), cache; kwargs...)
@@ -828,7 +829,7 @@ function set_up_linear_spaces!(cache, LX, LY)
 end
 
 
-function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
@@ -836,15 +837,13 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     y0 = cache.y0
     y = cache.y
 
-    LX = linear_subspace(X)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
-    k = codim(LY) - codim(LX)
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
 
-    P = points(X)
     l_X = length(P)
+
     out = Vector{Bool}(undef, l_X)
     idx = 0
 
@@ -861,10 +860,7 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
         end
 
         # second check
-        for i = 2:(k+1)
-            b[i] = sum(A[i, j] * x[j] for j = 1:n)
-        end
-
+        LA.mul!(b, A, x)
         # set up the corresponding LinearSubspace L
         E = ExtrinsicDescription(A, b; orthonormal = true)
         L = LinearSubspace(E)
@@ -874,7 +870,7 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
         rad = max(atol, norm(x, Inf) * rtol)
 
         # add the points in Y to U after we have moved them towards L 
-        for (i, p) in enumerate(points(Y))
+        for p in points(Y)
             track!(tracker, p, 1)
             q = solution(tracker)
             if distance(q, x, InfNorm()) < rad
@@ -887,22 +883,20 @@ function serial_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 
     out
 end
-function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
 
-    LX = linear_subspace(X)
     LY = linear_subspace(Y)
     n = ambient_dim(LY)
-    k = codim(LY) - codim(LX)
 
     dY = dim(LY)
     A, b = cache.As[dY+1], cache.bs[dY+1]
-
-    P = points(X)
     l_X = length(P)
+
+    # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
 
     # Pre-allocate one tracker and buffers per thread
@@ -944,9 +938,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
                         result = false
                         if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
                             # second check
-                            for i = 2:(k+1)
-                                local_b[i] = sum(A[i, j] * x[j] for j = 1:n)
-                            end
+                            LA.mul!(local_b, A, x)
                             # set up the corresponding LinearSubspace L
                             E = ExtrinsicDescription(A, local_b; orthonormal = true)
                             L = LinearSubspace(E)
@@ -956,7 +948,7 @@ function threaded_x_in_Y(X, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
                             rad = max(atol, norm(x, Inf) * rtol)
 
                             # add the points in Y to U after we have moved them towards L 
-                            for (i, p) in enumerate(points(Y))
+                            for p in points(Y)
                                 track!(local_tracker, p, 1)
                                 q = solution(local_tracker)
                                 if distance(q, x, InfNorm()) < rad
