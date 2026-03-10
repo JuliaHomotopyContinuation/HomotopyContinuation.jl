@@ -96,7 +96,7 @@ function update_progress_hypersurface!(progress::WitnessSetsProgress, i::Int)
         showvalues = showvalues(progress),
     )
 end
-update_progress_tasks!(progress::Nothing, i::Int, m::Int) = nothing
+# update_progress_tasks!(progress::Nothing, i::Int, m::Int) = nothing: not needed because already defined
 function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
     progress.current_task = i
     progress.ntasks = m
@@ -182,8 +182,8 @@ end
 A cache for [`regeneration`](@ref).
 """
 mutable struct RegenerationCache{Sys<:AbstractSystem}
-    As::Vector
-    bs::Vector
+    A::Vector
+    b::Vector
     x0::Vector
     y0::Vector
     y::Vector
@@ -217,13 +217,6 @@ function update_Fᵢ!(cache, Fᵢ)
     nothing
 end
 update_i!(cache, i) = cache.i = i
-function update_x0!(x0)
-    for i = 1:length(x0)
-        x0[i] = randn(ComplexF64)
-    end
-    LA.normalize!(x0)
-    x0
-end
 
 """
     regeneration(F::System; options...) 
@@ -745,38 +738,10 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 end
 
 
-"""
-    is_contained(X, Y, F, cache)
 
-Returns a boolean vector indicating whether the points of X are contained in (Y, F).
-"""
-function is_contained(P::Vector{Vector{ComplexF64}}, Y::WitnessSet, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...)
+function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     progress = cache.progress
     update_progress!(progress; is_membership_test = true)
-    
-    # set up homotopy
-    tracker_options = cache.tracker_options
-    endgame_options = cache.endgame_options
-    LY = linear_subspace(Y)
-    Hom = linear_subspace_homotopy(F, LY, LY)
-        tracker = EndgameTracker(
-            Hom;
-            tracker_options = tracker_options,
-            options = endgame_options,
-        )
-
-    # tracking
-    if threading
-        out = threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...)
-    else
-        out = serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
-    end
-    
-    update_progress!(progress; is_membership_test = false)
-
-    out
-end
-function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
@@ -786,7 +751,10 @@ function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     end
     
     set_up_linear_spaces!(cache, LX, LY)
-    is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
+    out = is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
+    update_progress!(progress; is_membership_test = true)
+
+    out
 end
 function is_contained(V::WitnessPoints, W::WitnessSet, cache::RegenerationCache; kwargs...)
     is_contained(V, W, system(W), cache; kwargs...)
@@ -801,8 +769,8 @@ function set_up_linear_spaces!(cache, LX, LY)
 
     # to compute linear spaces through the points in X we first set up
     # a matrix-vector pair of the correct size cY×n
-    A = cache.As[dY+1]
-    b = cache.bs[dY+1]
+    A = cache.A[dY+1]
+    b = cache.b[dY+1]
 
     # since we have used a subset of the equations for Y also for X,
     # we can reuse them
@@ -828,147 +796,6 @@ function set_up_linear_spaces!(cache, LX, LY)
     end
 end
 
-
-function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
-
-    progress = cache.progress
-    x0 = cache.x0
-    update_x0!(x0)
-    y0 = cache.y0
-    y = cache.y
-
-    LY = linear_subspace(Y)
-    n = ambient_dim(LY)
-    dY = dim(LY)
-    A, b = cache.As[dY+1], cache.bs[dY+1]
-
-    l_X = length(P)
-
-    out = Vector{Bool}(undef, l_X)
-    idx = 0
-
-    #we loop over the points in X and check if they are contained in Y
-    out = map(P) do x
-        idx += 1
-        update_progress_tasks!(progress, idx, l_X)
-
-        # first check
-        evaluate!(y0, F, norm(x, Inf) .* x0)
-        evaluate!(y, F, x)
-        if norm(y, Inf) > 1e-2 * norm(y0, Inf)
-            return false
-        end
-
-        # second check
-        LA.mul!(b, A, x)
-        # set up the corresponding LinearSubspace L
-        E = ExtrinsicDescription(A, b; orthonormal = true)
-        L = LinearSubspace(E)
-        # set L as the target for homotopy continuation
-        target_parameters!(tracker, L)
-
-        rad = max(atol, norm(x, Inf) * rtol)
-
-        # add the points in Y to U after we have moved them towards L 
-        for p in points(Y)
-            track!(tracker, p, 1)
-            q = solution(tracker)
-            if distance(q, x, InfNorm()) < rad
-                return true
-            end
-        end
-
-        return false
-    end
-
-    out
-end
-function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
-
-    progress = cache.progress
-    x0 = cache.x0
-    update_x0!(x0)
-
-    LY = linear_subspace(Y)
-    n = ambient_dim(LY)
-
-    dY = dim(LY)
-    A, b = cache.As[dY+1], cache.bs[dY+1]
-    l_X = length(P)
-
-    # Pre-allocate output
-    out = Vector{Bool}(undef, l_X)
-
-    # Pre-allocate one tracker and buffers per thread
-    nthr = Threads.nthreads()
-    trackers = [deepcopy(tracker) for _ = 1:nthr]
-    y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ = 1:nthr]
-    y_bufs = [zeros(ComplexF64, length(cache.y)) for _ = 1:nthr]
-    b_bufs = [deepcopy(b) for _ = 1:nthr]
-    F_bufs = [deepcopy(F) for _ = 1:nthr]
-
-    progress_lock = ReentrantLock()
-    next_idx = Threads.Atomic{Int}(1)
-
-    Threads.@sync begin
-        for tid = 1:nthr
-            let local_tracker = trackers[tid],
-                local_y0 = y0_bufs[tid],
-                local_y = y_bufs[tid],
-                local_b = b_bufs[tid]
-
-                local_F = F_bufs[tid]
-
-                Threads.@spawn begin
-                    while true
-                        idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > l_X
-                            break
-                        end
-
-                        x = P[idx]
-                        lock(progress_lock) do
-                            update_progress_tasks!(progress, idx, l_X)
-                        end
-
-                        # first check
-                        evaluate!(local_y0, local_F, norm(x, Inf) .* x0)
-                        evaluate!(local_y, local_F, x)
-
-                        result = false
-                        if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
-                            # second check
-                            LA.mul!(local_b, A, x)
-                            # set up the corresponding LinearSubspace L
-                            E = ExtrinsicDescription(A, local_b; orthonormal = true)
-                            L = LinearSubspace(E)
-                            # set L as the target for homotopy continuation
-                            target_parameters!(local_tracker, L)
-
-                            rad = max(atol, norm(x, Inf) * rtol)
-
-                            # add the points in Y to U after we have moved them towards L 
-                            for p in points(Y)
-                                track!(local_tracker, p, 1)
-                                q = solution(local_tracker)
-                                if distance(q, x, InfNorm()) < rad
-                                    result = true
-                                    break
-                                end
-                            end
-                        end
-
-                        lock(progress_lock) do
-                            out[idx] = result
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return out
-end
 
 """
     DecomposeProgress
