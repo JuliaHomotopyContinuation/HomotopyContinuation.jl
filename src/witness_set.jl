@@ -263,9 +263,17 @@ function update_x0!(x0)
 end
 
 """
-    membership(P, W)
+    membership(P::Vector{Vector{T}}, W::WitnessSet) where {T <: Number}
 
 Returns a boolean vector indicating whether the points of P are contained in X.
+
+### Options
+
+* `show_progress = true`: indicate whether a progress bar should be displayed.
+* `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 """
 function membership(P::Vector{Vector{T}}, W::WitnessSet; 
                     show_progress::Bool = true,
@@ -375,6 +383,7 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
 end
 function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
 
+    @show atol
     progress = cache.progress
     x0 = cache.x0
     update_x0!(x0)
