@@ -1900,7 +1900,7 @@ function prepare_for_u_homotopy(H, W, vars, u)
     FH0 = System(system(H)) |> deepcopy
     FW0 = System(system(W)) |> deepcopy
     fH = subs(expressions(FH0), variables(FH0) => vars)
-    fW = subs(expressions(FW0), variables(FH0) => vars)
+    fW = subs(expressions(FW0), variables(FW0) => vars)
     vars_u = [vars; u]
     FH = System(fH, variables = vars_u)
     FW = System(fW, variables = vars_u)
