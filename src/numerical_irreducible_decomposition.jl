@@ -1817,9 +1817,40 @@ end
 
 
 """
-    intersect
+    intersect(W::WitnessSet, H::WitnessSet)
+    intersect(W::WitnessSet, f::Expression)
+
+This intersects the witness sets `W` and `H`, where `H` is a hypersurface defined by single polynomial `f`. 
+
+### Options
+
+* `show_progress = true`: indicate whether a progress bar should be displayed.
+* `show_monodromy_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) should be displayed.
+* `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `monodromy_options`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref).
+* `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
+
+### Example
+
+The following example computes witness sets for a union of two circles.
+
+```julia-repl
+julia> @var x y z
+julia> f = x^2 + y^2 + z^2 - 1
+julia> g = [x^2 + y^2 - 4; (x-1)^2 + (z-1)^2 - 1]
+julia> W = witness_set(g, codim = 2)
+julia> intersect(W, f)
+Witness set for dimension 0 of degree 8
+```    
 
 """
+
+function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
+    H = witness_set(f)
+    intersect(W, H; kwargs...)
+end
 function Base.intersect(W::WitnessSet, H::WitnessSet; 
                     show_progress::Bool = true,
                     tracker_options = TrackerOptions(),
