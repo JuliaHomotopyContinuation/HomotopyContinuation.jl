@@ -148,7 +148,7 @@ julia> W = witness_set(F)
 Witness set for dimension 1 of degree 2
 ```
 """
-witness_set(F::Expression, args...; kwargs...) = witness_set([F], args...; kwargs...) 
+witness_set(F::Expression, args...; kwargs...) = witness_set([F], args...; kwargs...)
 witness_set(F::Vector{Expression}, args...; kwargs...) =
     witness_set(System(F), args...; kwargs...)
 witness_set(F::System, args...; compile = COMPILE_DEFAULT[], kwargs...) =
@@ -179,12 +179,24 @@ function witness_set(
     )
 end
 
-function witness_set(F::AbstractSystem, L::LinearSubspace; projective = nothing, rational = nothing, options...)
+function witness_set(
+    F::AbstractSystem,
+    L::LinearSubspace;
+    projective = nothing,
+    rational = nothing,
+    options...,
+)
     if isnothing(rational)
         res = solve(F; target_subspace = L, options...)
     else
         mon_res = monodromy_solve(F; dim = codim(L))
-        res = solve(F, solutions(mon_res); start_subspace = parameters(mon_res), target_subspace = L, options...)
+        res = solve(
+            F,
+            solutions(mon_res);
+            start_subspace = parameters(mon_res),
+            target_subspace = L,
+            options...,
+        )
     end
     if isnothing(projective)
         WitnessSet(F, L, results(res; only_nonsingular = true))
@@ -227,12 +239,17 @@ Base.@kwdef mutable struct MembershipProgress
     current_task::Int = 0
     ntasks::Int = 0
 end
-MembershipProgress(progress_meter::PM.Progress) = MembershipProgress(progress_meter = progress_meter)
+MembershipProgress(progress_meter::PM.Progress) =
+    MembershipProgress(progress_meter = progress_meter)
 update_progress_tasks!(progress::Nothing, i::Int, m::Int) = nothing
 function update_progress_tasks!(progress::MembershipProgress, i::Int, m::Int)
     progress.current_task = i
     progress.ntasks = m
-    PM.update!(progress.progress_meter, i; showvalues = [("Points checked", "$(progress.current_task)/$(progress.ntasks)")])
+    PM.update!(
+        progress.progress_meter,
+        i;
+        showvalues = [("Points checked", "$(progress.current_task)/$(progress.ntasks)")],
+    )
 end
 update_progress!(progress::Union{Nothing,MembershipProgress}, W::Nothing) = nothing
 
@@ -288,21 +305,30 @@ Returns a boolean vector indicating whether the points of P are contained in X.
 * `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
 * `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
 """
-function membership(P::Vector{Vector{T}}, W::WitnessSet; 
-                    show_progress::Bool = true,
-                    tracker_options = TrackerOptions(),
-                    endgame_options = EndgameOptions(;
-                        max_endgame_steps = 100,
-                        max_endgame_extended_steps = 100,
-                        sing_cond = 1e12,
-                    ),
-                    kwargs...) where {T <: Number}
+function membership(
+    P::Vector{Vector{T}},
+    W::WitnessSet;
+    show_progress::Bool = true,
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(;
+        max_endgame_steps = 100,
+        max_endgame_extended_steps = 100,
+        sing_cond = 1e12,
+    ),
+    kwargs...,
+) where {T<:Number}
 
     # progress bar
     if show_progress
         desc = "Membership test"
         barlen = min(ProgressMeter.tty_width(desc, stdout, false), 40)
-        progress_meter = ProgressMeter.Progress(length(P); dt = 0.2, desc = desc, barlen = barlen, output = stdout)
+        progress_meter = ProgressMeter.Progress(
+            length(P);
+            dt = 0.2,
+            desc = desc,
+            barlen = barlen,
+            output = stdout,
+        )
         progress = MembershipProgress(progress_meter)
     else
         progress = nothing
@@ -311,22 +337,26 @@ function membership(P::Vector{Vector{T}}, W::WitnessSet;
     cache = MembershipCache(W, endgame_options, tracker_options, progress)
     is_contained(P, W, system(W), cache; kwargs...)
 end
-function membership(p::Vector{T}, W::WitnessSet; kwargs...) where {T <: Number}
+function membership(p::Vector{T}, W::WitnessSet; kwargs...) where {T<:Number}
     out = membership([p], W)
     first(out)
 end
-function is_contained(P::Vector{Vector{T}}, Y::WitnessSet, F, cache; threading::Bool = Threads.nthreads() > 1, kwargs...) where {T <: Number}
-    
+function is_contained(
+    P::Vector{Vector{T}},
+    Y::WitnessSet,
+    F,
+    cache;
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+) where {T<:Number}
+
     # set up homotopy
     tracker_options = cache.tracker_options
     endgame_options = cache.endgame_options
     LY = linear_subspace(Y)
     Hom = linear_subspace_homotopy(F, LY, LY)
-        tracker = EndgameTracker(
-            Hom;
-            tracker_options = tracker_options,
-            options = endgame_options,
-        )
+    tracker =
+        EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
 
     # tracking
     if threading
@@ -346,8 +376,8 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     y = cache.y
     l_X = length(P)
 
-    A, b =  cache.A, cache.b
-   
+    A, b = cache.A, cache.b
+
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
     idx = 0
@@ -379,7 +409,7 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
             track!(tracker, p, 1)
             q = solution(tracker)
             d = distance(q, x, InfNorm())
-            if  d < rad
+            if d < rad
                 return true
             end
         end
@@ -399,7 +429,7 @@ function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
     l_X = length(P)
 
     if first(cache.b) isa Number
-        A, b =  cache.A, cache.b
+        A, b = cache.A, cache.b
     else
         LY = linear_subspace(Y)
         dY = dim(LY)
@@ -542,4 +572,3 @@ function trace_test(W₀::WitnessSet; options...)
 
     trace
 end
-

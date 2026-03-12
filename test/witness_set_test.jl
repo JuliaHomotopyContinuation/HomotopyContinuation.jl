@@ -93,7 +93,7 @@
         p * (z - 3) * (z - 5)
     ]
 
-    @testset "membership" begin 
+    @testset "membership" begin
         W = witness_set(F; codim = 2)
 
         p = randn(3)
@@ -105,7 +105,7 @@
         @test a == [false, true]
     end
 
-    @testset "intersect" begin 
+    @testset "intersect" begin
         H = [witness_set(f) for f in F]
         B = intersect(H[1], H[2])
         C = vcat([intersect(Hi, H[3]; show_progress = false) for Hi in B]...)
