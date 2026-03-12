@@ -621,7 +621,7 @@ function intersect_with_hypersurface!(
 
     # here comes the loop for tracking
     update_progress_tasks!(progress, 0, length(start))
-    update_progress!(progress;; is_membership_test = false, is_solving = true, is_monodromy = false)
+    update_progress!(progress; is_membership_test = false, is_solving = true, is_monodromy = false)
     if threading
         threaded_intersection!(X, start, tracker, progress)
     else
