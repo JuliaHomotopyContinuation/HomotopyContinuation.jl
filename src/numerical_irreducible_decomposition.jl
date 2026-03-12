@@ -675,7 +675,7 @@ function manage_initial_points!(P, m, W, progress)
 end
 
 function serial_intersection!(X, P, roots, egtracker, progress)
-    start = Iterators.product(P_next, roots)
+    start = Iterators.product(P, roots)
     l_start = length(P) * length(roots)
 
     for (i, s) in enumerate(start)
