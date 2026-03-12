@@ -193,13 +193,17 @@ end
 A cache for [`regeneration`](@ref).
 """
 mutable struct RegenerationCache{Sys<:AbstractSystem}
+    # array caches
     A::Matrix{ComplexF64}
     b::Vector{ComplexF64}
     x0::Vector{ComplexF64}
     y0::Vector{ComplexF64}
     y::Vector{ComplexF64}
 
+    # carry polynomials along
+    fᵢ::Vector{Expression}
     Fᵢ::Sys
+    h::Expression
     u::Variable
     i::Int
     codim::Int
@@ -210,7 +214,7 @@ mutable struct RegenerationCache{Sys<:AbstractSystem}
     progress::Union{WitnessSetsProgress,Nothing}
 end
 
-function RegenerationCache(u, F, codim, EO, TO, progress)
+function RegenerationCache(u, f, F, h, codim, EO, TO, progress)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -218,15 +222,18 @@ function RegenerationCache(u, F, codim, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    RegenerationCache(A, b, x0, y0, y, F, u, 0, codim, EO, TO, progress)
+    RegenerationCache(A, b, x0, y0, y, f, F, h, u, 0, codim, EO, TO, progress)
 end
-function update_Fᵢ!(cache, Fᵢ)
+function update_Fᵢ!(cache, fᵢ, vars)
+    Fᵢ = fixed(System(fᵢ, variables = vars), compile = false)
+    cache.fᵢ = fᵢ
     cache.Fᵢ = Fᵢ
     cache.y0 = zeros(ComplexF64, length(Fᵢ))
     cache.y = zeros(ComplexF64, length(Fᵢ))
 
     nothing
 end
+update_hᵢ!(cache, h) = cache.h = h
 update_i!(cache, i) = cache.i = i
 
 """
@@ -345,7 +352,16 @@ function _regeneration(
 
     # Initialize a cache
     Fᵢ = fixed(System(f[1:1], variables = vars), compile = false)
-    cache = RegenerationCache(u, Fᵢ, codim, endgame_options, tracker_options, progress)
+    cache = RegenerationCache(
+        u,
+        f[1:1],
+        Fᵢ,
+        f[1],
+        codim,
+        endgame_options,
+        tracker_options,
+        progress,
+    )
 
     # now comes the core loop of the algorithm.
     # we start with the first hypersurface f[1]=0 and take its witness superset H[1]
@@ -367,6 +383,7 @@ function _regeneration(
             else
                 begin
                     update_i!(cache, i)
+                    update_hᵢ!(cache, f[i])
 
                     # for all W in out we intersect W with H[i]
                     intersect_all!(
@@ -379,8 +396,7 @@ function _regeneration(
                     )
 
                     # update Fᵢ
-                    Fᵢ = fixed(System(f[1:i], variables = vars), compile = false)
-                    update_Fᵢ!(cache, Fᵢ)
+                    update_Fᵢ!(cache, f[1:i], vars)
 
                     # running one monodromy per witness set to fill up point
                     fill_up!(
@@ -598,14 +614,13 @@ function intersect_with_hypersurface!(
     threading::Bool = Threads.nthreads() > 1,
     kwargs...,
 )
-    F = cache.Fᵢ
     progress = cache.progress
+
+    F, f, h = cache.Fᵢ, cache.fᵢ, cache.h # eqs for W and H
     u = cache.u
 
     P = points(W)
-    f = (System(F).expressions) # equations for W
-    G = system(H) # H is the hypersurface
-    g = first(expressions(System(G))) # equations for H
+    vars = variables(F)
 
     # Step 1:
     # we check which points of W are also contained in H
@@ -624,7 +639,7 @@ function intersect_with_hypersurface!(
     # Step 2:
     # the points in P_next are used as starting points for a homotopy.
     # where u^d-1 (u is the extra variable in u-regeneration) is deformed into g 
-    Hom, d = set_up_u_homotopy(H, u, W, X, f, g, variables(F))
+    Hom, d = set_up_u_homotopy(W, f, X, H, h, vars, u)
 
     tracker = EndgameTracker(
         Hom;
@@ -737,19 +752,19 @@ function threaded_intersection!(X, start, tracker, progress)
     nothing
 end
 
-function set_up_u_homotopy(H, u, W, X, f, g, vars)
+function set_up_u_homotopy(W, f, X, H, h, vars, u)
 
-    P, Q = get_num_den(g)
+    P, Q = get_num_den(h)
     d = degree(P)
-    g0 = (u^d - 1) / Q
+    h0 = (u^d - 1) / Q
 
     # we start with the linear space L which does not use pose conditions on u, so that u^d=1
     # we end with the linear space K with u=c.
     L = linear_subspace_u(W)
     K = linear_subspace(X)
 
-    F₀ = slice(System([f; g0], variables = vars), L; compile = false)
-    G₀ = slice(System([f; g], variables = vars), K; compile = false)
+    F₀ = slice(System([f; h0], variables = vars), L; compile = false)
+    G₀ = slice(System([f; h], variables = vars), K; compile = false)
     Hom = StraightLineHomotopy(F₀, G₀; gamma = cis(2 * pi * rand()))
 
     return Hom, d
@@ -1822,7 +1837,9 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     y0::Vector{ComplexF64}
     y::Vector{ComplexF64}
 
+    fᵢ::Vector{Expression}
     Fᵢ::Sys
+    h::Expression
     u::Variable
 
     endgame_options::EndgameOptions
@@ -1831,7 +1848,7 @@ mutable struct IntersectCache{Sys<:AbstractSystem}
     progress::Union{IntersectProgress,Nothing}
 end
 
-function IntersectCache(u, F, W₁, W₂, Hᵤ, EO, TO, progress)
+function IntersectCache(u, f, F, h, EO, TO, progress)
     m, N = size(F)
     A = zeros(ComplexF64, N - 1, N)
     b = zeros(ComplexF64, N - 1)
@@ -1839,7 +1856,7 @@ function IntersectCache(u, F, W₁, W₂, Hᵤ, EO, TO, progress)
     y0 = zeros(ComplexF64, m)
     y = zeros(ComplexF64, m)
 
-    IntersectCache(A, b, x0, y0, y, F, u, EO, TO, progress)
+    IntersectCache(A, b, x0, y0, y, f, F, h, u, EO, TO, progress)
 end
 
 
@@ -1930,23 +1947,18 @@ function _intersect(
     n = ambient_dim(W.L)
     @unique_var u
     @unique_var vars[1:n]
-    W₁, W₂, Hᵤ, FW, fW, fH, vars_u = prepare_for_u_homotopy(H, W, vars, u)
-
-    # system for W ∩ H
-    G_sys = System([fW; fH], variables = vars_u)
-    G_u = fixed(G_sys; compile = false)
+    W₁, W₂, Hᵤ, f, F, h, vars_u = prepare_for_u_homotopy(H, W, vars, u)
 
     # cache
-    cache = IntersectCache(u, FW, W₁, W₂, Hᵤ, endgame_options, tracker_options, progress)
-
+    cache = IntersectCache(u, f, F, h, endgame_options, tracker_options, progress)
 
     # intersect
     intersect_with_hypersurface!(W₁, Hᵤ, W₂, cache; threading = threading, kwargs...)
-    update_Fᵢ!(cache, G_u)
+    update_Fᵢ!(cache, [f; h], vars_u)
     fill_up!([W₁; W₂], monodromy_options, cache, show_monodromy_progress, threading)
 
     # return data 
-    G = fixed(System([fW; fH], variables = vars); compile = false)
+    G = fixed(System([f; h], variables = vars); compile = false)
     P1, L1 = u_transform(W₁)
     out = [WitnessSet(G, L1, P1)]
     if !isnothing(W₂)
@@ -1966,11 +1978,11 @@ function prepare_for_u_homotopy(H, W, vars, u)
     # prepare polynomials 
     FH0 = deepcopy(System(system(H)))
     FW0 = deepcopy(System(system(W)))
-    fH = subs(expressions(FH0), variables(FH0) => vars)
-    fW = subs(expressions(FW0), variables(FW0) => vars)
+    h = subs(expressions(FH0), variables(FH0) => vars)
+    f = subs(expressions(FW0), variables(FW0) => vars)
     vars_u = [vars; u]
-    FH = System(fH, variables = vars_u)
-    FW = System(fW, variables = vars_u)
+    FH = System(h, variables = vars_u)
+    FW = System(f, variables = vars_u)
 
     # prepare flags
     LW = linear_subspace(W)
@@ -1990,6 +2002,6 @@ function prepare_for_u_homotopy(H, W, vars, u)
     Hᵤ =
         WitnessSet(fixed(FH; compile = false), flagH[1][1], map(x -> [x; cH], solutions(H)))
 
-    W₁, W₂, Hᵤ, fixed(FW; compile = false), fW, fH, vars_u
+    W₁, W₂, Hᵤ, f, fixed(FW; compile = false), first(h), vars_u
 end
 get_c(flag) = extrinsic((flag[1][1])).b[1] # the first entry of b is the right-hand side of "u=c"
