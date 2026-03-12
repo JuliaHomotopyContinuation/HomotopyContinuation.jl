@@ -251,7 +251,7 @@ function update_progress_tasks!(progress::MembershipProgress, i::Int, m::Int)
         showvalues = [("Points checked", "$(progress.current_task)/$(progress.ntasks)")],
     )
 end
-update_progress!(progress::Union{Nothing,MembershipProgress}, W::Nothing) = nothing
+update_progress!(progress::MembershipProgress, W::Nothing) = nothing
 
 """
     MembershipCache

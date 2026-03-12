@@ -1574,7 +1574,7 @@ Computes the numerical irreducible of the variety defined by ``F=0``.
 * `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
 * `monodromy_options_for_regeneration`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`regeneration`](@ref).
 * `monodromy_options_for_decompose`: [`MonodromyOptions`](@ref) for [`monodromy_solve`](@ref) in [`decompose`](@ref).
-* `show_progresss = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`.
+* `show_monodromy_progress = false`: if `true`, sets `show_monodromy_for_regeneration_progress` and `show_monodromy_for_decompose_progress` to `true`.
 * `show_monodromy_for_regeneration_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`regeneration`](@ref) should be displayed.
 * `show_monodromy_for_decompose_progress = false`: indicate whether the progress bar of [`monodromy_solve`](@ref) in [`decompose`](@ref) should be displayed.
 * `max_iters = 50`: maximal number of iterations for the decomposition step.
@@ -1629,6 +1629,7 @@ Numerical irreducible decomposition with 1 component
 """
 function numerical_irreducible_decomposition(
     F::System;
+    show_progress::Bool = true,
     tracker_options = TrackerOptions(),
     endgame_options = EndgameOptions(;
         max_endgame_steps = 100,
@@ -1664,6 +1665,7 @@ function numerical_irreducible_decomposition(
 
     Ws = regeneration(
         F;
+        show_progress = show_progress,
         sorted = sorted,
         max_codim = max_codim,
         tracker_options = tracker_options,
@@ -1681,6 +1683,7 @@ function numerical_irreducible_decomposition(
     end
     dec = decompose(
         Ws;
+        show_progress = show_progress,
         monodromy_options = monodromy_options_for_decompose,
         max_iters = max_iters,
         show_monodromy_progress = show_monodromy_for_decompose_progress,
