@@ -1838,10 +1838,9 @@ The following example computes witness sets for a union of two circles.
 
 ```julia-repl
 julia> @var x y z
-julia> f = x^2 + y^2 + z^2 - 1
-julia> g = [x^2 + y^2 - 4; (x-1)^2 + (z-1)^2 - 1]
-julia> W = witness_set(g, codim = 2)
-julia> intersect(W, f)
+julia> H = witness_set(x^2 + y^2 + z^2 - 1)
+julia> W = witness_set([x^2 + y^2 - 4; (x-1)^2 + (z-1)^2 - 1], codim = 2)
+julia> intersect(W, H)
 Witness set for dimension 0 of degree 8
 ```    
 
