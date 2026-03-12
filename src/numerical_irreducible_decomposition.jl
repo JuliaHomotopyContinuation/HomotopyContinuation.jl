@@ -1381,8 +1381,8 @@ decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 Store the witness sets in a common data structure.
 """
 struct NumericalIrreducibleDecomposition
-    Witness_Sets::Dict
-    seed::Any
+    Witness_Sets::Dict{Int,Vector{WitnessSet}}
+    seed::Union{Nothing,UInt32}
 end
 NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}) =
     NumericalIrreducibleDecomposition(Ws, nothing)
@@ -1748,6 +1748,8 @@ Base.@kwdef mutable struct IntersectProgress
     is_finished::Bool = false
     current_task::Int = 0
     ntasks::Int = 0
+    current_path::Int = 0
+    npaths::Int = 0
 end
 IntersectProgress(progress_meter::PM.ProgressUnknown) =
     IntersectProgress(progress_meter = progress_meter)
@@ -1767,6 +1769,11 @@ update_progress!(progress::IntersectProgress, W) = nothing
 function update_progress_tasks!(progress::IntersectProgress, i::Int, m::Int)
     progress.current_task = i
     progress.ntasks = m
+    PM.update!(progress.progress_meter, showvalues = showvalues(progress))
+end
+function update_progress_paths!(progress::IntersectProgress, i::Int, m::Int)
+    progress.current_path = i
+    progress.npaths = m
     PM.update!(progress.progress_meter, showvalues = showvalues(progress))
 end
 function finish_progress!(progress::IntersectProgress)
@@ -1865,7 +1872,7 @@ Witness set for dimension 0 of degree 8
 
 """
 function Base.intersect(W::WitnessSet, H::WitnessSet; kwargs...)
-    out = _intersect(H, W; kwargs...)
+    out = _intersect(W, H; kwargs...)
     if length(out) == 1
         return first(out)
     else
@@ -1970,7 +1977,7 @@ function prepare_for_u_homotopy(H, W, vars, u)
     LH = linear_subspace(H)
     flagW = get_flag(1:2, LW) # returns L, Lᵤ
     flagH = get_flag(1:1, LH)
-    cW, cH = extrinsic((flagW[1][1])).b[1], extrinsic((flagH[1][1])).b[1] # the first entry of b is c in "u=c"
+    cW, cH = get_c(flagW), get_c(flagH)
 
     # prepare WitnessPoints
     # in u-coordiantes the points in W have to be transformed as x -> [x; c]
@@ -1985,3 +1992,4 @@ function prepare_for_u_homotopy(H, W, vars, u)
 
     W₁, W₂, Hᵤ, fixed(FW; compile = false), fW, fH, vars_u
 end
+get_c(flag) = extrinsic((flag[1][1])).b[1] # the first entry of b is the right-hand side of "u=c"
