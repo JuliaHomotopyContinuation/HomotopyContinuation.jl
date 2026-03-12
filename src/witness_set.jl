@@ -148,6 +148,9 @@ julia> W = witness_set(F)
 Witness set for dimension 1 of degree 2
 ```
 """
+witness_set(F::Expression, args...; kwargs...) = witness_set([F], args...; kwargs...) 
+witness_set(F::Vector{Expression}, args...; kwargs...) =
+    witness_set(System(F), args...; kwargs...)
 witness_set(F::System, args...; compile = COMPILE_DEFAULT[], kwargs...) =
     witness_set(fixed(F; compile = compile), args...; kwargs...)
 function witness_set(
@@ -336,13 +339,7 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     y = cache.y
     l_X = length(P)
 
-    if first(cache.b) isa Number
-        A, b =  cache.A, cache.b
-    else
-        LY = linear_subspace(Y)
-        dY = dim(LY)
-        A, b = cache.A[dY+1], cache.b[dY+1]
-    end
+    A, b =  cache.A, cache.b
    
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
@@ -399,7 +396,7 @@ function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
     else
         LY = linear_subspace(Y)
         dY = dim(LY)
-        A, b = cache.A[dY+1], cache.b[dY+1]
+        A, b = cache.A[dY], cache.b[dY]
     end
 
     # Pre-allocate output
