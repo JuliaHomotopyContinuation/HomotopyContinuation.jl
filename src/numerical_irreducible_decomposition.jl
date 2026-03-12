@@ -299,7 +299,7 @@ function _regeneration(
             n,
             c,
             PM.ProgressUnknown(
-                dt = 0.4,
+                dt = 0.001,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
@@ -523,7 +523,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
     progress = cache.progress
     Fᵢ = cache.Fᵢ
 
-    update_progress!(progress; is_solving = false, is_monodromy = true)
+    update_progress!(progress; is_membership_test = false, is_solving = false, is_monodromy = true)
     for W in out
         if !isnothing(W) && dim(W) > 0 && degree(W) > 0
             res = monodromy_solve(
@@ -620,7 +620,8 @@ function intersect_with_hypersurface!(
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
     # here comes the loop for tracking
-    update_progress!(progress; is_solving = true, is_monodromy = false)
+    update_progress_tasks!(progress, 0, length(start))
+    update_progress!(progress;; is_membership_test = false, is_solving = true, is_monodromy = false)
     if threading
         threaded_intersection!(X, start, tracker, progress)
     else
@@ -737,7 +738,7 @@ end
 
 function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     progress = cache.progress
-    update_progress!(progress; is_membership_test = true)
+    update_progress!(progress; is_membership_test = true, is_solving = false, is_monodromy = false)
     # main idea: for every x∈X we take a linear space L with codim(L)=dim(Y) through p and move the points in Y to L. Then, we check if the computed points contain x. If yes, return true, else return false.
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
@@ -1842,7 +1843,7 @@ function Base.intersect(W::WitnessSet, H::WitnessSet;
     if show_progress
         progress = IntersectProgress(
             PM.ProgressUnknown(
-                dt = 0.4,
+                dt = 0.001,
                 desc = "Intersecting...",
                 enabled = true,
                 spinner = true,
