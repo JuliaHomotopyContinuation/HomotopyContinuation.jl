@@ -731,7 +731,6 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
     F₀ = slice(System([f; g0], variables = vars), L; compile = false)
     G₀ = slice(System([f; g], variables = vars), K; compile = false)
-    @show size(F₀), size(G₀)
     Hom = StraightLineHomotopy(F₀, G₀; gamma = cis(2 * pi * rand()))
 
     return Hom, d
