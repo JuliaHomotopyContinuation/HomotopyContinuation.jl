@@ -749,7 +749,6 @@ function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     
     set_up_linear_spaces!(cache, LX, LY)
     out = is_contained(points(X), Y::WitnessSet, F, cache; kwargs...)
-    update_progress!(progress; is_membership_test = true)
 
     out
 end
