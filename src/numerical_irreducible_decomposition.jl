@@ -358,7 +358,6 @@ function _regeneration(
                     update_i!(cache, i)
 
                     # for all W in out we intersect W with H[i]
-                    update_progress!(progress; is_solving = true, is_monodromy = false)
                     intersect_all!(
                         out,
                         H,
@@ -601,7 +600,6 @@ function intersect_with_hypersurface!(
     if isempty(P_next)
         return nothing
     end
-
     # if isnothing(X), then we should not add points to X
     if isnothing(X)
         return nothing
@@ -621,14 +619,13 @@ function intersect_with_hypersurface!(
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
-
     # here comes the loop for tracking
+    update_progress!(progress; is_solving = true, is_monodromy = false)
     if threading
         threaded_intersection!(X, start, tracker, progress)
     else
         serial_intersection!(X, start, tracker, progress)
     end
-
     nothing
 end
 
