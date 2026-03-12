@@ -49,6 +49,8 @@ Base.@kwdef mutable struct WitnessSetsProgress
     is_membership_test::Bool = false
     is_monodromy::Bool = false
     is_finished::Bool = false
+    current_path::Int = 0
+    npaths::Int = 0
     current_task::Int = 0
     ntasks::Int = 0
     current_hypersurface::Int = 1
@@ -84,7 +86,6 @@ function update_progress!(
         progress.progress_meter,
         progress.current_hypersurface,
         showvalues = showvalues(progress);
-        force = true,
     )
 end
 update_progress_hypersurface!(progress::Nothing, i::Int) = nothing
@@ -100,6 +101,16 @@ end
 function update_progress_tasks!(progress::WitnessSetsProgress, i::Int, m::Int)
     progress.current_task = i
     progress.ntasks = m
+    PM.update!(
+        progress.progress_meter,
+        progress.current_hypersurface,
+        showvalues = showvalues(progress),
+    )
+end
+update_progress_paths!(progress::Nothing, i::Int, m::Int) = nothing
+function update_progress_paths!(progress::WitnessSetsProgress, i::Int, m::Int)
+    progress.current_path = i
+    progress.npaths = m
     PM.update!(
         progress.progress_meter,
         progress.current_hypersurface,
@@ -140,22 +151,22 @@ function showvalues(progress::WitnessSetsProgress)
                 ),
             )
             if progress.is_solving
-                push!(text, ("Track paths", "$(progress.current_task)/$(progress.ntasks)"))
+                push!(
+                    text,
+                    ("Track paths", "$(progress.current_path) / $(progress.npaths)"),
+                )
             elseif progress.is_monodromy
                 push!(
                     text,
                     (
                         "Track paths",
-                        "$(progress.ntasks)/$(progress.ntasks) (fill up points...)",
+                        "$(progress.current_path) / $(progress.npaths) (fill up points...)",
                     ),
                 )
             elseif progress.is_membership_test
                 push!(
                     text,
-                    (
-                        "Membership test",
-                        "$(progress.current_task)/$(progress.ntasks) points checked",
-                    ),
+                    ("Membership test", "$(progress.current_task) / $(progress.ntasks)"),
                 )
             end
         end
@@ -299,7 +310,7 @@ function _regeneration(
             n,
             c,
             PM.ProgressUnknown(
-                dt = 0.001,
+                dt = 0.4,
                 desc = "Computing witness sets...",
                 enabled = true,
                 spinner = true,
@@ -625,7 +636,6 @@ function intersect_with_hypersurface!(
     start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
 
     # here comes the loop for tracking
-    update_progress_tasks!(progress, 0, length(start))
     update_progress!(
         progress;
         is_membership_test = false,
@@ -650,6 +660,8 @@ function serial_intersection!(X, start, egtracker, progress)
     l_start = length(start)
 
     for (i, s) in enumerate(start)
+        update_progress_paths!(progress, i, l_start)
+
         p = s[1]
         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
@@ -665,7 +677,6 @@ function serial_intersection!(X, start, egtracker, progress)
                 push!(X, q)
             end
         end
-        update_progress_tasks!(progress, i, l_start)
     end
 
     nothing
@@ -694,6 +705,10 @@ function threaded_intersection!(X, start, tracker, progress)
                             break
                         end
 
+                        lock(progress_lock) do
+                            update_progress_paths!(progress, idx, l_start)
+                        end
+
                         s = start_vec[idx]
                         p = copy(s[1])
                         p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
@@ -712,10 +727,6 @@ function threaded_intersection!(X, start, tracker, progress)
                                     push!(X, q)
                                 end
                             end
-                        end
-
-                        lock(progress_lock) do
-                            update_progress_tasks!(progress, idx, l_start)
                         end
                     end
                 end
@@ -1750,7 +1761,7 @@ function update_progress!(
     isnothing(is_membership_test) ? nothing :
     progress.is_membership_test = is_membership_test
     isnothing(is_monodromy) ? nothing : progress.is_monodromy = is_monodromy
-    PM.update!(progress.progress_meter, showvalues = showvalues(progress); force = true)
+    PM.update!(progress.progress_meter, showvalues = showvalues(progress))
 end
 update_progress!(progress::IntersectProgress, W) = nothing
 function update_progress_tasks!(progress::IntersectProgress, i::Int, m::Int)
@@ -1776,16 +1787,13 @@ function showvalues(progress::IntersectProgress)
                 text,
                 (
                     "Track paths",
-                    "$(progress.ntasks)/$(progress.ntasks) (fill up points...)",
+                    "$(progress.ntasks) / $(progress.ntasks) (fill up points...)",
                 ),
             )
         elseif progress.is_membership_test
             push!(
                 text,
-                (
-                    "Membership test",
-                    "$(progress.current_task)/$(progress.ntasks) points checked",
-                ),
+                ("Membership test", "$(progress.current_task) / $(progress.ntasks)"),
             )
         end
     else
@@ -1856,8 +1864,26 @@ Witness set for dimension 0 of degree 8
 ```    
 
 """
+function Base.intersect(W::WitnessSet, H::WitnessSet; kwargs...)
+    out = _intersect(H, W; kwargs...)
+    if length(out) == 1
+        return first(out)
+    else
+        return out
+    end
+end
 
-function Base.intersect(
+"""
+    intersect(W::WitnessSet, f::Expression)
+
+First computes a witness set `H` for `f` and then runs  `intersect(W, H)`.
+"""
+function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
+    H = witness_set(f)
+    intersect(W, H; kwargs...)
+end
+
+function _intersect(
     W::WitnessSet,
     H::WitnessSet;
     show_progress::Bool = true,
@@ -1882,7 +1908,7 @@ function Base.intersect(
     if show_progress
         progress = IntersectProgress(
             PM.ProgressUnknown(
-                dt = 0.001,
+                dt = 0.4,
                 desc = "Intersecting...",
                 enabled = true,
                 spinner = true,
@@ -1924,22 +1950,10 @@ function Base.intersect(
     filter!(X -> degree(X) > 0, out)
 
     finish_progress!(progress)
-    if length(out) == 1
-        return first(out)
-    else
-        return out
-    end
+    out
 end
 
-"""
-    intersect(W::WitnessSet, f::Expression)
 
-First computes a witness set `H` for `f` and then runs  `intersect(W, H)`.
-"""
-function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
-    H = witness_set(f)
-    intersect(W, H; kwargs...)
-end
 
 function prepare_for_u_homotopy(H, W, vars, u)
     # prepare polynomials 

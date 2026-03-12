@@ -248,7 +248,7 @@ function update_progress_tasks!(progress::MembershipProgress, i::Int, m::Int)
     PM.update!(
         progress.progress_meter,
         i;
-        showvalues = [("Points checked", "$(progress.current_task)/$(progress.ntasks)")],
+        showvalues = [("Points checked", "$(progress.current_task) / $(progress.ntasks)")],
     )
 end
 update_progress!(progress::MembershipProgress, W::Nothing) = nothing
