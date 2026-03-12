@@ -1818,7 +1818,6 @@ end
 
 """
     intersect(W::WitnessSet, H::WitnessSet)
-    intersect(W::WitnessSet, f::Expression)
 
 This intersects the witness sets `W` and `H`, where `H` is a hypersurface defined by single polynomial `f`. 
 
@@ -1846,10 +1845,6 @@ Witness set for dimension 0 of degree 8
 
 """
 
-function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
-    H = witness_set(f)
-    intersect(W, H; kwargs...)
-end
 function Base.intersect(W::WitnessSet, H::WitnessSet; 
                     show_progress::Bool = true,
                     tracker_options = TrackerOptions(),
@@ -1924,6 +1919,16 @@ function Base.intersect(W::WitnessSet, H::WitnessSet;
     else
         return out
     end
+end
+
+"""
+    intersect(W::WitnessSet, f::Expression)
+
+First computes a witness set `H` for `f` and then runs  `intersect(W, H)`.
+"""
+function Base.intersect(W::WitnessSet, f::Expression; kwargs...)
+    H = witness_set(f)
+    intersect(W, H; kwargs...)
 end
 
 function prepare_for_u_homotopy(H, W, vars, u)
