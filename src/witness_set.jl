@@ -162,7 +162,7 @@ function witness_set(
 )
     f = System(F)
     projective = is_homogeneous(f)
-    rational = !is_polynomial(f)
+    polynomial = is_polynomial(f)
     if isnothing(dim) && isnothing(codim)
         dim = corank(F) - projective
     elseif !isnothing(codim) && projective
@@ -174,7 +174,7 @@ function witness_set(
         L;
         target_parameters = target_parameters,
         projective = projective,
-        rational = rational,
+        polynomial = polynomial,
         options...,
     )
 end
@@ -183,10 +183,10 @@ function witness_set(
     F::AbstractSystem,
     L::LinearSubspace;
     projective = nothing,
-    rational = nothing,
+    polynomial = true,
     options...,
 )
-    if isnothing(rational)
+    if polynomial
         res = solve(F; target_subspace = L, options...)
     else
         mon_res = monodromy_solve(F; dim = codim(L))
