@@ -526,7 +526,7 @@ function fill_up!(out, monodromy_options, cache, show_monodromy_progress, thread
 
     update_progress!(progress; is_solving = false, is_monodromy = true)
     for W in out
-        if dim(W) > 0 && degree(W) > 0
+        if !isnothing(W) && dim(W) > 0 && degree(W) > 0
             res = monodromy_solve(
                 Fᵢ,
                 W.R,
@@ -602,7 +602,7 @@ function intersect_with_hypersurface!(
         return nothing
     end
 
-    # is isnothing(X), then we should not add points to X
+    # if isnothing(X), then we should not add points to X
     if isnothing(X)
         return nothing
     end
@@ -731,6 +731,7 @@ function set_up_u_homotopy(H, u, W, X, f, g, vars)
 
     F₀ = slice(System([f; g0], variables = vars), L; compile = false)
     G₀ = slice(System([f; g], variables = vars), K; compile = false)
+    @show size(F₀), size(G₀)
     Hom = StraightLineHomotopy(F₀, G₀; gamma = cis(2 * pi * rand()))
 
     return Hom, d
@@ -1881,13 +1882,17 @@ function Base.intersect(W::WitnessSet, H::WitnessSet;
         )
 
     # return data 
-    P1, L1 = u_transform(W₁)
-    P2, L2 = u_transform(W₂)
     G = fixed(System([fW; fH], variables = vars); compile = false)
-    out = [WitnessSet(G, L1, P1); WitnessSet(deepcopy(G), L2, P2)]
-    finish_progress!(progress)
-    
+    P1, L1 = u_transform(W₁)
+    out = [WitnessSet(G, L1, P1)]
+    if !isnothing(W₂)
+        P2, L2 = u_transform(W₂)
+        push!(out, WitnessSet(deepcopy(G), L2, P2))
+        
+    end
     filter!(X -> degree(X) > 0, out)
+
+    finish_progress!(progress)
     if length(out) == 1
         return first(out)
     else
@@ -1914,9 +1919,13 @@ function prepare_for_u_homotopy(H, W, vars, u)
 
     # prepare WitnessPoints
     # in u-coordiantes the points in W have to be transformed as x -> [x; c]
-    Wᵤ = WitnessPoints(flagW[1][1], flagW[1][2], map(x -> [x; cW], solutions(W)))
-    X = WitnessPoints(flagW[2][1], flagW[2][2], Vector{Vector{ComplexF64}}())
+    W₁ = WitnessPoints(flagW[1][1], flagW[1][2], map(x -> [x; cW], solutions(W)))
+    if dim(W) == 0 
+        W₂ = nothing
+    else
+        W₂ = WitnessPoints(flagW[2][1], flagW[2][2], Vector{Vector{ComplexF64}}())
+    end
     Hᵤ = WitnessSet(fixed(FH; compile = false), flagH[1][1],  map(x -> [x; cH], solutions(H)))
 
-    Wᵤ, X, Hᵤ, fixed(FW; compile = false), fW, fH, vars_u
+    W₁, W₂, Hᵤ, fixed(FW; compile = false), fW, fH, vars_u
 end
