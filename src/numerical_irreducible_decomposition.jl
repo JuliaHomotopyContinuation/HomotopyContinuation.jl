@@ -228,8 +228,11 @@ function update_Fᵢ!(cache, fᵢ, vars)
     Fᵢ = fixed(System(fᵢ, variables = vars), compile = false)
     cache.fᵢ = fᵢ
     cache.Fᵢ = Fᵢ
-    cache.y0 = zeros(ComplexF64, length(Fᵢ))
-    cache.y = zeros(ComplexF64, length(Fᵢ))
+    m = length(Fᵢ)
+    resize!(cache.y0, m)
+    fill!(cache.y0, zero(ComplexF64))
+    resize!(cache.y, m)
+    fill!(cache.y, zero(ComplexF64))
 
     nothing
 end
@@ -528,8 +531,8 @@ function intersect_all!(out, H, cache; kwargs...)
     # taken care of; i.e., if we intersect Wₖ∩Hᵢ below in the intersect_with_hypersurface function,
     # we have already intersected Wₖ₊₁ ∩ Hᵢ.
 
-    E = enumerate(out)
-    for (k, Wₖ) in reverse(E) # k = codim(W) for W in Ws
+    for k = length(out):-1:1  # k = codim(W) for W in Ws
+        Wₖ = out[k]
         if k < i
             if k < codim
                 Wₖ₊₁ = out[k+1]
@@ -648,7 +651,7 @@ function intersect_with_hypersurface!(
     )
 
     # the start solutions are the Cartesian product between P_next and the d-th roots of unity.
-    start = Iterators.product(P_next, [exp(2 * pi * im * k / d) for k = 0:(d-1)])
+    roots = [exp(2 * pi * im * k / d) for k = 0:(d-1)]
 
     # here comes the loop for tracking
     update_progress!(
@@ -658,9 +661,9 @@ function intersect_with_hypersurface!(
         is_monodromy = false,
     )
     if threading
-        threaded_intersection!(X, start, tracker, progress)
+        threaded_intersection!(X, P_next, roots, tracker, progress)
     else
-        serial_intersection!(X, start, tracker, progress)
+        serial_intersection!(X, P_next, roots, tracker, progress)
     end
     nothing
 end
@@ -671,8 +674,9 @@ function manage_initial_points!(P, m, W, progress)
     return P_next
 end
 
-function serial_intersection!(X, start, egtracker, progress)
-    l_start = length(start)
+function serial_intersection!(X, P, roots, egtracker, progress)
+    start = Iterators.product(P_next, roots)
+    l_start = length(P) * length(roots)
 
     for (i, s) in enumerate(start)
         update_progress_paths!(progress, i, l_start)
@@ -697,10 +701,11 @@ function serial_intersection!(X, start, egtracker, progress)
     nothing
 end
 
-function threaded_intersection!(X, start, tracker, progress)
+function threaded_intersection!(X, P, roots, tracker, progress)
 
-    l_start = length(start)
-    start_vec = collect(start)
+    l_P = length(P)
+    l_roots = length(roots)
+    l_start = l_P * l_roots
 
     # Pre-allocate one tracker per thread
     nthr = Threads.nthreads()
@@ -715,8 +720,9 @@ function threaded_intersection!(X, start, tracker, progress)
             let local_egtracker = trackers[tid]
                 Threads.@spawn begin
                     while true
+
                         idx = Threads.atomic_add!(next_idx, 1)
-                        if idx > length(start_vec)
+                        if idx > l_start
                             break
                         end
 
@@ -724,9 +730,10 @@ function threaded_intersection!(X, start, tracker, progress)
                             update_progress_paths!(progress, idx, l_start)
                         end
 
-                        s = start_vec[idx]
-                        p = copy(s[1])
-                        p[end] = s[2] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
+                        p_idx = rem(idx - 1, l_P) + 1
+                        r_idx = div(idx - 1, l_P) + 1
+                        p = copy(P[p_idx])
+                        p[end] = roots[r_idx] # the last entry of s[1] is zero. we replace it with a d-th root of unity.
 
                         res = track(local_egtracker, p, 1)
 
@@ -1093,14 +1100,11 @@ function decompose_with_monodromy!(
 
             complete_orbit_indices = Vector{Int}()
             for orbit in complete_orbits
-                append!(complete_orbit_indices, collect(orbit))
+                append!(complete_orbit_indices, orbit)
             end
             sort!(complete_orbit_indices)
 
-            non_complete_points = non_complete_points[setdiff(
-                1:length(non_complete_points),
-                complete_orbit_indices,
-            )]
+            deleteat!(non_complete_points, complete_orbit_indices)
 
 
             orbit_indices_mapping = Dict{Int,Int}()
@@ -1156,10 +1160,16 @@ end
 
 # Helper function to merge two sets
 function merge_sets_find(parent, i)
-    if parent[i] == i
-        return i
+    root = i
+    while parent[root] != root
+        root = parent[root]
     end
-    return merge_sets_find(parent, parent[i])
+    while parent[i] != root
+        next = parent[i]
+        parent[i] = root
+        i = next
+    end
+    root
 end
 function merge_sets_union(parent, rank, x, y)
     xroot = merge_sets_find(parent, x)
@@ -1214,6 +1224,7 @@ function get_orbits_from_monodromy_permutations(
     P = permutations(monodromy_result)
     orbits = copy(initial_orbits)
 
+    matching_orbits = Int[]
     for col in eachcol(P)
         for (i, j) in enumerate(col)
             # Ignore 0s in orbit since they indicate an error
@@ -1221,7 +1232,7 @@ function get_orbits_from_monodromy_permutations(
                 continue
             end
             # Find all orbits where i or j is contained
-            matching_orbits = Int[]
+            empty!(matching_orbits)   # reuse the buffer
             for (k, orbit) in enumerate(orbits)
                 if i in orbit || j in orbit
                     push!(matching_orbits, k)
