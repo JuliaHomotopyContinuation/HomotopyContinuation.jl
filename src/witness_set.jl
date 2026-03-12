@@ -338,7 +338,7 @@ function membership(
     is_contained(P, W, system(W), cache; kwargs...)
 end
 function membership(p::Vector{T}, W::WitnessSet; kwargs...) where {T<:Number}
-    out = membership([p], W)
+    out = membership([p], W; kwargs...)
     first(out)
 end
 function is_contained(
@@ -381,7 +381,6 @@ function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps())
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)
     idx = 0
-
     #we loop over the points in X and check if they are contained in Y
     out = map(P) do x
         idx += 1
