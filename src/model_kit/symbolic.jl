@@ -725,6 +725,7 @@ function is_polynomial(expr::Expression)
     den == 1 ? true : false
 end
 is_polynomial(f::Vector{Expression}) = all(is_polynomial, f)
+is_polynomial(f::System) = is_polynomial(expressions(f))
 
 """
     exponents_coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
