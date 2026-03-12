@@ -619,114 +619,6 @@ function to_dict_op!(dict, op, vars, mul_args, pow_args)
 end
 
 
-
-"""
-    get_num_den(expr::Expression)
-
-Computes numerator and denominator of `expr`.
-
-## Example
-julia> @var x y ;
-julia> expr = (y+1)*(x-1)/(x-1)^2 * ((x^2+1)/(y-1) + 1)
-julia> P, Q = get_num_den(expr)
-((1 + y)*(y + x^2), (-1 + x)*(-1 + y))
-
-(Careful: `get_num_den` is a simple implementation based on comparing polynomial symbolically. For instance, `(x-1)^2` and `x^2 + 2x + 1` are considered different by the implementation, so that `get_num_den((x-1)^2 / (x^2 + 2x + 1))` will return `x^2 + 2x + 1` as denominator.)
-"""
-function get_num_den(expr::Expression)
-    cls = class(expr)
-
-    if cls == :Add
-        # 1. Collect (num, den) for every term
-        terms = [get_num_den(arg) for arg in args(expr)]
-
-        # 2. Identify all unique base factors in the denominators and their max power
-        # We assume denominators are products of powers: (x-1)^2 * x^1
-        max_powers = Dict{Expression,Int}()
-
-        for (_, den) in terms
-            factors = (class(den) == :Mul) ? args(den) : [den]
-            for f in factors
-                base, exp =
-                    (class(f) == :Pow) ? (args(f)[1], Int(to_number(args(f)[2]))) : (f, 1)
-                max_powers[base] = max(get(max_powers, base, 0), exp)
-            end
-        end
-
-        # 3. Construct the Common Denominator Q
-        Q = Expression(1)
-        for (base, pwr) in max_powers
-            if pwr != 0
-                term_q = (pwr == 1) ? base : base^pwr
-                mul!(Q, Q, term_q)
-            end
-        end
-
-        # 4. Construct the Numerator P
-        P = Expression(0)
-        for (n, d) in terms
-            # Calculate what's missing: missing = Q / d
-            missing = Expression(1)
-            for (base, pwr) in max_powers
-                # Find the power of this base in the current denominator 'd'
-                # (Simple check: search through factors of d)
-                d_factors = (class(d) == :Mul) ? args(d) : [d]
-                current_pwr = 0
-                for df in d_factors
-                    dbase, dexp =
-                        (class(df) == :Pow) ? (args(df)[1], Int(to_number(args(df)[2]))) :
-                        (df, 1)
-                    if dbase == base
-                        current_pwr = dexp
-                        break
-                    end
-                end
-
-                needed_pwr = pwr - current_pwr
-                if needed_pwr > 0
-                    mul!(missing, missing, base^needed_pwr)
-                end
-            end
-
-            term_p = Expression(1)
-            mul!(term_p, n, missing)
-            add!(P, P, term_p)
-        end
-        return P, Q
-
-    elseif cls == :Mul
-        P, Q = Expression(1), Expression(1)
-        for arg in args(expr)
-            p, q = get_num_den(arg)
-            mul!(P, P, p)
-            mul!(Q, Q, q)
-        end
-        return P, Q
-
-    elseif cls == :Pow
-        v = args(expr)
-        p, q = get_num_den(v[1])
-        n = Int(to_number(v[2]))
-        return (n >= 0) ? (p^n, q^n) : (q^(-n), p^(-n))
-
-    else # Symbol, Constant, or None
-        return expr, Expression(1)
-    end
-end
-
-"""
-    is_polynomial(expr)
-
-
-Returns `true`, if `expr` is a polynomial (or vector of polynomials). Returns `false`, if `expr` is not a polynomial but a rational function.
-"""
-function is_polynomial(expr::Expression)
-    num, den = get_num_den(expr)
-    den == 1 ? true : false
-end
-is_polynomial(f::Vector{Expression}) = all(is_polynomial, f)
-is_polynomial(f::System) = is_polynomial(expressions(f))
-
 """
     exponents_coefficients(f::Expression, vars::AbstractVector{Variable}; expanded = false)
 
@@ -1748,3 +1640,112 @@ end
 function optimize(H::Homotopy)
     Homotopy(horner.(H.expressions, Ref(H.variables)), H.variables, H.t, H.parameters)
 end
+
+
+
+"""
+    get_num_den(expr::Expression)
+
+Computes numerator and denominator of `expr`.
+
+## Example
+julia> @var x y ;
+julia> expr = (y+1)*(x-1)/(x-1)^2 * ((x^2+1)/(y-1) + 1)
+julia> P, Q = get_num_den(expr)
+((1 + y)*(y + x^2), (-1 + x)*(-1 + y))
+
+(Careful: `get_num_den` is a simple implementation based on comparing polynomial symbolically. For instance, `(x-1)^2` and `x^2 + 2x + 1` are considered different by the implementation, so that `get_num_den((x-1)^2 / (x^2 + 2x + 1))` will return `x^2 + 2x + 1` as denominator.)
+"""
+function get_num_den(expr::Expression)
+    cls = class(expr)
+
+    if cls == :Add
+        # 1. Collect (num, den) for every term
+        terms = [get_num_den(arg) for arg in args(expr)]
+
+        # 2. Identify all unique base factors in the denominators and their max power
+        # We assume denominators are products of powers: (x-1)^2 * x^1
+        max_powers = Dict{Expression,Int}()
+
+        for (_, den) in terms
+            factors = (class(den) == :Mul) ? args(den) : [den]
+            for f in factors
+                base, exp =
+                    (class(f) == :Pow) ? (args(f)[1], Int(to_number(args(f)[2]))) : (f, 1)
+                max_powers[base] = max(get(max_powers, base, 0), exp)
+            end
+        end
+
+        # 3. Construct the Common Denominator Q
+        Q = Expression(1)
+        for (base, pwr) in max_powers
+            if pwr != 0
+                term_q = (pwr == 1) ? base : base^pwr
+                mul!(Q, Q, term_q)
+            end
+        end
+
+        # 4. Construct the Numerator P
+        P = Expression(0)
+        for (n, d) in terms
+            # Calculate what's missing: missing = Q / d
+            missing = Expression(1)
+            for (base, pwr) in max_powers
+                # Find the power of this base in the current denominator 'd'
+                # (Simple check: search through factors of d)
+                d_factors = (class(d) == :Mul) ? args(d) : [d]
+                current_pwr = 0
+                for df in d_factors
+                    dbase, dexp =
+                        (class(df) == :Pow) ? (args(df)[1], Int(to_number(args(df)[2]))) :
+                        (df, 1)
+                    if dbase == base
+                        current_pwr = dexp
+                        break
+                    end
+                end
+
+                needed_pwr = pwr - current_pwr
+                if needed_pwr > 0
+                    mul!(missing, missing, base^needed_pwr)
+                end
+            end
+
+            term_p = Expression(1)
+            mul!(term_p, n, missing)
+            add!(P, P, term_p)
+        end
+        return P, Q
+
+    elseif cls == :Mul
+        P, Q = Expression(1), Expression(1)
+        for arg in args(expr)
+            p, q = get_num_den(arg)
+            mul!(P, P, p)
+            mul!(Q, Q, q)
+        end
+        return P, Q
+
+    elseif cls == :Pow
+        v = args(expr)
+        p, q = get_num_den(v[1])
+        n = Int(to_number(v[2]))
+        return (n >= 0) ? (p^n, q^n) : (q^(-n), p^(-n))
+
+    else # Symbol, Constant, or None
+        return expr, Expression(1)
+    end
+end
+
+"""
+    is_polynomial(expr)
+
+
+Returns `true`, if `expr` is a polynomial (or vector of polynomials). Returns `false`, if `expr` is not a polynomial but a rational function.
+"""
+function is_polynomial(expr::Expression)
+    num, den = get_num_den(expr)
+    den == 1 ? true : false
+end
+is_polynomial(f::Vector{Expression}) = all(is_polynomial, f)
+is_polynomial(f::System) = is_polynomial(expressions(f))
