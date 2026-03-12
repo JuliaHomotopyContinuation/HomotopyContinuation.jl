@@ -86,7 +86,6 @@ function Base.show(io::IO, W::WitnessSet)
     print(io, "Witness set for dimension $(dim(W)) of degree $(degree(W))")
 end
 
-copy(W::WitnessSet) =  WitnessSet(copy(W.F), copy(W.L), copy(W.R), copy(W.projective), copy(W.is_irreducible))
 
 
 
