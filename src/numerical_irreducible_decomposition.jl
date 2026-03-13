@@ -340,7 +340,7 @@ function _regeneration(
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
     H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
-    if any(H .== nothing)
+    if any(isnothing, H)
         return nothing
     end
 
@@ -1450,7 +1450,7 @@ function witness_sets(
 
     out
 end
-witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N, [dim])
+witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N; dims = [dim])
 seed(N::NumericalIrreducibleDecomposition) = N.seed
 
 """
@@ -1516,7 +1516,7 @@ function ModelKit.degrees(
 
     out
 end
-ModelKit.degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N, [dim])
+ModelKit.degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N; dims = [dim])
 
 function max_dim(N::NumericalIrreducibleDecomposition)
     D = witness_sets(N)
