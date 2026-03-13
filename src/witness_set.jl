@@ -424,13 +424,7 @@ function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps(
     y = cache.y
     l_X = length(P)
 
-    if first(cache.b) isa Number
-        A, b = cache.A, cache.b
-    else
-        LY = linear_subspace(Y)
-        dY = dim(LY)
-        A, b = cache.A[dY], cache.b[dY]
-    end
+    A, b = cache.A, cache.b
 
     # Pre-allocate output
     out = Vector{Bool}(undef, l_X)

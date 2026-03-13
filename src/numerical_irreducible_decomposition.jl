@@ -18,13 +18,13 @@ mutable struct WitnessPoints{Sub1<:AbstractSubspace,Sub2<:AbstractSubspace}
     Lᵤ::Sub2
     R::Vector{Vector{ComplexF64}}
 end
-linear_subspace(W::WP) where {WP<:WitnessPoints} = W.L
-linear_subspace_u(W::WP) where {WP<:WitnessPoints} = W.Lᵤ
-points(W::WP) where {WP<:WitnessPoints} = W.R
-codim(W::WP) where {WP<:WitnessPoints} = dim(linear_subspace(W))
-dim(W::WP) where {WP<:WitnessPoints} = codim(linear_subspace(W))
-ModelKit.degree(W::WP) where {WP<:WitnessPoints} = length(points(W))
-push!(W::WP, R::Vector{ComplexF64}) where {WP<:WitnessPoints} = push!(W.R, R)
+linear_subspace(W::WitnessPoints) = W.L
+linear_subspace_u(W::WitnessPoints) = W.Lᵤ
+points(W::WitnessPoints) = W.R
+codim(W::WitnessPoints) = dim(linear_subspace(W))
+dim(W::WitnessPoints) = codim(linear_subspace(W))
+ModelKit.degree(W::WitnessPoints) = length(points(W))
+push!(W::WitnessPoints, R::Vector{ComplexF64}) = push!(W.R, R)
 
 function u_transform(W::WitnessPoints)
     L = linear_subspace_u(W)
@@ -425,19 +425,19 @@ function _regeneration(
     filter!(W -> degree(W) > 0, out)
     update_progress!(progress; is_solving = false, is_monodromy = false)
     if !isempty(out)
-        witness_sets = map(out) do W
+        ws = map(out) do W
             update_progress!(progress)
             P, L = u_transform(W)
             WitnessSet(fixed(F, compile = false), L, P)
         end
     else
-        return witness_sets = Vector{WitnessSet}()
+        return ws = Vector{WitnessSet}()
     end
 
 
     finish_progress!(progress)
 
-    return witness_sets
+    return ws
 end
 
 
@@ -630,7 +630,7 @@ function intersect_with_hypersurface!(
     # the rest is removed from P = points(W) and added to P_next
     # for further processing
     m = .!(is_contained(W, H, cache; threading = threading, kwargs...))
-    P_next = manage_initial_points!(P, m, W, progress)
+    P_next = manage_initial_points!(P, m)
     if isempty(P_next)
         return nothing
     end
@@ -668,7 +668,7 @@ function intersect_with_hypersurface!(
     nothing
 end
 
-function manage_initial_points!(P, m, W, progress)
+function manage_initial_points!(P, m)
     P_next = P[m]
     deleteat!(P, m)
     return P_next
@@ -791,7 +791,7 @@ function is_contained(X::WitnessPoints, Y::WitnessSet, F, cache; kwargs...)
     LX = linear_subspace(X)
     LY = linear_subspace(Y)
 
-    if length(points(Y)) == 0 || length(points(X)) == 0
+    if isempty(points(Y)) || isempty(points(X))
         return falses(length(points(X)))
     end
 
@@ -808,7 +808,6 @@ function set_up_linear_spaces!(cache, LX, LY)
 
     n = ambient_dim(LY)
     cX = codim(LX)
-    dY = dim(LY)
     k = codim(LY) - codim(LX)
 
     # to compute linear spaces through the points in X we first set up
@@ -1326,7 +1325,7 @@ Numerical irreducible decomposition with 2 components
 
 """
 function decompose(
-    Ws::Union{Vector{WP}};
+    Ws::Vector{WP};
     show_progress::Bool = true,
     show_monodromy_progress::Bool = false,
     monodromy_options::MonodromyOptions = MonodromyOptions(;
@@ -1416,11 +1415,7 @@ function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
     D = Dict{Int,Vector{WitnessSet}}()
     for W in Ws
         k = dim(W)
-        if !haskey(D, k)
-            D[k] = [W]
-        else
-            push!(D[k], W)
-        end
+        push!(get!(D, k, WitnessSet[]), W)
     end
     NumericalIrreducibleDecomposition(D, seed)
 end
@@ -1535,11 +1530,8 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
     else
         total = 0
     end
-    if total == 1
-        header = "Numerical irreducible decomposition with 1 component"
-    else
-        header = "Numerical irreducible decomposition with $total components"
-    end
+    s = total == 1 ? "component" : "components"
+    header = "Numerical irreducible decomposition with $total $s"
     println(io, header)
     println(io, "="^(length(header)))
     mdim = max_dim(N)
