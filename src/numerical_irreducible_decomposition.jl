@@ -1405,14 +1405,14 @@ decompose(W::WitnessSet; kwargs...) = decompose([W]; kwargs...)
 
 Store the witness sets in a common data structure.
 """
-struct NumericalIrreducibleDecomposition
-    Witness_Sets::Dict{Int,Vector{WitnessSet}}
+struct NumericalIrreducibleDecomposition{T<:WitnessSet}
+    Witness_Sets::Dict{Int,Vector{T}}
     seed::Union{Nothing,UInt32}
 end
-NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}) =
+NumericalIrreducibleDecomposition(Ws::Vector{T}) where {T<:WitnessSet} =
     NumericalIrreducibleDecomposition(Ws, nothing)
-function NumericalIrreducibleDecomposition(Ws::Vector{WitnessSet}, seed)
-    D = Dict{Int,Vector{WitnessSet}}()
+function NumericalIrreducibleDecomposition(Ws::Vector{T}, seed) where {T<:WitnessSet}
+    D = Dict{Int,Vector{T}}()
     for W in Ws
         k = dim(W)
         push!(get!(D, k, WitnessSet[]), W)
@@ -1428,14 +1428,14 @@ Returns the witness sets in `N`.
 `dims` specifies the dimensions that should be considered.
 """
 function witness_sets(
-    N::NumericalIrreducibleDecomposition;
+    N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
-)
+) where {T}
     D = N.Witness_Sets
     if isnothing(dims)
         out = D
     else
-        out = Dict{Int,Vector{WitnessSet}}()
+        out = Dict{Int,Vector{T}}()
         for k in dims
             if haskey(D, k)
                 out[k] = D[k]
@@ -1445,8 +1445,9 @@ function witness_sets(
 
     out
 end
-witness_sets(N::NumericalIrreducibleDecomposition, dim::Int) = witness_sets(N; dims = [dim])
-seed(N::NumericalIrreducibleDecomposition) = N.seed
+witness_sets(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
+    witness_sets(N; dims = [dim])
+seed(N::NumericalIrreducibleDecomposition{T}) where {T} = N.seed
 
 """
     ncomponents(N::NumericalIrreducibleDecomposition;
@@ -1456,9 +1457,9 @@ Returns the total number of components in `N`.
 `dims` specifies the dimensions that should be considered.
 """
 function ncomponents(
-    N::NumericalIrreducibleDecomposition;
+    N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
-)
+) where {T}
     D = witness_sets(N)
     if isempty(D)
         return 0
@@ -1475,7 +1476,8 @@ function ncomponents(
 
     out
 end
-ncomponents(N::NumericalIrreducibleDecomposition, dim::Int) = ncomponents(N; dims = [dim])
+ncomponents(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
+    ncomponents(N; dims = [dim])
 n_components(N; dims = nothing) = ncomponents(N; dims = dims)
 n_components(N, dim) = ncomponents(N; dims = [dim])
 
@@ -1489,9 +1491,9 @@ Returns the degrees of the components in `N`.
 
 """
 function ModelKit.degrees(
-    N::NumericalIrreducibleDecomposition;
+    N::NumericalIrreducibleDecomposition{T};
     dims::Union{Vector{Int},Nothing} = nothing,
-)
+) where {T}
     D = N.Witness_Sets
     out = Dict{Int,Vector{Int}}()
     if isnothing(dims)
@@ -1511,9 +1513,10 @@ function ModelKit.degrees(
 
     out
 end
-ModelKit.degrees(N::NumericalIrreducibleDecomposition, dim::Int) = degrees(N; dims = [dim])
+ModelKit.degrees(N::NumericalIrreducibleDecomposition{T}, dim::Int) where {T} =
+    degrees(N; dims = [dim])
 
-function max_dim(N::NumericalIrreducibleDecomposition)
+function max_dim(N::NumericalIrreducibleDecomposition{T}) where {T}
     D = witness_sets(N)
     k = keys(D)
     if !isempty(k)
@@ -1523,7 +1526,7 @@ function max_dim(N::NumericalIrreducibleDecomposition)
     end
 end
 
-function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
+function Base.show(io::IO, N::NumericalIrreducibleDecomposition{T}) where {T}
     D = witness_sets(N)
     if !isempty(D)
         total = sum(length(last(Ws)) for Ws in D)
@@ -1549,7 +1552,7 @@ function Base.show(io::IO, N::NumericalIrreducibleDecomposition)
         degree_table(io, N)
     end
 end
-function degree_table(io, N::NumericalIrreducibleDecomposition)
+function degree_table(io, N::NumericalIrreducibleDecomposition{T}) where {T}
     D = witness_sets(N)
     k = collect(keys(D))
     sort!(k, rev = true)
