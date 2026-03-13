@@ -1,5 +1,5 @@
 export WitnessSet,
-    witness_set, linear_subspace, system, dim, codim, trace_test, is_irreducible
+    witness_set, linear_subspace, system, dim, codim, trace_test, is_irreducible, membership
 
 """
     WitnessSet(F, L, S)
@@ -87,6 +87,8 @@ function Base.show(io::IO, W::WitnessSet)
 end
 
 
+
+
 """
     is_irreducible(W::WitnessSet)
 
@@ -146,6 +148,9 @@ julia> W = witness_set(F)
 Witness set for dimension 1 of degree 2
 ```
 """
+witness_set(F::Expression, args...; kwargs...) = witness_set([F], args...; kwargs...)
+witness_set(F::Vector{Expression}, args...; kwargs...) =
+    witness_set(System(F), args...; kwargs...)
 witness_set(F::System, args...; compile = COMPILE_DEFAULT[], kwargs...) =
     witness_set(fixed(F; compile = compile), args...; kwargs...)
 function witness_set(
@@ -157,6 +162,7 @@ function witness_set(
 )
     f = System(F)
     projective = is_homogeneous(f)
+    polynomial = is_polynomial(f)
     if isnothing(dim) && isnothing(codim)
         dim = corank(F) - projective
     elseif !isnothing(codim) && projective
@@ -168,12 +174,30 @@ function witness_set(
         L;
         target_parameters = target_parameters,
         projective = projective,
+        polynomial = polynomial,
         options...,
     )
 end
 
-function witness_set(F::AbstractSystem, L::LinearSubspace; projective = nothing, options...)
-    res = solve(F; target_subspace = L, options...)
+function witness_set(
+    F::AbstractSystem,
+    L::LinearSubspace;
+    projective = nothing,
+    polynomial = true,
+    options...,
+)
+    if polynomial
+        res = solve(F; target_subspace = L, options...)
+    else
+        mon_res = monodromy_solve(F; dim = codim(L))
+        res = solve(
+            F,
+            solutions(mon_res);
+            start_subspace = parameters(mon_res),
+            target_subspace = L,
+            options...,
+        )
+    end
     if isnothing(projective)
         WitnessSet(F, L, results(res; only_nonsingular = true))
     else
@@ -207,6 +231,273 @@ function witness_set(W::WitnessSet, L::LinearSubspace; options...)
         results(res; only_nonsingular = true);
         projective = is_linear(L) && W.projective,
     )
+end
+
+### Membership
+Base.@kwdef mutable struct MembershipProgress
+    progress_meter::PM.Progress
+    current_task::Int = 0
+    ntasks::Int = 0
+end
+MembershipProgress(progress_meter::PM.Progress) =
+    MembershipProgress(progress_meter = progress_meter)
+update_progress_tasks!(progress::Nothing, i::Int, m::Int) = nothing
+function update_progress_tasks!(progress::MembershipProgress, i::Int, m::Int)
+    progress.current_task = i
+    progress.ntasks = m
+    showvalues = [("Points checked", "$(progress.current_task) / $(progress.ntasks)")]
+    PM.update!(progress.progress_meter, i; showvalues = showvalues)
+end
+update_progress!(progress::MembershipProgress, W::Nothing) = nothing
+
+"""
+    MembershipCache
+
+A cache for [`membership`](@ref).
+"""
+mutable struct MembershipCache
+    A::Matrix
+    b::Vector
+    x0::Vector
+    y0::Vector
+    y::Vector
+
+    endgame_options::EndgameOptions
+    tracker_options::TrackerOptions
+
+    progress::Union{MembershipProgress,Nothing}
+end
+
+function MembershipCache(W, EO, TO, progress)
+    F = system(W)
+    m, n = size(F)
+    i = codim(W)
+    A0 = zeros(ComplexF64, n - i, n)
+    A = LA.svd(A0).Vt # need to orthonormalize A
+    b = zeros(ComplexF64, n - i)
+    x0 = zeros(ComplexF64, n)
+    y0 = zeros(ComplexF64, m)
+    y = zeros(ComplexF64, m)
+
+    MembershipCache(A, b, x0, y0, y, EO, TO, progress)
+end
+function update_x0!(x0)
+    for i = 1:length(x0)
+        x0[i] = randn(ComplexF64)
+    end
+    LA.normalize!(x0)
+    x0
+end
+
+"""
+    membership(P::Vector{Vector{T}}, W::WitnessSet) where {T <: Number}
+
+Returns a boolean vector indicating whether the points of P are contained in X.
+
+### Options
+
+* `show_progress = true`: indicate whether a progress bar should be displayed.
+* `tracker_options`: [`TrackerOptions`](@ref) for the [`Tracker`](@ref).
+* `endgame_options`: [`EndgameOptions`](@ref) for the [`EndgameTracker`](@ref).
+* `atol = 1e-14` and `rtol = sqrt(eps())`: a point `y` is considered equal to `x` when the distance between `x`and `y` is smaller than `max(atol, norm(x, Inf) * rtol).`
+* `threading = true`: Enable multi-threading for the computation. The number of available threads is controlled by the environment variable `JULIA_NUM_THREADS`. You can run `Julia` with `n` threads using the command `julia -t n`; e.g., `julia -t 8` for `n=8`. (Some CPUs hang when using multiple threads. To avoid this run Julia with 1 interactive thread for the REPL; e.g., `julia -t 8,1` for `n=8`. Note that some CPUs seem to let `Julia` crash when using that option.)
+"""
+function membership(
+    P::Vector{Vector{T}},
+    W::WitnessSet;
+    show_progress::Bool = true,
+    tracker_options = TrackerOptions(),
+    endgame_options = EndgameOptions(;
+        max_endgame_steps = 100,
+        max_endgame_extended_steps = 100,
+        sing_cond = 1e12,
+    ),
+    kwargs...,
+) where {T<:Number}
+
+    # progress bar
+    if show_progress
+        desc = "Membership test"
+        barlen = min(ProgressMeter.tty_width(desc, stdout, false), 40)
+        progress_meter = ProgressMeter.Progress(
+            length(P);
+            dt = 0.2,
+            desc = desc,
+            barlen = barlen,
+            output = stdout,
+        )
+        progress = MembershipProgress(progress_meter)
+    else
+        progress = nothing
+    end
+
+    cache = MembershipCache(W, endgame_options, tracker_options, progress)
+    is_contained(P, W, system(W), cache; kwargs...)
+end
+function membership(p::Vector{T}, W::WitnessSet; kwargs...) where {T<:Number}
+    out = membership([p], W; kwargs...)
+    first(out)
+end
+function is_contained(
+    P::Vector{Vector{T}},
+    Y::WitnessSet,
+    F,
+    cache;
+    threading::Bool = Threads.nthreads() > 1,
+    kwargs...,
+) where {T<:Number}
+
+    # set up homotopy
+    tracker_options = cache.tracker_options
+    endgame_options = cache.endgame_options
+    LY = linear_subspace(Y)
+    Hom = linear_subspace_homotopy(F, LY, LY)
+    tracker =
+        EndgameTracker(Hom; tracker_options = tracker_options, options = endgame_options)
+
+    # tracking
+    if threading
+        out = threaded_x_in_Y(P, Y, F, tracker, cache; kwargs...)
+    else
+        out = serial_x_in_Y(P, Y, F, tracker, cache; kwargs...)
+    end
+
+    out
+end
+function serial_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+
+    progress = cache.progress
+    x0 = cache.x0
+    update_x0!(x0)
+    y0 = cache.y0
+    y = cache.y
+    l_X = length(P)
+
+    A, b = cache.A, cache.b
+
+    # Pre-allocate output
+    out = Vector{Bool}(undef, l_X)
+    idx = 0
+    #we loop over the points in X and check if they are contained in Y
+    out = map(P) do x
+        idx += 1
+        update_progress_tasks!(progress, idx, l_X)
+
+        # first check
+        evaluate!(y0, F, norm(x, Inf) .* x0)
+        evaluate!(y, F, x)
+        if norm(y, Inf) > 1e-2 * norm(y0, Inf)
+            return false
+        end
+
+        # second check
+        LA.mul!(b, A, x)
+        # set up the corresponding LinearSubspace L
+        E = ExtrinsicDescription(A, b; orthonormal = true)
+        L = LinearSubspace(E)
+        # set L as the target for homotopy continuation
+        target_parameters!(tracker, L)
+
+        rad = max(atol, norm(x, Inf) * rtol)
+
+        # add the points in Y to U after we have moved them towards L 
+        for p in points(Y)
+            track!(tracker, p, 1)
+            q = solution(tracker)
+            d = distance(q, x, InfNorm())
+            if d < rad
+                return true
+            end
+        end
+
+        return false
+    end
+
+    out
+end
+function threaded_x_in_Y(P, Y, F, tracker, cache; atol = 1e-14, rtol = sqrt(eps()))
+
+    progress = cache.progress
+    x0 = cache.x0
+    update_x0!(x0)
+    y0 = cache.y0
+    y = cache.y
+    l_X = length(P)
+
+    A, b = cache.A, cache.b
+
+    # Pre-allocate output
+    out = Vector{Bool}(undef, l_X)
+
+    # Pre-allocate one tracker and buffers per thread
+    nthr = Threads.nthreads()
+    trackers = [deepcopy(tracker) for _ = 1:nthr]
+    y0_bufs = [zeros(ComplexF64, length(cache.y0)) for _ = 1:nthr]
+    y_bufs = [zeros(ComplexF64, length(cache.y)) for _ = 1:nthr]
+    b_bufs = [deepcopy(b) for _ = 1:nthr]
+    F_bufs = [deepcopy(F) for _ = 1:nthr]
+
+    progress_lock = ReentrantLock()
+    next_idx = Threads.Atomic{Int}(1)
+
+    Threads.@sync begin
+        for tid = 1:nthr
+            let local_tracker = trackers[tid],
+                local_y0 = y0_bufs[tid],
+                local_y = y_bufs[tid],
+                local_b = b_bufs[tid]
+
+                local_F = F_bufs[tid]
+
+                Threads.@spawn begin
+                    while true
+                        idx = Threads.atomic_add!(next_idx, 1)
+                        if idx > l_X
+                            break
+                        end
+
+                        x = P[idx]
+                        lock(progress_lock) do
+                            update_progress_tasks!(progress, idx, l_X)
+                        end
+
+                        # first check
+                        evaluate!(local_y0, local_F, norm(x, Inf) .* x0)
+                        evaluate!(local_y, local_F, x)
+
+                        result = false
+                        if norm(local_y, Inf) <= 1e-2 * norm(local_y0, Inf)
+                            # second check
+                            LA.mul!(local_b, A, x)
+                            # set up the corresponding LinearSubspace L
+                            E = ExtrinsicDescription(A, local_b; orthonormal = true)
+                            L = LinearSubspace(E)
+                            # set L as the target for homotopy continuation
+                            target_parameters!(local_tracker, L)
+
+                            rad = max(atol, norm(x, Inf) * rtol)
+
+                            # add the points in Y to U after we have moved them towards L 
+                            for p in points(Y)
+                                track!(local_tracker, p, 1)
+                                q = solution(local_tracker)
+                                if distance(q, x, InfNorm()) < rad
+                                    result = true
+                                    break
+                                end
+                            end
+                        end
+
+                        lock(progress_lock) do
+                            out[idx] = result
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return out
 end
 
 """

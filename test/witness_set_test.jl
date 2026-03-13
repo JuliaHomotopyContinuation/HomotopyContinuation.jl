@@ -83,4 +83,33 @@
         @test degree(witness_set(f; codim = 4, compile = false)) == 16
         @test degree(witness_set(f; compile = false)) == 16
     end
+
+    @var x, y, z
+    p = (x * y - x^2) + 1 - z
+    q = x^4 + x^2 - y - 1
+    F = [
+        p * q * (x - 3) * (x - 5)
+        p * q * (y - 3) * (y - 5)
+        p * (z - 3) * (z - 5)
+    ]
+
+    @testset "membership" begin
+        W = witness_set(F; codim = 2)
+
+        p = randn(3)
+        q = solutions(W)[1]
+
+        @test !membership(p, W)
+        @test membership(q, W; show_progress = false)
+        a = membership([p, q], W; show_progress = false)
+        @test a == [false, true]
+    end
+
+    @testset "intersect" begin
+        H = [witness_set(f) for f in F]
+        B = intersect(H[1], H[2])
+        C = vcat([intersect(Hi, H[3]; show_progress = false) for Hi in B]...)
+        @test degree.(C) == [2, 8, 8]
+    end
+
 end

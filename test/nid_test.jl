@@ -87,7 +87,17 @@
         @var x y z
         g = System([x^2 + y^2 - z; x / (y - 1) + y + z - 1], variables = [x, y, z])
         N = nid(g)
-        @test degrees(N)[1] == [4]
+        W = first(witness_sets(N)[1])
+        @test ncomponents(N) == 1
+        @test degree(W) == 4
+        p = randn(3)
+        q = solutions(W)[1]
+        @test !membership(p, W)
+        @test membership(q, W)
+        U = intersect(W, x / (y - 1) + y + z - 1)
+        @test degree(U) == 4
+        V = intersect(W, x * y^3 - z^4 + x^3 - 8)
+        @test degree(V) == 16
     end
 
     @testset "catch all components of degree 1" begin

@@ -31,6 +31,19 @@ Witness sets can be decomposed into [irreducible components](https://en.wikipedi
 decompose
 ```
 
+Membership in witness sets can be tested.
+
+```@docs
+membership
+```
+
+One can intersect a witness set with a hypersurface.
+
+```@docs
+Base.intersect(::WitnessSet, ::WitnessSet)
+Base.intersect(::WitnessSet, ::Expression)
+```
+
 ## Numerical Irreducible Decomposition
 
 A numerical irreducible decomposition for ``F`` is a collection of witness sets ``W₁, ..., Wᵣ`` such that the ``Wᵢ`` are all witness sets for different [irreducible components](https://en.wikipedia.org/wiki/Irreducible_component) and ``V(F)`` is their union. 
