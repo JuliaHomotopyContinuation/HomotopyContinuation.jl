@@ -162,6 +162,68 @@
         @test count(is_real, certificates(cert)) == 2
     end
 
+    @testset "DistinctCertifiedSolutions incremental API" begin
+        @var x y
+        F = System([x^2 + y^2 - 1, x - y])
+        res = solve(F; compile = false, start_system = :total_degree)
+        sols = solutions(res)
+
+        dcs = DistinctCertifiedSolutions(F, nothing)
+        added, status, representative = add_solution!(dcs, sols[1], 1)
+        @test added
+        @test status == :certified_distinct
+        @test representative == 1
+
+        added, status, representative = add_solution!(dcs, sols[1], 2)
+        @test !added
+        @test status == :duplicate
+        @test representative == 1
+
+        f_param = (x^4 + y^4 - 1) * (x^2 + y^2 - 2) + x^5 * y
+        @var λ[1:1] u[1:2]
+        J = differentiate([f_param], [x, y])
+        C = System([[x, y] - u - J' * λ; f_param], parameters = u)
+        Random.seed!(1)
+        not_certified_dcs = DistinctCertifiedSolutions(C, [-0.32, -0.1])
+        added, status, representative =
+            add_solution!(not_certified_dcs, 100 .* randn(ComplexF64, 3), 3; max_precision = 64)
+        @test !added
+        @test status == :not_certified
+        @test representative == 0
+        @test stats(dcs) == (
+            processed = 2,
+            certified_distinct = 1,
+            duplicates = 1,
+            not_certified = 0,
+        )
+        @test stats(not_certified_dcs) == (
+            processed = 1,
+            certified_distinct = 0,
+            duplicates = 0,
+            not_certified = 1,
+        )
+
+        dcs_batches = DistinctCertifiedSolutions(F, nothing)
+        distinct_certified_solutions!(dcs_batches, sols[1:1]; threading = false, show_progress = false)
+        distinct_certified_solutions!(
+            dcs_batches,
+            [sols[2]; sols[1]];
+            threading = false,
+            show_progress = false,
+        )
+        @test length(solutions(dcs_batches)) == 2
+        @test ncertified_distinct(dcs_batches) == 2
+        @test nduplicates(dcs_batches) == 1
+
+        left =
+            distinct_certified_solutions(F, sols[1:1], nothing; threading = false, show_progress = false)
+        right =
+            distinct_certified_solutions(F, [sols[2]; sols[1]], nothing; threading = false, show_progress = false)
+        merge!(left, right)
+        @test length(solutions(left)) == 2
+        @test nduplicates(left) == 1
+    end
+
     @testset "3264" begin
         F = steiner()
         real_conics = [

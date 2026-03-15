@@ -4,6 +4,8 @@ export monodromy_solve,
     MonodromyResult,
     is_success,
     is_heuristic_stop,
+    ncertified_distinct,
+    ndiscarded_uncertified,
     parameters,
     permutations,
     trace,
@@ -26,6 +28,9 @@ Base.@kwdef struct MonodromyOptions{D,GA<:Union{Nothing,GroupActions}}
     loop_finished_callback = always_false
     parameter_sampler = independent_normal
     equivalence_classes::Bool = !isnothing(group_actions)
+    duplicate_check::Symbol = :heuristic
+    certification_max_precision::Int = 256
+    certification_refine_solution::Bool = true
     # stopping heuristic
     trace_test_tol::Float64 = 1e-6
     trace_test::Bool = true
@@ -130,6 +135,10 @@ Base.@kwdef mutable struct MonodromyStatistics
     tracked_loops::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
     tracking_failures::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
     generated_loops::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    certification_attempts::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    certified_duplicate_hits::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    certified_distinct_inserts::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    uncertified_discards::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
     solutions::Vector{Int} = Int[]
     permutations::Vector{Vector{Int}} = Vector{Int}[]
 end
@@ -218,6 +227,9 @@ struct MonodromyResult{P,LP}
     loops::Vector{MonodromyLoop{LP}}
     statistics::MonodromyStatistics
     equivalence_classes::Bool
+    duplicate_check::Symbol
+    certified_distinct_count::Int
+    discarded_uncertified_count::Int
     seed::UInt32
     trace::Union{Nothing,Float64}
 end
@@ -305,6 +317,21 @@ is_success(result::MonodromyResult) = result.returncode == :success
 Returns true if the monodromy computation stopped due to the heuristic.
 """
 is_heuristic_stop(result::MonodromyResult) = result.returncode == :heuristic_stop
+
+"""
+    ncertified_distinct(result::MonodromyResult)
+
+Return the number of certified distinct solutions accepted by monodromy when
+`duplicate_check = :certified`.
+"""
+ncertified_distinct(r::MonodromyResult) = r.certified_distinct_count
+
+"""
+    ndiscarded_uncertified(result::MonodromyResult)
+
+Return the number of tracked endpoints discarded because they failed certification.
+"""
+ndiscarded_uncertified(r::MonodromyResult) = r.discarded_uncertified_count
 
 """
     solutions(result::MonodromyResult)
@@ -419,12 +446,14 @@ mutable struct MonodromySolver{
     Tracker<:EndgameTracker,
     P,
     UP<:UniquePoints,
+    CS,
     MO<:MonodromyOptions,
 }
     trackers::Vector{Tracker}
     loops::Vector{MonodromyLoop{P}}
     unique_points::UP
     unique_points_lock::ReentrantLock
+    certified_solutions::CS
     options::MO
     statistics::MonodromyStatistics
     # We save the sums of the solutions for three
@@ -447,6 +476,12 @@ function MonodromySolver(
     if !isa(options, MonodromyOptions)
         options = MonodromyOptions(; options...)
     end
+    options.duplicate_check ∈ (:heuristic, :certified) ||
+        throw(
+            ArgumentError(
+                "Invalid value for `duplicate_check`: $(options.duplicate_check). Expected `:heuristic` or `:certified`.",
+            ),
+        )
 
     if parameters isa LinearSubspace
         H = linear_subspace_homotopy(
@@ -483,6 +518,9 @@ function MonodromySolver(
         group_actions = group_actions,
         triangle_inequality = options.triangle_inequality,
     )
+    certified_solutions =
+        options.duplicate_check == :certified ?
+        monodromy_certified_solutions(F, parameters; compile = compile) : nothing
 
     trace = zeros(ComplexF64, length(x₀) + 1, 3)
     MonodromySolver(
@@ -490,6 +528,7 @@ function MonodromySolver(
         MonodromyLoop{P}[],
         unique_points,
         ReentrantLock(),
+        certified_solutions,
         options,
         MonodromyStatistics(),
         trace,
@@ -517,6 +556,43 @@ function reset_trace!(MS::MonodromySolver)
     MS.trace .= 0
     MS.trace[end, :] .= 1
     MS
+end
+
+function monodromy_certified_solutions(
+    F::System,
+    parameters;
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+)
+    base_system = fixed(F; compile = compile)
+    cert_system, cert_parameters =
+        parameters isa LinearSubspace ? (slice(base_system, parameters), nothing) :
+        (base_system, parameters)
+    DistinctCertifiedSolutions(cert_system, cert_parameters; thread_safe = true)
+end
+function monodromy_certified_solutions(
+    F::AbstractSystem,
+    parameters;
+    compile::Union{Bool,Symbol} = COMPILE_DEFAULT[],
+)
+    cert_system, cert_parameters =
+        parameters isa LinearSubspace ? (slice(F, parameters), nothing) : (F, parameters)
+    DistinctCertifiedSolutions(cert_system, cert_parameters; thread_safe = true)
+end
+
+duplicate_check_is_certified(MS::MonodromySolver) = MS.options.duplicate_check == :certified
+
+function monodromy_add_tolerances(MS::MonodromySolver, res::PathResult)
+    rtol =
+        isnothing(MS.options.unique_points_rtol) ? uniqueness_rtol(res) :
+        MS.options.unique_points_rtol
+    atol =
+        isnothing(MS.options.unique_points_atol) ? 1e-14 : MS.options.unique_points_atol
+    atol, rtol
+end
+
+function insert_unique_point!(MS::MonodromySolver, res::PathResult, id::Int)
+    atol, rtol = monodromy_add_tolerances(MS, res)
+    add!(MS.unique_points, solution(res), id; atol = atol, rtol = rtol)
 end
 
 # Check if trace is colinear
@@ -555,6 +631,13 @@ See also [`linear_subspace_homotopy`](@ref) for the `intrinsic` option.
   is only interpreted ([`InterpretedSystem`](@ref) resp. [`InterpretedHomotopy`](@ref)).
   This is slower than the compiled version, but does not introduce compilation overhead.
 * `distance = EuclideanNorm()`: The distance function used for [`UniquePoints`](@ref).
+* `duplicate_check = :heuristic`: Use `:heuristic` to keep the existing [`UniquePoints`](@ref)
+  deduplication. Use `:certified` to only accept solutions that certify as distinct, while
+  discarding endpoints that are neither certified duplicates nor certified distinct solutions.
+* `certification_max_precision = 256`: Maximal precision passed to the certification routine
+  when `duplicate_check = :certified`.
+* `certification_refine_solution = true`: Whether to refine a tracked endpoint with Newton
+  before certification when `duplicate_check = :certified`.
 * `loop_finished_callback = always_false`: A callback to end the computation. This function is
   called with all current [`PathResult`](@ref)s after a loop is exhausted.
   2 arguments. Return `true` if the compuation should be stopped.
@@ -825,6 +908,9 @@ function monodromy_solve(
     end
     MS.statistics = MonodromyStatistics()
     empty!(MS.unique_points)
+    if duplicate_check_is_certified(MS)
+        empty!(MS.certified_solutions)
+    end
     reset_trace!(MS)
     reset_loops!(MS)
     results = check_start_solutions(MS, X, p)
@@ -865,6 +951,9 @@ function monodromy_solve(
         MS.loops,
         MS.statistics,
         MS.options.equivalence_classes,
+        MS.options.duplicate_check,
+        duplicate_check_is_certified(MS) ? length(results) : 0,
+        MS.statistics.uncertified_discards[],
         seed,
         p isa LinearSubspace ? trace_colinearity(MS) : nothing,
     )
@@ -887,19 +976,40 @@ function check_start_solutions(MS::MonodromySolver, X, p)
     results
 end
 
-function add!(MS::MonodromySolver, res::PathResult, id)
-    if isnothing(MS.options.unique_points_rtol)
-        rtol = uniqueness_rtol(res)
-    else
-        rtol = MS.options.unique_points_rtol
-    end
-    if isnothing(MS.options.unique_points_atol)
-        atol = 1e-14
-    else
-        atol = MS.options.unique_points_atol
+function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
+    atol, rtol = monodromy_add_tolerances(MS, res)
+    if !duplicate_check_is_certified(MS)
+        return add!(MS.unique_points, solution(res), id; atol = atol, rtol = rtol)
     end
 
-    add!(MS.unique_points, solution(res), id; atol = atol, rtol = rtol)
+    if MS.options.equivalence_classes
+        rad = max(atol, rtol * MS.unique_points.tree.distance(solution(res), MS.unique_points.zero_vec))
+        orbit_id = search_in_radius(MS.unique_points, solution(res), rad)
+        if !isnothing(orbit_id)
+            return (orbit_id, false)
+        end
+    end
+
+    Threads.atomic_add!(MS.statistics.certification_attempts, 1)
+    added, status, representative_index = add_solution!(
+        MS.certified_solutions,
+        convert(Vector{ComplexF64}, solution(res)),
+        id,
+        tid;
+        max_precision = MS.options.certification_max_precision,
+        refine_solution = MS.options.certification_refine_solution,
+    )
+    if status == :duplicate
+        Threads.atomic_add!(MS.statistics.certified_duplicate_hits, 1)
+        return (representative_index, false)
+    elseif status == :not_certified
+        Threads.atomic_add!(MS.statistics.uncertified_discards, 1)
+        return (0, false)
+    else
+        Threads.atomic_add!(MS.statistics.certified_distinct_inserts, 1)
+        insert_unique_point!(MS, res, id)
+        return (id, true)
+    end
 end
 
 function serial_monodromy_solve!(
@@ -1108,7 +1218,7 @@ function threaded_monodromy_solve!(
                                 lock(data_lock)
                                 if length(results) <
                                    something(MS.options.target_solutions_count, Inf)
-                                    id, got_added = add!(MS, res, length(results) + 1)
+                                    id, got_added = add!(MS, res, length(results) + 1, tid)
 
                                     if MS.options.permutations
                                         add_permutation!(stats, job.loop_id, job.id, id)
