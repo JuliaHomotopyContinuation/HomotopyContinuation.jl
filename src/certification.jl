@@ -282,10 +282,12 @@ end
     struct DistinctSolutionCertificates
 
 A struct that holds a reference point and an interval tree of distinct solution certificates.
+Certificates are stored in buckets per interval key to avoid overwriting when two distinct
+certificates share the same squared_distance_interval key.
 """
 struct DistinctSolutionCertificates{S<:AbstractSolutionCertificate}
     reference_point::Vector{ComplexF64}
-    distinct_tree::IntervalTrees.IntervalMap{Float64,S}
+    distinct_tree::IntervalTrees.IntervalMap{Float64,Vector{S}}
     acb_solution_candidate::AcbMatrix
 end
 
@@ -309,7 +311,7 @@ DistinctSolutionCertificates(
     reference_point,
     IntervalTrees.IntervalMap{
         Float64,
-        extended_certificate ? ExtendedSolutionCertificate : SolutionCertificate,
+        Vector{extended_certificate ? ExtendedSolutionCertificate : SolutionCertificate},
     }(),
     AcbMatrix(length(reference_point), 1),
 )
@@ -319,7 +321,9 @@ DistinctSolutionCertificates(
 
 Return the number of distinct solution certificates in the interval tree.
 """
-Base.length(d::DistinctSolutionCertificates) = length(d.distinct_tree)
+function Base.length(d::DistinctSolutionCertificates)
+    return sum((length(bucket) for bucket in IntervalTrees.values(d.distinct_tree)); init = 0)
+end
 
 Base.show(io::IO, d::DistinctSolutionCertificates) =
     print(io, "DistinctSolutionCertificates with $(length(d)) certificates")
@@ -334,16 +338,24 @@ function add_certificate!(
     cert::AbstractSolutionCertificate,
 )
     d = squared_distance_interval(cert, distinct_sols.reference_point)
+    bucket_for_d = nothing
     for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
-        certᵢ = IntervalTrees.value(match)
-        if Bool(Arblib.overlaps(cert.I, certᵢ.I))
-            return (false, certᵢ)
-            break
+        bucket = IntervalTrees.value(match)
+        for certᵢ in bucket
+            if Bool(Arblib.overlaps(cert.I, certᵢ.I))
+                return (false, certᵢ)
+            end
         end
-
+        if first(match) == first(d) && last(match) == last(d)
+            bucket_for_d = bucket
+        end
     end
 
-    distinct_sols.distinct_tree[d] = cert
+    if !isnothing(bucket_for_d)
+        push!(bucket_for_d, cert)
+    else
+        distinct_sols.distinct_tree[d] = [cert]
+    end
     return (true, cert)
 end
 
@@ -354,16 +366,17 @@ function guaranteed_duplicate_certificate(
     d = squared_distance_interval(s, distinct_sols.reference_point)
     assigned = false
     for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
-        certᵢ = IntervalTrees.value(match)
+        bucket = IntervalTrees.value(match)
         if !assigned
             for (i, xᵢ) in enumerate(s)
                 distinct_sols.acb_solution_candidate[i] = xᵢ
             end
             assigned = true
         end
-
-        if Bool(Arblib.contains(certᵢ.I, distinct_sols.acb_solution_candidate))
-            return certᵢ
+        for certᵢ in bucket
+            if Bool(Arblib.contains(certᵢ.I, distinct_sols.acb_solution_candidate))
+                return certᵢ
+            end
         end
     end
 
@@ -1622,8 +1635,9 @@ end
     add_solution!(d::DistinctCertifiedSolutions, sol::Vector{ComplexF64}, i::Integer = 0; certify_solution_kwargs...)
 
 Add a solution to the DistinctSolutionCertificates object if it is not a duplicate.
-Returns `(added, status, representative_index)` where `status` is one of
-`:certified_distinct`, `:duplicate`, or `:not_certified`.
+Returns `(added, status, representative_index, certified_solution)` where `status` is one of
+`:certified_distinct`, `:duplicate`, or `:not_certified`. When `added` is `true`,
+`certified_solution` is the midpoint of the certified interval; otherwise `nothing`.
 """
 function add_solution!(
     d::DistinctCertifiedSolutions,
@@ -1636,7 +1650,7 @@ function add_solution!(
         certᵢ = guaranteed_duplicate_certificate(d.distinct_solution_certificates, sol)
         if !isnothing(certᵢ)
             record_add_solution_result!(d, :duplicate)
-            return (false, :duplicate, something(certᵢ.index, 0))
+            return (false, :duplicate, something(certᵢ.index, 0), nothing)
         end
     end
     cert = try
@@ -1644,7 +1658,7 @@ function add_solution!(
     catch err
         if (err isa LA.LAPACKException) || (err isa LA.SingularException)
             record_add_solution_result!(d, :not_certified)
-            return (false, :not_certified, 0)
+            return (false, :not_certified, 0, nothing)
         end
         rethrow(err)
     end
@@ -1653,14 +1667,14 @@ function add_solution!(
             added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
             if added
                 record_add_solution_result!(d, :certified_distinct)
-                return (true, :certified_distinct, something(cert.index, 0))
+                return (true, :certified_distinct, something(cert.index, 0), solution_approximation(cert))
             end
             record_add_solution_result!(d, :duplicate)
-            return (false, :duplicate, something(_cert.index, 0))
+            return (false, :duplicate, something(_cert.index, 0), nothing)
         end
     end
     record_add_solution_result!(d, :not_certified)
-    return (false, :not_certified, 0)
+    return (false, :not_certified, 0, nothing)
 end
 
 """
@@ -1669,7 +1683,10 @@ end
 Return a vector of solution certificates in the DistinctSolutionCertificates object.
 """
 function certificates(d::DistinctCertifiedSolutions)
-    return IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
+    buckets = collect(
+        IntervalTrees.values(d.distinct_solution_certificates.distinct_tree),
+    )
+    return collect(Iterators.flatten(buckets))
 end
 
 """
@@ -1751,7 +1768,7 @@ function distinct_certified_solutions!(
                             end
 
                             sol = S[i]
-                            added, _, _ = add_solution!(d, sol, i, tid; kwargs...)
+                            added, _, _, _ = add_solution!(d, sol, i, tid; kwargs...)
                             Threads.atomic_add!(processed, 1)
                             if added
                                 Threads.atomic_add!(ndistinct, 1)
@@ -1775,7 +1792,7 @@ function distinct_certified_solutions!(
     else
         ndistinct = processed = 0
         for (i, sol) in enumerate(S)
-            added, _, _ = add_solution!(d, sol, i, 1; kwargs...)
+            added, _, _, _ = add_solution!(d, sol, i, 1; kwargs...)
             processed += 1
             ndistinct += added
             if show_progress

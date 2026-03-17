@@ -219,6 +219,10 @@ end
     MonodromyResult
 
 The monodromy result contains the result of the [`monodromy_solve`](@ref) computation.
+When `duplicate_check = :certified`, each accepted PathResult solution is updated to the
+certified midpoint and marked non-singular. The canonical certified-distinct solution set is
+also stored separately and returned by [`solutions`](@ref) and [`nsolutions`](@ref), while
+[`results`](@ref) and [`nresults`](@ref) continue to expose the raw tracked [`PathResult`](@ref)s.
 """
 struct MonodromyResult{P,LP}
     returncode::Symbol
@@ -232,6 +236,7 @@ struct MonodromyResult{P,LP}
     discarded_uncertified_count::Int
     seed::UInt32
     trace::Union{Nothing,Float64}
+    certified_solutions::Union{Nothing,Vector{Vector{ComplexF64}}}
 end
 
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MonodromyResult) = x
@@ -287,7 +292,7 @@ function TreeViews.nodelabel(
 end
 function TreeViews.treenode(r::MonodromyResult, i::Integer)
     if i == 1
-        return r.results
+        return isnothing(r.certified_solutions) ? r.results : r.certified_solutions
     elseif i == 2
         return r.returncode
     elseif i == 3
@@ -336,16 +341,20 @@ ndiscarded_uncertified(r::MonodromyResult) = r.discarded_uncertified_count
 """
     solutions(result::MonodromyResult)
 
-Return all solutions.
+Return all solutions. When `duplicate_check = :certified`, this returns the canonical
+certified-distinct solution approximations.
 """
-solutions(r::MonodromyResult) = solutions(r.results)
+solutions(r::MonodromyResult) =
+    isnothing(r.certified_solutions) ? solutions(r.results) : r.certified_solutions
 
 """
     nsolutions(result::MonodromyResult)
 
-Returns the number solutions of the `result`.
+Returns the number solutions of the `result`. When `duplicate_check = :certified`, this
+counts the canonical certified-distinct solution set.
 """
-nsolutions(r::MonodromyResult) = length(r.results)
+nsolutions(r::MonodromyResult) =
+    isnothing(r.certified_solutions) ? length(r.results) : length(r.certified_solutions)
 
 """
     results(result::MonodromyResult)
@@ -357,7 +366,7 @@ results(r::MonodromyResult) = r.results
 """
     nresults(result::MonodromyResult)
 
-Returns the number of results computed.
+Returns the number of raw [`PathResult`](@ref)s computed.
 """
 nresults(r::MonodromyResult) = length(r.results)
 
@@ -476,12 +485,11 @@ function MonodromySolver(
     if !isa(options, MonodromyOptions)
         options = MonodromyOptions(; options...)
     end
-    options.duplicate_check ∈ (:heuristic, :certified) ||
-        throw(
-            ArgumentError(
-                "Invalid value for `duplicate_check`: $(options.duplicate_check). Expected `:heuristic` or `:certified`.",
-            ),
-        )
+    options.duplicate_check ∈ (:heuristic, :certified) || throw(
+        ArgumentError(
+            "Invalid value for `duplicate_check`: $(options.duplicate_check). Expected `:heuristic` or `:certified`.",
+        ),
+    )
 
     if parameters isa LinearSubspace
         H = linear_subspace_homotopy(
@@ -585,8 +593,7 @@ function monodromy_add_tolerances(MS::MonodromySolver, res::PathResult)
     rtol =
         isnothing(MS.options.unique_points_rtol) ? uniqueness_rtol(res) :
         MS.options.unique_points_rtol
-    atol =
-        isnothing(MS.options.unique_points_atol) ? 1e-14 : MS.options.unique_points_atol
+    atol = isnothing(MS.options.unique_points_atol) ? 1e-14 : MS.options.unique_points_atol
     atol, rtol
 end
 
@@ -944,6 +951,8 @@ function monodromy_solve(
         end
     end
 
+    certified_solutions_vec =
+        duplicate_check_is_certified(MS) ? solutions(MS.certified_solutions) : nothing
     MonodromyResult(
         retcode,
         results,
@@ -952,10 +961,11 @@ function monodromy_solve(
         MS.statistics,
         MS.options.equivalence_classes,
         MS.options.duplicate_check,
-        duplicate_check_is_certified(MS) ? length(results) : 0,
+        isnothing(certified_solutions_vec) ? 0 : length(certified_solutions_vec),
         MS.statistics.uncertified_discards[],
         seed,
         p isa LinearSubspace ? trace_colinearity(MS) : nothing,
+        certified_solutions_vec,
     )
 end
 
@@ -983,7 +993,10 @@ function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
     end
 
     if MS.options.equivalence_classes
-        rad = max(atol, rtol * MS.unique_points.tree.distance(solution(res), MS.unique_points.zero_vec))
+        rad = max(
+            atol,
+            rtol * MS.unique_points.tree.distance(solution(res), MS.unique_points.zero_vec),
+        )
         orbit_id = search_in_radius(MS.unique_points, solution(res), rad)
         if !isnothing(orbit_id)
             return (orbit_id, false)
@@ -991,7 +1004,7 @@ function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
     end
 
     Threads.atomic_add!(MS.statistics.certification_attempts, 1)
-    added, status, representative_index = add_solution!(
+    added, status, representative_index, certified_sol = add_solution!(
         MS.certified_solutions,
         convert(Vector{ComplexF64}, solution(res)),
         id,
@@ -1007,6 +1020,8 @@ function add!(MS::MonodromySolver, res::PathResult, id, tid::Int = 1)
         return (0, false)
     else
         Threads.atomic_add!(MS.statistics.certified_distinct_inserts, 1)
+        copyto!(res.solution, certified_sol)
+        res.singular = false
         insert_unique_point!(MS, res, id)
         return (id, true)
     end

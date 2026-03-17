@@ -169,12 +169,12 @@
         sols = solutions(res)
 
         dcs = DistinctCertifiedSolutions(F, nothing)
-        added, status, representative = add_solution!(dcs, sols[1], 1)
+        added, status, representative, _ = add_solution!(dcs, sols[1], 1)
         @test added
         @test status == :certified_distinct
         @test representative == 1
 
-        added, status, representative = add_solution!(dcs, sols[1], 2)
+        added, status, representative, _ = add_solution!(dcs, sols[1], 2)
         @test !added
         @test status == :duplicate
         @test representative == 1
@@ -185,7 +185,7 @@
         C = System([[x, y] - u - J' * λ; f_param], parameters = u)
         Random.seed!(1)
         not_certified_dcs = DistinctCertifiedSolutions(C, [-0.32, -0.1])
-        added, status, representative =
+        added, status, representative, _ =
             add_solution!(not_certified_dcs, 100 .* randn(ComplexF64, 3), 3; max_precision = 64)
         @test !added
         @test status == :not_certified
@@ -202,6 +202,24 @@
             duplicates = 0,
             not_certified = 1,
         )
+
+        @var z u
+        collision_dcs = DistinctCertifiedSolutions(
+            System([z^2 - u], variables = [z], parameters = [u]),
+            [1.0 + 0im],
+        )
+        collision_dcs.distinct_solution_certificates =
+            HC.DistinctSolutionCertificates([0.0 + 0im])
+        added, status, representative, _ = add_solution!(collision_dcs, [1.0 + 0im], 1)
+        @test added
+        @test status == :certified_distinct
+        @test representative == 1
+        added, status, representative, _ = add_solution!(collision_dcs, [-1.0 + 0im], 2)
+        @test added
+        @test status == :certified_distinct
+        @test representative == 2
+        @test length(collision_dcs) == 2
+        @test sort(map(s -> real(s[1]), solutions(collision_dcs))) == [-1.0, 1.0]
 
         dcs_batches = DistinctCertifiedSolutions(F, nothing)
         distinct_certified_solutions!(dcs_batches, sols[1:1]; threading = false, show_progress = false)
