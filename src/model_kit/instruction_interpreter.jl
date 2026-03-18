@@ -305,7 +305,8 @@ for has_parameters in [true, false],
         end
         @inbounds execute_instructions!(I.tape, I.sequence.instructions)
         $(
-            has_second_output ? quote
+            has_second_output ?
+            quote
                 I.sequence.all_U_assigned || zero!(U)
                 let idx = CartesianIndices((I.sequence.output_dim, size(U, 2)))
                     @inbounds for (j, k) in I.sequence.U_assignments
