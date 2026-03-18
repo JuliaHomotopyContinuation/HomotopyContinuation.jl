@@ -711,10 +711,22 @@ function init!(
     else
         evaluate_and_jacobian!(corrector.r, workspace(jacobian), homotopy, x, t)
         J = matrix(workspace(jacobian))
+
         if J isa StructArrays.StructArray
-            corank = size(J, 2) - LA.rank(Matrix(J), rtol = 1e-14)
+            JM = Matrix(J)
+            if any(isnan, JM)
+                state.code = TrackerCode.terminated_invalid_startvalue
+                corank = 0
+            else
+                corank = size(J, 2) - LA.rank(JM, rtol = 1e-14)
+            end
         else
-            corank = size(J, 2) - LA.rank(J, rtol = 1e-14)
+            if any(isnan, J)
+                state.code = TrackerCode.terminated_invalid_startvalue
+                corank = 0
+            else
+                corank = size(J, 2) - LA.rank(J, rtol = 1e-14)
+            end
         end
         if corank > 0
             state.code = TrackerCode.terminated_invalid_startvalue_singular_jacobian
