@@ -307,8 +307,10 @@ for has_parameters in [true, false],
         $(
             has_second_output ? quote
                 I.sequence.all_U_assigned || zero!(U)
-                @inbounds for (j, k) in I.sequence.U_assignments
-                    U[j] = I.tape[k]
+                let idx = CartesianIndices((I.sequence.output_dim, size(U, 2)))
+                    @inbounds for (j, k) in I.sequence.U_assignments
+                        U[idx[j]] = I.tape[k]
+                    end
                 end
                 if !isnothing(u)
                     I.sequence.all_u_assigned || zero!(u)
