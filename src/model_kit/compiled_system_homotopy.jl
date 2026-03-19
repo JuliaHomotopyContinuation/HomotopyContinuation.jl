@@ -193,6 +193,8 @@ function compiled_execute_impl(
             (j, k) in seq.U_assignments
         ]
         quote
+            # all_U_assigned is true only when every (row, col) entry has an explicit
+            # assignment (dense Jacobian). Sparse Jacobians always go through zero!(U).
             $(seq.all_U_assigned ? :() : :(zero!(U)))
             $(U_stmts...)
             if !isnothing(u)
