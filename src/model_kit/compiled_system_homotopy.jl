@@ -187,7 +187,11 @@ function compiled_execute_impl(
     end
     assignments = if has_second_output
         u_stmts = [:(u[$(i)] = $(get_var_name(k))) for (i, k) in seq.u_assignments]
-        U_stmts = [:(U[$(j)] = $(get_var_name(k))) for (j, k) in seq.U_assignments]
+        odim = seq.output_dim
+        U_stmts = [
+            :(U[$(mod1(j, odim)), $(div(j - 1, odim) + 1)] = $(get_var_name(k))) for
+            (j, k) in seq.U_assignments
+        ]
         quote
             $(seq.all_U_assigned ? :() : :(zero!(U)))
             $(U_stmts...)

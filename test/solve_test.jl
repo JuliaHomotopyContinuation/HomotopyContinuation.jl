@@ -290,6 +290,8 @@
         @var x y
         r1 = solve(F; target_subspace = l1, compile = false)
         @test nsolutions(r1) == 2
+        r1c = solve(F; target_subspace = l1, start_system = :total_degree)
+        @test nsolutions(r1c) == 2
         r2 = solve(
             F,
             solutions(r1);
