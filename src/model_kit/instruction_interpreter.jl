@@ -230,7 +230,7 @@ function execute_acb_instructions_inner!_impl(level = 0)
     # More would help but are too prohibitiv in compile cost
     if level < 1
         branches = map(branches) do ((cond, code))
-            (cond, :($code; $(execute_instructions_inner!_impl(level + 1))))
+            (cond, :($code; $(execute_acb_instructions_inner!_impl(level + 1))))
         end
     end
 
@@ -265,7 +265,7 @@ end
         # allocate some working memory
         m = (copy(tape[1]), copy(tape[1]))
         while true
-            $(execute_acb_instructions_inner!_impl(1))
+            $(execute_acb_instructions_inner!_impl(0))
         end
     end
 end
@@ -307,28 +307,21 @@ for has_parameters in [true, false],
         $(
             has_second_output ?
             quote
-                n = I.sequence.output_dim
-                zero!(U)
-                idx = CartesianIndices((I.sequence.output_dim, size(U, 2)))
-                if isnothing(u)
-                    for (i, k) in I.sequence.assignments
-                        if i > n
-                            U[idx[i-n]] = I.tape[k]
-                        end
+                I.sequence.all_U_assigned || zero!(U)
+                let idx = CartesianIndices((I.sequence.output_dim, size(U, 2)))
+                    @inbounds for (j, k) in I.sequence.U_assignments
+                        U[idx[j]] = I.tape[k]
                     end
-                else
-                    zero!(u)
-                    for (i, k) in I.sequence.assignments
-                        if i <= n
-                            u[i] = I.tape[k]
-                        else
-                            U[idx[i-n]] = I.tape[k]
-                        end
+                end
+                if !isnothing(u)
+                    I.sequence.all_u_assigned || zero!(u)
+                    @inbounds for (i, k) in I.sequence.u_assignments
+                        u[i] = I.tape[k]
                     end
                 end
             end : quote
-                @inbounds zero!(u)
-                @inbounds for (i, k) in I.sequence.assignments
+                I.sequence.all_u_assigned || zero!(u)
+                @inbounds for (i, k) in I.sequence.u_assignments
                     u[i] = I.tape[k]
                 end
             end

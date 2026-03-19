@@ -77,7 +77,7 @@ function jacobian!(U, H::InterpretedHomotopy, x, t, p = nothing)
     U
 end
 
-@generated function taylor!(
+function taylor!(
     u::AbstractVector,
     Order::Val{M},
     H::InterpretedHomotopy,
@@ -86,124 +86,18 @@ end
     p::Union{Nothing,AbstractVector} = nothing;
     assign_highest_order_only = u isa Vector,
 ) where {M}
-    if M == 1
-        quote
-            t = (t_, 1)
-            I = H.taylor_ComplexF64.order_1
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{2,ComplexF64}, H.eval_ComplexF64)
-                H.taylor_ComplexF64.order_1 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 2
-        quote
-            t = (t_, 1)
-            I = H.taylor_ComplexF64.order_2
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{3,ComplexF64}, H.eval_ComplexF64)
-                H.taylor_ComplexF64.order_2 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 3
-        quote
-            t = (t_, 1)
-            I = H.taylor_ComplexF64.order_3
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{4,ComplexF64}, H.eval_ComplexF64)
-                H.taylor_ComplexF64.order_3 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 4
-        quote
-            t = (t_, 1)
-            I = H.taylor_ComplexF64.order_4
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{5,ComplexF64}, H.eval_ComplexF64)
-                H.taylor_ComplexF64.order_4 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    t,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    end
-
+    t = (t_, 1)
+    I = _get_or_create_taylor_interpreter!(H, Order)
+    execute_taylor!(
+        u,
+        Order,
+        I,
+        x,
+        t,
+        p;
+        assign_highest_order_only = assign_highest_order_only,
+    )
+    u
 end
 
 # Acb
@@ -211,6 +105,7 @@ function evaluate!(
     u::AbstractArray{<:Union{Acb,AcbRef}},
     H::InterpretedHomotopy,
     x::AbstractArray{<:Union{Acb,AcbRef}},
+    t,
     p = nothing;
     prec = max(precision(first(u)), precision(first(x))),
 )
