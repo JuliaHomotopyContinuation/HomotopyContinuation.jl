@@ -16,7 +16,10 @@ using Test
     end
 
     @testset "JET checks" begin
-        rep = JET.report_package(HomotopyContinuation; target_modules = (HomotopyContinuation,))
+        rep = JET.report_package(
+            HomotopyContinuation;
+            target_modules = (HomotopyContinuation,),
+        )
         reports = JET.get_reports(rep)
         filtered = filter(!is_known_icomplexf64_report, reports)
         @show rep
