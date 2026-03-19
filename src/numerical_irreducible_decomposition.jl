@@ -339,7 +339,8 @@ function _regeneration(
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H_maybe = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
+    H_maybe =
+        initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
     if isnothing(H_maybe) || any(isnothing, H_maybe)
         return nothing
     end

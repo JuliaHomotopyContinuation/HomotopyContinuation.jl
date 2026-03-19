@@ -49,4 +49,3 @@ function judge_results(result1_name, result2_name)
     pretty_table(data; header = ["System", "evaluate", "evaluate_and_jacobian"])
     return r1, r2
 end
-

@@ -24,7 +24,8 @@ distance(u, v, norm::AbstractNorm) = throw(MethodError(distance, (u, v, norm)))
 
 Compute the norm ||u|| with respect to the given norm `norm`.
 """
-LinearAlgebra.norm(u, norm::AbstractNorm) = throw(MethodError(LinearAlgebra.norm, (u, norm)))
+LinearAlgebra.norm(u, norm::AbstractNorm) =
+    throw(MethodError(LinearAlgebra.norm, (u, norm)))
 
 (N::AbstractNorm)(x) = norm(x, N)
 (N::AbstractNorm)(x, y) = distance(x, y, N)

@@ -608,7 +608,10 @@ function CertificationCache(F::AbstractSystem)
         jac_interpreter_F64 = jac_interpreter_F64,
         eval_interpreter_acb = eval_interpreter_acb,
         jac_interpreter_acb = jac_interpreter_acb,
-        newton_cache = NewtonCache(F; optimize_data_structure = false)::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}},
+        newton_cache = NewtonCache(
+            F;
+            optimize_data_structure = false,
+        )::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}},
         C = zeros(ComplexF64, m, m),
         r₀ = zeros(IComplexF64, m),
         Δx₀ = zeros(IComplexF64, m),
@@ -1547,7 +1550,10 @@ function DistinctCertifiedSolutions(
     nthreads = thread_safe ? Threads.nthreads() : 1
     return DistinctCertifiedSolutions(
         [F; [deepcopy(F) for _ = 2:nthreads]],
-        Union{Nothing,CertificationParameters}[parameters; [deepcopy(parameters) for _ = 2:nthreads]],
+        Union{Nothing,CertificationParameters}[
+            parameters
+            [deepcopy(parameters) for _ = 2:nthreads]
+        ],
         [cache; [deepcopy(cache) for _ = 2:nthreads]],
         access_lock,
         distinct_solution_certificates,

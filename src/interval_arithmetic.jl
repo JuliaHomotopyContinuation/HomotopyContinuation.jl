@@ -246,7 +246,7 @@ Base.literal_pow(::typeof(^), a::Interval, ::Val{2}) = sqr(a)
 
 function ^(x::Interval, n::Integer)  # fast integer power
     if n < 0
-        return inv(x ^ (-n))
+        return inv(x^(-n))
     end
     isempty(x) && return x
     if iseven(n) && 0 ∈ x

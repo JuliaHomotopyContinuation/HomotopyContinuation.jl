@@ -494,7 +494,4 @@ function paths_to_track(f, ::Val{:total_degree})
         length(starts)
     end
 end
-@deprecate bezout_number(f::System) paths_to_track(
-    f;
-    start_system = :total_degree,
-)
+@deprecate bezout_number(f::System) paths_to_track(f; start_system = :total_degree)
