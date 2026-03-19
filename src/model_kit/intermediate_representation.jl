@@ -381,7 +381,7 @@ function split_into_num_denom!(ir, ex, cse, pse)
             xref = expr_to_ir_statements!(ir, x, cse, pse)
             k = to_number(k_ex)
             if k isa Basic
-                throw(ExprError("Cannot handle non-constant exponents"))
+                error("Cannot handle non-constant exponents")
             end
             if k < 0
                 push!(denoms, pow!(ir, xref, -k))

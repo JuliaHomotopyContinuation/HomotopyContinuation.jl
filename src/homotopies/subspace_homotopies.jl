@@ -43,6 +43,8 @@ function GrassmannianGeodesic(start, target; embedded_projective::Bool = false)
         else
             Q_cos = target.Y * U
         end
+    else
+        error("start must be an ExtrinsicDescription or IntrinsicDescription")
     end
 
 
@@ -104,8 +106,8 @@ Base.@kwdef mutable struct ExtrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     b0::Vector{ComplexF64}
 
     # For the offset part (linear interpolation)
-    a_minus_b::Union{Nothing,Vector{ComplexF64}}
-    offset::Union{Nothing,Vector{ComplexF64}}
+    a_minus_b::Vector{ComplexF64}
+    offset::Vector{ComplexF64}
 
     # caches for t
     t_cache::Base.RefValue{ComplexF64}
@@ -177,8 +179,8 @@ function ExtrinsicSubspaceHomotopy(
     # get correct coordinates for A and b in the Stiefel homotopy
     # extrinsic(start).A is replaced by transpose(path.γ1)
     # extrinsic(target).A is replaced by transpose(path.Q_cos)    
-    a0 = path.B_start * extrinsic(start).b
-    b0 = path.B_target * extrinsic(target).b
+    a0 = something(path.B_start) * extrinsic(start).b
+    b0 = something(path.B_target) * extrinsic(target).b
 
     # Prepare offset data for linear interpolation
     a_minus_b = a0 - b0
@@ -237,10 +239,10 @@ Base.@kwdef mutable struct IntrinsicSubspaceHomotopy{S<:AbstractSystem} <: Abstr
     path::GrassmannianGeodesic
 
     # For the offset part (linear interpolation)
-    a_minus_b::Union{Nothing,Vector{ComplexF64}}
-    offset::Union{Nothing,Vector{ComplexF64}}
+    a_minus_b::Vector{ComplexF64}
+    offset::Vector{ComplexF64}
 
-    # cache for t 
+    # cache for t
     t_cache::Base.RefValue{ComplexF64}
     offset_t_cache::Base.RefValue{ComplexF64}
 
@@ -493,8 +495,8 @@ function set_subspaces!(H::SubspaceHomotopy, start::LinearSubspace, target::Line
 
     # Update the offsets
     if isa(H, ExtrinsicSubspaceHomotopy)
-        LA.mul!(H.a0, H.path.B_start, extrinsic(start).b)
-        LA.mul!(H.b0, H.path.B_target, extrinsic(target).b)
+        LA.mul!(H.a0, something(H.path.B_start), extrinsic(start).b)
+        LA.mul!(H.b0, something(H.path.B_target), extrinsic(target).b)
         H.a_minus_b .= H.a0 .- H.b0
         H.offset .= H.b0
     elseif isa(H, IntrinsicSubspaceHomotopy)

@@ -27,15 +27,20 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
-    A = Matrix{ComplexF64}(Â)
-    d = ones(m)
-    factorized = Ref(false)
-    qr = LA.qrfactUnblocked!(copy(A))
+    A_mat = Matrix{ComplexF64}(Â)
     # experiments show that for m > 25 the data layout as a
     # struct array is beneficial
     if m > 25 && optimize_data_structure
-        A = StructArrays.StructArray(A)
+        return _make_matrix_workspace(StructArrays.StructArray(A_mat), A_mat, m, n)
+    else
+        return _make_matrix_workspace(A_mat, A_mat, m, n)
     end
+end
+
+function _make_matrix_workspace(A, A_mat::Matrix{ComplexF64}, m, n)
+    d = ones(m)
+    factorized = Ref(false)
+    qr = LA.qrfactUnblocked!(copy(A_mat))
     row_scaling = ones(m)
     scaled = Ref(false)
 
@@ -339,7 +344,7 @@ function ldiv_adj_upper!(
         for i = 1:j-1
             z -= conj(A[i, j]) * x[i]
         end
-        iszero(A[j, j]) && singular_exception && throw(SingularException(j))
+        iszero(A[j, j]) && singular_exception && throw(LA.SingularException(j))
         x[j] = @fastmath conj(A[j, j]) \ z
     end
     x
@@ -752,7 +757,7 @@ function LA.cond(
         if isa(d_l, Nothing) && isa(d_r, Nothing)
             inv(abs(WS.A[1, 1]))
         elseif isa(d_l, Nothing)
-            inv(abs(WS.A[1, 1]) * d_r[1])
+            inv(abs(WS.A[1, 1]) * something(d_r)[1])
         elseif isa(d_r, Nothing)
             inv(d_l[1] * abs(WS.A[1, 1]))
         else

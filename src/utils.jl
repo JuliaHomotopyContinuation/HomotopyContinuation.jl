@@ -60,7 +60,7 @@ julia> read_solutions("solutions.txt")
 ```
 """
 function read_solutions(filename)
-    A = DelimitedFiles.readdlm(filename; skipblanks = false)
+    A = DelimitedFiles.readdlm(filename; skipblanks = false)::Matrix
     n = convert(Int, A[1, 1])
     # figure out number of variables
     nvars = 0
@@ -130,7 +130,7 @@ julia> read_parameters("parameters.txt")
 ```
 """
 function read_parameters(filename)
-    A = DelimitedFiles.readdlm(filename)
+    A = DelimitedFiles.readdlm(filename)::Matrix
     n = A[1, 1]
     map(1:n) do i
         A[i+1, 1] + im * A[i+1, 2]
@@ -481,7 +481,7 @@ for (fJ, fC) in ((:add!, :add), (:mul!, :mul))
             )
             return z
         end
-        ($fJ)(c::Float64, x::BigFloat) = ($fJ)(x, c)
+        ($fJ)(c::Float64, x::BigFloat) = ($fJ)(x, x, c)
 
         function ($fJ)(z::BigFloat, x::BigFloat, c::Int64)
             ccall(
@@ -495,7 +495,7 @@ for (fJ, fC) in ((:add!, :add), (:mul!, :mul))
             )
             return z
         end
-        ($fJ)(c::Int64, x::BigFloat) = ($fJ)(x, c)
+        ($fJ)(c::Int64, x::BigFloat) = ($fJ)(x, x, c)
 
         # BigInt
         function ($fJ)(z::BigFloat, x::BigFloat, c::BigInt)
@@ -510,7 +510,7 @@ for (fJ, fC) in ((:add!, :add), (:mul!, :mul))
             )
             return z
         end
-        ($fJ)(c::BigInt, x::BigFloat) = ($fJ)(x, c)
+        ($fJ)(c::BigInt, x::BigFloat) = ($fJ)(x, x, c)
     end
 end
 

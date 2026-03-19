@@ -47,7 +47,7 @@ is_valid_interval(a::Real, b::Real) = isfinite(a) && isfinite(b) && a ≤ b
     )
 end
 
-Base.hash(x::Interval, h::UInt) = hash(x.hi, hash(x.lo, u))
+Base.hash(x::Interval, h::UInt) = hash(x.hi, hash(x.lo, h))
 Base.:(==)(a::Interval, b::Interval) = a.lo == b.lo && a.hi == b.hi
 Base.eltype(x::Interval{T}) where {T} = T
 
@@ -246,7 +246,7 @@ Base.literal_pow(::typeof(^), a::Interval, ::Val{2}) = sqr(a)
 
 function ^(x::Interval, n::Integer)  # fast integer power
     if n < 0
-        return inv(pow(x, -n))
+        return inv(x ^ (-n))
     end
     isempty(x) && return x
     if iseven(n) && 0 ∈ x

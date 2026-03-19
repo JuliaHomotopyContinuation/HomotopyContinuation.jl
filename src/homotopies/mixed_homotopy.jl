@@ -10,7 +10,7 @@ struct MixedHomotopy{ID} <: AbstractHomotopy
     compiled::CompiledHomotopy{ID}
     interpreted::InterpretedHomotopy
 end
-MixedHomotopy(H::Homotopy) = MixedHomotopy(CompiledHomotopy(H), InterpretedHomotopy(H))
+MixedHomotopy(H::Homotopy; kwargs...) = MixedHomotopy(CompiledHomotopy(H), InterpretedHomotopy(H))
 
 Base.size(H::MixedHomotopy) = size(H.compiled)
 ModelKit.variables(H::MixedHomotopy) = variables(H.interpreted)

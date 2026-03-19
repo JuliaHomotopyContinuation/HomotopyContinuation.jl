@@ -313,7 +313,7 @@ function get_error(error_code::Cuint, str = nothing)
     elseif error_code == 4
         return DomainError(str)
     elseif error_code == 5
-        return Meta.ParseError(str)
+        return Meta.ParseError(something(str, "SymEngine parse error"))
     else
         return ErrorException("Unexpected SymEngine error code")
     end
@@ -519,6 +519,7 @@ function Base.getindex(s::ExpressionSet, n::Int)
 end
 
 _variables(ex::Variable) = [ex]
+_variables(ex::ExpressionRef) = _variables(Expression(ex))
 function _variables(ex::Expression)
     syms = ExpressionSet()
     ccall(
@@ -638,10 +639,8 @@ function Base.getindex(v::ExprVec, n)
     @boundscheck checkbounds(v, n)
     if v.m === nothing
         vec_set_ptr!(v)
-        unsafe_load(v.m, n)
-    else
-        unsafe_load(v.m, n)
     end
+    unsafe_load(v.m::Ptr{ModelKit.ExpressionRef}, n)
 end
 
 function Base.push!(v::ExprVec, x::Basic)

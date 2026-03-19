@@ -339,10 +339,11 @@ function _regeneration(
     # it is covenient to use the WitnessSet wrapper here, because this also keeps track of the equation
     # as a linear subspace we take the linear subspace for out[1], that sets u=0.
     update_progress!(progress; is_computing_hypersurfaces = true)
-    H = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
-    if any(isnothing, H)
+    H_maybe = initialize_hypersurfaces(F, vars, linear_subspace(out[1]); threading = threading)
+    if isnothing(H_maybe) || any(isnothing, H_maybe)
         return nothing
     end
+    H = H_maybe::Vector{WitnessSet}
 
     # sort expressions by degree
     if sorted
@@ -610,8 +611,8 @@ end
 This is the core routine of the regeneration algorithm. It intersects a set of [`WitnessPoints`](@ref) with a hypersurface.
 """
 function intersect_with_hypersurface!(
-    W,
-    H,
+    W::WitnessPoints,
+    H::WitnessSet,
     X,
     cache;
     threading::Bool = Threads.nthreads() > 1,
@@ -674,7 +675,7 @@ function manage_initial_points!(P, m)
     return P_next
 end
 
-function serial_intersection!(X, P, roots, egtracker, progress)
+function serial_intersection!(X, P, roots, egtracker::EndgameTracker, progress)
     start = Iterators.product(P, roots)
     l_start = length(P) * length(roots)
 
@@ -701,7 +702,7 @@ function serial_intersection!(X, P, roots, egtracker, progress)
     nothing
 end
 
-function threaded_intersection!(X, P, roots, tracker, progress)
+function threaded_intersection!(X, P, roots, tracker::EndgameTracker, progress)
 
     l_P = length(P)
     l_roots = length(roots)
@@ -969,7 +970,7 @@ end
 The core function for decomposing a witness set into irreducible components.
 """
 function decompose_with_monodromy!(
-    W,
+    W::WitnessSet,
     show_monodromy_progress,
     options,
     max_iters,
@@ -1980,7 +1981,7 @@ end
 
 
 
-function prepare_for_u_homotopy(H, W, vars, u)
+function prepare_for_u_homotopy(H::WitnessSet, W::WitnessSet, vars::Vector{Variable}, u)
     # prepare polynomials 
     FH0 = deepcopy(System(system(H)))
     FW0 = deepcopy(System(system(W)))

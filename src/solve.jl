@@ -732,7 +732,7 @@ end
 Returns the number of paths tracked when calling [`solve`](@ref) with the given arguments.
 """
 function paths_to_track(
-    f::Union{System,AbstractSystem};
+    f::System;
     start_system::Symbol = :polyhedral,
     kwargs...,
 )
