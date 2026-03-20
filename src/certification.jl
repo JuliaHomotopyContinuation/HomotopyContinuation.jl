@@ -1695,7 +1695,7 @@ end
 Return a vector of solutions in the DistinctSolutionCertificates object.
 """
 function solutions(d::DistinctCertifiedSolutions)
-    return map(solution_approximation, certificates(d))
+    return [solution_approximation(cert)::Vector{ComplexF64} for cert in certificates(d)]
 end
 
 function Base.merge!(

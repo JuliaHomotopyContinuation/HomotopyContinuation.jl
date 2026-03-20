@@ -225,7 +225,7 @@
         distinct_certified_solutions!(dcs_batches, sols[1:1]; threading = false, show_progress = false)
         distinct_certified_solutions!(
             dcs_batches,
-            [sols[2]; sols[1]];
+            [sols[2], sols[1]];
             threading = false,
             show_progress = false,
         )
@@ -236,7 +236,7 @@
         left =
             distinct_certified_solutions(F, sols[1:1], nothing; threading = false, show_progress = false)
         right =
-            distinct_certified_solutions(F, [sols[2]; sols[1]], nothing; threading = false, show_progress = false)
+            distinct_certified_solutions(F, [sols[2], sols[1]], nothing; threading = false, show_progress = false)
         merge!(left, right)
         @test length(solutions(left)) == 2
         @test nduplicates(left) == 1
