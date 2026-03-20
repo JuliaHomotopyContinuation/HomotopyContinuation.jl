@@ -322,7 +322,10 @@ DistinctSolutionCertificates(
 Return the number of distinct solution certificates in the interval tree.
 """
 function Base.length(d::DistinctSolutionCertificates)
-    return sum((length(bucket) for bucket in IntervalTrees.values(d.distinct_tree)); init = 0)
+    return sum(
+        (length(bucket) for bucket in IntervalTrees.values(d.distinct_tree));
+        init = 0,
+    )
 end
 
 Base.show(io::IO, d::DistinctSolutionCertificates) =
@@ -1667,7 +1670,12 @@ function add_solution!(
             added, _cert = add_certificate!(d.distinct_solution_certificates, cert)
             if added
                 record_add_solution_result!(d, :certified_distinct)
-                return (true, :certified_distinct, something(cert.index, 0), solution_approximation(cert))
+                return (
+                    true,
+                    :certified_distinct,
+                    something(cert.index, 0),
+                    solution_approximation(cert),
+                )
             end
             record_add_solution_result!(d, :duplicate)
             return (false, :duplicate, something(_cert.index, 0), nothing)
@@ -1683,9 +1691,7 @@ end
 Return a vector of solution certificates in the DistinctSolutionCertificates object.
 """
 function certificates(d::DistinctCertifiedSolutions)
-    buckets = collect(
-        IntervalTrees.values(d.distinct_solution_certificates.distinct_tree),
-    )
+    buckets = collect(IntervalTrees.values(d.distinct_solution_certificates.distinct_tree))
     return collect(Iterators.flatten(buckets))
 end
 
@@ -1698,10 +1704,7 @@ function solutions(d::DistinctCertifiedSolutions)
     return [solution_approximation(cert)::Vector{ComplexF64} for cert in certificates(d)]
 end
 
-function Base.merge!(
-    dest::DistinctCertifiedSolutions,
-    src::DistinctCertifiedSolutions,
-)
+function Base.merge!(dest::DistinctCertifiedSolutions, src::DistinctCertifiedSolutions)
     for cert in certificates(src)
         @lock dest.access_lock begin
             added, _ = add_certificate!(dest.distinct_solution_certificates, cert)

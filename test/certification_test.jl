@@ -185,23 +185,19 @@
         C = System([[x, y] - u - J' * λ; f_param], parameters = u)
         Random.seed!(1)
         not_certified_dcs = DistinctCertifiedSolutions(C, [-0.32, -0.1])
-        added, status, representative, _ =
-            add_solution!(not_certified_dcs, 100 .* randn(ComplexF64, 3), 3; max_precision = 64)
+        added, status, representative, _ = add_solution!(
+            not_certified_dcs,
+            100 .* randn(ComplexF64, 3),
+            3;
+            max_precision = 64,
+        )
         @test !added
         @test status == :not_certified
         @test representative == 0
-        @test stats(dcs) == (
-            processed = 2,
-            certified_distinct = 1,
-            duplicates = 1,
-            not_certified = 0,
-        )
-        @test stats(not_certified_dcs) == (
-            processed = 1,
-            certified_distinct = 0,
-            duplicates = 0,
-            not_certified = 1,
-        )
+        @test stats(dcs) ==
+              (processed = 2, certified_distinct = 1, duplicates = 1, not_certified = 0)
+        @test stats(not_certified_dcs) ==
+              (processed = 1, certified_distinct = 0, duplicates = 0, not_certified = 1)
 
         @var z u
         collision_dcs = DistinctCertifiedSolutions(
@@ -222,7 +218,12 @@
         @test sort(map(s -> real(s[1]), solutions(collision_dcs))) == [-1.0, 1.0]
 
         dcs_batches = DistinctCertifiedSolutions(F, nothing)
-        distinct_certified_solutions!(dcs_batches, sols[1:1]; threading = false, show_progress = false)
+        distinct_certified_solutions!(
+            dcs_batches,
+            sols[1:1];
+            threading = false,
+            show_progress = false,
+        )
         distinct_certified_solutions!(
             dcs_batches,
             [sols[2], sols[1]];
@@ -233,10 +234,20 @@
         @test ncertified_distinct(dcs_batches) == 2
         @test nduplicates(dcs_batches) == 1
 
-        left =
-            distinct_certified_solutions(F, sols[1:1], nothing; threading = false, show_progress = false)
-        right =
-            distinct_certified_solutions(F, [sols[2], sols[1]], nothing; threading = false, show_progress = false)
+        left = distinct_certified_solutions(
+            F,
+            sols[1:1],
+            nothing;
+            threading = false,
+            show_progress = false,
+        )
+        right = distinct_certified_solutions(
+            F,
+            [sols[2], sols[1]],
+            nothing;
+            threading = false,
+            show_progress = false,
+        )
         merge!(left, right)
         @test length(solutions(left)) == 2
         @test nduplicates(left) == 1

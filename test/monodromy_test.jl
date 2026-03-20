@@ -557,8 +557,12 @@
             threading = false,
             show_progress = false,
         )
-        sliced_cert =
-            certify(slice(fixed(linear_system; compile = false), parameters(linear_result)), solutions(linear_result); show_progress = false, threading = false)
+        sliced_cert = certify(
+            slice(fixed(linear_system; compile = false), parameters(linear_result)),
+            solutions(linear_result);
+            show_progress = false,
+            threading = false,
+        )
         @test is_success(linear_result)
         @test nsolutions(linear_result) == 2
         @test length(solutions(linear_result)) == nsolutions(linear_result)
