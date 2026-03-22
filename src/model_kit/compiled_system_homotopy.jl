@@ -135,7 +135,7 @@ function CompiledHomotopy(H::Homotopy; kwargs...)
         end
         if k == 0
             push!(THOMOTOPY_TABLE[h], homotopy)
-            k = 1
+            k = length(THOMOTOPY_TABLE[h])
         end
     else
         k = 1
@@ -186,24 +186,20 @@ function compiled_execute_impl(
         expr, get_var_name = sequence_to_expr(seq; op_call = op_call)
     end
     assignments = if has_second_output
+        u_stmts = [:(u[$(i)] = $(get_var_name(k))) for (i, k) in seq.u_assignments]
+        odim = seq.output_dim
+        U_stmts = [
+            :(U[$(mod1(j, odim)), $(div(j - 1, odim) + 1)] = $(get_var_name(k))) for
+            (j, k) in seq.U_assignments
+        ]
         quote
-            zero!(U)
-            if isnothing(u)
-                $(map(seq.assignments) do (i, k)
-                    if i > seq.output_dim
-                        :(U[$(i - seq.output_dim)] = $(get_var_name(k)))
-                    end
-                end...)
-            else
-                zero!(u)
-                idx = CartesianIndices(($(seq.output_dim), size(U, 2)))
-                $(map(seq.assignments) do (i, k)
-                    if i <= seq.output_dim
-                        :(u[$(i)] = $(get_var_name(k)))
-                    else
-                        :(U[idx[$(i - seq.output_dim)]] = $(get_var_name(k)))
-                    end
-                end...)
+            # all_U_assigned is true only when every (row, col) entry has an explicit
+            # assignment (dense Jacobian). Sparse Jacobians always go through zero!(U).
+            $(seq.all_U_assigned ? :() : :(zero!(U)))
+            $(U_stmts...)
+            if !isnothing(u)
+                $(seq.all_u_assigned ? :() : :(zero!(u)))
+                $(u_stmts...)
             end
         end
     elseif taylor
@@ -224,7 +220,7 @@ function compiled_execute_impl(
 
     else
         quote
-            zero!(u)
+            $(seq.all_u_assigned ? :() : :(zero!(u)))
             $(map(seq.assignments) do (i, k)
                 :(u[$(i)] = $(get_var_name(k)))
             end...)

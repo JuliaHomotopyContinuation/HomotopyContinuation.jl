@@ -283,6 +283,19 @@ end
         @test length(w2) == 2
         pt = solution(w2[1])
         @test norm(l2(pt)) < 1e-12
+
+        ## extrinsic
+        @var x, y, z
+        S = x^2 + y^2 + z^2 - 1 # sphere 
+        P = y - x^2 # parabola
+        L = rand_subspace(3, codim = 1)
+        res = solve(
+            [S; P];
+            target_subspace = L,
+            start_system = :total_degree,
+            show_progress = false,
+        )
+        @test nsolutions(res) == 4
     end
 
     @testset "Compression" begin

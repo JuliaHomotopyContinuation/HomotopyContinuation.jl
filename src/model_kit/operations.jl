@@ -155,7 +155,17 @@ end
 # arity 0
 op_stop() = nothing
 # arity 1
+
+# Generic fallback: 2 complex multiplications (8 real muls)
 op_cb(x) = x * x * x
+# Specialized for Complex: use op_sqr (2 real muls via Karatsuba) + 1 complex mul (4 real muls) = 6 real muls total
+@inline function op_cb(z::Complex)
+    x, y = reim(z)
+    a = (x + y) * (x - y)   # real part of z²
+    b = (x + x) * y          # imag part of z²
+    Complex(a * x - b * y, a * y + b * x)
+end
+
 @inline function op_sqr(z::Complex)
     x, y = reim(z)
     Complex((x + y) * (x - y), (x + x) * y)
@@ -187,14 +197,17 @@ op_pow_int(x, p::Integer) =
 op_pow(x, y) = x^y
 
 # arity 3
-op_add3(x, y, z) = x + y + z
-op_mul3(x, y, z) = x * y * z
-op_muladd(x, y, z) = x * y + z
-op_mulsub(x, y, z) = x * y - z
-op_submul(x, y, z) = z - x * y
+@inline op_add3(x, y, z) = x + y + z
+@inline op_mul3(x, y, z) = x * y * z
+# Generic: plain multiply-add
+@inline op_muladd(x, y, z) = x * y + z
+# For real floats, use muladd which maps to a hardware FMA instruction when available
+@inline op_muladd(x::T, y::T, z::T) where {T<:AbstractFloat} = muladd(x, y, z)
+@inline op_mulsub(x, y, z) = x * y - z
+@inline op_submul(x, y, z) = z - x * y
 
 # arity 4
-op_add4(a, b, c, d) = a + b + c + d
-op_mul4(a, b, c, d) = a * b * c * d
-op_mulmuladd(a, b, c, d) = a * b + c * d
-op_mulmulsub(a, b, c, d) = a * b - c * d
+@inline op_add4(a, b, c, d) = a + b + c + d
+@inline op_mul4(a, b, c, d) = a * b * c * d
+@inline op_mulmuladd(a, b, c, d) = a * b + c * d
+@inline op_mulmulsub(a, b, c, d) = a * b - c * d

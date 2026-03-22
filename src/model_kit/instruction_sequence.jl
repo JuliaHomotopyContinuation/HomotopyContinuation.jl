@@ -15,6 +15,15 @@ struct InstructionSequence
     assignments::Vector{Tuple{Int,Int}}
     output_dim::Int
     tape_space_needed::Int
+    # Pre-split views of assignments for efficient execution:
+    #   u_assignments: function output entries (assignment_idx <= output_dim)
+    #   U_assignments: Jacobian entries, stored as (linear_index_into_U, tape_idx)
+    #                  where linear_index = assignment_idx - output_dim
+    u_assignments::Vector{Tuple{Int,Int}}
+    U_assignments::Vector{Tuple{Int,Int}}
+    # True when every output slot is explicitly assigned — allows skipping zero!(u)/zero!(U)
+    all_u_assigned::Bool
+    all_U_assigned::Bool
 end
 
 function sequence_to_expr(
@@ -220,6 +229,13 @@ function instruction_sequence(
     n = tape_space_needed
     push!(instructions, Instruction((n, n, n, n), OP_STOP, n))
 
+    # Pre-split assignments: function outputs vs Jacobian entries
+    odim = ir.output_dim
+    nvars = length(variables_range)
+    u_assignments = Tuple{Int,Int}[(i, k) for (i, k) in updated_assignments if i <= odim]
+    U_assignments =
+        Tuple{Int,Int}[(i - odim, k) for (i, k) in updated_assignments if i > odim]
+
     InstructionSequence(
         instructions,
         constants,
@@ -228,8 +244,12 @@ function instruction_sequence(
         variables_range,
         continuation_parameter_index,
         updated_assignments,
-        ir.output_dim,
+        odim,
         tape_space_needed,
+        u_assignments,
+        U_assignments,
+        length(u_assignments) == odim,
+        length(U_assignments) == odim * nvars,
     )
 end
 
