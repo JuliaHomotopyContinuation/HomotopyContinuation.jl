@@ -100,10 +100,6 @@
         @test degree(V) == 16
     end
 
-    @testset "catch all components of degree 1" begin
-        @test_skip "disabled because it takes too long in CI"
-    end
-
     @testset "Hypersurface of degree 5" begin
         @var x[1:4]
         f = rand_poly(ComplexF64, x, 5)
