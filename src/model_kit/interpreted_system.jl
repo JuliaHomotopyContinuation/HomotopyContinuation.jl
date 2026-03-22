@@ -31,7 +31,7 @@ mutable struct InterpretedSystem <: AbstractSystem
     jac_acb::Union{Nothing,Interpreter{AcbRefVector}}
 end
 
-function InterpretedSystem(F::System)
+function InterpretedSystem(F::System; kwargs...)
     eval_ComplexF64 = interpreter(ComplexF64, F)
     eval_ComplexDF64 = interpreter(ComplexDF64, eval_ComplexF64)
     eval_acb = nothing
@@ -78,6 +78,7 @@ function jacobian!(U, F::InterpretedSystem, x, p = nothing)
     execute!(nothing, U, F.jac_ComplexF64, x, p;)
     U
 end
+jacobian!(U, F::InterpretedSystem, x, p, cache) = jacobian!(U, F, x, p)
 
 # Helper: lazily create and cache the Taylor interpreter for order M.
 # @generated so that field access (order_1..order_4) and the TruncatedTaylorSeries
@@ -129,8 +130,9 @@ function evaluate!(
     if isnothing(F.eval_acb)
         F.eval_acb = interpreter(AcbRefVector, F.eval_ComplexF64)
     end
-    setprecision!(F.eval_acb, prec)
-    execute!(u, F.eval_acb, x, p)
+    I = F.eval_acb::Interpreter{AcbRefVector}
+    setprecision!(I, prec)
+    execute!(u, I, x, p)
 end
 
 function evaluate_and_jacobian!(
@@ -144,9 +146,10 @@ function evaluate_and_jacobian!(
     if isnothing(F.jac_acb)
         F.jac_acb = interpreter(AcbRefVector, F.jac_ComplexF64)
     end
-    setprecision!(F.jac_acb, prec)
+    I = F.jac_acb::Interpreter{AcbRefVector}
+    setprecision!(I, prec)
 
-    execute!(u, U, F.jac_acb, x, p)
+    execute!(u, U, I, x, p)
     nothing
 end
 

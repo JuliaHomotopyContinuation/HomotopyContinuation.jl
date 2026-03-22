@@ -348,8 +348,8 @@ Base.rem(a::DoubleF64, b::Union{Float64,DoubleF64}, r::RoundingMode) =
 end
 
 function Base.mod(x::DoubleF64, y::DoubleF64)
-    n = round(a / b)
-    return (a - b * n)
+    n = round(x / y)
+    return (x - y * n)
 end
 
 #
@@ -1029,7 +1029,7 @@ function Base.asin(a::DoubleF64)
     abs_a = abs(a)
 
     if abs_a > 1.0
-        throw(DomainError())
+        throw(DomainError(a, "asin requires abs(a) <= 1"))
     end
 
     if isone(abs_a)
@@ -1043,7 +1043,7 @@ function Base.acos(a::DoubleF64)
     abs_a = abs(a)
 
     if abs_a > 1.0
-        throw(DomainError())
+        throw(DomainError(a, "acos requires abs(a) <= 1"))
     end
 
     if isone(abs_a)

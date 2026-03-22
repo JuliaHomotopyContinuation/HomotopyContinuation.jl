@@ -30,7 +30,7 @@ on_affine_chart(
 ) = on_affine_chart(fixed(F; compile = compile), dims)
 function on_affine_chart(
     F::AbstractSystem,
-    dims = nothing,
+    dims = nothing;
     compile::Union{Bool,Symbol} = true,
 )
     vargroups = variable_groups(F)

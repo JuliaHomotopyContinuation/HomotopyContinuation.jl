@@ -268,7 +268,7 @@ mutable struct MembershipCache
     progress::Union{MembershipProgress,Nothing}
 end
 
-function MembershipCache(W, EO, TO, progress)
+function MembershipCache(W::WitnessSet, EO, TO, progress)
     F = system(W)
     m, n = size(F)
     i = codim(W)

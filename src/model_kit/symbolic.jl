@@ -627,6 +627,8 @@ Return a matrix `M` containing the exponents for all occuring terms
 Expands the given expression `f` unless `expanded = true`.
 Throws a `PolynomialError` if a rational expression is encountered.
 """
+exponents_coefficients(f::Expression, var::Variable; kwargs...) =
+    exponents_coefficients(f, [var]; kwargs...)
 function exponents_coefficients(
     f::Expression,
     vars::AbstractVector{Variable};
@@ -786,7 +788,7 @@ function is_homogeneous(f::Expression, vars::Vector{Variable}; expanded::Bool = 
         if err isa PolynomialError
             return false
         else
-            rethrow(e)
+            rethrow(err)
         end
     end
 end
@@ -811,7 +813,8 @@ julia> horner(f)
 c₁ + v*(c₂ + u^3*c₃ + u^2*v*c₃)
 ```
 """
-function horner(f::Expression, vars = variables(f))
+horner(f::Expression, var::Variable) = horner(f, [var])
+function horner(f::Expression, vars::AbstractVector{Variable} = variables(f))
     try
         M, coeffs = exponents_coefficients(f, vars; expanded = true, unpack_coeffs = false)
         multivariate_horner(M, coeffs, vars)
@@ -938,7 +941,7 @@ function check_vars_params(f, vars, params)
     isempty(Δ) || throw(
         ArgumentError(
             "Not all variables or parameters of the system are given. Missing: " *
-            join(Δ, ", "),
+            string(join(Δ, ", ")),
         ),
     )
     if params !== nothing
@@ -1088,18 +1091,23 @@ function System(
     variable_groups = nothing,
 )
     vars = map(variables) do v
+        v isa Variable && return v
         name, ind = MP.name_base_indices(v)
         Variable(name, ind...)
     end
     params = Variable[]
     for v in parameters
-        name, ind = MP.name_base_indices(v)
-        push!(params, Variable(name, ind...))
+        if v isa Variable
+            push!(params, v)
+        else
+            name, ind = MP.name_base_indices(v)
+            push!(params, Variable(name, ind...))
+        end
     end
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1248,7 +1256,7 @@ jacobian(F, [2, 3])
  441  294
 ```
 """
-function jacobian(F::System, x, p = nothing)
+function jacobian(F::System, x::AbstractVector, p::Union{Nothing,AbstractVector} = nothing)
     if p isa Nothing
         evaluate(jacobian(F), F.variables => x)
     else
@@ -1439,7 +1447,7 @@ function system_with_coefficents_as_params(
     if variable_groups === nothing
         var_groups = nothing
     else
-        var_groups = map(var_groups) do group
+        var_groups = map(variable_groups) do group
             map(group) do v
                 name, ind = MP.name_base_indices(v)
                 Variable(name, ind...)
@@ -1615,6 +1623,7 @@ variables(H::Homotopy) = H.variables
 Returns the parameters of the given homotopy `H`.
 """
 parameters(H::Homotopy) = H.parameters
+variable_groups(::Homotopy) = nothing
 
 """
     to_smallest_eltype(A::AbstractArray)

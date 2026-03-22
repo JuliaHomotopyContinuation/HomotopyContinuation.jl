@@ -17,14 +17,15 @@ abstract type AbstractNorm end
 
 Compute the distance ||u-v|| with respect to the given norm `norm`.
 """
-distance(u, v, norm::AbstractNorm) = MethodError(distance, (u, v, norm))
+distance(u, v, norm::AbstractNorm) = throw(MethodError(distance, (u, v, norm)))
 
 """
     norm(u, norm::AbstractNorm)
 
 Compute the norm ||u|| with respect to the given norm `norm`.
 """
-LinearAlgebra.norm(u, norm::AbstractNorm) = MethodError(LinearAlgebra.norm, (u, norm))
+LinearAlgebra.norm(u, norm::AbstractNorm) =
+    throw(MethodError(LinearAlgebra.norm, (u, norm)))
 
 (N::AbstractNorm)(x) = norm(x, N)
 (N::AbstractNorm)(x, y) = distance(x, y, N)

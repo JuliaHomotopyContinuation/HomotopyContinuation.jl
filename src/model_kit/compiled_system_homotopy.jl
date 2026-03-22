@@ -19,7 +19,7 @@ struct CompiledSystem{HI} <: AbstractSystem
     system::System
 end
 
-function CompiledSystem(F::System)
+function CompiledSystem(F::System; kwargs...)
     n = length(F)
     nvars = nvariables(F)
     nparams = nparameters(F)
@@ -104,7 +104,7 @@ struct CompiledHomotopy{HI} <: AbstractHomotopy
     homotopy::Homotopy
 end
 
-function CompiledHomotopy(H::Homotopy)
+function CompiledHomotopy(H::Homotopy; kwargs...)
     n = length(H)
     nvars = nvariables(H)
     nparams = nparameters(H)

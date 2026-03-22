@@ -68,7 +68,7 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator)
     isnothing(first_cell) && return nothing
     cell, inner_state = first_cell
 
-    solve(iter.BSS, iter.support, iter.start_coefficients, cell)
+    solve(iter.BSS, iter.support, iter.start_coefficients, cell::MixedCell)
     x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
 
     # return the value _and_ the combined state:
@@ -91,7 +91,7 @@ function Base.iterate(iter::PolyhedralStartSolutionsIterator, state::Tuple{Any,A
         next_cell === nothing && return nothing
         cell2, new_inner_state = next_cell
 
-        solve(iter.BSS, iter.support, iter.start_coefficients, cell2)
+        solve(iter.BSS, iter.support, iter.start_coefficients, cell2::MixedCell)
         x = [iter.BSS.X[i, 1] for i = 1:length(iter.support)]
 
         return (cell2, x), (cell2, new_inner_state, 1)
@@ -208,12 +208,13 @@ function polyhedral(
             @var x[1:n]
             support, target_coeffs = support_coefficients(System(F(x), x))
         else
+            F = f
             support, target_coeffs = support_coefficients(f)
         end
     end
     tracker, starts = polyhedral(support, target_coeffs; compile = compile, kwargs...)
     if m > n
-        tracker = OverdeterminedTracker(tracker, F)
+        tracker = OverdeterminedTracker(tracker, F::RandomizedSystem)
     end
     tracker, starts
 end
@@ -269,7 +270,7 @@ function paths_to_track(
         MixedSubdivisions.mixed_volume(supp′)
     end
 end
-MixedSubdivisions.mixed_volume(f::Union{System,AbstractSystem}) =
+MixedSubdivisions.mixed_volume(f::System) =
     paths_to_track(f; start_system = :polyhedral, only_torus = true)
 
 function polyhedral(

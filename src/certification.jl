@@ -245,7 +245,7 @@ function squared_distance_interval(
     n = length(solution_candidate(cert))
     d = zero(IntervalArithmetic.Interval{Float64})
     for i = 1:n
-        yᵢ = IComplexF64(cert.I[i], a, b)
+        yᵢ = IComplexF64(something(cert.I)[i], a, b)
         d +=
             IntervalArithmetic.sqr(real(yᵢ) - real(reference_point[i])) +
             IntervalArithmetic.sqr(imag(yᵢ) - imag(reference_point[i]))
@@ -331,7 +331,7 @@ function add_certificate!(
     d = squared_distance_interval(cert, distinct_sols.reference_point)
     for match in IntervalTrees.intersect(distinct_sols.distinct_tree, d)
         certᵢ = IntervalTrees.value(match)
-        if Bool(Arblib.overlaps(cert.I, certᵢ.I))
+        if Bool(Arblib.overlaps(something(cert.I), something(certᵢ.I)))
             return (false, certᵢ)
             break
         end
@@ -362,7 +362,7 @@ function is_solution_candidate_guaranteed_duplicate(
         end
 
         # Check if s is contained in certᵢ.I
-        if Bool(Arblib.contains(certᵢ.I, distinct_sols.acb_solution_candidate))
+        if Bool(Arblib.contains(something(certᵢ.I), distinct_sols.acb_solution_candidate))
             return true
             break
         end
@@ -608,7 +608,10 @@ function CertificationCache(F::AbstractSystem)
         jac_interpreter_F64 = jac_interpreter_F64,
         eval_interpreter_acb = eval_interpreter_acb,
         jac_interpreter_acb = jac_interpreter_acb,
-        newton_cache = NewtonCache(F; optimize_data_structure = false),
+        newton_cache = NewtonCache(
+            F;
+            optimize_data_structure = false,
+        )::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}},
         C = zeros(ComplexF64, m, m),
         r₀ = zeros(IComplexF64, m),
         Δx₀ = zeros(IComplexF64, m),
@@ -1173,9 +1176,13 @@ function extended_prec_certify_solution(
 end
 
 
-function Base.Vector{ComplexF64}(A::Arblib.AcbMatrixLike)
+function Base.Vector{ComplexF64}(A::Arblib.AcbMatrix)
     @assert size(A, 2) == 1
-    [ComplexF64(Arblib.ref(A, i, 1).acb_ptr) for i = 1:size(A, 1)]
+    [ComplexF64(Arblib.ref(A, i, 1)) for i = 1:size(A, 1)]
+end
+function Base.Vector{ComplexF64}(A::Arblib.AcbRefMatrix)
+    @assert size(A, 2) == 1
+    [ComplexF64(Arblib.ref(A, i, 1)) for i = 1:size(A, 1)]
 end
 
 function ε_inflation_krawczyk(x̃₀, p::Union{Nothing,CertificationParameters}, C, cert_cache)
@@ -1509,7 +1516,7 @@ Base.@kwdef mutable struct DistinctCertifiedSolutions{
     C<:AbstractSolutionCertificate,
 }
     system::Vector{S}
-    parameters::Union{Vector{Nothing},Vector{CertificationParameters}}
+    parameters::Vector{Union{Nothing,CertificationParameters}}
     cache::Vector{CertificationCache}
     access_lock::ReentrantLock
     distinct_solution_certificates::DistinctSolutionCertificates{C}
@@ -1543,7 +1550,10 @@ function DistinctCertifiedSolutions(
     nthreads = thread_safe ? Threads.nthreads() : 1
     return DistinctCertifiedSolutions(
         [F; [deepcopy(F) for _ = 2:nthreads]],
-        [parameters; [deepcopy(parameters) for _ = 2:nthreads]],
+        Union{Nothing,CertificationParameters}[
+            parameters
+            [deepcopy(parameters) for _ = 2:nthreads]
+        ],
         [cache; [deepcopy(cache) for _ = 2:nthreads]],
         access_lock,
         distinct_solution_certificates,

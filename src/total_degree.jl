@@ -109,7 +109,7 @@ function total_degree_variables(
     end
     T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
     if overdetermined
-        T = OverdeterminedTracker(T, F)
+        T = OverdeterminedTracker(T, F::RandomizedSystem)
     end
     starts = total_degree_start_solutions(D; homogeneous = homogeneous)
 
@@ -172,7 +172,7 @@ function total_degree_variable_groups(
     end
     T = EndgameTracker(H, tracker_options = tracker_options, options = endgame_options)
     if overdetermined
-        T = OverdeterminedTracker(T, F)
+        T = OverdeterminedTracker(T, F::RandomizedSystem)
     end
     T, starts
 end
@@ -204,11 +204,7 @@ function multi_homogeneous_system(D, vargroups; homogeneous::Bool)
 
     P = variables(C)
 
-    if homogeneous
-        Z = vargroups
-    else
-        Z = vcat.(vargroups, 1)
-    end
+    Z = homogeneous ? vargroups : vcat.(vargroups, 1)
 
     m, n = size(D)
     g = map(1:n) do i
@@ -401,6 +397,13 @@ end
 Base.show(io::IO, ::MIME"application/prs.juno.inline", x::MultiBezoutSolutionsIterator) = x
 Base.IteratorSize(::Type{<:MultiBezoutSolutionsIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{MultiBezoutSolutionsIterator}) = Vector{ComplexF64}
+function Base.length(iter::MultiBezoutSolutionsIterator)
+    k = 0
+    for _ in iter
+        k += 1
+    end
+    k
+end
 
 function Base.iterate(iter::MultiBezoutSolutionsIterator)
     (_, perm), indices_state = iterate(iter.indices)
@@ -491,7 +494,4 @@ function paths_to_track(f, ::Val{:total_degree})
         length(starts)
     end
 end
-@deprecate bezout_number(f::Union{System,AbstractSystem}) paths_to_track(
-    f;
-    start_system = :total_degree,
-)
+@deprecate bezout_number(f::System) paths_to_track(f; start_system = :total_degree)

@@ -595,7 +595,7 @@ function singular_endgame_step!(endgame_tracker::EndgameTracker, debug::Bool = f
     end
 
     @label prediction
-    m = state.winding_number
+    m = something(state.winding_number)
     κ = state.sample_conds[3]
     zero_cond = 1 / (m + 1)
     for i = 1:length(state.prediction)

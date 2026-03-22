@@ -134,6 +134,7 @@ seed(R::Result) = R.seed
 Returns the stored [`PathResult`](@ref)s.
 """
 path_results(R::Result) = R.path_results
+path_results(R::AbstractVector{<:PathResult}) = R
 
 multiple_indicator(::AbstractResult) =
     error("[`multiple_indicator`] Not defined for abstract results yet")

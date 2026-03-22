@@ -61,3 +61,5 @@ Random.seed!(0x8b868a97)
     #     include("extensive/extensive_test.jl")
     # end
 end
+
+include("jet_test.jl")

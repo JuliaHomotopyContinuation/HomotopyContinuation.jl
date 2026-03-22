@@ -23,7 +23,7 @@ mutable struct InterpretedHomotopy <: AbstractHomotopy
     jac_acb::Union{Nothing,Interpreter{AcbRefVector}}
 end
 
-function InterpretedHomotopy(H::Homotopy)
+function InterpretedHomotopy(H::Homotopy; kwargs...)
     eval_ComplexF64 = interpreter(ComplexF64, H)
     eval_ComplexDF64 = interpreter(ComplexDF64, eval_ComplexF64)
     eval_acb = nothing
@@ -46,6 +46,7 @@ Base.size(H::InterpretedHomotopy) = size(H.homotopy)
 variables(H::InterpretedHomotopy) = variables(H.homotopy)
 parameters(H::InterpretedHomotopy) = parameters(H.homotopy)
 variable_groups(H::InterpretedHomotopy) = variable_groups(H.homotopy)
+Homotopy(H::InterpretedHomotopy) = H.homotopy
 Base.:(==)(H::InterpretedHomotopy, G::InterpretedHomotopy) = H.homotopy == G.homotopy
 
 function Base.show(io::IO, H::InterpretedHomotopy)
@@ -112,8 +113,9 @@ function evaluate!(
     if isnothing(H.eval_acb)
         H.eval_acb = interpreter(AcbRefVector, H.eval_ComplexF64)
     end
-    setprecision!(H.eval_acb, prec)
-    execute!(u, H.eval_acb, x, t, p)
+    I = H.eval_acb::Interpreter{AcbRefVector}
+    setprecision!(I, prec)
+    execute!(u, I, x, t, p)
 end
 
 function evaluate_and_jacobian!(
@@ -128,9 +130,10 @@ function evaluate_and_jacobian!(
     if isnothing(H.jac_acb)
         H.jac_acb = interpreter(AcbRefVector, H.jac_ComplexF64)
     end
-    setprecision!(H.jac_acb, prec)
+    I = H.jac_acb::Interpreter{AcbRefVector}
+    setprecision!(I, prec)
 
-    execute!(u, U, H.jac_acb, x, t, p)
+    execute!(u, U, I, x, t, p)
     nothing
 end
 
