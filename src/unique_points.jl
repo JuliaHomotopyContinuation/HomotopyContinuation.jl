@@ -233,6 +233,7 @@ function search_in_radius(UP::UniquePoints{T,Id,M,GA}, v, tol::Real) where {T,Id
             end
         end
     end
+    id
 end
 
 """
