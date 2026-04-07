@@ -41,3 +41,16 @@ certified_solution_interval_after_krawczyk
 certificate_index
 solution_approximation
 ```
+
+## Incremental Certified Sets
+For iteratively building a certified set of distinct solutions, use [`DistinctCertifiedSolutions`](@ref)
+and [`add_solution!`](@ref). This API can be updated batch-by-batch and merged in memory with
+[`merge!`](https://docs.julialang.org/en/v1/base/collections/#Base.merge!).
+
+```@docs
+DistinctCertifiedSolutions
+add_solution!
+distinct_certified_solutions
+distinct_certified_solutions!
+stats
+```

@@ -22,6 +22,15 @@ Note that this computation can take substantially longer than the original `mono
 verify_solution_completeness
 ```
 
+`monodromy_solve` also supports `duplicate_check = :certified`. In this mode monodromy only
+accepts solutions that certify as distinct. This is rigorous for literal duplicates already
+covered by certified intervals, but `group_actions` / `equivalence_classes` remain heuristic
+and endpoints that fail certification are discarded by policy rather than being proved duplicates.
+The public solution set of a certified monodromy result is the canonical certified-distinct set
+returned by [`solutions(::MonodromyResult)`](@ref) and counted by [`nsolutions`](@ref), while
+[`results`](@ref) and [`nresults`](@ref) continue to expose the raw tracked [`PathResult`](@ref)s.
+Accepted certified endpoints are normalized to their certified midpoint and marked non-singular.
+
 ## Monodromy Result
 
 A call to [`monodromy_solve`](@ref) returns a [`MonodromyResult`](@ref):

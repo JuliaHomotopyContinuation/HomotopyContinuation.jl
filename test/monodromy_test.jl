@@ -459,4 +459,115 @@
 
         @test length(solutions(points)) == length(UP)
     end
+
+    @testset "certified duplicate checks" begin
+        @var x a
+        F = System([x^2 - a], variables = [x], parameters = [a])
+        base_parameters = [1.0 + 0im]
+
+        for (threading, starts) in (
+            (false, [[1.0 + 0im], [1.0 + 0im], [-1.0 + 0im], [-1.0 + 0im]]),
+            (true, [[1.0 + 0im]]),
+        )
+            result = monodromy_solve(
+                F,
+                starts,
+                base_parameters,
+                duplicate_check = :certified,
+                target_solutions_count = 2,
+                max_loops_no_progress = 20,
+                show_progress = false,
+                threading = threading,
+            )
+            cert = certify(F, result; show_progress = false, threading = false)
+            @test is_success(result)
+            @test result.duplicate_check == :certified
+            @test nsolutions(result) == 2
+            @test length(solutions(result)) == nsolutions(result)
+            @test nresults(result) == length(results(result))
+            @test ncertified_distinct(result) == 2
+            @test ndiscarded_uncertified(result) == 0
+            @test ndistinct_certified(cert) == ncertified_distinct(result)
+        end
+
+        singular_path = PathResult(
+            return_code = :success,
+            solution = [1.0 + 0im],
+            t = 0.0,
+            accuracy = 0.0,
+            residual = 0.0,
+            singular = true,
+            condition_jacobian = 1.0,
+            winding_number = 2,
+            extended_precision = false,
+            path_number = 1,
+            start_solution = [1.0 + 0im],
+            last_path_point = ([1.0 + 0im], 0.0),
+            valuation = nothing,
+            ω = 0.0,
+            μ = 0.0,
+            accepted_steps = 0,
+            rejected_steps = 0,
+            extended_precision_used = false,
+        )
+        singular_solver = HC.MonodromySolver(
+            F,
+            base_parameters;
+            compile = false,
+            options = (duplicate_check = :certified,),
+        )
+        id, added = HC.add!(singular_solver, singular_path, 1, 1)
+        @test added
+        @test id == 1
+        @test !is_singular(singular_path)
+        @test winding_number(singular_path) == 2
+
+        toric = toric_ed([3 2 1 0; 0 1 2 3])
+        x₀, p₀ = find_start_pair(toric)
+        roots_of_unity(s) = begin
+            t = cis(π * 2 / 3)
+            t² = t * t
+            (vcat(t * s[1], t * s[2], s[3:end]), vcat(t² * s[1], t² * s[2], s[3:end]))
+        end
+        eq_result = monodromy_solve(
+            toric,
+            x₀,
+            p₀,
+            duplicate_check = :certified,
+            group_action = roots_of_unity,
+            target_solutions_count = 7,
+            max_loops_no_progress = 20,
+            show_progress = false,
+            threading = false,
+        )
+        @test is_success(eq_result)
+        @test nsolutions(eq_result) == 7
+        @test length(solutions(eq_result)) == nsolutions(eq_result)
+        @test nresults(eq_result) == length(results(eq_result))
+        @test ncertified_distinct(eq_result) == 7
+
+        @var z[1:2]
+        linear_system = System([z[1]^2 + z[2]^2 - 1], z)
+        linear_result = monodromy_solve(
+            linear_system,
+            [[0.0 + 0im, 1.0 + 0im], [0.0 + 0im, -1.0 + 0im]],
+            LinearSubspace([1.0 + 0im 0.0 + 0im], [0.0 + 0im]);
+            duplicate_check = :certified,
+            target_solutions_count = 2,
+            threading = false,
+            show_progress = false,
+        )
+        sliced_cert = certify(
+            slice(fixed(linear_system; compile = false), parameters(linear_result)),
+            solutions(linear_result);
+            show_progress = false,
+            threading = false,
+        )
+        @test is_success(linear_result)
+        @test nsolutions(linear_result) == 2
+        @test length(solutions(linear_result)) == nsolutions(linear_result)
+        @test nresults(linear_result) == length(results(linear_result))
+        @test ncertified_distinct(linear_result) == 2
+        @test ndistinct_certified(sliced_cert) == 2
+    end
 end

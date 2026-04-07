@@ -49,8 +49,8 @@ end
 
 function (F::SlicedSystem)(x::AbstractVector, p = nothing)
     u = F.system(x, p)
-    append!(u, extrinsic(F.affine)(x))
-    u
+    v = extrinsic(F.affine)(x)
+    [u; v]
 end
 
 function ModelKit.evaluate!(u, F::SlicedSystem, x, p = nothing)
