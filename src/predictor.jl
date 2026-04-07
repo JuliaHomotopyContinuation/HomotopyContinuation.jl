@@ -235,26 +235,26 @@ function update!(
         return predictor
     end
 
-    if tx_norm[2] == 0.0
-        # Fallback for when the solution path is constant (first derivative of x(t) is zero)
+    taylor!(u, Val(2), H, tx¹, t, true)
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    tol_δ₂ = 1e-10
+    δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
+    tx_norm[3] = norm(xtemp)
+    x² .= xtemp
+
+    taylor!(u, Val(3), H, tx², t, true)
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    tol_δ₃ = 1e-4
+    δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
+    tx_norm[4] = norm(xtemp)
+    x³ .= xtemp
+
+    if tx_norm[2] == 0.0 && tx_norm[3] == 0.0 && tx_norm[4] == 0.0
+        # Fallback for when the solution path is constant (derivatives of x(t) are zero)
         τ = 1.0
     else
-        taylor!(u, Val(2), H, tx¹, t, true)
-        u .= .-u
-        LA.ldiv!(xtemp, J, u)
-        tol_δ₂ = 1e-10
-        δ > tol_δ₂ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₂, max_iters = 4)
-        tx_norm[3] = norm(xtemp)
-        x² .= xtemp
-
-        taylor!(u, Val(3), H, tx², t, true)
-        u .= .-u
-        LA.ldiv!(xtemp, J, u)
-        tol_δ₃ = 1e-4
-        δ > tol_δ₃ && iterative_refinement!(xtemp, J, u, norm; tol = tol_δ₃, max_iters = 3)
-        tx_norm[4] = norm(xtemp)
-        x³ .= xtemp
-
         τ = Inf
         for (i, (x, x¹, x², x³)) in enumerate(tx³)
             c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
