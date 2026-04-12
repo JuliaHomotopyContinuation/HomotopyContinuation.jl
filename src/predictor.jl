@@ -251,26 +251,31 @@ function update!(
     tx_norm[4] = norm(xtemp)
     x³ .= xtemp
 
-    τ = Inf
-    for (i, (x, x¹, x², x³)) in enumerate(tx³)
-        c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
-        λ = max(1e-6, c¹)
-        c¹ /= λ
-        c² /= λ^2
-        c³ /= λ^3
-        tol = 1e-14 * max(c¹, c², c³)
-        if !((c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol)
-            τᵢ = (c² / c³) / λ
-            if τᵢ < τ
-                τ = τᵢ
+    if tx_norm[2] == 0.0 && tx_norm[3] == 0.0 && tx_norm[4] == 0.0
+        # Fallback for when the solution path is constant (derivatives of x(t) are zero)
+        τ = 1.0
+    else
+        τ = Inf
+        for (i, (x, x¹, x², x³)) in enumerate(tx³)
+            c, c¹, c², c³ = fast_abs.((x, x¹, x², x³))
+            λ = max(1e-6, c¹)
+            c¹ /= λ
+            c² /= λ^2
+            c³ /= λ^3
+            tol = 1e-14 * max(c¹, c², c³)
+            if !((c¹ ≤ tol && c² ≤ tol && c³ ≤ tol) || c² ≤ tol)
+                τᵢ = (c² / c³) / λ
+                if τᵢ < τ
+                    τ = τᵢ
+                end
             end
         end
-    end
-    if !isfinite(τ)
-        τ = tx_norm[3] / tx_norm[4]
-    end
-    if !isfinite(τ)
-        τ = tx_norm[1] / maximum(tx_norm)
+        if !isfinite(τ)
+            τ = tx_norm[3] / tx_norm[4]
+        end
+        if !isfinite(τ)
+            τ = tx_norm[1] / maximum(tx_norm)
+        end
     end
 
     predictor.method = PredictionMethod.Pade21
