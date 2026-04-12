@@ -1975,7 +1975,7 @@ function _intersect(
     out = [WitnessSet(G, L1, P1)]
     if !isnothing(W₂)
         P2, L2 = u_transform(W₂)
-        push!(out, WitnessSet(deepcopy(G), L2, P2))
+        push!(out, WitnessSet(G, L2, P2))
 
     end
     filter!(X -> degree(X) > 0, out)
