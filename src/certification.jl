@@ -1812,3 +1812,583 @@ function distinct_certified_solutions!(
 
     return d
 end
+
+
+################################
+#### Certification of iterators 
+################################
+
+using HomotopyContinuation
+using IntervalTrees
+
+"""
+    BSPBucketEntry
+
+Stores the information we keep per certified solution during the BSP phase:
+the position of the path result in the `ResultIterator` and the certified interval
+for the chosen real coordinate.
+"""
+struct BSPBucketEntry
+    index::Int
+    interval::IntervalTrees.Interval{Float64}
+end
+
+"""
+    BSPPartition
+
+Binary spatial partition of the real line used to group certified solutions from a
+`ResultIterator` without materializing all solutions at once.
+
+The `tree` maps each leaf interval to the solution entries currently assigned to it.
+The `leaves` vector stores the same leaf intervals in sorted order, and
+`unsplittable` records leaves that cannot be refined further using only the chosen
+coordinate projection.
+"""
+mutable struct BSPPartition
+    tree::IntervalTrees.IntervalMap{Float64,Vector{BSPBucketEntry}}
+    leaves::Vector{IntervalTrees.Interval{Float64}}
+    unsplittable::Set{Tuple{Float64,Float64}}
+end
+
+"""
+    BSPAssignmentStats
+
+Summary statistics for one streaming pass through the iterator while assigning
+certified solutions to BSP buckets.
+"""
+Base.@kwdef mutable struct BSPAssignmentStats
+    total_results::Int = 0
+    finite_results::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+end
+
+"""
+    BSPCertificationSummary
+
+Final summary returned by [`certify_iterator_bsp`](@ref). This combines the statistics
+from the iterator passes with the distinct certification counts obtained by certifying
+bucket-by-bucket after refinement.
+"""
+Base.@kwdef struct BSPCertificationSummary
+    total_results::Int = 0
+    finite_results::Int = 0
+    certified::Int = 0
+    certified_real::Int = 0
+    certified_complex::Int = 0
+    not_certified::Int = 0
+    distinct_certified::Int = 0
+    distinct_real::Int = 0
+    distinct_complex::Int = 0
+    nparts::Int = 0
+    max_bucket_size::Int = 0
+    oversized_buckets::Int = 0
+    unsplittable_buckets::Int = 0
+    refinement_rounds::Int = 0
+end
+
+function Base.show(io::IO, summary::BSPCertificationSummary)
+    println(io, "BSPCertificationSummary")
+    println(io, "=======================")
+    println(io, "• $(summary.total_results) path results processed")
+    println(io, "• $(summary.finite_results) finite path results")
+    println(
+        io,
+        "• $(summary.certified) certified intervals " *
+        "($(summary.certified_real) real, $(summary.certified_complex) complex)",
+    )
+    println(io, "• $(summary.not_certified) not certified")
+    println(
+        io,
+        "• $(summary.distinct_certified) distinct certified intervals " *
+        "($(summary.distinct_real) real, $(summary.distinct_complex) complex)",
+    )
+    println(
+        io,
+        "• $(summary.nparts) BSP leaves, max bucket size $(summary.max_bucket_size)",
+    )
+    if summary.oversized_buckets > 0
+        println(
+            io,
+            "• $(summary.oversized_buckets) oversized buckets remain " *
+            "($(summary.unsplittable_buckets) unsplittable by the first coordinate)",
+        )
+    end
+    print(io, "• $(summary.refinement_rounds) refinement rounds")
+end
+
+_bucket_id(interval) = (first(interval), last(interval))
+
+"""
+    _convert_to_interval(cert; coordinate = 1)
+
+Project a certified solution interval to the real part of one coordinate and convert it
+to an `IntervalTrees.Interval`.
+"""
+function _convert_to_interval(cert; coordinate::Int = 1)
+    cert_interval = certified_solution_interval(cert)[coordinate]
+    real_part_interval = real(HomotopyContinuation.IComplexF64(cert_interval))
+    IntervalTrees.Interval(real_part_interval.lo, real_part_interval.hi)
+end
+
+# We always work with a sorted list of finite cut points and extend it by `±Inf`
+# so every real number belongs to exactly one initial leaf.
+function _normalize_boundaries(boundaries)
+    b = unique!(sort!(collect(float.(boundaries))))
+    [-Inf, b..., Inf]
+end
+
+"""
+    _build_partition(boundaries)
+
+Create the initial BSP partition of the real line from a set of finite boundaries.
+"""
+function _build_partition(boundaries)
+    # Build the initial coarse partition of the real line.
+    tree = IntervalTrees.IntervalMap{Float64,Vector{BSPBucketEntry}}()
+    leaves = IntervalTrees.Interval{Float64}[]
+    normalized = _normalize_boundaries(boundaries)
+    for i in 1:(length(normalized) - 1)
+        interval = IntervalTrees.Interval(normalized[i], normalized[i + 1])
+        tree[interval] = BSPBucketEntry[]
+        push!(leaves, interval)
+    end
+    BSPPartition(tree, leaves, Set{Tuple{Float64,Float64}}())
+end
+
+# Each reassignment pass starts from empty buckets and streams through the iterator again.
+function _clear_partition!(bsp::BSPPartition)
+    for leaf in bsp.leaves
+        empty!(_bucket_entries(bsp, leaf))
+    end
+    bsp
+end
+
+_bucket_entries(bsp::BSPPartition, leaf) = IntervalTrees.value(bsp.tree[leaf])
+
+function _find_bucket(bsp::BSPPartition, interval)
+    for match in IntervalTrees.intersect(bsp.tree, interval)
+        if first(match) <= first(interval) && last(interval) <= last(match)
+            return match
+        end
+    end
+    nothing
+end
+
+function _merge_covering_leaves!(bsp::BSPPartition, interval)
+    # Find the contiguous block of leaves touched by `interval`.
+    left = 0
+    right = 0
+    for i in eachindex(bsp.leaves)
+        leaf = bsp.leaves[i]
+        if last(leaf) < first(interval)
+            continue
+        end
+        left == 0 && (left = i)
+        if last(interval) < first(leaf)
+            break
+        end
+        right = i
+    end
+    left == 0 && return false
+    right == 0 && (right = left)
+
+    if left == right && first(bsp.leaves[left]) <= first(interval) && last(interval) <= last(bsp.leaves[left])
+        return true
+    end
+
+    # Merge the touched leaves into one larger leaf so `interval` fits into a single bucket.
+    merged_leaf = IntervalTrees.Interval(first(bsp.leaves[left]), last(bsp.leaves[right]))
+    merged_entries = BSPBucketEntry[]
+    total_entries = 0
+    for i in left:right
+        total_entries += length(_bucket_entries(bsp, bsp.leaves[i]))
+    end
+    sizehint!(merged_entries, total_entries)
+
+    for i in left:right
+        leaf = bsp.leaves[i]
+        append!(merged_entries, _bucket_entries(bsp, leaf))
+        delete!(bsp.tree, leaf)
+        delete!(bsp.unsplittable, _bucket_id(leaf))
+    end
+
+    splice!(bsp.leaves, left:right, [merged_leaf])
+    bsp.tree[merged_leaf] = merged_entries
+    return true
+end
+
+function _ensure_bucket!(bsp::BSPPartition, interval)
+    while true
+        match = _find_bucket(bsp, interval)
+        !isnothing(match) && return match
+        # If `interval` crosses a current cut, coarsen the BSP locally and try again.
+        _merge_covering_leaves!(bsp, interval) ||
+            error("Could not place certified interval $interval into the current BSP leaves.")
+    end
+end
+
+"""
+    _assign_solutions!(bsp, iter, F, cert_params, cert_cache; ...)
+
+Stream once through `iter`, certify each finite result, and assign the certified
+interval to the unique BSP leaf that fully contains its projected interval.
+"""
+function _assign_solutions!(
+    bsp::BSPPartition,
+    iter,
+    F,
+    cert_params,
+    cert_cache;
+    coordinate::Int = 1,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    # Reuse the existing bucket vectors and repopulate them in a fresh streaming pass.
+    _clear_partition!(bsp)
+    stats = BSPAssignmentStats()
+    for result in iter
+        # We index by the position inside the iterator so that we can later revisit
+        # exactly the same solutions without storing all of them in memory.
+        stats.total_results += 1
+        isfinite(result) || continue
+
+        stats.finite_results += 1
+
+        # Certify one solution candidate at a time, matching the memory goal of the iterator.
+        cert = HomotopyContinuation.certify_solution(
+            F,
+            solution(result),
+            cert_params,
+            cert_cache,
+            stats.total_results;
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        if !HomotopyContinuation.is_certified(cert)
+            stats.not_certified += 1
+            continue
+        end
+
+        stats.certified += 1
+        stats.certified_real += Int(HomotopyContinuation.is_real(cert))
+        stats.certified_complex += Int(HomotopyContinuation.is_complex(cert))
+
+        interval = _convert_to_interval(cert; coordinate = coordinate)
+        # If a certified interval straddles an existing BSP cut, merge the touched
+        # leaves so the interval is again fully contained in one bucket.
+        match = _ensure_bucket!(bsp, interval)
+        push!(IntervalTrees.value(match), BSPBucketEntry(stats.total_results, interval))
+    end
+    stats
+end
+
+"""
+    _largest_gap(entries)
+
+Return a safe split point between projected certified intervals in one bucket.
+If the projected intervals form a connected cluster, return `nothing`.
+"""
+function _largest_gap(entries::Vector{BSPBucketEntry})
+    length(entries) ≤ 1 && return nothing
+
+    # Sort in place and look for a genuine gap in the 1D projected certified intervals.
+    sort!(entries; by = entry -> first(entry.interval))
+    current_hi = last(entries[1].interval)
+    best_gap = -Inf
+    split_point = nothing
+    for i in 2:length(entries)
+        interval = entries[i].interval
+        lo = first(interval)
+        if current_hi < lo
+            gap = lo - current_hi
+            if gap > best_gap
+                best_gap = gap
+                split_point = (current_hi + lo) / 2
+            end
+        end
+        current_hi = max(current_hi, last(interval))
+    end
+    split_point
+end
+
+"""
+    split_tree!(bsp, k)
+
+Refine all BSP leaves that contain more than `k` entries by splitting them at a gap
+between projected certified intervals. Leaves with no such gap are marked unsplittable.
+
+Returns the number of leaves that were split.
+"""
+function split_tree!(bsp::BSPPartition, k::Integer)
+    nsplits = 0
+    i = 1
+    while i <= length(bsp.leaves)
+        leaf = bsp.leaves[i]
+        entries = _bucket_entries(bsp, leaf)
+        if length(entries) ≤ k || _bucket_id(leaf) in bsp.unsplittable
+            i += 1
+            continue
+        end
+
+        # We only split at a genuine gap. This guarantees that no certified interval
+        # is cut by the refinement step.
+        split_point = _largest_gap(entries)
+        if isnothing(split_point)
+            push!(bsp.unsplittable, _bucket_id(leaf))
+            i += 1
+            continue
+        end
+
+        # Split only the current leaf and reuse one of its bucket vectors.
+        left_leaf = IntervalTrees.Interval(first(leaf), split_point)
+        right_leaf = IntervalTrees.Interval(split_point, last(leaf))
+        left_entries = entries
+        empty!(left_entries)
+
+        delete!(bsp.tree, leaf)
+        delete!(bsp.unsplittable, _bucket_id(leaf))
+        bsp.tree[left_leaf] = left_entries
+        bsp.tree[right_leaf] = BSPBucketEntry[]
+
+        bsp.leaves[i] = left_leaf
+        insert!(bsp.leaves, i + 1, right_leaf)
+        nsplits += 1
+        i += 2
+    end
+
+    nsplits
+end
+
+function _count_oversized_buckets(bsp::BSPPartition, k::Integer)
+    n = 0
+    for leaf in bsp.leaves
+        n += Int(length(_bucket_entries(bsp, leaf)) > k)
+    end
+    n
+end
+
+function _count_distinct_certificates!(d)
+    ndistinct = 0
+    nreal = 0
+    ncomplex = 0
+    for bucket in IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
+        for cert in bucket
+            ndistinct += 1
+            nreal += Int(HomotopyContinuation.is_real(cert))
+            ncomplex += Int(HomotopyContinuation.is_complex(cert))
+        end
+    end
+    return ndistinct, nreal, ncomplex
+end
+
+function _bucket_bitmask(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+    sort!(entries; by = entry -> entry.index)
+    current_bitmask = bitmask(iter)
+    # The bucket indices live in the output index space of `iter`.
+    # For an unfiltered iterator this is just `1:length(iter)`, while for a filtered
+    # iterator we have to map those output indices back to the underlying start indices.
+    selected = falses(isnothing(current_bitmask) ? length(iter) : length(current_bitmask))
+
+    if isnothing(current_bitmask)
+        # No existing filter: the bucket indices can be used directly as a sparse bitmask.
+        for entry in entries
+            selected[entry.index] = true
+        end
+        return selected
+    end
+
+    target = 1
+    yielded_index = 0
+    for start_index in eachindex(current_bitmask)
+        current_bitmask[start_index] || continue
+        yielded_index += 1
+        # Compose the bucket selection with the current bitmask by walking through the
+        # indices that the filtered iterator would actually yield.
+        if target > length(entries)
+            break
+        elseif yielded_index == entries[target].index
+            selected[start_index] = true
+            target += 1
+        end
+    end
+    return selected
+end
+
+function _bucket_iterator(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+    # Build a sparse subiterator so recollecting one BSP bucket only retracks the
+    # selected paths instead of rescanning the full iterator.
+    bucket_mask = _bucket_bitmask(iter, entries)
+    HomotopyContinuation.ResultIterator(
+        start_solutions(iter),
+        solver(iter);
+        bitmask = bucket_mask,
+    )
+end
+
+"""
+    _collect_bucket_solutions(iter, entries)
+
+Revisit the iterator and collect only the solution candidates referenced by `entries`.
+This is used after the BSP refinement so each bucket can be certified independently.
+"""
+function _collect_bucket_solutions(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+    # Build a sparse subiterator so we only retrack the paths needed for this bucket.
+    bucket_iter = _bucket_iterator(iter, entries)
+    [solution(result) for result in bucket_iter]
+end
+
+"""
+    certify_iterator_bsp(iter, F, params; k = 32, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true)
+
+Certify a `ResultIterator` without materializing all solutions at once.
+
+The algorithm works in two phases:
+1. stream through the iterator, certify each finite result, and place the certified
+   interval into a BSP leaf using the real part of the first coordinate;
+2. iteratively refine heavy leaves until every splittable bucket contains at most `k`
+   entries, then revisit the iterator bucket-by-bucket and certify only the solutions
+   belonging to that bucket jointly.
+
+Returns `(bsp, summary)` where `summary` is a [`BSPCertificationSummary`](@ref).
+"""
+function certify_iterator_bsp(
+    iter::HomotopyContinuation.ResultIterator,
+    F::HomotopyContinuation.System,
+    params;
+    compile::Union{Bool,Symbol} = false,
+    kwargs...,
+)
+    certify_iterator_bsp(
+        iter,
+        HomotopyContinuation.fixed(F; compile = compile),
+        params;
+        kwargs...,
+    )
+end
+
+function certify_iterator_bsp(
+    iter::HomotopyContinuation.ResultIterator,
+    F::HomotopyContinuation.AbstractSystem,
+    params;
+    k::Integer = 32,
+    coordinate::Int = 1,
+    boundaries = -10:10,
+    max_refinement_rounds::Int = typemax(Int),
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    cert_params = HomotopyContinuation.certification_parameters(params; prec = max_precision)
+    cert_cache = HomotopyContinuation.CertificationCache(F)
+
+    # Phase 1: build the BSP and repeatedly refine it until every splittable leaf is small enough.
+    bsp = _build_partition(boundaries)
+
+    assignment_stats = _assign_solutions!(
+        bsp,
+        iter,
+        F,
+        cert_params,
+        cert_cache;
+        coordinate = coordinate,
+        max_precision = max_precision,
+        refine_solution = refine_solution,
+        extended_certificate = extended_certificate,
+        certify_solution_kwargs...,
+    )
+
+    rounds = 0
+    while rounds < max_refinement_rounds
+        heavy_buckets = _count_oversized_buckets(bsp, k)
+        heavy_buckets == 0 && break
+
+        nsplits = split_tree!(bsp, k)
+        nsplits == 0 && break
+
+        # After every refinement step we recompute the bucket assignment from scratch.
+        # This keeps the implementation simple and still respects the streaming model.
+        assignment_stats = _assign_solutions!(
+            bsp,
+            iter,
+            F,
+            cert_params,
+            cert_cache;
+            coordinate = coordinate,
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        rounds += 1
+    end
+
+    distinct_certified = 0
+    distinct_real = 0
+    distinct_complex = 0
+    max_bucket_size = 0
+    oversized_buckets = 0
+    d = HomotopyContinuation.DistinctCertifiedSolutions(
+        F,
+        params;
+        extended_certificate = extended_certificate,
+    )
+
+    # Phase 2: revisit the iterator bucket-by-bucket and certify only those solutions jointly.
+    for leaf in bsp.leaves
+        entries = _bucket_entries(bsp, leaf)
+        isempty(entries) && continue
+
+        bucket_size = length(entries)
+        max_bucket_size = max(max_bucket_size, bucket_size)
+        oversized_buckets += Int(bucket_size > k)
+
+        # Only the current bucket is materialized here; all other solutions remain in
+        # the iterator and are revisited on demand.
+        sols = _collect_bucket_solutions(iter, entries)
+        empty!(d)
+        for (entry, sol) in zip(entries, sols)
+            HomotopyContinuation.add_solution!(
+                d,
+                sol,
+                entry.index,
+                1;
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+        end
+
+        ndistinct, nreal, ncomplex = _count_distinct_certificates!(d)
+        distinct_certified += ndistinct
+        distinct_real += nreal
+        distinct_complex += ncomplex
+    end
+
+    summary = BSPCertificationSummary(;
+        total_results = assignment_stats.total_results,
+        finite_results = assignment_stats.finite_results,
+        certified = assignment_stats.certified,
+        certified_real = assignment_stats.certified_real,
+        certified_complex = assignment_stats.certified_complex,
+        not_certified = assignment_stats.not_certified,
+        distinct_certified = distinct_certified,
+        distinct_real = distinct_real,
+        distinct_complex = distinct_complex,
+        nparts = length(bsp.leaves),
+        max_bucket_size = max_bucket_size,
+        oversized_buckets = oversized_buckets,
+        unsplittable_buckets = length(bsp.unsplittable),
+        refinement_rounds = rounds,
+    )
+
+    return bsp, summary
+end

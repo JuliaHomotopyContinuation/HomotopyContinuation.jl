@@ -449,3 +449,93 @@
         @test is_certified(cert)
     end
 end
+
+@testset "BSP certification for ResultIterator" begin
+    @testset "parameterized iterator" begin
+        d = 2
+        @var x y a[1:6]
+        F = System(
+            [
+                (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+                (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+            ];
+            parameters = a,
+        )
+        params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        iter = solve(F; iterator_only = true, target_parameters = params)
+
+        bsp, summary = certify_iterator_bsp(iter, F, params; k = 2, boundaries = -10:10)
+
+        @test bsp isa BSPPartition
+        @test summary isa BSPCertificationSummary
+        @test summary.total_results == 7
+        @test summary.finite_results == 3
+        @test summary.certified == 3
+        @test summary.distinct_certified == 3
+    end
+
+    @testset "parameter-free iterator" begin
+        @var x y
+        F = System([x^2 - 1, y - 1], [x, y])
+        iter = solve(F; iterator_only = true, start_system = :total_degree)
+
+        bsp, summary = certify_iterator_bsp(iter, F, nothing; k = 1, boundaries = -3:3)
+
+        @test bsp isa BSPPartition
+        @test summary.certified == 2
+        @test summary.distinct_certified == 2
+        @test summary.not_certified == 0
+    end
+
+    @testset "bitmasked iterator" begin
+        d = 2
+        @var x y a[1:6]
+        F = System(
+            [
+                (a[1] * x^d + a[2] * y) * (a[3] * x + a[4] * y) + 1,
+                (a[1] * x^d + a[2] * y) * (a[5] * x + a[6] * y) + 1,
+            ];
+            parameters = a,
+        )
+        params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
+        iter = bitmask_filter(isfinite, solve(F; iterator_only = true, target_parameters = params))
+
+        _, summary = certify_iterator_bsp(iter, F, params; k = 1, boundaries = -10:10)
+
+        @test summary.total_results == 3
+        @test summary.finite_results == 3
+        @test summary.certified == 3
+        @test summary.distinct_certified == 3
+    end
+
+    @testset "iterator from iterator start solutions" begin
+        @var x y p
+        f₁ = y - x^2 + p
+        f₂ = y - x^3 - p
+        F = System([f₁, f₂]; variables = [x; y], parameters = [p])
+
+        first_iter = solve(
+            F,
+            [[1, 1], [-1, 1]];
+            iterator_only = true,
+            start_parameters = [0],
+            target_parameters = [-1],
+        )
+        second_iter = solve(
+            F,
+            first_iter;
+            iterator_only = true,
+            start_parameters = [-1],
+            target_parameters = [-2],
+        )
+
+        _, summary = certify_iterator_bsp(second_iter, F, [-2]; k = 2, boundaries = -10:10)
+        results = collect(second_iter)
+        nfinite_results = count(isfinite, results)
+
+        @test summary.total_results == length(results)
+        @test summary.finite_results == nfinite_results
+        @test summary.distinct_certified == summary.certified
+        @test summary.certified ≤ nfinite_results
+    end
+end
