@@ -450,6 +450,8 @@
     end
 end
 
+include("../bsp.jl")
+
 @testset "BSP certification for ResultIterator" begin
     @testset "parameterized iterator" begin
         d = 2
@@ -464,7 +466,7 @@ end
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         iter = solve(F; iterator_only = true, target_parameters = params)
 
-        bsp, summary = certify_iterator_bsp(iter, F, params; k = 2, boundaries = -10:10)
+        bsp, summary = certify(F, iter, params; k = 2, boundaries = -10:10)
 
         @test bsp isa BSPPartition
         @test summary isa BSPCertificationSummary
@@ -479,7 +481,7 @@ end
         F = System([x^2 - 1, y - 1], [x, y])
         iter = solve(F; iterator_only = true, start_system = :total_degree)
 
-        bsp, summary = certify_iterator_bsp(iter, F, nothing; k = 1, boundaries = -3:3)
+        bsp, summary = certify(F, iter, nothing; k = 1, boundaries = -3:3)
 
         @test bsp isa BSPPartition
         @test summary.certified == 2
@@ -500,7 +502,7 @@ end
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         iter = bitmask_filter(isfinite, solve(F; iterator_only = true, target_parameters = params))
 
-        _, summary = certify_iterator_bsp(iter, F, params; k = 1, boundaries = -10:10)
+        _, summary = certify(F, iter, params; k = 1, boundaries = -10:10)
 
         @test summary.total_results == 3
         @test summary.finite_results == 3
@@ -529,7 +531,7 @@ end
             target_parameters = [-2],
         )
 
-        _, summary = certify_iterator_bsp(second_iter, F, [-2]; k = 2, boundaries = -10:10)
+        _, summary = certify(F, second_iter, [-2]; k = 2, boundaries = -10:10)
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 

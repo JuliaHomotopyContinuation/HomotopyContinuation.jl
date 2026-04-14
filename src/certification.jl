@@ -1818,9 +1818,6 @@ end
 #### Certification of iterators 
 ################################
 
-using HomotopyContinuation
-using IntervalTrees
-
 """
     BSPBucketEntry
 
@@ -1868,7 +1865,8 @@ end
 """
     BSPCertificationSummary
 
-Final summary returned by [`certify_iterator_bsp`](@ref). This combines the statistics
+Final summary returned by the BSP-based [`certify`](@ref) method for
+`ResultIterator`s. This combines the statistics
 from the iterator passes with the distinct certification counts obtained by certifying
 bucket-by-bucket after refinement.
 """
@@ -2245,38 +2243,25 @@ function _collect_bucket_solutions(iter::HomotopyContinuation.ResultIterator, en
 end
 
 """
-    certify_iterator_bsp(iter, F, params; k = 32, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true)
+    certify(F, iter::ResultIterator, [p, cache]; k = 32, coordinate = 1, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true, ...)
 
-Certify a `ResultIterator` without materializing all solutions at once.
+Certify a `ResultIterator` without materializing all solutions at once by using a
+binary spatial partition of the real line.
 
 The algorithm works in two phases:
 1. stream through the iterator, certify each finite result, and place the certified
-   interval into a BSP leaf using the real part of the first coordinate;
+   interval into a BSP leaf using the real part of the chosen coordinate;
 2. iteratively refine heavy leaves until every splittable bucket contains at most `k`
    entries, then revisit the iterator bucket-by-bucket and certify only the solutions
    belonging to that bucket jointly.
 
 Returns `(bsp, summary)` where `summary` is a [`BSPCertificationSummary`](@ref).
 """
-function certify_iterator_bsp(
-    iter::HomotopyContinuation.ResultIterator,
-    F::HomotopyContinuation.System,
-    params;
-    compile::Union{Bool,Symbol} = false,
-    kwargs...,
-)
-    certify_iterator_bsp(
-        iter,
-        HomotopyContinuation.fixed(F; compile = compile),
-        params;
-        kwargs...,
-    )
-end
-
-function certify_iterator_bsp(
+function _certify_iterator_bsp(
     iter::HomotopyContinuation.ResultIterator,
     F::HomotopyContinuation.AbstractSystem,
-    params;
+    cert_params,
+    cache::HomotopyContinuation.CertificationCache;
     k::Integer = 32,
     coordinate::Int = 1,
     boundaries = -10:10,
@@ -2286,9 +2271,6 @@ function certify_iterator_bsp(
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
-    cert_params = HomotopyContinuation.certification_parameters(params; prec = max_precision)
-    cert_cache = HomotopyContinuation.CertificationCache(F)
-
     # Phase 1: build the BSP and repeatedly refine it until every splittable leaf is small enough.
     bsp = _build_partition(boundaries)
 
@@ -2297,7 +2279,7 @@ function certify_iterator_bsp(
         iter,
         F,
         cert_params,
-        cert_cache;
+        cache;
         coordinate = coordinate,
         max_precision = max_precision,
         refine_solution = refine_solution,
@@ -2320,7 +2302,7 @@ function certify_iterator_bsp(
             iter,
             F,
             cert_params,
-            cert_cache;
+            cache;
             coordinate = coordinate,
             max_precision = max_precision,
             refine_solution = refine_solution,
@@ -2335,6 +2317,7 @@ function certify_iterator_bsp(
     distinct_complex = 0
     max_bucket_size = 0
     oversized_buckets = 0
+    params = isnothing(cert_params) ? nothing : HomotopyContinuation.complexF64_params(cert_params)
     d = HomotopyContinuation.DistinctCertifiedSolutions(
         F,
         params;
@@ -2391,4 +2374,43 @@ function certify_iterator_bsp(
     )
 
     return bsp, summary
+end
+
+function certify(
+    F::HomotopyContinuation.System,
+    iter::HomotopyContinuation.ResultIterator,
+    args...;
+    compile::Union{Bool,Symbol} = false,
+    kwargs...,
+)
+    certify(
+        HomotopyContinuation.fixed(F; compile = compile),
+        iter,
+        args...;
+        kwargs...,
+    )
+end
+
+function certify(
+    F::HomotopyContinuation.AbstractSystem,
+    iter::HomotopyContinuation.ResultIterator,
+    p::Union{Nothing,AbstractArray} = nothing,
+    cache::HomotopyContinuation.CertificationCache = HomotopyContinuation.CertificationCache(F);
+    target_parameters = nothing,
+    max_precision::Int = 256,
+    kwargs...,
+)
+    cert_params =
+        HomotopyContinuation.certification_parameters(
+            isnothing(p) ? target_parameters : p;
+            prec = max_precision,
+        )
+    _certify_iterator_bsp(
+        iter,
+        F,
+        cert_params,
+        cache;
+        max_precision = max_precision,
+        kwargs...,
+    )
 end
