@@ -1863,14 +1863,14 @@ Base.@kwdef mutable struct BSPAssignmentStats
 end
 
 """
-    BSPCertificationSummary
+    IteratorCertificationSummary
 
 Final summary returned by the BSP-based [`certify`](@ref) method for
 `ResultIterator`s. This combines the statistics
 from the iterator passes with the distinct certification counts obtained by certifying
 bucket-by-bucket after refinement.
 """
-Base.@kwdef struct BSPCertificationSummary
+Base.@kwdef struct IteratorCertificationSummary
     total_results::Int = 0
     finite_results::Int = 0
     certified::Int = 0
@@ -1887,8 +1887,8 @@ Base.@kwdef struct BSPCertificationSummary
     refinement_rounds::Int = 0
 end
 
-function Base.show(io::IO, summary::BSPCertificationSummary)
-    println(io, "BSPCertificationSummary")
+function Base.show(io::IO, summary::IteratorCertificationSummary)
+    println(io, "IteratorCertificationSummary")
     println(io, "=======================")
     println(io, "• $(summary.total_results) path results processed")
     println(io, "• $(summary.finite_results) finite path results")
@@ -2272,7 +2272,7 @@ The algorithm works in two phases:
    entries, then revisit the iterator bucket-by-bucket and certify only the solutions
    belonging to that bucket jointly.
 
-Returns `(bsp, summary)` where `summary` is a [`BSPCertificationSummary`](@ref).
+Returns `(bsp, summary)` where `summary` is a [`IteratorCertificationSummary`](@ref).
 """
 function _certify_iterator_bsp(
     iter::ResultIterator,
@@ -2377,7 +2377,7 @@ function _certify_iterator_bsp(
         distinct_complex += ncomplex
     end
 
-    summary = BSPCertificationSummary(;
+    summary = IteratorCertificationSummary(;
         total_results = assignment_stats.total_results,
         finite_results = assignment_stats.finite_results,
         certified = assignment_stats.certified,
