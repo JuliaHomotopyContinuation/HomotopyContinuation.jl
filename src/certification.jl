@@ -1927,7 +1927,7 @@ to an `IntervalTrees.Interval`.
 """
 function _convert_to_interval(cert; coordinate::Int = 1)
     cert_interval = certified_solution_interval(cert)[coordinate]
-    real_part_interval = real(HomotopyContinuation.IComplexF64(cert_interval))
+    real_part_interval = real(IComplexF64(cert_interval))
     IntervalTrees.Interval(real_part_interval.lo, real_part_interval.hi)
 end
 
@@ -2058,7 +2058,7 @@ function _assign_solutions!(
         stats.finite_results += 1
 
         # Certify one solution candidate at a time, matching the memory goal of the iterator.
-        cert = HomotopyContinuation.certify_solution(
+        cert = certify_solution(
             F,
             solution(result),
             cert_params,
@@ -2069,14 +2069,14 @@ function _assign_solutions!(
             extended_certificate = extended_certificate,
             certify_solution_kwargs...,
         )
-        if !HomotopyContinuation.is_certified(cert)
+        if !is_certified(cert)
             stats.not_certified += 1
             continue
         end
 
         stats.certified += 1
-        stats.certified_real += Int(HomotopyContinuation.is_real(cert))
-        stats.certified_complex += Int(HomotopyContinuation.is_complex(cert))
+        stats.certified_real += Int(is_real(cert))
+        stats.certified_complex += Int(is_complex(cert))
 
         interval = _convert_to_interval(cert; coordinate = coordinate)
         # If a certified interval straddles an existing BSP cut, merge the touched
@@ -2179,14 +2179,14 @@ function _count_distinct_certificates!(d)
     for bucket in IntervalTrees.values(d.distinct_solution_certificates.distinct_tree)
         for cert in bucket
             ndistinct += 1
-            nreal += Int(HomotopyContinuation.is_real(cert))
-            ncomplex += Int(HomotopyContinuation.is_complex(cert))
+            nreal += Int(is_real(cert))
+            ncomplex += Int(is_complex(cert))
         end
     end
     return ndistinct, nreal, ncomplex
 end
 
-function _bucket_bitmask(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+function _bucket_bitmask(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # We sort the live bucket vector in place here and rely on the same order later in
     # Phase 2 when pairing the recollected solutions back with their bucket entries.
     sort!(entries; by = entry -> entry.index)
@@ -2221,11 +2221,11 @@ function _bucket_bitmask(iter::HomotopyContinuation.ResultIterator, entries::Vec
     return selected
 end
 
-function _bucket_iterator(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+function _bucket_iterator(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # Build a sparse subiterator so recollecting one BSP bucket only retracks the
     # selected paths instead of rescanning the full iterator.
     bucket_mask = _bucket_bitmask(iter, entries)
-    HomotopyContinuation.ResultIterator(
+    ResultIterator(
         start_solutions(iter),
         solver(iter);
         bitmask = bucket_mask,
@@ -2238,7 +2238,7 @@ end
 Revisit the iterator and collect only the solution candidates referenced by `entries`.
 This is used after the BSP refinement so each bucket can be certified independently.
 """
-function _collect_bucket_solutions(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBucketEntry})
     # Build a sparse subiterator so we only retrack the paths needed for this bucket.
     bucket_iter = _bucket_iterator(iter, entries)
     sols = Vector{Vector{ComplexF64}}()
@@ -2275,10 +2275,10 @@ The algorithm works in two phases:
 Returns `(bsp, summary)` where `summary` is a [`BSPCertificationSummary`](@ref).
 """
 function _certify_iterator_bsp(
-    iter::HomotopyContinuation.ResultIterator,
-    F::HomotopyContinuation.AbstractSystem,
+    iter::ResultIterator,
+    F::AbstractSystem,
     cert_params,
-    cache::HomotopyContinuation.CertificationCache;
+    cache::CertificationCache;
     k::Integer = 32,
     coordinate::Int = 1,
     boundaries = -10:10,
@@ -2334,8 +2334,8 @@ function _certify_iterator_bsp(
     distinct_complex = 0
     max_bucket_size = 0
     oversized_buckets = 0
-    params = isnothing(cert_params) ? nothing : HomotopyContinuation.complexF64_params(cert_params)
-    d = HomotopyContinuation.DistinctCertifiedSolutions(
+    params = isnothing(cert_params) ? nothing : complexF64_params(cert_params)
+    d = DistinctCertifiedSolutions(
         F,
         params;
         extended_certificate = extended_certificate,
@@ -2357,7 +2357,7 @@ function _certify_iterator_bsp(
         length(entries) == length(sols) ||
             error("Internal BSP error: bucket entries and recollected solutions disagree.")
         for (entry, sol) in zip(entries, sols)
-            HomotopyContinuation.add_solution!(
+            add_solution!(
                 d,
                 sol,
                 entry.index,
@@ -2398,14 +2398,14 @@ function _certify_iterator_bsp(
 end
 
 function certify(
-    F::HomotopyContinuation.System,
-    iter::HomotopyContinuation.ResultIterator,
+    F::System,
+    iter::ResultIterator,
     args...;
     compile::Union{Bool,Symbol} = false,
     kwargs...,
 )
     certify(
-        HomotopyContinuation.fixed(F; compile = compile),
+        fixed(F; compile = compile),
         iter,
         args...;
         kwargs...,
@@ -2413,16 +2413,16 @@ function certify(
 end
 
 function certify(
-    F::HomotopyContinuation.AbstractSystem,
-    iter::HomotopyContinuation.ResultIterator,
+    F::AbstractSystem,
+    iter::ResultIterator,
     p::Union{Nothing,AbstractArray} = nothing,
-    cache::HomotopyContinuation.CertificationCache = HomotopyContinuation.CertificationCache(F);
+    cache::CertificationCache = CertificationCache(F);
     target_parameters = nothing,
     max_precision::Int = 256,
     kwargs...,
 )
     cert_params =
-        HomotopyContinuation.certification_parameters(
+        certification_parameters(
             isnothing(p) ? target_parameters : p;
             prec = max_precision,
         )
