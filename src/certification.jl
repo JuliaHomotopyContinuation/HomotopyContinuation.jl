@@ -2187,6 +2187,8 @@ function _count_distinct_certificates!(d)
 end
 
 function _bucket_bitmask(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
+    # We sort the live bucket vector in place here and rely on the same order later in
+    # Phase 2 when pairing the recollected solutions back with their bucket entries.
     sort!(entries; by = entry -> entry.index)
     current_bitmask = bitmask(iter)
     # The bucket indices live in the output index space of `iter`.
@@ -2239,7 +2241,22 @@ This is used after the BSP refinement so each bucket can be certified independen
 function _collect_bucket_solutions(iter::HomotopyContinuation.ResultIterator, entries::Vector{BSPBucketEntry})
     # Build a sparse subiterator so we only retrack the paths needed for this bucket.
     bucket_iter = _bucket_iterator(iter, entries)
-    [solution(result) for result in bucket_iter]
+    sols = Vector{Vector{ComplexF64}}()
+    sizehint!(sols, length(entries))
+    nnonfinite = 0
+    for result in bucket_iter
+        if isfinite(result)
+            push!(sols, solution(result))
+        else
+            nnonfinite += 1
+        end
+    end
+    length(sols) == length(entries) ||
+        error(
+            "Re-tracking a BSP bucket produced $(length(sols)) finite solutions for " *
+            "$(length(entries)) expected entries ($nnonfinite non-finite results).",
+        )
+    sols
 end
 
 """
@@ -2337,6 +2354,8 @@ function _certify_iterator_bsp(
         # the iterator and are revisited on demand.
         sols = _collect_bucket_solutions(iter, entries)
         empty!(d)
+        length(entries) == length(sols) ||
+            error("Internal BSP error: bucket entries and recollected solutions disagree.")
         for (entry, sol) in zip(entries, sols)
             HomotopyContinuation.add_solution!(
                 d,
@@ -2350,6 +2369,8 @@ function _certify_iterator_bsp(
             )
         end
 
+        # Distinct counts can be accumulated bucketwise since different BSP leaves are
+        # disjoint in the chosen projected coordinate.
         ndistinct, nreal, ncomplex = _count_distinct_certificates!(d)
         distinct_certified += ndistinct
         distinct_real += nreal
