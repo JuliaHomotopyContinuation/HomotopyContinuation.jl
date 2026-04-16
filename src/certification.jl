@@ -1,4 +1,5 @@
 using Arblib: Acb, AcbRef, AcbVector, AcbRefVector, AcbMatrix, AcbRefMatrix
+using Random: rand
 
 export certify,
     SolutionCertificate,
@@ -2202,14 +2203,19 @@ function _collect_leaf_entries!(
     cert_params,
     cert_cache;
     coordinate::Int = 1,
+    max_entries::Union{Nothing,Int} = nothing,
     max_precision::Int = 256,
     refine_solution::Bool = true,
     extended_certificate::Bool = false,
     certify_solution_kwargs...,
 )
     # Revisit the iterator and keep projected intervals only for the current leaf.
+    # If `max_entries` is set, we keep a bounded reservoir sample while still counting
+    # the full size of the current leaf.
     entries = BSPBucketEntry[]
+    !isnothing(max_entries) && sizehint!(entries, max_entries)
     idx = 0
+    bucket_size = 0
     for result in iter
         idx += 1
         isfinite(result) || continue
@@ -2231,46 +2237,110 @@ function _collect_leaf_entries!(
         if last(interval) < first(leaf) || last(leaf) < first(interval)
             continue
         elseif first(leaf) <= first(interval) && last(interval) <= last(leaf)
-            push!(entries, BSPBucketEntry(idx, interval))
+            bucket_size += 1
+            if isnothing(max_entries)
+                push!(entries, BSPBucketEntry(idx, interval))
+            elseif length(entries) < max_entries
+                push!(entries, BSPBucketEntry(idx, interval))
+            else
+                # Reservoir sampling keeps a uniform random sample of the leaf entries
+                # while storing at most `max_entries` of them.
+                j = rand(1:bucket_size)
+                if j <= max_entries
+                    entries[j] = BSPBucketEntry(idx, interval)
+                end
+            end
         else
             # If a certified interval crosses the current cut, coarsen the BSP locally
             # and restart the collection for the merged leaf.
             match = _ensure_bucket!(bsp, interval)
             merged_leaf = IntervalTrees.Interval(first(match), last(match))
-            return entries, merged_leaf, false
+            return entries, bucket_size, merged_leaf, false
         end
     end
 
-    return entries, leaf, true
+    return entries, bucket_size, leaf, true
 end
 
 """
-    _largest_gap(entries)
+    _sample_split_point(entries, leaf; ε = 1e-4)
 
-Return a safe split point between projected certified intervals in one bucket.
-If the projected intervals form a connected cluster, return `nothing`.
+Return a candidate split point from one sampled projected certified interval inside
+`leaf`. If the sampled interval leaves no room for a safe split, return `nothing`.
 """
-function _largest_gap(entries::Vector{BSPBucketEntry})
-    length(entries) ≤ 1 && return nothing
+function _sample_split_point(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 = 1e-4)
+    isempty(entries) && return nothing
 
-    # Sort in place and look for a genuine gap in the 1D projected certified intervals.
-    sort!(entries; by = entry -> first(entry.interval))
-    current_hi = last(entries[1].interval)
-    best_gap = -Inf
-    split_point = nothing
-    for i in 2:length(entries)
-        interval = entries[i].interval
-        lo = first(interval)
-        if current_hi < lo
-            gap = lo - current_hi
-            if gap > best_gap
-                best_gap = gap
-                split_point = (current_hi + lo) / 2
-            end
-        end
-        current_hi = max(current_hi, last(interval))
+    # We deliberately use only one sampled certified interval here to keep the split
+    # proposal step at O(1) sampled entries, even if the geometry becomes unbalanced.
+    interval = entries[1].interval
+    left_gap = first(interval) - first(leaf)
+    right_gap = last(leaf) - last(interval)
+    if left_gap <= ε && right_gap <= ε
+        return nothing
+    elseif right_gap > left_gap
+        return last(interval) + ε
+    else
+        return first(interval) - ε
     end
-    split_point
+end
+
+function _verify_split!(
+    bsp::BSPPartition,
+    leaf,
+    split_point,
+    iter,
+    F,
+    cert_params,
+    cert_cache;
+    coordinate::Int = 1,
+    max_precision::Int = 256,
+    refine_solution::Bool = true,
+    extended_certificate::Bool = false,
+    certify_solution_kwargs...,
+)
+    left_count = 0
+    right_count = 0
+    idx = 0
+    for result in iter
+        idx += 1
+        isfinite(result) || continue
+
+        cert = certify_solution(
+            F,
+            solution(result),
+            cert_params,
+            cert_cache,
+            idx;
+            max_precision = max_precision,
+            refine_solution = refine_solution,
+            extended_certificate = extended_certificate,
+            certify_solution_kwargs...,
+        )
+        is_certified(cert) || continue
+
+        interval = _convert_to_interval(cert; coordinate = coordinate)
+        if last(interval) < first(leaf) || last(leaf) < first(interval)
+            continue
+        elseif !(first(leaf) <= first(interval) && last(interval) <= last(leaf))
+            match = _ensure_bucket!(bsp, interval)
+            merged_leaf = IntervalTrees.Interval(first(match), last(match))
+            return (valid = false, left_count = 0, right_count = 0, leaf = merged_leaf, stable = false)
+        elseif last(interval) <= split_point
+            left_count += 1
+        elseif split_point <= first(interval)
+            right_count += 1
+        else
+            return (valid = false, left_count = 0, right_count = 0, leaf = leaf, stable = true)
+        end
+    end
+    return (
+        valid = left_count > 0 && right_count > 0,
+        left_count = left_count,
+        right_count = right_count,
+        leaf = leaf,
+        stable = true,
+    )
 end
 
 function _split_leaf!(bsp::BSPPartition, leaf, split_point)
@@ -2331,6 +2401,7 @@ function _process_leaf!(
     d::DistinctCertifiedSolutions;
     k::Integer = 32,
     certify_oversized_buckets::Bool = false,
+    ε::Float64 = 1e-4,
     coordinate::Int = 1,
     max_refinement_rounds::Int = 50,
     depth::Int = 0,
@@ -2342,8 +2413,9 @@ function _process_leaf!(
     # Process one leaf subtree depth-first so only the current branch lives in memory.
     current_leaf = leaf
     entries = BSPBucketEntry[]
+    bucket_size = 0
     while true
-        entries, updated_leaf, stable = _collect_leaf_entries!(
+        entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
             bsp,
             current_leaf,
             iter,
@@ -2351,6 +2423,7 @@ function _process_leaf!(
             cert_params,
             cache;
             coordinate = coordinate,
+            max_entries = 1,
             max_precision = max_precision,
             refine_solution = refine_solution,
             extended_certificate = extended_certificate,
@@ -2360,58 +2433,102 @@ function _process_leaf!(
         stable && break
     end
 
-    bucket_size = length(entries)
     if bucket_size > k && depth < max_refinement_rounds
-        split_point = _largest_gap(entries)
-        if !isnothing(split_point)
-            # Recurse immediately on the two children and discard the parent entries.
-            left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
-            left_counts = _process_leaf!(
+        while true
+            split_point = _sample_split_point(entries, current_leaf; ε = ε)
+            isnothing(split_point) && break
+
+            verification = _verify_split!(
                 bsp,
-                left_leaf,
+                current_leaf,
+                split_point,
                 iter,
                 F,
                 cert_params,
-                cache,
-                d;
-                k = k,
-                certify_oversized_buckets = certify_oversized_buckets,
+                cache;
                 coordinate = coordinate,
-                max_refinement_rounds = max_refinement_rounds,
-                depth = depth + 1,
                 max_precision = max_precision,
                 refine_solution = refine_solution,
                 extended_certificate = extended_certificate,
                 certify_solution_kwargs...,
             )
-            right_counts = _process_leaf!(
-                bsp,
-                right_leaf,
-                iter,
-                F,
-                cert_params,
-                cache,
-                d;
-                k = k,
-                certify_oversized_buckets = certify_oversized_buckets,
-                coordinate = coordinate,
-                max_refinement_rounds = max_refinement_rounds,
-                depth = depth + 1,
-                max_precision = max_precision,
-                refine_solution = refine_solution,
-                extended_certificate = extended_certificate,
-                certify_solution_kwargs...,
-            )
-            return (
-                distinct_certified = left_counts.distinct_certified + right_counts.distinct_certified,
-                distinct_real = left_counts.distinct_real + right_counts.distinct_real,
-                distinct_complex = left_counts.distinct_complex + right_counts.distinct_complex,
-                refinement_steps = left_counts.refinement_steps + right_counts.refinement_steps + 1,
-                rightmost_leaf = right_counts.rightmost_leaf,
-            )
+
+            if !verification.stable
+                current_leaf = verification.leaf
+                while true
+                    entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
+                        bsp,
+                        current_leaf,
+                        iter,
+                        F,
+                        cert_params,
+                        cache;
+                        coordinate = coordinate,
+                        max_entries = 1,
+                        max_precision = max_precision,
+                        refine_solution = refine_solution,
+                        extended_certificate = extended_certificate,
+                        certify_solution_kwargs...,
+                    )
+                    current_leaf = updated_leaf
+                    stable && break
+                end
+                bucket_size ≤ k && break
+                continue
+            elseif verification.valid
+                # Recurse immediately on the two children and discard the parent sample.
+                left_leaf, right_leaf = _split_leaf!(bsp, current_leaf, split_point)
+                left_counts = _process_leaf!(
+                    bsp,
+                    left_leaf,
+                    iter,
+                    F,
+                    cert_params,
+                    cache,
+                    d;
+                    k = k,
+                    certify_oversized_buckets = certify_oversized_buckets,
+                    ε = ε,
+                    coordinate = coordinate,
+                    max_refinement_rounds = max_refinement_rounds,
+                    depth = depth + 1,
+                    max_precision = max_precision,
+                    refine_solution = refine_solution,
+                    extended_certificate = extended_certificate,
+                    certify_solution_kwargs...,
+                )
+                right_counts = _process_leaf!(
+                    bsp,
+                    right_leaf,
+                    iter,
+                    F,
+                    cert_params,
+                    cache,
+                    d;
+                    k = k,
+                    certify_oversized_buckets = certify_oversized_buckets,
+                    ε = ε,
+                    coordinate = coordinate,
+                    max_refinement_rounds = max_refinement_rounds,
+                    depth = depth + 1,
+                    max_precision = max_precision,
+                    refine_solution = refine_solution,
+                    extended_certificate = extended_certificate,
+                    certify_solution_kwargs...,
+                )
+                return (
+                    distinct_certified = left_counts.distinct_certified + right_counts.distinct_certified,
+                    distinct_real = left_counts.distinct_real + right_counts.distinct_real,
+                    distinct_complex = left_counts.distinct_complex + right_counts.distinct_complex,
+                    refinement_steps = left_counts.refinement_steps + right_counts.refinement_steps + 1,
+                    rightmost_leaf = right_counts.rightmost_leaf,
+                )
+            else
+                break
+            end
         end
         # No safe gap exists in the chosen projection, so this leaf becomes terminal.
-        push!(bsp.unsplittable, _bucket_id(current_leaf))
+        bucket_size > k && push!(bsp.unsplittable, _bucket_id(current_leaf))
     end
 
     _set_leaf_count!(bsp, current_leaf, bucket_size)
@@ -2434,6 +2551,29 @@ function _process_leaf!(
             refinement_steps = 0,
             rightmost_leaf = current_leaf,
         )
+    end
+
+    if bucket_size > k
+        # Oversized buckets are recollected in full only when the caller explicitly
+        # allows us to certify them despite exceeding the target bucket size.
+        while true
+            entries, bucket_size, updated_leaf, stable = _collect_leaf_entries!(
+                bsp,
+                current_leaf,
+                iter,
+                F,
+                cert_params,
+                cache;
+                coordinate = coordinate,
+                max_entries = nothing,
+                max_precision = max_precision,
+                refine_solution = refine_solution,
+                extended_certificate = extended_certificate,
+                certify_solution_kwargs...,
+            )
+            current_leaf = updated_leaf
+            stable && break
+        end
     end
 
     sols = _collect_bucket_solutions(iter, entries)
@@ -2556,6 +2696,7 @@ The algorithm works in two phases:
 * `compile = false`: See the [`solve`](@ref) documentation.
 * `k = 1000`: the algorithm tries to split the real lines into buckets each containing at most `k` solutions.
 * `certify_oversized_buckets = false`: if a buckets contains more than `k` solutions, only certify them when `certify_oversized_buckets` is true. 
+* `ε = 1e-4`: when proposing a split from one sampled certified interval, place the split at distance `ε` from that interval.
 * `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree. * `boundaries = -10:10`: the initial boundaries of the spatial partition.
 * `max_refinement_rounds = 50`: the maximal number of times we split buckets to get all buckets containing at most `k` solutions 
 """
@@ -2567,6 +2708,7 @@ function _certify_iterator_bsp(
     cache::CertificationCache;
     k::Integer = 1000,
     certify_oversized_buckets::Bool = false,
+    ε::Float64 = 1e-4,
     coordinate::Int = 1,
     boundaries = -10:10,
     max_refinement_rounds::Int = 50,
@@ -2616,6 +2758,7 @@ function _certify_iterator_bsp(
             d;
             k = k,
             certify_oversized_buckets = certify_oversized_buckets,
+            ε = ε,
             coordinate = coordinate,
             max_refinement_rounds = max_refinement_rounds,
             max_precision = max_precision,
