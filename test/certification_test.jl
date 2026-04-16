@@ -462,14 +462,14 @@
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         iter = solve(F; iterator_only = true, target_parameters = params)
 
-        bsp, summary = certify(F, iter, params; k = 2, boundaries = -10:10)
+        res = certify(F, iter, params)
 
-        @test bsp isa HomotopyContinuation.BSPPartition
-        @test summary isa IteratorCertificationResult
-        @test nresults(summary) == 7
-        @test nfinite(summary) == 3
-        @test ncertified(summary) == 3
-        @test ndistinct_certified(summary) == 3
+        @test bsp(res) isa BSPPartition
+        @test res isa IteratorCertificationResult
+        @test nresults(res) == 7
+        @test nfinite(res) == 3
+        @test ncertified(res) == 3
+        @test ndistinct_certified(res) == 3
     end
 
     @testset "BSP certification: parameter-free iterator" begin
@@ -477,12 +477,11 @@
         F = System([x^2 - 1, y - 1], [x, y])
         iter = solve(F; iterator_only = true, start_system = :total_degree)
 
-        bsp, summary = certify(F, iter, nothing; k = 1, boundaries = -3:3)
+        res = certify(F, iter, nothing; k = 2, boundaries = -3:3)
 
-        @test bsp isa HomotopyContinuation.BSPPartition
-        @test ncertified(summary) == 2
-        @test ndistinct_certified(summary) == 2
-        @test nnotcertified(summary) == 0
+        @test ncertified(res) == 2
+        @test ndistinct_certified(res) == 2
+        @test nnotcertified(res) == 0
     end
 
     @testset "BSP certification: bitmasked iterator" begin
@@ -498,12 +497,12 @@
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         iter = bitmask_filter(isfinite, solve(F; iterator_only = true, target_parameters = params))
 
-        _, summary = certify(F, iter, params; k = 1, boundaries = -10:10)
+        res = certify(F, iter, params; coordinate = 2)
 
-        @test nresults(summary) == 3
-        @test nfinite(summary) == 3
-        @test ncertified(summary) == 3
-        @test ndistinct_certified(summary) == 3
+        @test nresults(res) == 3
+        @test nfinite(res) == 3
+        @test ncertified(res) == 3
+        @test ndistinct_certified(res) == 3
     end
 
     @testset "BSP certification: iterator from iterator start solutions" begin
@@ -527,13 +526,13 @@
             target_parameters = [-2],
         )
 
-        _, summary = certify(F, second_iter, [-2]; k = 2, boundaries = -10:10)
+        res = certify(F, second_iter, [-2]; max_refinement_rounds = 2)
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 
-        @test nresults(summary) == length(results)
-        @test nfinite(summary) == nfinite_results
-        @test ndistinct_certified(summary) == ncertified(summary)
-        @test ncertified(summary) ≤ nfinite_results
+        @test nresults(res) == length(results)
+        @test nfinite(res) == nfinite_results
+        @test ndistinct_certified(res) == ncertified(res)
+        @test ncertified(res) ≤ nfinite_results
     end
 end
