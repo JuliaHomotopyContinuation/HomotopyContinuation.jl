@@ -2266,8 +2266,9 @@ end
     _sample_split_points(entries, leaf; ε = 1e-4)
 
 Return up to two candidate split points from one sampled projected certified interval
-inside `leaf`, first trying the side with the larger free gap. If the sampled interval
-leaves no room for a safe split, return an empty tuple.
+inside `leaf`: first `ε` to the left, then `ε` to the right, and finally one random
+admissible split point. If the sampled interval leaves no room for a safe split,
+return an empty tuple.
 """
 function _sample_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64 = 1e-4)
     isempty(entries) && return ()
@@ -2279,18 +2280,36 @@ function _sample_split_points(entries::Vector{BSPBucketEntry}, leaf; ε::Float64
     right_gap = last(leaf) - last(interval)
     left_split = left_gap > ε ? (first(interval) - ε) : nothing
     right_split = right_gap > ε ? (last(interval) + ε) : nothing
+    random_split = nothing
 
-    if isnothing(left_split) && isnothing(right_split)
-        return ()
-    elseif isnothing(left_split)
-        return (right_split,)
-    elseif isnothing(right_split)
-        return (left_split,)
-    elseif right_gap > left_gap
-        return (right_split, left_split)
-    else
-        return (left_split, right_split)
+    left_lo = first(leaf)
+    left_hi = first(interval) - ε
+    right_lo = last(interval) + ε
+    right_hi = last(leaf)
+    left_width = max(0.0, left_hi - left_lo)
+    right_width = max(0.0, right_hi - right_lo)
+    total_width = left_width + right_width
+    if total_width > 0
+        t = rand() * total_width
+        random_split = if t < left_width
+            left_lo + t
+        else
+            right_lo + (t - left_width)
+        end
     end
+
+    if isnothing(left_split) && isnothing(right_split) && isnothing(random_split)
+        return ()
+    end
+
+    candidates = Float64[]
+    !isnothing(left_split) && push!(candidates, left_split)
+    !isnothing(right_split) && push!(candidates, right_split)
+    if !isnothing(random_split) &&
+       all(!isapprox(random_split, c; atol = 0.0, rtol = 0.0) for c in candidates)
+        push!(candidates, random_split)
+    end
+    return Tuple(candidates)
 end
 
 function _verify_split!(
