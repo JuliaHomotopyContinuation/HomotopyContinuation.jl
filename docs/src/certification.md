@@ -15,6 +15,16 @@ The result of [`certify`](@ref) is a [`CertificationResult`](@ref):
 
 ```@docs
 CertificationResult
+```
+
+Certifying a [`ResultIterator`](@ref) produces a [`IteratorCertificationResult`](@ref):
+```@docs
+IteratorCertificationResult
+bsp
+```
+
+Helper functions:
+```@docs
 certificates
 distinct_certificates
 ncertified
@@ -23,6 +33,16 @@ ncomplex_certified
 ndistinct_certified
 ndistinct_real_certified
 ndistinct_complex_certified
+nprocessed
+nduplicates
+nnotcertified
+nresults
+nfinite
+nparts
+max_bucket_size
+oversized_buckets
+unsplittable_buckets
+refinement_rounds
 save(filename, R::CertificationResult)
 show_straight_line_program
 ```
