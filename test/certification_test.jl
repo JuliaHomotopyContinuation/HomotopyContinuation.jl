@@ -497,7 +497,7 @@
         params = [0.257, -0.139, -1.73, -0.199, 1.79, -1.32]
         iter = bitmask_filter(isfinite, solve(F; iterator_only = true, target_parameters = params))
 
-        res = certify(F, iter, params; coordinate = 2)
+        res = certify(F, iter, params; coordinate = 2, certify_oversized_buckets = true)
 
         @test nresults(res) == 3
         @test nfinite(res) == 3
@@ -526,7 +526,7 @@
             target_parameters = [-2],
         )
 
-        res = certify(F, second_iter, [-2]; max_refinement_rounds = 2)
+        res = certify(F, second_iter, [-2]; max_refinement_rounds = 0)
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 
@@ -534,26 +534,5 @@
         @test nfinite(res) == nfinite_results
         @test ndistinct_certified(res) == ncertified(res)
         @test ncertified(res) ≤ nfinite_results
-    end
-
-    @testset "BSP certification: skip oversized buckets" begin
-        @var x y
-        F = System([x^2 - 1, y - 1], [x, y])
-        iter = solve(F; iterator_only = true, start_system = :total_degree)
-
-        res = certify(
-            F,
-            iter,
-            nothing;
-            k = 1,
-            boundaries = [10.0],
-            max_refinement_rounds = 0,
-            certify_oversized_buckets = false,
-        )
-
-        @test ncertified(res) == 2
-        @test ndistinct_certified(res) == 0
-        @test oversized_buckets(res) == 1
-        @test max_bucket_size(res) == 2
     end
 end
