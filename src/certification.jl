@@ -2330,7 +2330,7 @@ function _process_leaf!(
     cache::CertificationCache,
     d::DistinctCertifiedSolutions;
     k::Integer = 32,
-    certify_oversized_buckets::Bool = true,
+    certify_oversized_buckets::Bool = false,
     coordinate::Int = 1,
     max_refinement_rounds::Int = 50,
     depth::Int = 0,
