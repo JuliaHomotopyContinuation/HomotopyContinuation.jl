@@ -2330,6 +2330,7 @@ function _process_leaf!(
     cache::CertificationCache,
     d::DistinctCertifiedSolutions;
     k::Integer = 32,
+    certify_oversized_buckets::Bool = true,
     coordinate::Int = 1,
     max_refinement_rounds::Int = 50,
     depth::Int = 0,
@@ -2374,6 +2375,7 @@ function _process_leaf!(
                 cache,
                 d;
                 k = k,
+                certify_oversized_buckets = certify_oversized_buckets,
                 coordinate = coordinate,
                 max_refinement_rounds = max_refinement_rounds,
                 depth = depth + 1,
@@ -2391,6 +2393,7 @@ function _process_leaf!(
                 cache,
                 d;
                 k = k,
+                certify_oversized_buckets = certify_oversized_buckets,
                 coordinate = coordinate,
                 max_refinement_rounds = max_refinement_rounds,
                 depth = depth + 1,
@@ -2420,6 +2423,18 @@ function _process_leaf!(
             refinement_steps = 0,
             rightmost_leaf = current_leaf,
         )
+
+    # Optionally leave oversized terminal buckets uncertified while still recording
+    # their size in the final BSP summary.
+    if bucket_size > k && !certify_oversized_buckets
+        return (
+            distinct_certified = 0,
+            distinct_real = 0,
+            distinct_complex = 0,
+            refinement_steps = 0,
+            rightmost_leaf = current_leaf,
+        )
+    end
 
     sols = _collect_bucket_solutions(iter, entries)
     empty!(d)
@@ -2524,10 +2539,9 @@ function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBuck
 end
 
 """
-    certify(F, iter::ResultIterator, [p, cache]; k = 1000, coordinate = 1, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true, ...)
+    certify(F, iter::ResultIterator, [p, cache]; options)
 
-Certify a `ResultIterator` without materializing all solutions at once by using a
-binary spatial partition of the real line.
+Certify a `ResultIterator` without materializing all solutions at once by using a binary spatial partition of the real line. Returns a [`IteratorCertificationResult`](@ref).
 
 The algorithm works in two phases:
 1. stream through the iterator, certify each finite result, and place the certified
@@ -2536,7 +2550,14 @@ The algorithm works in two phases:
    entries, then revisit the iterator bucket-by-bucket and certify only the solutions
    belonging to that bucket jointly.
 
-Returns `(bsp, summary)` where `summary` is a [`IteratorCertificationResult`](@ref).
+## Options
+
+* `max_precision = 256`: The maximal accuracy (in bits) that is used in the certification process.
+* `compile = false`: See the [`solve`](@ref) documentation.
+* `k = 1000`: the algorithm tries to split the real lines into buckets each containing at most `k` solutions.
+* `certify_oversized_buckets = false`: if a buckets contains more than `k` solutions, only certify them when `certify_oversized_buckets` is true. 
+* `coordinate = 1`: the coordinate of the solutions we project to to compute the binary spatial partition tree. * `boundaries = -10:10`: the initial boundaries of the spatial partition.
+* `max_refinement_rounds = 50`: the maximal number of times we split buckets to get all buckets containing at most `k` solutions 
 """
 
 function _certify_iterator_bsp(
@@ -2545,6 +2566,7 @@ function _certify_iterator_bsp(
     cert_params,
     cache::CertificationCache;
     k::Integer = 1000,
+    certify_oversized_buckets::Bool = false,
     coordinate::Int = 1,
     boundaries = -10:10,
     max_refinement_rounds::Int = 50,
@@ -2593,6 +2615,7 @@ function _certify_iterator_bsp(
             cache,
             d;
             k = k,
+            certify_oversized_buckets = certify_oversized_buckets,
             coordinate = coordinate,
             max_refinement_rounds = max_refinement_rounds,
             max_precision = max_precision,

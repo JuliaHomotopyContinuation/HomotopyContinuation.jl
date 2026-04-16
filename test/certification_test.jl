@@ -535,4 +535,25 @@
         @test ndistinct_certified(res) == ncertified(res)
         @test ncertified(res) ≤ nfinite_results
     end
+
+    @testset "BSP certification: skip oversized buckets" begin
+        @var x y
+        F = System([x^2 - 1, y - 1], [x, y])
+        iter = solve(F; iterator_only = true, start_system = :total_degree)
+
+        res = certify(
+            F,
+            iter,
+            nothing;
+            k = 1,
+            boundaries = [10.0],
+            max_refinement_rounds = 0,
+            certify_oversized_buckets = false,
+        )
+
+        @test ncertified(res) == 2
+        @test ndistinct_certified(res) == 0
+        @test oversized_buckets(res) == 1
+        @test max_bucket_size(res) == 2
+    end
 end
