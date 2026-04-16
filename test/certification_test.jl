@@ -464,12 +464,12 @@
 
         bsp, summary = certify(F, iter, params; k = 2, boundaries = -10:10)
 
-        @test bsp isa BSPPartition
-        @test summary isa BSPCertificationSummary
-        @test summary.total_results == 7
-        @test summary.finite_results == 3
-        @test summary.certified == 3
-        @test summary.distinct_certified == 3
+        @test bsp isa HomotopyContinuation.BSPPartition
+        @test summary isa IteratorCertificationResult
+        @test nresults(summary) == 7
+        @test nfinite(summary) == 3
+        @test ncertified(summary) == 3
+        @test ndistinct_certified(summary) == 3
     end
 
     @testset "BSP certification: parameter-free iterator" begin
@@ -479,10 +479,10 @@
 
         bsp, summary = certify(F, iter, nothing; k = 1, boundaries = -3:3)
 
-        @test bsp isa BSPPartition
-        @test summary.certified == 2
-        @test summary.distinct_certified == 2
-        @test summary.not_certified == 0
+        @test bsp isa HomotopyContinuation.BSPPartition
+        @test ncertified(summary) == 2
+        @test ndistinct_certified(summary) == 2
+        @test nnotcertified(summary) == 0
     end
 
     @testset "BSP certification: bitmasked iterator" begin
@@ -500,10 +500,10 @@
 
         _, summary = certify(F, iter, params; k = 1, boundaries = -10:10)
 
-        @test summary.total_results == 3
-        @test summary.finite_results == 3
-        @test summary.certified == 3
-        @test summary.distinct_certified == 3
+        @test nresults(summary) == 3
+        @test nfinite(summary) == 3
+        @test ncertified(summary) == 3
+        @test ndistinct_certified(summary) == 3
     end
 
     @testset "BSP certification: iterator from iterator start solutions" begin
@@ -531,10 +531,9 @@
         results = collect(second_iter)
         nfinite_results = count(isfinite, results)
 
-        @test summary.total_results == length(results)
-        @test summary.finite_results == nfinite_results
-        @test summary.distinct_certified == summary.certified
-        @test summary.certified ≤ nfinite_results
+        @test nresults(summary) == length(results)
+        @test nfinite(summary) == nfinite_results
+        @test ndistinct_certified(summary) == ncertified(summary)
+        @test ncertified(summary) ≤ nfinite_results
     end
 end
-

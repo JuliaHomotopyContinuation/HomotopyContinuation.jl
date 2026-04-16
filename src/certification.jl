@@ -31,6 +31,14 @@ export certify,
     nduplicates,
     nnotcertified,
     stats,
+    bsp,
+    nresults,
+    nfinite,
+    nparts,
+    max_bucket_size,
+    oversized_buckets,
+    unsplittable_buckets,
+    refinement_rounds,
     solutions,
     certificates,
     distinct_certified_solutions,
@@ -1875,8 +1883,8 @@ Summary statistics for one streaming pass through the iterator while assigning
 certified solutions to BSP buckets.
 """
 Base.@kwdef mutable struct BSPAssignmentStats
-    total_results::Int = 0
-    finite_results::Int = 0
+    nresults::Int = 0
+    nfinite::Int = 0
     certified::Int = 0
     certified_real::Int = 0
     certified_complex::Int = 0
@@ -1884,16 +1892,17 @@ Base.@kwdef mutable struct BSPAssignmentStats
 end
 
 """
-    IteratorCertificationSummary
+    IteratorCertificationResult
 
 Final summary returned by the BSP-based [`certify`](@ref) method for
 `ResultIterator`s. This combines the statistics
 from the iterator passes with the distinct certification counts obtained by certifying
 bucket-by-bucket after refinement.
 """
-Base.@kwdef struct IteratorCertificationSummary
-    total_results::Int = 0
-    finite_results::Int = 0
+Base.@kwdef struct IteratorCertificationResult
+    bsp::BSPPartition
+    nresults::Int = 0
+    nfinite::Int = 0
     certified::Int = 0
     certified_real::Int = 0
     certified_complex::Int = 0
@@ -1908,11 +1917,115 @@ Base.@kwdef struct IteratorCertificationSummary
     refinement_rounds::Int = 0
 end
 
-function Base.show(io::IO, summary::IteratorCertificationSummary)
-    println(io, "IteratorCertificationSummary")
+"""
+    bsp(R::IteratorCertificationResult)
+
+Return the BSP partition used during iterator certification.
+"""
+bsp(R::IteratorCertificationResult) = R.bsp
+
+"""
+    nresults(R::IteratorCertificationResult)
+
+Return the total number of path results produced by the iterator.
+"""
+nresults(R::IteratorCertificationResult) = R.nresults
+
+"""
+    nfinite(R::IteratorCertificationResult)
+
+Return the number of finite path results encountered during certification.
+"""
+nfinite(R::IteratorCertificationResult) = R.nfinite
+
+"""
+    ncertified(R::IteratorCertificationResult)
+
+Return the number of finite path results that were certified.
+"""
+ncertified(R::IteratorCertificationResult) = R.certified
+
+"""
+    nreal_certified(R::IteratorCertificationResult)
+
+Return the number of certified path results that were certified real.
+"""
+nreal_certified(R::IteratorCertificationResult) = R.certified_real
+
+"""
+    ncomplex_certified(R::IteratorCertificationResult)
+
+Return the number of certified path results that were certified non-real complex.
+"""
+ncomplex_certified(R::IteratorCertificationResult) = R.certified_complex
+
+"""
+    nnotcertified(R::IteratorCertificationResult)
+
+Return the number of finite path results that could not be certified.
+"""
+nnotcertified(R::IteratorCertificationResult) = R.not_certified
+
+"""
+    ndistinct_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions obtained after bucketwise certification.
+"""
+ndistinct_certified(R::IteratorCertificationResult) = R.distinct_certified
+
+"""
+    ndistinct_real_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions that were certified real.
+"""
+ndistinct_real_certified(R::IteratorCertificationResult) = R.distinct_real
+
+"""
+    ndistinct_complex_certified(R::IteratorCertificationResult)
+
+Return the number of distinct certified solutions that were certified non-real complex.
+"""
+ndistinct_complex_certified(R::IteratorCertificationResult) = R.distinct_complex
+
+"""
+    nparts(R::IteratorCertificationResult)
+
+Return the number of BSP leaves in the final partition.
+"""
+nparts(R::IteratorCertificationResult) = R.nparts
+
+"""
+    max_bucket_size(R::IteratorCertificationResult)
+
+Return the size of the largest terminal BSP bucket.
+"""
+max_bucket_size(R::IteratorCertificationResult) = R.max_bucket_size
+
+"""
+    oversized_buckets(R::IteratorCertificationResult)
+
+Return the number of terminal BSP buckets whose size exceeds the requested `k`.
+"""
+oversized_buckets(R::IteratorCertificationResult) = R.oversized_buckets
+
+"""
+    unsplittable_buckets(R::IteratorCertificationResult)
+
+Return the number of BSP leaves that could not be refined further in the chosen projection.
+"""
+unsplittable_buckets(R::IteratorCertificationResult) = R.unsplittable_buckets
+
+"""
+    refinement_rounds(R::IteratorCertificationResult)
+
+Return the number of local BSP refinement steps performed during certification.
+"""
+refinement_rounds(R::IteratorCertificationResult) = R.refinement_rounds
+
+
+function Base.show(io::IO, summary::IteratorCertificationResult)
+    println(io, "IteratorCertificationResult")
     println(io, "=======================")
-    println(io, "• $(summary.total_results) path results processed")
-    println(io, "• $(summary.finite_results) finite path results")
     println(
         io,
         "• $(summary.certified) certified intervals " *
@@ -1926,7 +2039,11 @@ function Base.show(io::IO, summary::IteratorCertificationSummary)
     )
     println(
         io,
-        "• $(summary.nparts) BSP leaves, max bucket size $(summary.max_bucket_size)",
+        "• max bucket size: $(summary.max_bucket_size)",
+    )
+    println(
+        io,
+        "• BSP leaves: $(summary.nparts) ",
     )
     if summary.oversized_buckets > 0
         println(
@@ -1935,7 +2052,6 @@ function Base.show(io::IO, summary::IteratorCertificationSummary)
             "($(summary.unsplittable_buckets) unsplittable by the first coordinate)",
         )
     end
-    print(io, "• $(summary.refinement_rounds) refinement rounds")
 end
 
 _bucket_id(interval) = (first(interval), last(interval))
@@ -2049,16 +2165,16 @@ function _iterator_certification_stats(
     stats = BSPAssignmentStats()
     # This first pass only computes global counters and never stores projected intervals.
     for result in iter
-        stats.total_results += 1
+        stats.nresults += 1
         isfinite(result) || continue
 
-        stats.finite_results += 1
+        stats.nfinite += 1
         cert = certify_solution(
             F,
             solution(result),
             cert_params,
             cert_cache,
-            stats.total_results;
+            stats.nresults;
             max_precision = max_precision,
             refine_solution = refine_solution,
             extended_certificate = extended_certificate,
@@ -2406,7 +2522,7 @@ function _collect_bucket_solutions(iter::ResultIterator, entries::Vector{BSPBuck
 end
 
 """
-    certify(F, iter::ResultIterator, [p, cache]; k = 32, coordinate = 1, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true, ...)
+    certify(F, iter::ResultIterator, [p, cache]; k = 1000, coordinate = 1, boundaries = -10:10, max_refinement_rounds = typemax(Int), max_precision = 256, refine_solution = true, ...)
 
 Certify a `ResultIterator` without materializing all solutions at once by using a
 binary spatial partition of the real line.
@@ -2418,7 +2534,7 @@ The algorithm works in two phases:
    entries, then revisit the iterator bucket-by-bucket and certify only the solutions
    belonging to that bucket jointly.
 
-Returns `(bsp, summary)` where `summary` is a [`IteratorCertificationSummary`](@ref).
+Returns `(bsp, summary)` where `summary` is a [`IteratorCertificationResult`](@ref).
 """
 
 function _certify_iterator_bsp(
@@ -2426,7 +2542,7 @@ function _certify_iterator_bsp(
     F::AbstractSystem,
     cert_params,
     cache::CertificationCache;
-    k::Integer = 32,
+    k::Integer = 1000,
     coordinate::Int = 1,
     boundaries = -10:10,
     max_refinement_rounds::Int = 50,
@@ -2497,9 +2613,10 @@ function _certify_iterator_bsp(
         oversized_buckets = 0
     end
 
-    summary = IteratorCertificationSummary(;
-        total_results = assignment_stats.total_results,
-        finite_results = assignment_stats.finite_results,
+    res = IteratorCertificationResult(;
+        bsp = bsp,
+        nresults = assignment_stats.nresults,
+        nfinite = assignment_stats.nfinite,
         certified = assignment_stats.certified,
         certified_real = assignment_stats.certified_real,
         certified_complex = assignment_stats.certified_complex,
@@ -2514,7 +2631,7 @@ function _certify_iterator_bsp(
         refinement_rounds = refinement_steps,
     )
 
-    return bsp, summary
+    return res
 end
 
 function certify(
